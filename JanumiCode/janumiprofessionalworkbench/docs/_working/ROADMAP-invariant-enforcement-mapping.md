@@ -237,14 +237,28 @@ confirmation, and the eight gate assertions that narrowed the same way.
 of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and it is now what
 `verif/invariant-verdict-census.test.ts` asserts against `OWES_A_FILING`.
 
-### V-7 — what is left, in order
+### ✅ V-7 — the filing debt reaches zero
 
-1. **The 21 `NEAR_MISS` limbs** — file each, or record why it is genuinely covered. Every one carries an
-   `owed`; six were re-authored from the blind adjudication and carry an independent decoy enumeration.
-2. **`docs/_working/HARMONIZATION-FINDINGS.md`'s "Refuted (32)"** — one of its struck items is true at
-   HEAD, found by accident. **Derive the answer over all 32.**
+1. ✅ **The 21 `NEAR_MISS` limbs — FILED** as REG-F-246..262 / REG-Q-063..069, 24 entries over 21 limbs.
+   ⚠ **The reading that made them debt was tested rather than assumed:** every drafter was told finding a
+   limb ALREADY COVERED was a win, was handed the decoy enumeration as an input rather than an authority,
+   and opened each named filing at its line. **Not one of the 21 was covered.**
+   **Three limbs are closed by TWO entries each** (`OBJ-3:2`, `ASR-16:6`, `ASR-19:3`) — a code half and an
+   adjudication half, **neither of which discharges the limb alone**. Both ordinals sit on the row.
+   **The filing axis now holds two values: `FILED` 229 · `NOT_APPLICABLE` 78.** A limb is either recorded,
+   or there was never anything to record.
+2. ✅ **`HARMONIZATION-FINDINGS.md`'s "Refuted (32)" — DERIVED over all 32**, not just the one that
+   surfaced. **15 are TRUE AT HEAD** (13 owing a register entry), 13 rightly refuted, 4 out of scope — and
+   **not one of the 32 had recorded a reason**. Every disposition and its evidence is now appended to that
+   file, keyed by ITEM NUMBER. **The 13 owed filings are tracked in `BACKLOG.md`.**
+
+### What remains — and none of it is filing debt
+
 3. **Split `UNENFORCED_NO_SHAPE`** (`DESIGN §16.2`) — deferred twice, deliberately, and still owed.
 4. **The 37 remaining stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed`
    misleads a reader but cannot misdirect a filing.
 5. **The 11 recorded arm doubts**, unadjudicated — including `limb:REL-2:3`, whose dead-predicate proof
    was falsified by this programme's own RPH-TRC-005 correction.
+6. **The 13 register entries owed by the re-dispositioned "Refuted (32)"** — two of them gate defects:
+   `depcruise packages` leaves `apps/` outside every layering rule, and `turbo run lint` is dead
+   configuration over a single unpipelined root `eslint .`.

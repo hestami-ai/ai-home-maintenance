@@ -734,9 +734,11 @@ describe('W-3b — the invariant enforcement census', () => {
 		// cover the limb, which is the note that stops the next reader closing the row on it. EIGHTEEN are
 		// genuinely UNFILED and each owes a register entry. Two are not divergences at all.
 		// Had these been defaulted to UNFILED at migration time, 30 of the 48 would have been wrong.
-		// ⚠ `UNFILED` IS NOW ZERO TOO. The 18 are filed as REG-F-234..245 and REG-Q-058..062 (2026-08-23),
-		// 190 -> 208. The 21 NEAR_MISS rows are NOT discharged by that and the next assertion is why.
-		expect(dist).toEqual({ FILED: 208, NEAR_MISS: 21, NOT_APPLICABLE: 78 });
+		// ⚠ BOTH DEBT ARMS ARE NOW ZERO. The 18 UNFILED became REG-F-234..245 / REG-Q-058..062, and the 21
+		// NEAR_MISS became REG-F-246..262 / REG-Q-063..069 — 24 entries over 21 limbs, because three limbs
+		// have halves with different FATES and are closed by a FINDING and a QUESTION together. 190 -> 229.
+		// Only two values survive: a limb is either recorded, or there was never anything to record.
+		expect(dist).toEqual({ FILED: 229, NOT_APPLICABLE: 78 });
 
 		// ⚠ THIS IS THE MIGRATION'S WHOLE RETURN, AND IT IS A NUMBER THE OLD LADDER COULD NOT PRODUCE. The
 		// retired `DIVERGENT_UNFILED` arm read ZERO outstanding filings on the day of the split, because all 49
@@ -748,6 +750,32 @@ describe('W-3b — the invariant enforcement census', () => {
 		// UNFILED means SEARCHED, and nothing covers it. Its 18 rows — 11 observed admissions and 7 limbs with
 		// no shape at all — are filed, and the arm is empty. It may not refill without this reddening.
 		expect(verdicts.filter((v) => String(v.filing) === 'UNFILED').length, 'each owed an entry').toBe(0);
+	});
+
+	// ── ⚠ THREE LIMBS ARE CLOSED BY TWO ENTRIES, AND NEITHER ALONE DISCHARGES THEM ─────────────────────────
+	// `limb:OBJ-3:2`, `limb:ASR-16:6` and `limb:ASR-19:3` each have halves with genuinely different FATES: a
+	// code defect that is right to fix under any reading, and a canon adjudication where writing a guard for
+	// the reading the engine already implements would ratify the narrower one by accident.
+	//
+	// ⚠ THE NAIVE MERGE WOULD HAVE LOST ONE OF EACH PAIR, and that is worse than not filing: a later reader
+	// closes the FINDING, sees the row point at it, and marks the limb discharged while the ratification
+	// question is still open. The row records BOTH ordinals and states why, and this gate is what keeps the
+	// pairing from being dropped by the next merge script that assumes one entry per limb.
+	it('a limb closed by two entries records both, and neither alone discharges it', () => {
+		const split = verdicts.filter((v) => v.filed_entry_split);
+		expect(split.map((v) => String(v.limb_id)).sort())
+			.toEqual(['limb:ASR-16:6', 'limb:ASR-19:3', 'limb:OBJ-3:2']);
+		for (const v of split) {
+			// The pair must be one of each kind. Two FINDINGS would be a partition failure, not a split.
+			expect(String(v.filed_entry_kind), `${String(v.limb_id)} primary`).toBe('FINDING');
+			expect(String(v.filed_entry)).toMatch(/^REG-F-\d{3}$/);
+			expect(String(v.filed_entry_split)).toMatch(/^REG-Q-\d{3}$/);
+			// An exception that does not say why is a hole with a name on it.
+			expect(
+				String(v.filed_split_reason ?? '').length,
+				`${String(v.limb_id)} must state why one entry does not discharge it`
+			).toBeGreaterThan(120);
+		}
 	});
 
 	// ── ⚠ THE CLOSE CONDITION, IN ITS GENERAL FORM — AND UNFILED WAS THE SPECIAL CASE ─────────────────────
@@ -799,15 +827,27 @@ describe('W-3b — the invariant enforcement census', () => {
 			new URL('../docs/canon/JPWB-REG-005 Decision and Divergence Register.md', import.meta.url),
 			'utf8'
 		);
-		const filed = verdicts.filter((v) => /^REG-[FQ]-(2[3-9]\d|0?5[89]|06[0-2])$/.test(String(v.filed_entry ?? '')));
-		const v6 = verdicts.filter((v) => {
-			const m = /^REG-([FQ])-(\d{3})$/.exec(String(v.filed_entry ?? ''));
+		const filed = verdicts.filter((v) => Boolean(v.filed_entry));
+		const inRange = (e: unknown, fLo: number, fHi: number, qLo: number, qHi: number) => {
+			const m = /^REG-([FQ])-(\d{3})$/.exec(String(e ?? ''));
 			if (!m) return false;
 			const n = Number(m[2]);
-			return m[1] === 'F' ? n >= 234 : n >= 58;
-		});
+			return m[1] === 'F' ? n >= fLo && n <= fHi : n >= qLo && n <= qHi;
+		};
+		const v6 = verdicts.filter((v) => inRange(v.filed_entry, 234, 245, 58, 62));
 		expect(v6.length, 'limbs closed by the V-6 batch').toBe(18);
 		expect(filed.length).toBeGreaterThanOrEqual(18);
+
+		// ── THE V-7 BATCH — the 21 NEAR_MISS limbs, 24 entries because three are split ────────────────────
+		const v7 = verdicts.filter((v) => inRange(v.filed_entry, 246, 262, 63, 69));
+		const v7split = verdicts.filter((v) => inRange(v.filed_entry_split, 246, 262, 63, 69));
+		expect(v7.length, 'limbs closed by the V-7 batch').toBe(21);
+		expect(v7split.length, 'V-7 limbs whose second entry is a QUESTION').toBe(3);
+		const v7ords = new Set([...v7.map((v) => String(v.filed_entry)),
+			...v7split.map((v) => String(v.filed_entry_split))]);
+		expect(v7ords.size, 'distinct V-7 entries').toBe(24);
+		const v7missing = [...v7ords].filter((o) => !register.includes(`### ${o} — `));
+		expect(v7missing, 'a V-7 row naming a register entry that was never written').toEqual([]);
 
 		const ordinals = new Set(v6.map((v) => String(v.filed_entry)));
 		expect(ordinals.size, 'distinct V-6 entries carrying a census limb').toBe(16);
@@ -829,9 +869,14 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(kinds).toEqual({ FINDING: 13, QUESTION: 5 });
 	});
 
+	// ⚠ IT REACHED ZERO IN V-7, AND THE 21 DID NOT DISSOLVE ON INSPECTION — THEY WERE FILED. Every drafter
+	// was told that finding a limb ALREADY COVERED was a win, was handed the prior reader's decoy enumeration
+	// as an INPUT rather than an authority, and opened each named filing at its line. NOT ONE of the 21 was
+	// covered. That is the measurement that justifies having treated NEAR_MISS as debt rather than as a
+	// weaker kind of FILED — the alternative reading was tested 21 times and failed 21 times.
 	it('the filing debt is counted in its general form, not just as UNFILED', () => {
 		const owes = verdicts.filter((v) => OWES_A_FILING.has(String(v.filing)));
-		expect(owes.length, 'limbs searched for, with no covering filing found').toBe(21);
+		expect(owes.length, 'limbs searched for, with no covering filing found').toBe(0);
 		// A debt with no plan is not a debt anybody can pay. ⚠ THE THRESHOLD IS 40, NOT 80, AND THE LOWER NUMBER
 		// IS THE HONEST ONE: `limb:ASR-14:3`'s entire `owed` is the 70-character sentence "a register finding:
 		// waiver expiry unenforced on the authorization path", which names the finding AND the defect and is

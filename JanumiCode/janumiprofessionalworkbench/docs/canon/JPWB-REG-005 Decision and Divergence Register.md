@@ -16039,3 +16039,6020 @@ through a ratified command, and the engine then parks an assessment until one is
   **REG-F-004**. Cross-references **REG-Q-027** (the safe default *"never require private
   chain-of-thought capture"*), **REG-D-015**, and the two sibling PER-12 entries filed the same day.
   Status: OPEN.
+
+---
+
+## W-3b — the near misses, filed
+
+The two batches above filed the census's 49 `DIVERGENT` limbs and then the 18 `UNFILED` ones. **These 21
+were invisible to both.** They carried `NEAR_MISS`: *a filing exists and does NOT cover this limb* — which
+is not a softer `FILED`. It is `UNFILED` **with a decoy attached**, and the decoy is usually the single
+best hit a search returns. Filed here as **17 FINDINGS and 7 QUESTIONS** over 21 limbs.
+
+⚠ **THE DECOY ARGUMENT HELD ON ALL 21.** Every drafter was told that finding a limb ALREADY COVERED was a
+win, was handed the prior reader's decoy enumeration as an input rather than an authority, and opened each
+named filing at its line. **Not one of the 21 turned out to be covered.** That is the measurement that
+justifies treating `NEAR_MISS` as unfiled debt rather than as a weaker kind of filed.
+
+⚠ **AND THE DECOYS ARE NOT VAGUE NEIGHBOURS.** `limb:ASR-14:3`'s nearest is `RPH-GOV-006`, whose
+`canonAnchor` is **this limb quoted word for word** — and whose aside that canon's first clause *"is
+honoured on the floor path"* went FALSE on 2026-08-20, when REG-F-202 deleted that consumer. A decoy that
+quotes the limb verbatim and concludes the opposite is a stronger refusal than silence: silence invites a
+search, a confident adjacent entry ends one.
+
+**⚠ THREE LIMBS ARE CLOSED BY TWO ENTRIES EACH, AND NEITHER ALONE DISCHARGES THEM.** `limb:OBJ-3:2`
+(REG-F-253 + REG-Q-063), `limb:ASR-16:6` (REG-F-254 + REG-Q-064), `limb:ASR-19:3` (REG-F-262 + REG-Q-069).
+In each case the limb's halves have genuinely different **fates** — one is a code defect that is right to
+fix under any reading, the other is a canon adjudication where writing a guard for the reading the engine
+already implements would ratify the narrower one by accident. Both ordinals are recorded on the census row,
+**so that landing the FINDING cannot read as closing the limb while the QUESTION is open.**
+
+⚠ **EVERY ONE OF THE 24 WAS ADVERSARIALLY VERIFIED AND EVERY ONE WAS AMENDED** — 16 of 16 drafting groups,
+after 32 of 36 and then 10 of 10 in the two earlier batches. **1,329 citations were re-opened at HEAD** by
+verifiers who had not written them: **12 DEAD POINTERS** and **80 MATERIAL corrections**. No entry in this
+programme has ever survived verification unchanged.
+
+Every entry names the limb ids it closes and names the filing that does NOT cover it, so
+`docs/tracking/w3b/invariant-verdicts.ndjson` can be RECONCILED against this register rather than trusted
+to match it — and so the next reader who finds the decoy is told, in the entry itself, why it is not this.
+
+Prose is wrapped at 108 characters deliberately: EM-7 records that this register's longest lines are
+withheld by the default search tool, which is how six already-filed findings stayed hidden.
+
+### REG-F-246 — the direct-store write path is public, credential-free and ungated: a `commit` carrying
+zero events published a PWA, and nothing in the repository keeps the one call site at one
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** PER-3's second sentence forbids any path that reaches canonical
+  state without crossing the command pipeline. `StorageAdapter.commit` is exactly such a path and it is
+  public: the port declares it with no credential parameter, `@janumipwb/rph-persistence` exports both
+  shipped implementations, and `apps/rph-demo` already declares that package as a dependency and
+  already imports the class. Inside `SqliteStorageAdapter.commit` the ONLY predicate is the
+  optimistic-concurrency comparison; there is no authentication, no authorization, no command-registry
+  lookup, no precondition or invariant check, no assurance gate, and no check that `events` is
+  non-empty. **Driven this pass:** a credential-free, engine-free, handler-free `commit` returned
+  `{"ok":true}` and left a PUBLISHED canonical PWA behind **zero events**, with a receipt naming a
+  command type that is not in the registry. The corpus's standing answer — *exactly one production call
+  site* — is a **COUNT of the call sites that exist, not a gate on the ones that could**: nothing in
+  `verif/`, `scripts/` or the boundary gate reddens when a second one appears, and the boundary gate
+  cannot even see `apps/`. PER-3's SCOPE makes *"the existence and completeness of the gate"* the
+  semantic requirement, and on the direct-store channel the gate does not exist.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§9
+  "Persistence semantics"** (heading at **L333**), **PER-3 · One authoritative write path**, at
+  **L345**, **limb 2** (second sentence), byte-exact: *"No generic CRUD/PATCH path, UI local state, RPH
+  worker, validator, projection worker, broker message, agent output, or informal approval bypasses
+  this pipeline."* And its **SCOPE**, at **L347**, the clause this entry turns on: *"governs semantic
+  writes. The exact pipeline ordering and envelope are repository shapes; the* existence and
+  completeness *of the gate is the semantic requirement."*
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD `303ee671`.**
+  - `packages/rph-ports/src/ports/storage.ts:75` — `commit(input: CommitInput): CommitResult;`. A
+    public port method taking no credential. (Contrast `Engine`, which since REG-D-028 exposes no
+    public `dispatch` at all and hands out a dispatcher only through `as(credential)`.)
+  - `packages/rph-persistence/src/sqlite-storage-adapter.ts:146` — `commit(input: CommitInput)`. Inside
+    the transaction the only branch is `if (input.expectedRevision === undefined) { if (existing)
+    return {ok:false, reason:'REVISION_CONFLICT', …} } else if (actualRevision !== …)` (`:154-158`);
+    then `JSON.stringify(input.currentState)` is UPSERTed into `professional_work_objects` (`:161-193`)
+    and version history at `:195-199`. `input.events` is only iterated (`:207`) — an empty array is a
+    no-op, never a refusal.
+  - `packages/rph-persistence/src/sqlite-storage-adapter.ts:38-43`, the class docblock, states the
+    guarantee as a **convention rather than a mechanism**: *"Every write goes through `commit` … the
+    single-authority guarantee is that the application command bus is the only caller."* That sentence
+    is the divergence written by the code itself.
+  - `packages/rph-persistence/src/index.ts:9` and `:10` export **both** adapters
+    (`SqliteStorageAdapter`, `SnapshotOverlayStorageAdapter`); the overlay carries its own public
+    `commit` at `snapshot-overlay-storage-adapter.ts:54`.
+  - `apps/rph-demo/package.json:27` declares `"@janumipwb/rph-persistence": "workspace:*"`;
+    `apps/rph-demo/src/lib/server/workbench.ts:21` already imports `SqliteStorageAdapter` (constructed
+    at `:99`). The channel is not hypothetical — it is one statement away in a file that already has
+    the import.
+  - **NOTHING GATES IT.** `package.json:18` — `"boundary": "depcruise packages --config
+    .dependency-cruiser.cjs && bun run scripts/csaa-product-boundary.ts"`. `.dependency-cruiser.cjs`
+    declares exactly **8** named rules — `no-circular`, `not-to-unresolvable`,
+    `contracts-is-foundation`, `domain-purity`, `ports-purity`, `projections-browser-safe`,
+    `no-app-or-ui-in-core` (`from ^packages/rph-` → `to ^apps/`, the REVERSE direction),
+    `product-does-not-import-csaa` (`from ^(packages/rph-|apps/)` → `to ^packages/csaa/`). None
+    constrains `apps/ → rph-persistence`, and `apps/` is outside the cruise set regardless.
+    `scripts/census/` holds one file (`derive-invariant-limbs.ts`), and it is not about call sites.
+  - **AND THE ONE THING THAT DOES INTERPOSE ON `commit` IS BLIND TO THIS BY CONSTRUCTION.**
+    `verif/emitted-event-guard.ts:155-164` monkey-patches `commit` on BOTH shipped adapter prototypes
+    — *"THE COMMIT PATH, not the dispatch path"* (`:151`). It is a **vitest setup module** (wired at
+    `vitest.projects.ts:25`), so it does not exist in production; and its body is
+    `checkEvents(input.events)` (`:158`), which loops over the events array — **an empty array inspects
+    nothing**. Even with events present it `continue`s on any event lacking `commandId` (`:139`),
+    precisely to skip hand-built writes. The only interposition point in the repository is structurally
+    unable to see the arrangement limb 2 forbids.
+
+- **OBSERVED / READ — MIXED, and which is which.** **OBSERVED (driven by me this pass, node v24.11.1,
+  in-memory `SqliteStorageAdapter` off the built `dist`; script preserved at
+  `scratchpad/v7/probe_per3_2.mjs`):**
+  ```
+  PROBE   commit({aggregateType:'PROFESSIONAL_WORK_ARCHITECTURE', expectedRevision:undefined,
+          currentState:{name:'SMUGGLED', publicationStatus:'PUBLISHED'}, events:[],
+          receipt:{commandId:'NO-SUCH-COMMAND', commandType:'GenericPatch'}})   -> {"ok":true}
+  PROBE   loadObject(pwa) -> {"objectType":"PROFESSIONAL_WORK_ARCHITECTURE","revision":0,
+          "semanticVersion":1,"state":{"objectId":"pwa_SMUGGLED_...","objectType":
+          "PROFESSIONAL_WORK_ARCHITECTURE","name":"SMUGGLED","publicationStatus":"PUBLISHED"}}
+  CONTROL-THAT-MUST-FAIL  the same call repeated -> {"ok":false,"reason":"REVISION_CONFLICT",
+          "actualRevision":0}      (the port DOES refuse things; the seam discriminates)
+  CONTROL-THAT-MUST-BE-ABSENT  loadObject('pwa_NEVER_WRITTEN') -> undefined
+  ```
+  **OBSERVED (ran the gate, not read it):** `depcruise packages --config .dependency-cruiser.cjs` →
+  *"✔ no dependency violations found (587 modules, 2900 dependencies cruised)"*; the same run with
+  `--output-type json` counted **0** modules under `apps/` in the graph, against controls of **575**
+  under `packages/` and **8** under `packages/rph-persistence/`. The gate is green and the app surface
+  is not in it. (Re-run at `303ee671` on a clean tree; an untracked test file present mid-pass moved
+  the totals to 588 / 2906 / 576 and left the load-bearing **0 under `apps/`** unchanged.) **READ (not
+  driven):** the eight cruiser rule bodies, the port and adapter sources, the `emitted-event-guard`
+  instrument, and every corpus citation below.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** **REG-F-222** (*"The trust pipeline is not six
+  stages: an opaque required field skips three of them"*, heading at
+  `docs/canon/JPWB-REG-005 Decision and Divergence Register.md:8670`). It is the single best hit any
+  `store.commit` search returns — the **only** entry in any corpus that measures this port — and it
+  rules **against** filing it. At **:8696-8698**: *"the divergence is in the STAGES, not the
+  chokepoint, and the chokepoint conjunct **HOLDS and must not be filed**. Canonical state is
+  write-reachable through **one** chokepoint: exactly **one** production call site of
+  `StorageAdapter.commit`, at `packages/rph-application/src/handlers/kit.ts:529`"*, and again at
+  **:8825-8826**: *"⚠ **The chokepoint conjunct HOLDS and is deliberately not filed.**"* **It is about
+  a different invariant and a different limb.** Its census reconciliation at **:8823-8824** names what
+  it closes: *"`limb:PER-10:1`, **for divergences (i) and (ii) only**"* — PER-10's inbound trust
+  pipeline (parse, structural, normalization, semantic, authorization, conversion). Its basis is
+  an explicitly ungated grep census (*"`grep -rn "\.commit(" --include=*.ts packages/*/src apps/*/src`
+  minus tests → **1**"*), which I re-ran at HEAD and which still returns **1** production site (**21**
+  raw hits; **6** after dropping `*.test.ts`, 5 of those under `__tests__`; control `\.loadObject(`
+  over the identical minus-tests population → **106**, raw **392**).
+  **A count of the call sites that exist cannot forbid one that does not exist yet, and REG-F-222 never
+  claims it can** — it says the conjunct is true, not that anything enforces it. Both facts are
+  simultaneously true: there is one call site today, and no mechanism holds it there. **Three more
+  artifacts a later reader will find, none of them coverage:** (a)
+  `packages/rph-domain/src/enforcement-register.ts:2330-2352` (**RPH-PER-005**) carries the identical
+  census (`:2339-2340` *"`ctx.store.commit` has exactly ONE production caller repo-wide"*) and even admits a
+  store-level hole — but its `canonAnchor` is *"Aggregate event history is gapless and strictly
+  ordered"* (**PER-4**, `:2334`), a different invariant on a different axis, and its argument is
+  unreachability-by-dispatch, which is the premise limb 2 exists to test. (b) The corpus's only other
+  PER-3 carriage, `enforcement-register.ts:2403-2408` (**RPH-PER-008**), anchors on *"atomically
+  persist state, version history, events, outbox, and command receipt"* — **limb 1's tail**, an
+  atomicity property, explicitly *"not a refusal"*. (c)
+  `docs/_working/HARMONIZATION-FINDINGS.md:119`, item **#31**, states this site claim almost exactly —
+  *"The boundary gate cruises only packages/, leaving the apps/ surface … outside the only mechanism
+  that preserves §4.3's boundaries"* — struck, as is **#11** at `:99` (*"No test proves that UI, agent,
+  worker, retry, direct-persistence, or projection paths cannot bypass server-side assurance
+  enforcement"*). ⚠ **AND ITS DISPOSITION MOVED UNDER ME MID-PASS, SO IT IS CITED BY HEADING.** Through
+  `857128a7` that file was **119 lines**, the heading at `:87` read `## Refuted (32) — recorded so
+  they are not re-raised`, and both items were struck with **no reason recorded** — an affirmative
+  record that a live gap is not a gap, which ends every future search. **Commit `303ee671` (2026-08-23,
+  +1,623 lines, landed while I was verifying this entry) re-dispositions all 32.** `:87` now reads
+  *"~~Refuted (32) …~~ · ⚠ **RE-DISPOSITIONED 2026-08-23: 15 OF THE 32 ARE TRUE AT HEAD**"*, and a
+  `## ⚠ Dispositions for the 32 above` section carries **`### Item 31 — TRUE AT HEAD`** — *"⚠ **TRUE
+  AT HEAD** (confidence HIGH). **The strike is wrong and is kept only as history.**"*, with **"Owes a
+  register entry"** and the same 587 / 575 / **0-under-`apps/`** gate measurement this entry reports —
+  and **`### Item 11 — TRUE AT HEAD`** likewise. So the corpus now says this filing is owed, and this
+  entry is that filing. ⚠ **It is still not coverage** — a working design paper is not a register
+  entry, and it says so itself by naming the entry as owed.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only (`-i` and
+  `-F` never combined — the instrument aborts); every long hit opened with `sed -n`/`awk`. **BY LIMB
+  ID:** `grep -c -F 'limb:PER-3'` → **0 / 0 / 0 / 1** — the lone hit is
+  `docs/_working/DESIGN-invariant-enforcement-mapping.md:614`, this audit's own §16.1 note about the
+  row, not a filing — against live controls in the same files with the same flags: `limb:PER-` in
+  REG-005 → **51**, `limb:ASR-14:1` → **5**. **No register entry closes any PER-3 limb.**
+  **BY INVARIANT ID:** `PER-3` → REG-005 **16** · `enforcement-register.ts` **1** ·
+  `verif/guard-enforcement-ledger.data.ts` **1** · **10** files in `docs/_working/` (controls: `PER-` →
+  **90** in REG-005's new region alone, **49** `RPH-PER` rows in the enforcement register, **50**
+  `guard` in the ledger, **19** working files). ⚠ **Every fourth-corpus FILE count in this bullet was
+  re-measured at `303ee671`, after that commit's +1,623-line rewrite of `HARMONIZATION-FINDINGS.md`;
+  several are one lower at `857128a7`, which is the baseline the census row was searched against.**
+  All 16 REG-005 hits opened: :1335 :1369 :1896 :1898
+  :1949 :1955 :1985 :2264 :2267 :2370 :2373 :2385 :2402 :3512 :7972 :8811 — the trust-boundary/D-1
+  family and REG-F-079/REG-D-029/REG-D-030 all close **limb 1** clauses; :8810-8811 names PER-3 only
+  to **refuse** it as a carrier (*"Deliberately NOT cited as carriers, because either would be an EM-1
+  substitution"*). The ledger hit (`:91`) is a RELOCATED-arrow row about `AbandonPwu`. **⚠ THE 17
+  ENTRIES FILED TODAY WERE GREPPED SPECIFICALLY** (REG-F-234..245, REG-Q-058..062, lines
+  **12116-16041**): `PER-3` → **0** there, `.commit(` → **0**, `depcruise` → **0**, and
+  `rph-persistence` → **0**, against the control `PER-` → **90** in that same region. The one
+  `StorageAdapter` mention in the new region, **:14847-14854** inside REG-F-245, enumerates the port
+  surface only to prove it holds
+  **no removal operation** — a hard-delete finding, not a bypass one. **BY SITE** (REG-005 / enfreg /
+  ledger / count of matching `docs/_working` files): `store.commit` → **1 / 1 / 0 / 1** (both
+  code-corpus hits opened — REG-005:8699 and enfreg:2339-2340, the only two places in any corpus that
+  measure this port, and **both count rather than gate**); `StorageAdapter` → 13 / 4 / 0 / 6 (all 13
+  REG-005 hits listed, the four candidates opened: :733 :8575 :8698 :14848); `SqliteStorageAdapter` →
+  4 / 2 / 0 / 4; `rph-persistence` → 7 / 3 / 0 / 6; `sqlite-storage-adapter` → 5 / 0 / 0 / 4;
+  `emitted-event-guard` → 9 / 1 / 0 / 1; `generic CRUD` → 3 / 0 / 0 / 5; `bypasses this pipeline` →
+  **2 / 0 / 0 / 3** (both REG-005 hits are the canon quote inside **limb-1** entries, :2264 and :2373).
+  **TRUE ZEROES, each proven live by the control `boundary` → 117 / 30 / 2 / 34 files, run in the same
+  sweep with the same flags:** `depcruise` → **0 / 0 / 0 / 3** (all three working hits are the
+  audit-method paper below, `HARMONIZATION-FINDINGS.md`'s re-disposition of #31, and `BACKLOG.md`);
+  `dependency-cruiser` → 1 / 0 / 0 / 7, and REG-005's single hit (:4596) is a csaa provider-count
+  correction. **REPO-SIDE, with a control:** `grep -rn "commit(" verif/ scripts/`
+  → **0**, against `dispatch(` over the identical population → **19**. ⚠ **THAT ZERO IS A DEAD
+  INSTRUMENT, and it is why the broader sweep was run:** the one file that DOES wrap `commit` writes it
+  as `proto.commit = function patchedCommit(…)`, which the pattern `commit(` cannot match —
+  `grep -n "commit(" verif/emitted-event-guard.ts` → **0**. `grep -rn "commit" verif/` → **99**
+  lines, all scanned, and that file is the only interposition in the repository. **AND THE FOURTH
+  CORPUS, WHICH EARLIER PASSES SKIPPED:** `docs/_working/` now carries an audit-method paper that names
+  this limb — `DESIGN-invariant-enforcement-mapping.md:110-112` (*"PER-3's census is **not gated** —
+  and 'true but unguarded' is a different claim from 'enforced'"*), `:611-627` (the driven-arm
+  exception), `:695` (the verdict-supersession table) and `:727-737` (the near-miss enumeration, which
+  itself says *"⚠ At HEAD the gap is live"*). **It is a paper about the audit's own method — it names
+  no site, proposes no gate, carries no merge target and closes no limb.** It records the fact; this
+  entry files it.
+
+- **THE REMEDY.** Both halves derived from the filesystem, never hand-listed (a hand-listed population
+  is the defect one level up). **(1) A gated census over the write funnel:** a `verif/` test that walks
+  `packages/*/src` **and** `apps/*/src`, collects every non-test call of `.commit(` on a
+  `StorageAdapter`, and fails naming any site outside `packages/rph-application/src/handlers/kit.ts`.
+  Its predicted RED, which must be seen before the green is trusted: add a second `.commit(` call under
+  `apps/rph-demo/src/lib/server/` and the test must fail naming that file; the existing 5 `__tests__`
+  fixture sites must NOT redden it. **(2) A boundary rule that can see the app:** widen the cruise set
+  in `package.json:18` from `depcruise packages` to `depcruise packages apps` (measured today: that
+  moves the `apps/` module set from 0 into the graph), and add a ninth rule to
+  `.dependency-cruiser.cjs`, `no-direct-persistence-from-apps`, `from: { path: '^apps/' }` → `to: {
+  path: '^packages/rph-persistence/' }`. Its predicted RED: with the rule in place the CURRENT tree
+  must fail, because `apps/rph-demo/src/lib/server/workbench.ts:21` imports it today — so landing (2)
+  requires first moving that construction behind an engine-owned factory, and a rule that goes green on
+  an unchanged tree has not been proved to fire. **(3) CHECKED, AND ALREADY LANDED — so this
+  entry does not ask for it again:** `docs/_working/HARMONIZATION-FINDINGS.md`'s `## ⚠ Dispositions
+  for the 32 above` section re-checks **all 32 at HEAD, at the site, each with a positive control**
+  (**15 TRUE AT HEAD** — *"13 owe a register entry"* — 13 REFUTED, 4 OUT OF SCOPE), committed as
+  `303ee671`. The general form — *derive* how many are still true rather than hand-checking the two
+  that surfaced — is therefore **performed, not owed**, and I confirmed it in the file rather than
+  inferring it from the heading. One pointer remains: `### Item 31 — TRUE AT HEAD` should name this
+  entry's ordinal once it is assigned.
+
+- **⚠ WHAT THIS ENTRY DOES NOT CLAIM.** It does not claim a second production call site exists — there
+  is one, and REG-F-222's census is correct at HEAD. It does not re-open the chokepoint conjunct as a
+  *fact*; it files the absence of the *mechanism*, which is what PER-3's SCOPE clause asks for. And it
+  does not claim the arrangement was driven **through the engine**: it was not, and it could not be —
+  a limb about going around the bus cannot be tested by a dispatch without being made unfalsifiable by
+  construction. That exception is recorded on the census row as `arm_exception` and in
+  `docs/_working/DESIGN-invariant-enforcement-mapping.md:611-627`.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:PER-3:2`. **It closes nothing else,
+  because** `limb:PER-3:1` (the pipeline's own stages — authenticated, authorized, semantically named,
+  revision-checked, atomic) carries verdict `ENFORCED_MULTI_SITE` and filing `NOT_APPLICABLE`, and its
+  residues are already filed elsewhere: authorization at **REG-F-054** (:1945, residual :1955-1957),
+  the `Principal.roleId` hollow at **REG-F-059** (:2038), and the unnamed lifecycle arrows at
+  **REG-F-079** (:2370). `limb:PER-10:1` stays with **REG-F-222**, and the PER-4 gaplessness axis stays
+  with **RPH-PER-005**. This entry adds one thing to the corpus that none of them holds: **a driven
+  bypass of the pipeline through a public port, and the measured absence of any mechanism that would
+  refuse it.**
+
+- **⚠ TWO CITATION CORRECTIONS THE NEXT READER WILL OTHERWISE INHERIT.** (1) Existing entries cite
+  *"JPWB-DOC-003 §9 PER-3 (**L343**)"* at REG-005 **:2264** and **:2373**, and
+  `docs/_working/DESIGN-pwu-write-path.md:108` repeats it. **At HEAD, L343 is PER-2's SCOPE line**
+  (*"governs all semantic writes. **NON-EXAMPLE:** upcasting old payloads at read time…"*); PER-3 is at
+  **L345** and its SCOPE at **L347**. The §9 attribution is right (heading at L333); only the line
+  number drifted. (2) The near-miss enumeration at
+  `docs/_working/DESIGN-invariant-enforcement-mapping.md:732-733` cites item **#31** as
+  `HARMONIZATION-FINDINGS.md:119` — **correct at both baselines, I checked** — but quotes the heading
+  as `## Refuted (32) — recorded so they are not re-raised` **without a line number**, and that
+  heading text is stale in the working tree, where `:87` now carries the RE-DISPOSITIONED marker. Its
+  next sentence, *"At HEAD the gap is live"*, still holds. What :732-733 needs is the disposition
+  pointer (`### Item 31 — TRUE AT HEAD`), not a new line number.
+
+- **Merge target:** **Repository** — `verif/` (the new write-funnel census), `package.json:18` and
+  `.dependency-cruiser.cjs` (the ninth rule plus the widened cruise set), and
+  `apps/rph-demo/src/lib/server/workbench.ts:21`/`:99` (the import that rule will redden). Plus one
+  **Corpus** pointer: `docs/_working/HARMONIZATION-FINDINGS.md`'s #31 (`:119`) — already
+  re-dispositioned **TRUE AT HEAD … Owes a register entry** under `### Item 31` at `303ee671` —
+  should name this entry's ordinal once assigned. No
+  ratification is required: canon states limb 2 flatly and its SCOPE names gate existence as the
+  requirement, so the adjudication is settled and only the code is missing. Status: OPEN.
+
+### REG-F-247 — an expired waiver still authorizes WAIVED: the assurance authority gate never reads
+`expiresAt`, and the one register row carrying this limb credits a floor path whose only expiry reader
+lost its last production caller three days earlier
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census, `limb:ASR-14:3`) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** Canon's first clause — *"Expired waivers stop waiving"* — is
+  unqualified: it binds wherever a waiver waives, not only at promotion. This engine moves an assurance
+  axis to WAIVED on one governed path, `ChangePwuState → assuranceState=WAIVED`, and its sole authority
+  gate is `resolveWaiverAuthorization`. That function runs seven ordered checks and **not one of them is
+  temporal**: it never reads `decision.waiver`, never reads `expiresAt`, and its query type carries no
+  `now` to compare anything against. A waiver whose recorded `expiresAt` is decades past therefore
+  authorizes the transition exactly as a live one does — driven by the census, ACCEPTED, and the
+  committed PWU read `assuranceState: 'WAIVED'`. **The second conjunct is worse than an omission.** The
+  enforcement-register row that carries this limb's `canonAnchor` word for word, `RPH-GOV-006`, files
+  only the promotion clause and disposes of the first in two separate places — its note at `:3753`,
+  *"The first clause is honoured on the floor path"*, and the file comment above it at `:3745-3746`,
+  *"It has one on the FLOOR path, where `waiverStillDischarges` reads `expired`"*. That floor discharge
+  path was deleted on 2026-08-20 under REG-F-202, and `waiverStillDischarges` has had **zero
+  production callers since**. Clause A is honoured **nowhere**, and the single row a reader would
+  consult says the opposite.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md` §8.6 *Waivers*
+  (heading at line **299**), **ASR-14 at line 301, limb 3**: *"Expired waivers stop waiving — an expired
+  required waiver blocks promotion."* Its WHY at **DOC-003:302**: *"the waiver is the designed
+  pressure-release valve; without these bounds it becomes the universal solvent of every other
+  invariant."*
+  **THE LIMB HAS TWO CLAUSES AND THEY ARE NOT THE SAME RULE, WHICH IS THE WHOLE OF THIS ENTRY.**
+  Clause B names one act — `promotion` — and is what `RPH-GOV-006` files. Clause A names no act at all,
+  so it binds every site at which a waiver discharges anything; and §8.6's SCOPE line at **DOC-003:303**
+  reads *"governs waiver meaning and scope"*, not "governs promotion", and its NON-EXAMPLE on that same
+  line calls *"a properly scoped, reasoned, **expiring** waiver"* the correct governed act. Expiry is
+  named as constitutive of a valid waiver, not as a promotion-only side condition. **This entry is
+  clause A on the assurance-authorization path.**
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD.**
+  - **(A) THE AUTHORITY GATE IS BLIND TO TIME.** `resolveWaiverAuthorization`
+    (`packages/rph-application/src/handlers/waiver-authorization.ts:54-117`; the file is 117 lines) runs
+    the seven checks its own docblock at **:49** advertises: object exists (**:58-59**), `objectType ===
+    'DECISION'` (**:61**), parses as `DecisionObjectSchema` (**:67**), `decisionType === 'WAIVER'`
+    (**:78**), `status === 'EFFECTIVE'` (**:87**), `subjectObjectIds` includes the PWU (**:95**),
+    `subjectSemanticVersions` pin matches (**:107**) — then `return { ok: true }` at **:116**. Its two
+    production callers are `pwu.ts:1422` and **:1434**, inside `rejectUnauthorizedWaiver`
+    (`pwu.ts:1409`), reached from `pwu.ts:1684`.
+    **NEGATIVE CLAIMS WITH IN-FILE POSITIVE CONTROLS, same file, same instrument, counts reported:**
+    `grep -c 'expiresAt'` → **0**; `grep -c 'decision\.waiver'` → **0**; `grep -ci 'expir'` → **0**.
+    CONTROLS, same file: `grep -c 'waiver'` → **11** lines; `grep -c 'decision\.'` → **6**;
+    `grep -c 'query\.'` → **12**; `grep -c 'return'` → **8**. The zeros are absences, not a dead
+    pattern.
+  - **THE DATUM IS IN THE GATE'S HAND AND SIMPLY NOT CONSULTED.** `WaiverDetailSchema.expiresAt` is
+    declared at `packages/rph-contracts/src/objects.ts:372`, hanging off `DecisionObjectSchema.waiver`
+    (`objects.ts:605`), and `requestWaiver` persists it onto the Decision at
+    `packages/rph-application/src/handlers/governance.ts:592` — `...(p.expiresAt ? { expiresAt:
+    p.expiresAt } : {})`, inside the `waiver:` literal opened at **:588**. The gate loads that same
+    object at `waiver-authorization.ts:58` and parses it at **:67**. Nothing is missing but the read.
+  - **AND THE SIBLING RESOLVER ONE FILE OVER PERFORMS EXACTLY THIS CHECK.** `resolveSkipAuthorization`
+    (`packages/rph-application/src/handlers/skip-authorization.ts`) takes `now` on its query, declared
+    at **:32-33** as *"The COMMAND's `issuedAt` — never a wall clock, so expiry replays
+    deterministically (§10.2)"*, and refuses at **:115**: `if (auth.expiresAt !== undefined &&
+    auth.expiresAt <= query.now)` → *"decision ${...} expired at ${...} (command issued ${...})"*
+    (**:118**). Same repository, same authorization shape, same optional `expiresAt` field
+    (`ExecutionSkipAuthorizationSchema`, `objects.ts:248`). **The engine owns this check and aims it at
+    the execution plane only.**
+  - **(B) THE ONLY OTHER EXPIRY READER HAS NO PRODUCTION CALLER, SO CLAUSE A IS ENFORCED NOWHERE.**
+    `waiverStillDischarges` (`packages/rph-domain/src/governance.ts:145` — `w.status === 'EFFECTIVE' &&
+    !w.expired`) is the function `RPH-GOV-006` credits. Re-derived at HEAD, `--include=*.ts
+    --include=*.svelte` over the repo with `node_modules` and `/dist/` excluded: **11** occurrences,
+    **7** of them in `*.test.ts`; the remaining four are the definition itself plus three COMMENTS
+    (`handlers/governance.ts:535`, `enforcement-register.ts:3745` and **:3765**). **Zero handlers call
+    it.** POSITIVE CONTROL, identical flags and scope: `waiverCovers` → **25**. Separately, `expiresAt`
+    across `packages/*/src`, `apps/*/src` and `verif` excluding tests → **14** lines carrying exactly
+    **one** predicate, `skip-authorization.ts:115`; CONTROL on that same scope, `issuedAt` → **33**.
+  - **THE REPOSITORY HAS ALREADY NOTICED HALF OF THIS AND FILED IT AS HYGIENE, NOT AS A DIVERGENCE.**
+    `verif/dead-kernel-census.test.ts:82-90` classifies `waiverStillDischarges` as `GATE_HELPER` and
+    says at **:87-89**, verbatim: *"⚠ enforcement-register.ts:3642 still records that expiry 'has one
+    [effect] on the FLOOR path, where waiverStillDischarges reads expired' — that sentence is now
+    historical, and the expiry limb has no production consumer at all."* It records the death of the
+    HELPER; it never names `resolveWaiverAuthorization`, never asks whether the invariant survived
+    the deletion, and carries no remedy. ⚠ **AND ITS OWN CROSS-REFERENCE HAS DRIFTED:**
+    `enforcement-register.ts:3642` at HEAD is DEC-3 obligation conservation; the sentence it quotes now
+    sits at **:3745**.
+
+- **OBSERVED / READ — STATED PLAINLY BECAUSE THE TWO CONJUNCTS HAVE DIFFERENT PROVENANCE. MIXED.**
+  **Conjunct (A) is DRIVEN and NOT RE-DRIVEN BY THIS FILING PASS.** It comes from the W-3b census lane
+  `w3b-lane:v0-trial`, 2026-08-21, confidence `DROVE_THE_ENGINE`, `refutation: HELD`, whose `observed`
+  field reads verbatim: *"ChangePwuState->WAIVED ACCEPTED; the stored PWU read assuranceState=WAIVED on
+  an EXPIRED waiver"*, with the arrangement recorded as a waiver minted with
+  `expiresAt='1999-01-01T00:00:00Z'`, granted, and the state change ACCEPTED. What this pass adds is
+  that the arrangement is **constructible from the schemas at HEAD** — `expiresAt` is optional on
+  `WaiverDetailSchema` and is persisted by `governance.ts:592` — so the observation is not an artefact
+  of a fixture the contracts would now reject. ⚠ **NO TRANSCRIPT ARTEFACT ACCOMPANIES THE ROW:** the
+  provenance for (A) is the lane record's own `observed` and `evidence` fields, read this pass, not a
+  drive re-run here. **Conjunct (B) is READ**, and it is re-derived here from the working tree rather
+  than inherited: the caller sweep, the counts and their controls above are this
+  pass's own. **Nothing here upgrades (B) into an OBSERVED admission**: the claim is that (B)'s consumer
+  set is empty, which is a search result with its control reported, not a drive.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS, AND WHY. SIX OF THEM, AND THE FIRST IS THE ONE A READER WILL
+  FIND.**
+  - **(1) `RPH-GOV-006` (`packages/rph-domain/src/enforcement-register.ts:3748`, `kind:
+    'UNENFORCED_DISCLOSED'` at :3749) IS NOT A FILING OF THIS LIMB, DESPITE QUOTING IT VERBATIM.** Its
+    `canonAnchor` at **:3752** is this limb's text word for word — *"Expired waivers stop waiving — an
+    expired required waiver blocks promotion"* — which is precisely why it will be mistaken for
+    coverage. **It scopes itself to clause B in its own note at :3753:** *"canon names PROMOTION
+    specifically … **The first clause is honoured on the floor path; the second, which is this rule, is
+    honoured nowhere.**"* Everything it measures is the promotion plane: `canPromoteBaseline` calls
+    `findExpiredWaivers` but `promoteBaseline` builds that input without `requiredWaivers`, so the loop
+    runs over `[]`, and its `guard.arrangement` at **:3770** is *"**PromoteBaseline** over an item
+    covered by an EFFECTIVE waiver whose expiresAt (2026-07-01) is a month before the command's
+    issuedAt"*. It is a disclosure and closes nothing. **AND ITS DISPOSAL OF CLAUSE A IS NOW FALSE:**
+    the floor path it credits, and the `waiverStillDischarges` read it names at **:3765**, were deleted
+    under REG-F-202 on 2026-08-20 — three days before this entry — as `docs/_working/BACKLOG.md:78-79`
+    records: *"The deletion is TOTAL, not scoped"*, taking *"the `waiverCovers`/`waiverStillDischarges`
+    import"* with it. A reader who closes this row on RPH-GOV-006 closes it on a sentence the
+    repository's own dead-kernel census calls *"historical"*.
+  - **(2) `REG-F-237` (REG-005:12828, filed TODAY on this same invariant) EXPRESSLY DECLINES THIS LIMB.**
+    It is about WHAT KIND of finding is waived — no predicate resolves `waivedFindingIds`, so a
+    canonically-unwaivable `UNAUTHORIZED_INTENT_REVISION` is waived by the identical path as a permitted
+    finding — and it closes `limb:ASR-14:5`. Its census reconciliation at **REG-005:13184-13185** names
+    this row and rules it out: *"`:3` on WHEN it expires (a NEAR_MISS at RPH-GOV-006,
+    `enforcement-register.ts:3748-3781`, **not a** filing — the four FILED siblings are `:1`, `:2`,
+    `:4`, `:6`)"*. **Its remedy also does not reach here:** its (b) at **REG-005:13150-13153** adds a
+    KIND discriminator at `waiver-authorization.ts:54`, and a waiver over a canon-permitted finding
+    that has simply lapsed passes every kind check there is. **Kind ≠ time.**
+  - **(3) `REG-F-216` (REG-005:7593, `limb:ASR-14:1`, OPEN) NAMES THIS LIMB BY ID IN ORDER TO DISCLAIM
+    IT.** At **REG-005:7771-7776**: *"**THE SIBLING TRAP, CHECKED AND REFUSED.** … `limb:ASR-14:3` drove
+    expiry at the same function. Those are scope-match predicates evaluated at consumption
+    (`ChangePwuState`); this limb is a recording requirement discharged at the mint."* ⚠ **AND ITS
+    REMEDY IS THE SHARPEST TRAP IN THIS SET**, because it edits the exact function: remedy **(3)** at
+    **REG-005:7800-7802** is *"Make `resolveWaiverAuthorization` (`waiver-authorization.ts:54`) read
+    `decision.waiver` as an eighth ordered check, so a **detail-less** waiver cannot authorize a
+    transition …"*. That is an **existence** predicate. Landing all five of REG-F-216's remedies leaves
+    this limb exactly as divergent as it is today, because a fully-detailed waiver bearing a populated,
+    long-past `expiresAt` passes an existence check. **Existence ≠ currency.**
+  - **(4) `REG-D-039` (REG-005:2893) IS THE DECISION RECORD THAT BUILT THIS RESOLVER AND ENUMERATES ITS
+    OWN GAPS — AND EXPIRY IS NOT AMONG THEM.** At **REG-005:2900** it lists *"**⚠ TWO GAPS LEFT OPEN
+    RATHER THAN FAKED**"*: ASR-14's tiering and §18.1's self-waiver. The two site docblocks say the same
+    and no more — `waiver-authorization.ts:30-33` (*"**It does not check the tier** … that is a
+    separate, real gap and is recorded rather than silently treated as satisfied"*) and
+    `pwu.ts:1404-1407` (*"⚠ WHAT THIS DOES NOT CHECK, STATED SO THE GAP IS NOT MISTAKEN FOR SATISFIED"*,
+    tiering only). **That is the positive control for the docblock channel:** this codebase demonstrably
+    discloses this function's omissions in prose at this exact site, and it disclosed two others and not
+    this one — so this limb was never considered here, rather than considered and deferred.
+  - **(5) `RPH-CNS-004` (`enforcement-register.ts:3609`) HANDS THE EXPIRY HALF AWAY IN WRITING.** Its
+    note at **:3614** reads: *"ASR-14's 'Expired waivers stop waiving' carries the expiry half and is
+    RPH-GOV-006's anchor … filing it here as well would let one gap green two rows."* It files the
+    CONSTRAINT-disposition plane (`ConstraintPropagationSchema` has no `waiverExpired` field, so no
+    dispatch can assert it), not the PWU assurance axis. ⚠ Note also that its `why` at **:3619** claims
+    expiry is computed *"in exactly one place: the floor gate"* — at HEAD the one surviving predicate is
+    `skip-authorization.ts:115` on the EXECUTION plane, so that sentence is stale in the same direction
+    as RPH-GOV-006's.
+  - **(6) `verif/guard-enforcement-ledger.data.ts:384` READS LIKE THIS LIMB AND MEASURES A DIFFERENT
+    MACHINE.** Its key is *"WaiverRule.maximumDuration / recorded expiration reached, OR
+    revalidationTrigger fired, OR a new subject semantic version …"*. Its `disposition` is
+    `ARROW_UNREACHABLE` and its evidence measures `AssuranceAssessment.state WAIVED→WAIVER_EXPIRED` — a
+    machine whose source state WAIVED *"is never occupied"*. The axis this entry drives is
+    `PWU.assuranceState`, a different aggregate reached by `ChangePwuState`. Its sibling row at **:363**
+    (*"waiver authority separately defined (§18.1)"*) is the self-waiver limb, `:6`. And
+    `docs/_working/OPEN-QUESTIONS.md:106-109` deferred *"the temporal expiry + baseline block"* to M10 —
+    scoped to RPH-CNS-004's constraint plane and to the baseline half — and M10's waiver authority gate
+    then shipped (REG-D-039) without carrying it.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` on full lines with
+  `sed -n` on every long hit; `-i` and `-F` never combined. Corpora in the order REG-005 /
+  enforcement-register.ts / guard-enforcement-ledger.data.ts / `docs/_working` (files).
+  **BY ID:** `ASR-14` → **56 / 5 / 2 / 6** · `RPH-GOV-006` → **7 / 6 / 0 / 0** · `Expired waivers stop
+  waiving` → **1 / 2 / 0 / 0** (REG-005:7748 is REG-F-216's enumeration; enfreg :3614 and :3752).
+  `limb:ASR-14:3` → **1 / 0 / 0 / 0**, and that single hit was opened: REG-005:**7772**, REG-F-216's
+  SIBLING-TRAP paragraph, which names this limb precisely in order to disclaim it. POSITIVE CONTROL on
+  the same instrument: `limb:ASR-14:1` is present at REG-005 :7595 / :7614 / :7786.
+  **BY SITE:** `resolveWaiverAuthorization` → **14 / 3 / 0 / 3 files** (`BACKLOG.md`,
+  `DESIGN-decision-subject-scope.md`, `ROADMAP-recomposition-acceptance.md` — all three read; all are
+  the RPH-GOV-005 scope re-aiming, none temporal) · `waiverStillDischarges` → **1 / 2 / 0 / 4 files**
+  (`BACKLOG.md`, `dead-kernel-census.txt`, `engine-reference-map.md`, `HARMONIZATION-LOG.md` — all read;
+  `dead-kernel-census.txt:77` records it `DEAD (tests only)`, which is the census's supply-side view,
+  not a divergence filing).
+  **THE 17 ENTRIES FILED TODAY WERE SWEPT SPECIFICALLY**, since every transcript on this row predates
+  them: over REG-005 lines 12116-16041 (REG-F-234..245, REG-Q-058..062), `expired waiver` / `waiver
+  expir` / `expiresAt` / `waiverStillDischarges` → **0**; `resolveWaiverAuthorization` → **7**, every
+  one inside REG-F-237 and every one read. **No entry filed today reaches waiver expiry.**
+  **POSITIVE CONTROLS, same instruments and corpora, reported by count:** `requiredEvidence` → working
+  corpus **13 files**; `ProposeEvidence` → **6 files**; in-file controls for every zero are given in the
+  code bullet above. Instruments alive in all four corpora.
+
+- **THE REMEDY — and step (1) is the one a hypothesis would have skipped.**
+  **(1) `WaiverAuthorizationQuery` HAS NO `now`, so the check cannot be written without changing the
+  signature.** Add `readonly now: string` to `waiver-authorization.ts:37-44`, documented as the sibling
+  documents it at `skip-authorization.ts:32-33` — the COMMAND's `issuedAt`, never a wall clock, so
+  expiry replays deterministically (§10.2). The value is already in scope at both call sites:
+  `rejectUnauthorizedWaiver` (`pwu.ts:1409`) takes `command: DomainCommand`, and `issuedAt` is on the
+  command envelope at `packages/rph-contracts/src/envelopes.ts:107`.
+  **(2)** Add a further ordered check to `resolveWaiverAuthorization`, after the `EFFECTIVE` test at
+  **:87** and before the subject test at **:95**, mirroring `skip-authorization.ts:115-119` and refusing
+  in its own voice naming ASR-14: `decision.waiver?.expiresAt !== undefined && decision.waiver.expiresAt
+  <= query.now`. ⚠ **DO NOT CALL IT "THE EIGHTH CHECK" — TWO OTHER OPEN REMEDIES ALREADY CLAIM THAT
+  ORDINAL AT THIS FUNCTION.** REG-F-216 remedy (3) (**REG-005:7801**) adds *"an eighth ordered check"*
+  reading `decision.waiver`; REG-F-237 remedy (b) (**REG-005:13150-13153**) extends the same function to
+  read `decision.waiver.waivedFindingIds`, and warns at **REG-005:13154-13155**: *"Land them together or
+  the eighth check will be written as existence-only and the gap will look closed."* **This check must
+  not be folded into either**: existence, KIND and currency are three different predicates over
+  `decision.waiver`, and landing any one of them leaves this row green and unfixed.
+  **(3) RED-FIRST, WITH THE CONTROLS THAT TELL THE LIMBS APART.** The arrangement: mint a waiver with a
+  past `expiresAt`, grant it, dispatch `ChangePwuState → WAIVED` — must REFUSE, and the assertion must
+  be on the refusal MESSAGE, not on `RPH_INVARIANT_VIOLATION`, which many sites emit. **Two controls,
+  each with its own mutant:** (a) the byte-identical dispatch with `expiresAt` in the future stays
+  ACCEPTED, so the new check is not refusing everything; (b) a waiver with `expiresAt` absent stays
+  ACCEPTED, so the check keys on lapse and not on the field's presence — canon writes *"duration **or**
+  expiration"*, and REG-F-216's remedy (4) has not yet settled which of the two is required.
+  **(4) CORPUS.** Amend `RPH-GOV-006`'s note at `enforcement-register.ts:3753` and its `why` at
+  **:3765**: strike the claim that the first clause *"is honoured on the floor path"* in place rather
+  than deleting it, recording that REG-F-202 removed that consumer on 2026-08-20 and that clause A had
+  no enforcing site anywhere between then and this fix. Same for `RPH-CNS-004`'s *"in exactly one place:
+  the floor gate"* at **:3619**. ⚠ **THE GENERAL FORM, WORTH DERIVING RATHER THAN ENUMERATING:**
+  REG-F-202's deletion was described as *"TOTAL, not scoped"*, and RPH-GOV-005 was re-aimed by hand at
+  `waiver-authorization.ts:54` while RPH-GOV-006, which shared the deleted consumer, was not. Every
+  register row whose `enforcedAt` or `why` cites a symbol in the deleted apparatus should be re-derived
+  against the dead-kernel census, not read.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-14:3` (verdict
+  `UNENFORCED_OBSERVED_ADMISSION`, refutation **HELD**, `filing: NEAR_MISS`). It closes nothing else,
+  because each ASR-14 sibling keys on a different question and the other five are filed elsewhere: `:1`
+  on WHAT a waiver must RECORD at the mint (REG-F-216); `:2` on WHICH object, criterion and version it
+  reaches (FILED — enforced at this same function, which is why the site is live rather than dead);
+  `:4` on WHOSE authority may grant it (FILED — REG-D-036, and the `pwu.ts:1404` docblock disclosing the
+  missing tier field); `:5` on WHAT KIND of finding may be waived (REG-F-237, filed today); `:6` on a
+  policy waiving its OWN blocking finding (FILED). **This limb alone asks WHEN the waiver lapsed** — a
+  question no predicate on this path is given the `now` to answer. It also does not close
+  `RPH-GOV-006`, whose promotion clause stays unreachable by construction for the separate reason that
+  nothing marks a waiver as REQUIRED BY a promotion.
+
+- **Merge target:** BOTH. **Repository** —
+  `packages/rph-application/src/handlers/waiver-authorization.ts` (the `now` field and the eighth
+  check), `packages/rph-application/src/handlers/pwu.ts` (threading `command.issuedAt` at :1422 and
+  :1434), and a red-first arrangement with its two named controls. **Corpus** —
+  `packages/rph-domain/src/enforcement-register.ts` `RPH-GOV-006` (:3753, :3765) and `RPH-CNS-004`
+  (:3619), struck in place rather than deleted, so the next reader is not told that clause A is honoured
+  on a path that no longer exists. Status: OPEN.
+
+### REG-F-248 — repository-operation state has no shape at all, so ASR-17's "independently modeled"
+conjunction carries one relatum modeled four ways over and one modeled zero ways, and the single
+link canon calls required practice is closed by an integer field the SOURCE itself specifies
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** ASR-17's fourth limb is a CONJUNCTION over two relata —
+  repository-operation state AND baseline-governance state are *independently modeled*. The engine
+  models the second and not the first. Baseline-governance state has 5 write sites, 5 BASELINE-target
+  commands, 6 baseline events, 8 declared schema fields and 7 lifecycle states; repository-operation
+  state has no object type, no command, no event, no field, and not even an artifact-type member —
+  FOUR DISCRIMINATING censuses, four live positive controls, four zeros (a fifth, tables, returns zero
+  on BOTH sides and is disclosed below as proving nothing). **Two things are not independently
+  modeled when only one of them is modeled at all**, so scoring this limb ENFORCED because nothing
+  collides would be exactly the vacuity this census refuses. Canon is not silent about the missing
+  half: RPH-DOC-009 names a *Repository Commit Artifact*, and ASR-17's own NON-EXAMPLE calls linking
+  commits into baseline items **required practice**. And the one place the two states were meant to
+  meet — the COMMIT compatibility milestone — reads NEITHER of them: it is a static lookup on
+  `pwuKind` at PWU-proposal time, which this entry drove.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, section heading
+  read off **line 312** (`### 8.8 Baselines`) rather than inferred, **ASR-17 at line 319, limb 4**:
+  *"Repository-operation state and baseline-governance state are independently modeled;"* The same
+  line's headline is *"A repository commit is never a baseline."* and its **SCOPE line, `:321`**,
+  carries the clause that turns the absence into a defect rather than a permitted silence:
+  *"**SCOPE:** governs the relation between version control and authority. **NON-EXAMPLE:** linking
+  commits into baseline items — with version and hash identity — is required practice, not a
+  violation."* ⚠ The limb is a claim about **the model**, not about the derivation — that distinction
+  is what separates it from limb 5 and from RPH-CMP-001's subject.
+
+- **THE SOURCE NAMES THE MISSING SHAPE, so this is a build gap and not a canon silence.** RPH-DOC-009
+  (`docs/Recursive Professional Harness/… Persistence, Migration, Dual-Run, and Cutover Design.md`,
+  2993 lines) defines the COMMIT milestone as TWO independent completions — **`:2385`** *"repository
+  operation complete when:"* / **`:2386`** *"required Repository Commit Artifact is recorded, if
+  applicable"* and **`:2387-2388`** *"compatibility milestone complete when: a separately governed
+  Product or Release Baseline is AUTHORITATIVE"* — and **`:2391`** is the exact sentence canon
+  distilled into limbs 4 and 5: *"The `COMMIT` label remains a legacy compatibility milestone. Its
+  derivation may summarize independently modeled repository-operation and baseline-governance state;
+  neither implies the other."* Both distillation extracts carry it verbatim and both were re-read at
+  HEAD: `docs/canon/_extracts/extract-doc009-a.md:33` and `extract-doc009-b.md:31`, the second
+  glossing it *"the legacy label conflated them."* Source-presence control: `grep -cF "Baseline"` on
+  the same DOC-009 → **18**.
+
+- **WHAT THE CODE DOES — FIVE CENSUSES RE-DERIVED AT HEAD THIS PASS, FOUR OF THEM DISCRIMINATING.**
+  - **(1) NO OBJECT TYPE.** `packages/rph-contracts/src/enums.ts:598-622`,
+    `ProfessionalWorkObjectTypeSchema` = **23 members**, of which repository-shaped
+    (`commit|branch|merge|release|deploy|repositor|pull|tag|git`, `-i -E`) = **0**. **CONTROL over the
+    same 25 lines, same flags:** `baseline|artifact|evidence` = **3**.
+  - **(2) NO COMMAND AND NO EVENT.** `packages/rph-contracts/src/messages.ts`. ⚠ **The row's and the
+    draft's "251 COMMANDS keys at `:1877-2903`" is a MISLABEL, re-derived and corrected here:**
+    `COMMANDS` runs **`:1877-2510`** and holds **105** keys; `EVENTS` runs **`:2513-2876`** and holds
+    **146**; 251 is the two registries TOGETHER. Repository-shaped keys = **0** in both. **105
+    distinct `emitsEvent` values** inside `COMMANDS`, repository-shaped = **0**. **CONTROLS:** across
+    both registries, keys matching `Baseline|Promote` = **13** and `Artifact` = **2**; within
+    `COMMANDS` alone the same two controls are **6** and **1**; `emitsEvent` matching `Baseline` = **6**.
+  - **(3) NO FIELD.** `grep -rniE` over `packages/*/src` for seventeen VCS identifiers
+    (`commitSha|commitId|commitHash|gitRef|gitSha|branchName|branchRef|mergeCommit|mergeRequest|`
+    `pullRequest|repositoryUrl|repoUrl|deploymentId|deployedAt|releaseTag|versionControl|worktree`) →
+    **30 lines, and every one of the 30 is in `packages/csaa/`** — the static-analysis agent, where the
+    hits are its own `subjectKind: 'WORKTREE'` analysis-subject discriminator
+    (`packages/csaa/src/contracts/subject.ts:6`, `packages/csaa/src/subject/capture.ts:148` — NOT
+    `contracts/capture.ts`, which does not exist) plus TWO prose comments (`contracts/call-graph.ts:68`
+    and `semantic/repository-smoke.test.ts:726`). ⚠ **Across the RPH engine and app trees the count
+    is 0** (`apps/` swept separately at HEAD, also **0**) — I report the 30 rather than the row's flat
+    "0" because the word IS in the repository and the next reader will find it. **CONTROL over the
+    identical `packages/*/src` sweep:** `contentHash|promotionDecisionId` = **110 lines**.
+  - **(4) NO TABLE — ⚠ AND THIS ONE DISCRIMINATES NOTHING, SO IT IS REPORTED AND THEN DISCOUNTED.**
+    `grep -rhoE "CREATE TABLE( IF NOT EXISTS)? [a-z_]+" --include=*.ts`
+    `packages/rph-persistence/src | sort -u` → exactly **5**: `command_receipts`, `domain_events`,
+    `outbox_messages`, `professional_work_object_versions`, `professional_work_objects`. None is
+    repository-shaped — **but none is baseline-shaped either**: the store is GENERIC, and
+    `grep -rniE "CREATE TABLE[^;]*baseline"` over the same tree returns **0**. Its positive control is
+    ZERO on the MODELED side too, which under EM-2 makes it no evidence of asymmetry at all. It is
+    kept for completeness and the entry leans on none of it; the four above are load-bearing.
+  - **(5) NOT EVEN AN ARTIFACT-TYPE MEMBER — AND NO READER.** A *Repository Commit Artifact* is
+    expressible only as a generic `ARTIFACT` whose `artifactType` is a bare `z.string()` with no value
+    domain (`packages/rph-contracts/src/objects.ts:613`, `messages.ts:160`, `messages.ts:1301`).
+    `packages/rph-application/src/handlers/artifact.ts:16-19` says so in its own words, verbatim:
+    *"DOC-009 types artifactType, status, securityClassification and retentionClass as bare `text not
+    null` with no CHECK constraint, and no enum for them exists anywhere in the corpus — so they are
+    `string` here. Inventing members would be exactly the fabrication the original note rightly
+    forbade."* Re-derived this pass: `artifactType`, `--include=*.ts`, across `packages apps verif
+    scripts`, minus `/dist/`, `.svelte-kit` and `.test.` → **8 lines, ZERO branches and ZERO
+    comparisons** — three schema declarations, one comment, two payload copies (`artifact.ts:56`,
+    `:85`) and two literal values in a seeder and an e2e
+    (`rph-engine/src/reference-undertaking.ts:1350`
+    `'ARCHITECTURE_MODEL'`, `apps/rph-demo/e2e/execution-plan.e2e.ts:171` `'DOCUMENT'`). **CONTROL
+    under the identical `--include=*.ts` filter:** `pwuKind` = **196 lines** — corrected: the draft's
+    "206" was measured with `.svelte` added, a WIDER filter than the one that yielded the 8. Branches,
+    merges, releases and deployments have no shape at all — not even that.
+  - **THE OTHER SIDE OF THE CONJUNCTION, same instruments.** `objectType: BASELINE` in
+    `packages/rph-application/src` minus tests = **5** (`handlers/governance.ts:754, :783, :802, :873,
+    :1030`, off `const BASELINE = 'BASELINE'` at `:50`); `targetAggregateType: 'BASELINE'` in
+    `messages.ts` = **5**; `BaselineObjectSchema` (`objects.ts:690-700`) = **8 declared fields** plus
+    the envelope; `BaselineStatusSchema` (`enums.ts:175-183`) = **7 states**.
+
+- **⚠ AND THE ONE BRIDGE CANON CALLS "REQUIRED PRACTICE" CANNOT CARRY A COMMIT — but the schema is
+  FAITHFUL, and re-classing that is this pass's largest correction.** ASR-17 `:321` says linking
+  commits into baseline items *"with version and hash identity"* is **required practice**.
+  `BaselineItemVersionSchema` (`packages/rph-contracts/src/objects.ts:152-156`, read at HEAD) is
+  exactly three fields: `objectId: z.string()`, `semanticVersion: z.number().int()`,
+  `contentHash: z.string().optional()`. A commit cannot be a baseline item **twice over**: there is no
+  object type that could mint its `objectId` (census 1), and its version identity is a revision, which
+  `z.number().int()` cannot hold. ⚠ **BUT THE INTEGER IS NOT AN ENGINE CHOICE, AND THE DRAFT IMPLIED
+  IT WAS.** It is RPH-DOC-009 §12.5 `create table baseline_items` column-for-column —
+  `semantic_version integer not null` at **DOC-009:1225**, block `:1219-1232` — and
+  `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:318` independently scores `baseline_items`
+  **ENFORCED** on exactly that ground, naming the line: *"BaselineItemVersionSchema (objects.ts:152 —
+  objectId, semanticVersion, contentHash?) column-for-column with §12.5 incl. nullable content_hash."*
+  So the required link is unrepresentable **at the SOURCE**, not by a repository divergence, and
+  widening `objects.ts` alone would DIVERGE from §12.5. This is still the limb's second, independent
+  failure — it needs no new plane to state — but its remedy is a corpus adjudication, and the entry
+  no longer asserts it as a code defect.
+
+- **THE CONSEQUENCE, DRIVEN THIS PASS AGAINST THE BUILT ARTIFACT AT HEAD.** The COMMIT compatibility
+  milestone is the one site where DOC-009 `:2391` says the two states may be summarized together. I
+  folded `compatibilityProjector` from `packages/rph-projections/dist/compatibility-view.js` (built
+  2026-08-22 from `src` of 2026-08-06; 14 mapped kinds in both, so `dist` is current):
+  - `PwuProposed{pwuKind: 'PRODUCT_BASELINE_PROMOTION'}` **alone** → `{"milestoneByPwu":{"pwu_A":`
+    `"COMMIT"}}` — with zero baselines, zero promotions and zero artifacts anywhere in the fold.
+  - **CONTROL 1 (the map discriminates, so COMMIT is a real result and not a default):**
+    `PwuProposed{pwuKind: 'ARCHITECTURE_DEFINITION'}` in the same fold → `"pwu_B":"ARCHITECTURE"`.
+  - **CONTROL 2 (both summarizable states are inert):** folding `BaselinePromoted`, `ArtifactRecorded`,
+    `BaselineApproved` and `BaselineSuperseded` left the view **byte-identical** — `apply` returns the
+    view unchanged at `packages/rph-projections/src/compatibility-view.ts:64`,
+    `if (event.eventType !== 'PwuProposed') return view;`.
+  - **CONTROL 3 (the map has no repository vocabulary):** `MAPPED_PWU_KINDS.length` = **14**,
+    repository-shaped = **0**, and `milestoneForKind('REPOSITORY_COMMIT')` returns **`'INTAKE'`** — the
+    entry milestone, via the `?? 'INTAKE'` default at `:51`.
+  So the COMMIT label's derivation reads neither of the two states its source says it may summarize.
+  Site lines re-pinned at HEAD: `:33` `PRODUCT_BASELINE_PROMOTION: 'COMMIT',`; `:50`
+  `export function milestoneForKind`; `:64` the short-circuit. File is 70 lines.
+
+- **OBSERVED / READ — STATED, NOT BLURRED.** **DRIVEN this pass:** the four projector results above
+  (one result plus three controls), executed with `node` against `dist` at HEAD. **INHERITED
+  OBSERVATION, not re-driven:** the census row's dispatch-level transcript that `RecordArtifact`
+  with `artifactType: 'REPOSITORY_COMMIT'` and with `artifactType: 'NOT_A_REAL_KIND_AT_ALL'` are
+  **equally ACCEPTED** — that stands as the row's admission and is cited as such, not upgraded.
+  **READ (re-derived at HEAD this pass, never inherited):** all five censuses — four load-bearing,
+  one (tables) disclosed inert above — and every `file:line`
+  above. ⚠ **This entry rests substantially on a READING, because a TOTAL ABSENCE cannot be driven —
+  only enumerated** — which is why every enumeration above carries its own live positive control and
+  why the one drivable half was driven with three controls rather than one.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY — the primary decoy, verified by opening it.**
+  **RPH-BAS-006**, `packages/rph-domain/src/enforcement-register.ts:3800-3817`. It cites ASR-17 **by
+  name** and records this limb's central fact, which is why a search lands on it first. Its
+  `declaredMutations[2]` at **`:3815`**, verbatim: *"THE ANTECEDENT NAMES A PLANE THAT DOES NOT EXIST:
+  'committing source or architecture artifacts to version control'. No command in the registry commits
+  anything to version control, so nothing can trip the rule from that direction. This row is ENFORCED
+  on the CONSEQUENT — no baseline becomes authoritative without a promotion decision — which is the
+  half a dispatch can reach."* **IT IS ABOUT A DIFFERENT LIMB OF THE SAME SENTENCE (EM-1).** Its
+  `canonAnchor` at **`:3804-3805`** is ASR-17's *second and third* limbs — *"A commit may exist without
+  promotion; promotion is a separate governance event over exact versions"* — and its `note` at
+  `:3806` frames the row as ASR-17-antecedent plus ASR-16-consequent. It closes itself
+  `kind: 'ENFORCED'` with `refusalMarker: 'NO_EFFECTIVE_PROMOTION_DECISION'`, measuring
+  `canPromoteBaseline`'s decision arm. **It records the missing plane as a REASON THE ROW IS FINE,
+  never as a defect, and it never touches "independently modeled"** — the conjunction whose second
+  relatum has no shape. A filing that records the same underlying fact FOR A DIFFERENT RULE, and
+  concludes the opposite, is not a filing of this limb's divergence.
+
+- **⚠ SEVEN FURTHER NEAR MISSES, ALL OPENED AT HEAD, NONE COVERING THIS LIMB.**
+  - **RPH-CMP-001** (`enforcement-register.ts:2874-2892`) names the exact consequence SITE —
+    *"`packages/rph-projections/src/compatibility-view.ts` (`compatibilityProjector`,
+    `milestoneForKind`)"* at `:2884-2885` — and says *"WHAT IS NOT BUILT is the derivation this rule
+    actually states: the current map is PWU KIND -> milestone, a stable lookup, while the rule
+    conditions the milestone on an approved Intent Baseline and COMPLETED PWUs"*, deferring to W5
+    WP-5-003. **Its gap runs along the INTAKE/axis dimension, not the repository dimension**, its
+    `canonAnchor` at `:2878-2879` is JPWB-**DOC-002** §8 (*"Derived compatibility milestone where
+    legacy support requires it; never ontology"*), and it never claims a relatum of ASR-17 is absent.
+  - **REG-F-208** (`JPWB-REG-005:5914`) is the sharpest new decoy and the census row mis-described it.
+    At **`:5938`** it names `compatibility-view.ts:50` `milestoneForKind` inside a bullet that
+    affirmatively **CLEARS** the site: *"Three sites carry `pwuKind` and all three are
+    descriptive-discriminator uses the limb expressly permits"*. It clears it along the
+    **type-identity** axis (RPH-CON-009 ownership binding), quoting the file's own *"a viewer's
+    familiar phase, never authoritative state"* — i.e. limb 5's subject. A reader who stops there will
+    close this row on an "already cleared" verdict about a different axis.
+  - **REG-F-028** (`JPWB-REG-005:872`, quoting at `:882`) files `compatibility-view.ts` for **PWU-kind
+    vocabulary drift** — seeded kinds silently degrading to the `?? 'INTAKE'` default. Same file,
+    different defect, and a repository plane would not change it.
+  - **REG-F-245** (`JPWB-REG-005:14771`, filed 2026-08-23) quotes **the same `artifact.ts:16-19`
+    docblock this entry quotes** — the strongest textual collision in the register — but files it for
+    **`retentionClass` having no expiry instant and no reader** under PER-12, closing `limb:PER-12:7`.
+    **REG-F-244** (`:14526`) likewise turns on `artifactType`'s missing value domain, at
+    `assurance.ts:1304-1308`, but files a **PER-12 chain-of-thought exclusion the engine performs**.
+    Both are about what `artifactType` cannot say for a *reasoning trace*; neither says a relatum of
+    ASR-17's conjunction is unmodeled, and neither closes an ASR limb.
+  - **REG-Q-056** (`JPWB-REG-005:11678`) is the near miss neither the census row nor the draft
+    reached. It quotes **the same `artifact.ts` docblock**, at `:11791-11793`, and asks whether canon
+    ratifies an ARTIFACT value domain — **but its subject is `status` under OBJ-1 limb 2**, not
+    `artifactType`, and not ASR-17. It does not close this limb; it GATES this entry's remedy 2, and
+    is cited for that below rather than as coverage.
+  - **`docs/_working/AUDIT-shape-survivorship-2026-08-20.md:318`** — reached by grepping
+    `BaselineItemVersion` rather than `compatibility-view`, which is why the row and the draft both
+    missed it — scores `baseline_items` **ENFORCED** against DOC-009 §12.5, citing `objects.ts:152`
+    by line. It scores no ASR limb and files no divergence, so it is not coverage; it is the reason
+    this entry's second leg is re-classed as a SOURCE gap above. (`:75` and `:211` score
+    `BaselineObject` DIVERGENT_FILED / ENFORCED on an unrelated `itemObjectIds` migration.)
+  - **`docs/_working/AUDIT-shape-survivorship-2026-08-20.md:220`** scores
+    `CompatibilityMilestoneProjection` **DIVERGENT_UNFILED** — but for missing
+    `dialogueId`/`milestoneStatus`/`derivedFrom` against DOC-007 §26.3, a field-set fidelity gap; and
+    **`:329`** scores `legacy_phase_projection` **DIVERGENT_FILED** to sponsor decision **D2**
+    (*"Legacy phases survive only as a derived, non-…"*), which is **limb 5's** subject. `:85` scores
+    the §30 legacy-lens mapping **ENFORCED**. None mentions repository-operation state.
+
+- **⚠ CITATION CORRECTIONS OWED — six, re-pinned at HEAD; the last three are the DRAFT'S OWN.**
+  - The row twice cited **RPH-DOC-009 L2385** for *"Repository Commit Artifact"*. At HEAD `:2385` is
+    *"repository operation complete when:"*; the artifact sentence is **`:2386`**. The case is
+    unchanged; the pointer was one line short of the noun it named.
+  - The row's `owed` cited **`enforcement-register.ts:3708`** for RPH-BAS-006. At HEAD `:3708` is
+    inside **RPH-BAS-003** — a different family row, anchored on ASR-16's *"no unresolved critical
+    finding…"*. RPH-BAS-006 begins at **`:3800`**. A reader following `:3708` would have differentiated
+    the wrong entry and concluded the decoy did not exist.
+  - The row put `BaselineObjectSchema` at **9 declared fields**. At HEAD (`objects.ts:692-699`) it is
+    **8**: `baselineType`, `purpose`, `scope`, `itemObjectVersions`, `assuranceAssessmentIds`,
+    `promotionDecisionId`, `approvalDecisionId`, `status`. 8 against 0 is the same asymmetry, so the
+    finding survives the correction — but the number in the row was wrong and is corrected here rather
+    than repeated.
+  - The row's third positive control, `contentHash|promotionDecisionId` over the src trees, was
+    **120**. At HEAD it is **110**. Still nowhere near zero, so the control still does its job.
+  - The draft labelled `messages.ts:1877-2903` as "`COMMANDS` … 251 command keys". `COMMANDS` ends at
+    **`:2510`** with 105 keys; the 251 spans `COMMANDS` + `EVENTS` (`:2513-2876`, 146). Corrected in
+    census 2, along with its two controls, which were also measured over the combined range.
+  - The draft's census-5 control (`pwuKind` = 206) used a wider filter than its subject (8). Under the
+    identical `--include=*.ts` filter it is **196**. Corrected in census 5.
+
+- **WHY THIS IS A FINDING AND NOT A QUESTION — the counter-reading, stated and answered.** The
+  strongest case for adjudication is that DOC-009 `:2386` hedges (*"if applicable"*) and `:2391` says
+  the derivation *"MAY summarize"* — so one could argue this engine is permitted to model zero
+  repository state and the limb is vacuously true. **That reading does not survive `:321`.** Canon's
+  own NON-EXAMPLE makes linking commits into baseline items *"required practice"*, which presupposes
+  the link is expressible; `BaselineItemVersionSchema` shows it is not. ⚠ **AND THE
+  ACCIDENTAL-RATIFICATION HAZARD IS NOT ABSENT — the draft said it was, and REG-Q-056 refutes that.**
+  For REMEDY 2 the hazard is exactly present: REG-Q-056 holds at `REG-005:11785-11790` that narrowing
+  an ARTIFACT open-domain string to an enum *"cannot be performed without inventing the members, and
+  inventing them would RATIFY THE NARROWER READING BY ACCIDENT"* — so remedy 2 waits on it and mints
+  nothing. **What sustains FINDING is REMEDY 1 and the DEFECT itself**: remedy 1 is a shape-and-scope
+  question about `BaselineItemVersionSchema` that invents no vocabulary, and the defect stated here —
+  one relatum of a conjunction has no shape anywhere in the engine — is a fact about the repository,
+  not a contested reading of canon. So this is a FINDING whose second remedy is gated on a QUESTION.
+
+- **WHAT IS *NOT* WRONG — so this is not read as a defect report on ASR-17's other limbs.** The very
+  absence this entry files is what makes **limbs 1, 2 and 5 hold BY CONSTRUCTION**: nothing can imply
+  a baseline from a commit when no commit is representable. **Building the repository plane REOPENS
+  all three**, and whoever lands a Repository Commit Artifact type must land ASR-17's guards in the
+  same increment or three green limbs go quietly red. Limb 3 is separately `PARTIAL` and filed. No
+  objection to the limb split: separating limb 4 from limb 5 is what made the asymmetry visible at all.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, at HEAD 2026-08-23.** Bash
+  `grep` throughout (never `-i` together with `-F` — that combination aborts on this box and returns a
+  silent zero through a pipe); every long hit opened with `sed -n`.
+  - **BY VERBATIM CANON TEXT.** `independently modeled` → REG-005 **0**, enforcement-register **0**,
+    ledger **0**, `docs/_working/` **0 files**. `Repository Commit Artifact` → **0 / 0 / 0 / 0**.
+    `repository-operation` → **0 / 0 / 0 / 0**. `version control` → **0 / 1 / 0 / 0** (the one hit is
+    RPH-BAS-006 `:3815`, differentiated above). **CONTROL, same four corpora, same flags:** `baseline`
+    → **188 / 51 / 28 / 33 files** (`-F`, case-sensitive; the ledger reads **33** under `-i`, and both
+    numbers are given because the draft used one in each place without saying which);
+    `Intent Baseline` → 1 / 1 / 0 / 1 file. All four instruments are
+    live; the zeros are absences, not the `-i -F` defect.
+  - **BY INVARIANT ID.** `ASR-17` → REG-005 **1** (`:15565`, opened: it is REG-Q-060's own search
+    disclosure counting `ASR-*` ids in the Conferral Sheet, not a filing about ASR-17);
+    enforcement-register **1** (`:3806`, RPH-BAS-006's note); ledger **0**; `docs/_working/` **2**
+    (`DESIGN-invariant-enforcement-mapping.md:261` and `:264`, both a meta-audit about
+    **`limb:ASR-17:3`** — *"`ASR-17:3`'s says \"Nothing owed against this limb\""* — a different limb
+    and not a filing of any divergence). **CONTROLS:** `ASR-16` → **28 / 8 / 0 / 3 files**; `ASR-18` →
+    1 in REG-005; `ASR-` → 71 in the enforcement register.
+  - **BY LIMB ID.** `grep -rno 'limb:ASR-17:[0-9]*'` across all four → **one** hit, `limb:ASR-17:3`.
+    **No `limb:ASR-17:4` anywhere.**
+  - **BY SITE / SYMBOL.** `compatibility-view` → REG-005 **4** (`:580`, `:583`, `:882`, `:5938` — all
+    four opened and all four differentiated above), enforcement-register `:2884`, `docs/_working/`
+    AUDIT **`:220`/`:329`/`:332`** — corrected: the draft listed `:85`, which is TRUNCATED in the
+    source file itself (it ends *"carried in rph-projections/src/comp |"*) and so is not a hit of this
+    pattern; `:85` is still opened and differentiated above, and `:332` (`legacy_object_mappings`
+    ABSENT under sponsor decision D2) is opened here and is not this subject.
+    `milestoneForKind` → REG-005 **2** (`:580`, `:5938`; the clearing sentence REG-F-208 relies on is
+    at **`:5930-5931`**). `PRODUCT_BASELINE_PROMOTION` → REG-005 **3** (`:887`, `:898`, `:908`) —
+    corrected: these sit in **REG-F-029** (heading `:885`), not REG-F-028, which ends at `:883`. All
+    three are policy-scoping prose; none is about repository state. **CONTROL, same file, same
+    flags:** `rph-projections` → **36**.
+  - **THE 17 ENTRIES FILED 2026-08-23 (REG-F-234..245, REG-Q-058..062, `:12116-16041`) WERE GREPPED
+    SPECIFICALLY**, as a standalone 3,926-line slice: `ASR-17` **1** (REG-Q-060's disclosure),
+    `compatibility-view` **0**, `milestoneForKind` **0**, `PRODUCT_BASELINE_PROMOTION` **0**,
+    `repository commit` **0**, `artifactType` **8** — all eight opened, and they resolve to REG-F-244
+    and REG-F-245, both differentiated above. **CONTROLS on the same slice:** `Evidence` **157**,
+    `invariant` **41**.
+  - **REGISTER BY FAMILY.** Every `RPH-BAS-*` row enumerated by `canonAnchor` (BAS-001..007). The only
+    ASR-17-derived anchor in the whole register is RPH-BAS-006's, and it carries limbs 2-3.
+  - **LEDGER.** `verif/guard-enforcement-ledger.data.ts`, 392 lines: `ASR-17` **0**, `BAS-006` **0**,
+    `repositor` **6** — all six opened (`:37`, `:73`, `:87`, `:277`, `:341`, `:378`), every one the
+    ordinary sense (*"in the repository"*), none a version-control subject. **CONTROLS:** `RPH-BAS`
+    **1**, `baseline` **33** under `-i` (**28** under `-F`; both are given because the counts differ
+    and the draft used one in each place). The instrument sees baseline material, and no repository row.
+  - **SITE DOCBLOCK READ FIRST-HAND** at `packages/rph-projections/src/compatibility-view.ts:1-9`: it
+    discloses the W2-baseline scope, the W5 WP-5-003 successor, and the projection's non-authority
+    (**limb 5's subject**). It says nothing about repository-operation state.
+
+- **THE REMEDY — and it is a hypothesis, so it carries its predicted red.** Two independent halves.
+  ⚠ **The draft said the first was "landable now without a new plane"; verification refuted that** —
+  the integer it would widen is DOC-009 §12.5's own column, so both halves are CORPUS-FIRST and
+  neither may be landed as a unilateral code change:
+  1. **Make the required link expressible, or record that it is not — and this leg is CORPUS-FIRST,
+     which the draft did not say.** `BaselineItemVersionSchema` (`objects.ts:152-156`) cannot carry a
+     revision identity, and it cannot because DOC-009 §12.5 (`:1219-1232`) types the column
+     `semantic_version integer not null`. So the act is a DECISION: widen the SOURCE's item identity
+     so a commit can be linked *"with version and hash identity"* per ASR-17 `:321`, or record that
+     the required practice is out of scope for this engine. **Widening `objects.ts` unilaterally would
+     break the §12.5 column-for-column fidelity `AUDIT:318` currently scores ENFORCED**, so this is
+     not a code fix anyone may land alone. **PREDICTED RED BEFORE TRUSTING ANY GREEN:** a test
+     asserting that a baseline item can name a revision must FAIL at HEAD against the current
+     `z.number().int()`.
+  2. **Give repository-operation state a shape, or ratify its absence — ⚠ BLOCKED ON REG-Q-056.**
+     Minimum: an `artifactType` value domain admitting a *Repository Commit Artifact* (DOC-009
+     `:2386`) and at least one production predicate that READS it — census 5 shows there are
+     currently **zero**. **No member may be minted before REG-Q-056 answers**, which holds that
+     inventing one ratifies the narrower reading by accident. **PREDICTED
+     RED:** the assertion must be one of EXISTENCE, not of behaviour. There is no check here to mutate
+     (verdict `UNENFORCED_NO_SHAPE`, not `UNENFORCED_DEAD_PREDICATE`), so a behaviour mutant cannot
+     redden and a guard that passes today would prove nothing — the same distinction REG-F-245 draws at
+     `:14875`.
+  3. **Cross-reference, do not absorb.** RPH-BAS-006 (`:3800`) and RPH-CMP-001 (`:2874`) should each
+     gain a pointer to this entry. Neither should be amended to claim coverage: each files a real fact
+     for a different rule, and collapsing them is precisely how this limb went unfiled for a census.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-17:4`. **It closes nothing else,
+  because** limbs 1, 2 and 5 are `ENFORCED_BY_CONSTRUCTION` *precisely by virtue of the absence this
+  entry files* — closing them on this entry would invert its argument — and limb 3 is `PARTIAL` and
+  already filed at RPH-BAS-006, whose anchor spans limbs 2-3. It closes no `RPH-CMP` limb either:
+  CMP's subject is the derivation's authority and axis-conditioning, which this entry deliberately
+  does not score.
+
+- **Merge target:** **BOTH.** *Corpus* — a DECISION settling whether this engine models repository
+  operations at all, and if not, an amendment saying so, since ASR-17 `:321` currently calls the link
+  required practice. *Repository* — `packages/rph-contracts/src/objects.ts`
+  (`BaselineItemVersionSchema`, and an `artifactType` domain on `ArtifactObjectSchema`),
+  `packages/rph-contracts/src/enums.ts` (`ProfessionalWorkObjectTypeSchema` if a plane is built),
+  `packages/rph-application/src/handlers/artifact.ts`, and a guard row in
+  `packages/rph-domain/src/enforcement-register.ts`. Cross-references **RPH-BAS-006**,
+  **RPH-CMP-001**, **REG-F-208**, **REG-F-028**, **REG-F-244**, **REG-F-245** and **REG-Q-056** (the
+  value-domain door this remedy has to walk through). **Safe default until then:** `artifactType`
+  acquires no members by fiat, and **no document, surface, projection or prompt may state that the
+  COMMIT milestone reflects a repository operation** — nothing reads one. Status: OPEN.
+
+### REG-F-249 — every door PER-12 limb 4 closes is open: the trace is admitted as Evidence, forwarded,
+and written verbatim into two permanent events, while the one surface that filters it stops at the
+durable store and leaves the wire open
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** PER-12 limb 4 is a five-fold negative over volunteered model
+  reasoning — never Evidence, never forwarded, never logged, never projected, never an assurance-policy
+  input. Driven against the engine, four of the five are ADMITTED. A chain-of-thought trace was proposed
+  as `evidenceType:'TRACE'` with the raw text inline and advanced to `ADMISSIBLE` through a guard that
+  is ALIVE and refuses six other conditions at the same line; it was forwarded into an assessment and
+  persisted on a Decision's `consideredEvidenceIds`; and it was written verbatim into two permanent
+  events. The fifth, *never projected*, has no engine surface to violate — but the demo's live SSE relay
+  forwards `kind:'thinking'` to the browser and the page renders and styles the raw text, while the
+  three sibling sites that own the same rule all filter it out. **The single root is that no predicate
+  in this engine ever asks what a piece of material IS** — and the module that owns the §9.7 boundary
+  says so itself: its docblock enumerates exactly TWO boundaries it enforces, and the wire is not one.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` §9 *Persistence semantics* (heading read off line **333**),
+  **PER-12** at line **381**, **limb 4**: *"It is never admitted as Evidence, never forwarded to another
+  actor, never logged, never projected, and **never an input to any tier of assurance policy or
+  Assurance Engineering**;"*
+  - **⚠ AND THE TWO CANON LINES THAT FIX WHAT THE LIMB MEANS, quoted so the remedy is not written too
+    wide.** PER-12's **WHY** at **`JPWB-DOC-003:382`**: *"a reasoning trace is not reliably tied to the
+    conclusion the model actually reached — which is exactly why it can never be evidence-grade or
+    contaminate evaluation"* — that sentence is conjuncts 1 and 5, and it is why a content-blind
+    admissibility gate is the wrong shape rather than merely an incomplete one. Its **NON-EXAMPLE** at
+    **`JPWB-DOC-003:383`** defines the verb in conjunct 2: *"offline diagnostic *reading* of a retained
+    trace is not "forwarding" — forwarding means placing it in an actor's or evaluator's operating
+    context."* **A browser agent log IS an actor's operating context**, which is what makes the live
+    wire a conjunct-2 breach and not only a conjunct-4 one — and conversely why nothing here forbids a
+    diagnostic read.
+
+- **THE FIVE CONJUNCTS, THEIR DOORS, AND THEIR MEASURED DISPOSITIONS — re-read at HEAD 2026-08-23.**
+  - **(1) NEVER ADMITTED AS EVIDENCE — ADMITTED, AND THROUGH A GATE THAT IS ALIVE.** `admitEvidence`
+    (`packages/rph-application/src/handlers/assurance.ts:530`) opens a `guard:` at **`:551`** that calls
+    the kernel `evidenceAdmissibility` at **`:552`** and refuses at **`:565-572`** with the message at
+    **`:570`**: *"AdmitEvidence blocked: … is inadmissible (§8.11) — failed …"*. The kernel
+    (`packages/rph-assurance/src/assurance-rules.ts:142-161`) has **eight** limbs — `IDENTITY_STABLE`
+    (`:147`), `PROVENANCE_PRESENT` (`:153`), `CONTENT_AVAILABLE` (`:154`), `SCOPE_STATED` (`:155`),
+    `LIMITATIONS_RECORDED` (`:156`), `NOT_INVALIDATED` (`:157`), `SUFFICIENTLY_CURRENT` (`:158`),
+    `RELEVANT` (`:159-160`) — and **not one asks what the evidence IS.** This is not a dead predicate:
+    `CONTENT_AVAILABLE` really refuses (`referencesContent`, `:129-134`, rejects `{}`), and the ledger
+    records a DRIVEN refusal on `scope: ''`. **The door discriminates on six axes and is blind on the
+    one axis this limb names.**
+  - **(2) NEVER FORWARDED TO ANOTHER ACTOR — ADMITTED at two doors.** `submitEvidenceForAssessment`
+    (`assurance.ts:1480`) loads the **assessment** (`:1483`) and the **policy** (`:1514-1518`) and
+    **never loads `p.evidenceId` at all** — the only `loadObject` in the handler is the policy's, and
+    `p.evidenceId` is merely copied onto the event at `:1582` — so the object it forwards is never
+    resolved. And `ProposeDecision` persisted the trace evidence on a governance object's
+    `consideredEvidenceIds`. Under `:383`'s definition the browser wire in (4) is a third such door.
+  - **(3) NEVER LOGGED — ADMITTED, into permanent state, twice.** `proposeEvidence` writes
+    `contentReference` onto object state at **`assurance.ts:484`** and echoes it verbatim onto the
+    `EvidenceProposed` event at **`:505`**, so the raw trace text is now in the append-only log.
+    Independently, `appendConversationEntries`
+    (`packages/rph-application/src/handlers/pwa-authoring.ts:70`) accepts `{role:'AGENT',
+    kind:'thinking', text:<raw trace>}`, appends it to `CONVERSATION.entries` and commits the payload
+    verbatim into `ConversationEntriesAppended`. **The carriers are open by construction:**
+    `ConversationEntrySchema.kind` is `z.string()`
+    (`packages/rph-contracts/src/objects.ts:190`, inside a `z.strictObject` at `:188-193`) and
+    `ArtifactReferenceSchema` is `z.record(z.string(), z.unknown())` (`objects.ts:70`), declared under
+    the header at `:66-67`, byte-exact: *"Permissive structured placeholders (any object) — tightened
+    in the milestone that defines them (M7/M9/M11)"*.
+  - **(4) NEVER PROJECTED — NO ENGINE PROJECTION CARRIES THE TEXT, AND A LIVE SURFACE ONE DOES. ⚠ AND
+    THE ASYMMETRY IS THE FINDING.** Engine side: `packages/rph-projections/src` has **no ARTIFACT view
+    and no CONVERSATION view** — re-derived at HEAD, every `artifact` hit is the PWU-Type input/output
+    **NAME** (`readonly artifact: string`, `execution-view.ts:963`, `pwa-graph.ts:49`), never the
+    ARTIFACT object type, and `CONVERSATION` is **0**.
+    ⚠ **CORRECTED ON VERIFICATION — THE FIRST DRAFT'S POSITIVE CONTROL WAS DEAD (EM-2).** `EVIDENCE`
+    → 7 lines does NOT show the package projects other object types: all seven are `EVIDENCE_PENDING`
+    / `EVIDENCE_INVALIDATED` **ASSESSMENT-status literals** in `assurance-view.ts`
+    (`:84 :151 :349 :357 :372 :374 :394`) — not one is an Evidence projection.
+    **THE DERIVED CONTROL THAT DOES WORK:** the package folds **40** distinct `case '<EventType>'`
+    labels; **zero** name any Artifact or Conversation event, while `EvidenceProposed` IS folded at
+    **`traceability-view.ts:57-58`** into SUPPORTS links, and `AssuranceEvidenceReceived` /
+    `EvidenceInvalidated` at `assurance-view.ts:381` / `:393`. **SO THE HONEST ENGINE CLAIM IS NARROWER
+    THAN "no surface":** the trace-carrying EVIDENCE object DOES reach a rebuildable read model —
+    `traceability-view.ts:90` registers every event's aggregate as a node — but **no fold copies the
+    content: `contentReference` occurs 0 times in the entire package.** The reasoning TEXT reaches no
+    engine projection; its carrier reaches one by identity. **BOTH NUMBERS: 0 Artifact/Conversation
+    folds vs 40 event folds.** Surface side,
+    three sibling sites filter `thinking` and the fourth does not: `transcript.ts:16-25` maps
+    `thinking → 'thinking'` and omits it from `RECORDABLE`; `agent/+server.ts:191` drops it before the
+    durable write (`if (!isRecordable(TRANSCRIPT_KIND[ev.kind] ?? '')) return;`);
+    `pwa/[id]/+page.server.ts:205` filters `.filter((e) => e.kind !== 'thinking')` off the durable
+    loader with the note *"§9.7: private chain-of-thought never enters a default or shared
+    projection"*; and **`agent/+server.ts:342` — `if (ev.kind !== 'done') send(ev);` — filters
+    nothing.** The browser then renders it: `pwa/[id]/+page.svelte:828-829` `appendText('thinking', …)`,
+    **`:1228`** the `thinking` branch, **`:1230`** `<span class="logtext">{entry.text}</span>` — the RAW
+    TEXT — and **`:2304-2307`** styles `.logentry.thinking`. ⚠ **AND THE MODULE THAT OWNS THE RULE
+    STATES ITS OWN SCOPE, WHICH IS THE PROOF THIS IS AN OMISSION AND NOT A DECISION:**
+    `transcript.ts:1-6` names *"the §9.7 boundary it enforces"* as *"**Two** rules"* — never another
+    agent's context, never a durable store. **The wire is a third boundary the module never claims.**
+    The path is unexercised today only because `thinkingLevel: 'off'` (`pi-agent.ts:127`) stops the
+    provider emitting — **a configuration value, not a guard.**
+  - **(5) NEVER AN INPUT TO ANY TIER OF ASSURANCE POLICY — ADMITTED to `SATISFIED`.** An ACTIVE policy
+    whose criterion reads *"judge the producing model chain-of-thought"* took the CoT artifact as its
+    assessment SUBJECT, received the raw trace as submitted evidence, and completed at
+    `assessmentState = SATISFIED`. **This conjunct is the sponsor's own sentence** — REG-D-015's
+    disposition at `JPWB-REG-005:150` records *"quarantined from every assurance tier"*.
+
+- **OBSERVED / READ — MIXED, and which is which. EM-5 respected: nothing below is upgraded.**
+  **OBSERVED (driven with node, W-3b lanes `lane-PER-12.mjs` / `lane-PER-12b.mjs`, 2026-08-21;
+  transcripts on the census row `limb:PER-12:4`):** conjuncts 1, 2, 3 and 5 — every ACCEPTED verdict,
+  `status = ADMISSIBLE`, `DECISION.consideredEvidenceIds = ["evd_01ARZ3NDEKTSV4RRFFQ69G5EE5"]`, and
+  `assessmentState = SATISFIED`. **CONTROL DRIVEN alongside, and it IS on this row:** a byte-adjacent
+  ordinary `evidenceType:'ARTIFACT'` over a DOCUMENT also reached `ADMISSIBLE` — **so the gate
+  discriminates nothing on material class**.
+  ⚠ **CORRECTED ON VERIFICATION — ONE CONTROL IS NOT MINE, AND ITS CLASS IS DOWNGRADED.** The
+  control-that-must-fail at the conjunct-3 site (an empty batch drawing
+  `RPH_VALIDATION_SEMANTIC_FAILED | AppendConversationEntries changes nothing: the entries batch is
+  empty.`) does **not** appear in this row's transcript — `limb:PER-12:4` carries no such run. It is
+  **REG-F-245's** record at `JPWB-REG-005:14866-14869`, driven on the same lane `lane-PER-12b.mjs` on
+  the same day, and its message matches `pwa-authoring.ts:65` byte-for-byte at HEAD. **READ from that
+  filing, not driven here** — cited so the conjunct-3 accept is still shown against a live handler,
+  without borrowing a sibling's evidence class.
+  **READ (this pass, at HEAD, re-derived rather than inherited):** every `file:line` above, both
+  censuses, and the whole of conjunct 4 — **conjunct 4 was never driven and this entry does not claim
+  it was.** A `thinking` delta cannot be produced in this deployment without changing
+  `pi-agent.ts:127`, which is precisely why it is filed as a reachable path rather than an admission.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY. Six exist, three landed hours ago, and two of
+  them drove the very arrangements quoted above.** The next reader will find them; none closes this row.
+  - **REG-F-244 (`JPWB-REG-005:14526`) — THE ONE MOST LIKELY TO BE MISTAKEN FOR COVERAGE, because its
+    title reads like this limb.** *"two of the three planes a reasoning trace is excluded from admit it
+    outright, and the one use canon permits it for is the one with no mechanism at all"*. It closes
+    **`limb:PER-12:6`** — the *offline diagnosis* PERMISSION and its three excluded **planes**
+    (assurance, execution, governance) — and it **rules this limb out in terms** at **`:14749-14752`**:
+    *"It closes nothing else, because limb 4's clause list (never Evidence / never forwarded / never
+    logged / never projected / never an input to any assurance TIER) turns on different predicates at
+    different doors **and is already partly raised at `HARMONIZATION-FINDINGS.md:39`**;"* — the last
+    clause **restored on verification**: the first draft's quote stopped one clause early and cut the
+    one concession in F-244 that is adverse to this entry. Its SIBLINGS bullet says it plainly at
+    **`:14702-14704`** — limb 4's *"**never logged** clause is separately raised as
+    `HARMONIZATION-FINDINGS.md:39`"*. The concession is real, and it is a PARTIAL raise of ONE conjunct
+    at the demo surface — dispositioned in full below — after which F-244 still declines the limb.
+    **Where it genuinely overlaps, and the overlap must not be re-litigated:** its
+    admission (i) is conjunct 5's substance under a plane framing, and its remedy 2 would close
+    conjunct 2's Decision door. **Where it does not reach at all:** the Evidence-ADMISSION door
+    (conjunct 1) appears nowhere in it — `evidenceAdmissibility` is not among its sites; the permanent
+    event log (conjunct 3) appears nowhere in it; and its remedy 1 touches only the assessment SUBJECT
+    axis, leaving `submitEvidenceForAssessment` unguarded. **Three of five conjuncts survive it.**
+  - **REG-F-245 (`JPWB-REG-005:14771`) — THE SECOND-STRONGEST DECOY, AND IT QUOTES MY CONJUNCT 3
+    VERBATIM.** At **`:14862-14865`** it records the identical driven arrangement — *"the raw trace
+    entered the append-only event log twice and both were permanent —
+    `ConversationEntriesAppended {entries:[{role:'AGENT',kind:'thinking',…}]}` → **ACCEPTED**"*. It
+    closes **`limb:PER-12:7`**, purgeability. **Its question is "once in, can it come out?"; this
+    limb's is "should it ever have gone in?"** — and its own reconciliation at `:14975-14977` declines
+    the rest for exactly that reason. A repair to F-245 (a purge mechanism) leaves all five doors open.
+  - **REG-F-230 (`JPWB-REG-005:10205`) — the one pre-existing entry naming PER-12, and it HANDS IT
+    BACK.** At **`:10345-10347`**: *"⚠ WHAT A REPAIR MUST NOT TOUCH. The `thinking` half of the same
+    filter is a different invariant's subject — PER-12 / §9.7 chain-of-thought retention — where the
+    exclusion is correct."* It closes `limb:ASR-4:6` (tool-call records never reaching Reasoning
+    Review). ⚠ **Note what its sentence is actually about: the DURABLE filter at `transcript.ts` /
+    `agent/+server.ts:191`, which IS correct. It says nothing about the wire at `:342`, a different
+    line of the same file.** That is the EM-1 sibling trap on this row.
+  - **`docs/_working/HARMONIZATION-FINDINGS.md:39` — finding #29, which reaches conjunct 4 and gets the
+    SITE WRONG.** Verbatim: *"| 29 | BLOCKING | CODE_IS_WRONG | governed-stream | §9.7:1338 |
+    `apps/rph-demo/src/lib/server/agent/pi-agent.ts:147` | **Volunteered chain-of-thought is streamed to
+    the browser agent log, which §9.7 forbids reaching a log or shared projection.** |"*. It is one of
+    75 confirmed findings (header `:1-7`), not struck. **It covers the surface half of conjuncts 3-4 and
+    nothing else** — it is anchored on the **pre-canon Guide §9.7:1338**, not on DOC-003 PER-12:381, it
+    sits in a 2026-07-15 audit appendix, and **its remedy is wrong** (see the citation corrections
+    below). Its sibling **#59** (`:69`) files `limb:PER-12:1` in the opposite direction.
+  - **REG-Q-062 (`JPWB-REG-005:15841`)** closes `limb:PER-12:3` (a procurement PERMISSION the engine
+    inverts into an obligation) and at **`:15974-15976`** records this very row as NEAR_MISS. It is a
+    QUESTION about *soliciting* a trace; this limb governs one already in hand.
+  - **REG-F-242 (`JPWB-REG-005:14077`)** — *"an Evidence object's TYPE is compared to nothing"* — is the
+    nearest entry at conjunct 1's own site and closes `limb:ASR-7:1` / `:5`. Its axis is **probative fit
+    between a type and the proposition it is offered for**; this limb's is **material class barring
+    admission at all, whatever it is offered for**. Its permitted-pairs remedy would still admit this
+    trace, because `TRACE` is a legitimate `EvidenceType` (`enums.ts:413-423`) for execution claims.
+    **REG-F-243** (`:14296`, `limb:ASR-7:6`) is the judgment-permission axis and is further away still.
+  - **NOT A DIVERGENCE FILING, but standing and worth citing:** REG-Q-027 (`:315`) is **MERGED** by
+    REG-D-015; its safe default at `:317` — *"never forward retained model reasoning to dependent
+    consumption or downstream prompts"* — binds conjunct 2 and is enforced nowhere.
+
+- **⚠ CITATION CORRECTIONS, all three found by re-reading at HEAD rather than inheriting.**
+  1. **A STANDING REMEDY THAT IS WRONG, AND WOULD BREAK A SIBLING LIMB IF FOLLOWED.**
+     `HARMONIZATION-FINDINGS.md:39` (#29) points the repair at `pi-agent.ts:147`; at HEAD the emit is
+     **`pi-agent.ts:143-144`**. **The drift is the smaller error.** That site is the *emit*, internal to
+     the server; suppressing it makes the trace unavailable to **every** consumer including the
+     retention path **`limb:PER-12:1`** requires (*"retained where available as a typed Artifact"*).
+     The defect is at the **relay**, `agent/+server.ts:342`, where it crosses to an actor. A repair at
+     #29's site closes conjunct 4 and forecloses limb 1.
+  2. **`verif/guard-enforcement-ledger.data.ts:151-156`**, row *"evidence must have provenance and state
+     scope + limitations (§16.2)"*, cites the guard at `assurance.ts:527`, the return at `:541-548` and
+     `enforcingSite: "…assurance.ts:543"`. At HEAD `admitEvidence` is at **`:530`**, the `guard:` opens
+     at **`:551`**, and the refusal block is **`:565-572`**. **Consequence, stated honestly: the row's
+     DISPOSITION still holds** — `enforcingAnchor: "is inadmissible"` still resolves at the new line, so
+     the ledger gate is not broken; only the pointer misleads a reader.
+  3. **Same ledger row**, kernel limbs cited as `assurance-rules.ts:152` / `:154` / `:155`; at HEAD they
+     are **`:153`** / **`:155`** / **`:156`** — each one line stale. (REG-F-242's `:153 :155 :156` is
+     correct and is the control that this is drift in the ledger, not in my reading.)
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, at HEAD 2026-08-23.** Bash
+  `grep` throughout (never `-i` with `-F` — that pair aborts on this box), every long hit opened with
+  `sed -n`. **⚠ The census row's own search covered only two corpora** (its `owed` names
+  `enforcement-register.ts` and the ledger); `docs/_working` and REG-005 are searched here.
+  - **BY LIMB ID, DERIVED — the decisive negative.** `grep -o 'limb:[A-Z]*-[0-9]*:[0-9]*'` over REG-005
+    yields **101 distinct limb ids**; `limb:PER-12:4` occurs **twice**, at **`:14702`** and
+    **`:15974`**, and **both are sibling-delta prose inside other entries, neither a closure line**. A
+    sweep of every `LIMB IDS THIS …` line (**32** of them) confirms **no entry closes this limb.**
+    **POSITIVE CONTROL in the same output:** `limb:PER-12:1`, `:2`, `:3`, `:6`, `:7`, plus
+    `limb:PER-8:3`, `limb:PER-10:1`, `limb:PER-11:1` all resolve — the instrument reaches this family.
+  - **BY SITE / SYMBOL, four corpora, format `REG-005 / enfreg / ledger / _working(files)`:**
+    `volunteeredReasoning` **2 / 0 / 0 / 0** (both REG-F-244/245, opened) · `CHAIN_OF_THOUGHT`
+    **3 / 0 / 0 / 0** (all REG-F-244, opened) · `evidenceAdmissibility` **4 / 7 / 1 / 6** (all opened;
+    ⚠ **corrected on verification:** enfreg's seven span **RPH-EVD-003, -004 AND -007** — the
+    producing-actor/content-reference axis (`:939 :953`), the scope-BREADTH axis (`:978 :992`) and the
+    admission-failure marker (`:1078 :1088 :1089`); **not one tests material class**, and the first
+    draft named only 003/004. Ledger is the row corrected above) ·
+    `ConversationEntriesAppended` **2 / 0 / 0 / 1** (`:8531` an event-name list,
+    `:14864` REG-F-245) · `AppendConversationEntries` **4 / 0 / 0 / 3** (all opened; `:10289`/`:10294`
+    are REG-F-230's tool-record drive) · `ConversationEntry` **3 / 0 / 0 / 2** (all REG-F-230, on the
+    missing tool-AUTHORIZATION field, `:10338`) · `EvidenceProposed` **9 / 0 / 0 / 5** ·
+    `contentReference` **11 / 2 / 0 / 3** · `SubmitEvidenceForAssessment` **4 / 0 / 1 / 3** ·
+    `pi-agent` **4 / 0 / 0 / 3** · `thinking` **13 / 0 / 0 / 2**, all thirteen opened · `volunteered`
+    **7 / 0 / 0 / 4**. ⚠ **FOUR `_working` FILE COUNTS WERE RE-RUN AND CORRECTED**, each one file low.
+    The extra files hold nothing that covers this limb, and all were opened: HF `:263`/`:278` is the
+    `ConversationEntriesAppendedPayloadSchema` shape; HF item 22 (`:1208-1240`) is a **REFUTED**
+    PER-8 purgeability claim already ruled on inside REG-F-245; and
+    `docs/_working/PROPOSED-EDITS-recording-and-cot.md:168` is a **proposed conformance scenario, not a
+    divergence filing** — it asks that *"no retained reasoning Artifact appears in a Validator's
+    context or a log"*, which is remedy-side support for this entry rather than coverage of it.
+    **Every count above is non-zero somewhere, which is this sweep's own control
+    that the instrument is not silently returning the `-i -F` zero.**
+  - **⚠ THE 17 ENTRIES SHIPPED 2026-08-23 WERE GREPPED SPECIFICALLY** (REG-F-234..245, REG-Q-058..062,
+    lines 12116-16041) by every term above, and each of the four PER-12 entries was read whole; all four
+    are dispositioned in the decoy bullet.
+
+- **THE REMEDY — it splits into ONE unblocked commit and FOUR doors blocked on a representation
+  decision. The entry keeps them apart so the cheap half is not lost in the table.**
+  1. **THE UNBLOCKED CODE FIX — the wire, conjunct 4.** At
+     `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:342`, apply the kind test the two sibling
+     boundaries in the same request already apply: forward everything except `done` **and `thinking`**.
+     Amend `transcript.ts:1-9`'s docblock to name **three** boundaries, since that docblock is the
+     module's own statement of scope and is what made the omission invisible.
+     ⚠ **PREDICTED RED REQUIRED BEFORE TRUSTING GREEN, and the naive test passes for the wrong
+     reason:** the mutant must be an agent that DOES emit a `thinking` delta, and the assertion must be
+     **two-sided** — the event reaches `record` (so `limb:PER-12:1`'s retention path stays reachable)
+     and does NOT reach `send`. An assertion that only says *"no thinking in the browser"* also passes
+     if someone deletes the emit at `pi-agent.ts:143-144`, which is #29's wrong remedy and forecloses
+     limb 1. ⚠ **Do NOT touch `thinkingLevel: 'off'` (`pi-agent.ts:127`)** — that is a configuration
+     value, and PER-12's own SCOPE (`JPWB-DOC-003:383`) says *"this rule governs retention and flow of
+     reasoning, never its generation"*.
+  2. **THE FOUR ENGINE DOORS — each is one predicate, and all four are blocked on the same missing
+     noun.** The predicates are cheap and the doors already hold the objects: `admitEvidence`'s guard
+     (`assurance.ts:551`) already has the state in hand; `submitEvidenceForAssessment` (`:1480`) must
+     first LOAD `p.evidenceId`, which it does not; `proposeDecision` can reuse the resolution shape
+     `invalidatedEvidenceUnderminingPromotion` already performs (**and REG-F-244's remedy 2 correctly
+     notes `approveDecision` is a second door on that one — cite it, do not re-derive it**);
+     `appendConversationEntries` (`pwa-authoring.ts:70`) must reject a reserved entry kind. **But none
+     of the four can be written until the engine can NAME volunteered reasoning.**
+  3. **⚠ THE RATIFICATION THAT GATES REMEDY 2, AND IT MUST NOT BE ANSWERED BY A COMMIT.** Does PER-12
+     need a first-class marker the trust pipeline recognises — a reserved
+     `ArtifactObjectSchema.artifactType` value (`objects.ts:613`, a bare `z.string()`), an
+     `EvidenceType`, or a `securityClassification` domain — or does the prohibition bind harnesses
+     only? **This walks straight through REG-Q-056's door — and the sentence saying so is REG-F-244's,
+     cited not re-derived** (`JPWB-REG-005:14736-14740`, its remedy 3): narrowing those columns
+     without a decision *"would RATIFY THE NARROWER READING BY ACCIDENT"*
+     (`JPWB-REG-005:11786-11790`), and `packages/rph-application/src/handlers/artifact.test.ts:123-136`
+     is a committed green test that exists to LOCK the absence of invented enums — re-read at HEAD,
+     titled *"accepts any value for the four open-domain columns — no enum is ratified, so none is
+     enforced"*. ⚠ **Q-056's own subject is the ARTIFACT `status` column (`objects.ts:623`), closing
+     `limb:OBJ-1:2` — a different column of the same schema** (F-244 says so at `:14690-14691`), which
+     is why this is *its door* and not its coverage. **AND THE TWO QUESTIONS DIFFER:** F-244's remedy 3
+     asks what the diagnostic READ SURFACE and its access model are; this one asks whether volunteered
+     reasoning is NAMEABLE at all. Sequence behind REG-Q-056 and beside REG-F-244's
+     remedy 1, which presumes the answer is `artifactType`. **Named separately so nobody folds it in.**
+  4. **⚠ AND THE PREREQUISITE ABOVE ALL OF IT.** `limb:PER-12:1` is already filed as divergent
+     (`HARMONIZATION-FINDINGS.md:69`, #59): the trace is DESTROYED at the write boundary rather than
+     retained. **That does not make this entry premature** — every admission above is reachable today
+     through the ordinary command surface by any caller who records a CoT artifact themselves, which is
+     exactly what the driven arrangement did.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:PER-12:4`. **It closes nothing else,
+  because** every sibling turns on a different act: `:1` is an affirmative RETENTION duty already filed
+  at `HARMONIZATION-FINDINGS.md:69`; `:2` is an availability statement of fact with no shape; `:3` is a
+  PERMISSION the engine inverts and is a QUESTION (REG-Q-062); `:5` is the ASR-13 hidden-context
+  consequence, enforced at the surface by `narrationOf` (`transcript.ts:34-39`); `:6` is the *offline
+  diagnosis* permission and its plane exclusions (REG-F-244); `:7` is purgeability (REG-F-245).
+  ⚠ **AND IT MUST NOT BE CLOSED BY A PARTIAL COMMIT.** Remedy 1 alone closes conjunct 4 at the surface
+  and leaves four engine doors open; remedies 2-3 alone leave the browser rendering the raw trace the
+  moment a harness config changes. **Five conjuncts, five doors: the limb closes when all five refuse.**
+
+- **Merge target:** **BOTH.** **Repository** — `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:342`
+  and `apps/rph-demo/src/lib/server/agent/transcript.ts:1-9` (remedy 1, landable now);
+  `packages/rph-application/src/handlers/assurance.ts` (`:551`, `:1480`),
+  `packages/rph-application/src/handlers/governance.ts` and
+  `packages/rph-application/src/handlers/pwa-authoring.ts:70` (remedy 2, gated on remedy 3); and
+  `verif/guard-enforcement-ledger.data.ts:151-156` for the stale pointers corrected above.
+  **Corpus first** for remedy 3 — a DECISION establishing whether volunteered reasoning is nameable in
+  the object model, sequenced behind **REG-Q-056**. Cross-references **REG-F-244** and **REG-F-245**
+  (the two sibling PER-12 entries filed 2026-08-23, whose driven arrangements this entry shares and
+  whose limbs it does not touch), **REG-Q-062**, **REG-F-230** (which rules PER-12 out of its own
+  scope), **REG-F-242** (the adjacent axis at conjunct 1's site), **REG-D-015** and **REG-Q-027**.
+  **Safe default until then:** no surface, seed, prompt or template may propose reasoning material as
+  Evidence, submit it against a requirement, name it on a Decision, or append it as a conversation
+  entry — nothing refuses any of it today. Status: OPEN.
+
+### REG-F-250 — DEC-2's assumption record is optional, fabricated when absent and unresolved when
+supplied: neither `assumptionId` nor `childWorkUnitIds` is ever matched against anything, and the set
+that would resolve "affected children" is already in hand three lines above the two builders that exist
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** DEC-2 makes a decomposition contract RECORD *"material assumptions
+  and affected children"*. The carrier exists and is persisted — `DecompositionContract.`
+  `assumptionPropagations`, shape `{assumptionId, childWorkUnitIds, rationale?}`, whose two required
+  members ARE canon's two nouns. It is REQUIRED on the object, in the emitted JSON Schema and in the M9
+  vocab, and `.optional()` on the wire; when it is absent the handler manufactures `[]`, so a contract
+  that never considered the parent's assumptions is byte-identical to one that considered them and found
+  none. And when it IS supplied, **neither end resolves**: `assumptionId` is never matched against the
+  parent's `assumptionIds`, `childWorkUnitIds` is never matched against this contract's own
+  `childWorkUnitIds`. A record naming an assumption that does not exist, affecting a PWU that is not a
+  child, reaches VALID. **The limb names two things to record; the code stores an array and checks
+  neither of them.** This is not UNENFORCED_NO_SHAPE — the shape for both halves exists and is simply
+  optional and unread.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§7 Decomposition and recomposition** (heading at line
+  207), **DEC-2** at line 215, **limb 6**: *"material assumptions and affected children;"* — one item of
+  the enumeration opened at the same line by *"A decomposition asserts that children collectively cover
+  their parent. It records: …"*. ⚠ **The section is §7, not §6** (`## 6.` at HEAD is *State axes and
+  transition guards*, line 169); REG-F-210 is the standing correction of that drift and this entry does
+  not re-file it. ⚠ **AND THE NEIGHBOURING CLAUSE IS A DIFFERENT DUTY:** DEC-4 at line 223 limb 7 reads
+  *"Material assumptions propagate when applicable;"* — a conditional PROPAGATION rule. DEC-2's is an
+  unconditional RECORDING duty on the contract. One carrier, two duties, and only one of them is filed.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD 2026-08-23 with `sed -n`, not grep summaries.**
+  - `packages/rph-contracts/src/objects.ts:137-141` — `AssumptionPropagationSchema = z.strictObject({`
+    `assumptionId: z.string(), childWorkUnitIds: z.array(z.string()), rationale: z.string().optional()`
+    `})`. `assumptionId` is canon's *"material assumptions"*; `childWorkUnitIds` is literally *"affected
+    children"*.
+  - `packages/rph-contracts/src/messages.ts:456` `ProposeDecompositionPayloadSchema` (a `z.strictObject`)
+    declares it OPTIONAL at **`:463`**: `assumptionPropagations: z.array(AssumptionPropagationSchema)`
+    `.optional(),`. `DecompositionContractSchema` (`objects.ts:628`) declares it REQUIRED at **`:636`**.
+  - `packages/rph-application/src/handlers/decomposition.ts:65` closes that gap by MANUFACTURING the
+    value: `assumptionPropagations: p.assumptionPropagations ?? [],`. The event builder thirty-two
+    lines down applies the OPPOSITE policy at **`:97-99`**, under its own docblock at **`:81-84`**:
+    *"plus any optional propagation fields the command actually supplied (absent = not specified, never
+    a fabricated empty). (Pinned defect; now conforms.)"* The object write is disclosed nowhere.
+  - **CENSUS, re-run verbatim at HEAD by this filing.** `grep -rn --include=*.ts --include=*.svelte`
+    `"assumptionPropagations" packages/*/src apps/*/src verif scripts` filtered of `/dist/`, `.test.`,
+    `messages.ts` and `objects.ts` → **3 lines**, all three in `handlers/decomposition.ts` (`:65`, `:97`,
+    `:98`), **all writes, ZERO readers**. **POSITIVE CONTROL — byte-identical command, same population,
+    the sibling field written one line ABOVE it:** `constraintPropagations` → **11 lines**, including a
+    genuine reader at `handlers/decomposition.ts:250` feeding the live `ValidateDecomposition` gate, and
+    a mutant at `scripts/mutants/ledger.ts:2177-2178`. **Both numbers: 3 with no reader, against 11.**
+
+- **THE TWO ENDS, AND WHAT WOULD RESOLVE EACH — BOTH ALREADY LOADED AT THE GATE. THIS IS THE
+  OBSERVATION NO EXISTING ENTRY CARRIES.** `checkDecompositionConservation`
+  (`handlers/decomposition.ts:262`), reached from `validateDecomposition` (`:334`) via its only `guard:`
+  (`:363`, call at `:366`), loads the parent at **`:271`** and at **`:273`** writes
+  `const childWorkUnitIds = (state.childWorkUnitIds as string[] | undefined) ?? [];`. **Both resolution
+  sets are in hand.** `:275-278` then hands them to exactly two builders and no third.
+  - `buildObligationInput` (**`:146`**) walks `(parent.obligationIds as string[] | undefined) ?? []`
+    at **`:155`**, `loadState`-ing each id and filtering on `objectType` and `status` — the exact shape a
+    `buildAssumptionInput` would need over `parent.assumptionIds` filtered on `materiality`
+    (`packages/rph-contracts/src/enums.ts:515`: `IMMATERIAL | MATERIAL | CRITICAL`).
+  - `buildConstraintInput` (**`:177`**) already computes the affected-child set one plane over, at
+    **`:194`**: `relevantChildWorkUnitIds: applicable ? childWorkUnitIds : []`.
+  - `buildAssumptionInput` → **0 hits repository-wide.** The machinery for both ends already exists —
+    `:146` and `:177`, 129 and 98 lines above the call at `:275` — and the assumption plane is handed
+    neither of them. ⚠ The census row called it *"twelve lines away"*; that distance is wrong and the
+    SHAPE claim it was making is right.
+
+- **THE ALTERNATE CARRIER, CHECKED IN THE OTHER DIRECTION SO THIS IS NOT AN ABSENCE OF MY SEARCH.**
+  If the affected children were recorded on the ASSUMPTION instead of the contract the limb could still
+  be met. They are not. `Assumption.affectedObjectIds` (`objects.ts:486`) is written from the payload at
+  `detectAssumption` (`handlers/assurance.ts:959`) and by no other command; the falsification path only
+  READS it (`assurance.ts:1123` into `assessFalsification`, echoed at `:1132`), and
+  `packages/rph-domain/src/decomposition.ts:458` copies it straight into `impactedObjectIds`. **No
+  decomposition command touches it.** ⚠ **DERIVED CONSEQUENCE, LABELLED READ AND NOT DRIVEN:** because
+  the children are recorded in neither carrier, falsifying the parent's assumption later emits an impact
+  set naming the parent and not the children the work moved to. That is a different cost surface from
+  the one already filed — REG-F-236's laundering runs through `PWU.assumptionIds` at plan approval.
+
+- **OBSERVED / READ — EVIDENCE CLASS IS MIXED, STATED PER CONJUNCT SO NOTHING IS UPGRADED (EM-5).**
+  **DRIVEN** (W-3b census lane `w3b-lane:v1-declyr`, measured 2026-08-21, `DROVE_THE_ENGINE`, all
+  through `Engine.dispatch` against a real store): the acceptance, the bogus-record acceptance and the
+  liveness control, each attributed below to the lane's transcript line or to its evidence
+  narrative. **READ / MEASURED AT HEAD BY THIS FILING 2026-08-23:** every
+  `file:line` above, both censuses with their controls, the alternate-carrier check, the four
+  declarations below and the EM-7 search. **This filing did not re-drive the engine.**
+
+- **THE DRIVEN ARRANGEMENT (DRIVEN, 2026-08-21), verbatim.**
+  - `S6.pre DetectAssumption materiality CRITICAL, affecting PARENT -> ACCEPTED | assumption state =`
+    `"CRITICAL" PROPOSED` — and the parent PWU was proposed carrying `assumptionIds: ['asm_…W20']`, so
+    the assumption is bound to the parent on the object plane, not merely adjacent to it.
+  - `S6.a ProposeDecomposition with the MANDATORY obligation allocated and assumptionPropagations`
+    `OMITTED -> ACCEPTED` · `S6.b ValidateDecomposition{VALID} -> ACCEPTED | D1 status = VALID |`
+    `assumptionPropagations = []`.
+  - **THE SUPPLIED-BUT-FALSE RECORD, same run. ⚠ SOURCED PRECISELY ON VERIFICATION: this one is
+    reported in the lane's EVIDENCE narrative (*"I also drove the degenerate case"*), not in its
+    transcript line — DRIVEN on the lane's word, not quotable from the transcript:**
+    `assumptionPropagations:[{assumptionId:'asm_does_not_exist',childWorkUnitIds:['pwu_not_a_child']}]`
+    `-> ACCEPTED` and VALID. **Neither end of a supplied record is resolved.** The next bullet is the
+    independently authored run that puts the same arrangement in this register verbatim.
+  - **INDEPENDENT CORROBORATION ALREADY IN THIS REGISTER, from a separately authored run:** REG-F-210's
+    own drive at `JPWB-REG-005:6504` reports a VALID contract holding
+    `assumptionPropagations = [{"assumptionId":"asm_does_not_exist",…}]`.
+
+- **THE LIVENESS CONTROL — THE GUARD ON THIS EXACT ARROW IS ALIVE AND SIMPLY HAS NO LIMB FOR
+  ASSUMPTIONS (DRIVEN, same run, byte-adjacent on the same store).** The accepted contract and the
+  refused one differ in ONE field — the refused one left the parent's MANDATORY obligation unallocated;
+  both omitted `assumptionPropagations` identically and both carried the same CRITICAL assumption on the
+  same parent: `CONTROL S6.c -> REJECTED | RPH_INVARIANT_VIOLATION | ValidateDecomposition cannot mark`
+  `dcp_01ARZ3NDEKTSV4RRFFQ69G5W05 valid: the decomposition does not conserve its parent's`
+  `obligations/constraints (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004):`
+  `MISSING_OBLIGATION_ALLOCATION(obl_01ARZ3NDEKTSV4RRFFQ69G5W02)`. **The gate runs, loads the parent's
+  object plane and refuses; it never asks about assumptions.**
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY — each opened at its line, not judged by name.**
+  - **`REG-F-236`** (`JPWB-REG-005:12546`, Date 2026-08-23, OPEN) is the one a searcher lands on: **13 of
+    the register's 15 hits for this field are inside it**, it quotes `decomposition.ts:65` verbatim at
+    `:12579`, and its remedy is a reader in this very function. **It is DEC-4's, and it says so itself.**
+    Its closure line at `:12812` reads *"LIMB IDS THIS ENTRY CLOSES: `limb:DEC-4:7`. It closes nothing
+    else."*, and `:12818-12820` is explicit: *"It also does not dispose of DEC-2's neighbouring clause
+    'material assumptions and affected children;' (JPWB-DOC-003:215), which is a **recording** duty on
+    the contract, not a **propagation** duty onto children."* Its remedy (1) refuses a MATERIAL/CRITICAL
+    parent assumption left **undisposed** — which a record naming the REAL assumption and
+    `pwu_not_a_child` satisfies, leaving the *affected children* unrecorded and unresolved. Its trap (ii)
+    at `:12796-12798` names the count-is-not-a-reader hazard, but its remedy text stops at the
+    disposition question and never resolves either pointer. **Compose, do not merge.**
+  - **`REG-F-210`** (`:6456`, OPEN) names this field verbatim TWICE (`:6497`, `:6504`) — and those are
+    the two lines an `assumptionPropagations` grep of REG-005 returned before today. Both are
+    **incidentals in a list of eight**: `:6497` enumerates the seven `?? []` fields to derive a general
+    form, `:6504` is one line of driven output. Its closure line at `:6669` reads *"LIMBS CLOSED BY THIS
+    ENTRY: `limb:DEC-2:3`, `limb:DEC-2:8`"*, and its remedy step (2) at `:6603-6607` gives readers to
+    `coverageClaims` alone. Its remedy step (1) at `:6600-6603` DOES close the fabrication half of this
+    limb (dropping `?? []` across all eight fields) and none of the resolution half. **A reader who
+    greps this field can close this row on `:6497`/`:6504`; they dispose of nothing about assumptions.**
+  - **`verif/guard-enforcement-ledger.data.ts:213`** is the closest thing to a filing and is the sharpest
+    proof this limb was never disposed of: its KEY decomposes this very sentence — *"obligations
+    allocated/retained, mandatory constraints propagated, siblings explicit; independent validation for
+    high-risk work (§13.2)"* — and its `evidence` at `:215` opens *"PARTIAL — 2 of 4 limbs enforced"*.
+    **The corpus that decomposed DEC-2's contract sentence into limbs counted four, and assumptions were
+    not one of them.** (REG-F-236 quotes this row for DEC-4; it is restated here because the sentence
+    that key is actually decomposing is DEC-2's.)
+  - **`RPH-DEC-005`** (`packages/rph-domain/src/enforcement-register.ts:3884`): its `canonAnchor` note
+    (`:3889`) cites DEC-2's enumeration — *"the last item of the mandatory contract's enumeration"* —
+    i.e. `recompositionContractId`, `limb:DEC-2:9`. A different item. ⚠ **CORRECTED ON VERIFICATION:
+    it is not the ONLY such row.** `RPH-DEC-001` (`:3453`) cites the same enumeration in its note at
+    `:3459` — *"whose enumeration covers all three of this rule's limbs — obligation allocation,
+    constraint disposition, and a recomposition strategy"*. **Two rows itemise DEC-2's enumeration and
+    neither names assumptions**, which sharpens the absence rather than weakening it: a second corpus
+    decomposed the same sentence and left this item out.
+
+- **⚠ FOUR REPOSITORY DECLARATIONS SAY THIS FIELD IS REQUIRED OR LOAD-BEARING — the REG-F-043 shape an
+  implementer will hit before they find any of the above.** `objects.ts:636` REQUIRED;
+  `packages/rph-contracts/schemas/objects/DecompositionContract.json:447` lists it in the emitted
+  schema's `required` array; `packages/rph-domain/vocab/m9-decomposition.json:23` carries
+  `"required": true` with `sourceRef: "§13.1; §13.2"`; and `packages/rph-domain/vocab/`
+  `m6-traceability.json:245`, the note on the `PROPAGATES` relation (opening `:233`), reads *"INFERRED.
+  Backed by DecompositionContract.constraintPropagations + assumptionPropagations (§13.1)"* — while the
+  audit property that same note names, *"'No constraint silently drops' property (§35.1) audits this
+  edge"*, has **no assumption counterpart**. ⚠ **CORRECTED ON VERIFICATION: `PROPAGATES` is not
+  merely an enum member.** Its two non-`dist` repository hits are
+  `packages/rph-contracts/src/enums.ts:761` (the `TraceRelation` member) and
+  `packages/rph-domain/src/traceability.ts:84`, a `TRACE_DIRECTIONALITY` entry declaring
+  `source: ['CONSTRAINT', 'ASSUMPTION']` / `target: ['PROFESSIONAL_WORK_UNIT', 'CONSTRAINT']`, read by
+  the LIVE `validateLinkDirectionality` (`:100`, lookup at `:105`, called from `:151`). **The
+  assumption→child edge is DECLARED LEGAL and nothing anywhere mints one** — those two hits are
+  the entire population.
+  `m9-decomposition.json:173` lists decomposition-time `assumptionPropagations` as one of FOUR channels
+  by which an assumption links to work. ⚠ And in `docs/_working/`, the corpus earlier sweeps skipped:
+  `AUDIT-shape-survivorship-2026-08-20.md:289` gives `constraint_propagations` its own **ENFORCED** row,
+  and the file has **no `assumption_propagations` row at all** (`grep -no '^| [a-z_]*propagations'` → one
+  hit, `:289`). Its `:292` scores `decomposition_contracts` ENFORCED citing *"+ allocations/propagations
+  /coverage"*; REG-F-210 already flagged `:292` as a field-set FIDELITY score rather than an enforcement
+  one, and it is restated here only because it reads as coverage of this field too.
+
+- **EM-7 SEARCH DISCLOSED, by id, by CONTENT and by SITE, across all four corpora at HEAD 2026-08-23.**
+  Bash `grep` throughout, `sed -n` on every long hit; never `-i` and `-F` together (that combination
+  aborts on this box and returns a silent zero through a pipe). Counts read
+  `REG-005 / enforcement-register.ts / guard-enforcement-ledger.data.ts / docs/_working` (69 files).
+  - **BY LIMB ID.** `limb:DEC-2:6` → **0 / 0 / 0 / 0**. *Observed positive controls, same command:*
+    `limb:DEC-2:3` → **4 / 0 / 0 / 0**, `limb:DEC-2:8` → **3 / 0 / 0 / 0**.
+  - **BY CANON TEXT, not by field name.** `material assumptions and affected` → **0 / 0 / 0 / 0**.
+    `affected children` → **1 / 0 / 0 / 0** — the single hit in 16,041 register lines is REG-F-236's own
+    disclaimer at `:12819`. *Control:* `material assumption` (case-insensitive) → **13 / 5 / 2 / 1 file**,
+    opened; every one is OBJ-4 reification, an STA arrow, a review-package list or an RPH-ASM row.
+  - **BY FIELD.** `assumptionPropagation` (case-insensitive) → **15 / 0 / 0 / 3 files**; **all 15 REG-005
+    hits opened** — 2 REG-F-210 incidentals (`:6497`, `:6504`), 13 inside REG-F-236.
+    `AssumptionPropagationSchema` → **1 / 0 / 0 / 0** (REG-F-236's own search line). The three `_working`
+    files opened: `doc009-audit-input.json:1074` a bare type-name list, `HARMONIZATION-LOG.md:1307` the
+    eighteen composite shapes whose payload schemas became real, and `OPEN-QUESTIONS.md:92-94` M9's
+    shape-minting note — *"genuinely undefined in ALL specs"* is at **`:92`**, the field name at `:93`
+    and the shape at `:94` — **none an enforcement claim.**
+    *Observed positive controls, sibling fields of the SAME object:* `obligationAllocations` →
+    **6 / 0 / 2 / 1**, `constraintPropagation` (case-insensitive) → **18 / 5 / 3 / 8** (re-measured
+    at HEAD; an earlier pass of this filing said 7 `_working` files). **Both numbers reported:
+    15/0/0/3 for the assumption plane, of which none is a filing, against 18/5/3/8.**
+  - **BY SITE, the channel that unhid earlier findings.** `buildAssumptionInput` → **0 / 0 / 0 / 0** and
+    0 repository-wide. `decomposition.ts:65` → **2 / 0 / 0 / 0**, both REG-F-236's. *Controls:*
+    `checkDecompositionConservation` → **15 / 6 / 1 / 0**, `buildConstraintInput` → **8 / 3 / 0 / 0**,
+    `buildObligationInput` → **3 / 0 / 0 / 0**.
+  - **BY ALTERNATE CARRIER.** `affectedObjectIds` → **2 / 1 / 1 / 1**, all five opened: `REG-005:7627`
+    and `:7710` are waiver/decision payload field lists; `enforcement-register.ts:3313` is RPH-ASM-001's
+    reification note; `ledger:167` is the Assumption FALSIFIED arrow; `AUDIT-shape-survivorship-`
+    `2026-08-20.md:291` is `assumption_impacts | DIVERGENT_UNFILED`, about per-link `impact_type` and
+    `rationale` having no carrier — **a different column, not this limb.**
+  - **THE 17 ENTRIES MERGED TODAY (`REG-F-234..245`, `REG-Q-058..062`) SEARCHED SPECIFICALLY**, because
+    every transcript on the census row predates them. Their closure declarations were enumerated rather
+    than hand-listed (`grep 'LIMB IDS THIS ENTRY CLOSES\|LIMBS CLOSED BY THIS ENTRY'` over `NR>=12100`)
+    and each read: `REL-2:1`, `ASR-9:9`, `DEC-4:7`, `ASR-14:5`, `AUT-2:2`, `DEC-1:1`+`:2`, `DEC-1:3`,
+    *none*, `ASR-7:1`+`:5`, `ASR-7:6`, `PER-12:6`, `PER-12:7`, `OBJ-2:3`, `AUT-2:3`, `ASR-1:6`.
+    ⚠ **CORRECTED ON VERIFICATION — THAT PATTERN RETURNS 15 OF 17, AND THE INSTRUMENT'S OWN GAP IS
+    ALREADY ON THIS REGISTER** (`REG-F-245:14904` names the variant wordings). The two it missed are
+    `REG-Q-061` — *"LIMB IDS AN ANSWER WOULD CLOSE"* (`:15814`) → `limb:ASR-7:3` — and `REG-Q-062`
+    — *"LIMB IDS THIS QUESTION WOULD CLOSE"* (`:16028`) → `limb:PER-12:3`; five such variant lines
+    exist register-wide. **No DEC-2 limb among any of the 17**, confirmed a second way that does not
+    depend on the declaration wording at all: `grep -o 'limb:DEC-2:[0-9]*'` over `NR>=12100` returns
+    only `:3`×2 and `:8`×2, every one inside REG-F-236's discussion of REG-F-210.
+
+- **THE REMEDY — THE TWO ENDS. TWO NEIGHBOURING HALVES ARE OWNED ELSEWHERE AND ARE NAMED SO NOTHING IS
+  IMPLEMENTED TWICE.**
+  1. **Resolve both ends of every supplied record**, inside `checkDecompositionConservation`
+     (`handlers/decomposition.ts:262`) — the one gate that already refuses
+     `MISSING_OBLIGATION_ALLOCATION` and `SILENT_CONSTRAINT_DROP`. Each
+     `assumptionPropagations[].assumptionId` must name a loadable object of
+     `objectType === 'ASSUMPTION'` that is in the PARENT's `assumptionIds`; each entry of
+     `childWorkUnitIds` must be in THIS contract's `childWorkUnitIds`, already bound at `:273`. Model the
+     parent walk on `buildObligationInput` (`:155`) and the child set on `buildConstraintInput` (`:194`),
+     and extend the refusal `parts` list at `:281-287` with its own finding codes.
+  2. **NOT THIS ENTRY'S TO WRITE.** The requiredness/fabrication half is **REG-F-210's** remedy step (1)
+     (drop `?? []` across all eight optional fields, so absence stays absence). The completeness floor —
+     every MATERIAL or CRITICAL parent assumption must appear at all — is **REG-F-236's** remedy (1).
+     **`limb:DEC-2:6` closes only when all three land**; this entry owns the resolution of the record's
+     two ends, which neither of the other two states.
+  3. ⚠ **Do not implement this as mandatory propagation.** DEC-2 obliges the contract to RECORD;
+     DEC-4's propagation clause is conditional, is REG-F-236's, and carries its own trap against forcing
+     every material assumption onto every child. Refusing a record whose ends do not resolve asserts
+     nothing about which children an assumption ought to reach — it is the minimum that closes THIS limb.
+
+- **THE TEST THAT MUST REDDEN FIRST, AND IT DOES NOT EXIST — MEASURED, NOT ASSUMED.** A whole-repository
+  grep with **no** exclusions (`--include=*.ts --include=*.svelte --include=*.json`, minus `dist` and
+  `node_modules`) returns **14 lines** for this field and **not one is a test**; and
+  `grep -ic assumptionPropagation scripts/mutants/ledger.ts` → **0**, against a control of
+  `constraintPropagation` → **2**. So there is no green to trust and no mutant guarding it. Write red:
+  the contract carrying `{assumptionId:'asm_does_not_exist', childWorkUnitIds:['pwu_not_a_child']}` must
+  move `ValidateDecomposition` from ACCEPTED to REJECTED. Ship it beside **two controls with their own
+  mutants** — (a) the `MISSING_OBLIGATION_ALLOCATION` refusal above still firing on its own limb, so the
+  new refusal is proved distinguishable rather than an arrangement tripping two conjuncts, and (b) a
+  well-formed record naming a real parent assumption and a real child still ACCEPTED. **Assert the
+  MESSAGE, not the code:** all three planes then share one `RPH_INVARIANT_VIOLATION` sentence at `:291`,
+  so the finding code is the only thing that tells the new refusal from `SILENT_CONSTRAINT_DROP`.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-2:6`. It closes nothing else,
+  because every other DEC-2 limb is separately disposed at HEAD: `:3` and `:8` by REG-F-210; `:2`, `:4`
+  and `:5` verdicted ENFORCED by the census; `:1`, `:7`, `:9`, `:10`, `:11` and `:12` FILED elsewhere.
+  And the adjacent assumption clause on the SAME carrier, `limb:DEC-4:7`, is REG-F-236's and is closed
+  there — this entry must not be read as re-filing it.
+
+- **Merge target:** Repository — `packages/rph-application/src/handlers/decomposition.ts` (the
+  resolution builder and the `parts` list at `:281-287`) and `packages/rph-domain/src/decomposition.ts`
+  (the kernel predicate, beside `validateConstraintPropagation`). Corpus: none — canon states the
+  recording duty plainly and needs no amendment. Status: OPEN.
+
+### REG-F-251 — an omitted optional field is written into the governed object as `[]`, so the record
+asserts "empty" where the message said nothing, and the fabricated empty is then prosecuted as a
+positive claim — while the same function's event builder, twenty-three lines below, records the truth
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** OBJ-1's third limb fixes the meaning of an omitted optional field:
+  it means the field was **not part of that message**. The engine writes the opposite into the governed
+  record. `proposeDecomposition` accepts a command carrying only its three required fields and persists
+  a `DECOMPOSITION_CONTRACT` in which **all eight** optional payload fields are PRESENT — seven
+  fabricated as `[]`, the eighth as `""`. Twenty-three lines below that write, the SAME function's event
+  builder applies canon's rule to the SAME eight fields, under a comment stating it in canon's own
+  words. One command, one handler, two opposite answers to *what does omission mean*. And the fabricated
+  value is not inert: it is read back as a positive claim — a contract that OMITTED
+  `obligationAllocations` is refused with `MISSING_OBLIGATION_ALLOCATION`, so silence is prosecuted as
+  *"nothing was allocated"*. This is not one handler's slip: the object model has no way to express
+  absence (the same eight fields are `.optional()` on the wire and REQUIRED on the object, and `kit.ts`
+  refuses to persist a state its object schema rejects), so the handler has no choice but to invent one.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`,
+  **§3 "Core objects and minimum rules"** (heading read off **line 75** from the file's own heading map,
+  never inferred from proximity), **OBJ-1 at line 105**, **limb 3**: *"An omitted optional field means
+  the field is not part of that message — not unknown, false, empty, or inapplicable."*
+  - OBJ-1's **SCOPE** and **NON-EXAMPLE** share one line (**L107**) and both bear on the remedy:
+    *"governs semantic state wherever it is read or persisted."* and *"this does not require every
+    optional wire field to become a status enum; requiredness is justified only where absence would
+    cause semantic ambiguity, never by implementer convenience."* ⚠ **The SCOPE clause forecloses the
+    one defence available here** — that the event plane conforms. The **persisted** object is in scope
+    by name, and it is the plane every later guard reads.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD 2026-08-23 with `sed -n`, not grep summaries.**
+  - `packages/rph-application/src/handlers/decomposition.ts:62-69` — the object write. `:62`
+    `intentMappings: p.intentMappings ?? [],` and the same idiom at `:63-68` for
+    `obligationAllocations`, `constraintPropagations`, `assumptionPropagations`,
+    `retainedParentObligationIds`, `coverageClaims`, `siblingDependencyIds`; `:69`
+    `recompositionContractId: p.recompositionContractId ?? '',`.
+  - `packages/rph-application/src/handlers/decomposition.ts:85-105` — the event builder in the SAME
+    function, applying the conditional spread to the SAME eight fields (`:90`
+    `...(p.intentMappings?.length ? { intentMappings: p.intentMappings } : {}),`), under its own comment
+    at **`:81-84`**, whose last line reads verbatim: *"actually supplied (absent = not specified, never
+    a fabricated empty). (Pinned defect; now conforms.)"* **The comment states canon's rule and governs
+    the plane BELOW it; the plane twenty-three lines above carries no comment at all.**
+  - `packages/rph-contracts/src/messages.ts:456` `ProposeDecompositionPayloadSchema` — all eight fields
+    `.optional()` at **`:460-467`**. `packages/rph-contracts/src/objects.ts:628`
+    `DecompositionContractSchema` — the same eight **non-optional** at **`:633-640`**.
+  - `packages/rph-application/src/handlers/kit.ts:419-420` — the seam that makes the fabrication
+    compulsory: *"(d) The produced state MUST be a valid domain object — fail loud otherwise (never
+    persist a bad state)"*, then `const stateCheck = validateAgainst(entry.schema, args.nextState, {`.
+    Drop the `?? []` without relaxing the object field and the write is REJECTED, not honest.
+  - `packages/rph-application/src/handlers/decomposition.ts:165` — the second default, on the READ
+    side: `const allocations = (state.obligationAllocations as { obligationId: string }[] | undefined)`
+    `?? [];`, feeding `checkDecompositionConservation`. *Not part of this message* became `[]` on the
+    write and *nothing was allocated* on the read.
+  - `packages/rph-application/src/handlers/kit.ts:585-586` — the SHARED builder, reached from **22**
+    production `newEnvelope(` call sites: `originType: opts.originType ?? 'USER_INPUT',` and
+    `sourceObjectIds: opts.sourceObjectIds ?? [],`. An unstated provenance origin becomes the POSITIVE
+    assertion that a human typed it.
+
+- **OBSERVED / READ — DRIVEN AT HEAD 2026-08-23 BY THIS FILING PASS** (node, real
+  `SqliteStorageAdapter` through `Engine.dispatch`; `scratchpad/p_obj1_3.mjs`, `p_obj1_3b.mjs`). The
+  census lane drove the same arrangement on 2026-08-21 (`w3b-lane:v1-orphans`, refutation HELD); this
+  pass re-drove it rather than inheriting it, and the adversarial pass re-ran both scripts again at
+  HEAD to the same stdout — correcting one abbreviation, `G9B→G9A` on the P1 provenance line.
+  Verbatim stdout, ids abbreviated only where marked `…`:
+
+  ```
+  P1 ProposeDecomposition{parentWorkUnitId, childWorkUnitIds, rationale ONLY}   -> ACCEPTED
+     OBJECT STATE  intentMappings              hasOwn=true value=[]
+     OBJECT STATE  obligationAllocations       hasOwn=true value=[]
+     OBJECT STATE  constraintPropagations      hasOwn=true value=[]
+     OBJECT STATE  assumptionPropagations      hasOwn=true value=[]
+     OBJECT STATE  retainedParentObligationIds hasOwn=true value=[]
+     OBJECT STATE  coverageClaims              hasOwn=true value=[]
+     OBJECT STATE  siblingDependencyIds        hasOwn=true value=[]
+     OBJECT STATE  recompositionContractId     hasOwn=true value=""
+     P1 EVENT DecompositionProposed
+        payloadKeys=["parentWorkUnitId","childWorkUnitIds","rationale","status"]
+        absent-optionals=[all eight, hasOwn=false]
+     P1 provenance={"originType":"USER_INPUT","sourceObjectIds":["pwu_…G9A10","pwu_…G9A11"],
+                    "sourceEventIds":[]}   (the command names no origin)
+  P2 CONTROL — same command, two of the eight SUPPLIED                          -> ACCEPTED
+     OBJECT STATE  intentMappings          = [{"childWorkUnitId":"pwu_…G9A11",
+                                               "servesParentIntentOrObligationId":"int_…G9A00"}]
+     OBJECT STATE  recompositionContractId = "rcp_…G9A99"   (the other six still fabricated)
+     P2 EVENT payloadKeys=["parentWorkUnitId","childWorkUnitIds","rationale","status",
+                           "intentMappings","recompositionContractId"]
+  ```
+
+  **THE CONTROL DISCRIMINATES CLEANLY.** Supplied values are stored verbatim AND grow the event
+  payload; omitted ones are absent from the event and fabricated on the object. The instrument tells
+  supplied from omitted perfectly — the divergence is a CHOICE the object write makes, not noise.
+
+- **THE FABRICATED EMPTY IS READ AS A POSITIVE CLAIM — the half that makes this more than tidiness.
+  DRIVEN in the same pass, with its own control.**
+
+  ```
+  parent holds a MANDATORY first-class Obligation obl_…G9B02
+  P3a ProposeDecomposition{obligationAllocations OMITTED}  -> ACCEPTED  D1 obligationAllocations = []
+  P3b ValidateDecomposition{VALID} on D1 -> REJECTED | RPH_INVARIANT_VIOLATION
+      "ValidateDecomposition cannot mark dcp_…G9B20 valid: the decomposition does not conserve its
+       parent's obligations/constraints (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004):
+       MISSING_OBLIGATION_ALLOCATION(obl_…G9B02)"       [message wrapped here; verbatim otherwise]
+      D1 status = UNDER_REVIEW
+  P3c CONTROL identical but obligationAllocations SUPPLIED -> ACCEPTED
+  P3d ValidateDecomposition{VALID} on D3 -> ACCEPTED       D3 status = VALID
+  ```
+
+  The refusal really keys on allocation CONTENT, so the fabricated `[]` really is what the gate
+  consumed. ⚠ **The refusal itself is not scored as enforcement of this limb** — in its own terms it
+  refuses an unallocated MANDATORY parent obligation (RPH-DEC-002's conservation sentence), and
+  `RPH-DEC-005` in `enforcement-register.ts` already banks that exact refusal as ITS control. It is
+  cited here only as the DOWNSTREAM CONSUMER that turns silence into an accusation.
+
+- **THE POPULATION, DERIVED FROM THE IDIOM RATHER THAN HAND-LISTED, WITH BOTH NUMBERS.** Subject —
+  `grep -rnE "\bp\.[A-Za-z0-9_]+ \?\? (\[\]|''|true|false|0)"` over
+  `packages/rph-application/src/handlers`, tests excluded → **44**. Positive control, same population,
+  same instrument family, the CONFORMING idiom — `grep -rnE '\.\.\.\(p\.[A-Za-z0-9_]+'` → **82**.
+  **Neither number is zero: the repository holds both conventions in the same eight files.** The
+  `[]`/`''` subset is 41, by file: `decomposition.ts` 14, `assurance.ts` 9, `pwa-authoring.ts` 6,
+  `governance.ts` 4, `pwu.ts` 3, `harness.ts` 2, `execution.ts` 2, `runtime-binding.ts` 1.
+  **And 44 is a FLOOR, not the population:** the 22 `newEnvelope(` call sites inherit two more defaults
+  from `kit.ts:585-586` without writing any `??` of their own. Counted at HEAD, exactly **9 of the 22**
+  state an `originType` (`assurance.ts:198`, `:954`; `governance.ts:205`, `:577`; `pwa-authoring.ts:81`,
+  `:229`, `:448`, `:1074`; `runtime-binding.ts:58` — and one of those nine states `USER_INPUT`
+  deliberately); **the other 13 take the fabricated `USER_INPUT` silently.** Observed above on a
+  `DECOMPOSITION_CONTRACT`, which is not an Evidence object.
+
+- **WHY THE HANDLER CANNOT SIMPLY BE FIXED IN PLACE — the structural conjunct, and the reason a
+  one-line remedy is wrong.** `kit.ts:419-420` refuses to persist a state its object schema rejects, and
+  `objects.ts:633-640` makes all eight REQUIRED. So *"this field was not part of the message"* is
+  **inexpressible** in the governed record. Deleting the `?? []` alone converts an ACCEPTED command into
+  a `RPH_INVARIANT_VIOLATION`; relaxing the object field alone is *"relaxing a required field with
+  nothing put back"*, the economy **REG-D-013** bans by name and which `kit.ts:339-344` records
+  verbatim for the one field it has already been applied to.
+
+- **WHY IT SURVIVED — THE INSTRUMENT ASYMMETRY, STATED PRECISELY AND NOT OVERCLAIMED.** Both planes
+  have a whole-write-path gate and they check **opposite** things. The event gate (`kit.ts:449`, "(d2)
+  THE EVENT GATE — LIVE as of 2026-07-17") holds each event against a declared shape that PERMITS
+  absence; the state gate (`kit.ts:419-420`) holds each object against a schema that FORBIDS it. On top
+  of that, the only WHOLE-SUITE instrument is the event one: `verif/emitted-event-guard.ts`, whose own
+  header records *"MEASURED, by instrumenting the commit path and running the full suite: 19,581 event
+  commits, 89 DISTINCT event types"*. There is no whole-suite analogue over persisted OBJECT STATE, and
+  no instrument anywhere compares a persisted object's keys against the keys its command carried. **That
+  is the mechanism: the event builder conforms because something measures it; the object write
+  twenty-three lines above does not because nothing does.** Naming the missing fix without the missing
+  instrument leaves the next handler free to reproduce this.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY — six of them, each opened at its line, not judged
+  by name.**
+  - **`REG-F-210`** (`JPWB-REG-005:6456`, OPEN, 2026-08-22) is the entry a searcher lands on, and it
+    carries this row's site and code facts. It quotes the very docblock this entry quotes and derives
+    the same eight-field general form at `:6495-6499`. **It is still not this filing.** Its **canon is
+    DEC-2**, not OBJ-1 (`:6461`, limbs 3 and 8: *"rationale and inherited intent mappings;"* /
+    *"coverage claims and validation status;"*), its finding is a per-field **READERSHIP** census
+    (*"→ 4 lines … ZERO readers"*, `:6514-6515`), and its closing line at **`:6669`** reads verbatim:
+    *"**LIMBS CLOSED BY THIS ENTRY:** `limb:DEC-2:3`, `limb:DEC-2:8`."* Three further separations:
+    (a) this limb's claim does not depend on readership at all, and its sharpest instance —
+    `obligationAllocations` — is a field that DOES have live readers (`decomposition.ts:165`), the case
+    REG-F-210 explicitly excluded; (b) its remedy is headed *"THE REMEDY, one commit at one handler"*
+    and its remedy (1) derives across *"all eight optional fields"* (`:6601-6602`), so it reaches
+    the 8 sites at `decomposition.ts:62-69` — **8 of 44**, and none of the shared envelope. (Read as
+    the whole file it would be **16** of 44, never 14: 14 is `decomposition.ts`'s figure in the
+    41-member `[]`/`''` subset and must not be quoted against the 44 denominator.) (c) Its remedy
+    (1), *"Drop the fabricated defaults so absence stays absence"* (`:6600`), is written **without**
+    the `kit.ts:419-420` constraint, so it is **not performable as stated**. ⚠ Its trap (ii) at `:6612`
+    says *"Do not remediate limb 3 …"* — that is **DEC-2's** limb 3, not OBJ-1's.
+  - **`REG-F-206`** (`:5434`, closing line `:5639`: *"`limb:OBJ-1:1`, `limb:ASR-15:9`"*) is the
+    **exact inverse and the sibling of this very sentence**: a caller who SUPPLIED `[]` on the wire and
+    an engine that believed it. Present-and-empty vs absent-key. Only limb 3 contains the word
+    *"omitted"*, and REG-F-206's remedy — array `.min(1)` floors — would not have changed one byte of
+    the P1 transcript above, because P1 supplies no array at all.
+  - **`REG-F-243`** (`:14296`, filed **2026-08-23**, closing `limb:ASR-7:6`) names `kit.ts:585`
+    `originType ?? 'USER_INPUT'` at `:14356` and is the newest and most tempting decoy for conjunct
+    (iii). Its subject is that **judgment has no carrier**: `evaluationMethod` has zero readers and
+    `EvidenceObject` cannot self-declare. Its remedy (b) is *"have `proposeEvidence` **pass**
+    `originType` through from the command"* — **one** of the 22 call sites, on EVIDENCE only, leaving
+    the `?? 'USER_INPUT'` default itself and the other callers exactly as they are. The transcript
+    above observed the same fabrication on a `DECOMPOSITION_CONTRACT`.
+  - **`REG-F-236`** (`:12546`, filed 2026-08-23, closing `limb:DEC-4:7`) quotes
+    `decomposition.ts:65` and the `:97-99` event echo at `:12578-12580` and calls them *"the entire
+    life of the field in production"* (`:12581`) — but its defect is a missing **reader and writer**
+    for the assumption plane; its closing line at `:12812` closes `limb:DEC-4:7` and nothing else, and
+    it explicitly refuses to re-file REG-F-210's subject at `:12683`.
+  - **`REG-F-008`** (`:495`, 2026-08-01, Class DOCS_STRONGER) states at `:498` that
+    *"`newEnvelope` … sets `provenance` unconditionally on **every** object, with a **defaulted**
+    `originType: 'USER_INPUT'`"* — the same code fact, filed as **RPH-EVD-003's admissibility limb being
+    structurally unfailable**, not as omission semantics. It proposes no change to the default.
+  - **AND THE ONE THAT DECLINES TO FILE, found only by going to the code corpus.**
+    `packages/rph-domain/src/enforcement-register.ts:3161-3166` (the `createBaseline` sentence at
+    `:3161`, the OBJ-1 sentence at `:3164`), inside `RPH-BAS-001` (`:3143`), reads
+    verbatim: *"`createBaseline` builds each item as `{ objectId, semanticVersion: obj?.semanticVersion
+    ?? 1 }`, so when the store cannot load the item object the baseline records VERSION 1 — INVENTED,
+    not identified. … That is canon OBJ-1 … inverted, and it is **recorded here rather than filed**
+    because no command is refused by it …"* It is the same idiom under a different rule, its OBJ-1 quote
+    is **limb 1**, and it affirmatively declines to file. It corroborates that the convention is
+    unfiled; it is not a filing of it. Same for `docs/_working/HARMONIZATION-LOG.md:3092`, which is the
+    **provenance of the docblock** — the record of the EVENT-plane fix, silent on the object write.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, with counts reported both ways**
+  (R = `JPWB-REG-005` · E = `enforcement-register.ts` · L = `guard-enforcement-ledger.data.ts` ·
+  W = files under `docs/_working`). Bash `grep` on full lines, every long hit opened with `sed -n`.
+  - **SUBJECT, all zero:** `limb:OBJ-1:3` **0/0/0/0** · `OBJ-1:3` **0/0/0/0** ·
+    `omitted optional` **0/0/0/0** · `not part of that message` **0/0/0/0** ·
+    `omission means` **0/0/0/0** · `absent key` **0/0/0/0** ·
+    `STATE_CONDITIONAL_FIELDS` **0/0/0/0** · `stateConditionalViolation` **0/0/0/0**.
+  - **⚠ AND ONE STRING IS WITHDRAWN FROM THAT LIST, BECAUSE ITS ZERO IS THE INSTRUMENT, NOT AN
+    ABSENCE.** `kit.ts:585` does return **0/0/0/0** — but the register DOES name that line:
+    REG-F-243 writes `kit.ts:560-594` on one line and pins the default at **`:585`** on the next
+    (R:14356), and its merge target spells `kit.ts:586` (R:14521). So `kit.ts:586` returns
+    **2/0/0/0**. A relative anchor defeats a literal `file:line` grep — exactly EM-7 — and the
+    envelope site is therefore reached here through REG-F-243 below, never through a zero.
+  - **OBSERVED POSITIVE CONTROLS, identical instrument and corpora, none zero** — R/E/L count matching
+    LINES and W matching FILES, per the legend; **four W figures are corrected here, each one low
+    when re-measured at HEAD.** `limb:OBJ-1:1` **3/0/0/0** ·
+    `limb:DEC-2:3` **4/0/0/0** · `objectType` **42/2/5/14** · `kit.ts` **53/11/3/11** ·
+    `canonAnchor` **30/108/0/1** · `REG-F-` **1397/82/15/51**.
+  - **BY SITE, every hit opened:** `decomposition.ts:62` **6/0/1/1** (the L hit is a substring of
+    `decomposition.ts:629-718` in an unrelated recomposition row, `ledger:269`; the W hit is a
+    shape-survivorship table row, `AUDIT-shape-survivorship-2026-08-20.md:257`, and it names the
+    DOMAIN `decomposition.ts:62`, not this handler's) · `newEnvelope` **7/1/0/2** ·
+    `originType` **10/0/0/4** · `USER_INPUT` **6/0/0/1** · `obligationAllocations` **6/0/2/1** ·
+    `assumptionPropagations` **11/0/0/0** · `OBJ-1` **27/2/0/2**.
+  - **⚠ THE 17 ENTRIES SHIPPED 2026-08-23 WERE GREPPED SPECIFICALLY** (REG-F-234..245,
+    REG-Q-058..062, R:12116-16041). `OBJ-1` returns four hits inside them — R:13599, :14509, :14691,
+    :14918 — and **all four were opened and all four are cross-references** to REG-F-206 or REG-Q-056.
+    None closes an OBJ-1 limb.
+  - **⚠ TWO INSTRUMENT DEFECTS DISCLOSED RATHER THAN HIDDEN.** (a) On this box `grep -i` and `-F`
+    together abort, and through a pipe return a silent zero; every sweep above used at most one.
+    (b) **Multi-word phrase greps under-report on this register because of its own 108-char wrap:**
+    `absence stays absence` → **0**, while `absence stays` → **2**, one of them REG-F-210's remedy at
+    R:6600 split across the wrap. Every phrase above was therefore also probed at half length.
+
+- **CITATION CORRECTIONS — both re-read at HEAD.** (1) `enforcement-register.ts:694` (`RPH-EXE-006`)
+  says *"JPWB-DOC-003 §4 OBJ-1"*; at HEAD **§4 is *Aggregate boundaries*** (heading line 133) and OBJ-1
+  is **§3** (heading line 75). That row also anchors on OBJ-1's **limb 1** (*"absent output"*), not
+  limb 3. (2) The census row's own by-file figure for the 44 was in fact the 41-member `[]`/`''`
+  subset; at HEAD the full-44 split is `decomposition.ts` **16** and `execution.ts` **3** (three sites
+  default to `true`/`false`/`0` rather than `[]`), while the 41-subset split is as quoted above. Both
+  numbers are given so neither is quoted out of its definition.
+
+- **THE REMEDY — THREE CONJUNCTS WITH THREE DIFFERENT FIXES; CLOSING THE CHEAPEST LEAVES THE OTHER
+  TWO.**
+  1. **THE SHAPE MISMATCH (root, structural).** Reuse the mechanism this repository already authored
+     and proved for exactly this problem instead of reinventing it: `STATE_CONDITIONAL_FIELDS`
+     (`kit.ts:360-377`) and `stateConditionalViolation` (`kit.ts:383-394`), applied at the (d1b) seam
+     every write passes (`kit.ts:437-448`). Relax the eight object fields to `.optional()` **and in the
+     same commit** add a `DECOMPOSITION_CONTRACT` rule keyed on `statusField: 'status'` with
+     `exemptStates: ['DRAFT','UNDER_REVIEW']`, requiring them at the states that imply them (`VALID`,
+     `CONDITIONALLY_VALID`, `INVALID`, `SUPERSEDED` — derived from `DecompositionContractStatusSchema`,
+     `enums.ts:361-368`, never hand-listed). Its stated principle is this limb's: *"the guarantee moved
+     rather than lapsing: optional at the schema, mandatory at the state that implies it."*
+     ⚠ **Relaxing the object fields on their own is FORBIDDEN** — REG-D-013 by name, `kit.ts:339-344`
+     verbatim. ⚠ And `stateConditionalViolation` tests `=== undefined || === null`, i.e. PRESENCE: it
+     is a floor, not substance, and the *supplied-and-empty* case remains REG-F-206's.
+  2. **THE MISSING INSTRUMENT.** Add the object-plane analogue of `verif/emitted-event-guard.ts`: a
+     whole-suite ledger that, for every committed CREATE, compares the persisted object's key set with
+     the key set its command payload carried, and fails on any key the object holds that the message
+     did not. Without it this closes for one command and reopens at the next handler.
+  3. **THE POPULATION.** 44 handler sites in 8 files against 82 conforming ones, plus the two defaults
+     inside `newEnvelope` (`kit.ts:585-586`) reached from 22 call sites. Any remedy scoped to
+     `DecompositionContract`'s create path closes the **8** sites at `decomposition.ts:62-69` — 8 of
+     44 — and leaves the provenance envelope, the path most object types actually take, untouched.
+     (`decomposition.ts` holds **16** of the 44 in all; its 14 is the 41-subset figure.)
+  - **⚠ THE PHRASING THAT MUST NOT BE USED,** because it reintroduces the collapse with an extra
+    branch: *"default to `[]` only when the field is semantically empty"*. The record must distinguish
+    *not supplied* from *supplied and empty*, which means the persisted shape has to admit absence.
+  - **THE TEST THAT MUST REDDEN FIRST, AND IT DOES NOT EXIST.** Write P1 red: `ProposeDecomposition`
+    with the three required fields must persist an object where `Object.hasOwn(state,'intentMappings')`
+    is **false**. Ship it beside two controls with their **own** mutants: (a) P2 — supplied values still
+    stored verbatim; (b) P3b — `MISSING_OBLIGATION_ALLOCATION` still firing when the field is present
+    and empty, proving the new absence is distinguishable from the existing refusal rather than an
+    arrangement tripping two conjuncts. Assert the **message**, not the code.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:OBJ-1:3`. It closes nothing else,
+  because the other two limbs of OBJ-1's sentence are already disposed and point the opposite way:
+  `limb:OBJ-1:1` (*"No semantic state may be inferred from null values, empty arrays…"*) is closed by
+  **REG-F-206**, whose arrangement is a **supplied** empty array; `limb:OBJ-1:2` (*"Illegal or
+  incomplete states are represented explicitly."*) is carried by **REG-Q-056** (`:11678`, closing line
+  `:11852`), an open ratification about ARTIFACT `status` vocabulary. Neither reaches an absent key, and
+  this entry reaches neither a supplied empty nor a status vocabulary. It also does not close
+  `limb:DEC-2:3` / `:8` (REG-F-210), `limb:DEC-4:7` (REG-F-236) or `limb:ASR-7:6` (REG-F-243), each of
+  which is a per-field record-or-read duty on one named field, whereas this limb is a **convention**
+  about what omission means. No V-6 entry shares this invariant: all three OBJ-1 limbs carry
+  `filed_by_V6: false`.
+
+- **Merge target:** BOTH. **Repository** — `packages/rph-contracts/src/objects.ts:633-640` (relax),
+  `packages/rph-application/src/handlers/kit.ts:360-377` (the state-conditional rule) and `:585-586`
+  (the envelope defaults), `packages/rph-application/src/handlers/decomposition.ts:62-69` (delete the
+  fabrication), plus a new `verif/` object-state guard. **Corpus** — the `§4 OBJ-1` miscitation at
+  `packages/rph-domain/src/enforcement-register.ts:694`. Status: OPEN.
+
+### REG-F-252 — a blind retry and a reload-and-re-decide leave byte-identical governed records, so
+PER-4's reload clause has no carrier, and the envelope refuses the one field that would carry it
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** After a `RPH_REVISION_CONFLICT`, canon requires the caller to reload
+  current state and re-form intent. Nothing anywhere records what state a caller READ, so the engine
+  cannot tell a caller that reloaded and re-decided from one that took the refusal's `actual` number,
+  bumped its own by one, and resubmitted the identical payload object. Driven today, in one process,
+  against two aggregates put through the identical concurrent write: both are ACCEPTED and both leave the
+  stream `[0:IntentCaptured, 1:IntentDiscoveryStarted, 2:IntentProvisioned]`. This is not a check that
+  fails to fire — `expectedRevision` asserts a NUMBER, never a READ — and it is not a dead predicate,
+  because no field carries the fact a predicate would read. Worse than absent: the envelope and the
+  payload are both `z.strictObject`, so a caller that WANTED to declare what it read is REFUSED.
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` §9 (Persistence semantics; heading verified at line 333),
+  PER-4 at line 349, limb 3 of 5: *"On conflict, the command is rejected; **the caller reloads current
+  state and re-forms intent;** the system never silently overwrites and never silently retries with stale
+  business assumptions."*
+  - **THE WHY LINE IS ON POINT, AND IS WHY THIS IS A DEFECT AND NOT A STYLE NOTE.** Line 350, byte-exact:
+    *"last-write-wins on governed state is unrecorded authority transfer between concurrent actors."*
+    The ratified rationale names RECORDING. The measured fact is that the record is byte-identical.
+  - **AND THE SCOPE LINE BARS THE EXACT ARRANGEMENT I DROVE.** Line 351: *"**NON-EXAMPLE:** retrying is
+    legal — after reloading and re-deciding against current reality; only the *silent stale* retry is
+    barred."* A retry that reuses the same payload object and bumps only the integer is that retry.
+- **WHAT THE CODE DOES, re-read at every site at HEAD.**
+  - `packages/rph-contracts/src/envelopes.ts:99` — `domainCommandSchema` is a `z.strictObject`; its whole
+    field list at HEAD is `commandId, commandType, commandSchemaVersion, targetAggregateType,
+    targetAggregateId, expectedRevision?` (`:106`), `issuedAt, issuedBy?, correlationId, causationId?,
+    idempotencyKey, payload`. No field names a read, a read time, or a reload.
+  - `packages/rph-application/src/handlers/kit.ts:144` — the only revision comparison on the update path:
+    `if (command.expectedRevision !== undefined && command.expectedRevision !== existing.revision)`. It
+    compares one integer to one integer at one instant. It cannot observe a SEQUENCE of caller acts.
+  - `apps/rph-demo/src/lib/server/authoring-turn-machine.ts:43` — `CONFLICTED: { on: { DISCARD:
+    'DISCARDED' } }`. This is the ONE site in the repository that structurally forces the remedy: a
+    conflicted turn has no edge back to `COMMITTING`, and a new turn re-runs `snapshotRevisions`
+    (`authoring-turn.ts:125`) at turn start. Its sibling `COMMIT_FAILED` (`:46`) carries the docblock
+    *"Do not expose blind retry; inspect/reconcile or discard this in-process candidate."* Both states are
+    live, not aspirational: `authoring-turn.ts:434` enters `CONFLICTED`, and `:442`/`:475` enter
+    `COMMIT_FAILED`.
+  - **AND IT BINDS ONE FLOW OF TEN.** MEASURED at HEAD: `grep -rn "dispatch(" apps/rph-demo/src
+    --include=*.ts --include=*.svelte`, minus tests and `.svelte-kit`, → **34 occurrences across 10
+    files** (`pwa/[id]/+page.server.ts` 12, `baselines` 6, `decisions` 4, `workbench.ts` 3,
+    `undertakings/[id]` 2, `+page.server.ts` 2, `authoring-turn.ts` 2, `undertakings` 1,
+    `test-api/dispatch/+server.ts` 1, `optimistic-concurrency.ts` 1); same-pipeline control on an
+    impossible token → 0. `commitAuthoringTurn` (`authoring-turn.ts:450`) has exactly one production
+    caller, `pwa/[id]/+page.server.ts:469`. The other nine files, `test-api/dispatch` included, have
+    neither the machine nor any reload obligation.
+- **OBSERVED / READ — stating which, per EM-5.** The arrangements below are **OBSERVED**, re-driven by me
+  at HEAD on 2026-08-23 through a probe run on `node`, not inherited from the census transcript, and
+  re-driven a second time at verification by a different party, which printed the identical values. The
+  only `src` files newer than their package's `dist/index.js` are untracked `zz-*-probe.test.ts` scratch
+  probes, so no production source is unbuilt. The code sites above are **READ** at HEAD with `sed -n`.
+  - **FORBIDDEN ARRANGEMENT (blind retry).** `CaptureIntent` → ACCEPTED; concurrent writer
+    `BeginIntentDiscovery` → ACCEPTED; actual revision 1, caller A believes 0; `ProvisionIntent`
+    `expectedRevision=0` → `CONFLICT | RPH_REVISION_CONFLICT | Revision conflict on int_…G5KS3: command
+    expected revision 0, actual is 1`; then **the same payload object**, no reload, `expectedRevision`
+    bumped to believed+1 → **ACCEPTED**, revision 2, `PROVISIONAL`, events
+    `["0:IntentCaptured","1:IntentDiscoveryStarted","2:IntentProvisioned"]`.
+  - **CONTROL (the arrangement canon prescribes).** Second aggregate, identical concurrent write, then
+    `loadObject` → revision 1 / `UNDER_DISCOVERY`, re-form against the reload, dispatch → **ACCEPTED**,
+    revision 2, `PROVISIONAL`, events `["0:IntentCaptured","1:IntentDiscoveryStarted",
+    "2:IntentProvisioned"]`. The probe printed `BLIND vs RELOADED identical event stream? true`.
+  - **⚠ THE SECOND OBSERVED FACT, AND IT IS NEW — THE CALLER IS NOT MERELY UNRECORDED, IT IS REFUSED.**
+    Same engine, same aggregate at revision 1. `ProvisionIntent` with `expectedRevision: 1` **plus**
+    `derivedAtSubjectRevision: 1` on the envelope → `VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED |
+    Schema validation failed`. With `readAtRevision: 1` instead → identical refusal. With
+    `derivedAtSubjectRevision` moved into the PAYLOAD → identical refusal. **CONTROL, the same command
+    with no extra field → ACCEPTED**, revision 1 → 2, `UNDER_DISCOVERY` → `PROVISIONAL`. Anyone
+    who wanted to record the basis of a re-issue cannot: the ratified contract rejects the declaration.
+- **⚠ THE FILINGS THAT DO NOT COVER THIS, AND WHY — five of them, one quoting this limb verbatim.**
+  - **REG-F-050** (`JPWB-REG-005`:1381, **Status: OPEN**) is the decoy that will be found. At **:1386** it
+    quotes this limb byte-exact — *"On conflict, the command is rejected; **the caller reloads current
+    state and re-forms intent;**"* — and at **:1388** names a carrier for it: *"`derivedAtSubjectRevision`
+    is a **caller-side** value… **That is PER-4's phrase performed**."* **What it MEASURES is three other
+    things:** that `DESIGN-accountability-substrate.md` §1.4 diagnosed caller-side and prescribed
+    engine-side (`existing.revision !== existing.revision`); that `freshness`, `derivedAtSubjectRevision`
+    and `FX-FRESH-18` are at zero implementation; and that the store-level CAS is unreachable because
+    handlers are synchronous. **What it CLOSES** is a design-record correction and the re-scoping of
+    INC-C, and its merge target is *"projection freshness + `expectedRevision` on non-`FRESH` dispatch"* —
+    **WHO SUPPLIES THE NUMBER, which is limb 1.** It nowhere states that a caller holding a correct number
+    is indistinguishable from one that reloaded.
+  - **`RPH-PER-001`** (`packages/rph-domain/src/enforcement-register.ts:2179`) is the most dangerous of
+    the five, because its disposition is **`ENFORCED`** and a census reader will stop there. Its
+    `canonAnchor` (`:2183`) is *"Updates to existing aggregates declare the revision they believe
+    current"* and its note (`:2184`) adds *"which continues \"On conflict, the command is rejected\""*.
+    Those are **limbs 1 and 2**. Its `refusalMarker` is `command expected revision` — the integer
+    comparison. My blind-retry run **satisfies it completely** while performing none of limb 3's acts.
+  - **`RPH-CON-003`** (`enforcement-register.ts:1954`, `UNENFORCED_DISCLOSED`) shares that same
+    `canonAnchor` (`:1958`). Its arrangement is *"BeginIntentDiscovery with the envelope field
+    `expectedRevision` **OMITTED** — accepted"*, control `expectedRevision: 99`. It measures the ABSENT
+    declaration — **limb 1**. My arrangement declares a fresh, correct number and sails past it.
+  - **`verif/optimistic-concurrency-surface.test.ts`** — the decoy in the third corpus, and the one whose
+    English is closest. Its header (`:3-5`) quotes PER-4's whole sentence **including this limb**, and its
+    third test (`:121`) is named *"a re-fetched expectation cannot conflict — WHEN the read happens is
+    the protection"*. **Read whole at HEAD (149 lines), it asserts `ACCEPTED` and is labelled "THE
+    TAUTOLOGY CONTROL" (`:116`):** it pins that a revision re-fetched at submit time can never conflict —
+    REG-F-050's `x !== x` one layer out, i.e. **limb 1's carrier again**. Neither it nor any of its
+    four tests contains an arrangement in which a caller declares a correct number it did not read.
+  - **REG-F-052** (`JPWB-REG-005`:1917, Status: EFFECTIVE — CORRECTION RECORDED) is the only other
+    register entry that names PER-4. At **:1923** it rules *"PER-4 has TWO legitimate surface shapes in
+    this repository, not one"* — form round-trip, and `snapshotRevisions`-at-turn-start. That is an
+    **accounting** correction about which sites count as wired, i.e. which sites DECLARE a revision —
+    **limb 1**. It is also the nearest thing to a ruling on `authoring-turn.ts`, and it rules on that
+    file's revision VECTOR, never on its `CONFLICTED` state.
+  - **`REG-Q-017`** (`:257`, Projection freshness envelope) reads *"a stale view never authorizes
+    mutation"*, which sounds decisive. It is a **safe default for an undecided contract question** about
+    projection METADATA, merge target `JPWB-DOC-003`; repository — not a measurement, and again about the
+    value the view supplies rather than about the caller's acts after a refusal.
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, with counts.** All greps run
+  through Bash (`-i` and `-F` never combined, per the instrument defect), every long hit opened with
+  `sed -n`.
+  - **`JPWB-REG-005` (16,041 lines).** `PER-4` → **4 hits**, ALL read: `:1386`, `:1388` (REG-F-050),
+    `:1918`, `:1923` (REG-F-052); positive control `PER-3` → **16**. `reloads current state` → 1,
+    `re-forms intent` → 1 — both are REG-F-050's one quotation at `:1386`. `silently retries` → 1,
+    `stale business` → 1, `silently overwrites` → 1, all that same line. `blind retry` → **0**,
+    `blind-retry` → **0**. `derivedAtSubjectRevision` → 4 (`:1387-1389`, `:2124`), `freshness` → 12,
+    `RPH_REVISION_CONFLICT` → 7 (read: `:9661`/`:9724` are REG-F-227 CONTROLS for an ASR tension limb,
+    `:12207` is REG-F-234's evidence-type refusal), `expectedRevision` → 10, `last-write-wins` → 1.
+  - **⚠ THE 2026-08-23 BLOCK SEARCHED SPECIFICALLY** (REG-F-234..245, REG-Q-058..062; `:12116-16041`,
+    3,926 lines, sliced to a file and searched there): `PER-4` **0**, `reload` **0**, `re-form` **0**,
+    `revision they believe` **0**, `optimistic` **0**, `last-write` **0**, `concurren` **1** (`:3103` of
+    the slice, a version-model quotation inside REG-Q-058), `stale` 7 — all read, all stale-line-number
+    corrections. **Positive control on the same slice, `canon` → 169.**
+  - **`packages/rph-domain/src/enforcement-register.ts`.** `PER-4` → **4** — `:1959` and `:1968` (both
+    RPH-CON-003, the second inside its own `why`), `:2184` (RPH-PER-001), `:2335` (RPH-PER-005,
+    anchored on *"Aggregate event history is gapless and strictly ordered"* = **limb 5**). Control
+    `canonAnchor` → **108**. **Every PER-4-anchored row in that
+    register anchors on a limb other than 3**, which is this finding's structural shape.
+  - **`verif/`.** `PER-4` → 9 hits in 3 files: `optimistic-concurrency-surface.test.ts` (read whole),
+    `route-action-census.test.ts` (`:4` disclaims itself — *"it makes no coverage claim about PER-4"*),
+    and `invariant-verdict-census.test.ts:763`, prose citing this row's own `owed`. Control `PER-` → 11
+    files. **`verif/guard-enforcement-ledger.data.ts`: `PER-4` 0, `RPH-CON-003` 0, `expectedRevision` 0,
+    `reload` 0, `re-form` 0** — the ledger is keyed on §-numbered arrow texts and holds no
+    concurrency row at all; its one `PER-` hit (`:91`) is `PER-3`, inside a PWU row's `abandonPwu` evidence.
+  - **`docs/_working/` (69 files — the corpus earlier passes skipped).** `PER-4` → 6 hits, 4 files,
+    all read: `DESIGN-accountability-substrate.md:91`; `DESIGN-fork22-freshness.md:33` (*"It also satisfies
+    **PER-4** directly (\"updates to existing aggregates declare the revision they believe current\")"* —
+    **limb 1, quoted alone**); `ROADMAP-fork22-surface-wiring.md:4`, `:60`, `:73` (the two surface shapes
+    — limb 1); and `DESIGN-invariant-enforcement-mapping.md:683`, which is **this census's own working
+    record** and names `PER-4:3` under *"A REG-F FINDING IS OWED"* — a statement of the debt, not its
+    discharge. Control `PER-3` → 10 files. `blind retry`/`blind-retry` in `docs/_working` → **0**.
+  - **BY LIMB ID.** `grep -rF 'limb:PER-4:3'` across all four corpora → **0** filings; the only hits are
+    the census's own working record and this row.
+- **THE REMEDY — and the first half of it is a WARNING, because the obvious remedy would close limb 1 and
+  look like it had closed this one.**
+  1. **THE CARRIER ALREADY EXISTS IN RATIFIED TEXT AND IS NOT IMPLEMENTED.** `JPWB-SPEC-001` **§2.4.3**
+     (*Field contracts — O-4 Affordance*, heading at `:1267`), read at HEAD, line 1299:
+     *"**`derivedAtSubjectRevision`** — `number` · required · no default · **the
+     subject aggregate revision the derivation read** · MUST be the revision actually loaded, never a
+     placeholder or `0` · **Projection only**."* MEASURED at HEAD, not inherited: over
+     `packages/rph-{application,contracts,domain,engine,persistence}/src` + `apps/rph-demo/src`, `*.ts`,
+     tests and `.svelte-kit` excluded, `derivedAtSubjectRevision|readAtRevision|basedOnRevision|freshness:`
+     → **0**; positive control `correlationId:` over the identical population and pipeline → **31**.
+     Repo-wide, every occurrence of `derivedAtSubjectRevision` (15) and `FX-FRESH-18` (11) is under
+     `docs/` — one of the 15 being this census's own `docs/tracking/w3b/invariant-verdicts.ndjson` row.
+  2. **⚠ IMPLEMENTING FORK-22 ITEM 2 EXACTLY AS ITS NAMED CHECK STATES IT WOULD NOT CLOSE THIS LIMB.**
+     `JPWB-SPEC-001` §11.4.22 item 2, read at HEAD (`:9687-9697`), **collapses the two values**: *"SHALL
+     set `expectedRevision` … **to the `derivedAtSubjectRevision`** the Projection recorded"*, and states
+     `SPEC-001-FX-FRESH-18`'s assertion as *"dispatch … from a Projection derived at revision r against a
+     subject advanced to r+1, and assert `CommandResult.status === 'CONFLICT'`"*. **A blind bumper sets
+     `expectedRevision` to r+1, so it MATCHES and FX-FRESH-18 passes it.** The paired census limb is *"no
+     Command … **omits** `expectedRevision`"* — limb 1 a third time. **§2.4.1** (`:1129-1131`) makes
+     the collapse explicit and soft: the Affordance *"SHALL carry"* the value, the Command only *"**SHOULD**
+     carry that value as `expectedRevision`"*. Because the two never travel as two fields, the
+     distinction is lost at the seam by the design of the current text.
+  3. **WHAT WOULD ACTUALLY CARRY IT.** The Command must carry `derivedAtSubjectRevision` **beside**
+     `expectedRevision`, not as it, and the update path must refuse when the two disagree — because
+     disagreement is precisely *"I hold a number I did not read"*. Today that field cannot even be sent:
+     driven above, `RPH_VALIDATION_SCHEMA_FAILED` on the envelope AND on the payload. So the first change
+     is to `domainCommandSchema` (`envelopes.ts:99`), and only then to `loadOrReject` (`kit.ts:144`).
+     **STATED AS A HYPOTHESIS, per [[verify the recorded remedy]]:** whether the second field belongs on
+     the envelope, or whether the obligation is discharged at the surface, is not settled here.
+  4. **THE PRECEDENT TO GENERALISE FROM, NOT A COVERAGE CLAIM.** `authoring-turn-machine.ts:43` already
+     performs the remedy for one flow by making a conflicted turn unresumable. A general answer should
+     start there. It is named here as evidence that the obligation is dischargeable, not as enforcement.
+- **⚠ A QUALIFIER THE CENSUS ARM SET CANNOT EXPRESS, recorded against the split rule and not against the
+  repository.** This is the one limb of PER-4's five whose SUBJECT is the caller rather than the system,
+  and `UNENFORCED_NO_SHAPE` — the honest arm, since there is no field, command or event to compare a
+  re-issue against — reads as a flat absence. It understates `authoring-turn-machine.ts:43`. A reader who
+  takes the arm as a zero will delete the one site that discharges the obligation. **The divergence stands
+  under either adjudication of who the addressee is:** if the engine, no shape exists; if the surface,
+  nine of the ten dispatch-bearing files have neither the shape nor the machine.
+- **CITATIONS CORRECTED AT HEAD, since line numbers drift and three of these are load-bearing here.**
+  REG-F-050 cites `kit.ts:126` for `loadOrReject` and `:143` for the handler check; at HEAD they are
+  **`:127`** and **`:144`**. `JPWB-SPEC-001` **§2.4.1** (`:1130-1132`) cites `envelopes.ts:70-79` for
+  `DomainCommand.expectedRevision`; at HEAD `:70-79` is the docblock above the factory and the field is at
+  **`:106`** (its companion citation `kit.ts:136-148` is still accurate).
+  **AND ONE CORRECTED IN MY OWN DRAFT, because it is the [[never infer a spec §N.M from a line number]]
+  shape:** an earlier draft of this entry cited the `derivedAtSubjectRevision` field contract as §2.5.2.
+  §2.5.2 is *Field contracts — O-5 Affordance Withholding* (`:1623`) and carries its OWN
+  `derivedAtSubjectRevision` at `:1712` for a different object. The Affordance one quoted here is §2.4.3
+  at `:1299`. Finally, `ROADMAP-fork22-surface-wiring`:68 cites `authoring-turn.ts:124-145` for
+  `snapshotRevisions`; at HEAD the declaration is **`:125`** and its sole call site is **`:252`**.
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:PER-4:3`. It closes nothing else, because
+  limb 1 (declaring the number) is filed at `RPH-CON-003` and REG-F-050 and is a different claim — that
+  the declaration may be ABSENT; limb 2 (refusal on conflict) is `ENFORCED_DRIVEN` at `kit.ts:144`, and my
+  own run was refused there correctly; limb 4 concerns what the SYSTEM does silently, where this limb
+  concerns what the record can show about the CALLER; limb 5 (gapless history) is carried by
+  `RPH-PER-005`.
+- **Merge target:** BOTH — Repository (`packages/rph-contracts/src/envelopes.ts`,
+  `packages/rph-application/src/handlers/kit.ts`, and the nine dispatch-bearing files without the
+  authoring-turn machine) and Corpus (`JPWB-SPEC-001` §11.4.22 item 2 and §2.4.1/§2.4.3, whose collapse
+  of `derivedAtSubjectRevision` into `expectedRevision` is the mechanism by which this limb loses its
+  carrier). REG-F-050 remains OPEN and is this entry's parent, not its coverage. Status: OPEN.
+
+### REG-F-253 — nothing compares an identifier to the object it names, so 32 shipped Assessments are ided
+`asm` — the registered prefix of ASSUMPTION — and three Assurance Policies are ided by English phrases
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** The only production binding of id validity is `id: RphIdSchema` on the
+  object envelope, and `RphIdSchema` is `z.string().regex(RPH_ID_REGEX)` — a SHAPE test and nothing else.
+  No site anywhere compares an identifier's CONTENT to the object it identifies, even though the envelope
+  carries `id` and `objectType` as adjacent, independently validated fields. Driving the reference
+  undertaking at HEAD persists 88 objects, and in them: 32 `ASSURANCE_ASSESSMENT` objects carry ids
+  beginning `asm`, the prefix the ratified registry assigns to **ASSUMPTION**; four object types carry
+  prefixes in no registry at all (five such prefixes are minted); and three `ASSURANCE_POLICY` objects
+  are identified by English phrases (`floor.schema-invariant`) that do not match `RPH_ID_REGEX` in any
+  part. A production expression then strips one of those ids with a regex and composes a second
+  identifier out of what it parsed. So BOTH
+  conjuncts of the limb — *edited into* and *parsed out of* — are violated in shipped output, and
+  nothing refuses any of it.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` §3 *Core objects and minimum rules* (heading at line 75;
+  §4 *Aggregate boundaries* begins at line 133), **OBJ-3 at line 113, limb 2**: *"No meaning is parsed out
+  of, or edited into, an identifier."* The invariant's **WHY** at `:114` states the interest:
+  *"meaning-bearing identity breaks the moment names change."* Its **NON-EXAMPLE** at `:115` carves out
+  only presentation — *"human-readable titles, slugs, and display names are encouraged — they simply are
+  not identity"* — which is the opposite of what the three floor policies do: there the human-readable
+  phrase **IS** the identity.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD.**
+  `packages/rph-contracts/src/ids.ts:42` — `RPH_ID_REGEX` is `^([a-z]+)_([0-9A-HJKMNP-TV-Z]{26})$`.
+  `:45` — `RphIdSchema = z.string().regex(RPH_ID_REGEX)`. `:38` — `KNOWN_ID_PREFIXES` is defined and has
+  **exactly one repo-wide reference, its own definition**; the registry that would police the type-tag slot
+  has zero consumers. `packages/rph-contracts/src/envelopes.ts:50` — `id: RphIdSchema` inside
+  `objectEnvelopeShape`, with `objectType` as the very next field and **no relation asserted between them**.
+  `packages/rph-engine/src/reference-undertaking.ts:804` defines a LOCAL
+  `const mintId = (prefix: string): string =>` taking a free string, bypassing the typed
+  `mintId(entity: IdEntity)` at `ids.ts:63`; its own docblock at `:801-803` says it produces *"the format
+  the object schemas enforce"* — i.e. it is shaped to satisfy the regex and nothing more. `:639`
+  (`const assessmentId = mintId('asm')`) and `:1022` (`governing.map(() => mintId('asm'))`) mint
+  ASSESSMENT ids under the ASSUMPTION prefix. `:657` is the parse — a template literal assigning
+  `validatorId` from `floorPolicyId.replace(/^floor\./, '')`. `floorPolicyId` is the Assurance Policy
+  object's own id (`:649` passes it as `assurancePolicyId`), so an identifier is string-stripped and the
+  extracted meaning is edited into a second identifier.
+
+- **DERIVED, NOT HAND-LISTED — the prefixes actually minted versus the registry.** Minted set, from
+  `grep -o "mintId('[a-z]*')" reference-undertaking.ts | sort -u` → `{asm asu ata bsl clm dec evd exp obs
+  stp}`. Registered set, from `sed -n '11,33p' ids.ts | grep -oE ": '[a-z]+'" | sort -u` → the 22 entries
+  of `ID_PREFIXES`. `comm -23` → **`{asu ata bsl exp stp}` are unregistered**. ⚠ That derivation ranges
+  over `mintId(...)` CALLS alone, so it is not the whole shipped population: `cns` is a **sixth**
+  unregistered prefix, written as a hardcoded literal at `reference-undertaking.ts:162`
+  (`multiTenancyConstraint: 'cns_01ARZ3NDEKTSV4RRFFQ69G5D00'`) and persisted on the one CONSTRAINT —
+  invisible to the `mintId` grep, which is why the drive below and not the grep is what bounds it.
+  The registry maps
+  `ASSUMPTION: 'asm'` (`ids.ts:16`) and `ASSURANCE_ASSESSMENT: 'assess'` (`:20`) — so the code has the two
+  **transposed**: Assessments get `asm`, Assumptions get the unregistered `asu`.
+
+- **OBSERVED / READ — stated per conjunct.** **OBSERVED (I drove the engine).** A probe built on
+  `createEngine` + `driveReferenceUndertaking` + `listByType`, iterating `Object.entries(ID_PREFIXES)` so
+  the population is derived rather than enumerated by hand, run at HEAD under
+  `./node_modules/.bin/vitest run`. It reported `TOTAL OBJECTS: 88` (**the control** — a drive that
+  persisted nothing would have read the same as one that found nothing) and, byte-exact from the store:
+  `{"id":"asm_01ARZ3NDEKTSV4RRFFQ69G0006","objectType":"ASSURANCE_ASSESSMENT",…,"assurancePolicyId":`
+  `"floor.schema-invariant",…}` — the false type claim and the English-phrase id in ONE envelope.
+  Per-type: `ASSURANCE_ASSESSMENT: n=32 actual='asm' registered='assess' MISMATCH -> 'asm' is registered
+  to ASSUMPTION`; `CONSTRAINT: n=1 actual='cns' registered='con' UNREGISTERED`; `ASSUMPTION: n=1
+  actual='asu'`; `EXECUTION_PLAN: n=8 actual='exp'`; `BASELINE: n=2 actual='bsl'`; and
+  `ASSURANCE_POLICY` persisted `pol_01ARZ3NDEKTSV4RRFFQ69G5P00 | floor.schema-invariant |
+  floor.identity-provenance | floor.reasoning-review`. I confirmed by `node -e` that all three
+  `floor.*` strings return `false` against `RPH_ID_REGEX` while `asm_01ARZ…` returns `true`. **READ (not
+  driven).** The `:657` parse expression — it lies on the path the drive executed, and I measured how
+  far: the `satisfyFloor` loop that contains it ran **24** times, being the 24 of the 32 assessments whose
+  persisted `assurancePolicyId` is a `floor.*` phrase (the other 8 carry `pol_01ARZ…`). But its output is
+  carried on the ValidatorResult and is **not** materialized into object state — `deterministic.` appears
+  in **0 of 32** persisted assessment states — so I did not read it back and do not claim I did.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY.** **(1) `docs/_working/HARMONIZATION-FINDINGS.md`
+  `:40`, finding #30** — still at `:40` at HEAD — is the entry a reader searching this site lands on
+  first: *"| 30 | BLOCKING | CODE_IS_WRONG | object-contract | §5.3:413 |
+  `packages/rph-contracts/src/ids.ts:42` | RphIdSchema validates id shape but never the registered prefix
+  — `banana_<ULID>` is a valid id everywhere in the system |"*. It is about **registry MEMBERSHIP of the
+  prefix slot**, never about meaning. Its whole remedy is a `KNOWN_ID_PREFIXES.has(prefix)` test — **and
+  that test PASSES all 32 of the Assessments this entry files, because `asm` IS registered.** It would
+  also pass every meaning-bearing 26-char body. It never mentions OBJ-3, opacity, or meaning, and its
+  authority anchor is a repository shape doc.
+  **(2) `docs/_working/HARMONIZATION-FINDINGS.md:21`, finding #11 — the more dangerous decoy, and it is
+  NOT in this row's prior enumeration.** Verbatim: *"AssurancePolicyDefinitionSchema re-declares `id` and
+  `semanticVersion` after the envelope spread, silently overriding RphIdSchema and NonNegativeIntSchema
+  with unconstrained primitives"*. That is the exact MECHANISM by which the three `floor.*` phrases are
+  admitted, and it is genuinely filed — **so this entry does not claim that mechanism as new, and its
+  remedy must not re-file it.** But #11 keys on ONE schema's shape override; it cannot reach the 32 `asm`
+  Assessments, which live in a different schema that does **not** override `id` and whose ids pass
+  `RphIdSchema` cleanly. Removing #11's override would leave the entire finding above standing.
+  ⚠ **Citation correction:** #11 cites `objects.ts:368`; at HEAD the override is at **`objects.ts:527`**
+  (`id: z.string(),`), directly under `...objectEnvelopeShape,` at `:526`. Derived check over the file:
+  23 schemas compose `objectEnvelopeShape`, **exactly one** overrides `id`.
+  **(3) `JPWB-REG-005:212-214`, REG-Q-008 "Identifier generation"** — an open QUESTION whose subject is
+  registry COVERAGE and FIXTURE readability: *"fixtures use intentionally readable ids … Use the
+  repository's registered prefix + ULID in production; fixture ids only in fixtures."* It prescribes
+  conduct and records no measured admission; and the ids above are **production**, not fixtures.
+  **(4) `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:160`** scores `RphId | ENFORCED` — it
+  ASSERTS the property, so it is the opposite of a filing; its sibling `:161` `PrefixRegistry |
+  DIVERGENT_FILED` is about WHICH prefixes appear versus the §5.2 table.
+  **(5) `REG-F-208` (REG-005:5914)** names `limb:OBJ-3:2` at `:6064`, which is why a reader will stop
+  there — but only to record that its refutation status was once mis-marked *"because the refuter's own
+  lane input arrived truncated mid-field"*; its own closing line at `:6061` reads
+  **"LIMB CLOSED BY THIS ENTRY: `limb:OBJ-3:3`"**, the pwuKind type-identity clause.
+  **(6) `enforcement-register.ts:2701`**, `RPH-PRJ-003`, `canonAnchor: 'Identity is opaque and immutable'`
+  — OBJ-3's HEADING, kind `NOT_A_COMMAND_REFUSAL`, a cross-view UI selection property whose own note
+  concedes canon *"says nothing about views, selection, or a UI at all"*. REG-005:6042-6043 already
+  classifies it as *"OBJ-3's **first** limb"*. ⚠ **Citation correction:** its note at `:2702` cites
+  *"JPWB-DOC-003 §4 OBJ-3"*; OBJ-3 is in **§3** (§3 spans lines 75-132, §4 begins at line 133).
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (`-i` and
+  `-F` never together on this box); every non-zero hit opened with `sed -n`. Corpora: **R** = REG-005
+  (**16,041 lines at HEAD — the row's transcripts were written against 12,079, so every REG-005 line
+  number in them was re-checked**), **E** = `enforcement-register.ts` (4,168), **L** =
+  `verif/guard-enforcement-ledger.data.ts` (392), **W** = `docs/_working/`.
+  **BY SITE, R/E/L/W(files):** `reference-undertaking.ts:657` → **0/0/0/0**;
+  `deterministic.schema-invariant` → **0/0/0/0**; `objects.ts:526` and `:527` → 0/0/0/0;
+  `mintId('asm')` → 0/0/0/0; `cns` → 0/0/0/0; `KNOWN_ID_PREFIXES` → 0/0/0/0; `parseRphId` → 0/0/0/0;
+  `meaning-bearing` → 0/0/0/0; `RPH_ID_REGEX` → 0/0/0/1 (the AUDIT row that asserts ENFORCED);
+  `RphIdSchema` → 0/0/0/3; `ids.ts` → 0/0/0/5; `ID_PREFIXES` → 0/0/0/2.
+  **BY ID:** `OBJ-3` → 12/1/0/1 — all twelve R hits opened; the E hit is `RPH-PRJ-003`; the single
+  W file is `DESIGN-invariant-enforcement-mapping.md:696`, the census's OWN tracking table
+  (*"| `OBJ-3:2` | ENFORCED_DRIVEN | UNENFORCED_OBSERVED_ADMISSION |"*), not a filing.
+  `limb:OBJ-3` → 5 hits, all in R, all inside REG-F-208 or citing it; `asm_` → 7/0/0/0, all opened, all
+  incidental ids inside unrelated entries.
+  **THE NEWLY FILED BLOCK WAS SWEPT SPECIFICALLY.** REG-F-234..245 and REG-Q-058..062 postdate every
+  transcript on this row. Extracted to a file and swept: `ids.ts`, `RphIdSchema`, `RPH_ID_REGEX`,
+  `KNOWN_ID_PREFIXES`, `parseRphId`, `isRphId`, `mintId`, `ULID`, `opaque`, `prefix` → **0 each**;
+  `OBJ-3` → 2, both opened (REG-F-239 at `:13509` invoking OBJ-3 only as *"kind as type identity"*, i.e.
+  limb 3; and REG-F-240 at `:13587` naming REG-F-208 as an adjacent entry).
+  **POSITIVE CONTROLS, identical commands and corpora, reported by count:** `REG-F-` → 1397/82/15/50;
+  `guard` → 582/136/50/42; `assurance` → 514/64/46/46; `objectType` → 42/2/5/13; `canonAnchor` →
+  30/108/0/1; `assess` → 291/82/25/35. Over the newly-filed block alone: `REG-F-` → 210, `packages/` →
+  208, `limb:` → 158. In-repo control for the symbol census: `mintId` → **34** hits across
+  `packages`/`apps` while `KNOWN_ID_PREFIXES` → **1**, so the instrument reaches this population and the
+  registry really is dead.
+  **THE LEDGER (L)** returns 0 on every identifier/prefix/identity pattern above while `guard` → 50 and
+  `assurance` → 46 in the same file: nothing in it names an identifier.
+
+- **⚠ THE ROW'S OWN `owed` IS WRONG ON ONE CONJUNCT, AND THE CORRECTION IS THIS ENTRY'S.** The blind
+  adjudication concluded *"Conjunct B ('parsed out of') is genuinely un-violated in production —
+  `parseRphId` has only its definition plus `ids.test.ts` as references — but that is an absence of the
+  act."* **It is not an absence.** `parseRphId` is indeed dead, but the act is performed **without** it,
+  by an inline regex at `reference-undertaking.ts:657`. The census that missed it is the one the refuter
+  had already shown to be broken — its `\bId\.` alternation branch is dead repo-wide, because `\b` cannot
+  fall between `t` and `I` in `objectId`. Re-run at HEAD with a corrected pattern
+  (`[A-Za-z]+[Ii]d\.(split|slice|substring|startsWith|endsWith|indexOf|match|replace)\(`) over
+  `packages/*/src` + `apps/*/src`, tests and e2e excluded: **4 hits**, of which `:657` is the one on an
+  RphId. **Positive control, same pattern with tests included: 8** — so the pattern finds this shape.
+  (The other **three** — named in full, because a count of 4 accounted for by 2 is the hand-listing defect
+  one level up. `packages/csaa/src/subject/projects.ts:403,635` match `artifact.policyId` against a
+  `jan-csaa-filter/1:` prefix — a **different id namespace** and a package this programme does not own.
+  `packages/rph-application/src/handlers/__tests__/floor-fixtures.ts:321` is the SAME
+  `deterministic.${policyId.replace(/^floor\./, '')}` expression in a shared test fixture; it survives the
+  `*.test.ts` exclusion on its filename alone, so it is a second COPY of the `:657` parse rather than a
+  fourth independent site. None banked.)
+
+- **THE REMEDY — deliberately scoped to what is a divergence under BOTH readings of the limb, so that it
+  does not decide the question filed alongside it.** **(1)** Delete the free-string minter at
+  `reference-undertaking.ts:804` and route every call through the typed `mintId(entity: IdEntity)` at
+  `ids.ts:63`, which cannot express `asu`/`ata`/`bsl`/`exp`/`stp` and cannot put an ASSUMPTION prefix on an
+  Assessment; replace the hardcoded `cns_…` literal at `:162` likewise. This removes every false and
+  unregistered tag without ruling on whether a truthful tag may exist.
+  **(2)** Mint real ids for the three floor policies and move `floor.schema-invariant` to a declared
+  `policyKey` field, so the floor gate keys on a field that is allowed to carry meaning and `:657` derives
+  its `validatorId` from that field instead of from an identifier. This retires the parse under both
+  readings. **(3)** Do **not** add a `prefix ↔ objectType` agreement check until REG-Q-XXX is adjudicated:
+  that check would ratify the reading that a type tag is permitted meaning provided it is accurate.
+  **(4)** `KNOWN_ID_PREFIXES` and `isRphId` are dead with a live purpose — whatever the adjudication, they
+  should acquire a consumer or be removed, rather than standing as a registry nothing consults.
+  ⚠ Finding #11's override at `objects.ts:527` is **cited, not banked**: it is already filed and its
+  remedy belongs to it.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:OBJ-3:2`, jointly with **REG-Q-XXX**
+  (drafted in the same pass), which takes the adjudication half. This entry takes the code half: false and
+  unregistered type tags, English-phrase identities, and the `:657` parse — each a divergence on any
+  reading. It closes nothing else. Not `limb:OBJ-3:1` (opacity/uniqueness/immutability), which is scored
+  `ENFORCED_MULTI_SITE` and whose probe is the MALFORMEDNESS refusal — a different property, and the one
+  this row's superseded `ENFORCED_DRIVEN` verdict mistook for this limb. Not `limb:OBJ-3:3` (pwuKind as
+  type identity), which **REG-F-208** closes and which concerns a `kind` FIELD, not an identifier.
+
+- **Merge target:** BOTH — Repository (the minting seam in `rph-engine`, the floor-policy ids in
+  `rph-assurance`/`rph-authoring`, and the dead registry in `rph-contracts`) and Corpus (this register).
+  Status: OPEN.
+
+### REG-F-254 — Baseline.purpose and Baseline.scope are manufactured by the handler, declarable by no
+command and read by no promotion gate, so canon's "declared" is a constant wearing a field's name
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** Canon makes a declared purpose and scope a PRECONDITION of baseline
+  promotion. The engine keeps both as REQUIRED fields on `BaselineObjectSchema` and then writes them
+  itself: `purpose` is a template of the ITEM COUNT and `scope` is the literal `'undertaking'`, for
+  every baseline the system will ever create. No command can carry either — `CreateBaselinePayload`
+  and `PromoteBaselinePayload` are closed `strictObject`s that refuse both keys, driven below — and the
+  promotion gate's input type has no view of either, so nothing reads them. A required field only its
+  writer can set and no reader consults is not a declaration. It is worse than an absent field, because
+  a reader takes it for a statement about THIS baseline; and a purpose computed from a cardinality is
+  the exact opposite of OBJ-1's headline, *"Semantic state is always explicit."*
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§8.8 Baselines** (heading at L312), **ASR-16** at L314,
+  **limb 6**, read back to the sentence's governing verb: *"Promotion requires: … and declared
+  purpose/scope with rollback/recovery where required."* **THIS ENTRY TAKES THE FIRST CONJUNCT ONLY.**
+  Doubly ratified corpus-side: `RPH-DOC-004` **§26.3 claim 9** (L1525) *"the baseline has a declared
+  purpose and scope."* and **§26.5** (L1549) the finding code `AMBIGUOUS_BASELINE_SCOPE`.
+  ⚠ **A CORRECTION TO THE CENSUS ROW'S FRAMING, NOT SMOOTHED OVER.** The row cites OBJ-1 as *"No
+  semantic state may be inferred from null values, empty arrays, missing rows"* and calls this
+  *"inference from a count"*. Re-read at HEAD (**L105**), OBJ-1's enumerated sources are *"null values,
+  empty arrays, missing rows, absent output, legacy phase order, event ordering alone, UI position, or
+  agent prose"* — **a cardinality is not on that list.** The clause that actually carries the point is
+  OBJ-1's own headline, *"Semantic state is always explicit,"* and it is cited that way here.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD.**
+  `packages/rph-contracts/src/objects.ts:690-700` — `BaselineObjectSchema`, with `purpose: z.string()`
+  (`:693`) and `scope: z.string()` (`:694`), **both required, neither optional**.
+  `packages/rph-application/src/handlers/governance.ts:746-747` — `createBaseline` writes
+  ``purpose: `Baseline of ${p.itemObjectIds.length} item(s)`,`` and `scope: 'undertaking',` into the
+  state literal, eight lines below `semanticVersion: obj?.semanticVersion ?? 1` (`:738`).
+  `packages/rph-contracts/src/messages.ts:375-379` — `CreateBaselinePayloadSchema`, a three-key
+  `strictObject` of `baselineType`, `itemObjectIds`, optional `assuranceAssessmentIds`; `:237-246` —
+  `PromoteBaselinePayloadSchema`, a three-key `strictObject` of `promotionDecisionId`,
+  `expectedItemObjectVersions`, `requiredAssessmentIds`. **Neither field is on either wire.**
+  `packages/rph-domain/src/governance.ts:213-235` — `BaselinePromotionInput`'s nine members are
+  `baselineStatus`, `promotionDecision?`, `baselineId`, `candidateItems`, `reviewedItems`,
+  `requiredAssessments`, `openObservations`, `contestedClaims?`, `requiredWaivers?`. **No purpose view,
+  no scope view.** `BaselinePromotionFindingCode` (`:237-247`) is a ten-member union whose only `scope`
+  substring is `PROMOTION_DECISION_OUT_OF_SCOPE` (`:239`) — *"the decision does not name THIS
+  baseline"*, a Decision's subject list, not the Baseline's declared scope.
+  **READERS, COUNTED IN THE FILE THAT OWNS THE PROMOTION GATE:** `grep -n "purpose"` over
+  `packages/rph-application/src/handlers/governance.ts` → **2** hits — `:459`, an unrelated docblock
+  about `decisionType`, and `:746`, the write. **One writer, zero readers.**
+
+- **OBSERVED / READ — stated per fact.** **OBSERVED, driven by me at HEAD with `node`** against the
+  built artifacts (both `dist` files are NEWER than their `src`: `rph-domain/dist/governance.js`
+  2026-08-22 vs `src` 2026-08-17; `rph-contracts/dist/messages.js` 2026-08-21 21:39 vs `src` 11:11).
+  ```
+  DRIVE 1 — rph-contracts/dist/messages.js
+    CONTROL  CreateBaseline  {baselineType:'RELEASE', itemObjectIds:['obj_1']} -> OK
+             CreateBaseline  + purpose  -> REFUSED | unrecognized_keys:purpose
+             CreateBaseline  + scope    -> REFUSED | unrecognized_keys:scope
+    CONTROL  PromoteBaseline {promotionDecisionId, expectedItemObjectVersions:[],
+                              requiredAssessmentIds:[]}                        -> OK
+             PromoteBaseline + purpose  -> REFUSED | unrecognized_keys:purpose
+  DRIVE 2 — rph-domain/dist/governance.js, canPromoteBaseline
+    A  full APPROVED promotion input, no purpose or scope anywhere in it -> ACCEPTED (ok:true)
+    CONTROL C  same + one OPEN BLOCKING observation -> REFUSED | OPEN_BLOCKING_FINDING
+    CONTROL D  same, promotionDecision omitted      -> REFUSED | NO_EFFECTIVE_PROMOTION_DECISION
+  ```
+  **Both DRIVE 1 controls parse and both DRIVE 2 controls refuse, so neither result is an artefact.**
+  ⚠ **THE FIRST RUN OF DRIVE 1 WAS INVALID AND IS REPORTED RATHER THAN DISCARDED.** Its control used
+  `baselineType: 'PRODUCT'`, which is not a member of `BaselineTypeSchema`
+  (`packages/rph-contracts/src/enums.ts:187-194`), so the control itself REFUSED and every arm tripped
+  **two** guards at once. Re-run with `'RELEASE'`; the numbers above are the corrected run.
+  **READ, NOT DRIVEN BY ME:** that the fabricated values are identical across baselines. The census
+  lane drove that through the full bus — `S17 purpose = "Baseline of 1 item(s)" | scope =
+  "undertaking"`, `S18 purpose = "Baseline of 2 item(s)" | scope = "undertaking"` — and I inherit it
+  as its observation rather than re-drive it.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY. FIVE, and the strongest was named only in half
+  by the census row.**
+  **(a) REG-F-228 component (4)**, `docs/canon/JPWB-REG-005 …:9921-9929`, verbatim at `:9921-9922`:
+  *"**(4) THE "BASELINE SCOPE STATEMENT" CARRIER IS A FABRICATED CONSTANT, AND THE BASELINE HOLDS NO
+  CONDITION-BEARING FIELD AT ALL.**"* — this row's exact site, its exact two literals. **It is about
+  ASR-9's deferral carrier.** `:9928-9929`: *"Canon names "baseline scope statement" among ASR-9's
+  deferral carriers, and here it says nothing about any particular baseline."* That is a complaint that
+  the carrier is UNINFORMATIVE ABOUT A DEFERRED CONDITION; limb 6 is a PROMOTION PRECONDITION.
+  REG-F-228 never says the fields are unread by the gate, never names `BaselinePromotionInput`, never
+  names `AMBIGUOUS_BASELINE_SCOPE`, and closes exactly one thing — `:10002`, verbatim:
+  *"- **LIMBS CLOSED BY THIS ENTRY:** `limb:ASR-9:7`."* **Corroborated by a filing dated today:**
+  REG-F-235's reconciliation at `:12528-12530` calls component (4) the one *"which files only the
+  "baseline scope statement" carrier and leaves the other four open"* — an ASR-9 carrier census.
+  **(b) REG-F-214** (`:7220`) — **the decoy the census row named only for its disclaimer.** The row
+  cites its SCOPE LIMIT (`:7407-7409`, *"This entry's **enforced half must NOT be cited as evidence for
+  ASR-16's other limbs** — it fires on Decision facts alone and is blind to items, assessments, claims,
+  evidence, purpose and scope."*). **But that is not why it looks like coverage.** Its component (i) at
+  `:7276-7286` names `AMBIGUOUS_BASELINE_SCOPE` in the ratified nine-code list and states the engine
+  union contains *"none of the last three ratified codes"*; its remedy step 1 (`:7377-7378`) says
+  *"**Add the three ratified DOC-004 §26.5 codes** to `BaselinePromotionFindingCode`"* — a fact and a
+  remedy that both touch this limb. **It still does not cover it:** the entry's defect, its whole
+  drive, its closure (`:7411`, `limb:ASR-16:5`) and step 1's own stated purpose (*"so an unaccepted
+  residual risk can block"*) are residual risk throughout; and a finding CODE with no input view to
+  compute it from is a name, not a check — **DRIVE 2 arm A above is the gate accepting with no
+  purpose or scope view in its input at all.**
+  **(c) `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:317`** — the corpus earlier passes
+  skipped, and the row most likely to close this by mistake. Under **§ "RPH-DOC-009 — Persistence,
+  Migration, Dual-Run, Cutover Design"** (heading `:273`, table header `schema | verdict | evidence`
+  at `:277`) it scores `baselines` **ENFORCED**, verbatim: *"Artifact: BaselineObjectSchema (objects.ts
+  — baselineType, purpose, scope, promotionDecisionId REQUIRED (stricter than the doc's nullable),
+  status)."* **Its axis is SHAPE SURVIVORSHIP** — whether an RPH-DOC-009 table's columns survive into a
+  contract schema with a fidelity test. *ENFORCED* there means THE FIELD EXISTS AND IS TYPED, which is
+  precisely the fact that makes this limb scan as covered, and it says nothing about who may write it
+  or who reads it.
+  **(d) `verif/guard-enforcement-ledger.data.ts:299-303`** — the baseline-promotion row, disposition
+  **ENFORCED**, `enforcingSite` `packages/rph-application/src/handlers/governance.ts:910`. Its key is
+  *"requires an explicit EFFECTIVE promotion decision (§23.2, §24.2); promotion evidence must be
+  retained; promotion is a governance event, not an execution step (§24.2)"* and its evidence opens
+  *"THE ONE REFUSABLE LIMB IS REFUSED, ON THIS ARROW, FROM STORE FACTS."* **One limb — the decision
+  limb.** Neither `purpose` nor `scope` is anywhere in that row.
+  **(e) `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:75`** — the same audit's OTHER baseline
+  row, added on verification, and the one that reads like an ALREADY-FILED divergence: `BaselineObject`
+  scores **DIVERGENT_FILED**, verbatim *"Filed: itemObjectIds: string[] → itemObjectVersions:
+  BaselineItemVersion[] (version-pinned) … +purpose/scope/approvalDecisionId? recorded additions."*
+  **The FILED divergence is the `itemObjectIds` flip alone.** `purpose`/`scope` appear there as
+  *recorded additions* — a claim that the CONTRACT carries MORE than the doc, the opposite direction
+  from this limb, and silent on who may write them and who reads them.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout, never
+  `-i` together with `-F`; every long hit opened with `sed -n` before scoring.
+  **A** = `docs/canon/JPWB-REG-005 Decision and Divergence Register.md` (16,041 lines at HEAD),
+  **B** = `packages/rph-domain/src/enforcement-register.ts`,
+  **C** = `verif/guard-enforcement-ledger.data.ts`, **D** = `docs/_working/`.
+  **BY ID:** `grep -on "limb:ASR-16:[0-9]*" A` → **3** occurrences, **all `limb:ASR-16:5`** (`:7174`,
+  `:7402`, `:7411`). **No entry in any corpus closes `limb:ASR-16:6`.** `ASR-16` → **A 28 · B 8 ·
+  C 0 · D 3 files** (`DESIGN-corpus-precedence.md:116`, `ROADMAP-corpus-precedence.md:27` — both the
+  P-4 canon-repair thread — and `DESIGN-invariant-enforcement-mapping.md:684`, the census's own
+  methodology note quoting this row's `owed`; all three opened). ⚠ **B's 8 hits are re-attributed to
+  their owning rows at HEAD, correcting the census row's `em7_search`, which named "RPH-BAS-001/003/
+  004/005 and RPH-ASR-017".** Walked structurally, they are `canonCarriage.note` lines on
+  **RPH-BAS-001** (`:3148`), **-002** (`:3186`), **-005** (`:3217`), **-007** (`:3237`), **-003**
+  (`:3710` and `:3711`), **-004** (`:3787`) and **-006** (`:3806`) — **all seven RPH-BAS rows, and no
+  RPH-ASR row.** Each was opened; every one anchors a DIFFERENT ASR-16 clause.
+  **RPH-BAS-001** (`B:3143`) anchors `:3147`
+  *"exact item identities, semantic versions, and content hashes where applicable"* — **limb 1**, and
+  it files `semanticVersion: obj?.semanticVersion ?? 1`, a DIFFERENT field eight lines above this
+  row's site.
+  **BY SITE:** `'undertaking'` over A B C D → **exactly 1**, `A:9922`. `Baseline of ` → **0/0/0/0**.
+  `declared purpose` → **0/0/0/0**. `governance.ts:746` and `:747` → only `A:9923-9924`.
+  `CreateBaselinePayloadSchema` → only `A:9924`. `BaselinePromotionInput` → **3**, corrected on
+  verification from the draft's 2: `A:2282` (**REG-F-073**, ✅ CLOSED 2026-08-08 — the entry that ADDED
+  `baselineId` to this very interface, for a decision's SUBJECT SCOPE; it adds no purpose or scope
+  view), `A:7330` (REG-F-214, residual risk) and `D:engine-reference-map.md:40` (a kernel signature
+  map). `AMBIGUOUS_BASELINE_SCOPE` → **A 2** (both inside REG-F-214, `:7281` and `:7287`), **B 0**,
+  **C 0**, **D 2**
+  (`canonical-vocabulary.json:1206`, a data file; `DESIGN-evidence-requirements.md:179`, an
+  evidence-TYPE classification note). Ledger term counts: `purpose` **0**, `rollback` **0**.
+  ⚠ **TODAY'S 17 FILINGS GREPPED SPECIFICALLY** — REG-F-234..245 / REG-Q-058..062 begin at `A:12116`:
+  `awk 'NR>=12116' A | grep -niE "canPromoteBaseline|BaselineObjectSchema|declared purpose|baseline
+  scope|promotion precondition"` → **1**, opened: `A:12530`, REG-F-235's reconciliation quoted above.
+  Controls for that same range and instrument: `DIVERGENT_UNFILED` → **11**, `baseline` → **22**.
+  **POSITIVE CONTROLS, identical instrument and files, same run:** `baseline` → **A 370 · B 108 ·
+  C 33**, and **43 files** in D. `canPromoteBaseline` → **C 3** and **6 files** in D
+  (`engine-reference-map.md`, `HARMONIZATION-LOG.md`, `OPEN-QUESTIONS.md`, `RESUME-STATE.md`,
+  `ROADMAP-claim-assessment.md`, `RPH-DOC-010-BUILD-PLAN.md`). All four corpora are demonstrably
+  reached and demonstrably discuss baseline promotion, so the zeros above are absences.
+
+- **THE REMEDY.**
+  **(1) SETTLE THE BRANCH FIRST, and it is already staked out.** REG-F-228 remedy (6), `A:9949-9950`:
+  *"**Make `scope` AND `purpose` supplyable by the caller — or DELETE them rather than fabricate
+  them**"*. ⚠ **Either branch must remove the write at `governance.ts:746-747` in the SAME change** — a
+  supplyable field with the literal still defaulting behind it reproduces the defect exactly.
+  **(2) IF SUPPLYABLE (wiring, not invention).** Add `purpose` and `scope` to
+  `CreateBaselinePayloadSchema` (`messages.ts:375-379`); give `BaselinePromotionInput`
+  (`rph-domain/governance.ts:213-235`) a view of both; carry the ratified `AMBIGUOUS_BASELINE_SCOPE`
+  into `BaselinePromotionFindingCode` (`:237-247`). ⚠ **That last edit is the same edit REG-F-214
+  remedy step 1 claims for its own code — work it once, not twice.**
+  **(3) ⚠ WHAT THE GUARD MAY ASSERT IS NOT SETTLED HERE, AND MUST NOT BE ASSUMED.** The default
+  severity for `AMBIGUOUS_BASELINE_SCOPE` is **MATERIAL**
+  (`packages/rph-product-realization-pwa/src/ontology.data.ts:3491-3498`) — and it is **AUTHORED, NOT
+  RATIFIED**, corrected on verification: `severityBasis: 'AUTHORED'` (`:3495`), rationale (`:3497`)
+  *"Nothing ratified decides this code; RPH-DOC-003 §35's Blocking conditions do not reach §26.3
+  claim 9 ('the baseline has a declared purpose and scope'), so the MATERIAL default holds."* And
+  MATERIAL does not block a promotion — `packages/rph-application/src/handlers/governance.ts:55`,
+  `BLOCKING_SEVERITIES = new Set(['BLOCKING', 'CRITICAL'])`, whose own comment reads *"MATERIAL and
+  below do not block a baseline."*
+  ⚠ **AND THE COMPANION REG-Q DOES NOT SETTLE IT EITHER — corrected on verification, because the draft
+  said it did.** That entry's Q1/Q2/Q3 are about the ROLLBACK code (`MISSING_RECOVERY_PLAN`) and never
+  ask what severity `AMBIGUOUS_BASELINE_SCOPE` carries. **The identical adjudication is OPEN for THIS
+  conjunct too**, on the authored rationale's own §35-restraint reasoning quoted above, and it is owed
+  a ruling that does not yet exist. **Wire the channel and the view here; write no blocking assertion
+  ahead of that ruling, and do not read the companion REG-Q as having supplied one.**
+  **(4) THE RED THAT MUST COME FIRST.** Drive `CreateBaseline` with `purpose: 'X'` and assert the
+  stored baseline reads `purpose === 'X'`: today that is `VALIDATION_FAILED |
+  RPH_VALIDATION_SCHEMA_FAILED` (DRIVE 1 above), and it must be seen red before step 2 lands. The
+  reader-side red — a promotion refused for a blank scope — **waits on (3)** and must not be written
+  before it.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-16:6`, **its FIRST conjunct
+  (*"declared purpose/scope"*) only**. ⚠ **The row is discharged only by this entry TOGETHER WITH the
+  companion REG-Q on the second conjunct (*"with rollback/recovery where required"*) — merge them as a
+  pair, or the limb stays half-open.** It closes nothing else, because: `limb:ASR-16:5` is closed by
+  REG-F-214 at `A:7411` and is about Decision facts, which that entry itself says are *"blind to …
+  purpose and scope"*; `limb:ASR-16:1` is `RPH-BAS-001`'s subject (`B:3143`, canonAnchor `:3147`), a
+  different field in the same object literal; and `limb:ASR-9:7` / `limb:ASR-9:10` belong to REG-F-228
+  and REG-F-235, both ASR-9 DEFERRAL-CARRIER subjects rather than promotion preconditions.
+
+- **Merge target:** Repository — `packages/rph-contracts/src/messages.ts` (the declaration channel),
+  `packages/rph-application/src/handlers/governance.ts:746-747` (the fabricated write),
+  `packages/rph-domain/src/governance.ts:213-235` + `:237-247` (the gate's view and its code), and a
+  `verif/` assertion pinning the absence until (2) lands. Status: OPEN.
+
+### REG-F-255 — "exactly one holds per relevant child" is enforced as "at least one": no site counts
+dispositions per (constraint, child) pair, so three contradictory ones for one MANDATORY constraint
+reach VALID — and the alternative this limb names carries neither strength nor the constraint to a child
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** DEC-4's head quantifies over (constraint, child) PAIRS and says
+  EXACTLY ONE disposition holds for each. The gate implements the `>= 1` half of that and nothing else.
+  `collectConstraintFindings` folds every record's children into a `covered` **Set**, so N records
+  naming one child collapse to a single mark; `checkConstraintDisposition` is a per-record `switch`
+  with no cross-record term. **Nothing anywhere counts dispositions per (`constraintId`,
+  `childWorkUnitId`) pair — which is the only thing "exactly one" asserts.** Driven at HEAD:
+  `PROPAGATED[A,B]` + `RETAINED[A,B]` + `SUPERSEDED[A,B]`, three mutually exclusive fates for ONE
+  mandatory constraint over the SAME two children, reached `VALID` with all three stored. **And the
+  alternative this limb names is hollow on both halves of its own parenthetical:** a propagation cannot
+  declare it keeps MANDATORY — `propagatedStrength` is off the wire AND off the boundary mapper, so the
+  kernel arm that reads it is dead twice over — and after a clean `PROPAGATED[A,B]` reached VALID, both
+  children's `constraintIds` were still `[]` with the CONSTRAINT sitting on the parent at
+  MANDATORY/PROPOSED. "Propagated" is a bookkeeping claim on the contract with no downstream carrier of
+  authority, of strength, or of the constraint itself.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§7 Decomposition
+  and recomposition** (heading at line 207), **DEC-4 · Constraint exhaustive disposition** at line 223,
+  **limb 1**: *"For every mandatory parent constraint, exactly one holds per relevant child: propagated
+  (retaining authority and strength);"*. Its **WHY** at line **224** is what the second conjunct
+  measures: *"constraints are the user's authority made portable; silent drop during decomposition is
+  unauthorized de-scoping."* Nothing makes the constraint portable.
+  ⚠ **The section is §7, not §6.** At HEAD `## 6.` (line 169) is *State axes and transition guards*.
+  Eleven `note:` fields in `packages/rph-domain/src/enforcement-register.ts` still read `§6 DEC-…`,
+  `RPH-CNS-001`'s at `:3573` among them. REG-F-210 is the standing correction of that class and this
+  entry does not re-file it; the anchor is restated only so this citation is not read as a new instance.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD `303ee671` with `sed -n`, not from grep summaries.**
+  - **THE COVERAGE LOOP — A SET, WHICH CANNOT COUNT.** `packages/rph-domain/src/decomposition.ts:186`
+    `collectConstraintFindings`. It gates on `c.strength !== 'MANDATORY' || !c.applicable` (`:190`),
+    then at `:195-196`, byte-exact: `const covered = new Set<string>();` ·
+    `for (const r of records) for (const child of r.childWorkUnitIds) covered.add(child);` — and emits
+    `SILENT_CONSTRAINT_DROP` at `:197-203` for every relevant child NOT in that set. **A Set answers
+    "is this child dispositioned at all"; it cannot answer "how many times, and how."**
+  - **THE PER-RECORD SWITCH — NO CROSS-RECORD TERM.** `decomposition.ts:212`
+    `checkConstraintDisposition`, invoked once per record from `:208`:
+    `for (const r of records) findings.push(...checkConstraintDisposition(c.constraintId, r));`. Every
+    arm (`:218`, `:223`, `:228`, `:233`, `:237`) reads fields of that ONE record. Neither the function
+    nor its caller ever compares two records.
+  - **⚠ THE KERNEL'S OWN DOCBLOCK LICENSES THE MULTIPLICITY AND STATES ONLY A COVER.**
+    `ConstraintDispositionRecord`'s docblock at `:108-110`: *"A constraint may be dispositioned by
+    several records
+    (e.g. propagated to some children, retained for others); the union of the records' childWorkUnitIds
+    must cover every relevant child (§11.2 'for each relevant child')."* Several records is right, and
+    a lawful split is the reason. But the condition it states is a **union cover**; canon states a
+    **partition**. Nothing forbids two records naming the same child with opposite dispositions.
+  - **THE PARENTHETICAL, HALF ONE — STRENGTH IS OFF THE WIRE, AND ALSO OFF THE BOUNDARY.**
+    `ConstraintPropagationSchema` (`packages/rph-contracts/src/objects.ts:177-186`) is a
+    `z.strictObject` of **six** keys — `constraintId`, `childWorkUnitIds`, `disposition`, `rationale`,
+    `authorityDecisionId`, `supersededByConstraintId` — so a caller sending `propagatedStrength` is
+    refused at payload validation. ⚠ **AND IT WOULD STILL NOT ARRIVE IF THE SCHEMA WERE WIDENED:** the
+    boundary mapper `buildConstraintInput` (`packages/rph-application/src/handlers/decomposition.ts:`
+    `251-258`) constructs each `ConstraintDispositionRecord` from exactly those same six keys, and
+    `propagatedStrength` is not among them. The kernel arm at `decomposition.ts:219-221` that would
+    emit `CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY` is therefore dead for **two independent reasons**, and
+    only one of them is on the record (see the citation corrections).
+  - **THE PARENTHETICAL, HALF TWO — NOTHING CARRIES THE CONSTRAINT TO THE CHILD.**
+    `ValidateDecomposition` mutates no child. `PWU.constraintIds` is written at exactly ONE production
+    site, `packages/rph-application/src/handlers/pwu.ts:325` inside `proposePwu` (opening at `:221`);
+    no command adds a constraint to an existing PWU. **CENSUS, derived not eyeballed:**
+    `grep -rn --include=*.ts "constraintIds" packages/*/src apps/*/src | grep -v '\.test\.' |`
+    `grep -v /dist/ | grep -v childWorkUnitIds` → **22 lines**, all opened and all classified:
+    **1** PWU write (`pwu.ts:325`) + **3** reader lines at 2 sites (below) + **2** INTENT-object writes
+    (`handlers/intent.ts:60`, `:244` — a different aggregate) + **4** schema declarations + **7** prose
+    comments + **5** payload/fixture literals in fixtures and demo routes = **22** — four of those five
+    are `constraintIds: []`; the fifth, `rph-engine/src/reference-undertaking.ts:447`, is
+    `constraintIds: [...(CONSTRAINTS_BY_PWU[pwuId] ?? [])]` on a `ProposePwu` PAYLOAD, so it reaches the
+    object through `pwu.ts:325` and does not add a second write site. *Positive
+    control, same population and flags:* `obligationIds` → **12**.
+  - **AND THE PERSISTED RECORD HAS ONE GATE-READER.** `handlers/decomposition.ts:250`
+    `const propagations = (state.constraintPropagations as ConstraintPropagation[] | undefined) ?? [];`
+    is the only production READ of the stored propagations; the other production sites are the write at
+    `:64`, the event echo at `:94-95`, and `HONOURED_REVISION_FIELDS` at `:446`.
+
+- **OBSERVED / READ — EVIDENCE CLASS IS MIXED AND STATED PER CONJUNCT, SO NOTHING IS UPGRADED (EM-5).**
+  **DRIVEN BY THIS FILING**, 2026-08-23 at `857128a7`, through `Engine.dispatch` against a real
+  `SqliteStorageAdapter` (a throwaway vitest probe under `packages/rph-application/src/handlers/`, run
+  once and deleted; `git status` re-checked clean afterwards): every transcript line below, including
+  both controls. **READ / MEASURED AT HEAD BY THIS FILING**: every `file:line` above, both censuses with
+  their positive controls, and the EM-7 search. The census row `limb:DEC-4:1` (lane
+  `w3b-lane:v1-declyr`, measured 2026-08-21, `DROVE_THE_ENGINE`, `refutation: HELD`) drove the same
+  three arrangements independently and agrees line for line; **this run is a second, later observation,
+  not a re-quotation of that one.**
+
+- **THE DRIVEN ARRANGEMENT (DRIVEN, 2026-08-23). Fenced — transcript lines cannot be wrapped.**
+
+  ```
+  L1-A: ProposeDecomposition(3 contradictory) -> ACCEPTED | ValidateDecomposition VALID -> ACCEPTED
+        | contract status = VALID | stored dispositions = ["PROPAGATED","RETAINED","SUPERSEDED"]
+  L1-B: propose(clean PROPAGATED[A,B]) -> ACCEPTED | validate -> ACCEPTED | contract status = VALID
+        | CHILD_A constraintIds AFTER = [] | CHILD_B constraintIds AFTER = []
+        | CON strength/status = MANDATORY PROPOSED | PARENT constraintIds = ["con_...W03"]
+  ```
+
+- **⚠ THE TWO REFUSING CONTROLS IN THE SAME RUN — THE GATE IS ALIVE AND SIMPLY HAS NO LIMB HERE, AND
+  NEITHER CONTROL IS THIS LIMB'S ENFORCEMENT (DRIVEN, same run, same objects).**
+
+  ```
+  L1-C: propose(PROPAGATED naming CHILD_A only) -> ACCEPTED | validate -> REJECTED
+        | RPH_INVARIANT_VIOLATION | ...: SILENT_CONSTRAINT_DROP(con_...W03->pwu_...W0B)
+        | contract status = UNDER_REVIEW
+  L1-D: ProposeDecomposition(+propagatedStrength ADVISORY) -> VALIDATION_FAILED
+        | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed | contract exists? = false
+  ```
+  **Citing either as limb 1's guard would be the EM-1 substitution.** `L1-C` is the coverage loop —
+  `limb:DEC-4:5`'s *"No silent omission"*, owned by `RPH-DEC-003`. `L1-D` is `z.strictObject` refusing
+  an unknown KEY: READ from `objects.ts:177`, it would refuse `propagatedStrength: 'MANDATORY'`
+  identically, so it is not a predicate about weakening. Neither keys on how many dispositions a
+  (constraint, child) pair carries.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY — each opened at its line, never taken by name.**
+  - **`RPH-CNS-001`** (`packages/rph-domain/src/enforcement-register.ts:3568`, kind
+    `NOT_A_COMMAND_REFUSAL`) **is the decoy a search returns first, because its `canonAnchor` at
+    `:3572` is this limb's own parenthetical VERBATIM** — `canonAnchor: 'propagated (retaining
+    authority and strength)',` — with the note at `:3573` reading *"the first of the five dispositions
+    it permits — retention of strength is the clause this rule protects."* **It disposes ONE CLAUSE and
+    it concludes that nothing is owed:** its whole `why` is *"THE ARRANGEMENT CANNOT BE EXPRESSED ON THE
+    WIRE … So no dispatch can weaken a propagated constraint, the antecedent is unreachable, and an
+    OBSERVED_ADMISSION has nothing to arrange."* **It says nothing whatever about this limb's HEAD** —
+    *"exactly one holds per relevant child"* — which is where the divergence is; nothing about the
+    AUTHORITY half of its own anchor; and nothing about the missing carrier. Its one live sub-claim
+    about strength is also understated: see the citation corrections below.
+  - **`REG-F-236`** (`JPWB-REG-005:12546`), filed **today** for this same invariant, is the entry most
+    likely to be mistaken for coverage — it is recent, long, DEC-4, and quotes this limb's head inside
+    its own canon bullet at `:12568`. **It closes `limb:DEC-4:7`, the ASSUMPTION plane, and it names
+    this limb as NOT closed, twice.** At `:12709`: *"Siblings `limb:DEC-4:1`, `:2` and `:6` are recorded
+    NEAR_MISS against `RPH-CNS-001`/`REG-F-006`/`RPH-CNS-002`, all three on the constraint plane."* At
+    `:12812-12813`: *"LIMB IDS THIS ENTRY CLOSES: `limb:DEC-4:7`. It closes nothing else. DEC-4's limbs
+    `:1`–`:6` are all constraint-plane clauses already disposed of elsewhere (`:3` and `:4` FILED; `:5`
+    closed by REG-F-211; `:1`, `:2`, `:6` recorded NEAR_MISS …)."* ⚠ **The phrase "already disposed of
+    elsewhere" is the trap**: its own parenthetical says three of those six are NEAR_MISS, which is
+    UNFILED with a decoy attached, not FILED.
+  - **`REG-F-211`** (`JPWB-REG-005:6672`) shares this function and even one of the three records in the
+    driven arrangement, and its closure line at `:6817` disclaims this limb in terms: *"**LIMB IDS THIS
+    ENTRY CLOSES:** `limb:DEC-4:5` — **one clause of it**, 'or superseded by a stronger constraint'. …
+    This entry is not shared with any other row of the W-3b batch."* Its axis is whether the REPLACEMENT
+    is stronger. Landing its remedy in full leaves `PROPAGATED[A,B]` + `RETAINED[A,B]` — two
+    contradictory dispositions with no SUPERSEDED record at all — accepted exactly as today.
+  - **`RPH-DEC-003`** (`enforcement-register.ts:3656`, kind `ENFORCED`, `refusalMarker`
+    `SILENT_CONSTRAINT_DROP(`) is the coverage rule and reserves itself at `:3661`: *"The 'no silent
+    omission' half is this rule."* Coverage is the `>= 1` half. This entry is the missing `<= 1` half.
+  - **`verif/guard-enforcement-ledger.data.ts:213`** scores *"limb 2 (SILENT_CONSTRAINT_DROP etc.,
+    rph-domain/src/decomposition.ts:200-235)"* ENFORCED over a LINE RANGE that CONTAINS the switch with
+    no multiplicity term. Its four limbs are obligations / constraints / siblings / independent
+    validation — a different decomposition of the sentence, in which "exactly one" is not a limb at all.
+
+- **EM-7 SEARCH DISCLOSED, by id, by CONTENT and by SITE, across all four corpora, at HEAD 2026-08-23.**
+  Bash `grep` throughout (the Grep TOOL elides this register's longest entries as
+  `[Omitted long matching line]`); `-i` and `-F` **never** combined, since together they abort on this
+  box and return a silent zero through a pipe; every hit opened with `sed -n`. Counts read
+  `JPWB-REG-005 / enforcement-register.ts / guard-enforcement-ledger.data.ts / docs/_working (files)`.
+  - **BY LIMB ID.** `limb:DEC-4:1` → **1 / 0 / 0 / 0**, and the single hit is `REG-005:12709`,
+    REG-F-236's NEAR_MISS note above — the one record naming this limb says it is unfiled. *Observed
+    positive controls, same command and flags:* `limb:DEC-4:5` → **5 / 0 / 0 / 0**, `limb:DEC-4:7` →
+    **2 / 0 / 0 / 0**, `limb:DEC-4:2` → **0 / 0 / 0 / 1 file**.
+  - **BY CONTENT, not by field name.** `exactly one holds` → **1 / 0 / 0 / 0**, and that hit is
+    `REG-005:12568` — REG-F-236 QUOTING the canon head inside its own canon bullet, not filing it.
+    *Positive controls, same run:* `DEC-4` → **34 / 6 / 0 / 2 files**, `constraintPropagations` →
+    **9 / 1 / 2 / 0**, `ConstraintPropagationSchema` → **3 / 3 / 1 / 2 files**.
+  - **BY SITE, the channel that unhid six earlier findings in this programme.**
+    `collectConstraintFindings` → **0 / 2 / 0 / 0** — both register hits are `RPH-DEC-003`'s
+    `enforcedAt` and both are about the COVERAGE loop. `checkConstraintDisposition` → **2 / 2 / 0 / 0**
+    (`REG-005:6706`, `:6812` are REG-F-211; `enfreg:3681`, `:3685` are RPH-CNS-003's INAPPLICABLE arm).
+    `buildConstraintInput` → **8 / 3 / 0 / 0**, all opened — `REG-005:614` (REG-F-014 item 3), `:1107`,
+    `:3023` (REG-F-102), `:6822` (REG-F-211's remedy), `:12587`/`:12740`/`:12777` inside REG-F-236 and
+    `:13703` inside REG-F-240 — the last is NOT REG-F-236's, and the boundary was derived from the
+    `### REG-` headings.
+    `propagatedStrength` → **1 / 4 / 0 / 0** (`REG-005:6723` is REG-F-211 quoting the arm; the four
+    register hits are RPH-CNS-001/002 themselves).
+  - **THE 17 ENTRIES MERGED TODAY (`REG-F-234..245`, `REG-Q-058..062`, from `REG-005:12116`), SEARCHED
+    SPECIFICALLY**, because every transcript on the census row predates them.
+    `awk 'NR>=12116' | grep -c` gives `DEC-4` → **21**, `constraint` → **34**, `disposition` → **32**,
+    `weakening` → **0**, `RETAINED` → **0**. All 21 `DEC-4` hits opened: **15** sit inside REG-F-236
+    (`:12546`–`:12827`), and the other **6** are search-disclosure COUNT lines in REG-F-238 /
+    REG-F-239 / REG-F-240 / REG-Q-059 (`:13291`, `:13518`, `:13521`, `:13848`, `:13851`, `:15374`) — the
+    entry boundaries derived from the `### REG-` headings after `:12116`, not read off the ordinals.
+    Two of the six state the closure set as *"`DEC-2:3`,
+    `DEC-2:8` (REG-F-210), `DEC-4:5` (REG-F-211) and `DEC-5:2` (REG-F-213) only."* **Nothing merged
+    today files this limb.**
+  - **`docs/_working/`, THE CORPUS EARLIER SWEEPS SKIPPED, MEASURED AT `303ee671`.** `DEC-4` →
+    **2 files**. (1) `DESIGN-invariant-enforcement-mapping.md`, whose DEC-4 material is `:335`
+    (`limb:DEC-4:6`, a §11 methodology note titled *"A REFUTER OVERTURNS A SCALAR; THE ROW IS A
+    NARRATIVE"*), `:729` (a §17.4 note recording `DEC-4:6 → enforcement-register.ts:3589` as a decoy
+    *"which concludes the opposite"*) and `:759` (a census-gate filter note naming `limb:DEC-4:2`).
+    (2) `HARMONIZATION-FINDINGS.md:1155`, which names DEC-4 only inside a list of invariants a corpus
+    was reachable for. None records a site, an arrangement or a remedy; all are about the AUDIT's
+    hygiene, and `:729` corroborates this entry rather than covering it. *Positive controls on the
+    same corpus:* `RETAINED` → **5 files**, `ConstraintPropagationSchema` → **2 files**,
+    `reviseDecomposition` → **1 file** — `_working` does reach this machinery.
+
+- **⚠ CITATION CORRECTIONS, each re-read at HEAD before it was written down.**
+  - **THE HEAD MOVED WHILE THIS ENTRY WAS DRAFTED, AND IT DOES NOT MOVE THE EVIDENCE.** The drives
+    ran at `857128a7`; HEAD is now `303ee671`, whose entire diff is three files under `docs/_working/`
+    (`git show --stat 303ee671`). Every code site above was re-read at `303ee671` and is byte-identical,
+    so the transcripts stand — but the `docs/_working` counts in the EM-7 disclosure above ARE
+    affected, and are stated at
+    `303ee671`, not at `857128a7`.
+  - **`RPH-CNS-001`'s field count is wrong.** `enforcement-register.ts:3580` says
+    `ConstraintPropagationSchema` is *"a `z.strictObject` of seven fields"*. It declares **six**
+    (`packages/rph-contracts/src/objects.ts:177-186`, `Object.keys` of its shape). The argument
+    survives; the number does not.
+  - **⚠ `RPH-CNS-001`'s RESIDUE IS WRONG, AND IT IS THE LOAD-BEARING ONE.** `:3586-3587` reads *"THE
+    RESIDUE: the day the field is added to the schema, this rule becomes live with a correct kernel arm
+    already waiting, and nothing here would notice."* **Widening the schema alone would NOT make it
+    live.** The boundary mapper at `handlers/decomposition.ts:251-258` never emits `propagatedStrength`,
+    so the arm at `decomposition.ts:219-221` would still receive `undefined` and still never fire. A
+    future editor acting on that residue would add the field, observe no behaviour change, and have no
+    filing that explains it.
+  - **The census row's reader count for `PWU.constraintIds` is off by one.** It reports *"exactly ONE
+    production reader in the whole engine — `buildConstraintInput` at handlers/decomposition.ts:184"*.
+    There are **two**: that one, and `packages/rph-engine/src/graph-conformance.ts:134`/`:144`, which
+    walks `(pwu?.constraintIds ?? []).includes(subjects.constraintId)` for the reference undertaking's
+    §25 trace. The second is a fixture conformance walk over the PARENT's proposal-time field and never
+    reads a child's, so the conclusion is unchanged — but the count is stated correctly here.
+
+- **THE REMEDY — A UNIQUENESS PREDICATE, PLUS THE TWO CARRIERS THE PARENTHETICAL PRESUPPOSES.**
+  1. **THE `<= 1` HALF, WHICH IS THE HEAD OF THE LIMB.** In `collectConstraintFindings`
+     (`packages/rph-domain/src/decomposition.ts:186`), beside the `covered` Set, accumulate a per-child
+     map of dispositions and emit a NEW `ConstraintFindingCode` — the union is at `:132-138` — for any
+     relevant child carrying more than one DISTINCT disposition of the same constraint. Kernel only:
+     the boundary supplies nothing new for this half.
+  2. **THE STRENGTH CARRIER.** `propagatedStrength` must reach the kernel before the arm at `:219-221`
+     can ever fire: add it to `ConstraintPropagationSchema` (`objects.ts:177`) **and** to the mapper at
+     `handlers/decomposition.ts:251-258`. Widening only the schema leaves the arm dead — that is the
+     correction above, and it is why this half is listed as two edits rather than one. ⚠ **This is the
+     SAME pair of edits the `limb:DEC-4:6` entry in this batch names as its remedy step 3; implement it
+     once, or the merge writes the carrier twice.**
+  3. **THE CONSTRAINT CARRIER**, or "propagated" stays a claim about the contract and not about the
+     child: `PWU.constraintIds` is written only by `proposePwu` (`handlers/pwu.ts:325`). This is the
+     constraint-plane twin of REG-F-236's remedy 2 for `PWU.assumptionIds`, and the two want one design
+     rather than two write paths invented independently.
+
+- **⚠ THREE TRAPS FOR THE REMEDY, each already demonstrated in this repository.**
+  (i) **Do not implement uniqueness as "one record per constraint".** The kernel docblock at `:108-110`
+  deliberately permits several records — *"propagated to some children, retained for others"* — and
+  canon quantifies per CHILD, not per record. A per-record rule would refuse the lawful split, which is
+  the over-refusal failure RPH-CNS-003's second declared mutation already records.
+  (ii) **A count is not a partition.** Two records naming child A with the SAME disposition are
+  redundant, not contradictory, and whether canon forbids them is a question this entry does not settle.
+  Refuse the DISTINCT-disposition case; record the duplicate case rather than deciding it silently.
+  (iii) **Assert the MESSAGE, not the code.** Every conservation finding shares one
+  `RPH_INVARIANT_VIOLATION` sentence (`handlers/decomposition.ts:288`, message at `:291`), so the
+  finding CODE is the only thing that tells a new refusal from `SILENT_CONSTRAINT_DROP`.
+
+- **THE TEST THAT MUST REDDEN FIRST, AND IT DOES NOT EXIST YET.** Write `L1-A` red: three contradictory
+  dispositions for one mandatory constraint over the same children must move `ValidateDecomposition`
+  from ACCEPTED to REJECTED with the new code. Today it is ACCEPTED, so the red is predicted, not hoped
+  for. Ship it beside **two controls with their own mutants**: (a) `L1-C`'s `SILENT_CONSTRAINT_DROP`
+  still firing on its own limb, proving the new refusal is distinguishable rather than an arrangement
+  tripping two conjuncts; and (b) the lawful SPLIT — `PROPAGATED[CHILD_A]` + `RETAINED[CHILD_B]` for one
+  constraint — still ACCEPTED, which is the control that trap (i) exists for.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-4:1`. **It closes nothing else,
+  because every other limb of DEC-4 turns on a different predicate and a different commit.** `:2`
+  (*"retained at parent level"*) is about what a REVISION may rewrite a stored disposition INTO — a
+  delta `checkDecompositionConservation` is never handed, since it receives `{ ...stored, ...revisions }`
+  merged — and is filed separately in this batch; a uniqueness predicate closes none of it, because
+  after a revise there is still exactly one record per child. `:3` and `:4` are FILED and
+  ENFORCED_DRIVEN (`RPH-CNS-003`; the WAIVED arm). `:5` is closed by REG-F-211 on the STRENGTH of the
+  replacement. `:6` is the AUTHORITY conjunct the SUPERSEDED arm lacks, filed separately in this batch.
+  `:7` is closed by REG-F-236 on the ASSUMPTION plane. `:8` is the sibling-dependency clause and is
+  separately FILED.
+
+- **Merge target:** Repository — `packages/rph-domain/src/decomposition.ts` (the uniqueness predicate
+  and its new finding code), `packages/rph-contracts/src/objects.ts` plus
+  `packages/rph-application/src/handlers/decomposition.ts` (the strength carrier, both edits), and
+  `packages/rph-application/src/handlers/pwu.ts` (the constraint carrier, designed jointly with
+  REG-F-236's writer half). Corpus: none — canon states the rule and needs no amendment.
+
+### REG-F-256 — a recorded RETENTION of a mandatory constraint is rewritable to any other disposition
+by one accepted ReviseDecomposition: the gate is handed the MERGED contract and never the delta, and
+the RETAINED arm is the one arm that cannot produce a finding
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** DEC-4's SCOPE binds *semantic revision* by name, so "retained at
+  parent level" has to survive a revise or it is not a disposition at all. It does not.
+  `HONOURED_REVISION_FIELDS` puts `constraintPropagations` on the honoured side, `reviseDecomposition`
+  builds `revisions` from the payload and applies them in place through `advanceStatus`'s `mutate`
+  hook, and the ONLY gate on that path is `checkDecompositionConservation({ ...stored, ...revisions })`
+  — **the gate receives the MERGED contract, so it cannot see what the disposition WAS and cannot ask
+  what changed.** Downstream of it the kernel has no opinion either: `case 'RETAINED': break;` emits no
+  finding under any input and, alone among the five arms, cites no rule. Driven at HEAD: a VALID
+  contract storing `RETAINED[A,B]` for a MANDATORY constraint, revised to `PROPAGATED[A,B]` →
+  ACCEPTED, the stored record rewritten, no authority cited and no Decision minted; and revised to
+  `SUPERSEDED` by the literal string `nothing-at-all` → also ACCEPTED. **The discriminating control in
+  the same run refuses** — dropping the propagations entirely is REJECTED with two
+  `SILENT_CONSTRAINT_DROP`s and the stored record left byte-identical — **so the gate discriminates on
+  COVERAGE and on nothing about retention.** A retention is data the parent keeps until the next
+  revise, never a binding.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§7 Decomposition
+  and recomposition** (heading at line 207), **DEC-4 · Constraint exhaustive disposition** at line 223,
+  **limb 2**: *"retained at parent level;"* — the second of the five fates the head quantifies over
+  (*"For every mandatory parent constraint, exactly one holds per relevant child"*). **The clause that
+  makes this a revision defect is DEC-4's own SCOPE, at line 225**: *"governs decomposition, delegation,
+  semantic revision, and context assembly (a context omission must not silently remove a mandatory
+  constraint)."* ⚠ **§7, not §6** — `## 6.` (line 169) is *State axes and transition guards*; eleven
+  `note:` fields in `packages/rph-domain/src/enforcement-register.ts` still read `§6 DEC-…`. REG-F-210
+  is the standing correction of that class and this entry does not re-file it.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD `303ee671` with `sed -n`, not from grep summaries.**
+  - **THE WHITELIST.** `packages/rph-application/src/handlers/decomposition.ts:446`, byte-exact:
+    `const HONOURED_REVISION_FIELDS = ['obligationAllocations', 'constraintPropagations'] as const;`
+    Its sibling `UNHONOURED_REVISION_FIELDS` at `:438` holds `childWorkUnitIds` alone, refused at
+    `:452-462` because DEC-2's impact-analysis plane does not exist. **So this file DOES carry an
+    explicit refusal list for fields it will not honour, and `constraintPropagations` is deliberately
+    on the honoured side.**
+  - **THE APPLICATION.** `reviseDecomposition` opens at `:448`; `revisions` is built at `:468-470` from
+    `HONOURED_REVISION_FIELDS.filter((f) => p[f] !== undefined)`, and applied at `:485` by
+    `mutate: (base) => ({ ...base, ...revisions }),` with `bumpSemanticVersion: true` at `:495`.
+  - **⚠ THE GATE IS BLIND TO THE DELTA BY CONSTRUCTION, AND THE COMMENT ABOVE IT EXPLAINS WHY.** At
+    `:474-479` the only check is `checkDecompositionConservation(` `{ ...stored, ...revisions },` … `)`.
+    The comment at `:465-467` states the design and is correct as far as it goes: *"The gate runs
+    against the contract AS REVISED, not as stored — checking the stored state would pass every
+    revision by construction, which is the vacuity shape this programme keeps finding."* **Both
+    readings are vacuous for THIS limb.** Checking the stored state passes everything; checking the
+    merged state cannot tell a rewrite from an original proposal, because by then there is exactly one
+    record per child and it is well-formed. **A transition rule needs both halves, and this call site
+    discards one of them.**
+  - **THE ARM THAT CANNOT FAIL.** `packages/rph-domain/src/decomposition.ts:237-238`, entire:
+    `case 'RETAINED':` · `    break; // retention at parent level is always a valid disposition (§11.2)`
+    — no predicate, no finding, no input that changes the outcome. **Its four siblings each cite a
+    rule and each test something**: `:218-221` PROPAGATED (RPH-CNS-001/002, and it fires only when a
+    `propagatedStrength` that cannot arrive is non-MANDATORY without authority), `:223-226`
+    INAPPLICABLE (RPH-CNS-003, rationale AND authority), `:228-232` WAIVED (RPH-CNS-004, authority then
+    expiry), `:233-236` SUPERSEDED (a truthiness test on a string). **The RETAINED arm cites none.**
+  - **AND COVERAGE CANNOT STAND IN FOR IT.** `collectConstraintFindings` (`:186`) builds `covered` from
+    `r.childWorkUnitIds` across ALL records regardless of disposition (`:195-196`) and emits
+    `SILENT_CONSTRAINT_DROP` per uncovered relevant child (`:197-203`). A rewrite that keeps the same
+    children is invisible to it.
+  - **THE RETENTION BINDS NOTHING DOWNSTREAM EITHER, WHICH IS WHY NOTHING ELSE CATCHES IT.**
+    `state.constraintPropagations` has ONE production reader — `handlers/decomposition.ts:250` — and it
+    is the validation gate itself. `PWU.constraintIds` is written at exactly one production site,
+    `handlers/pwu.ts:325` inside `proposePwu` (`:221`), and read at two:
+    `handlers/decomposition.ts:184` (`buildConstraintInput`) and
+    `packages/rph-engine/src/graph-conformance.ts:134`/`:144` (the reference undertaking's §25 trace
+    walk). **CENSUS, derived not eyeballed:** `grep -rn --include=*.ts "constraintIds" packages/*/src`
+    `apps/*/src | grep -v '\.test\.' | grep -v /dist/ | grep -v childWorkUnitIds` → **22 lines**, all
+    opened. *Positive control, same population and flags:* `obligationIds` → **12**.
+
+- **OBSERVED / READ — EVIDENCE CLASS IS MIXED AND STATED PER CONJUNCT, SO NOTHING IS UPGRADED (EM-5).**
+  **DRIVEN BY THIS FILING**, 2026-08-23 at `857128a7`, through `Engine.dispatch` against a real
+  `SqliteStorageAdapter` (a throwaway vitest probe under `packages/rph-application/src/handlers/`, run
+  once and deleted; `git status` re-checked clean afterwards): every transcript line below, including
+  the control. **READ / MEASURED AT HEAD BY THIS FILING**: every `file:line` above, the census with its
+  positive control, and the EM-7 search. The census row `limb:DEC-4:2` carries an independent driven
+  transcript from its refuter (`r_limb2.mjs`, node, 2026-08-21) with the same three outcomes; **this run
+  is a second, later observation, not a re-quotation of that one.**
+
+- **THE DRIVEN ARRANGEMENT (DRIVEN, 2026-08-23). Fenced — transcript lines cannot be wrapped.**
+
+  ```
+  L2-A: propose(RETAINED[A,B]) -> ACCEPTED | validate -> ACCEPTED
+        | stored BEFORE = [{"constraintId":"con_...W03","childWorkUnitIds":["...W0A","...W0B"],
+          "disposition":"RETAINED"}]
+        | Revise(RETAINED->PROPAGATED) -> ACCEPTED
+        | stored AFTER  = [{"constraintId":"con_...W03","childWorkUnitIds":["...W0A","...W0B"],
+          "disposition":"PROPAGATED"}]
+        | contract status AFTER = SUPERSEDED | semanticVersion = 2
+  L2-B: Revise(RETAINED->SUPERSEDED by the string "nothing-at-all") -> ACCEPTED
+        | stored AFTER = [{… "disposition":"SUPERSEDED","supersededByConstraintId":"nothing-at-all"}]
+        | contract status AFTER = SUPERSEDED | semanticVersion = 2
+  ```
+  No `authorityDecisionId` was supplied on either revision and no DECISION object exists in either run.
+
+- **⚠ THE DISCRIMINATING CONTROL, SAME RUN, SAME OBJECTS, SAME COMMAND — THE GATE IS ALIVE AND REFUSES
+  ON A DIFFERENT AXIS (DRIVEN).**
+
+  ```
+  L2-C: Revise(constraintPropagations: []) -> REJECTED | RPH_INVARIANT_VIOLATION
+        | ReviseDecomposition cannot apply this revision to dcp_...W05: the decomposition does not
+          conserve its parent's obligations/constraints (§35.1 / RPH-DEC-002/007 / RPH-CNS-001..004):
+          SILENT_CONSTRAINT_DROP(con_...W03->pwu_...W0A); SILENT_CONSTRAINT_DROP(con_...W03->pwu_...W0B)
+        | stored AFTER = [{… "disposition":"RETAINED"}] | contract status AFTER = VALID
+  ```
+  ⚠ **Citing `L2-C` as limb 2's enforcement would be the EM-1 substitution**, and the census row's own
+  superseded narrative did exactly that: it cited two coverage refusals as proof that *"the retention
+  cannot be silently revoked afterwards."* Both are the coverage loop, i.e. `limb:DEC-4:5`'s *"No
+  silent omission"*, owned by `RPH-DEC-003`. **Any revision that KEEPS coverage sails through**, which
+  is what `L2-A` and `L2-B` are.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY — each opened at its line, never taken by name.**
+  - **⚠ `REG-F-006`** (`JPWB-REG-005:475`, *"`ReviseDecomposition` performs none of DOC-003's revision
+    obligations"*) **is the dangerous decoy, because it is a POSITIVE claim inside a closed-direction
+    bullet on this exact command.** At `:484`: *"DOCS_STRONGER COMPONENT LANDED 2026-08-02, for DEC-3
+    and DEC-4. `reviseDecomposition` now APPLIES `obligationAllocations` and `constraintPropagations`
+    and gates them with the same M9 kernel `validateDecomposition` calls … The conservation check runs
+    against the contract **as revised**, not as stored."* Its status line at `:486` reads,
+    byte-exact, *"OPEN,
+    NARROWED — B7 discharged, event payload engine-enforced, DEC-3 and DEC-4 implemented and
+    mutation-proved. What remains is DEC-2 alone, and it is blocked on the impact-analysis plane rather
+    than on scheduling."* **A reader arriving at `limb:DEC-4:2` finds a
+    ratified entry asserting DEC-4 is implemented AND mutation-proved for the revise path, and closes
+    the row.** WHY IT DOES NOT COVER THIS: REG-F-006 measures **WIRING** — that the command applies the
+    field and runs the kernel gate — and it is correct about that. **It never measures what the gate
+    SAYS about a RETAINED record**, and the wiring it landed is the very mechanism of this gap: the
+    honoured field rewrites a stored disposition in place, and the gate it added is handed the merged
+    state. What its own status line leaves open is DEC-2's `childWorkUnitIds` and impact analysis — and
+    it is not quite the ONLY residue: `:482` offers a second, on a different plane (an
+    accepted-but-unapplied command is disclosed by nothing, offered as a candidate SPEC-001 gap).
+  - **`REG-F-211`** (`JPWB-REG-005:6672`) is the closer of the two on mechanism — same function, and it
+    shares one of the two escape routes (`RETAINED -> SUPERSEDED` with a garbage
+    `supersededByConstraintId` sails through because that arm tests only string truthiness). **It scopes
+    itself out at `:6817`:** *"**LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-4:5` — **one clause of it**, 'or
+    superseded by a stronger constraint'. … This entry is not shared with any other row of the W-3b
+    batch."* And this is the load-bearing half: its remedy at `:6821-6837` — resolve
+    `supersededByConstraintId` at the boundary and add a `SUPERSEDED_BY_WEAKER_CONSTRAINT` code — **would
+    kill `L2-B` and leave `L2-A` entirely intact**, because `RETAINED -> PROPAGATED` asks nothing at all
+    of the PROPAGATED arm. A retention would still evaporate without authority after REG-F-211 lands.
+  - **⚠ `verif/guard-enforcement-ledger.data.ts:309`**, key *"revision preserves parent identity but
+    increments semantic version (§13.2)"*, disposition `UNENFORCED`, **is the near miss that names this
+    exact whitelist and reads as though it had disposed of it.** Its evidence at `:311` says *"'preserves
+    parent identity' holds by construction of a whitelist, not by a check: `mutate: (base) => ({ ...base,
+    ...revisions })` where `revisions` is filtered to `HONOURED_REVISION_FIELDS` …, so `parentWorkUnitId`
+    is untouchable … a future `mutate` or a widened `HONOURED_REVISION_FIELDS` could break the declared
+    guard with no refusal."* **Its subject is what the whitelist EXCLUDES** (`parentWorkUnitId`,
+    versioning). **This limb's subject is what the whitelist INCLUDES** — that a field on the honoured
+    side may be rewritten to any value without authority. Its line citations have also drifted: see the
+    corrections below.
+  - **`REG-F-236`** (`JPWB-REG-005:12546`), filed **today** for this same invariant, is the entry most
+    likely to be mistaken for coverage. **It closes `limb:DEC-4:7`, the ASSUMPTION plane, and names this
+    limb as NOT closed, twice** — `:12709` (*"Siblings `limb:DEC-4:1`, `:2` and `:6` are recorded
+    NEAR_MISS against `RPH-CNS-001`/`REG-F-006`/`RPH-CNS-002`"*) and `:12812-12813`. ⚠ Its phrase at
+    `:12813`, *"DEC-4's limbs `:1`–`:6` are all constraint-plane clauses already disposed of elsewhere"*,
+    is the trap: its own parenthetical says three of the six are NEAR_MISS — UNFILED with a decoy, not
+    FILED. It does touch this file at `:12609` (*"`HONOURED_REVISION_FIELDS` … honours only the other two
+    planes"*), but only to establish that the ASSUMPTION plane has no revision carrier at all.
+  - **CHECKED AND NOT CLAIMED.** `RPH-DEC-003` (`enforcement-register.ts:3656`, note at `:3661`) owns
+    *"no silent omission"*, i.e. coverage. `RPH-CNS-003` (`:3673`, note at `:3678`) owns *"the third of
+    the five permitted dispositions"*; `RPH-CNS-001` (`:3568`, note at `:3573`) owns *"the first"*.
+    **The register's own arithmetic leaves the SECOND disposition with no row at all.** And
+    `verif/guard-enforcement-ledger.data.ts:213` scores its *"limb 2"* — which is SILENT_CONSTRAINT_DROP,
+    coverage — ENFORCED over the line range `decomposition.ts:200-235`, a range that CONTAINS the
+    unfailable RETAINED arm.
+
+- **EM-7 SEARCH DISCLOSED, by id, by CONTENT and by SITE, across all four corpora, at HEAD 2026-08-23.**
+  Bash `grep` throughout (the Grep TOOL elides this register's longest entries); `-i` and `-F` **never**
+  combined, since together they abort on this box and return a silent zero through a pipe; every hit
+  opened with `sed -n`. Counts read `JPWB-REG-005 / enforcement-register.ts /`
+  `guard-enforcement-ledger.data.ts / docs/_working (files)`.
+  - **BY LIMB ID.** `limb:DEC-4:2` → **0 / 0 / 0 / 1 file**, and the single `_working` hit is
+    `DESIGN-invariant-enforcement-mapping.md:759`, a §17.5 note recording that a census GATE's filter was
+    re-keyed and *"fails naming `limb:DEC-4:2`"* — a statement about the instrument, not a filing.
+    *Observed positive controls, same command and flags:* `limb:DEC-4:5` → **5 / 0 / 0 / 0**,
+    `limb:DEC-4:7` → **2 / 0 / 0 / 0**, `limb:DEC-4:1` → **1 / 0 / 0 / 0**.
+  - **BY CONTENT, not by field name.** `retained at parent` → **1 / 0 / 0 / 0**, and that hit is
+    `REG-005:12569` — REG-F-236 QUOTING the canon sentence inside its own canon bullet, not filing it.
+    *Positive controls, same run:* `DEC-4` → **34 / 6 / 0 / 2 files**, `RETAINED` → **7 / 0 / 0 / 5
+    files**, `constraintPropagations` → **9 / 1 / 2 / 0**.
+  - **BY SITE, the channel that unhid six earlier findings in this programme.**
+    `HONOURED_REVISION_FIELDS` → **3 / 0 / 1 / 0**, all four opened: `REG-005:6339` cites it as an
+    ANALOGUE for a different family's fix, `:12609` and `:12787` are REG-F-236 on the assumption plane,
+    and `ledger:311` is the parent-identity row above. **Not one is about what the honoured fields may
+    be overwritten WITH.** `reviseDecomposition` → **3 / 1 / 0 / 1 file**, all opened.
+    `checkDecompositionConservation` → **15 / 6 / 1 / 0**, re-measured here rather than carried over —
+    REG-F-236's own disclosure at `REG-005:12741` states **6 / 6 / 1 / 0** and is stale for its first
+    number (positive control — the corpora do reach this function).
+    `collectConstraintFindings` → **0 / 2 / 0 / 0**, both `RPH-DEC-003`'s `enforcedAt`.
+  - **THE 17 ENTRIES MERGED TODAY (`REG-F-234..245`, `REG-Q-058..062`, from `REG-005:12116`), SEARCHED
+    SPECIFICALLY**, because every transcript on the census row predates them.
+    `awk 'NR>=12116' | grep -c` gives `RETAINED` → **0**, `weakening` → **0**, `disposition` → **32**,
+    `constraint` → **34**, `DEC-4` → **21**. All 21 `DEC-4` hits opened: **15** sit inside REG-F-236
+    (`:12546`–`:12827`) and the other **6** are search-disclosure COUNT lines in REG-F-238 / REG-F-239 /
+    REG-F-240 / REG-Q-059 — boundaries derived from the `### REG-` headings after `:12116`, not read off
+    the ordinals. Two of the six state
+    the closure set as *"`DEC-2:3`, `DEC-2:8` (REG-F-210), `DEC-4:5` (REG-F-211) and `DEC-5:2`
+    (REG-F-213) only."* **Nothing merged today files this limb.**
+  - **`docs/_working/`, THE CORPUS EARLIER SWEEPS SKIPPED, MEASURED AT `303ee671`.** `RETAINED` →
+    **5 files**, `reviseDecomposition` → **1 file**, `DEC-4` → **2 files** — all opened.
+    `DESIGN-invariant-enforcement-mapping.md` carries `:335`, `:729` (a §17.4 near-miss note on
+    `DEC-4:6`) and `:759`; `HARMONIZATION-FINDINGS.md:1155` names DEC-4 only inside a list of
+    invariants. All are methodology notes about the audit's own hygiene, recording no site,
+    arrangement or remedy, and none touches the revise path.
+
+- **⚠ CITATION CORRECTIONS, each re-read at HEAD before it was written down.**
+  - **THE HEAD MOVED WHILE THIS ENTRY WAS DRAFTED, AND IT DOES NOT MOVE THE EVIDENCE.** The drives
+    ran at `857128a7`; HEAD is now `303ee671`, whose entire diff is three files under `docs/_working/`
+    (`git show --stat 303ee671`). Every code site above was re-read at `303ee671` and is byte-identical,
+    so the transcripts stand — but the `docs/_working` counts in the EM-7 disclosure above ARE
+    affected, and are stated at
+    `303ee671`, not at `857128a7`.
+  - **`verif/guard-enforcement-ledger.data.ts:311` has drifted on all five of its pointers, and NOT by
+    one offset** — four moved **+33** lines and the handler pointer **−3**, so a reader applying one
+    offset lands wrong on it. It cites `decomposition.ts:451` (the handler), `:452` (`mutate`), `:413`
+    (`HONOURED_REVISION_FIELDS`), `:462` (`bumpSemanticVersion`) and `:419-429` (the `childWorkUnitIds`
+    refusal). At HEAD they are **`:448`**, **`:485`**, **`:446`**, **`:495`** and **`:452-462`**. Every
+    substantive claim in that row still holds at the corrected lines; the pointers do not.
+  - **The census row's reader count for `PWU.constraintIds` is off by one.** It reports *"exactly ONE
+    production reader in the whole engine — `buildConstraintInput` at handlers/decomposition.ts:184"*.
+    There are **two**: that one, and `packages/rph-engine/src/graph-conformance.ts:134`/`:144`, which
+    walks `(pwu?.constraintIds ?? []).includes(subjects.constraintId)`. The second is a fixture
+    conformance walk over the PARENT's proposal-time field and never reads a child's, so the conclusion
+    is unchanged — but the count is stated correctly here.
+  - **⚠ THE CENSUS ROW'S OWN CORRECTION TO ITSELF IS THE THING THAT DRIFTED, AND BOTH HALVES ARE
+    RESTATED HERE SO THE NEXT READER DOES NOT RE-CORRECT A CORRECT LINE.** The row's `em7_search`
+    placed the sibling rule citations at `:219`, `:224`, `:229`; its blind adjudication then called
+    that *"off by roughly two lines at HEAD (:218, :223, :228)"*. **At HEAD both name a real line and
+    neither is wrong:** `:219`, `:224`, `:229` are the rule-citation COMMENTS (`// RPH-CNS-001: …`,
+    `// RPH-CNS-003: …`, `// RPH-CNS-004: …`) and `:218`, `:223`, `:228` are the `case` labels above
+    them; the PREDICATES are at `:220-221`, `:225-226` and `:230-231` — `:232` is the WAIVED arm's
+    `break;`, not part of its predicate.
+  - **⚠ AND THE RETAINED ARM ITSELF IS ONE LINE LOWER THAN EVERY PRIOR CITATION SAYS.** The row's
+    adjudication places it at `:236-237` and its `em7_search` at `:237`. At HEAD `:236` is the
+    SUPERSEDED arm's `break;`; the RETAINED arm is `case 'RETAINED':` at **`:237`** and
+    `break; // retention at parent level is always a valid disposition (§11.2)` at **`:238`**. Every
+    substantive claim holds; the span does not.
+
+- **THE REMEDY — A TRANSITION RULE OVER DISPOSITION VALUES, NOT ANOTHER FIELD-PRESENCE CHECK.** Every
+  field-presence check on this path already passes; the missing fact is the PRIOR disposition.
+  1. **GIVE THE REVISE GATE THE DELTA.** `reviseDecomposition` already loads `stored` at `:472` purely
+     to build the merged object at `:475`. Pass BOTH — the stored record set and the revised one — to a
+     new predicate, so the gate can ask which (constraint, child) pairs changed disposition. The
+     `ValidateDecomposition` call site (`:363-366`) has no prior state and correctly runs the existing
+     content-only gate; this is a second predicate at one call site, not a change to the shared one.
+  2. **DECIDE WHICH TRANSITIONS NEED AUTHORITY.** Canon's own vocabulary supplies the shape: the arms
+     that DISCHARGE a mandatory constraint (INAPPLICABLE, WAIVED) already require an
+     `authorityDecisionId` resolved to a live EFFECTIVE Decision by `authorityBasis`
+     (`handlers/decomposition.ts:243-249`, applied at `:256`). A revision that moves a child OFF
+     RETAINED should demand the same fact the destination arm demands, and a new
+     `ConstraintFindingCode` beside the six at `packages/rph-domain/src/decomposition.ts:132-138` to
+     name it.
+  3. **AND GIVE THE RETAINED ARM SOMETHING TO SAY.** `decomposition.ts:237-238` is today unfailable by
+     construction; if the transition rule lives in the boundary, the arm should at minimum carry the
+     rule id its four siblings carry, so the next reader can find the predicate from the arm.
+
+- **⚠ THREE TRAPS FOR THE REMEDY, each already demonstrated in this repository.**
+  (i) **Do not close this by narrowing `HONOURED_REVISION_FIELDS`.** Removing `constraintPropagations`
+  from `:446` would re-open REG-F-006's DOCS_STRONGER component, which was landed and mutation-proved
+  deliberately. The field must stay honoured; what is missing is a rule about its VALUES.
+  (ii) **Do not gate on the merged state.** `checkDecompositionConservation({ ...stored, ...revisions })`
+  is structurally incapable of this check, and a predicate added inside it will look correct and refuse
+  nothing — the vacuity shape the comment at `:465-467` names in the other direction.
+  (iii) **Assert the MESSAGE, not the code.** Both call sites share one `RPH_INVARIANT_VIOLATION`
+  sentence (`handlers/decomposition.ts:288`, message at `:291`; the `act` parameter defaults at `:269`
+  and its NAMED-BY-THE-CALLER note runs `:266-268`),
+  so the finding CODE is the only thing that tells a new refusal from `SILENT_CONSTRAINT_DROP`.
+
+- **THE TEST THAT MUST REDDEN FIRST, AND IT DOES NOT EXIST YET.** Write `L2-A` red: a VALID contract
+  storing `RETAINED[A,B]` for a MANDATORY constraint, revised to `PROPAGATED[A,B]` with no authority,
+  must move from ACCEPTED to REJECTED with the new code. Today it is ACCEPTED, so the red is predicted,
+  not hoped for. Ship it beside **two controls with their own mutants**: (a) `L2-C`'s
+  `SILENT_CONSTRAINT_DROP` still firing on its own limb, proving the new refusal is distinguishable
+  rather than an arrangement tripping two conjuncts; and (b) the SAME revision carrying an
+  `authorityDecisionId` that resolves to a real EFFECTIVE Decision still ACCEPTED — the over-refusal
+  control, whose own mutant is to break `authorityBasis` and watch (b) redden rather than (a).
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-4:2`. **It closes nothing else,
+  because its predicate takes an input no other limb's does — the stored-versus-revised DELTA.** `:1`
+  (*"exactly one holds per relevant child"*) is a within-state uniqueness question, and after either of
+  the driven revisions there is still exactly one record per child, so a uniqueness predicate closes
+  none of this and this transition rule closes none of that; it is filed separately in this batch. `:3`
+  and `:4` are FILED and ENFORCED_DRIVEN. `:5` is closed by REG-F-211, whose remedy provably leaves
+  `L2-A` accepted. `:6` is the AUTHORITY conjunct missing from the SUPERSEDED arm at PROPOSAL time,
+  filed separately in this batch. `:7` is closed by REG-F-236 on the ASSUMPTION plane. `:8` is the
+  sibling-dependency clause and is separately FILED.
+
+- **Merge target:** Repository — `packages/rph-application/src/handlers/decomposition.ts` (the delta
+  predicate at the `reviseDecomposition` call site, `:468-479`) and
+  `packages/rph-domain/src/decomposition.ts` (the new finding code at `:132-138`, and the rule citation
+  the RETAINED arm at `:237-238` lacks). Also `verif/guard-enforcement-ledger.data.ts:311`, whose five
+  drifted pointers are corrected above. Corpus: none — canon states the rule, including its revision
+  SCOPE at DOC-003 line 225, and needs no amendment.
+
+### REG-F-257 — the one disposition that DISCHARGES a mandatory constraint is the one arm with no
+authority conjunct: a MANDATORY SECURITY constraint is softened to its ADVISORY twin, accepted, with no
+Decision anywhere — and the register row that quotes this sentence verbatim records that it cannot happen
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** DEC-4 forbids softening a mandatory constraint to advisory absent
+  authority. At HEAD the engine performs exactly that softening, and it does so through the SUPERSEDED
+  disposition. `checkConstraintDisposition`'s SUPERSEDED arm tests one thing — whether a string is
+  non-empty — with no strength comparison and, unlike three of its four siblings, **no
+  `authorityDecisionId` conjunct at all**. The boundary does not supply the missing facts either: it
+  RESOLVES `authorityDecisionId` through `authorityBasis` (load the object, require `objectType ===
+  'DECISION'`, parse, require `status === 'EFFECTIVE'`) and passes `supersededByConstraintId` straight
+  from the caller's payload, never loaded, never compared. Driven at HEAD: two SECURITY constraints
+  byte-identical but for strength, the MANDATORY one dispositioned SUPERSEDED by the ADVISORY one →
+  ACCEPTED, `VALID`, no `authorityDecisionId` on the record and no DECISION object minted anywhere in
+  the run. **That is canon's own sentence, performed.** And the arm canon's *"without authority"*
+  qualifier presupposes — a PROPAGATED record at reduced strength WITH an authority decision — is
+  unreachable twice over, so **the lawful path is closed while the unlawful one is open.**
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§7 Decomposition
+  and recomposition** (heading at line 207), **DEC-4 · Constraint exhaustive disposition** at line 223,
+  **limb 6**: *"no unauthorized weakening — a model proposing to soften a mandatory constraint to
+  advisory is rejected without authority."* Its **SCOPE** at line **225** extends it past proposal:
+  *"governs decomposition, delegation, semantic revision, and context assembly."*
+  ⚠ **The section is §7, not §6.** At HEAD `## 6.` (line 169) is *State axes and transition guards*.
+  Eleven `note:` fields in `packages/rph-domain/src/enforcement-register.ts` still read `§6 DEC-…`,
+  including `RPH-CNS-002`'s at `:3595`. REG-F-210 is the standing correction of that class and this
+  entry does not re-file it; the anchor is restated only so this citation is not read as a new instance.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD `303ee671` with `sed -n`, not from grep summaries.**
+  - **THE ARM, ENTIRE.** `packages/rph-domain/src/decomposition.ts:233-236`, byte-exact across its four
+    lines: `case 'SUPERSEDED':` · `    if (!r.supersededByConstraintId)` ·
+    `        out.push({ code: 'SUPERSEDED_WITHOUT_REPLACEMENT', constraintId });` · `    break;`
+  - **⚠ THE ASYMMETRY IS INSIDE THE SAME `switch`, AND IT RUNS THE WRONG WAY.** Of the five arms, the
+    three that leave the constraint in force or excuse it for a stated reason all demand authority:
+    `:220-221` PROPAGATED (`!r.authorityDecisionId` → `CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY`),
+    `:225-226` INAPPLICABLE (rationale AND authority), `:230` WAIVED
+    (`if (!r.authorityDecisionId) … WAIVED_WITHOUT_AUTHORITY`). **The one arm that discharges the
+    constraint outright — replacing it wholesale for every relevant child — demands none.** The
+    remaining arm, `:237-238` RETAINED, tests nothing at all.
+  - **THE BOUNDARY RESOLVES THE NEIGHBOURING ID ON THE SAME RECORD AND NOT THIS ONE.**
+    `packages/rph-application/src/handlers/decomposition.ts:243-249` defines `authorityBasis` —
+    `ctx.store.loadObject(id)`, `stored?.objectType !== 'DECISION'` → `undefined`,
+    `DecisionObjectSchema.safeParse`, `parsed.data.status === 'EFFECTIVE'` — landed under REG-F-102 so
+    that an unresolvable id reaches the kernel as ABSENT. It is applied at `:256`
+    (`authorityDecisionId: authorityBasis(r.authorityDecisionId),`). **One line below, `:257` is bare:**
+    `supersededByConstraintId: r.supersededByConstraintId`. Same record, same function, one line apart.
+  - **THE LAWFUL PATH IS DEAD TWICE OVER, AND ONLY ONE DEATH IS ON THE RECORD.** (a)
+    `ConstraintPropagationSchema` (`packages/rph-contracts/src/objects.ts:177-186`) is a
+    `z.strictObject` of **six** keys and `propagatedStrength` is not among them, so a caller offering it
+    is refused at payload validation — this is the reason `RPH-CNS-001` gives. (b) ⚠ **NEW AT THE SITE,
+    stated in no filing:** the disposition mapper at `handlers/decomposition.ts:251-258` emits exactly
+    six keys — `constraintId`, `disposition`, `childWorkUnitIds`, `rationale`, `authorityDecisionId`,
+    `supersededByConstraintId` — and `propagatedStrength` is not one of them. **So even if the schema
+    were widened tomorrow, the arm at `decomposition.ts:220-221` would still receive `undefined` and
+    still never fire.**
+  - **THE RULE'S NARROWER SUBJECT IS EVALUATED NOWHERE, AND I MEASURED IT RATHER THAN TAKING THE
+    REGISTER'S WORD.** `RPH-CNS-002`'s `why` at `:3601-3603` says its subject is *"a mandatory SECURITY
+    constraint … `constraintType` IS carried on both the command payload and the object, and NO
+    production file branches on it."* **CENSUS AT HEAD:**
+    `grep -rn --include=*.ts "constraintType" packages/*/src apps/*/src | grep -v '\.test\.' |`
+    `grep -v /dist/ | grep -v '^packages/rph-contracts'` → **29 lines**, of which the RPH engine holds
+    exactly **5**, all opened: the mint's object write and event echo
+    (`handlers/obligation-constraint.ts:67`, `:85`), one fixture literal
+    (`packages/rph-engine/src/reference-undertaking.ts:393`), and two prose lines in the register
+    itself (`:3601`, `:3670`). **Not one is a branch.** *(The other **24** are `packages/csaa/**`'s
+    `constraintTypeId` / `constraintTypeOrdinal` — TypeScript type-parameter constraints, an unrelated
+    identifier in an unrelated package. Disambiguated here because a later reader running the same grep
+    sees 29 hits and can read the register's absence claim as refuted.)*
+    ⚠ **The driven arrangement below uses `constraintType: 'SECURITY'` on BOTH constraints, so it
+    lands on the narrower subject as well as the broad one.**
+
+- **OBSERVED / READ — EVIDENCE CLASS IS MIXED AND STATED PER CONJUNCT, SO NOTHING IS UPGRADED (EM-5).**
+  **DRIVEN BY THIS FILING**, 2026-08-23 at `857128a7`, through `Engine.dispatch` against a real
+  `SqliteStorageAdapter` (a throwaway vitest probe under `packages/rph-application/src/handlers/`, run
+  once and deleted; `git status` re-checked clean afterwards): every transcript line below, including
+  both controls. **READ / MEASURED AT HEAD BY THIS FILING**: every `file:line` above, the
+  `constraintType` census, and the EM-7 search. Two prior independent drives agree — the census row's
+  refuter (`r_limb6.mjs`, node, 2026-08-21) and REG-F-211's own run (`scratchpad/v4b_dec4.mjs`, quoted
+  at `JPWB-REG-005:6739-6741`) — but **this run is a third, later observation, not a re-quotation.**
+
+- **THE DRIVEN ARRANGEMENT (DRIVEN, 2026-08-23). Fenced — transcript lines cannot be wrapped.**
+
+  ```
+  L6-A: CON strength = MANDATORY | CON2 strength = ADVISORY
+        | statements identical? = true | types identical? = true   (both SECURITY, "Encrypt PII at rest")
+        | propose(CON SUPERSEDED by CON2/ADVISORY) -> ACCEPTED
+        | ValidateDecomposition VALID -> ACCEPTED | contract status = VALID
+        | authorityDecisionId on record? = undefined | CON strength AT END = MANDATORY
+  ```
+  No DECISION object was minted anywhere in that run, and none was cited.
+
+- **⚠ THE TWO REFUSING CONTROLS IN THE SAME RUN — THE GATE IS ALIVE AND SIMPLY HAS NO LIMB HERE (DRIVEN,
+  same run, same objects).**
+
+  ```
+  L6-B: propose(SUPERSEDED, replacement EMPTY) -> ACCEPTED | validate -> REJECTED
+        | RPH_INVARIANT_VIOLATION | ...: SUPERSEDED_WITHOUT_REPLACEMENT(con_...W03)
+        | contract status = UNDER_REVIEW
+  L6-C: re-AssertConstraint SAME id at ADVISORY -> CONFLICT | RPH_REVISION_CONFLICT
+        | Revision conflict on con_...W03 (actual revision 0) | CON strength AFTER = MANDATORY
+  ```
+  ⚠ **Neither control is this limb's enforcement, and citing either would be the EM-1 substitution.**
+  `L6-B` is the SAME arm firing on the ONE thing it tests — a missing string — which is precisely the
+  point: the arm is reached, it is live, and it has no authority term. `L6-C` is the OBJECT plane
+  refusing a re-assertion on `revision`, a concurrency guard, not a weakening guard; the softening in
+  `L6-A` never touches the constraint object at all, which is why `CON strength AT END = MANDATORY`
+  in both.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY — each opened at its line, never taken by name.**
+  - **⚠ `RPH-CNS-002`** (`packages/rph-domain/src/enforcement-register.ts:3589`, kind
+    `NOT_A_COMMAND_REFUSAL`) **is the decoy, and it is worse than a near miss: it is an ANTI-COVERING
+    filing.** Its `canonAnchor` at `:3593-3594` is **this limb, byte-exact** — *"a model proposing to
+    soften a mandatory constraint to advisory is rejected without authority"* — with the note at `:3595`
+    calling it *"verbatim against the ratified statement — canon and the pre-canon rule are the same
+    sentence twice."* **A reader searching by phrase WILL land here.** What it records is that there is
+    no gap: its `why` opens at `:3598` *"THE SAME UNREACHABLE ARM AS RPH-CNS-001 — the two are decided
+    by ONE line of kernel code"* and adopts that row's ground by reference, which reads at `:3581-3583`
+    *"So no dispatch can weaken a propagated constraint, the antecedent is unreachable, and an
+    OBSERVED_ADMISSION has nothing to arrange — the RPH-EVD-002 shape."* **THAT GROUND IS FALSE AT
+    HEAD.** A dispatch does weaken a mandatory constraint to advisory; it simply spells the act
+    `SUPERSEDED` rather than `propagatedStrength`. The unreachability claim is TRUE OF THE PROPAGATED
+    ARM ONLY (`:218-222`, whose comment at `:219` names both rules), and this limb's admission travels
+    a different arm fifteen lines below it. **This entry must correct that row as well as file the gap;
+    an entry that certifies a false absence stops the next reader looking.**
+  - **`REG-F-211`** (`JPWB-REG-005:6672`) drove the byte-identical arrangement — `:6739-6741`, *"S8b
+    (replacement is REAL but strictly WEAKER): CON strength = MANDATORY | CON2 strength = ADVISORY /
+    ValidateDecomposition VALID -> ACCEPTED | contract status = VALID"* — and **disclaims this limb at
+    `:6817`:** *"**LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-4:5` — **one clause of it**, 'or superseded by
+    a stronger constraint'. … This entry is not shared with any other row of the W-3b batch."* Three
+    reasons it does not close this, and the second is the load-bearing one. **(a)** Its own words,
+    above. **(b) ITS AXIS IS STRENGTH-ORDERING, NOT AUTHORITY.** Its remedy at `:6821-6837` resolves
+    `supersededByConstraintId` at the boundary and adds a `SUPERSEDED_BY_WEAKER_CONSTRAINT` kernel code
+    comparing strength on the ratified `['MANDATORY','PREFERRED','ADVISORY']` ordering. **That refuses
+    the weakening WITH OR WITHOUT authority**, whereas this limb's clause is *"rejected **without**
+    authority"* — an authorized weakening is what canon contemplates. Landing REG-F-211 alone leaves
+    DEC-4 mis-enforced in the OPPOSITE direction relative to limb 6, and **no entry records that
+    interaction; this one does.** **(c)** It never reaches `RPH-CNS-002`'s narrower SECURITY subject and
+    does not mention `constraintType`.
+    ⚠ Its scope bullet at `:6685-6690` can also mislead here: *"THE OTHER CLAUSE IS ENFORCED AND FILED,
+    AND A READER MUST NOT TAKE THE LIMB AS BROKEN"*, crediting `RPH-DEC-003`. That sentence is about
+    **limb 5's** other clause. `RPH-DEC-003`'s own note at `:3661` reserves it: *"The 'no silent
+    omission' half is this rule; 'no unauthorized weakening' is RPH-CNS-002."*
+  - **`RPH-DEC-003`** (`enforcement-register.ts:3656`, kind `ENFORCED`) is a second phrase-decoy,
+    because its `canonAnchor` at `:3660` is *"No silent omission; no unauthorized weakening"* — which
+    CONTAINS this limb's opening words. Its `refusalMarker` is `SILENT_CONSTRAINT_DROP(` and its note at
+    `:3661` hands the weakening half straight to RPH-CNS-002. Its third `declaredMutations` entry even
+    records the SECURITY-scope hole for its own rule — *"No production site keys on `constraintType` at
+    all"* — as a scope note on an `ENFORCED` row, not as a divergence.
+  - **`REG-F-236`** (`JPWB-REG-005:12546`), filed **today** for this same invariant, is the entry most
+    likely to be mistaken for coverage — recent, long, DEC-4. **It closes `limb:DEC-4:7`, the ASSUMPTION
+    plane, and it names this limb as NOT closed, twice:** `:12709` (*"Siblings `limb:DEC-4:1`, `:2` and
+    `:6` are recorded NEAR_MISS against `RPH-CNS-001`/`REG-F-006`/`RPH-CNS-002`"*) and `:12812-12813`.
+    ⚠ Its phrase at `:12813` — *"DEC-4's limbs `:1`–`:6` are all constraint-plane clauses already
+    disposed of elsewhere"* — is the trap: its own parenthetical says three of the six are NEAR_MISS,
+    which is UNFILED with a decoy attached, not FILED.
+  - **NOT COVERAGE, SAID PRECISELY.** `verif/guard-enforcement-ledger.data.ts:339`, key *"superseded by
+    a stronger constraint (§11.2)"*, disposition `ARROW_UNREACHABLE`, evidence at `:341` opening
+    *"Arrow: Constraint.status ACTIVE -> SUPERSEDED. Unreachable TWICE OVER…"* and closing *"'stronger
+    constraint' is evaluated nowhere."* **Different object, different enum, and its claim is that the
+    arrangement cannot be PERFORMED** — at the site actually audited it is performed and accepted.
+    `REG-F-212` (`:6839`) is PER-8 *"corrections create successors with supersession links"* across five
+    supersede COMMANDS, not constraint disposition. And `verif/guard-enforcement-ledger.data.ts:213`
+    scores its *"limb 2"* — `SILENT_CONSTRAINT_DROP`, i.e. coverage — ENFORCED over the line range
+    `rph-domain/src/decomposition.ts:200-235`, **a range that CONTAINS the unguarded SUPERSEDED arm.**
+  - **THE ONE RECORD THAT NAMES THIS LIMB BY ID IS NOT A FILING.**
+    `docs/_working/DESIGN-invariant-enforcement-mapping.md:335` is the only `limb:DEC-4:6` string in any
+    of the four corpora. It opens *"`limb:DEC-4:6` is the worst instance the audit has produced"* inside
+    **§11 "A REFUTER OVERTURNS A SCALAR; THE ROW IS A NARRATIVE"** — a methodology note about the census
+    row's own hygiene. It records no site, no arrangement and no remedy, and it files nothing. It does
+    independently corroborate that the row's original `owed` (*"FOUR THINGS, none of them a live hole in
+    the prohibition"*) was authored for the overturned `ENFORCED_BY_CONSTRUCTION` arm and is orphaned.
+
+- **EM-7 SEARCH DISCLOSED, by id, by CONTENT and by SITE, across all four corpora, at HEAD 2026-08-23.**
+  Bash `grep` throughout (the Grep TOOL elides this register's longest entries); `-i` and `-F` **never**
+  combined, since together they abort on this box and return a silent zero through a pipe; every hit
+  opened with `sed -n`. Counts read `JPWB-REG-005 / enforcement-register.ts /`
+  `guard-enforcement-ledger.data.ts / docs/_working (files)`.
+  - **BY LIMB ID.** `limb:DEC-4:6` → **1 / 0 / 0 / 1 file**. Both opened: `REG-005:12772` is REG-F-236's
+    own search disclosure, and the `_working` hit is the §11 methodology note above. *Observed positive
+    controls, same command and flags:* `limb:DEC-4:5` → **5 / 0 / 0 / 0**, `limb:DEC-4:7` →
+    **2 / 0 / 0 / 0**.
+  - **BY RULE ID.** `RPH-CNS-002` → **2 / 4 / 0 / 1 file**. The two REG-005 hits (`:12710`, `:12815`) are
+    both REG-F-236 listing this limb as NEAR_MISS **against** that rule. *Observed positive control,
+    same run:* its sibling `RPH-CNS-001` → **6 / 7 / 0 / 1 file**. **The register has never filed a
+    divergence naming RPH-CNS-002 — only entries recording that it is a near miss.**
+  - **BY CONTENT, not by field name.** `CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY` → **4 / 1 / 0 / 0**, all
+    opened: `REG-005:614` and `:3020` are the REG-F-014 / REG-F-102 `authorityDecisionId`-resolution
+    closures — **a different axis: they made a fake authority id resolve to nothing and never touched
+    the SUPERSEDED arm** — and `:6725`, `:6802` are inside REG-F-211. *Positive controls, same run:*
+    `DEC-4` → **34 / 6 / 0 / 2 files**, `propagatedStrength` → **1 / 4 / 0 / 0**,
+    `checkConstraintDisposition` → **2 / 2 / 0 / 0**, `buildConstraintInput` → **8 / 3 / 0 / 0**.
+  - **THE 17 ENTRIES MERGED TODAY (`REG-F-234..245`, `REG-Q-058..062`, from `REG-005:12116`), SEARCHED
+    SPECIFICALLY**, because every transcript on the census row predates them.
+    `awk 'NR>=12116' | grep -c` gives `weakening` → **0**, `ADVISORY` → **8**, `MANDATORY` → **9**,
+    `SUPERSEDED` → **5**, `DEC-4` → **21**. All 21 `DEC-4` hits opened: **15** sit inside
+    REG-F-236 (`:12546`–`:12827`) and the other **6** are search-disclosure COUNT lines in REG-F-238 /
+    REG-F-239 / REG-F-240 / REG-Q-059 — boundaries derived from the `### REG-` headings after
+    `:12116`, not read off the ordinals. Two of the six state
+    the closure set as *"`DEC-2:3`, `DEC-2:8` (REG-F-210), `DEC-4:5` (REG-F-211) and `DEC-5:2`
+    (REG-F-213) only."* **Nothing merged today files this limb, and `weakening` returning 0 across
+    3,900 new lines is measured beside those non-zeros, not asserted.**
+  - **`docs/_working/`, THE CORPUS EARLIER SWEEPS SKIPPED, MEASURED AT `303ee671`.** `DEC-4` →
+    **2 files**: `DESIGN-invariant-enforcement-mapping.md` (`:335`, disposed of above, plus `:729` — a
+    §17.4 note recording `DEC-4:6 → enforcement-register.ts:3589 (RPH-CNS-002)` as a decoy *"which
+    concludes the opposite"*, which CORROBORATES this entry's thesis and files nothing — and `:759`)
+    and `HARMONIZATION-FINDINGS.md:1155`, a bare mention of DEC-4 inside a list of invariants.
+    `RPH-CNS-002` → **1 file**, and it is the `:729` note just named. ⚠ **`RPH-CNS-001` → 1 file is a
+    DIFFERENT file** — `RESUME-STATE.md:168`/`:169`/`:173`, M9 planning notes listing `RPH-CNS-001..004`
+    among that milestone's exit criteria; they are not a filing and say nothing about weakening. No
+    `_working` file records a site, an arrangement or a remedy for this limb. *Positive controls on the
+    same corpus:* `RETAINED` → **5 files**, `ConstraintPropagationSchema` → **2 files**.
+
+- **⚠ CITATION CORRECTIONS, each re-read at HEAD before it was written down.**
+  - **THE HEAD MOVED WHILE THIS ENTRY WAS DRAFTED, AND IT DOES NOT MOVE THE EVIDENCE.** The drives
+    ran at `857128a7`; HEAD is now `303ee671`, whose entire diff is three files under `docs/_working/`
+    (`git show --stat 303ee671`). Every code site above was re-read at `303ee671` and is byte-identical,
+    so the transcripts stand — but the `docs/_working` counts in the EM-7 disclosure above ARE
+    affected, and are stated at
+    `303ee671`, not at `857128a7`.
+  - **REG-F-211's `S8b` transcript is at `JPWB-REG-005:6739-6741`**, inside the fence opened at `:6738`.
+    `:6742-6748` — the range a phrase search around it returns — is `S8c` plus the *"THREE CONTROLS"*
+    header, not `S8b`. Its SCOPE bullet likewise runs `:6685-6690`: `:6684` is blank and the
+    `RPH-DEC-003` credit sits at `:6688-6690`.
+  - **⚠ `RPH-CNS-002`'S GROUND IS FALSIFIED, WHICH IS THE HEART OF THIS ENTRY.**
+    `enforcement-register.ts:3581-3583` (adopted by `:3598`): *"So no dispatch can weaken a propagated
+    constraint, the antecedent is unreachable, and an OBSERVED_ADMISSION has nothing to arrange."* A
+    dispatch does weaken it — `L6-A` above, ACCEPTED. The claim is true of the PROPAGATED arm's
+    spelling and false of the rule.
+  - **`RPH-CNS-001`'s field count is wrong.** `:3580` says `ConstraintPropagationSchema` is *"a
+    `z.strictObject` of seven fields"*. It declares **six** (`objects.ts:177-186`).
+  - **⚠ `RPH-CNS-001`'s RESIDUE is wrong in the direction that matters.** `:3586-3587`: *"the day the
+    field is added to the schema, this rule becomes live with a correct kernel arm already waiting, and
+    nothing here would notice."* Widening the schema alone would NOT make it live — the mapper at
+    `handlers/decomposition.ts:251-258` never emits `propagatedStrength`. A future editor acting on that
+    residue would add the field, observe no change, and have no filing that explains it.
+  - **The census row's own `owed` places the SUPERSEDED arm at `:233-236` and the sibling authority
+    conjuncts at `:221`/`:226`/`:230`.** At HEAD the arm span is right; the conjuncts are at
+    **`:220-221`**, **`:225-226`** and **`:230`** — `:221` and `:226` are the `out.push` lines, `:220`
+    and `:225` the `if`. Substance unaffected; the pointers are stated exactly here.
+  - **`REG-F-211` cites `ConstraintStrength` at `enums.ts:272`;** at HEAD
+    `export const ConstraintStrengthSchema = z.enum(['MANDATORY', 'PREFERRED', 'ADVISORY']);` is at
+    **`:273`**. One line, and it is the line a remedy will open.
+
+- **WHY THIS IS A FINDING AND NOT A REG-Q.** The adjudication question below is real, but it is not
+  what this entry turns on. **Canon states the prohibition in terms and the engine performs the
+  prohibited act**; refusing an UNAUTHORIZED weakening enforces the sentence as written and ratifies no
+  narrower reading. What a guard must NOT do is decide the lawful spelling — which is exactly the trap
+  recorded at (i) below.
+
+- **THE REMEDY — GIVE THE DISCHARGING ARM THE CONJUNCT ITS SIBLINGS HAVE, AND OPEN THE LAWFUL PATH.**
+  1. **AT THE BOUNDARY, DO WHAT THE SIBLING FIELD ALREADY DOES.** In `buildConstraintInput`
+     (`packages/rph-application/src/handlers/decomposition.ts:177`), resolve `supersededByConstraintId`
+     the way `authorityBasis` (`:243-249`) resolves `authorityDecisionId` — load, require
+     `objectType === 'CONSTRAINT'`, parse — and pass the replacement's `strength` through to the kernel.
+     ⚠ **This is the SAME boundary edit REG-F-211's remedy step 1 names.** The two entries share one
+     edit and differ in what the kernel does with the fact; implement it once.
+  2. **AT THE KERNEL, ADD THE AUTHORITY CONJUNCT.** In the SUPERSEDED arm
+     (`packages/rph-domain/src/decomposition.ts:233-236`), when the resolved replacement does not
+     preserve strength, require `r.authorityDecisionId` — the same fact the three sibling arms require —
+     and emit a NEW `ConstraintFindingCode` beside the six at `:132-138`. Keep
+     `SUPERSEDED_WITHOUT_REPLACEMENT` for the absent and unresolvable cases: one code standing for two
+     defects is the failure this repository has already paid for once.
+  3. **AND OPEN THE LAWFUL SPELLING, OR THE REFUSAL IS A TRAP.** An authorized weakening needs somewhere
+     to be expressed. That is `propagatedStrength`, and it needs BOTH edits — the schema
+     (`packages/rph-contracts/src/objects.ts:177`) **and** the mapper (`handlers/decomposition.ts:`
+     `251-258`) — because widening the schema alone leaves the arm at `:220-221` dead, as above.
+
+- **⚠ THREE TRAPS FOR THE REMEDY.**
+  (i) ⚠ **DO NOT IMPLEMENT THIS AS REG-F-211'S UNCONDITIONAL STRENGTH REFUSAL.** Canon's clause here is
+  *"rejected **without** authority"*, so a refusal that fires with or without authority ratifies a
+  narrower reading by accident and closes the path canon contemplates. **AND THE RESIDUAL THAT MAKES
+  THIS GENUINELY OPEN, RECORDED RATHER THAN SETTLED:** read exhaustively, DEC-4's five alternatives may
+  offer no spelling for an authorized softening at all — supersession must be *"by a stronger
+  constraint"*, propagation *"retain[s] … strength"*, and waiver REMOVES rather than softens. **Whether
+  the authorized softening is spelled PROPAGATED-at-reduced-strength or is not permitted at all is a
+  canon question this entry does not decide**, which is precisely why the remedy refuses only the
+  UNAUTHORIZED case — the minimum that closes the limb without deciding it.
+  (ii) **Refusing on strength alone does NOT make the SECURITY reading enforced.** `RPH-CNS-002`'s
+  ratified subject is a mandatory SECURITY constraint and `constraintType` branches nowhere (census
+  above). Refusing on strength is broader and is the right minimum; the narrowing remains unavailable
+  and must not be scored as landed.
+  (iii) **Assert the MESSAGE, not the code.** Every conservation finding shares one
+  `RPH_INVARIANT_VIOLATION` sentence (`handlers/decomposition.ts:288`, message at `:291`), so the
+  finding CODE is the only thing that tells a new refusal from `SUPERSEDED_WITHOUT_REPLACEMENT`.
+
+- **THE TEST THAT MUST REDDEN FIRST, AND IT DOES NOT EXIST YET.** Write `L6-A` red: a MANDATORY SECURITY
+  constraint dispositioned SUPERSEDED by a real ADVISORY constraint, with no authority, must move
+  `ValidateDecomposition` from ACCEPTED to REJECTED with the new code. Today it is ACCEPTED, so the red
+  is predicted, not hoped for. Ship it beside **two controls with their own mutants**: (a) `L6-B`'s
+  `SUPERSEDED_WITHOUT_REPLACEMENT` still firing on an EMPTY replacement, proving the new refusal is
+  distinguishable rather than an arrangement tripping two conjuncts — its own mutant is to delete the
+  truthiness test and watch (a) redden, not the new case; and (b) the SAME arrangement carrying an
+  `authorityDecisionId` that resolves to a real EFFECTIVE Decision still ACCEPTED, the over-refusal
+  control, whose mutant is to break `authorityBasis` and watch (b) redden. ⚠ Note that
+  `packages/rph-domain/src/decomposition.test.ts:321-329` currently supplies
+  `supersededByConstraintId: 'con_stronger'` — an id naming no object — and asserts `r.ok` is `true`;
+  REG-F-211 already records that it must redden first, and it is the same fixture here.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:DEC-4:6`. **It closes nothing else,
+  because its predicate is an AUTHORITY conjunct and no other limb of DEC-4 turns on one.** `:1`
+  (*"exactly one holds per relevant child"*) is a within-state uniqueness question over (constraint,
+  child) pairs — a count, not an authority — and is filed separately in this batch; its parenthetical's
+  strength carrier overlaps remedy step 3 here, which is stated so the merge implements it once. `:2`
+  (*"retained at parent level"*) is a stored-versus-revised DELTA rule at a different call site, filed
+  separately in this batch. `:3` and `:4` are FILED and ENFORCED_DRIVEN — and note that `:4`'s arm is
+  the very WAIVED conjunct this arm lacks. `:5` is closed by REG-F-211 on the STRENGTH of the
+  replacement, an axis this entry deliberately does not take. `:7` is closed by REG-F-236 on the
+  ASSUMPTION plane. `:8` is the sibling-dependency clause and is separately FILED.
+
+- **Merge target:** Repository — `packages/rph-application/src/handlers/decomposition.ts` (the
+  `supersededByConstraintId` resolution at `:177-258`, **shared with REG-F-211's remedy step 1**),
+  `packages/rph-domain/src/decomposition.ts` (the authority conjunct on the SUPERSEDED arm and its new
+  finding code), and `packages/rph-contracts/src/objects.ts` plus the same handler's mapper (the lawful
+  `propagatedStrength` path). Also `packages/rph-domain/src/enforcement-register.ts:3568-3607`, where
+  `RPH-CNS-001`'s field count and residue and `RPH-CNS-002`'s ground are corrected in place by striking
+  rather than deleting. Corpus: none — canon states the prohibition and needs no amendment; the open
+  question at trap (i) is recorded here and is not a canon defect this entry asks to fix.
+
+### REG-F-258 — what may support and what may verify is settled from a stipulated label or an
+unresolved id, never from the object's type: the one table that states the rule is asked one
+question, and its VERIFIES row is asked none
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** REL-2's closing limb is about the MECHANISM behind the two rules
+  before it: support and verification are settled *by type*. The repository owns exactly one artifact
+  that does that — `TRACE_DIRECTIONALITY` (17 relations) read by `validateLinkDirectionality` — and it
+  is correct, unit-tested, and never asked a question whose answer is not already fixed. Of its 17 rows
+  exactly one is ever selected (`SUPPORTS`), by a literal, at one call site, with both endpoint types
+  supplied as module constants instead of resolved. Its `VERIFIES` row — which this repository's own
+  vocabulary marks AUTHORITATIVE on source from §25.1 — is selected by nothing at all, because no
+  production path mints a VERIFIES relation: driven end to end, a completed SATISFIED assessment
+  renders as an `ASSESSES` edge, a token the table does not contain. And where a verification
+  determination IS made from a real store lookup, it is made at exactly one of the three targets the
+  ratified VERIFIES row names — a PWU's disposition, `pwu.ts:1362`. At the CLAIM target the verifier is
+  not resolved at all: driven, `RecordClaimAssessment` carried a Claim to the terminal status REJECTED
+  with `assessmentId` naming a PROFESSIONAL_WORK_UNIT, and the ratified `ClaimRejected` event carries
+  that id. The rule is stated once, correctly, where nothing consults it, and decided wherever a
+  particular handler happened to write a decision.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`,
+  §5 *Relationships and traceability* (heading at line 151), **REL-2 at line 157**, limb 3:
+  *"What may support, and what may verify, is fixed by type."* — the closing sentence of
+  *"REL-2 · Edge endpoints carry epistemology."*, whose SCOPE line reads *"governs the
+  assurance-relevant relation types. Exact type rules per relation are contract shapes."* The
+  repository HAS that contract shape; this entry is about the shape governing nothing.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD (2026-08-23), with `sed -n`.**
+  - **The artifact exists and is right.** `packages/rph-domain/src/traceability.ts:27` declares
+    `TRACE_DIRECTIONALITY` (17 rows, closing `};` at `:92`); `:51` is
+    `SUPPORTS: { source: ['EVIDENCE', 'ASSURANCE_ASSESSMENT'], target: ['CLAIM'] },` and `:53-56` is
+    `VERIFIES: { source: ['ASSURANCE_ASSESSMENT'], target: ['CLAIM','PROFESSIONAL_WORK_UNIT',
+    'BASELINE'] }`. `validateLinkDirectionality` is `:100-120`. It is unit-tested at
+    `packages/rph-domain/src/traceability.test.ts:18-46`, under the describe title
+    *"trace-link directionality (DOC-002 §25.1)"*, including the exact SUPPORTS refusal this limb needs.
+    Provenance: `packages/rph-domain/vocab/m6-traceability.json:163` —
+    *"AUTHORITATIVE on source: §25.1 'VERIFIES must originate from an Assessment.'"* — and `:372`,
+    *"§25.1 hard-constrains only 4 relations — DECOMPOSES …, SUPPORTS …, VERIFIES (from Assessment),
+    PROMOTES …. Treat the 4 as invariants"*.
+  - **One row of seventeen is selectable, and the question is pre-answered.** The predicate's only
+    caller is `TraceGraph.addLink` (`traceability.ts:147`, the call at `:151` behind `if (s && t)` at
+    `:150`); `addLink`'s only production caller is `supportsGraph`
+    (`packages/rph-application/src/handlers/assurance.ts:585`), reached from `invalidateEvidence` at
+    `:643`. That path supplies all three arguments as constants: `relation: 'SUPPORTS'` (`:600`),
+    `objectType: EVIDENCE` (`:595`) and `objectType: CLAIM` (`:597`), where `EVIDENCE` and `CLAIM` are
+    the module consts at `:476` and `:651`. Repo-wide production `relation: '…'` literals are exactly
+    three: `assurance.ts:600` and `professional-work-graph.ts:39`/`:73` (`DECOMPOSES_TO`, a token in no
+    ratified registry, on a structure that is not a `TraceGraph`).
+  - **The VERIFIES row is selectable by nothing.** `relation: 'VERIFIES'` appears at ZERO production
+    sites; `VERIFIES` survives only as an enum member (`packages/rph-contracts/src/enums.ts:756`,
+    `schemas/enums/TraceRelation.json:15`), the table row, vocabulary prose
+    (`vocab/canonical-vocabulary.json:739`, `vocab/m6-traceability.json:152`) and two doc comments
+    in `packages/rph-engine/src/reference-undertaking.ts` (`:1006`, `:1345`). The read model's
+    relation vocabulary is a different set entirely —
+    `packages/rph-projections/src/traceability-view.ts:45-79` mints `TRACES_TO_INTENT`, `CHILD_OF`,
+    `DECOMPOSES`, `ABOUT`, `SUPPORTS`, `ASSESSES`, `OBLIGATION_OF`, `AFFECTS`, `BASELINES` — and the
+    assurance act renders as `ASSESSES` at `:60-62`, minted from `AssuranceAssessmentRequested`, i.e.
+    at REQUEST time, before any verdict exists.
+  - **The CLAIM-side verification verdict resolves nothing.** `recordClaimAssessment`
+    (`assurance.ts:840`) copies `p.assessmentId` onto the emitted event at `:910`, `:914` and `:921`
+    with no lookup. The whole application layer is measured: `objectType !== ` / `objectType === ` over
+    `packages/rph-application/src` excluding `*.test.ts` = **26 lines at HEAD**, and the count of those
+    inside `assurance.ts` is **2** — `:1044` (EVIDENCE, on `contradictingEvidenceIds`) and `:1301`
+    (a `typeof` check). Neither is on `assessmentId`. POSITIVE CONTROL, same instrument, same corpus:
+    `objectType !== 'ASSURANCE_ASSESSMENT'` = **2**, at `pwu.ts:1362` and `decomposition.ts:728`. The
+    pattern is alive in this layer, twice, on this exact type. Its absence on the claim verdict is a
+    fact, not a search artifact.
+
+- **OBSERVED — DRIVEN AT HEAD TODAY, not inherited.** Node, `SqliteStorageAdapter`, lanes
+  `lane-REL-2m.mjs` / `lane-REL-2n.mjs` / `lane-REL-2r.mjs`, 2026-08-23:
+  - `Object.keys(TRACE_DIRECTIONALITY).length` → **17**. Predicate asked real types:
+    `VERIFIES` PWU→CLAIM → `{"ok":false,"reason":"VERIFIES source must be one of
+    ASSURANCE_ASSESSMENT, got PROFESSIONAL_WORK_UNIT"}`; `VERIFIES` ASSESSMENT→CLAIM → `{"ok":true}`;
+    `SUPPORTS` EVIDENCE→INTENT → `{"ok":false,"reason":"SUPPORTS target must be one of CLAIM, got
+    INTENT"}`. **The rule is alive and discriminating. Nothing asks it.**
+  - **Full assurance run** (policy, activate, intent, PWU, claim, evidence, admit, request, begin,
+    complete SATISFIED, then `ChangePwuState` SATISFIED citing that assessment — ACCEPTED, PWU
+    `assuranceState = SATISFIED`): projection link types over the whole run =
+    `{"TRACES_TO_INTENT":1,"ABOUT":1,"SUPPORTS":1,"ASSESSES":1}`.
+    **VERIFIES edges = 0**, POSITIVE CONTROL **SUPPORTS edges = 1**. Of the four tokens minted, the ones
+    present in `TRACE_DIRECTIONALITY` are `["SUPPORTS"]`; absent from it are
+    `["TRACES_TO_INTENT","ABOUT","ASSESSES"]`.
+  - **The CLAIM target, terminal verdict.** `RecordClaimAssessment targetStatus:'REJECTED'` with
+    `assessmentId` = a PROFESSIONAL_WORK_UNIT → **ACCEPTED**, claim status REJECTED, and
+    `ClaimRejected` carries `{"assessmentId":"pwu_…HC201"}` which resolves to `PROFESSIONAL_WORK_UNIT`.
+    CONTROL with a real SATISFIED `ASSURANCE_ASSESSMENT` → also ACCEPTED. An earlier step drove
+    `UNDER_ASSESSMENT` the same way, plus an id resolving to **no object at all** → ACCEPTED, event
+    payload `{"assessmentId":"ass_no_such_object_00000000"}`. **The surface discriminates nothing.**
+  - **A forbidden SUPPORTS target on a type nobody has driven before.** `ProposeEvidence
+    supportsClaimIds:[<an INTENT>]` → ACCEPTED (control with a real CLAIM → ACCEPTED); `AdmitEvidence`
+    → ACCEPTED; `InvalidateEvidence` → ACCEPTED, emitting `EvidenceInvalidated` with
+    `affectedClaimIds:["int_…H5200"]`, an id that resolves in the store to `objectType = INTENT`.
+  - **Endpoint bypass, re-driven:** `new TraceGraph().addLink({relation:'SUPPORTS',from:'a',to:'b'})`
+    with no `addNode` → accepted. CONTROL, endpoints registered EVIDENCE→INTENT → **THREW**
+    `Invalid trace link: SUPPORTS target must be one of CLAIM, got INTENT`.
+
+- **⚠ THE ROW'S ARM IS WRONG AND THE FINDING SURVIVES IT — STATED, NOT BENT.** The census row scores
+  this limb `UNENFORCED_DEAD_PREDICATE` and its Proof 1 asserts the predicate *"is `{ok:true}`
+  unconditionally"*. **Falsified, by me, at HEAD.** Driven: two `ProposeEvidence` dispatches, the second
+  naming its OWN evidence id in `supportsClaimIds`, both ACCEPTED; a later `InvalidateEvidence` against
+  the FIRST, well-formed evidence **threw out of `Engine.dispatch`** — `Invalid trace link: SUPPORTS
+  source must be one of EVIDENCE|ASSURANCE_ASSESSMENT, got CLAIM` (uncaught escape confirmed `true` in
+  the same run). The mechanism is at `assurance.ts:595`/`:597`: one id is `addNode`d as `EVIDENCE` and
+  again as `CLAIM` inside the same fold, and the node map keeps whichever wrote last. So the predicate
+  is **LIVE, and the one time it ever fires in production it fires on a FABRICATED type and surfaces as
+  an unhandled throw rather than a rejection.** The honest arm is not "dead"; it is "unfailable on the
+  arrangement REL-2 governs, because every input is stipulated". The divergence this entry files is
+  unchanged by the correction — both its pass and its one refusal are decided by a label, never by a
+  type — and the arm word is corrected here rather than left to look like coverage.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** **`REG-F-234`** (this register, heading at
+  **:12116**, OPEN, filed 2026-08-23 — the same day as this entry) is what the next reader will find,
+  because it is the REL-2 entry, it names `TRACE_DIRECTIONALITY`, and its own sharp-mechanism bullet
+  quotes `assurance.ts:597`. **It closes `limb:REL-2:1` and says so in terms**, at **:12289-12294**:
+  *"LIMB IDS THIS ENTRY CLOSES: `limb:REL-2:1`. It closes nothing else, because … `limb:REL-2:3` … is
+  scored UNENFORCED_DEAD_PREDICATE on the dead TYPE TABLE — a different mechanism from this row's
+  driven acceptance at the command surface — and is filed NEAR_MISS against REG-F-203 in its own
+  right."* Its subject is the SUPPORTS ENDPOINT PAIR at the two command surfaces
+  (`proposeEvidence`, `assertClaim`); its remedy is two handler predicates plus resolving `claimId` at
+  `:597`. **Three things this limb needs survive a fully-repaired REG-F-234, and each is measured
+  above:** (i) VERIFIES — REG-F-234 contains no VERIFIES drive and no `pwu.ts:1362` citation, and
+  its remedy touches neither. ⚠ It DOES name `recordClaimAssessment` once, at **:12194-12197**, and
+  this entry does not claim otherwise: that bullet bounds REG-F-234's OWN consequence (ii) by noting
+  the handler OVERWRITES `supportingEvidenceIds` on the SUPPORTED branch (`assurance.ts:898-902`).
+  It says nothing about `assessmentId`, which is the field this entry files; (ii) the CLAIM-side
+  VERIFICATION VERDICT proper — REG-F-234's claim-side subject is `Claim.supportingEvidenceIds`,
+  a SUPPORT origin list, not `assessmentId`: a different field on a different command;
+  (iii) the ARTIFACT — REG-F-234's
+  remedy (i) writes predicates that *match* `TRACE_DIRECTIONALITY.SUPPORTS.source` rather than read it,
+  so the table stays non-load-bearing and drift between it and the handlers stays undetectable.
+  **Three further near-misses, each opened at its line.** (1) **`REG-F-203`** (:4892, OPEN) closes
+  `limb:REL-1:1` / `:12` *"and **only** those two"* (:5075) and spends this limb's central fact as
+  reassurance at **:5020-5024**: *"so **neither** of instance (a)'s two openings is exercised by
+  today's only production traffic"*, repeated at **:5091-5092** as *"both changes are
+  behaviour-preserving on today's traffic"*. Its remedy (a-ii) DOES close the `if (s && t)` bypass —
+  which is why this entry cites that bypass as context and does not re-file it. (2) **RPH-TRC-005**,
+  `packages/rph-domain/src/enforcement-register.ts:2829-2873`, whose 2026-08-22 correction retains
+  the refusal verbatim: *"the pair is still deliberately NOT filed as this row's guard, because it
+  implements link DIRECTIONALITY, which no ratified RPH-TRC rule states"*. That ground is about the
+  RPH-TRC conformance catalog, not about DOC-003, and it is right on its own terms: this entry files
+  against `JPWB-DOC-003 §5 REL-2 limb 3` directly and does **not** re-anchor RPH-TRC-005.
+  (3) `docs/_working/dead-kernel-census.txt:93`, *"validateLinkDirectionality DEAD (tests only)"* —
+  false at HEAD, and its own file header at **line 2** already says
+  *"RETIRED 2026-08-03 — SUPERSEDED BY A GATE. NOT AUTHORITATIVE."*; the live gate
+  `verif/dead-kernel-census.test.ts` no longer names this function at all (its only traceability row
+  is `impactedObjects`, `:285`). (4) `docs/_working/ROADMAP-invariant-enforcement-mapping.md:249`
+  lists this limb among *"the 11 recorded arm doubts, unadjudicated — including `limb:REL-2:3`, whose
+  dead-predicate proof was falsified by this programme's own RPH-TRC-005 correction."* That is a
+  to-do naming the doubt, not a filing of the divergence; the doubt is adjudicated in this entry's
+  arm bullet.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only (the Grep
+  tool omits long lines here); `-i` and `-F` never combined (they abort together on this box); every
+  hit opened with `sed -n`. R = `packages/rph-domain/src/enforcement-register.ts`, Q =
+  `docs/canon/JPWB-REG-005 …md`, L = `verif/guard-enforcement-ledger.data.ts`, W = `docs/_working`.
+  BY ID: `REL-2` → R=0 Q=15 L=0 W=2; `limb:REL-2` → R=0 Q=4 L=0 W=1 — **and all 15 Q hits and all 4
+  `limb:REL-2` hits were opened: every one is inside REG-F-234 except the two W lines above.**
+  `"fixed by type"` → R=0 Q=2 L=0 W=0, both inside REG-F-234. BY SITE: `TRACE_DIRECTIONALITY` →
+  R=1 Q=6 L=0 W=2; `validateLinkDirectionality` → R=4 Q=10 L=0 W=4; `directionality` → R=5 Q=21 L=0
+  W=6 — all opened. `recordClaimAssessment` → **R=7 Q=24 L=3 W=21** — a LOUD site, not a quiet one,
+  and every Q and L hit was opened: none is about `assessmentId`'s TYPE. The three L rows (`:17`,
+  `:133`, `:193`) are Claim status-arrow guards under RPH-EVD-002; Q's twelve case-sensitive hits are
+  REG-F-226's per-claim scope (`:9466`), REG-F-242's evidence-TYPE plane (`:14118`, `:14203`,
+  `:14220`, `:14233`) and REG-F-234's SUPPORTED-branch bound (`:12194`). No corpus carries any filing
+  on `assessmentId` as a verification origin. **POSITIVE CONTROLS, identical instrument and corpora:**
+  `REG-F-` → L=15 in a 392-line corpus, so L IS reachable, and it carries no LINK-DIRECTIONALITY
+  row: `validateLinkDirectionality` and `TRACE_DIRECTIONALITY` → L=0, against a broader
+  `traceab|directional|TraceGraph` control → L=2, both incidental (a §24.2 canon anchor at `:71`,
+  a `revokeDecision` evidence line at `:315`). And REG-Q-053's own sweep at Q:11165-11176 reports
+  `REL-1` 2/1/0/2 (`:11169`) with controls `AGG-1` 38, `STA-1` 19, `REL-3` 3 (`:11174`), so the
+  instrument resolves REL-family ids in these corpora. **GLOBAL CLOSURE SWEEP, derived not
+  hand-listed:** `grep -n` for `LIMB IDS THIS ENTRY CLOSES` and `LIMBS CLOSED BY THIS ENTRY` over Q →
+  **37 raw hits at HEAD, every one read; 32 are DECLARATION lines** — the other five (`:12234`,
+  `:12687`, `:14186`, `:14281`, `:14904`) quote or count the phrase rather than declare with it.
+  **`limb:REL-2:3` appears in none of the 32.** The only REL-2 closure in the register is
+  REG-F-234's `limb:REL-2:1` at `:12289`.
+
+- **WHAT IS GENUINELY HELD — named so this entry is not read as "no type is ever checked".**
+  `pwu.ts:1362` is a real, store-resolved type check and it fires: driven,
+  `ChangePwuState assuranceState=SATISFIED` citing an EVIDENCE was **REJECTED**
+  (`RPH_EVIDENCE_MISSING`, *"A disposition is the verdict of an assessment, not a property the
+  controller may assign"*) while the same command citing a SATISFIED `ASSURANCE_ASSESSMENT` naming that
+  PWU was ACCEPTED. That is `limb:REL-2:2`'s ENFORCED_MULTI_SITE score and this entry does not disturb
+  it. The BASELINE target fails closed too, but by accident rather than by type:
+  `governance.ts:901-903` loads each `requiredAssessmentIds` entry and reads `.state.assessmentState`
+  with no `objectType` check — a wrong-typed object simply has no such field, so `disposition` falls to
+  `'INCONCLUSIVE'` and `assessmentHasConcluded` refuses. Duck-typing that happens to fail safe is not
+  "fixed by type", and it is recorded here as the third data point, not as a second defect.
+
+- **THE REMEDY — three parts, and each survives the other two.** **(a) Make the artifact the
+  mechanism, not a duplicate of it.** Where a support or verification endpoint is decided, resolve the
+  object through `ctx.store.loadObject(id)` and pass its real `objectType` to
+  `validateLinkDirectionality` against the relevant `TRACE_DIRECTIONALITY` row, rather than restating
+  the row's contents in handler code — this is the part REG-F-234's remedy (i) as written does not
+  give, and it is what makes editing the table meaningful. **(b) Type-resolve the claim-side verifier.**
+  In `recordClaimAssessment` (`assurance.ts:840`), refuse when `p.assessmentId` does not resolve to an
+  `ASSURANCE_ASSESSMENT`, modelled on `pwu.ts:1362` and on `contradictingEvidenceExists`
+  (`assurance.ts:1044`). **(c) Settle the VERIFIES row.** Either mint the relation where verification
+  happens and route it through the table, or strike the row and record that verification is carried by
+  the disposition path instead — a ratified row that no path can select is a rule the next reader will
+  believe is enforced. **⚠ ONE REMEDY THAT DOES NOT WORK, NAMED SO IT IS NOT TRIED.** Adding
+  `.refine()` to the payload schemas cannot hold: the schemas are GENERATED and the repository says so
+  itself at `assurance.ts:1029-1031` — *"putting the arity in a hand-edited schema would put a rule
+  somewhere `bun run gen` would silently revert."* **WITNESSING MUTATIONS.** For (b): reverting the
+  predicate must redden a test asserting the MESSAGE (never the code — `RPH_VALIDATION_SEMANTIC_FAILED`
+  has many emitters) for `RecordClaimAssessment targetStatus:'REJECTED' assessmentId:[<a PWU>]`, with
+  the real-ASSESSMENT control still ACCEPTED. For (a), which the (b) mutant does **not** redden:
+  restoring the literal `objectType: CLAIM` at `assurance.ts:597` must redden a test that drives
+  `InvalidateEvidence` over evidence whose `supportsClaimIds` names an INTENT — that test needs
+  REG-F-234's remedy (i) bypassed or the event log seeded directly, and it must assert a REJECTION, not
+  a throw, since the throw path is exactly the defect RPH-TRC-005's correction records. For (c): a
+  control test that fails if `TRACE_DIRECTIONALITY` contains a row no production path can select.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:REL-2:3`. It closes nothing else,
+  because `limb:REL-2:1` is closed by REG-F-234 at `:12289` (the SUPPORTS endpoint pair at the command
+  surface) and `limb:REL-2:2` is scored ENFORCED_MULTI_SITE on `pwu.ts:1362`, re-driven clean above. It
+  closes no REL-1 limb: REL-1 asks whether a relation is typed and labelled at all — `limb:REL-1:1` and
+  `:12` are REG-F-203's, `:10`/`:11` are REG-F-204's, `:7`/`:8`/`:9` are REG-Q-053's — while this limb
+  asks by WHAT the endpoint rule is decided. It also does not close the `if (s && t)` bypass, which is
+  REG-F-203's remedy (a-ii).
+
+- **Merge target:** BOTH — the register entry in `docs/canon/JPWB-REG-005 …md`, and a Repository change
+  carrying (a), (b) and (c) with their witnessing mutants and ledger rows. Sequence it AFTER REG-F-234's
+  remedy lands, so (a) converts that entry's duplicated rule into a consultation of the table rather
+  than a third copy of it. Status: OPEN.
+
+### REG-F-259 — three of the seven things an assurance observation must name are inexpressible on the
+command, and a fourth is fabricated by copying the deficiency into the consequence slot
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** ASR-11's fourth limb is a **naming duty with seven parts and two
+  verbatim non-examples**, and it fails four different ways at once — which is why it must be filed as
+  one entry: a fix that adds one field closes none of the others. **Three parts cannot be expressed at
+  all**: `RecordAssuranceObservationPayloadSchema` is a `z.strictObject` of exactly six keys, so
+  `criterionId`, an `implication` distinct from the statement, and any professional-judgment declaration
+  are each refused *at the boundary* — canon's required content is not merely unenforced, it is
+  **unsayable**. **A fourth is worse than absent — it is fabricated**: `implication: p.statement` writes
+  the deficiency verbatim into the consequence slot for **every observation the system has ever
+  created**, so a §21 field the object schema marks REQUIRED is satisfied with a value nobody supplied,
+  and no reader can tell a real implication from the copy. **And the limb's operative clause has zero
+  enforcement**: canon's own two non-examples, driven word for word, were both ACCEPTED into canonical
+  state, as was an observation with an EMPTY statement at severity BLOCKING.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§8.4
+  Criteria, dispositions, composition** (heading read off line **275**, inside **§8 The assurance
+  model**, line **235**), **ASR-11 at line 285**, **limb 4**: *"Assurance observations must name subject,
+  policy, criterion, evidence or explicit professional judgment, severity, precise deficiency, and
+  implication — vague findings ("looks reasonable", "could be improved") are non-conformant."* Its
+  **SCOPE** (line **287**) names this limb's subject explicitly: *"governs assurance-process failures
+  **and observation quality**."* ⚠ **The section was read off the heading map, never inferred from the
+  line:** line 285 carries four limbs of one sentence.
+  - ⚠ **A COUNT DISCREPANCY, DISCLOSED RATHER THAN SILENTLY RESOLVED.** The W-3b lane brief describes
+    this limb as naming **SIX** parts; the committed limb text enumerates **SEVEN** comma-separated
+    parts. Scored as seven below. If the intended reading folds *"precise deficiency, and implication"*
+    into one part, the tally is 3-of-6 rather than 3-of-7 and **nothing else about this entry changes.**
+
+- **WHAT THE CODE DOES, part by part, re-read at every site at HEAD 2026-08-23.**
+  `RecordAssuranceObservationPayloadSchema` (`packages/rph-contracts/src/messages.ts:352-359`) is
+  `z.strictObject({ assessmentId, observationType, findingCode?, severity, statement, evidenceIds? })` —
+  **six keys.** The handler is `recordAssuranceObservation`
+  (`packages/rph-application/src/handlers/assurance.ts:2339`).
+  1. **SUBJECT — present, never NAMED by the observation.** `subjectObjectIds: assessment.subjectObjectIds
+     ?? []` (**`:2356`**), inherited from the assessment; **no command field carries it.**
+  2. **POLICY — inherited, and with a fallback that can make it FALSE.** `policyId:
+     assessment.assurancePolicyId ?? p.assessmentId` (**`:2355`**) writes the **assessment's own id into
+     the policy slot** when the assessment cites no policy. That is not a missing value; it is a wrong
+     one, and it type-checks.
+  3. **CRITERION — INEXPRESSIBLE.** Not among the six payload keys; the handler never writes it. The
+     field **does** exist on the object (`AssuranceObservationSchema`,
+     `packages/rph-contracts/src/objects.ts:576-589`, `criterionId: z.string().optional()` at **`:580`**)
+     — **and is written by nothing.**
+  4. **EVIDENCE OR EXPLICIT PROFESSIONAL JUDGMENT — one arm optional-and-empty, the other absent.**
+     `evidenceIds` is optional and defaults to `[]` (**`:2362`**, `evidenceIds: p.evidenceIds ?? []`);
+     there is **no professional-judgment field anywhere on this command or object**, so canon's
+     disjunction has no satisfiable second arm.
+  5. **SEVERITY — GENUINELY ENFORCED.** `severity: AssuranceSeveritySchema`, required (`messages.ts:356`).
+     This is the one part that bites, and it is what proves the boundary is alive.
+  6. **PRECISE DEFICIENCY — the field exists, "precise" does not.** `statement: z.string()`
+     (`messages.ts:357`) — **no `.min(1)`**, no predicate anywhere.
+  7. **IMPLICATION — INEXPRESSIBLE, AND FABRICATED.** No command field; **`:2361`** writes `implication:
+     p.statement,` — verified `grep -c` **exactly once** in that file — and **`:2396`** copies
+     `state.implication` onto the event. `AssuranceObservationRecordedPayloadSchema`
+     (`messages.ts:938-949`) declares `implication: z.string()` **REQUIRED at `:946`**, so §21.1's
+     required field is discharged by a copy of §21's other required field.
+  **TALLY: 3 of 7 carry a real value** (subject and policy, both inherited; severity), **1 of 7 is
+  present but unconstrained** (deficiency), **3 of 7 are inexpressible** (criterion,
+  evidence-or-judgment as a disjunction, implication). **And the operative clause — "vague findings …
+  are non-conformant" — has no predicate anywhere in the engine.**
+
+- **⚠ THE PART THAT MAKES THIS A DEFECT AND NOT A GAP: THE CRITERION IS KNOWN UPSTREAM AND DELIBERATELY
+  DROPPED.** Every floor observation is minted *from* a criterion. `packages/rph-assurance/src/floor.ts:
+  244-251` (⚠ **corrected this pass from a drafted `:243-250`, which starts one line early and stops one
+  line short of the closing `}))`**) builds each observation as `{ code: c.criterionId, severity:
+  'BLOCKING', statement:
+  \`${c.criterionId} not satisfied — identity/provenance/trace incomplete.\`, open: true }`, and
+  `packages/rph-assurance/src/validators.ts:236-241` does the same for Reasoning Review (`code:
+  f.criterionId`). **The carrier then discards the identity.** `FloorObservation`
+  (`floor.ts:83-88`) has four fields and **no `criterionId`**; `RecordableObservation`
+  (`packages/rph-assurance/src/recording.ts:22-27`) has **three** — `code`, `severity`, `statement` —
+  and `assuranceRecordingPlan` projects onto exactly those at **`recording.ts:104-108`**; the dispatch at
+  `packages/rph-engine/src/record-assurance.ts:149` then sends it as **`findingCode: o.code`**. **So the
+  criterion survives only by being smuggled into the finding-code slot and spliced into prose. It reaches
+  the boundary and the boundary has nowhere to put it** — which is why the object's own optional
+  `criterionId` is `undefined` on every observation in production.
+  - **AND THE PROPOSED-OBSERVATION SHAPE CONSTRAINS NOTHING EITHER.**
+    `ProposedAssuranceObservationSchema` (`objects.ts:94`) is `z.record(z.string(), z.unknown())`, inside
+    the declared placeholder block — so `ValidatorResult.observations` (`objects.ts:360`) is an array of
+    arbitrary bags. **There is no layer between a validator and canonical state that asks what an
+    observation names.**
+
+- **OBSERVED / READ — MIXED, and the split is stated exactly.** **OBSERVED (driven 2026-08-21 by the
+  W-3b census lane `w3b-lane:v2-b`, node, real engine; recorded verbatim on `limb:ASR-11:4`; NOT
+  re-dispatched by this filing pass):**
+  - **C1, canon's first non-example word for word** — `statement: 'looks reasonable'`, `severity:
+    MATERIAL`, no evidence, no criterion → **ACCEPTED.** Persisted object: `{"policyId":
+    "floor.schema-invariant", "findingCode":"FINDING", "severity":"MATERIAL", "statement":"looks
+    reasonable", "implication":"looks reasonable", "evidenceIds":[]}`; `criterionId` absent.
+  - **C2, the second non-example** — `'could be improved'` at `CRITICAL` → **ACCEPTED**, same shape.
+  - **C3, an EMPTY statement** — no deficiency named at all, severity **BLOCKING** → **ACCEPTED.**
+  - **C4/C5/C6** — supplying `criterionId`, an `implication` distinct from the statement, or a
+    `professionalJudgment` field → each **VALIDATION_FAILED / RPH_VALIDATION_SCHEMA_FAILED**.
+  - **CONTROL C7** — `severity: 'MEH'`, byte-adjacent to C1 → **VALIDATION_FAILED** at the same payload
+    schema. **CONTROL C8** — a nonexistent assessment → **REJECTED /
+    RPH_VALIDATION_SEMANTIC_FAILED**, *"RecordAssuranceObservation requires an existing assessment
+    assess_does_not_exist"*, from the handler at **`:2344-2351`**. **Both layers refuse; neither looks
+    at content, so the admissions are not a dead boundary.**
+  - **AND THE REAL PIPELINE MAKES THE SAME OBJECT.** The end-to-end floor run persisted
+    `obs_…0002` with `findingCode=VALIDATOR_EXECUTION_FAILED`, `criterionId=undefined`, `evidenceIds=[]`
+    and `implication` **identical** to `statement`. **This is the shape of every observation the system
+    actually creates, not an artefact of hand-built payloads.**
+  **READ (this pass):** every schema, handler line, carrier type and docblock quoted above, re-opened at
+  HEAD with `sed -n`/`grep -n`, plus the census re-run below. **The C4/C5/C6 refusals are additionally
+  corroborated by construction** — a `z.strictObject` of six keys rejects any seventh — but they are
+  reported as OBSERVED because they were driven.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS, AND WHY — there are six (⚠ **the draft said four and then
+  numbered five; item 6 was added by the verifying pass**), and the first one will close this row if it
+  is not disarmed here.**
+  1. **⚠⚠ `REG-F-243`, R:14490-14493 — IT QUOTES THIS LIMB AND DECLARES IT ALREADY CLOSED.** Verbatim:
+     *"**not `limb:ASR-11:2`** — ASR-11's limb (*"Assurance observations must name subject, policy,
+     criterion, evidence or explicit professional judgment…"*) is about observation **COMPLETENESS**, and
+     it is already closed by **REG-F-229** (R:10010, closing line at R:10198)."* **Two things are wrong
+     with that sentence and they compound.** The quoted text is **limb 4**, not limb 2 — limb 2 is
+     *"Malformed or invalid validator output can never mutate authoritative state or create authoritative
+     findings"*. And **REG-F-229 closes limb 2, not limb 4**: its closing line at R:10198 reads
+     `- **LIMB IDS THIS ENTRY CLOSES:** limb:ASR-11:2.`, and its subject, re-read in full this pass, is
+     `assuranceRecordingPlan` rehydrating observations for BOUNDARY_REJECTED results — **it never
+     inspects what an observation NAMES, and the words "criterion", "implication" and "vague" appear
+     nowhere in its 194 lines.** **REG-F-243's exclusion is right that ITS limb (ASR-7:6) is not this
+     one; it is wrong about which limb this is and wrong that anything closes it.** A reader arriving by
+     that bullet closes this row on a mis-numbered cross-reference.
+  2. **THE SITE DOCBLOCK — `packages/rph-application/src/handlers/assurance.ts:2373-2376`**, twelve lines
+     below the write it describes. Verbatim: *"Every value is read off `state`, so the event reports the
+     object as persisted. That includes `implication`, which the object sets to a copy of `statement` —
+     §21.1 wants the observation's consequence and no command field carries one. That placeholder is
+     pre-existing object state and **out of scope here**; the event inherits it rather than inventing a
+     second, differently-wrong value."* Under REG-D-039 a site docblock IS a legitimate filing, so a
+     reader arriving by SITE will find it. **It does not cover this limb, four ways:** (a) it speaks of
+     **one of seven parts** and is silent on `criterionId` and on professional judgment, both of which the
+     strictObject **refuses at dispatch**; (b) its subject is **event-vs-object parity** under §21.1, not
+     a canon invariant going unenforced; (c) it **expressly disclaims scope** — *"out of scope here"* —
+     a hand-off, not a divergence filing; (d) it says nothing whatever about **content quality**, which is
+     this limb's operative clause.
+  3. **THE WORKING PAPER THAT SCORES THIS OBJECT ENFORCED — and it is the reason nothing caught this.**
+     `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:70` scores `AssuranceObservation` **ENFORCED**
+     — *"all 7 §19 fields present with matching requiredness … superset additions
+     policyId/criterionId?/findingCode/implication"* — and **`:206`** and **`:310`** repeat it, `:310`
+     listing `criterionId?` and `implication` as carried. **All three readings are correct about the
+     SHAPE and each conceals the hole:** the fields are present, one is written from a value nobody
+     supplied and the other is written by nothing at all. Same paper, **`:141`**, scores
+     `ProposedAssuranceObservationSchema` **PLACEHOLDER** — *"z.record(z.string(), z.unknown()) … so an
+     observation missi[ng]"* — which measures the vacuity but on the **DOC-004 §33 example-fidelity**
+     axis, not against ASR-11.
+  4. **THE GUARD LEDGER'S NEAREST ROW — `verif/guard-enforcement-ledger.data.ts:135`**, *"criteria met
+     identified; evidence considered identified (§18.1) — NOT forced by executionState=SUCCEEDED"*,
+     disposition **UNENFORCED**, whose evidence even reports *"there is no criteria-met field at all"*.
+     **Its subject is the ASSESSMENT's completeness under §18.1** — it drives `ChangePwuState` and
+     `rejectUnbackedDisposition` — and it never reaches `RecordAssuranceObservation` or asks what an
+     **observation** must name. Adjacent axis, different object.
+  5. **AND IT DOES NOT RE-FILE `REG-F-213`** (R:7046, closing `limb:DEC-5:2` at R:7214), the ungated
+     finding **vocabulary**. `findingCode: p.findingCode ?? p.observationType` (**`:2357`**) is that
+     entry's defect, noted here only as the adjacent mechanism. **What belongs to THIS limb is the
+     seven-part naming duty and the fabricated `implication`, neither of which REG-F-213 touches.**
+
+  6. **⚠ ADDED BY THE VERIFYING PASS — A WORKING-CORPUS FINDING THAT INSPECTS BOTH OF THIS ENTRY'S
+     SCHEMAS, AT THIS ENTRY'S EXACT LINE RANGES, AND CONCLUDES A DIFFERENT ABSENCE.**
+     `docs/_working/HARMONIZATION-FINDINGS.md:610` (**Item 10 — TRUE AT HEAD**, original at `:98`) reads
+     at **`:615-617`**: *"`AssuranceObservation` — the record of what was detected or measured — carries
+     no field for WHEN it was observed and no validity window … **⚠ OWES A REGISTER ENTRY.**"* Its
+     evidence block enumerates `objects.ts:576-589`, `messages.ts:352-359` and `messages.ts:938-949`
+     — **the same three shapes, at the same three line ranges, this entry re-reads** — and quotes the
+     six-key command payload verbatim. **A reader arriving by SITE will meet it before meeting this
+     entry, and its own words say a register entry is owed.** It does not cover this limb: its subject is
+     a MISSING TIMESTAMP, its anchor is §19/§21 field-set fidelity rather than ASR-11, and the words
+     `criterion`, `implication`, `judgment` and `vague` appear in it only inside the field lists it
+     recites. **Its "OWES A REGISTER ENTRY" is a debt on a different field of the same object; nothing
+     discharges it here and nothing about it discharges this.** ⚠ **Its `implication` and `criterionId`
+     recitations at `:621` and `:632` are the hits the drafted BY-SITE counts missed.**
+
+- **⚠ CITATION CORRECTION OWED WITH THIS ENTRY.** `JPWB-REG-005:14490` mis-numbers `limb:ASR-11:4` as
+  `limb:ASR-11:2` and asserts it is *"already closed by REG-F-229"*. **Correct it in place** to read
+  *"not `limb:ASR-11:4` — that limb is a separate naming duty on the ASSURANCE_OBSERVATION object, filed
+  in this pass; REG-F-229 (R:10198) closes `limb:ASR-11:2` only."* Left as it stands, it is a ratified
+  sentence that forecloses this row.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (the
+  Grep tool omits this register's long lines); `-i` and `-F` never combined. Counts are REG-005 /
+  `packages/rph-domain/src/enforcement-register.ts` / `verif/guard-enforcement-ledger.data.ts` /
+  `docs/_working`.
+  - **BY LIMB ID.** `limb:ASR-11:4` → **0/0/0/0**. **CONTROL** `limb:ASR-11:2` → **4/0/0/0** — ⚠
+    **corrected this pass from a drafted 3**: R:10060, 10198, 10353 **and R:14490**, decoy 1's own
+    bullet, which the drafted count omitted.
+  - **BY ID.** `ASR-11` → **10/0/0/2**; every register hit opened by line (see the sibling entry's
+    disclosure), and **R:14490 is decoy 1 above**. Both `docs/_working` hits are the census's own process
+    memo.
+  - **BY PHRASE.** `looks reasonable` → **0/0/0/0**. `could be improved` → **0/0/0/0**. `precise
+    deficiency` → **0/0/0/0**. `vague` → **2/0/0/1** (⚠ **corrected from a drafted 2/0/0/0**), all
+    three opened: R:2877 (REG-Q-030, waivers), R:3460 (a stale-number entry), and
+    `DESIGN-invariant-enforcement-mapping.md:724` (*"They are not vague"*, the census's own process memo
+    describing its near-miss rows) — **not one of the three is this subject.**
+  - **BY SITE.** `implication` → **0/0/0/4** (⚠ **corrected from a drafted 0/0/0/2**), all four opened:
+    `AUDIT-shape-survivorship-2026-08-20.md:70` and `:310`, **both scoring the shape ENFORCED**
+    (decoy 3); and `HARMONIZATION-FINDINGS.md:621` and `:632`, which recite the object's and the event's
+    field lists inside decoy 6 — **all four record the field as CARRIED and none asks what is written
+    into it.** `criterionId` → **21** hits across the four (7/3/0/11 — ⚠ **corrected from a
+    drafted 18, and the drafted characterisation was wrong too**), every one opened: eighteen are
+    `waivedCriterionId` / `verificationCriterionIds` / `CriterionResult` (incl.
+    `canonical-vocabulary.json:1965`, which
+    is `CriterionResult.criterionId`), but **three ARE the observation's** — `AUDIT:70`, `AUDIT:310` and
+    `HARMONIZATION-FINDINGS.md:621`. **All three list it as a field the schema CARRIES; not one observes
+    that nothing writes it,** which is decoys 3 and 6 exactly, and is why the corrected count strengthens
+    this entry rather than weakening it.
+  - **DERIVED CLOSURE SET, not hand-listed.** `grep -nE '^[[:space:]]*-[[:space:]]+\*\*(Closes|CLOSES|
+    LIMB|LIMBS|CENSUS RECONCILIATION)'` over REG-005 → **51 declarations**. ⚠ **CORRECTED THIS PASS:
+    the four `- **Closes:**` lines (R:5908, 7586, 9035, 10544) are INSIDE that 51, not additional to it
+    — the alternation already matches them; the split is 47 + 4.** **`limb:ASR-11:4` is in none of the
+    51**, and the 101 distinct `limb:` ids those 51 name do not include it.
+  - **THE RPH-ASR FAMILY, ENUMERATED FROM THE FILE by `awk` rather than from memory** → twelve rows,
+    RPH-ASR-001..012, anchors read off each: 001 all-steps-succeeded, 002 evidence deficit, 003
+    independence, 004 satisfied-with-unmet-mandatory, 005 unable-to-determine, **006 = ASR-11 limb 1**,
+    **007 = ASR-11 limb 2** (`:1245-1268`), 008 open critical findings, 009/010, 011 contested aggregate,
+    012 strictest-wins. **No row carries the observation-quality clause.**
+  - **THE GUARD LEDGER, all 82 keys enumerated from the file.** Only two are observation-adjacent —
+    **`:81`** (*"assurance observations must REMAIN VISIBLE after remediation (§18.1)"*) and **`:135`**
+    (decoy 4). **Neither is about what an observation must NAME.**
+  - **OBSERVED POSITIVE CONTROLS, same instrument, same corpora:** `canonAnchor` → **30/108/0/1**;
+    `validator` → **139/51/14/250**; `ASR-7` → **36/0/0/0**.
+  - **THE CODE CENSUS, RE-RUN THIS PASS.** `grep -rniE "vague|looks reasonable|could be
+    improved|observationQuality|precise deficiency|nonSpecific"` over
+    `packages/rph-{contracts,application,domain,assurance,engine}/src` + `apps/rph-demo/src` + `verif`,
+    minus `*.test.ts` → **0**. **OBSERVED POSITIVE CONTROL, same population and filters, a term from the
+    same rule that DOES exist:** `implication` → **6** (⚠ **corrected from a drafted 4, which counted
+    only `handlers/assurance.ts`**), and **the control is also the finding** — the six production
+    mentions in the whole engine are the two schema DECLARATIONS, `objects.ts:586` and `messages.ts:946`
+    (both `implication: z.string()`, both REQUIRED), and four in `handlers/assurance.ts`:
+    **`:2361`** (the fabrication), `:2368` and `:2373` (the docblock conceding it) and `:2396` (the event
+    copy). **Two schemas demand the field and exactly one line supplies it, from the wrong source.**
+  - **⚠ THE ONE THE DRAFT MISSED, AND IT IS WHY THE `implication` AND `criterionId` COUNTS WERE BOTH
+    LOW — see decoy 6.**
+  - **EM-3 CHECKED (shorthand writes are invisible to a field-name grep):** the conclusion that
+    `criterionId` is never written was **not** taken from a `criterionId:` grep. The shared builders
+    `newEnvelope` / `createObject` (`packages/rph-application/src/handlers/kit.ts`) were read, and the
+    command was then driven and the persisted object read back.
+
+- **THE REMEDY — one commit, four moves, and they do not decompose.**
+  1. **WIDEN THE COMMAND.** Add `criterionId?: z.string()` and `implication: z.string()` to
+     `RecordAssuranceObservationPayloadSchema` (`messages.ts:352-359`), and tighten `statement` to
+     `z.string().min(1)` so C3 reddens. ⚠ **This makes a ratified payload STRICTER — compare
+     `REG-005:3205` — and `handlers/assessment-criterion-contract.test.ts:110`-style "rejects an unknown
+     extra key" tests exist for adjacent schemas; check for one on this payload before editing.**
+  2. **STOP FABRICATING.** Delete `implication: p.statement` (**`assurance.ts:2361`**) and write the
+     supplied value; **the object schema requires the field, so step 1 must land first or the handler
+     cannot mint at all.** Correct the docblock at **`:2373-2376`** in place — it currently records the
+     placeholder as *"out of scope"*, which will be false the moment this lands.
+  3. **CARRY THE CRITERION THE PRODUCERS ALREADY KNOW.** Add `criterionId` to `FloorObservation`
+     (`floor.ts:83-88`) and `RecordableObservation` (`recording.ts:22-27`), populate it at
+     `floor.ts:244-251` and `validators.ts:236-241` (both already hold `c.criterionId` / `f.criterionId`),
+     thread it through `recording.ts:104-108`, and send it at `record-assurance.ts:149` **instead of
+     smuggling it through `findingCode`.**
+  4. **THE POLICY FALLBACK IS A SEPARATE, SMALLER BUG IN THE SAME LINE-RANGE.** `policyId:
+     assessment.assurancePolicyId ?? p.assessmentId` (**`:2355`**) should refuse, not substitute.
+  **⚠ WHAT THIS REMEDY DELIBERATELY DOES NOT ATTEMPT.** The operative clause — *"vague findings … are
+  non-conformant"* — is **not** discharged by `.min(1)`. A non-vacuity predicate for a natural-language
+  statement is not derivable from canon as written; steps 1-3 make the required parts SAYABLE and
+  REQUIRED, which is the part that is unambiguously owed. **Whether canon wants a machine-checkable
+  vagueness test, or intends "non-conformant" as an assurance-engineering judgment, is a separate
+  question and should be raised as one rather than settled by whatever predicate gets written here.**
+  **A REMEDY IS A HYPOTHESIS:** three in this programme were wrong on inspection. Re-drive C1-C8 against
+  the changed schema and confirm C7/C8 still refuse.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-11:4`. **It closes nothing else,
+  because** the other three ASR-11 limbs are about VALIDATOR OUTPUT and land on a different object, a
+  different command and a different package: `:1` and `:2` reach `packages/rph-assurance` and
+  `CompleteAssuranceAssessment` (`:2` closed by **REG-F-229**), and `:3` is a retention claim about raw
+  text, filed as the sibling **REG-Q** in this same pass — **no commit closes both**: this entry edits
+  `messages.ts` + `assurance.ts` + the floor carriers, and that one edits nothing until canon rules on
+  which plane holds retained model output. **It also does not close `limb:ASR-7:6`** (whether a validator
+  opinion may be evidence at all, and must self-declare) — that is **REG-F-243**, on the EVIDENCE plane
+  and the `evaluationMethod` permission; this limb is about what the OBSERVATION names, and the two share
+  only the phrase *"professional judgment"*.
+
+- **Merge target:** **BOTH.** **Repository** — `packages/rph-contracts/src/messages.ts:352-359`,
+  `packages/rph-application/src/handlers/assurance.ts:2355`/`:2361`/`:2373-2376`,
+  `packages/rph-assurance/src/floor.ts:83-88`+`:244-251`,
+  `packages/rph-assurance/src/recording.ts:22-27`+`:104-108`,
+  `packages/rph-assurance/src/validators.ts:236-241`, `packages/rph-engine/src/record-assurance.ts:149`.
+  **Corpus** — the `limb:ASR-11:2` mis-numbering at `JPWB-REG-005:14490`, plus a corrections note on
+  `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:70`. Status: OPEN.
+
+### REG-F-260 — nothing in the engine ever dereferences an evidence reference, and the field that
+holds one is an unconstrained record, so a retrieved artifact and an inference about it are one shape
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+**In one line:** canon forbids inferring the content of evidence that cannot be retrieved; this engine
+never retrieves, never dereferences, and types the only content-bearing field as `unknown`.
+
+- **THE DEFECT, IN ONE PARAGRAPH.** ASR-9's fifth limb forbids one arrangement: evidence whose content
+  could not be retrieved, carrying inferred content anyway. The engine can neither obey nor disobey it,
+  because it has no notion of retrieval at any layer. `contentReference` is the Evidence object's ONLY
+  content-bearing field; it is typed `z.record(z.string(), z.unknown())` — a shared placeholder that
+  imposes no key set and no value set; it is written straight through from the caller's payload at
+  three sites with no validation; and **not one line anywhere resolves it**. The single predicate that
+  reads it asks `Object.keys(value).length > 0` — presence, never content. So an artifact pointer that
+  was fetched and a sentence a model invented about that artifact are the SAME SHAPE, satisfy the SAME
+  admissibility limb, and are indistinguishable to every downstream reader. This is
+  `UNENFORCED_NO_SHAPE` in its strict sense: canon requires a distinction the model cannot express.
+  ⚠ **And it is not saved by unreachability.** Canon's §34.3 gives the failure TWO landings, and this
+  repo splits them: `ASSESSING -> EVIDENCE_PENDING` is unreachable and filed as such, while
+  `ASSESSING -> INCONCLUSIVE` is REACHABLE and dispositioned UNENFORCED. On the live landing the
+  validator's disposition word is taken verbatim, with nothing asking where the content came from.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§8 "The assurance model"** (heading at line 235),
+  **§8.4 "Criteria, dispositions, composition"** (heading at line **275**), **ASR-9** at line **277**,
+  **limb 5**: *"when required evidence cannot be retrieved, its content is never inferred."*
+  Section re-derived from the heading stack at HEAD, never inferred from a line number: the headings
+  above L277 are `## 7.` (207), `## 8.` (235), `### 8.1` (237), `### 8.2` (247), `### 8.3` (261),
+  `### 8.4` (275). **§8.4, not §7** — `RPH-ASR-009`
+  (`packages/rph-domain/src/enforcement-register.ts:1307`) still says *"JPWB-DOC-003 §7"* in its
+  `canonCarriage.note` at **`:1313`**; REG-F-228 owns that correction and this entry does not re-file it.
+  ⚠ **The prohibition is also carried in the ratified transition data**, at
+  `packages/rph-domain/src/transitions.data.ts:1781`, verbatim: *"NOT drawn in the §30 diagram;
+  grounded in §34.3 (disposition becomes EVIDENCE_PENDING or INCONCLUSIVE; do not infer evidence
+  content)."* — and it rides in the arrow's `note`, **not** its `guard` (`:1780`, *"required evidence
+  becomes unavailable during assessment"*). That placement is the whole reason the ledger cannot hold
+  a row for this limb; see the non-coverage bullet.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD (`sed -n`, not grep summaries).**
+  - **(a) THE FIELD IMPOSES NOTHING.** `packages/rph-contracts/src/objects.ts:70` —
+    `export const ArtifactReferenceSchema = z.record(z.string(), z.unknown());`, under a docblock at
+    **`:66-67`** reading *"Helper sub-types the specs reference but never fully define. Permissive
+    structured placeholders (any object) — tightened in the milestone that defines them
+    (M7/M9/M11)."* That disclosure is **generic** — re-censused at HEAD it covers FOUR
+    placeholders, `ApplicabilityExpression`, `ArtifactReference`, `ArtifactRequirement` and
+    `ClaimAssessmentResult` (`:68-75`), and names neither evidence nor inference, so it is not a
+    REG-D-039-style site admission of THIS limb.
+  - **`objects.ts:511`** — `contentReference: ArtifactReferenceSchema,` inside `EvidenceObjectSchema`
+    (**`:508-521`**), a `z.strictObject` whose other members are `evidenceType, producedBy,
+    supportsClaimIds, contradictsClaimIds, scope, limitations, capturedAt, validFrom, validUntil,
+    status`, over the fifteen generic envelope fields every object spreads
+    (`packages/rph-contracts/src/envelopes.ts:49-65`, `id` … `extensions`). There is **no** `content`,
+    `body`, `payload` or `text` member — the reference is the only channel, and it accepts any keys,
+    so `contentReference: { inferredContent: '…' }` is schema-valid.
+  - **(b) NOBODY RESOLVES IT.** Every write site is a pass-through:
+    `packages/rph-application/src/handlers/assurance.ts:484` and **`:505`** copy `p.contentReference`
+    from the payload, **`:559`** copies `state.contentReference` forward. No branch inspects it.
+  - **(c) THE ONE READER ASKS PRESENCE.** `packages/rph-assurance/src/assurance-rules.ts:129-134` —
+    `referencesContent` is `Object.keys(value as object).length > 0` — feeding the `CONTENT_AVAILABLE`
+    limb at **`:154`**. Its own docblock (`:122-128`) concedes *"`ArtifactReferenceSchema` is
+    `z.record(z.string(), z.unknown())`, so `{}` is schema-valid"*. It tests that the reference names
+    SOMETHING. It never asks what, and it never opens it.
+  - **(d) THERE IS NO RETRIEVAL PLANE.** Censused across the five engine packages
+    (`rph-application`, `rph-assurance`, `rph-domain`, `rph-engine`, `rph-projections`, `src` only,
+    tests excluded) for `readFileSync|readFile(|await fetch(|http.get|resolveArtifact|fetchArtifact`
+    → **4 hits**, all opened: `rph-domain/src/gen/gen-transitions.ts:13` and `:49` (a codegen tool
+    reading its own spec) and `rph-engine/src/replay.ts:25` and `:40` (a replay fixture read). **None
+    touches evidence.** *Positive control, same pattern, wider population (`packages/` + `apps/`,
+    minus `dist` and `.svelte-kit`):* **130 hits** — the pattern finds retrieval where retrieval
+    exists, so the 4 is a measurement and not a broken regex.
+  - **(e) AND THE §34.3 LANDING PAIR IS SPLIT, WHICH IS WHY UNREACHABILITY DOES NOT ABSORB THIS.**
+    `EVIDENCE_PENDING` landing: no command performs it. Only two lines ASSIGN the field directly —
+    `handlers/assurance.ts:1389` (`assessmentState: landingState,`, the BIRTH, computed at
+    **`:1371`** as `const landingState = evidenceOutstanding ? 'EVIDENCE_PENDING' : 'READY';`) and
+    **`:1573`** (`advancesToReady`, which fires FROM `EVIDENCE_PENDING` and sets `READY` — the wrong
+    direction). The other route is `advanceStatus` with `statusField: 'assessmentState'`, so its
+    targets were enumerated MECHANICALLY rather than by hand — `grep -n 'advanceStatus'` → **14**
+    call sites (`:420, :446, :465, :532, :628, :855, :1011, :1090, :1148, :1684, :1732, :1940, :2180,
+    :2257`), carrying **13** literal `target:` lines (`:424, :450, :469, :536, :632, :1015, :1094,
+    :1152, :1688, :1736, :1944, :2184, :2266`) plus ONE dynamic `target,` at **`:864`**, whose range
+    is `Object.keys(CLAIM_STATUS_EVENT)` on the `Claim.status` machine — a different object.
+    **None of the fourteen is `EVIDENCE_PENDING`.** ⚠ An earlier draft of this bullet said *twelve*,
+    omitting `:424` (SUPERSEDED) and the dynamic `:864`; the conclusion is unchanged, the
+    enumeration is not.
+    `INCONCLUSIVE` landing: **reachable**. `grep -c INCONCLUSIVE
+    verif/arrow-command-census.baseline.json` → **0**, so the arrow is neither `uncovered` nor an
+    orphan; *positive control, same file, same flags,* `EVIDENCE_PENDING` → **3** (`:11`, `:15`,
+    `:16`), `:11` being `"AssuranceAssessment.state  ASSESSING -> EVIDENCE_PENDING"` under
+    `"uncovered"` (key opens `:2`). On that live landing the disposition is the validator's word:
+    `target: disposition,` at **`handlers/assurance.ts:2266`**, `disposition` sourced at **`:1798`**
+    from `validatorResult?.dispositionRecommendation`, checked at **`:1799`** for enum membership
+    alone (`if (!disposition || !DISPOSITIONS.has(disposition))`); **`:1805` is that refusal's
+    MESSAGE, not the test** — corrected here. And the file says so itself at **`:1959`** and
+    **`:2233-2234`**: *"Negative dispositions (REJECTED / ESCALATED / INCONCLUSIVE) are
+    deliberately NOT gated"*.
+
+- **OBSERVED / READ — MIXED, and stated per conjunct so neither is upgraded (EM-5).**
+  **READ / CENSUSED BY ME AT HEAD, this pass:** every `file:line` in (a)-(e) above, opened with
+  `sed -n` or `grep -n`, plus the four-corpus sweep below. **I did not drive the engine in this
+  filing.** **DRIVEN, BY A PRIOR PARTY, recorded verbatim and NOT re-driven here:** the reachable
+  landing, in `verif/guard-enforcement-ledger.data.ts:113-115` — *"DRIVEN: policy created and
+  activated, assessment requested and begun to ASSESSING, then CompleteAssuranceAssessment with
+  dispositionRecommendation 'INCONCLUSIVE', evidenceConsideredIds [], residualUncertainty [],
+  observations [] -> ACCEPTED, assessmentState = INCONCLUSIVE, with no deficit established by
+  anything."* The static census is the stronger conjunct anyway: a drive shows one arrangement was
+  accepted; the census shows there is no path by which content could ever be retrieved or compared.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** The next reader will land on
+  **`verif/guard-enforcement-ledger.data.ts:291-294`**, key
+  `["required evidence becomes unavailable during assessment"]`, disposition **`ARROW_UNREACHABLE`**.
+  The sentence that makes it look like coverage is its own opening: *"NO COMMAND PERFORMS ASSESSING ->
+  EVIDENCE_PENDING … The machine's own trigger for the arrow is 'evidence access failure — required
+  evidence cannot be retrieved (§34.3)', and no handler exists for it."* It names §34.3 and quotes
+  this limb's antecedent almost word for word, and it is genuinely GATED — `unreachabilityFaults` in
+  `verif/guard-enforcement-ledger.ts` reddens the day a command performs the arrow. **It is still not
+  this limb, for three independent reasons.** (i) **DIFFERENT TEXT.** The file's own contract, line 1:
+  *"the disposition of every declared arrow guard, one row per distinct text."* A row disposes a
+  GUARD. This limb's prohibition is not the guard (`transitions.data.ts:1780`); it is the arrow's
+  `note` (`:1781`). The ledger structurally has no row for it. (ii) **DIFFERENT AXIS.**
+  `ARROW_UNREACHABLE` is a dismissal about REACHABILITY. It says nothing about `contentReference`,
+  which the row never mentions. (iii) **HALF OF §34.3.** The row dismisses one landing; the other,
+  `ASSESSING -> INCONCLUSIVE`, is reachable, and ITS row — `guard-enforcement-ledger.data.ts:113-115`,
+  whose key itself ends *"also on evidence access failure (§34.3)"* — is **`UNENFORCED`**, stating
+  *"No code computes an evidence deficit, compares admissible evidence against the claim, or handles
+  §34.3 evidence-access failure."* Between them the two rows dispose BOTH §34.3 dispositions and
+  NEITHER prohibition. **Also ruled out, deliberately, as EM-1 siblings.** `RPH-EVD-003`
+  (`enforcement-register.ts:937`, `:960`; `JPWB-REG-005:499` REG-F-008, *"CONTENT_AVAILABLE is
+  satisfied by `{}`"*, REMEDIATED 2026-08-02) refuses evidence whose reference names **nothing**, at
+  **ADMISSION**. Mine is a reference that DOES name something and was never dereferenced, **later**.
+  Different moment, different failure. And `REG-F-228` (`:9736`) closes `limb:ASR-9:7` by name at
+  `:10002` — an explicitly named SIBLING limb of the same sentence.
+
+- **WHAT THIS ADDS THAT REG-F-235 DOES NOT CARRY, AND WHY IT IS NOT COVERED BY IT.** `REG-F-235`
+  (`JPWB-REG-005:12301`, filed 2026-08-23 against this same invariant) is the entry most likely to be
+  mistaken for this one — same invariant, same day, same census. It closes **`limb:ASR-9:9`** and says
+  so at `:12526`, and at **`:12533-12534`** it names this limb explicitly as still open:
+  *"`limb:ASR-9:5` (evidence content never inferred) is a NEAR_MISS against ledger `:291-294`"*. Its
+  subject is the RESIDUAL-to-OBLIGATION conversion — a different clause, a different pair of objects
+  (AssuranceAssessment → Obligation, not Evidence), a different remedy plane (a minting act on the
+  command bus, not the shape of a content pointer). Its remedy set — a
+  `DeriveObligationFromResidual` command, a `derivedFromAssessmentId` link, a mint-site guard — would
+  leave `contentReference` exactly as unconstrained as it is now.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, at HEAD 2026-08-23.** Bash
+  `grep` throughout (never `-i` together with `-F` — that combination aborts on this box and returns a
+  silent zero through a pipe); every long hit opened with `sed -n`. Corpora: `docs/canon/JPWB-REG-005
+  …md` (16,041 lines), `packages/rph-domain/src/enforcement-register.ts`,
+  `verif/guard-enforcement-ledger.data.ts`, `docs/_working/` (69 files).
+  - **BY LIMB ID.** `grep -no 'limb:ASR-9:[0-9]*'` over the whole register → **twelve** outputs,
+    eleven of them carrying an ordinal (`:12437` matches with none), and only
+    two ordinals are closed anywhere: `limb:ASR-9:7` (`:9998`, `:10002`) and `limb:ASR-9:9`
+    (`:12439`, `:12526`). **`limb:ASR-9:5` appears exactly once in the entire corpus, at `:12533`,
+    inside REG-F-235's census-reconciliation bullet declaring it NOT closed.** 0 in
+    `enforcement-register.ts`, 0 in the ledger, 0 in `docs/_working`.
+  - **BY SUBJECT, with counts reported both ways.** `infer evidence content` → REG-005 **0**,
+    enforcement-register **0**, ledger **0**, `docs/_working` **1 file** (`m7-assurance.json`, a
+    SOURCE spec extract restating canon, not a filing). `never inferred` → REG-005 **3**, ALL THREE
+    opened — the draft of this bullet said ONE: `:12534` (REG-F-235 naming this limb as open);
+    `:4533`, **CON-000 AX-6** verbatim, *"Professional meaning is never inferred from null fields,
+    missing values, attachment, proximity, …"* — a general axiom cited inside a decision entry,
+    binding on NULL FIELDS, not on a reference that was never dereferenced, and not a filing of
+    this limb; and `:1211`, *"never inferred from a hit"*, section-citation discipline.
+    `docs/_working` **2 files**, both opened (`HARMONIZATION-FINDINGS.md:947`, `:1550` —
+    section-citation discipline; `HARMONIZATION-LOG.md:3796` — requirement binding; the draft's
+    `:852`/`:1420` were stale). None about evidence content.
+    `silently delet` → **0/0/0/0**. *Positive controls, same corpora, same flags:* `RPH-ASR` →
+    enforcement-register **47**; `evidence` → enforcement-register **101**, `docs/_working` **49
+    files**; `REG-F-` → REG-005 **1,397**, `docs/_working` **51 files**.
+  - **BY SITE/SYMBOL** (REG-005 / enforcement-register / ledger / `docs/_working` files):
+    `ArtifactReferenceSchema` → **1 / 0 / 0 / 0** (the one hit is REG-F-008 at `:499`, opened);
+    `referencesContent` → **1 / 3 / 0 / 0** (all opened — REG-F-008's remediation and RPH-EVD-003's
+    mutant declaration); `CONTENT_AVAILABLE` → **4 / 2 / 0 / 0** (all opened, all admission-time);
+    `contentReference` → **11 / 2 / 0 / 3 files** (the draft reported only two of the four
+    columns): REG-005's eleven are `:499`, `:500`, `:505`, `:989`, `:8140`, `:8160`, `:8180` plus
+    the four in today's block below, all opened and all shape-lists or REG-F-008; the
+    enforcement-register's two are `:937`, `:960`; the ledger's is **0**; `docs/_working`'s three
+    are `AUDIT-shape-survivorship-2026-08-20.md:303` (a schema-parity table row),
+    `doc009-audit-input.json:84` and `HARMONIZATION-LOG.md:3094`, none a divergence filing;
+    `evidenceAdmissibility` → **4 / 7 / 1 / 6**,
+    all admission-time.
+  - **THE 17 ENTRIES FILED TODAY (REG-F-234..245, REG-Q-058..062, `:12116-16041`, 3,926 lines)
+    GREPPED SPECIFICALLY**, since every transcript on the census row predates them. `contentReference`
+    → **4**, all opened: `:14160` and `:14343` are REG-F-242/243, whose own closure lines name
+    `limb:ASR-7:1` and `limb:ASR-7:5` (`:14251`) and `limb:ASR-7:6` (`:14479`); `:14865` is
+    REG-F-244 (`limb:PER-12:6`, `:14749`), `:15919`
+    is REG-Q-062's EM-1 bullet listing the eight admissibility conditions. `34.3` → **0**.
+    `infer evidence content` → **0**. Neither REG-F-242 nor REG-F-243 is this limb — they close ASR-7
+    limbs by name, not an ASR-9 one — and both are about
+    what an Evidence object DECLARES ITSELF TO BE, neither about whether its content was retrieved.
+  - **DOCS/_WORKING, THE CORPUS EARLIER SWEEPS SKIPPED, SEARCHED IN FULL.** `ASR-9` → **3 files**, all
+    four hits opened. `DESIGN-invariant-enforcement-mapping.md:699` carries a row
+    `| ASR-9:5 | ENFORCED_BY_CONSTRUCTION | UNENFORCED_NO_SHAPE | "NOTHING IS OWED AS A DEFECT" |` —
+    ⚠ **this is the most misleading hit in any corpus and it is NOT a filing**: it is §17.2 of a
+    programme-methodology document tabulating the six census rows whose `owed` was authored for an arm
+    a refuter had overturned. It records that this row's denial was STALE, which is the opposite of
+    coverage. `DESIGN-claim-assessment.md:149` and `DESIGN-recomposition-judgement.md:46` are prose
+    cross-references on Claim status and on recomposition. **NO COVERING FILING EXISTS IN ANY CORPUS.**
+
+- **CITATION CORRECTIONS — every pointer re-read at HEAD, and the drift is inside the DECOY.** The
+  ledger rows a reader is sent to carry nine stale `assurance.ts` pointers between them — seven in row
+  `:291`, two more in row `:113`. The underlying claims all
+  still hold, but a reader following them lands on unrelated code and could conclude the facts were
+  never established. Corrected here for the next reader and **not re-filed**, since the rows'
+  dispositions are unaffected. From row `:291`: the BIRTH write `:1284` → **`:1389`** (`:1284` is a
+  comment; `landingState` is computed at `:1371`); `advancesToReady` `:1457` → **`:1573`** (`:1457` is
+  BLANK); ASSESSING `:1568` → **`:1688`**; CANCELLED `:1616` → **`:1736`**; INDEPENDENCE_VIOLATION
+  `:1933` → **`:2184`**; ESCALATED `:1991` → **`:1944`** (those last two have swapped order in the
+  file); the disposition range `:2056` → **`:2266`**. From row `:113`:
+  `advanceStatus(… target: disposition …)` `:2056` → **`:2266`**, and Gate A's *"Negative dispositions
+  … deliberately NOT gated"* `:2005-2008` → **`:1959`** and **`:2233`** (at HEAD `:2005-2008` is a
+  type declaration for `validatorResult?` / `producer?` — a dead pointer under a load-bearing quote).
+  **Verified UNCHANGED at HEAD:** `objects.ts:66-67`, `:70`, `:508-521`, `:511`;
+  `assurance-rules.ts:129-134` and `:154`; `handlers/assurance.ts:484`, `:505`, `:559`;
+  `transitions.data.ts:1776-1782` byte-for-byte including the `note` at `:1781`;
+  `guard-enforcement-ledger.data.ts:1`, `:113`, `:291`; `arrow-command-census.baseline.json:2`, `:11`.
+
+- **THE REMEDY — and note the ordering, because a guard written first would assert a refusal for an
+  act that does not exist.** (1) **Give the reference a shape that can tell a retrieval from an
+  assertion.** `ArtifactReferenceSchema` is a shared M7/M9/M11 placeholder and Evidence should not
+  share it. Define an evidence-specific reference with a discriminated origin — at minimum a
+  `resolution: 'RETRIEVED' | 'UNRESOLVED'` and a locator — so that "content we hold" and "content we
+  are asserting" are different values, not the same record. (2) **Then the antecedent becomes
+  assertable:** an evidence-access-failure act on the reachable `ASSESSING -> INCONCLUSIVE` landing
+  (the `EVIDENCE_PENDING` landing stays unreachable until someone builds a mover, and ledger `:291`
+  already reddens if they do). (3) **Then, and only then, the guard is writable:** a completion that
+  carries an UNRESOLVED reference and a disposition better than INCONCLUSIVE is an arrangement that
+  can be REFUSED, and this limb moves from `UNENFORCED_NO_SHAPE` to an `ENFORCED` arm. (4) **Until (1)
+  lands, pin the absence rather than leaving it uninstrumented** — a `verif/` census assertion that no
+  production line dereferences `contentReference` and that `ArtifactReferenceSchema` remains
+  unconstrained, so the day someone adds a retrieval plane this entry is forced open instead of
+  silently satisfied. ⚠ Remedy (1) is a HYPOTHESIS about the fix, not a measured fact; the measured
+  facts are (a)-(e) above.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-9:5`. **It closes nothing else**,
+  because every neighbour in this sentence has a different subject and a different fate:
+  `limb:ASR-9:4` (an evidence deficit yields an inconclusive disposition) is a DISPOSITION rule,
+  scored PARTIAL and already FILED — and citing this entry for it would be the inverse EM-1;
+  `limb:ASR-9:7` is closed by **REG-F-228**; `limb:ASR-9:9` is closed by **REG-F-235**;
+  `limb:ASR-9:10` (deferred scope stays represented) is a separate NEAR_MISS, filed alongside this one
+  as a QUESTION, on a different object, a different plane and a disjoint remedy. The two ledger rows
+  at `:113` and `:291` are arrow-guard dispositions and are **untouched** by this entry.
+
+- **Merge target:** BOTH — **Repository**, for `packages/rph-contracts/src/objects.ts:70` and `:511`
+  (the reference type), `packages/rph-assurance/src/assurance-rules.ts:129-134` (the reader),
+  `packages/rph-application/src/handlers/assurance.ts` (the access-failure act and the completion
+  guard), and a new `verif/` census assertion for remedy (4); **Corpus**, for the nine ledger pointer
+  corrections above and for the arm-count line in `verif/invariant-verdict-census.test.ts` (at HEAD
+  `expect(dist).toEqual({ FILED: 208, NEAR_MISS: 21, NOT_APPLICABLE: 78 })`), which moves when this
+  entry and its sibling merge. Status: OPEN.
+
+### REG-F-261 — a policy declaring it evaluates only CORRECTNESS carries a FITNESS claim to SATISFIED: the
+claim-type axis has zero predicate readers eight lines from the object-type axis that is enforced
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** The model draws canon's quality-versus-fitness distinction on the wire
+  in three places — `ClaimObject.claimType`, `AssurancePolicyDefinition.evaluatedClaimTypes` and
+  `FindingDefinition.affectedClaimTypes`, all typed `ClaimTypeSchema` whose ten members include both
+  `CORRECTNESS` and `FITNESS` — and **no predicate anywhere in the assurance kernel or the command path
+  ever compares them.** So an assurance policy that declares `evaluatedClaimTypes: ['CORRECTNESS']`, whose
+  single criterion reads *"The artifact is well made."*, accepted an assessment binding a FITNESS claim
+  reading *"This architecture is the RIGHT architecture for the approved need."*, was BEGUN, and COMPLETED
+  to `assessmentState = SATISFIED`, emitting `AssuranceAssessmentCompleted.disposition = SATISFIED`. The
+  same handler, at the same dispatch, **does** refuse when the SUBJECT's object type is out of the policy's
+  declared scope — and refuses it with a sentence that states this limb's own worry word for word. A
+  well-made verdict standing over a rightness claim is precisely *"a verdict against criteria written for
+  something else"*: refused on one axis of the same policy object, admitted on the other.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`,
+  **§8.2 The de minimis floor and Reasoning Review** (heading read in place at **line 247**, inside
+  **§8 The assurance model**, line 235), **ASR-5 at line 257**, limb 5:
+  *"A high-quality artifact can be the wrong artifact;"*
+  - ⚠ **THE SECTION WAS READ, NOT INFERRED FROM THE LINE.** ASR-5 is **§8.2**, not §8.3 —
+    §8.3 *Evidence* begins at line **261** and owns ASR-6 (line 263) and ASR-7 (line 267). Line 257
+    also carries ASR-5's ten other limbs; this entry quotes limb 5 only. ASR-5's **SCOPE** line
+    (**259**) reads *"governs assurance design and coverage planning"*, which is why the remedy below
+    is a policy-scope conjunct and not a new validator.
+  - **AND THE RATIFIED FIELD IS NOT AN INVENTION OF THIS REPOSITORY.** *Product Realization PWA —
+    Assurance Policy Catalog and Validator Contract*, **§3.1 Policy definition** (heading at that
+    file's line 96 — the heading, not the blank at 95), declares `evaluatedClaimTypes: ClaimType[]`
+    at **:111**, immediately below `applicability` (`:109`) and three lines below
+    `applicableObjectTypes` (`:108`). Its **§10.1** defines SATISFIED as *"The
+    available admissible evidence supports the assessed claims under the policy criteria, subject to
+    recorded limitations."* — **the assessed claims, under THIS policy's criteria.**
+
+- **WHAT THE CODE DOES, re-read at the sites at HEAD (2026-08-23).**
+  - `packages/rph-contracts/src/enums.ts:215-226` declares `ClaimTypeSchema` with ten members including
+    `CORRECTNESS` and `FITNESS`, under a docblock at **`:214`** that names all three carriers in one line:
+    *"ClaimObject.claimType; AssurancePolicyDefinition.evaluatedClaimTypes;
+    FindingDefinition.affectedClaimTypes — RPH-DOC-007 §13 / DOC-002 §15.1 (10 values)"*. The schema
+    sites are `objects.ts:286` (`affectedClaimTypes`) and the policy and claim objects.
+  - `packages/rph-application/src/handlers/assurance.ts:204` writes `applicableObjectTypes` and **`:212`**
+    writes `evaluatedClaimTypes` into the same object literal in `createAssurancePolicy`; **`:272`** and
+    **`:273`** list them as adjacent members of `EDITABLE_PATCH_FIELDS`. The two fields are carried
+    identically. Only one of them acquires a reader.
+  - `requestAssuranceAssessment` (`:1204`) runs `applicabilityBlock` at **`:1296-1323`**. It builds a
+    subject descriptor from `objectType`, `pwuKind` and `tags` (**`:1304-1308`**), calls
+    `policyApplicability(...)` (**`:1302-1312`**), and on a decided `NOT_APPLICABLE` returns
+    `RPH_VALIDATION_SEMANTIC_FAILED` (**`:1316-1321`**). **`claimIds` is never mentioned in that block.**
+  - The whole handler loads exactly two objects — the policy (`:1214`) and the first subject (`:1299`).
+    **No CLAIM object is loaded at this seam at all**, so `claimIds` reaches state (**`:1385`**) and the
+    `AssuranceAssessmentRequested` payload (**`:1418`**) as unresolved strings. Its schema is
+    `claimIds: z.array(z.string())` (`packages/rph-contracts/src/messages.ts:209`).
+  - **THE CENSUS, RE-RUN AT HEAD BY ME TODAY.**
+    `grep -rnE "claimType\s*(===|!==)|includes\([^)]*claimType" --include=*.ts` over
+    `packages/{rph-application,rph-assurance,rph-domain,rph-projections}/src` minus `.test.ts` → **0**.
+    **POSITIVE CONTROL, identical command form and identical population**, `objectType` substituted for
+    `claimType` → **29**. The pattern shape is proven to match in this tree; this field is never compared.
+    Widening the net to every mention of `claimType|evaluatedClaimTypes` over the same paths → **11**, all
+    read: 4 writes/copies (`assurance.ts:212`, `:273`, `:660`, `:681`), 4 declarations in
+    `floor-policies.ts` (`:80`, `:111`, `:119`, plus the copy at `:88`), 3 seed literals (`:144`, `:178`,
+    `:229`). **Zero branches.** `affectedClaimTypes` over `packages` + `apps` minus tests → writes, one
+    docblock and one seed test asserting enum membership; **no production reader.**
+
+- **OBSERVED / READ — STATED PRECISELY.** **OBSERVED, driven by me at HEAD on 2026-08-23** with `node`
+  against `SqliteStorageAdapter` (the census row drove the same arrangement on 2026-08-21; it reproduced
+  exactly, with one payload correction noted below):
+  ```
+  AssertClaim{claimType:'FITNESS', statement:'This architecture is the RIGHT architecture
+    for the approved need.'}                                               -> ACCEPTED
+  CreateAssurancePolicy{evaluatedClaimTypes:['CORRECTNESS'],
+    criteria:[{description:'The artifact is well made.'}],
+    applicableObjectTypes:['PROFESSIONAL_WORK_UNIT']}                      -> ACCEPTED
+  ActivateAssurancePolicy                                                  -> ACCEPTED
+  RequestAssuranceAssessment{claimIds:[the FITNESS claim]}                 -> ACCEPTED
+  BeginAssuranceAssessment                                                 -> ACCEPTED
+  CompleteAssuranceAssessment{validatorResult:{dispositionRecommendation:'SATISFIED',
+    claimResults:[{claimId:<the FITNESS claim>, outcome:'SUPPORTED'}]}}    -> ACCEPTED
+    assessmentState = SATISFIED
+    assessment.claimIds = ["clm_01ARZ3NDEKTSV4RRFFQ69V7A03"]
+    claim.claimType = FITNESS   claim.status = OPEN
+    AssuranceAssessmentCompleted.disposition = "SATISFIED"
+  CONTROL at the SAME dispatch, OBJECT axis — byte-identical policy but
+    applicableObjectTypes:['ARTIFACT']:
+  RequestAssuranceAssessment                                               -> REJECTED
+    code = RPH_VALIDATION_SEMANTIC_FAILED
+    message = RequestAssuranceAssessment: assurance policy pol_… does not apply to pwu_…
+      (a PROFESSIONAL_WORK_UNIT, kind ARCHITECTURE) — its DOC-004 §5.1 applicability rule
+      yields NOT_APPLICABLE. Assessing work a policy does not govern would record a verdict
+      against criteria written for something else.
+  ```
+  ⚠ **ONE CORRECTION TO THE CENSUS ROW'S TRANSCRIPT, found by re-driving it.** The row prints
+  `CompleteAssuranceAssessment{dispositionRecommendation:…, claimResults:…}` as the payload. That exact
+  payload is **VALIDATION_FAILED / RPH_VALIDATION_SCHEMA_FAILED**:
+  `CompleteAssuranceAssessmentPayloadSchema` is `z.strictObject({validatorResult, producer?})`, so the
+  verdict must be **wrapped in `validatorResult`**. Wrapped, it is ACCEPTED and the row's conclusion
+  stands unchanged. Recorded because the next reader will copy that line. **READ (not driven):** the
+  section headings, the corpus §3.1 / §10.1 quotations, and every line number cited above.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY — the nearest is at the IDENTICAL 28 lines.**
+  - **REG-F-244** (`JPWB-REG-005:14526`, filed **today**) is the one that will be mistaken for coverage,
+    because it reads the very block this entry's remedy lands on and argues in the same shape. Its sentence
+    at **`:14565-14574`**: *"a LIVE SUBJECT-CLASS PREDICATE EXISTS AND SIMPLY CANNOT SEE THIS AXIS … the
+    door where the exclusion belongs is already built … and blind on the only axis that
+    distinguishes a reasoning trace from a design document."* **Its axis is `artifactType`** — the
+    SUBJECT's material class — and its closure line at **`:14749`** reads `limb:PER-12:6`, *"It closes
+    nothing else"*. A subject-class field added to the descriptor at `:1304-1308` still lets a
+    CORRECTNESS-only policy certify a FITNESS claim, because the claim is not the subject. ⚠ **SITE
+    COLLISION, so the two edits are sequenced and not merged:** both land inside `:1296-1323`.
+  - **REG-F-226** (`:9450`) **names this limb by id and expressly declines it.** Its closure line,
+    **`:9571-9574`**, verbatim: *"**LIMB CLOSED BY THIS ENTRY:** `limb:ASR-5:6`. **It closes nothing
+    else.** `limb:ASR-5:5` (the `claimType` / `evaluatedClaimTypes` axis having no predicate readers) …
+    are separate rows with separate remedies"*. Its three remedies (`:9563-9570`) are populate
+    `claimResults`, a **set-level** joint-satisfiability predicate at `completeAssuranceAssessment`, and a
+    claim-result field on the completion event. **None asks what KIND of claim the policy evaluates:** a
+    jointness test over a set of FITNESS claims still certifies every member under a CORRECTNESS-only
+    policy.
+  - **REG-F-243** (`:14296`, filed **today**) is the closest by argument shape — *"the policy field that
+    decides whether professional judgment may be evidence has zero readers"* — and its own drive *"carried
+    a FITNESS claim to SUPPORTED under a policy whose criterion is `DETERMINISTIC`"*. **Its field is
+    `AssessmentCriterion.evaluationMethod`**, a permission on HOW a criterion may be evaluated; it closes
+    `limb:ASR-7:6`, *"both conjuncts"* (`:14479`). Flipping `evaluationMethod` to `HUMAN_JUDGMENT` changes
+    nothing about which claim types the policy evaluates.
+  - **REG-F-242** (`:14077`, filed **today**) mentions `ClaimTypeSchema` at `:14090` and proposes an
+    `EvidenceType × ClaimType` permitted-pairs table in its **remedy** (`:14230-14241`; the table
+    sentence is **`:14238`**). ⚠ `:14483` is **REG-F-243's**, not this entry's. That table governs
+    what one **artifact** may prove about one claim at `AdmitEvidence`; it closes `limb:ASR-7:1` and
+    `limb:ASR-7:5` (`:14251`). A policy carrying no admissible evidence at all still reached SATISFIED
+    in the drive above.
+  - **`RPH-EVD-004`** (`packages/rph-domain/src/enforcement-register.ts:966`, kind `UNENFORCED_DISCLOSED`)
+    names FITNESS at **`:982`** — but only as *"the rule's own consequent noun"*, and its arrangement is a
+    `TEST_RESULT` of scope `'unit'` offered for a FITNESS claim. Evidence **scope versus claim breadth**,
+    not policy scope versus claim kind.
+  - **REG-F-029** (`:885`) cites `pol_fitness_for_purpose` for PWUs it does not govern — the
+    `appliesToPwuKinds` / §5.1 **object/kind** axis, which is exactly the axis this entry's control shows
+    IS enforced; and it **CLOSED 2026-08-05** (`:899`).
+  - **REG-F-225** (`:9256`) quotes the same refusal at `:9336-9338` as a live **control**, and closes
+    `limb:ASR-5:4` (`:9436`). ⚠ Note for the next reader: `NOT_APPLICABLE` is limb 4's fifth noun
+    (*"inapplicable"*), which is why this entry cites `:1296-1323` as a **control and a template**, never
+    as enforcement of limb 5.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** All greps run through Bash
+  (`-i` and `-F` never together — the documented abort on this box); every hit landing on a long line was
+  opened with `sed -n 'Np'`. **A** = `packages/rph-domain/src/enforcement-register.ts`, **B** =
+  `docs/canon/JPWB-REG-005 …md` (16,041 lines at HEAD), **C** = `verif/guard-enforcement-ledger.data.ts`,
+  **D** = `docs/_working/`.
+  - **BY ID:** `grep -no 'limb:ASR-5:[0-9]*' B` → 28 occurrences; **`limb:ASR-5:5` appears exactly
+    ONCE, at `B:9571`**, inside REG-F-226's declining sentence. Positive controls, same instrument:
+    `limb:DEC-5:2` → **7** hits (`:7100 :7174 :7214 :7403 :14499 :15727 :15826` — the last two landed
+    today); all `limb:` ids in B → **299**.
+  - **CLOSURE SWEEP over the entries filed TODAY, which every transcript on this row predates:**
+    `grep -n 'LIMB IDS THIS ENTRY CLOSES\|LIMB CLOSED BY THIS ENTRY\|CENSUS RECONCILIATION' B` restricted
+    to `NR>12000` → REG-F-234..245 / REG-Q-058..062 close `REL-2:1, ASR-9:9, DEC-4:7, ASR-14:5, AUT-2:2,
+    DEC-1:1, DEC-1:2, DEC-1:3, none, ASR-7:1, ASR-7:5, ASR-7:6, PER-12:6, PER-12:7, OBJ-2:3, AUT-2:3,
+    ASR-1:6, ASR-7:3, PER-12:3`. **`limb:ASR-5:5` is on no list.**
+  - **BY SITE / SYMBOL:** `claimType` (case-insensitive) in B → **6 lines**: `:9571` and `:9572`, the
+    REG-F-226 decline, plus `:14090 :14131 :14235 :14483` inside today's REG-F-242 and REG-F-243, all
+    opened — **not one pairs a policy's `evaluatedClaimTypes` with a claim's `claimType`**;
+    `ClaimTypeSchema` alone → **2**, `:14090` and `:14131`, both REG-F-242. In **A** → **1**
+    (`:982`, RPH-EVD-004). In **C** → **0**, against controls `disposition` **109** and `assurance`
+    **49** over 392 lines, so the instrument reaches that file and the zero is real. In **D** →
+    **18 lines across 5 files**, each opened:
+    `AUDIT-placeholder-helpers.md:172` (*"Filling it from the policy's own `evaluatedClaimTypes` is an
+    **inference**, not a transcription"* — a provenance note on `affectedClaimTypes` authoring, not a
+    predicate), `canonical-vocabulary.json:368` and `:2076` (vocabulary rows), `HARMONIZATION-LOG.md:1426`
+    (a shape-conformance table row), `AUDIT-shape-survivorship-2026-08-20.md:301` (scores `claims`
+    ENFORCED on **schema fidelity**), and `doc009-audit-input.json:186` — the fifth file, a
+    `Source TBD` shape note on `FindingDefinition.affectedClaimTypes`, not a predicate either.
+    `docs/_working` control on the same instrument: `applicableObjectTypes` → **9**.
+  - **BY REFUSAL SENTENCE:** `grep -n 'does not govern' B` → `:885` (REG-F-029's title), `:9338`
+    (REG-F-225's control quote), `:12266` (REL-2, unrelated). `grep -n 'applicabilityBlock' B` → **1**,
+    `:14567`, REG-F-244 — read in full above. `grep -n 'claimIds' B` → 7, all read; the four assurance
+    hits are REG-F-226's (`:9477 :9482 :9557 :9565`).
+  - **REGISTER FAMILY SWEEP (A):** all twelve `RPH-ASR-0xx` `canonAnchor`s enumerated with `awk` and read
+    (`:1114 :1134 :1151 :1171 :1203 :1230 :1249 :1273 :1311 :1350 :1384 :1425`). None is this limb; the
+    nearest by subject, `RPH-ASR-008`, is *"Open critical findings block satisfaction"*.
+  - **CORPUS SWEEP, because an absence in `docs/canon` is not an absence in the corpus.**
+    `evaluatedClaimTypes` across `docs/Recursive Professional Harness/` → **4** declarations, all read
+    (Domain Model §17.1 `:1082`; Contract Package `:1263`; Policy Catalog §3.1 `:111`; Migration `:1233`);
+    control `applicableObjectTypes` → 2 files. The corpus declares the field and **states no separate rule
+    binding it to the claims an assessment may carry** — which is why the remedy leans on §10.1's
+    SATISFIED definition and on the field's own name, and why this is a repository change and not a
+    ratification.
+
+- **THE REMEDY — and ⚠ THE CENSUS ROW'S PROPOSED REMEDY IS CORRECTED HERE.** The row proposed
+  *"extend the `assurance.ts:1302` applicability block"*. `:1302` is the **call to
+  `policyApplicability`**, and threading
+  a claim axis **through** that function would diverge from the ratified `ApplicabilityRule` (Catalog §5.1,
+  that file's `:295-313`), whose members are `objectTypeConditions` (the one required field),
+  `pwuKindConditions`, lifecycle and event triggers, risk and semantic-change conditions, tags and
+  `expression` — **there is no claim dimension in the ratified shape, and inventing one would settle by
+  code a question §5.1 has answered the other way.** `policyApplicability`
+  (`packages/rph-domain/src/governance.ts:711`) is also shared with `earnAssurance` and the reference
+  drive, so widening it moves three consumers at once.
+  1. Add a **separate conjunct** immediately after `if (applicabilityBlock) return applicabilityBlock;`
+     (`:1323`) in `requestAssuranceAssessment`: load each id in `p.claimIds`, and when a resolvable claim's
+     `claimType` is absent from the policy's `evaluatedClaimTypes`, refuse with
+     `RPH_VALIDATION_SEMANTIC_FAILED` **reusing that block's own final sentence** — *"…would record a
+     verdict against criteria written for something else."* Follow `:1301`'s existing discipline: **an
+     unresolvable claim is not a decided negative** — decline to answer, exactly as the subject arm does.
+  2. Decide explicitly what an **empty** `evaluatedClaimTypes` means before writing the predicate, and say
+     so at the site. Silence on that point is how `applicableObjectTypes` acquired REG-F-024's false scope.
+  3. **Predicted red, named before any green is trusted:** a test asserting the new refusal **MESSAGE**
+     (never the code alone — `RPH_VALIDATION_SEMANTIC_FAILED` has many emitters) must fail on the mutant
+     that makes the membership test return `true` unconditionally; and the **accept-control** — the same
+     drive with `evaluatedClaimTypes: ['FITNESS']` — must stay ACCEPTED, or the guard is refusing
+     everything. Home: `packages/rph-application/src/handlers/assurance-applicability-precondition.test.ts`,
+     the harness REG-F-029 shipped.
+  4. **Deliberately not in scope, so the fix does not overreach:** `claimResults` accumulation and joint
+     satisfiability are REG-F-226's, and so is the claim's own `status` remaining `OPEN` after a SATISFIED
+     verdict.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-5:5`. **It closes nothing else,
+  because** every other limb of ASR-5 line 257 turns on a different field at a different door:
+  `limb:ASR-5:6` is a SET-level predicate at `completeAssuranceAssessment` (REG-F-226); `limb:ASR-5:7` is
+  `AssuranceObservation.observationType` at `RecordAssuranceObservation`, filed in this same pass as a
+  **QUESTION** because canon partitions none of its seven values; `limb:ASR-5:4` is coverage classes on
+  `ProposePwu` and `assurance-view.ts` (REG-F-225); `limb:ASR-5:8` is the missing tension carrier
+  (REG-F-227); `limb:ASR-5:9` is `forbiddenOpenSeverities` (REG-F-224); `limb:ASR-5:10` is criterion
+  epistemic status (REG-Q-057). One commit closes this limb and no other. It also does **not** close
+  `limb:PER-12:6` even though it edits the same 28 lines.
+
+- **Merge target:** **Repository.** `packages/rph-application/src/handlers/assurance.ts`
+  (`requestAssuranceAssessment`, the conjunct after `:1323`) and
+  `packages/rph-application/src/handlers/assurance-applicability-precondition.test.ts`. **Sequenced with
+  REG-F-244**, which edits `:1304-1308` inside the same block, and cross-referencing **REG-F-226** per its
+  `:9571-9576` instruction to cross-reference rather than merge. No corpus change is required: the Catalog
+  already declares the field (§3.1) and already defines SATISFIED as a verdict over *the assessed claims
+  under the policy criteria* (§10.1). Status: OPEN.
+
+### REG-F-262 — PublishPwa writes a caller-supplied root onto the published PWA after the only structural
+gate has already run, validates it against nothing, and emits an empty event, so the version's certified
+required-assurance set can be swapped for one carrying none and leave no trace
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (W-3b invariant census) · **Class:** CODE_DIVERGES ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `PublishPwa` accepts an optional `rootPwuTypeId` and its `mutate`
+  writes that value onto the published PWA's state with no validation of any kind. The single-root /
+  connectedness check (`pwaCompositionGate`) is wired to `ValidatePwa` ONLY, and it derives the root from
+  each PWU Type's own `isRoot` flag, never from `PWA.rootPwuTypeId` — so the publication step
+  re-points the version's root AFTER the structural gate has spoken, at a type that gate never
+  certified as a root. The substituted type carries its own `requiredAssurancePolicyIds`, which may
+  be empty where the validated root's was not: the published architecture's declared assurance
+  obligation is lowered by the act of publishing it. And `eventPayload: () => ({})` means
+  `PwaPublished` carries nothing, so the swap appears in no domain event — the *"silently"* of the
+  limb, observed. The publication step is not merely permissive: it is unvalidated, and a root id
+  naming an object that does not exist at all is accepted.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003 Semantic Model and Invariant Catalog.md` **§8.9 "Assignment,
+  capability, execution, and publication"** (heading at line **323**, read at HEAD — not inferred from a
+  line number), **ASR-19 at line 329, limb 3**: *"and no publication or activation step may silently
+  downgrade required assurance."* The same sentence's limb 1 supplies the standard the swap defeats: *"A
+  PWA version with an implicit leaf, an opaque child count, a non-leaf type without a recomposition
+  contract, or a missing required policy assignment cannot become validated or published"*. ASR-19's WHY
+  line (330): *"publication is where a design's unstated obligations become every future Undertaking's
+  silent gaps."*
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD (`303ee671`), every line opened with `sed -n`.**
+  ⚠ **Commit corrected on verification:** the drafting pass labelled HEAD `857128a7`; HEAD is `303ee671`,
+  which touches only `docs/_working/`, so every code line below is unchanged between the two and was
+  re-opened at `303ee671`.
+  - `packages/rph-contracts/src/messages.ts:631-633` — `PublishPwaPayloadSchema = z.strictObject({
+    rootPwuTypeId: z.string().optional() })`. The field is an accepted command input, not smuggled.
+  - `packages/rph-application/src/handlers/pwa-authoring.ts:1003-1006`, verbatim:
+    ``mutate: (base) => { const p = command.payload as PublishPwaPayload; return p.rootPwuTypeId ?
+    { ...base, rootPwuTypeId: p.rootPwuTypeId } : base; }`` — no existence check, no `isRoot` check, no
+    comparison with what `ValidatePwa` certified. ⚠ **Line drift:** the row cited `:1004-1006`; it is
+    `:1003-1006` at HEAD, the code identical.
+  - `pwa-authoring.ts:1000` `precondition: fromStates('VALIDATED')` and `:1002` `guard: (state, gctx) =>
+    pwaFloorGate(command, state, gctx)` are the handler's ONLY two conditions. The floor gate asks whether
+    the de minimis floor is SATISFIED at the PWA's current version; it never reads the payload.
+  - `pwa-authoring.ts:908` declares `pwaCompositionGate` and `:942` wires it as `validatePwa`'s guard —
+    the ONLY wiring. It calls `analyzePwaGraph(pwaGraphExport(ctx, pwaId, state))`, and `pwaGraphExport`
+    (`:871-885`) builds its node set from `pwuTypeNodesOf(ctx, pwaId)`. **The structural gate cannot see
+    the field publish writes, and does not run at publish.**
+  - `pwa-authoring.ts:1011` `eventPayload: () => ({})`, so `PwaPublished` records no fields at all.
+  - The two production callers derive the root correctly and so never expose the lever: the demo action
+    (`apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:618-620`) resolves the root at `:618`
+    (`listPwuTypes(getEngine(), params.id).find((t) => t.state.isRoot === true)`) and sends `root.id` at
+    `:620` — ⚠ the draft cited the `find` at `:620`; `:620` is the send. And `packages/rph-engine/src/
+    seed-workbench.ts:400-402` sends `types[0]!.id`, which `derivedTypes` guarantees is the root
+    (`seed-workbench.ts:153`, `return [roots[0]!, ...]`). **The lever is reachable by a direct command,
+    which is precisely the C-5 bypass class this file's own boundary doctrine exists to close** —
+    `pwa-authoring.ts:342-345`: *"the broker and the SvelteKit action carry the same rule as FRIENDLY
+    pre-checks, but until now the engine did not — so a direct command (bypassing both) could persist …
+    This closes that bypass (C-5)."*
+
+- **OBSERVED / READ — OBSERVED (DRIVEN), with a control and a dead control.** Driven through
+  `Engine.dispatch` over `SqliteStorageAdapter` (a temporary vitest driver, since removed; the refuter's
+  `scratchpad/ref-ASR-19-limb3.mjs` no longer exists at HEAD and was re-derived, not carried).
+  ⚠ **RE-DRIVEN INDEPENDENTLY BY THE VERIFIER at HEAD `303ee671`**, from a driver written from scratch
+  against `pwa-authoring.test.ts`'s floor-gate harness and deleted after: `A` and both controls below
+  reproduce line for line, including `payloads = [{}]` and the nonexistent-id acceptance. This is an
+  OBSERVED admission twice over, by two drivers neither of which survives at HEAD. Verbatim:
+  ```
+    validated root = pwut_…S41 requiredAssurancePolicyIds = ["pol_ref19"]
+    substitute     = pwut_…S43 requiredAssurancePolicyIds = []
+    ValidatePwa (pwaCompositionGate runs HERE) -> ACCEPTED
+    A. PublishPwa {rootPwuTypeId: BARE} -> ACCEPTED
+    publicationStatus = PUBLISHED | rootPwuTypeId = pwut_…S43
+    PWA.assurancePolicyIds = []
+    PwaPublished events = 1 | payloads = [{}]
+    events whose payload names pwut_…S43: PwuTypeDefined, PwuTypeRedefined
+  ```
+  **THE CONTROL THAT SHOWS THIS IS NOT A PERMISSIVE CHECK BUT NO CHECK** (separate store, same harness):
+  ``CONTROL PublishPwa {rootPwuTypeId:"pwut_THIS_TYPE_DOES_NOT_EXIST"} -> ACCEPTED`` and
+  ``rootPwuTypeId now = pwut_THIS_TYPE_DOES_NOT_EXIST``. A nonexistent aggregate id is written onto
+  published state.
+  **AND THE DEAD CONTROL, so no reader mistakes the neighbouring refusal for enforcement of this:**
+  ``B1. PublishPwa {rootPwuTypeId: ROOT} (re-root back) -> REJECTED | RPH_ILLEGAL_STATE_TRANSITION`` and
+  ``B2. PublishPwa {} (benign no-op) -> REJECTED | RPH_ILLEGAL_STATE_TRANSITION`` — **byte-identical
+  messages.** The only publication-step refusal in reach fires the same way for the hostile re-root and
+  the harmless no-op, so it discriminates nothing about this limb. What *does* protect the requirement is
+  an EDIT-step guard, not a publication step: ``C1. EditPwuType ROOT requiredAssurancePolicyIds=[]
+  (post-publish strip) -> REJECTED | RPH_INVARIANT_VIOLATION | A PWU Type can only be changed while its
+  PWA is DRAFT``.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY — four of them, three named by the row and one filed
+  after the row's transcripts were taken.**
+  1. **THE DOCBLOCK AT THE ADJACENT SITE, `pwa-authoring.ts:899-906`** — the strongest decoy, because it
+     is in this very file and cites ASR-19's own Guide line. Verbatim at HEAD: *"NOT enforced here,
+     deliberately — the assurance-assignment limb of L1639: see `pwa-validation-gate.test.ts`'s skipped
+     case … L1639's 'A missing policy assignment blocks PWA validation/publication' is therefore relative
+     to APPLICABILITY … Un-skip when the declaration is contracted (§16 item 9)."* Under REG-D-039 a site
+     docblock is a legitimate filing — but what this one MEASURES is **ASR-19 limb 1** (a *missing*
+     assignment) at **ValidatePwa**, and what it CLOSES is a §16 deferral of that clause. A missing
+     assignment and an assignment *swapped out under it at the next transition* are different arrangements
+     at different arrows. It is silent on `rootPwuTypeId`, on `mutate`, and on the publish step.
+  2. **THE DOCBLOCK 90 LINES BELOW, `pwa-authoring.ts:993-996`** — verbatim: *"A re-publish of an
+     already-PUBLISHED PWA rewrote rootPwuTypeId … and bypassing the single-root composition gate, which
+     runs on ValidatePwa and not here."* It names the hazard exactly. But the arrangement it MEASURES is
+     `PUBLISHED -> PUBLISHED`, and the remedy it CLOSES is the line below it, `precondition:
+     fromStates('VALIDATED')` (`:1000`) — proved to fire by control B1/B2 above. **The arrangement owed
+     here is the FIRST publish, on the `VALIDATED -> PUBLISHED` arrow, which that precondition admits by
+     design.** The docblock names half the hazard and its remedy closes that half.
+  3. **`REG-F-020` at REG-005:740** — *"SIX ARE FIXED, FIFTEEN REMAIN. `ArtifactRecorded` …, then
+     `PwaCreated`, `PwaPublished`, `UndertakingCreated`, `PwuTypeDefined` and `PwuTypeRedefined` — each
+     given the DECLARED shape through `kit.ts`'s existing `eventPayload` seam"*. It **certifies**
+     `PwaPublished`'s empty payload as conforming to its declared shape. It is the opposite of a filing
+     against `eventPayload: () => ({})` — and that empty payload is exactly what makes the swap silent.
+  4. **`REG-F-233` at REG-005:10763**, filed 2026-08-22, which names this handler and this guard line:
+     *"`pwa-authoring.ts:966`, inside `pwaFloorGate` … wired as the `PublishPwa` guard at `:1002`"*. Its
+     own reconciliation bullet (REG-005:10945) reads **"LIMB IDS THIS ENTRY CLOSES: `limb:ASR-3:3`. ⚠ It
+     closes limb 3 ONLY"** — ASR-3's *sequencing and universality*, not ASR-19. A reader who lands on it
+     by grepping `PublishPwa` will find the right file and the wrong sentence.
+  Also checked and rejected: `docs/_working/HARMONIZATION-LOG.md:1874` (and the same argument copied to
+  `packages/rph-contracts/src/gen/gen-messages.ts:280`) — *"Enforcing it would have rejected `PublishPwa`
+  for the extra key `rootPwuTypeId` — forcing a handler to strip a real field, recorded in object state,
+  to satisfy the absence of a spec."* That MEASURES the ratified-event-gate membership rule and CLOSES it
+  (*"ratified citation AND non-empty `payloadFields`"*); it treats the field as legitimate and defends
+  keeping it on the command, and never asks whether the publish step may rewrite it. And
+  `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:17` is a field-list fidelity row scoring
+  `PwaFirstClassContents` ENFORCED because `rootPwuTypeId` is a schema member — silent on the write.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only; never `-i` and
+  `-F` together; every long hit opened with `sed -n`. Reported as REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` / `docs/_working` (files).
+  - BY ID: `limb:ASR-19:3` → 0 / 0 / 0 / 0. `ASR-19` → **1** / 0 / 0 / 2. The single REG-005 hit is
+    **`:15538`, inside REG-Q-060** (filed 2026-08-23, after this row's transcripts) and it is about
+    PROVENANCE — *"for exactly 4 clauses (`STA-8`, `ASR-18`, `ASR-19`, `PER-11`) the repair note is the
+    ONLY provenance, so `b3Standing` returns `NO_RECORD`"* — not about publication. The two
+    `docs/_working` files are this census programme's own DESIGN/ROADMAP worksheets.
+    `L1639` -> 0 / 0 / 0 / 0.
+  - BY SITE: `rootPwuTypeId` → 0 / 0 / 0 / 2 (both opened, both quoted above). `PublishPwa` → 11 / 0 /
+    0 / 10; all 11 REG-005 lines listed and the substantive ones opened (`:4794`, `:4826`, `:6175-6197`,
+    `:10813`) — floor-waiver text, the ASR-3 EditPwa under-bump entry, and REG-F-233. `publishPwa`
+    (lower-p) → 0 / 0 / 0 / 1. `pwaCompositionGate` → 0 / 0 / 0 / 0. `PwaPublished` → 1 / 0 / 0.
+    `single-root` → 0 in REG-005. Canon phrases `Publication gates are substantive`, `silently downgrade`
+    and `downgrade required assurance` → **0 in all four**.
+  - **TODAY'S 17 ENTRIES SWEPT SEPARATELY** (REG-F-234..245 / REG-Q-058..062, REG-005 lines 12116-16041):
+    `PublishPwa` 0, `rootPwuTypeId` 0, `instantiationProfile` 0, `conformanceProfiles` 0, `activation` 0;
+    `ASR-19` 1 (REG-Q-060, above). **Positive control in that same range: `limb:` → 155.**
+  - **POSITIVE CONTROLS, same instrument and same files, reported by count:** REG-005 `ASR-5` → **53**,
+    `limb:ASR` → **107**, `AdmitEvidence` → **13**; `enforcement-register.ts` `ASR-3` → **5**,
+    `AdmitEvidence` → **4**; ledger `REG-F-` → **15**, `AdmitEvidence` → **2**; `docs/_working`
+    `AdmitEvidence` → **7 files**. All four corpora are reachable and populated, so the zeros are real
+    absences and not the `-i`/`-F` abort.
+  - CODE CENSUS RE-RUN AT HEAD: `grep -rn "rootPwuTypeId" --include=*.ts --include=*.svelte packages/
+    apps/ | grep -v /dist/ | grep -v .svelte-kit` → **26** hits; excluding `*.test.ts` and `e2e/`, every
+    remaining hit is a schema declaration (`objects.ts:710`, `messages.ts:632`, `pwa-ontology.ts:9`), a
+    writer (`pwa-authoring.ts:1005`, `seed-workbench.ts:401`, `pwa/[id]/+page.server.ts:620`), or a
+    comment. **ZERO production readers.** POSITIVE CONTROL, same command form and tree:
+    `requiredAssurancePolicyIds` → **95** non-test hits including live readers
+    (`pwa-authoring.ts:408-411` `checkPolicyRefsOnState`), so the instrument does surface readers.
+
+- **THE REMEDY (a hypothesis, stated as one).** Two candidate closures; both are code, and the first is
+  the one this entry recommends because it does not widen a ratified event shape.
+  (a) **Refuse the field at the boundary.** In `publishPwa`, add a guard ahead of `mutate`: if
+  `payload.rootPwuTypeId` is present it MUST resolve to a live `PWU_TYPE` whose `pwaId` is this PWA and
+  whose `isRoot === true` — i.e. the same root `pwaCompositionGate` certified — else
+  `RPH_INVARIANT_VIOLATION`. This is the `checkAssurancePolicyRefs` pattern already established in this
+  file (`:340-349`) for exactly this bypass class. The predicted red that must exist before the guard is
+  trusted: a test driving `PublishPwa {rootPwuTypeId: <a non-root type>}` and asserting the refusal
+  **MESSAGE**, plus a control asserting the correct root still publishes; neutralising the `isRoot`
+  conjunct must redden the first and not the second.
+  (b) **Or drop `rootPwuTypeId` from `PublishPwaPayloadSchema` entirely** and let the published root be
+  derived from `isRoot` at read time, which is what both production callers already compute. ⚠ Do NOT
+  take the third option of "put it on the `PwaPublished` event": that widens a shape REG-F-020 declared
+  and would trade a silent write for a recorded one without removing the write.
+  ⚠ **What this entry does NOT claim:** that the swap changes any behaviour today. `rootPwuTypeId` has
+  zero production readers, so this is a latent lever, not a live downgrade — the arrangement is admitted
+  and unrecorded, and becomes a downgrade the day anything reads the field.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-19:3`, **the PUBLICATION clause
+  only**. It closes nothing else, because: limb 1 (*"cannot become validated or published"* for a missing
+  assignment) is a different arrangement at `ValidatePwa` and is already deferred at
+  `pwa-authoring.ts:899-906` under §16 item 9; limb 2 is about Validator capability at activation; limb 4
+  is about PWA-version-owned versioned data. **The ACTIVATION clause of this same limb is NOT closed
+  here** — it is a ratification question and is filed separately as REG-Q-XXX (ASR-19-2), and this limb is
+  not fully discharged until both are resolved. It closes nothing in ASR-3: the version-bound floor
+  refusal this row's superseded arm relied on belongs to ASR-3 (DOC-003:249) and ASR-12 (DOC-003:289), and
+  the code says so itself — `pwa-authoring.ts:481-482` cites *"§10.1 L1379"* and
+  `pwa-publish-stale-floor.test.ts:7-9` cites *"Guide §10.1 L1379"* and *"Guide §8.4 L854"*, never L1639.
+
+- **Merge target:** BOTH — the finding to the Corpus (JPWB-REG-005) and the guard to the Repository
+  (`packages/rph-application/src/handlers/pwa-authoring.ts`, with its red-first test in
+  `pwa-authoring.test.ts` alongside the existing re-publish case, whose `it(...)` begins at `:842`).
+  Status: OPEN.
+
+### REG-Q-063 — OBJ-3 forbids meaning in an identifier absolutely, and the same section delegates a
+type-tag prefix registry to the repository: the guard that would close the limb ratifies one reading
+
+**Date:** 2026-08-23 · **Type:** QUESTION (W-3b invariant census) · **Status:** OPEN
+
+- **THE QUESTION, IN ONE PARAGRAPH.** OBJ-3 limb 2 is unqualified: *"No meaning is parsed out of, or
+  edited into, an identifier."* Ten lines earlier, the same section's Common object contract hands the
+  repository *"the registered identifier scheme and prefix registry"* as repository shapes — and the
+  scheme the repository then ratified is `<type-prefix>_<ULID>`, which edits a **type claim into every
+  identifier the system mints**, and ships `parseRphId` to read that claim back out. Both cannot be read
+  at full strength. The engine currently implements NEITHER: it neither enforces that the tag is truthful
+  nor forbids the tag from carrying meaning — it checks shape and stops. So the question is not academic
+  tidiness; it decides which of two OPPOSITE remedies the sibling finding is allowed to write, and the
+  obvious guard would settle it silently in the wrong direction.
+
+- **CANON, QUOTED VERBATIM, BOTH SIDES.** `JPWB-DOC-003` §3 *Core objects and minimum rules* (heading at
+  line 75; §4 *Aggregate boundaries* begins at 133). **The prohibition — OBJ-3 at line 113, limb 2:**
+  *"No meaning is parsed out of, or edited into, an identifier."* **The delegation — the Common object
+  contract at line 103, final sentence:** *"The registered identifier scheme and prefix registry are
+  repository shapes."* **The stated interest, OBJ-3's WHY at line 114:** *"meaning-bearing identity breaks
+  the moment names change."* **The only carve-out, OBJ-3's NON-EXAMPLE at line 115:** *"human-readable
+  titles, slugs, and display names are encouraged — they simply are not identity."* Note what that
+  carve-out does and does not do: it exempts **presentation strings that are not identity**. It says
+  nothing about a type tag that **is** part of identity, which is the case actually in front of us.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD — it ASSERTS the permissive reading rather than
+  disclosing the tension.** `packages/rph-contracts/src/ids.ts:1` opens: *"RphId — opaque, immutable,
+  prefixed identifiers of the form `<prefix>_<ULID>` (docs §5; DOC-007 §5.1)."* **"Opaque" and "prefixed"
+  are asserted in the same breath**, and the citation goes to the repository shape docs — OBJ-3 is not
+  named anywhere in the file. `:2` then states *"Human-readable strings (e.g. \"FSM-ARCH-001\") are
+  DISPLAY LABELS ONLY and are never ids"* — the NON-EXAMPLE restated as if it settled the type-tag case,
+  which it does not. `:7-9` calls `ID_PREFIXES` *"The ratified id-prefix registry (docs §5)"* and records
+  that `obl/art/dcp/rcp` *"were carried from the reference fixture and ratified (open item #8, best
+  judgment)"*. `:53` ships `parseRphId`, whose entire purpose is to split the type claim back out of an
+  identifier — the forbidden act, provided as a supported contract export.
+
+- **THE TWO READINGS, AND WHY THEIR REMEDIES POINT IN OPPOSITE DIRECTIONS.**
+  **(A) PERMISSIVE.** The prefix is a structural type tag sanctioned by the §3 delegation; limb 2 governs
+  *semantic* content — subject matter, titles, hierarchy — which is what its WHY and NON-EXAMPLE are
+  about. **Remedy:** enforce `prefix === ID_PREFIXES[objectType]` at the persistence seam, revive
+  `KNOWN_ID_PREFIXES`, and keep `parseRphId` as a supported reader.
+  **(B) STRICT.** Limb 2 is unqualified, and a type tag is exactly the meaning-bearing identity the WHY
+  warns about; the delegation settles *which prefixes and how they are spelled*, not *whether identity may
+  carry meaning at all* — a repository shape cannot license what a canon invariant forbids. **Remedy:**
+  strip the tag of authority — `objectType` is the sole type carrier, the prefix is at most an opaque
+  namespace nothing may read, and `parseRphId` is **deleted rather than revived**.
+  **These are not two spellings of one fix.** (A) makes every identifier a certified type assertion;
+  (B) makes it certified to assert nothing.
+
+- **⚠ WHY THIS IS A QUESTION AND NOT A FINDING — the accident it exists to prevent.** The obvious guard
+  for the sibling finding is a `prefix ↔ objectType` agreement check. Writing it would make the engine
+  **enforce meaning-in-identifiers, in the name of an invariant whose text forbids meaning in
+  identifiers.** That ratifies reading (A) by construction and forecloses (B) without anyone deciding it —
+  and it would then stand as the tested, guarded interpretation that a later reader takes as settled. The
+  sibling finding is therefore scoped to what diverges under BOTH readings and explicitly declines to add
+  that check until this is adjudicated.
+
+- **THE TENSION IS LIVE, NOT THEORETICAL: the registry has already churned exactly as OBJ-3's WHY
+  predicts.** `docs/_working/AUDIT-shape-survivorship-2026-08-20.md:161` records the prefix registry as
+  `DIVERGENT_FILED` with the churn itemised: *"Divergence from the §5.2 table: obl/art/dcp/rcp ADDED
+  (ratified) and pwa/pwut/und moved out of ID_PREFIXES"*. Three type tags were **removed** from the
+  registry after ids bearing them could already have been minted, and four were added on *"best
+  judgment"*. That is canon's WHY — *"meaning-bearing identity breaks the moment names change"* —
+  happening in this repository's own history, which is the strongest available argument that (B) is not a
+  pedantic reading. `docs/_working/DECISION-item23-attempt-record.md:104` records the same pressure from
+  the governance side: the `art` prefix is *"a live §5.3 violation but a disclosed one"*, and *"The
+  failure is an absent decision loop, not a rogue mint."* **The decision loop this entry asks for is that
+  loop.**
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** **`JPWB-REG-005:212-214`, REG-Q-008 "Identifier
+  generation"** is the entry a reader will close this on, because its title is the subject and it is
+  already a QUESTION. Its safe default reads: *"Use the repository's registered prefix + ULID in
+  production; fixture ids only in fixtures. Extend the registry, schemas, and tests together before
+  adding an object prefix; never casually accept multiple generators."* **It does not ask this question —
+  it PRESUMES reading (A) and moves on.** Its statement is *"The prefix registry does not cover every
+  proposed object; fixtures use intentionally readable ids"*: the axis is registry COVERAGE and FIXTURE
+  readability, and its merge target is *"Repository (registry); JPWB-DOC-003 (identity semantics)"*.
+  Nowhere does it put the prefix scheme itself against OBJ-3 limb 2, which is the only thing at issue
+  here; a reader adopting its safe default has answered (A) without noticing there was a question. Also
+  checked and rejected: **`enforcement-register.ts:2701`** (`RPH-PRJ-003`, `canonAnchor` *"Identity is
+  opaque and immutable"*) anchors OBJ-3's **heading** and is a cross-view UI selection property —
+  REG-005:6042-6043 already calls it *"OBJ-3's **first** limb"*; and **`REG-F-208`** (REG-005:5914)
+  closes `limb:OBJ-3:3`, the `pwuKind` clause, per its own line at `:6061`. ⚠ **Citation correction:**
+  `enforcement-register.ts:2702` cites *"JPWB-DOC-003 §4 OBJ-3"*; OBJ-3 is in **§3** (lines 75-132).
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (`-i` and
+  `-F` never together on this box); every non-zero hit opened with `sed -n`. **R** = REG-005 (16,041 lines
+  at HEAD — the row's transcripts predate 3,962 lines of new filings and were re-checked against them),
+  **E** = `enforcement-register.ts` (4,168), **L** = `verif/guard-enforcement-ledger.data.ts` (392),
+  **W** = `docs/_working/`. **THE ADJUDICATION ITSELF IS UNRECORDED, R/E/L/W(files):** `type tag` →
+  0/0/0/0; `type-tag` → 0/0/0/0; `prefix is meaning` → 0/0/0/0; `meaning-bearing` → 0/0/0/0;
+  `opaque identifier` → 0/0/0/0; `KNOWN_ID_PREFIXES` → 0/0/0/0; `parseRphId` → 0/0/0/0.
+  `opaque` → **7/2/0/9** — **all eighteen opened.** The seven in R are REG-F-222's opaque-blob trust
+  pipeline (`:8670`, `:8675`, `:8743`, `:8752`), a DOC-002 tier-uniformity note (`:2013`), an unrelated
+  lint fix (`:4057`), and the RPH-PRJ-003 discussion (`:6042`). The **two** E hits are RPH-PRJ-003's own
+  anchor at `:2701` and an unrelated `InputBindingSchema` "opaque bag" note at `:650`. The **nine** W
+  files are opaque BAGS, branded credential types, PolicyExpression operands and capsule hashes —
+  `AUDIT-shape-survivorship-2026-08-20.md:296`, `canonical-vocabulary.json:2539,2676`,
+  `DESIGN-derived-capsule-closure.md:42`, `DESIGN-machine-connectivity-and-policy-applicability.md:105`,
+  `DESIGN-trust-boundary.md:174,189`, `HARMONIZATION-FINDINGS.md:592`, `HARMONIZATION-LOG.md:3976,4046`,
+  `m7-assurance.json:260`, `ROADMAP-derived-capsule-closure.md:58`. **Not one of the eighteen is about
+  whether a prefix is meaning**, which is the claim; but the shape of the corpus is denser than a bare
+  count suggests. ⚠ **Corrected on verification:** this line was drafted as `7/1/0/0`; re-run at HEAD with
+  `grep -c -F` per corpus and `grep -rl -F` over `docs/_working/` it is **7/2/0/9**. The two undisclosed
+  E/W populations were opened in full and change nothing in the conclusion, but a disclosed zero that is
+  not zero is exactly the EM-2 failure this bullet exists to prevent, so the true figure stands here.
+  `prefix registry` → 1/0/0/2, all opened — the R hit is REG-Q-008 itself.
+  **THE NEWLY FILED BLOCK (REG-F-234..245, REG-Q-058..062) WAS SWEPT SPECIFICALLY**, extracted to its own
+  file: `ids.ts`, `RphIdSchema`, `RPH_ID_REGEX`, `KNOWN_ID_PREFIXES`, `parseRphId`, `isRphId`, `mintId`,
+  `ULID`, `opaque`, `prefix` → **0 each**; `OBJ-3` → 2, both opened and neither on this axis.
+  **POSITIVE CONTROLS, identical commands and corpora, by count:** `REG-F-` → 1397/82/15/50; `guard` →
+  582/136/50/42; `assurance` → 514/64/46/46; `canonAnchor` → 30/108/0/1; `assess` → 291/82/25/35; over
+  the new block alone `REG-F-` → 210, `limb:` → 158. So the zeros above are absences, not the `-i`/`-F`
+  abort.
+
+- **THE ADJUDICATION SOUGHT.** Rule on ONE of: **(A)** limb 2 governs semantic content only, and a
+  type-tag prefix is a sanctioned repository shape — in which case amend OBJ-3's NON-EXAMPLE at DOC-003
+  `:115` to say so in terms, because nothing in the text currently does, and the sibling finding may then
+  add the agreement check; or **(B)** limb 2 is unqualified, the delegation at `:103` governs spelling and
+  coverage only — in which case the prefix must lose its semantic authority, `parseRphId` is retired
+  rather than revived, and `ids.ts:1`'s *"opaque … prefixed"* docblock is corrected. Either way the
+  repository stops asserting an answer it was never given. **REG-Q-008 should be closed into whichever
+  branch is chosen**, since its safe default silently assumes (A).
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:OBJ-3:2`, jointly with the sibling
+  **REG-F-XXX** drafted in the same pass. The partition is by FATE, not by topic: the finding takes what
+  is a divergence under both readings (false and unregistered type tags, English-phrase identities, and
+  the `reference-undertaking.ts:657` parse) and is remediable in code today; this entry takes the part
+  that **cannot** be remediated in code without deciding canon. It closes nothing else. Not
+  `limb:OBJ-3:1`, which is scored `ENFORCED_MULTI_SITE` and concerns uniqueness, immutability and
+  presentation-stability. Not `limb:OBJ-3:3`, closed by **REG-F-208**, which concerns a `kind` FIELD
+  rather than an identifier.
+
+- **Merge target:** Corpus — `JPWB-DOC-003` §3 (OBJ-3's NON-EXAMPLE at `:115`, or the Common object
+  contract at `:103`), and this register. A repository change follows the ruling; none should precede it.
+
+### REG-Q-064 — canon makes rollback/recovery a promotion REQUIREMENT and the AUTHORED catalog scored it
+non-blocking and hedge-free: which reading binds, and what supplies canon's "where required"?
+
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+
+- **THE CONFLICT, IN ONE PARAGRAPH.** ASR-16's last clause makes rollback or recovery part of what
+  *"Promotion requires"*. The engine has no shape for it at all — no Baseline field, no key on either
+  baseline command, no field on either baseline event, no view on the promotion gate's input, no member
+  of its finding-code union. **But the concept is NOT absent from the repository:** it is fully
+  authored, in ratified transcription, inside the Product-Realization PWA ontology — as a promotion
+  claim, as a finding code, and as an evidence requirement. **And that authored plane resolved two
+  questions canon leaves open, in directions no source states together:** it scored the finding
+  **MATERIAL**, which is a severity the promotion gate does not block on, and it scored the claim
+  `mayBeNotApplicable: false`, which deletes canon's *"where required"* hedge. **Writing a guard now
+  ratifies one of those by accident whichever way it is written**, which is why this is a QUESTION and
+  not a FINDING: the code half is real, but the reading it would enforce is not settled.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§8.8 Baselines** (heading at L312), **ASR-16** at L314,
+  **limb 6**, second conjunct, read back to the governing verb: *"Promotion requires: … and declared
+  purpose/scope **with rollback/recovery where required**."* **THIS ENTRY TAKES THE SECOND CONJUNCT
+  ONLY;** the first is the companion **REG-F** on this same limb.
+
+- **THE SOURCE SAYS IT BOTH WAYS, IN ONE DOCUMENT, AND THAT IS THE QUESTION.** `RPH-DOC-003` =
+  `docs/Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA -
+  Professional Ontology and Assurance Policy Specification.md` (the identification is not inferred —
+  `docs/canon/_extracts/extract-doc003-a.md:3` names that file as its source).
+  **AS A PROMOTION CONDITION:** §20 *PWU Type: Product Baseline Promotion* (heading L1084),
+  *"## Promotion conditions"* at **L1116**, item at **L1124**: *"rollback or recovery exists where
+  required;"*.
+  **AS EVIDENCE, AND POINTEDLY NOT AS A BLOCKER:** §35 *Assurance Policy: Baseline Promotion* (heading
+  **L1773**), *"## Required evidence"* at **L1779** carries it at **L1788** — *"rollback or recovery
+  where required."* — while *"## Blocking conditions"* at **L1790** runs to **L1798** and lists
+  *candidate differs from reviewed version; unresolved critical observation; expired waiver;
+  invalidated evidence; missing authority; contested root completion claim; unacknowledged residual
+  risk* — **and not this.**
+  **AND AS A RATIFIED CLAIM PLUS A RATIFIED CODE:** `RPH-DOC-004` **§26.3 claim 8** (L1524) *"rollback
+  or recovery exists where required."*, **§26.4** (L1536) *"rollback plan;"* among Evidence, **§26.5**
+  (L1548) the code `MISSING_RECOVERY_PLAN`.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD.**
+  **NO ENGINE SHAPE.** `BaselineObjectSchema` (`packages/rph-contracts/src/objects.ts:690-700`) —
+  `baselineType, purpose, scope, itemObjectVersions, assuranceAssessmentIds, promotionDecisionId,
+  approvalDecisionId?, status`; nothing recovery-shaped. `CreateBaselinePayloadSchema`
+  (`messages.ts:375-379`) and `PromoteBaselinePayloadSchema` (`:237-246`) are three-key
+  `strictObject`s. **The events cannot carry it either:** `BaselineCreatedPayloadSchema` (`:958-963`)
+  and `BaselinePromotedPayloadSchema` (`:965-978`) are likewise closed and likewise silent.
+  `BaselinePromotionInput` (`packages/rph-domain/src/governance.ts:213-235`) has no such view, and
+  `BaselinePromotionFindingCode` (`:237-247`) is a ten-member union that does not contain the ratified
+  code. **MEASURED:** `grep -rc "MISSING_RECOVERY_PLAN\|AMBIGUOUS_BASELINE_SCOPE\|
+  UNACCEPTED_RESIDUAL_RISK"` over `packages/rph-domain/src`, `packages/rph-contracts/src`,
+  `packages/rph-application/src` → **0 in every file**. **POSITIVE CONTROL, same three trees, same
+  command form:** `OPEN_BLOCKING_FINDING` → **5 files** (`rph-domain/src/enforcement-register.ts` 3,
+  `rph-domain/src/governance.ts` 2, `rph-domain/src/governance.test.ts` 1,
+  `rph-application/…/baseline-open-blocking-observation.test.ts` 2, `…/disclosure-observed.test.ts` 1).
+  **CONTRACT PLANE, RE-RUN AT HEAD AND REPRODUCING THE CENSUS ROW EXACTLY:** `grep -rncEi
+  "rollback|rollforward|recoveryplan|revertplan|backout"` over `packages/rph-contracts/src/objects.ts`
+  and `…/messages.ts` → **0 and 0**; **positive control, byte-identical command over the same two
+  files with the adjacent remedial concept**, `"remediation"` → **4 and 5**. The files carry remedial
+  vocabulary, so the zero discriminates.
+  **THE AUTHORED PLANE THAT DOES CARRY IT**, all in
+  `packages/rph-product-realization-pwa/src/ontology.data.ts`: criterion **BP-08** (`:3383-3391`),
+  `description: 'Rollback or recovery exists where required.'` (`:3385`), `severityIfNotMet:
+  'CRITICAL'` (`:3389`), **`mayBeNotApplicable: false`** (`:3390`); the `findingTypes` list
+  (`:3403-3413`) naming `MISSING_RECOVERY_PLAN` (`:3411`); the annotation block (`:3483-3490`) with
+  **`defaultSeverity: 'MATERIAL'`** (`:3484`) and `severityBasis: 'AUTHORED'` (`:3487`); and evidence
+  requirement **EV-26-08** *"Rollback plan"* (`:3579-3588`), which sits in **`optionalEvidence`**
+  (`:3501`) because this policy's `requiredEvidence` is `[]` (`:3500`). ⚠ **Line-corrected on
+  verification** — the draft cited `:3203`/`:3204`, which are the §25 policy's own pair (they open
+  `EV-25-01`), not this one's.
+  **THE AUTHORED RATIONALE, VERBATIM AND LOAD-BEARING** (`:3489`): *"Nothing ratified decides this
+  code. RPH-DOC-003 §35 places 'rollback or recovery where required' under Required evidence and
+  pointedly not under Blocking conditions — it had the concept in front of it and declined to make it
+  blocking, so BLOCKING would overreach the ratified list's own restraint."* ⚠ **That reasoning is
+  half of a document that says both things.** It cites §35 and does not reach §20's *"## Promotion
+  conditions"* list at L1116-1124, where the same document makes it a promotion condition.
+  **AND MATERIAL DOES NOT BLOCK.** `packages/rph-application/src/handlers/governance.ts:55`:
+  `const BLOCKING_SEVERITIES = new Set(['BLOCKING', 'CRITICAL']);`, whose own docblock (`:53-54`)
+  reads *"MATERIAL and below do not block a baseline."* — and `:149` computes the gate's per-
+  observation `blocking` flag from exactly that set.
+
+- **OBSERVED / READ — stated per fact.** **OBSERVED, driven by me at HEAD with `node`** against
+  `packages/rph-domain/dist/governance.js` (dist 2026-08-22, newer than `src` 2026-08-17):
+  ```
+  A  canPromoteBaseline, full APPROVED input, nothing rollback-shaped in it
+       -> ACCEPTED (ok:true)
+  B  same + one OPEN, NON-BLOCKING observation — the severity class the ratified catalog
+     assigns MISSING_RECOVERY_PLAN                              -> ACCEPTED (ok:true)
+  CONTROL C  same + one OPEN BLOCKING observation -> REFUSED | OPEN_BLOCKING_FINDING
+  CONTROL D  same, promotionDecision omitted      -> REFUSED | NO_EFFECTIVE_PROMOTION_DECISION
+  ```
+  **ARM B IS THE ADJUDICATION, DRIVEN:** even after REG-F-214's remedy step 1 carries
+  `MISSING_RECOVERY_PLAN` into the engine, an observation raised at its **authored** default severity
+  **still promotes the baseline.** Both controls refuse, so B is not an artefact.
+  Also **OBSERVED** on the contract plane (`rph-contracts/dist/messages.js`, dist newer than src):
+  `CreateBaseline + rollbackPlan -> REFUSED | unrecognized_keys:rollbackPlan`;
+  `CreateBaseline + recoveryPlan -> REFUSED | unrecognized_keys:recoveryPlan`;
+  `PromoteBaseline + rollbackPlan -> REFUSED | unrecognized_keys:rollbackPlan`; **controls** —
+  both bare payloads parse `OK`.
+  **READ, NOT DRIVEN:** everything in the source and ontology bullets above is a document and code
+  read at HEAD, not an engine admission.
+
+- **⚠ A BYTE CORRECTION TO THE CENSUS ROW THIS ENTRY IS FILED FROM.** Its `missing_shape` says
+  *"ROLLBACK/RECOVERY: absent entirely … no shape anywhere that can express canon's 'where required'
+  condition"*, and its `evidence` says *"no shape at all, anywhere"*. **Too strong.** The row's own
+  four-corpora sweep was correct — the FILING corpora and the engine trees carry nothing — but the
+  repository does: BP-08, `MISSING_RECOVERY_PLAN` and EV-26-08 above. **The conclusion survives and
+  sharpens:** the shape exists as ratified PWA *content* evaluated by `MODEL_JUDGMENT`, is disconnected
+  from `canPromoteBaseline`, and carries an authored severity that would not block if it were
+  connected.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS LIMB, AND WHY. FOUR.**
+  **(a) REG-F-214 remedy step 1**, `docs/canon/JPWB-REG-005 …:7377-7378`, verbatim: *"**Add the three
+  ratified DOC-004 §26.5 codes** to `BaselinePromotionFindingCode`
+  (`packages/rph-domain/src/governance.ts:237-247`) **so an unaccepted residual risk can block.**"*
+  **This is the sentence that will close this row by mistake** — it names the exact union and would
+  carry `MISSING_RECOVERY_PLAN` in. It does not cover the limb: the clause after the comma names its
+  purpose (residual risk), its component (i) at `:7278-7284` names this code only as a list member,
+  its closure at `:7411` reads `limb:ASR-16:5`, and its own SCOPE LIMIT at `:7407-7409` disclaims
+  ASR-16's other limbs. **And mechanically it is not a fix:** arm B above shows the union member
+  arriving with no antecedent, no input view and a non-blocking severity.
+  **(b) REG-Q-059** (`:15250`), **filed today, and its subject word is `rollback`.** Its heading is
+  *"AUT-2's reversion limb has an antecedent this engine cannot evaluate…"*; the canon it quotes is
+  `JPWB-DOC-003` §10 **AUT-2 at L391** — *"rollback is incident recovery, never authority reversion"*
+  (`:15263-15266`). Its own rollback census at `:15308-15310` even reaches this row's site, naming
+  *"authored PWA domain content in `rph-product-realization-pwa/src/ontology.data.ts` where a rollback
+  plan is promotion EVIDENCE"* — **and passes over it**, because its subject is reverting AUTHORITY
+  between representations, not a baseline's promotion precondition. It labels its own nearest
+  neighbour *"NEAR, NOT COVERING"* (`:15366`) and closes an AUT-2 limb.
+  **(c) `packages/rph-product-realization-pwa/src/ontology.data.ts:3385` and `:3483-3490`** — the
+  strongest non-register decoy, because it is not a filing at all but the thing itself. A reader who
+  finds *"Rollback or recovery exists where required."* as a ratified criterion with a ratified finding
+  code will read this limb as enforced. **It is PWA ontology CONTENT, not a gate:** `evaluationMethod:
+  'MODEL_JUDGMENT'` (`:3387`), the code appears nowhere in `rph-domain/src`, `rph-contracts/src` or
+  `rph-application/src` (0, against a 5-file positive control), and the gate that decides promotion is
+  `canPromoteBaseline`, whose ten-member union does not contain it.
+  **(d) `docs/_working/AUDIT-placeholder-helpers.md:191`** — the decoy in the opposite direction:
+  *"POL-REQUIREMENT-COVERAGE, … and POL-BASELINE-PROMOTION ship **zero** of theirs."* It reads like a
+  filing of this gap. It is a census of **seeded `FindingDefinition` helpers in a demonstration
+  fixture**, and it says so in terms two lines later (`:193`): *"This is not necessarily a defect — the
+  seed is a demonstration fixture and may be a deliberate subset."*
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout, never
+  `-i` together with `-F`; every long hit opened with `sed -n`. **A** = `docs/canon/JPWB-REG-005 …md`,
+  **B** = `packages/rph-domain/src/enforcement-register.ts`, **C** =
+  `verif/guard-enforcement-ledger.data.ts`, **D** = `docs/_working/`.
+  **BY ID:** `grep -on "limb:ASR-16:[0-9]*" A` → **3**, all `limb:ASR-16:5`. `ASR-16` → **A 28 · B 8 ·
+  C 0 · D 3 files**, all opened; not one is this conjunct.
+  **BY SITE / CONCEPT:** `grep -rniE "rollback|rollforward|backout|recovery plan|revertplan|
+  recoveryPlan"` over A B C D → **A 9 lines** (`:433` a REG-D deferring resilience verification;
+  `:2125` at-least-once delivery; `:13251` REG-F-238's regex; and six inside REG-Q-059 — `:15265`,
+  `:15308`, `:15309`, `:15310`, `:15326`, `:15366`), **B 4** (`:2412`, `:2420`, `:2422`, `:2428` —
+  every one a DATABASE TRANSACTION rollback in the persistence/overlay layer, each opened in
+  place), **C 0** for `rollback`
+  (its two `recovery` hits, `:271`/`:273`, are a validator *"recovery confirmed"* arrow), **D 2**
+  (`RESUME-STATE.md:187` outbox atomic-commit-with-rollback; `AUDIT-shape-survivorship-2026-08-20.md:
+  275` the lane's enumeration rule). **NOT ONE is a baseline rollback or recovery plan.**
+  `MISSING_RECOVERY_PLAN` → **A 2** (both inside REG-F-214, `:7281` and `:7287`), **B 0**, **C 0**,
+  **D 1** (`canonical-vocabulary.json:1205`, a data file). `rollbackPlan` → **0/0/0/0**.
+  ⚠ **TODAY'S 17 FILINGS GREPPED SPECIFICALLY** — REG-F-234..245 / REG-Q-058..062 begin at `A:12116`.
+  `awk 'NR>=12116' A | grep -n "ASR-16"` → **3**, each opened, and RE-ATTRIBUTED on verification:
+  `A:12443` is a `residual` span-count inside **REG-F-235**'s newest-entries sweep (the draft put it in
+  REG-Q-059 — wrong), and `A:15523` / `A:15601` are a provenance control line and a canon-repair
+  carriage note, both inside **REG-Q-060**. None is this conjunct. `awk 'NR>=12116' A | grep -niE
+  "canPromoteBaseline|BaselineObjectSchema|declared purpose|baseline scope|promotion precondition"` →
+  **1**, `A:12530`, REG-F-235 describing REG-F-228. Controls for that range: `DIVERGENT_UNFILED` →
+  **11**, `baseline` → **22**.
+  **POSITIVE CONTROLS, identical instrument and files, same run:** `baseline` → **A 370 · B 108 ·
+  C 33**, and **43 files** in D; `canPromoteBaseline` → **C 3**, **6 files** in D. These corpora
+  discuss baseline promotion constantly, so the rollback zeros are absences and not a dead instrument.
+
+- **THE QUESTIONS TO ADJUDICATE — three, and the third is the one no source answers.**
+  **(Q1) BLOCKING OR EVIDENTIARY?** Does ASR-16's *"Promotion requires"* make an absent rollback plan a
+  REFUSAL at promotion (RPH-DOC-003 §20 L1124's *"Promotion conditions"* reading), or a required
+  evidence item whose absence raises a non-blocking finding (§35 L1788 + L1790-1798, and the
+  **AUTHORED** — not ratified — `MATERIAL` at `ontology.data.ts:3484`, `severityBasis: 'AUTHORED'` at
+  `:3487`)? **The two halves of one source document disagree, and canon
+  distilled only the first.**
+  **(Q2) IS THE HEDGE STILL LIVE?** Canon and both source sections say *"where required"*. The
+  authored criterion says `mayBeNotApplicable: false` (`ontology.data.ts:3390`), i.e. the claim is
+  ALWAYS applicable — **the hedge is gone.** Is the hedge retired, or is `mayBeNotApplicable: false`
+  an authoring error to correct before anything reads it?
+  **(Q3) WHAT SUPPLIES THE ANTECEDENT?** If the hedge is live, **nothing in the model can express THAT
+  a given baseline requires a rollback plan.** `BaselineTypeSchema`
+  (`packages/rph-contracts/src/enums.ts:187-194`) is six bare members with no such attribute; no
+  Baseline field, policy field or waiver field carries the condition. **A guard written before Q3 is
+  answered has no predicate to branch on**, and would silently resolve Q2 by making the obligation
+  unconditional.
+
+- **⚠ WHY A GUARD, NOT A RULING, IS THE WRONG MOVE HERE — the accident this entry exists to prevent.**
+  The engine implements nothing, but the repository's AUTHORED plane already implements a reading:
+  **hedge-free and non-blocking.** Wiring BP-08 and `MISSING_RECOVERY_PLAN` as they stand would ship
+  that pair as enforcement — a combination **no source states**: §20 makes it a condition without
+  saying it is unconditional, §35 makes it evidence, and DOC-004 §26.3 claim 8 keeps the hedge. And
+  writing the opposite guard — a BLOCKING refusal — ratifies canon's distillation over §35's explicit
+  restraint. **Either guard settles Q1 and Q2 by construction and hides the settlement in a test.**
+
+- **THE SAFE DEFAULT UNTIL THIS IS RULED.** A promoted baseline's record **must not be read as carrying
+  a rollback or recovery plan**, and the absence of a `MISSING_RECOVERY_PLAN` finding on any promotion
+  **must not be read as its satisfaction** — the engine cannot record the plan, cannot name the code,
+  and would not block on it at the ratified severity if it could. State it wherever promotion output is
+  presented as assurance.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-16:6`, **its SECOND conjunct
+  (*"with rollback/recovery where required"*) only**. ⚠ **The row is discharged only by this entry
+  TOGETHER WITH the companion REG-F on the first conjunct — merge them as a pair, or the limb stays
+  half-open.** It closes nothing else, because: `limb:ASR-16:5` is REG-F-214's (`A:7411`) and is about
+  Decision facts; `limb:ASR-16:4` (blocking findings and the scoped waiver) is a severity rule already
+  ENFORCED_DRIVEN and is not touched by Q1, which asks what severity a *recovery* finding carries, not
+  how a BLOCKING one is handled; and `AUT-2`'s reversion limb is REG-Q-059's, a different invariant
+  about authority between representations that merely shares the word *rollback*.
+
+- **Merge target:** BOTH — **Corpus**, because Q1/Q2/Q3 are adjudications: a ruling on `JPWB-DOC-003`
+  §8.8 ASR-16's last clause, recorded against `RPH-DOC-003` §20 L1116-1124 versus §35 L1779-1798 and
+  `RPH-DOC-004` §26.3 claim 8. **Repository, only after the ruling** — a Baseline-side or policy-side
+  carrier for the *"where required"* antecedent, a declaration channel on
+  `packages/rph-contracts/src/messages.ts`, the ratified code in
+  `packages/rph-domain/src/governance.ts:237-247`, and `mayBeNotApplicable` /
+  `defaultSeverity` at `packages/rph-product-realization-pwa/src/ontology.data.ts:3390`/`:3484`
+  corrected to whatever the ruling says. Status: OPEN.
+
+### REG-Q-065 — Representation has no carrier; its only sayable form is the ARTIFACT label LYR-1 forbids
+
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** Canon makes `Representation` a core object with a stated cardinality
+  to `Artifact` and two named non-collapse guards. The engine has none of it: not a member of the
+  23-value object-type enum, not one of the 22 id prefixes, not a field on any of the 23 object
+  schemas, not a member of the 17-value `TraceRelation` set. The concept therefore has exactly ONE
+  sayable form on this engine — an ARTIFACT whose free-text `artifactType` reads `REPRESENTATION` — and
+  I drove it: ACCEPTED, persisted, with nothing behind the label and no reader of the field. That is one
+  object meaning two layers, which LYR-1's own SCOPE forbids in terms. But the remedy is not code. The
+  register already holds a BINDING open safe default that forbids minting the discriminator, and writing
+  a guard for the reading the engine implements — *there is no REPRESENTATION member; ARTIFACT declares
+  no meaning-bearing field* — would ratify by accident the reading that DOC-003 §3's own object row is
+  descriptive prose rather than a ratified object. So the question is put rather than answered.
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§2 The five-layer semantic model** (heading read off line
+  53), **LYR-1** at line 63, **limb 2:** *"a Representation is not the thing represented;"*
+  Same invariant, **SCOPE at line 65:** *"governs the object model, state axes, and every API and store
+  that carries semantic state. Does not forbid one service from implementing several layers; it forbids
+  one object or field from meaning several layers."*
+  `JPWB-DOC-003` **§3 Core objects and minimum rules** (heading line 75), object row at **line 89:**
+  *"**Representation / Artifact** | Meaning-bearing externalization vs. its persistent embodiment. One
+  Representation may have several Artifacts. …"* — a canonical object WITH a declared cardinality.
+  ⚠ Verifier: the row runs past that ellipsis — *"Every Artifact has identity, provenance, semantic
+  version, producing PWU, linked Claims, status, supersession, and a content hash where applicable."*
+  — and THAT half the schema does carry. Only the Representation half of the row has no carrier.
+  `JPWB-DOC-002` **§3 Epistemic and professional-state terms** (heading line 109), **line 119:**
+  *"**Artifact** is a produced container — a file, document, model, or code unit. A **Representation**
+  is the understanding an artifact embodies: the PDF is an Artifact; the architecture expressed within
+  it is a Representation."* and **line 120:** *"> Guards: **Artifact ≠ Representation**;
+  **Representation ≠ Reality**."*
+  And the OTHER pole of the limb — the thing represented — `JPWB-DOC-003` §3, **line 82:**
+  *"**Outcome** | Desired or observed change in reality, with beneficiary, criteria, time horizon,
+  evaluation method."*
+- **WHAT THE CODE DOES, re-read at the site at HEAD.**
+  - `packages/rph-contracts/src/enums.ts:598-622` — `ProfessionalWorkObjectTypeSchema`, 23 members.
+    No REPRESENTATION. ARTIFACT is member 12.
+  - `packages/rph-contracts/src/ids.ts:12-33` — `ID_PREFIXES`, 22 keys. No REPRESENTATION; `ARTIFACT:
+    'art'` is there.
+  - `packages/rph-contracts/src/objects.ts:611-624` — `ArtifactObjectSchema` is a `z.strictObject`;
+    its eleven fields past the envelope are `artifactType, mediaType, storageProvider, storageKey,
+    contentHash, byteSize, producingPwuId, producingExecutionAttemptId, securityClassification,
+    retentionClass, status`. No `represents`, no `representationId`, no professional-purpose field.
+  - `packages/rph-contracts/src/enums.ts:745-763` — `TraceRelationSchema`, 17 members. No REPRESENTS /
+    EMBODIES / DEPICTS / MODELS. The nearest, `PRODUCES` (`:753`), is the production edge.
+  - `packages/rph-contracts/src/objects.ts:84` — `DesiredOutcomeSchema = z.record(z.string(),
+    z.unknown())`, an unconstrained passthrough. ⚠ Verifier-corrected: the draft said "used once at
+    `:411`"; it is used at **three** sites, all of them the same `desiredOutcomes` array —
+    `objects.ts:411` (`IntentObjectSchema`), `messages.ts:104` (`FormalizeIntentPayloadSchema`) and
+    `messages.ts:1377` (`IntentFormalizedPayloadSchema`). No beneficiary, criteria, time horizon or
+    evaluation method at any of the three, and no OBSERVED outcome anywhere: the referent pole of the
+    limb has no carrier either.
+  - `packages/rph-contracts/src/messages.ts:158-171` — `RecordArtifactPayloadSchema` is a
+    `z.strictObject` over the same eleven columns plus `artifactId` — twelve fields, not eleven
+    (verifier-corrected) — with `artifactType: z.string()` at `:160`.
+  - `packages/rph-application/src/handlers/artifact.ts:56` and `:85` are the ONLY two reads of
+    `artifactType` in `packages/rph-domain/src` + `packages/rph-application/src` non-test source — the
+    grep returns three lines and the third, `:16`, is a docblock, not a read — and both are field
+    copies. Nothing branches on it. Controls over the identical population:
+    `contentHash` 17, `lifecycleStatus` 38, `semanticVersion` 92.
+  - `packages/rph-contracts/src/envelopes.ts:3` states the one sanctioned widening route: *"so unknown
+    properties are rejected (RPH-CON-002); extensibility flows ONLY through `extensions[]`."* That plane
+    is written at exactly three production sites — `intent.ts:54`, `kit.ts:592`, `pwu.ts:312` — and all
+    three write `extensions: []`.
+- **OBSERVED / READ — state which. DRIVEN for the code half; READ for the canon half.**
+  DRIVEN, `node` against the built `dist` (never bun — better-sqlite3 is a Node native addon),
+  `SqliteStorageAdapter` + `Engine(...).as(TEST_CRED.human)`, every negative beside a positive control
+  in the same run:
+  - **CONTROL** — `RecordArtifact` with DOC-009 §18.1's required columns → **ACCEPTED**.
+  - `RecordArtifact` with `artifactType: 'REPRESENTATION'` → **ACCEPTED**. ⚠ Verifier-corrected at
+    the site, re-driven at HEAD: `store.loadObject(id)` returns a four-key wrapper
+    `{objectType, revision, semanticVersion, state}`. `objectType: "ARTIFACT"` is top-level;
+    `artifactType: "REPRESENTATION"` and `extensions: []` are inside `.state`, NOT top-level — the
+    draft's own transcript printed `ARTIFACT undefined undefined` for the top-level read, so that
+    sentence was written from expectation. The substance holds at `.state`; the wording did not.
+    The engine records an object that declares itself to be the meaning, and nothing anywhere objects.
+  - The same command carrying `extensions:[{namespace:'representation', schemaVersion:1, data:{...}}]` →
+    **VALIDATION_FAILED**, `RPH_VALIDATION_SCHEMA_FAILED`, issue `unrecognized_keys`, message
+    `Unrecognized key: "extensions"`. So the ONE route REG-Q-015's binding safe default leaves open —
+    *"declared extension"* — is unreachable from the command surface. ⚠ Stated honestly: no envelope
+    field is command-settable (`extensions` and `tags` are both 0 in `messages.ts`), so this is a
+    property of the command layer, not a carve-out aimed at Representation.
+  - `ArtifactObjectSchema.safeParse`: **CONTROL** a complete valid ARTIFACT → `true`; the same object
+    plus `representationId` / `represents` → `false`, `unrecognized_keys: ["representationId",
+    "represents"]`. The typed carrier is affirmatively refused, not merely missing.
+  - Enumerated through the built contracts rather than grepped, so an EM-3 shorthand cannot hide a
+    member: objectType 23 members, `/REPRESENT|EMBOD|DEPICT/` → `[]`, **control** `/ARTIFACT/` →
+    `['ARTIFACT']`; TraceRelation 17 members, `/REPRESENT|EMBOD|DEPICT|MODELS/` → `[]`, **control**
+    `/PRODUCES/` → `['PRODUCES']`; `ID_PREFIXES` 22 keys, `'REPRESENTATION' in` → `false`, **control**
+    `'ARTIFACT' in` → `true`.
+  ⚠ **VERIFIER RE-DRIVE.** Both probes were re-run at HEAD with `node` by the adversarial verifier —
+  `scratchpad/lyr1-drive.mjs` (engine) and `scratchpad/lyr1-probe2.mjs` (schema). Every result above
+  reproduced except the persisted-read shape, corrected in place above.
+  READ, not driven: every canon quotation above, and the readings of REG-Q-015, REG-F-188, REG-Q-056.
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** Four, and the next reader will find at least one.
+  - **REG-Q-015 — "CPCO entities and JSDL authority" (`JPWB-REG-005:247-250`).** Its Statement at
+    `:248` names my subject by name: *"Candidate cognitive entities (Outcome, Question, Uncertainty,
+    Representation, Confidence Assessment, …) are absent from the contracted discriminators"* — BOTH
+    poles of the limb, in one clause. Its Safe default at `:249`: *"Use CPCO as doctrine, projection, or
+    declared extension only. Do not add canonical tables, discriminators, Commands, or JSDL-generated
+    contracts until a Decision maps them losslessly and supplies migrations and conformance."* It IS
+    live and it DOES bind — Section B's blanket line at `:171` reads, verbatim but with its bold
+    markers stripped so this entry keeps exactly one Status line: *"All Section B entries: Date:
+    2026-07-16 (carried from Guide §16) · Type: OPEN QUESTION · Disposition: — · Status: OPEN, unless
+    stated otherwise"*. REG-Q-015 states no otherwise, and `:41` defines `OPEN` as *"live; any recorded
+    safe default binds"*. **What it is about instead:** whether the CPCO/JSDL entity set
+    should be ADOPTED into the contract. Dated 2026-07-16, it predates canon's operative act and engages
+    neither DOC-002:120's two guards nor DOC-003:89's object row — the two places that make
+    Representation a canonical object rather than a CPCO candidate. It cannot dispose LYR-1's
+    non-collapse guard; it is the reason a CODE remedy is currently forbidden, which is precisely why
+    this entry is a QUESTION and not a FINDING.
+  - **REG-F-188 (`:4438`, quote at `:4442`) — the closest hit by SITE, and absent from the prior
+    reader's list.** It says verbatim: *"`ArtifactObjectSchema` is a `z.strictObject` whose eleven
+    fields beyond the envelope are artifactType, mediaType, … — **not one of them is content.** An
+    Artifact is a content-addressed POINTER"*, concluding *"There is no product-content plane for these
+    fields to live in, so their absence is not drift."* **What it is about instead:** RPH-DOC-003
+    §12/§13/§15's PRODUCT-DOMAIN artifact content fields — `USER_JOURNEY`, `REQUIREMENT`, `SCENARIO`,
+    `ACTOR`, `DOMAIN_ENTITY`, `CAPABILITY` — disposed by CON-000 **AX-11**: the harness is
+    domain-agnostic and product content belongs to a domain PWA. `Representation` is not a
+    product-domain concept; DOC-003 §3 lists it as a CORE object of the harness itself, beside Claim and
+    Evidence. AX-11 does not reach it, and REG-F-188 never mentions Representation, LYR-1, or either
+    guard.
+  - **REG-Q-056 (`:11678`) — the decoy at my exact SITE, also unlisted by the prior reader.** Its safe
+    default quotes and pins the very openness that lets `artifactType` say `REPRESENTATION`:
+    *"`artifact.test.ts:123-136` stays green and unaltered; **no member set is invented**"*, and it
+    argues *"Writing the guard would be walking through the door that test exists to hold shut."*
+    **What it is about instead:** ARTIFACT's `status` axis and `limb:OBJ-1:2` — its own closure line
+    reads *"LIMB IDS AN ANSWER WOULD CLOSE: `limb:OBJ-1:2`"*. Its single mention of `artifactType` sits
+    inside a quoted handler docblock. It settles the value domain of a state axis, not whether one
+    object may mean two layers. It is, however, why my remedy must NOT be an enum.
+  - **`docs/_working/HARMONIZATION-FINDINGS.md:102` and `:791-797` — Item 14, STRUCK.** Its struck line
+    reads *"The cognitive-focus axis named in 6.4 has no representation anywhere in the codebase"* and
+    its census at `:805-806` prints *"'REPRESENTATION' 0 … 'BASELINED' 34 <-- POSITIVE CONTROL"*,
+    disposed **OUT OF SCOPE** at `:794` because *"the absence is mandated, not a gap"*. ⚠ Verifier line
+    numbers: the heading `### Item 14 — OUT OF SCOPE` is at `:791`, not `:790`; `'REPRESENTATION' 0`
+    sits on `:805` with its `'BASELINED' 34` control on `:806`. A case-insensitive `representation`
+    sweep of the working corpus lands here first. **What it is about instead:** `REPRESENTATION` as a
+    member of the Guide §6.4 PWU **cognitive-focus** axis — an unratified state axis DOC-003 §6:173
+    forbids persisting. Same token, different referent, opposite direction.
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` (the Grep tool
+  elides this register's longest lines), `-i` and `-F` never together (they abort on this box), every
+  long hit opened with `sed -n`.
+  **BY ID.** `grep -rn 'limb:LYR-1'` over REG-005 + `enforcement-register.ts` +
+  `guard-enforcement-ledger.data.ts` + `docs/_working` → **0**; control `grep -c 'limb:'` on REG-005 →
+  **287**. `grep -n 'LYR-1'` → REG-005 **1** (`:5235`, a citation-census tally *"`LYR-1` → 2"*),
+  enforcement-register **0**, ledger **0**, `docs/_working` **2**
+  (`DESIGN-invariant-enforcement-mapping.md:245`, `ROADMAP-invariant-enforcement-mapping.md:79` — both
+  list LYR-1 in the *"architectural tail … zero citation census"*, neither disposes it). Control
+  `LYR-2` → REG-005 **10**. ⚠ Control disclosure: `LYR-2` is **0** in both code corpora too, so for
+  those the working control is `AGG-1|STA-1|ASR-6` → **2** in `enforcement-register.ts` and **0** in
+  the ledger; the ledger carries no invariant ids at all (its own control, `evidence:` → **82**), so a
+  zero there is uninformative and is not offered as evidence.
+  **BY SITE.** `Representation` (case-sensitive) → REG-005 **1** (`:248`, REG-Q-015),
+  enforcement-register **0**, ledger **0**, Conferral Sheet **0** (control on that file: `REG-Q-015` →
+  **6** lines — `:72`, `:85`, `:104`, `:192`, `:205`, `:209`; the draft said 3, verifier-corrected by
+  `grep -c`), `docs/_working` **0**. Widened, because a case-sensitive zero is a claim about my pattern:
+  case-insensitive `representation` over `docs/_working` → **15**, and `represent` → **47**; all 15
+  opened, none is canon's object — `View is a user-facing representation` (HARMONIZATION `:1262`,
+  `:1264`, `:1276`), *"repair representation"* (`:1065`), STA-1's scope word
+  (`DESIGN-pwu-write-path.md:37`, `:40`, `:304`), *"assurance-floor representation"*
+  (`DESIGN-floor-declared-scope.md:41`), `PwaVersionReference` addressing (`BACKLOG.md:357`), ⚠ the
+  fifteenth the draft's own list omitted — *"unexpressible until Attempt `a` has a representation"*
+  (`DECISION-item23-attempt-record.md:127`) — and five lines of HARMONIZATION Item 14's
+  cognitive-focus block (`:102`, `:805`, `:815`, `:817`, `:830`). The draft listed 14; all 15 are here.
+  ⚠ **INSTRUMENT DISCLOSURE:** an earlier run of that identical sweep in a multi-pattern batch printed
+  **7** lines; re-run alone at HEAD it is **15**. The smaller number is not trusted and is not the one
+  quoted. `REPRESENTATION` (all caps) → REG-005 **2** (`:15305`, `:15394`, both inside REG-Q-059 /
+  AUT-2, *"representations of semantic state"* — the schema-version axis, not this one).
+  `layer collapse|layers do not collapse|not reality` → **0** in all four.
+  `ArtifactObjectSchema` → REG-005 **10**, all ten opened: `:3021`, `:11703`, `:11806`, `:11822`,
+  `:11837` (the `status` free-text thread), `:4442`, `:4446` (REG-F-188), `:14671`, `:14808`, `:14985`
+  (REG-F-245, expiry instant). `artifact.test.ts` → REG-005 **9**, ledger **0**, `docs/_working` **1**.
+  `RecordArtifactPayloadSchema` → REG-005 **4**. `ExtensionPayloadSchema` and `extensions[]` → **0** in
+  all four (control on the same files: `objects.ts` → **125** / **1** / **2**). **REG-F-234..245 and
+  REG-Q-058..062 were grepped as their own block** (`awk 'NR>=12116'`, 3,926 lines): `Representation`
+  **0**, `LYR-` **0**, case-insensitive `represent` **20** — every one read, all the AUT-1 / AUT-2
+  semantic-state sense or *"each child represents coherent work"*; control `Artifact` → **13**.
+  Production source, re-run rather than inherited: `Representation` in `packages apps verif scripts`
+  (non-test, no dist/node_modules) → **0**; **control**, identical command and filter chain, the sibling
+  noun from the same canon sentence, `Artifact` → **1326**.
+- **THE REMEDY — an adjudication, because the code remedy is currently forbidden and the guard would
+  ratify the wrong reading.** The question, in two parts.
+  **(a) Is `Representation` a ratified governed object, or is DOC-003 §3's row doctrinal prose?** If
+  ratified: what is owed is a REPRESENTATION object type, an id prefix, a purpose declaration (*what it
+  represents, and for which professional purpose*), and the many-to-one `Artifact → Representation`
+  edge that DOC-003:89's *"One Representation may have several Artifacts"* asserts — **and REG-Q-015's
+  safe default must be lifted by a Decision first, because it forbids exactly that act.** If doctrinal:
+  a clause-level disposition against DOC-003 §3 and DOC-002 §3 should say ARTIFACT is the single
+  carrier, and DOC-002:120's *"Artifact ≠ Representation"* is then a guard with no object on one side.
+  **(b) NOT the remedy, and this was checked rather than assumed.** Narrowing `artifactType` to an enum
+  is wrong twice over: `packages/rph-application/src/handlers/artifact.test.ts:123-136` exists to
+  prevent it (*"This test exists to LOCK the absence of invented enums: if someone later narrows these
+  to a made-up enum, this fails and sends them to the corpus first"*), and REG-Q-056's safe default
+  keeps that test green and unaltered. A remedy that reddens it walks through the door it holds shut.
+- **SAFE DEFAULT (in force until answered).** No REPRESENTATION object type, id prefix, schema field or
+  `TraceRelation` member is minted, and no `represents` field is added to `ArtifactObjectSchema` —
+  REG-Q-015 binds. Readers must not treat an ARTIFACT as meaning-bearing because its `artifactType`
+  says so: on this engine that string is caller-supplied prose whose only two readers are field copies.
+  If a fate-independent tripwire is wanted before the adjudication, the only one that does not
+  pre-answer the question is a routing test pinning today's SETS — the 23 object types, the 22 id
+  prefixes, the 17 relations, the 11 Artifact fields — **derived from the enums rather than
+  hand-listed**, failing on any change with *go to the corpus first*, exactly as
+  `artifact.test.ts:123-136` already does for the open-domain columns.
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:LYR-1:2`. It closes nothing else,
+  because the four siblings turn on different carriers: limb 1 (*"An Observation of reality is not
+  reality"*) is already FILED and has a live plane — `ASSURANCE_OBSERVATION` is object type 10 and
+  `EVIDENCE` is type 7, so its verdict rests on the admission gates rather than on an absent noun;
+  limbs 3 and 4 are already `ENFORCED_BY_CONSTRUCTION`; limb 5 is the wider seven-way distinction and
+  is separately FILED. It also does not close `limb:OBJ-1:2` (REG-Q-056's, ARTIFACT `status`) nor
+  REL-1's limbs 7-9 (REG-Q-053's six omitted relation tokens — `IMPLEMENTS, VALIDATES, APPROVES,
+  IMPACTS, REALIZES, DEFINES`: **none of the six is REPRESENTS or EMBODIES**, so that entry is near
+  my site and not on my limb).
+- **Merge target:** Corpus — `JPWB-DOC-003` §2 (LYR-1) and §3 (the Representation / Artifact row),
+  `JPWB-DOC-002` §3 (lines 119-120). Repository work is contingent on the answer and on a Decision
+  lifting REG-Q-015's safe default; nothing is built here. It stays OPEN.
+
+### REG-Q-066 — nothing anywhere in the engine retains raw validator output, and the one carrier ever
+proposed for it was withdrawn as the chain-of-thought hazard PER-12 has since ratified
+
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** ASR-11's third limb is a six-word consequent — *"raw output is
+  retained for diagnostics"* — and **no shape in the RPH engine can hold it.** The REFUSED path leaves
+  neither an event nor a `command_receipts` row, so the malformed output that CAUSED the refusal is
+  unrecoverable. The ACCEPTED path strips the validator result by §19.3 contract, and the handler's own
+  delta note records the removal. The FLOOR path keeps one derived diagnostic — a
+  `VALIDATOR_EXECUTION_FAILED` observation whose `statement` is the caught exception's `.message` — which
+  contains raw output only by accident of V8 splicing a twelve-character snippet into `SyntaxError`, and
+  contains none at all for an infrastructure failure. **It is filed as a QUESTION and not a FINDING
+  because the obvious code remedy is forbidden by a second ratified rule, and because it was already
+  attempted and withdrawn once in this programme for exactly that reason.** A guard that parks raw
+  validator output on the completion event, on `ValidatorResult`, or in an observation `statement` would
+  put volunteered model reasoning into the event log and into projections — which **PER-12 forbids in
+  those words** — and would thereby settle the chain-of-thought carriage question by accident, in the
+  direction the corpus has already once refused.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`, **§8.4
+  Criteria, dispositions, composition** (heading read off line **275**, inside **§8 The assurance
+  model**, line **235**), **ASR-11 at line 285**, **limb 3**: *"raw output is retained for diagnostics."*
+  Its **WHY** (line **286**): *"letting unparsed prose become findings hands authority to noise."* Its
+  **SCOPE** (line **287**): *"governs assurance-process failures and observation quality."* ⚠ **The
+  section number was read off the heading map, not inferred from the line** — line 285 carries **four**
+  limbs of one sentence, of which this is the third.
+
+- **⚠ THE SECOND RATIFIED RULE, AND IT IS WHY THIS IS A QUESTION.** `JPWB-DOC-003` **§9 Persistence
+  semantics** (heading line **333**), **PER-12 at line 381** — *"(Sponsor-ruled — REG-D-015.)"* —
+  verbatim: *"Chain-of-thought and other volunteered model reasoning is redacted at the trust boundary
+  and **retained where available** as a typed Artifact bound to its producing Attempt under the
+  applicable retention, security, and access policy. … It is never admitted as Evidence, never forwarded
+  to another actor, **never logged, never projected**, and **never an input to any tier of assurance
+  policy or Assurance Engineering** … Its one permitted use is **offline diagnosis**."* Its SCOPE line
+  (**383**) both helps and hurts: *"offline diagnostic reading of a retained trace is not 'forwarding'"*
+  **permits** the diagnostic use ASR-11 demands, while *"never logged, never projected"* and *"a typed
+  Artifact bound to its producing Attempt"* **forbid every carrier this engine actually has.**
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD 2026-08-23.**
+  - **NO SHAPE EXISTS.** `ValidatorResultSchema` (`packages/rph-contracts/src/objects.ts:349-366`) is a
+    `z.strictObject` of **sixteen** keys — `validatorId`, `validatorVersion`, `policyId`,
+    `policyVersion`, `assessmentId`, `subjectObjectIds`, `subjectSemanticVersions`, `claimResults`,
+    `evidenceConsideredIds`, `evidenceRejected`, `observations`, `dispositionRecommendation`,
+    `recommendedControlActions`, `residualUncertainty`, `limitations`, `executionProvenance` — **and not
+    one holds unparsed text.** `AssuranceObservationSchema` (`:576-589`) has `statement` and
+    `implication` and no raw field.
+  - **THE ACCEPTED PATH STRIPS THE RESULT, AND SAYS SO.**
+    `packages/rph-application/src/handlers/assurance.ts:2281`, verbatim at HEAD: *"- validatorResult (not
+    a §19.3 field; a strictObject rejects it)."* Four lines above it (**`:2277-2278`**) the same docblock
+    records what the removal cost: *"the audit log recorded the validator's raw return and nothing about
+    the assessment it completed."* **The retention that once existed was removed deliberately, for a
+    §19.3 reason, with no successor carrier named.**
+  - **THE REFUSED PATH RETAINS NOTHING AT ALL.** `packages/rph-persistence/src/schema.ts:119-131` —
+    `command_receipts` stores `payload_hash TEXT` (**`:130`**; the comment carrying
+    *"contentHash(command.payload)"* is at **`:128`** — ⚠ **line corrected this pass**), a SHA-256 and
+    never the payload; and the refused command wrote **no receipt row at all** — OBSERVED below, and by
+    construction: `packages/rph-application/src/command-bus.ts:316` puts envelope validation BEFORE the
+    idempotency/receipt lookup (*"a malformed envelope must not be answered from a receipt"*).
+  - **THE FLOOR PATH RETAINS A DERIVATIVE.** `packages/rph-assurance/src/validators.ts:261-286`,
+    `failedResult(...)`, mints exactly one observation —
+    `{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: reason, open: true }` at
+    **`:277`** (⚠ **corrected from a drafted `:277-279`, which reaches into
+    `dispositionRecommendation`**) — and `reason` is supplied at **`:307`** as
+    `e instanceof Error ? e.message : String(e)`. **The exception message, not the output.**
+  - **THE RAW STRING IS A LOCAL `let`, DESTROYED BY THE REPAIR RETRY.**
+    `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:176` — `let raw = await
+    print(prompt);`; **`:179`** `judgement = coerceJudgement(JSON.parse(extractJson(raw)), input);`;
+    **`:181`** reassigns `raw` on the repair path and **`:182`** re-parses. **The first answer is
+    overwritten; when `:182` throws, both are dropped.** ⚠ **The line numbers have drifted from the
+    2026-07-15 record of the same mechanism (`:140` → `:176-182`); the function and the defect are the
+    same.** The only comments in `evaluate` at `:165-200` concern evaluator identity (§8.4/§14.6) and the
+    §9.7 rationale summary — **nothing at the site mentions retention.**
+
+- **OBSERVED / READ — MIXED, and the split is stated exactly.** **OBSERVED (driven 2026-08-21 by the
+  W-3b census lane `w3b-lane:v2-b`, node, real engine + real floor registry; recorded verbatim on
+  `limb:ASR-11:3`; NOT re-dispatched by this filing pass):** a malformed `CompleteAssuranceAssessment`
+  carrying the planted marker `RAW-MARKER-9271` → `VALIDATION_FAILED` /
+  `RPH_VALIDATION_SCHEMA_FAILED`; **events retaining the marker = 0**; `store.getReceipt('K-RAW-1')` =
+  `undefined`. **POSITIVE CONTROL, same store, same command type:** a WELL-FORMED completion carrying
+  `KEPT-MARKER-4410` in `residualUncertainty` → ACCEPTED, **events retaining that marker = 1**, receipt
+  present carrying `payloadHash: sha256:58ee78b8…`. **So the log does retain planted text when the
+  command is accepted, and the zero is a measured absence.** Also OBSERVED: the persisted
+  `AssuranceAssessmentCompleted` payload keys are exactly the twelve §19.3 fields with `validatorResult`
+  absent; and an end-to-end floor run with `RAW-MODEL-TEXT-7731` planted in the prose the judge returned
+  gave `statement="Unexpected token 'R', \"RAW-MODEL-TE\"... is not valid JSON"` — **canonical state
+  retains the raw model text: FALSE; retains the exception message: TRUE.** **READ (this pass):** every
+  site quoted above, re-opened at HEAD with `sed -n`, plus both censuses re-run below.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS, AND WHY — there are seven (five drafted; 6 and 7 added by
+  the verifying pass), and three of them conclude the OPPOSITE.**
+  1. **⚠⚠ THE STRONGEST, AND IT IS A DISPOSAL RATHER THAN AN ABSENCE.**
+     `docs/_working/HARMONIZATION-LOG.md:4135` and `docs/_working/DESIGN-execution-attempt-staged.md:65`
+     and **`:161`** each record the same disposal. ⚠ **THE QUOTATION IS VERBATIM FROM `:161-162`
+     ALONE — corrected this pass, because the draft attributed one wording to all three:** *"the
+     `rawOutput`-is-chain-of-thought hazard (§9.7) is **structurally avoided** — the contracted shape
+     carries `executedBy`/`evaluator` `ActorReference`s and `producingExecutionAttemptId`, never raw
+     inline reasoning."* `HARMONIZATION-LOG.md:4135` says it in near-identical words (*"(the shape
+     carries `ActorReference`s + an attempt-id reference, never raw reasoning)"*); **`:65` says the same
+     fact in different words** — *"**not** raw provider/model strings and **not** `rawOutput`"*. **Three
+     working-corpus sites record the ABSENCE OF A RAW-OUTPUT FIELD AS A DESIGN WIN.** They are right
+     about the hazard and **never ask whether ASR-11's retention consequent is then unmet** — the word
+     "retained", the id `ASR-11`, and the phrase "for diagnostics" appear at none of the three. A reader
+     who lands here closes the row on a sentence about the opposite proposition.
+  2. **`docs/_working/DECISION-item23-attempt-record.md:60`** (*"The bullet we dodged"*) records the
+     withdrawal itself: *"The draft proposed an Attempt field holding `rawOutput` — output before
+     coercion — stored inline and permanently. For any reason-then-answer model … **`rawOutput` IS
+     volunteered chain-of-thought.**"* Its SUPERSEDED banner at **`:30`** says *"What stands: the
+     `rawOutput`-is-chain-of-thought hazard (below) — still a real trap for any future Attempt design."*
+     **This is the record of the remedy being refused. It is not a filing that the canon rule is unmet.**
+  3. **`REG-F-229`** (R:**10010-10203**, DIVERGENCE FINDING, CODE_DIVERGES, OPEN) quotes RPH-EXE-009's
+     *"retain the raw output, fail boundary validation, create no authoritative objects"* **verbatim at
+     R:10146** — the single closest-looking sentence in the whole register. **Its closing line at
+     R:10198 reads `- **LIMB IDS THIS ENTRY CLOSES:** limb:ASR-11:2.`** It closes the OTHER consequent of
+     the same sentence (invalid output creating authoritative findings), quotes this one only inside a
+     quotation of a third document, and **disposes of nothing about retention** — "retention", "retained
+     for diagnostics" and "diagnostics" appear nowhere in its 194 lines.
+  4. **`packages/rph-domain/src/enforcement-register.ts:754-766`, `RPH-EXE-009`** — the source of that
+     quotation, and the row this census's own `sibling_control` already declined. Re-read at HEAD:
+     `kind: 'NOT_A_COMMAND_REFUSAL'`; `canonAnchor` (**`:758`**) is *"Malformed output creates no
+     authoritative object"*; its `note` anchors on **DOC-003 §9 PER-10** and §22.1, **not on ASR-11**;
+     and its `why` (**`:761-765`**) ends *"Nothing here is a refusal a dispatch could observe."* **The
+     row records that this rule is not refusable. It never states that retention is absent.** Citing it
+     as a filing of this divergence is document substitution.
+  5. **Adjacent, measuring the same lines, on a different anchor:**
+     `docs/_working/HARMONIZATION-FINDINGS.md:35` (Appendix A, *"the 75 confirmed findings"*, 2026-07-15,
+     107 raised / 75 confirmed after adversarial refutation), finding **#25**, verbatim: *"The judge's
+     raw answer before coercion is never recorded, and the first try's answer is destroyed by variable
+     reassignment on the repair path."* Its **Guide anchor is §9.7:1340** — the governed-stream / Attempt
+     record — **not ASR-11**; its scope is one composition root in `apps/rph-demo`; and it measures none
+     of the engine facts above. **Cite it rather than re-discover it: its fix path is the one item 23
+     withdrew.** Nothing records it closed or superseded — `reasoning-review-validator` returns **0** in
+     `HARMONIZATION-LOG.md` against controls of **15** (`Reasoning Review`) and **99** (`finding`) in that
+     same file.
+  6. **⚠⚠ THE ONE NEITHER THE ROW NOR THE DRAFT FOUND — A RATIFIED ROW THAT STATES THIS MECHANISM,
+     ADDED BY THE VERIFYING PASS.** `packages/rph-domain/src/enforcement-register.ts:2581-2612`,
+     **`RPH-PER-014`** (`kind: 'NOT_A_COMMAND_REFUSAL'`, `canonCarriage.kind:
+     'CARRIED_BY_GENERAL_RULE'`), whose `why` reads verbatim at **`:2590-2593`**: *"… and the RAW RESULT
+     is never written: `validatorResult` exists only as a field of the `CompleteAssuranceAssessment`
+     COMMAND payload, and `parseCompletion` validates it and derives the disposition IN THE SAME
+     DISPATCH that commits the terminal transition."* **A search by SITE or by phrase for
+     raw-validator-result retention lands here, and it is the only ratified row anywhere that says the
+     raw result is never written.** It does not cover this limb: its `canonAnchor` (**`:2585`**) is
+     *"When an external operation's completion is uncertain — including across restarts"*, and its
+     `note` (**`:2586`**) anchors on **§9 PER-6**, saying in terms that canon's subject there *"nowhere
+     mentions an Assurance Service, a raw validator result, or a disposition boundary."* Its conclusion
+     is that **PER-6's premise has no referent** — the absence is spent EXCUSING a resumption rule,
+     never raised as an unmet ASR-11 consequent, and the row prescribes nothing. ⚠ **It CORROBORATES
+     this entry from an independently ratified source; cite it rather than re-discover it.** It also
+     bounds the claim, at **`:2596-2597`**: *"something validator-derived does survive a restart in that
+     window. What does not is the raw §20 ValidatorResult itself."*
+  7. **THE THREE PER-12 ENTRIES FILED THE SAME DAY, AND THE RETENTION FINDING THEY BOTH POINT AT —
+     ALSO ADDED THIS PASS.** **REG-F-244** (R:14526, closing `limb:PER-12:6`) is the nearest by TOPIC:
+     its heading says *"the one use canon permits it for is the one with no mechanism at all"* — offline
+     diagnosis with no carrier. **`ASR-11` appears nowhere in it** (`grep -ci` over R:14526-14770 →
+     **0**; `raw output` → **0**; `validator output` → **0**), and its subject is three-plane admission
+     of a `CHAIN_OF_THOUGHT` artifact, not retention of validator output. **REG-F-245** closes
+     `limb:PER-12:7` (purgeability) and **REG-Q-062** `limb:PER-12:3` (procurement). Both name the
+     RETENTION half as filed elsewhere and not by them: `docs/_working/HARMONIZATION-FINDINGS.md:69`,
+     **#59** (MATERIAL/BOTH, §9.7:1338, `transcript.ts:25`) — *"Volunteered chain-of-thought is
+     discarded at the write boundary rather than redacted and retained as a typed Artifact of its
+     producing Attempt."* **#59 is `limb:PER-12:1`, on the AGENT TRANSCRIPT plane.** This limb is
+     validator output on the ASSURANCE plane, and #59 measures nothing about
+     `CompleteAssuranceAssessment`, the floor, or `ValidatorResult`. They are one missing carrier seen
+     from two planes — which is precisely why an answer here should say whether ONE carrier serves both.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** All searches through Bash
+  `grep` (the Grep tool omits this register's long lines); `-i` and `-F` never combined (together they
+  abort on this box). Counts below are REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` / `docs/_working`.
+  - **BY PHRASE.** `raw output` → **1/1/0/1** — R:10146 (REG-F-229 quoting RPH-EXE-009),
+    `enforcement-register.ts:762` (the `why` itself), `docs/_working/m7-assurance.json:232` (a DOC-007
+    §20.2 build-input restating the RULE). `retained for diagnostics` → **0/0/0/0**. `rawOutput` →
+    **0/0/0/5**, all five opened and all five the chain-of-thought hazard (decoys 1 and 2 above).
+    `diagnostics` → **1/0/0/8**; the single register hit is **R:149**, REG-D-015's reconciliation note,
+    about PER-12 and not about validator output.
+  - **BY ID.** `ASR-11` → **10/0/0/2**. All ten register hits opened by line: R:10016, 10060, 10102,
+    10145, 10198, 10353 are REG-F-229 and its cross-reference; R:14184, 14408, 15762 are
+    search-disclosure counts inside other entries; **R:14490 is REG-F-243's exclusion bullet, and it is
+    this pass's citation correction — see the sibling entry.** Both `docs/_working` hits are
+    `DESIGN-invariant-enforcement-mapping.md:683` and **`:714`**, the census's own process memo, which
+    names `limb:ASR-11:3` as the **positive control** in a blind adjudication and records that it *"owes
+    an entry"*. **That is a statement about the debt, not a discharge of it.**
+  - **BY LIMB ID.** `limb:ASR-11:3` → **0/0/0/1** — ⚠ **corrected this pass from a drafted 0/0/0/0,
+    which contradicted this entry's own BY-ID paragraph.** The one hit is
+    `DESIGN-invariant-enforcement-mapping.md:714`, the census's own process memo already disclosed above;
+    it records the debt, not a discharge. **CONTROL** `limb:ASR-11:2` → **4/0/0/0** (R:10060, 10198,
+    10353 and **R:14490**, REG-F-243's exclusion bullet — ⚠ **corrected from a drafted 3**), so the
+    limb-id instrument resolves.
+  - **DERIVED CLOSURE SET, not hand-listed.** `grep -nE '^[[:space:]]*-[[:space:]]+\*\*(Closes|CLOSES|
+    LIMB|LIMBS|CENSUS RECONCILIATION)'` over REG-005 → **51 declarations**. ⚠ **CORRECTED THIS PASS:
+    the four `- **Closes:**` lines (R:5908, 7586, 9035, 10544) are INSIDE that 51, not additional to it
+    — the alternation already matches them; the split is 47 + 4.** **`limb:ASR-11:3` is in none of the
+    51**, and the 101 distinct `limb:` ids those 51 name do not include it.
+  - **BY THE RATIFIED ROW FAMILY, ENUMERATED FROM THE FILE.** `awk` over `enforcement-register.ts`
+    printing every `'RPH-ASR-0NN': {` with its `canonAnchor` → twelve rows, RPH-ASR-001..012.
+    **RPH-ASR-006** (`:1226`) carries ASR-11 limb 1 and **RPH-ASR-007** (`:1245-1268`, anchor string at
+    **`:1250`**) carries limb 2. **No row carries limb 3.** `RPH-ASR-013` cannot be minted: the id set is
+    the ratified catalog `packages/rph-domain/vocab/m12-conformance.json` (REG-F-229's vehicle
+    constraint).
+  - **THE GUARD LEDGER, all 82 keys enumerated from the file.** The two validator-failure rows are
+    **`:43`** *"a validator execution failure was observed (§34.1)"* (UNENFORCED — its subject is whether
+    `MarkValidatorDegraded` is CAUSED by an observed failure) and **`:347`** *"validator crashed / timed
+    out / errored during execution"* (ARROW_UNREACHABLE — `VALIDATOR_FAILED` is outside the completion
+    enum). **Neither mentions retention, output, or diagnosis.**
+  - **OBSERVED POSITIVE CONTROLS for every zero above, same instrument, same corpora:** `validator` →
+    **139/51/14/250**; `ASR-7` → **36/0/0/0**; `canonAnchor` → **30/108/0/1**.
+  - **THE CODE CENSUS, RE-RUN THIS PASS.** `grep -rniE
+    "rawOutput|rawResponse|rawText|rawResult|rawPayload|verbatimOutput"` over
+    `packages/rph-{contracts,application,domain,assurance,engine,persistence}/src` + `apps/rph-demo/src`,
+    minus `*.test.ts` → **0**. **OBSERVED POSITIVE CONTROL, identical command and population, sibling §20
+    field names:** `residualUncertainty|evidenceRejected|limitations` → **82**. ⚠ **The population
+    deliberately excludes `packages/csaa`,** whose contracts DO define `rawOutput`/`rawText`: those
+    belong to the CSAA static-analysis provider pipeline, not to assurance validator output, and counting
+    them would manufacture a false non-zero.
+
+- **WHAT AN ANSWER MUST DECIDE — three options, and the engine cannot choose between them.**
+  1. **ASR-11's "raw output" IS PER-12 material.** Then the carrier is *"a typed Artifact bound to its
+     producing Attempt"* — and **no `EXECUTION_ATTEMPT` object type, store row, or table exists**
+     (`HARMONIZATION-LOG.md:4138-4141`, *"verified in code"*), so limb 3 is **blocked behind the two
+     staged Attempt decisions**, not behind a missing field. Say so, and the row stops reading as a
+     buildable gap.
+  2. **IT IS NOT.** Then the malformed blob is *"ordinary content"* under PER-12's own NON-EXAMPLE, a
+     retention field is buildable today, and this becomes a REG-F with a concrete remedy. ⚠ **But note
+     which case is at issue:** the MALFORMED path is exactly the case where the output did **not** come
+     through the governed contract, so the NON-EXAMPLE's *"offered through governed contracts"*
+     condition is the one that just failed. **That is the whole difficulty, and it is not resolvable
+     from code.**
+  3. **IT DEPENDS ON THE VALIDATOR.** A deterministic validator (`deterministic.identity-provenance`,
+     `floor.schema-invariant`) emits no reasoning, and an infrastructure failure emits nothing at all;
+     only a MODEL validator raises the hazard. A split ruling is available and would make the
+     deterministic half a FINDING today.
+  **⚠ A REMEDY IS A HYPOTHESIS, AND THIS ONE HAS ALREADY BEEN WRONG ONCE** — item 23's `rawOutput` field
+  was drafted, defended as *"retained whole"*, and withdrawn. **Do not write the field before the
+  ruling.** **ONE BOUND, stated so this is not read wider than it is:** out-of-band logging
+  (console/stderr from `agy-cli`) was not tested. It is outside canonical state and outside this
+  census's definition of retention, but it is an unexamined escape hatch and an answer should say
+  whether it counts.
+
+- **CENSUS RECONCILIATION — LIMB IDS AN ANSWER WOULD CLOSE:** `limb:ASR-11:3`. **It closes nothing
+  else**, because ASR-11's other three limbs are disjoint in object, path and remedy: `:1`
+  (infrastructure failure leaves assurance incomplete) is already FILED at the surface; `:2` is closed
+  by **REG-F-229** on the recording path; and `:4` (what an observation must NAME) is a different
+  object, a different command and a different schema, filed as the sibling REG-F in this same pass. **It
+  also answers none of PER-12's own limbs** — `:3` (no obligation to procure) is **REG-Q-062**, `:6`
+  (the three-plane quarantine) is **REG-F-244**, and `:7` (purgeability) is **REG-F-245**; this
+  question asks only which plane ASR-11's retention consequent names.
+
+- **Merge target:** **Corpus** — `JPWB-DOC-003` ASR-11 (a SCOPE or NON-EXAMPLE line saying whether the
+  retained raw output is PER-12 material and which carrier holds it), cross-referenced from PER-12's
+  SCOPE at line 383. **Repository, only after the ruling** — a carrier at
+  `packages/rph-contracts/src/objects.ts` and the write at
+  `packages/rph-assurance/src/validators.ts:261-286`. Status: OPEN.
+
+### REG-Q-067 — RATIFICATION: nothing in this engine can say that scope was DEFERRED, and the one
+scope-shaped field conflates "never ours" with "ours, postponed" — adjudicate before a guard freezes it
+
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+
+**In one line:** canon names five carriers a deferral must stay represented in; four of them exist as
+first-class mintable objects, and there is no such thing as a deferral for any of them to carry.
+
+- **THE DEFECT, IN ONE PARAGRAPH, AND WHY IT IS A QUESTION RATHER THAN A FINDING.** ASR-9's tenth limb
+  requires that deferred scope *stays represented* — as an assumption, a constraint, a residual
+  condition, a baseline scope statement, or a future obligation — and is *never silently deleted*. Both
+  halves fail, by opposite mechanisms, and neither failure is a missing refusal. The **carriers are
+  real**: four of the five are first-class objects with minting commands. What does not exist is the
+  **deferral** — no field marks scope as deferred, no command among the engine's 105 defers anything,
+  and the word does not occur in the contracts at all. ⚠ One EVENT type was authored for exactly this
+  and is emitted by nothing — see **(f)**, which corrects an earlier flat claim that no event records
+  a deferral. Either way there is no producer,
+  and a conservation check would quantify over an empty set. Meanwhile the **prohibition** is
+  vacuously satisfied: `boundaries` is written at exactly one site and is unwritable afterwards, so
+  scope cannot be deleted because it cannot be *changed*. **The reason this is a QUESTION and not a
+  FINDING is that the only guard writable today would ratify a reading canon does not state.** The
+  single scope-shaped field, `outOfScope`, conflates *"never ours"* with *"ours, postponed"* — and a
+  guard keyed on it would harden that conflation into the model, inferring a professional meaning from
+  a field that does not carry one, which CON-000 AX-6 forbids by name. Canon has to say which reading
+  it means BEFORE code is written that settles the question by accident.
+
+- **THE QUESTION, STATED SO IT CAN BE ANSWERED.** Does ASR-9 limb 10 bind the **engine** or the
+  **professional**? **Reading A (the engine must represent deferral):** a deferral is a first-class
+  fact; the model owes a way to record that named scope was moved out of this unit's work and must be
+  carried, plus a link from it to whichever of the five carriers holds it, plus a check that the link
+  survives. **Reading B (the engine must only offer the carriers):** "stays represented as one of
+  five" is satisfied because a professional can mint an ASSUMPTION, a CONSTRAINT or an OBLIGATION at
+  will, and nothing can delete them; the limb then governs practice, and the engine complies today at
+  four-fifths. ⚠ **The two readings differ in what they cost and in what they forbid**, which is why
+  the adjudication cannot be skipped: Reading A owes a new shape, a new act and a new gate; Reading B
+  owes only the repair of the one inert carrier (below) and a note that the rest is professional
+  discipline. A third possibility the adjudication should rule on explicitly: whether `outOfScope` is
+  ever permitted to serve as the deferral record, or is disqualified because it cannot distinguish the
+  two cases.
+
+- **CANON, QUOTED VERBATIM.** `JPWB-DOC-003` **§8 "The assurance model"** (heading at line 235),
+  **§8.4 "Criteria, dispositions, composition"** (heading at line **275**), **ASR-9** at line **277**,
+  **limb 10**: *"deferred scope stays represented — as assumption, constraint, residual condition,
+  baseline scope statement, or future obligation — never silently deleted."* Section re-derived from
+  the heading stack at HEAD rather than inferred from the line number (`## 7.` 207, `## 8.` 235,
+  `### 8.1` 237, `### 8.2` 247, `### 8.3` 261, `### 8.4` 275). **§8.4, not §7** — `RPH-ASR-009`
+  (`packages/rph-domain/src/enforcement-register.ts:1307`) still says *"JPWB-DOC-003 §7"*; REG-F-228
+  owns that correction and this entry does not re-file it.
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD (`sed -n` and `grep -n`, not summaries).**
+  - **(a) THE CONCEPT IS ABSENT FROM THE CONTRACTS.** `grep -c -i defer` over
+    `packages/rph-contracts/src/objects.ts`, `messages.ts` and `enums.ts` → **0 / 0 / 0**. *Positive
+    controls, the SAME three files, the same grep form:* `residual` → **2 / 3 / 0** and `scope` →
+    **6 / 10 / 1** — non-zero in five of those six cells (`residual` is genuinely absent from
+    `enums.ts`), so the pattern and the population resolve and the `defer` zeros are real absences
+    and not an instrument fault.
+  - **(b) NO COMMAND DEFERS.** The handler registry declares **105** command types
+    (`packages/rph-application/src/handlers/registry.ts`). Exactly **one** matches
+    `/defer|scope|residual|obligation|uncertain|criter/`: `AssertObligation` (`registry.ts:229`) —
+    which mints an obligation from a caller's payload and knows nothing of deferral. *Positive control,
+    same extraction, same file:* `CaptureIntent` (`:130`), `ProposePwu` (`:138`),
+    `CompleteAssuranceAssessment` (`:213`) → **3 of 3 found**.
+  - **(c) THE FIVE CARRIERS, TAKEN ONE AT A TIME RATHER THAN AS A PHRASE.** **ASSUMPTION** — real and
+    mintable (`DetectAssumption` `:191`, `DiscloseAssumption` `:193`, plus `ExpireAssumption` `:194`
+    and `FalsifyAssumption` `:197`). **CONSTRAINT** — real and mintable
+    (`packages/rph-application/src/handlers/obligation-constraint.ts`). **RESIDUAL CONDITION** — real
+    on the completion event and dropped from the assessment object, which is REG-F-228's finding.
+    **FUTURE OBLIGATION** — real and mintable (`AssertObligation`, `registry.ts:229`), and REG-F-235
+    establishes that nothing converts a residual into one. **BASELINE SCOPE STATEMENT** — a
+    **fabricated constant**: `BaselineObjectSchema` requires `scope: z.string()`
+    (`packages/rph-contracts/src/objects.ts:694`) but `CreateBaselinePayloadSchema`
+    (`packages/rph-contracts/src/messages.ts:375-379`) carries only `baselineType`, `itemObjectIds`
+    and optional `assuranceAssessmentIds`, so `packages/rph-application/src/handlers/governance.ts:747`
+    writes `scope: 'undertaking',` on **every baseline ever created**. Four carriers are alive; one
+    cannot record anything about any particular baseline. **And not one of the five is ever written
+    because something was deferred.**
+  - **(d) `outOfScope` IS THE HAZARD, NOT THE ANSWER — and it is the field a future guard would reach
+    for.** `WorkBoundarySchema` (`packages/rph-contracts/src/objects.ts:389-394`) is exactly
+    `inScope`, `outOfScope`, `permittedChanges`, `prohibitedChanges` — four string arrays, no deferral
+    flag and no status member. It is written at exactly one site,
+    `packages/rph-application/src/handlers/pwu.ts:323` (`boundaries: p.boundaries,`, inside
+    `proposePwu`), and `boundaries` occurs exactly once in `messages.ts`, at **`:125`**, on the
+    `ProposePwu` payload. No command edits it: `ReshapePwuPayloadSchema`
+    (`packages/rph-contracts/src/messages.ts:442-445`) is `{ reason: z.string(), triggeringObjectId:
+    z.string().optional() }` — a lifecycle move that carries no boundary at all. It is read by the
+    §9.1 readiness guard at `packages/rph-application/src/handlers/pwu.ts:733-743` and
+    `packages/rph-domain/src/pwuGuards.ts:140` / **`:145-147`**, which refuses `MarkPwuReady` when
+    `outOfScope` is empty — so **every READY PWU carries out-of-scope items and none of them is
+    distinguishable as a deferral.**
+  - **(e) SO "NEVER SILENTLY DELETED" IS VACUOUSLY TRUE, AND VACUITY IS NOT ENFORCEMENT.** Scope
+    cannot be deleted because it cannot be changed. The carriers cannot be deleted either — they are
+    soft status machines (`expireAssumption`,
+    `packages/rph-application/src/handlers/assurance.ts:1146-1163`, is an `advanceStatus` to
+    `'EXPIRED'`, not a removal). Of the 105 commands, the only two whose names suggest removal are
+    `DeletePwa` (`registry.ts:243`) and `RemovePwuType` (`:248`), and `deletePwa`
+    (`packages/rph-application/src/handlers/pwa-authoring.ts:563-585`) is a **guarded soft delete** —
+    it refuses when the PWA is in use and writes `publicationStatus: 'DISCARDED'`. Both act on the
+    ARCHITECTURE plane, neither on a PWU's scope. ⚠ **Independently corroborated at HEAD by an entry
+    filed today**: `REG-F-245` (`JPWB-REG-005:14771`) establishes that *"nothing in the engine can
+    purge anything"* — which is the general form of this limb's second half, and is exactly why the
+    second half proves nothing about the first.
+  - **(f) ⚠ THE ONE ARTIFACT AUTHORED FOR EXACTLY THIS LIMB HAS NO PRODUCER — found on verification,
+    missed by the census row AND by the draft of this entry, and it is the strongest near-miss in the
+    repository.** A ratified EVENT type exists whose declared purpose IS a deferral staying
+    represented: `IntentConstraintRefined` (`packages/rph-contracts/src/messages.ts:1362-1367`;
+    registered in the event table at **`:2692-2695`**, `aggregateType: 'Intent'`). The reference
+    undertaking's §26 trace carries it as event 53 — `{"seq":53,"event":"IntentConstraintRefined",`
+    `"aggregate":"Intent","phase":"REMEDIATION","label":"Offline scope"}`
+    (`packages/rph-engine/fixtures/expected-events.jsonl:53`) — and the replay oracle asserts it by
+    name at `packages/rph-engine/src/replay.ts:139-143`, whose comment reads verbatim *"RPH-FIX-006
+    — the deferred offline capability stays explicitly represented (a refined intent constraint)"*
+    over the predicate `named('IntentConstraintRefined').length >= 1`. **NOTHING EMITS IT.**
+    `grep -rn 'IntentConstraintRefined' packages/rph-application/src` → **0**; *positive control,
+    same population and form,* `eventType: 'IntentRevised'` → **1** (`handlers/intent.ts:328`). The
+    repository says so itself, and gated: `packages/rph-engine/src/replay-conformance.test.ts:114`
+    opens a shrink-only pin titled *"DEFICIENCY: the engine emits none of these 12 §26 event types"*
+    (*"This list is a defect register, not a specification. It must only ever SHRINK"*, `:119-120`)
+    and `IntentConstraintRefined` is `:141` of it. So RPH-FIX-006 checks that a HAND-AUTHORED
+    FIXTURE contains an event no engine act can produce: it is not a guard over the engine, it never
+    reads a PWU's `boundaries`, and it enforces nothing about scope. **READ, not driven** — the
+    conformance suite was not run in this filing. This is why the fork below is real rather than
+    academic: the corpus's own worked example already REPRESENTS a deferral, and the engine cannot.
+
+- **OBSERVED / READ — MIXED, stated per conjunct so neither is upgraded (EM-5).** **READ / CENSUSED BY
+  ME AT HEAD, this pass:** every `file:line` in (a)-(f), opened with `sed -n` or `grep -n`; the
+  105-command registry count and its single subject-matching entry; the three contract-file censuses
+  with their two positive controls; and the four-corpus sweep below. **I did not drive the engine in
+  this filing.** **OBSERVED BY A PRIOR PARTY, recorded verbatim and NOT re-driven here:** the baseline
+  constant, in REG-F-228 at `JPWB-REG-005:9926-9927` — *"Observed on the conditional subject: `L7 BASELINE
+  object: scope = "undertaking" | condition-bearing fields = []`"*. The census is the load-bearing
+  conjunct regardless: the claim is that a producer does not exist, and no drive can show that.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY.** The next reader will close this row on
+  **`REG-F-228`** (`docs/canon/JPWB-REG-005 …md:9736-10009`, OPEN), and specifically on its component
+  **(4)** at **`:9921-9929`**, because that component names this limb's own vocabulary while filing
+  something else. The sentence that makes it look like coverage is `:9928-9929`, verbatim: *"Canon
+  names "baseline scope statement" among ASR-9's deferral carriers, and here it says nothing about any
+  particular baseline."* **It is not this limb, on three checks.** (i) **ITS CANON QUOTE IS LIMB 7.**
+  At `:9741-9743` it quotes *"The condition remains visible in the assessment, the PWU assurance view,
+  review packages, and baseline packages, and persists after parent baselining;"* — four surfaces plus
+  a persistence clause. (ii) **IT DECLARES ITS OWN SCOPE.** `:10002` reads *"**LIMBS CLOSED BY THIS
+  ENTRY:** `limb:ASR-9:7`."* One limb, and limb 10 is not it. (iii) **IT FILES ONE CARRIER'S
+  INERTNESS, NOT THE ABSENCE OF THE THING CARRIED.** Its four components score the visibility of a
+  RESIDUAL CONDITION on an assessment — a dead `controlActions` field, unimplemented package shapes,
+  an unreachable `CONDITIONALLY_SATISFIED -> BASELINED` arrow, and the baseline `scope` constant — and
+  its remedy (**`:9949-9950`** — ⚠ **REG-F-235's search block cites `:9948`, which is off by one at
+  HEAD and lands mid-sentence in remedy (5)**; the text is *"(6) Make `scope` AND `purpose` supplyable
+  by the caller — or DELETE them rather than fabricate them"*) would leave the other four carriers,
+  and the deferral itself, exactly as they are. **THREE MORE, RULED OUT DELIBERATELY, BECAUSE EACH IS
+  THE BEST HIT ON A DIFFERENT PATTERN.**
+  **REG-F-225** (`:9256`), *"DEFERRED coverage has no shape anywhere"* — the closest match by
+  WORDING and the furthest by subject: its canon is **ASR-5 §8.2 line 257 limb 4** (*"required,
+  inherited, deferred, waived, and inapplicable additional coverage are explainable"*) and it closes
+  **`limb:ASR-5:4`** at `:9436`. Deferred **coverage** is not deferred **scope**. **REG-F-205**
+  (`:5285-5433`), the best hit on `outOfScope` — it refuses a PWU entering READY with blank scope
+  statements and closes **`limb:STA-5:2`** at `:5428`; it requires a statement to EXIST at a moment,
+  never that a deferral persist. **REG-F-236** (`:12546`), filed today, the best hit on the word
+  *assumption* and on the conservation gate this row's own sibling-control had to rule out — it closes
+  **`limb:DEC-4:7`** (*"Material assumptions propagate when applicable"*) at `:12812` and states *"It closes
+  nothing else"*; propagation of an EXISTING assumption across a decomposition is a different act at a
+  different seam from a deferral being recorded at all.
+
+- **WHAT REG-F-235 DOES AND DOES NOT SETTLE HERE.** `REG-F-235` (`:12301`, filed 2026-08-23 on this
+  same invariant) is the entry most likely to be mistaken for covering this limb, and it addresses the
+  point head-on and **declines**. At `:12528-12533` it says, verbatim, that `limb:ASR-9:10` *"is a
+  NEAR_MISS against REG-F-228's component (4), which files only the "baseline scope statement" carrier
+  and leaves the other four open — this entry touches the "future obligation" carrier only insofar as
+  it proves that carrier **unreachable from a residual** today … and it does **not** close limb 10."*
+  Taken at its word and checked: REG-F-235 closes `limb:ASR-9:9` (`:12526`), and its subject is the
+  residual→obligation conversion. **What it genuinely contributes to this question** is a fact the
+  adjudication needs: the bus has **no reactor or process-manager plane**, quoted there from
+  `RPH-ASR-001`'s own `why` at `packages/rph-domain/src/enforcement-register.ts:1120-1123` — so under
+  Reading A the link from a deferral to its carrier can only be an explicit act or an in-handler mint,
+  never an automatic derivation. **What it does not contribute** is any claim about scope, about
+  `outOfScope`, or about the other four carriers.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora, at HEAD 2026-08-23.** Bash
+  `grep` throughout (never `-i` together with `-F` — that combination aborts on this box and returns a
+  silent zero through a pipe); every long hit opened with `sed -n`. Corpora: `docs/canon/JPWB-REG-005
+  …md` (16,041 lines), `packages/rph-domain/src/enforcement-register.ts`,
+  `verif/guard-enforcement-ledger.data.ts`, `docs/_working/` (69 files).
+  - **BY LIMB ID.** `grep -no 'limb:ASR-9:[0-9]*'` over the whole register → **twelve** outputs,
+    eleven of them carrying an ordinal (`:12437` matches with none); the only
+    ordinals closed anywhere are `limb:ASR-9:7` (`:9998`, `:10002`) and `limb:ASR-9:9` (`:12439`,
+    `:12526`). **`limb:ASR-9:10` appears exactly once in the entire corpus, at `:12528`, inside
+    REG-F-235's census-reconciliation bullet declaring it NOT closed.** 0 in
+    `enforcement-register.ts`, 0 in the ledger, 0 in `docs/_working`.
+  - **BY PHRASE** (REG-005 / enforcement-register / ledger / `docs/_working` files). ⚠ **Two counts
+    are corrected here against the draft, which reported `deferred scope` as 0 in REG-005 while its
+    own today-block line below reported 1, and reported one `stays represented` hit where there are
+    two.** `deferred scope` → **1 / 0 / 0 / 0** (`:12528`, REG-F-235 declining this limb);
+    `silently delet` → **0 / 0 / 0 / 0**; `stays represented` → **2 / 0 / 0 / 0**, BOTH opened —
+    `:12529` (REG-F-235 declining) and **`:712`**, *"FIX-006 (the deferred offline capability stays
+    represented)"*, inside **REG-F-019** (heading `:704`, a 2026-08-04 finding about the conformance
+    manifest recording a rule family DEFERRED while its checks ran). That line is a DISCHARGE
+    CHECKLIST item, not a filing of this limb — and it is the register end of the (f) near-miss
+    above, so it is disclosed rather than dropped; `future obligation` → **2 / 0 / 0 / 0**
+    (`:12454`, `:12531`, both REG-F-235); `baseline scope` → **1** in the today-block (`:12530`,
+    REG-F-235) plus REG-F-228's `:9921`/`:9928`. *Positive controls, same corpora, same flags:*
+    `defer` → enforcement-register **13** — all thirteen opened and every one is a PROGRAMME or
+    MILESTONE deferral (`DEFERRABLE_PREFIXES`, "deferred to M5", conformance-manifest work packages),
+    not deferred scope; `residual` → enforcement-register **6**; `evidence` → **101**; `REG-F-` →
+    REG-005 **1,397**.
+  - **BY SITE/SYMBOL** (same four columns): `WorkBoundarySchema` → **0 / 0 / 0 / 0**; `outOfScope` →
+    **11 / 0 / 0 / 1 file**, every register hit opened and all eleven belong to REG-F-205's readiness
+    gate (`:5301-5417`), **REG-F-072**'s generic-setter entry (heading `:2241`; hits `:2244`, `:2265`)
+    or **REG-F-239**'s §9.1 field list (heading `:13347`; hit `:13415`) — none about a deferral;
+    `boundaries` → **27 / 0 / 0 / 5 files**; `scope: 'undertaking'` → **1 / 0 / 0 / 0**
+    (`:9922`, REG-F-228 component (4)); `createBaseline` → **1 / 3 / 0 / 1**.
+  - **THE 17 ENTRIES FILED TODAY (REG-F-234..245, REG-Q-058..062, `:12116-16041`, 3,926 lines)
+    GREPPED SPECIFICALLY**, since every transcript on the census row predates them. `deferred scope`
+    → **1** (REG-F-235 declining); `silently delet` → **0**; `stays represented` → **1** (same);
+    `baseline scope` → **1** (same). *Positive controls over the same 3,926 lines:* `REG-F-` →
+    **204**, `obligation` → **96**, `Evidence` → **157**. The two structurally nearest new entries
+    were opened in full and are named in the non-coverage bullet above (REG-F-236, `limb:DEC-4:7`) or
+    cited as corroboration (REG-F-245, `limb:PER-12:7`).
+  - **DOCS/_WORKING, THE CORPUS EARLIER SWEEPS SKIPPED, SEARCHED IN FULL.** `deferred scope`,
+    `silently delet`, `stays represented`, `baseline scope statement`, `future obligation` → **0 files
+    each**. `ASR-9` → **3 files**, all four hits opened:
+    `DESIGN-invariant-enforcement-mapping.md:650` (`limb:ASR-9:8`, a vocabulary argument), `:699` (a
+    §17.2 methodology table row on this census's own stale-`owed` phenomenon, not a filing),
+    `DESIGN-claim-assessment.md:149` and `DESIGN-recomposition-judgement.md:46`, both prose
+    cross-references. *Positive controls, same corpus:* `residualUncertainty` → **4 files**,
+    `evidence` → **49 files**, `REG-F-` → **51 files**. **NO COVERING FILING EXISTS IN ANY CORPUS.**
+
+- **CITATION CORRECTIONS — every pointer re-read at HEAD.** (i) The census row's `sibling_control`
+  cites the obligation-conservation register row at `packages/rph-domain/src/enforcement-register.ts:3538`;
+  at HEAD that line is mid-prose inside a different entry and **`RPH-DEC-002` opens at `:3636`**. This
+  independently reproduces REG-F-235's correction (iv) and matters here because the conservation gate
+  is the single nearest live gate a reader would reach for. (ii) The same field names the gate as
+  *"`checkDecompositionConservation` / `validateObligationConservation`
+  (packages/rph-domain/src/decomposition.ts:62 …)"*, conflating two symbols in two packages: at HEAD
+  `validateObligationConservation` is `packages/rph-domain/src/decomposition.ts:62`, while
+  `checkDecompositionConservation` is `packages/rph-application/src/handlers/decomposition.ts:262`,
+  which calls it at **`:275`**. (iii) The row cites `pwuGuards.ts:44-45`, `:107`, `:140-146` for the
+  readiness limb; at HEAD the `outOfScope` branch is **`:145-147`** and the `inScope` branch is
+  `:140`. (iv) **REG-F-235's own pointer to REG-F-228's remedy (6) — `:9948` — is off by one at HEAD**
+  and lands mid-sentence in remedy (5); the quoted text begins at **`:9949`** and runs to `:9950`.
+  Corrected for the next reader, not re-filed: REG-F-235's argument is unaffected. **Verified UNCHANGED
+  at HEAD:** `objects.ts:389-394`, `:694`; `messages.ts:125`, `:375-379`,
+  `:442-445`; `governance.ts:747`; `pwu.ts:323`, `:733-743`; `registry.ts:229`, `:243`, `:248`;
+  `assurance.ts:1146-1162`; `pwa-authoring.ts:563-585`.
+
+- **WHAT AN ANSWER WOULD UNLOCK — the remedy under each reading, so the adjudication is actionable.**
+  **Under Reading A:** (1) a way to record a deferral — either a first-class record naming the scope
+  moved out and the carrier that now holds it, or a `deferred` discriminator on the boundary, with the
+  explicit ruling that `outOfScope` alone may NOT serve; (2) an act that writes it, since `boundaries`
+  is unwritable after `ProposePwu` and a deferral discovered mid-work currently has nowhere to go;
+  (3) only then a conservation check, which today would quantify over an empty set. **Under Reading
+  B:** record in canon that the limb governs professional practice, and repair the one inert carrier —
+  make `scope` supplyable on `CreateBaseline` rather than fabricating `'undertaking'`. ⚠ **That repair
+  is owed under limb 7 as well, for a different reason** (the baseline as a visibility surface,
+  REG-F-228 remedy (6) at `:9949-9950` — NOT `:9948`, the stale pointer corrected above);
+  **the two should be closed by one commit, not twice.** ⚠ Both remedy sets are HYPOTHESES about the
+  fix; the measured facts are (a)-(f) above.
+
+- **A NOTE AGAINST THE LIMB SPLIT, RAISED AND NOT ACTED ON** (rule `w3b-limb-split/1.0.0`). Limb 10
+  bundles a five-way disjunction of carriers with a prohibition, and the two score differently — the
+  carriers are four-fifths present, the prohibition is vacuously satisfied by immutability. A future
+  split separating *"stays represented"* from *"never silently deleted"* would let the vacuity be
+  reported without laundering it into the carrier finding. Not re-split here: the single verdict is
+  the honest one for the limb as committed, and re-cutting a limb inside a filing would orphan the
+  census row.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-9:10`. **It closes nothing else.**
+  `limb:ASR-9:7` is closed by **REG-F-228** and `limb:ASR-9:9` by **REG-F-235**; `limb:ASR-9:5`
+  (evidence content never inferred) is filed alongside this one as a separate FINDING — a different
+  object (Evidence, not scope), a different plane (a content pointer, not a carrier link) and a
+  disjoint remedy, so no single commit closes both. `limb:ASR-5:4` belongs to REG-F-225,
+  `limb:STA-5:2` to REG-F-205, `limb:DEC-4:7` to REG-F-236 and `limb:PER-12:7` to REG-F-245; this
+  entry touches none of them.
+
+- **Merge target:** BOTH — **Corpus first**, because the adjudication gates the code: `JPWB-DOC-003`
+  §8.4 ASR-9 (which reading), and a ruling on whether `outOfScope` may ever serve as a deferral
+  record. **Repository**, once answered: `packages/rph-contracts/src/objects.ts:389-394` (the
+  boundary shape) and `messages.ts:375-379` + `packages/rph-application/src/handlers/governance.ts:747`
+  (the baseline `scope` repair, to be landed with REG-F-228's), plus the arm-count line in
+  `verif/invariant-verdict-census.test.ts` (at HEAD
+  `expect(dist).toEqual({ FILED: 208, NEAR_MISS: 21, NOT_APPLICABLE: 78 })`), which moves when this
+  entry and its sibling merge. Status: OPEN.
+
+### REG-Q-068 — RATIFICATION: `observationType` is a seven-value axis no predicate reads, and no ratified
+document says which of the seven are signals — so any guard written today would invent the partition
+
+**Date:** 2026-08-23 · **Type:** QUESTION (W-3b invariant census), carrying a measured admission ·
+**Status:** OPEN
+
+**In one line:** ASR-5 says *"a signal is not a defect"*; the engine mints a seven-value
+`observationType` and then decides everything about an observation from its author-supplied `severity`
+alone — so does canon require that type to have a runtime consequence, and if so, **which of the seven
+values are signals**, given that no ratified document partitions them and the engine's own catalog says an
+observation must identify eight things, `observationType` not among them?
+
+- **⚠ WHAT IS A QUESTION HERE, AND WHY THIS IS NOT FILED AS A FINDING.** The measurement below is
+  finding-grade and is not in doubt: `AssuranceObservation.observationType` has **zero** predicate readers,
+  and the one production consumer of an assessment's observations discards it. What is in doubt is the
+  **remedy**, and both obvious repairs settle a canon question by accident. (a) Constraining admissible
+  `severity` by `observationType` at record time requires a signal/defect partition of `FINDING,
+  MEASUREMENT, CONFLICT, EVIDENCE_DEFICIT, SHAPE_RISK, POLICY_VIOLATION, RECOMMENDATION` — **no ratified
+  document supplies one**, and two of the seven (`CONFLICT`, `EVIDENCE_DEFICIT`) do not obviously sit on
+  either side. (b) Making the §10.3 foreclosure gate read `observationType` ratifies the same invented
+  partition one door later. And **doing nothing** is itself a reading — that `observationType` is
+  decorative — which ASR-5's own limb 2 (*"These are coverage questions and policy rationale, not wire
+  enums or state axes"*) can be read to license and limb 7 to forbid. **A ruling must precede the guard.**
+  The one thing that does **not** wait is named at the end.
+
+- **CANON, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md`,
+  **§8.2 The de minimis floor and Reasoning Review** (heading read in place at **line 247**, inside
+  **§8 The assurance model**, line 235), **ASR-5 at line 257**, limb 7:
+  *"Validation is inquiry, not rule-matching: a signal is not a defect;"*
+  - ⚠ **SECTION READ, NOT INFERRED FROM THE LINE.** ASR-5 is **§8.2**. §8.3 *Evidence* starts at line
+    **261**; a filing that cites ASR-5 as §8.3 has confused it with ASR-6/ASR-7. Line 257 carries eleven
+    limbs — this question is about limb 7 alone.
+  - **THE SAME SENTENCE'S TWO NEIGHBOURS, because they pull in opposite directions and the ruling must
+    resolve both.** Limb 2 (line 257): *"These are coverage questions and policy rationale, not wire enums
+    or state axes."* Limb 10: *"A policy criterion retains the epistemic status of the professional
+    knowledge it encodes — a prohibition may block, a heuristic raises a question, a smell triggers
+    investigation without presuming a defect."* ASR-5's **SCOPE** (line 259): *"governs assurance design
+    and coverage planning."* Its **NON-EXAMPLE**: *"it does not command running every validator at every
+    step or one universal critic."*
+  - **AND WHAT THE RATIFIED CORPUS DOES AND DOES NOT SAY ABOUT THIS FIELD.** The seven values are declared
+    — *RPH Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract*, **§19
+    Assurance Observations** (heading read in place at that file's **line 1177**), the interface at
+    **`:1180-1212`** and `observationType` at **`:1186`** — as a bare union with **no semantics, no
+    partition, and no rule relating the type to severity, to foreclosure, or to any consequence.**
+    The *Product Realization PWA —
+    Assurance Policy Catalog and Validator Contract*, **§9.2 Observation requirements** (heading at that
+    file's **`:523`**, the mandatory list at **`:525-534`**), says what *"every material observation must
+    identify"*: **subject; policy; criterion; evidence; severity; statement; implications; recommended
+    control action.** **`observationType` is not on that list.** So the corpus
+    both mints the axis and omits it from the observation's own mandatory content — which is exactly the
+    ambiguity a ruling has to settle.
+
+- **WHAT THE CODE DOES, re-read at the sites at HEAD (2026-08-23).**
+  - `packages/rph-contracts/src/enums.ts:570-578` declares `ObservationTypeSchema` with the seven members,
+    under a docblock at **`:569`** reading *"AssuranceObservation.observationType — RPH-DOC-007 §21 /
+    DOC-002 §19 (7 values)"*. It is **required** on the command payload
+    (`packages/rph-contracts/src/messages.ts:354`) and on the object
+    (`packages/rph-contracts/src/objects.ts:583`).
+  - `openObservationSeverities` (`packages/rph-application/src/handlers/assurance.ts:2092-2110`) is the
+    **single production consumer** of an assessment's observations — its docblock at **`:2088-2090`** says
+    so: *"Shared by Gate D (escalation) and Gate C (foreclosure): the CURRENT severities of this
+    assessment's still-OPEN observations."* Both call it, at **`:2228`** and
+    **`:2253`**. Its filter, **`:2108`**, is byte-exact:
+    `.filter((o) => o?.disposition === 'OPEN' && typeof o.severity === 'string')`, and **`:2109`** maps to
+    `o!.severity`. The memo returns a `Set<string>` of **severity strings**. `observationType` cannot
+    reach any downstream gate because it never enters the memo.
+  - **THE CENSUS, RE-RUN AT HEAD BY ME TODAY.**
+    `grep -rnE "observationType\s*(===|!==)" --include=*.ts packages apps` minus `/dist/` and
+    `.svelte-kit` → **0**. **POSITIVE CONTROL, identical command form and identical population**,
+    `severity` substituted → **12**. Widening the net so a `.has()` / `.includes()` reader could not hide:
+    every mention of `observationType` over the same population minus tests, e2e and `__tests__` → **13
+    lines, all read** — 3 schema declarations (`enums.ts:569`, `messages.ts:354`, `objects.ts:583`), 4
+    literal writes (`assurance.ts:2358`, `record-assurance.ts:148`, `reference-undertaking.ts:1082`,
+    `+page.server.ts:1040`), 2 `findingCode ?? observationType` defaults (`assurance.ts:2357`, demo
+    `floor.ts:406`), 1 helper that maps a policy id **to** an observationType and never reads one
+    (`record-assurance.ts:87-89`), 3 comments. **Zero readers.**
+  - **AND THE CONTROL IS NOT MERELY A COUNT — `severity` IS READ AS A DISCRIMINATING PREDICATE AT THREE
+    SEPARATE PRODUCTION GATES,** each re-read at HEAD: `assurance.ts:2108` (the §10.3 memo above),
+    `decomposition.ts:328` (`BLOCKING_OBSERVATION_SEVERITIES.has(str(o.severity))`, the set declared at
+    `:311`) and **`packages/rph-application/src/handlers/governance.ts:149`**
+    (`blocking: BLOCKING_SEVERITIES.has(String(s.severity))`, inside `observationsAgainstBaselineItems`,
+    the baseline-promotion gate). ⚠ **Not `rph-domain/src/governance.ts`** — that file contains the
+    token `severity` **0** times; `BLOCKING_SEVERITIES` is declared at
+    `rph-application/src/handlers/governance.ts:55`. One axis of the same object is load-bearing three
+    times over; its twin is inert.
+
+- **OBSERVED / READ — STATED PRECISELY. OBSERVED, driven by me at HEAD on 2026-08-23** with `node` against
+  `SqliteStorageAdapter`; six arrangements over one policy shape, including an indistinguishability
+  control, an accept-control and a liveness control. The census row drove the same shape on 2026-08-21 and
+  it reproduced exactly.
+  ```
+  SIGNAL, a bare number, at the top tier:
+    RecordAssuranceObservation{observationType:'MEASUREMENT', severity:'CRITICAL',
+      statement:'Method is 400 lines long.'}                       -> ACCEPTED
+      persisted: observationType=MEASUREMENT severity=CRITICAL findingCode=MEASUREMENT
+                 disposition=OPEN
+    CompleteAssuranceAssessment{SATISFIED}                         -> REJECTED
+      code    = RPH_VALIDATION_SEMANTIC_FAILED
+      message = CompleteAssuranceAssessment: a SATISFIED disposition is foreclosed — the
+        policy's dispositionRules forbid it while an observation of severity [CRITICAL] is
+        still OPEN (DOC-004 §10.3). Resolve or waive the finding, or return a non-satisfied
+        disposition.
+      assessmentState = ASSESSING
+  SIGNAL, a smell, at BLOCKING:   {observationType:'SHAPE_RISK',     severity:'BLOCKING'}
+  SIGNAL, a suggestion, BLOCKING: {observationType:'RECOMMENDATION', severity:'BLOCKING'}
+  INDISTINGUISHABILITY CONTROL, the acknowledged DEFECT at the same tier:
+                                  {observationType:'POLICY_VIOLATION', severity:'BLOCKING'}
+    -> all three ACCEPTED at record time; all three produce the IDENTICAL refusal, naming
+       only "[BLOCKING]". The engine cannot tell a smell from a policy violation.
+  ACCEPT-CONTROL (the gate is not refusing everything):
+    {observationType:'SHAPE_RISK', severity:'INFORMATIONAL'} -> ACCEPTED;
+    CompleteAssuranceAssessment{SATISFIED} -> ACCEPTED, assessmentState = SATISFIED.
+  LIVENESS CONTROL at the same dispatch (the schema arm is alive):
+    RecordAssuranceObservation{severity:'A_SMELL_IS_NOT_A_DEFECT'}
+      -> VALIDATION_FAILED / RPH_VALIDATION_SCHEMA_FAILED
+  ```
+  **WHERE THE ADMISSION SITS, AND IT IS NOT THE REFUSAL.** The forbidden arrangement is a signal being
+  treated as a defect, and the engine **admits** it at `RecordAssuranceObservation`: nothing there
+  constrains `severity` by `observationType`, so a MEASUREMENT is born CRITICAL and a RECOMMENDATION is
+  born BLOCKING. The refusal that follows is the **consequence** of that admission, not enforcement of the
+  limb. **READ (not driven):** the two corpus sections, the enum and schema declarations, and every line
+  number above.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS LIMB, AND WHY — it is the ONLY place in any corpus where this
+  limb's text appears, and it disclaims itself.** **REG-F-224**
+  (`docs/canon/JPWB-REG-005 Decision and Divergence Register.md:9040`, *"`forbiddenOpenSeverities` is
+  range-checked by nothing…"*, Date 2026-08-22, Status OPEN). Its sentence at **`:9216-9217`**, read at
+  HEAD, verbatim: *"`limb:ASR-5:7` (**"a signal is not a defect"**) points at the same observations but its
+  axis is `observationType`, which this gate never reads."* **What it measures:** which SEVERITY values a
+  policy author may declare foreclosing. **What it closes:** `:9225` — *"**LIMB CLOSED BY THIS ENTRY:
+  `limb:ASR-5:9`** (the only member)."* Same command, same observations, **different axis** — and its
+  remedy pushes foreclosure **narrower**, which does nothing about a signal and a defect being
+  indistinguishable inside whatever tier survives. Three further filings sit on the **same canon sentence**
+  and each closes a different limb, so none may be read as coverage:
+  - **REG-Q-057** (`:11860`) is the nearest by shape and will be the second candidate a reader reaches: it
+    is a QUESTION, on ASR-5, whose own drive at `:11951` records
+    `RecordAssuranceObservation{observationType:'SHAPE_RISK', severity:'CRITICAL', statement:'Smell: this
+    module smells like the one that failed last quarter. Investigate.'}`. **Its subject is a POLICY
+    CRITERION's epistemic axis** and `EscalationRule.trigger`; it closes `limb:ASR-5:10` (`:12068`). Its
+    open question (ii) — *"whether the ADVISORY/INFORMATIONAL tier may carry an investigation consequence
+    at all"* — is the **severity tier**, not the observation's type. Different object, different field: a
+    criterion is authored on the policy, an observation is recorded against an assessment.
+  - **REG-F-227** (`:9578`) closes `limb:ASR-5:8` (`:9712`) — the missing tension carrier — and its own
+    search transcript at `:9709` independently reports `observationType` → **0 / 0 / 0**.
+  - **REG-F-213** (`:7046`) sits at the **same handler** and quotes `p.findingCode ?? p.observationType`
+    inside `recordAssuranceObservation` at `:7097`, but closes `limb:DEC-5:2` (`:7214`); its subject is the
+    policy's declared **finding vocabulary**. The three entries filed today that touch the same expression
+    (`:13074` in REG-F-237, `:14497` in **REG-F-243** — not REG-F-244, whose heading is at `:14526`
+    — and `:15726` in REG-Q-061) each name it and each defer to
+    REG-F-213 in as many words — `:15726` reads *"already filed as REG-F-213"*.
+  - **The site's own docblocks do not file it either.** `assurance.ts:2088-2090` describes what the memo
+    reads without disclosing that `observationType` is dropped; `:2368-2370` discusses
+    `findingCode ?? observationType` and the `implication` placeholder, which is a different defect already
+    scored at `limb:ASR-11:4`.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (`-i` and
+  `-F` never together — the documented abort on this box); every long hit opened with `sed -n 'Np'`.
+  **A** = `packages/rph-domain/src/enforcement-register.ts`, **B** = `JPWB-REG-005 …md` (16,041 lines at
+  HEAD), **C** = `verif/guard-enforcement-ledger.data.ts`, **D** = `docs/_working/`.
+  - **BY LIMB ID:** `grep -no 'limb:ASR-5:[0-9]*' B` → 28 occurrences; **`limb:ASR-5:7` appears exactly
+    ONCE, at `B:9216`** — REG-F-224's disclaimer. Positive controls on the same instrument: `limb:ASR-5:9`
+    → **7** (`:15762` landed today), `limb:ASR-5:10` → 7, `limb:DEC-5:2` → **7** (`:15727` and
+    `:15826` likewise today), all `limb:` ids in B → **299**.
+  - **CLOSURE SWEEP INCLUDING THE ENTRIES FILED TODAY, which every transcript on this row predates:**
+    `grep -n 'LIMB IDS THIS ENTRY CLOSES\|LIMB CLOSED BY THIS ENTRY\|CENSUS RECONCILIATION' B` over
+    `NR>12000` → REG-F-234..245 / REG-Q-058..062 close `REL-2:1, ASR-9:9, DEC-4:7, ASR-14:5, AUT-2:2,
+    DEC-1:1, DEC-1:2, DEC-1:3, none, ASR-7:1, ASR-7:5, ASR-7:6, PER-12:6, PER-12:7, OBJ-2:3, AUT-2:3,
+    ASR-1:6, ASR-7:3, PER-12:3`. **`limb:ASR-5:7` is on no list.**
+  - **BY SITE / SYMBOL:** `observationType` → **A 0**, **C 0**, **B 11** (`:7097 :7299 :9116 :9217 :9598
+    :9631 :9634 :9709 :10072 :11951 :11958`, plus the three from today at `:13074 :14497 :15726`), **D
+    7** case-sensitive and **10** once `ObservationType` is folded in
+    (`AUDIT-shape-survivorship-2026-08-20.md:70`/`:206`/`:310` field-fidelity rows,
+    `canonical-vocabulary.json:530-531`, `HARMONIZATION-FINDINGS.md:621`/`:629` shape rows,
+    `ROADMAP-blocking-finding-capability.md:43` and `:47-48` — a demo-surface build step reading
+    *"Verify `observationType` against `ObservationTypeSchema` before writing"*, not a divergence
+    filing). **All opened.** `openObservationSeverities` across all four → **1 hit**,
+    `HARMONIZATION-LOG.md:4001`, opened: an Increment note that the function was extracted.
+  - **BY VERBATIM CANON TEXT:** `grep -rnF 'a signal is not a defect' A B C D` → **1**, `B:9216`.
+    Positive control, identical command shape, on a sibling limb known to be filed:
+    `grep -rnF 'rule violated' …` → **2**, `B:9048` and `B:9084`, both inside REG-F-224.
+  - **LEDGER (C) CONTROL, so its zero is evidence and not an instrument failure:** `observationType` →
+    **0** against `disposition` → **109** and `assurance` → **49** over 392 lines.
+  - **REGISTER FAMILY SWEEP (A):** all twelve `RPH-ASR-0xx` `canonAnchor`s enumerated with `awk` and read
+    (`:1114 :1134 :1151 :1171 :1203 :1230 :1249 :1273 :1311 :1350 :1384 :1425`). None is this limb; the
+    nearest by subject, `RPH-ASR-008`, is *"Open critical findings block satisfaction"* — the **severity**
+    rule again.
+  - **CORPUS SWEEP, because an absence in `docs/canon` is not an absence in the corpus.** `SHAPE_RISK`
+    across `docs/Recursive Professional Harness/` → **3**, all three the bare seven-member union
+    (Domain Model `:1191`, Contract Package `:1565`, Migration `:676`); `observationType` → **5**, the
+    same three declarations plus two reference-undertaking JSON literals. **No prose anywhere in the
+    corpus partitions the seven values or attaches a consequence to any of them.** That absence is the
+    question.
+
+- **WHAT AN ANSWER WOULD SETTLE.** (i) Whether ASR-5 limb 7 binds the **runtime** at all, or — as limb 2
+  and ASR-5's SCOPE line can be read to say — governs assurance **design** and leaves `observationType` as
+  honest metadata. (ii) If it binds: **which of the seven values are signals**, said in canon rather than
+  inferred by a coder, including where `CONFLICT` and `EVIDENCE_DEFICIT` fall. (iii) Where the
+  consequence attaches — a birth-time constraint on `severity` at `RecordAssuranceObservation`, a type
+  dimension on the policy's own `dispositionRules` (author-declared, inventing no partition), or a
+  projection-only disclosure. (iv) Whether §9.2's eight-item mandatory list is amended to include the
+  type, or whether its
+  omission is the ratified answer to (i).
+
+- **⚠ WHAT DOES NOT WAIT FOR THE RULING.** Under **every** answer, Gate C's refusal message —
+  `packages/rph-application/src/handlers/assurance.ts:1908`, inside `rejectForeclosedDisposition`
+  (**`:1871-1911`**, called at `:2249` — the span REG-F-224 itself cites at `B:9065`) — is wrong to
+  call the open observation *"the finding"*. **Driven above:** *"Resolve or waive the finding, or return
+  a non-satisfied disposition."* is emitted verbatim for an observation whose own persisted
+  `observationType` is `MEASUREMENT`. Correcting that sentence to name what was actually recorded is the
+  difference between an engine that is silent about the axis and one that actively misdescribes it.
+  - ⚠ **AND "the finding" IS NOT A CANON QUOTATION — CHECKED TWO WAYS, BECAUSE ONE READING WOULD HAVE
+    DISSOLVED THIS BULLET.** `docs/_working/DESIGN-blocking-finding-capability.md:130` asserts
+    *"§10.3 says `Resolve or waive the finding`"*, which would have made the message a verbatim
+    ratified sentence and its correction a canon act, not a repository one. **It does not.**
+    **Route 1** — §10.3 *Default precedence* read in place (Catalog heading **`:594`**, ladder
+    **`:598-613`**) is a precedence ladder and nothing else: *"CRITICAL open finding → REJECTED or
+    ESCALATED … BLOCKING open finding → REJECTED … MATERIAL open finding → CONDITIONALLY_SATISFIED,
+    INCONCLUSIVE, or REJECTED … Evidence deficit → INCONCLUSIVE … All mandatory criteria met →
+    SATISFIED"*. **Route 2** — `grep -rn 'Resolve or waive' docs/'Recursive Professional Harness'/`
+    → **0**, against a positive control on the same instrument and population, `open finding`
+    → **6** (`:599 :602 :605` in that ladder, `:1485`, `:1532`, and one in the Ontology spec). The
+    sentence is the engine's own authoring.
+  - ⚠ **BUT THE RATIFIED LADDER SAYS "open finding" AT EVERY TIER,** so the correction must **ADD**
+    what was recorded (the type and the severity) and must not **substitute** "observation" for
+    "finding": the additive form pre-empts none of (i)-(iv); the substitution would answer (ii) by the
+    back door.
+
+- **Safe default until answered:** do **not** read the severity ladder's correctness as evidence that the
+  type axis is settled, and do not add a signal/defect partition to code, seeds, prompts, surfaces or
+  policy notes — it would be authored, not ratified. Author observations at the severity their consequence
+  warrants, and treat a `MEASUREMENT` or `RECOMMENDATION` recorded at BLOCKING or CRITICAL as an authoring
+  defect the engine currently cannot catch.
+
+- **CENSUS RECONCILIATION — LIMB IDS AN ANSWER WOULD CLOSE:** `limb:ASR-5:7`. **It closes nothing else,
+  because** each neighbour on line 257 turns on a different field at a different door: `limb:ASR-5:9` is
+  `forbiddenOpenSeverities` at `CreateAssurancePolicy` (REG-F-224), `limb:ASR-5:10` is the criterion's
+  epistemic axis (REG-Q-057), `limb:ASR-5:8` is the missing tension carrier (REG-F-227), `limb:ASR-5:6` is
+  set-level joint satisfiability (REG-F-226), and `limb:ASR-5:5` is `claimType` versus
+  `evaluatedClaimTypes` at `RequestAssuranceAssessment`, filed as a **FINDING** in this same pass because
+  its remedy needs no ruling. It also does not close `limb:ASR-11:4`, whose site is `assurance.ts:2361`
+  (`implication: p.statement,`) and whose claim is about one observation's CONTENT completeness.
+
+- **Merge target: BOTH.** **Corpus first** — JPWB-DOC-003 §8.2 (ASR-5's own text) for (i) and (ii),
+  and the ratified *Assurance Policy Catalog* **§9.2** and **§10.3** plus the *RPH Canonical Domain
+  Model* **§19** for (iii) and (iv); **sequenced with REG-Q-057**, whose answer fixes the severity-tier
+  half of the same sentence and which must not be merged with this one — that entry is about a
+  criterion, this one about an observation. **Repository** —
+  `packages/rph-application/src/handlers/assurance.ts:1908` for the Gate C message alone, which is not
+  gated on the ruling; everything else in the repository waits for it. Status: OPEN.
+
+### REG-Q-069 — RATIFICATION: the repository ships a three-rung required-assurance ladder whose rungs
+differ by ten mandatory policies, and the activation step's own selector is a free string that no site
+ever resolves against it, so ASR-19's "activation step" clause has no ratified referent
+
+**Date:** 2026-08-23 · **Type:** QUESTION (W-3b invariant census) · **Status:** OPEN
+
+- **THE QUESTION, IN ONE PARAGRAPH.** ASR-19 limb 3 forbids an *activation* step from silently
+  downgrading required assurance. Whether this engine can commit that act depends on one unratified fact:
+  does `Undertaking.instantiationProfile` — the only assurance-shaped field an activation step writes —
+  name a rung of the shipped `conformanceProfiles` ladder, and thereby select that rung's
+  `mandatoryPolicyIds` and `minIndependence`? The ladder is real, versioned, and steeply graded
+  (LIGHTWEIGHT 2 mandatory policies / `DIFFERENT_INVOCATION`; STANDARD 8 / `DIFFERENT_AGENT`;
+  HIGH_ASSURANCE 12 / `DIFFERENT_MODEL`). The selector is a bare `z.string()`. **No site anywhere joins
+  them.** If canon says the profile selects the rung, then `CreateUndertaking` is an activation step that
+  lowers required assurance by an unvalidated, unread, unrecorded string, and a guard is owed at that
+  arrow. If canon says the profile is a descriptive label, then required assurance is fixed by the PwuType
+  and limb 3's activation clause is vacuous in this engine, and the shipped ladder should be struck as
+  dead data rather than left to look like governance. **The register cannot tell which, and the code has
+  quietly chosen the second.**
+
+- **CANON, QUOTED VERBATIM.**
+  - `JPWB-DOC-003 Semantic Model and Invariant Catalog.md` **§8.9 "Assignment, capability, execution, and
+    publication"** (heading read at line **323**), **ASR-19 at line 329, limb 3**: *"and no publication or
+    activation step may silently downgrade required assurance."*
+  - The SAME sentence, limb 4, at the same line: *"Assurance-policy catalog definitions and the PWA
+    branch/role/profile ontology are PWA-version-owned versioned data: their professional meanings travel
+    with the seeded published PWA version"*. **The profile ontology is canon-mandated to TRAVEL with the
+    published version** — and the seam that would carry it is the one hard-coded to `[]` below.
+  - `docs/Janumi Canonical Implementation Context - Coding Agent Guide.md` **§7.3 "Two independent profile
+    axes"** (heading byte-exact at **L673**): L675 *"Do not collapse assurance rigor into work shape."*;
+    L677 *"**Assurance/conformance rigor**"*; the table's own column header at L679 is *"| Profile | Use
+    and minimum consequence |"*, with rows **Lightweight** (L681), **Standard** (L682) and **High
+    Assurance** (L683). **Canon's own word for what a profile carries is "minimum consequence" — i.e. a
+    floor of required treatment, which is exactly the quantity limb 3 forbids lowering.**
+  - `docs/Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA -
+    Professional Ontology and Assurance Policy Specification.md` **§4 "Ontology Conformance Levels"**
+    (heading at **L127**), **L129**: *"The Product Realization PWA supports three conformance
+    profiles."* — §4.1 Lightweight, §4.2 Standard, §4.3 High-Assurance, each with its own "Minimum
+    expectations".
+  - `docs/Recursive Professional Harness/… Reference Demonstration.md` **§23 "Undertaking-to-PWA
+    binding"** (heading at **L833**), lead-in at L835 and items at L837-842, with `instantiation profile`
+    at **L839**: *"Every Undertaking records: PWA ID; PWA version; instantiation profile; local
+    overrides; applicable organizational policies; migration status."*
+
+- **WHAT THE CODE DOES, re-read at HEAD (`303ee671`), every line opened with `sed -n`.**
+  ⚠ **Commit corrected on verification.** The drafting pass labelled HEAD `857128a7`. HEAD is
+  `303ee671`, and the difference is load-bearing for this entry: at `857128a7`
+  `docs/_working/HARMONIZATION-FINDINGS.md` was **119 lines**, so the `:706` / `:888` / `:892` / `:896` /
+  `:938` citations below did not exist there. All were re-opened at `303ee671` and hold; the code
+  citations are identical across the two commits, which touch only `docs/_working/`.
+  - **THE LADDER EXISTS AND IS WELL-TYPED.** `packages/rph-product-realization-pwa/src/
+    ontology.types.ts:184-190` declares `interface ConformanceProfile { profile; minIndependence?;
+    mandatoryPolicyIds?; appliesToRisk? }`. `ontology.data.ts:3603-3647` populates three of them.
+    **DERIVED by parsing the literal, not enumerated by hand:** `LIGHTWEIGHT` →
+    `minIndependence: 'DIFFERENT_INVOCATION'`, `mandatoryPolicyIds` **2** (`pol_intent_fidelity`,
+    `pol_assumption_disclosure`); `STANDARD` → `'DIFFERENT_AGENT'`, **8**; `HIGH_ASSURANCE` →
+    `'DIFFERENT_MODEL'`, **12**. Choosing the bottom rung over the top drops **ten** mandatory policies
+    and two levels of independence.
+  - **NOTHING RESOLVES A PROFILE NAME.** `ontology.ts:44` exports
+    `getConformanceProfile(name): ConformanceProfile | undefined`. Its ONLY caller repository-wide is its
+    own unit test, `ontology.test.ts:82`. `mandatoryPolicyIds` is read at exactly one site —
+    `ontology.ts:118-120`, `checkProfilePolicies`, a referential-integrity check that each id resolves to
+    a seeded policy. **No assurance gate consults either.**
+  - **THE SELECTOR IS UNCONSTRAINED.** `packages/rph-contracts/src/objects.ts:758` and
+    `packages/rph-contracts/src/messages.ts:649` both declare `instantiationProfile: z.string()`.
+    `packages/rph-application/src/handlers/pwa-authoring.ts:1081` is a straight pass-through
+    (`instantiationProfile: p.instantiationProfile,`); the census at HEAD returns **7** non-test hits, all
+    declarations, writes or comments, **ZERO readers**. ⚠ The draft said 6: it silently dropped
+    `apps/rph-demo/e2e/execution-plan.e2e.ts:455`, which the stated `grep -v` test-file filter does not
+    exclude. The seventh hit is an e2e write, so the ZERO-readers conclusion is unchanged.
+  - **THE TWO PRODUCTION WRITERS DISAGREE WITH EACH OTHER AND WITH THE LADDER.**
+    `packages/rph-engine/src/seed-workbench.ts:417` writes `'Standard Product Realization'`;
+    `apps/rph-demo/src/routes/undertakings/+page.server.ts:122` writes `'Standard'`. The ladder's keys are
+    `LIGHTWEIGHT` / `STANDARD` / `HIGH_ASSURANCE`. **Neither production value would resolve.**
+  - **THE ACT IS NOT RECORDED.** `pwa-authoring.ts:1095` is
+    `eventPayload: { undertakingId: p.undertakingId, pwaId: p.pwaId, pwaVersion: p.pwaVersion }`, and the
+    comment above it at `:1093-1094` says so: *"the command payload adds name, description,
+    instantiationProfile, objective and intendedOutputProduct, all rejected by the strictObject."* The
+    profile choice reaches persisted state and **no domain event**.
+  - **AND THE LADDER CANNOT CROSS INTO THE ENGINE AT ALL.** `packages/rph-engine/src/engine.ts:82`
+    declares `readonly conformanceProfiles: readonly unknown[];` — a port typed to carry nothing in
+    particular — and the published-PWA seam `packages/rph-engine/src/pwa-ontology.ts:24-25` returns
+    `seedPolicies: []` and `conformanceProfiles: []` **unconditionally**. That file's own header (`:1-4`)
+    calls itself *"The published-PWA → EngineOntology seam"*. Canon's limb 4 says the profile ontology
+    must travel with the published version; this seam empties it.
+  - **WHAT THE ENGINE IMPLEMENTS INSTEAD — the narrower reading, stated so the adjudicator can see it.**
+    Instance-time required assurance is the UNION of the PWU's own `assurancePolicyIds` and its PwuType's
+    `requiredAssurancePolicyIds`: `packages/rph-projections/src/assurance-view.ts:478`,
+    `return [...new Set([...direct, ...typeReq])].map(...)`. Under that reading instantiation can only
+    ADD, and no profile choice can subtract. **That is a coherent reading. It is not a ratified one.**
+
+- **OBSERVED / READ — MIXED, split by conjunct.** **DRIVEN** at HEAD `857128a7` through `Engine.dispatch`
+  over `SqliteStorageAdapter` (temporary vitest driver, since removed), verbatim:
+  ```
+    D1. CreateUndertaking instantiationProfile="NO_ASSURANCE_AT_ALL" -> ACCEPTED
+    Undertaking.status = ACTIVE | instantiationProfile = NO_ASSURANCE_AT_ALL
+    UndertakingCreated payloads = [{"undertakingId":"und_…S90","pwaId":"pwa_…S00","pwaVersion":"1.0.0"}]
+  ```
+  An arbitrary string that names no rung is accepted onto an ACTIVE Undertaking and vanishes from the
+  event log. **READ (not driven):** the ladder's contents and grading, the zero-reader censuses, the
+  `conformanceProfiles: []` seam, and every canon quote above. **This entry does NOT claim a driven
+  downgrade** — under the reading the engine implements there is nothing to downgrade, which is precisely
+  what the question is about.
+
+- **⚠ THE FILING THAT DOES NOT COVER THIS, AND WHY — the first is the decoy that will end this row if
+  nobody writes this bullet.**
+  1. **`REG-Q-010` at REG-005:222, titled — verbatim — "Assurance schema and profile activation."** Its
+     Statement (`:223`): *"Applicability expressions, required Evidence/waiver arrays, `riskProfiles`, and
+     the mandatory-policy-by-profile matrix are not fully frozen."* Safe default (`:224`): *"Pin the slice
+     to a versioned matrix of PWA conformance profile, independent PWU risk profile, applicable policies,
+     criteria, and independence. A missing mapping blocks promotion."* It sits in **§3 Section B — Open
+     questions carried from the retired Guide §16 do-not-guess register** (heading at `:167`), carrying
+     Guide §16 item **10** (`Guide:2507`). **A reader grepping "profile" will land here and close the
+     row.** It does not cover this limb: what REG-Q-010 MEASURES is whether the matrix's **contract shape
+     is frozen**, and what it CLOSES is that shape question. It never names `Undertaking.
+     instantiationProfile`, never names an activation step or `CreateUndertaking`, never names ASR-19 or
+     limb 3, and its safe default's operative word is **"promotion"** — which this corpus uses for waiver
+     and Baseline promotion (`RPH-GOV-006`'s `canonAnchor` at `enforcement-register.ts:3752`, *"an expired
+     required waiver blocks promotion"*, quoted at REG-005:7748-7749), **never, in any of the four corpora I
+     searched, for PWA publication or Undertaking activation.** REG-Q-010 asks whether the matrix is
+     frozen; this asks whether the activation step is bound to it at all. ⚠ **If the adjudicator rules
+     that REG-Q-010's safe default DOES already bind activation, then this entry converts to a FINDING and
+     the remedy below is the guard** — that ruling is one of the two dispositions asked for.
+  2. **The docblock at `packages/rph-application/src/handlers/pwa-authoring.ts:899-906`** — a legitimate
+     site filing under REG-D-039, and it names ASR-19's own Guide line: *"NOT enforced here, deliberately
+     — the assurance-assignment limb of L1639 … Un-skip when the declaration is contracted (§16 item
+     9)."*
+     It defers **limb 1** (a *missing* assignment) at **ValidatePwa**, on **§16 item 9** (`Guide:2506`,
+     the bootstrap item, cited byte-exact at `pwa-validation-gate.test.ts:16`). This question is limb 3 at
+     `CreateUndertaking`, on **§16 item 10** — the adjacent row, which **no site in the repository cites
+     at all** (`grep -rn "profile activation\|16 item 10"` over `packages/ apps/ verif/` → **0**, against
+     the control `16 item 9` → **6**).
+  3. **`REG-F-183` at REG-005:4359**, whose survivorship table row at `:4369` reads *"| Conformance
+     profiles (as entities) | 3 | **3** | STRUCTURED — `conformanceProfiles` | `ontology.test.ts` —
+     count + reference resolution |"*. It **scores the three profiles as fully survived and gated**
+     — which is exactly why a reader concludes nothing is owed. What it MEASURES is whether
+     RPH-DOC-003's content reached the seed without loss, and what it CLOSES is that. It is silent
+     on whether anything READS them, and `ontology.test.ts`'s "reference resolution" is
+     `checkProfilePolicies` — integrity of the data, not enforcement over an act.
+  4. **`REG-F-220` at REG-005:8253** — its field census at `:8275` and `:8293` merely LISTS
+     `instantiationProfile` among the Undertaking's eight persisted fields while adjudicating a different
+     matter (the missing Intent binding).
+  5. **`docs/_working/HARMONIZATION-FINDINGS.md` Item 16** — see the correction below. It is TRUE AT HEAD
+     and it OWES its own entry, but what it MEASURES is **vocabulary drift** (the field is unbound to
+     §7.3's closed sets and carries three spellings) and what it CLOSES is that. It never asks whether an
+     activation step may thereby lower required assurance, and its owed entry is still unfiled
+     (`instantiationProfile` in REG-005 → 2 hits, both REG-F-220's census).
+  6. **⚠ `docs/_working/HARMONIZATION-FINDINGS.md` Item 15 — THE DECOY NO SEARCH ON THIS ROW COULD SEE,
+     ADDED BY THE VERIFIER.** `### Item 15 — TRUE AT HEAD` at `:834` landed in commit `303ee671`, i.e.
+     at HEAD and AFTER every transcript on this row, including the drafting pass's. It is the nearest
+     thing in any corpus to this question: *"Guide §8.4 makes the strength of Reasoning-Review
+     independence conditional on "the active profile", but no profile is available to the runtime that
+     plans the floor"*, and it quotes **REG-Q-010 at `:224` byte-exact** for the same missing matrix,
+     concluding *"No such matrix reaches `deMinimisFloorPlan`, and nothing blocks promotion for its
+     absence."* It carries **`⚠ OWES A REGISTER ENTRY`** and `docs/_working/BACKLOG.md` at HEAD lists
+     item #15 among those owing one. **IT DOES NOT COVER THIS LIMB, and the check is mechanical:** over
+     `:834-887`, `instantiationProfile` → **0**, `CreateUndertaking` → **0**, `activation` → **0**,
+     `ASR-19` → **0**, `mandatoryPolicyIds` → **0**, `conformanceProfiles` → **0**, `Undertaking` →
+     **0**, against the **positive control `profile` → 14** in the same span. What it MEASURES is the
+     `deMinimisFloorPlan` **independence literal** (`floor.ts:76`, `'DIFFERENT_MODEL'`) under ASR-13 and
+     Guide §8.4; what this asks is whether `Undertaking.instantiationProfile` selects a rung's
+     **mandatory-policy set** at `CreateUndertaking` under ASR-19 limb 3. Different site, different
+     quantity, different canon clause. **BUT THEY OVERLAP ON ONE CONJUNCT** — `minIndependence` — and
+     disposition (A) below is carved back accordingly, because the half that asks a profile to reach the
+     floor's independence is Item 15's owed entry, not this one's.
+
+- **⚠ A CITATION CORRECTION — BOTH PRIOR READERS OF THIS ROW MADE THE SAME ONE, IN INDEPENDENT PASSES.**
+  The row's `near_miss_filing` (w3b-v5) and its blind re-search (w3b-v6) each dismiss
+  `docs/_working/HARMONIZATION-FINDINGS.md:104` as *"STRUCK (`~~…~~`), i.e. refuted"*. **It is not
+  refuted.** Line 104 is the ORIGINAL claim, retained struck by the file's own convention; the
+  adjudication is **`### Item 16 — TRUE AT HEAD` at `:888`**, which says verbatim at `:892`: *"**The
+  strike is wrong and is kept only as history.**"* and at `:896`: *"**⚠ OWES A REGISTER ENTRY.**"* **THE
+  CONTROL THAT PROVES THE STRIKE ENCODES NO VERDICT:** the same struck list (`:100-110`) contains Item 12
+  (adjudicated `### Item 12 — FALSE AT HEAD`, `:706`) and Item 17 (`### Item 17 — OUT OF SCOPE`, `:938`)
+  — three different verdicts, all struck. Item 17's body says the convention outright: *"(original at
+  line 105, struck — kept exactly as the 2026-07-15 pass wrote it)"*. Anyone re-running this row's search
+  must read the per-item adjudication, never the struck index line.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only; never `-i` and
+  `-F` together; every long hit opened with `sed -n`. Reported as REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` / `docs/_working` (files).
+  - BY ID: `limb:ASR-19:3` → 0 / 0 / 0 / 0. `ASR-19` → 1 / 0 / 0 / 2 — the REG-005 hit is `:15538`
+    inside **REG-Q-060**, filed today, and is about clause PROVENANCE (`b3Standing` → `NO_RECORD`), not
+    profiles; the two `docs/_working` files are this census's own DESIGN/ROADMAP worksheets.
+    `L1639` → 0 / 0 / 0 / 0.
+  - BY SITE: `instantiationProfile` → **2** / 0 / 0 / **2** (all four opened: REG-005 `:8275`/`:8293` =
+    REG-F-220; `HARMONIZATION-FINDINGS.md` Item 16; `AUDIT-shape-survivorship-2026-08-20.md`).
+    ⚠ The draft named `HARMONIZATION-LOG.md` as the second `docs/_working` file; that file contains
+    **0** occurrences of `instantiationProfile` (`grep -rl` names the two files above). A dead pointer in
+    a search disclosure, corrected — the count of 2 is right, one of the two names was not.
+    `conformanceProfiles` → 1 / 0
+    / 0 / 2 (REG-005 `:4369` = REG-F-183, opened). `getConformanceProfile` → **0 / 0 / 0 / 0**.
+    `mandatoryPolicyIds` → **0 / 0 / 0 / 0**. `minIndependence` → **0** in REG-005, **0 files** in
+    `docs/_working`. `CreateUndertaking` → 7 / 0 / 0 / 6 — all 7 REG-005 lines listed and their entries
+    resolved: REG-F-208 (`:5914`) and REG-F-220 (`:8253`), neither about profiles. `UndertakingCreated` →
+    1 / 0 / 0 / 1. `conformance profile` → 4 / 0 / 0 / 3 (all four REG-005 lines opened: `:224` REG-Q-010,
+    `:406`, `:4361`, `:4377`). `profile activation` → **1** / 0 / 0 / 0 — the single hit is REG-Q-010's
+    heading itself. `§16 item 10` and `Missing mapping blocks promotion` → **0 in all four**.
+  - **TODAY'S 17 ENTRIES SWEPT SEPARATELY** (REG-F-234..245 / REG-Q-058..062, REG-005 lines 12116-16041):
+    `instantiationProfile` 0, `conformanceProfiles` 0, `activation` 0, `PublishPwa` 0; `profile` **1**,
+    opened — REG-005:13995, inside REG-F-241, where `profile` is a **risk** profile in a `RISK_AT_LEAST`
+    operand. **Positive control in that same range: `limb:` → 155.**
+  - **POSITIVE CONTROLS, same instrument and same files, reported by count:** REG-005 `ASR-5` → **53**,
+    `limb:ASR` → **107**, `AdmitEvidence` → **13**; `enforcement-register.ts` `ASR-3` → **5**,
+    `AdmitEvidence` → **4**; ledger `REG-F-` → **15**, `AdmitEvidence` → **2**; `docs/_working`
+    `AdmitEvidence` → **7 files**. All four corpora are reachable and populated, so the zeros are real.
+  - CODE CENSUS RE-RUN AT HEAD: `grep -rn "instantiationProfile" --include=*.ts --include=*.svelte
+    packages/ apps/ | grep -v /dist/ | grep -v .svelte-kit | grep -v '\.test\.'` → **6** hits (2 schema
+    declarations, 3 writes, 1 comment), **ZERO readers**. POSITIVE CONTROL, identical command form and
+    tree: `requiredAssurancePolicyIds` → **95**, including live readers at `pwa-authoring.ts:408-411`.
+
+- **WHY THIS IS A QUESTION AND NOT A FINDING, AND WHAT A GUARD WRITTEN TODAY WOULD RATIFY BY ACCIDENT.**
+  The obvious repair is to constrain `instantiationProfile` to an enum. **Do not make it.** A closed enum
+  makes the field well-typed while leaving it unread — the hollow-governed-layer shape this programme has
+  already filed once — and it would settle by construction the very thing §16 item 10 holds open: it
+  blesses the union-only reading at `assurance-view.ts:478` as complete, and it blesses
+  `conformanceProfiles: []` at `pwa-ontology.ts:25` as a correct projection of a published version, when
+  ASR-19 limb 4 says the profile ontology must travel with that version. This is the move the adjacent
+  docblock already refused for limb 1 (`pwa-authoring.ts:904-905`): *"Deciding applicability without that
+  is choosing a convenient interpretation and encoding it as architecture — §0.3 forbids it."* The same
+  refusal applies here, one clause over.
+
+- **THE ADJUDICATION ASKED FOR — two dispositions, and each names what follows.**
+  **(A) The profile SELECTS required assurance** (canon ratifies `Undertaking.instantiationProfile` as a
+  key into the PWA-version-owned `conformanceProfiles` matrix, per ASR-19 limb 4 and Guide §7.3's
+  "minimum consequence"). Then this converts to a FINDING and four things are owed, all code:
+  `CreateUndertaking` must resolve the profile and refuse an unresolvable one; the resolved rung's
+  `mandatoryPolicyIds` must join the applicable-policy fold at `assurance-view.ts:478`; the chosen rung
+  must appear on `UndertakingCreated` so the act is auditable;
+  and `pwaToEngineOntology` must carry `conformanceProfiles` instead of `[]`. ⚠ **The rung's
+  `minIndependence` is deliberately NOT in that list.** Routing a profile's independence into the
+  de minimis floor is the arrangement `HARMONIZATION-FINDINGS.md` Item 15 already holds open and already
+  owes an entry for; annexing it here would file one defect twice and let whichever entry lands second
+  look discharged. Whoever writes Item 15's entry owns that conjunct. Predicted red before any of
+  it is trusted: activating with `LIGHTWEIGHT` under an architecture whose risk gate names
+  `HIGH_ASSURANCE` must be REFUSED **by message**, with a control that the correct rung is accepted.
+  **(B) The profile is a descriptive label.** Then ASR-19 limb 3's activation clause is **vacuous in this
+  engine** and should be recorded as satisfied-by-construction with the union at `assurance-view.ts:478`
+  cited as the reason — and the shipped ladder's `mandatoryPolicyIds` and `minIndependence` should be
+  struck or explicitly marked non-operative, because governance-shaped data nothing reads is the exact
+  hazard ASR-19's WHY line names: *"publication is where a design's unstated obligations become every
+  future Undertaking's silent gaps."* ⚠ **A REMEDY IS A HYPOTHESIS:** both dispositions above are
+  proposals for the adjudicator, not conclusions, and (A)'s four items were derived from the sites read
+  at HEAD, not from any prior filing's recommendation.
+
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-19:3`, **the ACTIVATION clause only**.
+  It closes nothing else, because: the PUBLICATION clause of the same limb is a code defect with a driven
+  admission and is filed separately as REG-F-XXX (ASR-19-1) — this limb is discharged only when both are
+  resolved; limb 1 is a *missing* assignment at `ValidatePwa`, already deferred at
+  `pwa-authoring.ts:899-906` on §16 item 9; limb 2 is Validator capability, a different field entirely;
+  and limb 4 — the profile ontology as PWA-version-owned versioned data — is **cited here as the canon
+  ground of the question but is NOT closed by it**, since this entry asks only whether the *activation
+  step* is bound to that ontology, not whether the ontology is correctly versioned. It also does not
+  discharge `REG-Q-010`, which remains open on the matrix's contract shape; it asks the narrower question
+  REG-Q-010 does not reach. And it closes nothing owed to
+  `docs/_working/HARMONIZATION-FINDINGS.md` Item 16, whose own entry — on the field's vocabulary drift —
+  is still unfiled, nor anything owed to that file's **Item 15**, whose entry — on the floor plan's
+  inability to consult a profile for its independence literal — is likewise still unfiled. Both are
+  listed as owing one in `docs/_working/BACKLOG.md` at HEAD `303ee671`.
+
+- **Merge target:** Corpus (JPWB-REG-005), for adjudication alongside `REG-Q-010`. No repository change
+  should be made until disposition (A) or (B) is recorded, because either one written as code first would
+  settle the question by accident. Status: OPEN.

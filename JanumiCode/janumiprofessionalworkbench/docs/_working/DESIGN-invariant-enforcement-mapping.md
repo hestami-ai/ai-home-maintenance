@@ -829,3 +829,79 @@ time authored by the repair rather than found by it.
 > **An append-only artifact makes every line number it cites into a contract with the cited file.** The
 > repair keeps lines 1-120 byte-identical except the heading, which is replaced by exactly one line, and
 > appends every disposition after item 32 keyed by ITEM NUMBER — a reference that survives the next edit.
+
+---
+
+## 18. ⚠ ADDENDUM (V-7) — THE READING THAT DECIDED 21 LIMBS WAS TESTED, AND A RULE DOES NOT APPLY ITSELF
+
+§17 argued that `NEAR_MISS` is `UNFILED` with a decoy attached, not a weaker `FILED`. **That argument
+decided whether 21 limbs were debt or done, so it was put at risk rather than assumed.**
+
+Every V-7 drafter was told, in the brief, that finding a limb ALREADY COVERED was a **win**; was handed
+the prior reader's decoy enumeration as an **input rather than an authority**; and was required to open
+each named filing at its line and read what it closes.
+
+> **Not one of the 21 was covered.** The alternative reading was tested 21 times and failed 21 times.
+
+That is the measurement §17 was owed. It also settles, retrospectively, the V-5 decision to spend a search
+on `NOT_ESTABLISHED` rather than default it: the population that search created has now been fully
+adjudicated and every row in it was real.
+
+### 18.1 The decoys are worse than §17.4 could show, because one of them is FALSE
+
+`limb:ASR-14:3`'s nearest filing is `RPH-GOV-006` (`enforcement-register.ts:3748`), whose `canonAnchor`
+is **this limb quoted word for word**. Its aside — that canon's first clause *"is honoured on the floor
+path"* — **went false on 2026-08-20**, when REG-F-202 deleted that consumer; `waiverStillDischarges` has
+had zero production callers since, and `verif/dead-kernel-census.test.ts:88` says so in the repository's
+own words. **The decoy is not merely narrower than the row. It is wrong in the direction that hides the
+gap**, which upgrades the finding from *"one path missed it"* to *"the clause is enforced nowhere."*
+
+Its drafter also found a **sixth decoy the census row had missed, and the most seductive of all**:
+`REG-F-216`'s remedy (3) proposes making `resolveWaiverAuthorization` read `decision.waiver` *"as an eighth
+ordered check"* — **this entry's exact function, at the exact ordinal this entry needs.** A reader who sees
+REG-F-216 land will believe the row is fixed. It is not: that remedy is an **existence** predicate, and a
+fully-detailed waiver carrying a decades-past `expiresAt` passes it. **Existence is not currency.**
+
+> **The most dangerous decoy is not an adjacent entry. It is a landed remedy that touches your site.**
+
+### 18.2 Three limbs whose halves have different fates — and the merge that would have lost one
+
+`limb:OBJ-3:2`, `limb:ASR-16:6` and `limb:ASR-19:3` are each closed by a **FINDING and a QUESTION**: a code
+defect right to fix under any reading, and a canon adjudication where writing a guard for the reading the
+engine already implements would ratify the narrower one by accident.
+
+**`filed_entry` is a single field, and the naive merge takes the last write.** That is worse than not
+filing: a later reader closes the FINDING, sees the row point at it, and marks the limb discharged while
+the ratification question is open. Both ordinals are now on the row with a stated reason, and a gate holds
+the pairing — its mutant, dropping one split pointer, reddens two assertions and names the limb.
+
+### 18.3 ⚠ A RULE YOU HAVE JUST DERIVED DOES NOT APPLY ITSELF TO THE CODE YOU WRITE WHILE DERIVING IT
+
+§17.5 records that `verdict === 'DIVERGENT'` was a predicate **correct when written and silently wider the
+day the vocabulary moved**, that 8 of 36 assertions had it, and that the fix is to re-key to a named
+predicate. It was written, and committed, alongside a **new** assertion reading:
+
+```ts
+return m[1] === 'F' ? n >= 234 : n >= 58;   // "limbs closed by the V-6 batch"
+```
+
+**An open-ended ordinal range.** The moment V-7's entries landed it counted them too and reported **39**
+where it means **18**. Same defect, same commit, eleven lines below the section documenting it.
+
+> **Deriving a general form does not immunise the code you are writing while you derive it.** The habit
+> that produces the defect is *"this bound is obviously right today"*, and that habit is not suspended by
+> having just written down why it fails. The countermeasure is mechanical, not cognitive: **when a
+> collection is a BATCH, pin both ends** — the next batch is the falsifier, and it always arrives.
+
+### 18.4 Where the census stands
+
+| | |
+|---|---|
+| filing axis | **`FILED` 229 · `NOT_APPLICABLE` 78** — the only two values left |
+| register | **77 entries**: REG-F-203..262, REG-Q-053..069 |
+| verification | **all three batches: 32/36, then 10/10, then 16/16 AMENDED.** No entry has ever survived it unchanged |
+
+**Still open, and none of it is filing debt:** 37 stale `owed` fields (all on FILED or NOT_APPLICABLE rows,
+where a stale `owed` misleads a reader but cannot misdirect a filing); the `UNENFORCED_NO_SHAPE` split
+(§16.2, deferred twice); 11 recorded arm doubts; and the 13 register entries owed by
+`HARMONIZATION-FINDINGS.md`'s re-dispositioned *"Refuted (32)"* (§17.7), tracked in `BACKLOG.md`.
