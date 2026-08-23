@@ -71,4 +71,37 @@ describe('authored source is reviewable text', () => {
 		},
 		30_000
 	);
+
+	// ⚠ EXTENDED 2026-08-23, AND NOT SPECULATIVELY — NUL IS NOT THE ONLY CONTROL BYTE THAT HURTS.
+	// A raw 0x08 (backspace) reached `verif/invariant-verdict-census.test.ts` when an escape level was lost
+	// writing `\b` into a regex through a generator script. The file stayed text, git diffed it happily, and
+	// `grep` printed the line looking exactly right — the byte is invisible in every view a reviewer uses. What
+	// it did was silently break the alternation it sat in, so a gate meant to check that every FILED row names
+	// its filing matched NOTHING.
+	//
+	// That one failed SAFE: a dead regex made the assertion refuse everything, so it went red and was found in
+	// minutes. The same byte one branch over — in a pattern whose match ADMITS rather than refuses — is a
+	// control that cannot fail: green, permanently, for a reason no reader can see. This repository has already
+	// recorded that class from the other side (a census whose positive control returns zero proves the pattern
+	// is broken, not that the thing is absent).
+	//
+	// So: every C0 control except TAB, LF and CR is refused. None has a legitimate place in authored source
+	// here, and each is invisible at exactly the moment a reviewer is deciding whether the code is right.
+	it(
+		'contains no other C0 control byte — invisible in every view, and able to change what a pattern means',
+		() => {
+			const ALLOWED = new Set([9, 10, 13]);
+			const offenders: string[] = [];
+			for (const f of files) {
+				const found = new Set<number>();
+				for (const b of readFileSync(f)) if (b < 32 && !ALLOWED.has(b)) found.add(b);
+				if (found.size > 0) {
+					const codes = [...found].map((b) => `0x${b.toString(16).padStart(2, '0')}`).join(',');
+					offenders.push(`${f.slice(ROOT.length).replaceAll('\\', '/')} (${codes})`);
+				}
+			}
+			expect(offenders, 'a control byte in source is a change nobody can see reviewing it').toEqual([]);
+		},
+		30_000
+	);
 });

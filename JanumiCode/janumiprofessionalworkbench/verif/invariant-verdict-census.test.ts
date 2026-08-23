@@ -73,12 +73,34 @@ const ARMS = [
 	'ENFORCED_BY_CONSTRUCTION',
 	'ENFORCED_MULTI_SITE',
 	'ENFORCED_AT_SURFACE_ONLY',
-	'PARTIAL_DIVERGENT_FILED',
-	'DIVERGENT_UNFILED',
+	'ENFORCED_AT_PRESENTATION',
+	'PARTIAL',
+	'DIVERGENT',
 	'UNENFORCED_OBSERVED_ADMISSION',
 	'UNENFORCED_DEAD_PREDICATE',
 	'UNENFORCED_NO_SHAPE'
 ] as const;
+
+/**
+ * ⚠ THE SECOND AXIS, SPLIT OUT OF THE FIRST BY THE V-4 MIGRATION (DESIGN §10).
+ *
+ * The ladder used to fuse two independent facts into one word: `PARTIAL_DIVERGENT_FILED` asserted that
+ * enforcement is partial AND that the divergence is recorded, and `DIVERGENT_UNFILED` asserted the opposite of
+ * the second half. Every other arm could say nothing about filing at all — so an unfiled divergence sitting on
+ * an UNENFORCED arm was invisible to the one counter that was supposed to reach zero.
+ *
+ * The leak was not hypothetical. On the day the axes were split, the retired `DIVERGENT_UNFILED` arm counted
+ * ZERO outstanding filings (all 49 of its rows had just been filed as REG-F-203..233 / REG-Q-053..057) while
+ * **48 rows on other arms** had a filing status nobody had ever looked for.
+ *
+ * ⚠ AND `UNFILED` IS NOT THE DEFAULT, DELIBERATELY. `UNFILED` asserts that no filing exists, which is a claim
+ * about a SEARCH — and this programme has now recorded, twice, what happens when such a claim is made without
+ * one (EM-7: the search tool withholds the register's longest lines; six findings were "not filed" until
+ * somebody looked again). Those 48 rows are `NOT_ESTABLISHED`: divergent enough to owe a filing, never
+ * searched. It is the same refusal that kept STA-4:5 and DEC-6:3 between arms until the promotion path was
+ * actually driven.
+ */
+const FILINGS = ['FILED', 'UNFILED', 'NEAR_MISS', 'NOT_APPLICABLE', 'NOT_ESTABLISHED'] as const;
 
 /** Arms whose evidence is a REFUSAL OBSERVED THROUGH `Engine.dispatch`, not a reading. */
 const DRIVEN_ARMS = new Set(['ENFORCED_DRIVEN', 'UNENFORCED_OBSERVED_ADMISSION']);
@@ -202,11 +224,12 @@ describe('W-3b — the invariant enforcement census', () => {
 		for (const v of verdicts) dist[String(v.verdict)] = (dist[String(v.verdict)] ?? 0) + 1;
 		expect(dist).toEqual({
 			ENFORCED_DRIVEN: 29,
-			ENFORCED_BY_CONSTRUCTION: 44,
+			ENFORCED_BY_CONSTRUCTION: 43,
 			ENFORCED_MULTI_SITE: 20,
 			ENFORCED_AT_SURFACE_ONLY: 2,
-			PARTIAL_DIVERGENT_FILED: 61,
-			DIVERGENT_UNFILED: 49,
+			ENFORCED_AT_PRESENTATION: 1,
+			PARTIAL: 61,
+			DIVERGENT: 49,
 			UNENFORCED_OBSERVED_ADMISSION: 64,
 			UNENFORCED_DEAD_PREDICATE: 12,
 			UNENFORCED_NO_SHAPE: 26
@@ -306,7 +329,7 @@ describe('W-3b — the invariant enforcement census', () => {
 
 	// ── THE ARMS THAT ARE FINDINGS, NOT RESTING STATES ──────────────────────────────────────────────────────
 	it('DIVERGENT_UNFILED rows name the register entry owed — the arm must reach zero at close', () => {
-		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT');
 		for (const r of rows) {
 			expect(String(r.owed ?? ''), `${String(r.limb_id)} must say what filing it owes`).not.toBe('');
 		}
@@ -349,7 +372,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// recorded here rather than performed under a slice commit.
 	it('PARTIAL_DIVERGENT_FILED rows name the filing they rest on, and the five that do not are counted', () => {
 		const unnamed = verdicts
-			.filter((v) => String(v.verdict) === 'PARTIAL_DIVERGENT_FILED')
+			.filter((v) => String(v.verdict) === 'PARTIAL')
 			.filter((v) => String(v.filed_as ?? '') === '')
 			.map((v) => String(v.limb_id));
 		// ⚠ ELEVEN BECAME TWO, AND THE SEARCH SETTLED IT IN BOTH DIRECTIONS — which is what the list was pinned
@@ -448,7 +471,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		// divergence — re-verified as still reproducing, and re-searched against all four filing corpora. The
 		// remaining 44 sit on other arms, where a stale `owed` misleads but does not misdirect a filing.
 		expect(
-			stale.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED').length,
+			stale.filter((v) => String(v.verdict) === 'DIVERGENT').length,
 			'the subset that blocks V-4: these rows owe a filing and describe the wrong one'
 		).toBe(0);
 	});
@@ -464,7 +487,7 @@ describe('W-3b — the invariant enforcement census', () => {
 			'ENFORCED_AT_SURFACE_ONLY'
 		]);
 		const bad = verdicts
-			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED')
+			.filter((v) => String(v.verdict) === 'DIVERGENT')
 			.filter((v) => ENFORCED.has(String(v.owed_for_verdict)))
 			.map((v) => String(v.limb_id));
 		// Empty as of V-4b, and three of the four left by being RE-ARMED rather than re-worded: ASR-10:5 was never
@@ -486,7 +509,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// an adjacent filing that does not cover it still belongs in `near_miss_filing` and nowhere else.
 	it('a DIVERGENT_UNFILED row cites a filing only when one was actually written for it', () => {
 		const bad = verdicts
-			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED')
+			.filter((v) => String(v.verdict) === 'DIVERGENT')
 			.filter((v) => v.filed_as !== undefined && !v.filed_entry)
 			.map((v) => String(v.limb_id));
 		expect(bad, 'a near miss dressed as a filing — the field asserts what the arm denies').toEqual([]);
@@ -521,7 +544,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// the limb's own consequent, and — in one case — a correction that REVERSED a claim the draft made. That is
 	// kept per row rather than summarised, because it is the measurement of what the cut cost.
 	it('every filed divergence names its register entry, and every entry is accounted for', () => {
-		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT');
 		const entries = new Set(rows.map((v) => String(v.filed_entry)));
 		expect(entries.size, 'register entries carrying the W-3b filing').toBe(36);
 		const findings = rows.filter((v) => String(v.filed_entry_kind) === 'FINDING').length;
@@ -538,7 +561,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	});
 
 	it('every live divergence carries a drafted filing statement and its EM-7 search', () => {
-		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT');
 		const noStatement = rows.filter((v) => String(v.filing_statement ?? '').length < 80).map((v) => String(v.limb_id));
 		expect(noStatement, 'an unfiled divergence with no drafted remedy is a debt with no plan').toEqual([]);
 		const noSearch = rows.filter((v) => String(v.em7_search ?? '').length < 40).map((v) => String(v.limb_id));
@@ -565,7 +588,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// construction, and it agrees in the same vocabulary, so it reads as corroboration. The disclosure was
 	// honest and the instrument was still systematically optimistic.
 	it('every live divergence belongs to exactly one filing cluster', () => {
-		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT');
 		const unclustered = rows.filter((v) => !v.cluster_id).map((v) => String(v.limb_id));
 		expect(unclustered, 'a divergence with no cluster would be filed alone or not at all').toEqual([]);
 		const ids = new Set(rows.map((v) => String(v.cluster_id)));
@@ -586,7 +609,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// carrying DRIVEN evidence was overridden. Eight rows sit in five RATIFICATION-FIRST clusters, where the
 	// remedy is a canon question and writing code would ratify the narrower reading by accident.
 	it('the filing clusters declare how much the lenses actually agreed', () => {
-		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT');
 		const seen = new Map<string, string>();
 		for (const v of rows) seen.set(String(v.cluster_id), String(v.cluster_confidence));
 		const dist: Record<string, number> = {};
@@ -638,6 +661,83 @@ describe('W-3b — the invariant enforcement census', () => {
 			}
 		}
 		expect(offenders, 'a truncated evidence field is evidence that has been silently edited').toEqual([]);
+	});
+
+	// ── THE FILING AXIS ─────────────────────────────────────────────────────────────────────────────────────
+	it('every row declares a filing status from the closed vocabulary', () => {
+		const bad = verdicts
+			.filter((v) => !(FILINGS as readonly string[]).includes(String(v.filing)))
+			.map((v) => `${String(v.limb_id)} (${String(v.filing)})`);
+		expect(bad, 'fail closed: a row with no filing status is unclassified, not exempt').toEqual([]);
+	});
+
+	// ⚠ `NOT_APPLICABLE` MEANS "NOTHING DIVERGENT TO FILE", so it is reachable ONLY from an ENFORCED arm. A
+	// PARTIAL, DIVERGENT or UNENFORCED row has something to record BY DEFINITION; letting it claim
+	// NOT_APPLICABLE would rebuild the exact hiding place the migration just removed.
+	it('NOT_APPLICABLE is reachable only from an ENFORCED arm', () => {
+		const bad = verdicts
+			.filter((v) => String(v.filing) === 'NOT_APPLICABLE')
+			.filter((v) => !String(v.verdict).startsWith('ENFORCED'))
+			.map((v) => `${String(v.limb_id)} (${String(v.verdict)})`);
+		expect(bad, 'a divergence cannot have nothing to file').toEqual([]);
+	});
+
+	it('the filing axis is pinned, and the debt it exposed is counted', () => {
+		const dist: Record<string, number> = {};
+		for (const v of verdicts) dist[String(v.filing)] = (dist[String(v.filing)] ?? 0) + 1;
+		// ⚠ 186/73 ON THE FIRST RUN, AND THIS GATE CORRECTED IT TO 183/76 BEFORE THE MIGRATION LANDED. Three
+		// PER-1 rows carried `filed_as: "n/a — no divergence to file for this limb."` — the row DENYING that
+		// anything is owed — and my migration read the field's mere PRESENCE as FILED. Presence of a field is not
+		// its assertion. The three are NOT_APPLICABLE, which is what their own text says, and the misleading
+		// field was retired rather than reworded so nothing later reads "n/a" as a citation.
+		expect(dist).toEqual({ FILED: 183, NOT_APPLICABLE: 76, NOT_ESTABLISHED: 48 });
+
+		// ⚠ THIS IS THE MIGRATION'S WHOLE RETURN, AND IT IS A NUMBER THE OLD LADDER COULD NOT PRODUCE. The
+		// retired `DIVERGENT_UNFILED` arm read ZERO outstanding filings on the day of the split, because all 49
+		// of its rows had just been filed. These 48 were sitting on UNENFORCED arms the entire time — 25 observed
+		// admissions, 21 with no shape at all, 2 dead predicates — each one a limb where canon says something the
+		// code does not do, and where nobody has ever checked whether that is recorded.
+		const ne = verdicts.filter((v) => String(v.filing) === 'NOT_ESTABLISHED');
+		const byArm: Record<string, number> = {};
+		for (const v of ne) byArm[String(v.verdict)] = (byArm[String(v.verdict)] ?? 0) + 1;
+		expect(byArm).toEqual({
+			UNENFORCED_OBSERVED_ADMISSION: 25,
+			UNENFORCED_NO_SHAPE: 21,
+			UNENFORCED_DEAD_PREDICATE: 2
+		});
+
+		// UNFILED is the arm for "searched, and nothing covers it". It is empty because every search this
+		// programme has actually run ended in a filing — which is the honest reason, not a clean result.
+		expect(ne.filter((v) => String(v.filing) === 'UNFILED').length).toBe(0);
+	});
+
+	it('a FILED row names its filing; a NEAR_MISS names the filing that misses', () => {
+		// ⚠ A LENGTH THRESHOLD WAS THE WRONG TEST AND IT FAILED HONESTLY ON `limb:DEC-6:4`, whose `filed_as` is
+		// the nine characters "REG-F-042" — a complete and precise citation. What FILED owes is a NAMEABLE
+		// REFERENCE, not a word count: a register ordinal, or a path to the artifact that carries it.
+		const NAMES = /REG-[FQDE]-\d{3}|RPH-[A-Z]{3}-\d{3}|\.(ts|md|json)/;
+		const filedNoName = verdicts
+			.filter((v) => String(v.filing) === 'FILED')
+			.filter((v) => !v.filed_entry && !NAMES.test(String(v.filed_as ?? '')))
+			.map((v) => String(v.limb_id));
+		expect(filedNoName, 'FILED asserts a filing exists — it has to say WHICH').toEqual([]);
+		const nearNoName = verdicts
+			.filter((v) => String(v.filing) === 'NEAR_MISS')
+			.filter((v) => String(v.near_miss_filing ?? '').length < 20)
+			.map((v) => String(v.limb_id));
+		expect(nearNoName).toEqual([]);
+	});
+
+	// ⚠ THE ARM THIS MIGRATION ADDED, AND THE ROW THAT PROVED IT WAS MISSING. `limb:ASR-9:8` forbids a DISPLAY —
+	// "conditional satisfaction is never displayed as unconditional success" — so the presentation layer is the
+	// CORRECT locus for it, not a deficiency. The old ladder's nearest arm, ENFORCED_AT_SURFACE_ONLY, is a
+	// FINDING every time it is used, and filing one against a properly enforced rule would have been an
+	// overstatement of exactly the kind REG-F-043 records. The row sat on ENFORCED_BY_CONSTRUCTION as a stated
+	// interim for four commits while the gap was recorded and deferred.
+	it('ENFORCED_AT_PRESENTATION carries the display limb, and SURFACE_ONLY stays a finding', () => {
+		const pres = verdicts.filter((v) => String(v.verdict) === 'ENFORCED_AT_PRESENTATION');
+		expect(pres.map((v) => String(v.limb_id))).toEqual(['limb:ASR-9:8']);
+		expect(String(pres[0]?.verdict_before_migration)).toBe('ENFORCED_BY_CONSTRUCTION');
 	});
 
 	it('ENFORCED_BY_CONSTRUCTION rows say whether their census is GATED', () => {

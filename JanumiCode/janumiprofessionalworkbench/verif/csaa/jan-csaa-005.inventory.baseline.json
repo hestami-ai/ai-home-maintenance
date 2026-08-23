@@ -5693,7 +5693,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "7f559c2d6e7b8046777caf0e10faf9eefa92603e8e139df5f6a2868a5dade3cc",
+    "fileManifestDigest": "c38bef3f237eec13ec07a8c63dbe2e2eed83c56bb6727adfce70b8fbf0a6c5cc",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -12046,9 +12046,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 76214,
+        "bytes": 76230,
         "path": "scripts/mutants/run.ts",
-        "sha256": "937e4a9b10d585138810e021993dac96ec1b6c39eb86f6bd0988e3104c712f24",
+        "sha256": "25fcee3082aa35660f8a0a7e26b7c5f12408f36ecd13ace7c7ff07e79973a6c1",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -12347,9 +12347,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 54007,
+        "bytes": 60561,
         "path": "verif/invariant-verdict-census.test.ts",
-        "sha256": "6170a55d5794d0b4ce843a94d23462bc30b540781ad67671f91d663c89f90557",
+        "sha256": "9c6859177df87103c5698c70b57c9c3ea92005e57e1ed3c765b635fa095799b8",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12424,9 +12424,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 4262,
+        "bytes": 6205,
         "path": "verif/source-is-reviewable.test.ts",
-        "sha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
+        "sha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -12542,7 +12542,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "0636f59553746c5b1b458338cabb8645a6f01f5a2cf0b69ee844feb423294e06",
+    "subjectId": "72ae29a8a343b3719078d6b564a91e812f080488345f67e8ebfede61c9b0ffe8",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -15006,7 +15006,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/run.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "937e4a9b10d585138810e021993dac96ec1b6c39eb86f6bd0988e3104c712f24",
+      "contentSha256": "25fcee3082aa35660f8a0a7e26b7c5f12408f36ecd13ace7c7ff07e79973a6c1",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -15617,7 +15617,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "6170a55d5794d0b4ce843a94d23462bc30b540781ad67671f91d663c89f90557",
+      "contentSha256": "9c6859177df87103c5698c70b57c9c3ea92005e57e1ed3c765b635fa095799b8",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -15793,7 +15793,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/source-is-reviewable.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
+      "contentSha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

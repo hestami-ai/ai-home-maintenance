@@ -1009,7 +1009,7 @@ const summarise = (s: string): string =>
 		.split('\n')
 		.filter((l) => l.includes('Tests '))
 		.at(-1) ?? '')
-		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
+		.replaceAll(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
 		.trim();
 
 // ── CRASH RECOVERY, added after this runner LOST a mutant ────────────────────────────────────────────────────
