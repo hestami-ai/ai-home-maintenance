@@ -30,6 +30,7 @@
 		"csaa:analyze:arrow-command-census": "bun scripts/csaa-arrow-command-census.ts",
 		"csaa:analyze:command-handler-graph": "bun scripts/csaa-command-handler-graph.ts",
 		"csaa:analyze:command-dispatch-topology": "bun scripts/csaa-command-dispatch-topology.ts",
+		"csaa:analyze:command-event-contract-overlay": "bun scripts/csaa-command-event-contract-overlay.ts",
 		"csaa:analyze:guard-enforcement-ledger": "bun scripts/csaa-guard-enforcement-ledger.ts",
 		"csaa:analyze:guard-classification-overlay": "bun scripts/csaa-guard-classification-overlay.ts",
 		"csaa:analyze:declaration-context": "bun scripts/csaa-declaration-context.ts",

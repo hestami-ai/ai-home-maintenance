@@ -62,7 +62,17 @@ import {
 	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCHEMA_VERSION,
 	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE,
 	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_BYTES,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_EVENTS,
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_OPERATION_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_RESULT_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SCHEMA_VERSION,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SCOPE,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SELECTION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
@@ -216,6 +226,8 @@ import {
 	buildModuleResolutionTrace,
 	moduleResolutionTraceReportExitCode,
 	buildCommandEventContractOverlay,
+	commandEventContractOverlayReportExitCode,
+	runCommandEventContractOverlayReport,
 	buildCommandHandlerGraph,
 	buildCommandDispatchTopology,
 	commandHandlerGraphReportExitCode,
@@ -323,6 +335,16 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('createModuleResolutionTraceProgressJsonlWriter');
 		expect(publicSurface).not.toHaveProperty('runModuleResolutionTraceCommand');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
+		expect(runCommandEventContractOverlayReport).toBeTypeOf('function');
+		expect(commandEventContractOverlayReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty(
+			'createCommandEventContractOverlayProgressJsonlWriter'
+		);
+		expect(publicSurface).not.toHaveProperty('runCommandEventContractOverlayCommand');
+		expect(publicSurface).not.toHaveProperty('admitCommandEventContractOverlayReportRequest');
+		expect(publicSurface).not.toHaveProperty(
+			'runCommandEventContractOverlayReportWithDependencies'
+		);
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
 		expect(runCommandHandlerGraphReport).toBeTypeOf('function');
 		expect(commandHandlerGraphReportExitCode).toBeTypeOf('function');
@@ -662,6 +684,35 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(COMMAND_EVENT_CONTRACT_OVERLAY_SCHEMA_VERSION).toBe(
 			'jan-csaa-command-event-contract-overlay/1.0.0'
 		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-command-event-contract-overlay/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-report-request/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-report-result/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-report/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SCOPE).toBe(
+			'EXACT_SELECTED_FROZEN_SUBJECT_SEMANTIC_RETAINED_ARROW_COMMAND_HANDLER_AND_COMMAND_EVENT_CONTRACT_OVERLAY'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_SELECTION).toMatchObject({
+			commandDispatchTopology: 'NOT_CONSUMED',
+			guardClassificationOverlay: 'NOT_CONSUMED',
+			retainedEventSurfaceCensus:
+				'EXACT_FROZEN_ARTIFACT_REFERENCE_NOT_EXECUTED_BY_CSAA_AND_NOT_INTEGRATED'
+		});
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-report-progress/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-event-contract-overlay-progress-transport/0.1.0'
+		);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION).toBe(
 			'jan-csaa-build-guard-classification-overlay/0.1.0'
 		);

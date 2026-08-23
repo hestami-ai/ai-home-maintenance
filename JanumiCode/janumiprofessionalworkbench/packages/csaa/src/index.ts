@@ -10,6 +10,7 @@ export * from './contracts/arrow-command-census-report.js';
 export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-handler-graph-report.js';
 export * from './contracts/command-event-contract-overlay.js';
+export * from './contracts/command-event-contract-overlay-report.js';
 export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/command-dispatch-topology-report.js';
 export * from './contracts/guard-enforcement-ledger.js';
@@ -223,6 +224,25 @@ export {
 	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type CommandDispatchTopologyProgressTransportTruncation
 } from './application/command-dispatch-topology-progress-jsonl.js';
+
+export {
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_BYTES,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_MAX_EVENTS,
+	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type CommandEventContractOverlayProgressTransportTruncation
+} from './application/command-event-contract-overlay-progress-jsonl.js';
+
+export {
+	commandEventContractOverlayReportExitCode,
+	runCommandEventContractOverlayReport,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROGRESS_NONCLAIMS,
+	COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION,
+	type CommandEventContractOverlayReportProgressEvent,
+	type CommandEventContractOverlayReportProgressObservation,
+	type CommandEventContractOverlayReportProgressObservationMetric,
+	type CommandEventContractOverlayReportProgressPhase,
+	type RunCommandEventContractOverlayReportOptions
+} from './application/run-command-event-contract-overlay-report.js';
 
 export {
 	guardEnforcementLedgerReportExitCode,
