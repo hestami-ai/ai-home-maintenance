@@ -260,19 +260,45 @@ of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and
    constructive questions, with the answer stripped from the payload — classified all 26 and agreed on 25.
    **Said 2, is 5.** And the split retires a hand-listed exception: `NOT_APPLICABLE` is now reachable from
    `ENFORCED_*` **or `UNENFORCED_NO_SUBJECT`**, by rule rather than by naming two ids.
-4. **The 37 remaining stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed`
-   misleads a reader but cannot misdirect a filing.
-5. **The recorded arm doubts — 11 decompose into 3 + 5 + 3.** THREE are STALE: their own subject is an arm
-   the V-4 migration retired, and each row has already moved where the doubt asked (`STA-2:3`, `ASR-10:5`,
-   `ASR-8:5`). FIVE are SELF-CLEARED — the text opens *"The ARM is right"*, *"None on the arm"*, *"NOT a
-   doubt about the verdict"*. ⚠ **THREE are LIVE**: `PER-3:2`, `REL-2:3` (whose dead-predicate proof this
-   programme's own RPH-TRC-005 correction falsified), and `LYR-3:1`.
+4. **The stale `owed` fields — 37 -> 43**, all on FILED or NOT_APPLICABLE rows, where a stale `owed`
+   misleads a reader but cannot misdirect a filing. ⚠ **It ROSE because two vocabulary acts orphaned
+   fields: the NO_SUBJECT split (5) and `REL-2:3`'s adjudicated arm move (1).** Neither was repaired by
+   stamping: `owed_for_verdict` records the arm an `owed` was AUTHORED FOR, so rewriting it would make a
+   provenance fact false. **A vocabulary change is not a rename** — its honest cost is orphaned prose.
+5. ✅ **THE ARM DOUBTS ARE SETTLED** (`DESIGN §22`) — 11 = **3 stale + 5 self-cleared + 3 live**, and all
+   three live ones were adjudicated, then REFUTED by a second agent required to re-establish the
+   load-bearing fact by a DIFFERENT route.
+   **`REL-2:3` MOVED** — `UNENFORCED_DEAD_PREDICATE` -> `UNENFORCED_OBSERVED_ADMISSION`. The arm means "a
+   predicate implements the limb and nothing calls it", and something calls it; the row conceded it in its
+   own fields. **REG-F-258 stands — it had already made the correction itself.** ⚠ But no arm holds the
+   honest fact (a correct, unit-tested artifact that governs nothing): **the fifth vocabulary gap**.
+   **`PER-3:2` STANDS** with three corrections — its supporting drive rejected six HAND-PICKED command
+   names, *"the enumerated form of the question"*; "113 registered types" is 105 by derivation; and
+   "no generic setter" is false (`ChangePwuState`, `registry.ts:141`).
    ⚠ **A keyword rule got `LYR-3:1` wrong** — it names the retired arm only inside a QUOTATION of the
-   refuter it argues against. Its own claim is live: REG-F-209 contradicts the refuter's load-bearing
-   premise, since a rename-only `EditPwuType` bumps the PWA semantic version today and `floor-gate.ts:314`
-   then invalidates a SATISFIED review off that bump.
-6. **`limb:LYR-3:1` owes a re-adjudication** — the only row carrying a LIVE arm doubt *and* an unwritten
-   `missing_shape` *and* a stale `owed`, with its doubt citing a FILED entry the refuter never searched.
-6. **The 13 register entries owed by the re-dispositioned "Refuted (32)"** — two of them gate defects:
+   refuter it argues against. A string appearing in a row is not that row asserting it.
+6. ✅ **`limb:LYR-3:1` IS RE-ADJUDICATED — CONTESTED THROUGH FOUR AGENTS** (`DESIGN §22.2`). Adjudicator
+   (NO_SHAPE) -> refuter (REFUTED, proposing DIVERGENT) -> **two settlers from opposite ends**, who AGREED
+   on the measurement and SPLIT on the disposition. The measurement is the crux both earlier agents merely
+   asserted: every production consumer of `permittedChildTypeIds` classified, and **not one governed
+   consumer reads ORDER** — the semantic-path reader produces a provably isomorphic tree.
+   **Resolved by §21.2's own lesson — the arm stays `UNENFORCED_NO_SHAPE` AND a ratification question is
+   owed**, because enforceability and debt are different axes.
+   ⚠ Two artifacts misled careful readers: a **truncated quote** of `pwa-authoring.ts:442` (the omitted
+   half reverses it) and a **docblock at `pwaFlow.ts:178-180` that is FALSE on the primary layout engine**.
+7. ✅ **The five unwritten `missing_shape` fields are authored — the debt is ZERO** (`DESIGN §22.4`), and
+   the arm's mechanism assertion moved to where it can still fail rather than looping over an empty list.
+8. ✅ **The 13 register entries owed by the re-dispositioned "Refuted (32)" are FILED** as REG-F-263..271
+   and REG-Q-070..073, with item #31 found ALREADY FILED as REG-F-246. Two were gate defects:
    `depcruise packages` leaves `apps/` outside every layering rule, and `turbo run lint` is dead
-   configuration over a single unpipelined root `eslint .`.
+   configuration over a single unpipelined root `eslint .`. Both now carry register entries.
+
+### ⚠ What is genuinely still open
+
+- **A ratification question against LYR-3**, owed by `limb:LYR-3:1` and not yet filed (§22.2).
+- **`REL-2:3`'s destination arm owes its third evidence item** — `UNENFORCED_OBSERVED_ADMISSION` requires
+  the arrangement, the accepted result, and one more the row does not yet carry (§22.1).
+- **The 43 stale `owed` fields**, and the **fifth vocabulary gap** the ladder cannot express (§22.1).
+- **A superseding note for REG-F-234's clause about `limb:REL-2:3`** — it was TRUE when written, was
+  falsified by V-7 filing the row, and is falsified again by the arm move. The register is APPEND-ONLY, so
+  a superseding entry is the only available repair.

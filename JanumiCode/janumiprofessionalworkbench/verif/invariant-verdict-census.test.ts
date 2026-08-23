@@ -249,8 +249,12 @@ describe('W-3b — the invariant enforcement census', () => {
 			ENFORCED_AT_PRESENTATION: 1,
 			PARTIAL: 61,
 			DIVERGENT: 49,
-			UNENFORCED_OBSERVED_ADMISSION: 64,
-			UNENFORCED_DEAD_PREDICATE: 12,
+			// ⚠ 64 -> 65 and 12 -> 11: `limb:REL-2:3` moved, and it moved because its own recorded `arm_doubt`
+			// was RIGHT. `UNENFORCED_DEAD_PREDICATE` means, by its only definition anywhere, "a kernel predicate
+			// implements the limb and nothing calls it" — and something calls it. The row conceded it in its own
+			// `census` and `sibling_control` fields; the arm was refuted by the row's own data.
+			UNENFORCED_OBSERVED_ADMISSION: 65,
+			UNENFORCED_DEAD_PREDICATE: 11,
 			UNENFORCED_NO_SHAPE: 21,
 			UNENFORCED_NO_SUBJECT: 5
 		});
@@ -452,7 +456,11 @@ describe('W-3b — the invariant enforcement census', () => {
 				`${String(v.limb_id)}: the superseded arm must itself be one of the nine`
 			).toBe(true);
 		}
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(80);
+		// 80 -> 81: `limb:REL-2:3` joins the population, and it joins for the best possible reason — its own
+		// recorded `arm_doubt` argued the verdict was wrong, an adjudication agreed, and a refuter upheld
+		// that with corrections. **A row entering this set on a SETTLED doubt is the instrument working**,
+		// not a regression: the narrative it outlived is now MARKED as outlived instead of silently standing.
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(81);
 	});
 
 	// ── ⚠ GATE THE PROVENANCE, BECAUSE THE PROSE CANNOT BE GATED ───────────────────────────────────────────
@@ -496,7 +504,10 @@ describe('W-3b — the invariant enforcement census', () => {
 		// orphans prose, the count says how much, and re-authoring needs the row, not a script.
 		// These five are distinguishable from the other 37: single cause, single date, and every one of them
 		// carries `arm_split_from`.
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(42);
+		// 42 -> 43: `limb:REL-2:3`'s arm moved on an adjudicated doubt, orphaning its `owed` exactly as the
+		// NO_SUBJECT split orphaned five. Same rule, same refusal to stamp: the field records the arm an
+		// `owed` was AUTHORED FOR, and rewriting it would make a provenance fact false.
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(43);
 		expect(
 			stale.filter((v) => String(v.arm_split_from ?? '') === 'UNENFORCED_NO_SHAPE').length,
 			'the subset the NO_SUBJECT split orphaned, in this commit'
@@ -867,10 +878,14 @@ describe('W-3b — the invariant enforcement census', () => {
 			.filter((v) => String(v.missing_shape ?? '').trim().length < 40)
 			.map((v) => String(v.limb_id))
 			.sort();
+		// ⚠ THE FIVE ARE WRITTEN AND THE DEBT IS ZERO. Four were authored by a pass that ran a fresh census
+		// per row with its own positive controls; `limb:LYR-3:1` was deliberately EXCLUDED from that pass
+		// while its arm was under dispute, and was written afterwards from the tiebreak measurement with the
+		// attribution attached. **This may only stay empty.** A sixth row arriving silent reddens here.
 		expect(
 			silent,
 			'a row asserting canon has no shape, without saying WHICH shape is absent'
-		).toEqual(['limb:ASR-19:3', 'limb:ASR-9:5', 'limb:AUT-2:1', 'limb:LYR-1:1', 'limb:LYR-3:1']);
+		).toEqual([]);
 
 		// ⚠ THE CONTROL, AND IT IS WHAT MAKES THE FIVE MEAN SOMETHING. Without it, an assertion listing five
 		// ids passes just as happily if the field were empty on all 26 — the vacuity this repository has
@@ -879,18 +894,29 @@ describe('W-3b — the invariant enforcement census', () => {
 			.filter((v) => String(v.refutation) === 'HELD')
 			.filter((v) => String(v.missing_shape ?? '').trim().length < 40);
 		expect(heldSilent, 'a HELD row on this arm has no excuse for silence').toEqual([]);
+		// ⚠ THIS IS NOW THE ONLY THING KEEPING THE ASSERTION ABOVE FROM BEING VACUOUS. `toEqual([])` passes
+		// just as happily against a parser that returns nothing, or an arm that has emptied. It must equal the
+		// arm's own size: every row on the arm states its shape, none excepted.
 		expect(
 			noShape.filter((v) => String(v.missing_shape ?? '').trim().length >= 40).length,
-			'rows that DO state their missing shape — the population is real'
-		).toBe(16);
+			'rows that DO state their missing shape — must equal the whole arm'
+		).toBe(21);
 
-		// Every one of the five is an OVERTURN. If that ever stops being true the mechanism above is wrong,
-		// and the comment explaining it becomes a story rather than a finding.
-		for (const id of silent) {
-			const row = verdicts.find((v) => String(v.limb_id) === id);
-			expect(String(row?.refutation), `${id} — the mechanism is the overturn`).toBe('OVERTURNED');
-			expect(String(row?.superseded_verdict ?? ''), `${id} must name what it superseded`).not.toBe('');
+		// ⚠ THE MECHANISM IS PINNED WHERE IT CAN STILL BE FALSIFIED. The old form looped over `silent` and
+		// asserted each was an OVERTURN — which is now a loop over an empty array, i.e. nothing. The claim it
+		// was making is still checkable in the other direction, and this is where it moves: EVERY row a
+		// refuter LEFT on this arm (refutation HELD) states its shape. That was true when the five were
+		// silent and it is what made "0 of 14 vs 5 of 12" a mechanism rather than a coincidence.
+		for (const v of noShape.filter((x) => String(x.refutation) === 'HELD')) {
+			expect(
+				String(v.missing_shape ?? '').trim().length,
+				`${String(v.limb_id)} — a HELD row has no excuse for silence`
+			).toBeGreaterThan(40);
 		}
+		expect(
+			noShape.filter((v) => String(v.refutation) === 'OVERTURNED').length,
+			'the moved population the five came from — if this reaches 0 the mechanism is unfalsifiable here'
+		).toBeGreaterThan(0);
 	});
 
 	// ── ⚠ THREE LIMBS ARE CLOSED BY TWO ENTRIES, AND NEITHER ALONE DISCHARGES THEM ─────────────────────────
@@ -902,6 +928,53 @@ describe('W-3b — the invariant enforcement census', () => {
 	// closes the FINDING, sees the row point at it, and marks the limb discharged while the ratification
 	// question is still open. The row records BOTH ordinals and states why, and this gate is what keeps the
 	// pairing from being dropped by the next merge script that assumes one entry per limb.
+	// ── ⚠ AN ARM DOUBT IS A RECORDED CLAIM THAT THE VERDICT IS WRONG, AND IT MUST BE SETTLED OR STAND OPEN ──
+	// Eleven rows carried one. They were THREE populations, not one: THREE were stale — their own subject was
+	// an arm the V-4 migration RETIRED, and each row had already moved where the doubt asked; FIVE say in
+	// their own opening words that the arm is right ("The ARM is right", "None on the arm", "NOT a doubt
+	// about the verdict"); THREE were live.
+	//
+	// ⚠ A KEYWORD RULE GOT ONE OF THEM WRONG, and it is worth the line: "the doubt names a retired arm, so
+	// it is stale" returned FOUR. `limb:LYR-3:1` names `DIVERGENT_UNFILED` only inside a QUOTATION OF THE
+	// REFUTER IT ARGUES AGAINST. A string appearing in a row is not that row asserting it — the same shape
+	// as "presence of a field is not its assertion", which this gate already records one assertion over.
+	//
+	// The three live ones were adjudicated, then REFUTED by a second agent required to re-establish the
+	// load-bearing fact BY A DIFFERENT ROUTE. One verdict moved (`REL-2:3`); one stood with corrections
+	// (`PER-3:2`); one was REFUTED and went to two settlers working from opposite ends, who agreed on the
+	// measurement and split on the disposition — resolved by this programme's own §21.2 lesson, that
+	// ENFORCEABILITY and DEBT are different axes.
+	it('every live arm doubt is adjudicated, and the adjudication records its own refutation', () => {
+		const adjudicated = verdicts.filter((v) => v.arm_doubt_adjudication);
+		expect(adjudicated.map((v) => String(v.limb_id)).sort())
+			.toEqual(['limb:LYR-3:1', 'limb:PER-3:2', 'limb:REL-2:3']);
+		for (const v of adjudicated) {
+			const a = String(v.arm_doubt_adjudication);
+			// An adjudication that records only its outcome is an assertion. It must carry the refutation it
+			// survived — this repository has never had one survive unchanged.
+			expect(a, `${String(v.limb_id)} must record the refuter`).toContain('REFUTER');
+			expect(a.length, `${String(v.limb_id)} adjudication`).toBeGreaterThan(1000);
+			// The original doubt is PRESERVED, not replaced — it is the record of how the error was caught.
+			expect(String(v.arm_doubt), `${String(v.limb_id)}`).toContain('ORIGINAL DOUBT:');
+		}
+		// ⚠ THE ONE THAT MOVED MUST STILL SAY WHAT THE MOVE COST. `UNENFORCED_OBSERVED_ADMISSION` captures
+		// REL-2:3's surface admission and drops its distinctive subject — that a correct, unit-tested,
+		// general type-fixing artifact EXISTS and GOVERNS NOTHING. No arm among the eleven says that; it is
+		// the fifth vocabulary gap this programme has found, and it stays visible on the row.
+		const moved = verdicts.find((v) => String(v.limb_id) === 'limb:REL-2:3');
+		expect(String(moved?.verdict)).toBe('UNENFORCED_OBSERVED_ADMISSION');
+		expect(String(moved?.superseded_verdict)).toBe('UNENFORCED_DEAD_PREDICATE');
+		expect(String(moved?.what_the_move_costs ?? '').length).toBeGreaterThan(200);
+		expect(String(moved?.destination_arm_evidence_owed ?? '').length).toBeGreaterThan(100);
+		// ⚠ AND THE CONTESTED ONE MUST CARRY BOTH HALVES OF ITS RESOLUTION, or "the arm stands" reads as
+		// "nothing was owed" — which is exactly the conflation §21.2 records me making.
+		const contested = verdicts.find((v) => String(v.limb_id) === 'limb:LYR-3:1');
+		expect(String(contested?.verdict)).toBe('UNENFORCED_NO_SHAPE');
+		expect(String(contested?.ratification_question_owed ?? '').length).toBeGreaterThan(200);
+		expect(String(contested?.order_is_inert_measurement ?? '').length).toBeGreaterThan(400);
+		expect(String(contested?.refuter_correction_partly_struck ?? '').length).toBeGreaterThan(200);
+	});
+
 	it('a limb closed by two entries records both, and neither alone discharges it', () => {
 		const split = verdicts.filter((v) => v.filed_entry_split);
 		expect(split.map((v) => String(v.limb_id)).sort())

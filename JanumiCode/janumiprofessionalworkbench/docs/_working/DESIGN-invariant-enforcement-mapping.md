@@ -1131,3 +1131,103 @@ and the five are distinguishable from the other 37 by carrying `arm_split_from`.
 
 > **A vocabulary change is not a rename. It is an edit to every field authored under the old vocabulary,
 > and the honest cost of one is measured in orphaned prose rather than in changed rows.**
+
+---
+
+## 22. ⚠ ADDENDUM (V-10) — THE DOUBTS ARE SETTLED, AND ONE OF THEM COST FOUR AGENTS
+
+Eleven rows carried an `arm_doubt` — a note saying **the verdict itself may be wrong**. They were three
+populations: **3 stale** (their own subject was an arm the V-4 migration retired, and each row had already
+moved where the doubt asked), **5 self-cleared** (the text opens *"The ARM is right"*, *"None on the
+arm"*, *"NOT a doubt about the verdict"*), **3 live**.
+
+⚠ **A keyword rule got one of them wrong.** *"The doubt names a retired arm, so it is stale"* returned
+**four**. `limb:LYR-3:1` names `DIVERGENT_UNFILED` only inside a **quotation of the refuter it argues
+against**. A string appearing in a row is not that row asserting it — the same shape as *presence of a
+field is not its assertion*, which this census already carries a gate over.
+
+### 22.1 `REL-2:3` — the doubt was right, and the arm moved
+
+`UNENFORCED_DEAD_PREDICATE` means, by its only definition anywhere, *"a kernel predicate implements the
+limb and nothing calls it."* **Something calls it** — established from the call chain, from the seam
+having no catch, and from two committed records on other instruments. **The row concedes it in its own
+`census` and `sibling_control` fields: the arm was refuted by the row's own data before any drive.**
+
+**`REG-F-258` stands unchanged, and this is *"entries describe defects, not arms"* in its purest form —
+because the entry had already made the correction itself**, at `REG-005:19352`: *"⚠ THE ROW'S ARM IS WRONG
+AND THE FINDING SURVIVES IT — STATED, NOT BENT."*
+
+⚠ **But the move costs something no arm can hold.** The honest fact about this limb, in REG-F-258's own
+words, is that the predicate is *"unfailable on the arrangement REL-2 governs, because every input is
+stipulated"* — **a correct, unit-tested, general type-fixing artifact that governs nothing.** No arm among
+the eleven says that. `UNENFORCED_OBSERVED_ADMISSION` captures the surface admission and drops the
+distinctive subject. **That is the fifth vocabulary gap this programme has found**, and it is recorded on
+the row rather than argued away.
+
+### 22.2 ⚠ `limb:LYR-3:1` — contested through four agents, and settled on a measurement neither side made
+
+Adjudicator (**NO_SHAPE**, HIGH, having *driven* the arrangement) → refuter (**REFUTED**, proposing
+`DIVERGENT`) → **two settlers from opposite ends**, one starting from the code, one from canon.
+
+**The settlers agreed on the measurement and split on the disposition.** Both said **BOTH_PARTLY** wrong.
+
+**The measurement — the crux both the adjudicator and the refuter merely asserted.** Every production
+consumer of `permittedChildTypeIds` enumerated and classified ORDER vs MEMBERSHIP. **Not one governed or
+semantic consumer reads ORDER.** The semantic-path order-reader (`planComposition`) produces a provably
+**isomorphic** tree — driven: identical typeId set, identical parent-child relation, byte-identical
+`decompositions`/`offered`/`unresolved`, `analyzePwaGraph.valid` true/true under reversal — and its
+persisted downstream is consumed only through `new Set(...)`.
+
+> **So order is neither semantic nor — on the live engine — view-state. It is inert.** That kills the
+> adjudicator's gloss (*"the authoritative flat edge list, i.e. semantic composition state"*, which
+> **truncated `pwa-authoring.ts:442` at the point that reverses it**: the full line reads *"…(render/
+> projections consume it)"*) **and** the refuter's gloss (*"membership is semantic; ORDER is not"*), which
+> is equally absent from the text.
+
+⚠ **AND A DOCBLOCK MISLED THE SECOND SETTLER.** `pwaFlow.ts:178-180` states the field's order *"Drives the
+LEFT-TO-RIGHT sibling ordering: the first-authored child sits leftmost."* **False on the primary path.**
+It describes `preorderIndex`, which only `dagreLayout` consumes; ELK is primary (`:333`, with DAGRE the
+`catch` fallback at `:334`) and is configured `forceNodeModelOrder: 'true'` (`:329`), taking sibling
+placement from the **types array**. Settler 1 drove both engines: reversing the field produced
+**byte-identical ELK coordinates**, against a positive control where reversing the types array **did**
+move nodes. *A docblock is not a measurement, and this one misled a careful reader.*
+**Residual, disclosed:** on the DAGRE fallback the reorder **does** move nodes.
+
+**THE RESOLUTION IS NOT PICKING AN AGENT.** The two settlers are compatible, by §21.2's own lesson:
+**enforceability and debt are different axes.** Settler 1 answers *what arm* — `UNENFORCED_NO_SHAPE`.
+Settler 2 answers *what is owed* — **a ratification question**, because the operative-source passages the
+provenance sidecar reaches **split on exactly this line**: most fix the subject by the ACT and its ORIGIN
+(*"Canvas layout operations"*, *"Moving a node"*), while the SCOPE line fixes it by the OPERATION CLASS
+(*"view-state operations"*). **The split is the question.** Both hold; both are recorded.
+
+⚠ **And one sentence of the row's `refuter_correction` is struck in place**, not deleted: its DEFECT 4
+says *"there is no live violation"*, and the adjudicator **drove one**. The arm survives for a different
+reason — the arrangement is OBJ-2 limb 5's subject, filed as REG-F-209, whose closure line at
+`REG-005:6438` deliberately does **not** name LYR-3:1.
+
+### 22.3 `PER-3:2` stands, and its supporting drive was enumerated rather than derived
+
+§16.1's exception holds. But the drive that supported it rejected **six hand-picked command names** —
+*"the enumerated form of the question, and it proves almost nothing"*. Two further corrections: *"113
+registered types"* is **105** by derivation, and *"no generic setter among them"* is **false** —
+`ChangePwuState` is registered at `registry.ts:141` and REG-005 itself calls it the generic setter.
+**The arm survives all three; the SUPPORT needs re-deriving, not re-asserting.**
+
+### 22.4 The `missing_shape` debt reaches zero, and the mechanism moves to where it can still fail
+
+§19 pinned five rows whose arm-required field was unwritten. Four were authored by a pass running a fresh
+census per row with its own controls; `limb:LYR-3:1` was **excluded while its arm was contested** and
+written afterwards from the tiebreak measurement, attributed.
+
+⚠ **The old assertion looped over the pinned five and asserted each was an OVERTURN. With the list empty
+that loop is a loop over nothing** — an assertion that cannot fail. The claim it was making is still
+checkable in the other direction, and that is where it moved: **every row a refuter LEFT on this arm
+states its shape**, which is what made *"0 of 14 vs 5 of 12"* a mechanism rather than a coincidence.
+
+### 22.5 Two more orphanings, both mine, both refused a stamp
+
+The stale-`owed` debt went **42 → 43** (`REL-2:3`'s move) and the superseded-narrative count **80 → 81**.
+⚠ **A row entering that second set on a SETTLED doubt is the instrument working, not a regression** — the
+narrative it outlived is now *marked* as outlived instead of silently standing. Neither is repaired by
+stamping: `owed_for_verdict` records the arm an `owed` was **authored for**, and rewriting it would make a
+provenance fact false.
