@@ -752,6 +752,63 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(verdicts.filter((v) => String(v.filing) === 'UNFILED').length, 'each owed an entry').toBe(0);
 	});
 
+	// ── ⚠ AN ARM MUST BE ABLE TO STATE ITS OWN CONTENT, AND FIVE ROWS CANNOT ───────────────────────────────
+	// `UNENFORCED_NO_SHAPE` asserts that canon requires something the model has no field for. The row's
+	// `missing_shape` is where it says WHICH — and it is the arm's whole content: without it the verdict is a
+	// word, not a measurement.
+	//
+	// ⚠ THE POPULATION SPLITS PERFECTLY ON REFUTATION, WHICH IS WHAT MAKES IT A MECHANISM RATHER THAN A GAP.
+	// All 14 rows a refuter LEFT on this arm carry `missing_shape`. **Zero exceptions.** Five of the 12 a
+	// refuter MOVED onto it do not — LYR-3:1, AUT-2:1, LYR-1:1, ASR-19:3, ASR-9:5, each superseding an
+	// ENFORCED_* or PARTIAL verdict. The field is authored by the LANE, for the arm the LANE assigned; when a
+	// refuter changes the arm, the field the NEW arm requires was never written and nothing notices.
+	//
+	// This is the third field in this census to show that shape — `owed` (§11, and the six NEAR_MISS rows a
+	// blind adjudication re-authored) and `evidence` (DEC-4:2, whose pillar (2) was affirmatively false for
+	// the arm it ended on) were the first two. ⚠ THE DIFFERENCE IS THAT THIS ONE IS MECHANICALLY DETECTABLE:
+	// prose authored for a dead verdict reads exactly like prose authored for the live one, but an ARM WHOSE
+	// DEFINING FIELD IS EMPTY can be found by asking. That is why this gate is cheap and the other two needed
+	// a blind adjudication to find.
+	//
+	// ⚠ AND `missing_shape` IS NOT EXCLUSIVE TO THIS ARM — 49 rows on other arms carry one, so the five
+	// empties are not "the field belongs elsewhere". They are the arm's own claim, unstated.
+	//
+	// PINNED AS A SHRINK-ONLY DEBT rather than asserted to zero, because authoring five of these needs the
+	// site evidence, not a stamp — the REG-F-043 failure this repository has recorded. The list may only
+	// shrink; a sixth reddens this.
+	it('a NO_SHAPE row names the shape that is missing, and the five that do not are counted', () => {
+		const noShape = verdicts.filter((v) => String(v.verdict) === 'UNENFORCED_NO_SHAPE');
+		expect(noShape.length, 'the arm').toBe(26);
+		const silent = noShape
+			.filter((v) => String(v.missing_shape ?? '').trim().length < 40)
+			.map((v) => String(v.limb_id))
+			.sort();
+		expect(
+			silent,
+			'a row asserting canon has no shape, without saying WHICH shape is absent'
+		).toEqual(['limb:ASR-19:3', 'limb:ASR-9:5', 'limb:AUT-2:1', 'limb:LYR-1:1', 'limb:LYR-3:1']);
+
+		// ⚠ THE CONTROL, AND IT IS WHAT MAKES THE FIVE MEAN SOMETHING. Without it, an assertion listing five
+		// ids passes just as happily if the field were empty on all 26 — the vacuity this repository has
+		// recorded six times. Every row a refuter LEFT on this arm states its shape.
+		const heldSilent = noShape
+			.filter((v) => String(v.refutation) === 'HELD')
+			.filter((v) => String(v.missing_shape ?? '').trim().length < 40);
+		expect(heldSilent, 'a HELD row on this arm has no excuse for silence').toEqual([]);
+		expect(
+			noShape.filter((v) => String(v.missing_shape ?? '').trim().length >= 40).length,
+			'rows that DO state their missing shape — the population is real'
+		).toBe(21);
+
+		// Every one of the five is an OVERTURN. If that ever stops being true the mechanism above is wrong,
+		// and the comment explaining it becomes a story rather than a finding.
+		for (const id of silent) {
+			const row = verdicts.find((v) => String(v.limb_id) === id);
+			expect(String(row?.refutation), `${id} — the mechanism is the overturn`).toBe('OVERTURNED');
+			expect(String(row?.superseded_verdict ?? ''), `${id} must name what it superseded`).not.toBe('');
+		}
+	});
+
 	// ── ⚠ THREE LIMBS ARE CLOSED BY TWO ENTRIES, AND NEITHER ALONE DISCHARGES THEM ─────────────────────────
 	// `limb:OBJ-3:2`, `limb:ASR-16:6` and `limb:ASR-19:3` each have halves with genuinely different FATES: a
 	// code defect that is right to fix under any reading, and a canon adjudication where writing a guard for

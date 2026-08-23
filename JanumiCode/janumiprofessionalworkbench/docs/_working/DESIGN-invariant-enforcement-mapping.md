@@ -905,3 +905,83 @@ where it means **18**. Same defect, same commit, eleven lines below the section 
 where a stale `owed` misleads a reader but cannot misdirect a filing); the `UNENFORCED_NO_SHAPE` split
 (§16.2, deferred twice); 11 recorded arm doubts; and the 13 register entries owed by
 `HARMONIZATION-FINDINGS.md`'s re-dispositioned *"Refuted (32)"* (§17.7), tracked in `BACKLOG.md`.
+
+---
+
+## 19. ⚠ ADDENDUM — THE THIRD ORPHANED FIELD, AND THE FIRST ONE A GATE CAN SEE
+
+§16.2 deferred splitting `UNENFORCED_NO_SHAPE` twice, for a stated reason: *"re-cutting a second arm one
+commit after the first would re-open rows nobody has re-read."* **That condition has lapsed** — V-6 and V-7
+filed every row on the arm that owed a filing, each drafted and adversarially verified. Going back to the
+split found something better than the split.
+
+### 19.1 The arm's defining field is empty on five rows, and the five are not a random five
+
+`UNENFORCED_NO_SHAPE` asserts that canon requires something the model has no field for. `missing_shape` is
+where the row says **which** — it is the arm's whole content. Without it the verdict is a word.
+
+| | rows | `missing_shape` empty |
+|---|---|---|
+| refutation **HELD** (a refuter left the row here) | 14 | **0** |
+| refutation **OVERTURNED** (a refuter moved the row here) | 12 | **5** |
+
+**Zero of fourteen against five of twelve.** `LYR-3:1`, `AUT-2:1`, `LYR-1:1`, `ASR-19:3`, `ASR-9:5` — each
+superseding an `ENFORCED_*` or `PARTIAL` verdict.
+
+**The mechanism is the same one §11 records, one field further in.** `missing_shape` is authored by the
+LANE, for the arm the LANE assigned. When a refuter changes the arm, the field the *new* arm requires was
+never written, and nothing notices — the row simply carries a verdict it cannot substantiate.
+
+⚠ **And the field is not exclusive to this arm** — 49 rows on other arms carry a `missing_shape`. So the
+five empties are not *"the field belongs elsewhere"*. They are the arm's own claim, unstated.
+
+### 19.2 ⚠ THIS IS THE THIRD FIELD, AND THE FIRST ONE THAT IS MECHANICALLY DETECTABLE
+
+1. **`owed`** (§11, §17.2) — six `NEAR_MISS` rows carried an `owed` written for an `ENFORCED_*` arm, five of
+   them *denying anything was owed*. Found by a **blind adjudication with a negative control**.
+2. **`evidence`** — `DEC-4:2`'s pillar (2) was **affirmatively false** for the arm the row ended on, quoting
+   a drive that proved the superseded verdict. Found by an agent reading it whole.
+3. **`missing_shape`** — found by **asking whether the field was there.**
+
+> **Prose authored for a dead verdict reads exactly like prose authored for the live one — that is why the
+> first two needed a blind reader. But an ARM WHOSE DEFINING FIELD IS EMPTY can be found by a query.**
+
+The generalisation is cheap and worth stating: **for every arm, name the field that carries its content,
+and gate that the field is present.** An arm whose content is optional is a word, and a word cannot be
+falsified. This is `feedback_check_the_instrument_itself` applied to the vocabulary rather than the gate.
+
+### 19.3 Pinned as a shrink-only debt, with three mutants because it has three assertions
+
+The five are **pinned, not fixed**: authoring a `missing_shape` needs the site evidence, and stamping the
+field to clear a gate is the REG-F-043 failure this repository has already recorded. The list may only
+shrink; a sixth reddens it.
+
+Each of the block's three assertions has **its own** mutant, because a control that only fires when the main
+assertion passes proves nothing (`feedback_a_control_that_cannot_fail`):
+
+| assertion | mutant | what it reports |
+|---|---|---|
+| the pinned list of five | empty a sixth row's field | *expected 5, got 6* |
+| — same — | empty **all 26** (vacuity) | *expected 5, got 26* |
+| **no HELD row is silent** | empty a HELD row **and add it to the pinned list**, so the list still matches | *"a HELD row on this arm has no excuse for silence"* |
+| **21 rows do state their shape** | the same mutant | *expected 20 to be 21* |
+
+⚠ **The third mutant took two attempts, and the first attempt is the lesson.** I emptied `limb:PER-9:6`
+believing it was HELD without checking; it is OVERTURNED, so `heldSilent` correctly stayed empty and only
+the count control fired. **A control exercised by the wrong mutant looks exercised.** Re-run against
+`limb:LYR-3:3`, verified HELD by assertion inside the mutant script itself, it fires with its own message.
+
+### 19.4 The split itself is still owed, and the criterion is now sharper
+
+The two meanings §16.2 identified are still both live on the arm, and the filing axis separates them **by
+accident rather than by construction**: the two "no enforceable subject" rows (`PER-11:2`, `PER-12:2`) are
+`NOT_APPLICABLE` and the other 24 are `FILED`. That works only while nobody wrongly files one of them, and
+`verdict` is supposed to state what the code does **independently of what the record says**.
+
+⚠ **But `missing_shape` does not separate them either, and that is worth recording before the next attempt:**
+`PER-11:2`'s reads *"There is no field, command or event that could carry the forbidden arrangement,
+**because the limb has no forbidden arrangement**"* — the no-subject claim, stated in the field meant for
+the other one. `PER-12:2`'s reads like an ordinary shape census. **The decisive text is in `evidence`, which
+opens "THIS LIMB ASSERTS A FACT ABOUT THE WORLD" on both.** A future split should key on that, and should
+DERIVE its population over all 26 rather than inherit V-5's hand-picked pair — hand-listing an exception
+set is the defect one level up, and this programme has already measured it once as *"said 2, was 8"*.
