@@ -1050,3 +1050,84 @@ beside the scope.** A corpus list headed *"the four FILING corpora"* is safe to 
 and unsafe for anything else, and that is legible only if the heading survives into every copy. It did
 survive — and eight passes read past it, because a list of four paths reads like a fact about the
 repository rather than an answer to one question.
+
+---
+
+## 21. ⚠ ADDENDUM (V-9) — THE ARM IS SPLIT, THE HAND-PICKED PAIR WAS WRONG, AND MY BRIEF CONFLATED TWO THINGS
+
+§16.2 identified `UNENFORCED_NO_SHAPE` carrying two claims at V-5 and deferred the split twice, for a
+stated reason: *re-cutting an arm re-opens rows nobody has re-read.* V-6 and V-7 filed every row on the arm
+that owed a filing, so the condition lapsed. §19.4 sharpened the criterion. The split is now performed.
+
+### 21.1 Said 2, is 5 — and the derivation is what makes that sayable
+
+§16.2 pinned **two** rows by name. **Two independent lenses classified all 26:**
+
+- **differently batched** — the two batchings were derived so that **no pair of rows appears together in
+  both**, so no agent could anchor a second row off the same neighbour;
+- **asked opposite constructive questions** — lens A: *"name the guard this limb would need"*; lens B:
+  *"name the fact this limb states"*. Neither is a yes/no, so neither can be answered by shrugging;
+- **with the answer stripped out** — `filing`, `filed_entry`, `owed`, `filing_note`, `near_miss_filing`
+  and the rest were withheld from the payload, so the classification could not be read off the row.
+
+**They agreed on 25 of 26.** The one disagreement, `limb:PER-9:7`, went to a tiebreaker who settled it
+NO_SUBJECT and said what misled lens A: two citations that *"really do say what Lens A says they say —
+they just are not this limb's"*, from Guide **§14.6**, the observability clause, when the provenance
+sidecar names **§9.7** as this limb's source and names nothing else.
+
+| | rows | |
+|---|---|---|
+| `UNENFORCED_NO_SHAPE` | **21** | canon requires something and the model has no field for it — **a guard COULD exist** |
+| `UNENFORCED_NO_SUBJECT` | **5** | no arrangement a command could present would violate the clause — **no guard is constructible even with every field in the world** |
+
+**The pinned pair is confirmed and three more join it: `ASR-1:6`, `PER-9:7`, `PER-9:10`.** Hand-listing an
+exception set was wrong here by 150%, which is the third time this programme has measured that cost.
+
+### 21.2 ⚠⚠ MY BRIEF DEFINED NO_SUBJECT AS "NOTHING IS OWED". THAT IS WRONG, AND THE AGENTS KEPT IT APART
+
+The commissioning prompt said, in terms: *NO_FIELD — "this is a divergence, something is owed"*;
+*NO_SUBJECT — "nothing is owed. There is nothing to build."* **The second half of that is a different
+claim from the first, and it does not follow.**
+
+`limb:ASR-1:6` is the counterexample and lens A said so unprompted: **no guard is constructible** for a
+clause that hands the expression language to the repository — *"no field, command or event can falsify a
+meta-claim about canon's own text"* — **and a canon-coherence filing is genuinely owed anyway**, because
+DOC-007 §18 ratifies the eight-op grammar that canon calls a repository shape. It holds **REG-Q-060**.
+
+**Three of the five moved rows are FILED.** `PER-9:10`'s filing is for a real driven leak the lane found
+on the same row; `PER-9:7`'s prose gap is filed in the Guide already.
+
+> **The split is a claim about ENFORCEABILITY. It is not a claim about DEBT.** Every moved row now carries
+> a field saying so by name, because the conflation was in the instructions and would otherwise have been
+> inherited by every future reader of the arm.
+
+This is §20's defect one more time and in the same place: **a definition that answers two questions at
+once, reused as though it answered one.** §20 caught it in a corpus list; here it is in an arm's
+definition, in a brief I wrote after writing §20.
+
+### 21.3 A hand-listed exception set is a vocabulary gap wearing an allowlist
+
+The gate asserted *"NOT_APPLICABLE is reachable only from an ENFORCED arm, **or the two named
+non-divergent clauses**"*, with `limb:PER-11:2` and `limb:PER-12:2` listed **by id**. They were listed
+because the ladder had no way to say what those rows ARE.
+
+It has one now. **A clause with no enforceable subject has nothing to record by construction**, so the
+assertion is re-keyed to *"…or from `UNENFORCED_NO_SUBJECT`"* and **no id is named**. Both rows are still
+in the population; they are covered by a rule instead of by their names. The per-row reason survives — a
+NO_SUBJECT row filing nothing must still say what its clause does instead, or the new arm becomes the
+hiding place the allowlist used to be.
+
+### 21.4 ⚠ AND THE SPLIT ORPHANED FIVE FIELDS, IN THE COMMIT THAT PERFORMED IT
+
+The stale-`owed` debt went **37 → 42**. All five moved rows had a **reconciled** `owed_for_verdict` before
+the split; moving the arm orphaned every one. **The gate written for this defect caught it inside the same
+commit** — the fourth time this session an arm move has orphaned a field (§11 `owed`, §19 `missing_shape`,
+the stale `arm_doubt`s, and now this).
+
+⚠ **They are not repaired by stamping, deliberately.** `owed_for_verdict` records **the arm an `owed` was
+authored for**. Those five were authored for `UNENFORCED_NO_SHAPE`; writing the new arm into the field
+would make it **false** — it is a provenance fact, not a status. So the count rises, the cause is named,
+and the five are distinguishable from the other 37 by carrying `arm_split_from`.
+
+> **A vocabulary change is not a rename. It is an edit to every field authored under the old vocabulary,
+> and the honest cost of one is measured in orphaned prose rather than in changed rows.**

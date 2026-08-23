@@ -78,7 +78,16 @@ const ARMS = [
 	'DIVERGENT',
 	'UNENFORCED_OBSERVED_ADMISSION',
 	'UNENFORCED_DEAD_PREDICATE',
-	'UNENFORCED_NO_SHAPE'
+	'UNENFORCED_NO_SHAPE',
+	// ⚠ SPLIT OUT OF `UNENFORCED_NO_SHAPE` 2026-08-23, and the population was DERIVED rather than inherited.
+	// DESIGN §16.2 identified the double duty at V-5 and pinned TWO rows by name. Two independent lenses —
+	// differently batched so no row pair recurs, and asked OPPOSITE constructive questions ("name the guard
+	// this limb would need" vs "name the fact this limb states") — classified all 26 with the
+	// conclusion-bearing fields stripped out. They agreed on 25; one tiebreak. **SAID 2, IS 5.**
+	// NO_SHAPE: canon requires something and the model has no field for it — a guard COULD exist.
+	// NO_SUBJECT: no arrangement a command could present would violate the clause — no guard is
+	// constructible even with every field in the world.
+	'UNENFORCED_NO_SUBJECT'
 ] as const;
 
 /**
@@ -242,7 +251,8 @@ describe('W-3b — the invariant enforcement census', () => {
 			DIVERGENT: 49,
 			UNENFORCED_OBSERVED_ADMISSION: 64,
 			UNENFORCED_DEAD_PREDICATE: 12,
-			UNENFORCED_NO_SHAPE: 26
+			UNENFORCED_NO_SHAPE: 21,
+			UNENFORCED_NO_SUBJECT: 5
 		});
 	});
 
@@ -476,7 +486,21 @@ describe('W-3b — the invariant enforcement census', () => {
 	// failure REG-F-043 records. It can only move DOWN without this reddening.
 	it('the unreconciled-owed debt is counted, not hidden', () => {
 		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(37);
+		// ⚠ 37 -> 42, AND THE FIVE ARE MINE. The NO_SUBJECT arm split moved five rows, and every one of them had
+		// a RECONCILED `owed` before it. The gate written for exactly this defect caught it in the same commit
+		// that performed the split — which is the fourth time this session an arm move has orphaned a field.
+		//
+		// ⚠ AND THEY ARE NOT REPAIRED BY STAMPING, DELIBERATELY. `owed_for_verdict` records THE ARM AN `owed`
+		// WAS AUTHORED FOR. Those five were authored for `UNENFORCED_NO_SHAPE`; writing the new arm into the
+		// field would make it FALSE — it is a provenance fact, not a status. The honest state is that a split
+		// orphans prose, the count says how much, and re-authoring needs the row, not a script.
+		// These five are distinguishable from the other 37: single cause, single date, and every one of them
+		// carries `arm_split_from`.
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(42);
+		expect(
+			stale.filter((v) => String(v.arm_split_from ?? '') === 'UNENFORCED_NO_SHAPE').length,
+			'the subset the NO_SUBJECT split orphaned, in this commit'
+		).toBe(5);
 		// ⚠ THE SUBSET THAT BLOCKS THE CLOSE IS ZERO, AND THE FILTER THAT FINDS IT WAS WRONG FOR SIX COMMITS.
 		// It read `verdict === 'DIVERGENT'`, which meant "every row that can owe a filing" before the ladder
 		// split — filing was a suffix on two arms and unsayable everywhere else. After the split, `filing` is the
@@ -705,19 +729,77 @@ describe('W-3b — the invariant enforcement census', () => {
 	// They are PINNED BY NAME with a stated reason rather than waved through, and the arm needs splitting the
 	// way PARTIAL_DIVERGENT_FILED did — recorded in DESIGN §16 rather than performed here, because re-cutting a
 	// second arm one commit after the first would re-open rows nobody has re-read.
-	it('NOT_APPLICABLE is reachable only from an ENFORCED arm, or the two named non-divergent clauses', () => {
-		const EXCEPT = new Set(['limb:PER-11:2', 'limb:PER-12:2']);
+	// ⚠ THE HAND-NAMED EXCEPTION IS RETIRED, AND THAT IS THE POINT OF THE ARM SPLIT.
+	// This assertion used to read "…or the two named non-divergent clauses", with `limb:PER-11:2` and
+	// `limb:PER-12:2` listed by id — because the ladder had no way to say what those two rows ARE. It has
+	// one now: a clause with no enforceable subject has nothing to record BY CONSTRUCTION, so
+	// `UNENFORCED_NO_SUBJECT` is a legitimate source of NOT_APPLICABLE and no id needs naming.
+	// **A hand-listed exception set is a vocabulary gap wearing an allowlist.** Both ids are still in the
+	// population; they are now covered by a rule instead of by their names.
+	it('NOT_APPLICABLE is reachable only from an ENFORCED arm or from UNENFORCED_NO_SUBJECT', () => {
 		const bad = verdicts
 			.filter((v) => String(v.filing) === 'NOT_APPLICABLE')
-			.filter((v) => !String(v.verdict).startsWith('ENFORCED') && !EXCEPT.has(String(v.limb_id)))
+			.filter((v) => !String(v.verdict).startsWith('ENFORCED'))
+			.filter((v) => String(v.verdict) !== 'UNENFORCED_NO_SUBJECT')
 			.map((v) => `${String(v.limb_id)} (${String(v.verdict)})`);
 		expect(bad, 'a divergence cannot have nothing to file').toEqual([]);
-		// An exception has to SAY why, or it is just a hole with a name on it.
-		for (const id of EXCEPT) {
-			const row = verdicts.find((v) => String(v.limb_id) === id);
-			expect(String(row?.filing)).toBe('NOT_APPLICABLE');
-			expect(String(row?.filing_note ?? '').length, `${id} must state why nothing is owed`).toBeGreaterThan(60);
+		// The rule still owes a reason per row — a NO_SUBJECT row filing nothing must say what the clause
+		// does instead, or the arm becomes the new hiding place the allowlist used to be.
+		for (const v of verdicts.filter((x) => String(x.filing) === 'NOT_APPLICABLE'
+			&& String(x.verdict) === 'UNENFORCED_NO_SUBJECT')) {
+			expect(
+				String(v.filing_note ?? '').length,
+				`${String(v.limb_id)} must state why nothing is owed`
+			).toBeGreaterThan(60);
 		}
+	});
+
+	// ── ⚠ THE ARM SPLIT THAT WAS DEFERRED TWICE, AND THE HAND-PICKED PAIR THAT WAS WRONG ──────────────────
+	// DESIGN §16.2 found `UNENFORCED_NO_SHAPE` carrying two claims at V-5 and deferred the split twice, for a
+	// stated reason: re-cutting an arm re-opens rows nobody has re-read. V-6 and V-7 filed every row on the
+	// arm that owed a filing, so the condition lapsed.
+	//
+	// ⚠ AND THE POPULATION WAS DERIVED, NOT INHERITED. §16.2 pinned TWO rows by name. Two lenses —
+	// differently batched (no row pair appears together in both) and asked OPPOSITE constructive questions,
+	// with `filing`, `filed_entry`, `owed` and `filing_note` STRIPPED so neither could read the answer off
+	// the row — classified all 26. **They agreed on 25 of 26; the one disagreement went to a tiebreaker.**
+	// **SAID 2, IS 5**: the pinned pair confirmed, plus `ASR-1:6`, `PER-9:7`, `PER-9:10`.
+	//
+	// ⚠⚠ AND MY OWN BRIEF CONFLATED TWO THINGS THE AGENTS KEPT APART. It defined NO_SUBJECT as "nothing is
+	// owed". That is wrong, and `limb:ASR-1:6` is the counterexample: no guard is constructible for it AND a
+	// canon-coherence filing is genuinely owed — it holds **REG-Q-060**. Three of the five moved rows are
+	// FILED. **The split is a claim about ENFORCEABILITY, not about debt**, and every moved row carries a
+	// field saying so, because the conflation was in the instructions and would otherwise propagate.
+	it('every UNENFORCED_NO_SUBJECT row records how it was derived and what its clause does instead', () => {
+		const ns = verdicts.filter((v) => String(v.verdict) === 'UNENFORCED_NO_SUBJECT');
+		expect(ns.map((v) => String(v.limb_id)).sort()).toEqual([
+			'limb:ASR-1:6', 'limb:PER-11:2', 'limb:PER-12:2', 'limb:PER-9:10', 'limb:PER-9:7'
+		]);
+		for (const v of ns) {
+			expect(String(v.arm_split_from), `${String(v.limb_id)} must name the arm it left`)
+				.toBe('UNENFORCED_NO_SHAPE');
+			// The derivation, not just its outcome — both lens verdicts and their reasoning, so a later reader
+			// can re-run the disagreement rather than inherit the answer.
+			const d = String(v.subject_class_derivation ?? '');
+			expect(d.length, `${String(v.limb_id)} must carry its derivation`).toBeGreaterThan(400);
+			expect(d, `${String(v.limb_id)} must record BOTH lenses`).toContain('LENS A');
+			expect(d).toContain('LENS B');
+			// A clause with no subject has to say what it IS doing, or "no subject" is just a refusal to look.
+			expect(
+				String(v.what_the_clause_does ?? '').length,
+				`${String(v.limb_id)} must say what the clause asserts instead`
+			).toBeGreaterThan(80);
+			expect(String(v.no_subject_does_not_mean_nothing_owed ?? '').length).toBeGreaterThan(100);
+		}
+		// ⚠ THE INSTANCE THAT KEEPS THE DISTINCTION HONEST. If this ever stops being FILED, the arm has quietly
+		// become "nothing owed" again and the comment above becomes a story.
+		const asr = verdicts.find((v) => String(v.limb_id) === 'limb:ASR-1:6');
+		expect(String(asr?.filing), 'no guard constructible AND a filing owed').toBe('FILED');
+		expect(String(asr?.filed_entry)).toBe('REG-Q-060');
+		expect(
+			ns.filter((v) => String(v.filing) === 'FILED').length,
+			'NO_SUBJECT rows that nonetheless carry a filing'
+		).toBe(3);
 	});
 
 	it('the filing axis is pinned, and the debt it exposed is counted', () => {
@@ -778,7 +860,9 @@ describe('W-3b — the invariant enforcement census', () => {
 	// shrink; a sixth reddens this.
 	it('a NO_SHAPE row names the shape that is missing, and the five that do not are counted', () => {
 		const noShape = verdicts.filter((v) => String(v.verdict) === 'UNENFORCED_NO_SHAPE');
-		expect(noShape.length, 'the arm').toBe(26);
+		// 26 before the NO_SUBJECT split. ⚠ None of the five moved rows was one of the five SILENT rows, so
+		// this arm shrank for exactly one reason and the pinned list below is unchanged by the split.
+		expect(noShape.length, 'the arm').toBe(21);
 		const silent = noShape
 			.filter((v) => String(v.missing_shape ?? '').trim().length < 40)
 			.map((v) => String(v.limb_id))
@@ -798,7 +882,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			noShape.filter((v) => String(v.missing_shape ?? '').trim().length >= 40).length,
 			'rows that DO state their missing shape — the population is real'
-		).toBe(21);
+		).toBe(16);
 
 		// Every one of the five is an OVERTURN. If that ever stops being true the mechanism above is wrong,
 		// and the comment explaining it becomes a story rather than a finding.

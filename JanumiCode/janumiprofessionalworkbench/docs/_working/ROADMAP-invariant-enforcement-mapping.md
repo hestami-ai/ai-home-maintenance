@@ -254,11 +254,25 @@ of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and
 
 ### What remains — and none of it is filing debt
 
-3. **Split `UNENFORCED_NO_SHAPE`** (`DESIGN §16.2`) — deferred twice, deliberately, and still owed.
+3. ✅ **`UNENFORCED_NO_SHAPE` IS SPLIT** (`DESIGN §21`) — deferred twice, performed 2026-08-23 once V-6/V-7
+   had re-read every row on the arm. **NO_SHAPE 21 · the new `UNENFORCED_NO_SUBJECT` 5.** ⚠ §16.2 pinned
+   TWO rows by name; two independent lenses — differently batched so no row pair recurs, asked opposite
+   constructive questions, with the answer stripped from the payload — classified all 26 and agreed on 25.
+   **Said 2, is 5.** And the split retires a hand-listed exception: `NOT_APPLICABLE` is now reachable from
+   `ENFORCED_*` **or `UNENFORCED_NO_SUBJECT`**, by rule rather than by naming two ids.
 4. **The 37 remaining stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed`
    misleads a reader but cannot misdirect a filing.
-5. **The 11 recorded arm doubts**, unadjudicated — including `limb:REL-2:3`, whose dead-predicate proof
-   was falsified by this programme's own RPH-TRC-005 correction.
+5. **The recorded arm doubts — 11 decompose into 3 + 5 + 3.** THREE are STALE: their own subject is an arm
+   the V-4 migration retired, and each row has already moved where the doubt asked (`STA-2:3`, `ASR-10:5`,
+   `ASR-8:5`). FIVE are SELF-CLEARED — the text opens *"The ARM is right"*, *"None on the arm"*, *"NOT a
+   doubt about the verdict"*. ⚠ **THREE are LIVE**: `PER-3:2`, `REL-2:3` (whose dead-predicate proof this
+   programme's own RPH-TRC-005 correction falsified), and `LYR-3:1`.
+   ⚠ **A keyword rule got `LYR-3:1` wrong** — it names the retired arm only inside a QUOTATION of the
+   refuter it argues against. Its own claim is live: REG-F-209 contradicts the refuter's load-bearing
+   premise, since a rename-only `EditPwuType` bumps the PWA semantic version today and `floor-gate.ts:314`
+   then invalidates a SATISFIED review off that bump.
+6. **`limb:LYR-3:1` owes a re-adjudication** — the only row carrying a LIVE arm doubt *and* an unwritten
+   `missing_shape` *and* a stale `owed`, with its doubt citing a FILED entry the refuter never searched.
 6. **The 13 register entries owed by the re-dispositioned "Refuted (32)"** — two of them gate defects:
    `depcruise packages` leaves `apps/` outside every layering rule, and `turbo run lint` is dead
    configuration over a single unpipelined root `eslint .`.
