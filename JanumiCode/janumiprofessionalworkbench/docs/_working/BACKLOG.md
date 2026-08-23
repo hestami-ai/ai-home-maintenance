@@ -449,6 +449,21 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   retire it and name the real one. The census index (`f200-deferrals.ndjson`) answers the deferral
   question today, but the other four registers have the same hole and no index.
 
+- [ ] **⚠ 13 register entries owed by `HARMONIZATION-FINDINGS.md`'s re-dispositioned "Refuted (32)"** —
+  that section carried 32 struck findings and **not one recorded a reason**, under a heading saying they
+  were *"recorded so they are not re-raised"*. All 32 were re-checked at HEAD (2026-08-23): **15 are TRUE
+  AT HEAD** (items #3, #5, #7, #9, #10, #11, #13, #15, #16, #21, #26, #27, #30, #31, #32), 13 are rightly refuted, 4 are out of scope. Every disposition and its evidence is
+  now appended to that file, keyed by ITEM NUMBER. **Items #3, #9, #10, #11, #13, #15, #16, #21, #26, #27, #30, #31, #32 owe a register entry**; items 5 and 7 are
+  true but already covered by REG-D-026 (tenant/organization scope).
+  Two are gate defects and are the sharpest: **#31** — `bun run boundary` runs `depcruise packages`, so
+  `apps/` (the one host composing engine + authoring + projections) is outside every layering rule;
+  **#32** — `turbo.json` declares `lint: {"dependsOn": ["^lint"]}` and **0 of 13 workspace members define
+  a `lint` script**, so `turbo run lint` is dead configuration over a single unpipelined root `eslint .`.
+  **#27** — the three purity rules each enumerate `rph-controller`, which does not exist, and none names
+  `rph-authoring`, which does and transitively pulls `better-sqlite3` into a browser bundle.
+  ⚠ **Do not renumber or re-flow lines 1-120 of that file.** Eleven citations point into it, two of them
+  from `JPWB-REG-005`, which is append-only and cannot have them repaired. Cite by item number.
+
 - [ ] **A format-conformance RATCHET** — `format:check` is red for 267 files and is invoked by no
   gate, so the standing "conformance arrives edit-by-edit" policy has no measurement and cannot
   fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the

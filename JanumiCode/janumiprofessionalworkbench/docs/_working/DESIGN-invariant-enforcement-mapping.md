@@ -774,3 +774,58 @@ what the close condition would actually be satisfied by.**
 > the operator has no reason to look at the close condition. It is found by reading the close condition
 > against the data and asking whether the sentence and the intent still name the same set.** That check
 > is one query. It should have run at the migration, and it would have found this three commits sooner.
+
+### 17.7 ⚠ THE GENERAL FORM WAS RUN, AND THE ANSWER IS 15 OF 32
+
+§17.4 ended by naming the question rather than the item: *"how many of the 32 are true at HEAD? Derive it
+over all 32; hand-checking the two that surfaced is the defect one level up."* It was derived, all 32, each
+at the site with a positive control.
+
+| disposition | n | |
+|---|---|---|
+| ⚠ **TRUE AT HEAD** | **15** | the claim is accurate today — **13 of them owe a register entry** |
+| REFUTED — FALSE at HEAD | 13 | rightly struck; the reason is now recorded |
+| OUT OF SCOPE | 4 | accurate, but describes something JPWB does not attempt |
+
+**The defect was not "the refutations are wrong."** 17 of 32 are sound — and several are sound for reasons
+written at length *elsewhere in the repository and never carried back*: #2's lives at
+`handlers/kit.ts:212-222`; #14's is **mandated** by `JPWB-DOC-003 §6:173` and `REG-Q-003`'s safe default,
+so representing the axis would *breach* canon; #25 was carried into canon as `REG-Q-001` and CLOSED
+2026-08-09.
+
+> **The defect is that none of the 32 recorded a reason, so no reader could separate the sound ones from
+> the live ones without redoing all 32 — which is exactly what the heading existed to prevent.** A sound
+> refutation with an unwritten reason and a wrong refutation are, from outside, the same artifact.
+
+### 17.8 ⚠ TWO OF MY OWN SPOT-CHECKS WERE WRONG, BOTH BY NAMED ERROR MODES
+
+The sweep was launched off a 6-item hand sample. **The sweep contradicted two of those six**, and both
+failures are ones this programme puts in every lane prompt:
+
+- **#30** — called FALSE by reading `gate:fast`, which does run `e2e`. But the claim says *the CI gate*,
+  and CI here is `.github/workflows/ci.yml`: six steps — build, check-types, lint, boundary, format:check,
+  test — and it stops. `gate:fast` is a local script. **The wrong referent**, and `REG-005:4587`
+  (REG-F-196) had already enumerated those six steps and used "CI" for exactly that file.
+- **#27** — called FALSE by `grep 'rph-controller'` returning zero. The name exists only as a **regex
+  alternation branch**, `^packages/rph-(…|controller|…)/`, so the literal string never appears anywhere.
+  **A negative search with no positive control** — EM-2, the error mode this repository has recorded more
+  than any other. `grep -c 'controller'` returns **4**; `grep -c 'authoring'` returns **0**, and
+  `rph-authoring` is the package that transitively drags `better-sqlite3` into a browser bundle.
+
+**Both were committed while calling the check cheap.** A cheap check is exactly where a control gets
+skipped, and the two rows it got wrong were the two rows the whole sweep was launched to generalise.
+
+### 17.9 THE REPAIR HAD TO NOT MOVE A LINE, AND THAT WAS ONLY FOUND BY LOOKING
+
+The first repair rewrote the section in place, pushing all 32 items down ~30 lines. **Eleven citations
+point into that region** — `invariant-verdicts.ndjson` at `:92 :104 :110 :119`, `docs/_working` at
+`:110 :119 :120` (one written by §17.4 the same day), and **`JPWB-REG-005` at `:108` and `:110`.**
+
+`REG-005`'s own `changeProcedure` is *"Append-only after ratification. Entries are never destructively
+edited."* **Those two citations could not have been repaired afterwards.** The restructure would have left
+two permanently dead pointers in ratified canon — the defect class the V-6 verifiers caught nine of, this
+time authored by the repair rather than found by it.
+
+> **An append-only artifact makes every line number it cites into a contract with the cited file.** The
+> repair keeps lines 1-120 byte-identical except the heading, which is replaced by exactly one line, and
+> appends every disposition after item 32 keyed by ITEM NUMBER — a reference that survives the next edit.
