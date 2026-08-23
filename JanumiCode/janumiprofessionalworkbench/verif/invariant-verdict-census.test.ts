@@ -310,11 +310,20 @@ describe('W-3b — the invariant enforcement census', () => {
 		for (const r of rows) {
 			expect(String(r.owed ?? ''), `${String(r.limb_id)} must say what filing it owes`).not.toBe('');
 		}
-		// ⚠ 8 -> 12 ACROSS THE DEC/LYR SLICE, and the growth is the arm working rather than failing. Four of the
-		// five overturns that landed here were rows a lane had filed PARTIAL_DIVERGENT_FILED: the refuter went and
-		// READ the filing, found it covered a neighbouring subject, and moved the row. An audit that never grew
-		// this number would be one where nobody opened the filings it rested on.
-		expect(rows.length, 'live violations with no filed finding — a standing debt, not a status').toBe(49);
+		// ⚠⚠ THE DEBT IS DISCHARGED, AND THE ARM'S NAME IS NOW WRONG — WHICH IS THE POINT.
+		// All 49 are filed: REG-F-203..233 carry 41 of them and REG-Q-053..057 carry the other 8, whose remedy is
+		// a canon adjudication rather than code. So the population that "must be zero at programme close" is zero
+		// IN THE SENSE THAT MATTERS — no divergence goes unrecorded — while the ROW COUNT is unchanged, because
+		// the enforcement fact did not change when the filing appeared.
+		//
+		// That is DESIGN §10's axis defect, no longer argued but demonstrated: `DIVERGENT_UNFILED` fuses an
+		// ENFORCEMENT verdict with a FILING status, so a row that is divergent AND filed has nowhere to sit. The
+		// ladder cannot say what is now true of these 49. The gate therefore counts the thing the arm was really
+		// for — a divergence NOBODY HAS RECORDED — and that number is 0.
+		// V-4's migration splits `verdict` from `filing`; this assertion is what it will replace.
+		expect(rows.length, 'divergences found by the census').toBe(49);
+		const unrecorded = rows.filter((v) => !v.filed_entry).map((v) => String(v.limb_id));
+		expect(unrecorded, 'a divergence nothing records — THIS is the population that must be zero').toEqual([]);
 	});
 
 	// ── ⚠ THE ARM ASSERTS A FILING; THE ROW HAS TO NAME IT ──────────────────────────────────────────────────
@@ -468,11 +477,19 @@ describe('W-3b — the invariant enforcement census', () => {
 	// content was good every time: each named a filing that EXISTS and does NOT cover this limb. That near miss is
 	// worth more than silence, because the next reader who greps the register WILL find that filing, and without
 	// this note they will close the row on it. The content stays; the name stops contradicting the arm.
-	it('DIVERGENT_UNFILED rows carry no filed_as — a near miss is recorded as a near miss', () => {
+	// ⚠ THIS TEST'S PREMISE WAS FALSIFIED BY THE PROGRAMME'S OWN PROGRESS, for the second time in this file.
+	// It once read: a DIVERGENT_UNFILED row may carry NO `filed_as`, because the arm asserts nothing records the
+	// divergence and the field would assert the opposite. That was right for eleven commits, and the filing pass
+	// made it wrong — these rows now carry a REAL filing, in an entry written for them.
+	// The INTENT survives and is what the assertion now checks: a NEAR MISS must not masquerade as a filing.
+	// So `filed_as` is admissible here only when `filed_entry` names the register ordinal that carries this limb;
+	// an adjacent filing that does not cover it still belongs in `near_miss_filing` and nowhere else.
+	it('a DIVERGENT_UNFILED row cites a filing only when one was actually written for it', () => {
 		const bad = verdicts
-			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED' && v.filed_as !== undefined)
+			.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED')
+			.filter((v) => v.filed_as !== undefined && !v.filed_entry)
 			.map((v) => String(v.limb_id));
-		expect(bad, 'filed_as on an UNFILED arm asserts the opposite of the row it sits on').toEqual([]);
+		expect(bad, 'a near miss dressed as a filing — the field asserts what the arm denies').toEqual([]);
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
@@ -491,6 +508,35 @@ describe('W-3b — the invariant enforcement census', () => {
 	// `sed -n` on every long hit, moved THREE more rows off this arm: they had been filed all along. Two of the
 	// three were in `docs/_working/`, the corpus an earlier search skipped entirely — which is now the source of
 	// three of this programme's six already-filed discoveries.
+	// ── ⚠ THE FILING IS RECONCILED AGAINST THE REGISTER, NOT TRUSTED TO MATCH IT ───────────────────────────
+	// Each entry names the limb ids it closes, and each row names the entry it landed in, so the two artifacts
+	// can be checked against each other by a reader who trusts neither. 41 rows filed as FINDINGS; 8 as
+	// QUESTIONS, because their remedy is an adjudication and writing a guard for the reading the engine already
+	// implements would ratify the narrower one by accident.
+	//
+	// ⚠ AND 45 OF THE 49 ROWS RECORD WHAT A TRUNCATION HAD HIDDEN FROM THEIR FIRST DRAFT. The entries were
+	// written twice: once from a census whose evidence was silently cut at character caps, and once from the
+	// restored text. 32 of 36 entries required amendment. The severed tails held second admissions at the same
+	// site, halves of two-part remedies, an explicit "CITE, DO NOT RE-FILE" instruction, a ratified row carrying
+	// the limb's own consequent, and — in one case — a correction that REVERSED a claim the draft made. That is
+	// kept per row rather than summarised, because it is the measurement of what the cut cost.
+	it('every filed divergence names its register entry, and every entry is accounted for', () => {
+		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
+		const entries = new Set(rows.map((v) => String(v.filed_entry)));
+		expect(entries.size, 'register entries carrying the W-3b filing').toBe(36);
+		const findings = rows.filter((v) => String(v.filed_entry_kind) === 'FINDING').length;
+		const questions = rows.filter((v) => String(v.filed_entry_kind) === 'QUESTION').length;
+		expect({ findings, questions }).toEqual({ findings: 41, questions: 8 });
+		const bad = rows
+			.filter((v) => !/^REG-[FQ]-\d{3}$/.test(String(v.filed_entry)))
+			.map((v) => String(v.limb_id));
+		expect(bad, 'a filing that does not name a register ordinal').toEqual([]);
+		expect(
+			rows.filter((v) => v.filing_cut_hid).length,
+			'rows whose entry was amended once the severed evidence was restored'
+		).toBe(45);
+	});
+
 	it('every live divergence carries a drafted filing statement and its EM-7 search', () => {
 		const rows = verdicts.filter((v) => String(v.verdict) === 'DIVERGENT_UNFILED');
 		const noStatement = rows.filter((v) => String(v.filing_statement ?? '').length < 80).map((v) => String(v.limb_id));
