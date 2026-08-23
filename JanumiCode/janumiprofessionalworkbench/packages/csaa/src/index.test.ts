@@ -39,7 +39,16 @@ import {
 	SOURCE_ORIGIN_CORRELATION_REQUEST_SCHEMA_VERSION,
 	SOURCE_ORIGIN_CORRELATION_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_OPERATION_VERSION,
+	COMMAND_HANDLER_GRAPH_PROGRESS_MAX_BYTES,
+	COMMAND_HANDLER_GRAPH_PROGRESS_MAX_EVENTS,
 	COMMAND_HANDLER_GRAPH_PROGRESS_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_OPERATION_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_SCOPE,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
@@ -187,6 +196,8 @@ import {
 	moduleResolutionTraceReportExitCode,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
+	commandHandlerGraphReportExitCode,
+	runCommandHandlerGraphReport,
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	guardEnforcementLedgerReportExitCode,
@@ -285,6 +296,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('runModuleResolutionTraceCommand');
 		expect(buildCommandEventContractOverlay).toBeTypeOf('function');
 		expect(buildCommandHandlerGraph).toBeTypeOf('function');
+		expect(runCommandHandlerGraphReport).toBeTypeOf('function');
+		expect(commandHandlerGraphReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createCommandHandlerGraphProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runCommandHandlerGraphCommand');
+		expect(publicSurface).not.toHaveProperty('admitCommandHandlerGraphReportRequest');
+		expect(publicSurface).not.toHaveProperty('runCommandHandlerGraphReportWithDependencies');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(runGuardEnforcementLedgerReport).toBeTypeOf('function');
@@ -300,6 +317,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('runReadWriteAccessCommand');
 		expect(publicSurface).not.toHaveProperty('admitProjectContextReportRequest');
 		expect(publicSurface).not.toHaveProperty('captureProjectContextReportPipeline');
+		expect(publicSurface).not.toHaveProperty('captureSemanticReportPipeline');
 		expect(buildArrowCommandCensusArtifactSet).toBeTypeOf('function');
 		expect(runArrowCommandCensusReport).toBeTypeOf('function');
 		expect(arrowCommandCensusReportExitCode).toBeTypeOf('function');
@@ -538,6 +556,29 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-command-handler-graph-request/1.0.0'
 		);
 		expect(COMMAND_HANDLER_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-command-handler-graph/1.0.0');
+		expect(COMMAND_HANDLER_GRAPH_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-command-handler-graph/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-report-request/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-report-result/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-report/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REPORT_SCOPE).toBe(
+			'EXACT_SELECTED_FROZEN_SUBJECT_SEMANTIC_RETAINED_ARROW_AND_COMMAND_HANDLER_GRAPH'
+		);
+		expect(COMMAND_HANDLER_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-report-progress/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-handler-graph-progress-transport/0.1.0'
+		);
+		expect(COMMAND_HANDLER_GRAPH_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(COMMAND_HANDLER_GRAPH_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION).toBe(
 			'jan-csaa-build-command-event-contract-overlay/0.1.0'
 		);

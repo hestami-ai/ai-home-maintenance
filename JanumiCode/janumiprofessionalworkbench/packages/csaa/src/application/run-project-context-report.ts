@@ -305,6 +305,8 @@ export interface RunProjectContextReportOptions {
 
 /** Trusted same-process options for a capture that deliberately emits no report telemetry. */
 export interface CaptureProjectContextReportPipelineOptions {
+	/** Successor-owned exact artifacts that must participate in the same frozen subject identity. */
+	readonly additionalArtifacts?: readonly string[];
 	/** Successor-only semantic enrichment; the public CAP-010 report remains syntax/symbol scoped. */
 	readonly includeTypeCapability?: true;
 	/** Absolute fixed worktree root supplied by the successor facade. */
@@ -340,6 +342,32 @@ export interface ProjectContextReportPipelineCapture {
 
 export type ProjectContextReportPipelineOutcome =
 	| ProjectContextReportPipelineCapture
+	| Extract<ProjectContextReportOutcome, { readonly outcome: 'unavailable' }>;
+
+/** Same-process subject and semantic handoff for successors that do not require CAP-010 projection. */
+export interface SemanticReportPipelineCapture {
+	readonly diagnostics: readonly ProjectContextReportDiagnostic[];
+	readonly frozenSubject: FrozenSubject;
+	readonly outcome: 'semantic-captured';
+	readonly predecessorStageOutcomes: {
+		readonly semanticSnapshot: {
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'complete' | 'partial';
+		};
+		readonly subject: {
+			readonly completeness: SubjectCompleteness;
+			readonly diagnosticCodes: readonly string[];
+			readonly outcome: 'resolved';
+		};
+	};
+	/** Canonical absolute root retained only for the trusted same-process successor. */
+	readonly repositoryRoot: string;
+	readonly request: ProjectContextReportRequest;
+	readonly semanticSnapshot: StaticSemanticSnapshot;
+}
+
+export type SemanticReportPipelineOutcome =
+	| SemanticReportPipelineCapture
 	| Extract<ProjectContextReportOutcome, { readonly outcome: 'unavailable' }>;
 
 function createReportProgressRecorder(
@@ -983,9 +1011,13 @@ function runProjectContextReportInternal(
 	requestValue: unknown,
 	options: RunProjectContextReportOptions,
 	progress: ReportProgressRecorder,
-	capturePipeline = false,
-	includeTypeCapability = false
-): ProjectContextReportOutcome | ProjectContextReportPipelineCapture {
+	captureMode: 'NONE' | 'PROJECT_CONTEXT' | 'SEMANTIC' = 'NONE',
+	includeTypeCapability = false,
+	additionalArtifacts: readonly string[] = []
+):
+	| ProjectContextReportOutcome
+	| ProjectContextReportPipelineCapture
+	| SemanticReportPipelineCapture {
 	progress.start('REQUEST_BIND');
 	const admission = admitProjectContextReportRequest(requestValue);
 	if (admission.outcome === 'rejected')
@@ -1030,6 +1062,7 @@ function runProjectContextReportInternal(
 		rootLocator: repositoryRoot,
 		schemaVersion: SUBJECT_REQUEST_SCHEMA_VERSION,
 		scope: {
+			...(additionalArtifacts.length > 0 ? { additionalArtifacts } : {}),
 			kind: 'EXPLICIT_PROJECTS',
 			projects: resolvedSubjectProjects.map((project) => project.path)
 		},
@@ -1119,6 +1152,26 @@ function runProjectContextReportInternal(
 		);
 	const snapshot = semanticOutcome.snapshot;
 	progress.complete([], semanticOutcome.outcome.toUpperCase());
+	if (captureMode === 'SEMANTIC')
+		return Object.freeze({
+			diagnostics: Object.freeze([...subjectDiagnostics, ...semanticDiagnostics]),
+			frozenSubject: subject,
+			outcome: 'semantic-captured' as const,
+			predecessorStageOutcomes: Object.freeze({
+				semanticSnapshot: {
+					diagnosticCodes: semanticOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+					outcome: semanticOutcome.outcome
+				},
+				subject: {
+					completeness: subjectOutcome.completeness,
+					diagnosticCodes: subjectOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+					outcome: 'resolved' as const
+				}
+			}),
+			repositoryRoot,
+			request,
+			semanticSnapshot: snapshot
+		});
 
 	progress.start('PROJECT_CONTEXT');
 	const projectContextOutcome = buildProjectContextGraph({
@@ -1224,7 +1277,7 @@ function runProjectContextReportInternal(
 				outcome: 'resolved'
 			}
 		};
-	if (capturePipeline)
+	if (captureMode === 'PROJECT_CONTEXT')
 		return Object.freeze({
 			diagnostics: Object.freeze([
 				...subjectDiagnostics,
@@ -1392,7 +1445,7 @@ export function runProjectContextReport(
 	const progress = createReportProgressRecorder(options);
 	try {
 		const outcome = runProjectContextReportInternal(requestValue, options, progress);
-		if (outcome.outcome === 'captured')
+		if (outcome.outcome === 'captured' || outcome.outcome === 'semantic-captured')
 			throw new Error('The public CAP-010 report path returned an internal pipeline capture.');
 		return progress.finish(outcome);
 	} catch (error) {
@@ -1413,13 +1466,45 @@ export function captureProjectContextReportPipeline(
 			requestValue,
 			captureOptions,
 			progress,
-			true,
-			options.includeTypeCapability === true
+			'PROJECT_CONTEXT',
+			options.includeTypeCapability === true,
+			options.additionalArtifacts ?? []
 		);
 		if (outcome.outcome === 'captured') return outcome;
+		if (outcome.outcome === 'semantic-captured')
+			throw new Error('The CAP-010 capture path returned a semantic-only capture.');
 		const terminal = progress.finish(outcome);
 		if (terminal.outcome !== 'unavailable')
 			throw new Error('The internal CAP-010 pipeline returned a terminal partial report.');
+		return terminal;
+	} catch (error) {
+		progress.fail([], 'INTERNAL_FAILURE');
+		throw error;
+	}
+}
+
+/** @internal Same-process subject and semantic seam; never package-root export or serialize it. */
+export function captureSemanticReportPipeline(
+	requestValue: unknown,
+	options: CaptureProjectContextReportPipelineOptions
+): SemanticReportPipelineOutcome {
+	const captureOptions: RunProjectContextReportOptions = { repositoryRoot: options.repositoryRoot };
+	const progress = createReportProgressRecorder(captureOptions);
+	try {
+		const outcome = runProjectContextReportInternal(
+			requestValue,
+			captureOptions,
+			progress,
+			'SEMANTIC',
+			options.includeTypeCapability === true,
+			options.additionalArtifacts ?? []
+		);
+		if (outcome.outcome === 'semantic-captured') return outcome;
+		if (outcome.outcome === 'captured')
+			throw new Error('The semantic capture path returned a CAP-010 projection capture.');
+		const terminal = progress.finish(outcome);
+		if (terminal.outcome !== 'unavailable')
+			throw new Error('The internal semantic pipeline returned a terminal partial report.');
 		return terminal;
 	} catch (error) {
 		progress.fail([], 'INTERNAL_FAILURE');

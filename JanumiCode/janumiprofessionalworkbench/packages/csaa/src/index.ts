@@ -8,6 +8,7 @@ export * from './contracts/source-origin-correlation.js';
 export * from './contracts/arrow-command-census.js';
 export * from './contracts/arrow-command-census-report.js';
 export * from './contracts/command-handler-graph.js';
+export * from './contracts/command-handler-graph-report.js';
 export * from './contracts/command-event-contract-overlay.js';
 export * from './contracts/command-dispatch-topology.js';
 export * from './contracts/guard-enforcement-ledger.js';
@@ -182,6 +183,25 @@ export {
 	ARROW_COMMAND_CENSUS_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type ArrowCommandCensusProgressTransportTruncation
 } from './application/arrow-command-census-progress-jsonl.js';
+
+export {
+	commandHandlerGraphReportExitCode,
+	runCommandHandlerGraphReport,
+	COMMAND_HANDLER_GRAPH_REPORT_PROGRESS_NONCLAIMS,
+	COMMAND_HANDLER_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION,
+	type CommandHandlerGraphReportProgressEvent,
+	type CommandHandlerGraphReportProgressObservation,
+	type CommandHandlerGraphReportProgressObservationMetric,
+	type CommandHandlerGraphReportProgressPhase,
+	type RunCommandHandlerGraphReportOptions
+} from './application/run-command-handler-graph-report.js';
+
+export {
+	COMMAND_HANDLER_GRAPH_PROGRESS_MAX_BYTES,
+	COMMAND_HANDLER_GRAPH_PROGRESS_MAX_EVENTS,
+	COMMAND_HANDLER_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type CommandHandlerGraphProgressTransportTruncation
+} from './application/command-handler-graph-progress-jsonl.js';
 
 export {
 	guardEnforcementLedgerReportExitCode,

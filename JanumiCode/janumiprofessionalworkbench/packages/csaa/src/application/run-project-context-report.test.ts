@@ -13,6 +13,8 @@ import { canonicalSemanticJson } from '../semantic/canonical.js';
 import {
 	PROJECT_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
 	PROJECT_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	captureProjectContextReportPipeline,
+	captureSemanticReportPipeline,
 	projectContextReportExitCode,
 	runProjectContextReport,
 	type ProjectContextReportProgressEvent
@@ -461,5 +463,41 @@ describe('runProjectContextReport', () => {
 		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
+	});
+
+	it('adds successor-owned artifacts only to the internal same-subject capture seam', () => {
+		const root = fixture();
+		write(root, 'verif/retained-evidence.ts', 'export const retained = true;\n');
+		const captured = captureProjectContextReportPipeline(request(), {
+			additionalArtifacts: ['verif/retained-evidence.ts'],
+			repositoryRoot: root
+		});
+		expect(captured.outcome).toBe('captured');
+		if (captured.outcome !== 'captured') return;
+		expect(captured.frozenSubject.artifacts.map((artifact) => artifact.path)).toContain(
+			'verif/retained-evidence.ts'
+		);
+
+		const publicOutcome = runProjectContextReport(request(), { repositoryRoot: root });
+		expect(publicOutcome.outcome).toBe('partial');
+		if (publicOutcome.outcome !== 'partial') return;
+		expect(publicOutcome.subject.subjectId).not.toBe(captured.frozenSubject.descriptor.subjectId);
+		expect(publicOutcome.request).toEqual(request());
+	});
+
+	it('hands off one subject and semantic snapshot without constructing CAP-010 projection evidence', () => {
+		const root = fixture();
+		write(root, 'verif/retained-evidence.ts', 'export const retained = true;\n');
+		const captured = captureSemanticReportPipeline(request(), {
+			additionalArtifacts: ['verif/retained-evidence.ts'],
+			repositoryRoot: root
+		});
+		expect(captured.outcome).toBe('semantic-captured');
+		if (captured.outcome !== 'semantic-captured') return;
+		expect(captured.frozenSubject.artifacts.map((artifact) => artifact.path)).toContain(
+			'verif/retained-evidence.ts'
+		);
+		expect(captured.semanticSnapshot.subjectId).toBe(captured.frozenSubject.descriptor.subjectId);
+		expect(captured).not.toHaveProperty('projectContextGraph');
 	});
 });

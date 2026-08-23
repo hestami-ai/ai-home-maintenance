@@ -44,6 +44,19 @@ import {
 	CALL_GRAPH_REPORT_SELECTION
 } from '../contracts/call-graph-report.js';
 import {
+	COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY,
+	COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY_TRANSFER,
+	COMMAND_HANDLER_GRAPH_REPORT_EXECUTION_SELECTION,
+	COMMAND_HANDLER_GRAPH_REPORT_GATE_EFFECT,
+	COMMAND_HANDLER_GRAPH_REPORT_NONCLAIMS,
+	COMMAND_HANDLER_GRAPH_REPORT_OPERATION_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_SCHEMA_VERSION,
+	COMMAND_HANDLER_GRAPH_REPORT_SELECTION,
+	COMMAND_HANDLER_GRAPH_REPORT_SCOPE
+} from '../contracts/command-handler-graph-report.js';
+import {
 	STATE_MACHINE_GRAPH_REPORT_AUTHORITY,
 	STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER,
 	STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT,
@@ -278,6 +291,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
 const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
+const COMMAND_HANDLER_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-command-handler-graph.ts';
 const GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND = 'bun scripts/csaa-guard-enforcement-ledger.ts';
 const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
@@ -395,6 +409,20 @@ const ARROW_COMMAND_CENSUS_REPORT_PROVENANCE = [
 	'packages/csaa/src/index.test.ts',
 	'packages/csaa/src/index.ts',
 	'scripts/csaa-arrow-command-census.ts'
+] as const;
+const COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE = [
+	'packages/csaa/src/application/command-handler-graph-command.test.ts',
+	'packages/csaa/src/application/command-handler-graph-progress-jsonl.test.ts',
+	'packages/csaa/src/application/command-handler-graph-progress-jsonl.ts',
+	'packages/csaa/src/application/run-command-handler-graph-command.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.test.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.ts',
+	'packages/csaa/src/application/run-project-context-report.test.ts',
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/contracts/command-handler-graph-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-command-handler-graph.ts'
 ] as const;
 const GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE = [
 	GUARD_ENFORCEMENT_LEDGER_REPORT_ANALYZER_DEPENDENCY_PATH,
@@ -538,6 +566,7 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
+	if (name === 'csaa:analyze:command-handler-graph') return COMMAND_HANDLER_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:guard-enforcement-ledger')
 		return GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND;
 	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
@@ -736,6 +765,7 @@ describe('inventory discovery and identity', () => {
 				...PROJECT_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -765,6 +795,32 @@ describe('inventory discovery and identity', () => {
 		}
 		const commandHandlerCapability = capabilities.get('command-handler-static-projection');
 		expect(commandHandlerCapability).toBeDefined();
+		expect(commandHandlerCapability!.provider).toBe('typescript+jpwb-arrow-command-census-overlay');
+		expect(commandHandlerCapability!.state).toBe('PARTIAL');
+		for (const expectedProvenance of [
+			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+			'package.json#/scripts/csaa:analyze:command-handler-graph'
+		])
+			expect(commandHandlerCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		for (const expected of [
+			COMMAND_HANDLER_GRAPH_REPORT_OPERATION_VERSION,
+			COMMAND_HANDLER_GRAPH_REPORT_REQUEST_SCHEMA_VERSION,
+			COMMAND_HANDLER_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
+			COMMAND_HANDLER_GRAPH_REPORT_SCHEMA_VERSION,
+			JSON.stringify(COMMAND_HANDLER_GRAPH_REPORT_SELECTION),
+			COMMAND_HANDLER_GRAPH_REPORT_EXECUTION_SELECTION,
+			`analysis authority is ${COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY}`,
+			`authority transfer is ${COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY_TRANSFER}`,
+			`gate effect is ${COMMAND_HANDLER_GRAPH_REPORT_GATE_EFFECT}`,
+			'bounded semantic snapshot summary',
+			'does not construct CAP-010 project-context projection evidence',
+			'same-process FrozenSubject-and-semantic handoff',
+			'successful evidence is never truncated',
+			'CONFIGURED_NOT_RUN'
+		])
+			expect(commandHandlerCapability!.explanation).toContain(expected);
+		for (const nonclaim of COMMAND_HANDLER_GRAPH_REPORT_NONCLAIMS)
+			expect(commandHandlerCapability!.explanation).toContain(nonclaim);
 		const retainedArrowProvenance = [...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS];
 		const arrowCapability = capabilities.get('arrow-command-census');
 		expect(arrowCapability).toBeDefined();
@@ -840,8 +896,6 @@ describe('inventory discovery and identity', () => {
 		expect(guardCapability!.explanation).toContain('selected-captured-subject currentness');
 		for (const nonclaim of GUARD_ENFORCEMENT_LEDGER_REPORT_NONCLAIMS)
 			expect(guardCapability!.explanation).toContain(nonclaim);
-		expect(commandHandlerCapability!.provider).toBe('typescript+jpwb-arrow-command-census-overlay');
-		expect(commandHandlerCapability!.state).toBe('PARTIAL');
 		for (const expectedProvenance of [
 			...retainedArrowProvenance,
 			'capabilities#arrow-command-census',
@@ -1811,6 +1865,7 @@ describe('inventory discovery and identity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
@@ -1855,6 +1910,9 @@ describe('inventory discovery and identity', () => {
 			'exact selected retained arrow-command census evidence and baseline comparison'
 		);
 		expect(semanticBoundary).toContain(
+			'exact same-subject COMMANDS-to-HANDLERS static projection with retained arrow sites, occurrences, exact/candidate lanes, and explicit frontiers'
+		);
+		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
 		);
 		expect(semanticBoundary).toContain(
@@ -1865,7 +1923,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, guard-enforcement-ledger, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -1914,7 +1972,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, guard-enforcement-ledger, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -2004,6 +2062,7 @@ describe('inventory discovery and identity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
@@ -2038,6 +2097,12 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`arrow-command-census report facade has analysis authority ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY}, authority transfer ${ARROW_COMMAND_CENSUS_REPORT_AUTHORITY_TRANSFER}, and gate effect ${ARROW_COMMAND_CENSUS_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`command-handler-graph report facade has analysis authority ${COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY}, authority transfer ${COMMAND_HANDLER_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${COMMAND_HANDLER_GRAPH_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`distinct facade scope is ${COMMAND_HANDLER_GRAPH_REPORT_SCOPE}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`guard-enforcement-ledger report facade has analysis authority ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY}, authority transfer ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER}, and gate effect ${GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT}`
@@ -2521,6 +2586,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:source-origin-correlation',
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:analyze:arrow-command-census',
+				'csaa:analyze:command-handler-graph',
 				'csaa:analyze:guard-enforcement-ledger',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
@@ -2726,6 +2792,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:arrow-command-census');
+
+		const missingCommandHandlerGraphReportCommand = fixture();
+		write(
+			missingCommandHandlerGraphReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:command-handler-graph'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingCommandHandlerGraphReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:command-handler-graph');
 
 		const missingGuardEnforcementLedgerReportCommand = fixture();
 		write(
@@ -3094,6 +3180,24 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:arrow-command-census');
 
+		const incompatibleCommandHandlerGraphReportCommand = fixture();
+		write(
+			incompatibleCommandHandlerGraphReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:command-handler-graph': 'bun scripts/wrong-command-handler-graph.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleCommandHandlerGraphReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:command-handler-graph'
+		);
+
 		const incompatibleGuardEnforcementLedgerReportCommand = fixture();
 		write(
 			incompatibleGuardEnforcementLedgerReportCommand,
@@ -3269,6 +3373,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
@@ -3344,6 +3449,7 @@ describe('JPWB population non-vacuity', () => {
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
@@ -3383,6 +3489,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
@@ -3457,6 +3564,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:source-origin-correlation',
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
+						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
@@ -3505,6 +3613,7 @@ describe('JPWB population non-vacuity', () => {
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
@@ -3587,6 +3696,7 @@ describe('JPWB population non-vacuity', () => {
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
@@ -3617,6 +3727,20 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB arrow-command census report facade or verification source is absent: ${missingArrowCommandCensusReportPath}`
 			);
 			write(root, missingArrowCommandCensusReportPath, 'export {};\n');
+		}
+		for (const missingCommandHandlerGraphReportPath of COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE.filter(
+			(path) =>
+				!CALL_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!MODULE_DEPENDENCY_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!READ_WRITE_ACCESS_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingCommandHandlerGraphReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB command-handler graph report facade or verification source is absent: ${missingCommandHandlerGraphReportPath}`
+			);
+			write(root, missingCommandHandlerGraphReportPath, 'export {};\n');
 		}
 		for (const missingGuardEnforcementLedgerReportPath of GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE.filter(
 			(path) =>
@@ -3735,7 +3859,8 @@ describe('JPWB population non-vacuity', () => {
 		for (const missingProjectContextReportPath of PROJECT_CONTEXT_REPORT_PROVENANCE.filter(
 			(path) =>
 				!MODULE_DEPENDENCY_REPORT_PROVENANCE.some((shared) => shared === path) &&
-				!READ_WRITE_ACCESS_REPORT_PROVENANCE.some((shared) => shared === path)
+				!READ_WRITE_ACCESS_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path)
 		)) {
 			rmSync(join(root, ...missingProjectContextReportPath.split('/')));
 			expect(() =>
@@ -3981,6 +4106,15 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:analyze:command-handler-graph'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: COMMAND_HANDLER_GRAPH_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) =>
 					command.owner === '.' && command.name === 'csaa:analyze:guard-enforcement-ledger'
 			)
@@ -4075,6 +4209,7 @@ describe('JPWB population non-vacuity', () => {
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
+				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
