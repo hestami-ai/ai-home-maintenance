@@ -24967,3 +24967,488 @@ neither of their values resolves against anything
   repository change should be made until (A) or (B) is recorded** — an enum written first would settle
   both this question and REG-Q-069's by accident, which is the outcome REG-Q-069 asked to avoid.
   Status: OPEN.
+
+---
+
+## W-3b — the two artifacts the census still owed
+
+Two entries closing what the invariant census recorded as outstanding after its arm doubts were settled.
+
+**The RECORD correction** supersedes ONE bullet of `REG-F-234` and nothing else. That entry's finding —
+the SUPPORTS endpoint pair at two command surfaces — is untouched and is not re-opened. What is corrected
+is a clause describing a SIBLING ROW'S CENSUS BOOKKEEPING, which was **true when written** and has been
+falsified twice since: once when V-7 filed that row, and again when its arm moved on an adjudicated doubt.
+
+> ⚠ **An append-only entry that asserts another row's census bookkeeping makes a claim with an expiry
+> date, in an artifact whose own `changeProcedure` forbids correcting it in place.** Cite a sibling's
+> SUBSTANCE — the mechanism, the site — not its arm word or its filing status. Where the bookkeeping is
+> genuinely load-bearing for a distinction, date it.
+
+**The ratification question** is `limb:LYR-3:1`'s, and it is a question rather than a finding because
+canon splits on it. Following `JPWB-DOC-003`'s provenance sidecar to the operative source: **five passages
+fix LYR-3's subject by the canvas ACT** (*"Canvas layout operations must never increment semantic
+version"*, *"Moving a node cannot alter a PWU semantic version"*) while **one fixes it by the EFFECT**
+(Property P8, *"For ARBITRARY layout changes…"*). And the SCOPE line's own phrase is sharper evidence than
+either: **`view-state` occurs exactly ONCE in the entire operative corpus**, where it modifies
+*contracts*, not operations — so the operation-class framing is a canon-drafting transformation of a
+corpus rule about contract SEPARATION. That seam is precisely where the question sits.
+
+Both entries were adversarially verified and both were amended.
+
+### REG-F-272 — the clause that keeps REG-F-234 off limb:REL-2:3 was falsified twice and now inverts
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes
+**REG-F-234** as to ONE bullet only ·
+**Status:** OPEN
+
+- **WHAT THIS SUPERSEDES, AND WHAT IT LEAVES STANDING.** This entry corrects **one clause of one
+  bullet** of REG-F-234 — the CENSUS RECONCILIATION bullet at `:12289-12295`, and within it only the
+  two assertions it makes about a SIBLING row, `limb:REL-2:3`. **REG-F-234's finding is untouched and
+  is not re-opened.** Its subject — that no command surface resolves either endpoint of a SUPPORTS
+  relation, that `ProposeEvidence.supportsClaimIds` and `AssertClaim.supportingEvidenceIds` are copied
+  onto governed objects verbatim, that the wrong-typed target reaches the ratified `EvidenceInvalidated`
+  payload under `affectedClaimIds`, and that `validateLinkDirectionality` is handed the literal `CLAIM`
+  at `assurance.ts:597` instead of a lookup — was re-read at HEAD for this entry and every limb of it
+  holds. Its remedy, its witnessing mutations, its merge target and its closure of `limb:REL-2:1` all
+  stand. **A reader who treats the whole entry as suspect on the strength of this correction is reading
+  it wrong**, and this sentence exists so that reading is not available.
+
+- **THE CLAUSE, VERBATIM, READ AT THE LINE.** `docs/canon/JPWB-REG-005 …md:12289-12295`:
+  *"**CENSUS RECONCILIATION — LIMB IDS THIS ENTRY CLOSES:** `limb:REL-2:1`. It closes nothing else,
+  because `limb:REL-2:2` … is scored ENFORCED_MULTI_SITE and owes no filing, and `limb:REL-2:3`
+  ("What may support, and what may verify, is fixed by type") **is scored UNENFORCED_DEAD_PREDICATE**
+  on the dead TYPE TABLE — a different mechanism from this row's **driven acceptance at the command
+  surface** — and **is filed NEAR_MISS against REG-F-203 in its own right**."* Filed 2026-08-23 in
+  commit `857128a7`.
+
+- **⚠ IT WAS TRUE WHEN WRITTEN, AND I VERIFIED THAT RATHER THAN CONCEDING IT.** `git show
+  857128a7:…/docs/tracking/w3b/invariant-verdicts.ndjson`, row `limb:REL-2:3`: `verdict:
+  UNENFORCED_DEAD_PREDICATE`, `filing: NEAR_MISS`, `refutation: HELD`, `confidence: DROVE_THE_ENGINE`,
+  `measured_at: 2026-08-21`, and a `near_miss_filing` field whose preamble closes *"A READER WILL CLOSE
+  THIS ROW ON IT. IT MUST NOT BE CLOSED ON IT."* and whose paragraph (1) then opens on `REG-F-203`.
+  Both halves of the clause were accurate transcriptions of the ledger on the day. **This is a
+  correction of an entry that was right, not of an entry that was careless** — which is precisely why
+  it is worth recording as a class rather than as a slip. The clause also asserts `limb:REL-2:2` is
+  `ENFORCED_MULTI_SITE`; that one is **still true at HEAD** and is not corrected here.
+
+- **FALSIFICATION 1 — THE FILING WORD, AND IT IS NOW UNSATISFIABLE BY ANY ROW.** Commit `a4a19057`
+  ("the near misses are filed, and the filing debt reaches zero") filed this limb: the HEAD row carries
+  `filing: FILED`, `filed_entry: REG-F-258`, `filed_entry_kind: FINDING`, and a `filed_as` field
+  recording *"w3b-v7 near-miss filing pass 2026-08-23 … 62 citations re-opened at HEAD, 10 corrections
+  applied, verdict AMENDED."* So `limb:REL-2:3` is **FILED**, not NEAR_MISS, and the filing is
+  **REG-F-258**, not a near-miss against REG-F-203. **The word itself is extinct:** across the 307
+  verdict rows at HEAD the `filing` field takes exactly two values — `FILED` = 229 and
+  `NOT_APPLICABLE` = 78, summing to 307. **Zero rows carry `NEAR_MISS`.** No sentence anywhere in this
+  register that says a limb "is NEAR_MISS" can be true today, whatever limb it names.
+
+- **FALSIFICATION 2 — THE ARM WORD, AND ⚠ IT INVERTS THE CLAUSE RATHER THAN MERELY DATING IT.** Commit
+  `73d1ec9e` adjudicated this row's recorded arm doubt: HEAD carries `verdict:
+  UNENFORCED_OBSERVED_ADMISSION` with `superseded_verdict: UNENFORCED_DEAD_PREDICATE` retained on the
+  row. The clause distinguishes the two entries on the ground that REL-2:3 is *"a different mechanism
+  from this row's driven acceptance at the command surface"* — **and `UNENFORCED_OBSERVED_ADMISSION`
+  IS driven acceptance at the command surface.** Read at HEAD, the sentence no longer explains why
+  REG-F-234 does not close REL-2:3; it supplies the premise that it should. That is worse than
+  staleness: a stale clause misinforms, an inverted clause **argues the opposite of what its author
+  established**, and it does so in the one bullet a later reader consults to decide whether a limb is
+  already closed.
+  - The adjudication is honest about its own cost and the row says so: *"UNENFORCED_OBSERVED_ADMISSION
+    … captures the surface admission and drops this row's distinctive subject: a correct, unit-tested,
+    general type-fixing artifact EXISTS and GOVERNS NOTHING. ⚠ THAT IS A GAP IN THE LADDER"*
+    (`what_the_move_costs`). **The arm words collided because the ladder has no arm for this row**, not
+    because the two entries converged. The collision is a vocabulary defect; the clause inherited it.
+
+- **THE LOAD-BEARING QUESTION — DOES THE NON-CLOSURE STILL HOLD ON SUBSTANCE? YES, AND I MEASURED IT
+  RATHER THAN INHERITING IT FROM EITHER ENTRY.** Instrument: `sed -n` the two entries into separate
+  files (REG-F-234 `:12116-12300`, REG-F-258 `:19253-19481`) and count with `grep -c` the MATCHING
+  LINES for the same eight probes over both, BOTH NUMBERS reported. ⚠ **The unit is lines, not
+  occurrences** — for three probes they differ (`grep -o` gives 12 / 16 / 17 where lines give 11 / 15 /
+  14), so a re-run must use `-c`. **REG-F-234 / REG-F-258:** `supportsClaimIds` **11 / 3**;
+  `supportingEvidenceIds` **15 / 2**; `VERIFIES` **0 / 14**; `assessmentId` **0 / 12**; `pwu.ts:1362`
+  **0 / 6**; `TRACE_DIRECTIONALITY` **1 / 10**; `recordClaimAssessment` **1 / 4**. The zeros are not a
+  failed search: every probe returns non-zero on the other entry with the identical instrument over an
+  identically-extracted corpus, which is the positive control.
+  - **The two subjects, stated plainly.** REG-F-234's is the **SUPPORTS endpoint pair at two command
+    surfaces** — two payload fields written onto governed objects with neither end resolved.
+    REG-F-258's is **the general type-fixing artifact governing nothing**: a 17-row table of which one
+    row is ever selected and by a literal; a ratified `VERIFIES` row that **no production path can
+    select at all**, because nothing mints a VERIFIES relation; and a verification determination made
+    at the CLAIM target from an unresolved `assessmentId`, driven to a terminal `REJECTED` with a PWU
+    id in the ratified `ClaimRejected` event. **Repairing REG-F-234 in full leaves every one of those
+    three standing** — it contains no VERIFIES drive, names no `assessmentId`, and cites `pwu.ts:1362`
+    nowhere.
+  - **⚠ THE ONE GENUINE OVERLAP, NAMED RATHER THAN SMOOTHED.** Both entries touch `assurance.ts:597`
+    (**2 / 2**). REG-F-234's remedy (ii) resolves the target's real `objectType` there; REG-F-258's
+    remedy (a) makes the handler CONSULT `TRACE_DIRECTIONALITY` rather than restate it. **These are
+    different repairs of one line, and REG-F-258 already sequences itself accordingly** — *"Sequence it
+    AFTER REG-F-234's remedy lands, so (a) converts that entry's duplicated rule into a consultation of
+    the table rather than a third copy of it."* One shared line under two remedies that compose is not
+    one finding; it is the reason the sequence is recorded.
+  - **CORROBORATION THAT PREDATES BOTH ENTRIES**, so the distinction is not something the filings
+    invented to justify themselves. The REL-2:3 ledger row's `sibling_control` field, written
+    2026-08-21: *"NOT limb 1's row. Limb 1 is scored UNENFORCED_OBSERVED_ADMISSION on the command
+    surface accepting the arrangement (`ProposeEvidence` / `AssertClaim` write unresolved id lists).
+    This row is scored on the DOWNSTREAM predicate that exists to catch it and structurally cannot.
+    They share the same driven transcript because one drive exercises both planes; they cite different
+    files and different mechanisms."* ⚠ **Note what that field already says: limb 1 was ALREADY scored
+    `UNENFORCED_OBSERVED_ADMISSION` when REG-F-234 was written.** The arm words did not merely collide
+    later — REG-F-234 chose to distinguish the rows by a *phrase describing its own arm*, which the
+    sibling was one adjudication away from acquiring. The census field got the distinction right by
+    citing mechanism; the register bullet got it wrong by citing bookkeeping.
+
+- **THE CORRECTED CLAUSE — what a reader should take `:12291-12294` to say.** *"…and `limb:REL-2:3`
+  ("What may support, and what may verify, is fixed by type") is **filed in its own right as
+  REG-F-258**, whose subject is the general type-fixing artifact rather than this entry's endpoint
+  pair: `TRACE_DIRECTIONALITY` is consulted at one call site with stipulated arguments, its ratified
+  `VERIFIES` row is selectable by no production path, and the claim-side verifier `assessmentId` is
+  never resolved. **None of those three is repaired by this entry's remedy**, and REG-F-258's remedy
+  (a) is sequenced to land after it."* Note what the replacement does **not** contain: no arm word and
+  no filing word. It names an entry id and three mechanisms, all of which are stable under any
+  re-scoring of the census.
+
+- **⚠ THE GENERAL FORM, BECAUSE THIS IS A CLASS AND NOT A ONE-OFF: an append-only artifact must not
+  assert a value that lives in a mutable ledger.** REG-F-234's clause was true, sourced, and
+  transcribed correctly; it was falsified inside 24 hours by two routine acts of the very programme
+  that wrote it — a filing pass and an arm adjudication. Nothing about the authoring was careless. The
+  defect is **structural**: the register forbids correction in place (`changeProcedure`, line 19), and
+  a claim of the shape *"row X is scored A"* or *"row X is filed B"* has an **expiry date set by
+  someone else's next commit**.
+  - **THE VOCABULARY, DERIVED — NOT HAND-LISTED.** The token set was not typed out; it was derived by
+    parsing the `verdict`, `superseded_verdict` and `filing` fields of every row across all **23**
+    revisions of `docs/tracking/w3b/invariant-verdicts.ndjson` in `git log`, yielding 13 verdict values
+    and 5 filing values. **Eighteen tokens, of which five are carried by NO row at HEAD** —
+    `NEAR_MISS`, `DIVERGENT_UNFILED`, `PARTIAL_DIVERGENT_FILED`, `UNFILED`, `NOT_ESTABLISHED`.
+  - **⚠ THE DENOMINATOR IS STATED TWICE, BECAUSE ONLY ONE OF THE TWO MEASURES CITATIONS.**
+    Word-boundary matching all 18 tokens over this register gives **290** raw occurrences. Three of
+    them — `FILED` (113), `PARTIAL` (29), `DIVERGENT` (7) — are ordinary English words the register
+    uses non-referentially throughout, so the referential count over the remaining 15 is **141**. A
+    re-run that keeps all 18 will see 290 and must not read that as a contradiction.
+  - **THE STALENESS, WHICH IS THE FIGURE THAT SETTLES IT AND THE ONE A RE-RUN REPRODUCES EXACTLY.**
+    **73** occurrences use a token no row carries at HEAD — `NEAR_MISS` 28, `DIVERGENT_UNFILED` 28,
+    `PARTIAL_DIVERGENT_FILED` 9, `UNFILED` 8, `NOT_ESTABLISHED` 0. **73 is invariant under the
+    exclusion above**, since all five dead tokens are unambiguous. **POSITIVE CONTROL, same instrument,
+    same corpus:** the still-live 10 of those 15 tokens return **68** occurrences (`NOT_APPLICABLE` 20,
+    `ENFORCED_DRIVEN` 13, `UNENFORCED_NO_SHAPE` 10, `ENFORCED_MULTI_SITE` 9, six smaller), so the
+    instrument resolves these tokens here and the 73 is a measurement, not a failed search.
+  - **⚠ THE SENTENCE-LEVEL PARTITION IS INSTRUMENT-SENSITIVE, AND BOTH RUNS ARE RECORDED RATHER THAN
+    THE FLATTERING ONE.** Reflowing the register into paragraphs, splitting into sentences and
+    requiring both a token and a `limb:[A-Z]+-\d+:\d+` id in the same sentence yields **27-28
+    sentences that predicate a ledger field of a NAMED limb row**, spread over **13-19 entries**, of
+    which **17-22 name a SIBLING row** — the exact shape of this defect. The spread is the reflow rule
+    and the self/sibling test moving, not the corpus. **No exact partition is asserted here**; an
+    entry that needs one must re-derive it and publish its splitter.
+  - **THE FLOOR THAT SURVIVES BOTH RUNS, AND IT IS ENOUGH: at least TEN sibling bookkeeping assertions
+    in this register are false at HEAD**, this clause among them — and ⚠ **the class is NOT one
+    mechanism.** Nine are `NEAR_MISS`, extinct since the filing field partitioned 229/78 into
+    `FILED`/`NOT_APPLICABLE`. **The tenth is not `NEAR_MISS`, and that is the part that matters:**
+    REG-Q-053 at `:11188-11189` says of the sibling `limb:REL-1:6` that *"it sits on a different arm
+    (`PARTIAL_DIVERGENT_FILED`, refutation HELD)"*; at HEAD that row reads `verdict: PARTIAL`,
+    `superseded_verdict: DIVERGENT`, `filing: FILED`. **That one was falsified by an ARM RE-SCORING,
+    not by a filing pass** — the same second mechanism that inverted REG-F-234's own clause. Sibling
+    assertions resting on a still-live token were true row by row when I checked them against the HEAD
+    ledger (`limb:PER-3:1`, `limb:OBJ-3:1`, `limb:OBJ-2:1`, `limb:OBJ-2:2`, `limb:OBJ-2:5`,
+    `limb:ASR-9:4`, `limb:ASR-16:4`, `limb:PER-12:2` and `:5`, `limb:REL-2:2`).
+  - **THE DISCIPLINE PROPOSED — cite a sibling's SUBSTANCE, not its bookkeeping; and where the
+    bookkeeping is genuinely the point, DATE IT.** Concretely, in a CENSUS RECONCILIATION bullet or any
+    sentence disposing of a sibling limb: (i) distinguish rows by **mechanism, file and field** — the
+    things a re-scoring cannot move — and by **entry id**, which is append-only and therefore stable;
+    (ii) if an arm or filing word is load-bearing, write it as an observation with a date and a source
+    — *"`filing: NEAR_MISS` as at 2026-08-21 (`invariant-verdicts.ndjson`)"* — so a later reader sees a
+    timestamped reading rather than a standing claim; (iii) **never distinguish two entries by a phrase
+    that describes an arm**, since arms are exactly what refuters move. ⚠ The trap in (i) is that an
+    entry id is only stable if the entry is not itself superseded — cite the id **and** the mechanism,
+    never the id alone.
+  - **THE DISCIPLINE IS ALREADY PRACTISED ONCE IN THIS REGISTER, which is why it is proposed rather
+    than invented.** REG-F-258's own reconciliation at `:19469` disposes of the same sibling pair by
+    substance: *"`limb:REL-2:1` is closed by REG-F-234 at `:12289` (**the SUPPORTS endpoint pair at the
+    command surface**)"* — an entry id plus a mechanism, no arm word, no filing word. That sentence is
+    still true at HEAD and would survive any further re-scoring of either row. **The two sentences were
+    written the same day about the same two limbs; one has expired and one has not, and the only
+    difference is which kind of fact each chose to cite.**
+  - **WHAT THIS ENTRY DOES NOT CLAIM.** It does not claim every other sibling assertion is a defect
+    needing an entry — those resting on a still-live token were true row by row when checked. **Nor
+    does it claim the false ones are a single mechanical class produced by one filing pass: they are
+    not.** REG-Q-053's `PARTIAL_DIVERGENT_FILED` sentence was falsified by an arm re-scoring, so the
+    class has **at least two producers** — which is the general form above holding, not narrowing. The
+    proposal is a **drafting rule for future bullets**, not a re-opening of the entries it would have
+    caught. Whether the other false sentences warrant their own superseding entries or a single
+    omnibus correction is a question this entry deliberately leaves open rather than answering by fiat.
+
+- **THE FORM I FOLLOWED, AND ⚠ THE TENSION IN THE REGISTER'S OWN PRACTICE, RECORDED RATHER THAN
+  SMOOTHED.** Two conventions exist and they are not the same act.
+  1. **`changeProcedure` (line 19):** *"Entries are never destructively edited; a correction is a
+     superseding entry citing the entry it supersedes."* The worked precedent is **REG-F-040**
+     (`:1098`), a `Class: RECORD` entry that supersedes REG-F-014 *"only as to its heading, its
+     instance arithmetic, and the disposition of its residue"* and states in terms *"WHY THIS IS AN
+     ENTRY AND NOT AN EDIT"*, having found that **no heading in this register has ever been struck**.
+  2. **The annotation precedent at `:632`,** inside REG-F-014 itself: *"⚠ SUPERSEDED IN PART BY
+     REG-F-040 (2026-08-06), which is where the correct heading lives. This entry is not edited, per §1
+     … including the two lines directly above, both of which are wrong."*
+  - **THE TENSION.** (2) is an **append inside** an entry that (1) says is *"never edited"* — and it
+    says so of itself, in the same sentence, while adding text to the entry. The register is therefore
+    reading *"never destructively edited"* as *"text may be ADDED, never removed or rewritten"*, and it
+    nowhere states that reading. **This is worth recording** because the two rules give different
+    answers to *"may I touch REG-F-234's file region?"*, and an agent who reads only line 19 will
+    conclude the pointer is forbidden — which is the reasoning error REG-F-040 records making twice, in
+    the opposite direction.
+  - **I FOLLOWED BOTH, because they are complementary and the failure mode is asymmetric.** This entry
+    is the correction (form 1). Form 2 is what makes it **findable**: the reader who is about to
+    wrongly close `limb:REL-2:3` arrives at `:12289`, not here, so a superseding entry with no pointer
+    corrects the record and never reaches the reader it exists to protect. **The pointer proposed,
+    exactly one line, appended at the end of REG-F-234's census bullet:**
+    *"⚠ SUPERSEDED IN PART BY REG-F-272 (2026-08-23) as to `limb:REL-2:3` alone, which is FILED as
+    REG-F-258, not NEAR_MISS, and whose arm moved that day; this entry's finding and its closure of
+    `limb:REL-2:1` stand and are not edited, per §1."* ⚠ It carries **no `Status:` token** — the
+    register admits exactly one Status line per entry, and REG-F-014's precedent likewise routes status
+    through prose (*"This entry's status is now recorded by REG-F-040"*) rather than a second field.
+  - **⚠ AND THE POINTER OBEYS THE RULE THIS ENTRY PROPOSES**, which is the test of whether the rule is
+    usable at all: it cites an **entry id** (REG-F-258) and **dates** the one bookkeeping fact it
+    states. A pointer reading *"REL-2:3 is now UNENFORCED_OBSERVED_ADMISSION"* would be the same defect
+    a second time, one commit from expiry.
+
+- **Merge target:** This register — this entry, plus the one-line pointer appended inside REG-F-234's
+  census bullet at `:12295`. **No repository change and no ledger change:** the ledger is already
+  correct at HEAD; it is the register that trails it. REG-F-234's own merge target (the two handler
+  predicates and the `assurance.ts:597` resolution) is unchanged by this entry and remains OPEN there.
+  This entry CLOSES when the pointer is appended; the drafting discipline in the general-form bullet is
+  offered for adoption and, if adopted, belongs in JPWB-DOC-004 (agent conduct) rather than here.
+
+### REG-Q-074 — RATIFICATION: is an ORDER-ONLY edit to `permittedChildTypeIds` a presentation operation
+
+**Date:** 2026-08-23 · **Type:** QUESTION (W-3b invariant census, `limb:LYR-3:1`) · **Status:** OPEN
+
+- **THE QUESTION, IN ONE SENTENCE.** LYR-3's SCOPE governs *"canvas/layout/view-state operations and
+  their contracts"* — does that reach an edit to a field on a **semantic aggregate** whose ORDER no
+  semantic consumer reads and whose only production order-consumers are presentation, so that a pure
+  **order-only** change to `PwuType.permittedChildTypeIds` counts as a *"presentation operation"* for
+  limb 1?
+
+- **WHAT CANON SAYS, byte-exact at HEAD `73d1ec9e`.** `docs/canon/JPWB-DOC-003 Semantic Model and
+  Invariant Catalog.md` **L71**: *"**LYR-3 · Presentation is meaning-inert.** No presentation operation
+  may change semantic state or increment a semantic version. Layout has its own revision plane. No
+  presentation contract may reference a Command capable of mutating PWU semantic state."* **L72**:
+  *"if moving a node can change meaning, meaning becomes unauditable and untestable."* **L73**:
+  *"**SCOPE:** governs canvas/layout/view-state operations and their contracts. **NON-EXAMPLE:**
+  persisting layout and versioning it on its own presentation-revision axis is required, not forbidden
+  — the rule bars *semantic* effect, not persistence."*
+
+- **⚠ WHY CANON CANNOT ANSWER IT — THE SOURCE SPLITS ON EXACTLY THIS LINE, AND THE SPLIT IS REAL.**
+  Followed under REG-D-034 from the sidecar to the extracts to the operative documents, each opened at
+  its own line with `sed -n`. `JPWB-DOC-003 … .provenance.md:17` names LYR-3's sources verbatim:
+  *"extract-doc002-b.md (RPH Canonical Domain Model L2148); extract-doc007-a.md (RPH-DOC-007 L160-164);
+  extract-doc007-b.md (Contract Package L2322); extract-doc008-b.md (L2011-2018, Property P8
+  L2346-2348). NON-EXAMPLE: NEW (P6)."*
+  - **FIXING THE SUBJECT BY THE ACT AND ITS ORIGIN — five passages.** *Canonical Domain Model* **:2155**
+    heading *"### No semantic mutation from presentation"*, **:2157** *"Canvas layout operations must
+    never increment semantic version."* · *Contract Package* **:160** *"## 2.7 Presentation is
+    non-semantic"*, **:164** *"Moving a node cannot alter a PWU semantic version."* · same file
+    **:2322** *"No canvas-layout schema may reference a command capable of mutating PWU semantic
+    state."* · *Conformance Spec* **:2011** *"## RPH-PRJ-004 — Layout change updates presentation
+    only"*, **:2013-2018** *"Moving a node: updates presentation revision; does not change semantic
+    version; emits no PWU semantic event; does not invalidate assurance."*
+  - **FIXING IT BY THE EFFECT, NOT THE ACT — one passage.** *Conformance Spec* **:2346** *"## Property
+    P8 — Presentation independence"*, **:2348** *"For arbitrary layout changes, semantic object
+    versions and assurance states remain unchanged."* The quantifier is the opposite of a narrowing.
+  - **⚠ AND THE SCOPE LINE'S OPERATIVE WORD IS A DRAFTING TRANSFORMATION, WHICH IS THE SHARP FORM OF
+    THE SPLIT.** `view-state` occurs **exactly once** in the entire operative corpus — *Contract
+    Package* **:162**, *"Canvas layout and view-state **contracts** must remain separate from semantic
+    object contracts."* There it modifies **contracts**; canon's SCOPE line re-casts it as an
+    **operation class**. The exact phrase *"view-state operation"* → **0** in the corpus. **POSITIVE
+    CONTROLS, identical instrument and population:** *"Moving a node"* → **2**, *"presentation
+    revision"* → **2**. (*"revision plane"* → **0**, so canon's L71 clause is itself non-corpus, and
+    the sidecar independently marks the NON-EXAMPLE half of L73 *"NEW (P6)"*.)
+  - **THE QUESTION IS THEREFORE PRIOR TO ANY VERDICT:** does LYR-3 bind by where an act **originates**
+    (the canvas) or by what an act **is** (an operation whose only effect is view-state)? The
+    arrangement below falls on opposite sides of that line, and no ratified text picks a side.
+
+- **THE MEASUREMENT ALREADY MADE — WHAT MAKES THIS ANSWERABLE RATHER THAN ACADEMIC.** Every production
+  consumer of `permittedChildTypeIds` was classified ORDER vs MEMBERSHIP, and **no governed consumer's
+  OUTCOME turns on ORDER** — narrowed at HEAD from *"not one reads ORDER"*, which the surface site
+  below falsifies. Census re-run at HEAD: **85** source lines across **17** files
+  (`--include=*.ts --include=*.svelte` over `packages apps`, less `node_modules`, `dist`,
+  `.svelte-kit`, `*.test.ts`, `e2e/`).
+
+- **⚠ RE-VERIFIED AT HEAD, NOT CARRIED ON TRUST — a representative sample, DRIVEN with `node`.** Driver
+  in the session scratchpad (`av_lyr3.mjs`, `av_lyr3b.mjs`, `av_lyr3c.mjs`, `av_lyr3d.mjs`), against
+  the built `dist` of `@janumipwb/rph-projections`; these projections are pure, so better-sqlite3 is
+  not involved. Arrangement: one root permitting four children, reversed **in order only**, membership
+  identical.
+  - **THE SEMANTIC-PATH ORDER-READER.** `packages/rph-projections/src/composition-plan.ts:113` —
+    `planComposition`'s `for (const childTypeId of node.permittedChildTypeIds)`. Under reversal:
+    `decompositions` **byte-identical**; parent→child relation identical
+    (`ROOT->C1, ROOT->C2, ROOT->C3, ROOT->C4`); typeId multiset identical. **The tree is isomorphic.**
+  - **⚠ THREE REFINEMENTS THE PRIOR RECORD DID NOT STATE, AND THEY DISCHARGE THEMSELVES.** `instances`,
+    `offered` and `unresolved` are **NOT** byte-identical in general — **all three permute with the
+    field.** On this arrangement `offered` and `unresolved` are **EMPTY both ways**, so a byte-identity
+    claimed for those two here is **vacuous**; driven non-vacuously they move. Re-driven at HEAD: with
+    two `C1`-cardinality children `offered` reverses; with two unresolvable permitted ids `unresolved`
+    reverses; `instances`' plan-local keys permute (`i2`→`C1` forward, `i2`→`C4` reversed). **Only
+    `decompositions` is order-inert, and the ISOMORPHISM is what the arm rests on.** None of the three
+    is a semantic difference — each is equal AS A SET, and `composition-plan.ts:40` declares `key`
+    *"a plan-local handle, not an id"*. Recorded so the next reader who drives this is not surprised by
+    a `false` and reads it as a defect.
+  - **THE GRAPH PROJECTION.** `buildPwaGraphExport` → `analyzePwaGraph` (`pwa-graph.ts:168`, `:378`;
+    `collectPermits` declared `:132`, its order walk `:135`): `report.invariants` **byte-identical**,
+    `valid` **true/true**, permits equal **as a set** — `permits` is **not** byte-identical, the
+    authored edge sequence differs and nothing reads it. `leafKind` (`leaf.ts:24`) → `NON_LEAF` both,
+    reading `.length` only.
+  - **MEMBERSHIP-ONLY CONSUMERS confirmed by reading the site:** `lint.ts:52` (`.filter(…)` then
+    `.length`), `lint.ts:102` (`permitted.add(c)` into a `Set`), `pwa-graph-report.ts:49`
+    (`.length === 0`), `pwa-authoring.ts:283` (`.length`).
+  - **⚠ THE ONE PRODUCTION SITE THAT DOES CONSUME THE PLAN'S SEQUENCE — this narrows the census claim.**
+    `apps/rph-demo/src/routes/undertakings/+page.server.ts` reads `plan.instances` IN ORDER at `:198`
+    (`pwuIdByKey`, minting through `mintUiId` — a monotonic sequence, `workbench.ts:361`) and at `:201`
+    (the dispatched `ProposePwu` list), and at `:193` takes `const [first] = plan.unresolved` into a
+    refusal string. So a reorder changes WHICH minted id lands on which type, the ORDER of dispatched
+    commands, and WHICH unresolved pair the refusal names — while changing no tree, no gate outcome and
+    no version. Read the census as *"no governed OUTCOME turns on order"*, never as *"nothing reads it"*.
+  - **⚠ THE DISCRIMINATING POSITIVE CONTROL — and it takes TWO arrangements, not one.** ⚠ The prior
+    record claimed a single membership change moved all four probes; re-driven at HEAD, **no single one
+    does.** (A) one permitted id dropped, its node KEPT → `report.valid` **true → false**, `invariants`
+    differ (`connected`: *"1 orphan(s): C4"*), permits set differs, and `unresolved` does **not** move.
+    (B) the node removed, the permit KEPT → `unresolved` moves from `[]` to one `ROOT → C4` pair, while
+    `valid` stays **true** and `invariants` are unchanged. Every order-only equality above is
+    discriminated by (A) or (B), so they are real negatives and not a silent zero — but the four-way
+    conjunction as previously written is not reproducible and must not be repeated.
+
+- **WHAT TURNS ON THE ANSWER.**
+  - **If YES** — an order-only edit is a presentation operation — then **limb 1 has a live subject and
+    the arm is wrong.** The arrangement is dispatchable today: `EditPwuType` is accepted (its DWP-08
+    no-op precondition compares with `isDeepStrictEqual` at `command-precondition.ts:100`, which is
+    order-SENSITIVE, so a reversal counts as a change and is not refused), the PWA's `semanticVersion`
+    increments (`pwa-authoring.ts:178`, wrapped by `withPwaVersionBump` at `:200`, which inspects no
+    field), and `floor-gate.ts:314`'s `versionOk` — reached from `pwaFloorGate` (`:966`) on
+    `publishPwa` (`:987`) — then invalidates a **SATISFIED** de minimis floor so `PublishPwa` is
+    REJECTED. That is *"increment a semantic version"* and *"does not invalidate assurance"* both
+    broken, and the correct arm becomes **DIVERGENT (filed)**.
+  - **If NO** — the subject is fixed by the canvas act — then the arrangement is **OBJ-2 limb 5's**,
+    not this limb's: `JPWB-DOC-003:109`, *"retries, **layout moves**, and formatting are not"*
+    semantic. That is filed as **REG-F-209** (`REG-005:6093`), whose closure line at **`REG-005:6438`**
+    reads *"**LIMB IDS THIS ENTRY CLOSES:** `limb:ASR-3:5`, `limb:ASR-3:6`, `limb:OBJ-2:5`,
+    `limb:OBJ-2:2`."* — **`limb:LYR-3:1` is deliberately absent**, and REG-F-209's cross-reference
+    paragraph (`:6329-6335`) asks only that *"That row should gain a cross-reference to this entry"*.
+    The limb then stays **`UNENFORCED_NO_SHAPE`**, on the stronger ground that LYR-3's own kernel is
+    dead: `packages/rph-domain/src/presentation.ts` (header `:1`, *"Property P8 / §35.8; the RPH-PRJ
+    family"*) has **zero production callers** — only its own `properties.test.ts` and
+    `verif/dead-kernel-census.test.ts:180`/`:184`, both `DEAD_BY_DESIGN`.
+  - **⚠ AND THE DEAD KERNEL HAS ALREADY ANSWERED — a ruling should see that before it decides.**
+    `presentation.ts:1-2`: *"A presentation/layout change — canvas position, **node ordering**, a
+    display-only revision bump — MUST NOT alter an object's semantic version."* That reads the SCOPE
+    line the YES way, by EFFECT, and names ordering outright. It is a docblock over unwired code, so it
+    settles nothing — but it is the repository's own unratified answer and belongs in front of the
+    ruling rather than behind it.
+
+- **SAFE DEFAULT (in force until answered).** **Treat the arm as `UNENFORCED_NO_SHAPE` and do not
+  re-score it to `DIVERGENT`.** Concretely, while this is open:
+  1. **Do not add a refusal** for an order-only `EditPwuType`, and **do not make
+     `bumpPwaSemanticVersion` field-material.** The materiality defect is REG-F-209's and REG-F-209 is
+     **OPEN**; a guard written here would settle the scope question **by construction** — encoding a
+     convenient reading as architecture — and would close a limb no ruling has reached.
+  2. **Do not add a `presentationRevision` field or a presentation plane to "fix" limb 1.** That is
+     **limb 2's** subject (`UNENFORCED_DEAD_PREDICATE`), and canon's NON-EXAMPLE makes the plane
+     *required, not forbidden* — building it is a design act, not a repair to this limb.
+  3. **Do not rely on order-inertness at the wire.** The census establishes that no governed OUTCOME
+     turns on ORDER; it does **not** make a reorder free, because the bump and the floor invalidation
+     happen today regardless, and the surface site above dispatches in field order. Read the
+     measurement as *"order carries no meaning"*, never as *"a reorder is a no-op"*.
+  4. **Write REG-F-209's owed cross-reference on `RPH-PRJ-004`** (`REG-005:6452-6454`), which is still
+     unwritten: `grep -c "REG-F-209" packages/rph-domain/src/enforcement-register.ts` → **0**, against
+     a positive control of `grep -c "RPH-PRJ-004"` → **2**. Until it exists, a reader who greps the
+     field name lands on a row marked with a dedicated-command census and reads it as coverage of the
+     general-edit route, which `:6329-6335` says in terms that it does not give.
+
+- **⚠ THE TWO ARTIFACTS THAT MISLED CAREFUL READERS — both re-opened at HEAD before being repeated.**
+  - **A TRUNCATED QUOTE THAT REVERSES ITS OWN GLOSS.**
+    `packages/rph-application/src/handlers/pwa-authoring.ts:442` was cited as *"the authoritative flat
+    edge list"* and glossed as *"i.e. semantic composition state, not canvas state."* **The full line,
+    verified at `:442-443`:** *"permittedChildTypeIds stays the authoritative flat edge list
+    (**render/projections consume it**); permittedChildren is the parallel cardinality annotation."*
+    The omitted parenthetical names **render** as a first-class consumer — the half that makes the
+    field's status the open question rather than the settled premise. **Quote the whole line.**
+  - **A DOCBLOCK THAT IS FALSE ON THE PRIMARY LAYOUT ENGINE.**
+    `apps/rph-demo/src/lib/pwaFlow.ts:178-180` states the field's order *"Drives the LEFT-TO-RIGHT
+    sibling ordering: the first-authored child sits leftmost."* **Verified false on the live path, by
+    the call graph and not by assertion:** the docblock documents `preorderIndex` (declared `:181`),
+    whose **only** call site repo-wide is `:232`, inside `dagreLayout` (declared `:208`, whose only
+    caller is `dagreCompositionFlow` — declared `:268`, calling at `:273`) — and DAGRE is reached
+    **only** from the `catch` at `:334` (`dagreCompositionFlow` at `:336`). The primary path returns
+    `layoutEngine: 'ELK'` at **`:333`** and is configured
+    `'elk.layered.crossingMinimization.forceNodeModelOrder': 'true'` at **`:329`**, which takes
+    sibling placement from the **types array**, not from this field. *A docblock is not a
+    measurement.*
+  - **⚠ RESIDUALS ON THAT SECOND ARTIFACT, DISCLOSED RATHER THAN SMOOTHED.** (i) **I did not re-drive
+    ELK coordinates.** The *"byte-identical ELK coordinates under reversal, against a positive control
+    where reversing the types array did move nodes"* result is carried from the prior settler's drive;
+    what I re-verified is the **call graph and the engine configuration** above. (ii) **`:328` sets
+    `'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'`**, so ELK is told to consider
+    *edge* model order too, and `visibleEdges` are built by `permitPairs` (declared `:117`) walking
+    this field in order (`:122`) — `forceNodeModelOrder` should dominate, but that conjunct is **not**
+    discharged by the call-graph argument and would need its own drive. (iii) On the DAGRE fallback the
+    reorder **does** move nodes, so the finding is **engine-path-dependent** and must be re-measured if
+    DAGRE ever becomes primary or if layout is persisted.
+
+- **CENSUS RECONCILIATION — LIMB IDS AN ANSWER WOULD CLOSE:** **`limb:LYR-3:1`**, and **nothing else,
+  because:**
+  - **`limb:LYR-3:2`** (*"Layout has its own revision plane"*, `UNENFORCED_DEAD_PREDICATE`) turns on a
+    **missing axis**, not on an operation class. Re-measured at HEAD: `presentationRevision` repo-wide
+    → **1** hit, `packages/rph-domain/src/enforcement-register.ts:2726`, which is the register
+    **quoting canon**; **POSITIVE CONTROL, identical instrument and population:** `semanticVersion` →
+    **407**. A ruling either way leaves that plane unbuilt.
+  - **`limb:LYR-3:3`** (*"No presentation contract may reference a Command capable of mutating PWU
+    semantic state"*, `UNENFORCED_NO_SHAPE`) has a **different subject** — a presentation *contract* —
+    which its own source fixes as a *"canvas-layout schema"* (*Contract Package* **:2322**). No such
+    schema exists, and an answer about operation class does not create one.
+  - **`limb:OBJ-2:5` and `limb:OBJ-2:2`** are **already closed** by REG-F-209 at `REG-005:6438`; a NO
+    answer relocates this arrangement onto ground that is closed, it does not re-open it. OBJ-2 limb
+    5's **retries** clause is listed there (`:6439-6440`) as expressly NOT closed, and is untouched.
+  - **`limb:REL-2:3`** is the only other **LIMB** the census carries open
+    (`docs/_working/ROADMAP-invariant-enforcement-mapping.md:299-300`) — an **evidence-item debt** on a
+    different invariant, sharing no subject with this one. ⚠ It is **not** the only other OPEN ITEM, as
+    previously written: that same list also carries the **43 stale `owed` fields** and the **fifth
+    vocabulary gap** (`:301`) and a **superseding note for REG-F-234** (`:302-304`). Neither is a limb;
+    neither touches this subject.
+
+- **EM-7 SEARCH DISCLOSED — by id and by SITE, across all four corpora**, Bash `grep` only (never `-i`
+  and `-F` together), every long hit opened with `sed -n`, every REG-005 hit resolved to its enclosing
+  entry **by a heading walk, not by eye**. Reported as REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` (which lives at `verif/`, not under `packages/`) / `docs/_working`.
+  - `LYR-3` → **3 / 1 / 0 / 10**. All three REG-005 hits (`:6123`, `:6255`, `:6330`) lie inside
+    **REG-F-209** (heading `:6093`) — its canon-anchor list, its live arrangement, and its
+    cross-reference narrowing `RPH-PRJ-004`. The one `enforcement-register.ts` hit is `RPH-PRJ-004`
+    itself (`:2711-2731`). ⚠ The `docs/_working` figure was drafted as **2**; measured at HEAD it is
+    **10** — `DESIGN-…:928`/`:972`/`:1145`/`:1167`/`:1206`/`:1219` and
+    `ROADMAP-…:194`/`:278`/`:280`/`:298`. None is a register entry, so the conclusion is unchanged.
+  - `permittedChildTypeIds` → **7 / 0 / 0 / 4**. The seven resolve to **REG-F-204** (`:5185`, heading
+    `:5100`), **REG-F-209** (`:6218`, `:6222`, `:6223`, `:6244`, `:6408`) and **REG-Q-053** (`:11070`,
+    heading `:10954`). `:6244` is REG-F-209's complementary half — *"no production consumer reads its
+    **order** as meaning"* — which this entry's census now supplies the measurement for.
+  - **THE NEGATIVE THAT MATTERS, WITH ITS CONTROL:** `view-state` → **0 / 0 / 0 / 2** (drafted as
+    **1**), and `meaning-inert` → **0 / 1 / 0 / 0**. Both `docs/_working` hits are
+    `DESIGN-invariant-enforcement-mapping.md` **:1181** (*"order is neither semantic nor — on the live
+    engine — view-state"*) and **:1201** (*"The split is the question."*) — a working design note, not
+    a filing. **No entry anywhere adjudicates LYR-3's SCOPE clause.** The controls on the identical
+    instrument are the `LYR-3` and `permittedChildTypeIds` counts above, both non-zero, so the zeros
+    are absences and not a broken search.
+  - **CLOSURE SWEEP, re-measured repo-wide** (excluding `node_modules`, `dist`, `.svelte-kit`, `.git`):
+    `limb:LYR-3:1` → **13** hits in four files, **none of them a closure** — four in
+    `verif/invariant-verdict-census.test.ts` (`:882`, `:938`, `:950`, `:971`), three in
+    `docs/tracking/w3b/invariant-verdicts.ndjson` (`:92`, the limb's OWN verdict row, whose
+    `ratification_question_owed` field IS this question; `:170` and `:208` are sibling mentions), one
+    in `docs/tracking/w3b/limbs.ndjson` (`:8`, the limb text), three in
+    `DESIGN-invariant-enforcement-mapping.md` (`:1145`, `:1167`, `:1219`) and two in
+    `ROADMAP-invariant-enforcement-mapping.md` (`:280`, `:298`) — the last being *"A ratification
+    question against LYR-3, owed by `limb:LYR-3:1` and not yet filed"*, i.e. **this entry**.
+    **POSITIVE CONTROL, same instrument and population:** `limb:OBJ-2:5` → **8**.
+  - **⚠ THE SHARPER CONTROL, AND WHY THE DRAFTED SWEEP READ 9 AND 3.** In REG-005 itself
+    `limb:OBJ-2:5` → **3**, including the closure line `:6438`, while `limb:LYR-3:1` → **0** — the
+    absence this entry turns on, stated against a live control in the same file. The drafted counts
+    came from a population that omitted `docs/tracking/w3b`, the one corpus where a limb's verdict is
+    actually recorded and which a CLOSURE sweep must not skip. ⚠ **INSTRUMENT TRAP:**
+    `grep -rn … | grep -v "/dist/"` deletes hits whose *content* contains that string — it filters the
+    LINE, not the PATH, and it silently dropped a verdict row here. Use `--exclude-dir=dist`.
+
+- **Merge target:** Canon — a SCOPE clarification on `docs/canon/JPWB-DOC-003 Semantic Model and
+  Invariant Catalog.md` **L73**, saying whether LYR-3 binds by the act's ORIGIN or by its EFFECT.
+  Consequentially, on a YES: `packages/rph-domain/src/enforcement-register.ts` `RPH-PRJ-004`
+  (`:2711-2731`), whose *"It is satisfied by absence, which is not the same as enforced"* would cease
+  to be true of this limb. On a NO: the `RPH-PRJ-004` cross-reference REG-F-209 already owes. Status:
+  OPEN.

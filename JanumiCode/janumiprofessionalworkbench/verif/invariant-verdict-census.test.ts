@@ -975,6 +975,59 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(String(contested?.refuter_correction_partly_struck ?? '').length).toBeGreaterThan(200);
 	});
 
+	// ── ⚠ THE TWO ARTIFACTS THE ARM-DOUBT PASS LEFT OWED, AND THE CLAIMS THEY PUT ON ROWS ────────────────
+	// Settling the doubts produced two debts and the rows now ASSERT they are discharged:
+	// `limb:LYR-3:1` names the ratification question it filed, and `limb:REL-2:3` carries the third
+	// evidence item its new arm requires. **Both are claims about the register and about a drive, and
+	// nothing checked either** — which is the shape this file already carries three assertions against.
+	//
+	// ⚠ THE RATIFICATION QUESTION IS NOT A CONSOLATION PRIZE FOR AN UNSETTLED VERDICT. `limb:LYR-3:1` is
+	// `UNENFORCED_NO_SHAPE` **and** owes a canon adjudication, because ENFORCEABILITY and DEBT are
+	// different axes (§21.2) — the same distinction my own V-9 brief got wrong. The arm answers "what does
+	// the code do"; the question answers "what does canon mean". A row may need both, and if this
+	// assertion ever passes with the question absent, the arm has quietly re-absorbed the debt.
+	//
+	// ⚠ AND THE EVIDENCE ITEM WAS SATISFIABLE, WHICH WAS NOT OBVIOUS. `UNENFORCED_OBSERVED_ADMISSION`
+	// requires "a sibling-limb control AT THE SAME SITE that IS refused" (DESIGN:100). The tempting pick —
+	// limb 2, the only sibling scored ENFORCED_MULTI_SITE — is the WRONG one: its enforcement lives at
+	// `pwu.ts:1362`, a different site, and no production path can put a VERIFIES relation through
+	// `traceability.ts:151` because that site's single production caller hardcodes `'SUPPORTS'`. The real
+	// control is SIBLING LIMB 1, refused at the same site with a message pinned by two mutants.
+	// **A refusal elsewhere in the engine is not a control for this site**, and the brief that commissioned
+	// this walked right up to that trap.
+	it('the two artifacts the arm-doubt pass owed are filed, and the rows name them', () => {
+		const register = readFileSync(
+			new URL('../docs/canon/JPWB-REG-005 Decision and Divergence Register.md', import.meta.url),
+			'utf8'
+		);
+
+		const lyr = verdicts.find((v) => String(v.limb_id) === 'limb:LYR-3:1');
+		const q = String(lyr?.ratification_question_filed ?? '');
+		expect(q, 'the ratification question limb:LYR-3:1 owes').toMatch(/^REG-Q-\d{3}$/);
+		// Named as a HEADING, not merely mentioned — "mentioned somewhere in a 25,000-line register" is what
+		// an EM-7 search reports as filed when nothing was written.
+		expect(register.includes(`### ${q} — `), `${q} must exist as a register entry`).toBe(true);
+		// The arm and the question are BOTH live. Losing either is the conflation §21.2 records.
+		expect(String(lyr?.verdict), 'the arm is unchanged by the question being filed')
+			.toBe('UNENFORCED_NO_SHAPE');
+		expect(String(lyr?.ratification_question_owed ?? '').length).toBeGreaterThan(200);
+
+		const rel = verdicts.find((v) => String(v.limb_id) === 'limb:REL-2:3');
+		expect(String(rel?.verdict)).toBe('UNENFORCED_OBSERVED_ADMISSION');
+		const ev = String(rel?.destination_arm_evidence ?? '');
+		expect(ev.length, 'the arm-required sibling-limb control, driven').toBeGreaterThan(1000);
+		// The control must name the SITE it was refused at and the SIBLING it used — an evidence field that
+		// says only "a control was refused" is the shape this repository has recorded three times as a
+		// control that cannot fail.
+		expect(ev, 'the control must name its site').toContain('traceability.ts');
+		expect(ev, 'and which sibling limb it used, since the obvious pick is the wrong one')
+			.toMatch(/LIMB 1|limb 1/);
+		// ⚠ THE OWED FIELD IS STRUCK, NOT DELETED. It is the record that the requirement was NOTICED when
+		// the arm moved rather than waived on arrival — which is why it got satisfied at all.
+		expect(String(rel?.destination_arm_evidence_owed ?? ''), 'the owed record survives its discharge')
+			.toContain('ORIGINAL:');
+	});
+
 	it('a limb closed by two entries records both, and neither alone discharges it', () => {
 		const split = verdicts.filter((v) => v.filed_entry_split);
 		expect(split.map((v) => String(v.limb_id)).sort())

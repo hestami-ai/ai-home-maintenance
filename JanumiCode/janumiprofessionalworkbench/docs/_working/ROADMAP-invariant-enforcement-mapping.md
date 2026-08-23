@@ -295,10 +295,29 @@ of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and
 
 ### ⚠ What is genuinely still open
 
-- **A ratification question against LYR-3**, owed by `limb:LYR-3:1` and not yet filed (§22.2).
-- **`REL-2:3`'s destination arm owes its third evidence item** — `UNENFORCED_OBSERVED_ADMISSION` requires
-  the arrangement, the accepted result, and one more the row does not yet carry (§22.1).
-- **The 43 stale `owed` fields**, and the **fifth vocabulary gap** the ladder cannot express (§22.1).
-- **A superseding note for REG-F-234's clause about `limb:REL-2:3`** — it was TRUE when written, was
-  falsified by V-7 filing the row, and is falsified again by the arm move. The register is APPEND-ONLY, so
-  a superseding entry is the only available repair.
+- ✅ ~~A ratification question against LYR-3~~ — **FILED as REG-Q-074.** ⚠ And the corpus split it rests on
+  is sharper than §22.2 stated: **`view-state` occurs EXACTLY ONCE in the entire operative corpus**
+  (Contract Package:162), where it modifies **contracts**, not operations, and the phrase *"view-state
+  operation"* returns **zero** — against positive controls of *"Moving a node"* = 2 and *"presentation
+  revision"* = 2. So the SCOPE line's operation-class framing is a **canon-drafting transformation** of a
+  corpus rule about contract SEPARATION. That seam is where the question sits.
+- ✅ ~~`REL-2:3`'s destination arm owes its third evidence item~~ — **DRIVEN and recorded.** ⚠ The control
+  is **sibling limb 1**, not limb 2: limb 2 is the only sibling scored ENFORCED_MULTI_SITE and is the
+  tempting pick, but its enforcement lives at `pwu.ts:1362` — a DIFFERENT SITE — and no production path can
+  put a VERIFIES relation through `traceability.ts:151`, whose single production caller hardcodes
+  `'SUPPORTS'`. Refusal pinned by two mutants plus an accept/refuse delta.
+- ✅ ~~A superseding note for REG-F-234's clause~~ — **FILED as REG-F-272**, a RECORD-class entry
+  superseding ONE bullet. ⚠ **The inversion was LATENT ON THE DAY OF FILING, not introduced by the arm
+  move**: the REL-2:3 row's `sibling_control`, written 2026-08-21, already recorded that `limb:REL-2:1` was
+  scored UNENFORCED_OBSERVED_ADMISSION — so REG-F-234 chose to distinguish the two rows by a phrase
+  describing **its own arm**, which the sibling was one adjudication away from acquiring.
+  The non-closure still holds **on substance**, measured with eight probes over both entries, every zero
+  controlled by a non-zero on the sibling.
+
+- **The 43 stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed` misleads a
+  reader but cannot misdirect a filing.
+- **The fifth vocabulary gap** the ladder cannot express (§22.1): a correct, unit-tested artifact that
+  governs nothing. `REL-2:3` is on the nearest arm and its `what_the_move_costs` field says what was lost.
+- **The general form of the REG-F-272 defect**: an append-only entry that asserts another row's CENSUS
+  BOOKKEEPING makes a claim with an expiry date in an artifact that forbids correcting it in place. Cite a
+  sibling's SUBSTANCE, not its arm word or filing status — or date it.
