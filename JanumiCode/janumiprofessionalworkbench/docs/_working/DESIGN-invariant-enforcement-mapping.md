@@ -585,3 +585,72 @@ remedy cluster behind a changed grouping — C17, C20, C21, C24, C25, C30, C34, 
 cut**, as does the remedy lens's entire `reasoning` block, because the schema serialises `clusters` before
 `reasoning`. The truncation did not remove a random 58%; it removed the *tail* of the second signal and the
 *whole* of the third, which is precisely the part a reconciliation exists to weigh.
+
+---
+
+## 16. ⚠ ADDENDUM (V-5) — WHAT THE SPLIT AXIS FOUND, AND TWO ARMS THAT ARE STILL DOING DOUBLE DUTY
+
+Splitting `verdict` from `filing` exposed **48 rows whose filing status nobody had ever established** — they
+sat on UNENFORCED arms, where the old ladder could say nothing about filing at all. They were marked
+`NOT_ESTABLISHED` rather than `UNFILED`, because `UNFILED` asserts that no filing exists and that is a claim
+about a search nobody had run.
+
+**Running the search was worth it, and the numbers say why defaulting would have been wrong:**
+
+| outcome | rows | |
+|---|---|---|
+| **FILED** | 7 | already recorded — 14.6%, against measured base rates of 13.6% and 5.8% on the two earlier populations |
+| **NEAR_MISS** | 21 | a filing exists and does NOT cover the limb |
+| **UNFILED** | 18 | searched, nothing covers it; each owes a register entry |
+| **NOT_APPLICABLE** | 2 | not a divergence at all |
+
+**Had these been defaulted to `UNFILED` at migration time, 30 of the 48 would have been wrong** — and the 21
+NEAR_MISS rows are the ones that would have hurt most, because each names a filing a later reader WILL find
+and would close the row on.
+
+### 16.1 A stated exception to the driven-arm rule, because the rule's premise fails on one limb
+
+`UNENFORCED_OBSERVED_ADMISSION` requires that the forbidden arrangement was **driven through
+`Engine.dispatch` and accepted**. V-5 flagged that `limb:PER-3:2` carries that arm on a probe that called
+`StorageAdapter.commit` directly — no engine call happened.
+
+The flag was right and the arm still stands, for a reason worth stating rather than applying silently:
+**this limb's subject is bypassing the bus.** It forbids exactly the arrangement a dispatch cannot express.
+Requiring a dispatch would make the limb **unfalsifiable by construction** — the shape §4 exists to refuse.
+What was performed and observed *is* the arrangement the limb names: a public, app-importable,
+credential-free `commit` producing a PUBLISHED aggregate with **zero events** and a receipt naming an
+unregistered command type.
+
+> **The rule assumes the forbidden act travels through the engine. For a limb about going around the engine,
+> that assumption cannot hold, and the rule does not apply.** Recorded on the row as `arm_exception` so no
+> later reader takes this as the driven-arm rule being waived generally.
+
+### 16.2 ⚠ `UNENFORCED_NO_SHAPE` IS THE NEXT `PARTIAL_DIVERGENT_FILED`
+
+§10 found one arm carrying two claims and advertising one. Here is the second, found the same way — by an
+operator saying so unprompted while using it:
+
+- On most rows it means **"canon requires X and the model has no field for it"** — a divergence, which owes a
+  filing.
+- On `limb:PER-11:2` and `limb:PER-12:2` it means **"the clause has no subject matter for a guard at all"** —
+  a sentence stating a fact about the world rather than forbidding an arrangement. Nothing is owed.
+
+Those two readings of one word are what made this look like a 48-row divergence population when two of its
+rows are not divergences. The two are pinned by name in the gate, each required to state why — an exception
+that does not say why is a hole with a name on it.
+
+**The split is deferred, deliberately.** Re-cutting a second arm one commit after the first would re-open
+rows nobody has re-read, which is the same reason §10's migration waited for the population to be complete.
+
+### 16.3 The pattern, now three-for-three
+
+Every one of these was found by an operator USING the vocabulary, never by a reader auditing it:
+
+1. `PARTIAL_DIVERGENT_FILED` — partial **and** filed; five rows dropped the second half (§10).
+2. `ENFORCED_AT_SURFACE_ONLY` — carries a pejorative that is wrong for a limb about display (`limb:ASR-9:8`).
+3. `UNENFORCED_NO_SHAPE` — no field for a required thing **vs** no enforceable subject at all.
+
+> **A closed vocabulary is a design artifact and it can be wrong, and the people who find out are the ones
+> forced to choose a word for a case it did not anticipate.** The countermeasure is not a better vocabulary up
+> front — it is making the operator's discomfort a first-class output. All three of these arrived through a
+> free-text field (`armDoubt`, `owed`, a merge note) that existed for exactly that.

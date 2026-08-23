@@ -466,7 +466,7 @@ describe('W-3b — the invariant enforcement census', () => {
 	// failure REG-F-043 records. It can only move DOWN without this reddening.
 	it('the unreconciled-owed debt is counted, not hidden', () => {
 		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(44);
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(43);
 		// ⚠ THE SUBSET THAT BLOCKED V-4 IS ZERO. Every row asserting a live unfiled divergence now describes THAT
 		// divergence — re-verified as still reproducing, and re-searched against all four filing corpora. The
 		// remaining 44 sit on other arms, where a stale `owed` misleads but does not misdirect a filing.
@@ -516,7 +516,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			verdicts.filter((v) => v.near_miss_filing !== undefined).length,
 			'filings that exist and do NOT cover their limb'
-		).toBe(23);
+		).toBe(44);
 	});
 
 	// ── ⚠ THE ARM NOW CARRIES ITS OWN REMEDY, RE-SEARCHED UNDER EM-7 ───────────────────────────────────────
@@ -674,12 +674,28 @@ describe('W-3b — the invariant enforcement census', () => {
 	// ⚠ `NOT_APPLICABLE` MEANS "NOTHING DIVERGENT TO FILE", so it is reachable ONLY from an ENFORCED arm. A
 	// PARTIAL, DIVERGENT or UNENFORCED row has something to record BY DEFINITION; letting it claim
 	// NOT_APPLICABLE would rebuild the exact hiding place the migration just removed.
-	it('NOT_APPLICABLE is reachable only from an ENFORCED arm', () => {
+	// ⚠ AND THE TWO EXCEPTIONS ARE THE SAME DEFECT AS §10, ONE ARM OVER. `UNENFORCED_NO_SHAPE` is doing double
+	// duty and the V-5 pass said so in its own words: on most rows it means "canon requires X and the model has
+	// no field for it" — a divergence, which owes a filing. On `limb:PER-11:2` and `limb:PER-12:2` it means "the
+	// clause has no subject matter for a guard AT ALL" — a sentence stating a fact about the world rather than
+	// forbidding an arrangement. Those two readings of one arm are what made this look like a 48-row divergence
+	// population when two of the rows are not divergences.
+	// They are PINNED BY NAME with a stated reason rather than waved through, and the arm needs splitting the
+	// way PARTIAL_DIVERGENT_FILED did — recorded in DESIGN §16 rather than performed here, because re-cutting a
+	// second arm one commit after the first would re-open rows nobody has re-read.
+	it('NOT_APPLICABLE is reachable only from an ENFORCED arm, or the two named non-divergent clauses', () => {
+		const EXCEPT = new Set(['limb:PER-11:2', 'limb:PER-12:2']);
 		const bad = verdicts
 			.filter((v) => String(v.filing) === 'NOT_APPLICABLE')
-			.filter((v) => !String(v.verdict).startsWith('ENFORCED'))
+			.filter((v) => !String(v.verdict).startsWith('ENFORCED') && !EXCEPT.has(String(v.limb_id)))
 			.map((v) => `${String(v.limb_id)} (${String(v.verdict)})`);
 		expect(bad, 'a divergence cannot have nothing to file').toEqual([]);
+		// An exception has to SAY why, or it is just a hole with a name on it.
+		for (const id of EXCEPT) {
+			const row = verdicts.find((v) => String(v.limb_id) === id);
+			expect(String(row?.filing)).toBe('NOT_APPLICABLE');
+			expect(String(row?.filing_note ?? '').length, `${id} must state why nothing is owed`).toBeGreaterThan(60);
+		}
 	});
 
 	it('the filing axis is pinned, and the debt it exposed is counted', () => {
@@ -690,25 +706,32 @@ describe('W-3b — the invariant enforcement census', () => {
 		// anything is owed — and my migration read the field's mere PRESENCE as FILED. Presence of a field is not
 		// its assertion. The three are NOT_APPLICABLE, which is what their own text says, and the misleading
 		// field was retired rather than reworded so nothing later reads "n/a" as a citation.
-		expect(dist).toEqual({ FILED: 183, NOT_APPLICABLE: 76, NOT_ESTABLISHED: 48 });
+		// ⚠ `NOT_ESTABLISHED` IS ZERO — the 48 rows the migration exposed have been searched under EM-7, and the
+		// result is the reason the value existed. SEVEN were already FILED (14.6%, against measured base rates of
+		// 13.6% and 5.8% on the two earlier populations). TWENTY-ONE are NEAR_MISS: a filing exists and does not
+		// cover the limb, which is the note that stops the next reader closing the row on it. EIGHTEEN are
+		// genuinely UNFILED and each owes a register entry. Two are not divergences at all.
+		// Had these been defaulted to UNFILED at migration time, 30 of the 48 would have been wrong.
+		expect(dist).toEqual({ FILED: 190, NEAR_MISS: 21, NOT_APPLICABLE: 78, UNFILED: 18 });
 
 		// ⚠ THIS IS THE MIGRATION'S WHOLE RETURN, AND IT IS A NUMBER THE OLD LADDER COULD NOT PRODUCE. The
 		// retired `DIVERGENT_UNFILED` arm read ZERO outstanding filings on the day of the split, because all 49
 		// of its rows had just been filed. These 48 were sitting on UNENFORCED arms the entire time — 25 observed
 		// admissions, 21 with no shape at all, 2 dead predicates — each one a limb where canon says something the
 		// code does not do, and where nobody has ever checked whether that is recorded.
-		const ne = verdicts.filter((v) => String(v.filing) === 'NOT_ESTABLISHED');
-		const byArm: Record<string, number> = {};
-		for (const v of ne) byArm[String(v.verdict)] = (byArm[String(v.verdict)] ?? 0) + 1;
-		expect(byArm).toEqual({
-			UNENFORCED_OBSERVED_ADMISSION: 25,
-			UNENFORCED_NO_SHAPE: 21,
-			UNENFORCED_DEAD_PREDICATE: 2
-		});
+		expect(verdicts.filter((v) => String(v.filing) === 'NOT_ESTABLISHED').length, 'nothing unsearched').toBe(0);
 
-		// UNFILED is the arm for "searched, and nothing covers it". It is empty because every search this
-		// programme has actually run ended in a filing — which is the honest reason, not a clean result.
-		expect(ne.filter((v) => String(v.filing) === 'UNFILED').length).toBe(0);
+		// UNFILED now means what it always should have: SEARCHED, and nothing covers it. Each of these 18 owes a
+		// register entry, and each carries the `owed` that will become one — 11 observed admissions and 7 limbs
+		// with no shape at all.
+		const unfiled = verdicts.filter((v) => String(v.filing) === 'UNFILED');
+		const byArm: Record<string, number> = {};
+		for (const v of unfiled) byArm[String(v.verdict)] = (byArm[String(v.verdict)] ?? 0) + 1;
+		expect(byArm).toEqual({ UNENFORCED_OBSERVED_ADMISSION: 11, UNENFORCED_NO_SHAPE: 7 });
+		expect(
+			unfiled.filter((v) => String(v.owed ?? '').length < 80).map((v) => String(v.limb_id)),
+			'UNFILED asserts a filing is owed — it has to say which'
+		).toEqual([]);
 	});
 
 	it('a FILED row names its filing; a NEAR_MISS names the filing that misses', () => {
