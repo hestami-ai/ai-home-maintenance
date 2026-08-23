@@ -161,3 +161,90 @@ and outlived its condition. Fix it in V-0, since a lane reading that paragraph w
 The 130 non-canon invariants (RPH CDM 102, Assurance Policy §39 20, Contract Package §35 8); JPWB-SPEC-001's 14
 surface invariants and CON-000's 12 axioms, which are **not in the 192 at all**; and `cap:projection` (0/8), the
 census's other hole. **This programme measures enforcement. It does not create any.**
+
+---
+
+## ✅ V-0 · V-1 · V-2 · V-3 · V-4 · V-5 · V-6 ALL LANDED — and where this plan was wrong
+
+Nothing above is deleted. The plan stays as written so the difference between it and the outcome is
+readable. **The census is total: 307 limbs over 62 canon invariants, every one verdicted, every one
+refuted, every verdict on a two-axis ladder.**
+
+| | planned | delivered |
+|---|---|---|
+| limbs | *"expected ~316 over the 62"* | **307**, by the committed rule `w3b-limb-split/1.0.0` |
+| V-1, the drive queue | ≈22-25 invariants | **39** |
+| V-2, the architectural tail | ≈37-40 invariants | **21** |
+| refutation | every row attacked | **307/307 — 128 OVERTURNED, 179 HELD** |
+| filings | *"`DIVERGENT_UNFILED` must be zero"* | **53 entries** — 52 closing **67 limbs**, one closing none |
+
+### ⚠ THE WAVE SPLIT WAS DERIVED, AND THE DERIVATION FAILED IN THE DIRECTION IT WARNED ABOUT
+
+V-1's size was not guessed. §V-1 derives it: *"the intersection of register-anchored (37 of 62 named by
+≥1 `ENFORCEMENT_REGISTER` row) and production-cited (40 of 62)"*. V-2 was defined as the remainder —
+*"statements with a zero citation census and **no command that could violate them**"*.
+
+**46 of V-2's 114 limbs were settled by an arm that REQUIRES an executed dispatch** — 28
+`UNENFORCED_OBSERVED_ADMISSION`, 15 `DIVERGENT`, 3 `ENFORCED_DRIVEN`. Every one is a limb this plan said
+no command could violate, settled by driving a command that violated it. **The rate is 40%, against 51%
+in V-1** — the wave built to *be* the drive queue. A partition meant to be categorical came out eleven
+points apart.
+
+Of the twelve invariants named here by name as the tail, **four were reassigned to V-1 lanes during
+execution** (LYR-3, REL-1, REL-3, REL-4 — REL-1 alone yielded 7 driven limbs of 12), and of the eight
+that stayed, **five still produced limbs on driven arms** (LYR-2, REL-2, AUT-1, ASR-19, PER-11).
+
+**§V-2 states the instrument's blindness in its own words** — *"it counts NAMES. A zero here means
+nobody wrote the id in a comment — **not** that the rule is unenforced. AGG-1 is cited nowhere and holds
+BY CONSTRUCTION"* — and both waves were sized with it anyway.
+
+> **A known-blind instrument used for TRIAGE is a triage instrument. Used for SIZING it silently becomes
+> a claim about the population.** §V-1 forbids the first misuse in bold (*"MUST NOT be used as the
+> mapping"*) and commits the second in its own heading. The lanes corrected it by hand, four invariants
+> at a time, and the plan was never amended.
+
+### The four filings this plan named as owed regardless of when V-4 landed — checked, not assumed
+
+| named here | outcome |
+|---|---|
+| STA-4 limb 1 | ✅ `limb:STA-4:1` → **REG-F-231** |
+| ASR-15 subject limb | ✅ `limb:ASR-15:2` → **REG-F-217** |
+| AGG-1 | ✅ `limb:AGG-1:1` and `:2` both FILED |
+| ASR-14 tier limb | ✅ `limb:ASR-14:1` → **REG-F-216** |
+
+### V-4 gained a fifth filing value this plan did not anticipate, and it paid for itself in one commit
+
+The filing axis was specified here as four values. It shipped with **five**: `NOT_ESTABLISHED` was added
+because 48 rows sat on UNENFORCED arms where the old ladder could say nothing about filing, and
+`UNFILED` **asserts that no filing exists** — a claim about a search nobody had run. Searching all 48
+returned FILED 7 / NEAR_MISS 21 / UNFILED 18 / NOT_APPLICABLE 2. **Defaulting them would have been wrong
+30 times.**
+
+### ⚠ THE CLOSE CONDITION IS NOT MET, AND THIS PLAN'S WORDING IS WHY IT LOOKS MET
+
+> *"`filing = UNFILED` must be zero across ALL verdicts"*
+
+**That sentence is TRUE as of V-6** — the 18 are filed as REG-F-234..245 / REG-Q-058..062 — **and 21
+limbs still owe a register entry.** `NEAR_MISS` means *a filing exists and does NOT cover this limb*,
+which is a statement that the limb is unfiled with a decoy attached. 16 of the 21 say a filing is owed
+in their own words; the 5 that deny it are exactly the rows whose `owed` was authored for a verdict a
+refuter overturned, confirmed by a blind adjudication with a working negative control.
+
+**The debt is 39 limbs, of which 18 are discharged.** `DESIGN §17` carries the measurement, the blind
+confirmation, and the eight gate assertions that narrowed the same way.
+
+**The condition is restated here rather than edited above**, because the wording that hid this is part
+of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and it is now what
+`verif/invariant-verdict-census.test.ts` asserts against `OWES_A_FILING`.
+
+### V-7 — what is left, in order
+
+1. **The 21 `NEAR_MISS` limbs** — file each, or record why it is genuinely covered. Every one carries an
+   `owed`; six were re-authored from the blind adjudication and carry an independent decoy enumeration.
+2. **`docs/_working/HARMONIZATION-FINDINGS.md`'s "Refuted (32)"** — one of its struck items is true at
+   HEAD, found by accident. **Derive the answer over all 32.**
+3. **Split `UNENFORCED_NO_SHAPE`** (`DESIGN §16.2`) — deferred twice, deliberately, and still owed.
+4. **The 37 remaining stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed`
+   misleads a reader but cannot misdirect a filing.
+5. **The 11 recorded arm doubts**, unadjudicated — including `limb:REL-2:3`, whose dead-predicate proof
+   was falsified by this programme's own RPH-TRC-005 correction.

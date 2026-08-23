@@ -654,3 +654,123 @@ Every one of these was found by an operator USING the vocabulary, never by a rea
 > forced to choose a word for a case it did not anticipate.** The countermeasure is not a better vocabulary up
 > front — it is making the operator's discomfort a first-class output. All three of these arrived through a
 > free-text field (`armDoubt`, `owed`, a merge note) that existed for exactly that.
+
+---
+
+## 17. ⚠ ADDENDUM (V-6) — THE CLOSE CONDITION WAS SATISFIABLE WITH HALF THE DEBT OUTSTANDING
+
+`ROADMAP-invariant-enforcement-mapping.md` sets this programme's close:
+
+> *"`DIVERGENT_UNFILED` must be zero"* becomes *"`filing = UNFILED` must be zero across ALL verdicts"*
+
+V-6 filed the 18 `UNFILED` rows as **REG-F-234..245 / REG-Q-058..062**, and that sentence is now true.
+**It does not close the programme, and finding out why is this wave's real result.**
+
+### 17.1 `NEAR_MISS` is the fourth two-claim value, and it is the one that sat on the close condition
+
+A row owes a register entry exactly when **a search has been run and nothing covering the limb was
+found**. `UNFILED` is that outcome when the search returned nothing. `NEAR_MISS` is the *same outcome*
+when the search returned something that **does not cover it**. Whether a decoy turned up is a fact about
+the corpus, not about the debt.
+
+| | rows | |
+|---|---|---|
+| `UNFILED` | 18 → **0** | filed by V-6 |
+| `NEAR_MISS` | **21** | searched, and what was found does not cover it |
+| **owes a filing** | **39**, of which 18 discharged | |
+
+**16 of the 21 say so in their own `owed`, verbatim** — *"A FILING IS OWED AND NOTHING RECORDS IT
+TODAY"* (`ASR-11:3`), *"A REG-F FINDING IS OWED"* (`PER-12:4`, `PER-4:3`), *"NOT FILED today, checked
+both directions"* (`ASR-16:6`). The `near_miss_filing` fields say it in the other direction, in section
+headings the V-5 agents wrote unprompted: **"WHY IT DOES NOT COVER THIS LIMB"** (11 rows), **"WHAT
+REMAINS OWED"**, **"WHAT THE ENTRY THAT FINALLY FILES THIS MUST SAY"**.
+
+### 17.2 ⚠ THE FIVE THAT DENY IT ARE EXACTLY THE ORPHANED ONES, AND THE SEPARATION IS PERFECT
+
+Six `NEAR_MISS` rows carried an `owed` authored for an arm they no longer hold. **All six were authored
+for an `ENFORCED_*` arm; all six now hold an `UNENFORCED_*` arm.**
+
+| row | `owed` written for | now holds | its `owed` opened |
+|---|---|---|---|
+| `PER-3:2`  | ENFORCED_BY_CONSTRUCTION | UNENFORCED_OBSERVED_ADMISSION | *(empty)* |
+| `OBJ-3:2`  | ENFORCED_DRIVEN          | UNENFORCED_OBSERVED_ADMISSION | "Nothing for this row's arm" |
+| `DEC-4:2`  | ENFORCED_BY_CONSTRUCTION | UNENFORCED_OBSERVED_ADMISSION | "none of them a refusal gap" |
+| `DEC-4:6`  | ENFORCED_BY_CONSTRUCTION | UNENFORCED_OBSERVED_ADMISSION | "none of them a live hole" |
+| `ASR-9:5`  | ENFORCED_BY_CONSTRUCTION | UNENFORCED_NO_SHAPE           | "NOTHING IS OWED AS A DEFECT" |
+| `ASR-19:3` | ENFORCED_MULTI_SITE      | UNENFORCED_NO_SHAPE           | "A REG-F finding on a LATENT lever" |
+
+**Every non-stale `NEAR_MISS` row affirms that a filing is owed — 15 of 15. Every denial comes from a
+stale row — 5 of 6.** The denials were never judgments about the limb. They are §11 measured on a
+population instead of a row: *a refuter overturns a scalar, and every field authored for the old scalar
+survives, reading exactly like a field authored for the new one.*
+
+### 17.3 The reading was confirmed blind, with a working negative control
+
+§17.2 is a reading of prose, so it was re-established without prose. Eight rows went to eight agents
+**with `owed`, `filing` and `near_miss_filing` stripped out** — no conclusion about filing was visible,
+and the controls were unlabelled.
+
+- **negative control** `limb:STA-4:8` (ENFORCED_DRIVEN / NOT_APPLICABLE) → **owes nothing** ✅
+- **positive control** `limb:ASR-11:3` (non-stale NEAR_MISS) → **owes an entry** ✅
+- **all six orphaned rows → owes an entry**, five at HIGH confidence, **each finding the stale narrative
+  on its own and saying so unprompted**
+
+The negative control returning `false` is what makes the six mean anything: an adjudicator that answers
+"owed" to everything produces the same six. Their re-authored `owed` fields are now on the rows, with
+the superseded text preserved in `owed_superseded` rather than deleted.
+
+### 17.4 ⚠ A DECOY THAT CONCLUDES THE OPPOSITE IS A STRONGER REFUSAL THAN SILENCE
+
+Every one of the eight rows had at least one near miss; four had **three**. They are not vague
+neighbours — several are the single best hit a search returns:
+
+- **`PER-3:2` → REG-F-222**, the only entry in any corpus that measures `StorageAdapter.commit`, which
+  says verbatim: *"the chokepoint conjunct **HOLDS** and is deliberately **not filed**."*
+- **`DEC-4:6` → `enforcement-register.ts:3589`** (RPH-CNS-002), whose `canonAnchor` **is this limb
+  quoted verbatim** — and which concludes the opposite.
+- **`ASR-19:3` →** a **docblock at the adjacent site, naming this invariant's own canon line.**
+- **`PER-3:2` → `docs/_working/HARMONIZATION-FINDINGS.md:119`**, the exact site claim, filed under the
+  heading **`## Refuted (32) — recorded so they are not re-raised`** and struck. ⚠ **At HEAD the gap is
+  live** — `package.json:18` runs `depcruise packages`, and neither `apps/` rule in
+  `.dependency-cruiser.cjs` constrains what `apps/` imports. That corpus carries an affirmative record
+  that a real gap is not a gap. **The general form is the question: how many of the 32 are true at
+  HEAD?** Derive it over all 32; hand-checking the two that surfaced is the defect one level up.
+
+> **A missing filing invites a search. A filing that does not cover the limb ends one. A filing that
+> records the limb as REFUTED ends every future one, and does it with the corpus's own authority.**
+
+### 17.5 ⚠ AND THE GATE BUILT TO CATCH THIS COULD NOT SEE IT — DERIVED, NOT NOTICED
+
+`verif/invariant-verdict-census.test.ts` carries an assertion named *"a live divergence whose owed was
+written for an ENFORCED arm is named"*. It is this defect's detector. **It asserted `[]` and was green
+while all six rows satisfied it in substance.**
+
+It filtered `verdict === 'DIVERGENT'`. Before the ladder split that filter meant *"every row that can
+owe a filing"*, because filing was a suffix on two arms and unsayable everywhere else. After the split,
+`filing` is the axis that says who owes a filing, and `DIVERGENT` names 49 of 229.
+
+**DERIVED over the file rather than noticed: 8 of its 36 assertions filter on `verdict === 'DIVERGENT'`.**
+Each was complete when written; each silently narrowed the day the axes split. Three were the general
+form and are re-keyed to `OWES_A_FILING = {UNFILED, NEAR_MISS}`; the cluster assertions are genuinely
+scoped to the V-4e population and stay.
+
+**The narrowing was demonstrated, not argued.** With a data mutant in place — one row re-orphaned
+exactly the way a refuter overturn does it — **the pre-V-6 filter passes GREEN** and the re-keyed filter
+fails naming `limb:DEC-4:2`. That is the measurement: not "the old filter looks too narrow", but "the
+old filter is green on the defect it exists to catch".
+
+### 17.6 The pattern, now four-for-four — and the cheaper instrument
+
+`PARTIAL_DIVERGENT_FILED` (partial **and** filed) · `ENFORCED_AT_SURFACE_ONLY` (a pejorative wrong for a
+limb about display) · `UNENFORCED_NO_SHAPE` (no field **vs** no subject) · **`NEAR_MISS` (a decoy **vs**
+a filing)**.
+
+The first three were found by an operator forced to choose a word for a case the vocabulary did not
+anticipate, and §16.3 concluded the countermeasure was to make that discomfort a first-class output.
+**That is still right and it is not the whole answer, because this one was found differently: by asking
+what the close condition would actually be satisfied by.**
+
+> **A vocabulary defect that touches the close condition is not found by an operator using the word —
+> the operator has no reason to look at the close condition. It is found by reading the close condition
+> against the data and asking whether the sentence and the intent still name the same set.** That check
+> is one query. It should have run at the migration, and it would have found this three commits sooner.

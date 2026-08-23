@@ -102,6 +102,16 @@ const ARMS = [
  */
 const FILINGS = ['FILED', 'UNFILED', 'NEAR_MISS', 'NOT_APPLICABLE', 'NOT_ESTABLISHED'] as const;
 
+/**
+ * The two filing outcomes that mean **a search was run and nothing covering the limb was found**.
+ *
+ * ⚠ `NEAR_MISS` BELONGS HERE AND THAT IS NOT OBVIOUS FROM ITS NAME, which is why three assertions in this file
+ * were keyed on `verdict === 'DIVERGENT'` instead and silently narrowed when the ladder split. It means *"a
+ * filing exists and does NOT cover this limb"* — a statement that the limb is unfiled, with a decoy attached.
+ * Whether the search turned up a decoy is a fact about the corpus, not about the debt.
+ */
+const OWES_A_FILING: ReadonlySet<string> = new Set(['UNFILED', 'NEAR_MISS']);
+
 /** Arms whose evidence is a REFUSAL OBSERVED THROUGH `Engine.dispatch`, not a reading. */
 const DRIVEN_ARMS = new Set(['ENFORCED_DRIVEN', 'UNENFORCED_OBSERVED_ADMISSION']);
 
@@ -466,13 +476,18 @@ describe('W-3b — the invariant enforcement census', () => {
 	// failure REG-F-043 records. It can only move DOWN without this reddening.
 	it('the unreconciled-owed debt is counted, not hidden', () => {
 		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(43);
-		// ⚠ THE SUBSET THAT BLOCKED V-4 IS ZERO. Every row asserting a live unfiled divergence now describes THAT
-		// divergence — re-verified as still reproducing, and re-searched against all four filing corpora. The
-		// remaining 44 sit on other arms, where a stale `owed` misleads but does not misdirect a filing.
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(37);
+		// ⚠ THE SUBSET THAT BLOCKS THE CLOSE IS ZERO, AND THE FILTER THAT FINDS IT WAS WRONG FOR SIX COMMITS.
+		// It read `verdict === 'DIVERGENT'`, which meant "every row that can owe a filing" before the ladder
+		// split — filing was a suffix on two arms and unsayable everywhere else. After the split, `filing` is the
+		// axis that says who owes a filing, and `DIVERGENT` names 49 of 229. Six NEAR_MISS rows sat in the gap:
+		// stale, still owing a filing, and invisible to the assertion built to catch exactly that. They were
+		// re-authored from a blind adjudication (2026-08-23) and the debt fell 43 -> 37.
+		// The 37 that remain are all FILED or NOT_APPLICABLE: a stale `owed` there misleads a reader but cannot
+		// misdirect a filing, because there is no filing left to misdirect.
 		expect(
-			stale.filter((v) => String(v.verdict) === 'DIVERGENT').length,
-			'the subset that blocks V-4: these rows owe a filing and describe the wrong one'
+			stale.filter((v) => OWES_A_FILING.has(String(v.filing))).length,
+			'the subset that blocks the close: these rows owe a filing and describe the wrong one'
 		).toBe(0);
 	});
 
@@ -484,14 +499,21 @@ describe('W-3b — the invariant enforcement census', () => {
 			'ENFORCED_BY_CONSTRUCTION',
 			'ENFORCED_DRIVEN',
 			'ENFORCED_MULTI_SITE',
-			'ENFORCED_AT_SURFACE_ONLY'
+			'ENFORCED_AT_SURFACE_ONLY',
+			'ENFORCED_AT_PRESENTATION'
 		]);
+		// ⚠ RE-KEYED 2026-08-23 FROM `verdict === 'DIVERGENT'` TO THE FILING AXIS, and the re-keying is the
+		// finding. As written this assertion reported 0 while SIX rows satisfied it in substance — `PER-3:2`,
+		// `OBJ-3:2`, `DEC-4:2`, `DEC-4:6`, `ASR-19:3`, `ASR-9:5`, every one authored for an ENFORCED_* arm and
+		// every one now holding an UNENFORCED_* arm. This is the SECOND predicate that picks that set out; the
+		// first is the stale-owed filter above, keyed on different fields entirely, and they agree exactly.
 		const bad = verdicts
-			.filter((v) => String(v.verdict) === 'DIVERGENT')
+			.filter((v) => OWES_A_FILING.has(String(v.filing)))
 			.filter((v) => ENFORCED.has(String(v.owed_for_verdict)))
 			.map((v) => String(v.limb_id));
-		// Empty as of V-4b, and three of the four left by being RE-ARMED rather than re-worded: ASR-10:5 was never
-		// a divergence (a CLOSED, test-pinned adjudication), while ASR-8:5 and STA-2:3 were already filed.
+		// Empty as of V-4b for the DIVERGENT population, and three of the four left by being RE-ARMED rather than
+		// re-worded: ASR-10:5 was never a divergence (a CLOSED, test-pinned adjudication), while ASR-8:5 and
+		// STA-2:3 were already filed. Empty for the GENERAL population as of the V-6 re-authoring.
 		expect(bad.sort()).toEqual([]);
 	});
 
@@ -712,7 +734,9 @@ describe('W-3b — the invariant enforcement census', () => {
 		// cover the limb, which is the note that stops the next reader closing the row on it. EIGHTEEN are
 		// genuinely UNFILED and each owes a register entry. Two are not divergences at all.
 		// Had these been defaulted to UNFILED at migration time, 30 of the 48 would have been wrong.
-		expect(dist).toEqual({ FILED: 190, NEAR_MISS: 21, NOT_APPLICABLE: 78, UNFILED: 18 });
+		// ⚠ `UNFILED` IS NOW ZERO TOO. The 18 are filed as REG-F-234..245 and REG-Q-058..062 (2026-08-23),
+		// 190 -> 208. The 21 NEAR_MISS rows are NOT discharged by that and the next assertion is why.
+		expect(dist).toEqual({ FILED: 208, NEAR_MISS: 21, NOT_APPLICABLE: 78 });
 
 		// ⚠ THIS IS THE MIGRATION'S WHOLE RETURN, AND IT IS A NUMBER THE OLD LADDER COULD NOT PRODUCE. The
 		// retired `DIVERGENT_UNFILED` arm read ZERO outstanding filings on the day of the split, because all 49
@@ -721,16 +745,100 @@ describe('W-3b — the invariant enforcement census', () => {
 		// code does not do, and where nobody has ever checked whether that is recorded.
 		expect(verdicts.filter((v) => String(v.filing) === 'NOT_ESTABLISHED').length, 'nothing unsearched').toBe(0);
 
-		// UNFILED now means what it always should have: SEARCHED, and nothing covers it. Each of these 18 owes a
-		// register entry, and each carries the `owed` that will become one — 11 observed admissions and 7 limbs
-		// with no shape at all.
-		const unfiled = verdicts.filter((v) => String(v.filing) === 'UNFILED');
-		const byArm: Record<string, number> = {};
-		for (const v of unfiled) byArm[String(v.verdict)] = (byArm[String(v.verdict)] ?? 0) + 1;
-		expect(byArm).toEqual({ UNENFORCED_OBSERVED_ADMISSION: 11, UNENFORCED_NO_SHAPE: 7 });
+		// UNFILED means SEARCHED, and nothing covers it. Its 18 rows — 11 observed admissions and 7 limbs with
+		// no shape at all — are filed, and the arm is empty. It may not refill without this reddening.
+		expect(verdicts.filter((v) => String(v.filing) === 'UNFILED').length, 'each owed an entry').toBe(0);
+	});
+
+	// ── ⚠ THE CLOSE CONDITION, IN ITS GENERAL FORM — AND UNFILED WAS THE SPECIAL CASE ─────────────────────
+	// `ROADMAP-invariant-enforcement-mapping.md` sets the programme's close as *"`filing = UNFILED` must be zero
+	// across ALL verdicts"*. That sentence is TRUE as of this commit and it DOES NOT CLOSE THE PROGRAMME.
+	//
+	// A row owes a register entry exactly when a search has been run and nothing COVERING the limb was found.
+	// `UNFILED` is that outcome when the search returned nothing. `NEAR_MISS` is the SAME outcome when the search
+	// returned something that does not cover it. Whether a decoy turned up is a fact about the corpus, not about
+	// the debt — so the general form is `UNFILED ∪ NEAR_MISS`, and the roadmap's condition names half of it.
+	//
+	// ⚠ 16 OF THE 21 SAY SO IN THEIR OWN `owed`, VERBATIM: *"A FILING IS OWED AND NOTHING RECORDS IT TODAY"*
+	// (ASR-11:3), *"A REG-F FINDING IS OWED"* (PER-12:4, PER-4:3). The five that DENY it are exactly the rows
+	// whose `owed` was authored for a verdict a refuter overturned: every non-stale row affirms, every denial is
+	// orphaned prose. Two independent predicates — "stale AND still owes a filing" and "owes a filing AND its
+	// `owed` was written for an ENFORCED arm" — pick out the SAME SIX ROWS.
+	//
+	// ⚠ AND IT WAS CONFIRMED BLIND, WITH A WORKING NEGATIVE CONTROL. Eight rows went to eight agents with
+	// `owed`, `filing` and `near_miss_filing` STRIPPED OUT and the controls unlabelled. The negative control
+	// (`limb:STA-4:8`, ENFORCED_DRIVEN / NOT_APPLICABLE) returned OWES-NOTHING; the positive control returned
+	// OWES-AN-ENTRY; all six orphaned rows returned OWES-AN-ENTRY, five at HIGH confidence, each finding the
+	// stale narrative unprompted. The negative control returning `false` is what makes the six mean anything.
+	//
+	// THE DECOYS ARE THE POINT. `PER-3:2`'s nearest hit is REG-F-222, which says *"the chokepoint conjunct
+	// HOLDS and is deliberately not filed"*; `DEC-4:6`'s is an enforcement-register row whose `canonAnchor` is
+	// THIS LIMB QUOTED VERBATIM, concluding the opposite. A missing filing invites a search. A confident
+	// adjacent entry ends one.
+	// ── ⚠ THE V-6 FILING IS RECONCILED AGAINST THE REGISTER, NOT TRUSTED TO MATCH IT ──────────────────────
+	// The 18 rows that were UNFILED are filed as **REG-F-234..245 and REG-Q-058..062** — 12 findings and 5
+	// questions over 18 limbs. Each row names its entry; each entry names the limbs it closes. Read from the
+	// REGISTER FILE, so a row claiming an ordinal that was never written reddens here rather than passing on the
+	// strength of its own field.
+	//
+	// ⚠ EVERY ONE OF THE 17 WAS AMENDED BY ADVERSARIAL VERIFICATION — 10 of 10 drafting groups, matching the
+	// 32-of-36 rate the previous filing pass measured. 829 citations were re-opened at HEAD by a verifier who
+	// had not written them: 9 were DEAD POINTERS (a cited range whose far end lands inside the NEXT entry; a
+	// line cited for a comment that begins one line later; an `organizationId` that is a `tenantId` at the line
+	// given; a rule id attributed to its neighbour), and 42 more were MATERIAL. Three REFUTED the draft outright:
+	// a function's sole caller was named wrongly, a command asserted to have "no caller" has three, and one
+	// entry's own remedy contradicted its claim that the carrier was "unbuildable today".
+	//
+	// ⚠ AND ONE COUNT WAS STRUCK RATHER THAN REPRINTED. A draft reported "318 unique object shapes, 58 carrying
+	// the field" from a recursive walk of the schema barrel. An independent re-walk of the SAME barrel with a
+	// different traversal returned different totals, so the totals came out of the entry. A measurement that
+	// does not reproduce under a second implementation is not a measurement, and printing it beside verified
+	// facts is how REG-F-148's four defects were made.
+	it('the 18 newly-filed limbs reconcile against entries that exist in the register', () => {
+		const register = readFileSync(
+			new URL('../docs/canon/JPWB-REG-005 Decision and Divergence Register.md', import.meta.url),
+			'utf8'
+		);
+		const filed = verdicts.filter((v) => /^REG-[FQ]-(2[3-9]\d|0?5[89]|06[0-2])$/.test(String(v.filed_entry ?? '')));
+		const v6 = verdicts.filter((v) => {
+			const m = /^REG-([FQ])-(\d{3})$/.exec(String(v.filed_entry ?? ''));
+			if (!m) return false;
+			const n = Number(m[2]);
+			return m[1] === 'F' ? n >= 234 : n >= 58;
+		});
+		expect(v6.length, 'limbs closed by the V-6 batch').toBe(18);
+		expect(filed.length).toBeGreaterThanOrEqual(18);
+
+		const ordinals = new Set(v6.map((v) => String(v.filed_entry)));
+		expect(ordinals.size, 'distinct V-6 entries carrying a census limb').toBe(16);
+
+		// ⚠ THE ENTRY MUST EXIST AS A HEADING, not merely be mentioned. A row naming an ordinal nobody wrote is
+		// the exact shape this reconciliation exists to refuse — and it is what an EM-7 search would report as
+		// "filed" from the row alone.
+		const missing = [...ordinals].filter((o) => !register.includes(`### ${o} — `));
+		expect(missing, 'a census row naming a register entry that was never written').toEqual([]);
+
+		// The one entry with no census limb is REG-F-241, spun out of limb:ASR-1:6 because its drafter found a
+		// second defect at the same site. It is counted here so 17 entries and 16 ordinals do not read as a
+		// discrepancy: 16 carry limbs, one carries none and says so in its own reconciliation bullet.
+		expect(register.includes('### REG-F-241 — '), 'the spun-out entry that closes no limb').toBe(true);
+
+		// Every V-6 entry must declare which of the two series it is in, and the two must partition.
+		const kinds: Record<string, number> = {};
+		for (const v of v6) kinds[String(v.filed_entry_kind)] = (kinds[String(v.filed_entry_kind)] ?? 0) + 1;
+		expect(kinds).toEqual({ FINDING: 13, QUESTION: 5 });
+	});
+
+	it('the filing debt is counted in its general form, not just as UNFILED', () => {
+		const owes = verdicts.filter((v) => OWES_A_FILING.has(String(v.filing)));
+		expect(owes.length, 'limbs searched for, with no covering filing found').toBe(21);
+		// A debt with no plan is not a debt anybody can pay. ⚠ THE THRESHOLD IS 40, NOT 80, AND THE LOWER NUMBER
+		// IS THE HONEST ONE: `limb:ASR-14:3`'s entire `owed` is the 70-character sentence "a register finding:
+		// waiver expiry unenforced on the authorization path", which names the finding AND the defect and is
+		// complete. Length was never the property being tested.
 		expect(
-			unfiled.filter((v) => String(v.owed ?? '').length < 80).map((v) => String(v.limb_id)),
-			'UNFILED asserts a filing is owed — it has to say which'
+			owes.filter((v) => String(v.owed ?? '').length < 40).map((v) => String(v.limb_id)),
+			'a row that owes a filing must state which'
 		).toEqual([]);
 	});
 

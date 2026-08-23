@@ -454,12 +454,24 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the
   policy real without triggering the REG-F-194 wholesale-reformat churn trap. Design-first: it
   changes `gate:fast`.
-- [ ] **Push `main` to origin** — 30 commits ahead as of 2026-08-20, carrying REG-F-199..202 and the
-  whole ground-truth programme. NOT done autonomously: history on this branch is shared and pushing is
-  outward-facing. Needs an explicit go-ahead.
+- [ ] **Push `main` to origin** — ~~30 commits ahead as of 2026-08-20~~ **74 commits ahead as of
+  2026-08-23**, carrying REG-F-199..202, the whole ground-truth programme, and the W-3b invariant
+  enforcement census with REG-F-203..245 / REG-Q-053..062. NOT done autonomously: history on this
+  branch is shared and pushing is outward-facing. Needs an explicit go-ahead.
 - [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
   REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
   priority slice.
+  **⚠ THE PRIORITY SLICE IS COMPLETE (V-0..V-6, 2026-08-23) AND THE ITEM STAYS OPEN, because it is
+  scoped to 192 and the census covers 62.** Delivered: **307 limbs over the canon 62**, every one
+  verdicted and every one refuted (128 OVERTURNED / 179 HELD), on a two-axis ladder; **53 register
+  entries (REG-F-203..245, REG-Q-053..062)** closing **67 limbs**. `filing = UNFILED` is **zero**.
+  ⚠ **AND THAT IS NOT THE CLOSE CONDITION IT LOOKS LIKE.** `NEAR_MISS` means *a filing exists and does
+  NOT cover this limb* — the limb is unfiled, with a decoy attached — so **21 limbs still owe an entry**
+  and the real debt is 39 of which 18 are discharged. See `DESIGN-invariant-enforcement-mapping.md` §17
+  and the V-7 list at the end of `ROADMAP-invariant-enforcement-mapping.md`.
+  **Still out of scope of the census entirely:** the 130 non-canon invariants (RPH CDM 102, Assurance
+  Policy §39 20, Contract Package §35 8), JPWB-SPEC-001's 14 surface invariants, CON-000's 12 axioms,
+  and `cap:projection` (0/8).
 - [x] ~~**Implementation ground-truth program**~~ — **W-0..W-5 ALL LANDED 2026-08-20 (REG-F-198)**:
   substrate + ingest + census + measured verdicts + DRIVEN bridge + `tracker:build` in `gate:fast`.
   Remaining program residue: W-3b invariant mapping (below), the query-name delta (below), and the
