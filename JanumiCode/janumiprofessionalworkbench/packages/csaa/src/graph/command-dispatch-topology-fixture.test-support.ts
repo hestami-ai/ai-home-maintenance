@@ -12,6 +12,7 @@ import type { SemanticDeclarationRecord } from '../contracts/semantic.js';
 import { buildCommandHandlerGraph } from './build-command-handler-graph.js';
 import {
 	createCommandHandlerGraphFixture,
+	createCommandDispatchReportHandlerGraphFixture,
 	type CommandHandlerGraphFixture
 } from './command-handler-graph-fixture.test-support.js';
 import { validateCommandHandlerGraph } from './validate-command-handler-graph.js';
@@ -103,8 +104,7 @@ function dispatchRequest(
  * Real compiler-backed overlay fixture. The predecessor graph is independently built and
  * validated; the retained command-dispatch census is frozen as an artifact and never executed.
  */
-export function createCommandDispatchTopologyFixture(): CommandDispatchTopologyFixture {
-	const fixture = createCommandHandlerGraphFixture();
+function createFixture(fixture: CommandHandlerGraphFixture): CommandDispatchTopologyFixture {
 	try {
 		const outcome = buildCommandHandlerGraph(
 			fixture.graphRequest,
@@ -134,4 +134,13 @@ export function createCommandDispatchTopologyFixture(): CommandDispatchTopologyF
 		fixture.cleanup();
 		throw error;
 	}
+}
+
+export function createCommandDispatchTopologyFixture(): CommandDispatchTopologyFixture {
+	return createFixture(createCommandHandlerGraphFixture());
+}
+
+/** Exact facade closure while retaining the same compiler-backed dispatch evidence. */
+export function createCommandDispatchTopologyReportFixture(): CommandDispatchTopologyFixture {
+	return createFixture(createCommandDispatchReportHandlerGraphFixture());
 }

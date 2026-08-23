@@ -9,12 +9,14 @@ import {
 	type CommandHandlerGraphReportRequest
 } from '../contracts/command-handler-graph-report.js';
 import type { ProjectContextReportRequest } from '../contracts/project-context-report.js';
+import { COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH } from '../contracts/command-dispatch-topology.js';
 import { buildCommandHandlerGraph } from '../graph/build-command-handler-graph.js';
 import { createCommandHandlerGraphFixture } from '../graph/command-handler-graph-fixture.test-support.js';
 import { validateArrowCommandCensusArtifactSet } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { verifyFrozenSubject } from '../subject/freshness.js';
 import {
 	admitCommandHandlerGraphReportRequest,
+	captureCommandHandlerGraphReportPipeline,
 	runCommandHandlerGraphReportWithDependencies,
 	type CommandHandlerGraphReportProgressEvent,
 	type CommandHandlerGraphReportRuntimeDependencies
@@ -233,6 +235,34 @@ describe('runCommandHandlerGraphReport', () => {
 				expect.objectContaining({ state: 'STARTED' }),
 				expect.objectContaining({ state: 'COMPLETED' })
 			]);
+	});
+
+	it('hands one validated handler pipeline to a successor with its artifact in the initial subject', async () => {
+		const { dependencies, fixture, observations } = syntheticDependencies();
+		const outcome = await captureCommandHandlerGraphReportPipeline(
+			fixtureRequest(fixture),
+			{
+				additionalArtifacts: [COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH],
+				repositoryRoot: fixture.root
+			},
+			dependencies
+		);
+		expect(outcome.outcome, JSON.stringify(outcome)).toBe('captured');
+		if (outcome.outcome !== 'captured') return;
+		expect(observations.captureAdditionalArtifacts).toEqual([
+			'verif/arrow-command-census.ts',
+			'verif/arrow-command-census.baseline.json',
+			'verif/arrow-census-coverage.test.ts',
+			'verif/arrow-command-census.test.ts',
+			COMMAND_DISPATCH_TOPOLOGY_RETAINED_CENSUS_PATH
+		]);
+		expect(outcome.frozenSubject).toBe(fixture.subject);
+		expect(outcome.semanticSnapshot).toBe(fixture.snapshot);
+		expect(outcome.artifactSet).toBe(fixture.arrowArtifactSet);
+		expect(outcome.observation.subjectId).toBe(fixture.subject.descriptor.subjectId);
+		expect(outcome.commandHandlerGraph.subjectId).toBe(fixture.subject.descriptor.subjectId);
+		expect(outcome).not.toHaveProperty('result');
+		expect(observations.verifiedSubject).toBeUndefined();
 	});
 
 	it('fails final reconciliation for forged executor binding even when injected validators accept it', async () => {

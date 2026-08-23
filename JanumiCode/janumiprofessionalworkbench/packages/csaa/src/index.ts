@@ -11,6 +11,7 @@ export * from './contracts/command-handler-graph.js';
 export * from './contracts/command-handler-graph-report.js';
 export * from './contracts/command-event-contract-overlay.js';
 export * from './contracts/command-dispatch-topology.js';
+export * from './contracts/command-dispatch-topology-report.js';
 export * from './contracts/guard-enforcement-ledger.js';
 export * from './contracts/guard-enforcement-ledger-report.js';
 export * from './contracts/guard-classification-overlay.js';
@@ -202,6 +203,25 @@ export {
 	COMMAND_HANDLER_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type CommandHandlerGraphProgressTransportTruncation
 } from './application/command-handler-graph-progress-jsonl.js';
+
+export {
+	commandDispatchTopologyReportExitCode,
+	runCommandDispatchTopologyReport,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_PROGRESS_NONCLAIMS,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_PROGRESS_SCHEMA_VERSION,
+	type CommandDispatchTopologyReportProgressEvent,
+	type CommandDispatchTopologyReportProgressObservation,
+	type CommandDispatchTopologyReportProgressObservationMetric,
+	type CommandDispatchTopologyReportProgressPhase,
+	type RunCommandDispatchTopologyReportOptions
+} from './application/run-command-dispatch-topology-report.js';
+
+export {
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_BYTES,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_EVENTS,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type CommandDispatchTopologyProgressTransportTruncation
+} from './application/command-dispatch-topology-progress-jsonl.js';
 
 export {
 	guardEnforcementLedgerReportExitCode,

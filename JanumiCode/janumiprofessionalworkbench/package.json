@@ -29,6 +29,7 @@
 		"csaa:inventory:check": "bun run scripts/csaa-inventory.ts --check",
 		"csaa:analyze:arrow-command-census": "bun scripts/csaa-arrow-command-census.ts",
 		"csaa:analyze:command-handler-graph": "bun scripts/csaa-command-handler-graph.ts",
+		"csaa:analyze:command-dispatch-topology": "bun scripts/csaa-command-dispatch-topology.ts",
 		"csaa:analyze:guard-enforcement-ledger": "bun scripts/csaa-guard-enforcement-ledger.ts",
 		"csaa:analyze:declaration-context": "bun scripts/csaa-declaration-context.ts",
 		"csaa:analyze:call-graph": "bun scripts/csaa-call-graph.ts",

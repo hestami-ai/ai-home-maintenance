@@ -36,6 +36,7 @@ import {
 	type ResolveSubjectRequest
 } from '../contracts/subject.js';
 import {
+	ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
 	buildArrowCommandCensusArtifactSet,
 	validateArrowCommandCensusArtifactSet
 } from '../providers/jpwb-arrow-command-census/artifact-set.js';
@@ -50,6 +51,16 @@ const HANDLER_REGISTRY_PATH = 'packages/rph-application/src/handlers/registry.ts
 const HANDLER_REGISTRY_PROJECT = 'packages/rph-application/tsconfig.json';
 const HANDLER_SOURCE_PATH = 'packages/rph-application/src/handlers/work.ts';
 const RETAINED_VERIFIER_PATH = 'verif/arrow-command-census.ts';
+const COMMAND_DISPATCH_CENSUS_PATH = 'verif/command-dispatch-census.test.ts';
+const COMMAND_DISPATCH_REPORT_PROJECTS = [
+	'packages/rph-application/tsconfig.json',
+	'packages/rph-assurance/tsconfig.json',
+	'packages/rph-contracts/tsconfig.json',
+	'packages/rph-domain/tsconfig.json',
+	'packages/rph-persistence/tsconfig.json',
+	'packages/rph-ports/tsconfig.json',
+	'packages/rph-projections/tsconfig.json'
+] as const;
 const FIXTURE_SHA = 'a'.repeat(64);
 
 const DIRECT_HANDLER_SOURCE = [
@@ -218,7 +229,8 @@ function handlerRegistryEntries(variant: HandlerFixtureVariant): string {
 
 function createRepository(
 	variant: HandlerFixtureVariant,
-	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform
+	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform,
+	commandDispatchReportClosure = false
 ): {
 	readonly handlerSiteLine: number;
 	readonly root: string;
@@ -232,11 +244,19 @@ function createRepository(
 	});
 	write(root, 'bun.lock', 'fixture lock\n');
 
-	for (const [directory, name] of [
+	const packages: Array<readonly [string, string]> = [
 		['rph-application', '@fixture/rph-application'],
 		['rph-contracts', '@fixture/rph-contracts'],
 		['rph-domain', '@fixture/rph-domain']
-	] as const)
+	];
+	if (commandDispatchReportClosure)
+		packages.push(
+			['rph-assurance', '@fixture/rph-assurance'],
+			['rph-persistence', '@fixture/rph-persistence'],
+			['rph-ports', '@fixture/rph-ports'],
+			['rph-projections', '@fixture/rph-projections']
+		);
+	for (const [directory, name] of packages)
 		json(root, `packages/${directory}/package.json`, {
 			name,
 			private: true,
@@ -283,6 +303,21 @@ function createRepository(
 			'src/transitions.data.ts'
 		]
 	});
+	if (commandDispatchReportClosure)
+		for (const directory of ['rph-assurance', 'rph-persistence', 'rph-ports', 'rph-projections']) {
+			json(root, `packages/${directory}/tsconfig.json`, {
+				compilerOptions: {
+					module: 'NodeNext',
+					moduleResolution: 'NodeNext',
+					noEmit: true,
+					noLib: true,
+					strict: true,
+					target: 'ES2022'
+				},
+				files: ['src/index.ts']
+			});
+			write(root, `packages/${directory}/src/index.ts`, 'export {};\n');
+		}
 
 	write(
 		root,
@@ -512,7 +547,7 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	);
 }
 
-function subjectRequest(root: string): ResolveSubjectRequest {
+function subjectRequest(root: string, commandDispatchReportClosure = false): ResolveSubjectRequest {
 	return {
 		budgets: {
 			maxBytes: 16 * 1024 * 1024,
@@ -528,7 +563,16 @@ function subjectRequest(root: string): ResolveSubjectRequest {
 		policyVersion: SUBJECT_POLICY_VERSION,
 		rootLocator: root,
 		schemaVersion: SUBJECT_REQUEST_SCHEMA_VERSION,
-		scope: { kind: 'REPOSITORY' },
+		scope: commandDispatchReportClosure
+			? {
+					additionalArtifacts: [
+						...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+						COMMAND_DISPATCH_CENSUS_PATH
+					],
+					kind: 'EXPLICIT_PROJECTS',
+					projects: COMMAND_DISPATCH_REPORT_PROJECTS
+				}
+			: { kind: 'REPOSITORY' },
 		subjectKind: 'WORKTREE'
 	};
 }
@@ -607,8 +651,8 @@ function arrowBudgets(): ArrowCommandCensusBudgets {
 		maxDeclaredSites: 100,
 		maxDiagnostics: 100,
 		maxExecutorDurationMs: 30_000,
-		maxExternalModuleBytes: 100_000_000,
-		maxExternalModuleFiles: 10_000,
+		maxExternalModuleBytes: 64 * 1024 * 1024,
+		maxExternalModuleFiles: 5_000,
 		maxMachines: 100,
 		maxMapStates: 100,
 		maxMaterializedBytes: 16 * 1024 * 1024,
@@ -782,9 +826,14 @@ export interface CommandHandlerGraphFixture {
 function createFixture(
 	variant: HandlerFixtureVariant,
 	eventContractRegistrySourceTransform?: EventContractRegistrySourceTransform,
-	semanticSnapshotTransform?: (snapshot: StaticSemanticSnapshot) => StaticSemanticSnapshot
+	semanticSnapshotTransform?: (snapshot: StaticSemanticSnapshot) => StaticSemanticSnapshot,
+	commandDispatchReportClosure = false
 ): CommandHandlerGraphFixture {
-	const repository = createRepository(variant, eventContractRegistrySourceTransform);
+	const repository = createRepository(
+		variant,
+		eventContractRegistrySourceTransform,
+		commandDispatchReportClosure
+	);
 	const { root } = repository;
 	let cleaned = false;
 	const cleanup = (): void => {
@@ -793,7 +842,7 @@ function createFixture(
 		rmSync(root, { force: true, recursive: true });
 	};
 	try {
-		const subjectOutcome = resolveSubject(subjectRequest(root));
+		const subjectOutcome = resolveSubject(subjectRequest(root, commandDispatchReportClosure));
 		if (subjectOutcome.outcome !== 'resolved')
 			throw new Error(`Subject fixture construction failed: ${JSON.stringify(subjectOutcome)}`);
 		const subject = subjectOutcome.subject;
@@ -822,6 +871,11 @@ function createFixture(
 
 export function createCommandHandlerGraphFixture(): CommandHandlerGraphFixture {
 	return createFixture('DIRECT');
+}
+
+/** Exact seven-project and retained-artifact closure used by the command-dispatch report facade. */
+export function createCommandDispatchReportHandlerGraphFixture(): CommandHandlerGraphFixture {
+	return createFixture('DIRECT', undefined, undefined, true);
 }
 
 /** Event-rich direct-handler variant used by the command/event contract overlay fixture. */

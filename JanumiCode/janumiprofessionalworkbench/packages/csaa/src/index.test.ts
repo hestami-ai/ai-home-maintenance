@@ -51,6 +51,16 @@ import {
 	COMMAND_HANDLER_GRAPH_REPORT_SCOPE,
 	COMMAND_HANDLER_GRAPH_REQUEST_SCHEMA_VERSION,
 	COMMAND_HANDLER_GRAPH_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_BYTES,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_EVENTS,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_OPERATION_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_PROGRESS_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_REQUEST_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_RESULT_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE,
 	COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROGRESS_SCHEMA_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
@@ -196,8 +206,11 @@ import {
 	moduleResolutionTraceReportExitCode,
 	buildCommandEventContractOverlay,
 	buildCommandHandlerGraph,
+	buildCommandDispatchTopology,
 	commandHandlerGraphReportExitCode,
+	commandDispatchTopologyReportExitCode,
 	runCommandHandlerGraphReport,
+	runCommandDispatchTopologyReport,
 	buildGuardClassificationOverlay,
 	buildGuardEnforcementLedgerArtifactSet,
 	guardEnforcementLedgerReportExitCode,
@@ -236,6 +249,7 @@ import {
 	observeArrowCommandCensus,
 	observeGuardEnforcementLedger,
 	selectJpwbCommandEventContractOverlayInputs,
+	selectJpwbCommandDispatchTopology,
 	selectJpwbCommandHandlerRegistries,
 	validateDependencyCruiserObservation,
 	validateDependencyProviderComparison,
@@ -245,6 +259,7 @@ import {
 	validateSourceOriginCorrelation,
 	validateModuleResolutionTrace,
 	validateCommandEventContractOverlay,
+	validateCommandDispatchTopology,
 	validateCommandHandlerGraph,
 	validateGuardClassificationOverlay,
 	validateGuardEnforcementLedgerArtifactSet,
@@ -302,6 +317,16 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('runCommandHandlerGraphCommand');
 		expect(publicSurface).not.toHaveProperty('admitCommandHandlerGraphReportRequest');
 		expect(publicSurface).not.toHaveProperty('runCommandHandlerGraphReportWithDependencies');
+		expect(buildCommandDispatchTopology).toBeTypeOf('function');
+		expect(selectJpwbCommandDispatchTopology).toBeTypeOf('function');
+		expect(validateCommandDispatchTopology).toBeTypeOf('function');
+		expect(runCommandDispatchTopologyReport).toBeTypeOf('function');
+		expect(commandDispatchTopologyReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createCommandDispatchTopologyProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runCommandDispatchTopologyCommand');
+		expect(publicSurface).not.toHaveProperty('admitCommandDispatchTopologyReportRequest');
+		expect(publicSurface).not.toHaveProperty('runCommandDispatchTopologyReportWithDependencies');
+		expect(publicSurface).not.toHaveProperty('captureCommandHandlerGraphReportPipeline');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(runGuardEnforcementLedgerReport).toBeTypeOf('function');
@@ -579,6 +604,32 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(COMMAND_HANDLER_GRAPH_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(COMMAND_HANDLER_GRAPH_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(COMMAND_DISPATCH_TOPOLOGY_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-progress/1.0.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-command-dispatch-topology/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-report-request/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-report-result/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-report/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE).toBe(
+			'EXACT_SELECTED_FROZEN_SUBJECT_SEMANTIC_RETAINED_ARROW_COMMAND_HANDLER_AND_COMMAND_DISPATCH_TOPOLOGY'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-report-progress/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-command-dispatch-topology-progress-transport/0.1.0'
+		);
+		expect(COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(COMMAND_DISPATCH_TOPOLOGY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(COMMAND_EVENT_CONTRACT_OVERLAY_OPERATION_VERSION).toBe(
 			'jan-csaa-build-command-event-contract-overlay/0.1.0'
 		);

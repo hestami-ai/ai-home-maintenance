@@ -82,7 +82,7 @@ import {
 	PROJECT_CONTEXT_REPORT_SAFETY_CEILINGS,
 	type ProjectContextReportRequest
 } from '../contracts/project-context-report.js';
-import type { SubjectDiagnostic } from '../contracts/subject.js';
+import type { FrozenSubject, SubjectDiagnostic } from '../contracts/subject.js';
 import {
 	buildCommandHandlerGraph,
 	selectJpwbCommandHandlerRegistries
@@ -115,6 +115,11 @@ import {
 	captureSemanticReportPipeline,
 	type SemanticReportPipelineCapture
 } from './run-project-context-report.js';
+
+type ArrowArtifactSet = Extract<
+	ReturnType<typeof buildArrowCommandCensusArtifactSet>,
+	{ readonly outcome: 'complete' }
+>['artifactSet'];
 
 const REQUEST_KEYS = [
 	'budgets',
@@ -257,6 +262,31 @@ export interface RunCommandHandlerGraphReportOptions {
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
 }
+
+/** Trusted same-process options for a successor capture that emits no terminal report. */
+export interface CaptureCommandHandlerGraphReportPipelineOptions extends RunCommandHandlerGraphReportOptions {
+	/** Successor-owned exact artifacts that must participate in the initial frozen subject. */
+	readonly additionalArtifacts?: readonly string[];
+}
+
+/** Same-process evidence handoff for bounded successors; never serialize or package-root export it. */
+export interface CommandHandlerGraphReportPipelineCapture {
+	readonly artifactSet: ArrowArtifactSet;
+	readonly commandHandlerGraph: CommandHandlerGraphSnapshot;
+	readonly diagnostics: readonly CommandHandlerGraphReportDiagnostic[];
+	readonly frozenSubject: FrozenSubject;
+	readonly observation: ArrowCommandCensusObservation;
+	readonly outcome: 'captured';
+	readonly predecessorStageOutcomes: Omit<CommandHandlerGraphReportStageOutcomes, 'currentness'>;
+	/** Canonical absolute root retained only for the trusted same-process successor. */
+	readonly repositoryRoot: string;
+	readonly request: CommandHandlerGraphReportRequest;
+	readonly semanticSnapshot: SemanticReportPipelineCapture['semanticSnapshot'];
+}
+
+export type CommandHandlerGraphReportPipelineOutcome =
+	| CommandHandlerGraphReportPipelineCapture
+	| Extract<CommandHandlerGraphReportOutcome, { readonly outcome: 'unavailable' }>;
 
 interface ProgressRecorder {
 	complete(
@@ -944,11 +974,6 @@ const DEFAULT_DEPENDENCIES: CommandHandlerGraphReportRuntimeDependencies = Objec
 	verifySubject: verifyFrozenSubject
 });
 
-type ArrowArtifactSet = Extract<
-	ReturnType<typeof buildArrowCommandCensusArtifactSet>,
-	{ readonly outcome: 'complete' }
->['artifactSet'];
-
 function evidenceReconciles(
 	capture: SemanticReportPipelineCapture,
 	artifactSet: ArrowArtifactSet,
@@ -1049,12 +1074,30 @@ function evidenceReconciles(
 	);
 }
 
+function capturedAdditionalArtifacts(additionalArtifacts: readonly string[]): readonly string[] {
+	const seen = new Set<string>();
+	const captured: string[] = [];
+	for (const candidate of [
+		...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+		...additionalArtifacts
+	]) {
+		const path = assertCanonicalRelativePath(candidate);
+		const key = canonicalPathKey(path);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		captured.push(path);
+	}
+	return Object.freeze(captured);
+}
+
 async function runInternal(
 	requestValue: unknown,
 	options: RunCommandHandlerGraphReportOptions,
 	progress: ProgressRecorder,
-	dependencies: CommandHandlerGraphReportRuntimeDependencies
-): Promise<CommandHandlerGraphReportOutcome> {
+	dependencies: CommandHandlerGraphReportRuntimeDependencies,
+	capturePipeline = false,
+	additionalArtifacts: readonly string[] = []
+): Promise<CommandHandlerGraphReportOutcome | CommandHandlerGraphReportPipelineCapture> {
 	progress.start('REQUEST_BIND');
 	let admission: CommandHandlerGraphReportAdmission;
 	try {
@@ -1076,7 +1119,7 @@ async function runInternal(
 
 	progress.start('PREDECESSOR_PIPELINE');
 	const predecessor = dependencies.captureSemantic(admission.predecessorRequest, {
-		additionalArtifacts: ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+		additionalArtifacts: capturedAdditionalArtifacts(additionalArtifacts),
 		repositoryRoot: options.repositoryRoot
 	});
 	if (predecessor.outcome !== 'semantic-captured') {
@@ -1399,10 +1442,73 @@ async function runInternal(
 			subject.descriptor
 		);
 	}
+	if (
+		capturePipeline &&
+		!evidenceReconciles(predecessor, artifactSet, censusObservation, graph, registries, request)
+	) {
+		progress.fail(
+			graphObservations(graph, request.budgets.commandHandlerGraph),
+			'EVIDENCE_IDENTITY_MISMATCH'
+		);
+		return failure(
+			'EVIDENCE_IDENTITY_MISMATCH',
+			'COMMAND_HANDLER_GRAPH',
+			'failed',
+			[
+				...inheritedDiagnostics,
+				...artifactSetDiagnostics,
+				...censusDiagnostics,
+				...graphDiagnostics,
+				reportDiagnostic(
+					'EVIDENCE_IDENTITY_MISMATCH',
+					'The semantic capture, retained arrow evidence, registry selectors, and command-handler graph do not reconcile with one exact frozen subject.',
+					null,
+					'VALIDATE',
+					'COMMAND_HANDLER_GRAPH',
+					'ERROR'
+				)
+			],
+			request,
+			subject.descriptor
+		);
+	}
 	progress.complete(
 		graphObservations(graph, request.budgets.commandHandlerGraph),
 		'PARTIAL_OPEN_STATIC_PROJECTION'
 	);
+	const predecessorStageOutcomes = Object.freeze({
+		artifactSet: {
+			diagnosticCodes: [],
+			outcome: 'complete' as const
+		},
+		commandHandlerGraph: {
+			diagnosticCodes: graphOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+			outcome: 'partial' as const
+		},
+		predecessorPipeline: predecessor.predecessorStageOutcomes,
+		retainedCensus: {
+			diagnosticCodes: censusOutcome.diagnostics.map((diagnostic) => diagnostic.code),
+			outcome: censusOutcome.outcome
+		}
+	});
+	if (capturePipeline)
+		return Object.freeze({
+			artifactSet,
+			commandHandlerGraph: graph,
+			diagnostics: Object.freeze([
+				...inheritedDiagnostics,
+				...artifactSetDiagnostics,
+				...censusDiagnostics,
+				...graphDiagnostics
+			]),
+			frozenSubject: subject,
+			observation: censusObservation,
+			outcome: 'captured' as const,
+			predecessorStageOutcomes,
+			repositoryRoot: predecessor.repositoryRoot,
+			request,
+			semanticSnapshot: predecessor.semanticSnapshot
+		});
 
 	progress.start('CURRENTNESS');
 	let freshness: ReturnType<typeof verifyFrozenSubject>;
@@ -1469,22 +1575,10 @@ async function runInternal(
 		);
 	}
 	const stageOutcomes: CommandHandlerGraphReportStageOutcomes = {
-		artifactSet: {
-			diagnosticCodes: [],
-			outcome: 'complete'
-		},
-		commandHandlerGraph: {
-			diagnosticCodes: graphOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: 'partial'
-		},
+		...predecessorStageOutcomes,
 		currentness: {
 			diagnosticCodes: freshness.diagnostics.map((diagnostic) => diagnostic.code),
 			state: currentnessState
-		},
-		predecessorPipeline: predecessor.predecessorStageOutcomes,
-		retainedCensus: {
-			diagnosticCodes: censusOutcome.diagnostics.map((diagnostic) => diagnostic.code),
-			outcome: censusOutcome.outcome
 		}
 	};
 	const report: CommandHandlerGraphReportOutcome = {
@@ -1606,7 +1700,10 @@ export async function runCommandHandlerGraphReportWithDependencies(
 ): Promise<CommandHandlerGraphReportOutcome> {
 	const progress = createProgressRecorder(options);
 	try {
-		return progress.finish(await runInternal(requestValue, options, progress, dependencies));
+		const outcome = await runInternal(requestValue, options, progress, dependencies);
+		if (outcome.outcome === 'captured')
+			throw new Error('The public command-handler report path returned an internal capture.');
+		return progress.finish(outcome);
 	} catch {
 		progress.fail([], 'INTERNAL_FAILURE');
 		return progress.finish(
@@ -1614,6 +1711,41 @@ export async function runCommandHandlerGraphReportWithDependencies(
 				reportDiagnostic('INTERNAL_FAILURE', 'The command-handler-graph report failed closed.')
 			])
 		);
+	}
+}
+
+/** @internal Same-process command-handler evidence seam; never package-root export or serialize it. */
+export async function captureCommandHandlerGraphReportPipeline(
+	requestValue: unknown,
+	options: CaptureCommandHandlerGraphReportPipelineOptions,
+	dependencies: CommandHandlerGraphReportRuntimeDependencies = DEFAULT_DEPENDENCIES
+): Promise<CommandHandlerGraphReportPipelineOutcome> {
+	const captureOptions: RunCommandHandlerGraphReportOptions = {
+		...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+		repositoryRoot: options.repositoryRoot
+	};
+	const progress = createProgressRecorder(captureOptions);
+	try {
+		const outcome = await runInternal(
+			requestValue,
+			captureOptions,
+			progress,
+			dependencies,
+			true,
+			options.additionalArtifacts ?? []
+		);
+		if (outcome.outcome === 'captured') return outcome;
+		const terminal = progress.finish(outcome);
+		if (terminal.outcome !== 'unavailable')
+			throw new Error('The command-handler capture path returned a terminal partial report.');
+		return terminal;
+	} catch {
+		progress.fail([], 'INTERNAL_FAILURE');
+		const terminal = failure('INTERNAL_FAILURE', 'COMMAND_HANDLER_GRAPH', 'failed', [
+			reportDiagnostic('INTERNAL_FAILURE', 'The command-handler capture failed closed.')
+		]);
+		progress.finish(terminal);
+		return terminal;
 	}
 }
 

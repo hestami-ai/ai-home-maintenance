@@ -57,6 +57,19 @@ import {
 	COMMAND_HANDLER_GRAPH_REPORT_SCOPE
 } from '../contracts/command-handler-graph-report.js';
 import {
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY_TRANSFER,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_EXECUTION_SELECTION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_GATE_EFFECT,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_NONCLAIMS,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_OPERATION_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_REQUEST_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_RESULT_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCHEMA_VERSION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_SELECTION,
+	COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE
+} from '../contracts/command-dispatch-topology-report.js';
+import {
 	STATE_MACHINE_GRAPH_REPORT_AUTHORITY,
 	STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER,
 	STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT,
@@ -292,6 +305,7 @@ const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts'
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
 const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
 const COMMAND_HANDLER_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-command-handler-graph.ts';
+const COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND = 'bun scripts/csaa-command-dispatch-topology.ts';
 const GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND = 'bun scripts/csaa-guard-enforcement-ledger.ts';
 const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
@@ -423,6 +437,22 @@ const COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE = [
 	'packages/csaa/src/index.test.ts',
 	'packages/csaa/src/index.ts',
 	'scripts/csaa-command-handler-graph.ts'
+] as const;
+const COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE = [
+	'packages/csaa/src/application/command-dispatch-topology-command.test.ts',
+	'packages/csaa/src/application/command-dispatch-topology-progress-jsonl.test.ts',
+	'packages/csaa/src/application/command-dispatch-topology-progress-jsonl.ts',
+	'packages/csaa/src/application/run-command-dispatch-topology-command.ts',
+	'packages/csaa/src/application/run-command-dispatch-topology-report.test.ts',
+	'packages/csaa/src/application/run-command-dispatch-topology-report.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.test.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.ts',
+	'packages/csaa/src/contracts/command-dispatch-topology-report.ts',
+	'packages/csaa/src/graph/command-dispatch-topology-fixture.test-support.ts',
+	'packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-command-dispatch-topology.ts'
 ] as const;
 const GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE = [
 	GUARD_ENFORCEMENT_LEDGER_REPORT_ANALYZER_DEPENDENCY_PATH,
@@ -567,6 +597,8 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
 	if (name === 'csaa:analyze:command-handler-graph') return COMMAND_HANDLER_GRAPH_REPORT_COMMAND;
+	if (name === 'csaa:analyze:command-dispatch-topology')
+		return COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:guard-enforcement-ledger')
 		return GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND;
 	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
@@ -766,6 +798,7 @@ describe('inventory discovery and identity', () => {
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -923,9 +956,11 @@ describe('inventory discovery and identity', () => {
 		expect(commandDispatchCapability!.provider).toBe('typescript+command-handler-graph-overlay');
 		expect(commandDispatchCapability!.state).toBe('PARTIAL');
 		for (const expectedProvenance of [
+			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			'capabilities#command-handler-static-projection',
 			'capabilities#symbol-table',
 			'capabilities#typescript-ast',
+			'package.json#/scripts/csaa:analyze:command-dispatch-topology',
 			'packages/csaa/src/contracts/command-dispatch-topology.ts',
 			'packages/csaa/src/graph/build-command-dispatch-topology.ts',
 			'packages/csaa/src/graph/command-dispatch-topology-canonical.ts',
@@ -940,12 +975,28 @@ describe('inventory discovery and identity', () => {
 			)
 		).toBe(false);
 		for (const boundary of [
+			COMMAND_DISPATCH_TOPOLOGY_REPORT_OPERATION_VERSION,
+			COMMAND_DISPATCH_TOPOLOGY_REPORT_REQUEST_SCHEMA_VERSION,
+			COMMAND_DISPATCH_TOPOLOGY_REPORT_RESULT_SCHEMA_VERSION,
+			COMMAND_DISPATCH_TOPOLOGY_REPORT_SCHEMA_VERSION,
+			JSON.stringify(COMMAND_DISPATCH_TOPOLOGY_REPORT_SELECTION),
+			COMMAND_DISPATCH_TOPOLOGY_REPORT_EXECUTION_SELECTION,
+			`distinct facade scope is ${COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE}`,
+			`analysis authority is ${COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY}`,
+			`authority transfer is ${COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY_TRANSFER}`,
+			`gate effect is ${COMMAND_DISPATCH_TOPOLOGY_REPORT_GATE_EFFECT}`,
+			'same-process nonserialized command-handler pipeline handoff',
+			'full retained-arrow observation, command-handler graph, and command-dispatch topology evidence',
+			'successful evidence is never truncated',
+			'CONFIGURED_NOT_RUN',
 			'NOT_EXECUTED_BY_CSAA',
 			'NOT_INTEGRATED',
 			'runtime dispatch',
-			'full JAN-CSAA-007/008 conformance remain NOT_CLAIMED'
+			'full JAN-CSAA-007/008 conformance'
 		])
 			expect(commandDispatchCapability!.explanation).toContain(boundary);
+		for (const nonclaim of COMMAND_DISPATCH_TOPOLOGY_REPORT_NONCLAIMS)
+			expect(commandDispatchCapability!.explanation).toContain(nonclaim);
 		const guardOverlayCapability = capabilities.get('guard-classification-static-overlay');
 		expect(guardOverlayCapability).toBeDefined();
 		expect(guardOverlayCapability).toMatchObject({
@@ -1866,6 +1917,7 @@ describe('inventory discovery and identity', () => {
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
@@ -1911,6 +1963,12 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain(
 			'exact same-subject COMMANDS-to-HANDLERS static projection with retained arrow sites, occurrences, exact/candidate lanes, and explicit frontiers'
+		);
+		expect(semanticBoundary).toContain(
+			'exact same-subject COMMANDS-to-HANDLERS static projection, full retained-arrow and command-handler predecessor evidence, and candidate-only dispatch handler edges'
+		);
+		expect(semanticBoundary).toContain(
+			'command csaa:analyze:command-dispatch-topology is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
@@ -2063,6 +2121,7 @@ describe('inventory discovery and identity', () => {
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
@@ -2103,6 +2162,15 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`distinct facade scope is ${COMMAND_HANDLER_GRAPH_REPORT_SCOPE}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`command-dispatch-topology report facade has analysis authority ${COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY}, authority transfer ${COMMAND_DISPATCH_TOPOLOGY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${COMMAND_DISPATCH_TOPOLOGY_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`distinct facade scope is ${COMMAND_DISPATCH_TOPOLOGY_REPORT_SCOPE}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`retained census ${COMMAND_DISPATCH_TOPOLOGY_REPORT_SELECTION.retainedDispatchCensus}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`guard-enforcement-ledger report facade has analysis authority ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY}, authority transfer ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER}, and gate effect ${GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT}`
@@ -2587,6 +2655,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:analyze:arrow-command-census',
 				'csaa:analyze:command-handler-graph',
+				'csaa:analyze:command-dispatch-topology',
 				'csaa:analyze:guard-enforcement-ledger',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
@@ -2812,6 +2881,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:command-handler-graph');
+
+		const missingCommandDispatchTopologyReportCommand = fixture();
+		write(
+			missingCommandDispatchTopologyReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:command-dispatch-topology'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingCommandDispatchTopologyReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:command-dispatch-topology');
 
 		const missingGuardEnforcementLedgerReportCommand = fixture();
 		write(
@@ -3198,6 +3287,24 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is incompatible: csaa:analyze:command-handler-graph'
 		);
 
+		const incompatibleCommandDispatchTopologyReportCommand = fixture();
+		write(
+			incompatibleCommandDispatchTopologyReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:command-dispatch-topology': 'bun scripts/wrong-command-dispatch-topology.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleCommandDispatchTopologyReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:command-dispatch-topology'
+		);
+
 		const incompatibleGuardEnforcementLedgerReportCommand = fixture();
 		write(
 			incompatibleGuardEnforcementLedgerReportCommand,
@@ -3374,6 +3481,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
@@ -3450,6 +3558,7 @@ describe('JPWB population non-vacuity', () => {
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
@@ -3490,6 +3599,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
@@ -3565,6 +3675,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
@@ -3614,6 +3725,7 @@ describe('JPWB population non-vacuity', () => {
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
@@ -3697,6 +3809,7 @@ describe('JPWB population non-vacuity', () => {
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
@@ -3741,6 +3854,17 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB command-handler graph report facade or verification source is absent: ${missingCommandHandlerGraphReportPath}`
 			);
 			write(root, missingCommandHandlerGraphReportPath, 'export {};\n');
+		}
+		for (const missingCommandDispatchTopologyReportPath of COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE.filter(
+			(path) => !COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingCommandDispatchTopologyReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB command-dispatch topology report facade or verification source is absent: ${missingCommandDispatchTopologyReportPath}`
+			);
+			write(root, missingCommandDispatchTopologyReportPath, 'export {};\n');
 		}
 		for (const missingGuardEnforcementLedgerReportPath of GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE.filter(
 			(path) =>
@@ -4116,6 +4240,16 @@ describe('JPWB population non-vacuity', () => {
 		expect(
 			inventory.commands.find(
 				(command) =>
+					command.owner === '.' && command.name === 'csaa:analyze:command-dispatch-topology'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
 					command.owner === '.' && command.name === 'csaa:analyze:guard-enforcement-ledger'
 			)
 		).toMatchObject({
@@ -4210,6 +4344,7 @@ describe('JPWB population non-vacuity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
