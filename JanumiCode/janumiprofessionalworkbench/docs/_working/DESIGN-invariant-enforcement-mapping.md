@@ -985,3 +985,68 @@ the other one. `PER-12:2`'s reads like an ordinary shape census. **The decisive 
 opens "THIS LIMB ASSERTS A FACT ABOUT THE WORLD" on both.** A future split should key on that, and should
 DERIVE its population over all 26 rather than inherit V-5's hand-picked pair — hand-listing an exception
 set is the defect one level up, and this programme has already measured it once as *"said 2, was 8"*.
+
+---
+
+## 20. ⚠ ADDENDUM — THE CORPUS LIST WAS RIGHT FOR ONE QUESTION AND WAS REUSED FOR ANOTHER
+
+Every agent brief in this programme carried the same block: **"THE FOUR FILING CORPORA — all four, every
+time"** — `JPWB-REG-005`, `enforcement-register.ts`, `guard-enforcement-ledger.data.ts`, `docs/_working/`.
+It was written for one question — *does a filing already record this divergence?* — and it is correct for
+that question. It was then reused verbatim in eight consecutive passes, including for questions of a
+different kind.
+
+### 20.1 What it cost, caught by a verifier and not by me
+
+A drafter concluded that the Coding Agent Guide's Mandatory property **P5 turns on "fingerprint", a term
+with no source anywhere**, and proposed as a disposition that **the clause be STRUCK from the Guide.**
+
+Its verifier refuted it with **one grep of a corpus the brief never named**:
+
+- `docs/Constitution Discussion/` is admitted to CON-000 B1's registry by **REG-D-034 — "SPONSOR RULING:
+  the source corpora are operative; canon's authority over a principle is conditional on fidelity"** — the
+  same ruling that admits the Guide and the RPH corpus, *"as SOURCE OF RECORD, authoritative for DETAIL"*.
+- `grep -rn -i fingerprint 'docs/Constitution Discussion/' --include='*.md'` → **37 hits**
+  (positive control, same glob, `-i 'semantic version'` → **19**).
+- The definition is `retired/Janumi Constitution Discussion.md:15055`, heading **"27. Model Fingerprint"**,
+  stated at `:15057`: *"The compiler SHALL generate a deterministic fingerprint over canonical IR."*
+- ⚠ **And it was reachable from inside `docs/canon/` all along:** `_extracts/extract-condisc-15001.md:29`
+  quotes that very definition. The draft's own canon sweep reported 5 hits where there are **9 across 7
+  files**, missing PER-9's provenance sidecar and the extract carrying the answer.
+
+**The proposed remedy was to delete a ratified clause on the grounds that it was unsourced.** It is sourced
+— to the JSDL compiler formalization the Guide itself marks CANDIDATE — so the entry now offers three
+dispositions with *"the limb IS the JSDL model fingerprint, therefore BLOCKED on candidate material"*
+inserted before the strike.
+
+### 20.2 ⚠ THE MEMORY FOR THIS EXISTS, IS CORRECT, AND WAS NOT APPLIED
+
+`project_jpwb_corpus_precedence` was written in an earlier session and says, in its own HOW TO APPLY:
+
+> *"An absence recorded against `docs/canon/` alone is not a finding. Before 'not defined' blocks an
+> increment or reaches the sponsor, search the RPH set + Constitution Discussion + the Guide, with a
+> positive control, and say so."*
+> *"**Do not label a source corpus 'lower authority' in an agent prompt.** I did, for a directory that
+> feeds canon."*
+
+**Having the rule written down did not apply it.** The brief was correct when authored, was reused, and
+nobody re-derived its scope against the question being asked.
+
+### 20.3 The third instance of one pattern, and the first outside code
+
+| | correct when written | silently narrower later |
+|---|---|---|
+| `verdict === 'DIVERGENT'` (§17.5) | before the ladder split it meant *every row that can owe a filing* | after the split, 49 of 229 |
+| `REG-F >= 234` (§18.3) | when V-6 was the last batch it meant *the V-6 batch* | the day V-7 landed, both batches |
+| **"the four filing corpora"** | for *"is this divergence already recorded?"* | for *"is this term defined anywhere?"*, it omits an operative source corpus |
+
+> **A scope is an answer to a question. Reuse it and you have silently answered a different question with
+> the old one's bounds.** The first two were in code and were found by a gate and by a batch landing. This
+> one was in a PROMPT — where nothing type-checks, nothing reddens, and the only detector is a reader who
+> asks *"which question is this list the answer to?"*
+
+**The countermeasure is the same one §18.3 named and it generalises: state the question a scope answers,
+beside the scope.** A corpus list headed *"the four FILING corpora"* is safe to reuse for a filing search
+and unsafe for anything else, and that is legible only if the heading survives into every copy. It did
+survive — and eight passes read past it, because a list of four paths reads like a fact about the
+repository rather than an answer to one question.

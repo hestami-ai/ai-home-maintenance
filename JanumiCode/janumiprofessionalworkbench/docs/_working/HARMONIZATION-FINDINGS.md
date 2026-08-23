@@ -246,7 +246,7 @@ than any other. `grep -c 'controller'` returns 4.
   (b2a24ba7, 2026-07-15). So this was struck for whatever reason held in July, and is independently false
   today by construction.
 
-### Item 3 — TRUE AT HEAD
+### Item 3 — TRUE AT HEAD · ✅ FILED as **REG-F-268** and **REG-Q-071**
 
 *(original at line 91, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -561,7 +561,7 @@ than any other. `grep -c 'controller'` returns 4.
   BaselineStatusSchema`, whose `SUPERSEDED` value the handler writes, and the pointer lives on the event.
   'Absent from Baseline entirely' is false on every one of those five surfaces.
 
-### Item 9 — TRUE AT HEAD
+### Item 9 — TRUE AT HEAD · ✅ FILED as **REG-F-269**
 
 *(original at line 97, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -607,7 +607,7 @@ than any other. `grep -c 'controller'` returns 4.
   NARROWING: because nothing populates the field today, the exposure is CONTRACTUAL rather than observed — a
   caller supplying the forbidden shape would be accepted, but no code path currently supplies one.
 
-### Item 10 — TRUE AT HEAD
+### Item 10 — TRUE AT HEAD · ✅ FILED as **REG-Q-072**
 
 *(original at line 98, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -654,7 +654,7 @@ than any other. `grep -c 'controller'` returns 4.
   caller-settable" — a statement about **Evidence**, not about Observation. No filing anywhere reaches
   AssuranceObservation.
 
-### Item 11 — TRUE AT HEAD
+### Item 11 — TRUE AT HEAD · ✅ FILED as **REG-F-267**
 
 *(original at line 99, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -751,7 +751,7 @@ than any other. `grep -c 'controller'` returns 4.
   claim was almost certainly TRUE on the day it was struck as refuted, and was remediated two days later by
   two named increments. At HEAD it is false.
 
-### Item 13 — TRUE AT HEAD
+### Item 13 — TRUE AT HEAD · ✅ FILED as **REG-F-264**
 
 *(original at line 101, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -831,7 +831,7 @@ than any other. `grep -c 'controller'` returns 4.
   only REG-E-017 at :1442, an OPEN question about whether the CPCO-era rows stay in the §3 object list at
   all — not a ratification). Building the axis today would VIOLATE canon; its absence is the correct state.
 
-### Item 15 — TRUE AT HEAD
+### Item 15 — TRUE AT HEAD · ✅ FILED as **REG-F-270**
 
 *(original at line 103, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -885,7 +885,7 @@ than any other. `grep -c 'controller'` returns 4.
   independent PWU risk profile, applicable policies, criteria, and independence. A missing mapping blocks
   promotion." No such matrix reaches `deMinimisFloorPlan`, and nothing blocks promotion for its absence.
 
-### Item 16 — TRUE AT HEAD
+### Item 16 — TRUE AT HEAD · ✅ FILED as **REG-Q-073**
 
 *(original at line 104, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1158,7 +1158,7 @@ than any other. `grep -c 'controller'` returns 4.
   is *proceeding on an independence-invalid review*, which §8.12's waiver route — recording the violation
   first, and only under a permitting policy — is written to respect.
 
-### Item 21 — TRUE AT HEAD
+### Item 21 — TRUE AT HEAD · ✅ FILED as **REG-F-265**
 
 *(original at line 109, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1385,7 +1385,7 @@ than any other. `grep -c 'controller'` returns 4.
   Engineering Constitution's durable content."* `grep -n -i 'fingerprint\|Engineering Constitution\| P5 '`
   over the CONFIRMED table (findings lines 1–86) returns 0 — this claim is nowhere in the 75.
 
-### Item 26 — TRUE AT HEAD
+### Item 26 — TRUE AT HEAD · ✅ FILED as **REG-Q-070**
 
 *(original at line 114, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1433,7 +1433,7 @@ than any other. `grep -c 'controller'` returns 4.
   concept exists anywhere in the RPH engine, so P5's second limb is unimplementable as written — which is
   exactly what an undefined term in a mandatory property costs.
 
-### Item 27 — TRUE AT HEAD
+### Item 27 — TRUE AT HEAD · ✅ FILED as **REG-F-271**
 
 *(original at line 115, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1603,7 +1603,7 @@ than any other. `grep -c 'controller'` returns 4.
   criteria path is a live, tested, fail-closed counterexample that changes both the rubric the reviewer
   judges and the scored criterion set that drives the disposition.
 
-### Item 30 — TRUE AT HEAD
+### Item 30 — TRUE AT HEAD · ✅ FILED as **REG-F-263**
 
 *(original at line 118, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1658,7 +1658,7 @@ than any other. `grep -c 'controller'` returns 4.
   `execution-flow.e2e.ts`. The surface-level obligations (drill-down, capability visibility, publication
   fixtures) are e2e-only.
 
-### Item 31 — TRUE AT HEAD
+### Item 31 — TRUE AT HEAD · ✅ ALREADY FILED as **REG-F-246**
 
 *(original at line 119, struck — kept exactly as the 2026-07-15 pass wrote it)*
 
@@ -1705,7 +1705,7 @@ than any other. `grep -c 'controller'` returns 4.
   It performs no §4.3 layering analysis whatsoever. So `apps/` is scanned for one forbidden import and is
   outside every responsibility-boundary rule, which is the substance of the claim.
 
-### Item 32 — TRUE AT HEAD
+### Item 32 — TRUE AT HEAD · ✅ FILED as **REG-F-266**
 
 *(original at line 120, struck — kept exactly as the 2026-07-15 pass wrote it)*
 

@@ -22056,3 +22056,2914 @@ ever resolves against it, so ASR-19's "activation step" clause has no ratified r
 - **Merge target:** Corpus (JPWB-REG-005), for adjudication alongside `REG-Q-010`. No repository change
   should be made until disposition (A) or (B) is recorded, because either one written as code first would
   settle the question by accident. Status: OPEN.
+
+---
+
+## The harmonization findings that were sealed as "refuted", filed
+
+`docs/_working/HARMONIZATION-FINDINGS.md` carried **75 confirmed findings** in a six-column table, then a
+heading — **`## Refuted (32) — recorded so they are not re-raised`** — and 32 struck one-line sentences.
+**Not one of the 32 recorded a reason.** No evidence, no site, no date, no *"refuted because"*.
+
+All 32 were re-checked at HEAD on 2026-08-23. **15 are TRUE.** 13 owed a register entry; **12 are filed
+here** as 9 FINDINGS and 4 QUESTIONS, and the thirteenth turned out to be filed already.
+
+> **A refusal with no reason is not a refutation — it is a prohibition on re-checking.** A missing filing
+> invites a search; a filing that records the claim as *refuted, do not re-raise* ends every future one,
+> with the corpus's own authority behind it. Each entry below names its item number and says so.
+
+**The defect was never that the refutations were wrong.** 17 of 32 are sound, several for reasons written
+at length elsewhere and never carried back — item #2's lives at `handlers/kit.ts:212-222`; item #14's
+absence is **mandated** by `JPWB-DOC-003 §6:173`, so representing that axis would *breach* canon. The
+defect is that with no reason recorded, no reader could separate the sound from the live without redoing
+all 32 — which is exactly what the heading existed to prevent.
+
+⚠ **ITEM #31 WAS ALREADY FILED, BY A BATCH THAT LANDED AFTER THE SWEEP RAN.** `REG-F-246` (2026-08-23)
+quotes it verbatim, claims the filing in its own text, and carries the remedy — widening
+`package.json:18` from `depcruise packages` to include `apps`. The sweep could not see it: `REG-F-246`
+was committed in `a4a19057`, after the sweep's `303ee671`. **A drafter found it by searching rather than
+trusting the assignment**, which is the outcome the brief called a win.
+
+⚠ **AND THE GATE DEFECTS WERE DRIVEN, NOT READ.** Item #27's drafter ran the boundary gate's own binary
+**ten times** — one baseline (587 modules, 575 under `packages/`, 0 violations) plus six mutants and
+three paired controls, each mutant a single leaf file added and deleted. An import of
+`@janumipwb/rph-authoring` into `rph-domain`, `rph-ports` or `rph-projections` produces **0 violations**;
+the same import of `@janumipwb/rph-engine` produces **1 each**, naming the exact rule under test. So every
+control has its own mutant, and the three purity rules are shown to forbid a package that has never
+existed while admitting the one that reaches every forbidden target.
+
+⚠ **EVERY ENTRY WAS ADVERSARIALLY VERIFIED AND EVERY ONE WAS AMENDED** — 10 of 10 groups, after 32/36,
+10/10 and 16/16 in the three W-3b batches. **693 citations re-opened at HEAD** by verifiers who had not
+written them: **11 DEAD POINTERS** and **54 MATERIAL corrections**.
+
+Every entry names the harmonization item it closes, so that file can be RECONCILED against this register
+rather than trusted to match it. Prose is wrapped at 108 characters: EM-7 records that this register's
+longest lines are withheld by the default search tool.
+
+### REG-F-263 — CI compiles all 37 Playwright specs and executes none of them, so §15.6's
+Designer/authoring obligations are type-checked into looking covered while nothing drives them
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** §15.6 makes PWA Designer/authoring-agent proof a condition of
+  "done", and the only witnesses that drive that surface end-to-end are the 37 `*.e2e.ts` Playwright
+  specs in `apps/rph-demo/e2e/`. Continuous integration here is one file,
+  `.github/workflows/ci.yml`, and it never invokes them. Worse than a plain omission: CI's
+  **Type-check** step *does* compile all 37 plus `playwright.config.ts` —
+  `apps/rph-demo/package.json:12` ends `&& tsc --noEmit -p ./e2e/tsconfig.json`, whose `include` is
+  `["**/*.ts", "../playwright.config.ts"]` (`apps/rph-demo/e2e/tsconfig.json:7`) — and `eslint .`
+  lints them (`eslint.config.mjs:11-23`'s ignore list never names `e2e`). The specs are present in
+  three CI steps as *source* and absent from the only step that could execute them. A green CI run
+  reports that the e2e suite compiles cleanly, which reads as the suite being covered.
+- **THE GATE GAP, STATED PLAINLY.** What CI's `Test` step currently proves: the `src/**` and
+  `verif/**` unit suites pass against emitted `dist`, plus the app's own 28 `src/` tests. What it is
+  believed to prove: that "done" per §15.6 has been demonstrated, Designer/authoring bullet
+  included. **Nothing in CI has ever executed one of the 37 specs.**
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.** `docs/Janumi Canonical Implementation Context -
+  Coding Agent Guide.md:2472` is `### 15.6 Definition of done`; `:2474` reads "A change is done only
+  when:". The bullet at **`:2481`**, byte-exact: "- PWA Designer/authoring-agent changes prove
+  recursive type composition, explicit leaves, typed relationship separation, recursive instance
+  creation, recomposition, assurance assignment/capability visibility, actual-execution drill-down,
+  and positive/negative publication fixtures;". The same list closes at **`:2485`**: "- required
+  Evidence is captured and all proportional tests pass;".
+- **THE SUITE'S OWN CONFIG STATES WHY ONLY IT CAN DISCHARGE THAT BULLET.**
+  `apps/rph-demo/playwright.config.ts:5-7`, verbatim: "A spec here drives the FULL stack — headless
+  browser -> SvelteKit server action/load -> RPH engine -> SQLite -> pure projection -> DOM — so a
+  green spec proves the UX actually OPERATES the event-sourced engine, not merely that a route
+  returns 200."
+- **WHAT THE CODE DOES, re-read at the site at HEAD.** `.github/workflows/ci.yml` is **30 lines** and
+  holds exactly six build steps after `Install`: `Build` (`:19-20`), `Type-check` (`:21-22`), `Lint`
+  (`:23-24`), `Boundary` (`:25-26`), `Format check` (`:27-28`), `Test` (`:29-30`) — then the file
+  ends. Its only test step is `bun run test`, which is `turbo run test && bun run test:dist`
+  (`package.json:14`). **The referent is settled, not assumed:** `find .github -type f` returns that
+  one file; there is no `.gitlab-ci.yml`, `azure-pipelines.yml`, `Jenkinsfile`, `.travis.yml`, or
+  `.husky/`; `core.hooksPath` is unset; and all **four** non-sample hooks in the enclosing git dir
+  (`post-checkout`, `post-commit`, `post-merge`, `pre-push`) are pure `git lfs` shims running no
+  suite.
+- **NEITHER HALF CAN REACH `e2e/`, AND THE REASON IS STRUCTURAL, NOT ACCIDENTAL.** Every vitest
+  project's include glob is `src/**/*.test.ts` or `verif/**/*.test.ts` (`vitest.projects.ts:83`,
+  `:90`, `:127`), while Playwright's is `testDir: './e2e'` plus `testMatch: '**/*.e2e.ts'`
+  (`playwright.config.ts:24-25`). The globs are disjoint — a `.e2e.ts` file matches no vitest
+  project in either resolution mode. `turbo.json` declares **no `e2e` task at all**. The `e2e`
+  script exists only at `apps/rph-demo/package.json:15` and is invoked from exactly one place,
+  `package.json:26` `gate:fast`, a local developer command wired into no automation.
+- **OBSERVED / READ — both, and here is the split.**
+  - **DRIVEN, and this is the load-bearing one.** CI's six steps were expanded transitively through
+    the root and all 13 workspace `package.json` files: the closure holds **32 real commands**, and
+    exactly **one** matches `/playwright|e2e/i` — `@janumipwb/rph-demo` `check-types`, i.e.
+    `… && tsc --noEmit -p ./e2e/tsconfig.json`. **The compile, never the run.** Positive control,
+    same detector over **all 81 scripts in the repository**: **4** hits — that one plus `gate:fast`,
+    `e2e`, and `e2e:live`, none of which any step in `.github/` reaches.
+  - **DRIVEN.** `./node_modules/.bin/turbo run check-types --dry=json` confirms the compile half is
+    genuinely in CI: `@janumipwb/rph-demo | svelte-kit sync && svelte-check --tsconfig
+    ./tsconfig.json && tsc --noEmit -p ./e2e/tsconfig.json`.
+  - **DRIVEN.** `./node_modules/.bin/turbo run test --dry=json` → **24 tasks**, of which exactly
+    **one** carries a real test command: `@janumipwb/rph-demo | test | vitest run
+    --passWithNoTests`. Every other package's `test` resolves to `<NONEXISTENT>`.
+  - **DRIVEN.** `cd apps/rph-demo && ../../node_modules/.bin/vitest list --filesOnly` → **28 files
+    collected, all under `src/`, ZERO under `e2e/`** (exit 0). Those 28 are the positive control:
+    collection demonstrably worked and still reached nothing in `e2e/`.
+  - **READ.** `vitest.projects.ts`, `vitest.dist.config.ts:48`, `playwright.config.ts:24-25`,
+    `.github/workflows/ci.yml`, `apps/rph-demo/package.json:12,13,15`, `package.json:14,25,26`,
+    `turbo.json`.
+  - **NOT DRIVEN, and not claimed:** I did not execute the Playwright suite, so this entry makes no
+    claim about whether those 37 specs currently pass. The finding is that CI never asks.
+- **THE FIRST CONJUNCT IS WEAKER THAN THE ORIGINAL WORDING, AND IS NARROWED HERE RATHER THAN
+  REPEATED.** "the only thing proving" is not sustainable as a coverage statement: `apps/rph-demo`
+  owns 28 non-e2e unit tests, several on the authoring plane (`authoring-turn.test.ts`,
+  `authoring-turn-machine.test.ts`, `pwaFlow.test.ts`, `floor.test.ts`,
+  `policy-governs-review.test.ts`).
+- **⚠ AND THE OBLIGATION-BY-OBLIGATION SPLIT COULD NOT BE SETTLED LEXICALLY, which is itself worth
+  recording.** The population is named, because the control is only sound inside one: the demo's
+  TEST corpus — the 37 `*.e2e.ts` under `e2e/` and the 28 `*.test.ts` under `src/`. `grep -ril` for
+  `drill`, `capabilit`, and `recompos` returns **0 in both planes**; the positive control `pwa` on
+  the identical shape returns **30 of 37 e2e specs / 18 of 28 src tests**. ⚠ Widen to the whole
+  directories and the negative moves: `capabilit` becomes **5** and `recompos` **1** under `src/`,
+  every one of them in production code and none in a test — which is why the population is stated
+  rather than left implicit. §15.6's vocabulary appears nowhere in the demo's test corpus in either
+  plane, so no name-match census can assign those three obligations to a suite. **The defensible
+  claim, and the only one this entry rests on, is the load-bearing conjunct:** whatever the 37 specs
+  prove about the Designer and authoring surface — and the config at `:5-7` says it is full-stack
+  operation of the engine through the DOM — **CI proves none of it.**
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#30**
+  (**line 118**), struck under *"Refuted (32) — recorded so they are not re-raised"*, **with no
+  reason recorded** — as with all 32; that heading is itself now struck and annotated at `:87` by
+  the re-disposition sweep. Re-checked at HEAD today and it holds. The strike is part of
+  the defect: a filing that records the claim as refuted, under a heading instructing readers not to
+  raise it again, ends every future search with the corpus's own authority.
+- **⚠ AND IT WAS MIS-CHECKED A SECOND TIME, BY HAND.** That failure is recorded in the same file at
+  `:158-160`: #30 was called FALSE by reading `gate:fast`, which does run `e2e` — but the claim says
+  *the CI gate*, and CI here is `.github/workflows/ci.yml`. **The wrong referent.** Two independent
+  passes therefore dismissed this item, neither on evidence about CI.
+- **CHRONOLOGY, WHICH SHOWS THE REMEDIATION LANDED ON THE WRONG ARTIFACT.**
+  `git log -- .github/workflows/ci.yml` returns **exactly one commit**: `19a1b20f` (2026-07-12), the
+  submodule-removal import. The file is byte-identical to that import at HEAD. The e2e leg was
+  appended to `gate:fast` on 2026-07-26 (`9c952433`), and `docs/_working/HARMONIZATION-LOG.md:756`
+  records the standing correction that produced it — "**the gate is not green until `playwright` is
+  green.**" That correction was applied to a **local script**; CI was left exactly as #30 described.
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout; the
+  Grep tool was not used.
+  1. **`docs/canon/JPWB-REG-005 …Register.md`** (22,058 lines, 373 `### REG-` headings).
+     `grep -c '.github'` → **1**, the single hit being REG-F-196 at `:4587`.
+     `grep -n '^### REG-' | grep -iE 'e2e|playwright|CI|workflow'` → two headings, **REG-F-166**
+     (`:4051`) and **REG-F-178** (`:4267`); positive control on the identical pipeline, headings
+     matching `gate`, returns **53**. `grep -ic 'playwright'` → **43** lines, all of them gate-result
+     lines, mutation-runner cost/anchor accounting, or REG-F-166's type-gate entry — none a filing
+     about CI.
+  2. **The 77 recent entries were grepped specifically.** REG-F-203 begins at `:4892`; over
+     `:4892-22058` (17,167 lines), `grep -inE 'playwright|\.github|e2e suite|never runs it'` returns
+     **nothing**, with positive controls **carrying the same `-i`** in that range: **562** for
+     `gate`, **13** for `e2e` (the 12 first recorded was the case-sensitive count — a flag mismatch
+     between a negative and its control, corrected here). All 13 `e2e` hits are spec files cited as
+     evidence SITES by other entries — `execution-plan.e2e.ts` six times — none a filing about CI.
+     Last headings confirmed as **REG-F-262** and **REG-Q-069**.
+  3. **`packages/rph-domain/src/enforcement-register.ts`** (4,168 lines). The only `e2e` hits are
+     `:49` and `:54`, naming `RPH-E2E` as a 7-rule *conformance family* out of reach of that
+     instrument by construction — a statement about command-refusal observability, not about CI.
+     Positive control `grep -c 'RPH-'` → **439**.
+  4. **`verif/guard-enforcement-ledger.data.ts`** (392 lines). No `e2e`, `playwright`, `ci.yml`, or
+     `workflow`. ⚠ **My first positive control here FAILED** — `grep -c 'id:'` returned **0**,
+     because rows are keyed by guard TEXT, not by an `id:` field. Re-controlled against the real
+     shape: **81** lines carry a quoted string and **7** distinct `RPH-*-NNN` ids appear. The
+     negative stands on that control, not the dead one.
+  5. **`docs/_working/`.** `grep -rn 'ci\.yml'` → three files: `HARMONIZATION-FINDINGS.md` (8 hits —
+     this item's own sweep evidence), `HARMONIZATION-LOG.md:1077`, and
+     `DESIGN-invariant-enforcement-mapping.md:806`. **Both were opened.** The second is the sweep's
+     own methodology write-up: the heading standing above that line is `### 17.8 ⚠ TWO OF MY OWN
+     SPOT-CHECKS WERE WRONG, BOTH BY NAMED ERROR MODES` at `:800` — read at the line, not inferred
+     from it — and it is not a filing. ⚠ **The first is the nearest prior record of this defect in
+     any corpus, and it is disclosed in its own bullet below rather than left as a line number.**
+     Widening to `grep -ril 'playwright' docs/_working/` returns **12 of 69 files**, all gate-result
+     lines in roadmaps and in the log; none of them files the absence.
+- **⚠ THE PROGRAMME ALREADY NOTICED THIS ONCE, IN PROSE, AND IT NEVER BECAME A FILING.**
+  `docs/_working/HARMONIZATION-LOG.md:1082-1083`, inside a blockquoted self-correction dated
+  **2026-07-16 — one day after** the pass that struck #30, reads byte-exact: "- **My "full gate" was
+  never CI's gate.** I ran check-types / test / lint / boundary / svelte-check / Playwright. CI runs
+  build / check-types / lint / boundary / **format:check** / test." That is the asymmetry reported
+  here, written down by this same programme — and then acted on in the `format:check` direction only
+  (`:1089` records the tree being formatted so CI's format gate would go green). The Playwright
+  direction was left exactly as it was, and the item that would have carried it had already been
+  struck. **A note in a working log is not a filing, and it is not searchable as one.**
+- **NOTHING COVERS THIS.** The nearest entry is **REG-F-196 Finding 1** (`:4587`, **OPEN**), which
+  supplies the CI fact this rests on — "it is in **neither** `gate` nor `gate:fast`
+  (`package.json:25-26`) **nor CI** (`.github/workflows/ci.yml` runs build, check-types, lint,
+  boundary, format:check, test — and stops)" — and states the general principle: "**an opt-in
+  witness nobody invokes is a claim of coverage, not coverage.**" But its subject is the **CSAA
+  repository-smoke harness**, a different suite, and its owed action names only that harness.
+  **REG-F-166** is CLOSED and is the adjacent *type* gate — its own heading reads "38 e2e specs were
+  compiled by nothing" (**38** when written on 2026-08-14; **37** at HEAD), and installing that gate
+  is what created the compile-but-never-run asymmetry reported here. Neither entry names the
+  Playwright suite's absence from CI.
+- **THE REMEDY, and it is not a one-line step, which is the likeliest reason it was never added.**
+  Either (a) add an e2e step to `.github/workflows/ci.yml`, or (b) rule the suite deliberately out
+  of CI and record what discharges §15.6's Designer/authoring bullet instead, naming it. (a) has a
+  real obstacle worth stating: `playwright.config.ts:44` pins `projects: [{ name: 'edge', use: {
+  ...devices['Desktop Chrome'], channel: 'msedge' } }]`, and `:12` explains the choice — "The browser
+  is the SYSTEM Edge (Chromium) via `channel`, so no Playwright browser download is required." On
+  `runs-on: ubuntu-latest` (`ci.yml:11`) there is no system Edge, so the step needs a
+  channel/project override or a browser install. **That cost is the finding's own explanation and
+  does not excuse it:** until (a) or (b) is chosen, CI's green is a claim about 37 files that
+  compile.
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#30.** It closes nothing else,
+  because the neighbouring struck items resolve to different artifacts entirely — #31 is the
+  boundary gate's `packages`-only cruise and #32 is `turbo.json`'s unimplemented lint fan-out, both
+  concerning which *directories* a gate inspects, whereas this concerns a suite CI never *executes*.
+  It also does not close REG-F-196 Finding 1, whose subject is the CSAA smoke harness.
+- **Merge target:** BOTH — the register entry, and a repository change to `.github/workflows/ci.yml`
+  (or a recorded ruling that the suite stays out). Status: OPEN.
+
+### REG-F-264 — the replay harness's Property P6 check cannot fail: it is entailed by RPH-FIX-001
+sixty-five lines up in the same report, and its detail line certifies "no duplicate decisions/baselines"
+over a trace that carries them
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `runConformance` in `packages/rph-engine/src/replay.ts` builds ONE
+  `checks[]` array and pushes both of these into it. At `:81-87` it asserts, under the id `RPH-FIX-001`,
+  that the trace's `seq` values are contiguous `1..N` — `seqs.every((s, i) => s === i + 1)`, which is a
+  uniqueness assertion on `seq`. At `:146-153` it asserts, under the id `RPH-PER-002` and the label
+  *Property P6*, that a Map keyed by `e.seq` over `[...events, ...events]` has `size === events.length` —
+  true if and only if the `seq` values are distinct. The second check is therefore logically ENTAILED by
+  the first, in the same function, in the same report, sixty-five lines apart. It cannot redden in any
+  run where `RPH-FIX-001` is green, and in any run where it does redden `report.ok` is already `false` on
+  `RPH-FIX-001`'s account. It contributes zero discriminating power. Worse than inert: the detail string it
+  writes into the report is `` `replayed x2 dedups to ${dedup.size} events (no duplicate
+  decisions/baselines)` `` — a claim about **Decision and Baseline facts** that the predicate never looks
+  at, and that a trace carrying duplicate decisions and duplicate baseline promotions still earns (driven
+  below). The harness reports a governance guarantee it did not test.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.**
+  - The Conformance spec, `docs/Recursive Professional Harness/Janumi Professional Workbench Recursive
+    Professional Harness - Executable Invariant and Conformance Test Specification.md:2332-2336`,
+    **`## Property P6 — Idempotent commands`** / *"For every command: Executing the same idempotency key
+    multiple times produces the same business result and no additional domain events."*
+  - The same spec at `:1796-1809`, **`## RPH-PER-002 — Duplicate command returns prior result`** —
+    *"Given a previously accepted command with an idempotency key. When the same key is submitted again.
+    Then no new domain events are emitted;"* (that clause is `:1808`; the return-prior-result one `:1809`).
+  - The M13 vocab states the replay-shaped form of the obligation —
+    `packages/rph-domain/vocab/m13-replay.json:215`, verbatim: *"Idempotency: duplicate/replayed commands or
+    events produce no duplicate decisions and no duplicate baseline promotions; the rebuilt state is
+    identical."* Each of those three conjuncts names something the check at `:146-153` does not compute.
+  - The check's own comment, `replay.ts:146`, verbatim: *"RPH-PER-002 / Property P6 — replaying the
+    history twice is idempotent (dedup by seq yields the same set)."*
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD (`856dd8e1`; `replay.ts` is byte-identical at
+  `a4a19057`, so the reading is stable across both).**
+  - `packages/rph-engine/src/replay.ts:146-153` — `const doubled = [...events, ...events];`
+    `const dedup = new Map(doubled.map((e) => [e.seq, e]));` then
+    `add('RPH-PER-002', dedup.size === events.length, …)`. No fold, no re-application, no aggregate
+    rebuild, no comparison of terminal states; `foldTerminalStates` (`replay.ts:49-53`) is never called from
+    `runConformance` (declared `:71`) at all.
+  - `packages/rph-engine/src/replay.ts:81-87` — the entailing check:
+    `const seqs = events.map((e) => e.seq);`
+    `add('RPH-FIX-001', seqs.length > 0 && seqs.every((s, i) => s === i + 1), …)`.
+  - `packages/rph-engine/src/replay.test.ts:25` asserts the whole report green under the title *"conformance
+    mode: every RPH-FIX / P1 / P5 / P6 check passes (the whole loop replays coherently)"*, so the empty
+    check is consumed by a passing test that names P6 by letter.
+  - **AND A STANDING GATE READS IT AS A DISCHARGED OBLIGATION — driven, not inferred.**
+    `verif/deferral-honesty.test.ts:85-105` defines `rulesWithPassingChecks()` as
+    `[...runConformance(loadExpectedEvents()).checks]` filtered on `c.ok`, mapped through `ruleIdOf`, kept
+    on `/^RPH-[A-Z0-9]+-\d+$/`; `:109` then asserts *"no rule the replay harness proves is written off in
+    the manifest"*. I drove that population at HEAD: `RPH-PER-002 among passing named ids: true`. So the
+    tautology is not merely reported — it is counted, by name, as a rule this harness PROVES.
+
+- **⚠ WHAT THE GATE PROVES vs WHAT IT IS BELIEVED TO PROVE — the gap IS the finding.**
+  - **Believed, in TWO places, and the second is easy to miss because it is not in `docs/`'s ratified
+    tree.** `docs/JPWB Implementation Roadmap and Tracker.md:346-347`, in the standing M13 CORE COMPLETE
+    record of what conformance mode *"replays the trace and asserts"*, ends: *"RPH-FIX-006 (offline
+    residual represented), **RPH-PER-002/P6 (idempotent double-replay)**"*. And
+    `docs/_working/RESUME-STATE.md:131`, the same milestone record kept separately and unstruck:
+    *"Conformance asserts RPH-FIX-001..006 + P1/P5/P6 over the real trace"*. Two standing records of this
+    obligation being discharged by this harness.
+  - **Proved:** that the 72 integers in a hand-authored JSONL file are pairwise distinct — which the check
+    sixty-five lines above already proved, and more strongly, by proving they are exactly `1..72`.
+  - The harness's OWN header already states the general form of this failure, `replay.ts:7-15`: *"An
+    oracle that cannot disagree with the system is not observing it."* The P6 check is that defect one
+    level down — a check that cannot disagree with the report it lives in.
+
+- **OBSERVED / READ — DRIVEN, and stated per conjunct (EM-5). TWO INDEPENDENT DRIVES, kept separate.**
+  Both used a scratch probe placed in `packages/rph-engine/src/`, run with `./node_modules/.bin/vitest run`,
+  then deleted (`git status --porcelain packages/rph-engine/` empty afterwards).
+  - **DRIVE 1 (the drafting pass, at `a4a19057`).**
+    `BASELINE PER-002 true | replayed x2 dedups to 72 events (no duplicate decisions/baselines)`.
+    **PROBE A:** appending a verbatim copy of every `Decision`- and `Baseline`-aggregate event and
+    renumbering `seq` contiguously — `duplicated Decision/Baseline events appended = 10` ·
+    `PER-002 true | replayed x2 dedups to 82 events (no duplicate decisions/baselines)`.
+    **PROBE B, exhaustive:** for every `(i, j)` in `72 x 72`, overwrite `events[i].seq` with `events[j].seq`
+    — `arrangements = 5184` · `FIX-001 green = 72` · `PER-002 red = 5112` ·
+    `PER-002 red AND FIX-001 already red = 5112` · **`PER-002 red WHILE FIX-001 green = 0`.**
+  - **DRIVE 2 (this verification, at `856dd8e1`, by a DIFFERENT construction — not a re-run of DRIVE 1).**
+    Verbatim from the probe's console output:
+    - `R1 fullDup n=144 Decision+Baseline 10->20 FIX-001=true PER-002=true detail="replayed x2 dedups to
+      144 events (no duplicate decisions/baselines)"` — the WHOLE trace duplicated event-for-event with
+      `seq` renumbered `1..144`, so every decision and every baseline promotion appears TWICE, and the
+      report still certifies there are none. PROBE A duplicated 10 events; this duplicates all 72.
+    - `R1 foldKeys base=38 dbl=38` — the terminal fold that WOULD be the real idempotence comparison is
+      equal, and `runConformance` never computes it.
+    - `R2 trials=200000 ... PER-002 RED while FIX-001 GREEN = 0 | PER-002 GREEN while FIX-001 RED = 99387`
+      — 200,000 randomly shaped traces (gaps, collisions, negatives, non-integer `seq`), a different
+      population from DRIVE 1's overwrite lattice. The entailment never breaks in one direction and breaks
+      99,387 times in the other: `RPH-PER-002` is STRICTLY weaker than the check above it.
+    - `R3 CONTROL collision FIX-001=false PER-002=false` — the probe's zero is not a dead instrument; a
+      forced `seq` collision reddens both.
+    - `runConformance checks=9 allGreen=true` · `RPH-PER-002 among passing named ids: true` ·
+      `manifest RPH-PER-002 status=COVERED testFile=packages/rph-engine/src/engine.test.ts`.
+  - **READ, not driven:** every `file:line` quoted above, opened with `sed -n`/`awk` at HEAD; the corpus
+    quotes; and the four-corpus sweep below.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#13** (line **101**),
+  struck under the heading at `:87` — *"Refuted (32) — recorded so they are not re-raised"* — **with
+  no reason recorded**: no evidence, no site, no date, as that file says of all 32 at `:126-128`. That is
+  the aggravating half. An unfiled finding invites the next reader's search; a finding recorded as REFUTED
+  under an instruction not to re-raise it **ends** every future search, with the corpus's own authority
+  behind the wrong answer. Re-checked at HEAD by the 2026-08-23 sweep (`:754`, *"Item 13 — TRUE AT HEAD"*,
+  confidence HIGH, *"⚠ OWES A REGISTER ENTRY"*, evidence `:765-789`), and independently re-verified and
+  re-driven here by a different construction.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora. Bash `grep` throughout; `-i` and
+  `-F` never combined (together they abort silently on this box); every negative carries a positive control
+  in the same file with the same flags.**
+  - **(1) `docs/canon/JPWB-REG-005 Decision and Divergence Register.md` (22,058 lines).** By SITE:
+    `grep -c 'replay\.ts'` → **8**, all opened — `:707` (REG-F-019, spanning `:704-723`, which lists
+    the `runConformance` ids it credits as *"`RPH-FIX-001`, `RPH-FIX-002`, `RPH-FIX-003a/b/c` and
+    `RPH-FIX-006`"*, and **never mentions RPH-PER-002 or P6**); `:2451`, `:2603`, `:2694`, `:4526`, `:4548`
+    (all `pwu-replay.ts`, a different file); `:19834`; `:21374` (the RPH-FIX-006 / `IntentConstraintRefined`
+    limb — the adjacent check in the same function, a different defect: no producer for the event it
+    names). `grep -c 'runConformance'` → **2** (`:707`, `:709`).
+  - By **ID**, which the sweep did not do: `grep -c 'RPH-PER-002'` → **6** (`:521`, `:551`, `:558`,
+    `:564`, `:567`, `:570`) — every one inside REG-F-012, the command-bus idempotency-key-reuse entry,
+    whose `:558` says *"This does NOT change RPH-PER-002's disposition"* and puts it on the COMMAND plane.
+    None is at `replay.ts`. `grep -c 'RPH-FIX-001'` → **2** (`:707`, `:722`), both REG-F-019.
+  - `grep -cE 'Property P6|/P6|P6 '` → **1** (`:54`, a JPWB-DOC-004 merge target, unrelated); note
+    `grep -c 'Property P6'` alone → **0**, an EM-2 branch-only zero, which is why the alternation is used.
+    `grep -c 'dedup'` → **0**; *positive control, same file same flags:* `grep -ci 'idempot'` → **39**.
+    `grep -c 'no duplicate decisions'` → **0**; *control:* `grep -ci 'replay harness'` → **2** (`:706`,
+    `:719`, both REG-F-019). `grep -ci 'tautolog'` → **8** — the nearest class term, all read, none at
+    `replay.ts`. `grep -ci 'cannot fail'` → **35**, read: the class precedent is **REG-F-008** (`:495`,
+    *"Evidence admissibility carries two guard limbs that cannot fail"*), plus `:817`, `:992`, `:11437`,
+    `:13167` — every one a different site and a different mechanism, none at `replay.ts`.
+  - **⚠ THE 77 ENTRIES FROM THE LAST TWO DAYS, GREPPED BY CONTENT AS WELL AS BY HEADING.** REG-F-203
+    begins at `:4892`; the span `:4892-22058` (17,166 lines) carries REG-F-203..262 and REG-Q-053..069; 77
+    headings were read. Content greps over that span: `runConformance` → **0**, `P6` → **0**,
+    `RPH-PER-002` → **0**, `tautolog` → 3 (unrelated), `replay` → 9 (`:16482-16488` is the RPH-FIX-006
+    limb; the rest are `pwu-replay.ts` or clock-free-replay remarks), `idempot` → **3** (`:8729` a refusal
+    table row, `:17792` a field list, `:21069` an envelope-validation note). **So the accurate statement is
+    that the last 77 mention idempotency three times and the replay harness's P6 check zero times** — not
+    that idempotency is absent from them, which reading only the headings would have suggested. Nearest by
+    subject remain REG-F-232 and REG-F-252, both on the command/execution plane, neither a conformance
+    check.
+  - **(2) `packages/rph-domain/src/enforcement-register.ts` (4,168 lines).** `grep -c 'replay'` → **10**;
+    *control:* `grep -c 'command-bus'` → **8**. `grep -c 'P6'` → **0**; `grep -c 'runConformance'` →
+    **0**; `grep -c 'dedup'` → **0**; *control:* `grep -c 'rph-engine'` → **7**. Ten replay hits, read.
+    `:49-72` is the scope note that credits `replay.ts` with discharging **four RPH-FIX rules** and calls
+    the RPH-FIX/RPH-E2E families *"OUT OF REACH BY CONSTRUCTION"* for this instrument — it makes no claim
+    about P6. `:2208` is the `RPH-PER-002` row itself, disposed `NOT_A_COMMAND_REFUSAL` and enforced at
+    `packages/rph-application/src/command-bus.ts` (`:2220`) — **a different plane, and it does not cite
+    `replay.ts`.** `:2364`/`:2371` sit inside the `RPH-PER-006` row (opens `:2354`) and cite
+    `pwu-replay.ts` and `replay-equivalence.test.ts`.
+  - **(3) `verif/guard-enforcement-ledger.data.ts` (392 lines).** `grep -c 'replay'` → **0**;
+    `grep -c 'PER-002'` → **0**; `grep -c 'P6'` → **0**; `grep -c 'idempot'` → **0**; *positive
+    controls, same file same flags:* `grep -c 'rph-engine'` → **2**, `grep -c 'rph-application'` →
+    **74**. Nothing in the ledger touches this.
+  - **(4) `docs/_working/`.** `grep -rn 'replay\.ts'` → **18** hits in **six** files, and the per-file
+    breakdown matters because one of them is a second record of discharge: `HARMONIZATION-FINDINGS.md`
+    **10** (`:710`, `:718`, `:723` = item 12's disposition; `:766`-`:787` = item 13's own evidence block),
+    `HARMONIZATION-LOG.md` **2** (`:1888`, `:2079`, neither about P6 — `grep -c 'P6'` there → **0**),
+    `AUDIT-shape-survivorship-2026-08-20.md` **2** (`:210` is `replay.ts`, on `DecisionEffective` ordering;
+    `:324` is `pwu-replay.ts`), `DESIGN-recomposition-judgement.md` **2** (both `pwu-replay.ts`),
+    `ROADMAP-recomposition-acceptance.md` **1** (`pwu-replay.ts`), and **`RESUME-STATE.md` `:131` — the
+    M13 CORE COMPLETE record, unstruck, asserting *"Conformance asserts RPH-FIX-001..006 + P1/P5/P6 over
+    the real trace"*.** Only **4** of the 18 are `pwu-replay.ts`. The **confirmed-75 table** (lines 1-86,
+    `grep -c '^| [0-9]'` → **75** rows) holds exactly one idempotency row — row **19** at `:29`,
+    `command-bus.ts:82`, *"Idempotency-key reuse with a DIFFERENT payload or target returns the prior
+    result"* — a different file, a different mechanism, already closed by REG-F-012.
+  - **(5) THE ONE THING THAT COVERS PART OF THE SUBJECT, disclosed because it narrows the remedy rather
+    than closing the row.** The idempotency OBLIGATION is genuinely proved elsewhere, three times, none of
+    them here: `packages/rph-engine/src/replay-equivalence.test.ts:101` — *"the rebuild is a pure fold:
+    replaying twice yields the same state (RPH-PER-002 in the aggregate dimension)"*, over a LIVE engine
+    stream, and it does compare folded states; `packages/rph-domain/src/execution.test.ts:355`; and
+    `packages/rph-domain/src/properties.test.ts:235` (the fast-check P6 property). The conformance manifest
+    cites RPH-PER-002 to `packages/rph-engine/src/engine.test.ts`
+    (`packages/rph-domain/src/conformance-manifest.ts:188`, status `COVERED` — driven above), **not** to
+    `replay.ts`. So the exposure is not an unproven guarantee — it is a harness check, a standing gate,
+    and two milestone records that all claim a proof this site does not perform, plus a report line
+    stating a governance fact DRIVE 2's `R1` shows to be false.
+
+- **THE REMEDY — either of two closes it; a third must not happen.**
+  1. **Make it discriminate, in the dimension the vocab names.** `m13-replay.json:215` asks for *"no
+     duplicate decisions and no duplicate baseline promotions; the rebuilt state is identical."* All three
+     are computable from what `replay.ts` already holds: fold `events` and fold `[...events, ...events]`
+     through `foldTerminalStates` (`:49-53`) and require the two maps to be EQUAL; and count `Decision`- and
+     `Baseline`-aggregate events per `label` over the doubled stream, requiring the per-instance counts to
+     be unchanged. **The named predicted reds are the two duplication probes above**: PROBE A's 82-event
+     arrangement (10 duplicated Decision/Baseline events) and DRIVE 2's `R1` 144-event arrangement (all 72
+     duplicated, Decision+Baseline 10→20) MUST redden the repaired check while the shipped 72-event
+     fixture stays green. A repair that does not redden both has rebuilt the tautology in a longer form.
+  2. **Delete it and correct the record — BOTH copies of the record.** If the aggregate-dimension proof at
+     `replay-equivalence.test.ts:101` is held to be the whole of this obligation, remove the `RPH-PER-002`
+     check from `runConformance`, drop `P6` from `replay.test.ts:25`'s title and from `replay.ts:162`'s mode
+     docblock, and strike **both** milestone sentences — *"RPH-PER-002/P6 (idempotent double-replay)"* at
+     `docs/JPWB Implementation Roadmap and Tracker.md:347` **and** *"+ P1/P5/P6 over the real trace"* at
+     `docs/_working/RESUME-STATE.md:131` — struck in place, not deleted, per the standing
+     retire-by-striking rule. Striking only the Tracker leaves that claim standing in the working corpus.
+  3. **⚠ NOT ACCEPTABLE:** keeping the check and merely rewording the detail string. The string is the
+     smaller half; the check's presence under a rule id is what `verif/deferral-honesty.test.ts:85-105`
+     counts — driven above — and what every future coverage audit reads as a discharged obligation.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#13**. It closes nothing else, because the
+  only other idempotency finding in the corpus is confirmed-table row 19 (`HARMONIZATION-FINDINGS.md:29`),
+  which is `command-bus.ts:82` — a key-reuse-with-different-payload defect on the COMMAND plane, closed by
+  REG-F-012; and the only other finding at this file is item **#12** (`:100`), which the same sweep disposed
+  **FALSE at HEAD** (`:706-710`) — the `ok: true` literal it names belongs to `replay` mode, not to
+  `conformance` mode. Neighbouring register entries touching this file — REG-F-019 (`:704-723`) and the
+  RPH-FIX-006 limb at `:21374` — argue the RPH-FIX ids and are silent on RPH-PER-002; neither is amended.
+
+- **Merge target:** Repository — `packages/rph-engine/src/replay.ts:146-153` (the check),
+  `packages/rph-engine/src/replay.test.ts:25` (the title that names P6),
+  `docs/JPWB Implementation Roadmap and Tracker.md:347` and `docs/_working/RESUME-STATE.md:131` (the two
+  records of discharge). Corpus: none — Property P6 and RPH-PER-002 are unambiguous and correctly stated,
+  so nothing needs adjudicating. Status: OPEN.
+
+### REG-F-265 — Guide §16 item 14 holds Baseline hashing open on the premise that "no canonicalization
+algorithm exists"; one already sat in this repository's tree at the very commit that added the Guide,
+and the only two prior recordings of that fact were a superseded note and a struck "refuted" line
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** RECORD_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** The Coding Agent Guide's §16 do-not-guess register holds Baseline
+  hashing open on a three-clause premise, and its middle clause is not a judgement but a claim of fact
+  about this repository: *"no canonicalization algorithm exists"*. One does.
+  `packages/rph-contracts/src/hash.ts` ships a deterministic, JCS-aligned canonical-JSON serializer and a
+  `sha256:<hex>` `contentHash`; the M0 Ratify Sheet lists it under *Ratified registries (implemented)*;
+  and the command bus runs every command payload and every post-state through it. The Guide is not
+  historical material — CON-000 B1, amended 2026-08-09 by REG-D-034, admits it to the registry as SOURCE
+  OF RECORD holding **authority for DETAIL** — and production source in this repository cites it by
+  section and line as authority. So an agent who opens item 14 to find out whether hashing is settled is
+  told, by an admitted source of record, that a thing does not exist which the same repository ships,
+  ratifies and depends on; and the safe default it is then sent to — *"Use only an accepted hash
+  contract"* — names no contract, so the agent has nowhere to go.
+
+- **WHAT THE ARTIFACT SAYS, QUOTED VERBATIM.** `docs/Janumi Canonical Implementation Context - Coding
+  Agent Guide.md:2511`. The section number is read from the heading `## 16. Do-not-guess decision
+  register` in place at `:2492`, and the item number from the row's own first cell — neither is inferred
+  from a line number. Byte-exact, one physical line, wrapped here at chunk boundaries only (the file's
+  quotes around *where applicable* are typographic, and are reproduced as such):
+  `| 14 | **Baseline hashing and cross-aggregate promotion.** Hash is optional/“where applicable”; no`
+  ``canonicalization algorithm exists. Promotion and a PWU entering `BASELINED` cross aggregate``
+  `boundaries without a complete ordering/recovery protocol. | Use only an accepted hash contract;`
+  `content-bearing Artifact/Evidence should not omit a required hash merely because the field is` …
+
+- **⚠ ONLY ONE OF THE THREE CLAUSES IS FALSE — this row must be struck surgically, never closed.** The
+  first clause, *"Hash is optional/'where applicable'"*, still holds at HEAD:
+  `packages/rph-contracts/src/envelopes.ts:41` declares `contentHash: z.string().optional()` on
+  `ProvenanceRecordSchema`, and `packages/rph-domain/src/enforcement-register.ts:3147` carries ASR-16's
+  anchor `exact item identities, semantic versions, and content hashes where applicable` with the note
+  at `:3148` that it is quoted *"verbatim against the ratified statement including its 'where applicable'
+  hedge on hashes."* The third clause — cross-aggregate promotion ordering/recovery — is untouched by
+  this entry and is separately live (see the decoy disclosure below). **This entry retires exactly one
+  conjunct**, and anyone acting on it who closes the row entire has done more than it licenses.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD** (every line number in this entry was re-opened at
+  HEAD `856dd8e1`; the drafting pass read them at `a4a19057`, now HEAD's parent, and the sweep's cited
+  ranges were off by one to five lines and are corrected here).
+  `packages/rph-contracts/src/hash.ts:5-7`, byte-exact: `// Canonicalization is a DETERMINISTIC subset
+  scheme (JCS-aligned for our data shape):` / `//   - object keys sorted ascending by UTF-16 code unit
+  (JS default string sort);` / `//   - minimal separators, no insignificant whitespace;`. `:21`
+  `export function canonicalJson(value: unknown): string {`. `:78` `export function sha256Hex(input:
+  string): string {`. `:86` `export function contentHash(value: unknown): string {`, and
+  `:87` returns the algorithm-prefixed digest as a template literal:
+  ``return `sha256:${sha256Hex(canonicalJson(value))}`;``
+
+- **IT IS RATIFIED, NOT INCIDENTAL.** `docs/JPWB Reconciliation Ratify Sheet (M0).md:41-42`, under the
+  heading `## B. Ratified registries (implemented)` in place at `:33`, byte-exact across its two
+  physical lines:
+  ``- **Content hash** = `sha256:<hex>` over deterministic canonical JSON → `src/hash.ts` (MUST for``
+  `baseline` / `  items + admitted evidence).` A registry the Ratify Sheet lists as *implemented* is the
+  opposite of a thing that does not exist.
+
+- **IT IS ON THE PRODUCTION WRITE PATH, NOT IN A TEST.** `packages/rph-application/src/command-bus.ts:21`
+  `import { contentHash } from '@janumipwb/rph-contracts/hash';`; `:567` `const actualContentHash =
+  actual ? contentHash(actual) : undefined;` (postcondition comparison); `:698` `return { payloadHash:
+  contentHash(command.payload) };` (the bus's step-0c hashability gate).
+  `packages/rph-application/src/handlers/kit.ts:519` `resultHash: contentHash(args.nextState),` and
+  `:525` `payloadHash: contentHash(command.payload)` — the receipt every accepted command writes.
+
+- **⚠ THE PREMISE WAS NOT "STALE" — IT WAS NEVER TRUE IN THIS REPOSITORY, AND git PROVES IT.** The Guide
+  file enters this repository at commit `a64145c1` (2026-07-14, an ancestor of HEAD, confirmed by
+  `git merge-base --is-ancestor a64145c1 HEAD`), and the row's false clause is present in that very blob
+  (`git show a64145c1:…/Coding Agent Guide.md | grep -c` → **1**). Driven at that same commit:
+  `git cat-file -e a64145c1:JanumiCode/janumiprofessionalworkbench/packages/rph-contracts/src/hash.ts`
+  **succeeds**, and `git show` of that blob returns `5:// Canonicalization is a DETERMINISTIC subset
+  scheme`, `21:export function canonicalJson`, `76:export function contentHash`. `hash.ts` enters this
+  history two days earlier, at `19a1b20f` (2026-07-12) — titled *"JanumiCode v2: Remove
+  janumiprofessionalworkbench submodule"*, i.e. the flatten that brought the workbench in, so the file
+  is older still. **The clause was false on the day the row was committed**, which is why no amount of
+  keep-the-documents-fresh discipline would ever have caught it — nothing here went out of date.
+
+- **OBSERVED / READ — both, stated separately.** **DRIVEN:** (a) `./node_modules/.bin/vitest run
+  packages/rph-contracts/src/hash.test.ts` → `Test Files  1 passed (1)` / `Tests  16 passed (16)`.
+  (b) I imported `hash.ts` under node and called it: `canonicalJson({b:2,a:1,c:{z:9,y:8}})` and
+  `canonicalJson({c:{y:8,z:9},a:1,b:2})` both returned `{"a":1,"b":2,"c":{"y":8,"z":9}}`, and both
+  `contentHash` calls returned
+  `sha256:d996c21122d4ce136cd5343ba089b335bb880c5579d2d877ae6a9eeb2812bb0d` — deterministic across key
+  order and prefixed with the algorithm, exactly as the header claims. (c) The git existence probe
+  above. (d) **The production import specifier, not just the source file:** `createRequire` from
+  `packages/rph-application/package.json` resolved `@janumipwb/rph-contracts/hash` — the exact specifier
+  at `command-bus.ts:21` — to `packages/rph-contracts/dist/hash.js`, and calling `contentHash` through
+  that built export reproduced the same digest. NEGATIVE CONTROL on the same module, proving it is the
+  algorithm and not a stub: `contentHash({x:1.5})` threw `CanonicalJsonError | Non-integer number cannot
+  be canonicalized (model as integer or string): 1.5`. **READ (not driven):** the Guide row, the Ratify
+  Sheet line, CON-000 B1, REG-Q-014, the four production call sites, and every census count below.
+
+- **WHY THE GUIDE STILL BINDS, so this is not a dead document's problem.** `docs/canon/JPWB-CON-000
+  Constitution.md:97` (B1, ⚠ AMENDED 2026-08-09, REG-D-034 sponsor ruling): *"**the SOURCE CORPORA** from
+  which the canon artifacts were distilled — `docs/Recursive Professional Harness/`, `docs/Constitution
+  Discussion/`, and the Coding Agent Guide — holding authority for DETAIL"*. REG-005:2812 records the
+  ruling that produced it: *"abandon the retirement; keep the sources visible with a declared role."* And
+  the repository behaves accordingly: production source cites the Guide by line as authority, e.g.
+  `packages/rph-application/src/handlers/floor-gate.ts:188` *"Coding Agent Guide L1964"*,
+  `packages/rph-application/src/handlers/execution.ts:1418`, and
+  `packages/rph-projections/src/handoff-order.ts:7` *"The Coding Agent Guide §9.1 is explicit"*. Six
+  non-`dist` TypeScript files cite it by name — those three production files and three tests
+  (`execution-floor-zero-subject`, `floor-gate-admissibility`, `pwu-readiness-contract`); POSITIVE
+  CONTROL, same grep, `docs/canon` is cited by **6** files under `verif/`.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#21**, at **line
+  109**, struck: `21. ~~Section 16 item 14's premise 'no canonicalization algorithm exists' is factually
+  stale: a deterministic canonical-JSON + SHA-256 content hash is in production in rph-contracts.~~`,
+  filed under the heading at `:87` which read *"Refuted (32) — recorded so they are not re-raised"*,
+  **with no reason, no evidence, no site and no date recorded**. Re-checked at HEAD 2026-08-23 and TRUE.
+  A missing filing invites the next search; a filing that records the claim as *refuted*, under a heading
+  instructing readers not to re-raise it, **ends every future search with the corpus's own authority.**
+
+- **⚠ AND IT HAD ALREADY BEEN RECORDED ONCE BEFORE — IN A DOCUMENT WHOSE OWN BANNER FORBIDS ACTING ON
+  IT.** `docs/_working/DECISION-item23-attempt-record.md:66` carries the heading *"## Item 14 does NOT
+  block this — and item 14 is factually stale"*, and `:68` reads verbatim: *"Item 14 says "no
+  canonicalization algorithm exists". One does: `packages/rph-contracts/src/hash.ts:86-87` — a prefixed,
+  JCS-aligned `contentHash`, in production use at `kit.ts:220`."* That document is headed at `:3`
+  ``> ## ⚠️ SUPERSEDED 2026-07-15 by `HARMONIZATION-LOG.md`. Three of its four blockers are FALSE.`` and
+  at `:6` `> Do not act on it.` (the line continues *"Corrections, in descending importance:"*) — while
+  its own retained-value list at `:30-31` names *"item 14's staleness"* as one of three things that
+  **stand**. Its `:70` then declines the remedy outright: *"**Reported as drift per §17, not requested as
+  a change.**"* And one of its two code citations has since drifted: `hash.ts:86-87` still resolves
+  exactly (`:86` the `contentHash` declaration, `:87` the `sha256:` return), but `kit.ts:220` at HEAD is
+  a causation-comment block, not a hash call. **So the tally is: detected 2026-07-15 and parked in a
+  do-not-act document behind a call-site line number that is now wrong; re-detected and struck as refuted
+  with no reason; zero register entries; and the Guide row unchanged through all of it.** This is the
+  third recording and the first one a process can act on.
+
+- **WHAT THE GATES PROVE HERE, AND WHAT THEY ARE BELIEVED TO PROVE.** `verif/register-citations.test.ts`
+  is this repository's citation gate; its own header states its scope: *"EVERY REGISTER ID CITED BY THE
+  CODE RESOLVES TO AN ENTRY THAT EXISTS."* That is all it proves — that an id resolves. Its `canonText()`
+  globs `${ROOT}docs/canon` only, so it never opens the Coding Agent Guide, and it tests RESOLUTION, not
+  TRUTH. Its header even names the exclusion: *"A stale number says something false. A dangling citation
+  says nothing at all … only the first has ever reddened anything here."* **Nothing in the four corpora
+  gates a factual assertion made by a source-of-record document about the code.** The Guide is cited by
+  line from three production files (and three tests) and by name on **14** lines of REG-005, and no gate
+  would notice if any of those citations pointed at a sentence the repository disproves.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (the Grep
+  tool elides the register's longest lines); long hits opened with `sed -n`. ⚠ `grep -i -F` together
+  aborts on this box, so every count below uses one or the other, never both.
+  **(1) `docs/canon/JPWB-REG-005 Decision and Divergence Register.md` (22,058 lines):**
+  `no canonicalization algorithm` → **0**; `canonicalJson` → **0**; `hash.ts` → **0**;
+  `rph-contracts/src/hash` → **0**; `JCS` → **0**; `RFC-8785` → **0**;
+  `item 14` → **0** case-sensitive.
+  POSITIVE CONTROLS, same file, same flags: `canonicaliz` → **5**, `hash` → **29**, `contentHash` →
+  **19**, `§16` → **34**, `Coding Agent Guide` → **14**.
+  All five `canonicaliz` hits were opened: `:243`
+  is REG-Q-014's own restatement; `:565` and `:568` sit inside **REG-F-012** (heading at `:550`,
+  idempotency-key reuse) and `:692`/`:695` inside **REG-F-018** (heading at `:690`, unconstrained
+  contract numbers vs the hashing layer) — all four about what `contentHash` REFUSES, never about
+  whether it exists.
+  **⚠ TWO DECOYS IN THE REGISTER, disclosed because a grep lands on them.** (i) Case-insensitively,
+  `Item 14` → **3** (`:20925`, `:20929`, `:20957`, all inside REG-Q-065 at `:20795`) — but that is
+  HARMONIZATION-FINDINGS.md's OWN item 14 (`### Item 14 — OUT OF SCOPE`), a different list's row, not
+  the Guide's §16 item 14. (ii) The 77 entries that landed in the last two days — REG-F-203..262
+  (from `:4892`) and REG-Q-053..069 (from `:10954`) — were enumerated by heading; I read the wider
+  REG-F-200..262 plus REG-Q-050..069, **83 headings**. Two of them DO engage the Guide's §16 register:
+  REG-F-262 (`:20249`) at `:20343`/`:20426`, and REG-Q-069 (`:21796`, 2026-08-23) at `:21908`/`:21923`,
+  both on **§16 items 9 and 10** (`Guide:2506`/`:2507`) — the adjacent rows, a different subject.
+  **Neither touches item 14 or canonicalization**, and
+  `awk 'NR>9000 && (/canonicaliz/||/hash\.ts/||/item 14/)'` over the register returns **0 lines**.
+  **(2) `packages/rph-domain/src/enforcement-register.ts`:** `canonicaliz` → **0**, `canonicalJson` →
+  **0**, `item 14` → **0**; POSITIVE CONTROLS `RPH-` → **439**, `hash` → **8**
+  (all eight opened: `:728`, `:2227`, `:2230-2232` are
+  `command_receipts.payload_hash`/`result_hash` prose; `:3147-3148` is ASR-16's
+  "where applicable" anchor; `:3171` is a call-site comment — none names the algorithm's existence).
+  **(3) `verif/guard-enforcement-ledger.data.ts` (392 lines):** `canonicaliz` → **0**, `hash` → **0**,
+  `item 14` → **0**; POSITIVE CONTROLS same file same flags `guard` → **50**, `RPH` → **26**.
+  (⚠ my first control, `guardId`, returned **0** — it is not a token in this file.
+  Disclosed as a control that would
+  have proved nothing, and replaced.)
+  **(4) `docs/_working/` (recursive):** `no canonicalization algorithm` → **4 hits in 2 files**, all
+  accounted for above — `DECISION-item23-attempt-record.md:68` (superseded, do-not-act) and
+  `HARMONIZATION-FINDINGS.md:109 / :1166 / :1173` (the struck item plus the 2026-08-23 sweep's own
+  appended disposition). `HARMONIZATION-LOG.md`, the document that SUPERSEDES the item-23 note:
+  `canonicaliz` → **0**, `item 14` → **0**, POSITIVE CONTROL `hash` → **0** — the log never took the
+  subject up at all.
+  **(5) The Guide itself:** `canonicaliz` → **4**; the three that are not `:2511` were opened — `:347`
+  and `:1174` are Assurance *result*-canonicalization (a service, and an Observation operation), `:1484`
+  is cutover schema canonicalization. A different subject in all three. POSITIVE CONTROL `hash` → **11**;
+  `hash.ts` → **0** and `contentHash` → **0**, so the Guide never names the contract it denies.
+  **Nothing in any corpus files this.**
+
+- **THE REMEDY,** and the sponsor mandate that already authorizes it —
+  `docs/_working/HARMONIZATION-LOG.md:3-4`, verbatim: *"**Mandate (sponsor, 2026-07-15):** harmonize the
+  coding-agent guidance with the source code and tests. Resolution may be "update the guide", "update the
+  code/tests", or *both*."* Amending the Guide is therefore in scope and needs no new grant.
+  **(a)** In `Guide.md:2511`, strike the clause `no canonicalization algorithm exists` **in place** — a
+  soft delete that keeps the text and its history — and append the pointer the row should always have
+  carried: the ratified `contentHash` contract at `packages/rph-contracts/src/hash.ts`, per M0 Ratify
+  Sheet `:41`. Leave the *optional/where applicable* clause and the cross-aggregate-promotion clause
+  standing.
+  **(b)** Annotate `REG-Q-014` (`REG-005:242-245`) to record that its safe default's *"the accepted hash
+  contract"* **has a name and a site**, so the next reader is not sent looking. Its Statement binds the
+  canonicalization gap to *promotion effects that cross aggregate boundaries* rather than asserting the
+  Guide's unqualified clause, so no correction is owed to the Statement itself.
+  **(c)** CLOSE CONDITION, checkable rather than narrative: `grep -c "no canonicalization algorithm
+  exists"` over the Guide returns 0 outside a struck span, and `grep -c "hash.ts"` over the Guide returns
+  at least 1 (it is **0** today). **A gate is worth more than the edit:** extend
+  `verif/register-citations.test.ts` (or a sibling) so that a factual assertion a source-of-record
+  document makes about a repository path is checked against that path. The general form of this defect is
+  *a source-of-record document asserting the non-existence of an artifact the repository ships*; this
+  entry establishes that it happened here, never that it happened only here — DERIVE that census from the
+  corpus, do not hand-list it.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#21**. It closes nothing else, because
+  every other struck item names a different section pair, and the two neighbouring hash/promotion
+  questions are explicitly NOT closed. **REG-Q-014** stays OPEN on its cross-aggregate-promotion half
+  (`REG-005:243`, *"promotion effects that cross aggregate boundaries"*). **REG-Q-064**
+  (`REG-005:20575`, ASR-16 rollback/recovery as a promotion requirement, dated 2026-08-23) is the decoy a
+  reader grepping "promotion" will land on: it asks what supplies canon's *"where required"* for
+  rollback and never touches whether a canonicalization algorithm exists.
+  `DECISION-item23-attempt-record.md:70` said it first and is right: *"Do not close item 14 by
+  association — its cross-aggregate-promotion half is untouched and nobody examined it."*
+
+- **Merge target:** Corpus — the Guide `:2511` strike-in-place and the REG-Q-014 annotation; Repository
+  only for the optional (c) gate. No code change is owed: the code is the party that is correct here.
+  Status: OPEN.
+
+### REG-F-266 — the turbo `lint` task fans out to nothing: 0 of 13 workspace members define a `lint`
+script, so `turbo run lint` executes zero tasks and exits 0, beside a root `eslint .` that really
+lints 767 files — and README.md documents the empty path as the real one
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `turbo.json` declares a `lint` task whose entire body is
+  `"dependsOn": ["^lint"]`. Turbo runs a task by invoking the same-named script in each workspace
+  package, and `^lint` merely orders each package's lint after those of its dependencies — so the
+  task is wholly parasitic on package-level `lint` scripts. **No workspace member defines one: 0 of
+  13.** `turbo run lint` therefore builds a 13-node graph in which every node's command is
+  `<NONEXISTENT>`, runs nothing, and **exits 0**. The cosmetic reading — "a dead config entry" —
+  understates it. The root `package.json` delegates four of its five turbo-named scripts to turbo
+  (`build`, `check-types`, `test`, `gen`); `lint` is the sole exception, pointing instead at a flat
+  `eslint .` that really does lint 767 files. The turbo `lint` task thus reads as the missing half
+  of an established convention, and "completing" that convention — repointing root `lint` at
+  `turbo run lint` — would silently swap a 767-file lint for a zero-task no-op that exits 0, while
+  both consumers of `bun run lint` (CI and `gate:fast`) stayed green having linted nothing.
+
+- **⚠ WHAT THIS GATE PROVES vs WHAT IT IS BELIEVED TO PROVE.** Believed: that every workspace
+  package passed its own lint, ordered after those of its dependencies. Actually proves: **nothing
+  whatsoever** — 0 tasks executed, exit 0. The gap is total, and that gap is the whole finding. It
+  is latent in execution today only because nothing invokes `turbo run lint` — but ⚠ **the belief
+  is not hypothetical, it is already written down.** `README.md:32` states it in the repository's
+  own words: `bun run lint          # turbo: eslint`. That is one of four `# turbo:` annotations in
+  one fenced block (`:30-33`) and **the only false one** — `build`, `check-types` and `test` really
+  do delegate. So the reader is told the convention is already complete, and the trap goes live the
+  moment anyone makes the code agree with the README rather than the other way round.
+
+- **WHAT THE ARTIFACT DECLARES, QUOTED VERBATIM.** `turbo.json:13-15`:
+      "lint": {
+        "dependsOn": ["^lint"]
+      },
+  There is no `inputs`, no `outputs` and no `cache` key — the `dependsOn` IS the whole task. And
+  the convention it appears to belong to, `package.json:11-15` verbatim:
+      "build": "turbo run build",
+      "check-types": "turbo run check-types && tsc --noEmit -p verif/tsconfig.json
+        && tsc --noEmit -p scripts/tsconfig.json",     <- one physical line, wrapped here only
+      "lint": "eslint .",
+      "test": "turbo run test && bun run test:dist",
+      "gen": "turbo run gen",
+  Four delegate to turbo; `lint` alone does not.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD.**
+  - `turbo.json:13-15` — the task exactly as quoted above.
+  - Members resolved from `package.json:6-9` (`"workspaces": ["packages/*", "apps/*"]`) -> 13
+    members, of which **0** define a `lint` script.
+  - `package.json:13` — `"lint": "eslint .",` the real, unpipelined root pass.
+  - `README.md:32` — `bun run lint          # turbo: eslint`, documenting a turbo-mediated lint
+    that does not exist. Its three siblings at `:30`, `:31` and `:33` are accurate.
+  - `.github/workflows/ci.yml:23-24` — `- name: Lint` then `run: bun run lint`.
+  - `package.json:26` — `gate:fast` chains `... && bun run check-types && bun run lint && ...`.
+    Both consumers invoke the ROOT script; neither invokes the turbo task.
+  - `verif/csaa/jan-csaa-005.inventory.baseline.json:1518` records that command as `"eslint ."`,
+    so the repository's own gated inventory already carries the unpipelined truth.
+
+- **OBSERVED, NOT READ — driven at HEAD, with the positive controls EM-2 demands.**
+  - `./node_modules/.bin/turbo run lint --dry=json` -> 13 tasks, **every one** carrying
+    `command="<NONEXISTENT>"`.
+  - `./node_modules/.bin/turbo run lint` -> verbatim: *"Running lint in 13 packages"*,
+    *"WARNING  No tasks were executed as part of this run."*, *"Tasks:    0 successful, 0 total"*,
+    and **exit code 0**.
+  - ⚠ NO ROOT-TASK ESCAPE HATCH: `turbo.json` declares **no** root task — a search of it for the
+    `//#` root-task prefix returns 0 — so `turbo run lint` cannot fall back on the root `eslint .`
+    either. The 13 packages in scope are the members; the root is not among them.
+  - POSITIVE CONTROLS, same binary and same flags: `turbo run check-types --dry=json` -> 24 tasks,
+    **22 real commands**, 2 `<NONEXISTENT>`; `turbo run test --dry=json` -> 24 tasks, **11 real**,
+    13 `<NONEXISTENT>`. So `<NONEXISTENT>` discriminates — it is not what turbo always prints.
+  - MECHANISM, SHOWN NOT ASSERTED: `turbo run gen --dry=json` -> 13 tasks, 3 real, 10
+    `<NONEXISTENT>`, although `gen` declares **no `dependsOn` at all** (`turbo.json:19-21`, only
+    `"cache": false`). What supplies a command is the package's own same-named script, never the
+    `dependsOn` arm — which is why `lint`'s graph is `<NONEXISTENT>` rather than merely unordered.
+  - THE GENERAL FORM, DERIVED rather than enumerated: task names read out of `turbo.json` and
+    members out of the `workspaces` globs in `package.json`, then each member's `scripts` keys
+    parsed —
+        build 12/13 · check-types 12/13 · lint 0/13 · test 1/13 · gen 3/13 · dev 1/13
+    **`lint` is the only declared turbo task in this repository with zero implementers**, against
+    five non-zero controls produced by the same sweep over the same files.
+  - `./node_modules/.bin/eslint . --format json` -> **767 files linted, 0 errors, 0 warnings**,
+    spanning **11 of the 12 `packages/*` members** — `packages/typescript-config` contributes
+    nothing because it holds no source at all (0 `.ts`; it is `base.json` + `package.json`) — plus
+    `apps/rph-demo` (118 files: 116 `.ts`, 2 `.js`), `verif/` and `scripts/`. The root pass is real
+    and broad; the turbo task is the empty one.
+
+- **⚠ IT WAS RECORDED AS REFUTED, WITH NO REASON.** `docs/_working/HARMONIZATION-FINDINGS.md`
+  **item #32 (line 120)**, struck through, under a heading that read *"Refuted (32) — recorded so
+  they are not re-raised"* (line 87). Not one of those 32 recorded a reason, evidence, site or
+  date. That is worse than an unfiled finding: an unfiled finding invites the next search, whereas
+  a recorded refutation ends every future one on the corpus's own authority. Re-checked at HEAD on
+  2026-08-23 and found **TRUE**; the disposition is appended at line 1708. The strike is wrong and
+  is kept only as history. ⚠ Cite this by ITEM NUMBER — lines 1-120 of that file must not be
+  re-flowed, because eleven citations point into them, two of them from append-only canon.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora — Bash `grep`, never `-i`
+  and `-F` together.** (1) **`JPWB-REG-005`** (22,058 lines): `turbo.json` **0** · `turbo run lint`
+  **0** · `"^lint"` **0** · `dependsOn` **0** · `turborepo` **0** · `turbo` **3** — two about
+  `turbo run check-types` not covering `verif/` (`:2945`, `:2949`), one a `.turbo` cache-dir
+  exclusion inside a walk glob (`:4579`), **none about the lint task** · `lint` **27**, and I
+  opened every one: gate-result reports (*"lint clean"*, *"lint 0"*),
+  `packages/rph-authoring/src/lint.ts` (composition linting — an unrelated domain concept, at
+  `:13564`, `:13577`, `:13583`), SonarLint remediation notes, and a *proposed* ESLint rule at
+  `:1405-1406`. **None concerns turbo.json.** POSITIVE CONTROLS, same
+  file and flags: `package.json` **14**, `gate:fast` **6**, `ci.yml` **1** — the register does
+  discuss build config, so the search reaches. I additionally read all 80 `### REG-[FQ]-` headings
+  from REG-F-200 through REG-Q-069, covering the whole W-3b band **REG-F-203..262 /
+  REG-Q-053..069** that landed in the last two days: every one is domain or canon semantics, none
+  is build tooling. (2) **`packages/rph-domain/src/enforcement-register.ts`** (4,168 lines):
+  `turbo` 0 · `lint` 0 · `eslint` 0; controls `RPH-` **439**, `gate` **185**. (3)
+  **`verif/guard-enforcement-ledger.data.ts`** (392 lines): `turbo` 0 · `lint` 0; controls `guard`
+  **54**, `packages/` **85**. (4) **`docs/_working/`**: `turbo run lint` occurs **6 times across 3
+  files**, and **not one is a filing** — four are `HARMONIZATION-FINDINGS.md` itself (item #32 at
+  `:120`, and its re-disposition at `:1714`, `:1726`, `:1731`), while `BACKLOG.md:460-461` and
+  `ROADMAP-invariant-enforcement-mapping.md:263` are this same sweep's own debt tracker, both
+  stating that the entry is OWED. Repository-wide invocation search over
+  `*.json,*.ts,*.yml,*.yaml,*.cjs,*.mjs` outside `node_modules`: `turbo run lint` **0 hits**;
+  POSITIVE CONTROL `turbo run ` in that same scope **14 hits**, including all five root delegations
+  at `package.json:11,12,14,15,20`. ⚠ That scope is exactly why the README miss was possible —
+  `.md` is outside it, and `README.md:32` writes `# turbo: eslint`, never `turbo run lint`.
+
+- **THE REMEDY — pick one of two, and do not leave the third state.** (a) **DELETE** the `lint`
+  task (`turbo.json:13-15`) **and correct `README.md:32`** to say what `bun run lint` is: a flat
+  root `eslint .`, not a turbo fan-out. Linting here genuinely is one flat root pass; the config
+  and the README should both say so, and deletion removes the trap outright. This is the cheaper
+  fix and the one the evidence supports. (b) **IMPLEMENT** the fan-out: add a `lint` script to each
+  of the 12 members that hold source (all but the config-only `packages/typescript-config`) and
+  repoint root `lint` at `turbo run lint` — admissible only WITH the guard below, because without
+  it a single missing script silently shrinks the gate again. **EITHER WAY, add the guard that
+  makes this failure mode unsayable:** a `verif/` check asserting that every task name declared in
+  `turbo.json` is implemented as a script by at least one workspace member — deriving both lists
+  from disk, never hand-listing either. ⚠ **Name the predicted red BEFORE trusting the green:**
+  with that guard added and `turbo.json` otherwise untouched it MUST fail, naming `lint` and only
+  `lint` — the derived census above puts the other five tasks at 12, 12, 1, 3 and 1 implementers,
+  so the red is specific rather than a blanket. Either remedy then turns it green, and any future
+  task declared with no implementer reddens it again. ⚠ Place it under `verif/`, which is type-
+  gated via `verif/tsconfig.json` in root `package.json:12`, so the guard is itself checked.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#32**, in full. Both halves of the
+  struck claim — the fan-out no member implements, and the masked single unpipelined root
+  invocation — are one fact seen twice and share one fate, so they are not partitioned. It closes
+  nothing else, because the neighbouring gate defects in that same re-disposition are different
+  artifacts with different remedies: **#31** is `bun run boundary` running `depcruise packages`
+  (`package.json:18`), leaving `apps/` outside every layering rule; **#30** is
+  `.github/workflows/ci.yml`, whose steps end at `Test` (`:29-30`) with no e2e invocation anywhere
+  in its 30 lines. Neither is touched by deleting or implementing a turbo task. It also closes
+  nothing about the `eslint.config.mjs` ignore list — and ⚠ **that list is narrower than its own
+  comment reads.** `eslint.config.mjs:9-10` says the demo *"owns its own svelte-check toolchain and
+  is outside the engine lint gate"*, but it sits above an `ignores` array (`:11-23`) naming only
+  generated output and documentation (`**/.svelte-kit/**`, `**/build/**`, `**/dist/**`,
+  `**/docs/**`, `**/harness/**`, …); in fact **118 `apps/rph-demo` files ARE linted** by the root
+  pass, and only its 11 `.svelte` components are not — which no parser this config loads could read
+  in any case. That comment is a separate artifact with a separate remedy and is not this finding.
+
+- **Merge target:** BOTH — the finding to the Corpus (`JPWB-REG-005`), and the fix plus its guard
+  to the Repository (`turbo.json`, `README.md:32`, root `package.json` under remedy (b), and a new
+  check under `verif/`). Status: OPEN.
+
+### REG-F-267 — the §14.3 six-path bypass scenario is proved by nothing, and the accounting gate cannot
+see the gap: no catalogued rule states the obligation, and the family whose remit covers it is exempt
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** §14.3 makes it a MINIMUM conformance scenario — for any slice
+  claiming PWA Designer, PWA-authoring-agent or PWA-instantiation support — that the suite *proves* six
+  named paths (UI, agent, worker, retry, direct-persistence, projection) cannot bypass server-side
+  assurance enforcement. This repository is such a slice and accepts the bullet in its own code: it
+  built and ships the FIRST half of that same sentence as a named §14.3 scenario, GREEN when driven.
+  The second half is proved by nothing — no test file in the repository asserts that boundary for any
+  of the six paths. What makes this a GATE defect rather than a to-do is that the omission is
+  unreachable by the one instrument built to catch precisely this class. The conformance gate's
+  population is the 125-rule catalog in `packages/rph-domain/vocab/m12-conformance.json`, and that
+  catalog contains the token `bypass` **zero** times (DRIVEN; control `/assurance/gi` → **44**
+  occurrences in the same file), so the "no rule is silently unaccounted" check can never redden for
+  this obligation. Meanwhile the only family whose remit IS end-to-end scenarios — `RPH-E2E`, all seven
+  ids — is affirmatively certified `DEFERRED`, and its prefix is the sole member of
+  `DEFERRABLE_PREFIXES`, which the gate reads in order to permit exactly that. DRIVEN at HEAD: the gate
+  is **GREEN** (9 tests passed) over a catalog that resolves **42 COVERED / 76 PARTIAL / 7 DEFERRED**,
+  all seven deferrals `RPH-E2E`. A minimum conformance scenario is unbuilt and nothing in the
+  repository is able to say so.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.** `docs/Janumi Canonical Implementation Context -
+  Coding Agent Guide.md`, heading **`### 14.3 Minimum conformance scenarios`** at **L2306** (verified at
+  the heading, not inferred from a line). The antecedent that binds this repository is **L2323**,
+  byte-exact: *"Any slice claiming PWA Designer, PWA-authoring-agent, PWA instantiation, or governed
+  model-transformation support additionally proves:"*. Its last bullet, **L2332**, ends byte-exact:
+  *"…and proves that UI, agent, worker, retry, direct-persistence, and projection paths cannot bypass
+  server-side assurance enforcement."* ⚠ **"PROVES" IS THE OPERATIVE VERB** — the obligation is
+  discharged by a scenario that demonstrates the refusal, not by a property that happens to hold.
+
+- **THE ANTECEDENT IS NOT OPEN — THE REPOSITORY HAS ALREADY ANSWERED IT, IN CODE.**
+  `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts:1` opens *"§14.3 minimum
+  conformance scenario — 'conformance requires no private chain-of-thought'"*, and its `describe` at
+  `:83` is `'Reasoning Review Validator — §14.3 conformance: no private chain-of-thought'`. That is the
+  FIRST clause of L2332, and **I DROVE IT THIS PASS: `Test Files 1 passed (1) · Tests 8 passed (8)`**
+  under `apps/rph-demo`'s own vitest project (`apps/rph-demo/package.json:13`,
+  `"test": "vitest run --passWithNoTests"`; that project is reached by `turbo run test` — READ from
+  `turbo.json`'s `test` task plus `package.json:6-9`'s `apps/*` workspace glob, not driven through
+  turbo). The bypass clause is the SAME SENTENCE and has nothing. So this is not a slice arguing it is
+  out of scope; it is a slice that discharged half a bullet, green, and left the half no instrument
+  watches. Five further source lines cite §14.3 by name for the CoT half (`transcript.ts:8`,
+  `transcript.test.ts:2`, `reasoning-review-validator.ts:151` and `:153`, `floor.ts:326`); **not one
+  names the bypass half.**
+
+- **WHAT THE CODE DOES, re-read at every site at HEAD `856dd8e1`.**
+  - `packages/rph-domain/src/conformance-manifest.ts:439-442` — `'RPH-E2E': {` / `status: 'DEFERRED',` /
+    `note: 'full end-to-end scenarios — the M13 Reference Undertaking replay + M14 surface'` / `}`.
+    ⚠ **The sweep cited this as `:437-440`; at HEAD it is `:439-442`** — `:437` is the `RPH-FIX` note.
+  - `packages/rph-domain/src/conformance-manifest.ts:468` — `export const DEFERRABLE_PREFIXES:
+    ReadonlySet<string> = new Set(['RPH-E2E']);`
+  - `packages/rph-domain/src/conformance.test.ts:101-105` — the gate READS that set:
+    `if (c.status === 'DEFERRED') expect(DEFERRABLE_PREFIXES.has(prefixOf(r.id)), …).toBe(true);`.
+    A DEFERRED rule in a deferrable family is not a failure; it is the permitted case.
+  - `packages/rph-domain/src/conformance.test.ts:72-78` — the accounting check, `describe('M12
+    conformance coverage GATE — no rule is silently unaccounted')` / `it('EVERY RPH-* rule resolves to a
+    coverage status (fails CI on any unaccounted rule)')`. Its population is `catalog.ruleCatalog` —
+    the 125 ids — so an obligation with no id is not "unaccounted", it is unseen.
+  - `packages/rph-domain/vocab/m12-conformance.json:207-213` — the seven `RPH-E2E` statements. **None of
+    them is the six-path bypass scenario:** they are §24's flows (E2E-001 intent-to-architecture,
+    E2E-002 missing tenant isolation, E2E-003 falsified assumption, E2E-004 scoped waiver, E2E-005
+    validator disagreement, E2E-006 restart mid-generation, E2E-007 changed artifact after approval).
+  - ⚠ **NOR IS THE OBLIGATION CATALOGUED UNDER SOME OTHER §14 CITE.** DRIVEN over the catalog: **12**
+    rules carry a `sourceRef` matching `§14`, and all twelve are `RPH-ASR-001..012` — the RPH
+    Conformance Spec's §14 *Assurance Service*, not the Guide's §14.3. **0** of the 125 statements match
+    `/bypass|route around|server-side|projection path|retry path|direct-persist/i`, against a control of
+    **27** statements containing `assurance`. The obligation has no id under any spelling.
+  - `verif/deferral-honesty.test.ts` — the standing counter-gate built for the blind direction
+    (REG-F-019) — cannot see this either, and says so at `:27-30`: *"WHAT THIS CANNOT SEE, stated so the
+    gate is not read as more than it is: it observes the ids these harnesses EMIT. A rule discharged by
+    some other test file, under no id, is invisible here"*. An obligation with **no id at all** is
+    further out of reach than the case that sentence disclaims.
+  - **NO TEST ASSERTS THE BOUNDARY.** `grep -rn "bypass" --include=*.test.ts packages/ apps/ verif/`
+    (dist excluded) → **37 lines in 21 files, every one opened**. The nearest five are named under
+    partial coverage below; the remaining thirty-two are about prunable steps, generic-setter arrows,
+    birth sites, a csaa compiler host and a Svelte Flow history — none about assurance enforcement, and
+    none touching worker, retry or projection. Controls on the identical population: **369** `*.test.ts`
+    files exist and **150** of them contain `assurance`. The e2e suite is no better:
+    `grep -rn "bypass" apps/rph-demo/e2e` → **2** lines (`execution-plan.e2e.ts:312`,
+    `pwa-authoring-backbone.e2e.ts:108`), neither the scenario, against a control of **19** of the
+    **37** `.e2e.ts` specs containing `assurance`. Two further probes, run as independent routes rather
+    than variants of the first: `grep -rn "cannot bypass" --include=*.ts .` → **0**, and
+    `grep -rn "direct-persistence\|direct persistence" --include=*.ts .` → **0** across the whole
+    repository (node_modules / dist / .svelte-kit excluded).
+
+- **WHAT THE GATE IS PROVING, AND WHAT IT IS BELIEVED TO PROVE — the gap is the finding.** BELIEVED,
+  from the manifest's own header at `conformance-manifest.ts:3-4`: *"every rule in the catalog must map
+  to a coverage status; a rule that resolves to `undefined` (UNACCOUNTED) fails the conformance test
+  (the 'CI fails on any single invariant violation' goal)"*. ACTUALLY PROVED: that each of **125**
+  catalogued ids has a status, that non-COVERED ids carry a note, that DEFERRED ids belong to a
+  whitelisted prefix, and that the COVERED count is exactly as pinned. **The gap:** the gate's universe
+  is the catalog. §14.3's minimum-conformance scenarios were never minted as rule ids, so the
+  obligation is not under-covered — it is absent from the accounting, which is a strictly weaker state
+  than DEFERRED and produces no artifact anywhere. And where the obligation's subject matter WOULD be
+  named, at `RPH-E2E`, the manifest's docblock tells the reader the accounting is complete and honest:
+  `:463-466`, *"ONE ENTRY REMAINS, AND ITS DEFERRAL IS REAL — checked in both directions rather than
+  assumed by association. No `RPH-E2E` rule id appears in any check, any test, or any source file in
+  this repository; the seven scenarios are genuinely unbuilt."* That sentence is TRUE and it is the
+  problem: a reader who checks the end-to-end obligation set finds a reasoned, recently-audited
+  all-clear. The same docblock states the cost of an entry in that set, at `:451-454`: *"an entry here
+  does not weaken a claim, it DELETES the claim … Everything else in this module fails LOUDLY when
+  wrong; a wrong entry here fails silently, forever."*
+
+- **⚠ ONE CORRECTION TO THE STRUCK CLAIM'S SECOND LIMB, recorded rather than quietly inherited.** The
+  claim reads *"the gate blesses the omission by declaring the whole E2E family deferrable"*. As a
+  statement ABOUT THE GATE that is exactly true — all seven `RPH-E2E` ids are certified DEFERRED and the
+  prefix is whitelisted. But the six-path scenario is **not one of those seven**, so the exemption is
+  not the mechanism that hides THIS obligation. The real mechanism is worse and was not in the struck
+  claim: the obligation has no rule id anywhere in the gated catalog (`bypass` → **0** occurrences,
+  DRIVEN), so it cannot be deferred, covered, partial or unaccounted. The exemption's contribution is
+  that it makes the end-to-end books LOOK balanced while they are silent.
+
+- **WHAT PARTIAL COVERAGE DOES EXIST, stated so this is not overclaimed.** Five tests come near and
+  none is the scenario. (a) `packages/rph-application/src/handlers/generic-setter-scope.test.ts:3-7`
+  quotes DOC-003 §9 PER-3's own bypass list verbatim, but proves only that `ChangePwuState` may not
+  perform a PWU work-lifecycle arrow a semantic command owns; its header disclaims its own reach at
+  `:14-17` (*"A table-driven test that reads the same table the handler reads can only prove TOTALITY …
+  It cannot prove the CLASSIFICATION"*). Different invariant, one path, no assurance. (b)
+  `pwa-authoring.test.ts:1263` — *"rejects a DIRECT command that references a locked floor policy
+  (bypassing broker/UI)"*, with siblings at `:1270` and `:1276`; one rule against the UI path only.
+  (c) `execution-floor-subject.test.ts:226` — *"an output that is not a recorded object blocks
+  completion — the bypass, closed"*; one rule, one arrangement. (d) ⚠ **the near-miss neither the sweep
+  nor the draft named, and the one whose WORDING is closest:**
+  `packages/rph-application/src/handlers/baseline-open-blocking-observation.test.ts:9` quotes Guide
+  §9.3 L1218 byte-exact — *"→ revalidate impact/revalidation closure and reject missing, failed, stale,
+  invalidated, or bypassed assurance"* — and drives the REAL pipeline; but it asserts exactly one rule
+  (RPH-BAS-003, `:191`), against the dispatch path only, and names none of the six. (e) **REG-F-246**
+  (heading at `docs/canon/JPWB-REG-005 Decision and Divergence Register.md:16082`) DROVE a real
+  direct-persistence bypass and files it — but as `limb:PER-3:2`, under DOC-003's write-path invariant,
+  and it closes harmonization item **#31**, not #11 (`:16295`, *"CENSUS RECONCILIATION — LIMB IDS THIS
+  ENTRY CLOSES: `limb:PER-3:2`. It closes nothing else"*). It is evidence that one of the six paths is
+  genuinely open; it is not the §14.3 proof, and it says so. ⚠ **THE SHAPE THE SCENARIO NEEDS ALREADY
+  EXISTS AND IS SPENT ON A DIFFERENT RULE:** `apps/rph-demo/e2e/decisions.e2e.ts:92-95` posts the
+  SvelteKit action directly to reach a server-side guard, reasoning *"a client-side `required` that the
+  server does not enforce is a validation that a curl request walks past"* — the UI-path pattern,
+  applied to decision subjects rather than to required assurance.
+
+- **OBSERVED / READ — stated per conjunct.** **DRIVEN by me on this verification pass (node v24.11.1,
+  HEAD `856dd8e1`):** (i) `./node_modules/.bin/vitest run packages/rph-domain/src/conformance.test.ts`
+  → *"Test Files 1 passed (1) · Tests 9 passed (9)"* — the gate is green with the obligation unbuilt;
+  (ii) `vitest run --root apps/rph-demo src/lib/server/assurance/reasoning-review-validator.test.ts` →
+  *"Tests 8 passed (8)"* — the CoT half of L2332 is built and green, which is what makes the missing
+  half a half rather than a scope argument; (iii) a node probe over the built
+  `packages/rph-domain/dist/index.js`, calling `coverageFor` for every id in the vocab catalog →
+  `{"COVERED":42,"PARTIAL":76,"DEFERRED":7}`, every DEFERRED id `RPH-E2E`,
+  `coverageFor('RPH-E2E-001')` → `{"status":"DEFERRED","note":"full end-to-end scenarios …"}`,
+  `DEFERRABLE_PREFIXES` → `['RPH-E2E']`; (iv) the same probe over the catalog JSON → **125** rules,
+  **7** `RPH-E2E` ids, **12** rules with a `§14` `sourceRef` (all `RPH-ASR-*`), `/bypass/i` → false,
+  `/assurance/gi` → **44** matches (the positive control that the false is real). **READ, not driven:**
+  the Guide bullet and its antecedent, the manifest and gate sources, `deferral-honesty.test.ts`'s
+  disclaimer, the five near-miss tests, `turbo.json`'s reach, and every corpus citation below.
+  **NOT CLAIMED:** I did not drive any of the six paths and did not attempt a bypass — that would be a
+  different finding (REG-F-246 is that finding for one path). This entry is about the ABSENCE OF THE
+  PROOF and the gate's inability to notice it, both of which are established by census and by running
+  the gate.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#11** (line **99**),
+  struck under the heading at `:87`, *"Refuted (32) — recorded so they are not re-raised"*, **with no
+  reason recorded** — no evidence, no site, no date. That is worse than an unfiled finding: an unfiled
+  gap invites the next search, while an affirmative record that a live gap is not a gap ends every
+  future search with the corpus's own authority. Re-checked at HEAD by the 2026-08-23 sweep, whose
+  disposition is at `:657` (`### Item 11 — TRUE AT HEAD`) and `:661-664` — *"⚠ **TRUE AT HEAD**
+  (confidence HIGH). **The strike is wrong and is kept only as history.** … **⚠ OWES A REGISTER
+  ENTRY.**"* Re-verified independently by me at HEAD `856dd8e1`, at every site, with the controls above.
+  **This entry is that filing.** The heading at `:87` now carries *"⚠ **RE-DISPOSITIONED 2026-08-23: 15
+  OF THE 32 ARE TRUE AT HEAD**"*, so the strike no longer misleads — but a re-disposition in a working
+  paper is not a register entry, and the file itself says the entry is owed.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only (`-i` and `-F`
+  never combined — the instrument aborts and returns a silent zero through a pipe); every long hit
+  opened with `awk`/`sed`. Columns are REG-005 / `enforcement-register.ts` /
+  `verif/guard-enforcement-ledger.data.ts` / count of matching files in `docs/_working/`.
+  **BY OBLIGATION:** `14.3` → **0 / 0 / 0 / 4** — the register has never once cited Guide §14.3,
+  against the live control `14.1` → **18 / 1 / 4 / 7** run in the same sweep with the same flags. The
+  four working-corpus files are `HARMONIZATION-FINDINGS.md` (the item and its disposition),
+  `PROPOSED-EDITS-recording-and-cot.md:160` (a proposed edit to L2332's CoT clause, **not** the bypass
+  clause), `DESIGN-invariant-enforcement-mapping.md:511` (a heading numbered 14.3 in that paper, not a
+  citation) and `AUDIT-shape-survivorship-2026-08-20.md:191` (a DOC-007 §14.3 field list).
+  `server-side assurance` → **1 / 0 / 0 / 2**; the single register hit is `:16203`, REG-F-246 quoting
+  item #11 as struck — a pointer, not a filing. `Minimum conformance` → **0 / 0 / 0 / 2**;
+  `six named paths` → **0 / 0 / 0 / 1**. **BY SITE/SYMBOL:** `RPH-E2E` → **5 / 2 / 0 / 4** (control
+  `RPH-FIX` → **15 / 4 / 0 / 4**); all five register hits opened — `:718`, `:720`, `:723` are
+  REG-F-019's disposition, `:3681` is a staleness correction about RPH-FIX, `:9883` is a prose-string
+  census. `DEFERRABLE_PREFIXES` → **10 / 3 / 0 / 1**; all ten register hits opened — `:578`, `:581`,
+  `:583` (REG-F-013, removing `RPH-CMP`), `:705`, `:706`, `:720`, `:723` (REG-F-019, removing
+  `RPH-FIX`), `:3681`, `:9310` (REG-F-225's DEFERRED-token census), `:21465` (a positive control inside
+  REG-Q-067's own search block). **Both of those entries move rules OUT of the set; neither asks what
+  the set makes invisible.** `deferral-honesty` → **4 / 0 / 0 / 1** (`:721`, `:723`, `:4678`, `:4688` —
+  all REG-F-019 and its later citation); `conformance-manifest` → **16 / 4 / 0 / 5**;
+  `conformance.test.ts` → **25 / 0 / 1 / 13**; `reasoning-review-validator` → **3 / 0 / 0 / 1**, all
+  three opened (`:12387`, `:21077`, `:21142` — a wire-writer census, a raw-output question, a
+  supersession census; none about §14.3). **⚠ THE 77 ENTRIES OF THE LAST TWO DAYS WERE GREPPED
+  SPECIFICALLY, OVER THE FULL REGION** — REG-F-203..262 and REG-Q-053..069 begin at `### REG-F-203` on
+  register line **4892** (`### REG-Q-053` at `:10954`), not at the REG-F-234 boundary a narrower cut
+  would take; over `:4892-22058`, **17,167 lines**: `14.3` → **0**, `RPH-E2E` → **1** (`:9883`, the
+  prose-string census), `DEFERRABLE` → **2** (`:9310`, `:21465`), `conformance-manifest` → **5**,
+  `bypass server-side` → **1** (REG-F-246's pointer at `:16203`), against live controls in that same
+  region of `conformance` → **52** and `e2e` → **12**. **REPO-SIDE:** no `verif/` or `scripts/` census
+  covers this — `grep -rn "14\.3" verif/ scripts/` → **0**, control `conformance` over the identical
+  population → **86** lines in **16** files.
+
+- **THE REMEDY.** Two halves, and the populations are DERIVED rather than hand-listed. **(1) BUILD THE
+  SCENARIO.** A §14.3 conformance test — properly sited in `apps/rph-demo` beside the CoT half it
+  shares a sentence with, since only the app composes engine + authoring + projections — that for each
+  of the six named paths drives the real surface and asserts a REFUSAL when required assurance is not
+  satisfied. `apps/rph-demo/e2e/decisions.e2e.ts:92-104` is the working template for the UI limb.
+  Derive each surface from the filesystem, never from a list in the test: the UI path from
+  `apps/rph-demo/src/routes/**/+page.server.ts` and `**/+server.ts` (today **6** and **4**, the latter
+  being `pwa/[id]/agent`, `test-api/dispatch`, `test-api/introspect`, `test-api/reset`); the agent path
+  from `apps/rph-demo/src/lib/server/agent/`; the retry path from the execution-retry handlers; the
+  direct-persistence path from `StorageAdapter.commit` implementors; the projection path from
+  `packages/rph-projections/src/index.ts`'s exports. ⚠ **THE WORKER LIMB IS DISCHARGEABLE BY A DERIVED
+  ABSENCE, NOT BY SILENCE:** there is no RPH worker process —
+  `grep -rln "worker" --include=*.ts packages/rph-*/src apps/*/src` → **3** files, of which two are
+  canon quotes (`rph-application/src/handlers/pwu.ts:413-414`, `generic-setter-scope.test.ts:6`) and one
+  is about vitest's own workers (`rph-persistence/src/sql-driver.ts:1` and `:30`), against a control of
+  **91** files containing `projection`. The scenario must ASSERT that absence so a future worker cannot
+  appear un-gated. **PREDICTED RED, required before any green is trusted:** for each path, neutralize
+  the assurance check at ITS site and that path's case must redden naming that path — a case that stays
+  green with the gate removed proves nothing, and one arrangement must not redden two paths.
+  **(2) MAKE THE GAP VISIBLE TO THE ACCOUNTING.** The gate cannot see an obligation with no id. Either
+  mint the §14.3 additional-scenario bullets into the gated population (they are Guide obligations, so
+  this is a corpus act and belongs in the same commit as the scenario), or add a `verif/` ledger of
+  §14.3's bullets with the same UNACCOUNTED shape as `conformance.test.ts:73-78`, deriving the bullet
+  list from the Guide between `L2323` and the blank at `L2333`. Whichever is chosen,
+  `conformance-manifest.ts:463-466`'s all-clear must be narrowed to say what it actually covers — the
+  seven §24 scenarios — because as written it tells the next reader the end-to-end obligation set is
+  fully and honestly accounted for, and that is how this survived.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#11** (`HARMONIZATION-FINDINGS.md:99`,
+  disposition at `:657`). **It closes nothing else, because** the two adjacent items have different
+  subjects and different remedies: **#30** (`:118`, *"The e2e suite is the only thing proving §15.6's
+  PWA Designer/authoring obligations, and the CI gate never runs it"*) is about
+  `.github/workflows/ci.yml`, whose seven `run:` steps — Install, Build, Type-check, Lint, Boundary,
+  Format check, Test — end at `bun run test` (`:29-30`) and never reach `bun run e2e`, which lives only
+  in `package.json:26`'s `gate:fast` — a true and separate defect that I verified in passing and
+  deliberately do not file here; and **#31** (`:119`, the boundary gate not cruising `apps/`) is already
+  filed as **REG-F-246**, which also carries `limb:PER-3:2`. This entry adds one thing none of them
+  holds: **the measured absence of any proof of the §14.3 six-path obligation, together with the
+  demonstration that the repository's conformance accounting is structurally unable to record that
+  absence.**
+
+- **Merge target:** **BOTH.** *Repository* — a new §14.3 conformance scenario under
+  `apps/rph-demo/src/lib/server/` (or `verif/`), plus whichever accounting change (2) resolves to, plus
+  the narrowing of `packages/rph-domain/src/conformance-manifest.ts:463-466`. *Corpus* — one pointer:
+  `docs/_working/HARMONIZATION-FINDINGS.md`'s `### Item 11` (`:657`) should name this entry's ordinal
+  once assigned, so the re-disposition and the filing reference each other. No ratification is required
+  for limb 1: §14.3 states the obligation flatly and the repository has already accepted that the block
+  binds it by shipping the sentence's first clause, green. Status: OPEN.
+
+### REG-F-268 — the durable PWA-authoring turn record can carry no time at all: its entry contract is a
+`z.strictObject` that REFUSES every time key, so the per-tool-call start/end §9.7 requires is
+inexpressible rather than merely unimplemented
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `AUTHORING_CONVERSATION` is the only durable record of what an
+  authoring agent did, and its element type is `ConversationEntrySchema` = `{role, kind, text,
+  success?}` — four fields, nothing else. Because it is a `z.strictObject`, a time on an entry is not
+  merely absent, it is **REFUSED**: presenting `occurredAt`, `startedAt`/`completedAt` or `recordedAt`
+  on an entry fails schema validation at the boundary, so no call site can supply one and no app-layer
+  repair is possible without a contract change. Canon binds PWA authoring to the *identical* recording
+  obligation an Execution Attempt carries, and the execution plane really does derive
+  `startedAt`/`completedAt` per attempt; the authoring plane can derive none. The one latent time —
+  the append event's `occurredAt`/`recordedAt` — is per-TURN, not per-entry, and the only reader of
+  the transcript never touches the event at all.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.**
+  - **JPWB-DOC-003 PER-9** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:369`,
+    under `## 9. Persistence semantics` at `:333`): *"Every material act in the stream retains
+    identity, scope, actor and provenance, correlation and causation, exact
+    input/subject/context/policy/evidence/output references, **the time dimensions PER-11 requires**,
+    and status/supersession relations."* And, inside the same invariant, the clause that names this
+    plane: *"Where no Execution Plan exists — PWA authoring among them — the identical obligation
+    binds to the plane's governed-stream record."*
+  - **JPWB-DOC-003 PER-11** (`…Semantic Model and Invariant Catalog.md:377`): *"Every durable semantic
+    record preserves semantic-occurrence time and record time as distinct meanings, and carries
+    observed, valid, and Decision-effective time where their distinction matters."*
+  - **The Guide §9.7** (`docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:1340`):
+    *"Every tool/sandbox call records identity, authorization scope, input reference, **start/end**,
+    result/error, resource use, and declared outputs."* — and, on that same line, *"Where no Execution
+    Plan exists—PWA authoring is the current example—the identical recording obligation binds to the
+    plane's own governed-stream record, not to an Execution Attempt."* **`start/end` is two times per
+    tool call.** The carrier for a tool call in this repository is a `ConversationEntry` of kind
+    `tool_call` / `tool_result` (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:196-208`).
+  - **The Guide §9.4 "Envelope and schema rules"** (heading at `…Coding Agent Guide.md:1230`) fixes the
+    shape the added field must take, `:1239`: *"RFC 3339 UTC timestamps;"* — so the remedy is not a
+    free choice of representation.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD** (856dd8e1 — not a4a19057, which is now HEAD~1;
+  the one commit between them touches only `docs/` and `verif/`, no file cited in this entry).
+  `packages/rph-contracts/src/objects.ts:188-193`, read field by field this pass:
+  ```
+  export const ConversationEntrySchema = z.strictObject({
+  	role: z.string(),
+  	kind: z.string(),
+  	text: z.string(),
+  	success: z.boolean().optional()
+  });
+  ```
+  That one type is the whole durable turn record. It is what the command carries
+  (`packages/rph-contracts/src/messages.ts:682-685`, `AppendConversationEntriesPayloadSchema … entries:
+  z.array(ConversationEntrySchema)`), what the event carries (`messages.ts:1711-1714`,
+  `ConversationEntriesAppendedPayloadSchema`), and what the object stores
+  (`AuthoringConversationSchema`, `objects.ts:767-771`, `entries` at `:770`).
+
+- **OBSERVED — I DROVE THE CONTRACT, I did not only read it.** Node against the built contract
+  (`packages/rph-contracts/dist/objects.js:96`, whose text is byte-identical to the `src` block above
+  and newer than it; `src/objects.ts` is clean at HEAD). Verbatim tool output:
+  ```
+  A baseline {role,kind,text}  -> ACCEPTED
+  B + occurredAt (RFC ts)      -> REFUSED | unrecognized_keys::Unrecognized key: "occurredAt"
+  C + startedAt/completedAt    -> REFUSED | unrecognized_keys::Unrecognized keys: "startedAt", "completedAt"
+  D + recordedAt               -> REFUSED | unrecognized_keys::Unrecognized key: "recordedAt"
+  CONTROL missing text         -> REFUSED | invalid_type:text:Invalid input: expected string,
+                                            received undefined
+  ```
+  **The control matters:** the schema is alive and really does refuse, so B/C/D are a refusal of the
+  time key and not a dead parse. **That is the whole finding: `start/end` cannot be written.**
+
+- **OBSERVED, SECOND ROUTE — DRIVEN THROUGH THE REAL COMMAND PIPELINE, not the schema in isolation.**
+  A throwaway vitest suite over `Engine` + `SqliteStorageAdapter` (the same harness as
+  `packages/rph-application/src/handlers/pwa-authoring.test.ts:25-49`) dispatched a real
+  `AppendConversationEntries` per case. Verbatim result line, reformatted one case per row:
+  ```
+  A baseline {role,kind,text} -> ACCEPTED
+  B + occurredAt              -> VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed
+  C + startedAt/completedAt   -> VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed
+  D + recordedAt              -> VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed
+  CONTROL missing text        -> VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed
+  ```
+  So the refusal is not a property of the contract read alone: **a per-entry time is refused by the
+  dispatch pipeline**, and the code a remedy must predict-red against is `RPH_VALIDATION_SCHEMA_FAILED`
+  with the generic message *"Schema validation failed"* — the zod `unrecognized_keys` detail above
+  does **not** survive to the command result. ⚠ **EM-2, DISCLOSED AGAINST MYSELF:** the first two runs
+  of this drive reported `A baseline -> REJECTED`, i.e. a DEAD CONTROL — the aggregate id was a 25-char
+  ULID and every case failed on the id, not on the entry. The control is the only reason those runs
+  were not read as evidence. The rows above are from the run whose control is ACCEPTED.
+
+- **THE GAP IS AT THE AUTHORING SOURCE, NOT ONLY AT THE GENERATED FILE — a route neither the sweep nor
+  the draft took.** `packages/rph-contracts/src/objects.ts:1` says *"GENERATED FILE — do not edit by
+  hand. Regenerate with `bun run gen:objects`."* and `:2` names the input: *"Source:
+  vocab/m1-object-fields.json"*. That input declares this sub-type at
+  `packages/rph-contracts/vocab/m1-object-fields.json:3013` (`"name": "ConversationEntry"`) with
+  exactly four fields — `role` `:3016`, `kind` `:3022`, `text`, `success` `:3033`, closing at `:3038`
+  — **and no time field.** So the absence is authored, not a generation artifact, and the remedy
+  edits this file. **EM-2 POSITIVE CONTROL in that same file, same flag:** `"field": "[a-zA-Z]*At"`
+  → **7** (`createdAt`, `capturedAt`, `startedAt`, `completedAt`, `effectiveAt`, `expiresAt`×2) — the
+  vocabulary plainly does carry time fields elsewhere, so **0** on this sub-type is a real absence.
+
+- **⚠ THE HONEST QUALIFICATION, AND WHY IT DOES NOT DISSOLVE THE FINDING.** PER-11's own
+  invariant sentence ends *"Exact field spellings and placement are repository shapes"*
+  (`…Invariant Catalog.md:377` — that clause is in the invariant, **not** in the SCOPE line at
+  `:379`, which reads *"governs events, observations, assessments, decisions, and version history."*),
+  and the NON-EXAMPLE on `:379` reads *"records whose dimensions provably coincide need not carry
+  redundant fields — the preserved meaning distinction, not field count, is the requirement."*
+  A defender will point at the append event, which genuinely carries both dimensions
+  (`occurredAt: command.issuedAt` /
+  `recordedAt: ctx.now()`, `packages/rph-application/src/handlers/kit.ts:207-208`, both REQUIRED on
+  the envelope at `packages/rph-contracts/src/envelopes.ts:148-149`), and at the object envelope's
+  `createdAt`/`updatedAt` (`envelopes.ts:56`/`:58`). **That defence fails on two independent grounds,
+  both re-established here:**
+  - **(a) The append is per-TURN, so one event timestamp cannot carry N tool calls' start AND end.**
+    `recordConversation(...)` is called once per turn, guarded by a `conversationRecorded` flag, and
+    hands over the entire `transcript` array
+    (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:365`, with the failure path at `:271`).
+    Every entry in that turn therefore shares one `occurredAt`. §9.7 asks for two times *per tool
+    call*; the stream offers one time *per turn*.
+  - **(b) The only reader never reads the event.** `loadConversation`
+    (`apps/rph-demo/src/lib/server/workbench.ts:340-346`) returns
+    `getConversation(engine, pwaId)?.state.entries` — object state, not the stream — and the handler
+    flattens every turn into one array, `entries: [...prior, ...p.entries]`
+    (`packages/rph-application/src/handlers/pwa-authoring.ts:100` — **not `:99`, which is
+    `...nextEnvelope(loaded.state, command, newRevision),`**), which discards even the turn
+    boundary. The page then maps that array to render rows carrying `{kind, text, ok?}` and no time
+    (`apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:59-77`, `toLogEntry` at `:64`). So the latent
+    event-level time is unreachable by the only consumer that exists.
+  - **AND THE COMPARISON THAT SETTLES "placement is a repository shape".** The execution plane, which
+    canon says carries the *identical* obligation, DOES build the axis:
+    `packages/rph-projections/src/execution-attempts.ts:188` folds `event.occurredAt` into `startedAt`
+    and `:201` into `completedAt` (fields declared at `:40-41` and `:60-61`). The authoring plane has
+    no such projection to fold into — see the census below.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora — Bash `grep`, long hits opened
+  with `sed -n Np`. Format `REG-005 / enfreg / ledger / _working`.**
+  - **By symbol.** `ConversationEntry` **5 / 0 / 0 / 8** · `AUTHORING_CONVERSATION` **0 / 0 / 0 / —** ·
+    `AppendConversationEntries` **6 / 0 / 0 / 3 files** · `ConversationEntriesAppended` **6 / 0 / 0 /
+    —** · `loadConversation` **1** · `toLogEntry` **0** · `TRANSCRIPT_KIND` **1**.
+  - **By SITE.** `objects.ts:188` → **2** in REG-005 (`:10282` and `:10338`, both REG-F-230);
+    `objects.ts:190` → **1** (`:16969`; the sentence it serves is at `:16968`), REG-F-249.
+  - **By CONCEPT.** `"per-entry timestamp"` **0** · `"turn record"` **0** · `"durable turn"` **0** ·
+    `"time axis"` **1**, and it is REG-F-207's heading (`:5650`, baseline readiness over a
+    promoter-named set — a different subject). `"materialized input"` → **0 in REG-005**, though the
+    phrase is canon (`…Invariant Catalog.md:369`, Guide `:1340`).
+  - **⚠ THE ONE SEARCH THAT NEARLY LANDS ON THIS, DISCLOSED RATHER THAN OMITTED.** `start/end`
+    → **1** in REG-005, at `:10317` — and it is **REG-F-230 quoting HF #63 verbatim**, immediately
+    followed by REG-F-230's own ruling on it (`:10318-10320`): *"It measures the RECORD's shape —
+    this entry's second half — and says nothing about the record reaching the REVIEW."* So the
+    phrase is present in the register **as a citation of an unfiled finding**, not as a filing of it.
+    Related concept greps: `tool/sandbox` → **0**, `per-entry` → **0**, `bitemporal` → **2**,
+    `occurrence and record` → **1** (REG-Q-055, `:11538`).
+  - **EM-2 POSITIVE CONTROLS, same files, same flags, counts reported.** REG-005: `objects.ts:` →
+    **155**, `envelopes.ts` → **24**, `z.strictObject` → **59**, `timestamp` → **11** (`-i`: 12),
+    `occurredAt` → **9**, `pwa-authoring.ts` → **49**, `PER-11` → **23**, `PER-9` → **4**.
+    `packages/rph-domain/src/enforcement-register.ts` (4168 lines): `conversation` **0**, `transcript`
+    **0**, against controls `RPH-EVD` → **37** and `timestamp` → **6**.
+    `verif/guard-enforcement-ledger.data.ts` (392 lines): `conversation` **0**, `transcript` **0**,
+    against control `RPH-` → **8** (`RPH-ASM-006`, `RPH-BAS-007`, `RPH-CNS-003`, `RPH-DOC-002`,
+    `RPH-DOC-008`, `RPH-EVD-002`, `RPH-INT-007`, …). `docs/_working/` (69 files): `ConversationEntry`
+    → 8 hits in 2 files, against control `pwaId` → **4 files**.
+  - **⚠ THE 77 ENTRIES FROM THE LAST TWO DAYS WERE GREPPED SPECIFICALLY.** REG-F-203 opens at `:4892`
+    and REG-Q-069 at `:21796`; every `ConversationEntry`-family hit from `:8531` onward falls inside
+    that block, and each was opened: `:8531` an event-name list; `:10282`/`:10289`/`:10293`/`:10294`/
+    `:10338` **REG-F-230**; `:14864`/`:14868` and `:16967`–`:17130` **REG-F-245 / REG-F-249**; `:3492`
+    the JAN-CMDPRE **residual R2** deferral, which is about a *stable per-act id*, not about time.
+  - **WHY NONE OF THEM COVERS THIS.** **REG-F-230** (`:10205`) quotes this exact schema but files two
+    other things — that tool-call records never reach Reasoning Review, and (remedy item 4, `:10338`)
+    that the entry needs a **tool-AUTHORIZATION** field; it says nothing about time. **REG-F-249**
+    (`:16909`) cites `kind: z.string()` (`:16968`) only as proof that the carrier is *open* to a
+    `thinking` trace under PER-12 — its remedy closes a door, it does not add a time. **REG-Q-055**
+    (`:11480`) is PER-11's *Decision-effective* dimension, and it explicitly rules the
+    occurrence-vs-record conjunct *"ENFORCED BY CONSTRUCTION"* **on the event envelope**
+    (`:11538-11546`) — which is precisely the level this entry says is the wrong level.
+
+- **THE CENSUS THAT SHOWS THE GAP IS NOT MADE UP ELSEWHERE (derived, not enumerated).**
+  `grep -rn "ConversationEntriesAppended" --include=*.ts packages apps/rph-demo/src` (non-`dist`) →
+  **14 hits in 4 files, all of them the handler, the contract, or tests** (`pwa-authoring.ts` 4,
+  `messages.ts` 6, `dwp08-precondition-coverage.test.ts` 3, `validate.test.ts` 1). **No projection or
+  reader consumes the event, so nothing rebuilds a time axis from it.** ⚠ **AND I CORRECTED THE
+  SWEEP'S CONTROL, WHICH WAS DEAD (EM-2).** The sweep offered `PwaCreated` → 7 as proof that
+  *"event-name greps do return consumers here"*; opened, all seven are `pwa-authoring.ts:250-251` plus
+  five `messages.ts` declarations — **not one is a consumer**, so that control proves nothing.
+  **THE DERIVED CONTROL THAT DOES WORK:** `packages/rph-projections/src` folds **40** distinct
+  `case '<EventType>'` labels (`AssumptionDetected`, `AssuranceAssessmentCompleted`,
+  `AssuranceEvidenceReceived`, …) and **0** of them name a Conversation event; `conversation`
+  case-insensitively across that whole package is **0**. The instrument reaches 40 event types and
+  finds this one nowhere.
+
+- **⚠ IT WAS RECORDED AS REFUTED, WITH NO REASON.** `docs/_working/HARMONIZATION-FINDINGS.md` item
+  **#3** (line **91**): *"Transcript entries are contractually untyped and carry no timestamp, so the
+  durable turn record has no time axis."* — struck, under the heading at line **87**, *"Refuted (32) —
+  recorded so they are not re-raised"*, **with no evidence, no site and no date recorded** (the file
+  itself now says so at `:126`). That instruction is the harm: a missing filing invites a search, but
+  a filing that records the claim as refuted ends every future search with the corpus's own authority.
+  Re-checked at HEAD 2026-08-23 and **TRUE**; the sweep's disposition is appended to the same file at
+  `### Item 3 — TRUE AT HEAD` (line **249**). ⚠ **AND THE SAME WORKING CORPUS ALREADY CONTRADICTED THE
+  STRIKE:** `docs/_working/HARMONIZATION-LOG.md:258` carries finding **F4**, labelled *"The priority
+  defect"*, reading *"`ConversationEntry` = `{role, kind, text, success?}` is the entire durable record
+  of an agent turn. **No timestamp**, no producer, no model…"* against §9.7 L1340 — so the claim was
+  struck as refuted in one working file while standing as the priority defect in its sibling.
+
+- **THE REMEDY.** Repository, and it must start at the contract, because the contract is what refuses.
+  1. **Give `ConversationEntry` the time dimensions PER-11 names**, as required fields, so an entry
+     that omits them is inexpressible rather than merely unusual: an occurrence time for the act, and
+     — for `kind: 'tool_call'`/`'tool_result'` — the `start/end` pair §9.7:1340 names. Edit
+     `packages/rph-contracts/vocab/m1-object-fields.json:3013-3038` and re-generate with
+     `bun run gen:objects` — the instruction `objects.ts:1` itself carries — never by hand-editing
+     `objects.ts`, which is a generated file.
+  2. **Populate them at the one write boundary**, `recordEvent`
+     (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:190-212`), where each `transcript.push(...)`
+     already knows the instant it fires — today it pushes four literal shapes with no clock read.
+  3. **RED FIRST, and name the test that must redden.** Before the field exists, a test asserting that
+     `AppendConversationEntries` carrying a per-entry occurrence time is ACCEPTED **must fail with
+     `RPH_VALIDATION_SCHEMA_FAILED`** — that is the predicted red, and it is the drive recorded above.
+     A suite that is green before that red proves nothing.
+  4. **Do NOT settle the gap by adding another event-level or object-level time.** Both already exist
+     (`envelopes.ts:148-149`, `:56`/`:58`) and neither reaches an entry; a third at those levels would
+     close the *appearance* of this finding without closing it.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#3** (its timestamp half; the typing
+  half is filed as its own QUESTION alongside this entry, because that half's remedy is an
+  adjudication). **It closes nothing else, because:**
+  - **Not #63** (`HARMONIZATION-FINDINGS.md:73`, MATERIAL, unstruck, still open): *"Tool-call records
+    lack start/end, resource use and authorization scope, flatten arguments into an ambiguous string,
+    and discard the tool's structured result."* This entry supplies the **contract-layer blocker** for
+    #63's `start/end` limb — #63 cannot be fixed at its own site while the strict object refuses the
+    key — but #63 keeps resource use, authorization scope, argument flattening, and the discarded
+    structured result. ⚠ **#63's anchor has DRIFTED:** it cites `agent/+server.ts:162`, which at HEAD
+    is `turn.engine` (a dispatch argument); `candidateSubjectHash: subjectHash` is `:160`, and the
+    tool-record site is `:196-208`. REG-F-230 carries the same stale anchor at `:10315`.
+  - **Not REG-F-230's remedy item 4** (`:10338`), which asks the same strict object for a *tool
+    authorization* field. Same schema, different field — the two should land in one contract change,
+    and neither closes the other.
+  - **Not item #1 of the struck 32** (objects attributed to a constant role label rather than the
+    model identity), which is a provenance claim about *who* authored, not about *when*.
+  - **Not REG-Q-055**, which is PER-11's *Decision-effective* dimension at the event/decision level.
+
+- **Merge target:** BOTH — Repository (`packages/rph-contracts/src/objects.ts:188-193` via the
+  vocabulary generator, and `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:190-212`) and Corpus
+  (this entry, plus striking the item-#3 line at `HARMONIZATION-FINDINGS.md:91` off the refuted list).
+  Status: OPEN.
+
+### REG-F-269 — the Confidence Assessment contract is an open key/value bag, so the one arrangement canon
+names as forbidden — a bare aggregate score with no basis and no limitations — validates on both the
+stored object and the wire event
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** Canon states a minimum rule for Confidence Assessment with two named
+  elements and one named prohibition: it is a *"Qualified assessment with basis and limitations"* and it
+  is *"never an unexplained aggregate score."* The type that implements it is
+  `z.record(z.string(), z.unknown())` — every key optional, every value `unknown`, nothing required. The
+  prohibition is therefore not merely unenforced, it is **inexpressible**: no arrangement of this schema
+  refuses `{ score: 0.92 }`, because the schema requires nothing and rejects nothing. The forbidden shape
+  is admitted on the STORED object (`AssuranceAssessment.confidence`) and, independently, on the WIRE
+  (`AssuranceAssessmentSatisfied`), so a producer can put a bare number into the governed event stream
+  and call it professional confidence.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.** Three artifacts say the same thing, and the third is
+  this repository's own contract catalogue.
+  - **Ratified canon.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:92`, under the
+    heading `## 3. Core objects and minimum rules` read off `:75` (not inferred), byte-exact:
+    `| **Confidence Assessment** | Qualified assessment with basis and limitations; never a substitute
+    for Evidence, never an unexplained aggregate score. |`
+  - **The Guide (historical material under CON-000 B1, cited because the struck item cited it).**
+    `docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:387`, under the heading
+    `### 5.2 Core semantic objects` at `:368`, byte-exact: `| **Confidence Assessment** | Qualified
+    assessment with basis and limitations. It cannot replace Evidence or become an unexplained
+    aggregate score. |`
+  - **⚠ THE REPOSITORY'S OWN VOCAB ROW — AND, ADDED BY THE VERIFYING PASS, ITS OWN DISCLAIMER.**
+    `packages/rph-contracts/vocab/m3-commands-events.json:3821-3824` describes the `confidence` field of
+    `AssuranceAssessmentSatisfied` (eventType declared at `:3804`) as `"type": "ConfidenceAssessment"`
+    with `"note": "complex type (basis+limitations)"`. **The vocab row and the schema describe the same
+    field of the same event and disagree:** the catalogue says basis+limitations, the schema says
+    `z.record`. ⚠ **BUT THAT ROW IS NOT AN AUTHORITY, BY ITS OWN WORDS.** Its `sourceSection` at `:3806`
+    reads *"UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant) … these fields were AUTHORED,
+    not derived … Do NOT treat this sourceSection as proof the shape is ratified."* So this is an
+    INTERNAL INCONSISTENCY between two authored catalogue rows and the schema — worth closing in the
+    same commit — and **not** a second ratified requirement. **The ratified requirement is DOC-003:92
+    alone, and it is sufficient.**
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD.**
+  - `packages/rph-contracts/src/objects.ts:80` — `export const ConfidenceAssessmentSchema =
+    z.record(z.string(), z.unknown());` with the type alias at `:81`. It sits under the block header at
+    `:66-67`: *"Helper sub-types the specs reference but never fully define. Permissive structured
+    placeholders (any object) — tightened in the milestone that defines them (M7/M9/M11)."*
+  - `packages/rph-contracts/src/objects.ts:569` — `confidence: ConfidenceAssessmentSchema.optional(),`
+    inside `AssuranceAssessmentSchema` (declared `:553`), the STORED object.
+  - `packages/rph-contracts/src/messages.ts:911` — `confidence: ConfidenceAssessmentSchema.optional(),`
+    inside `AssuranceAssessmentSatisfiedPayloadSchema` (declared `:908`), the WIRE event payload.
+  - **NOTHING READS IT.** `confidence` (case-sensitive) in `packages/*/src`, non-test → **7** hits,
+    every one opened: the two field declarations above, two prose comments
+    (`rph-assurance/src/floor.ts:97`, `rph-domain/src/governance.ts:531`), one guard-ledger key string
+    (`rph-domain/src/transitions.data.ts:1413`), and two PWA ontology prose strings
+    (`rph-product-realization-pwa/src/ontology.data.ts:16`, `:456`). **No handler validates, populates,
+    or reads the field.** ⚠ **CORRECTED SCOPE:** repo-wide the only OTHER non-test hits are the two
+    guard-ledger lines discussed below (`verif/…:191`, `:193`) and generated `.svelte-kit` build output
+    under `apps/rph-demo/` — no additional reader. The schema is the only gate there is, and it gates
+    nothing.
+
+- **OBSERVED — DRIVEN, not read.** `node` against the built contracts
+  (`packages/rph-contracts/dist/index.js`, re-verified at HEAD to carry the same
+  `z.record(z.string(), z.unknown())` at `dist/objects.js:14`), verbatim results:
+  - `ConfidenceAssessmentSchema.safeParse({score:0.92}).success` → **`true`** (the forbidden arrangement).
+  - `.safeParse({})` → **`true`**; `.safeParse({qqq:null})` → **`true`**.
+  - `AssuranceAssessmentSatisfiedPayloadSchema.safeParse({evidenceConsideredIds:[],
+    disposition:'SATISFIED', confidence:{score:0.92}})` → **`true`** — the bare score crosses the wire.
+  - **CONTROL ON THE SAME INSTRUMENT, and it discriminates:**
+    `AssuranceObservationSchema.safeParse({score:0.92})` → **`false`**. The trues are the schema's
+    behaviour, not a broken harness. Second control: `.safeParse(0.92)` on the record schema →
+    **`false`**, so it is not a schema that accepts literally anything.
+  - **SECOND ROUTE, DIFFERENT ARTIFACT AND DIFFERENT INSTRUMENT:** the GENERATED JSON Schema
+    `packages/rph-contracts/schemas/objects/AssuranceAssessment.json:401-407` emits `confidence` as
+    `"type": "object"` with `propertyNames: {type: string}` and `"additionalProperties": {}` — the same
+    permissiveness, reached without the TypeScript build.
+  - **HONEST NARROWING:** because nothing populates the field, the exposure is **CONTRACTUAL** — a
+    caller supplying the forbidden shape is accepted, but no code path supplies one today.
+
+- **⚠ THE GATE GAP, STATED PLAINLY, because a reader who greps `confidence` meets it first.**
+  `verif/guard-enforcement-ledger.data.ts:191` is keyed *"must reference admissible evidence; confidence
+  values must not replace evidence (§15.2)"* and its disposition at `:192` is **`ENFORCED`**.
+  - **WHAT IT ACTUALLY PROVES:** that a `Claim` cannot reach `SUPPORTED` unless some **ADMISSIBLE
+    Evidence object** references it. Re-read at HEAD, the refusal is the `guard:` at
+    `packages/rph-application/src/handlers/assurance.ts:879`, rejecting at `:882-888` with
+    *"cannot be SUPPORTED: no ADMISSIBLE evidence supports it"*.
+  - **ITS `enforcingSite` HAS DRIFTED — AND THAT IS ALREADY ON THE RECORD, NOT NEWS HERE.** The row's
+    `enforcingSite: "…assurance.ts:780"` (`:194`) points at HEAD into the doc comment attached to
+    `claimReassessmentRecordsSomething` (declared `:782`), a different predicate. REG-005 `:14214-14215`
+    and `:14439-14440` already say so, in those words. **Re-confirmed here, not discovered here.**
+  - **WHAT IT IS BELIEVED TO PROVE:** that the confidence rule is enforced. It is the only ledger row of
+    82 containing the word `confidence`, and it is marked ENFORCED.
+  - **THE GAP:** the guard never reads a `confidence` field, on any object. It addresses the
+    SUBSTITUTION prohibition on a different object (`Claim`) and a different arrow. The
+    AGGREGATE-SCORE prohibition — *"never an unexplained aggregate score"* — has no gate anywhere, and
+    it is the prohibition this entry is about.
+
+- **⚠ THE NEAREST FILING, AND WHY IT IS NOT THIS ONE — `limb:ASR-7:7`, THE OTHER CONFIDENCE RULE.**
+  Canon carries TWO confidence prohibitions, in two different places, and only one of them is filed.
+  - **FILED.** `JPWB-DOC-003:267`, **ASR-7 · Existence is not proof**, closes byte-exact: *"Confidence
+    values never replace evidence."* That is `limb:ASR-7:7`, and the W-3b census records it **FILED,
+    ENFORCED** — REG-005 `:14268`, verbatim: *"not `limb:ASR-7:7` (FILED, ENFORCED at
+    `assurance.ts:882-888` via the ledger row above)"*, and again at `:14487`. Two census entries
+    enumerate the whole ledger and meet the very row this entry meets: `:14211-14216`, `:14436-14440`.
+  - **NOT FILED — this entry.** `JPWB-DOC-003:92` is a **§3 object row, not an invariant**, and it
+    carries a prohibition ASR-7 does not: *"never an unexplained aggregate score."* A gate that admits
+    only ADMISSIBLE Evidence objects satisfies ASR-7's sentence completely and says nothing whatever
+    about the SHAPE of a confidence value.
+  - **AND THAT IS WHY 307 LIMBS AND 77 NEW ENTRIES NEVER REACHED IT.** Every limb id in REG-005 is an
+    INVARIANT-catalog id: `grep -o 'limb:[A-Z]*-[0-9]*:[0-9]*'` over REG-005 yields **123 distinct ids**
+    in exactly eight families (occurrences: ASR 236, DEC 99, PER 88, OBJ 55, REL 38, STA 27, AUT 6,
+    LYR 3). **§3's object table has no limb id at all**, so the census population never contained this
+    rule.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#9** (line **97**),
+  struck under the heading at line **87**, *"Refuted (32) — recorded so they are not re-raised"* (that
+  heading is now itself struck and annotated `RE-DISPOSITIONED 2026-08-23`), **with no reason recorded**
+  — the file's own line **126** now says not one of the 32 recorded one. Re-checked at HEAD by the
+  2026-08-23 sweep (disposition at `:564-571`, *"TRUE AT HEAD … OWES A REGISTER ENTRY"*) and re-verified
+  independently for this filing by driving the schema. **A missing filing invites a search; a filing
+  that records the claim as refuted ends every future search with the corpus's own authority.** That is
+  why this entry exists rather than a code change alone.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (the Grep
+  tool omits this register's long lines); `-i` and `-F` never combined. Counts are REG-005 /
+  `packages/rph-domain/src/enforcement-register.ts` / `verif/guard-enforcement-ledger.data.ts` /
+  `docs/_working`.
+  - **BY TYPE NAME.** `ConfidenceAssessment` → **0 / 0 / 0 / 4 files (10 hits)**. All four files opened;
+    see the decoys below. **CONTROLS in the same files with the same flags:** REG-005 `^### REG-F-` →
+    **258** and `^### REG-Q-` → **69**; enforcement-register `RPH-ASR` → **47** lines, `RPH-PER` →
+    **49** lines (51 occurrences, 14 distinct ids); ledger `]: {` → **82** rows, of which
+    `disposition: "ENFORCED"` → **18** (UNENFORCED 42, ARROW_UNREACHABLE 20, REDUNDANT_WITH_MACHINE 2);
+    `docs/_working` → **69** files, with `AssuranceObservation` in **14** of them. No control was zero.
+  - **BY PROHIBITION.** `unexplained aggregate` → **0 / 0 / 0 / 1**, and `aggregate score` →
+    **0 / 0 / 0 / 1** — the single file being `HARMONIZATION-FINDINGS.md` itself (the struck item at
+    `:97` and its own disposition block).
+  - **BY SITE.** In REG-005: `objects.ts:80` → **0**; `objects.ts:569` → **0**;
+    `messages.ts:911` → **0**.
+  - **THE 77 NEWEST ENTRIES SEARCHED SPECIFICALLY** (REG-F-203..262, REG-Q-053..069). Slice = REG-005
+    from line **4892** (`### REG-F-203`) to EOF. `ConfidenceAssessment` → **0**; `unexplained aggregate`
+    → **0**; `objects.ts:80` → **0**; `objects.ts:569` → **0**. **Controls in the same slice:**
+    `assurance.ts` → **219**, `messages.ts` → **157**, `REG-F-` → **787**. **Nothing in the two-day
+    batch reaches this type.**
+  - **`confidence` (bare, case-insensitive) → 37 / 0 / 2 / 8 files, and every REG-005 hit was opened.**
+    ⚠ **CORRECTED BY THE VERIFYING PASS — the split is 27 / 10, not 32 / 5.** **27** are W-3b census
+    boilerplate (*"Cluster confidence: ALL_THREE_AGREE"*, *"confidence DROVE_THE_ENGINE"*). The **10**
+    substantive hits are `:248` and `:20892` (the candidate-entity question, quoting the same CPCO
+    object list), `:1442` (REG-E-017, where those rows are told to stay), `:272` and `:273` (REG-Q-020),
+    `:2380` (a recorded misquote, unrelated), and `:14212`, `:14214`, `:14437`, `:14487` — the ledger
+    row and `limb:ASR-7:7`, handled in the NEAREST FILING bullet above because they are a FILING, not a
+    decoy.
+
+- **THE SIX DECOYS, EACH OPENED AND EACH DISTINGUISHED.**
+  1. **`REG-Q-020` — "Confidence, memory, and automated acceptance"** (REG-005:**272-275**). Its
+     statement defers *"Numeric confidence aggregation"* as a **candidate idea**; its safe default reads
+     *"Use categorical dispositions with explicit basis, limitations, and residual uncertainty. Do not
+     average professional truth."* **It does not cover this — and it is why this is a FINDING and not a
+     QUESTION.** REG-Q-020 asks whether to ADOPT numeric aggregation; this entry says the contract
+     already ADMITS it. Its safe default is precisely the reading a guard would implement, so writing
+     that guard ratifies nothing narrower than what is already ruled.
+  2. **`docs/_working/AUDIT-placeholder-helpers.md:41-46`** lists `ConfidenceAssessment` (at `:43`)
+     among *"Genuinely undefined (25), confirmed — the restraint on these was **correct**"* (`:41`).
+     **That audit is right on its own axis, and it is the reason nothing caught this.** Its axis is
+     FIELD-COMPLETENESS: no ratified document supplies a full field table, so inventing one would be
+     over-reach. It never asks whether canon supplies a **partial** constraint. It does — two named
+     elements and one named prohibition — and a schema can carry that without inventing a whole shape.
+  3. **`vocab/m1-object-fields.json:2950-2956`**, the `ConfidenceAssessment` entry, whose single field
+     row is `"field": "(undefined)"` with `"note": "Referenced by AssuranceAssessment.confidence
+     (DOC-002 §18 ONLY; absent from DOC-007 §19). NOT field-defined. OPEN ITEM (retain or drop)."`
+     **That is a PRESENCE question, not a prohibition question, and neither arm closes this.** Retaining
+     the field leaves the bag; **dropping the object field does not close it either**, because
+     `messages.ts:911` carries `confidence` on a DOC-007 event payload independently of the object — and
+     m3, quoted above, says that event's field IS basis+limitations. ⚠ **The two vocab files disagree
+     about the same type, and the schema implements the weaker of the two.**
+  4. **`packages/rph-domain/src/governance.ts:531`** — *"(§38 no confidence fusion; Conformance 'results
+     are not averaged silently')"*. Read in full at `:528-534`, it is the rationale for
+     `NON_DECISIVE_ACTIONS` (declared `:534`) and `selectControlAction`, and its own words scope it
+     *"analogous — at the DISPOSITION level"*. It governs CONTROL-ACTION selection, never the
+     ConfidenceAssessment object.
+  5. **`docs/_working/AUDIT-shape-survivorship-2026-08-20.md:148`** recites `ConfidenceAssessment` inside
+     a roster of declared placeholders. A roster line, not a filing; it does not connect the type to the
+     DOC-003 prohibition.
+  6. **`docs/_working/doc009-audit-input.json:1074`** — the fourth `docs/_working` file, added by the
+     verifying pass because the drafting pass counted it and did not account for it. It lists
+     `ConfidenceAssessment` among *"the ~15 complex nested types referenced but schematized in neither
+     doc"* (that phrase is the record's `subject`, `:1072`). Same PRESENCE axis as decoy 3, and likewise
+     silent on the prohibition.
+
+- **THE NEIGHBOURING FIELD IS THE CONTROL THAT MAKES THIS ACTIONABLE.** `residualUncertainty` is declared
+  on the SAME object one line later (`objects.ts:570`), is one of the three things REG-Q-020's safe
+  default names alongside basis and limitations, and is **typed and consumed**: **26** non-test
+  production references across **10** files (a 27th is a test fixture), including
+  `readonly residualUncertainty: readonly string[]` (`packages/rph-assurance/src/floor.ts:114`),
+  `packages/rph-assurance/src/recording.ts:137`, and the write at
+  `packages/rph-application/src/handlers/assurance.ts:2316` populating it from the validator result.
+  **Its immediate neighbour has 26 readers and a real type; `confidence` has none and is a bag.** The
+  repository already knows how to carry this kind of field.
+
+- **THE REMEDY.** The smallest change that makes the forbidden arrangement refusable, inventing nothing:
+  1. Replace `objects.ts:80` with a `z.strictObject` requiring the two elements canon names — `basis`
+     and `limitations` — leaving any further fields to the milestone that defines them. **Both spellings
+     already exist as fields in this package:** `basis: z.string().optional()` on
+     `AssumptionObjectSchema` (`objects.ts:484`, and on the wire at `messages.ts:302`, `:810`), and
+     `limitations: z.array(z.string())` on `EvidenceObjectSchema` (`objects.ts:516`). Nothing is coined.
+  2. **RED TEST FIRST, and name the test that must redden:** a case asserting
+     `ConfidenceAssessmentSchema.safeParse({ score: 0.92 }).success === false`, plus the wire case on
+     `AssuranceAssessmentSatisfiedPayloadSchema`. Both return `true` at HEAD (driven above), so both
+     redden before the fix and green after. Add an ACCEPTING control on a well-formed
+     `{ basis, limitations }` so the test cannot pass by refusing everything.
+  3. Regenerate `packages/rph-contracts/schemas/objects/AssuranceAssessment.json`, whose `confidence` at
+     `:401-407` currently emits `"type": "object"` with `propertyNames` and `"additionalProperties": {}`.
+  4. Reconcile `vocab/m1-object-fields.json:2956` with `vocab/m3-commands-events.json:3824` in the same
+     commit, so the catalogue stops carrying two answers for one type — noting that m3's own `:3806`
+     marks that block UNRATIFIED-AUTHORED, so the reconciliation follows DOC-003:92, not either row.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#9**. It closes nothing else.
+  ⚠ **CORRECTED BY THE VERIFYING PASS — two other TRUE items touch this entry's files, and neither is
+  closed here.** **#10** (`AssuranceObservation` time, `objects.ts:576-589` / `messages.ts`) is filed
+  separately as a QUESTION, because its remedy is a sponsor adjudication rather than a schema
+  tightening. **#3** (`ConversationEntrySchema`, `objects.ts:188-193`, no typed role/kind and no
+  per-entry timestamp — TRUE AT HEAD, disposition at `HARMONIZATION-FINDINGS.md:249`, *"OWES A REGISTER
+  ENTRY"*) is a different type, a different rule and a different remedy; **it is still owed and this
+  entry does not discharge it.** No one commit closes any two of the three.
+
+- **Merge target:** Repository — `packages/rph-contracts/src/objects.ts`, its generated JSON Schema, and
+  the two vocab files. **No canon change is required:** DOC-003:92 already states the rule; this is code
+  diverging from it. Status: OPEN.
+
+### REG-F-270 — the de minimis floor's required independence is a literal inside the plan function, so
+§8.4's "active profile" and ASR-13's graduation have no input by which anything could raise it, and the
+three rungs above DIFFERENT_MODEL are unreachable at the floor gate
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** Guide §8.4 and DOC-003 ASR-13 make required evaluator independence a
+  graduated, policy-declared, profile-conditional quantity: the same base model is legal only where the
+  active profile permits it, and stricter profiles may demand a different provider or human/organizational
+  independence. In this engine the quantity is a string literal in the body of `deMinimisFloorPlan`, whose
+  only parameter is an `AssuranceSubject` carrying five fields, none of them a profile. `DIFFERENT_MODEL`
+  is therefore both the floor AND the ceiling: of the eight rungs `checkIndependence` implements, the
+  three above it — `DIFFERENT_PROVIDER`, `HUMAN`, `ORGANIZATIONALLY_INDEPENDENT` — can be selected at
+  the floor gate by no input whatsoever. The repository's own shipped conformance ladder declares
+  exactly that
+  escalation, in prose, on its top rung, and the floor has no way to express it. **Nothing today WEAKENS
+  the floor; what is absent is any means of STRENGTHENING it, which is the direction canon graduates in.**
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.**
+  - **Guide §8.4 "De minimis assurance floor and control planning"** — heading verified byte-exact at
+    **L835** via `grep -n "^### 8\.4"`, NOT inferred from a line number. **L851**: *"- prohibit
+    same-invocation self-review and use at least a distinct evaluator invocation, role, and review
+    context whose actual identities and lineage are recorded; the same base model is allowed only when
+    the active profile permits its visible common-mode limitation, while stricter profiles may require a
+    different model/provider or human/organizational independence;"*
+  - **`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md` §8.5 "Independence"** (heading at
+    **L293**), **ASR-13 at L295**: *"Required independence is policy-declared and graduated (separate
+    invocation → different agent → different model/provider → human or organizational independence,
+    scaling with claim materiality)."* Its SCOPE line at **L297**: *"conversely, the same base model in a
+    separate invocation *is* legal where the active profile permits that visible common-mode
+    limitation."* **Canon RE-RATIFIED the conditional rather than settling it away** — this is not stale
+    Guide-only material.
+  - **AND THE SHIPPED DATA ASKS FOR THE ESCALATION IN ITS OWN WORDS.**
+    `packages/rph-product-realization-pwa/src/ontology.data.ts:3630` — the `HIGH_ASSURANCE` rung's
+    `appliesToRisk` string, whose key is at `:3629` — ends: *"Escalates to DIFFERENT_PROVIDER +
+    HUMAN/ORGANIZATIONALLY_INDEPENDENT for critical claims."* Its `minIndependence` at `:3631` is
+    `'DIFFERENT_MODEL'` — so the top rung of the
+    ladder this repository ships already names a level ABOVE the constant the floor hardcodes.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD (`856dd8e1`), every line opened with `sed -n`.**
+  - `packages/rph-assurance/src/floor.ts:56` — `export function deMinimisFloorPlan(subject:
+    AssuranceSubject): FloorPolicyRef[]`. **ONE parameter.**
+  - `floor.ts:27-35` is the WHOLE `AssuranceSubject`: `subjectId`, `objectType`, `semanticVersion`,
+    `isAiProduced`, `producer`. **Five fields — no profile, no risk profile, no conformance profile.**
+  - `floor.ts:76` — `independence: 'DIFFERENT_MODEL'`, a literal in the function body reachable by no
+    input other than `subject.isAiProduced` (`:71`). `:62` and `:68` are `'NONE'`.
+  - **THE PLAN'S LITERAL IS THE ENFORCED REQUIREMENT.** `floor.ts:314`, inside `composeAssuranceOutcome`
+    (`:290`): `const independence = checkIndependence(p.independence, subject.producer, r.evaluator);`
+    ⚠ **That function's own docblock at `:286` says it "enforce[s] *the policy's* independence
+    requirement".** It does not. The value it enforces comes from the plan literal and never from the
+    governed `ASSURANCE_POLICY` object — which is a second, different independence source (last bullet
+    below). **The comment states the obligation the code does not meet.**
+  - **THE PATH IS LIVE, NOT DEAD KERNEL.** `validators.ts:298` (`const plan = deMinimisFloorPlan(
+    subject);`) sits inside `runFloorResults` (`:293`), reached from `runFloorAndPlanRecording` (`:328`),
+    whose production caller is the PWA authoring plane: `apps/rph-demo/src/lib/server/floor.ts` imports
+    it at `:8-15`, and that file's header at `:1-6` calls itself *"The in-product de minimis assurance
+    floor (guide §8.4) for the PWA authoring plane."*
+  - **THE RUNGS EXIST AND ARE FULLY IMPLEMENTED.** `packages/rph-assurance/src/assurance-rules.ts:164-172`
+    declares eight `IndependenceRequirement` values; `checkIndependence` at `:185` implements all eight.
+    Nothing is missing from the ladder except the ability to ASK for a rung.
+  - **AND NO PRODUCTION SITE ANYWHERE NAMES A STRICTER RUNG AS A REQUIREMENT — a second, independent
+    route to the same conclusion, taken from the VALUE side rather than the parameter side.** A census
+    of every required-independence literal in the repository (`independence: '`, `--include=*.ts` over
+    `packages apps`, non-dist, non-test) → **6** lines in **two** files, and every one is `'NONE'` or
+    `'DIFFERENT_MODEL'`: `floor.ts:62`, `:68`, `:76` and `floor-policies.ts:146`, `:180`, `:231`.
+    **POSITIVE CONTROL, same tree and flags:** `DIFFERENT_PROVIDER|ORGANIZATIONALLY_INDEPENDENT` →
+    **7**, and all seven are union members, switch cases, or prose (`assurance-rules.ts:170`/`:172`/
+    `:204`/`:210`, `enums.ts:495`/`:497`, `ontology.data.ts:3630`) — **not one is a required value that
+    any code assigns.**
+  - **NO CALLER SUPPLIES A PROFILE EITHER.** `grep -rn "deMinimisFloorPlan" --include=*.ts packages apps`
+    (non-dist) → **15** lines; the sole non-test production call is `validators.ts:298`, inside
+    `runFloorResults(subject, ctx, registry)`, which threads no profile of any kind.
+  - **AND THE PACKAGE HAS NO PROFILE INPUT AT ALL.** `grep -rn "profile" --include=*.ts
+    packages/rph-assurance/src | grep -v "\.test\.ts"` → **5** lines, all opened: `floor.ts:53` and
+    `floor-policies.ts:143` are prose comments saying no profile may SUPPRESS the floor;
+    `applicability.ts:72-74` resolves `$.riskProfile` on a POLICY-APPLICABILITY subject, a different type
+    that never feeds `deMinimisFloorPlan`. **POSITIVE CONTROL, same tree, same flags:** `independence` →
+    **36**. Zero of the five is a profile input to the floor plan.
+  - **THE SECOND INDEPENDENCE SOURCE, WHICH MAKES THE FLOOR'S CONSTANT THE OUTLIER.** The
+    assessment-completion gate DOES read a governed value:
+    `packages/rph-application/src/handlers/assurance.ts:2169` —
+    `const independenceRequirement = policyState?.independenceRequirement;` → `:2174`
+    `checkIndependence(...)`; and `'independenceRequirement'` is in `EDITABLE_PATCH_FIELDS`
+    (`assurance.ts:276`), so `EditAssurancePolicy` can move it. **The floor plan's own literal is movable
+    by nothing — not a profile, not a policy edit, not a command.**
+
+- **OBSERVED — DRIVEN, not read, for the plan-side conjunct.** Driven with **node** (never bun) against
+  the built `dist` of `@janumipwb/rph-assurance` and `@janumipwb/rph-product-realization-pwa`
+  (`dist/floor.js` is newer than `src/floor.ts` and carries the same literal at `dist/floor.js:42`); both
+  functions are pure, so better-sqlite3 is not involved. Drivers in the session scratchpad
+  (`v8/drive15.mjs`, `v8/drive15b.mjs`); output verbatim, with `…` eliding the two `=NONE` rows:
+  ```
+  D1 plain AI subject                 : … | floor.reasoning-review=DIFFERENT_MODEL
+  D2 + activeProfile=HIGH_ASSURANCE   : … | floor.reasoning-review=DIFFERENT_MODEL
+  D3 + instantiationProfile=HIGH_ASSUR: … | floor.reasoning-review=DIFFERENT_MODEL
+  D4 + riskProfile all HIGH           : … | floor.reasoning-review=DIFFERENT_MODEL
+  D5 + minIndependence=HUMAN          : … | floor.reasoning-review=DIFFERENT_MODEL
+  D6 isAiProduced=false               : floor.schema-invariant=NONE | floor.identity-provenance=NONE
+  E DIFFERENT_MODEL              -> {"independent":true}
+  E DIFFERENT_PROVIDER           -> {"independent":false,"reason":"same provider"}
+  E HUMAN                        -> {"independent":false,"reason":"evaluator is not human"}
+  E ORGANIZATIONALLY_INDEPENDENT -> {"independent":false,"reason":"same organization"}
+  ```
+  **D6 IS THE DISCRIMINATING CONTROL:** the one input that DOES move the plan is `isAiProduced`, and it
+  removes the reasoning-review row entirely — so the instrument is live and D2-D5's sameness is a real
+  negative, not an instrument that ignores everything handed to it. **E** is a single producer/evaluator
+  pair (`providerId: 'openai'`, `orgId: 'janumi'`, `actorType: 'AGENT'` on both) evaluated at four rungs:
+  it **PASSES** the floor and would be **REFUSED at every rung above it**. That is the concrete
+  under-enforcement — a same-provider, same-organization, non-human reviewer certifies the de minimis
+  floor for work whose shipped top rung asks for `DIFFERENT_PROVIDER + HUMAN/ORGANIZATIONALLY_INDEPENDENT`.
+  **READ (not driven):** every canon quotation above, the caller census, the demo composition path, and
+  the `EditAssurancePolicy` second-source seam.
+
+- **⚠ IT WAS RECORDED AS REFUTED, WITH NO REASON.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#15**
+  (**line 103**), struck under the heading whose original wording — *"Refuted (32) — recorded so they
+  are not re-raised"* — survives verbatim at **line 126**; ⚠ **at HEAD line 87 is itself struck and
+  carries the same sweep's `RE-DISPOSITIONED 2026-08-23` annotation**, so the instruction is no longer
+  live text. The item records **no evidence, no site, no date, no reason of any kind**. That is the
+  load-bearing half of this
+  filing: a missing entry invites the next search, whereas an entry recording the claim as refuted, under
+  a heading instructing future readers not to raise it again, ends every future search with the corpus's
+  own authority. Re-checked at HEAD by the 2026-08-23 sweep — `### Item 15 — TRUE AT HEAD` at **line
+  834** of the same file — and independently re-verified here at `856dd8e1`, including the drive above,
+  which the sweep did not run.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only (never `-i` and
+  `-F` together); every long hit opened with `sed -n`. Reported as REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` / `docs/_working`.
+  - BY SITE: `deMinimisFloorPlan` → **2** / **0** / **0** / **2 files**. Both REG-005 hits (`:21949`,
+    `:21955`) are inside **REG-Q-069** and are its own disclaimers about this item; the two
+    `docs/_working` files are `HARMONIZATION-FINDINGS.md` and `HARMONIZATION-LOG.md`, both opened below.
+    `composeAssuranceOutcome` → **0 / 0 / 0**. `minIndependence` → **7** in REG-005, **all seven inside
+    REG-Q-069** (`:21806`, `:21847`, `:21850`, `:21958`, `:21988`, `:22026`, `:22034`).
+  - BY QUANTITY: `active profile` → **1** in REG-005 (`:21947`, REG-Q-069 quoting this very item) and
+    **1** in DOC-003 (`:297`, the ASR-13 SCOPE line) — `grep -rn "active profile"` over `docs/canon/` plus
+    the Guide returns exactly **3** lines in total, the third being Guide `:851`. `DIFFERENT_PROVIDER` →
+    **0** in REG-005. `ORGANIZATIONALLY_INDEPENDENT` → **2**, both inside REG-F-055 / REG-E-032 (see
+    near-misses). `DIFFERENT_MODEL` → **3**, all inside REG-Q-069.
+  - **THE 77 ENTRIES OF THE LAST TWO DAYS SWEPT SEPARATELY** (REG-F-203..262 / REG-Q-053..069, REG-005
+    lines **4892-22058**): `active profile` → **1** (REG-Q-069); `independence` → **19**, and ALL
+    nineteen resolved to their enclosing entry by a heading walk rather than by eye — REG-F-209 ×4
+    (`semanticVersion`), REG-F-223, REG-F-226, REG-F-228, REG-F-237, REG-F-240, REG-F-243, REG-Q-058,
+    REG-F-259, and REG-Q-069 ×7. The seven outside REG-Q-069's own disclosure were opened individually
+    and **not one is about where the floor's requirement comes from**. **POSITIVE CONTROL in the same
+    range: `limb:` → 525.**
+  - **POSITIVE CONTROLS, same instrument and same files, reported by count:** REG-005 `§8.4` → **33**,
+    `ASR-13` → **9**, `checkIndependence` → **3**, `floor.ts` → **29** (the seven
+    `rph-assurance/src/floor.ts` hits opened — `:10047`, `:10053`, `:10092`, `:10201`, `:10822`,
+    `:19548`, `:19761` — all about disposition/observation shape, none about the source of the
+    requirement); `enforcement-register.ts` `independence` → **5**, `profile` → **4**, `canonAnchor` →
+    **108**; ledger `independenceRequirement` → **2**, `evidence:` → **82**. All four corpora are
+    reachable and populated, so the zeros are real. ⚠ `floor.ts` / `deMinimisFloorPlan` / `active profile`
+    in `enforcement-register.ts` → **0** against those live controls.
+
+- **⚠ THE NEAR-MISS FILINGS, AND WHY EACH FAILS TO COVER THIS — the first two will end this row if
+  nobody writes this bullet.**
+  1. **`REG-Q-069` at REG-005:21796** (filed 2026-08-23, the same day). It asks whether
+     `Undertaking.instantiationProfile` selects a rung of the `conformanceProfiles` ladder, and it
+     **explicitly carves this conjunct out and assigns it here**: at `:22025-22029`, *"⚠ **The rung's
+     `minIndependence` is deliberately NOT in that list.** Routing a profile's independence into the
+     de minimis floor is the arrangement `HARMONIZATION-FINDINGS.md` Item 15 already holds open and
+     already owes an entry for; annexing it here would file one defect twice"*, and at `:22051-22054` it
+     records that Item 15's entry *"— on the floor plan's inability to consult a profile for its
+     independence literal — is likewise still unfiled."* Different site (`objects.ts:758` vs
+     `floor.ts:76`), different quantity (`mandatoryPolicyIds` vs the enforced independence rung),
+     different canon clause (ASR-19 limb 3 vs §8.4 / ASR-13).
+  2. **`REG-F-055` (REG-005:1960) and `REG-E-032` (`:1974`)** — *"The strongest rung of the independence
+     ladder does not compare identities"*. **A reader grepping the independence ladder lands here and
+     closes the row.** It does not cover this: what REG-F-055 MEASURES is whether the `HUMAN` rung's
+     PREDICATE compares producer to evaluator once that rung has been selected, and what it CLOSES is
+     that predicate's semantics. This finding is upstream of the predicate entirely — at the floor gate no
+     rung above `DIFFERENT_MODEL` can be selected at all, so `HUMAN`'s semantics never arise there.
+  3. **`docs/_working/HARMONIZATION-LOG.md:815-822`, the section "Conjunctive independence beyond
+     DIFFERENT_MODEL — WITHHELD, and why forcing it is the disease".** A REASONED deferral, and the
+     nearest thing in any corpus to a recorded justification for `floor.ts:76`. It does not cover this,
+     in two ways. (a) It withholds the OTHER direction — adding the conjunctive `DIFFERENT_INVOCATION` /
+     `DIFFERENT_CONTEXT_INSTANCE` axes — on the ground that those ids are not yet real call identities;
+     this finding is about selecting a STRICTER rung, which needs no new id. (b) ⚠ **Its stated ground is
+     falsified by the shipped ladder.** It reasons *"(model, since no profile permits sameness)"*
+     (`:817-818`), but `ontology.data.ts:3608` and `:3615` give `LIGHTWEIGHT` and `STANDARD` the
+     `minIndependence` values `'DIFFERENT_INVOCATION'` and `'DIFFERENT_AGENT'` — **two shipped profiles
+     that do permit model sameness.** The deferral asserted a profile fact in a system that has no
+     profile input, which is this finding restated.
+  4. **`HARMONIZATION-FINDINGS.md` items #28 (`:1480`) and #29 (`:1539`), both correctly FALSE at HEAD.**
+     Each records a RESIDUE naming this same function — *"`deMinimisFloorPlan()` still hardcodes the
+     POLICY SET, `policyVersion: '1'`, `required: true`, and `independence: 'NONE' | 'DIFFERENT_MODEL'`
+     as literals and consults no store"* (`:1599-1601`). ⚠ **Those residues are the STORE-vs-CODE axis:**
+     they ask whether an edit to the seeded `ASSURANCE_POLICY` object reaches the plan. They are not
+     register entries — they are struck-item dispositions in a working file — and neither asks whether a
+     PROFILE can raise the rung, which is a question no policy edit answers, because §8.4's conditional
+     is on the profile, not on the policy record.
+  5. **`enforcement-register.ts` `RPH-ASR-001` (`:1110-1129`)** records, as a reason that rule is
+     `NOT_A_COMMAND_REFUSAL`, that *"the rule's \"profile\" subject is ERASED AT THE ENGINE PORT:
+     `ConformanceProfile` exists only as PWA ontology data, the engine types the array as `readonly
+     unknown[]`, and the published-PWA seam hard-codes it empty."* True, and adjacent — but what it
+     MEASURES is whether RPH-ASR-001's consequent is an arrangement a dispatch can be refused for, and
+     what it CLOSES is that classification. It names no independence quantity and no floor.
+  6. **`REG-F-233` (REG-005:10763) and `REG-F-024` (`:852`) — the entries a reader grepping the
+     QUANTITY rather than the site lands on first.** `de minimis floor` → **20** in REG-005; REG-F-233
+     holds three of those hits and REG-F-024 one. REG-F-233 (2026-08-22, inside the 77) measures the
+     floor set's **SEQUENCING** — ASR-3 limb 3's *"in order"* — and its **UNIVERSALITY**; REG-F-024
+     measures the floor's **applicability scoping** to object types. Both are about WHICH floor
+     policies run and in what order. Neither reaches the independence rung attached to one of them,
+     and neither asks where that rung's value comes from.
+
+- **THE REMEDY.** ⚠ **A REMEDY IS A HYPOTHESIS** — this is derived from the sites read and driven at
+  HEAD, not carried from any prior filing's recommendation.
+  1. Give `deMinimisFloorPlan` a required-independence input and compute the Reasoning-Review rung as
+     **`strictest(floor, required)`** — never below the §8.4 non-suppressible floor, and able to reach
+     `DIFFERENT_PROVIDER` / `HUMAN` / `ORGANIZATIONALLY_INDEPENDENT`. The ordering must be explicit data,
+     not the declaration order of the union at `assurance-rules.ts:164-172`.
+  2. Thread it from a source that already exists and is governed: the loaded `ASSURANCE_POLICY` object's
+     `independenceRequirement` — the same field `assurance.ts:2169` already reads and
+     `EDITABLE_PATCH_FIELDS` already permits editing — so that `composeAssuranceOutcome`'s docblock claim
+     at `floor.ts:286` becomes true. Fail closed when it cannot be resolved; never fall back to the
+     literal.
+  3. ⚠ **WHICH ARTIFACT NAMES "THE ACTIVE PROFILE" IS NOT SETTLED HERE.** Whether
+     `Undertaking.instantiationProfile` selects a `conformanceProfiles` rung is REG-Q-069's open
+     adjudication, and step 2 deliberately routes through the policy record rather than the profile
+     selector so that closing this finding cannot settle that question by construction.
+  4. **PREDICTED RED BEFORE ANY GREEN IS TRUSTED** (a green with no named predicted red proves nothing
+     here): a subject whose governing policy declares `DIFFERENT_PROVIDER`, reviewed by the E-row
+     evaluator above (same `providerId`), must produce a **non-SATISFIED** floor outcome carrying the
+     independence reason **by message** — with the discriminating **CONTROL** that the same subject under
+     a `DIFFERENT_MODEL` policy still passes. Assert the message, not the code: an arrangement that trips
+     two conjuncts proves neither.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#15**, in full. **It closes nothing else,
+  because:** item **#16** (`Undertaking.instantiationProfile` unbound to §7.3 and carrying drifted values)
+  is a contracts-package vocabulary defect at `objects.ts:758` with its own entry filed alongside this
+  one, and no commit that changes `floor.ts` touches it; items **#28** and **#29** are correctly FALSE at
+  HEAD and their surviving residues are the STORE-vs-CODE axis of the same function, which remedy step 2
+  would incidentally advance but which this entry does not adjudicate or claim; **REG-Q-069** stays open
+  on whether the instantiation profile selects a rung's `mandatoryPolicyIds`, which this entry neither
+  asks nor answers; and **REG-E-032** stays open on the `HUMAN` rung's predicate, which this entry never
+  reaches because no rung above `DIFFERENT_MODEL` is selectable at the floor at all.
+
+- **Merge target:** BOTH — Corpus (JPWB-REG-005) for the record, and Repository for remedy steps 1-2 and
+  the predicted-red guard, which need no adjudication because §8.4 L851 and ASR-13 L295 are ratified and
+  agree. Status: OPEN.
+
+### REG-F-271 — all three package-purity rules forbid a package that has never existed and none of them
+names the one package that reaches every forbidden target: an import of `rph-authoring` defeats
+`domain-purity`, `ports-purity` and `projections-browser-safe` alike, driven
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (harmonization "Refuted (32)" re-disposition) ·
+**Class:** CODE_DIVERGES · **Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `.dependency-cruiser.cjs` states the engine's three purity
+  boundaries as hand-written regex alternations over package directory names. All three alternations
+  contain `controller` — there is no `packages/rph-controller` and there never has been — and none of
+  them contains `authoring`, although `packages/rph-authoring` exists and its root entry re-exports the
+  CapabilityBroker over the engine seam, so it transitively reaches `rph-engine`, `rph-application`,
+  `rph-assurance` and `rph-persistence`, i.e. every package the three rules forbid. The rules are
+  therefore not partially weak: each one is fully defeatable by routing the same import through
+  `@janumipwb/rph-authoring`, which I drove. The thing to hold onto is that the enumerated set is
+  MAINTAINED BY HAND against a filesystem no test compares it to — a nonexistent name can sit in it for
+  the life of the repository, and a package added tomorrow is outside every rule by default.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM** — the config's own comments, which are the statement
+  of intent the regex is supposed to implement.
+  - `.dependency-cruiser.cjs:31` (`domain-purity`): *"rph-domain is a pure kernel: no
+    persistence/application/assurance/controller/projections/engine/product-realization-pwa."*
+  - `.dependency-cruiser.cjs:40` (`ports-purity`): *"rph-ports declares interfaces only; it depends
+    solely on rph-contracts."* — the comment states an ALLOW-list of one, which the regex at `:44` then
+    tries to express as a hand-written DENY-list of eight.
+  - `.dependency-cruiser.cjs:49-50` (`projections-browser-safe`): *"It must not import Node-only engine
+    packages or the PWA data package — that would drag better-sqlite3 / node:crypto into a browser
+    bundle. It may depend only on the browser-safe rph-contracts, rph-domain, and rph-ports APIs."*
+    Again an allow-list of three, expressed at `:54` as a hand-written deny-list of six.
+  - And the release exit criterion that RESTS on that rule,
+    `docs/_working/RPH-DOC-010-BUILD-PLAN.md:115`: *"Browser bundle contains no `better-sqlite3` /
+    `node:crypto`; `projections-browser-safe` rule holds."*
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD `856dd8e1`.** (Drafted at `a4a19057`; HEAD then
+  advanced one W-3b commit, which leaves `.dependency-cruiser.cjs` byte-identical — every line number
+  below was re-opened at `856dd8e1`.) The file is 85 lines; I read all of it. Three `to.path` values,
+  byte-exact — each is ONE string on ONE line at the site; the break below is editorial, to hold this
+  entry under 108 columns:
+  - `.dependency-cruiser.cjs:35` (rule name at `:30`) — `path:`
+    `'^packages/rph-(persistence|application|assurance|controller|`
+    `projections|engine|product-realization-pwa)/'`
+  - `.dependency-cruiser.cjs:44` (rule name at `:39`) — `path:`
+    `'^packages/rph-(domain|persistence|application|assurance|controller|`
+    `projections|engine|product-realization-pwa)/'`
+  - `.dependency-cruiser.cjs:54` (rule name at `:48`) — `path:`
+    `'^packages/rph-(persistence|application|assurance|controller|engine|`
+    `product-realization-pwa)/'`
+  Every alternation contains `controller`; none contains `authoring`. `ls packages/` → csaa,
+  rph-application, rph-assurance, **rph-authoring**, rph-contracts, rph-domain, rph-engine,
+  rph-persistence, rph-ports, rph-product-realization-pwa, rph-projections, typescript-config — **no
+  rph-controller**. `find . -maxdepth 3 -name '*controller*' -not -path '*/node_modules/*'` → **empty**;
+  POSITIVE CONTROL, identical command with `'*authoring*'` → `./coverage/rph-authoring`,
+  `./packages/rph-authoring`. `packages/rph-authoring/package.json:2` → `"name":
+  "@janumipwb/rph-authoring"`, and `:31-34` → `"dependencies": { "@janumipwb/rph-contracts":
+  "workspace:*", "@janumipwb/rph-engine": "workspace:*" }`.
+  ⚠ **METHOD NOTE, because the wrong instrument is what produced the original strike.** `grep
+  'rph-controller' .dependency-cruiser.cjs` returns **0** — the name exists only as an alternation
+  branch, never as a whole token. The correct instrument is `grep -c 'controller'` → **4** (the three
+  rule paths plus the `domain-purity` comment at `:31`), against `grep -c 'authoring'` → **0**.
+  ⚠ **AND THE SAME FACT DERIVED WITHOUT GREP AT ALL, since a hand-listed population is what failed
+  here:** loading the config in node and testing each rule's `to.path` against `readdirSync('packages')`
+  gives, for all three rules, exactly one alternation branch matching no directory on disk
+  (`controller`) and `rph-authoring` sitting in the UNMATCHED set.
+
+- **OBSERVED / READ — MIXED, and which is which. OBSERVED (driven, not read):** runs of the gate's own
+  binary, `./node_modules/.bin/depcruise packages --config .dependency-cruiser.cjs --output-type json`,
+  each with exactly one leaf `.ts` file added under the named package's `src` and removed immediately
+  after (`git status --porcelain | grep -c 'tmp_probe'` → **0** at the end; the tree is clean of them
+  now). **BASELINE, unmodified tree:** 587 modules, 575 under `packages/` (**POSITIVE CONTROL, same
+  JSON object as the zero below**), **0** violations.
+
+  ```
+  MUTANT  rph-projections -> '@janumipwb/rph-authoring/catalog'  -> violations 0  errors 0
+  MUTANT  rph-projections -> '@janumipwb/rph-authoring' (root)   -> violations 0  errors 0
+  CONTROL rph-projections -> '@janumipwb/rph-engine'             -> violations 1  projections-browser-safe
+  MUTANT  rph-domain      -> '@janumipwb/rph-authoring/catalog'  -> violations 0  errors 0
+  MUTANT  rph-domain      -> '@janumipwb/rph-authoring' (root)   -> violations 0  errors 0
+  CONTROL rph-domain      -> '@janumipwb/rph-engine'             -> violations 1  domain-purity
+  MUTANT  rph-ports       -> '@janumipwb/rph-authoring/catalog'  -> violations 0  errors 0
+  MUTANT  rph-ports       -> '@janumipwb/rph-authoring' (root)   -> violations 0  errors 0
+  CONTROL rph-ports       -> '@janumipwb/rph-engine'             -> violations 1  ports-purity
+  ```
+
+  **EACH CONTROL HAS ITS OWN MUTANT AND REDDENS THE EXACT RULE UNDER TEST** — `projections-browser-safe`,
+  `domain-purity`, `ports-purity` respectively, each named in the emitted violation record — so none of
+  the six zeroes is a dead instrument. Re-driven independently at `856dd8e1`: the same six zeroes and
+  the same three named violations, and the process EXIT CODES captured separately, since a shell
+  `local rc=$?` swallows them — the root-import mutant prints *"no dependency violations found (588
+  modules, 2901 dependencies cruised)"* and exits **0**, the matching control exits **1**.
+  **AND THE REACH IS MEASURED, NOT ARGUED:** from the `rph-projections` root-import mutant I walked the
+  emitted graph transitively — the probe reaches **12** `packages/rph-engine/` modules, **22**
+  `packages/rph-application/`, **7** `packages/rph-assurance/` and **5** `packages/rph-persistence/`
+  modules, among them `packages/rph-persistence/src/sql-driver.ts`, while depcruise reports **0**
+  violations and exits 0. **READ (not driven):** `packages/rph-persistence/src/sql-driver.ts:6` is
+  `import Database from 'better-sqlite3';`, so the exact arrangement the `:49-50` comment exists to
+  prevent is reachable with the gate green. (better-sqlite3 is not itself a graph node —
+  `options.doNotFollow` at `:73` and `exclude` at `:74` remove `node_modules` — which is why that last
+  step is READ and not DRIVEN.)
+  ⚠ **ONE HONEST SUBTRACTION.** The same walk also reaches `crypto`, but its importer is
+  `packages/rph-contracts/src/hash.ts`, a package the `:50` comment expressly permits. **The
+  `node:crypto` half of that comment is NOT breached by this hole; the `better-sqlite3` half is.** The
+  comment's FIRST clause is breached on its own terms, though: within the same reachable set the only
+  other Node-builtin importer is `packages/rph-engine/src/replay.ts` → `fs`, and `rph-engine` is
+  precisely a *"Node-only engine package"*.
+  ⚠ **AND THE QUALIFIER THE SWEEP CONCEDED DOES NOT MATERIALISE.** The sweep allowed that `no-circular`
+  (`:9-14`) might give incidental cover on the `rph-domain` / `rph-ports` arcs, since
+  authoring→engine→domain is a package-level back-edge. Driven, it does not: the root-import mutants
+  into `rph-domain` and into `rph-ports` returned **0 violations, not a cycle**, because
+  dependency-cruiser detects cycles at MODULE level and a leaf module that nothing imports closes none.
+  Leaf modules are ordinary in this repository, so the claim's word *"trivially"* survives the check.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#27** (line
+  **115**), struck under *"Refuted (32) — recorded so they are not re-raised"* (heading at `:87`), **with
+  no reason recorded** — no evidence, no site, no date, and the same for all 32. That is not a missing
+  filing; it is an affirmative record, carrying the corpus's own authority, that a live hole is not a
+  hole — and it ends every future search rather than inviting one. Re-checked at HEAD by the 2026-08-23
+  sweep (`303ee671`, disposition at `:1436`, *"### Item 27 — TRUE AT HEAD"*, confidence HIGH, *"OWES A
+  REGISTER ENTRY"*), and re-verified independently for this entry by the driven runs above. The method
+  paper records how the strike happened —
+  `docs/_working/DESIGN-invariant-enforcement-mapping.md:809-810`: *"#27 — called FALSE by `grep
+  'rph-controller'` returning zero. The name exists only as a regex alternation branch"*.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora — Bash `grep`, long hits opened
+  with `sed -n`.** Counts are REG-005 / `packages/rph-domain/src/enforcement-register.ts` /
+  `verif/guard-enforcement-ledger.data.ts` / count of matching files under `docs/_working/`.
+  - `rph-controller` → **0 / 0 / 0 / 3**; `domain-purity` → **1 / 0 / 0**; `ports-purity` →
+    **1 / 0 / 0**; `projections-browser-safe` → **1 / 0 / 0**; `depcruise` → **5 / 0 / 0 / 4**;
+    `dependency-cruiser` → **6 / 0 / 0 / 7**; `rph-authoring` → **12 / 0 / 0 / 3**. Two further
+    patterns, run on the adversarial pass: `purity` → **1 / 0 / 0** and `alternation` → **7 / 0 / 0**,
+    with all seven `alternation` hits opened (:2306 :4459 :7211 :13235 :18114 :19693 :21203) — none is
+    about a boundary rule.
+  - **POSITIVE CONTROLS, same files, same flags, same sweep:** `boundary` → **152 / 30 / 2 / 34 files**;
+    `REG-F-` → **1772 / 82 / 15 / 51 files**; `rph-` → **1175 / 101 / 88 / 45 files**. The zeroes in the
+    enforcement register and in the guard ledger are live zeroes, not broken queries.
+  - **THE REG-005 HITS OPENED.** The single `domain-purity` / `ports-purity` /
+    `projections-browser-safe` hit is **:16135**, inside **REG-F-246** (heading at **:16082**, *"the
+    direct-store write path is public, credential-free and ungated"*). It enumerates the eight rule
+    NAMES only to establish that *"None constrains `apps/ → rph-persistence`"*; it opens no alternation,
+    names neither `rph-controller` nor `rph-authoring` (register-wide `rph-controller` → **0**), and its
+    stated closure is `limb:PER-3:2`. Five of the six `dependency-cruiser` hits are inside REG-F-246;
+    the sixth, **:4596**, is a csaa provider-count correction. All twelve `rph-authoring` hits opened —
+    :3503 :5629 :6157 :8767 :8829 :10824 :11919 :13389 :13394 :13564 :13577 :18152 — every one a
+    `broker.ts` / `lint.ts` / agent-channel site; none is about boundary rules.
+  - ⚠ **THE 77 ENTRIES OF THE LAST TWO DAYS WERE GREPPED SPECIFICALLY.** REG-F-203..262 and
+    REG-Q-053..069 occupy lines **4892-22058** (REG-F-203 at :4892, REG-Q-053 at :10954, REG-Q-069 at
+    :21796). Over exactly that slice: `rph-controller` → **0**; `domain-purity` / `ports-purity` /
+    `projections-browser-safe` → **1** each (all :16135, above); `depcruise` → **5** (all REG-F-246);
+    `rph-authoring` → **11** (the broker sites). **Controls over the identical slice:** `boundary` →
+    **87**, `REG-F-` → **787**, `REG-Q-` → **195**.
+  - **BY SITE, repo-wide — who READS this config at all.** `find . -name '.dependency-cruiser*' -not
+    -path '*/node_modules/*'` → exactly one config file, and **two** things in the repository read it.
+    (i) `packages/csaa/src/inventory/boundary-policy.test.ts:35` requires it — and inspects exactly
+    **one** rule, `product-does-not-import-csaa`, at `:43`. (ii) `packages/csaa/src/inventory/
+    collect-inventory.ts` reads the config as TEXT (`:892-893`, `:913`) and walks it with the TypeScript
+    AST collecting **only `name:` string literals** (`:922-932`; `ruleIds: [...names].sort(...)` at
+    `:960`), which land in `verif/csaa/jan-csaa-005.inventory.baseline.json:2209-2218` — the eight rule
+    NAMES, sorted — pinned by `csaa:inventory:check`, the FIRST step of `gate:fast` (`package.json:26`).
+    ⚠ **AND THAT IS THE SHARPEST STATEMENT OF THIS DEFECT.** A gate does watch this config, and would
+    redden if `domain-purity` were renamed or deleted. It never reads `to.path` at all — `grep -c
+    'product-realization-pwa)/' verif/csaa/jan-csaa-005.inventory.baseline.json` → **0** — so it stays
+    green while that rule's regex denies a package that has never existed and admits the one package
+    that reaches everything the rule forbids. **POSITIVE CONTROL on the identical population:**
+    `product-does-not-import-csaa` is found in three places (`.dependency-cruiser.cjs:65`,
+    `boundary-policy.test.ts:43`, and that baseline), whereas `domain-purity` / `ports-purity` /
+    `projections-browser-safe` appear in `.dependency-cruiser.cjs` (`:30`, `:39`, `:48`), in that same
+    NAME-only baseline, **and in prose only. Nothing in the repository asserts anything about the
+    alternation CONTENTS of the three purity rules.**
+  - **THE THREE `docs/_working` HITS ARE THE AUDIT'S OWN RECORD, NOT COVERAGE:** `BACKLOG.md:462-463`
+    (a two-line backlog restatement carrying no site and no remedy),
+    `DESIGN-invariant-enforcement-mapping.md:809` (a paper about the audit's METHOD), and
+    `HARMONIZATION-FINDINGS.md` itself, whose disposition says *"OWES A REGISTER ENTRY"*. A working
+    paper is not a register entry, and each of them says so.
+
+- **⚠ WHAT THE GATE PROVES vs WHAT IT IS BELIEVED TO PROVE — this gap is the whole finding.**
+  *Believed:* four independent places treat these three rules as the mechanism that holds the kernel
+  pure and the browser bundle Node-free. `docs/_working/RPH-DOC-010-BUILD-PLAN.md:115` makes
+  *"`projections-browser-safe` rule holds"* a release exit criterion.
+  `docs/_working/DESIGN-declare-the-spine.md:91` refuses a design outright because
+  *"`.dependency-cruiser.cjs` domain-purity is severity `error`, gated by `boundary` in `gate:fast`"*.
+  `packages/rph-authoring/src/catalog.floor-consistency.test.ts:2-5` deliberately DUPLICATES a floor
+  label map rather than import across the seam, *"which is exactly why the browser-safe ./catalog keeps
+  its OWN floor id→label map (.dependency-cruiser.cjs `projections-browser-safe` forbids dragging
+  rph-assurance into a browser bundle)"*. And `docs/JPWB Implementation Roadmap and Tracker.md:374-376`
+  records why the rule was introduced at all — *"the **demo now builds** (`vite build` had been failing
+  because the engine dragged `better-sqlite3`/`node:crypto` into the browser bundle). Added a
+  `projections-browser-safe` boundary rule"*. *Proved:* only that no module under those three `src`
+  trees imports a package whose directory name matches a hand-written alternation which denies a
+  directory that has never existed and admits the one package that re-exports the engine. The distance
+  between the two is a single import, and it is green.
+
+- **THE REMEDY.** Derived from the filesystem, never hand-listed — a hand-listed population is the
+  defect one level up, and here it IS the defect.
+  1. **Invert all three rules from a deny-list to the allow-list their own comments already state —
+     keeping the rule's OWN package in the exclusion, which is the half the first draft of this remedy
+     dropped.** `contracts-is-foundation` at `:27` already has the right shape,
+     `'^packages/rph-(?!contracts/)[a-z-]+/'`, and note WHY it excludes `contracts`: a `to` path also
+     matches a package's INTRA-package imports, so each rule must exclude itself. With that kept:
+     `domain-purity` → `'^packages/rph-(?!contracts/|domain/)[a-z-]+/'`; `ports-purity` →
+     `'^packages/rph-(?!contracts/|ports/)[a-z-]+/'`; `projections-browser-safe` →
+     `'^packages/rph-(?!contracts/|domain/|ports/|projections/)[a-z-]+/'` — exactly the three names its
+     `:50` comment permits, plus itself. **MEASURED, NOT PROPOSED:** evaluated against the emitted
+     baseline graph these three give **0 / 0 / 0** violations on the unchanged tree, while the same
+     regexes WITHOUT the self-exclusion give **69 / 8 / 58** — every one an intra-package import such as
+     `packages/rph-domain/src/index.ts → packages/rph-domain/src/aggregate-assurance.ts`. A package
+     added tomorrow is then forbidden by DEFAULT, and neither `controller` nor `authoring` remains a
+     fact about a maintainer's memory.
+  2. **A gate on the gate.** A `verif/` test that `require`s `.dependency-cruiser.cjs`, derives the
+     package set from `readdirSync('packages')`, and fails naming (a) any directory a rule regex denies
+     that does not exist on disk, and (b) any `packages/rph-*` directory outside a rule's stated
+     allow-list that the rule's regex fails to match. It must assert on `to.path`, because the one gate
+     that already watches this file — the csaa inventory baseline — pins rule NAMES and nothing else.
+     **Its predicted RED, which must be seen before the green is trusted:** at HEAD it must fail naming
+     `controller` as nonexistent AND `rph-authoring` as unmatched by all three rules; after (1) it must
+     go green; and re-inserting `controller` into any one alternation must redden it again, naming that
+     one rule.
+  3. **The end-to-end predicted RED for (1).** Re-run the driven mutant — a module under
+     `packages/rph-projections/src` importing `@janumipwb/rph-authoring` — and `depcruise packages
+     --config .dependency-cruiser.cjs` must report **1** violation of `projections-browser-safe`; at
+     HEAD it reports **0**. The same mutant into `rph-domain` and into `rph-ports` must redden
+     `domain-purity` and `ports-purity` respectively. **Already measured against the emitted mutant
+     graphs:** the self-excluding regexes of (1) yield exactly **1** hit each, `…/src/tmp_probe_verif.ts
+     → packages/rph-authoring/src/index.ts`, where HEAD's regexes yield 0.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#27**. **It closes nothing else,
+  because** the only adjacent item, **#31** (`:119`, *"The boundary gate cruises only packages/"*), is a
+  defect of the cruise SCOPE in `package.json:18`, not of rule CONTENT in `.dependency-cruiser.cjs`, and
+  neither remedy touches the other: rewriting these three alternations leaves `apps/` at **0 of 587**
+  modules in the graph, and widening the cruise set leaves all three alternations still denying
+  `controller` and still admitting `rph-authoring` — I drove both halves separately. #31 is additionally
+  already carried by **REG-F-246** (`:16082`), whose remedy step (2) widens the cruise set and whose
+  merge target names `package.json:18`; REG-F-246 does **not** carry #27, for the reasons set out in the
+  search disclosure above.
+
+- **Merge target:** **Repository** — `.dependency-cruiser.cjs:35`, `:44` and `:54` (the three
+  alternations) plus a new `verif/` test for remedy (2). And one **Corpus** pointer:
+  `docs/_working/HARMONIZATION-FINDINGS.md`'s item **#27** (`:115`, disposition at `:1436`) should name
+  this entry's ordinal once assigned; do not re-flow lines 1-120 of that file. No ratification is
+  required — the divergence is between the config's regexes and the config's own comments plus the
+  filesystem, so nothing is owed an adjudication and only the code is wrong. Status: OPEN.
+
+### REG-Q-070 — RATIFICATION: mandatory generative property P5 carries a second limb its own source
+specification does not have, turning on a term whose only corpus definition belongs to the explicitly
+CANDIDATE JSDL formalization, so the property the conformance gate certifies is narrower than the
+property the Guide publishes
+
+**Date:** 2026-08-23 · **Type:** QUESTION (harmonization "Refuted (32)" re-disposition) · **Status:** OPEN
+
+- **THE QUESTION, IN ONE PARAGRAPH.** The Coding Agent Guide states mandatory generative property P5 with
+  two limbs: approval of semantic version `n` authorizes neither `n+1` **nor a different fingerprint**. The
+  RPH *Executable Invariant and Conformance Test Specification* — the document the property catalog names
+  as its own source, and the Guide's PEER in the same admitted class — states P5 with limb one only, and
+  never uses the word. Neither does the Guide's own §3 canonical-vocabulary table, nor canon's DOC-002 §7
+  version vocabulary, nor any file in `docs/Recursive Professional Harness/`. The term is not, however,
+  undefined everywhere: `docs/Constitution Discussion/` — admitted to B1's registry by the same ruling —
+  defines it, as a **compiler fingerprint over JSDL canonical IR**, the sense the Guide carries in §12 and
+  §12 itself declares CANDIDATE. So: **does P5 have a second limb; if it does, is its "fingerprint" that
+  JSDL model fingerprint, and if so what is a MANDATORY generative property doing resting on machinery
+  the Guide says is not yet ratified and this engine does not implement — or is the limb to be struck?**
+  Until that is answered, one of the eight mandatory properties has a limb nobody can generate a case for,
+  and a green conformance gate is read as certifying a property it has never tested.
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.** `docs/Janumi Canonical Implementation Context - Coding
+  Agent Guide.md:2293`, byte-exact:
+  `| **P5** | Approval of semantic version \`n\` never authorizes \`n+1\` or a different fingerprint. |`
+  The heading above it is `### 14.2 Mandatory generative properties` (Guide:2283 — grepped, not inferred
+  from the line number), and its preamble at Guide:2285 is *"Generate valid and invalid cases around these
+  properties:"*. P5 is therefore a test-generation obligation, not commentary.
+
+- **§3 NEVER DEFINES THE TERM, AND §3 IS A DEFINITION TABLE.** `grep -n '^## '` puts
+  `## 3. Canonical vocabulary and non-equivalences` at Guide:203 and `## 4. Integrated architecture` at
+  Guide:291, so §3 is lines 203–290; Guide:205-206 is its table header, `| Term | Canonical meaning |`,
+  and Guide:207 its first row. `sed -n '203,290p' … | grep -c -i fingerprint` → **0**.
+  POSITIVE CONTROLS, same range and flags: `grep -c 'Baseline'` → **6**, `grep -c -i version` → **13**,
+  and the count of defined terms — `grep -c '^| \*\*'` → **31**. A term a 31-row definition table
+  omits is a term it does not define.
+
+- **NO OTHER USE IN THE GUIDE SUPPLIES A MEANING FOR AN APPROVED VERSION.** `grep -n -i fingerprint` over
+  the Guide returns **8** hits at 900, 1340, 2140, 2145, 2147, 2293, 2362, 2373 (POSITIVE CONTROL
+  `grep -c -i hash` → **11**, so the file is not being silently zeroed):
+  - **2140 / 2145 / 2147** — inside `## 12. Shape Engineering, JSDL, and JEM` (Guide:2070; §13 opens at
+    Guide:2176, so all three are inside §12). Guide:2145 is the document's ONLY definitional sentence:
+    *"The fingerprint excludes formatting, comments, and irrelevant declaration order but changes when
+    meaning changes."* It is a JSDL **compiler IR** fingerprint (Guide:2140,
+    `→ calculate deterministic semantic fingerprint`), and §12's own preamble at Guide:2072 labels that
+    material candidate: *"what is candidate — not yet ratified authority over the numbered RPH corpus or
+    current repository architecture — is the specific staged formalization in this section together with
+    the JSDL v0.1, JEM v0.1, and JSRP encodings."*
+  - **1340 / 2373** — an unrelated prompt/template sense: *"A prompt/template fingerprint identifies that
+    record; it never substitutes for it"* and *"prompt/template/tool versions or fingerprints"*.
+  - **900** — explicitly candidate and deferred: *"Recurrence uses `findingCode` plus a candidate
+    fingerprint/lineage relation"*, gated on §16 item 24.
+  - **2362** — generated-code provenance: *"Generated code identifies its source and fingerprint and is
+    not hand-edited."*
+  None of the seven other occurrences is a property of an approved semantic version of a governed object.
+
+- **⚠ THE TERM IS NOT UNSOURCED — AND WHERE ITS SOURCE IS, IS THE POINT.** An earlier draft of this
+  entry called the limb *"an unsourced addition"*. That is FALSE and is corrected here, because one grep of
+  an admitted corpus refutes it. `docs/Constitution Discussion/` is admitted to CON-000 B1 by REG-D-034
+  Ruling 2 alongside the Guide and the RPH corpus, and `grep -rn -i fingerprint` over it (`*.md`) returns
+  **37** hits (POSITIVE CONTROL, same glob, `-i 'semantic version'` → **19**). The definition is
+  `docs/Constitution Discussion/retired/Janumi Constitution Discussion.md:15055`, heading
+  `# **27\. Model Fingerprint**`, stated at :15057: *"The compiler SHALL generate a deterministic
+  fingerprint over canonical IR."* **AND ITS OWN LIST OF USES DOES NOT INCLUDE APPROVAL.** :15079 —
+  *"The fingerprint supports:"* — enumerates exactly four (:15081-15084):
+  *reproducible builds; cache identity; deployment verification; compatibility checks.*
+  The non-retired roadmap files agree and keep the two axes apart:
+  `…/08-JAN-IRP-008-Canonical-Capability-Increment-Catalog.md:81` — *"semantic model version and
+  fingerprint;"* — and `…/baseline/JAN-REQ-001-…-incorporated.md:187` (`JAN-REQ-OPS-009`) —
+  *"deployed JSDL contracts, semantic model fingerprints, database versions, and migrations are
+  compatible."*
+  So the corpus supplies **one** meaning, it is the JSDL model fingerprint, and even that meaning does not
+  reach a decision's approval scope. The limb is sourced to candidate machinery, not to nothing — which is
+  a harder question than an unsourced clause, not an easier one.
+
+- **⚠ THE PEER SOURCE HAS NO SECOND LIMB — the fact that makes this an adjudication, not a typo.**
+  `docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness -
+  Executable Invariant and Conformance Test Specification.md:2326` heads
+  `## Property P5 — Semantic version approval isolation`, and :2328 states it whole:
+  *"A decision approving semantic version `n` never authorizes semantic version `n+1`."* The section
+  number is verified, not inferred: `grep -n -E '^#+ *(Section )?25'` on that spec returns exactly one
+  line, `2277:# 25. Property-Based Test Catalog`, and 2326 falls inside it — so "§25 P5" resolves here.
+  `grep -c -i fingerprint` on that spec → **0**; POSITIVE CONTROL `grep -c -i 'semantic version'`
+  → **19**. Across the whole `docs/Recursive Professional Harness/` directory (17 files plus `retired/`)
+  the word occurs **once**, at `Janumi Professional Workbench - Engineering Doctrine.md:251`, in a
+  telemetry/privacy sense — *"governed access, retention, summarization, fingerprints, and controlled
+  artifacts"*; POSITIVE CONTROL over the same directory, `-i 'semantic version'` → **64**. So the Guide's
+  limb is not a restatement of §25 P5; it is an addition to it.
+
+- **WHAT THE CODE DOES, re-read at each site at HEAD `856dd8e1`. It implements the SPEC, exactly.**
+  - `packages/rph-domain/vocab/m12-conformance.json` **names the spec as its source in its own header**:
+    `_meta.sourceDoc` (:4) is the Executable Invariant and Conformance Test Specification, and
+    `_meta.purpose` (:5) is *"…extracting the authoritative test taxonomy (§3 seven layers), the full
+    RPH-* rule catalog (§6-24), the property-based catalog (§25 P1-P8)… Verbatim ids/spellings. This is
+    the vocab source-of-truth the M12 suite is generated against."* The P5 row is :265-269; its
+    `invariant` (:267) is *"A decision approving semantic version n never authorizes semantic version
+    n+1."* and its `sourceRef` (:269) is *"§25 P5 (see RPH-INT-005, RPH-GOV-003, RPH-ASR-010,
+    RPH-CON-007)"*. The extraction is faithful to its declared source; the Guide was never its source.
+  - `packages/rph-domain/src/conformance-manifest.ts:476` binds `P5` to
+    `packages/rph-domain/src/properties.test.ts`, under the docblock at :470 — *"Properties P1–P8
+    are all asserted generatively in properties.test.ts."*
+  - `packages/rph-domain/src/properties.test.ts:190` comments the property as
+    `// P5 — approval of semantic version n never authorizes n+1.`; the `describe` at :191 is
+    *"Property P5 — version-binding (§25; RPH-GOV-003)"*; the call at :222 is
+    `decisionAuthorizesVersions(d, current)` and the two assertions at :225-226 compare `r.ok` and
+    `r.staleSubjects`. `grep -c -i fingerprint` on that file → **0**; POSITIVE CONTROL
+    `grep -c -i 'semanticVersion\|semantic version'` → **7**.
+  - The RPH engine has no fingerprint concept for a limb to bind to:
+    `grep -rn -i fingerprint packages/rph-*/src` → **3**, and all three are comments in
+    `packages/rph-domain/src/transition-row-landing.test.ts:33,37,93` about a generator edge `trigger`.
+    POSITIVE CONTROL on the same glob: `grep -rn 'semanticVersion' packages/rph-*/src | wc -l` → **227**.
+    ⚠ The sweep's evidence attributed those 3 hits to `packages/csaa/` and reported the control as 229;
+    both are wrong and are corrected here. Its conclusion is unchanged.
+  - **⚠ AND THE ONE PLACE THE REPOSITORY DOES HAVE FINGERPRINTS IS DISCLOSED, because a reader will find
+    it.** `packages/csaa/src/contracts/semantic.ts:16-18` declares
+    `SEMANTIC_TYPE_FINGERPRINT_PROFILE = 'jan-csaa-ts-type-fingerprint/1.0.0'` and
+    `SEMANTIC_SIGNATURE_FINGERPRINT_PROFILE`, carried as `fingerprintSha256` (:582, :646). These
+    fingerprint **TypeScript types and signatures** for the code-semantics analyzer. They are not on a
+    governed object, not on a Decision, and not the JSDL model fingerprint either — so they are not the
+    limb's referent; they are disclosed so the absence claim above is read as scoped, which it is.
+
+- **WHAT THE GATE PROVES, AND WHAT IT IS BELIEVED TO PROVE — the gap is the whole finding.**
+  `packages/rph-domain/src/conformance.test.ts:80` is the only property-facing assertion in the gate:
+  *"every Property P1–P8 is bound to a property test"* — its body (:81-82) checks that
+  `PROPERTY_COVERAGE[p.id]` is `toBeDefined()`. It proves P5 has a named test file. That file proves
+  version-binding isolation. Together they prove the **spec's** P5. A reader who arrives from Guide §14.2
+  — the document titled *Canonical Implementation Context* and written for coding agents — reads a green
+  conformance gate as certifying the **Guide's** P5, fingerprint limb included. No artifact in the
+  repository states the difference, so the overclaim is invisible from either end.
+
+- **OBSERVED / READ — stated explicitly.** **OBSERVED (driven at HEAD `856dd8e1`):**
+  `./node_modules/.bin/vitest run packages/rph-domain/src/properties.test.ts` → **1 file, 9 passed**; the
+  same runner on `packages/rph-domain/src/conformance.test.ts` → **1 file, 9 passed**. Both suites are
+  green while neither file contains the term. **READ:** every document quotation, line citation, and
+  census above — each re-opened at HEAD rather than carried from the sweep. Nothing here is inferred from
+  a line number: every section number cited was grepped from its own heading.
+  ⚠ **HEAD MOVED DURING DRAFTING.** The draft cited HEAD `a4a19057`; HEAD is now `856dd8e1`.
+  `git merge-base --is-ancestor` confirms a4a19057 is its parent and `git diff --stat` between them
+  touches four files, none of them the Guide, the spec, the catalog, the manifest or either test — so
+  every citation is unchanged, and the SHA is corrected rather than the evidence re-gathered.
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#26** (line **114**),
+  struck under the heading at line **87**, which read *"Refuted (32) — recorded so they are not
+  re-raised"* (that heading is now itself struck and annotated *"RE-DISPOSITIONED 2026-08-23: 15 OF THE 32
+  ARE TRUE AT HEAD"*), **with no reason recorded** — no evidence, no site, no date, in a list of 32 that
+  carried none. A missing filing invites a search; a filing that records the claim as refuted ends every
+  future search, with the corpus's own authority behind it. Re-checked at HEAD on 2026-08-23: the claim
+  holds; the item's own appended disposition is at that file's lines 1385-1432.
+
+- **⚠⚠ WHY NO CODE AND NO GUARD IS PROPOSED HERE.** The two documents are admitted in the SAME class and
+  neither outranks the other. `docs/canon/JPWB-CON-000 Constitution.md:97` (B1): *"the SOURCE CORPORA from
+  which the canon artifacts were distilled — `docs/Recursive Professional Harness/`,
+  `docs/Constitution Discussion/`, and the Coding Agent Guide — holding authority for DETAIL … Admission
+  grants authority for detail ONLY; principle remains canon's by concern."* **REG-005:2806 REG-D-034
+  Ruling 2** is the act that put them there — *"admitted to B1's registry as SOURCE OF RECORD,
+  authoritative for DETAIL … and subordinate to canon by concern per B3"* — and it rules **canon versus
+  source** (its Ruling 3), never **source versus source**. So no ratified act says which of two admitted
+  peers governs when they differ on a detail, which is exactly the shape of this conflict. Writing a test
+  for the limb requires choosing the JSDL reading and thereby ratifying candidate machinery; writing a
+  guard that certifies P5 complete as implemented ratifies the narrower peer reading by accident. Either
+  act settles the question instead of asking it.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora — Bash `grep`, not the Grep tool.**
+  - **`docs/canon/JPWB-REG-005` (22,058 lines).** `-i fingerprint` → **1** (:924, a generator edge
+    `trigger` — unrelated). `-E '\bP5\b'` → **1** (:52, the canon-synthesis problem list).
+    `-E 'P1[–-]P8'` → **0**. `properties.test.ts` → **0**. `PROPERTY_COVERAGE` → **0**.
+    `Mandatory generative` → **0**. `generative propert` → **0**. `conformance-manifest` → **16**, and
+    **each of the 16 lines was re-opened**: 541, 578, 584, 706, 723, 3530, 3626, 3676, 3735, 3756, 4682,
+    9300, 9301, 9309, 9425, 21465 — RPH-CMP/RPH-FIX statuses, INT-007, deferral censuses and merge
+    targets; a scripted re-scan of those 16 lines for `PROPERTY_COVERAGE|P[1-8]\b` returns **nothing**.
+    POSITIVE CONTROLS: `grep -c 'REG-F-'` → **1772**, `grep -c 'REG-Q-'` → **308**,
+    `grep -c -i semanticVersion` → **129**, `grep -c '^### REG-'` → **373** headings.
+    **The last two days' entries were opened directly, not assumed:** the tail of `^### REG-` runs to
+    **REG-F-262** (:20249) and **REG-Q-069** (:21796), and the nearest neighbours are **REG-F-209**
+    (:6093 — *"`semanticVersion` is decided by command identity, never by field materiality"*) and
+    **REG-Q-058** (:14995 — *"the contracts declare a four-axis version model and carry three; the
+    contract-package axis…"*). Both are about the FOUR ratified axes; neither asks whether there is a
+    fifth, and neither mentions P5 or the Guide's property table.
+  - **`packages/rph-domain/src/enforcement-register.ts` (4,168 lines).** `-i fingerprint` → **0**, and
+    `-E "'P[1-8]'"` → **0**, so no property id is registered there. POSITIVE CONTROLS:
+    `semanticVersion` → **10**, `RPH-GOV` → **33**.
+  - **`verif/guard-enforcement-ledger.data.ts` (392 lines).** `-i fingerprint` → **0**. POSITIVE CONTROLS:
+    `disposition:` → **87**, row keys `^\t\["` → **82**, `RPH-` → **8**. ⚠ An earlier draft argued
+    from `grep -c 'GOV'` → **0** — a control that returns zero proves nothing (EM-2), and the claim
+    it carried (*"registers no P-series property at all"*) is FALSE: the ledger names **P1** three
+    times, at :135, :139 and :145, as the label `(P1/INV-5)` on the cross-axis execution/assurance
+    guards. What is true is narrower, and is what this entry now claims: the ledger's unit is an
+    **arrow guard**, not a property; **P5 appears on none of its 82 rows**, and neither does the term.
+  - **`docs/_working/`.** `-i fingerprint` → **26** lines: this item's own text in
+    `HARMONIZATION-FINDINGS.md` (:114 and the appended disposition, :1385-1432);
+    `PROPOSED-EDITS-recording-and-cot.md` :120, :122, :146, :150, :153, :156, :205 — seven lines, all the
+    prompt/template RECORDING sense and a different obligation; and
+    `DESIGN-derived-capsule-closure.md:301`, a failure digest. POSITIVE CONTROL `properties.test.ts` →
+    **5**, none about P5's content.
+  - **CANON-WIDE, beyond REG-005.** `grep -rn -i fingerprint docs/canon/` → **9** hits in 7 files:
+    `JPWB-DOC-003 …:369` (PER-9, prompt/template sense) and its sidecar
+    `JPWB-DOC-003 ….provenance.md:130`; `JPWB-DOC-004 …:217`; `JPWB-REG-005 …:924`;
+    `JPWB-SPEC-001 …:3224` and `:3236` (both quoting PER-9); and three hits across two `_extracts`
+    (`extract-condisc-15001.md:29`, quoting §27's L15059-15062, `:32` quoting the generated-header
+    example at L15308, and `extract-condisc-16501.md:59`). **`JPWB-DOC-002 Canonical Vocabulary.md`
+    §7 Version vocabulary** (heading `## 7. Version vocabulary` at :208) states at :210 *"Four version
+    words carry four distinct meanings, and they are never interchangeable:"* and names exactly four at
+    :212-215 — `contractVersion`, `schemaVersion`, `semanticVersion`, `revision`. `-i fingerprint` on
+    DOC-002 → **0**; POSITIVE CONTROL `-i baseline` on the same file → **10**. No canon artifact makes
+    it a version axis. ⚠ Per REG-D-034 consequence 2, *"an absence recorded against `docs/canon/` alone
+    is not a finding"* — which is why the absence above is established in the source corpora too, and why
+    the one corpus that DOES define the term is quoted rather than omitted.
+
+- **WHAT WOULD CLOSE IT — one of three dispositions, recorded in REG-005.**
+  **(A) THE LIMB STANDS ON A NEW AXIS.** Canon defines "fingerprint" for a governed object, most naturally
+  as a fifth entry in DOC-002 §7 beside the four version words, and says what it fingerprints and which
+  object carries it. Then the limb becomes generable: `m12-conformance.json:267` is amended,
+  `properties.test.ts` owes a generator and a red-first mutant for it, and the manifest's P5 binding
+  becomes true of the Guide's P5 as well.
+  **(B) THE LIMB IS THE JSDL MODEL FINGERPRINT** of Guide §12 / Constitution-Discussion §27. Then P5's
+  second limb is **BLOCKED on candidate material** by the Guide's own :2072 clause and must say so at
+  :2293, because a mandatory generative property may not rest silently on a formalization the same
+  document declares unratified.
+  **(C) THE LIMB IS STRUCK** from Guide:2293 — §25 P5 does not carry it, the only corpus meaning is a
+  compiler concern whose own four stated uses exclude approval, and nothing in this engine carries it.
+  Then catalog, manifest and test are already correct and only the Guide changes.
+  **Under all three**, `m12-conformance.json` P5 should record WHICH disposition it reflects, because
+  today it silently reflects (C) without one having been taken.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#26**. It closes nothing else, because
+  the only other fingerprint material in `docs/_working/` is the prompt/template RECORDING sense, whose
+  live question — whether an exchange record may be replaced by a digest — is
+  `docs/_working/PROPOSED-EDITS-recording-and-cot.md`'s §14.6 *"or fingerprints"* edit, and this entry
+  takes no position on it; **REG-F-209** asks whether a semantic bump is judged by field materiality, which
+  presumes the axis and does not reach a fifth one; **REG-Q-058** asks whether the contract-package axis
+  must be CARRIED, again within the ratified four; and nothing here touches the other 14 true items of the
+  *Refuted (32)* re-disposition — 12 of which owe their own entry, two being already covered by REG-D-026.
+
+- **Merge target:** Corpus (JPWB-REG-005) for adjudication first; then, on disposition, BOTH — the Guide
+  at :2293 or DOC-002 §7, plus `packages/rph-domain/vocab/m12-conformance.json:267` and
+  `packages/rph-domain/src/properties.test.ts`. No repository change should be made before the disposition
+  is recorded, because either one written as code first would settle the question by accident. Status: OPEN.
+
+### REG-Q-071 — the durable turn record's `role` and `kind` are unconstrained strings that accept `''`,
+no guard anywhere reads them, and the only vocabulary in existence is an app-side list whose `role`
+values canon's ratified actor vocabulary does not contain — so what should type them is unsettled
+
+**Date:** 2026-08-23 · **Type:** QUESTION (harmonization "Refuted (32)" re-disposition) ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH, AND WHY IT IS A QUESTION AND NOT A FINDING.** `ConversationEntry` —
+  the entire durable record of an authoring turn — types its two discriminators as bare
+  `z.string()`: `role` and `kind` (`packages/rph-contracts/src/objects.ts:189-190`). Driven, the
+  contract accepts `role: ''`, `kind: ''`, and arbitrary junk in either. No guard anywhere in
+  `rph-application` or `rph-domain` reads either field. So the durable record's own discriminators are
+  whatever the untrusted producer said they were, which PER-10 forbids. **The gap is real; what is
+  NOT settled is what should type them**, and that is why this is a QUESTION. Two plausible answers
+  point in opposite directions, and writing a guard for the one the app already implements would
+  ratify the narrower one by accident: the app's de-facto `role` values are `USER` / `AGENT` /
+  `SYSTEM`, and **two of those three are not members of the ratified actor vocabulary at all.**
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.**
+  - **JPWB-DOC-003 PER-10 · *Untrusted until admitted*** (`docs/canon/JPWB-DOC-003 Semantic Model and
+    Invariant Catalog.md:373`): *"All inbound data — user input, model output, validator output, tool
+    output, imports, templates, migration data, external API responses — crosses the full trust
+    pipeline (parse, structural validation, normalization, **semantic validation**, authorization,
+    conversion to domain values) before touching canonical state. Model output is untrusted external
+    input; the system's own agents have no privileged bypass."*
+  - **The Guide §9.4 "Envelope and schema rules"** (heading at `docs/Janumi Canonical Implementation
+    Context - Coding Agent Guide.md:1230`), the wire rule at `:1238`: *"uppercase snake-case enums;"*.
+    ⚠ **This cuts both ways and is part of the question.** The app's de-facto kinds are `message`,
+    `tool_call`, `tool_result`, `error` — **lower-case**. Either they are enums and are spelled
+    against `:1238`, or they are not enums and there is no vocabulary at all. Both readings are
+    defects; they have different remedies.
+  - **The ratified alternative the repository already ships.** `ActorReferenceSchema`
+    (`packages/rph-contracts/src/envelopes.ts:23-31`) — `actorId`, `actorType`, `displayName`,
+    `roleId?`, `modelId?`, `providerId?`, `executionInstanceId?` — is REQUIRED on the object envelope
+    as `createdBy`/`updatedBy` (`envelopes.ts:57`/`:59`) and on the event envelope as `actor`
+    (`:150`), and its `actorType` is the ratified `ActorTypeSchema` enum
+    (`packages/rph-contracts/src/enums.ts:7-14`): `HUMAN`, `AGENT`, `MODEL`, `SERVICE`,
+    `POLICY_ENGINE`, `EXTERNAL_SYSTEM`. **`USER` and `SYSTEM` are not in it.**
+
+- **WHAT THE CODE DOES, re-read at the sites at HEAD** (856dd8e1 — not a4a19057, which is now
+  HEAD~1; the single commit between them touches only `docs/` and `verif/`, no site cited here).
+  - `packages/rph-contracts/src/objects.ts:188-193` — `ConversationEntrySchema = z.strictObject({ role:
+    z.string(), kind: z.string(), text: z.string(), success: z.boolean().optional() })`. Neither
+    discriminator is narrowed; `z.string()` with no `.min(1)`, no `.enum`, no refinement.
+  - **The app-side vocabulary.** `apps/rph-demo/src/lib/server/agent/transcript.ts:16-22`
+    `TRANSCRIPT_KIND` maps five producer events to five kind labels, and `:25`
+    `const RECORDABLE = new Set(['message', 'tool_call', 'tool_result', 'error'])` narrows the
+    durable set to four (`thinking` is excluded by design under PER-12). It is a plain
+    `Record<string, string>` and a plain `Set` — nothing generated, nothing ratified, nothing the
+    schema imports.
+  - **⚠ AND IT IS NOT THE ONLY ONE. A SECOND VOCABULARY EXISTS INSIDE THE CONTRACT'S OWN GENERATOR
+    INPUT, CARRIED AS PROSE NOTHING CAN ENFORCE.** `objects.ts:1-2` declares the file generated from
+    `vocab/m1-object-fields.json`; that file declares this sub-type at
+    `packages/rph-contracts/vocab/m1-object-fields.json:3013` and gives BOTH discriminators a written
+    vocabulary in a `note`: `:3019` *"USER | AGENT | SYSTEM — who produced this entry."* and `:3025`
+    *"Render/semantic kind: message | thinking | tool_call | tool_result | error."* The generator
+    emits neither — `objects.ts:188-193` carries no comment and no enum — so the vocabulary is
+    **written down in the ratified-shape source and enforced nowhere**. **This sharpens the question
+    rather than answering it:** the two written vocabularies already DISAGREE (the vocab note lists
+    **five** kinds including `thinking`; the app's `RECORDABLE` admits **four**), and the vocab note
+    is the artifact that enshrines `USER`/`SYSTEM` — the two labels `ActorTypeSchema` does not have.
+  - **The `role` labels are string literals in one route file.** `USER` at
+    `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:304`, `AGENT` at `:195`/`:198`/`:204`,
+    `SYSTEM` at `:112`/`:119`/`:141`/`:172`/`:182`/`:210`/`:329`. Eleven literals, three values, no
+    declaration.
+  - **The consumer depends on both untyped fields, and its fallback is silent corruption.**
+    `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:64-77` `toLogEntry` switches on `e.kind`
+    (`:66` `case 'message'` … ) and branches on `e.role === 'USER'` at `:67`; its `default:` at `:74`
+    returns `{ kind: 'error', text: e.text }`. **So an unrecognized `kind` is not rejected — it is
+    RENDERED TO THE PROFESSIONAL AS AN ERROR ROW**, and a producer typo becomes a false error in the
+    permanent transcript with nothing anywhere reporting it.
+
+- **OBSERVED — I DROVE THE CONTRACT.** Node against the built contract
+  (`packages/rph-contracts/dist/objects.js:96`, byte-identical to `src` and newer; `src` clean at
+  HEAD). Verbatim tool output:
+  ```
+  E role = arbitrary junk string  -> ACCEPTED
+  F kind = arbitrary junk string  -> ACCEPTED
+  G role = empty string           -> ACCEPTED
+  H kind = empty string           -> ACCEPTED
+  CONTROL missing text            -> REFUSED | invalid_type:text:Invalid input: expected string,
+                                               received undefined
+  ```
+  **The control is what makes E-H mean something:** the schema is alive and does refuse a bad field,
+  so accepting `''` for both discriminators is a decision the contract makes, not a dead parse.
+
+- **OBSERVED, SECOND ROUTE — DRIVEN THROUGH THE REAL COMMAND PIPELINE, not the schema in isolation.**
+  A throwaway vitest suite over `Engine` + `SqliteStorageAdapter` (the harness at
+  `packages/rph-application/src/handlers/pwa-authoring.test.ts:25-49`) dispatched a real
+  `AppendConversationEntries` per case. Verbatim:
+  ```
+  A baseline {role,kind,text} -> ACCEPTED
+  E role = junk               -> ACCEPTED
+  F kind = junk               -> ACCEPTED
+  G role = empty string       -> ACCEPTED
+  H kind = empty string       -> ACCEPTED
+  CONTROL missing text        -> VALIDATION_FAILED | RPH_VALIDATION_SCHEMA_FAILED | Schema validation failed
+  ```
+  So an empty or arbitrary discriminator is not merely accepted by the schema — the **whole command
+  is ACCEPTED by `Engine.dispatch`** against a real `SqliteStorageAdapter`, past parse, structural
+  validation, authorization, and the DWP-08 precondition. ⚠ **EM-2, DISCLOSED AGAINST MYSELF:**
+  the first two runs of this drive
+  reported `A baseline -> REJECTED`, i.e. a DEAD CONTROL — a 25-char ULID made every case fail on the
+  id rather than on the entry. The rows above are from the run whose control is ACCEPTED.
+
+- **AND NO GUARD DOWNSTREAM CATCHES IT — DERIVED, NOT ENUMERATED.** The only precondition registered
+  for `AppendConversationEntries` is `entriesNonEmpty`
+  (`packages/rph-application/src/handlers/pwa-authoring.ts:59-68`, JAN-CMDPRE DWP-08), whose message
+  at `:65` is *"AppendConversationEntries changes nothing: the entries batch is empty…"* — a
+  cardinality check, not a vocabulary one. `grep -rn "kind ===\|role ===" packages/rph-application/src
+  packages/rph-domain/src --include=*.ts` (non-test) → **12 hits, and not one is a ConversationEntry**:
+  `enforcement-register.ts` **7** (register-row kinds, `:3922`-`:4139`), `transition-gate.ts` **4**
+  (`:443`/`:445` verdict kinds, `:820`/`:821` action kinds), and `conformance-manifest.ts:312`, which
+  is a comment. **The grep form returns 12, so the instrument works and the absence is real** — and
+  `packages/rph-application/src` contributes **0** of the 12, which is the half that matters here.
+
+- **THE QUESTION, IN THE FORM AN ADJUDICATION CAN ANSWER.**
+  1. **Is `role` on a conversation entry a label, or is it the ratified `ActorReference`?** If it is
+     the ratified carrier, the remedy is to replace the string with `ActorReferenceSchema` — which
+     would also make `modelId`/`providerId` sayable, and is the shape the object and event envelopes
+     already require. If it is a label, which vocabulary — and does `USER`/`SYSTEM` stand, or does it
+     become `HUMAN`/`SERVICE` to match `ActorTypeSchema`?
+  2. **Is `kind` a ratified vocabulary, and if so which — and does the generator note become it?**
+     Canon names none: `AUTHORING_CONVERSATION` appears in the corpus only as an object-type list
+     member (`docs/canon/JPWB-SPEC-001 Professional Projection and Workbench Surface.md:8936`), and
+     `packages/rph-contracts/src/enums.ts` declares **78** `z.enum`s of which **0** name a
+     conversation kind or a turn role. The one written list is the generator note at
+     `vocab/m1-object-fields.json:3025`, which is **five** kinds, not the app's four — so adopting it
+     is itself a decision, not a transcription.
+  3. **Does the answer to (2) settle `thinking` at the contract layer?** The app excludes `thinking`
+     from `RECORDABLE` by rule (`transcript.ts:25`, docblock at `:14-15`); an enum omitting it would
+     move that rule from a runtime filter into the contract. **That is REG-F-249's live subject
+     (`:16909`) and must not be settled as a side effect of typing this field.**
+  4. **What happens to entries already persisted with an unlisted `kind`?** PER-8 forbids hard delete
+     after participation; an upcaster or a lifecycle disposition is required, not a migration that
+     rewrites events (Guide `:1242`: *"persisted Events are immutable and permanent; schema change
+     uses new versions/upcasters, never event rewrite"*).
+
+- **⚠ WHY A GUARD WRITTEN TODAY WOULD RATIFY THE NARROWER READING.** The lists available to someone
+  implementing now are the app's (three `role` literals, four `RECORDABLE` kinds) and the generator
+  note's (the same three roles, but **five** kinds) — and they disagree. Encoding
+  those as `z.enum` would (a) enshrine `USER` and `SYSTEM`, two labels the ratified actor vocabulary
+  does not contain, (b) foreclose answer 1's `ActorReference` option by making the string field
+  officially a label, (c) ship lower-case members against Guide `:1238`, and (d) settle `thinking` at
+  the contract layer while REG-F-249 is open. **All four are decisions, and none of them has been
+  made.** That is why this is filed as a QUESTION rather than as a `CODE_DIVERGES` finding with a
+  remedy.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora — Bash `grep`, long hits opened
+  with `sed -n Np`. Format `REG-005 / enfreg / ledger / _working`.**
+  - **By symbol.** `ConversationEntry` **5 / 0 / 0 / 8** · `AUTHORING_CONVERSATION` **0 / 0 / 0 / —**
+    · `TRANSCRIPT_KIND` **1 / 0 / 0 / —** · `toLogEntry` **0 / 0 / 0 / —** ·
+    `AppendConversationEntries` **6 / 0 / 0 / 3 files**.
+  - **By SITE.** `objects.ts:190` (the `kind` line itself) → **1** in REG-005 at `:16969`
+    (the sentence it serves is `:16968`), inside **REG-F-249**; `objects.ts:188` → **2**, `:10282`
+    and `:10338`, both **REG-F-230**.
+  - **EM-2 POSITIVE CONTROLS, same files, same flags.** REG-005: `objects.ts:` → **155**,
+    `z.strictObject` → **59**, `envelopes.ts` → **24**, `pwa-authoring.ts` → **49**.
+    `packages/rph-domain/src/enforcement-register.ts` (4168 lines): `conversation` **0**, `transcript`
+    **0**, against controls `RPH-EVD` → **37**, `objects.ts` → **1**, `z.string` → **3**.
+    `verif/guard-enforcement-ledger.data.ts` (392 lines): `conversation` **0**, `transcript` **0**,
+    against control `RPH-` → **8**. `docs/_working/` (69 files): `ConversationEntry` → 8 hits in 2
+    files (`HARMONIZATION-FINDINGS.md`, `HARMONIZATION-LOG.md`), against control `pwaId` → **4
+    files**. `packages/rph-contracts/src/enums.ts`: conversation/turn vocabulary **0**, against
+    control `z.enum` → **78**. `packages/rph-contracts/vocab/m1-object-fields.json`:
+    `conversation` (`-i`) → **4**, and two of them are the unenforced `note` vocabularies above.
+  - **⚠ THE 77 ENTRIES FROM THE LAST TWO DAYS WERE GREPPED SPECIFICALLY.** REG-F-203 opens at `:4892`,
+    REG-Q-069 at `:21796`; every `ConversationEntry`-family hit from `:8531` onward is inside that
+    block and each was opened. **REG-F-249** (`:16909`) quotes `kind: z.string()` at `:16968` — but as
+    proof that the carrier is **open** to a `thinking` trace under PER-12; its remedy narrows what may
+    be *written*, and it proposes no vocabulary and no `role` decision. **REG-F-230** (`:10205`) quotes
+    the same schema for a **tool-authorization** field. **REG-Q-063** (`:20439`) is OBJ-3 on meaning in
+    an *identifier* — a different axis. No entry asks what should type these two fields.
+
+- **⚠ IT WAS RECORDED AS REFUTED, WITH NO REASON.** `docs/_working/HARMONIZATION-FINDINGS.md` item
+  **#3** (line **91**): *"Transcript entries are **contractually untyped** and carry no timestamp, so
+  the durable turn record has no time axis."* — struck, under the heading at line **87**, *"Refuted
+  (32) — recorded so they are not re-raised"*, **with no evidence, no site and no date recorded** (the
+  file itself now says so at `:126`). The strike is the harm: a missing filing invites a search, while
+  a filing that records the claim as refuted ends every future one on the corpus's own authority.
+  Re-checked at HEAD 2026-08-23 and **TRUE**; the sweep's disposition is appended to the same file at
+  `### Item 3 — TRUE AT HEAD` (line **249**). ⚠ **AND THE SAME WORKING CORPUS ALREADY CONTRADICTED THE
+  STRIKE:** `docs/_working/HARMONIZATION-LOG.md:1305-1309` lists `ConversationEntry` among 18 sub-types
+  that *"the contract simply could not check"*, and `:258` finding **F4** calls the shape *"the entire
+  durable record of an agent turn"* and *"the priority defect"*.
+
+- **THE REMEDY — an adjudication first, then one contract change.** Answer (1)-(4) above as a sponsor
+  ruling or a canon amendment naming the conversation vocabulary; then narrow `role` and `kind` in the
+  ratified vocabulary — which means editing
+  `packages/rph-contracts/vocab/m1-object-fields.json:3013-3038`, where the unenforced prose
+  vocabulary already sits — and re-generating with `bun run gen:objects` (`objects.ts:1`), never by
+  hand-editing `objects.ts`.
+  **RED FIRST:** the test that must redden before any of this is trusted is one asserting that
+  `AppendConversationEntries` with `kind: ''` is **REFUSED** — today it is ACCEPTED, as driven above.
+  And `toLogEntry`'s `default:` (`+page.server.ts:74`) must stop rendering an unknown kind as an
+  `error` row once the vocabulary is closed; a closed vocabulary with a silent fallback is the same
+  defect wearing a type.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#3** (its *"contractually untyped"*
+  half; the timestamp half is filed as a separate `CODE_DIVERGES` FINDING alongside this entry,
+  because that half's remedy needs no adjudication — canon states it). **It closes nothing else,
+  because:**
+  - **Not item #1 of the struck 32** (*"Objects the agent authors are attributed to a constant role
+    label rather than the actual model identity"*). That is a claim about the ACTOR on authored
+    OBJECTS and the independence check that depends on it; this entry is about the two discriminators
+    on a CONVERSATION ENTRY. They touch at answer (1) — if `role` becomes an `ActorReference`, the
+    model identity becomes sayable *here* — but #1's subject is a different carrier and stays open.
+  - **Not REG-F-249**, whose subject is which material may be written at all under PER-12, and which
+    this entry deliberately refuses to settle (question 3).
+  - **Not REG-F-230's remedy item 4**, a tool-authorization field on the same strict object.
+  - **Not #63** (`HARMONIZATION-FINDINGS.md:73`), which is the tool-call record's *content*.
+
+- **Merge target:** Corpus first — a sponsor ruling or a JPWB-DOC-002 vocabulary entry answering
+  (1)-(4); then Repository, `packages/rph-contracts/src/objects.ts:189-190` via the vocabulary
+  generator, plus `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:74` and
+  `apps/rph-demo/src/lib/server/agent/transcript.ts:16-25`. **Safe default while it is open:** narrow
+  nothing — a wrong enum is harder to retract than an absent one, and the observable harm today
+  (a typo rendered as an error row) is bounded and diagnosable. Status: OPEN.
+
+### REG-Q-072 — an Assurance Observation cannot say WHEN it was observed: does PER-11's "where their
+distinction matters" reach the observation, and if it does, is the observed time a fact about the
+recording act or one a professional may declare?
+
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+
+- **⚠ ADJUDICATION GATES THE CODE, AND THAT IS WHY THIS IS NOT FILED AS A FINDING.** The engine already
+  implements one of the two available readings — the observation's only times are the envelope's
+  record-keeping stamps, so the observed moment is *de facto* the recording moment. **Two opposite
+  remedies are available, each closes the gap, and each is a different ratification:** removing nothing
+  and declaring the dimensions provably coincident, or adding a caller-settable observed time and with
+  it the backdating hazard `REG-F-020` and `REG-F-014` name. Writing a guard for either would settle the
+  canon question by accident, in code, with no act. **This is filed on `REG-Q-055`'s stated precedent,
+  and distinguished from `REG-F-219`'s below.**
+
+- **THE FACTS ARE NOT IN DOUBT; ONLY THE OBLIGATION IS.** What follows is established, driven where it
+  could be driven. It is the *"where their distinction matters"* clause that needs an answer.
+
+- **WHAT CANON SAYS, QUOTED VERBATIM.** `docs/canon/JPWB-DOC-003 Semantic Model and Invariant
+  Catalog.md:377`, PER-11, under the heading `## 9. Persistence semantics` read off `:333` (not
+  inferred), byte-exact: *"**PER-11 · Time is bitemporal; occurrence and record never conflate.** Every
+  durable semantic record preserves semantic-occurrence time and record time as distinct meanings, and
+  carries observed, valid, and Decision-effective time where their distinction matters. Exact field
+  spellings and placement are repository shapes."*
+  - **⚠ AND CANON'S OWN OBJECT ROW FOR THIS OBJECT NAMES NO TIME AT ALL**, which is half the question.
+    Ratified canon gives the object no row of its own: `JPWB-DOC-003:93`, in `## 3. Core objects and
+    minimum rules` (heading read off `:75`), is a COMBINED row, byte-exact —
+    `| **Assurance Assessment / Observation** | Version-bound evaluation of Claims under an Assurance
+    Policy; what was detected and its professional implication. Observation, interpretation, and Claim
+    remain separate. |` (**`grep -c "Assurance Observation"` over DOC-003 → 0; controls in the same
+    file: `Assurance Assessment` → 3, `Confidence Assessment` → 1, `Evidence` → 12.**) The Guide's
+    §5.2 row, `docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:389`, likewise:
+    *"| **Assurance Observation** | What was detected or measured and its professional implication. …"*
+    **Neither enumerates a time duty**, so the whole obligation — if there is one — rests on PER-11's
+    general clause, and that is precisely the clause with a judgment condition in it.
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD.**
+  - **THE OBJECT.** `packages/rph-contracts/src/objects.ts:576-589`,
+    `export const AssuranceObservationSchema = z.strictObject({ ...objectEnvelopeShape, assessmentId,
+    policyId, criterionId?, subjectObjectIds, findingCode, observationType, severity, statement,
+    implication, evidenceIds, disposition })`. Because it is a **`strictObject`**, no unlisted time
+    field is even admissible — the gap is *inexpressible*, not merely unused. ⚠ **AND THE ONE OPEN
+    CARRIER DOES NOT RESCUE IT:** the envelope's `extensions` array could in principle hold a time, but
+    `RecordAssuranceObservationPayloadSchema` has no `extensions` key either (enumerated below), so a
+    caller cannot supply one by that route.
+  - **THE ENVELOPE.** `packages/rph-contracts/src/envelopes.ts:49-65` — `objectEnvelopeShape` (the
+    `ObjectEnvelopeSchema` built from it follows at `:67-68`) carries `createdAt` and `updatedAt` and no
+    other time. `ProvenanceRecordSchema` (`envelopes.ts:35-42`) is `{ originType, sourceObjectIds,
+    sourceEventIds, producingExecutionAttemptId?, producingValidatorId?, contentHash? }` — **no
+    timestamp**.
+  - **NEITHER WIRE SURFACE ADDS ONE.** Command: `packages/rph-contracts/src/messages.ts:352-359`,
+    `RecordAssuranceObservationPayloadSchema` = `{ assessmentId, observationType, findingCode?,
+    severity, statement, evidenceIds? }` — **a professional cannot DECLARE when the thing was
+    observed.** Event: `packages/rph-contracts/src/messages.ts:938-949`,
+    `AssuranceObservationRecordedPayloadSchema` = `{ observationId, assessmentId, policyId,
+    subjectObjectIds, findingCode, severity, statement, implication, evidenceIds, disposition }` — no
+    time field.
+
+- **OBSERVED — DRIVEN for the shapes, READ for the canon.** The three key sets were **enumerated by
+  `node` off the built contracts** (`packages/rph-contracts/dist/index.js`), not eyeballed:
+  - OBJECT → `[id, objectType, schemaVersion, semanticVersion, revision, lifecycleStatus, createdAt,
+    createdBy, updatedAt, updatedBy, provenance, ontologyId, ontologyVersion, tags, extensions,
+    assessmentId, policyId, criterionId, subjectObjectIds, findingCode, observationType, severity,
+    statement, implication, evidenceIds, disposition]` — no observed or valid time.
+  - COMMAND → `[assessmentId, observationType, findingCode, severity, statement, evidenceIds]`.
+  - EVENT → `[observationId, assessmentId, policyId, subjectObjectIds, findingCode, severity,
+    statement, implication, evidenceIds, disposition]`.
+  - **CONTROL on the same instrument:** `AssuranceAssessmentSchema` enumerated the same way DOES carry
+    `startedAt` and `completedAt`. The instrument reports time fields where they exist. Second control:
+    the object schema REFUSES an unlisted key (`{observedAt: …}` → `false`), so `strictObject` is doing
+    what this entry says it does.
+  - **SECOND ROUTE, DIFFERENT ARTIFACT AND DIFFERENT INSTRUMENT:** the GENERATED JSON Schema
+    `packages/rph-contracts/schemas/objects/AssuranceObservation.json`, parsed with `python`, declares
+    exactly those 26 properties, `"additionalProperties": false`, and 23 `required` — **no observed and
+    no valid time**, reached without the TypeScript build.
+
+- **⚠ TWO CORRECTIONS TO THE STRUCK ITEM'S WORDING, which do not touch its substance.** (1) The envelope
+  carries `createdAt` **and** `updatedAt`, not *"only the envelope's createdAt"*. (2) The
+  `AssuranceObservationRecorded` **event** envelope does carry two times — `occurredAt` and `recordedAt`
+  are both REQUIRED at `packages/rph-contracts/src/envelopes.ts:148-149`. But those are PER-11's
+  **occurrence/record** pair, a different dimension from the **observed** and **valid** times at issue,
+  and REG-Q-055 records that conjunct as already *"ENFORCED BY CONSTRUCTION"* via `makeEvent`.
+
+- **THE VOCABULARY EXISTS IN THIS PACKAGE AND WAS SIMPLY NOT GIVEN TO THIS OBJECT — with a census and a
+  positive control.** `grep -rnoE "observedAt|occurredAt|validFrom|validUntil|observationTime|
+  detectedAt|effectiveAt|capturedAt"` over `packages/rph-contracts/src/*.ts` → **16 hits, all opened,
+  none on this object**: `validFrom`/`validUntil` at `objects.ts:148-149` (`AuthorityReference`),
+  `objects.ts:518-519` and `messages.ts:1188-1189` (Evidence); `capturedAt` at `objects.ts:517`,
+  `messages.ts:194`, `messages.ts:1187`; `effectiveAt` at `objects.ts:603`, `messages.ts:371, 1101,
+  1112, 1631`; `occurredAt` at `envelopes.ts:148` and `envelopes.test.ts:154`. **`observedAt` → 0.**
+  **CONTROL on the same files and instrument:** `createdAt` → present in `objects.ts` and
+  `envelopes.ts`; the alternation itself returns 16, so the zero for `observedAt` is a real absence.
+  - **THE SIBLING OBJECT IS THE SHARP COMPARISON.** `EvidenceObjectSchema` (`objects.ts:508-521`), sixty
+    lines above, carries `limitations` (`:516`), **`capturedAt` (`:517`, REQUIRED)**, `validFrom`
+    (`:518`) and `validUntil` (`:519`) — and `capturedAt` is **caller-settable**, declared REQUIRED on
+    `ProposeEvidencePayloadSchema` (`messages.ts:194`). **The engine already knows how to let a
+    professional declare when something was observed. It gives that affordance to Evidence and not to
+    Observation.** Whether that asymmetry is a defect or a correct reading of *"where their distinction
+    matters"* is exactly the question.
+
+- **⚠ HONEST NARROWING — NOTHING UPSTREAM IS BEING DISCARDED.** The gap is uniform through the stack, so
+  this is not a case of a known time being dropped: `RecordableObservation`
+  (`packages/rph-assurance/src/recording.ts:22-27`, fields at `:24-26`) is `{ code, severity,
+  statement }` — the validator layer that feeds observations carries no observed time either. **A remedy
+  would have to introduce the value, not merely stop losing it**, which raises the provenance question
+  in the sub-question below.
+
+- **THE CONFLICT, STATED AS A CONFLICT.**
+  - **Canon reads one way.** PER-11 requires a durable record to carry **observed** time *"where their
+    distinction matters"*, and an assurance observation is by definition *"what was detected or
+    measured"* — a detection has a moment. A scan run last night and recorded this morning, a
+    measurement taken against a build that has since moved, a finding transcribed from an external
+    report: in each the observed moment and the record moment differ, and the engine cannot say so.
+  - **The repository's own shape reads the other way.** Observations are minted only inside an
+    assessment, by `recordAssuranceObservation`, from a validator result produced during that
+    assessment — so the two dimensions **provably coincide** for every observation the engine can
+    currently create. REG-Q-055 records that canon's own NON-EXAMPLE *"licenses omitting a field whose
+    dimensions provably coincide"* (REG-005:`11496-11498`; the NON-EXAMPLE itself is `DOC-003:379`). On
+    that reading the answer is *"it does not matter, for observations"*, and the correct outcome is a
+    **recorded declaration of coincidence**, not a field.
+  - **AND THE PRECEDENT CUTS BOTH WAYS.** `REG-F-020` (heading REG-005:**725**; the bullet at **:753**)
+    deleted `GrantWaiver.effectiveAt` rather than honour it, reasoning that the moment a governance act
+    became effective is *"a fact about the ACT"* and that honouring a caller-supplied value *"would
+    permit a waiver to be BACKDATED — the manufacture-a-governance-fact shape REG-F-014 records."* An
+    observed time a caller may set is that same shape, on the object that carries a blocking finding.
+
+- **THE QUESTION.** **Is PER-11's *"where their distinction matters"* answered YES for
+  `ASSURANCE_OBSERVATION` — (i) NO, because every observation the engine can mint is detected inside the
+  assessment that records it, in which case the coincidence should be DECLARED (a site disclosure plus a
+  guard-ledger row disposed `NOT_A_COMMAND_REFUSAL`), not left as a silent absence; or (ii) YES, in
+  which case `AssuranceObservationSchema` and `RecordAssuranceObservationPayloadSchema` must gain an
+  observed time?** Sub-question, because it is where REG-F-020's reasoning bites: **if (ii), is the
+  observed time caller-DECLARABLE or engine-STAMPED — and if declarable, must a value disagreeing with
+  the recording act be REFUSED rather than silently preferred, per REG-F-017, given that the validator
+  layer supplies no such value today and a caller would be its only source?** Second sub-question:
+  **does a validity window (`validFrom`/`validUntil`) belong on an observation at all, or is an
+  observation's validity wholly derived from the Evidence it cites?**
+
+- **⚠ IT WAS RECORDED AS REFUTED.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#10** (line **98**),
+  struck under the heading at line **87**, *"Refuted (32) — recorded so they are not re-raised"* (that
+  heading is now itself struck and annotated `RE-DISPOSITIONED 2026-08-23`), **with no reason recorded**
+  — the file's own line **126** now says not one of the 32 recorded one. Re-checked at HEAD by the
+  2026-08-23 sweep (disposition at `:610-617`, *"TRUE AT HEAD … OWES A REGISTER ENTRY"*) and re-verified
+  independently for this filing by enumerating the shapes. **A missing filing invites a search; a filing
+  that records the claim as refuted ends every future search with the corpus's own authority** — which
+  is why the debt is discharged here as a QUESTION rather than left for a reader who would meet the
+  strike first.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` throughout (the Grep
+  tool omits this register's long lines); `-i` and `-F` never combined. Counts are REG-005 /
+  `packages/rph-domain/src/enforcement-register.ts` / `verif/guard-enforcement-ledger.data.ts` /
+  `docs/_working`.
+  - **BY LIMB.** `PER-11` → **23 / 0 / 0 / 9 hits in 3 files**; every register hit opened. They resolve
+    to REG-Q-055 (canon-quote bullet at `:11491`ff), REG-F-219's cross-references (`:8237-8239`), the
+    `:5624` and `:7783` cross-citations, the provenance notes at `:15539`, `:15558` and `:20379`, and
+    census roll-ups at `:14669`, `:14899`, `:15947`, `:17114`. **`limb:PER-11:1` has exactly TWO filed
+    instances and this is neither** — see below.
+  - **BY SITE.** `objects.ts:576` → **2** in REG-005, both inside **REG-F-259** (`:19527`, `:19647`);
+    `observedAt` → **0 / 0 / 0 / 1**, the one hit being the sweep's own recitation of its census
+    command at `HARMONIZATION-FINDINGS.md:634`. `observation time` → **0** in REG-005. `bitemporal` →
+    **2 / 0 / 0 / 1**, both REG-005 hits inside REG-Q-055 (`:11492`, `:11633`). `validity window` →
+    **3** in REG-005, all opened: `:1477` (authority model), `:8110` (REG-F-219's own heading), `:19646`
+    (REG-F-259 quoting THIS item).
+  - **CONTROLS, same files and flags, none zero:** REG-005 `^### REG-F-` → **258**, `^### REG-Q-` →
+    **69**; enforcement-register `RPH-PER` → **49** lines (51 occurrences, 14 distinct ids), `RPH-ASR`
+    → **47** lines; ledger `]: {` → **82** rows, of which `disposition: "ENFORCED"` → **18**
+    (UNENFORCED 42, ARROW_UNREACHABLE 20, REDUNDANT_WITH_MACHINE 2); `docs/_working` → **69** files.
+  - **THE 77 NEWEST ENTRIES SEARCHED SPECIFICALLY** (REG-F-203..262, REG-Q-053..069). Slice = REG-005
+    from line **4892** (`### REG-F-203`) to EOF: `observedAt` → **0**, `observation time` → **0**,
+    `bitemporal` → **2** (REG-Q-055), `validity window` → **2** (REG-F-219 heading, REG-F-259 quote),
+    `objects.ts:576` → **2** (both REG-F-259). **Controls in the same slice:** `assurance.ts` → **219**,
+    `messages.ts` → **157**, `REG-F-` → **787**.
+  - **CORPORA 2 AND 3 REACH THIS OBJECT ONLY ON A DIFFERENT AXIS.** `enforcement-register.ts`:
+    `AssuranceObservation` → **3**, all opened and each traced to its owning rule — `:2595` inside
+    `RPH-PER-014` (a PER-6 resumption row, citing the `RecordAssuranceObservation` dispatch), `:3049`
+    inside `RPH-GOV-004` (the `disposition` → WAIVED arrow), `:3713` inside `RPH-BAS-003` (baseline
+    promotion and blocking findings). **None is about time.** `PER-11` → **0**, and note the namespace
+    differs (that file keys `RPH-PER-NNN` catalog rules, not DOC-003 `PER-NN` invariants). Ledger:
+    `AssuranceObservation` → **2** (`:83`, `:382`), both the `disposition OPEN → REMEDIATED / WAIVED`
+    arrows; every time-vocabulary term → **0**.
+
+- **THE THREE ADJACENT FILINGS, EACH OPENED AND EACH DISTINGUISHED.**
+  1. **`REG-F-259`** (heading REG-005:**19482**) — *"three of the seven things an assurance observation
+     must name are inexpressible…"*. **Same object, same three schemas, the same three line ranges.**
+     ⚠ **It already MET this item and expressly declined to discharge it**, at `:19650-19654`, verbatim:
+     *"Its subject is a MISSING TIMESTAMP, its anchor is §19/§21 field-set fidelity rather than ASR-11 …
+     **Its 'OWES A REGISTER ENTRY' is a debt on a different field of the same object; nothing discharges
+     it here and nothing about it discharges this.**"* **This entry is that debt.** The two collide at
+     one file: whichever lands first must carry the other's citation, or `objects.ts:576-589` and
+     `messages.ts:352-359` get edited twice.
+  2. **`REG-Q-055`** (heading REG-005:**11480**) — `limb:PER-11:1` **instance (a)**, the Decision
+     `effectiveAt` dimension. Different object, different dimension (**Decision-effective**, not
+     **observed**). It is cited here as the **form precedent**: it states the rule this entry follows,
+     at `:11486-11488` — *"Two opposite remedies are available, each closes the gap, and each is a
+     different ratification — so writing a guard for either one would settle the canon question by
+     accident, in code, with no act."*
+  3. **`REG-F-219`** (heading REG-005:**8110**) — `limb:PER-11:1` **instance (b)**, Evidence **valid**
+     time. ⚠ **This is the entry that had to be distinguished most carefully, because it is a FINDING on
+     the neighbouring dimension.** It is a FINDING and this is a QUESTION for one reason, and the reason
+     is load-bearing: **for Evidence the obligation is already ratified twice over** — canon **OBJ-6**
+     (`JPWB-DOC-003:125`) says Evidence *"declares which claim it supports, what it does not establish,
+     its provenance, scope, validity, and limitations"*, and `validFrom`/`validUntil` are **already
+     declared** on the object (`objects.ts:518-519`) and the event (`messages.ts:1188-1189`), so only
+     the command path is missing. **For AssuranceObservation nothing is declared anywhere and no
+     per-object canon row names a time** — so deciding the distinction matters would be a NEW
+     ratification, not the repair of an unreachable field.
+
+- **LIMB / ITEM RECONCILIATION — WHAT THIS ENTRY WOULD CLOSE:** harmonization item **#10**, and a THIRD
+  instance of `limb:PER-11:1` (observed time on `ASSURANCE_OBSERVATION`), joining instance (a)
+  (REG-Q-055) and instance (b) (REG-F-219). **It closes nothing else**, because its subject is a time
+  dimension on one object: it does not touch REG-F-259's naming duty on the same object (different
+  fields, different canon anchor), and it does not touch item **#9** (`ConfidenceAssessment` shape),
+  which is filed separately as a FINDING — that one's remedy is a schema tightening against an
+  already-ratified rule, this one's is a sponsor ruling, and no one commit closes both.
+  ⚠ **ADDED BY THE VERIFYING PASS — THE NEAREST SIBLING IT DOES NOT CLOSE.** Harmonization item **#3**
+  (*"Transcript entries are contractually untyped and carry no timestamp"*) is also **TRUE AT HEAD** and
+  also **OWES A REGISTER ENTRY** (`HARMONIZATION-FINDINGS.md:249`, original at `:91`), and it is the
+  same *shape* of gap — a durable record with no time dimension — on `ConversationEntrySchema`
+  (`packages/rph-contracts/src/objects.ts:188-193`). **It is a different object, a different command and
+  event pair, and it is not adjudication-gated**, so it is neither closed nor merged here. A reader who
+  answers this question must not read the answer across to `ConversationEntry`.
+
+- **Merge target:** Sponsor ruling first → then BOTH. If (ii): Repository
+  (`packages/rph-contracts/src/objects.ts`, `messages.ts`, and the `rph-assurance` recording path that
+  would have to supply the value) **and** Corpus — JPWB-DOC-003, to record which time dimensions PER-11
+  reaches for `ASSURANCE_OBSERVATION`. If (i): Corpus only — a declared coincidence plus a guard-ledger
+  row, so the silence stops being indistinguishable from an omission. Status: OPEN.
+
+### REG-Q-073 — RATIFICATION: §7.3 declares TWO independent profile axes and forbids collapsing them, and
+`Undertaking` carries ONE unconstrained string for both — the two PRODUCTION writers already disagree, and
+neither of their values resolves against anything
+
+**Date:** 2026-08-23 · **Type:** QUESTION (harmonization "Refuted (32)" re-disposition) · **Status:** OPEN
+
+- **THE QUESTION, IN ONE PARAGRAPH.** Guide §7.3 is titled *"Two independent profile axes"* and opens by
+  forbidding their conflation. It defines two closed sets: an assurance/conformance **rigor** axis
+  (Lightweight / Standard / High Assurance) and a **Product Realization work-shape** axis (Exploratory
+  Product Shape / Feature Delivery Shape / Brownfield Change Shape / Migration Shape / High-Assurance
+  Shape). `Undertaking` has exactly one profile-shaped field, `instantiationProfile`, typed `z.string()`
+  with no enumeration, and no ratified text anywhere names that field and maps it to either set. So the
+  question is prior to any binding: **which axis does this field carry, and where does the other one
+  live?** It is not academic. The two PRODUCTION writers have already answered differently — one writes
+  `'Standard Product Realization'`, a string built from a token of the rigor set and the qualifier §7.3
+  attaches to the work-shape set; the other writes `'Standard'` — and **neither resolves against the only
+  profile vocabulary that exists in code.** The work-shape axis has no carrier at all: none of its five
+  members appears anywhere in the repository. **The collapse §7.3 forbids is not a mistake someone made;
+  it is what the schema shape currently requires.**
+
+- **WHAT THE ARTIFACT REQUIRES, QUOTED VERBATIM.**
+  - **Guide §7.3 "Two independent profile axes"** — heading verified byte-exact at **L673** via
+    `grep -n "^### 7\.3"`, NOT inferred from a line number. **L675**: *"Do not collapse assurance rigor
+    into work shape."* **L677**: *"**Assurance/conformance rigor**"*, whose table header at **L679** is
+    *"| Profile | Use and minimum consequence |"* with rows **Lightweight** (**L681**), **Standard**
+    (**L682**) and **High Assurance** (**L683**). **L685**: *"**Product Realization work-shape
+    profiles**"*, its members at **L687-691**: *"Exploratory Product Shape; Feature Delivery Shape;
+    Brownfield Change Shape; Migration Shape; High-Assurance Shape."*
+  - **`docs/Recursive Professional Harness/Janumi Professional Workbench PWA Designer and Undertaking
+    Workbench - Reference Demonstration.md` §23 "Undertaking-to-PWA binding"** (heading at **L833**),
+    item at **L839**: *"instantiation profile;"* — the source of the field's NAME, listing it among what
+    every Undertaking records, **and supplying no vocabulary for it.**
+  - **NOTHING IN CANON SETTLES IT EITHER WAY.** `instantiationProfile` appears in `docs/canon/` **20**
+    times, all in REG-005 and all resolved below; the field appears in no canon vocabulary as a defined
+    term, and no entry rules that it is deliberately free-form. **This is not moot-by-canon; it is
+    unadjudicated.**
+
+- **WHAT THE CODE DOES, re-read at the site at HEAD (`856dd8e1`), every line opened with `sed -n`.**
+  - **UNCONSTRAINED AT ALL THREE LAYERS.** `packages/rph-contracts/src/objects.ts:758`, inside
+    `UndertakingSchema` (a `z.strictObject` at `:752`): `instantiationProfile: z.string(),`.
+    `packages/rph-contracts/src/messages.ts:649`, inside `CreateUndertakingPayloadSchema` (`:643`):
+    `instantiationProfile: z.string(),`. `packages/rph-contracts/schemas/objects/Undertaking.json:247-249`
+    is `"instantiationProfile": { "type": "string" }`, and `:286` lists it in `"required"`.
+  - **AND THE ABSENCE OF AN `enum` IS REAL, NOT A GENERATOR LIMITATION — THE CONTROL IS IN THE SAME
+    FILE.** `Undertaking.json:259-266` emits `"status": { "type": "string", "enum": ["ACTIVE", "MIGRATING",
+    "ARCHIVED"] }`. The generator DOES emit enums for constrained fields; it was simply told nothing here.
+  - **THE ANNOTATION THAT DRIVES GENERATION IS EMPTY OF MEANING.**
+    `packages/rph-contracts/vocab/m1-object-fields.json:1432-1436` carries exactly
+    `{ "field": "instantiationProfile", "type": "string", "required": true }` — no enum, no note, no
+    source citation — and `vocab/m3-commands-events.json:2726-2728` says the same for the command payload.
+    **The gap is upstream of the schema, in the vocabulary itself.**
+  - **THE §7.3 WORK-SHAPE SET EXISTS NOWHERE IN CODE.** `grep -rn "Exploratory Product Shape|Feature
+    Delivery Shape|Brownfield Change Shape|Migration Shape|High-Assurance Shape"` (alternation, one
+    `grep -E`) over `--include=*.ts --include=*.svelte packages apps`, non-dist → **0**. **POSITIVE
+    CONTROL, identical command form and tree:** `HIGH_ASSURANCE` → **11**.
+  - **THE ONLY PROFILE VOCABULARY THAT DOES EXIST IS A THIRD ONE.**
+    `packages/rph-product-realization-pwa/src/ontology.data.ts:3603-3647` ships three
+    `conformanceProfiles` keyed `LIGHTWEIGHT` / `STANDARD` / `HIGH_ASSURANCE`, resolved by
+    `ontology.ts:44` `getConformanceProfile(name)`, whose only caller repository-wide is its own unit test
+    (`ontology.test.ts:82`).
+  - **THE TWO PRODUCTION WRITERS DISAGREE, AND A TEST ADDS A THIRD SPELLING.**
+    `packages/rph-engine/src/seed-workbench.ts:417` → `instantiationProfile: 'Standard Product
+    Realization',`; `apps/rph-demo/src/routes/undertakings/+page.server.ts:122` →
+    `instantiationProfile: 'Standard',`; `packages/rph-application/src/handlers/disclosure-observed.
+    test.ts:1867` → `instantiationProfile: 'STANDARD',`. Full census at HEAD, `grep -rn
+    "instantiationProfile" --include=*.ts --include=*.svelte --include=*.json packages apps` (non-dist,
+    non-`.svelte-kit`) → **19** lines: 2 Zod declarations, 2 JSON-schema lines, 2 vocab annotations, 1
+    pass-through, 1 comment, and **11 write sites carrying three different spellings**.
+  - **NOTHING VALIDATES OR READS IT.** The sole non-test, non-literal occurrence on any handler path is
+    `packages/rph-application/src/handlers/pwa-authoring.ts:1081` —
+    `instantiationProfile: p.instantiationProfile,` — a straight pass-through from payload to persisted
+    object. No membership check, no normalization, no canonical set on the path, and **zero readers**
+    anywhere: the `--include=*.svelte` arm of the census above returns nothing at all.
+
+- **OBSERVED — DRIVEN for the resolution conjunct, READ for the rest.** Driven with **node** (never bun)
+  against the built `dist` of `@janumipwb/rph-product-realization-pwa`; `getConformanceProfile` is pure,
+  so better-sqlite3 is not involved. Driver in the session scratchpad (`v8/drive15.mjs`), verbatim:
+  ```
+  D9  getConformanceProfile("Standard Product Realization") -> undefined
+  D10 getConformanceProfile("Standard")   -> undefined
+  D11 getConformanceProfile("STANDARD")   -> RESOLVES
+  D12 getConformanceProfile("Feature Delivery Shape") -> undefined
+  ```
+  **D11 IS THE DISCRIMINATING CONTROL** — the resolver is live and does return a profile for a key it
+  knows, so D9, D10 and D12 are real negatives, not a silent zero. **D9 and D10 are the two PRODUCTION
+  write sites**: shipped code writes two different values, and neither names anything the repository can
+  resolve. **READ (not driven):** the canon quotations, the schema and vocab declarations, the census
+  counts, and the zero-readers result.
+
+- **⚠ IT WAS RECORDED AS REFUTED, WITH NO REASON.** `docs/_working/HARMONIZATION-FINDINGS.md` item **#16**
+  (**line 104**), struck under the heading whose original wording — *"Refuted (32) — recorded so they
+  are not re-raised"* — survives verbatim at **line 126**; ⚠ **at HEAD line 87 is itself struck and
+  carries the same sweep's `RE-DISPOSITIONED 2026-08-23` annotation**, so the instruction is no longer
+  live text. The item records **no evidence, no site, no date, no reason of any kind**. That is the
+  load-bearing half of this
+  filing: a missing entry invites the next search, whereas an entry recording the claim as refuted, under
+  a heading instructing future readers not to raise it again, ends every future search with the corpus's
+  own authority. ⚠ **AND THE STRIKE HAS ALREADY MISLED A READER TWICE:** REG-Q-069 records at
+  REG-005:21962-21966 that two independent prior passes each dismissed this same line 104 as *"STRUCK
+  (`~~…~~`), i.e. refuted"*, when the strike encodes no verdict at all — the same struck list holds
+  items later adjudicated TRUE, FALSE and OUT OF SCOPE. Re-checked at HEAD by the 2026-08-23 sweep
+  (`### Item 16 — TRUE AT HEAD` at **line 888**) and independently re-verified here at `856dd8e1`,
+  including the drive above, which the sweep did not run.
+
+- **EM-7 SEARCH DISCLOSED, by id and by SITE, across all four corpora.** Bash `grep` only (never `-i` and
+  `-F` together); every long hit opened with `sed -n`. Reported as REG-005 / `enforcement-register.ts` /
+  `guard-enforcement-ledger.data.ts` / `docs/_working`.
+  - BY SITE: `instantiationProfile` → **20 / 0 / 0 / 2 files**. **All 20 REG-005 lines resolved to their
+    entries:** `:8275` and `:8293` are **REG-F-220**'s field census; `:20390` is **REG-F-262**'s search
+    disclosure, reporting the term at **0**; the remaining **17** are all inside **REG-Q-069**. The two
+    `docs/_working` files are `HARMONIZATION-FINDINGS.md` (item #16 itself) and
+    `AUDIT-shape-survivorship-2026-08-20.md` (opened below).
+  - BY QUANTITY: `work shape` / `work-shape` → **1** in REG-005 (`:21825`, REG-Q-069 quoting §7.3 L675),
+    **0** in `enforcement-register.ts`, **0** in the ledger. `Product Shape` → **0** in all four.
+    `§7.3` → **3** in REG-005, all inside REG-Q-069 (`:21824`, `:21940`, `:22020`).
+  - **THE 77 ENTRIES OF THE LAST TWO DAYS SWEPT SEPARATELY** (REG-F-203..262 / REG-Q-053..069, REG-005
+    lines **4892-22058**): `conformance profile` → **2**, both in REG-Q-069's own disclosure;
+    `active profile` → **1**, likewise. **POSITIVE CONTROL in the same range: `limb:` → 525.**
+  - **POSITIVE CONTROLS, same instrument and same files, reported by count:** REG-005 `Undertaking` →
+    **112**; `enforcement-register.ts` `Undertaking` → **1**, `profile` → **4**, `canonAnchor` →
+    **108**; ledger `assurance` → **46**, `evidence:` → **82**, `RPH-` → **8**; `docs/_working`
+    `Undertaking` →
+    **15 files**. ⚠ **The ledger has NO Undertaking content at all (`Undertaking` → 0), so the
+    Undertaking control does not discriminate there** — the ledger's populated-ness is established by
+    `evidence:` → 82 instead. All four corpora are reachable; the zeros are real.
+
+- **⚠ THE FILINGS THAT DO NOT COVER THIS, AND WHY — the first two will end this row if nobody writes
+  this bullet.**
+  1. **`REG-Q-069` at REG-005:21796** (filed 2026-08-23, the same day, and it quotes many of the same
+     lines). **It asks the DOWNSTREAM question, and it says so.** Its question is whether
+     `Undertaking.instantiationProfile` selects a rung's `mandatoryPolicyIds` and `minIndependence` under
+     ASR-19 limb 3 — i.e. what CONSEQUENCE the value has, measured against the shipped ladder's keys,
+     which it presupposes as the referent. At `:21938-21942` it disclaims this item explicitly: item 16
+     *"is TRUE AT HEAD and it OWES its own entry, but what it MEASURES is **vocabulary drift** (the field
+     is unbound to §7.3's closed sets and carries three spellings) and what it CLOSES is that"*, and at
+     `:22050-22052` it records that item 16's entry *"— on the field's vocabulary drift — is still
+     unfiled."* ⚠ **AND NEITHER OF REG-Q-069'S TWO DISPOSITIONS ANSWERS THIS ONE.** Its (A) makes the
+     field a key into the shipped ladder and grounds that on *"Guide §7.3's \"minimum consequence\""*
+     (`:22020`) — a phrase occurring exactly ONCE in the Guide, at **L679**, as the RIGOR table's own
+     column header. So (A) LEANS to the rigor axis without RULING it, without choosing between that
+     axis's two spellings, and without giving the work-shape axis a carrier; its (B) declares the
+     field a *"descriptive
+     label"* and strikes the ladder's `mandatoryPolicyIds`/`minIndependence` as non-operative — a label
+     drawn from which set, and where the second axis lives, is untouched either way.
+  2. **`docs/_working/AUDIT-shape-survivorship-2026-08-20.md:19`** scores `UndertakingContents` as
+     **ENFORCED** and lists `instantiationProfile` among the fields, citing `UndertakingSchema` as the
+     artifact and `reference-undertaking.test.ts` as the driving test. **A reader grepping the field name
+     lands on a row marked ENFORCED and stops.** What that row MEASURES is whether the shape's FIELDS
+     survived into a real type with a live test; what it CLOSES is field PRESENCE. It is silent on the
+     field's value domain, and a `z.string()` satisfies presence perfectly.
+  3. **`REG-F-220` at REG-005:8253** merely ENUMERATES `instantiationProfile` (`:8275`, `:8293`) among the
+     Undertaking's eight persisted fields while adjudicating a different matter — the missing Intent
+     binding.
+  4. **`REG-Q-010` at REG-005:222, "Assurance schema and profile activation."** Its safe default (`:224`)
+     — *"Pin the slice to a versioned matrix of PWA conformance profile, independent PWU risk profile,
+     applicable policies, criteria, and independence. A missing mapping blocks promotion."* — is about
+     freezing the **matrix's contract shape**, and its operative noun is the matrix, not the Undertaking
+     field. It never names `instantiationProfile`, §7.3, or a work-shape axis.
+  5. **`enforcement-register.ts` `RPH-ASR-001` (`:1110-1129`)** records, as a reason that rule is
+     `NOT_A_COMMAND_REFUSAL`, that *"the rule's \"profile\" subject is ERASED AT THE ENGINE PORT:
+     `ConformanceProfile` exists only as PWA ontology data, the engine types the array as `readonly
+     unknown[]`, and the published-PWA seam hard-codes it empty."* Adjacent and true — but what it
+     MEASURES is whether that rule's consequent is an arrangement a dispatch can be refused for, and what
+     it CLOSES is that classification. It never reaches the Undertaking's own field or its vocabulary.
+
+- **WHY THIS IS A QUESTION AND NOT A FINDING, AND WHAT A GUARD WRITTEN TODAY WOULD RATIFY BY ACCIDENT.**
+  The obvious repair is to replace `z.string()` with an enum. ⚠ **REG-Q-069 has already forbidden exactly
+  that move**, at REG-005:22008-22010: *"The obvious repair is to constrain `instantiationProfile` to an
+  enum. **Do not make it.** A closed enum makes the field well-typed while leaving it unread — the
+  hollow-governed-layer shape this programme has already filed once — and it would settle by construction
+  the very thing §16 item 10 holds open…"* — the source sentence continues *": it blesses the
+  union-only reading…"*, so the quote is cut, not ended. This entry adds the reason prior to
+  REG-Q-069's:
+  **choosing an enum is choosing which of §7.3's two axes the field carries**, and choosing it silently
+  erases the other, which is the collapse **L675** forbids by name. Encoding a convenient reading as
+  architecture is what `pwa-authoring.ts:904-905` already refused for the adjacent clause — *"Deciding
+  applicability without that is choosing a convenient interpretation and encoding it as architecture —
+  §0.3 forbids it."*
+
+- **THE ADJUDICATION ASKED FOR — two dispositions, and each names what follows.** ⚠ **A REMEDY IS A
+  HYPOTHESIS:** both are proposals derived from the sites read and driven at HEAD, not conclusions, and
+  neither is carried from a prior filing's recommendation.
+  **(A) The field carries the assurance/conformance RIGOR axis.** Then canon must also say which
+  spelling of that axis is authoritative — §7.3's display names (*Lightweight / Standard / High
+  Assurance*, L681-3) or the shipped ladder's keys (`LIGHTWEIGHT` / `STANDARD` / `HIGH_ASSURANCE`) —
+  and three things follow,
+  none of which pre-empts REG-Q-069: the two PRODUCTION writers must be corrected to a member of the
+  chosen set; the drift must be caught by a gate rather than by the next audit; and **§7.3's work-shape
+  axis needs its own carrier on `Undertaking`, or an explicit ruling that this engine does not model it**,
+  because today it has none (0 occurrences, against the control of 11). **PREDICTED RED BEFORE ANY GREEN
+  IS TRUSTED:** a test asserting that every production `instantiationProfile` write resolves through
+  `getConformanceProfile` is **RED at HEAD today** — D9 and D10 above are the driven baseline — with
+  D11 as the discriminating control that the resolver is not simply always-undefined. Assert the
+  refusal MESSAGE, not a code.
+  **(B) The field is descriptive free text with no canonical set.** Then §7.3 L675 has no repository
+  consequence for `Undertaking` and that should be recorded as satisfied-by-construction with the reason
+  cited — **and the field should be renamed or documented in the vocabulary so that no future reader
+  reads it as a governed selector.** A field named `instantiationProfile`, required on every Undertaking,
+  sitting beside a shipped three-rung `conformanceProfiles` ladder, reads as a selector to every reader;
+  that reading is precisely how REG-Q-069 came to be filed. Governance-shaped data nothing reads is the
+  hazard this programme has already named once.
+
+- **RECONCILIATION — HARMONIZATION ITEMS THIS ENTRY CLOSES:** **#16**, in full. **It closes nothing else,
+  because:** item **#15** (the de minimis floor's independence literal) is a defect in
+  `packages/rph-assurance/src/floor.ts:76` under §8.4 / ASR-13, with its own entry filed alongside this
+  one, and **no commit that changes `objects.ts:758` touches it** — REG-Q-069 makes the same split at
+  `:22026-22029`; **REG-Q-069** stays open on what CONSEQUENCE the value has, which this entry neither
+  asks nor answers, and this entry deliberately proposes no type change so that answering it cannot
+  settle REG-Q-069 by construction; **REG-Q-010** stays open on the mandatory-policy-by-profile matrix's
+  contract shape; and **REG-F-220** stays as filed on the Undertaking's missing Intent binding, which
+  this entry does not touch.
+
+- **Merge target:** Corpus (JPWB-REG-005), for adjudication alongside `REG-Q-069` and `REG-Q-010`. **No
+  repository change should be made until (A) or (B) is recorded** — an enum written first would settle
+  both this question and REG-Q-069's by accident, which is the outcome REG-Q-069 asked to avoid.
+  Status: OPEN.

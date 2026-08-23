@@ -74,15 +74,15 @@
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 49,
+      "discovered": 50,
       "excluded": 0,
       "failed": 0,
-      "included": 49,
+      "included": 50,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 49
+      "successfullyInventoried": 50
     }
   ],
   "assuranceSurfaces": {
@@ -521,6 +521,7 @@
         "verif/event-surface-census.test.ts",
         "verif/evidence-gate-reachability.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
+        "verif/harmonization-reconciliation.test.ts",
         "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
@@ -2513,7 +2514,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/2.0.0",
   "subject": {
-    "configurationDigest": "f6e25d180cacb020d227d5e1eed6afaeb64502e808a413b3b48b1039fb326b3b",
+    "configurationDigest": "db3dfe5ed95c21594ebcd0ca218b12e29bf2f88a3eaab81860b77a0a7f6c1ccd",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -4949,7 +4950,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "b8ec17336fca0b89cfda1a36b32bfe5a2133ed92e8a89372671dc83c9905ef3b",
+          "projectResolutionDigest": "2049c6ed7e9a7cb77f84461a9e1837cc15ee151f072cca426809beba990ce935",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -4980,6 +4981,7 @@
             "verif/guard-enforcement-ledger.data.ts",
             "verif/guard-enforcement-ledger.test.ts",
             "verif/guard-enforcement-ledger.ts",
+            "verif/harmonization-reconciliation.test.ts",
             "verif/invariant-verdict-census.test.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
@@ -5616,11 +5618,12 @@
         "id": "jan-csaa-exclude-build/1",
         "includedFileCount": 0,
         "physicalPopulationState": "EXCLUDED_BEFORE_ENUMERATION",
-        "policyRuleCount": 5,
+        "policyRuleCount": 6,
         "rules": [
           "Compiled output is not an authored compiler input.",
           "Coverage output is derived evidence, not a compiler input.",
           "E2E results are derived outputs.",
+          "Generated framework output is excluded except consumed configuration and declaration roots.",
           "Test results are derived outputs.",
           "Unconsumed generated framework output."
         ]
@@ -5693,7 +5696,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "a6443ff193b902bffb74aa7372fb050f1a6f1247841433c9a93a9e71d7e6f391",
+    "fileManifestDigest": "5e4127015263102ee290ac45a7b7daf93b0b8152ea6cc53b55fc3343ee652fa5",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -5756,7 +5759,7 @@
     ],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/1.1.0",
-    "selectedFileCount": 969,
+    "selectedFileCount": 970,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -12347,6 +12350,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 7583,
+        "path": "verif/harmonization-reconciliation.test.ts",
+        "sha256": "f20e1ed2dbad01510aca61efbea9a48ac2ca3dffc10b885fdc9522d9d65a6765",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 78111,
         "path": "verif/invariant-verdict-census.test.ts",
         "sha256": "085c20c5e9ec9ce0566b0b79d4343376c5ff289d7a90d6e4de8885559cfebe2a",
@@ -12542,7 +12552,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "a5133d69b205a5487daaeb59b525258ffbdda2fe85418a5418ceb2395f20cb42",
+    "subjectId": "05a6df1b37647a3bc04d0b7f968333717b6fbbd3784202147256b11d05fa69d4",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -14496,7 +14506,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 49,
+      "candidateArtifactCount": 50,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -14550,6 +14560,7 @@
         "verif/guard-enforcement-ledger.data.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/guard-enforcement-ledger.ts",
+        "verif/harmonization-reconciliation.test.ts",
         "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
@@ -15613,6 +15624,22 @@
         "verif/guard-enforcement-ledger.ts"
       ],
       "role": "ANALYZER"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/harmonization-reconciliation.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "f20e1ed2dbad01510aca61efbea9a48ac2ca3dffc10b885fdc9522d9d65a6765",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/harmonization-reconciliation.test.ts"
+      ],
+      "path": "verif/harmonization-reconciliation.test.ts",
+      "provenance": [
+        "verif/harmonization-reconciliation.test.ts"
+      ],
+      "role": "TEST"
     },
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
