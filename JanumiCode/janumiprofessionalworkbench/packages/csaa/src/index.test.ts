@@ -66,7 +66,18 @@ import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_REQUEST_SCHEMA_VERSION,
 	COMMAND_EVENT_CONTRACT_OVERLAY_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_OPERATION_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_BYTES,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_EVENTS,
 	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_OPERATION_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_RESULT_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SCOPE,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE,
 	GUARD_CLASSIFICATION_OVERLAY_REQUEST_SCHEMA_VERSION,
 	GUARD_CLASSIFICATION_OVERLAY_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
@@ -212,6 +223,8 @@ import {
 	runCommandHandlerGraphReport,
 	runCommandDispatchTopologyReport,
 	buildGuardClassificationOverlay,
+	guardClassificationOverlayReportExitCode,
+	runGuardClassificationOverlayReport,
 	buildGuardEnforcementLedgerArtifactSet,
 	guardEnforcementLedgerReportExitCode,
 	runGuardEnforcementLedgerReport,
@@ -328,6 +341,13 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('runCommandDispatchTopologyReportWithDependencies');
 		expect(publicSurface).not.toHaveProperty('captureCommandHandlerGraphReportPipeline');
 		expect(buildGuardClassificationOverlay).toBeTypeOf('function');
+		expect(runGuardClassificationOverlayReport).toBeTypeOf('function');
+		expect(guardClassificationOverlayReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createGuardClassificationOverlayProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runGuardClassificationOverlayCommand');
+		expect(publicSurface).not.toHaveProperty('admitGuardClassificationOverlayReportRequest');
+		expect(publicSurface).not.toHaveProperty('runGuardClassificationOverlayReportWithDependencies');
+		expect(publicSurface).not.toHaveProperty('hasValidatedStaticSemanticSnapshotCapability');
 		expect(buildGuardEnforcementLedgerArtifactSet).toBeTypeOf('function');
 		expect(runGuardEnforcementLedgerReport).toBeTypeOf('function');
 		expect(guardEnforcementLedgerReportExitCode).toBeTypeOf('function');
@@ -654,6 +674,38 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(GUARD_CLASSIFICATION_OVERLAY_SCHEMA_VERSION).toBe(
 			'jan-csaa-guard-classification-overlay/1.0.0'
 		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-guard-classification-overlay/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-report-request/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-report-result/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-report/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_SCOPE).toBe(
+			'EXACT_SELECTED_FROZEN_SUBJECT_RETAINED_GUARD_STATE_COMMAND_HANDLER_AND_GUARD_CLASSIFICATION_OVERLAY'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE).toEqual({
+			logicalPath: 'packages/rph-domain/src/transitions.data.ts',
+			projectConfigPath: 'packages/rph-domain/tsconfig.json'
+		});
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION).toMatchObject({
+			commandDispatchTopology: 'NOT_CONSUMED',
+			commandEventContractOverlay: 'NOT_CONSUMED',
+			stateSource: GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE
+		});
+		expect(GUARD_CLASSIFICATION_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-report-progress/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-guard-classification-overlay-progress-transport/0.1.0'
+		);
+		expect(GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(READ_WRITE_ACCESS_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-read-write-access-graph/0.1.0'
 		);

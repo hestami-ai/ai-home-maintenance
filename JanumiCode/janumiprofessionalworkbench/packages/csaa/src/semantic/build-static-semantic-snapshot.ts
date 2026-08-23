@@ -81,6 +81,55 @@ import {
 	type SemanticValidationOptions
 } from './validate-snapshot.js';
 
+interface ValidatedStaticSemanticSnapshotCapabilityState {
+	readonly budgetsJson: string;
+	readonly subject: FrozenSubject;
+}
+
+const VALIDATED_STATIC_SEMANTIC_SNAPSHOTS = new WeakMap<
+	object,
+	ValidatedStaticSemanticSnapshotCapabilityState
+>();
+
+function attachValidatedStaticSemanticSnapshotCapability(
+	snapshot: StaticSemanticSnapshot,
+	subject: FrozenSubject,
+	budgetsJson: string
+): void {
+	if (VALIDATED_STATIC_SEMANTIC_SNAPSHOTS.has(snapshot))
+		throw new Error('Validated static semantic snapshot capability is already attached.');
+	if (!Object.isFrozen(snapshot))
+		throw new Error(
+			'Validated static semantic snapshot capability requires the final frozen snapshot.'
+		);
+	if (snapshot.subjectId !== subject.descriptor.subjectId)
+		throw new Error('Validated static semantic snapshot and FrozenSubject identities differ.');
+	VALIDATED_STATIC_SEMANTIC_SNAPSHOTS.set(snapshot, Object.freeze({ budgetsJson, subject }));
+}
+
+/**
+ * @internal Exact same-process producer proof issued only after validation, budget finalization,
+ * final freshness, and compiler-capture binding. Cloning or serialization intentionally loses it.
+ */
+export function hasValidatedStaticSemanticSnapshotCapability(
+	snapshot: StaticSemanticSnapshot,
+	subject: FrozenSubject,
+	expectedBudgets: SemanticBudgets
+): boolean {
+	try {
+		const state = VALIDATED_STATIC_SEMANTIC_SNAPSHOTS.get(snapshot);
+		return (
+			state !== undefined &&
+			state.subject === subject &&
+			Object.isFrozen(snapshot) &&
+			snapshot.subjectId === subject.descriptor.subjectId &&
+			state.budgetsJson === canonicalSemanticJson(expectedBudgets)
+		);
+	} catch {
+		return false;
+	}
+}
+
 const REQUEST_KEYS = [
 	'assignabilityRequests',
 	'budgets',
@@ -1830,7 +1879,9 @@ export function buildStaticSemanticSnapshot(
 		assertWithinDeadline();
 		operationBudgetSession.finalize();
 		attachVerifiedCompilerCaptureToStaticSemanticSnapshot(finalSnapshot, subject, verifiedCapture);
+		const validatedBudgetsJson = canonicalSemanticJson(finalSnapshot.budgets);
 		assertDeadline(deadlineMs, operationClock.now);
+		attachValidatedStaticSemanticSnapshotCapability(finalSnapshot, subject, validatedBudgetsJson);
 		progress.complete(finalSnapshot.health);
 		return finalSnapshot.health === 'PARTIAL'
 			? { diagnostics, outcome: 'partial', snapshot: finalSnapshot }

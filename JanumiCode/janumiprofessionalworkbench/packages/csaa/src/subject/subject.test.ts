@@ -1862,10 +1862,10 @@ describe('live JPWB and inventory projection', () => {
 		expect(counts.get('tsconfig.json')).toBe(0);
 		expect(counts.get('packages/rph-contracts/tsconfig.json')).toBe(28);
 		expect(counts.get('packages/rph-contracts/tsconfig.build.json')).toBe(10);
-		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report command
-		// imports its bounded implementation closure into the scripts program; the verification program also
+		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report commands
+		// import their bounded implementation closures into the scripts program; the verification program also
 		// grows with the public report contract and root-surface assertions.
-		expect(counts.get('scripts/tsconfig.json')).toBe(29);
+		expect(counts.get('scripts/tsconfig.json')).toBe(30);
 		expect(counts.get('verif/tsconfig.json')).toBe(48);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(84);
 		expect(

@@ -15,6 +15,7 @@ export * from './contracts/command-dispatch-topology-report.js';
 export * from './contracts/guard-enforcement-ledger.js';
 export * from './contracts/guard-enforcement-ledger-report.js';
 export * from './contracts/guard-classification-overlay.js';
+export * from './contracts/guard-classification-overlay-report.js';
 export * from './contracts/read-write-access-graph.js';
 export * from './contracts/read-write-access-report.js';
 export * from './contracts/dependency-comparison.js';
@@ -241,6 +242,25 @@ export {
 	GUARD_ENFORCEMENT_LEDGER_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type GuardEnforcementLedgerProgressTransportTruncation
 } from './application/guard-enforcement-ledger-progress-jsonl.js';
+
+export {
+	guardClassificationOverlayReportExitCode,
+	runGuardClassificationOverlayReport,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_PROGRESS_NONCLAIMS,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_PROGRESS_SCHEMA_VERSION,
+	type GuardClassificationOverlayReportProgressEvent,
+	type GuardClassificationOverlayReportProgressObservation,
+	type GuardClassificationOverlayReportProgressObservationMetric,
+	type GuardClassificationOverlayReportProgressPhase,
+	type RunGuardClassificationOverlayReportOptions
+} from './application/run-guard-classification-overlay-report.js';
+
+export {
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_BYTES,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_MAX_EVENTS,
+	GUARD_CLASSIFICATION_OVERLAY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type GuardClassificationOverlayProgressTransportTruncation
+} from './application/guard-classification-overlay-progress-jsonl.js';
 
 export {
 	runStateMachineGraphReport,

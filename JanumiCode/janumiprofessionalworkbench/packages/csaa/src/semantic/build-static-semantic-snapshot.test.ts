@@ -31,6 +31,7 @@ import { ProgramRecipeMaterializationError } from '../providers/typescript/mater
 import {
 	buildStaticSemanticSnapshot,
 	collectStaticDiagnosticFamily,
+	hasValidatedStaticSemanticSnapshotCapability,
 	type BuildStaticSemanticSnapshotRuntimeOptions,
 	type StaticSemanticSnapshotProgressEvent
 } from './build-static-semantic-snapshot.js';
@@ -460,6 +461,29 @@ describe('buildStaticSemanticSnapshot', () => {
 		expect(first.snapshot.assignments.length).toBeGreaterThan(0);
 		expect(Object.isFrozen(first.snapshot)).toBe(true);
 		expect(Object.isFrozen(first.snapshot.astNodes)).toBe(true);
+		expect(
+			hasValidatedStaticSemanticSnapshotCapability(first.snapshot, subject, request.budgets)
+		).toBe(true);
+		expect(
+			hasValidatedStaticSemanticSnapshotCapability(
+				Object.freeze(structuredClone(first.snapshot)),
+				subject,
+				request.budgets
+			)
+		).toBe(false);
+		expect(
+			hasValidatedStaticSemanticSnapshotCapability(
+				first.snapshot,
+				Object.freeze({ ...subject }),
+				request.budgets
+			)
+		).toBe(false);
+		expect(
+			hasValidatedStaticSemanticSnapshotCapability(first.snapshot, subject, {
+				...request.budgets,
+				maxSources: request.budgets.maxSources + 1
+			})
+		).toBe(false);
 		const firstProject = first.snapshot.projects[0]!;
 		const compilerLookup = getStaticSemanticSnapshotCompilerProjectInputLookup(
 			first.snapshot,

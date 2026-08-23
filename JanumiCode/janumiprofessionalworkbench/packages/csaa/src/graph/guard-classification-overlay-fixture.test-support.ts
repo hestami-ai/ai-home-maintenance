@@ -6,13 +6,21 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_DATA_PATH,
 	GUARD_ENFORCEMENT_LEDGER_OPERATION_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_REQUEST_SCHEMA_VERSION,
+	GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS,
 	type GuardEnforcementLedgerArtifactSetBinding,
 	type GuardEnforcementLedgerExecutorIdentity,
 	type GuardEnforcementLedgerObservation,
 	type GuardEnforcementLedgerRawEvidence,
 	type ObserveGuardEnforcementLedgerRequest
 } from '../contracts/guard-enforcement-ledger.js';
-import type { ArrowCommandCensusObservation } from '../contracts/arrow-command-census.js';
+import {
+	ARROW_COMMAND_CENSUS_ARTIFACT_SET_OPERATION_VERSION,
+	ARROW_COMMAND_CENSUS_ARTIFACT_SET_REQUEST_SCHEMA_VERSION,
+	ARROW_COMMAND_CENSUS_OPERATION_VERSION,
+	ARROW_COMMAND_CENSUS_REQUEST_SCHEMA_VERSION,
+	type ArrowCommandCensusArtifactSetBinding,
+	type ArrowCommandCensusObservation
+} from '../contracts/arrow-command-census.js';
 import type {
 	BuildCommandHandlerGraphRequest,
 	CommandHandlerGraphSnapshot
@@ -23,7 +31,11 @@ import {
 	type BuildGuardClassificationOverlayRequest,
 	type GuardClassificationOverlayBuildInputs
 } from '../contracts/guard-classification-overlay.js';
-import type { StaticSemanticSnapshot } from '../contracts/semantic.js';
+import {
+	SEMANTIC_OPERATION_VERSION,
+	SEMANTIC_REQUEST_SCHEMA_VERSION,
+	type StaticSemanticSnapshot
+} from '../contracts/semantic.js';
 import {
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_REQUEST_SCHEMA_VERSION,
@@ -34,7 +46,18 @@ import {
 	type StateMachineGraphSnapshot,
 	type StateMachineTopologyObservation
 } from '../contracts/state-machine-graph.js';
-import type { FrozenSubject } from '../contracts/subject.js';
+import {
+	SUBJECT_POLICY_VERSION,
+	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type FrozenSubject
+} from '../contracts/subject.js';
+import {
+	ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+	buildArrowCommandCensusArtifactSet,
+	validateArrowCommandCensusArtifactSet
+} from '../providers/jpwb-arrow-command-census/artifact-set.js';
+import { normalizeArrowCommandCensusObservation } from '../providers/jpwb-arrow-command-census/normalize-arrow-command-census.js';
+import { validateArrowCommandCensusObservation } from '../providers/jpwb-arrow-command-census/validate-arrow-command-census.js';
 import {
 	buildGuardEnforcementLedgerArtifactSet,
 	validateGuardEnforcementLedgerArtifactSet
@@ -43,10 +66,16 @@ import { normalizeGuardEnforcementLedgerObservation } from '../providers/jpwb-gu
 import { validateGuardEnforcementLedgerObservation } from '../providers/jpwb-guard-enforcement-ledger/validate-guard-enforcement-ledger.js';
 import { GUARD_ENFORCEMENT_LEDGER_WORKER_RESULT_SCHEMA_VERSION } from '../providers/jpwb-guard-enforcement-ledger/worker.js';
 import { observeStateMachineTopology } from '../providers/jpwb-state-machines/observe-state-machines.js';
-import { buildCommandHandlerGraph } from './build-command-handler-graph.js';
+import { buildStaticSemanticSnapshot } from '../semantic/build-static-semantic-snapshot.js';
+import { resolveSubject } from '../subject/resolve-subject.js';
+import {
+	buildCommandHandlerGraph,
+	selectJpwbCommandHandlerRegistries
+} from './build-command-handler-graph.js';
 import { buildStateMachineGraph } from './build-state-machine-graph.js';
 import {
 	createCommandHandlerGraphFixture,
+	createCommandDispatchReportHandlerGraphFixture,
 	createFactoryCommandHandlerGraphFixture,
 	createInitializerFactoryCommandHandlerGraphFixture,
 	createNestedDirectCommandHandlerGraphFixture,
@@ -58,6 +87,15 @@ const STATE_SOURCE_PATH = 'packages/rph-domain/src/transitions.data.ts';
 const STATE_PROJECT_PATH = 'packages/rph-domain/tsconfig.json';
 const FIXTURE_SHA = 'b'.repeat(64);
 const GUARD_TEXT = 'operator is authorized';
+const REPORT_PROJECTS = [
+	'packages/rph-application/tsconfig.json',
+	'packages/rph-assurance/tsconfig.json',
+	'packages/rph-contracts/tsconfig.json',
+	'packages/rph-domain/tsconfig.json',
+	'packages/rph-persistence/tsconfig.json',
+	'packages/rph-ports/tsconfig.json',
+	'packages/rph-projections/tsconfig.json'
+] as const;
 const DIRECT_ENFORCING_ANCHOR =
 	"return advanceStatus({ machine: 'Work.status', target: 'STARTED' });";
 const FACTORY_ENFORCING_ANCHOR = 'export function makeWorkHandler() {';
@@ -269,6 +307,7 @@ function commandHandlerGraph(fixture: CommandHandlerGraphFixture): CommandHandle
 }
 
 export interface GuardClassificationOverlayPredecessorFixture {
+	readonly arrowArtifactSet?: ArrowCommandCensusArtifactSetBinding;
 	readonly arrowObservation: ArrowCommandCensusObservation;
 	readonly cleanup: () => void;
 	readonly commandHandlerGraph: CommandHandlerGraphSnapshot;
@@ -277,12 +316,128 @@ export interface GuardClassificationOverlayPredecessorFixture {
 	readonly guardObservation: GuardEnforcementLedgerObservation;
 	readonly inputs: GuardClassificationOverlayBuildInputs;
 	readonly request: BuildGuardClassificationOverlayRequest;
+	readonly root: string;
 	readonly snapshot: StaticSemanticSnapshot;
 	readonly stateGraph: StateMachineGraphSnapshot;
 	readonly stateGraphRequest: BuildStateMachineGraphRequest;
 	readonly stateObservation: StateMachineTopologyObservation;
 	readonly stateObservationRequest: BuildStateMachineTopologyObservationRequest;
 	readonly subject: FrozenSubject;
+}
+
+function reportArrowArtifactSet(subject: FrozenSubject): ArrowCommandCensusArtifactSetBinding {
+	const totalBytes = subject.artifacts.reduce((sum, artifact) => sum + artifact.bytes, 0);
+	const outcome = buildArrowCommandCensusArtifactSet(
+		{
+			budgets: {
+				maxArtifacts: subject.artifacts.length + 1,
+				maxDiagnostics: 1_000,
+				maxTotalBytes: totalBytes + 1
+			},
+			operationVersion: ARROW_COMMAND_CENSUS_ARTIFACT_SET_OPERATION_VERSION,
+			schemaVersion: ARROW_COMMAND_CENSUS_ARTIFACT_SET_REQUEST_SCHEMA_VERSION,
+			subjectId: subject.descriptor.subjectId
+		},
+		{ subject }
+	);
+	if (outcome.outcome !== 'complete')
+		throw new Error(`Report arrow artifact-set fixture failed: ${JSON.stringify(outcome)}`);
+	const validation = validateArrowCommandCensusArtifactSet(outcome.artifactSet, subject);
+	if (validation.state !== 'VALID')
+		throw new Error(`Report arrow artifact-set fixture is invalid: ${JSON.stringify(validation)}`);
+	return outcome.artifactSet;
+}
+
+/** Exact seven-project report closure with retained arrow and guard artifacts on one FrozenSubject. */
+export function createGuardClassificationOverlayReportPredecessorFixture(): GuardClassificationOverlayPredecessorFixture {
+	const base = createCommandDispatchReportHandlerGraphFixture();
+	try {
+		const subjectOutcome = resolveSubject({
+			budgets: base.subject.request.budgets,
+			expectEmpty: false,
+			filters: { exclude: [], include: [] },
+			operationVersion: 'guard-classification-overlay-report-fixture/1.0.0',
+			outputs: [],
+			policyVersion: SUBJECT_POLICY_VERSION,
+			rootLocator: base.root,
+			schemaVersion: SUBJECT_REQUEST_SCHEMA_VERSION,
+			scope: {
+				additionalArtifacts: [
+					...ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS,
+					...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS
+				],
+				kind: 'EXPLICIT_PROJECTS',
+				projects: REPORT_PROJECTS
+			},
+			subjectKind: 'WORKTREE'
+		});
+		if (subjectOutcome.outcome !== 'resolved')
+			throw new Error(`Report subject fixture failed: ${JSON.stringify(subjectOutcome)}`);
+		const subject = subjectOutcome.subject;
+		const semanticOutcome = buildStaticSemanticSnapshot(
+			{
+				assignabilityRequests: [],
+				budgets: base.snapshot.budgets,
+				capabilities: ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'],
+				expectEmpty: false,
+				operationVersion: SEMANTIC_OPERATION_VERSION,
+				rootLocator: base.root,
+				schemaVersion: SEMANTIC_REQUEST_SCHEMA_VERSION,
+				subjectId: subject.descriptor.subjectId
+			},
+			{ subject }
+		);
+		if (semanticOutcome.outcome === 'unavailable' || semanticOutcome.outcome === 'incompatible')
+			throw new Error(`Report semantic fixture failed: ${JSON.stringify(semanticOutcome)}`);
+		const snapshot = semanticOutcome.snapshot;
+		const arrowArtifactSet = reportArrowArtifactSet(subject);
+		const arrowObservation = normalizeArrowCommandCensusObservation({
+			artifactSet: arrowArtifactSet,
+			evidence: base.observation.rawEvidence,
+			executor: base.observation.executor,
+			request: {
+				artifactSetId: arrowArtifactSet.id,
+				budgets: base.observation.budgets,
+				operationVersion: ARROW_COMMAND_CENSUS_OPERATION_VERSION,
+				schemaVersion: ARROW_COMMAND_CENSUS_REQUEST_SCHEMA_VERSION,
+				subjectId: subject.descriptor.subjectId
+			}
+		}).observation;
+		const arrowValidation = validateArrowCommandCensusObservation(arrowObservation, subject);
+		if (arrowValidation.state !== 'VALID')
+			throw new Error(
+				`Report arrow observation fixture is invalid: ${JSON.stringify(arrowValidation)}`
+			);
+		const registries = selectJpwbCommandHandlerRegistries(snapshot);
+		const graphRequest: BuildCommandHandlerGraphRequest = {
+			arrowObservationId: arrowObservation.id,
+			budgets: base.graphRequest.budgets,
+			commandRegistry: registries.commandRegistry,
+			handlerRegistry: registries.handlerRegistry,
+			operationVersion: base.graphRequest.operationVersion,
+			schemaVersion: base.graphRequest.schemaVersion,
+			semanticSnapshotId: snapshot.id,
+			subjectId: subject.descriptor.subjectId
+		};
+		return {
+			...createOverlayFixture(
+				{
+					arrowArtifactSet,
+					cleanup: base.cleanup,
+					graphRequest,
+					observation: arrowObservation,
+					root: base.root,
+					snapshot,
+					subject
+				},
+				DIRECT_ENFORCING_ANCHOR
+			),
+			arrowArtifactSet
+		};
+	} catch (error) {
+		base.cleanup();
+		throw error;
+	}
 }
 
 function createOverlayFixture(
@@ -339,6 +494,7 @@ function createOverlayFixture(
 			guardObservation: guard,
 			inputs,
 			request,
+			root: fixture.root,
 			snapshot: fixture.snapshot,
 			stateGraph: projectedState.graph,
 			stateGraphRequest: projectedState.request,

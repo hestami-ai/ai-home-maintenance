@@ -147,6 +147,20 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_REPORT_SCOPE
 } from '../contracts/guard-enforcement-ledger-report.js';
 import {
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY_TRANSFER,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_EXECUTION_SELECTION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_GATE_EFFECT,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_NONCLAIMS,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_OPERATION_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_RESULT_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SCHEMA_VERSION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_SCOPE,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE
+} from '../contracts/guard-classification-overlay-report.js';
+import {
 	LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER,
 	LOGICAL_GRAPH_COMPOSITION_CAPABILITY,
 	LOGICAL_GRAPH_COMPOSITION_CAPABILITY_STATUS,
@@ -307,6 +321,8 @@ const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-cens
 const COMMAND_HANDLER_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-command-handler-graph.ts';
 const COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND = 'bun scripts/csaa-command-dispatch-topology.ts';
 const GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND = 'bun scripts/csaa-guard-enforcement-ledger.ts';
+const GUARD_CLASSIFICATION_OVERLAY_REPORT_COMMAND =
+	'bun scripts/csaa-guard-classification-overlay.ts';
 const CALL_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-call-graph.ts';
 const READ_WRITE_ACCESS_REPORT_COMMAND = 'bun scripts/csaa-read-write-access.ts';
 const CONDITIONAL_EXPORT_RESOLUTION_ONLY_SMOKE_COMMAND =
@@ -467,6 +483,24 @@ const GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE = [
 	'packages/csaa/src/index.ts',
 	'scripts/csaa-guard-enforcement-ledger.ts'
 ] as const;
+const GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE = [
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE.logicalPath,
+	GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE.projectConfigPath,
+	'packages/csaa/src/application/guard-classification-overlay-progress-jsonl.test.ts',
+	'packages/csaa/src/application/guard-classification-overlay-progress-jsonl.ts',
+	'packages/csaa/src/application/run-guard-classification-overlay-command.test.ts',
+	'packages/csaa/src/application/run-guard-classification-overlay-command.ts',
+	'packages/csaa/src/application/run-guard-classification-overlay-report.test.ts',
+	'packages/csaa/src/application/run-guard-classification-overlay-report.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.test.ts',
+	'packages/csaa/src/application/run-command-handler-graph-report.ts',
+	'packages/csaa/src/contracts/guard-classification-overlay-report.ts',
+	'packages/csaa/src/graph/command-handler-graph-fixture.test-support.ts',
+	'packages/csaa/src/graph/guard-classification-overlay-fixture.test-support.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-guard-classification-overlay.ts'
+] as const;
 const READ_WRITE_ACCESS_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/read-write-access-report.ts',
 	'packages/csaa/src/index.test.ts',
@@ -601,6 +635,8 @@ function jpwbFixtureScriptCommand(name: string): string {
 		return COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:guard-enforcement-ledger')
 		return GUARD_ENFORCEMENT_LEDGER_REPORT_COMMAND;
+	if (name === 'csaa:analyze:guard-classification-overlay')
+		return GUARD_CLASSIFICATION_OVERLAY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:call-graph') return CALL_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:read-write-access') return READ_WRITE_ACCESS_REPORT_COMMAND;
 	if (name === 'csaa:semantic:smoke:structural-module-reachability') {
@@ -799,6 +835,7 @@ describe('inventory discovery and identity', () => {
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
+				...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -1004,6 +1041,7 @@ describe('inventory discovery and identity', () => {
 			state: 'PARTIAL'
 		});
 		for (const expectedProvenance of [
+			...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 			'capabilities#arrow-command-census',
 			'capabilities#command-handler-static-projection',
 			'capabilities#guard-enforcement-ledger',
@@ -1016,22 +1054,41 @@ describe('inventory discovery and identity', () => {
 			'packages/csaa/src/graph/validate-guard-classification-overlay.ts',
 			'packages/csaa/src/semantic/repository-smoke.test.ts',
 			'package.json#/scripts/csaa:semantic:smoke:guard-classification',
+			'package.json#/scripts/csaa:analyze:guard-classification-overlay',
 			...GUARD_ENFORCEMENT_LEDGER_RETAINED_VERIFIER_PATHS
 		])
 			expect(guardOverlayCapability!.provenance.includes(expectedProvenance)).toBe(true);
 		for (const boundary of [
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_OPERATION_VERSION,
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION,
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_RESULT_SCHEMA_VERSION,
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_SCHEMA_VERSION,
+			JSON.stringify(GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION),
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_EXECUTION_SELECTION,
+			`distinct facade scope is ${GUARD_CLASSIFICATION_OVERLAY_REPORT_SCOPE}`,
+			`analysis authority is ${GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY}`,
+			`authority transfer is ${GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY_TRANSFER}`,
+			`gate effect is ${GUARD_CLASSIFICATION_OVERLAY_REPORT_GATE_EFFECT}`,
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE.logicalPath,
+			GUARD_CLASSIFICATION_OVERLAY_REPORT_STATE_SOURCE.projectConfigPath,
+			'same-process nonserialized command-handler pipeline handoff',
+			'full retained-arrow, command-handler, guard, state-observation, state-graph, and overlay evidence',
+			'successful evidence is never truncated',
+			'Dispatch topology and command-event evidence remain explicitly NOT_CONSUMED',
 			'without promotion',
-			'configured but is not executed by inventory generation',
+			'CONFIGURED_NOT_RUN',
 			'stale retained line numbers',
 			'JAN-CSAA-CAP-027 derivation evidence',
 			'candidate-only JAN-CSAA-CAP-028 inference evidence',
 			'neither invokes nor executes handlers',
-			'handler execution',
+			'handler ownership',
 			'helper citations remain explicit frontiers',
 			'runtime enforcement or performability',
 			'full JAN-CSAA-007/008 conformance'
 		])
 			expect(guardOverlayCapability!.explanation).toContain(boundary);
+		for (const nonclaim of GUARD_CLASSIFICATION_OVERLAY_REPORT_NONCLAIMS)
+			expect(guardOverlayCapability!.explanation).toContain(nonclaim);
 		const commandEventCapability = capabilities.get('command-event-contract-static-overlay');
 		expect(commandEventCapability).toMatchObject({
 			provider: 'typescript+command-handler-graph+jpwb-event-contract-overlay',
@@ -1919,6 +1976,7 @@ describe('inventory discovery and identity', () => {
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+				...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				'packages/csaa/src/contracts/logical-graph-composition.ts',
@@ -1971,6 +2029,15 @@ describe('inventory discovery and identity', () => {
 			'command csaa:analyze:command-dispatch-topology is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain(
+			'preliminary guard-classification-overlay report facade exposes the exact same-subject retained-arrow, command-handler, retained-guard, generated-state, and guard-classification evidence'
+		);
+		expect(semanticBoundary).toContain(
+			'command csaa:analyze:guard-classification-overlay is CONFIGURED_NOT_RUN by inventory generation'
+		);
+		expect(semanticBoundary).toContain(
+			'aggregate unexecuted preliminary report-command population includes command-dispatch-topology and guard-classification-overlay'
+		);
+		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
 		);
 		expect(semanticBoundary).toContain(
@@ -1981,7 +2048,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, read/write-access'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, guard-classification-overlay, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -2030,7 +2097,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, guard-enforcement-ledger, guard-classification-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -2123,6 +2190,7 @@ describe('inventory discovery and identity', () => {
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+				...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/validate-call-graph.ts'
 			])
@@ -2174,6 +2242,18 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`guard-enforcement-ledger report facade has analysis authority ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY}, authority transfer ${GUARD_ENFORCEMENT_LEDGER_REPORT_AUTHORITY_TRANSFER}, and gate effect ${GUARD_ENFORCEMENT_LEDGER_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`guard-classification-overlay report facade has analysis authority ${GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY}, authority transfer ${GUARD_CLASSIFICATION_OVERLAY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${GUARD_CLASSIFICATION_OVERLAY_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`distinct facade scope is ${GUARD_CLASSIFICATION_OVERLAY_REPORT_SCOPE}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`commandDispatchTopology=${GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION.commandDispatchTopology}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`commandEventContractOverlay=${GUARD_CLASSIFICATION_OVERLAY_REPORT_SELECTION.commandEventContractOverlay}`
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`neither holds nor transfers the retained census's ${ARROW_COMMAND_CENSUS_VERIFIER_AUTHORITY} verifier authority`
@@ -2657,6 +2737,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:analyze:command-handler-graph',
 				'csaa:analyze:command-dispatch-topology',
 				'csaa:analyze:guard-enforcement-ledger',
+				'csaa:analyze:guard-classification-overlay',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
 				'csaa:analyze:module-resolution-trace',
@@ -2921,6 +3002,28 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:guard-enforcement-ledger');
+
+		const missingGuardClassificationOverlayReportCommand = fixture();
+		write(
+			missingGuardClassificationOverlayReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:guard-classification-overlay'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingGuardClassificationOverlayReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:analyze:guard-classification-overlay'
+		);
 
 		const missingCallGraphReportCommand = fixture();
 		write(
@@ -3323,6 +3426,25 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is incompatible: csaa:analyze:guard-enforcement-ledger'
 		);
 
+		const incompatibleGuardClassificationOverlayReportCommand = fixture();
+		write(
+			incompatibleGuardClassificationOverlayReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:guard-classification-overlay':
+					'bun scripts/wrong-guard-classification-overlay.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleGuardClassificationOverlayReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:guard-classification-overlay'
+		);
+
 		const incompatibleCallGraphReportCommand = fixture();
 		write(
 			incompatibleCallGraphReportCommand,
@@ -3483,6 +3605,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
+						'csaa:analyze:guard-classification-overlay',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
 						'csaa:analyze:module-dependency',
@@ -3505,6 +3628,11 @@ describe('JPWB population non-vacuity', () => {
 			root,
 			'packages/csaa/package.json',
 			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		write(
+			root,
+			'packages/rph-domain/package.json',
+			JSON.stringify({ name: '@janumipwb/rph-domain', private: true, version: '0.0.0' })
 		);
 		const semanticPaths = [
 			'packages/csaa/src/contracts/semantic.ts',
@@ -3560,6 +3688,7 @@ describe('JPWB population non-vacuity', () => {
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+			...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...commandHandlerPaths,
 			...commandDispatchPaths,
@@ -3601,6 +3730,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
+						'csaa:analyze:guard-classification-overlay',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3677,6 +3807,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:command-handler-graph',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:guard-enforcement-ledger',
+						'csaa:analyze:guard-classification-overlay',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
 						'csaa:analyze:module-resolution-trace',
@@ -3698,6 +3829,11 @@ describe('JPWB population non-vacuity', () => {
 			root,
 			'packages/csaa/package.json',
 			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		write(
+			root,
+			'packages/rph-domain/package.json',
+			JSON.stringify({ name: '@janumipwb/rph-domain', private: true, version: '0.0.0' })
 		);
 		write(
 			root,
@@ -3727,6 +3863,7 @@ describe('JPWB population non-vacuity', () => {
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+			...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/command-handler-graph.ts',
 			'packages/csaa/src/graph/build-command-handler-graph.ts',
@@ -3811,6 +3948,7 @@ describe('JPWB population non-vacuity', () => {
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 			...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 			...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+			...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 			...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 			...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 			...MODULE_RESOLUTION_TRACE_PROVENANCE,
@@ -3878,6 +4016,23 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB guard-enforcement-ledger report facade or verification source is absent: ${missingGuardEnforcementLedgerReportPath}`
 			);
 			write(root, missingGuardEnforcementLedgerReportPath, 'export {};\n');
+		}
+		for (const missingGuardClassificationOverlayReportPath of GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE.filter(
+			(path) =>
+				!COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingGuardClassificationOverlayReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB guard-classification overlay report facade or verification source is absent: ${missingGuardClassificationOverlayReportPath}`
+			);
+			write(
+				root,
+				missingGuardClassificationOverlayReportPath,
+				missingGuardClassificationOverlayReportPath.endsWith('.json') ? '{}\n' : 'export {};\n'
+			);
 		}
 		const missingStateGraph = 'packages/csaa/src/graph/validate-state-machine-graph.ts';
 		rmSync(join(root, ...missingStateGraph.split('/')));
@@ -4259,6 +4414,16 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:analyze:guard-classification-overlay'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: GUARD_CLASSIFICATION_OVERLAY_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) => command.owner === '.' && command.name === 'csaa:analyze:call-graph'
 			)
 		).toMatchObject({
@@ -4346,6 +4511,7 @@ describe('JPWB population non-vacuity', () => {
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...GUARD_ENFORCEMENT_LEDGER_REPORT_PROVENANCE,
+				...GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 				...READ_WRITE_ACCESS_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE
 			])
