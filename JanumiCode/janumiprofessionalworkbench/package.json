@@ -40,6 +40,7 @@
 		"csaa:analyze:logical-graph-composition": "bun scripts/csaa-logical-graph-composition.ts",
 		"csaa:analyze:semantic-source-query": "bun scripts/csaa-semantic-source-query.ts",
 		"csaa:analyze:static-module-impact-candidates": "bun run scripts/csaa-static-module-impact-candidates.ts",
+		"csaa:analyze:working-source-edit-impact-candidates": "bun run scripts/csaa-working-source-edit-impact-candidates.ts",
 		"csaa:analyze:module-resolution-trace": "bun scripts/csaa-module-resolution-trace.ts",
 		"csaa:analyze:project-context": "bun run scripts/csaa-project-context.ts",
 		"csaa:analyze:read-write-access": "bun scripts/csaa-read-write-access.ts",

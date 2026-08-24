@@ -35,6 +35,7 @@ export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
 export * from './contracts/state-machine-graph-report.js';
 export * from './contracts/static-module-impact-candidate-report.js';
+export * from './contracts/working-source-edit-impact-candidate-report.js';
 export * from './contracts/structural-module-reachability-analysis.js';
 export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
@@ -393,6 +394,11 @@ export {
 	staticModuleImpactCandidateReportExitCode,
 	type RunStaticModuleImpactCandidateReportOptions
 } from './application/run-static-module-impact-candidate-report.js';
+export {
+	runWorkingSourceEditImpactCandidateReport,
+	type RunWorkingSourceEditImpactCandidateReportOptions,
+	workingSourceEditImpactCandidateReportExitCode
+} from './application/run-working-source-edit-impact-candidate-report.js';
 export {
 	runStructuralModuleReachabilityReport,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,

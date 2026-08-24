@@ -221,6 +221,12 @@ import {
 	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
 	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
 	STATIC_MODULE_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION,
@@ -291,6 +297,8 @@ import {
 	buildStructuralModuleReachabilityAnalysis,
 	runStaticModuleImpactCandidateReport,
 	staticModuleImpactCandidateReportExitCode,
+	runWorkingSourceEditImpactCandidateReport,
+	workingSourceEditImpactCandidateReportExitCode,
 	runStructuralModuleReachabilityReport,
 	structuralModuleReachabilityReportExitCode,
 	buildStructuralSccAnalysis,
@@ -485,6 +493,14 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
 		expect(runStaticModuleImpactCandidateReport).toBeTypeOf('function');
 		expect(staticModuleImpactCandidateReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty(
+			'runStaticModuleImpactCandidateReportWithCapturedSubject'
+		);
+		expect(runWorkingSourceEditImpactCandidateReport).toBeTypeOf('function');
+		expect(workingSourceEditImpactCandidateReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('observeWorkingSourceEdit');
+		expect(publicSurface).not.toHaveProperty('bindWorkingSourceEditObservation');
+		expect(publicSurface).not.toHaveProperty('verifyWorkingSourceEditObservation');
 		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty(
 			'runStructuralModuleReachabilityReportWithCapturedSubject'
@@ -1186,6 +1202,24 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(STATIC_MODULE_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION).toBe(
 			'jan-csaa-caller-declared-source-edit-seed/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-working-source-edit-impact-candidates/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-working-source-edit-impact-candidate-report-request/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-working-source-edit-impact-candidate-report-result/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-working-source-edit-impact-candidate-report/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION).toBe(
+			'jan-csaa-working-source-edit-seed/0.1.0'
+		);
+		expect(WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION).toBe(
+			'jan-csaa-working-source-edit-observation/0.1.0'
 		);
 		expect(STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION).toBe('jan-csaa-analyze-structural-scc/0.1.0');
 		expect(STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(

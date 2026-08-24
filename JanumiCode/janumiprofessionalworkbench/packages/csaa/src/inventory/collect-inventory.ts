@@ -350,6 +350,29 @@ import {
 	STRUCTURAL_SCC_REPORT_SCHEMA_VERSION
 } from '../contracts/structural-scc-report.js';
 import {
+	WORKING_SOURCE_EDIT_EVIDENCE_DIGEST_METHOD,
+	WORKING_SOURCE_EDIT_EVIDENCE_DIGEST_SCOPE,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_AUTHORITY_TRANSFER,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY_STATUS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_FULL_CAP_031,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_GATE_EFFECT,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_METHOD,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_NEXT_EVIDENCE,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_NONCLAIMS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_OBSERVATION_EXCLUSIONS,
+	WORKING_SOURCE_EDIT_OBSERVATION_METHOD,
+	WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_TEXTUAL_CHANGE_METHOD
+} from '../contracts/working-source-edit-impact-candidate-report.js';
+import {
 	INVENTORY_GENERATOR_ID,
 	INVENTORY_GENERATOR_VERSION,
 	INVENTORY_SCHEMA_VERSION,
@@ -504,6 +527,19 @@ const TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE = [
 	'scripts/csaa-static-module-impact-candidates.ts'
 ] as const;
 
+const TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/working-source-edit-impact-candidate-report.ts',
+	'packages/csaa/src/impact/observe-working-source-edit.ts',
+	'packages/csaa/src/impact/observe-working-source-edit.test.ts',
+	'packages/csaa/src/semantic/monotonic-operation-clock.ts',
+	'packages/csaa/src/application/run-working-source-edit-impact-candidate-report.ts',
+	'packages/csaa/src/application/run-working-source-edit-impact-candidate-report.test.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/application/working-source-edit-impact-candidate-command.test.ts',
+	'scripts/csaa-working-source-edit-impact-candidates.ts'
+] as const;
+
 const JPWB_STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_MODULE_REACHABILITY vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 
@@ -512,6 +548,9 @@ const JPWB_STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND =
 
 const JPWB_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_COMMAND =
 	'bun run scripts/csaa-static-module-impact-candidates.ts';
+
+const JPWB_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_COMMAND =
+	'bun run scripts/csaa-working-source-edit-impact-candidates.ts';
 
 const JPWB_STRUCTURAL_SCC_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_SCC vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
@@ -1005,7 +1044,8 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'source-origin-correlation',
 	'static-module-impact-candidates',
 	'structural-module-reachability-analysis',
-	'structural-scc-analysis'
+	'structural-scc-analysis',
+	'working-source-edit-impact-candidates'
 ] as const;
 
 function canonicalProvenance(...paths: readonly string[]): string[] {
@@ -1610,6 +1650,7 @@ function providerInventory(
 							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 							...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+							...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 							...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
@@ -2111,6 +2152,26 @@ function capabilities(): CapabilityInventory[] {
 			),
 			state: 'PARTIAL'
 		},
+		{
+			explanation: `A third preliminary implementation-local unregistered DWP-005 increment exposes ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY} with ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY_STATUS} status through ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION}. It accepts exactly one ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION} existing regular authored source EDIT seed and one exact full lowercase immutable base commit object ID. The path-local ${WORKING_SOURCE_EDIT_OBSERVATION_METHOD} observation reads the selected raw immutable HEAD tree blob, requires the exact stage-zero index blob and regular-file mode to match that HEAD tree entry, fatally decodes both the immutable blob and current raw source as UTF-8, and binds the current bytes by path, byte count, and SHA-256 to the exact FrozenSubject artifact under ${WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION}. It does not execute git status or porcelain, enumerate repository-wide dirty state, or execute Git attribute filters, clean/smudge/process filters, external diff drivers, or text normalization; observation exclusions are ${WORKING_SOURCE_EDIT_OBSERVATION_EXCLUSIONS.join(', ')}. The ${WORKING_SOURCE_EDIT_TEXTUAL_CHANGE_METHOD} records one UTF-16 longest-common-prefix/suffix envelope that can contain unchanged interior text and is neither a minimal multi-hunk edit script nor semantic change evidence. Its ${WORKING_SOURCE_EDIT_EVIDENCE_DIGEST_METHOD} evidence digest covers ${WORKING_SOURCE_EDIT_EVIDENCE_DIGEST_SCOPE}. The ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_METHOD} composition invokes the existing static-module-impact predecessor once with the observed current artifact digest and evidence digest as its implementation-local working-change binding, then embeds that predecessor report verbatim. Every predecessor importer candidate remains POSSIBLE, direct/transitive remains structural distance only, all native importer-to-imported witnesses and upstream limitations remain unchanged, and global impact closure remains OPEN. Currentness requires the initial exact Git HEAD/tree/stage-zero index/raw-byte observation, exact FrozenSubject binding and final currentness recheck, and a final exact Git reobservation after composition and result-size admission; it is limited to the selected source HEAD, index, raw bytes, and captured subject. The command emits one maxResultBytes-bounded admitted partial ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION} report with ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION} result under ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION}; the absolute result ceiling is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.maxResultBytes.toLocaleString('en-US')} bytes and successful evidence is not truncated. Next evidence is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_NEXT_EVIDENCE.join(', ')}. This path-local evidence is not a repository-wide WorkingChangeSetRecord, ChangeSeedRecord, ChangeImpactResultRecord, or revision comparison; full CAP-031 is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_FULL_CAP_031}, analysis authority is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY}, authority transfer is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_AUTHORITY_TRANSFER}, and gate effect is ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_GATE_EFFECT}. It does not complete DWP-005 or DWP-006, qualify Git or an analysis provider, create a finding or gate, establish runtime impact or behavior preservation, or prove non-impact, irrelevance, dead code, or safe removal, and publishes ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_NONCLAIMS.join(', ')}. The machine-facing coding-agent invocation bun run --silent csaa:analyze:working-source-edit-impact-candidates is CONFIGURED_NOT_RUN by inventory generation. The package root exports the contract, runner, and exit-code helper; the Git observer, executable adapter, private exact-subject predecessor handoff, and reused predecessor JSONL writer remain trust-bound implementation details.`,
+			id: 'working-source-edit-impact-candidates',
+			provider: 'git+typescript+validated-working-source-edit-impact-candidates',
+			provenance: canonicalProvenance(
+				...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
+				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SEMANTIC_PROVENANCE,
+				'capabilities#dependency-graph',
+				'capabilities#static-module-impact-candidates',
+				'capabilities#structural-module-reachability-analysis',
+				'capabilities#symbol-table',
+				'capabilities#typescript-ast',
+				'package.json#/scripts/csaa:analyze:working-source-edit-impact-candidates'
+			),
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
 				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
@@ -2269,6 +2330,7 @@ function assertJpwbRequiredRootCommands(configuredCommands: readonly CommandInve
 		'csaa:analyze:read-write-access',
 		'csaa:analyze:static-module-impact-candidates',
 		'csaa:analyze:structural-module-reachability',
+		'csaa:analyze:working-source-edit-impact-candidates',
 		'csaa:semantic:smoke:project-context-graph',
 		'csaa:semantic:smoke:structural-module-reachability',
 		'csaa:semantic:smoke:structural-scc'
@@ -2312,6 +2374,11 @@ function assertJpwbNonVacuity(
 		configuredCommands,
 		'csaa:analyze:static-module-impact-candidates',
 		JPWB_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_COMMAND
+	);
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:analyze:working-source-edit-impact-candidates',
+		JPWB_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_COMMAND
 	);
 	assertJpwbAssuranceCommandExact(
 		configuredCommands,
@@ -2565,6 +2632,11 @@ function assertJpwbNonVacuity(
 	);
 	assertRequiredSelectedPaths(
 		selectedPaths,
+		TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+		'Required JPWB working-source-edit impact-candidate report facade or verification source'
+	);
+	assertRequiredSelectedPaths(
+		selectedPaths,
 		TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 		'Required JPWB logical graph composition implementation or verification source'
 	);
@@ -2703,6 +2775,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 					...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+					...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 					...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
@@ -2738,6 +2811,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'capabilities#read-write-access-graph',
 					'capabilities#semantic-source-query',
 					'capabilities#state-machine-graph',
+					'capabilities#working-source-edit-impact-candidates',
 					'capabilities#structural-module-reachability-analysis',
 					'capabilities#structural-scc-analysis',
 					'capabilities#symbol-table',
@@ -2747,12 +2821,14 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 				statement:
 					`The preliminary semantic-source-query report facade exposes one explicitly selected retained ${SEMANTIC_SOURCE_QUERY_POPULATION} population, fixed safe scalar-field and operator registries, exact T/F/U/C equality, exact nonempty case-sensitive logicalPath prefix comparison with no path normalization/glob/regex/segment inference, unary NOT, and nonempty ordered AND/OR semantics, whole-AST validation, ${SEMANTIC_SOURCE_QUERY_EXECUTION_MODE}-only node-total evaluation, applicability partitions, and all six independent epistemic dimensions. Evaluation closure is limited to retained validated semantic sources, global closure remains OPEN, dynamic evidence is explicitly NOT_APPLICABLE, and zero supported matches do not establish global absence. Its configured command csaa:analyze:semantic-source-query is CONFIGURED_NOT_RUN by inventory generation; the facade remains PARTIAL and IMPLEMENTATION_LOCAL_UNREGISTERED and does not complete CAP-029, DWP-005, DWP-006, G5, a registered JAN-CSAA-007 operation, findings, or disposition. ` +
 					`The preliminary static-module-impact-candidates facade binds one caller-declared whole-source EDIT seed and expected artifact SHA-256 to one current captured source, reuses one reverse CAP-027 traversal, and emits only POSSIBLE importer candidates with complete seed-to-candidate witnesses over unchanged native importer-to-imported edges. Global impact closure remains OPEN; the caller working-change identity is not independently validated; unvisited or zero-candidate nodes receive no non-impact state; and ${STATIC_MODULE_IMPACT_CANDIDATE_FULL_CAP_031}, DWP-005/DWP-006 completion, G5/G6, findings, gates, remediation, safe removal, and behavior preservation remain NOT_CLAIMED. Its configured command csaa:analyze:static-module-impact-candidates is CONFIGURED_NOT_RUN by inventory generation. ` +
+					`The preliminary working-source-edit-impact-candidates facade path-locally binds one raw immutable HEAD blob and exact matching stage-zero index entry to one fatally decoded UTF-8 current FrozenSubject artifact, without executing Git status or filters or classifying repository-wide dirty state, then embeds the predecessor static-module POSSIBLE importer report verbatim. Its maxGitOperationDurationMs is one aggregate monotonic wall budget across all Git invocations in each complete observation; the child environment retains only narrow operating-system essentials and the resolved Git executable directory, while the host-installed Git executable and OS process launch remain ambient trust boundaries. Every terminal stdout envelope after request admission is maxResultBytes-bounded, with variable-size evidence omitted from a compact unavailable refusal when necessary. Its initial Git observation, exact FrozenSubject binding and final currentness recheck, and final Git reobservation are selected-source-only currentness; complete WorkingChangeSet identity, full CAP-031, DWP-005/DWP-006 completion, gates, runtime impact, provider qualification, and safe-removal proof remain NOT_CLAIMED. Its configured command csaa:analyze:working-source-edit-impact-candidates is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary command-dispatch-topology report facade exposes the exact same-subject COMMANDS-to-HANDLERS static projection, full retained-arrow and command-handler predecessor evidence, and candidate-only dispatch handler edges while preserving PARTIAL/OPEN status and all upstream limitations. Its configured command csaa:analyze:command-dispatch-topology is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary guard-classification-overlay report facade exposes the exact same-subject retained-arrow, command-handler, retained-guard, generated-state, and guard-classification evidence while preserving PARTIAL/OPEN status, retained verifier authority, candidate factory associations, helper/no-command frontiers, and explicit non-consumption of command-dispatch and command-event evidence. Its configured command csaa:analyze:guard-classification-overlay is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary command-event-contract-overlay report facade exposes the exact same-subject retained-arrow, command-handler, COMMANDS/EVENTS registry, vocabulary, retained event-census, and command-event overlay evidence while preserving PARTIAL/OPEN status, retained event-surface authority, exact/candidate/unresolved predecessor attribution, an empty CAP-028 inference lane, dated static EMITTED meaning, and explicit non-consumption of command-dispatch, guard-enforcement, and guard-classification evidence. Its configured command csaa:analyze:command-event-contract-overlay is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary logical-graph-composition report facade exposes one exact same-subject project-context, module-dependency, call, and two-layer reference-only composition evidence set while preserving PARTIAL/OPEN status, every predecessor limitation, and no query, slice, impact, finding, remediation, dead-code, safe-removal, DWP completion, registered-operation, or gate authority. Its configured command csaa:analyze:logical-graph-composition is CONFIGURED_NOT_RUN by inventory generation. ` +
 					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary DWP-005 coding-agent surfaces now include the bounded semantic-source query and one caller-declared whole-source static module impact-candidate projection over reverse CAP-027 reachability; neither completes DWP-005. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge, the complete selected open static call projection with every retained invocation and candidate/frontier edge, the complete bounded generated JPWB state-machine topology projection for one exact generated source, the exact selected retained arrow-command census evidence and baseline comparison, the exact same-subject COMMANDS-to-HANDLERS static projection with retained arrow sites, occurrences, exact/candidate lanes, and explicit frontiers, the exact selected retained guard-enforcement-ledger audit and classification evidence, the exact same-subject retained guard, generated state, handler, and guard-classification overlay evidence, and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies, callers, handlers, arrows, or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary semantic-source-query, static-module-impact-candidates, project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED." +
-					' The aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition.'
+					' The additional working-source-edit-impact-candidates surface validates only one selected path-local raw edit before reusing the static module importer-candidate projection; none of the three preliminary DWP-005 surfaces completes DWP-005. Inventory generation also does not execute the working-source-edit-impact-candidates report command. ' +
+					'The aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, working-source-edit-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition.'
 			},
 			{
 				provenance: canonicalProvenance(
@@ -2790,6 +2866,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 					...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+					...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
 					...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
 					...JPWB_STATE_MACHINE_GRAPH_PROVENANCE,
@@ -2811,6 +2888,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					`The structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}; it does not change retained verifier authority.`,
 					`The structural module reachability analysis has graph authority ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_GATE_EFFECT}; it changes no retained verifier authority. The preliminary structural module reachability report facade adds no authority; its final selected-captured-subject currentness does not create semantic-query, code-slice, change-impact, whole-program, irrelevance, non-impact, or safe-removal proof. Its complete static traversal is bounded to one independently validated graph and one explicit criterion, carries upstream closure, and is not JAN-CSAA-CAP-009 graph composition, JAN-CSAA-CAP-029 semantic query, or JAN-CSAA-CAP-030 code slicing.`,
 					`The static module impact-candidate facade has analysis authority ${STATIC_MODULE_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY}, authority transfer ${STATIC_MODULE_IMPACT_CANDIDATE_AUTHORITY_TRANSFER}, and gate effect ${STATIC_MODULE_IMPACT_CANDIDATE_GATE_EFFECT}; it retains ${STATIC_MODULE_IMPACT_CANDIDATE_CAPABILITY_STATUS} status and ${STATIC_MODULE_IMPACT_CANDIDATE_FULL_CAP_031} full CAP-031 conformance. Its direct/transitive vocabulary is structural distance only, every candidate remains POSSIBLE, and it confers no retained authority, definite breakage, non-impact, safe removal, behavior-preservation, finding, remediation, or gate claim.`,
+					`The working-source-edit impact-candidate facade has analysis authority ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY}, authority transfer ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_AUTHORITY_TRANSFER}, and gate effect ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_GATE_EFFECT}; it retains ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY_STATUS} status and ${WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_FULL_CAP_031} full CAP-031 conformance. Its path-local raw edit observation does not establish a repository-wide WorkingChangeSetRecord, and its verbatim predecessor candidates remain POSSIBLE; it confers no provider qualification, runtime impact, finding, gate, non-impact, or safe-removal authority.`,
 					`The logical graph composition has graph authority ${LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT}; freshness is ${LOGICAL_GRAPH_COMPOSITION_FRESHNESS}, currentness is ${LOGICAL_GRAPH_COMPOSITION_CURRENTNESS}, and it changes no retained verifier authority. Full JAN-CSAA-009 conformance is ${LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE}.`,
 					`The logical-graph-composition report facade has analysis authority ${LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_REPORT_GATE_EFFECT}; it remains preliminary and unregistered, preserves PARTIAL/OPEN status and every predecessor/report nonclaim, and confers no query, slice, impact, architecture, finding, remediation, dead-code, safe-removal, DWP completion, gate, merge, or disposition authority.`,
 					`The semantic-source-query report facade has analysis authority ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY}, authority transfer ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT}; it remains ${SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY_STATUS}, evaluates only the fixed retained ${SEMANTIC_SOURCE_QUERY_POPULATION} static-source population in ${SEMANTIC_SOURCE_QUERY_EXECUTION_MODE} mode, preserves OPEN global closure and explicit dynamic-evidence non-applicability, and confers no full CAP-029, DWP-005/DWP-006 completion, G5 or other gate, registered JAN-CSAA-007 operation, finding, remediation, or disposition authority.`,
@@ -2824,7 +2902,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					`The call-graph report facade has analysis authority ${CALL_GRAPH_REPORT_AUTHORITY}, authority transfer ${CALL_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${CALL_GRAPH_REPORT_GATE_EFFECT}; it changes no retained verifier authority, does not promote the embedded PARTIAL/OPEN graph to full CAP-005, exact or exhaustive callers, dispatch or entry closure, whole-program reachability, dead-code, or safe-removal proof.`,
 					`The state-machine-graph report facade has analysis authority ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY}, authority transfer ${STATE_MACHINE_GRAPH_REPORT_AUTHORITY_TRANSFER}, and gate effect ${STATE_MACHINE_GRAPH_REPORT_GATE_EFFECT}; it neither holds nor transfers the embedded graph's ${STATE_MACHINE_GRAPH_VERIFIER_AUTHORITY} specialized verifier authority, does not promote the embedded CAP-027 PARTIAL/OPEN and IMPLEMENTATION_LOCAL_UNREGISTERED projection, and confers no runtime behavior, command performability, guard enforcement, behavioral reachability, architecture, dead-code, or safe-removal proof.`,
 					'The authority-resolution, aggregate-birth, command-dispatch, contract-number, dead-kernel, policy-evidence-requirement, and route-action census families remain delegated and unwrapped; event-surface remains delegated and exact-identity-bound but NOT_EXECUTED_BY_CSAA and NOT_INTEGRATED.',
-					'Neither wrapper, preliminary report facades including semantic-source-query and static-module-impact-candidates, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
+					'Neither wrapper, preliminary report facades including semantic-source-query, static-module-impact-candidates, and working-source-edit-impact-candidates, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority.',
 					'No such analysis establishes whole-program or behavioral reachability, assigns irrelevance or non-impact to unvisited nodes, identifies orphan or dead code, proves safe removal, supplies runtime evidence, changes a gate, or establishes full JAN-CSAA-007/008/009 conformance.',
 					'Runtime guard enforcement, runtime dispatch, runtime event emission, runtime performability, replacement equivalence, and full graph-relation conformance remain unclaimed.'
 				].join(' ')

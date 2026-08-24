@@ -359,6 +359,27 @@ import {
 	STRUCTURAL_SCC_REPORT_RESULT_SCHEMA_VERSION,
 	STRUCTURAL_SCC_REPORT_SCHEMA_VERSION
 } from '../contracts/structural-scc-report.js';
+import {
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_AUTHORITY_TRANSFER,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY_STATUS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_FULL_CAP_031,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_GATE_EFFECT,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_METHOD,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_NEXT_EVIDENCE,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_NONCLAIMS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_OBSERVATION_EXCLUSIONS,
+	WORKING_SOURCE_EDIT_OBSERVATION_METHOD,
+	WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION,
+	WORKING_SOURCE_EDIT_TEXTUAL_CHANGE_METHOD
+} from '../contracts/working-source-edit-impact-candidate-report.js';
 import { ARROW_COMMAND_CENSUS_RETAINED_VERIFIER_PATHS } from '../providers/jpwb-arrow-command-census/artifact-set.js';
 import { collectInventory } from './collect-inventory.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
@@ -379,6 +400,8 @@ const STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND =
 	'bun run scripts/csaa-structural-module-reachability.ts';
 const STATIC_MODULE_IMPACT_CANDIDATE_REPORT_COMMAND =
 	'bun run scripts/csaa-static-module-impact-candidates.ts';
+const WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_COMMAND =
+	'bun run scripts/csaa-working-source-edit-impact-candidates.ts';
 const LOGICAL_GRAPH_COMPOSITION_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=FULL CSAA_REPOSITORY_SMOKE_SUITE=LOGICAL_GRAPH_COMPOSITION vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
@@ -452,6 +475,18 @@ const STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE = [
 	'packages/csaa/src/application/run-static-module-impact-candidate-report.test.ts',
 	'packages/csaa/src/application/static-module-impact-candidate-command.test.ts',
 	'scripts/csaa-static-module-impact-candidates.ts'
+] as const;
+const WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE = [
+	'packages/csaa/src/contracts/working-source-edit-impact-candidate-report.ts',
+	'packages/csaa/src/impact/observe-working-source-edit.ts',
+	'packages/csaa/src/impact/observe-working-source-edit.test.ts',
+	'packages/csaa/src/semantic/monotonic-operation-clock.ts',
+	'packages/csaa/src/application/run-working-source-edit-impact-candidate-report.ts',
+	'packages/csaa/src/application/run-working-source-edit-impact-candidate-report.test.ts',
+	'packages/csaa/src/application/working-source-edit-impact-candidate-command.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/index.test.ts',
+	'scripts/csaa-working-source-edit-impact-candidates.ts'
 ] as const;
 const PROJECT_CONTEXT_GRAPH_PROVENANCE = [
 	'packages/csaa/src/contracts/project-context-graph.ts',
@@ -779,6 +814,9 @@ function jpwbFixtureScriptCommand(name: string): string {
 	if (name === 'csaa:analyze:static-module-impact-candidates') {
 		return STATIC_MODULE_IMPACT_CANDIDATE_REPORT_COMMAND;
 	}
+	if (name === 'csaa:analyze:working-source-edit-impact-candidates') {
+		return WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_COMMAND;
+	}
 	return name === 'csaa:semantic:smoke:structural-scc' ? STRUCTURAL_SCC_ONLY_SMOKE_COMMAND : 'true';
 }
 
@@ -969,7 +1007,8 @@ describe('inventory discovery and identity', () => {
 			'source-origin-correlation',
 			'static-module-impact-candidates',
 			'structural-module-reachability-analysis',
-			'structural-scc-analysis'
+			'structural-scc-analysis',
+			'working-source-edit-impact-candidates'
 		]);
 		expect(typescript?.provenance).toEqual(
 			expect.arrayContaining([
@@ -1019,6 +1058,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 				'packages/csaa/src/contracts/structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/build-structural-module-reachability-analysis.ts',
 				'packages/csaa/src/graph/structural-module-reachability-analysis-canonical.ts',
@@ -1604,6 +1644,60 @@ describe('inventory discovery and identity', () => {
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
 			expect(staticModuleImpactCandidateCapability!.explanation).toContain(boundary);
+		const workingSourceEditImpactCandidateCapability = capabilities.get(
+			'working-source-edit-impact-candidates'
+		);
+		expect(workingSourceEditImpactCandidateCapability).toMatchObject({
+			provider: 'git+typescript+validated-working-source-edit-impact-candidates',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+			...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+			'capabilities#static-module-impact-candidates',
+			'package.json#/scripts/csaa:analyze:working-source-edit-impact-candidates'
+		])
+			expect(
+				workingSourceEditImpactCandidateCapability!.provenance.includes(expectedProvenance)
+			).toBe(true);
+		for (const exactBoundary of [
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_CAPABILITY_STATUS,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
+			WORKING_SOURCE_EDIT_OBSERVATION_METHOD,
+			WORKING_SOURCE_EDIT_OBSERVATION_SCHEMA_VERSION,
+			WORKING_SOURCE_EDIT_TEXTUAL_CHANGE_METHOD,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_METHOD,
+			...WORKING_SOURCE_EDIT_OBSERVATION_EXCLUSIONS,
+			...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_NEXT_EVIDENCE,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_FULL_CAP_031,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_AUTHORITY_TRANSFER,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_GATE_EFFECT,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
+			WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.maxResultBytes.toLocaleString(
+				'en-US'
+			),
+			...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_NONCLAIMS
+		])
+			expect(workingSourceEditImpactCandidateCapability!.explanation).toContain(exactBoundary);
+		for (const boundary of [
+			'A third preliminary implementation-local unregistered DWP-005 increment',
+			'exact stage-zero index blob and regular-file mode to match that HEAD tree entry',
+			'does not execute git status or porcelain',
+			'binds the current bytes by path, byte count, and SHA-256 to the exact FrozenSubject artifact',
+			'Every predecessor importer candidate remains POSSIBLE',
+			'global impact closure remains OPEN',
+			'final exact Git reobservation after composition and result-size admission',
+			'not a repository-wide WorkingChangeSetRecord, ChangeSeedRecord, ChangeImpactResultRecord, or revision comparison',
+			'machine-facing coding-agent invocation bun run --silent csaa:analyze:working-source-edit-impact-candidates',
+			'Git observer, executable adapter, private exact-subject predecessor handoff, and reused predecessor JSONL writer remain trust-bound implementation details',
+			'CONFIGURED_NOT_RUN by inventory generation'
+		])
+			expect(workingSourceEditImpactCandidateCapability!.explanation).toContain(boundary);
 		const logicalGraphCompositionCapability = capabilities.get('logical-graph-composition');
 		expect(logicalGraphCompositionCapability).toMatchObject({
 			provider: 'typescript+validated-module-and-call-graph-composition',
@@ -2352,6 +2446,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts'
@@ -2387,6 +2482,24 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain(
 			'command csaa:analyze:static-module-impact-candidates is CONFIGURED_NOT_RUN by inventory generation'
+		);
+		expect(semanticBoundary).toContain(
+			'preliminary working-source-edit-impact-candidates facade path-locally binds one raw immutable HEAD blob and exact matching stage-zero index entry to one fatally decoded UTF-8 current FrozenSubject artifact'
+		);
+		expect(semanticBoundary).toContain(
+			'complete WorkingChangeSet identity, full CAP-031, DWP-005/DWP-006 completion, gates, runtime impact, provider qualification, and safe-removal proof remain NOT_CLAIMED'
+		);
+		expect(semanticBoundary).toContain(
+			'maxGitOperationDurationMs is one aggregate monotonic wall budget across all Git invocations in each complete observation'
+		);
+		expect(semanticBoundary).toContain(
+			'Every terminal stdout envelope after request admission is maxResultBytes-bounded'
+		);
+		expect(semanticBoundary).toContain(
+			'host-installed Git executable and OS process launch remain ambient trust boundaries'
+		);
+		expect(semanticBoundary).toContain(
+			'command csaa:analyze:working-source-edit-impact-candidates is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
 		expect(semanticBoundary).toContain('wall-anchored monotonic operation clock');
@@ -2435,7 +2548,7 @@ describe('inventory discovery and identity', () => {
 			'command csaa:analyze:logical-graph-composition is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain(
-			'aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition'
+			'aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, working-source-edit-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition'
 		);
 		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
@@ -2564,6 +2677,7 @@ describe('inventory discovery and identity', () => {
 				'packages/csaa/src/graph/validate-structural-module-reachability-analysis.ts',
 				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 				'packages/csaa/src/contracts/structural-scc-analysis.ts',
 				'packages/csaa/src/graph/build-structural-scc-analysis.ts',
 				'packages/csaa/src/graph/validate-structural-scc-analysis.ts',
@@ -2600,7 +2714,7 @@ describe('inventory discovery and identity', () => {
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, preliminary report facades including semantic-source-query and static-module-impact-candidates, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, preliminary report facades including semantic-source-query, static-module-impact-candidates, and working-source-edit-impact-candidates, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`semantic-source-query report facade has analysis authority ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY}, authority transfer ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT}`
@@ -3195,6 +3309,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:project-context-graph',
 				'csaa:semantic:smoke:structural-module-reachability',
 				'csaa:analyze:static-module-impact-candidates',
+				'csaa:analyze:working-source-edit-impact-candidates',
 				'csaa:analyze:structural-module-reachability',
 				'csaa:semantic:smoke:structural-scc'
 			].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -3721,6 +3836,28 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is absent: csaa:analyze:static-module-impact-candidates'
 		);
 
+		const missingWorkingSourceEditImpactCandidateReportCommand = fixture();
+		write(
+			missingWorkingSourceEditImpactCandidateReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:working-source-edit-impact-candidates'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingWorkingSourceEditImpactCandidateReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is absent: csaa:analyze:working-source-edit-impact-candidates'
+		);
+
 		const missingStructuralModuleReachabilityReportCommand = fixture();
 		write(
 			missingStructuralModuleReachabilityReportCommand,
@@ -4156,6 +4293,25 @@ describe('JPWB population non-vacuity', () => {
 			'Required JPWB assurance command is incompatible: csaa:analyze:static-module-impact-candidates'
 		);
 
+		const incompatibleWorkingSourceEditImpactCandidateReportCommand = fixture();
+		write(
+			incompatibleWorkingSourceEditImpactCandidateReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:working-source-edit-impact-candidates':
+					'bun run scripts/wrong-working-source-edit-impact-candidates.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleWorkingSourceEditImpactCandidateReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:working-source-edit-impact-candidates'
+		);
+
 		const incompatibleStructuralModuleReachabilityReportCommand = fixture();
 		write(
 			incompatibleStructuralModuleReachabilityReportCommand,
@@ -4226,6 +4382,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:analyze:static-module-impact-candidates',
+						'csaa:analyze:working-source-edit-impact-candidates',
 						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -4357,6 +4514,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:analyze:static-module-impact-candidates',
+						'csaa:analyze:working-source-edit-impact-candidates',
 						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -4440,6 +4598,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:project-context-graph',
 						'csaa:semantic:smoke:structural-module-reachability',
 						'csaa:analyze:static-module-impact-candidates',
+						'csaa:analyze:working-source-edit-impact-candidates',
 						'csaa:analyze:structural-module-reachability',
 						'csaa:semantic:smoke:structural-scc'
 					].map((name) => [name, jpwbFixtureScriptCommand(name)])
@@ -4565,6 +4724,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 			...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 			...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+			...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
@@ -4767,6 +4927,19 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB static module impact-candidate report facade or verification source is absent: ${missingStaticModuleImpactCandidateReportPath}`
 			);
 			write(root, missingStaticModuleImpactCandidateReportPath, 'export {};\n');
+		}
+		for (const missingWorkingSourceEditImpactCandidateReportPath of WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE.filter(
+			(path) =>
+				path !== 'packages/csaa/src/semantic/monotonic-operation-clock.ts' &&
+				!STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingWorkingSourceEditImpactCandidateReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB working-source-edit impact-candidate report facade or verification source is absent: ${missingWorkingSourceEditImpactCandidateReportPath}`
+			);
+			write(root, missingWorkingSourceEditImpactCandidateReportPath, 'export {};\n');
 		}
 		for (const missingLogicalGraphCompositionPath of LOGICAL_GRAPH_COMPOSITION_PROVENANCE.filter(
 			(path) => path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
@@ -5202,6 +5375,26 @@ describe('JPWB population non-vacuity', () => {
 		expect(
 			inventory.commands.find(
 				(command) =>
+					command.owner === '.' &&
+					command.name === 'csaa:analyze:working-source-edit-impact-candidates'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.verificationAssets.find(
+				(asset) => asset.path === 'scripts/csaa-working-source-edit-impact-candidates.ts'
+			)
+		).toMatchObject({
+			disposition: 'CSAA_NATIVE',
+			gateCarriers: ['UNMAPPED'],
+			role: 'ANALYZER'
+		});
+		expect(
+			inventory.commands.find(
+				(command) =>
 					command.owner === '.' && command.name === 'csaa:semantic:smoke:guard-classification'
 			)
 		).toMatchObject({
@@ -5225,6 +5418,7 @@ describe('JPWB population non-vacuity', () => {
 				'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 				...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 				...STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
 				'packages/csaa/src/graph/build-structural-scc-analysis.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts',

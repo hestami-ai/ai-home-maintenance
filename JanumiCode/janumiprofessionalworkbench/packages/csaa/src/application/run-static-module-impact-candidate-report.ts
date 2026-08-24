@@ -3,6 +3,7 @@ import type {
 	ModuleDependencyGraphNode,
 	ModuleDependencyGraphSourceNode
 } from '../contracts/graph.js';
+import type { FrozenSubject } from '../contracts/subject.js';
 import {
 	STATIC_MODULE_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY,
 	STATIC_MODULE_IMPACT_CANDIDATE_AUTHORITY_TRANSFER,
@@ -614,7 +615,12 @@ function selectSeedNode(
 
 function runInternal(
 	requestValue: unknown,
-	options: RunStaticModuleImpactCandidateReportOptions
+	options: RunStaticModuleImpactCandidateReportOptions,
+	captureSuccessfulExecution?: (
+		subject: FrozenSubject,
+		repositoryRoot: string,
+		resultBytes: number
+	) => void
 ): StaticModuleImpactCandidateReportOutcome {
 	let shell: AdmittedRequestShell;
 	try {
@@ -936,6 +942,11 @@ function runInternal(
 			predecessor.subject
 		);
 	}
+	captureSuccessfulExecution?.(
+		predecessorExecution.subject,
+		predecessorExecution.repositoryRoot,
+		resultBytes
+	);
 	return report;
 }
 
@@ -948,17 +959,47 @@ export interface RunStaticModuleImpactCandidateReportOptions {
 	readonly repositoryRoot: string;
 }
 
+/** @internal Same-process handoff used by trusted facades that must recheck final currentness. */
+export function runStaticModuleImpactCandidateReportWithCapturedSubject(
+	requestValue: unknown,
+	options: RunStaticModuleImpactCandidateReportOptions
+): {
+	readonly outcome: StaticModuleImpactCandidateReportOutcome;
+	readonly repositoryRoot: string | null;
+	readonly resultBytes: number | null;
+	readonly subject: FrozenSubject | null;
+} {
+	let repositoryRoot: string | null = null;
+	let resultBytes: number | null = null;
+	let subject: FrozenSubject | null = null;
+	try {
+		const outcome = runInternal(
+			requestValue,
+			options,
+			(capturedSubject, capturedRepositoryRoot, capturedResultBytes) => {
+				repositoryRoot = capturedRepositoryRoot;
+				resultBytes = capturedResultBytes;
+				subject = capturedSubject;
+			}
+		);
+		return { outcome, repositoryRoot, resultBytes, subject };
+	} catch {
+		return {
+			outcome: failure('INTERNAL_FAILURE', 'RESULT', 'failed', [
+				diagnostic('INTERNAL_FAILURE', 'The static module impact-candidate report failed closed.')
+			]),
+			repositoryRoot: null,
+			resultBytes: null,
+			subject: null
+		};
+	}
+}
+
 export function runStaticModuleImpactCandidateReport(
 	requestValue: unknown,
 	options: RunStaticModuleImpactCandidateReportOptions
 ): StaticModuleImpactCandidateReportOutcome {
-	try {
-		return runInternal(requestValue, options);
-	} catch {
-		return failure('INTERNAL_FAILURE', 'RESULT', 'failed', [
-			diagnostic('INTERNAL_FAILURE', 'The static module impact-candidate report failed closed.')
-		]);
-	}
+	return runStaticModuleImpactCandidateReportWithCapturedSubject(requestValue, options).outcome;
 }
 
 export function staticModuleImpactCandidateReportExitCode(
