@@ -266,6 +266,27 @@ import {
 	READ_WRITE_ACCESS_REPORT_SELECTION
 } from '../contracts/read-write-access-report.js';
 import {
+	SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION,
+	SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS,
+	SEMANTIC_SOURCE_QUERY_EXECUTION_MODE,
+	SEMANTIC_SOURCE_QUERY_FIELDS,
+	SEMANTIC_SOURCE_QUERY_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_POPULATION
+} from '../contracts/semantic-source-query.js';
+import {
+	SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY,
+	SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER,
+	SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY,
+	SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY_STATUS,
+	SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT,
+	SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION
+} from '../contracts/semantic-source-query-report.js';
+import {
 	SOURCE_ORIGIN_CORRELATION_AUTHORITY,
 	SOURCE_ORIGIN_CORRELATION_AUTHORITY_TRANSFER,
 	SOURCE_ORIGIN_CORRELATION_CAPABILITY,
@@ -342,6 +363,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
+const SEMANTIC_SOURCE_QUERY_REPORT_COMMAND = 'bun scripts/csaa-semantic-source-query.ts';
 const LOGICAL_GRAPH_COMPOSITION_REPORT_COMMAND = 'bun scripts/csaa-logical-graph-composition.ts';
 const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
 const COMMAND_HANDLER_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-command-handler-graph.ts';
@@ -439,6 +461,22 @@ const MODULE_DEPENDENCY_REPORT_PROVENANCE = [
 	'packages/csaa/src/application/run-module-dependency-report.test.ts',
 	'packages/csaa/src/application/run-module-dependency-report.ts',
 	'scripts/csaa-module-dependency.ts'
+] as const;
+const SEMANTIC_SOURCE_QUERY_PROVENANCE = [
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/application/run-semantic-source-query-command.test.ts',
+	'packages/csaa/src/application/run-semantic-source-query-command.ts',
+	'packages/csaa/src/application/run-semantic-source-query-report.test.ts',
+	'packages/csaa/src/application/run-semantic-source-query-report.ts',
+	'packages/csaa/src/application/semantic-source-query-progress-jsonl.test.ts',
+	'packages/csaa/src/application/semantic-source-query-progress-jsonl.ts',
+	'packages/csaa/src/contracts/semantic-source-query-report.ts',
+	'packages/csaa/src/contracts/semantic-source-query.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'packages/csaa/src/query/evaluate-semantic-source-query.test.ts',
+	'packages/csaa/src/query/evaluate-semantic-source-query.ts',
+	'scripts/csaa-semantic-source-query.ts'
 ] as const;
 const CALL_GRAPH_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/call-graph-report.ts',
@@ -686,6 +724,7 @@ function jpwbFixtureScriptCommand(name: string): string {
 	}
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
+	if (name === 'csaa:analyze:semantic-source-query') return SEMANTIC_SOURCE_QUERY_REPORT_COMMAND;
 	if (name === 'csaa:analyze:logical-graph-composition')
 		return LOGICAL_GRAPH_COMPOSITION_REPORT_COMMAND;
 	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
@@ -855,6 +894,7 @@ describe('inventory discovery and identity', () => {
 			'module-resolution-trace',
 			'project-context-graph',
 			'read-write-access-projection',
+			'semantic-source-query',
 			'source-origin-correlation',
 			'structural-module-reachability-analysis',
 			'structural-scc-analysis'
@@ -893,6 +933,7 @@ describe('inventory discovery and identity', () => {
 				...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 				...PROJECT_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -926,6 +967,53 @@ describe('inventory discovery and identity', () => {
 		for (const capability of capabilities.values()) {
 			expect(new Set(capability.provenance).size).toBe(capability.provenance.length);
 		}
+		const semanticSourceQueryCapability = capabilities.get('semantic-source-query');
+		expect(semanticSourceQueryCapability).toMatchObject({
+			provider: 'typescript+implementation-local-semantic-source-query',
+			state: 'PARTIAL'
+		});
+		for (const expectedProvenance of [
+			...SEMANTIC_SOURCE_QUERY_PROVENANCE,
+			'capabilities#typescript-ast',
+			'package.json#/scripts/csaa:analyze:semantic-source-query'
+		])
+			expect(semanticSourceQueryCapability!.provenance.includes(expectedProvenance)).toBe(true);
+		for (const boundary of [
+			SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+			SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION,
+			SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS,
+			SEMANTIC_SOURCE_QUERY_EXECUTION_MODE,
+			SEMANTIC_SOURCE_QUERY_POPULATION,
+			JSON.stringify(SEMANTIC_SOURCE_QUERY_FIELDS),
+			SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION,
+			SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION,
+			SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION,
+			SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION,
+			SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY,
+			SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY_STATUS,
+			`analysis authority ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY}`,
+			`authority transfer ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER}`,
+			`gate effect ${SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT}`,
+			'equality plus unary NOT and nonempty ordered AND/OR',
+			'Whole-AST validation precedes COMPLETE node-total evaluation',
+			'CLOSED_FOR_RETAINED_VALIDATED_SEMANTIC_SOURCES',
+			'OPEN global closure',
+			'dynamic-evidence NOT_APPLICABLE',
+			'Successful evidence is never truncated',
+			'not full JAN-CSAA-CAP-029',
+			'does not complete DWP-005 or DWP-006',
+			'does not pass or activate G5',
+			'not a registered JAN-CSAA-007 operation or OperationResponse',
+			'creates no rule, finding, severity, remediation, gate, or disposition',
+			'four-valued algebra helpers and evaluator',
+			'CONFIGURED_NOT_RUN'
+		])
+			expect(semanticSourceQueryCapability!.explanation).toContain(boundary);
+		for (const nonclaim of [
+			...SEMANTIC_SOURCE_QUERY_NONCLAIMS,
+			...SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS
+		])
+			expect(semanticSourceQueryCapability!.explanation).toContain(nonclaim);
 		const commandHandlerCapability = capabilities.get('command-handler-static-projection');
 		expect(commandHandlerCapability).toBeDefined();
 		expect(commandHandlerCapability!.provider).toBe('typescript+jpwb-arrow-command-census-overlay');
@@ -2050,7 +2138,7 @@ describe('inventory discovery and identity', () => {
 		expect(readWriteExplanation).toContain('parsed-request command adapter');
 		for (const nonclaim of READ_WRITE_ACCESS_REPORT_NONCLAIMS)
 			expect(readWriteExplanation).toContain(nonclaim);
-		for (const id of ['code-property-graph', 'control-flow', 'data-flow']) {
+		for (const id of ['code-property-graph', 'control-flow', 'data-flow', 'security-query']) {
 			expect(capabilities.get(id)).toMatchObject({
 				explanation: expect.stringContaining('no control-flow, data-flow'),
 				provider: null,
@@ -2082,6 +2170,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
@@ -2117,6 +2206,24 @@ describe('inventory discovery and identity', () => {
 			])
 		);
 		const semanticBoundary = semanticBoundaryEntry?.statement;
+		expect(semanticBoundary).toContain(
+			`preliminary semantic-source-query report facade exposes one explicitly selected retained ${SEMANTIC_SOURCE_QUERY_POPULATION} population`
+		);
+		expect(semanticBoundary).toContain(
+			'exact T/F/U/C equality plus unary NOT and nonempty ordered AND/OR semantics'
+		);
+		expect(semanticBoundary).toContain(
+			'whole-AST validation, COMPLETE-only node-total evaluation, applicability partitions, and all six independent epistemic dimensions'
+		);
+		expect(semanticBoundary).toContain(
+			'Evaluation closure is limited to retained validated semantic sources, global closure remains OPEN, dynamic evidence is explicitly NOT_APPLICABLE, and zero supported matches do not establish global absence'
+		);
+		expect(semanticBoundary).toContain(
+			'command csaa:analyze:semantic-source-query is CONFIGURED_NOT_RUN by inventory generation'
+		);
+		expect(semanticBoundary).toContain(
+			'facade remains PARTIAL and IMPLEMENTATION_LOCAL_UNREGISTERED and does not complete CAP-029, DWP-005, DWP-006, G5, a registered JAN-CSAA-007 operation, findings, or disposition'
+		);
 		expect(semanticBoundary).toContain('TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction');
 		expect(semanticBoundary).toContain('wall-anchored monotonic operation clock');
 		expect(semanticBoundary).toContain(
@@ -2164,7 +2271,7 @@ describe('inventory discovery and identity', () => {
 			'command csaa:analyze:logical-graph-composition is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain(
-			'aggregate unexecuted preliminary report-command population includes command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition'
+			'aggregate unexecuted preliminary report-command population includes semantic-source-query, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition'
 		);
 		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
@@ -2177,7 +2284,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('preserving PARTIAL capability status');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access'
+			'preliminary semantic-source-query, project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access'
 		);
 		expect(semanticBoundary).toContain(
 			'implementation-local generated JPWB state-machine topology'
@@ -2226,7 +2333,7 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(semanticBoundary).toContain('does not execute the retained event-surface gate');
 		expect(semanticBoundary).toContain(
-			'preliminary project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
+			'preliminary semantic-source-query, project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands'
 		);
 		expect(semanticBoundary).toContain(
 			'configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands'
@@ -2313,6 +2420,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
@@ -2327,7 +2435,19 @@ describe('inventory discovery and identity', () => {
 			])
 		});
 		expect(verificationAuthority?.statement).toContain(
-			'Neither wrapper, preliminary report facades, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+			'Neither wrapper, preliminary report facades including semantic-source-query, any static overlay, partial call graph, structural SCC analysis, structural module reachability analysis, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, source origin correlation, nor generated state-machine topology projection replaces, retires, weakens, or transfers retained authority'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`semantic-source-query report facade has analysis authority ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY}, authority transfer ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER}, and gate effect ${SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`remains ${SEMANTIC_SOURCE_QUERY_REPORT_CAPABILITY_STATUS}, evaluates only the fixed retained ${SEMANTIC_SOURCE_QUERY_POPULATION} static-source population in ${SEMANTIC_SOURCE_QUERY_EXECUTION_MODE} mode`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'preserves OPEN global closure and explicit dynamic-evidence non-applicability'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'confers no full CAP-029, DWP-005/DWP-006 completion, G5 or other gate, registered JAN-CSAA-007 operation, finding, remediation, or disposition authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`structural SCC analysis has graph authority ${STRUCTURAL_SCC_ANALYSIS_GRAPH_AUTHORITY}, authority transfer ${STRUCTURAL_SCC_ANALYSIS_AUTHORITY_TRANSFER}, and gate effect ${STRUCTURAL_SCC_ANALYSIS_GATE_EFFECT}`
@@ -2884,6 +3004,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:semantic:smoke:module-resolution-trace',
 				'csaa:analyze:arrow-command-census',
 				'csaa:analyze:command-handler-graph',
+				'csaa:analyze:semantic-source-query',
 				'csaa:analyze:command-dispatch-topology',
 				'csaa:analyze:command-event-contract-overlay',
 				'csaa:analyze:guard-enforcement-ledger',
@@ -3073,6 +3194,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:module-dependency');
+
+		const missingSemanticSourceQueryReportCommand = fixture();
+		write(
+			missingSemanticSourceQueryReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:semantic-source-query'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingSemanticSourceQueryReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:semantic-source-query');
 
 		const missingLogicalGraphCompositionReportCommand = fixture();
 		write(
@@ -3549,6 +3690,24 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:module-dependency');
 
+		const incompatibleSemanticSourceQueryReportCommand = fixture();
+		write(
+			incompatibleSemanticSourceQueryReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:semantic-source-query': 'bun scripts/wrong-semantic-source-query.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleSemanticSourceQueryReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:semantic-source-query'
+		);
+
 		const incompatibleLogicalGraphCompositionReportCommand = fixture();
 		write(
 			incompatibleLogicalGraphCompositionReportCommand,
@@ -3833,6 +3992,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:semantic-source-query',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:command-event-contract-overlay',
 						'csaa:analyze:guard-enforcement-ledger',
@@ -3914,6 +4074,7 @@ describe('JPWB population non-vacuity', () => {
 			...semanticPaths,
 			...readWritePaths,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
@@ -3962,6 +4123,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:semantic-source-query',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:command-event-contract-overlay',
 						'csaa:analyze:guard-enforcement-ledger',
@@ -4002,6 +4164,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/semantic/validate-snapshot.ts',
 			'packages/csaa/src/providers/typescript/extract-types.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/read-write-access-graph.ts',
@@ -4042,6 +4205,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:semantic:smoke:module-resolution-trace',
 						'csaa:analyze:arrow-command-census',
 						'csaa:analyze:command-handler-graph',
+						'csaa:analyze:semantic-source-query',
 						'csaa:analyze:command-dispatch-topology',
 						'csaa:analyze:command-event-contract-overlay',
 						'csaa:analyze:guard-enforcement-ledger',
@@ -4096,6 +4260,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
 			'packages/csaa/src/graph/validate-read-write-access-graph.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
@@ -4185,6 +4350,7 @@ describe('JPWB population non-vacuity', () => {
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 			...PROJECT_CONTEXT_REPORT_PROVENANCE,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+			...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -4435,6 +4601,17 @@ describe('JPWB population non-vacuity', () => {
 			);
 			write(root, missingModuleDependencyReportPath, 'export {};\n');
 		}
+		for (const missingSemanticSourceQueryPath of SEMANTIC_SOURCE_QUERY_PROVENANCE.filter(
+			(path) => !MODULE_DEPENDENCY_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingSemanticSourceQueryPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB TypeScript semantic-source query facade or verification source is absent: ${missingSemanticSourceQueryPath}`
+			);
+			write(root, missingSemanticSourceQueryPath, 'export {};\n');
+		}
 		for (const missingCallGraphReportPath of CALL_GRAPH_REPORT_PROVENANCE) {
 			rmSync(join(root, ...missingCallGraphReportPath.split('/')));
 			expect(() =>
@@ -4647,6 +4824,15 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) => command.owner === '.' && command.name === 'csaa:analyze:semantic-source-query'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: SEMANTIC_SOURCE_QUERY_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) =>
 					command.owner === '.' && command.name === 'csaa:analyze:logical-graph-composition'
 			)
@@ -4798,6 +4984,7 @@ describe('JPWB population non-vacuity', () => {
 				...DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...SEMANTIC_SOURCE_QUERY_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,

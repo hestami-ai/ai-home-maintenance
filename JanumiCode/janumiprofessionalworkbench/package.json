@@ -38,6 +38,7 @@
 		"csaa:analyze:state-machine-graph": "bun scripts/csaa-state-machine-graph.ts",
 		"csaa:analyze:module-dependency": "bun scripts/csaa-module-dependency.ts",
 		"csaa:analyze:logical-graph-composition": "bun scripts/csaa-logical-graph-composition.ts",
+		"csaa:analyze:semantic-source-query": "bun scripts/csaa-semantic-source-query.ts",
 		"csaa:analyze:module-resolution-trace": "bun scripts/csaa-module-resolution-trace.ts",
 		"csaa:analyze:project-context": "bun run scripts/csaa-project-context.ts",
 		"csaa:analyze:read-write-access": "bun scripts/csaa-read-write-access.ts",

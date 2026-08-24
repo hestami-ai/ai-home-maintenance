@@ -24,6 +24,8 @@ export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
 export * from './contracts/logical-graph-composition-report.js';
+export * from './contracts/semantic-source-query.js';
+export * from './contracts/semantic-source-query-report.js';
 export * from './contracts/module-resolution-trace.js';
 export * from './contracts/module-resolution-trace-report.js';
 export * from './contracts/module-dependency-report.js';
@@ -52,6 +54,14 @@ export {
 	type StaticSemanticSnapshotProgressPhase,
 	type StaticSemanticSnapshotProgressProject
 } from './semantic/build-static-semantic-snapshot.js';
+export {
+	evaluateSemanticSourceQuery,
+	evidencePairForTruth,
+	semanticQueryAnd,
+	semanticQueryNot,
+	semanticQueryOr,
+	truthForEvidencePair
+} from './query/evaluate-semantic-source-query.js';
 export { buildCallGraph } from './graph/build-call-graph.js';
 export { buildReadWriteAccessGraph } from './graph/build-read-write-access-graph.js';
 export {
@@ -187,6 +197,25 @@ export {
 	LOGICAL_GRAPH_COMPOSITION_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type LogicalGraphCompositionProgressTransportTruncation
 } from './application/logical-graph-composition-progress-jsonl.js';
+
+export {
+	runSemanticSourceQueryReport,
+	SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_SCHEMA_VERSION,
+	semanticSourceQueryReportExitCode,
+	type RunSemanticSourceQueryReportOptions,
+	type SemanticSourceQueryReportProgressEvent,
+	type SemanticSourceQueryReportProgressMetric,
+	type SemanticSourceQueryReportProgressObservation,
+	type SemanticSourceQueryReportProgressPhase
+} from './application/run-semantic-source-query-report.js';
+
+export {
+	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES,
+	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS,
+	SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type SemanticSourceQueryProgressTransportTruncation
+} from './application/semantic-source-query-progress-jsonl.js';
 
 export {
 	arrowCommandCensusReportExitCode,

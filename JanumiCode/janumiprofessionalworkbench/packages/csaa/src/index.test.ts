@@ -189,6 +189,20 @@ import {
 	SEMANTIC_OPERATION_VERSION,
 	SEMANTIC_REQUEST_SCHEMA_VERSION,
 	SEMANTIC_SNAPSHOT_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION,
+	SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS,
+	SEMANTIC_SOURCE_QUERY_EXECUTION_MODE,
+	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES,
+	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS,
+	SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION,
+	SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION,
 	STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_OPERATION_VERSION,
 	STATE_MACHINE_GRAPH_PROGRESS_MAX_BYTES,
@@ -278,6 +292,14 @@ import {
 	runStateMachineGraphReport,
 	stateMachineGraphReportExitCode,
 	buildStaticSemanticSnapshot,
+	evaluateSemanticSourceQuery,
+	evidencePairForTruth,
+	runSemanticSourceQueryReport,
+	semanticQueryAnd,
+	semanticQueryNot,
+	semanticQueryOr,
+	semanticSourceQueryReportExitCode,
+	truthForEvidencePair,
 	runCallGraphReport,
 	canonicalSemanticJson,
 	canonicalSemanticJsonWitness,
@@ -436,6 +458,18 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty(
 			'validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors'
 		);
+		expect(evaluateSemanticSourceQuery).toBeTypeOf('function');
+		expect(evidencePairForTruth).toBeTypeOf('function');
+		expect(truthForEvidencePair).toBeTypeOf('function');
+		expect(semanticQueryNot).toBeTypeOf('function');
+		expect(semanticQueryAnd).toBeTypeOf('function');
+		expect(semanticQueryOr).toBeTypeOf('function');
+		expect(runSemanticSourceQueryReport).toBeTypeOf('function');
+		expect(semanticSourceQueryReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('admitSemanticSourceQueryReportRequest');
+		expect(publicSurface).not.toHaveProperty('createSemanticSourceQueryProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runSemanticSourceQueryCommand');
+		expect(publicSurface).not.toHaveProperty('runSemanticSourceQueryReportWithDependencies');
 		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(runProjectContextReport).toBeTypeOf('function');
 		expect(projectContextReportExitCode).toBeTypeOf('function');
@@ -1019,6 +1053,39 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_EVENTS).toBe(2_048);
+		expect(SEMANTIC_SOURCE_QUERY_OPERATION_VERSION).toBe(
+			'jan-csaa-semantic-source-query-core/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION).toBe('jan-csaa-four-valued-evidence-pair/0.1.0');
+		expect(SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS).toBe('IMPLEMENTATION_LOCAL_UNREGISTERED');
+		expect(SEMANTIC_SOURCE_QUERY_EXECUTION_MODE).toBe('COMPLETE');
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-semantic-source-query/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-semantic-source-query-report-request/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-semantic-source-query-report-result/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-semantic-source-query-report/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-semantic-source-query-report-progress/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS).toEqual({
+			dwp005Dwp006OrG5Completion: 'NOT_CLAIMED',
+			facadeNonclaims: SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS,
+			janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+			runtimeOutcomeInvariance: 'NOT_CLAIMED',
+			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+		});
+		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-semantic-source-query-progress-transport/0.1.0'
+		);
+		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(PROJECT_CONTEXT_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-project-context-graph/0.1.0'
 		);
