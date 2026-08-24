@@ -25452,3 +25452,163 @@ Both entries were adversarially verified and both were amended.
   (`:2711-2731`), whose *"It is satisfied by absence, which is not the same as enforced"* would cease
   to be true of this limb. On a NO: the `RPH-PRJ-004` cross-reference REG-F-209 already owes. Status:
   OPEN.
+
+---
+
+## The register's own drafting habit, measured
+
+`REG-F-272` corrected one clause that asserted a sibling row's census bookkeeping. This entry is the
+general form it asked for — and it supersedes a clause of REG-F-272 itself, because that entry's tenth
+example was misdiagnosed.
+
+⚠ **REG-F-272 warned against exactly the mistake the first draft of this entry made.** At `:25136-25139`
+it says *"No exact partition is asserted here; an entry that needs one must re-derive it and publish its
+splitter."* The first draft asserted a per-batch table of 76 anyway. Two independently written extractors
+then returned 41, 71, 109, 137 and 53 for the same corpus — **the number is a function of the scope rule
+and nothing else** — and every limb-id-anchored count is an **undercount by construction**, because
+entries name siblings in shorthand (`limb:DEC-4:1`, `:2` and `:6`) that no such extractor can see.
+
+**The denominator is withdrawn. The numerator is eight, each read at its line and verified against the
+census at HEAD.**
+
+### REG-F-273 — the W-3b filing passes taught the register to cite a sibling row's census bookkeeping,
+and EIGHT such claims are already false at HEAD in an artifact that forbids correcting them
+
+**Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes one clause
+each of **REG-F-235**, **REG-F-237** and **REG-Q-062**, **two** clauses of **REG-F-236**, and one clause
+of **REG-F-272** (its *"the tenth is not `NEAR_MISS`"*), without re-opening any of their findings ·
+**Status:** OPEN
+
+- **THE DEFECT, IN ONE PARAGRAPH.** `REG-F-272` corrected one clause of `REG-F-234` that asserted a
+  sibling row's bookkeeping — *"is scored UNENFORCED_DEAD_PREDICATE … and is filed NEAR_MISS"* —
+  true when written, falsified twice since. **That was not a one-off.** The practice of citing another
+  row's ARM WORD or FILING STATUS inside an entry was introduced by this programme's own filing passes,
+  and it produces claims with an expiry date in an artifact whose `changeProcedure` (`:19`) reads
+  *"Entries are never destructively edited; a correction is a superseding entry citing the entry it
+  supersedes."*
+
+- **⚠ THE NUMERATOR IS DERIVED FROM THE LEDGER'S HISTORY, NOT FROM A TEXT WINDOW — WHICH IS WHY IT IS
+  EXACT.** An earlier draft counted the population with a `limb:XXX:N`-within-500-characters heuristic,
+  reported **76** claims and **4** false ones, and both figures were wrong. The instrument was replaced.
+  `filing` was a five-valued field; `git show 857128a7:…/invariant-verdicts.ndjson` gives
+  `FILED 208 · NEAR_MISS 21 · NOT_APPLICABLE 78`, and the very next revision, **`a4a19057`** (*"V-7: the
+  near misses are filed, and the filing debt reaches zero"*), gives `FILED 229 · NOT_APPLICABLE 78`.
+  **One commit discharged all 21 `NEAR_MISS` rows.** So the false claims are not searched for — they are
+  *enumerated*: take the 21 ids, grep each in this register, and keep every assertion made by an entry
+  that is not itself that limb's filing. **That derivation has no window parameter, and it terminates.**
+
+- **THE EIGHT STALE CLAIMS, EACH READ AT ITS LINE, ALL VERIFIED AGAINST HEAD.**
+  - **`REG-F-234` on `limb:REL-2:3`** (`:12291-12294`) — *"is scored UNENFORCED_DEAD_PREDICATE … and is
+    filed NEAR_MISS against REG-F-203"*. Now `UNENFORCED_OBSERVED_ADMISSION` / `FILED` / **REG-F-258**.
+    **Already superseded by REG-F-272**; recorded here for completeness, not re-corrected. The only one
+    of the eight falsified by BOTH mechanisms — an arm re-scoring and a filing pass.
+  - **`REG-F-235` on `limb:ASR-9:10`** (`:12528-12533`) — *"is a NEAR_MISS against REG-F-228's component
+    (4)"*. Now `FILED`, closed by **REG-Q-067**.
+  - **`REG-F-235` on `limb:ASR-9:5`** (`:12533-12534`) — *"(evidence content never inferred) is a
+    NEAR_MISS against ledger `:291-294`"*. Now `FILED`, closed by **REG-F-260** — **the entry that
+    quotes this very clause back at `:19904` while being the filing that falsifies it.**
+  - **`REG-F-236` on `limb:DEC-4:1`, `limb:DEC-4:2` and `limb:DEC-4:6`** — *"Siblings … are recorded
+    NEAR_MISS against `RPH-CNS-001`/`REG-F-006`/`RPH-CNS-002`"*. **Three limbs, and the clause appears
+    TWICE**: at `:12709-12711` in full ids, and again at `:12813-12814` in shorthand (*"`:1`, `:2`, `:6`
+    recorded NEAR_MISS"*). All three are now `FILED` — by **REG-F-255**, **REG-F-256** and **REG-F-257**
+    respectively, the three entries that each quote the `:12709` clause as their own reason for existing.
+  - **`REG-F-237` on `limb:ASR-14:3`** (`:13184`) — *"`:3` on WHEN it expires (a NEAR_MISS at
+    RPH-GOV-006, `enforcement-register.ts:3748-3781`, **not a filing** — the four FILED siblings are
+    `:1`, `:2`, `:4`, `:6`)"*. Now `FILED`, closed by **REG-F-247**; the four FILED siblings are five.
+  - **`REG-Q-062` on `limb:PER-12:4`** (`:15974`) — *"is NEAR_MISS against **REG-F-230**"*. Now `FILED`,
+    closed by **REG-F-249**. ⚠ The underlying observation survives — REG-F-230 does rule PER-12 out of
+    its own scope at `:10345-10347`, and that sentence is still true. **Only the status word is false.**
+
+- **⚠ THE THREE FAILURE MODES OF A LIMB-ID WINDOW, AND THE THIRD ONE CORRECTS REG-F-272.** The
+  discarded heuristic flagged tens of candidates; read in context, almost all were artifacts. The
+  failure modes are kept because each will recur in any future sweep of this register:
+  1. **SENTENCE-BOUNDARY ATTACHMENT.** The arm word scores a *different* limb in the same sentence —
+    usually the entry's own. `REG-Q-058:15233-15236` reads *"`limb:OBJ-2:1` … is scored ENFORCED_DRIVEN
+    and needs no filing; `limb:OBJ-2:2` and `limb:OBJ-2:5` are already closed by REG-F-209"*. The arm
+    belongs to OBJ-2:1 — **verified `ENFORCED_DRIVEN` / `NOT_APPLICABLE` at HEAD** — and what is said of
+    the other two is a FILING claim that is **true** (both `filed_entry: REG-F-209`).
+  2. **A QUOTATION IS NOT AN ASSERTION.** `REG-F-255:18492`, `REG-F-256:18790`, `REG-F-257:19085`,
+    `REG-F-260:19904` and `REG-Q-067:21429` all reproduce the clause they falsify, verbatim, as their
+    reason for existing. Reporting what another entry says, accurately, is not making its claim.
+  3. **⚠ THE LADDER SPLIT MADE A CORRECT ENTRY LOOK WRONG TO TWO SUCCESSIVE INSTRUMENTS.** `REG-Q-053`
+    at `:11186-11189` says `limb:REL-1:6` *"sits on a different arm (`PARTIAL_DIVERGENT_FILED`,
+    refutation HELD)"*. **REG-F-272 at `:25141-25145` names this as the tenth false claim and the one
+    falsified by an arm re-scoring. It is not false, and this entry supersedes that clause.** Traced
+    through all 24 revisions of `invariant-verdicts.ndjson`: the row reached
+    `PARTIAL_DIVERGENT_FILED` at **`2dff1d42`** (superseding `DIVERGENT_UNFILED`) and has not moved
+    since; **`f63c4b00`**, the V-4 ladder split, rewrote it as `verdict: PARTIAL` + `filing: FILED` and
+    preserved `verdict_before_migration: PARTIAL_DIVERGENT_FILED`. The `superseded_verdict: DIVERGENT`
+    REG-F-272 reads as the re-scoring is the **pre-split** `DIVERGENT_UNFILED` renamed by the same
+    migration. `DESIGN-invariant-enforcement-mapping.md:283-291` settles it in terms: the two composite
+    arms *"are one enforcement verdict crossed with one filing status"*. The mapping is bijective in the
+    data — **61 rows carry `PARTIAL`, the same 61 carry `verdict_before_migration:
+    PARTIAL_DIVERGENT_FILED`, and no other row does.** REG-F-272's derivation parsed `verdict`,
+    `superseded_verdict` and `filing` and **never read `verdict_before_migration`**, which is the field
+    that holds the composite. **A migration does not only orphan the fields it moves; it invalidates
+    every later comparison that does not know the migration happened — twice, here.**
+
+- **⚠ WHAT IS NOT CLAIMED: THERE IS NO DENOMINATOR, AND ASSERTING ONE WAS THE EARLIER DRAFT'S REAL
+  ERROR.** Two independent extractors were written — one sentence-scoped and anchored on the bookkeeping
+  tokens, one character-windowed — and the sibling-claim population they report is **41 at an 80-char
+  window, 71 at 150, 109 at 300, 137 at 500, and 53 sentence-scoped**. The number is a function of the
+  scope rule and nothing else. REG-F-272 said so first, at `:25132-25139` (*"27-28 sentences … 17-22 name
+  a SIBLING row … No exact partition is asserted here"*), and the earlier draft published a table of
+  **76** anyway. ⚠ **Worse, every limb-id-anchored population is an undercount by construction:** two of
+  the eight false claims above (`REG-F-236:12813`, `REG-F-237:13184`) refer to their siblings in
+  SHORTHAND — `:1`, `:2`, `:6`, `:3` — and no `limb:XXX:N` extractor can see them.
+  **The finding is the eight and the mechanism, not a rate.**
+
+- **THE SHAPE, WHICH *IS* STABLE, AND ONE CLAIM IT WILL NOT CARRY.** Across all ten parameterizations of
+  both extractors, entries filed **before REG-F-203 return ZERO** sibling census claims — with
+  `limb:` occurring 3 times in that region as a positive control (all three unrelated: a §11.4.2 quote, a
+  *"version limb"*, a heading) and `NEAR_MISS` 0 there against 39 after. The claims cluster in
+  REG-F-234..245 / REG-Q-058..062 and REG-F-246..262 / REG-Q-063..069 under every setting.
+  ⚠ **But the zero is a fact about the W-3b census vocabulary, not about the register's habits, and it
+  must not be read as *"the register did not rot until this programme."*** The habit of asserting another
+  record's mutable status is older: **REG-F-016** (`:663`, 2026-08-03) states *"`RPH-DEC-004` was
+  disclosed UNENFORCED with a `DEAD_PREDICATE` guard"*, and `:1286` states `RPH-EVD-001`
+  `UNENFORCED_DISCLOSED` — both about `enforcement-register.ts`'s `kind` field, and **both still true at
+  HEAD**, checked. **And two pre-programme entries already carry a mutable-ledger value that is FALSE at
+  HEAD:** `REG-F-072:2255` (*"`UNENFORCED 44 · ARROW_UNREACHABLE 22 · ENFORCED 14 ·
+  REDUNDANT_WITH_MACHINE 2`"*) and `REG-F-134:3564` (the same four figures in a table), against
+  `verif/guard-enforcement-ledger.test.ts:59-62`, which pins **`ARROW_UNREACHABLE 20 · ENFORCED 18 ·
+  REDUNDANT_WITH_MACHINE 2 · UNENFORCED 42`** at HEAD. **What this programme introduced is the volume and
+  the speed, not the class** — and the class predates it by three weeks.
+
+- **WHY THIS IS A RECORD FINDING AND NOT A REPAIR.** None of the five entries' FINDINGS are affected —
+  each concerns a different subject from the sibling it mis-scores, and each remains correct on its own
+  limb: REG-F-235 closes `limb:ASR-9:9` (residual→obligation conversion), REG-F-236 closes
+  `limb:DEC-4:7` (the assumption plane), REG-F-237 closes `limb:ASR-14:5` (what kind of finding a waiver
+  waives), REG-Q-062 closes `limb:PER-12:3` (a procurement permission inverted into an obligation), and
+  REG-F-272's own finding — that an append-only artifact must not assert a mutable ledger's value —
+  stands and is strengthened by this entry, which corrects only its example. What is wrong in each case
+  is a bookkeeping clause used to justify *"it closes nothing else"*. **The entries are not re-opened
+  and their closures are not disturbed.**
+
+- **THE REMEDY IS A DRAFTING RULE, NOT A SWEEP.** Three parts, the first two restating REG-F-272's
+  proposal at `:25150-25158` rather than inventing it:
+  1. **An entry may cite a sibling's SUBSTANCE and must not cite its BOOKKEEPING.** *"A different
+    mechanism — the dead type table"* survives any re-score. *"Is scored UNENFORCED_DEAD_PREDICATE"* does
+    not, and it is the census file's job to say so.
+  2. **Where the arm is genuinely load-bearing for a distinction, DATE IT** — *"scored X as at
+    `<commit>`"* — so a later reader knows to re-check rather than to trust.
+  3. **The census row is the reconcilable record; the register is not.** `invariant-verdicts.ndjson` is
+    edited in place by design and `verif/invariant-verdict-census.test.ts` reconciles it against this
+    register. An entry that duplicates census state creates a second copy that **cannot** be reconciled,
+    because it cannot be edited.
+
+- **RECONCILIATION — WHAT THIS ENTRY CLOSES:** no census limb. It supersedes ONE CLAUSE each in
+  `REG-F-235`, `REG-F-237` and `REG-Q-062`, **TWO** in `REG-F-236` (`:12709-12711` and `:12813-12814`,
+  the second in shorthand), one in `REG-F-272` (its identification of `REG-Q-053`/`limb:REL-1:6` as a
+  false claim), and records `REG-F-234`'s clause as already superseded by `REG-F-272`. It closes no limb
+  because the defect is in the register's drafting habit, not in the engine.
+
+- **Merge target:** **Corpus** — the drafting rule belongs in `JPWB-DOC-004` (agent conduct) or in this
+  register's §1 entry discipline, whichever the sponsor prefers; it is a rule about how entries are
+  written, not about what the engine does. Following REG-F-272's own pointer precedent, this entry
+  CLOSES when a one-line *"⚠ SUPERSEDED IN PART"* pointer is appended at the END of the bullet holding
+  each corrected clause — the six sites being `REG-F-235:12528-12534`, `REG-F-236:12709-12711` and
+  `:12813-12814`, `REG-F-237:13184-13185` and `REG-Q-062:15974-15976` — since a superseding entry with
+  no pointer never reaches the reader it exists to protect. ⚠ Each pointer must itself obey the rule
+  above: name the closing ENTRY ID and the mechanism, never the new arm word.
+  No repository change; the ledger is correct at HEAD and it is the register that trails it. Status: OPEN.
