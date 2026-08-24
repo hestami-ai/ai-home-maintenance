@@ -272,6 +272,7 @@ import {
 	SEMANTIC_SOURCE_QUERY_FIELDS,
 	SEMANTIC_SOURCE_QUERY_NONCLAIMS,
 	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_OPERATORS,
 	SEMANTIC_SOURCE_QUERY_POPULATION
 } from '../contracts/semantic-source-query.js';
 import {
@@ -985,6 +986,7 @@ describe('inventory discovery and identity', () => {
 			SEMANTIC_SOURCE_QUERY_EXECUTION_MODE,
 			SEMANTIC_SOURCE_QUERY_POPULATION,
 			JSON.stringify(SEMANTIC_SOURCE_QUERY_FIELDS),
+			JSON.stringify(SEMANTIC_SOURCE_QUERY_OPERATORS),
 			SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION,
 			SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION,
 			SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION,
@@ -994,7 +996,8 @@ describe('inventory discovery and identity', () => {
 			`analysis authority ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY}`,
 			`authority transfer ${SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER}`,
 			`gate effect ${SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT}`,
-			'equality plus unary NOT and nonempty ordered AND/OR',
+			'exact scalar equality, exact nonempty case-sensitive logicalPath prefix comparison, unary NOT, and nonempty ordered AND/OR',
+			'no path normalization, globbing, regular-expression matching, or path-segment inference',
 			'Whole-AST validation precedes COMPLETE node-total evaluation',
 			'CLOSED_FOR_RETAINED_VALIDATED_SEMANTIC_SOURCES',
 			'OPEN global closure',
@@ -2210,7 +2213,7 @@ describe('inventory discovery and identity', () => {
 			`preliminary semantic-source-query report facade exposes one explicitly selected retained ${SEMANTIC_SOURCE_QUERY_POPULATION} population`
 		);
 		expect(semanticBoundary).toContain(
-			'exact T/F/U/C equality plus unary NOT and nonempty ordered AND/OR semantics'
+			'exact T/F/U/C equality, exact nonempty case-sensitive logicalPath prefix comparison with no path normalization/glob/regex/segment inference, unary NOT, and nonempty ordered AND/OR semantics'
 		);
 		expect(semanticBoundary).toContain(
 			'whole-AST validation, COMPLETE-only node-total evaluation, applicability partitions, and all six independent epistemic dimensions'

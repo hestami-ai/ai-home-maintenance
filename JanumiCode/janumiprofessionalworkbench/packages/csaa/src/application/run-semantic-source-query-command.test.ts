@@ -48,7 +48,7 @@ function progressEvent(): SemanticSourceQueryReportProgressEvent {
 		phase: 'RESULT',
 		protocolRole: 'PRELIMINARY_SEMANTIC_SOURCE_QUERY_REPORT_TELEMETRY',
 		reportIdentityEffect: 'EXCLUDED_FROM_REPORT_IDENTITY',
-		schemaVersion: 'jan-csaa-semantic-source-query-report-progress/0.1.0',
+		schemaVersion: 'jan-csaa-semantic-source-query-report-progress/0.2.0',
 		sequence: 1,
 		stage: 'RESULT',
 		state: 'COMPLETED'
@@ -68,7 +68,7 @@ function partial(): SemanticSourceQueryReportOutcome {
 			partitions: { supportedMatches: ['semantic-source:synthetic'] },
 			population: { retainedRecords: 1 }
 		},
-		schemaVersion: 'jan-csaa-semantic-source-query-report/0.1.0',
+		schemaVersion: 'jan-csaa-semantic-source-query-report/0.2.0',
 		stageOutcomes: {},
 		state: 'partial',
 		subject: { subjectId: 'subject:synthetic-semantic-source-query' }
@@ -87,7 +87,7 @@ function unavailable(
 		gateEffect: 'NONE',
 		operationVersion: SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION,
 		outcome: 'unavailable',
-		schemaVersion: 'jan-csaa-semantic-source-query-report/0.1.0',
+		schemaVersion: 'jan-csaa-semantic-source-query-report/0.2.0',
 		stage: 'RESULT',
 		state
 	} as unknown as SemanticSourceQueryReportOutcome;
@@ -119,9 +119,9 @@ function acceptedRequest(
 	],
 	expression: Record<string, unknown> = {
 		field: 'logicalPath',
-		kind: 'EQUALS',
+		kind: 'LOGICAL_PATH_STARTS_WITH',
 		nodeId: 'fixture-alpha',
-		value: 'packages/csaa/test-fixtures/project-context-command/left/src/alpha.ts'
+		value: 'packages/csaa/test-fixtures/project-context-command/left/src/alpha'
 	}
 ): Record<string, unknown> {
 	return {

@@ -193,6 +193,7 @@ import {
 	SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS,
 	SEMANTIC_SOURCE_QUERY_EXECUTION_MODE,
 	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_OPERATORS,
 	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES,
 	SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS,
 	SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION,
@@ -1054,25 +1055,32 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(SEMANTIC_SOURCE_QUERY_OPERATION_VERSION).toBe(
-			'jan-csaa-semantic-source-query-core/0.1.0'
+			'jan-csaa-semantic-source-query-core/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION).toBe('jan-csaa-four-valued-evidence-pair/0.1.0');
 		expect(SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS).toBe('IMPLEMENTATION_LOCAL_UNREGISTERED');
 		expect(SEMANTIC_SOURCE_QUERY_EXECUTION_MODE).toBe('COMPLETE');
+		expect(SEMANTIC_SOURCE_QUERY_OPERATORS).toEqual([
+			'EQUALS',
+			'LOGICAL_PATH_STARTS_WITH',
+			'NOT',
+			'AND',
+			'OR'
+		]);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION).toBe(
-			'jan-csaa-report-semantic-source-query/0.1.0'
+			'jan-csaa-report-semantic-source-query/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
-			'jan-csaa-semantic-source-query-report-request/0.1.0'
+			'jan-csaa-semantic-source-query-report-request/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION).toBe(
-			'jan-csaa-semantic-source-query-report-result/0.1.0'
+			'jan-csaa-semantic-source-query-report-result/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION).toBe(
-			'jan-csaa-semantic-source-query-report/0.1.0'
+			'jan-csaa-semantic-source-query-report/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
-			'jan-csaa-semantic-source-query-report-progress/0.1.0'
+			'jan-csaa-semantic-source-query-report-progress/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS).toEqual({
 			dwp005Dwp006OrG5Completion: 'NOT_CLAIMED',
@@ -1082,7 +1090,7 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
 		});
 		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
-			'jan-csaa-semantic-source-query-progress-transport/0.1.0'
+			'jan-csaa-semantic-source-query-progress-transport/0.2.0'
 		);
 		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS).toBe(2_048);

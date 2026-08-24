@@ -9,6 +9,7 @@ import {
 	SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS,
 	SEMANTIC_SOURCE_QUERY_NONCLAIMS,
 	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_OPERATORS,
 	SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS,
 	type SemanticSourceQueryBudgets,
 	type SemanticSourceQueryExpression,
@@ -22,17 +23,17 @@ import { PROJECT_CONTEXT_REPORT_SAFETY_CEILINGS } from './project-context-report
 
 /**
  * Preliminary implementation-local facade over one fixed SEMANTIC_SOURCE population and exact
- * four-valued equality-expression core. It is deliberately not a registered query operation or
+ * four-valued equality/logical-path-prefix expression core. It is deliberately not a registered query operation or
  * evidence that CAP-029, DWP-005, DWP-006, or G5 is complete.
  */
 export const SEMANTIC_SOURCE_QUERY_REPORT_REQUEST_SCHEMA_VERSION =
-	'jan-csaa-semantic-source-query-report-request/0.1.0' as const;
+	'jan-csaa-semantic-source-query-report-request/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_SCHEMA_VERSION =
-	'jan-csaa-semantic-source-query-report/0.1.0' as const;
+	'jan-csaa-semantic-source-query-report/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_RESULT_SCHEMA_VERSION =
-	'jan-csaa-semantic-source-query-report-result/0.1.0' as const;
+	'jan-csaa-semantic-source-query-report-result/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_OPERATION_VERSION =
-	'jan-csaa-report-semantic-source-query/0.1.0' as const;
+	'jan-csaa-report-semantic-source-query/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY = 'NONE' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_AUTHORITY_TRANSFER = 'NONE' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_GATE_EFFECT = 'NONE' as const;
@@ -49,7 +50,8 @@ export const SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS = Object.freeze([
 	'JAN_CSAA_007_REGISTERED_OPERATION_OR_OPERATION_RESPONSE_ENVELOPE',
 	'FULL_JAN_CSAA_007_008_009_010_OR_011_CONFORMANCE',
 	'RULE_FINDING_SEVERITY_GATE_REMEDIATION_OR_DISPOSITION_AUTHORITY',
-	'QUERY_FORMS_BEYOND_FIXED_SEMANTIC_SOURCE_EQUALITY_NOT_AND_OR',
+	'QUERY_FORMS_BEYOND_FIXED_SEMANTIC_SOURCE_EQUALITY_LOGICAL_PATH_PREFIX_NOT_AND_OR',
+	'PATH_NORMALIZATION_GLOB_REGULAR_EXPRESSION_OR_PATH_SEGMENT_INFERENCE',
 	'SHORT_CIRCUIT_EVALUATION',
 	'QUANTIFICATION_TRAVERSAL_JOIN_AGGREGATION_ORDERING_OR_PAGING',
 	'GRAPH_SLICE_CHANGE_IMPACT_OR_SEMANTIC_COMPARISON',
@@ -170,10 +172,10 @@ export interface SemanticSourceQueryReportDefinition {
 	readonly ordering: 'STATIC_SEMANTIC_SNAPSHOT_SOURCE_ORDER';
 	readonly population: 'SEMANTIC_SOURCE';
 	readonly prerequisiteCapabilities: readonly ['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'];
-	readonly purpose: 'BOUNDED_STATIC_SOURCE_METADATA_EQUALITY_FILTER';
+	readonly purpose: 'BOUNDED_STATIC_SOURCE_METADATA_SCALAR_FILTER';
 	readonly registeredFields: readonly SemanticSourceQueryField[];
-	readonly registeredOperators: readonly ['EQUALS', 'NOT', 'AND', 'OR'];
-	readonly version: '0.1.0';
+	readonly registeredOperators: typeof SEMANTIC_SOURCE_QUERY_OPERATORS;
+	readonly version: '0.2.0';
 }
 
 export interface SemanticSourceQueryReportReference {
@@ -247,7 +249,7 @@ export interface SemanticSourceQueryReportResult {
 		readonly queryReferenceId: string;
 		readonly queryResultId: string;
 	};
-	readonly interpretation: 'BOUNDED_STATIC_SEMANTIC_SOURCE_EQUALITY_QUERY';
+	readonly interpretation: 'BOUNDED_STATIC_SEMANTIC_SOURCE_SCALAR_QUERY';
 	readonly limitations: {
 		readonly semanticSnapshot: readonly SemanticLimitation[];
 		readonly zeroSupportedMatchesGlobalAbsence: 'NOT_SUPPORTED';

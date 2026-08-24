@@ -7,7 +7,7 @@ import {
 } from './run-semantic-source-query-report.js';
 
 export const SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION =
-	'jan-csaa-semantic-source-query-progress-transport/0.1.0' as const;
+	'jan-csaa-semantic-source-query-progress-transport/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_BYTES = 8 * 1024 * 1024;
 export const SEMANTIC_SOURCE_QUERY_PROGRESS_MAX_EVENTS = 2_048;
 

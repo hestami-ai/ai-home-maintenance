@@ -38,6 +38,7 @@ import {
 	SEMANTIC_SOURCE_QUERY_FIELDS,
 	SEMANTIC_SOURCE_QUERY_NONCLAIMS,
 	SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
+	SEMANTIC_SOURCE_QUERY_OPERATORS,
 	SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS,
 	type SemanticSourceQueryBudgets,
 	type SemanticSourceQueryEvaluation,
@@ -113,7 +114,6 @@ const SUBJECT_BUDGET_KEYS = [
 	'maxProjects'
 ] as const satisfies readonly (keyof SubjectBudgets)[];
 const BASE_SEMANTIC_CAPABILITIES = Object.freeze(['TS_PROJECT', 'TS_SYMBOL', 'TS_SYNTAX'] as const);
-const REGISTERED_OPERATORS = Object.freeze(['EQUALS', 'NOT', 'AND', 'OR'] as const);
 const MAX_DIAGNOSTIC_PATH_CHARACTERS = 10_000;
 
 interface SemanticSourceQueryReportAdmission {
@@ -124,7 +124,7 @@ interface SemanticSourceQueryReportAdmission {
 }
 
 export const SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_SCHEMA_VERSION =
-	'jan-csaa-semantic-source-query-report-progress/0.1.0' as const;
+	'jan-csaa-semantic-source-query-report-progress/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS = Object.freeze({
 	dwp005Dwp006OrG5Completion: 'NOT_CLAIMED',
 	facadeNonclaims: SEMANTIC_SOURCE_QUERY_REPORT_NONCLAIMS,
@@ -847,10 +847,10 @@ function queryDefinition(
 		ordering: 'STATIC_SEMANTIC_SNAPSHOT_SOURCE_ORDER' as const,
 		population: 'SEMANTIC_SOURCE' as const,
 		prerequisiteCapabilities: BASE_SEMANTIC_CAPABILITIES,
-		purpose: 'BOUNDED_STATIC_SOURCE_METADATA_EQUALITY_FILTER' as const,
+		purpose: 'BOUNDED_STATIC_SOURCE_METADATA_SCALAR_FILTER' as const,
 		registeredFields: SEMANTIC_SOURCE_QUERY_FIELDS,
-		registeredOperators: REGISTERED_OPERATORS,
-		version: '0.1.0' as const
+		registeredOperators: SEMANTIC_SOURCE_QUERY_OPERATORS,
+		version: '0.2.0' as const
 	};
 	return {
 		...preimage,
@@ -1679,7 +1679,7 @@ async function runInternal(
 				queryReferenceId: detachedEvidence.reference.id,
 				queryResultId: detachedEvidence.resultOccurrence.id
 			},
-			interpretation: 'BOUNDED_STATIC_SEMANTIC_SOURCE_EQUALITY_QUERY',
+			interpretation: 'BOUNDED_STATIC_SEMANTIC_SOURCE_SCALAR_QUERY',
 			limitations: {
 				semanticSnapshot: detachedEvidence.semanticLimitations,
 				zeroSupportedMatchesGlobalAbsence: 'NOT_SUPPORTED'

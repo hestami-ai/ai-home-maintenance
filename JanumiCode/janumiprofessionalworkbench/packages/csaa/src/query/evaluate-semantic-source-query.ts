@@ -27,6 +27,7 @@ import {
 	type SemanticSourceQueryLeafEvaluator,
 	type SemanticSourceQueryNormalizedEqualityNode,
 	type SemanticSourceQueryNormalizedExpression,
+	type SemanticSourceQueryNormalizedLogicalPathStartsWithNode,
 	type SemanticSourceQueryNormalizedNode,
 	type SemanticSourceQueryRecord,
 	type SemanticSourceQueryRecordResult,
@@ -435,6 +436,33 @@ function normalizeExpression(root: unknown, budgets: SemanticSourceQueryBudgets)
 				children = [];
 				break;
 			}
+			case 'LOGICAL_PATH_STARTS_WITH': {
+				assertExactKeys(
+					inspected,
+					['field', 'kind', 'nodeId', 'value'],
+					[],
+					'AST_INVALID',
+					'VALIDATE_AST',
+					'A LOGICAL_PATH_STARTS_WITH node must contain exactly field, kind, nodeId, and value.'
+				);
+				if (inspected.values.get('field') !== 'logicalPath')
+					refuse(
+						'AST_INVALID',
+						'VALIDATE_AST',
+						'A LOGICAL_PATH_STARTS_WITH node is restricted to the logicalPath field.'
+					);
+				field = 'logicalPath';
+				const value = inspected.values.get('value');
+				if (!boundedString(value) || value.length === 0)
+					refuse(
+						'AST_INVALID',
+						'VALIDATE_AST',
+						'A LOGICAL_PATH_STARTS_WITH value must be a nonempty bounded Unicode-scalar string.'
+					);
+				scalar = value;
+				children = [];
+				break;
+			}
 			case 'NOT':
 				assertExactKeys(
 					inspected,
@@ -471,7 +499,11 @@ function normalizeExpression(root: unknown, budgets: SemanticSourceQueryBudgets)
 					);
 				break;
 			default:
-				refuse('AST_INVALID', 'VALIDATE_AST', 'Expression kind must be EQUALS, NOT, AND, or OR.');
+				refuse(
+					'AST_INVALID',
+					'VALIDATE_AST',
+					'Expression kind must be EQUALS, LOGICAL_PATH_STARTS_WITH, NOT, AND, or OR.'
+				);
 		}
 
 		const ordinal = nodes.length;
@@ -508,6 +540,14 @@ function normalizeExpression(root: unknown, budgets: SemanticSourceQueryBudgets)
 				kind: 'EQUALS' as const,
 				value: node.value!
 			} as SemanticSourceQueryNormalizedEqualityNode;
+		if (node.kind === 'LOGICAL_PATH_STARTS_WITH')
+			return {
+				...base,
+				childNodeIds: [] as const,
+				field: 'logicalPath' as const,
+				kind: 'LOGICAL_PATH_STARTS_WITH' as const,
+				value: node.value!
+			} as SemanticSourceQueryNormalizedLogicalPathStartsWithNode;
 		if (node.kind === 'NOT')
 			return { ...base, childNodeIds: base.childNodeIds as [string], kind: 'NOT' };
 		if (node.kind === 'AND')
@@ -924,7 +964,9 @@ export function semanticQueryOr(
 }
 
 function defaultLeafEvaluation(
-	expression: SemanticSourceQueryNormalizedEqualityNode,
+	expression:
+		| SemanticSourceQueryNormalizedEqualityNode
+		| SemanticSourceQueryNormalizedLogicalPathStartsWithNode,
 	record: SemanticSourceQueryRecord
 ): SemanticSourceQueryApplicableLeafEvaluation {
 	const fieldValue = (record as unknown as Record<SemanticSourceQueryField, unknown>)[
@@ -935,6 +977,10 @@ function defaultLeafEvaluation(
 		`semantic-provenance:${record.provenanceId}`,
 		`semantic-source-field:${expression.field}`
 	];
+	const supported =
+		expression.kind === 'EQUALS'
+			? Object.is(fieldValue, expression.value)
+			: record.logicalPath.startsWith(expression.value);
 	return {
 		disposition: 'applicable-result',
 		epistemic: {
@@ -944,16 +990,19 @@ function defaultLeafEvaluation(
 			freshness: 'unknown',
 			inference: 'direct',
 			rationale:
-				'The registered scalar equality was evaluated directly over a retained SemanticSourceRecord; snapshot currentness is intentionally not asserted by this core.',
+				'The registered scalar predicate was evaluated directly over a retained SemanticSourceRecord; snapshot currentness is intentionally not asserted by this core.',
 			supportBasis: {
 				kind: 'direct-extraction',
-				method: SEMANTIC_SOURCE_QUERY_OPERATION_VERSION,
-				rationale: 'The compared scalar is an explicit SemanticSourceRecord data property.',
+				method: `${SEMANTIC_SOURCE_QUERY_OPERATION_VERSION}:${expression.kind}`,
+				rationale:
+					expression.kind === 'EQUALS'
+						? 'The compared scalar is an explicit SemanticSourceRecord data property.'
+						: 'The retained logicalPath was compared to the exact nonempty case-sensitive prefix without normalization, globbing, regular-expression matching, or path-segment inference.',
 				sourceRefs: evidenceRefs
 			},
 			unresolvedRegions: ['snapshot-currentness-not-bound-in-query-core']
 		},
-		evidencePair: evidencePairForTruth(Object.is(fieldValue, expression.value) ? 'T' : 'F'),
+		evidencePair: evidencePairForTruth(supported ? 'T' : 'F'),
 		evidenceRefs
 	};
 }
@@ -1137,11 +1186,13 @@ function evaluateRecord(
 	// deterministic left-to-right, independent of the post-order composition pass.
 	for (let ordinal = 0; ordinal < ast.nodes.length; ordinal += 1) {
 		const node = ast.nodes[ordinal]!;
-		if (node.kind !== 'EQUALS') continue;
+		if (node.kind !== 'EQUALS' && node.kind !== 'LOGICAL_PATH_STARTS_WITH') continue;
 		const publicNode = ast.expression.nodes[ordinal]!;
 		const childResults = node.childOrdinals.map((childOrdinal) => evaluated[childOrdinal]!);
 		const childContributions = childResults.map(childContribution);
-		const expression = publicNode as SemanticSourceQueryNormalizedEqualityNode;
+		const expression = publicNode as
+			| SemanticSourceQueryNormalizedEqualityNode
+			| SemanticSourceQueryNormalizedLogicalPathStartsWithNode;
 		let leaf: SemanticSourceQueryLeafEvaluation;
 		try {
 			leaf = normalizeLeafEvaluation(
@@ -1203,7 +1254,7 @@ function evaluateRecord(
 	// Compose operators bottom-up only after every leaf callback has completed.
 	for (let ordinal = ast.nodes.length - 1; ordinal >= 0; ordinal -= 1) {
 		const node = ast.nodes[ordinal]!;
-		if (node.kind === 'EQUALS') continue;
+		if (node.kind === 'EQUALS' || node.kind === 'LOGICAL_PATH_STARTS_WITH') continue;
 		const publicNode = ast.expression.nodes[ordinal]!;
 		const childResults = node.childOrdinals.map((childOrdinal) => evaluated[childOrdinal]!);
 		const childContributions = childResults.map(childContribution);

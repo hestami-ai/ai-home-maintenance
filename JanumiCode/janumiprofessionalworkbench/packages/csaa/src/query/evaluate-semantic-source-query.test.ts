@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	SEMANTIC_SOURCE_QUERY_FIELDS,
 	SEMANTIC_SOURCE_QUERY_NONCLAIMS,
+	SEMANTIC_SOURCE_QUERY_OPERATORS,
 	SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS,
 	type EvaluateSemanticSourceQueryInput,
 	type SemanticQueryNotApplicableProjection,
@@ -59,6 +60,10 @@ function equals(
 	value: boolean | string
 ): SemanticSourceQueryExpression {
 	return { field, kind: 'EQUALS', nodeId, value } as SemanticSourceQueryExpression;
+}
+
+function logicalPathStartsWith(nodeId: string, value: string): SemanticSourceQueryExpression {
+	return { field: 'logicalPath', kind: 'LOGICAL_PATH_STARTS_WITH', nodeId, value };
 }
 
 function input(
@@ -234,7 +239,7 @@ describe('four-valued semantic query algebra', () => {
 });
 
 describe('evaluateSemanticSourceQuery', () => {
-	it('completely evaluates a closed scalar-equality AST with deterministic node-total traces', () => {
+	it('completely evaluates a closed registered-scalar AST with deterministic node-total traces', () => {
 		const expression: SemanticSourceQueryExpression = {
 			kind: 'AND',
 			nodeId: 'root',
@@ -308,13 +313,81 @@ describe('evaluateSemanticSourceQuery', () => {
 	it('freezes exported registries, policy nonclaims, and absolute safety ceilings', () => {
 		expect(Object.isFrozen(SEMANTIC_SOURCE_QUERY_FIELDS)).toBe(true);
 		expect(Object.isFrozen(SEMANTIC_SOURCE_QUERY_NONCLAIMS)).toBe(true);
+		expect(Object.isFrozen(SEMANTIC_SOURCE_QUERY_OPERATORS)).toBe(true);
 		expect(Object.isFrozen(SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS)).toBe(true);
 		expect(() =>
 			(SEMANTIC_SOURCE_QUERY_FIELDS as unknown as string[]).push('unregisteredField')
 		).toThrow();
+		expect(() =>
+			(SEMANTIC_SOURCE_QUERY_OPERATORS as unknown as string[]).push('UNREGISTERED_OPERATOR')
+		).toThrow();
 		expect(() => {
 			(SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS as { maxNodes: number }).maxNodes = 1_000_000;
 		}).toThrow();
+	});
+
+	it('evaluates exact case-sensitive logicalPath prefixes without path inference', () => {
+		const records = [
+			source('inside', { logicalPath: 'packages/csaa/src/index.ts' }),
+			source('adjacent', { logicalPath: 'packages/csaa-extra/src/index.ts' }),
+			source('case-different', { logicalPath: 'Packages/csaa/src/index.ts' }),
+			source('exact', { logicalPath: 'packages/csaa/' })
+		];
+		const evaluation = evaluated(
+			input(logicalPathStartsWith('csaa-prefix', 'packages/csaa/'), records)
+		);
+		expect(evaluation.expression.nodes).toEqual([
+			{
+				childNodeIds: [],
+				depth: 1,
+				field: 'logicalPath',
+				kind: 'LOGICAL_PATH_STARTS_WITH',
+				nodeId: 'csaa-prefix',
+				ordinal: 0,
+				value: 'packages/csaa/'
+			}
+		]);
+		expect(
+			evaluation.recordResults.map((result) =>
+				result.disposition === 'applicable-result' ? result.truth : result.disposition
+			)
+		).toEqual(['T', 'F', 'F', 'T']);
+		const rawMidSegmentPrefix = evaluated(
+			input(logicalPathStartsWith('raw-mid-segment', 'packages/csaa'), records)
+		);
+		expect(
+			rawMidSegmentPrefix.recordResults.map((result) =>
+				result.disposition === 'applicable-result' ? result.truth : result.disposition
+			)
+		).toEqual(['T', 'T', 'F', 'T']);
+		for (const literalPrefix of ['packages\\csaa\\', 'packages/*'])
+			expect(
+				evaluated(input(logicalPathStartsWith('literal-only', literalPrefix), [records[0]!]))
+					.recordResults[0]
+			).toMatchObject({ truth: 'F' });
+		expect(evaluation.recordResults[0]).toMatchObject({
+			epistemic: {
+				effective: {
+					supportBasis: {
+						method: 'jan-csaa-semantic-source-query-core/0.2.0:LOGICAL_PATH_STARTS_WITH'
+					}
+				}
+			}
+		});
+		const composed = evaluated(
+			input(
+				{
+					kind: 'AND',
+					nodeId: 'prefix-and-authored',
+					operands: [
+						logicalPathStartsWith('prefix', 'packages/csaa/'),
+						equals('authored', 'origin', 'AUTHORED')
+					]
+				},
+				[records[0]!]
+			)
+		);
+		expect(composed.recordResults[0]).toMatchObject({ truth: 'T' });
 	});
 
 	it('registers exact source, project, program, and provenance identity equality', () => {
@@ -467,6 +540,7 @@ describe('evaluateSemanticSourceQuery', () => {
 
 	it('rejects lone-surrogate text in both the expression and source population', () => {
 		expectRefused(input(equals('leaf', 'logicalPath', '\ud800')), 'AST_INVALID');
+		expectRefused(input(logicalPathStartsWith('prefix', '\ud800')), 'AST_INVALID');
 		expectRefused(
 			input(equals('leaf', 'origin', 'AUTHORED'), [source('one', { logicalPath: '\ud800' })]),
 			'POPULATION_INVALID'
@@ -483,6 +557,20 @@ describe('evaluateSemanticSourceQuery', () => {
 		cycle.operand = cycle;
 		for (const candidate of [
 			{ ...leaf, extra: true },
+			{ field: 'logicalPath', kind: 'LOGICAL_PATH_STARTS_WITH', nodeId: 'empty-prefix', value: '' },
+			{
+				field: 'origin',
+				kind: 'LOGICAL_PATH_STARTS_WITH',
+				nodeId: 'alien-prefix-field',
+				value: 'packages/'
+			},
+			{
+				extra: true,
+				field: 'logicalPath',
+				kind: 'LOGICAL_PATH_STARTS_WITH',
+				nodeId: 'wide-prefix',
+				value: 'packages/'
+			},
 			{ kind: 'AND', nodeId: 'empty', operands: [] },
 			{ kind: 'AND', nodeId: 'shared', operands: [leaf, leaf] },
 			{

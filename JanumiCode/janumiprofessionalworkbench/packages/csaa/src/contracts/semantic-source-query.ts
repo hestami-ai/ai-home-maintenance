@@ -10,17 +10,26 @@ import type {
 } from './semantic.js';
 
 export const SEMANTIC_SOURCE_QUERY_OPERATION_VERSION =
-	'jan-csaa-semantic-source-query-core/0.1.0' as const;
+	'jan-csaa-semantic-source-query-core/0.2.0' as const;
 export const SEMANTIC_SOURCE_QUERY_ALGEBRA_VERSION =
 	'jan-csaa-four-valued-evidence-pair/0.1.0' as const;
 export const SEMANTIC_SOURCE_QUERY_CAPABILITY_STATUS = 'IMPLEMENTATION_LOCAL_UNREGISTERED' as const;
 export const SEMANTIC_SOURCE_QUERY_EXECUTION_MODE = 'COMPLETE' as const;
 export const SEMANTIC_SOURCE_QUERY_POPULATION = 'SEMANTIC_SOURCE' as const;
 
+export const SEMANTIC_SOURCE_QUERY_OPERATORS = Object.freeze([
+	'EQUALS',
+	'LOGICAL_PATH_STARTS_WITH',
+	'NOT',
+	'AND',
+	'OR'
+] as const);
+
 export const SEMANTIC_SOURCE_QUERY_NONCLAIMS = Object.freeze([
 	'This implementation-local core is not registered JAN-CSAA-CAP-029.',
 	'This core does not complete DWP-005 or expose the DWP-006 coding-agent interface.',
 	'This core does not claim JAN-CSAA-007 or JAN-CSAA-008 conformance and does not activate an assurance gate.',
+	'This core provides no scalar predicate beyond exact equality and exact case-sensitive logicalPath prefix comparison; it performs no path normalization, globbing, regular-expression matching, or path-segment inference.',
 	'This core does not provide short-circuit evaluation, traversal, quantifiers, joins, aggregation, ordering, paging, dynamic evidence, or negative population closure.',
 	'Query identities, snapshot binding, access control, currentness, cancellation, time limits, result persistence, and output-byte accounting remain facade responsibilities.'
 ] as const);
@@ -53,6 +62,14 @@ export type SemanticSourceQueryEqualityExpression = {
 	};
 }[SemanticSourceQueryField];
 
+export interface SemanticSourceQueryLogicalPathStartsWithExpression {
+	readonly field: 'logicalPath';
+	readonly kind: 'LOGICAL_PATH_STARTS_WITH';
+	readonly nodeId: string;
+	/** Exact nonempty case-sensitive prefix; no normalization, globbing, or segment inference. */
+	readonly value: string;
+}
+
 export interface SemanticSourceQueryNotExpression {
 	readonly kind: 'NOT';
 	readonly nodeId: string;
@@ -73,6 +90,7 @@ export interface SemanticSourceQueryOrExpression {
 
 export type SemanticSourceQueryExpression =
 	| SemanticSourceQueryEqualityExpression
+	| SemanticSourceQueryLogicalPathStartsWithExpression
 	| SemanticSourceQueryNotExpression
 	| SemanticSourceQueryAndExpression
 	| SemanticSourceQueryOrExpression;
@@ -144,6 +162,13 @@ export type SemanticSourceQueryNormalizedEqualityNode = {
 	};
 }[SemanticSourceQueryField];
 
+export interface SemanticSourceQueryNormalizedLogicalPathStartsWithNode extends SemanticSourceQueryNormalizedNodeBase {
+	readonly childNodeIds: readonly [];
+	readonly field: 'logicalPath';
+	readonly kind: 'LOGICAL_PATH_STARTS_WITH';
+	readonly value: string;
+}
+
 export interface SemanticSourceQueryNormalizedNotNode extends SemanticSourceQueryNormalizedNodeBase {
 	readonly childNodeIds: readonly [string];
 	readonly kind: 'NOT';
@@ -161,6 +186,7 @@ export interface SemanticSourceQueryNormalizedOrNode extends SemanticSourceQuery
 
 export type SemanticSourceQueryNormalizedNode =
 	| SemanticSourceQueryNormalizedEqualityNode
+	| SemanticSourceQueryNormalizedLogicalPathStartsWithNode
 	| SemanticSourceQueryNormalizedNotNode
 	| SemanticSourceQueryNormalizedAndNode
 	| SemanticSourceQueryNormalizedOrNode;
@@ -203,7 +229,9 @@ export type SemanticSourceQueryLeafEvaluation =
 	SemanticSourceQueryApplicableLeafEvaluation | SemanticSourceQueryNotApplicableLeafEvaluation;
 
 export interface SemanticSourceQueryLeafContext {
-	readonly expression: SemanticSourceQueryNormalizedEqualityNode;
+	readonly expression:
+		| SemanticSourceQueryNormalizedEqualityNode
+		| SemanticSourceQueryNormalizedLogicalPathStartsWithNode;
 	readonly record: SemanticSourceQueryRecord;
 }
 

@@ -20,11 +20,11 @@ function event(detailCode: string, sequence = 1): SemanticSourceQueryReportProgr
 		kind: 'REPORT_STAGE',
 		nonclaims: SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS,
 		observations: [],
-		operationVersion: 'jan-csaa-report-semantic-source-query/0.1.0',
+		operationVersion: 'jan-csaa-report-semantic-source-query/0.2.0',
 		phase: 'REQUEST_BIND',
 		protocolRole: 'PRELIMINARY_SEMANTIC_SOURCE_QUERY_REPORT_TELEMETRY',
 		reportIdentityEffect: 'EXCLUDED_FROM_REPORT_IDENTITY',
-		schemaVersion: 'jan-csaa-semantic-source-query-report-progress/0.1.0',
+		schemaVersion: 'jan-csaa-semantic-source-query-report-progress/0.2.0',
 		sequence,
 		stage: 'REQUEST',
 		state: 'STARTED'

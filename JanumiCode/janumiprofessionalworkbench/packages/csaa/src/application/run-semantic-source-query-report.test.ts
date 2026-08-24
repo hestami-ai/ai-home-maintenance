@@ -135,9 +135,9 @@ function matchingExpression(): SemanticSourceQueryExpression {
 		operands: [
 			{
 				field: 'logicalPath',
-				kind: 'EQUALS',
+				kind: 'LOGICAL_PATH_STARTS_WITH',
 				nodeId: 'path',
-				value: 'projects/app/src/alpha.ts'
+				value: 'projects/app/src/alpha'
 			},
 			{
 				field: 'declarationFile',
@@ -254,7 +254,7 @@ describe('runSemanticSourceQueryReport', () => {
 			explanationPolicy: 'NODE_TOTAL_PREORDER_TRACE_PER_RETAINED_SOURCE',
 			ordering: 'STATIC_SEMANTIC_SNAPSHOT_SOURCE_ORDER',
 			population: 'SEMANTIC_SOURCE',
-			registeredOperators: ['EQUALS', 'NOT', 'AND', 'OR']
+			registeredOperators: ['EQUALS', 'LOGICAL_PATH_STARTS_WITH', 'NOT', 'AND', 'OR']
 		});
 		expect(outcome.result.queryDefinition.registeredFields).toEqual(
 			expect.arrayContaining(['id', 'projectId', 'programId', 'provenanceId', 'logicalPath'])
