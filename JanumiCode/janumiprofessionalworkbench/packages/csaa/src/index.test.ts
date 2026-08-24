@@ -216,6 +216,11 @@ import {
 	STATE_MACHINE_GRAPH_REPORT_RESULT_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_REPORT_SCHEMA_VERSION,
 	STATE_MACHINE_GRAPH_SCHEMA_VERSION,
+	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION,
+	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
+	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION,
+	STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION,
+	STATIC_MODULE_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_OPERATION_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_REQUEST_SCHEMA_VERSION,
 	STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_SCHEMA_VERSION,
@@ -284,6 +289,8 @@ import {
 	runModuleResolutionTraceReport,
 	projectContextReportExitCode,
 	buildStructuralModuleReachabilityAnalysis,
+	runStaticModuleImpactCandidateReport,
+	staticModuleImpactCandidateReportExitCode,
 	runStructuralModuleReachabilityReport,
 	structuralModuleReachabilityReportExitCode,
 	buildStructuralSccAnalysis,
@@ -476,7 +483,12 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(projectContextReportExitCode).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty('createProjectContextProgressJsonlWriter');
 		expect(buildStructuralModuleReachabilityAnalysis).toBeTypeOf('function');
+		expect(runStaticModuleImpactCandidateReport).toBeTypeOf('function');
+		expect(staticModuleImpactCandidateReportExitCode).toBeTypeOf('function');
 		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty(
+			'runStructuralModuleReachabilityReportWithCapturedSubject'
+		);
 		expect(publicSurface).not.toHaveProperty(
 			'buildStructuralModuleReachabilityAnalysisWithConsumedInputUsage'
 		);
@@ -1137,10 +1149,10 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-structural-module-reachability-analysis/1.0.0'
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION).toBe(
-			'jan-csaa-report-structural-module-reachability/0.1.0'
+			'jan-csaa-report-structural-module-reachability/0.2.0'
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
-			'jan-csaa-structural-module-reachability-report-progress/0.1.0'
+			'jan-csaa-structural-module-reachability-report-progress/0.2.0'
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS).toEqual({
 			dwp006Completion: 'NOT_CLAIMED',
@@ -1150,15 +1162,30 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
 		});
 		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
-			'jan-csaa-structural-module-reachability-progress-transport/0.1.0'
+			'jan-csaa-structural-module-reachability-progress-transport/0.2.0'
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
 		expect(STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION).toBe(
-			'jan-csaa-structural-module-reachability-report-request/0.1.0'
+			'jan-csaa-structural-module-reachability-report-request/0.2.0'
 		);
 		expect(STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION).toBe(
-			'jan-csaa-structural-module-reachability-report/0.1.0'
+			'jan-csaa-structural-module-reachability-report/0.2.0'
+		);
+		expect(STATIC_MODULE_IMPACT_CANDIDATE_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-static-module-impact-candidates/0.1.0'
+		);
+		expect(STATIC_MODULE_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-static-module-impact-candidate-report-request/0.1.0'
+		);
+		expect(STATIC_MODULE_IMPACT_CANDIDATE_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-static-module-impact-candidate-report-result/0.1.0'
+		);
+		expect(STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-static-module-impact-candidate-report/0.1.0'
+		);
+		expect(STATIC_MODULE_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION).toBe(
+			'jan-csaa-caller-declared-source-edit-seed/0.1.0'
 		);
 		expect(STRUCTURAL_SCC_ANALYSIS_OPERATION_VERSION).toBe('jan-csaa-analyze-structural-scc/0.1.0');
 		expect(STRUCTURAL_SCC_ANALYSIS_REQUEST_SCHEMA_VERSION).toBe(

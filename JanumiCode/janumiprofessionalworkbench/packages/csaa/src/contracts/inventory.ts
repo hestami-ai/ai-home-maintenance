@@ -138,7 +138,8 @@ export interface CommandInventory {
 	readonly state: 'CONFIGURED_NOT_RUN';
 }
 
-export type AnalyzerDisposition = 'RETAIN_DELEGATED' | 'WRAP' | 'PORT' | 'RETIRE_AFTER_EQUIVALENCE';
+export type AnalyzerDisposition =
+	'CSAA_NATIVE' | 'RETAIN_DELEGATED' | 'WRAP' | 'PORT' | 'RETIRE_AFTER_EQUIVALENCE';
 
 export interface VerificationAssetInventory {
 	readonly associatedBaselines: readonly string[];

@@ -6,7 +6,7 @@ import {
 } from './run-structural-module-reachability-report.js';
 
 export const STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION =
-	'jan-csaa-structural-module-reachability-progress-transport/0.1.0' as const;
+	'jan-csaa-structural-module-reachability-progress-transport/0.2.0' as const;
 export const STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_BYTES = 8 * 1024 * 1024;
 export const STRUCTURAL_MODULE_REACHABILITY_PROGRESS_MAX_EVENTS = 2_048;
 

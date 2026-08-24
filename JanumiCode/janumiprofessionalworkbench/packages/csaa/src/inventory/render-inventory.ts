@@ -4,7 +4,10 @@ const code = (value: string | number | boolean | null): string =>
 	value === null ? '`—`' : `\`${String(value).replaceAll('`', '\\`')}\``;
 
 const cell = (value: string): string =>
-	value.replaceAll('|', String.raw`\|`).replaceAll('\r', ' ').replaceAll('\n', ' ');
+	value
+		.replaceAll('|', String.raw`\|`)
+		.replaceAll('\r', ' ')
+		.replaceAll('\n', ' ');
 
 const list = (values: readonly string[]): string =>
 	values.length === 0 ? code('NONE') : values.map((value) => code(value)).join(', ');
@@ -147,7 +150,7 @@ export function renderInventoryMarkdown(inventory: InventoryDocument): string {
 		`| Coverage | provider ${code(inventory.assuranceSurfaces.coverage.provider)}; include ${cell(list(inventory.assuranceSurfaces.coverage.include))}; exclude ${cell(list(inventory.assuranceSurfaces.coverage.exclude))} | ${code(inventory.assuranceSurfaces.coverage.state)} | ${code(inventory.assuranceSurfaces.coverage.configurationPath)}; no output ingested |`,
 		`| Mutation | ${cell(list(inventory.assuranceSurfaces.mutation.commands))} | ${code(inventory.assuranceSurfaces.mutation.state)} | runner ${code(inventory.assuranceSurfaces.mutation.runnerPath)}; ledger ${code(inventory.assuranceSurfaces.mutation.ledgerPath)} |`,
 		'',
-		'#### Existing `verif` and `scripts` analyzer estate and migration disposition',
+		'#### Existing `verif` and `scripts` analyzer estate and integration or migration disposition',
 		'',
 		'| Path | Content SHA-256 | Role | Extraction | Asserted population | Gate/test carrier | Baseline | Disposition | Provenance |',
 		'| --- | --- | --- | --- | --- | --- | --- | --- | --- |'

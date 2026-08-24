@@ -106,7 +106,7 @@ interface DiagnosticLike {
 }
 
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION =
-	'jan-csaa-structural-module-reachability-report-progress/0.1.0' as const;
+	'jan-csaa-structural-module-reachability-report-progress/0.2.0' as const;
 
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS = Object.freeze({
 	dwp006Completion: 'NOT_CLAIMED',
@@ -933,7 +933,9 @@ export interface RunStructuralModuleReachabilityReportOptions {
 function runStructuralModuleReachabilityReportInternal(
 	requestValue: unknown,
 	options: RunStructuralModuleReachabilityReportOptions,
-	progress: ReportProgressRecorder
+	progress: ReportProgressRecorder,
+	captureSubject?: (subject: FrozenSubject, repositoryRoot: string) => void,
+	captureResultBytes?: (resultBytes: number) => void
 ): StructuralModuleReachabilityReportOutcome {
 	progress.start('REQUEST_BIND');
 	let request: StructuralModuleReachabilityReportRequest;
@@ -1023,6 +1025,7 @@ function runStructuralModuleReachabilityReportInternal(
 		return failure(identity.code, 'SUBJECT', identity.state, subjectDiagnostics, request);
 	}
 	const subject = subjectOutcome.subject;
+	captureSubject?.(subject, repositoryRoot);
 	progress.complete(
 		[
 			progressObservation('SUBJECT_ARTIFACTS', subject.artifacts.length, null, 'COUNT'),
@@ -1485,6 +1488,7 @@ function runStructuralModuleReachabilityReportInternal(
 				status: 'PARTIAL'
 			},
 			criterionSelector: {
+				artifact: { ...criterionArtifact, roles: [...criterionArtifact.roles] },
 				logicalPath: criterion.node.logicalPath,
 				projectConfigPath: project.configPath,
 				selectedNodeId: criterion.node.id
@@ -1546,6 +1550,7 @@ function runStructuralModuleReachabilityReportInternal(
 				subject
 			);
 		}
+		captureResultBytes?.(resultBytes);
 		progress.complete(
 			[progressObservation('RESULT_BYTES', resultBytes, request.budgets.maxResultBytes, 'BYTES')],
 			'PARTIAL'
@@ -1569,19 +1574,52 @@ function runStructuralModuleReachabilityReportInternal(
 	}
 }
 
-export function runStructuralModuleReachabilityReport(
+/** @internal Same-process handoff used by trusted facades that must recheck final currentness. */
+export function runStructuralModuleReachabilityReportWithCapturedSubject(
 	requestValue: unknown,
 	options: RunStructuralModuleReachabilityReportOptions
-): StructuralModuleReachabilityReportOutcome {
+): {
+	readonly outcome: StructuralModuleReachabilityReportOutcome;
+	readonly repositoryRoot: string | null;
+	readonly resultBytes: number | null;
+	readonly subject: FrozenSubject | null;
+} {
+	let capturedRepositoryRoot: string | null = null;
+	let capturedResultBytes: number | null = null;
+	let capturedSubject: FrozenSubject | null = null;
 	const progress = createReportProgressRecorder(options);
 	try {
-		return progress.finish(
-			runStructuralModuleReachabilityReportInternal(requestValue, options, progress)
+		const outcome = progress.finish(
+			runStructuralModuleReachabilityReportInternal(
+				requestValue,
+				options,
+				progress,
+				(subject, repositoryRoot) => {
+					capturedRepositoryRoot = repositoryRoot;
+					capturedSubject = subject;
+				},
+				(resultBytes) => {
+					capturedResultBytes = resultBytes;
+				}
+			)
 		);
+		return {
+			outcome,
+			repositoryRoot: capturedRepositoryRoot,
+			resultBytes: capturedResultBytes,
+			subject: capturedSubject
+		};
 	} catch (error) {
 		progress.fail([], 'INTERNAL_FAILURE');
 		throw error;
 	}
+}
+
+export function runStructuralModuleReachabilityReport(
+	requestValue: unknown,
+	options: RunStructuralModuleReachabilityReportOptions
+): StructuralModuleReachabilityReportOutcome {
+	return runStructuralModuleReachabilityReportWithCapturedSubject(requestValue, options).outcome;
 }
 
 export function structuralModuleReachabilityReportExitCode(

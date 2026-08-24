@@ -34,6 +34,7 @@ export * from './contracts/project-context-report.js';
 export * from './contracts/semantic.js';
 export * from './contracts/state-machine-graph.js';
 export * from './contracts/state-machine-graph-report.js';
+export * from './contracts/static-module-impact-candidate-report.js';
 export * from './contracts/structural-module-reachability-analysis.js';
 export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
@@ -387,6 +388,11 @@ export {
 export { buildDeclarationContextAnalysis } from './semantic/build-declaration-context-analysis.js';
 export { buildSourceOriginCorrelation } from './semantic/build-source-origin-correlation.js';
 export { buildStructuralModuleReachabilityAnalysis } from './graph/build-structural-module-reachability-analysis.js';
+export {
+	runStaticModuleImpactCandidateReport,
+	staticModuleImpactCandidateReportExitCode,
+	type RunStaticModuleImpactCandidateReportOptions
+} from './application/run-static-module-impact-candidate-report.js';
 export {
 	runStructuralModuleReachabilityReport,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,

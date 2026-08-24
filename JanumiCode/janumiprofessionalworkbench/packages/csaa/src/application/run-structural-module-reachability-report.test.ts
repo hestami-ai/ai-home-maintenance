@@ -157,6 +157,11 @@ describe('runStructuralModuleReachabilityReport', () => {
 		});
 		expect(first.result.facadeNonclaims).toBe(STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS);
 		expect(first.result.interpretation).toBe('STRUCTURAL_IMPORTER_CANDIDATES');
+		expect(first.result.criterionSelector.artifact).toMatchObject({
+			disposition: 'ANALYZED',
+			path: 'packages/demo/src/leaf.ts',
+			sha256: expect.stringMatching(/^[0-9a-f]{64}$/u)
+		});
 		expect(first.result.currentness).toMatchObject({
 			changedPaths: [],
 			scope: 'SELECTED_CAPTURED_SUBJECT_ONLY',

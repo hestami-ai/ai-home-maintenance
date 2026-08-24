@@ -20,20 +20,25 @@ import type {
 	StructuralModuleReachabilityAnalysisSnapshot,
 	StructuralModuleReachabilityDirection
 } from './structural-module-reachability-analysis.js';
-import type { SubjectBudgets, SubjectCompleteness, SubjectDescriptor } from './subject.js';
+import type {
+	CapturedArtifactRecord,
+	SubjectBudgets,
+	SubjectCompleteness,
+	SubjectDescriptor
+} from './subject.js';
 
 /**
  * This preliminary wire surface exposes only the already implemented CAP-027 analysis. It is not
  * the stable JAN-CSAA-007 query envelope or completion evidence for DWP-005/DWP-006.
  */
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_REQUEST_SCHEMA_VERSION =
-	'jan-csaa-structural-module-reachability-report-request/0.1.0' as const;
+	'jan-csaa-structural-module-reachability-report-request/0.2.0' as const;
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_SCHEMA_VERSION =
-	'jan-csaa-structural-module-reachability-report/0.1.0' as const;
+	'jan-csaa-structural-module-reachability-report/0.2.0' as const;
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_RESULT_SCHEMA_VERSION =
-	'jan-csaa-structural-module-reachability-report-result/0.1.0' as const;
+	'jan-csaa-structural-module-reachability-report-result/0.2.0' as const;
 export const STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION =
-	'jan-csaa-report-structural-module-reachability/0.1.0' as const;
+	'jan-csaa-report-structural-module-reachability/0.2.0' as const;
 
 export interface StructuralModuleReachabilityReportBudgets {
 	/** Maximum admitted partial-result bytes, including the command's terminal LF; small refusals remain emit-able. */
@@ -182,6 +187,8 @@ export interface StructuralModuleReachabilityReportResult {
 		readonly status: 'PARTIAL';
 	};
 	readonly criterionSelector: {
+		/** Exact captured artifact bound before semantic extraction and rechecked by final currentness. */
+		readonly artifact: CapturedArtifactRecord;
 		readonly logicalPath: string;
 		readonly projectConfigPath: string;
 		readonly selectedNodeId: ModuleDependencyGraphNodeId;
