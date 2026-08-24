@@ -90,6 +90,19 @@ const ZERO_CAPACITY_PROJECT_CONTEXT_BUDGET_KEYS = new Set<keyof ProjectContextGr
 	'maxProjectReferences',
 	'maxSources'
 ]);
+const INTERNAL_CAPTURE_PROJECT_CONTEXT_BUDGET_CEILINGS = Object.freeze({
+	maxConfigurationClosureRecords: Number.MAX_SAFE_INTEGER,
+	maxDiagnostics: 100_000,
+	maxInputRecords: Number.MAX_SAFE_INTEGER,
+	maxInputStringCharacters: Number.MAX_SAFE_INTEGER,
+	maxMemberships: Number.MAX_SAFE_INTEGER,
+	maxOutputRecords: Number.MAX_SAFE_INTEGER,
+	maxPrograms: Number.MAX_SAFE_INTEGER,
+	maxProjectReferences: Number.MAX_SAFE_INTEGER,
+	maxProjects: Number.MAX_SAFE_INTEGER,
+	maxSources: Number.MAX_SAFE_INTEGER,
+	maxTraversalSteps: Number.MAX_SAFE_INTEGER
+} satisfies ProjectContextGraphBudgets);
 const FORBIDDEN_PATH_PATTERN_CHARACTERS = new Set(['*', '?', '[', ']', '{', '}']);
 
 interface DiagnosticLike {
@@ -309,6 +322,11 @@ export interface CaptureProjectContextReportPipelineOptions {
 	readonly additionalArtifacts?: readonly string[];
 	/** Successor-only semantic enrichment; the public CAP-010 report remains syntax/symbol scoped. */
 	readonly includeTypeCapability?: true;
+	/**
+	 * Successor-owned graph-construction budgets for an enriched same-process capture. These do not
+	 * alter the public CAP-010 admission ceilings or public report path.
+	 */
+	readonly projectContextBudgets?: ProjectContextGraphBudgets;
 	/** Absolute fixed worktree root supplied by the successor facade. */
 	readonly repositoryRoot: string;
 }
@@ -595,6 +613,18 @@ function materializeBudgetRecord<Keys extends readonly string[]>(
 			])
 		) as Record<Keys[number], number>
 	);
+}
+
+function materializeInternalCaptureProjectContextBudgets(
+	value: unknown
+): ProjectContextGraphBudgets {
+	return materializeBudgetRecord(
+		value,
+		PROJECT_CONTEXT_BUDGET_KEYS,
+		INTERNAL_CAPTURE_PROJECT_CONTEXT_BUDGET_CEILINGS,
+		'$options.projectContextBudgets',
+		ZERO_CAPACITY_PROJECT_CONTEXT_BUDGET_KEYS
+	) as unknown as ProjectContextGraphBudgets;
 }
 
 function materializePath(value: unknown, maxPathCharacters: number, path: string): string {
@@ -1013,7 +1043,8 @@ function runProjectContextReportInternal(
 	progress: ReportProgressRecorder,
 	captureMode: 'NONE' | 'PROJECT_CONTEXT' | 'SEMANTIC' = 'NONE',
 	includeTypeCapability = false,
-	additionalArtifacts: readonly string[] = []
+	additionalArtifacts: readonly string[] = [],
+	projectContextBudgetOverride?: ProjectContextGraphBudgets
 ):
 	| ProjectContextReportOutcome
 	| ProjectContextReportPipelineCapture
@@ -1024,7 +1055,22 @@ function runProjectContextReportInternal(
 		return failure(admission.code, 'REQUEST', admission.state, [
 			reportDiagnostic(admission.code, admission.message, admission.path, 'REQUEST')
 		]);
-	const request = admission.request;
+	if (projectContextBudgetOverride !== undefined && captureMode !== 'PROJECT_CONTEXT')
+		throw new Error('Project-context budget overrides are restricted to internal capture mode.');
+	const materializedProjectContextBudgetOverride =
+		projectContextBudgetOverride === undefined
+			? undefined
+			: materializeInternalCaptureProjectContextBudgets(projectContextBudgetOverride);
+	const request =
+		materializedProjectContextBudgetOverride === undefined
+			? admission.request
+			: Object.freeze({
+					...admission.request,
+					budgets: Object.freeze({
+						...admission.request.budgets,
+						projectContext: materializedProjectContextBudgetOverride
+					})
+				});
 
 	let repositoryRoot: string;
 	try {
@@ -1468,7 +1514,8 @@ export function captureProjectContextReportPipeline(
 			progress,
 			'PROJECT_CONTEXT',
 			options.includeTypeCapability === true,
-			options.additionalArtifacts ?? []
+			options.additionalArtifacts ?? [],
+			options.projectContextBudgets
 		);
 		if (outcome.outcome === 'captured') return outcome;
 		if (outcome.outcome === 'semantic-captured')

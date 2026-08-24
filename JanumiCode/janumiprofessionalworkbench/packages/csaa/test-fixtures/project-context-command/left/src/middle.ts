@@ -1,3 +1,5 @@
 import { zeta } from './zeta.js';
 
-export const middle = zeta + 1;
+export function middle(): number {
+	return zeta() + 1;
+}

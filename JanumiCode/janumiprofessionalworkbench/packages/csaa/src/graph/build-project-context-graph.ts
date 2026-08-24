@@ -988,7 +988,6 @@ export function buildProjectContextGraph(
 			...content,
 			contentDigest: projectContextGraphContentDigest(content)
 		};
-		canonicalSemanticJsonWitness(graph);
 		progress.complete({ outputRecords: counts.outputRecords });
 
 		progress.start('GRAPH_VALIDATE');

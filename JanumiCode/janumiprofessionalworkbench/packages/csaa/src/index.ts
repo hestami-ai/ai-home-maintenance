@@ -23,6 +23,7 @@ export * from './contracts/dependency-comparison.js';
 export * from './contracts/dependency-cruiser.js';
 export * from './contracts/graph.js';
 export * from './contracts/logical-graph-composition.js';
+export * from './contracts/logical-graph-composition-report.js';
 export * from './contracts/module-resolution-trace.js';
 export * from './contracts/module-resolution-trace-report.js';
 export * from './contracts/module-dependency-report.js';
@@ -167,6 +168,25 @@ export {
 	CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION,
 	type CallGraphProgressTransportTruncation
 } from './application/call-graph-progress-jsonl.js';
+
+export {
+	logicalGraphCompositionReportExitCode,
+	runLogicalGraphCompositionReport,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_SCHEMA_VERSION,
+	type LogicalGraphCompositionReportProgressEvent,
+	type LogicalGraphCompositionReportProgressMetric,
+	type LogicalGraphCompositionReportProgressObservation,
+	type LogicalGraphCompositionReportProgressPhase,
+	type RunLogicalGraphCompositionReportOptions
+} from './application/run-logical-graph-composition-report.js';
+
+export {
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_BYTES,
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_EVENTS,
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	type LogicalGraphCompositionProgressTransportTruncation
+} from './application/logical-graph-composition-progress-jsonl.js';
 
 export {
 	arrowCommandCensusReportExitCode,

@@ -1,1 +1,3 @@
-export const zeta = 1;
+export function zeta(): number {
+	return 1;
+}

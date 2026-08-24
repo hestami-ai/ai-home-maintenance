@@ -22,7 +22,10 @@ import {
 	logicalGraphCompositionLayerId
 } from './logical-graph-composition-canonical.js';
 import {
+	validateAndIssueLogicalGraphCompositionCallPredecessorWitness,
+	validateAndIssueLogicalGraphCompositionModulePredecessorWitness,
 	validateConstructedLogicalGraphComposition,
+	validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors,
 	validateLogicalGraphComposition
 } from './validate-logical-graph-composition.js';
 
@@ -208,6 +211,217 @@ describe('logical graph composition public boundary coverage', () => {
 				'SHAPE_INVALID',
 				options as LogicalGraphCompositionValidationOptions
 			);
+	});
+
+	it('validates both predecessor stages before issuing an exact single-use witness', () => {
+		const maxIssues = Math.min(value.request.budgets.maxDiagnostics, 100_000);
+		const issueWitness = () => {
+			const moduleStage = validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+				value.inputs,
+				maxIssues
+			);
+			if (moduleStage.state !== 'VALID')
+				throw new Error(`Module prevalidation failed: ${JSON.stringify(moduleStage)}`);
+			const callStage = validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+				value.inputs,
+				moduleStage.witness,
+				maxIssues
+			);
+			if (callStage.state !== 'VALID')
+				throw new Error(`Call prevalidation failed: ${JSON.stringify(callStage)}`);
+			return callStage;
+		};
+		const validateWithWitness = (
+			inputs: LogicalGraphCompositionInputs,
+			digest: string,
+			witness: unknown,
+			candidate: unknown = composition,
+			options?: LogicalGraphCompositionValidationOptions
+		) =>
+			validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors(
+				candidate,
+				inputs,
+				digest,
+				witness as ReturnType<typeof issueWitness>['witness'],
+				options
+			);
+
+		const genuineResult = issueWitness();
+		const genuine = genuineResult.witness;
+		expect(genuineResult.inputDigest).toBe(composition.inputDigest);
+		expect(Object.isFrozen(genuine)).toBe(true);
+		expect(Object.getPrototypeOf(genuine)).toBeNull();
+		expect(validateWithWitness(value.inputs, composition.inputDigest, genuine)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(validateWithWitness(value.inputs, composition.inputDigest, genuine)).toMatchObject({
+			issues: [expect.objectContaining({ code: 'SHAPE_INVALID' })],
+			state: 'INVALID'
+		});
+
+		const cloneSource = issueWitness().witness;
+		for (const forged of [
+			{},
+			Object.freeze(Object.create(null)),
+			{ ...cloneSource },
+			structuredClone(cloneSource)
+		])
+			expect(validateWithWitness(value.inputs, composition.inputDigest, forged)).toMatchObject({
+				state: 'INVALID'
+			});
+
+		const exactBinding = issueWitness().witness;
+		const wrongWrapper = { ...value.inputs } as LogicalGraphCompositionInputs;
+		const wrongRequest = {
+			...value.inputs,
+			request: structuredClone(value.inputs.request)
+		} as LogicalGraphCompositionInputs;
+		const wrongModuleGraph = {
+			...value.inputs,
+			moduleDependencyGraph: structuredClone(value.inputs.moduleDependencyGraph)
+		} as LogicalGraphCompositionInputs;
+		const wrongCallGraph = {
+			...value.inputs,
+			callGraph: structuredClone(value.inputs.callGraph)
+		} as LogicalGraphCompositionInputs;
+		const wrongSnapshot = {
+			...value.inputs,
+			semanticSnapshot: structuredClone(value.inputs.semanticSnapshot)
+		} as LogicalGraphCompositionInputs;
+		for (const wrongInputs of [
+			wrongWrapper,
+			wrongRequest,
+			wrongModuleGraph,
+			wrongCallGraph,
+			wrongSnapshot
+		])
+			expect(validateWithWitness(wrongInputs, composition.inputDigest, exactBinding)).toMatchObject(
+				{ state: 'INVALID' }
+			);
+		expect(validateWithWitness(value.inputs, 'f'.repeat(64), exactBinding)).toMatchObject({
+			state: 'INVALID'
+		});
+		expect(validateWithWitness(value.inputs, composition.inputDigest, exactBinding)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+
+		const candidateFailure = issueWitness().witness;
+		const mismatchedCandidate = redigested((draft) => {
+			(draft.coverage as { crossLinks: number }).crossLinks += 1;
+		});
+		expect(
+			validateWithWitness(
+				value.inputs,
+				composition.inputDigest,
+				candidateFailure,
+				mismatchedCandidate
+			)
+		).toMatchObject({
+			issues: [expect.objectContaining({ code: 'POPULATION_MISMATCH' })],
+			state: 'INVALID'
+		});
+		expect(
+			validateWithWitness(value.inputs, composition.inputDigest, candidateFailure)
+		).toMatchObject({
+			issues: [expect.objectContaining({ code: 'SHAPE_INVALID' })],
+			state: 'INVALID'
+		});
+
+		const hostileOptions = issueWitness().witness;
+		expect(
+			validateWithWitness(
+				value.inputs,
+				composition.inputDigest,
+				hostileOptions,
+				composition,
+				new Proxy({ maxIssues }, {})
+			)
+		).toMatchObject({ state: 'INVALID' });
+		expect(validateWithWitness(value.inputs, composition.inputDigest, hostileOptions)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+		expect(
+			validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+				value.inputs,
+				maxIssues === 1 ? 2 : maxIssues - 1
+			)
+		).toMatchObject({ state: 'INVALID' });
+	});
+
+	it('rejects forged module-stage witnesses and never attests an invalid call predecessor', () => {
+		const maxIssues = Math.min(value.request.budgets.maxDiagnostics, 100_000);
+		const moduleStage = validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+			value.inputs,
+			maxIssues
+		);
+		if (moduleStage.state !== 'VALID')
+			throw new Error(`Module prevalidation failed: ${JSON.stringify(moduleStage)}`);
+		for (const forged of [
+			{},
+			Object.freeze(Object.create(null)),
+			{ ...moduleStage.witness },
+			structuredClone(moduleStage.witness)
+		])
+			expect(
+				validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+					value.inputs,
+					forged as typeof moduleStage.witness,
+					maxIssues
+				)
+			).toMatchObject({ state: 'INVALID' });
+
+		const wrongWrapper = { ...value.inputs } as LogicalGraphCompositionInputs;
+		expect(
+			validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+				wrongWrapper,
+				moduleStage.witness,
+				maxIssues
+			)
+		).toMatchObject({ state: 'INVALID' });
+		expect(
+			validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+				value.inputs,
+				moduleStage.witness,
+				maxIssues === 1 ? 2 : maxIssues - 1
+			)
+		).toMatchObject({ state: 'INVALID' });
+		expect(
+			validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+				value.inputs,
+				moduleStage.witness,
+				maxIssues
+			)
+		).toMatchObject({ state: 'VALID' });
+		expect(
+			validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+				value.inputs,
+				moduleStage.witness,
+				maxIssues
+			)
+		).toMatchObject({ state: 'INVALID' });
+
+		const invalidCallInputs = structuredClone(value.inputs) as LogicalGraphCompositionInputs;
+		const callSite = invalidCallInputs.callGraph.nodes.find((node) => node.kind === 'CALL_SITE');
+		if (callSite === undefined) throw new Error('The fixture must include a call-site node.');
+		(callSite as { optional: boolean }).optional = !(callSite as { optional: boolean }).optional;
+		const invalidModuleStage = validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+			invalidCallInputs,
+			maxIssues
+		);
+		if (invalidModuleStage.state !== 'VALID')
+			throw new Error(`Module prevalidation failed: ${JSON.stringify(invalidModuleStage)}`);
+		const invalidCallStage = validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+			invalidCallInputs,
+			invalidModuleStage.witness,
+			maxIssues
+		);
+		expect(invalidCallStage).toMatchObject({ state: 'INVALID' });
+		expect(invalidCallStage.issues.map((problem) => problem.code)).toEqual(
+			expect.arrayContaining(['CONTENT_DIGEST_MISMATCH', 'INVALID_VALUE'])
+		);
 	});
 
 	it('accepts exact descriptor limits and rejects every one-below boundary', () => {

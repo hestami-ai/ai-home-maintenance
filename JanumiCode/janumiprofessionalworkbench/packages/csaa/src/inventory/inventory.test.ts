@@ -189,6 +189,18 @@ import {
 	LOGICAL_GRAPH_COMPOSITION_SELECTION
 } from '../contracts/logical-graph-composition.js';
 import {
+	LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY_TRANSFER,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_FULL_CAPABILITY,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_GATE_EFFECT,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_OPERATION_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_REQUEST_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_RESULT_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_SELECTION
+} from '../contracts/logical-graph-composition-report.js';
+import {
 	MODULE_DEPENDENCY_REPORT_AUTHORITY,
 	MODULE_DEPENDENCY_REPORT_AUTHORITY_TRANSFER,
 	MODULE_DEPENDENCY_REPORT_GATE_EFFECT,
@@ -330,6 +342,7 @@ const PROJECT_CONTEXT_GRAPH_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=PROJECT_CONTEXT_GRAPH vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const PROJECT_CONTEXT_REPORT_COMMAND = 'bun run scripts/csaa-project-context.ts';
 const MODULE_DEPENDENCY_REPORT_COMMAND = 'bun scripts/csaa-module-dependency.ts';
+const LOGICAL_GRAPH_COMPOSITION_REPORT_COMMAND = 'bun scripts/csaa-logical-graph-composition.ts';
 const ARROW_COMMAND_CENSUS_REPORT_COMMAND = 'bun scripts/csaa-arrow-command-census.ts';
 const COMMAND_HANDLER_GRAPH_REPORT_COMMAND = 'bun scripts/csaa-command-handler-graph.ts';
 const COMMAND_DISPATCH_TOPOLOGY_REPORT_COMMAND = 'bun scripts/csaa-command-dispatch-topology.ts';
@@ -362,6 +375,19 @@ const LOGICAL_GRAPH_COMPOSITION_PROVENANCE = [
 	'packages/csaa/src/graph/build-logical-graph-composition.test.ts',
 	'packages/csaa/src/graph/logical-graph-composition-coverage.test.ts',
 	'packages/csaa/src/semantic/repository-smoke.test.ts'
+] as const;
+const LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE = [
+	'packages/csaa/src/application/logical-graph-composition-progress-jsonl.test.ts',
+	'packages/csaa/src/application/logical-graph-composition-progress-jsonl.ts',
+	'packages/csaa/src/application/run-logical-graph-composition-command.test.ts',
+	'packages/csaa/src/application/run-logical-graph-composition-command.ts',
+	'packages/csaa/src/application/run-logical-graph-composition-report.test.ts',
+	'packages/csaa/src/application/run-logical-graph-composition-report.ts',
+	'packages/csaa/src/application/run-project-context-report.ts',
+	'packages/csaa/src/contracts/logical-graph-composition-report.ts',
+	'packages/csaa/src/index.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-logical-graph-composition.ts'
 ] as const;
 const STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE = [
 	'packages/csaa/src/contracts/structural-module-reachability-report.ts',
@@ -660,6 +686,8 @@ function jpwbFixtureScriptCommand(name: string): string {
 	}
 	if (name === 'csaa:analyze:project-context') return PROJECT_CONTEXT_REPORT_COMMAND;
 	if (name === 'csaa:analyze:module-dependency') return MODULE_DEPENDENCY_REPORT_COMMAND;
+	if (name === 'csaa:analyze:logical-graph-composition')
+		return LOGICAL_GRAPH_COMPOSITION_REPORT_COMMAND;
 	if (name === 'csaa:analyze:arrow-command-census') return ARROW_COMMAND_CENSUS_REPORT_COMMAND;
 	if (name === 'csaa:analyze:command-handler-graph') return COMMAND_HANDLER_GRAPH_REPORT_COMMAND;
 	if (name === 'csaa:analyze:command-dispatch-topology')
@@ -866,6 +894,7 @@ describe('inventory discovery and identity', () => {
 				...PROJECT_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
 				...COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
 				...COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROVENANCE,
@@ -1344,10 +1373,13 @@ describe('inventory discovery and identity', () => {
 		for (const expectedProvenance of [
 			'capabilities#call-graph',
 			'capabilities#dependency-graph',
+			'capabilities#project-context-graph',
 			'capabilities#symbol-table',
 			'capabilities#typescript-ast',
 			'capabilities#type-graph',
 			'package.json#/scripts/csaa:semantic:smoke:logical-graph-composition',
+			'package.json#/scripts/csaa:analyze:logical-graph-composition',
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/logical-graph-composition.ts',
 			'packages/csaa/src/graph/build-logical-graph-composition.ts',
 			'packages/csaa/src/graph/logical-graph-composition-canonical.ts',
@@ -1387,6 +1419,15 @@ describe('inventory discovery and identity', () => {
 			LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_009_CONFORMANCE,
 			LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_007_CONFORMANCE,
 			LOGICAL_GRAPH_COMPOSITION_FULL_JAN_CSAA_008_CONFORMANCE,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_OPERATION_VERSION,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_REQUEST_SCHEMA_VERSION,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_SCHEMA_VERSION,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_RESULT_SCHEMA_VERSION,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY_TRANSFER,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_GATE_EFFECT,
+			LOGICAL_GRAPH_COMPOSITION_REPORT_FULL_CAPABILITY,
+			JSON.stringify(LOGICAL_GRAPH_COMPOSITION_REPORT_SELECTION),
 			LOGICAL_GRAPH_COMPOSITION_SELECTION.moduleNodePopulation,
 			LOGICAL_GRAPH_COMPOSITION_SELECTION.callNodePopulation,
 			LOGICAL_GRAPH_COMPOSITION_SELECTION.joinKey,
@@ -1395,7 +1436,8 @@ describe('inventory discovery and identity', () => {
 			LOGICAL_GRAPH_COMPOSITION_SELECTION.conflictTreatment,
 			...LOGICAL_GRAPH_COMPOSITION_SELECTION.consistencyFields,
 			...LOGICAL_GRAPH_COMPOSITION_SELECTION.layerOrder,
-			...LOGICAL_GRAPH_COMPOSITION_NONCLAIMS
+			...LOGICAL_GRAPH_COMPOSITION_NONCLAIMS,
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_NONCLAIMS
 		])
 			expect(logicalGraphCompositionCapability!.explanation).toContain(exactBoundary);
 		for (const boundary of [
@@ -1407,6 +1449,16 @@ describe('inventory discovery and identity', () => {
 			'Source-layer graph identities, semantic-snapshot identities, coverage, health, epistemic state, closure, and limitations are preserved without promotion',
 			'complete only for the declared mapping',
 			'not for a universal or materialized code property graph',
+			'implementation-local preliminary coding-agent report facade',
+			'one exact same-subject project-context, module-dependency, call, and two-layer reference-only composition evidence set',
+			'remains preliminary and unregistered',
+			'preserves PARTIAL/OPEN status and every predecessor limitation',
+			'final currentness check only for the selected captured subject',
+			'does not claim query, slice, impact, finding, remediation, dead-code, safe-removal, DWP-004/DWP-005/DWP-006 completion, G4/G5/G6 passage, or a registered JAN-CSAA-007 operation envelope',
+			'bounded best-effort JSONL progress transport is excluded from report identity and evidence',
+			'machine-facing coding-agent invocation bun run --silent csaa:analyze:logical-graph-composition',
+			'package root exports the report contract, runner, progress-event schema, and transport schema/limits/types',
+			'parsed-request command adapter and JSONL progress writer remain trust-bound implementation details and are not package-root exports',
 			'dedicated FULL-profile logical-graph-composition-only smoke command',
 			'CONFIGURED_NOT_RUN by inventory generation'
 		])
@@ -2031,6 +2083,7 @@ describe('inventory discovery and identity', () => {
 				...DECLARATION_CONTEXT_REPORT_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -2102,7 +2155,16 @@ describe('inventory discovery and identity', () => {
 			'command csaa:analyze:command-event-contract-overlay is CONFIGURED_NOT_RUN by inventory generation'
 		);
 		expect(semanticBoundary).toContain(
-			'aggregate unexecuted preliminary report-command population includes command-dispatch-topology, guard-classification-overlay, and command-event-contract-overlay'
+			'preliminary logical-graph-composition report facade exposes one exact same-subject project-context, module-dependency, call, and two-layer reference-only composition evidence set'
+		);
+		expect(semanticBoundary).toContain(
+			'preserving PARTIAL/OPEN status, every predecessor limitation, and no query, slice, impact, finding, remediation, dead-code, safe-removal, DWP completion, registered-operation, or gate authority'
+		);
+		expect(semanticBoundary).toContain(
+			'command csaa:analyze:logical-graph-composition is CONFIGURED_NOT_RUN by inventory generation'
+		);
+		expect(semanticBoundary).toContain(
+			'aggregate unexecuted preliminary report-command population includes command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition'
 		);
 		expect(semanticBoundary).toContain(
 			'exact selected retained guard-enforcement-ledger audit and classification evidence'
@@ -2252,6 +2314,7 @@ describe('inventory discovery and identity', () => {
 				...SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 				...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 				...CALL_GRAPH_REPORT_PROVENANCE,
+				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 				...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 				...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -2277,6 +2340,15 @@ describe('inventory discovery and identity', () => {
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`logical graph composition has graph authority ${LOGICAL_GRAPH_COMPOSITION_GRAPH_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			`logical-graph-composition report facade has analysis authority ${LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY}, authority transfer ${LOGICAL_GRAPH_COMPOSITION_REPORT_AUTHORITY_TRANSFER}, and gate effect ${LOGICAL_GRAPH_COMPOSITION_REPORT_GATE_EFFECT}`
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'remains preliminary and unregistered, preserves PARTIAL/OPEN status and every predecessor/report nonclaim'
+		);
+		expect(verificationAuthority?.statement).toContain(
+			'confers no query, slice, impact, architecture, finding, remediation, dead-code, safe-removal, DWP completion, gate, merge, or disposition authority'
 		);
 		expect(verificationAuthority?.statement).toContain(
 			`read/write-access report facade has analysis authority ${READ_WRITE_ACCESS_REPORT_AUTHORITY}, authority transfer ${READ_WRITE_ACCESS_REPORT_AUTHORITY_TRANSFER}, and gate effect ${READ_WRITE_ACCESS_REPORT_GATE_EFFECT}`
@@ -2818,6 +2890,7 @@ describe('JPWB population non-vacuity', () => {
 				'csaa:analyze:guard-classification-overlay',
 				'csaa:analyze:call-graph',
 				'csaa:analyze:module-dependency',
+				'csaa:analyze:logical-graph-composition',
 				'csaa:analyze:module-resolution-trace',
 				'csaa:semantic:smoke:command-event-contract',
 				'csaa:semantic:smoke:guard-classification',
@@ -3000,6 +3073,26 @@ describe('JPWB population non-vacuity', () => {
 				requireJpwbPopulations: true
 			})
 		).toThrow('Required JPWB assurance command is absent: csaa:analyze:module-dependency');
+
+		const missingLogicalGraphCompositionReportCommand = fixture();
+		write(
+			missingLogicalGraphCompositionReportCommand,
+			'package.json',
+			manifest(
+				['packages/*', 'apps/*'],
+				Object.fromEntries(
+					Object.entries(completeScripts).filter(
+						([name]) => name !== 'csaa:analyze:logical-graph-composition'
+					)
+				)
+			)
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: missingLogicalGraphCompositionReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow('Required JPWB assurance command is absent: csaa:analyze:logical-graph-composition');
 
 		const missingArrowCommandCensusReportCommand = fixture();
 		write(
@@ -3456,6 +3549,24 @@ describe('JPWB population non-vacuity', () => {
 			})
 		).toThrow('Required JPWB assurance command is incompatible: csaa:analyze:module-dependency');
 
+		const incompatibleLogicalGraphCompositionReportCommand = fixture();
+		write(
+			incompatibleLogicalGraphCompositionReportCommand,
+			'package.json',
+			manifest(['packages/*', 'apps/*'], {
+				...completeScripts,
+				'csaa:analyze:logical-graph-composition': 'bun scripts/wrong-logical-graph-composition.ts'
+			})
+		);
+		expect(() =>
+			collectInventory({
+				repositoryRoot: incompatibleLogicalGraphCompositionReportCommand,
+				requireJpwbPopulations: true
+			})
+		).toThrow(
+			'Required JPWB assurance command is incompatible: csaa:analyze:logical-graph-composition'
+		);
+
 		const incompatibleArrowCommandCensusReportCommand = fixture();
 		write(
 			incompatibleArrowCommandCensusReportCommand,
@@ -3729,6 +3840,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:call-graph',
 						'csaa:analyze:state-machine-graph',
 						'csaa:analyze:module-dependency',
+						'csaa:analyze:logical-graph-composition',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -3803,6 +3915,7 @@ describe('JPWB population non-vacuity', () => {
 			...readWritePaths,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -3855,6 +3968,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:guard-classification-overlay',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
+						'csaa:analyze:logical-graph-composition',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -3889,6 +4003,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/providers/typescript/extract-types.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			'packages/csaa/src/contracts/read-write-access-graph.ts',
 			'packages/csaa/src/graph/build-read-write-access-graph.ts',
 			'packages/csaa/src/graph/read-write-access-graph-canonical.ts',
@@ -3933,6 +4048,7 @@ describe('JPWB population non-vacuity', () => {
 						'csaa:analyze:guard-classification-overlay',
 						'csaa:analyze:call-graph',
 						'csaa:analyze:module-dependency',
+						'csaa:analyze:logical-graph-composition',
 						'csaa:analyze:module-resolution-trace',
 						'csaa:semantic:smoke:command-event-contract',
 						'csaa:semantic:smoke:guard-classification',
@@ -3981,6 +4097,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/validate-read-write-access-graph.ts',
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
 			...CALL_GRAPH_REPORT_PROVENANCE,
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...STATE_MACHINE_GRAPH_REPORT_PROVENANCE,
 			...ARROW_COMMAND_CENSUS_REPORT_PROVENANCE,
 			...COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
@@ -4064,6 +4181,7 @@ describe('JPWB population non-vacuity', () => {
 			'packages/csaa/src/graph/structural-module-reachability-analysis-coverage.test.ts',
 			...STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
 			...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+			...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 			...PROJECT_CONTEXT_GRAPH_PROVENANCE,
 			...PROJECT_CONTEXT_REPORT_PROVENANCE,
 			...MODULE_DEPENDENCY_REPORT_PROVENANCE,
@@ -4262,6 +4380,20 @@ describe('JPWB population non-vacuity', () => {
 				`Required JPWB logical graph composition implementation or verification source is absent: ${missingLogicalGraphCompositionPath}`
 			);
 			write(root, missingLogicalGraphCompositionPath, 'export {};\n');
+		}
+		for (const missingLogicalGraphCompositionReportPath of LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE.filter(
+			(path) =>
+				!MODULE_DEPENDENCY_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!CALL_GRAPH_REPORT_PROVENANCE.some((shared) => shared === path) &&
+				!PROJECT_CONTEXT_REPORT_PROVENANCE.some((shared) => shared === path)
+		)) {
+			rmSync(join(root, ...missingLogicalGraphCompositionReportPath.split('/')));
+			expect(() =>
+				collectInventory({ repositoryRoot: root, requireJpwbPopulations: true })
+			).toThrow(
+				`Required JPWB logical graph composition report facade or verification source is absent: ${missingLogicalGraphCompositionReportPath}`
+			);
+			write(root, missingLogicalGraphCompositionReportPath, 'export {};\n');
 		}
 		for (const missingProjectContextGraphPath of PROJECT_CONTEXT_GRAPH_PROVENANCE.filter(
 			(path) => path !== 'packages/csaa/src/semantic/repository-smoke.test.ts'
@@ -4515,6 +4647,16 @@ describe('JPWB population non-vacuity', () => {
 		});
 		expect(
 			inventory.commands.find(
+				(command) =>
+					command.owner === '.' && command.name === 'csaa:analyze:logical-graph-composition'
+			)
+		).toMatchObject({
+			categories: ['OTHER'],
+			command: LOGICAL_GRAPH_COMPOSITION_REPORT_COMMAND,
+			state: 'CONFIGURED_NOT_RUN'
+		});
+		expect(
+			inventory.commands.find(
 				(command) => command.owner === '.' && command.name === 'csaa:analyze:arrow-command-census'
 			)
 		).toMatchObject({
@@ -4649,6 +4791,7 @@ describe('JPWB population non-vacuity', () => {
 				'packages/csaa/src/graph/structural-scc-analysis-coverage.test.ts',
 				'packages/csaa/src/graph/structural-scc-analysis-fixture.test-support.ts',
 				...LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+				...LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
 				...CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_PROVENANCE,
 				...MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,

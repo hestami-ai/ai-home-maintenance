@@ -45,6 +45,7 @@ import {
 } from '../contracts/logical-graph-composition.js';
 import { compareText } from '../inventory/canonical.js';
 import { isProxyValue, isUnicodeScalarString } from '../semantic/canonical.js';
+import { logicalGraphCompositionInputDigest } from './logical-graph-composition-canonical.js';
 import { validateCallGraph } from './validate-call-graph.js';
 import { validateModuleDependencyGraph } from './validate-graph.js';
 
@@ -55,6 +56,69 @@ interface ClosedOptions {
 	readonly maxIssues: number;
 	readonly maxRecords: number;
 	readonly maxStringCharacters: number;
+}
+
+/**
+ * Opaque same-process proof that the exact predecessor objects were validated.
+ * This type is intentionally not exported from the package root.
+ */
+export interface LogicalGraphCompositionPrevalidatedPredecessorWitness {
+	readonly __logicalGraphCompositionPrevalidatedPredecessorWitness: never;
+}
+
+/** Opaque first-stage proof that the exact module predecessor validated successfully. */
+export interface LogicalGraphCompositionValidatedModulePredecessorWitness {
+	readonly __logicalGraphCompositionValidatedModulePredecessorWitness: never;
+}
+
+export interface LogicalGraphCompositionPrevalidationIssue {
+	readonly code: string;
+	readonly message: string;
+	readonly path: string;
+}
+
+export type LogicalGraphCompositionModulePrevalidationResult =
+	| {
+			readonly issues: readonly [];
+			readonly state: 'VALID';
+			readonly witness: LogicalGraphCompositionValidatedModulePredecessorWitness;
+	  }
+	| {
+			readonly issues: readonly LogicalGraphCompositionPrevalidationIssue[];
+			readonly state: 'BUDGET_EXHAUSTED' | 'INVALID';
+	  };
+
+export type LogicalGraphCompositionCallPrevalidationResult =
+	| {
+			readonly inputDigest: string;
+			readonly issues: readonly [];
+			readonly state: 'VALID';
+			readonly witness: LogicalGraphCompositionPrevalidatedPredecessorWitness;
+	  }
+	| {
+			readonly issues: readonly LogicalGraphCompositionPrevalidationIssue[];
+			readonly state: 'BUDGET_EXHAUSTED' | 'INVALID';
+	  };
+
+interface ValidatedModulePredecessorWitnessState {
+	readonly callGraph: LogicalGraphCompositionInputs['callGraph'];
+	consumed: boolean;
+	readonly inputs: LogicalGraphCompositionInputs;
+	readonly maxIssues: number;
+	readonly moduleDependencyGraph: LogicalGraphCompositionInputs['moduleDependencyGraph'];
+	readonly request: LogicalGraphCompositionInputs['request'];
+	readonly semanticSnapshot: LogicalGraphCompositionInputs['semanticSnapshot'];
+}
+
+interface PrevalidatedPredecessorWitnessState {
+	readonly callGraph: LogicalGraphCompositionInputs['callGraph'];
+	consumed: boolean;
+	readonly inputDigest: string;
+	readonly inputs: LogicalGraphCompositionInputs;
+	readonly maxIssues: number;
+	readonly moduleDependencyGraph: LogicalGraphCompositionInputs['moduleDependencyGraph'];
+	readonly request: LogicalGraphCompositionInputs['request'];
+	readonly semanticSnapshot: LogicalGraphCompositionInputs['semanticSnapshot'];
 }
 
 const DEFAULT_OPTIONS: ClosedOptions = {
@@ -68,6 +132,11 @@ const DEFAULT_OPTIONS: ClosedOptions = {
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const INDEPENDENT_ID_ALGORITHM_VERSION = '1';
+const validatedModulePredecessorWitnesses = new WeakMap<
+	object,
+	ValidatedModulePredecessorWitnessState
+>();
+const prevalidatedPredecessorWitnesses = new WeakMap<object, PrevalidatedPredecessorWitnessState>();
 
 const INPUT_KEYS = ['callGraph', 'moduleDependencyGraph', 'request', 'semanticSnapshot'] as const;
 const REQUEST_KEYS = [
@@ -672,6 +741,156 @@ function requestIssue(
 	return null;
 }
 
+function prevalidationInvalid(
+	message: string,
+	path = '$prevalidatedPredecessors'
+): {
+	readonly issues: readonly LogicalGraphCompositionPrevalidationIssue[];
+	readonly state: 'INVALID';
+} {
+	return { issues: [{ code: 'PREVALIDATION_INVALID', message, path }], state: 'INVALID' };
+}
+
+/**
+ * Validates the exact module predecessor and issues an opaque first-stage witness only on VALID.
+ * This function is intentionally not exported from the package root.
+ */
+export function validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+	inputs: LogicalGraphCompositionInputs,
+	maxIssues: number
+): LogicalGraphCompositionModulePrevalidationResult {
+	try {
+		if (
+			arguments.length !== 2 ||
+			inputShellIssue(inputs) !== null ||
+			requestIssue(inputs) !== null ||
+			!safePositive(maxIssues) ||
+			maxIssues > 100_000 ||
+			maxIssues !== Math.min(inputs.request.budgets.maxDiagnostics, 100_000)
+		)
+			return prevalidationInvalid('Module-predecessor witness arguments are invalid.');
+		const validation = validateModuleDependencyGraph(
+			inputs.moduleDependencyGraph,
+			inputs.semanticSnapshot,
+			{ maxIssues }
+		);
+		if (validation.state !== 'VALID') return validation;
+		const witness = Object.freeze(
+			Object.create(null)
+		) as LogicalGraphCompositionValidatedModulePredecessorWitness;
+		validatedModulePredecessorWitnesses.set(witness, {
+			callGraph: inputs.callGraph,
+			consumed: false,
+			inputs,
+			maxIssues,
+			moduleDependencyGraph: inputs.moduleDependencyGraph,
+			request: inputs.request,
+			semanticSnapshot: inputs.semanticSnapshot
+		});
+		return { issues: [], state: 'VALID', witness };
+	} catch {
+		return prevalidationInvalid('Module-predecessor validation failed closed on hostile input.');
+	}
+}
+
+/** Consumes the module-stage witness only after every exact binding matches. */
+function takeValidatedModulePredecessorWitness(
+	witness: LogicalGraphCompositionValidatedModulePredecessorWitness,
+	inputs: LogicalGraphCompositionInputs,
+	maxIssues: number
+): boolean {
+	if (witness === null || typeof witness !== 'object') return false;
+	const state = validatedModulePredecessorWitnesses.get(witness);
+	if (
+		state === undefined ||
+		state.consumed ||
+		state.inputs !== inputs ||
+		state.request !== inputs.request ||
+		state.moduleDependencyGraph !== inputs.moduleDependencyGraph ||
+		state.callGraph !== inputs.callGraph ||
+		state.semanticSnapshot !== inputs.semanticSnapshot ||
+		state.maxIssues !== maxIssues
+	)
+		return false;
+	state.consumed = true;
+	return true;
+}
+
+/**
+ * Consumes an exact module-stage witness, validates the call predecessor, computes the exact
+ * composition input digest, and issues the combined single-use witness only on VALID.
+ *
+ * @internal Between the two synchronous stages, callers must not await, expose the detached
+ * materialized inputs to a callback, or mutate any bound object. The package root does not export
+ * this trust-bound operation.
+ */
+export function validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+	inputs: LogicalGraphCompositionInputs,
+	moduleWitness: LogicalGraphCompositionValidatedModulePredecessorWitness,
+	maxIssues: number
+): LogicalGraphCompositionCallPrevalidationResult {
+	try {
+		if (
+			arguments.length !== 3 ||
+			inputShellIssue(inputs) !== null ||
+			requestIssue(inputs) !== null ||
+			!safePositive(maxIssues) ||
+			maxIssues > 100_000 ||
+			maxIssues !== Math.min(inputs.request.budgets.maxDiagnostics, 100_000)
+		)
+			return prevalidationInvalid('Call-predecessor witness arguments are invalid.');
+		if (!takeValidatedModulePredecessorWitness(moduleWitness, inputs, maxIssues))
+			return prevalidationInvalid(
+				'The module-predecessor witness is invalid for these exact inputs.',
+				'$validatedModulePredecessor'
+			);
+		const validation = validateCallGraph(inputs.callGraph, inputs.semanticSnapshot, { maxIssues });
+		if (validation.state !== 'VALID') return validation;
+		const inputDigest = logicalGraphCompositionInputDigest(inputs);
+		const witness = Object.freeze(
+			Object.create(null)
+		) as LogicalGraphCompositionPrevalidatedPredecessorWitness;
+		prevalidatedPredecessorWitnesses.set(witness, {
+			callGraph: inputs.callGraph,
+			consumed: false,
+			inputDigest,
+			inputs,
+			maxIssues,
+			moduleDependencyGraph: inputs.moduleDependencyGraph,
+			request: inputs.request,
+			semanticSnapshot: inputs.semanticSnapshot
+		});
+		return { inputDigest, issues: [], state: 'VALID', witness };
+	} catch {
+		return prevalidationInvalid('Call-predecessor validation failed closed on hostile input.');
+	}
+}
+
+/** Consumes a witness only after every exact-object and effective-budget binding matches. */
+function takePrevalidatedPredecessorWitness(
+	witness: LogicalGraphCompositionPrevalidatedPredecessorWitness,
+	inputs: LogicalGraphCompositionInputs,
+	inputDigest: string,
+	maxIssues: number
+): boolean {
+	if (witness === null || typeof witness !== 'object') return false;
+	const state = prevalidatedPredecessorWitnesses.get(witness);
+	if (
+		state === undefined ||
+		state.consumed ||
+		state.inputs !== inputs ||
+		state.request !== inputs.request ||
+		state.moduleDependencyGraph !== inputs.moduleDependencyGraph ||
+		state.callGraph !== inputs.callGraph ||
+		state.semanticSnapshot !== inputs.semanticSnapshot ||
+		state.inputDigest !== inputDigest ||
+		state.maxIssues !== maxIssues
+	)
+		return false;
+	state.consumed = true;
+	return true;
+}
+
 function operationBudgetIssue(
 	inputs: LogicalGraphCompositionInputs
 ): LogicalGraphCompositionValidationIssue | null {
@@ -1117,7 +1336,9 @@ function validateInternal(
 	value: unknown,
 	inputsValue: unknown,
 	options: LogicalGraphCompositionValidationOptions | undefined,
-	knownInputDigest?: string
+	knownInputDigest?: string,
+	prevalidatedPredecessorWitness?: LogicalGraphCompositionPrevalidatedPredecessorWitness,
+	predecessorsPrevalidated = false
 ): LogicalGraphCompositionValidationResult {
 	const limits = closeOptions(options);
 	if (limits === null)
@@ -1152,15 +1373,40 @@ function validateInternal(
 			inputs.request.budgets.maxInputStringCharacters
 		)
 	};
-	const inputTreeIssue = inputWrapperTreeIssue(inputsValue, inputLimits);
-	if (inputTreeIssue !== null) return invalid(inputTreeIssue);
+	if (
+		inputLimits.maxRecords !== limits.maxInputRecords ||
+		inputLimits.maxStringCharacters !== limits.maxInputStringCharacters
+	) {
+		const inputTreeIssue = inputWrapperTreeIssue(inputsValue, inputLimits);
+		if (inputTreeIssue !== null) return invalid(inputTreeIssue);
+	}
 	const budgetIssue = operationBudgetIssue(inputs);
 	if (budgetIssue !== null) return invalid(budgetIssue);
 	const bindingIssue = inputBindingIssue(inputs);
 	if (bindingIssue !== null) return invalid(bindingIssue);
 	const maxIssues = Math.min(limits.maxIssues, inputs.request.budgets.maxDiagnostics, 100_000);
-	const predecessorIssue = predecessorValidationIssue(inputs, maxIssues);
-	if (predecessorIssue !== null) return invalid(predecessorIssue);
+	if (predecessorsPrevalidated) {
+		if (
+			knownInputDigest === undefined ||
+			prevalidatedPredecessorWitness === undefined ||
+			!takePrevalidatedPredecessorWitness(
+				prevalidatedPredecessorWitness,
+				inputs,
+				knownInputDigest,
+				maxIssues
+			)
+		)
+			return invalid(
+				issue(
+					'SHAPE_INVALID',
+					'The prevalidated predecessor witness is invalid for these exact inputs.',
+					'$prevalidatedPredecessors'
+				)
+			);
+	} else {
+		const predecessorIssue = predecessorValidationIssue(inputs, maxIssues);
+		if (predecessorIssue !== null) return invalid(predecessorIssue);
+	}
 	const expected = deriveComposition(inputs, knownInputDigest);
 	if (expected.state === 'INVALID')
 		return invalid(issue('INPUT_INVALID', expected.message, expected.path));
@@ -1220,6 +1466,46 @@ export function validateConstructedLogicalGraphComposition(
 	} catch {
 		return invalid(
 			issue('SHAPE_INVALID', 'Constructed logical graph composition validation failed closed.')
+		);
+	}
+}
+
+/**
+ * Producer-internal single-use path that skips only repeated predecessor validation.
+ * All candidate, input-tree, budget, binding, independent-derivation, identity, digest, and
+ * population checks remain active. This function is intentionally not exported from the package root.
+ */
+export function validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors(
+	value: unknown,
+	inputs: LogicalGraphCompositionInputs,
+	knownInputDigest: string,
+	witness: LogicalGraphCompositionPrevalidatedPredecessorWitness,
+	options?: LogicalGraphCompositionValidationOptions
+): LogicalGraphCompositionValidationResult {
+	if (arguments.length < 4 || arguments.length > 5)
+		return invalid(
+			issue(
+				'SHAPE_INVALID',
+				'The prevalidated constructed validator requires four or five arguments.',
+				'$arguments'
+			)
+		);
+	if (typeof knownInputDigest !== 'string' || !SHA256.test(knownInputDigest))
+		return invalid(
+			issue(
+				'SHAPE_INVALID',
+				'The known input digest must be lowercase SHA-256.',
+				'$validationInput.inputDigest'
+			)
+		);
+	try {
+		return validateInternal(value, inputs, options, knownInputDigest, witness, true);
+	} catch {
+		return invalid(
+			issue(
+				'SHAPE_INVALID',
+				'Prevalidated constructed logical graph composition validation failed closed.'
+			)
 		);
 	}
 }

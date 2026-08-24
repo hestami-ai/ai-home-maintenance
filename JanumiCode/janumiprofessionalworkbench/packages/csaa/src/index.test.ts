@@ -103,7 +103,18 @@ import {
 	GUARD_ENFORCEMENT_LEDGER_REPORT_SCHEMA_VERSION,
 	GUARD_ENFORCEMENT_LEDGER_SCHEMA_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_OPERATION_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_BYTES,
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_EVENTS,
 	LOGICAL_GRAPH_COMPOSITION_PROGRESS_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_PROGRESS_TRANSPORT_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_OPERATION_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_NONCLAIMS,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_REQUEST_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_RESULT_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_SCHEMA_VERSION,
+	LOGICAL_GRAPH_COMPOSITION_REPORT_SELECTION,
 	LOGICAL_GRAPH_COMPOSITION_REQUEST_SCHEMA_VERSION,
 	LOGICAL_GRAPH_COMPOSITION_SCHEMA_VERSION,
 	PROJECT_CONTEXT_GRAPH_OPERATION_VERSION,
@@ -250,6 +261,8 @@ import {
 	moduleDependencyReportExitCode,
 	runModuleDependencyReport,
 	buildLogicalGraphComposition,
+	logicalGraphCompositionReportExitCode,
+	runLogicalGraphCompositionReport,
 	buildProjectContextGraph,
 	runProjectContextReport,
 	runDeclarationContextReport,
@@ -301,6 +314,14 @@ import {
 	validateStateMachineTopologyObservation,
 	validateStaticSemanticSnapshot
 } from '@janumipwb/csaa';
+
+export type LogicalGraphCompositionPrevalidatedPredecessorWitnessMustRemainInternal =
+	// @ts-expect-error -- this trust-bound witness type must remain absent from the package root.
+	import('@janumipwb/csaa').LogicalGraphCompositionPrevalidatedPredecessorWitness;
+
+export type LogicalGraphCompositionValidatedModulePredecessorWitnessMustRemainInternal =
+	// @ts-expect-error -- this trust-bound witness type must remain absent from the package root.
+	import('@janumipwb/csaa').LogicalGraphCompositionValidatedModulePredecessorWitness;
 
 interface PackageManifest {
 	readonly dependencies?: Readonly<Record<string, string>>;
@@ -400,6 +421,21 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('classifyModuleDependencyGraphFailureState');
 		expect(publicSurface).not.toHaveProperty('projectedModuleDependencyPopulation');
 		expect(buildLogicalGraphComposition).toBeTypeOf('function');
+		expect(runLogicalGraphCompositionReport).toBeTypeOf('function');
+		expect(logicalGraphCompositionReportExitCode).toBeTypeOf('function');
+		expect(publicSurface).not.toHaveProperty('createLogicalGraphCompositionProgressJsonlWriter');
+		expect(publicSurface).not.toHaveProperty('runLogicalGraphCompositionCommand');
+		expect(publicSurface).not.toHaveProperty('admitLogicalGraphCompositionReportRequest');
+		expect(publicSurface).not.toHaveProperty('runLogicalGraphCompositionReportWithDependencies');
+		expect(publicSurface).not.toHaveProperty(
+			'validateAndIssueLogicalGraphCompositionModulePredecessorWitness'
+		);
+		expect(publicSurface).not.toHaveProperty(
+			'validateAndIssueLogicalGraphCompositionCallPredecessorWitness'
+		);
+		expect(publicSurface).not.toHaveProperty(
+			'validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors'
+		);
 		expect(buildProjectContextGraph).toBeTypeOf('function');
 		expect(runProjectContextReport).toBeTypeOf('function');
 		expect(projectContextReportExitCode).toBeTypeOf('function');
@@ -949,6 +985,40 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(LOGICAL_GRAPH_COMPOSITION_SCHEMA_VERSION).toBe(
 			'jan-csaa-logical-graph-composition/1.0.0'
 		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_OPERATION_VERSION).toBe(
+			'jan-csaa-report-logical-graph-composition/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_REQUEST_SCHEMA_VERSION).toBe(
+			'jan-csaa-logical-graph-composition-report-request/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_RESULT_SCHEMA_VERSION).toBe(
+			'jan-csaa-logical-graph-composition-report-result/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-logical-graph-composition-report/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_SELECTION).toMatchObject({
+			contributingLayers: ['MODULE_DEPENDENCY', 'CALL'],
+			dependencyCruiserCorroboration: 'NOT_RUN',
+			evidence:
+				'FULL_VALIDATED_SAME_SUBJECT_PROJECT_CONTEXT_MODULE_DEPENDENCY_CALL_AND_REFERENCE_ONLY_COMPOSITION',
+			subjectPopulation: 'EXPLICIT_PROJECT_CLOSURE_CAPTURED_IN_ONE_FROZEN_SUBJECT'
+		});
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_SCHEMA_VERSION).toBe(
+			'jan-csaa-logical-graph-composition-report-progress/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_NONCLAIMS).toEqual({
+			dwp004Dwp005OrDwp006Completion: 'NOT_CLAIMED',
+			facadeNonclaims: LOGICAL_GRAPH_COMPOSITION_REPORT_NONCLAIMS,
+			janCsaa007OperationProgressResponse: 'NOT_CLAIMED',
+			runtimeOutcomeInvariance: 'NOT_CLAIMED',
+			terminalOutcomeEvidenceOrCapabilityCompleteness: 'NOT_CLAIMED'
+		});
+		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_TRANSPORT_SCHEMA_VERSION).toBe(
+			'jan-csaa-logical-graph-composition-progress-transport/0.1.0'
+		);
+		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(LOGICAL_GRAPH_COMPOSITION_PROGRESS_MAX_EVENTS).toBe(2_048);
 		expect(PROJECT_CONTEXT_GRAPH_OPERATION_VERSION).toBe(
 			'jan-csaa-build-project-context-graph/0.1.0'
 		);

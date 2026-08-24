@@ -44,12 +44,13 @@ import {
 	logicalGraphCompositionContentDigest,
 	logicalGraphCompositionCrossLinkId,
 	logicalGraphCompositionId,
-	logicalGraphCompositionInputDigest,
 	logicalGraphCompositionLayerId
 } from './logical-graph-composition-canonical.js';
-import { validateCallGraph } from './validate-call-graph.js';
-import { validateModuleDependencyGraph } from './validate-graph.js';
-import { validateConstructedLogicalGraphComposition } from './validate-logical-graph-composition.js';
+import {
+	validateAndIssueLogicalGraphCompositionCallPredecessorWitness,
+	validateAndIssueLogicalGraphCompositionModulePredecessorWitness,
+	validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors
+} from './validate-logical-graph-composition.js';
 
 const INPUT_KEYS = ['callGraph', 'moduleDependencyGraph', 'request', 'semanticSnapshot'] as const;
 const REQUEST_KEYS = [
@@ -830,11 +831,11 @@ export function buildLogicalGraphComposition(
 			assertBudgetNotExceeded(path, actual, maximum, 'BIND');
 		progress.complete({ inputRecords });
 
+		const predecessorMaxIssues = Math.min(request.budgets.maxDiagnostics, 100_000);
 		progress.start('MODULE_DEPENDENCY_GRAPH_VALIDATE');
-		const moduleValidation = validateModuleDependencyGraph(
-			moduleDependencyGraph,
-			semanticSnapshot,
-			{ maxIssues: Math.min(request.budgets.maxDiagnostics, 100_000) }
+		const moduleValidation = validateAndIssueLogicalGraphCompositionModulePredecessorWitness(
+			inputs,
+			predecessorMaxIssues
 		);
 		if (moduleValidation.state !== 'VALID')
 			throw new CompositionFailure(
@@ -845,15 +846,18 @@ export function buildLogicalGraphComposition(
 		progress.complete({ issues: 0 });
 
 		progress.start('CALL_GRAPH_VALIDATE');
-		const callValidation = validateCallGraph(callGraph, semanticSnapshot, {
-			maxIssues: Math.min(request.budgets.maxDiagnostics, 100_000)
-		});
+		const callValidation = validateAndIssueLogicalGraphCompositionCallPredecessorWitness(
+			inputs,
+			moduleValidation.witness,
+			predecessorMaxIssues
+		);
 		if (callValidation.state !== 'VALID')
 			throw new CompositionFailure(
 				'CALL_GRAPH_INVALID',
 				`Call predecessor is invalid (${validationSummary(callValidation.issues)}).`,
 				'VALIDATE'
 			);
+		const { inputDigest, witness: prevalidatedPredecessorWitness } = callValidation;
 		progress.complete({ issues: 0 });
 
 		progress.start('SOURCE_OCCURRENCE_JOIN');
@@ -884,7 +888,6 @@ export function buildLogicalGraphComposition(
 				.sort((left, right) => compareText(left.id, right.id))
 				.map((source) => [source.id, source] as const)
 		);
-		const inputDigest = logicalGraphCompositionInputDigest(inputs);
 		const compositionId = logicalGraphCompositionId({
 			inputDigest,
 			semanticSnapshotId: semanticSnapshot.id,
@@ -1045,10 +1048,11 @@ export function buildLogicalGraphComposition(
 		progress.complete({ compositionRecords: outputRecords });
 
 		progress.start('COMPOSITION_VALIDATE');
-		const validation = validateConstructedLogicalGraphComposition(
+		const validation = validateConstructedLogicalGraphCompositionWithPrevalidatedPredecessors(
 			composition,
 			inputs,
 			inputDigest,
+			prevalidatedPredecessorWitness,
 			{
 				maxInputRecords: request.budgets.maxInputRecords,
 				maxInputStringCharacters: request.budgets.maxInputStringCharacters,

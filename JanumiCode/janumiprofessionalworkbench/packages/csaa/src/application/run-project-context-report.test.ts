@@ -7,6 +7,7 @@ import {
 	PROJECT_CONTEXT_REPORT_NONCLAIMS,
 	PROJECT_CONTEXT_REPORT_OPERATION_VERSION,
 	PROJECT_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
+	PROJECT_CONTEXT_REPORT_SAFETY_CEILINGS,
 	type ProjectContextReportRequest
 } from '../contracts/project-context-report.js';
 import { canonicalSemanticJson } from '../semantic/canonical.js';
@@ -483,6 +484,63 @@ describe('runProjectContextReport', () => {
 		if (publicOutcome.outcome !== 'partial') return;
 		expect(publicOutcome.subject.subjectId).not.toBe(captured.frozenSubject.descriptor.subjectId);
 		expect(publicOutcome.request).toEqual(request());
+	});
+
+	it('snapshots an exact internal graph-budget override without widening public CAP-010 admission', () => {
+		const root = fixture();
+		const baseline = request();
+		const override = {
+			...baseline.budgets.projectContext,
+			maxInputRecords: PROJECT_CONTEXT_REPORT_SAFETY_CEILINGS.projectContext.maxInputRecords + 1
+		};
+		const captured = captureProjectContextReportPipeline(baseline, {
+			projectContextBudgets: override,
+			repositoryRoot: root
+		});
+		expect(captured.outcome).toBe('captured');
+		if (captured.outcome !== 'captured') return;
+		const capturedMaxInputRecords = captured.request.budgets.projectContext.maxInputRecords;
+		override.maxInputRecords = 1;
+		expect(capturedMaxInputRecords).toBe(
+			PROJECT_CONTEXT_REPORT_SAFETY_CEILINGS.projectContext.maxInputRecords + 1
+		);
+		expect(captured.request.budgets.projectContext.maxInputRecords).toBe(capturedMaxInputRecords);
+		expect(Object.isFrozen(captured.request.budgets.projectContext)).toBe(true);
+
+		const publicOutcome = runProjectContextReport(
+			request({
+				budgets: {
+					...baseline.budgets,
+					projectContext: {
+						...baseline.budgets.projectContext,
+						maxInputRecords: capturedMaxInputRecords
+					}
+				}
+			}),
+			{ repositoryRoot: root }
+		);
+		expect(publicOutcome).toMatchObject({
+			code: 'REQUEST_BUDGET_EXCEEDS_SAFETY_CEILING',
+			outcome: 'unavailable',
+			state: 'resource-refused'
+		});
+
+		let accessorTouched = false;
+		const accessorOverride = { ...baseline.budgets.projectContext };
+		Object.defineProperty(accessorOverride, 'maxInputRecords', {
+			enumerable: true,
+			get: () => {
+				accessorTouched = true;
+				return capturedMaxInputRecords;
+			}
+		});
+		expect(() =>
+			captureProjectContextReportPipeline(baseline, {
+				projectContextBudgets: accessorOverride,
+				repositoryRoot: root
+			})
+		).toThrow('must be an enumerable data property');
+		expect(accessorTouched).toBe(false);
 	});
 
 	it('hands off one subject and semantic snapshot without constructing CAP-010 projection evidence', () => {

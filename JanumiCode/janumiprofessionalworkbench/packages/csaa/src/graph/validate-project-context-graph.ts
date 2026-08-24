@@ -1270,20 +1270,30 @@ function validatedInputsIssue(
 	const inputs = inputsValue as ProjectContextGraphBuildInputs;
 	const closedRequestIssue = requestIssue(inputs);
 	if (closedRequestIssue !== null) return closedRequestIssue;
-	const requestInputIssue = plainTreeIssue(
-		inputsValue,
-		{
-			maxDepth: limits.maxDepth,
-			maxRecords: Math.min(limits.maxInputRecords, inputs.request.budgets.maxInputRecords),
-			maxStringCharacters: Math.min(
-				limits.maxInputStringCharacters,
-				inputs.request.budgets.maxInputStringCharacters
-			)
-		},
-		'$inputs',
-		true
+	const requestMaxRecords = Math.min(
+		limits.maxInputRecords,
+		inputs.request.budgets.maxInputRecords
 	);
-	if (requestInputIssue !== null) return requestInputIssue;
+	const requestMaxStringCharacters = Math.min(
+		limits.maxInputStringCharacters,
+		inputs.request.budgets.maxInputStringCharacters
+	);
+	if (
+		requestMaxRecords !== limits.maxInputRecords ||
+		requestMaxStringCharacters !== limits.maxInputStringCharacters
+	) {
+		const requestInputIssue = plainTreeIssue(
+			inputsValue,
+			{
+				maxDepth: limits.maxDepth,
+				maxRecords: requestMaxRecords,
+				maxStringCharacters: requestMaxStringCharacters
+			},
+			'$inputs',
+			true
+		);
+		if (requestInputIssue !== null) return requestInputIssue;
+	}
 	const bindingIssue = inputBindingIssue(inputs);
 	if (bindingIssue !== null) return bindingIssue;
 	return operationBudgetIssue(inputs);
