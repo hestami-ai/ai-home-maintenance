@@ -5,7 +5,7 @@ export type { ArtifactPrimaryClass } from './artifact-class.js';
 
 export const SUBJECT_REQUEST_SCHEMA_VERSION = 'jan-csaa-subject-request/2.0.0' as const;
 export const SUBJECT_SCHEMA_VERSION = 'jan-csaa-subject/2.0.0' as const;
-export const SUBJECT_POLICY_VERSION = 'jan-csaa-subject-policy/2.0.0' as const;
+export const SUBJECT_POLICY_VERSION = 'jan-csaa-subject-policy/2.1.0' as const;
 // JAN-CSAA-001 W4 fixes the v1 domain preimage around configurationDigest rather than
 // freezing the internal configuration-preimage schema. The schema/policy versions above
 // therefore govern the additive test-population and generated-context inputs to that digest.

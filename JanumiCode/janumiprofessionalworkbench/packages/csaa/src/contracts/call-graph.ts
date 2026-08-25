@@ -16,10 +16,10 @@ import type {
 import { FULL_JAN_CSAA_007_CONFORMANCE } from './semantic.js';
 
 export const CALL_GRAPH_REQUEST_SCHEMA_VERSION = 'jan-csaa-call-graph-request/1.0.0' as const;
-export const CALL_GRAPH_SCHEMA_VERSION = 'jan-csaa-call-graph/1.0.0' as const;
-export const CALL_GRAPH_OPERATION_VERSION = 'jan-csaa-build-call-graph/0.1.0' as const;
+export const CALL_GRAPH_SCHEMA_VERSION = 'jan-csaa-call-graph/2.0.0' as const;
+export const CALL_GRAPH_OPERATION_VERSION = 'jan-csaa-build-call-graph/1.0.0' as const;
 export const CALL_GRAPH_CANONICAL_PROFILE = 'jan-csaa-call-graph-canonical/1.0.0' as const;
-export const CALL_GRAPH_METHOD = 'typescript-5.9.3-direct-static-call-projection/0.1.0' as const;
+export const CALL_GRAPH_METHOD = 'typescript-5.9.3-direct-static-call-projection/1.0.0' as const;
 export const CALL_GRAPH_CAPABILITY = 'JAN-CSAA-CAP-005' as const;
 export const CALL_GRAPH_CAPABILITY_STATUS = 'PARTIAL' as const;
 
@@ -49,6 +49,7 @@ export type CallGraphDispatchClass =
 	| 'UNSUPPORTED_EXPRESSION';
 export type CallGraphReasonCode =
 	| 'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED'
+	| 'INLINE_CALLABLE_EXACT_SYNTAX_TARGET'
 	| 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE'
 	| 'RESOLVED_LOCAL_CALLABLE_CANDIDATES'
 	| 'RESOLVED_EXTERNAL_OR_CONTEXT_ONLY_SYMBOL'

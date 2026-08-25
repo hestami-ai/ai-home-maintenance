@@ -41,7 +41,11 @@ import {
 	typescriptSyntaxKindName
 } from '../../semantic/syntax-projection.js';
 import { extractTypeScriptTypes } from './extract-types.js';
-import type { ExtractTypeScriptTypesInput, RawTypeScriptTypeProjection } from './extract-types.js';
+import type {
+	ExtractTypeScriptTypesInput,
+	RawTypeScriptInvocationResolution,
+	RawTypeScriptTypeProjection
+} from './extract-types.js';
 
 export interface TypeScriptSymbolExtractionGuard {
 	readonly addFact: () => void;
@@ -71,6 +75,7 @@ export interface ExtractTypeScriptSymbolsInput {
 export interface RawTypeScriptSymbolProjection {
 	readonly aliases: readonly RawSemanticAlias[];
 	readonly declarations: readonly RawSemanticDeclaration[];
+	readonly invocationResolutions: readonly RawTypeScriptInvocationResolution[];
 	readonly moduleExports: readonly RawSemanticModuleExport[];
 	readonly moduleResolutions: readonly RawSemanticModuleResolution[];
 	readonly overloadSets: readonly RawSemanticOverloadSet[];
@@ -915,6 +920,12 @@ function anchorForDeclaration(
 	const nodeOrdinal =
 		sourceInput.nodes === null ? null : (state.ordinalByNode.get(declaration) ?? null);
 	const named = declarationName(ts.getNameOfDeclaration(declaration), sourceFile);
+	const compatibleCandidate =
+		candidate !== null &&
+		candidate.nameState === named.nameState &&
+		candidate.syntacticName === named.name
+			? candidate
+			: null;
 	const scope = declaringScope(state, declaration);
 	const key = canonicalSemanticJson({
 		end,
@@ -926,7 +937,7 @@ function anchorForDeclaration(
 	});
 	const anchor: DeclarationAnchor = {
 		ambient: isAmbientDeclaration(declaration, sourceFile),
-		candidateNodeOrdinal: candidate?.nodeOrdinal ?? null,
+		candidateNodeOrdinal: compatibleCandidate?.nodeOrdinal ?? null,
 		declaringScopeKey: scope.key,
 		declaration,
 		end,
@@ -1720,6 +1731,27 @@ function typeExtractionInput(
 			declarationOrdinal
 		})),
 		guard: input.guard,
+		invocations: input.sources.flatMap((sourceInput) =>
+			(sourceInput.nodes ?? []).flatMap((node, nodeOrdinal) => {
+				const invocationKind = ts.isCallExpression(node)
+					? ('CALL' as const)
+					: ts.isNewExpression(node)
+						? ('NEW' as const)
+						: ts.isTaggedTemplateExpression(node)
+							? ('TAGGED_TEMPLATE' as const)
+							: null;
+				return invocationKind === null
+					? []
+					: [
+							{
+								invocationKind,
+								node: node as ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression,
+								nodeOrdinal,
+								sourceOrdinal: sourceInput.source.sourceOrdinal
+							}
+						];
+			})
+		),
 		nodeAnchorForNode: (node) => {
 			const sourceInput = state.sourceByFile.get(node.getSourceFile());
 			const nodeOrdinal = state.ordinalByNode.get(node);
@@ -1751,6 +1783,7 @@ function typeExtractionInput(
 
 function emptyTypeProjection(): RawTypeScriptTypeProjection {
 	return {
+		invocationResolutions: [],
 		overloadSets: [],
 		signatureParameters: [],
 		signatures: [],
@@ -2098,6 +2131,7 @@ export function extractTypeScriptSymbols(
 	return {
 		aliases,
 		declarations,
+		invocationResolutions: typeProjection.invocationResolutions,
 		moduleExports,
 		moduleResolutions,
 		overloadSets: typeProjection.overloadSets,

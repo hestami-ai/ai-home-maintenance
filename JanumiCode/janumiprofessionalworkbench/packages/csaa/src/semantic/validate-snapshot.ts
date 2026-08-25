@@ -15,6 +15,18 @@ import type {
 } from '../contracts/semantic.js';
 import type { FrozenSubject } from '../contracts/subject.js';
 import {
+	SVELTE2TSX_PROVIDER_VERSION,
+	SVELTE_PROVIDER_VERSION,
+	SVELTE_TYPESCRIPT_PROVIDER_VERSION,
+	SVELTE_VIRTUAL_SOURCE_ADAPTER_VERSION,
+	SVELTE_VIRTUAL_SOURCE_ID_PROFILE,
+	SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
+	SVELTE_VIRTUAL_SOURCE_SCHEMA_VERSION,
+	SVELTE_VIRTUAL_SOURCE_TRANSFORM_PROFILE,
+	svelteVirtualLogicalPath
+} from '../providers/svelte/svelte-virtual-source.js';
+import { STRICT_SOURCE_MAP_V3_DECODER_VERSION } from '../providers/source-map/decode-source-map-v3.js';
+import {
 	FULL_JAN_CSAA_007_CONFORMANCE,
 	SEMANTIC_AST_TRAVERSAL_PROFILE,
 	SEMANTIC_BUDGET_KEYS,
@@ -499,6 +511,40 @@ function expectedCandidateExportBinding(
 	return { carrierId: null, syntax: 'NONE' };
 }
 
+function hasExactFrameworkCandidateCoverage(
+	snapshot: StaticSemanticSnapshot,
+	project: StaticSemanticSnapshot['projects'][number],
+	candidate: string
+): boolean {
+	const source = snapshot.sources.find(
+		(record) =>
+			record.projectId === project.id &&
+			record.logicalPath === candidate &&
+			record.analysisDisposition === 'DEEP_INDEXED' &&
+			record.origin === 'VIRTUAL' &&
+			record.mapping.state === 'EXACT' &&
+			record.transformation !== null &&
+			record.transformation.authored.logicalPath === candidate &&
+			record.transformation.virtual.origin === 'VIRTUAL' &&
+			record.transformation.virtual.contentBytes === record.bytes &&
+			record.transformation.virtual.contentSha256 === record.contentSha256 &&
+			record.transformation.virtual.contentCharacters === record.textLength
+	);
+	if (source?.transformation === null || source === undefined) return false;
+	return snapshot.compilerInputs.some(
+		(observation) =>
+			observation.operation === 'READ_FILE' &&
+			observation.result === 'PRESENT' &&
+			observation.byteBudgetClass === 'VIRTUAL_TRANSFORM' &&
+			observation.origin === 'VIRTUAL' &&
+			observation.logicalPath === candidate &&
+			observation.contentBytes === source.bytes &&
+			observation.contentSha256 === source.contentSha256 &&
+			canonicalSemanticJson(observation.transformation) ===
+				canonicalSemanticJson(source.transformation)
+	);
+}
+
 /**
  * Unsafe in exactly one respect: it assumes the closed wire shape has already been established.
  * The parameter type carries that assumption as far as a type can — only
@@ -587,7 +633,10 @@ function validateStaticSemanticSnapshotUnsafe(
 		snapshot.symbols.length +
 		snapshot.typeParameters.length +
 		snapshot.typeRelations.length +
-		snapshot.types.length;
+		snapshot.types.length +
+		snapshot.invocations.filter(
+			(invocation) => invocation.resolutionReason !== 'TYPE_CAPABILITY_NOT_REQUESTED'
+		).length;
 	if (recordCount > options.maxRecords) {
 		return {
 			issues: [
@@ -932,7 +981,7 @@ function validateStaticSemanticSnapshotUnsafe(
 		Extract<CompilerInputObservation, { operation: 'READ_FILE'; result: 'PRESENT' }>
 	>();
 	function validateCompilerInputs(): void {
-		for (const observation of snapshot.compilerInputs)
+		for (const [index, observation] of snapshot.compilerInputs.entries()) {
 			if (
 				observation.operation === 'READ_FILE' &&
 				observation.result === 'PRESENT' &&
@@ -940,6 +989,42 @@ function validateStaticSemanticSnapshotUnsafe(
 				!liveContextReadsByPath.has(observation.logicalPath)
 			)
 				liveContextReadsByPath.set(observation.logicalPath, observation);
+			if (
+				observation.operation === 'READ_FILE' &&
+				observation.result === 'PRESENT' &&
+				observation.byteBudgetClass === 'VIRTUAL_TRANSFORM'
+			) {
+				validateSourceTransformationRecord(
+					observation.transformation,
+					`$.compilerInputs[${index}].transformation`
+				);
+				if (
+					observation.logicalPath !== observation.transformation.authored.logicalPath ||
+					observation.contentBytes !== observation.transformation.virtual.contentBytes ||
+					observation.contentSha256 !== observation.transformation.virtual.contentSha256
+				)
+					issue(
+						'IDENTITY_MISMATCH',
+						`$.compilerInputs[${index}]`,
+						'VIRTUAL_TRANSFORM observation content and logical path must bind its exact authored and virtual transformation descriptors.'
+					);
+				const matchingSources = snapshot.sources.filter(
+					(source) =>
+						source.logicalPath === observation.logicalPath &&
+						source.transformation !== null &&
+						source.bytes === observation.contentBytes &&
+						source.contentSha256 === observation.contentSha256 &&
+						canonicalSemanticJson(source.transformation) ===
+							canonicalSemanticJson(observation.transformation)
+				);
+				if (matchingSources.length === 0)
+					issue(
+						'DANGLING_REFERENCE',
+						`$.compilerInputs[${index}]`,
+						'Every VIRTUAL_TRANSFORM compiler observation must support at least one exact transformed Program source.'
+					);
+			}
+		}
 		if (liveContextReadsByPath.size > snapshot.budgets.maxContextFiles)
 			issue(
 				'INVALID_VALUE',
@@ -1538,7 +1623,108 @@ function validateStaticSemanticSnapshotUnsafe(
 		}
 		return true;
 	}
-	const frozenReads = snapshot.compilerInputs.filter(
+	function validateSourceTransformationRecord(
+		transformation: NonNullable<StaticSemanticSnapshot['sources'][number]['transformation']>,
+		jsonPath: string
+	): void {
+		path(transformation.authored.logicalPath, `${jsonPath}.authored.logicalPath`);
+		path(transformation.virtual.logicalPath, `${jsonPath}.virtual.logicalPath`);
+		const descriptorCounts = [
+			transformation.authored.contentBytes,
+			transformation.authored.contentCharacters,
+			transformation.virtual.contentBytes,
+			transformation.virtual.contentCharacters,
+			transformation.sourceMap.canonicalJsonBytes,
+			transformation.sourceMap.generatedLines,
+			transformation.sourceMap.segmentCount
+		];
+		if (
+			descriptorCounts.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+			!SHA256.test(transformation.authored.contentSha256) ||
+			!SHA256.test(transformation.virtual.contentSha256) ||
+			!SHA256.test(transformation.sourceMap.canonicalJsonSha256)
+		)
+			issue(
+				'INVALID_VALUE',
+				jsonPath,
+				'Source transformation sizes, counts, and content digests must be bounded canonical values.'
+			);
+		if (
+			transformation.authored.contentBytes >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxAuthoredBytes ||
+			transformation.authored.contentCharacters >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxAuthoredCharacters ||
+			transformation.virtual.contentBytes >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedBytes ||
+			transformation.virtual.contentCharacters >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedCharacters ||
+			transformation.sourceMap.generatedLines >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedLines ||
+			transformation.sourceMap.segmentCount >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxMapSegments ||
+			transformation.authored.logicalPath.length >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxPathCharacters ||
+			transformation.virtual.logicalPath.length >
+				SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxPathCharacters
+		)
+			issue(
+				'INVALID_VALUE',
+				jsonPath,
+				'Source transformation evidence exceeds the pinned adapter implementation ceilings.'
+			);
+		const expectedAdapter = {
+			adapter: 'svelte2tsx',
+			adapterVersion: SVELTE_VIRTUAL_SOURCE_ADAPTER_VERSION,
+			svelte2tsxVersion: SVELTE2TSX_PROVIDER_VERSION,
+			svelteVersion: SVELTE_PROVIDER_VERSION,
+			typescriptVersion: SVELTE_TYPESCRIPT_PROVIDER_VERSION
+		};
+		if (
+			transformation.schemaVersion !== SVELTE_VIRTUAL_SOURCE_SCHEMA_VERSION ||
+			transformation.idProfile !== SVELTE_VIRTUAL_SOURCE_ID_PROFILE ||
+			transformation.transformProfile !== SVELTE_VIRTUAL_SOURCE_TRANSFORM_PROFILE ||
+			transformation.sourceMap.decoderVersion !== STRICT_SOURCE_MAP_V3_DECODER_VERSION ||
+			transformation.sourceMap.mappingState !== 'EXACT_SEGMENT_POINTS_ONLY' ||
+			canonicalSemanticJson(transformation.adapter) !== canonicalSemanticJson(expectedAdapter)
+		)
+			issue(
+				'UNSUPPORTED_SCHEMA_VERSION',
+				jsonPath,
+				'Source transformation must bind the exact registered adapter, provider, transform, and source-map profiles.'
+			);
+		let expectedVirtualLogicalPath: string | null = null;
+		try {
+			expectedVirtualLogicalPath = svelteVirtualLogicalPath(
+				transformation.authored.logicalPath,
+				transformation.virtual.scriptKind
+			);
+		} catch {
+			// The structured issue below is the public failure surface.
+		}
+		if (expectedVirtualLogicalPath !== transformation.virtual.logicalPath)
+			issue(
+				'IDENTITY_MISMATCH',
+				`${jsonPath}.virtual.logicalPath`,
+				'Virtual-source logical path must be derived exactly from authored identity and script kind.'
+			);
+		const expectedId = sha256(
+			canonicalSemanticJson({
+				adapter: transformation.adapter,
+				authored: transformation.authored,
+				idProfile: transformation.idProfile,
+				sourceMap: transformation.sourceMap,
+				transformProfile: transformation.transformProfile,
+				virtual: transformation.virtual
+			})
+		);
+		if (transformation.id !== expectedId)
+			issue(
+				'IDENTITY_MISMATCH',
+				`${jsonPath}.id`,
+				'Source transformation identity must bind the exact authored, virtual, provider, and source-map evidence.'
+			);
+	}
+	const subjectBackedReads = snapshot.compilerInputs.filter(
 		(
 			observation
 		): observation is Extract<
@@ -1547,7 +1733,8 @@ function validateStaticSemanticSnapshotUnsafe(
 		> =>
 			observation.operation === 'READ_FILE' &&
 			observation.result === 'PRESENT' &&
-			observation.byteBudgetClass === 'FROZEN_SUBJECT'
+			(observation.byteBudgetClass === 'FROZEN_SUBJECT' ||
+				observation.byteBudgetClass === 'VIRTUAL_TRANSFORM')
 	);
 	const frozenSubject = context.frozenSubject;
 	const caseObservation = snapshot.compilerInputs.find(
@@ -1621,11 +1808,11 @@ function validateStaticSemanticSnapshotUnsafe(
 		}
 	}
 	function checkFrozenEvidenceRequiredOfProjects(): void {
-		if (frozenReads.length > 0 && frozenSubject === undefined)
+		if (subjectBackedReads.length > 0 && frozenSubject === undefined)
 			issue(
 				'FROZEN_EVIDENCE_REQUIRED',
 				'$validationContext.frozenSubject',
-				'FROZEN_SUBJECT observations require the exact FrozenSubject artifact witness.'
+				'FROZEN_SUBJECT and VIRTUAL_TRANSFORM observations require the exact authored FrozenSubject artifact witness.'
 			);
 		if (frozenSubject !== undefined && frozenSubject.descriptor.subjectId !== snapshot.subjectId)
 			issue(
@@ -1634,8 +1821,16 @@ function validateStaticSemanticSnapshotUnsafe(
 				'FrozenSubject witness does not bind the semantic snapshot subject.'
 			);
 		if (frozenSubject?.descriptor.subjectId === snapshot.subjectId) {
-			for (const observation of frozenReads) {
-				const artifactPath = frozenArtifactPath(observation.logicalPath);
+			for (const observation of subjectBackedReads) {
+				const authored =
+					observation.byteBudgetClass === 'VIRTUAL_TRANSFORM'
+						? observation.transformation.authored
+						: {
+								contentBytes: observation.contentBytes,
+								contentSha256: observation.contentSha256,
+								logicalPath: observation.logicalPath
+							};
+				const artifactPath = frozenArtifactPath(authored.logicalPath);
 				const matchingArtifacts = frozenSubject.artifacts.filter(
 					(artifact) => artifact.canonicalPathKey === frozenPathKey(artifactPath)
 				);
@@ -1643,13 +1838,13 @@ function validateStaticSemanticSnapshotUnsafe(
 				if (
 					artifact === undefined ||
 					(caseSensitive && artifact.path !== artifactPath) ||
-					artifact.bytes !== observation.contentBytes ||
-					artifact.sha256 !== observation.contentSha256
+					artifact.bytes !== authored.contentBytes ||
+					artifact.sha256 !== authored.contentSha256
 				) {
 					issue(
 						'FROZEN_EVIDENCE_REQUIRED',
 						'$validationContext.frozenSubject.artifacts',
-						`Frozen observation ${observation.logicalPath} does not match exactly one subject artifact by path, bytes, and digest.`
+						`Subject-backed observation ${observation.logicalPath} does not match exactly one authored subject artifact by path, bytes, and digest.`
 					);
 				}
 			}
@@ -2441,24 +2636,29 @@ function validateStaticSemanticSnapshotUnsafe(
 						`$.projects[${index}].partialityReasons[${reasonIndex}]`,
 						'Partiality reason must name a requested capability and a non-empty message.'
 					);
-			if (project.frameworkCandidates.length > 0 && project.health !== 'PARTIAL')
+			const unsupportedFrameworkCandidates = project.frameworkCandidates.filter(
+				(candidate) => !hasExactFrameworkCandidateCoverage(snapshot, project, candidate)
+			);
+			if (unsupportedFrameworkCandidates.length > 0 && project.health !== 'PARTIAL')
 				issue(
 					'INVALID_VALUE',
 					`$.projects[${index}].health`,
-					'Framework candidates require explicit project partiality.'
+					'Framework candidates without exact virtual-source coverage require explicit project partiality.'
 				);
-			if (
-				project.frameworkCandidates.length > 0 &&
-				!project.partialityReasons.some(
-					(reason) =>
-						reason.capability === 'TS_SYNTAX' && reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED'
+			for (const candidate of unsupportedFrameworkCandidates)
+				if (
+					!project.partialityReasons.some(
+						(reason) =>
+							reason.capability === 'TS_SYNTAX' &&
+							reason.code === 'FRAMEWORK_CANDIDATES_UNSUPPORTED' &&
+							reason.path === candidate
+					)
 				)
-			)
-				issue(
-					'INVALID_VALUE',
-					`$.projects[${index}].partialityReasons`,
-					'Unsupported framework candidates must explicitly degrade TS_SYNTAX with FRAMEWORK_CANDIDATES_UNSUPPORTED.'
-				);
+					issue(
+						'INVALID_VALUE',
+						`$.projects[${index}].partialityReasons`,
+						`Unsupported framework candidate ${candidate} must explicitly degrade TS_SYNTAX with FRAMEWORK_CANDIDATES_UNSUPPORTED.`
+					);
 		}
 		checkInvalidValueOfProvenancesEntry2();
 		const parserRecoveryPaths = sortedUnique(
@@ -2764,17 +2964,50 @@ function validateStaticSemanticSnapshotUnsafe(
 				);
 		}
 		checkInvalidValueOfProvenancesEntry4();
+		if (source.transformation === null) {
+			if (source.origin === 'VIRTUAL')
+				issue(
+					'INVALID_VALUE',
+					`$.sources[${index}].origin`,
+					'Virtual source origin requires exact transformation evidence.'
+				);
+		} else {
+			validateSourceTransformationRecord(
+				source.transformation,
+				`$.sources[${index}].transformation`
+			);
+			if (
+				source.origin !== 'VIRTUAL' ||
+				source.analysisDisposition !== 'DEEP_INDEXED' ||
+				source.mapping.state !== 'EXACT' ||
+				source.scriptKind !== ts.ScriptKind.TS ||
+				source.logicalPath !== source.transformation.authored.logicalPath ||
+				source.bytes !== source.transformation.virtual.contentBytes ||
+				source.contentSha256 !== source.transformation.virtual.contentSha256 ||
+				source.textLength !== source.transformation.virtual.contentCharacters
+			)
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.sources[${index}]`,
+					'Transformed source must be an exact deep-indexed TypeScript virtual projection whose public identity remains the authored logical path.'
+				);
+		}
 		const matchingReads =
 			presentReadsByProjectPath.get(`${source.projectId}\0${source.logicalPath}`) ?? [];
 		const expectedByteBudgetClass =
-			source.analysisDisposition === 'DEEP_INDEXED' ? 'FROZEN_SUBJECT' : 'LIVE_COMPILER_CONTEXT';
+			source.transformation !== null
+				? 'VIRTUAL_TRANSFORM'
+				: source.analysisDisposition === 'DEEP_INDEXED'
+					? 'FROZEN_SUBJECT'
+					: 'LIVE_COMPILER_CONTEXT';
 		function checkIdentityMismatchOfProvenancesEntry42(): void {
+			const matchingRead = matchingReads.length === 1 ? matchingReads[0]! : undefined;
 			if (
 				matchingReads.length !== 1 ||
-				matchingReads[0]!.byteBudgetClass !== expectedByteBudgetClass ||
-				matchingReads[0]!.contentSha256 !== source.contentSha256 ||
-				matchingReads[0]!.contentBytes !== source.bytes ||
-				matchingReads[0]!.origin !== source.origin
+				matchingRead!.byteBudgetClass !== expectedByteBudgetClass ||
+				matchingRead!.contentSha256 !== source.contentSha256 ||
+				matchingRead!.contentBytes !== source.bytes ||
+				matchingRead!.origin !== source.origin
 			) {
 				issue(
 					'IDENTITY_MISMATCH',
@@ -2782,6 +3015,17 @@ function validateStaticSemanticSnapshotUnsafe(
 					`Every Program source must match exactly one project-attributed ${expectedByteBudgetClass} PRESENT READ_FILE observation by path, bytes, digest, and origin.`
 				);
 			}
+			if (
+				source.transformation !== null &&
+				(matchingRead?.byteBudgetClass !== 'VIRTUAL_TRANSFORM' ||
+					canonicalSemanticJson(matchingRead.transformation) !==
+						canonicalSemanticJson(source.transformation))
+			)
+				issue(
+					'IDENTITY_MISMATCH',
+					`$.sources[${index}].transformation`,
+					'Transformed source evidence must equal its one project-attributed VIRTUAL_TRANSFORM compiler observation.'
+				);
 			if (source.analysisDisposition === 'DEEP_INDEXED') {
 				const rootNode = source.rootNodeId === null ? undefined : nodeById.get(source.rootNodeId);
 				if (
@@ -7156,6 +7400,115 @@ function validateStaticSemanticSnapshotUnsafe(
 				`$.invocations[${index}]`,
 				'Invocation projection must reproduce its exact call, new, or tagged-template variant and absolute child order.'
 			);
+		const source = sourceById.get(invocation.sourceId);
+		const resolvedSignature =
+			invocation.resolvedSignatureId === null
+				? undefined
+				: signatureById.get(invocation.resolvedSignatureId);
+		const implementationDeclaration =
+			invocation.implementationDeclarationId === null
+				? undefined
+				: declarationById.get(invocation.implementationDeclarationId);
+		const implementationNode =
+			invocation.implementationNodeId === null
+				? undefined
+				: nodeById.get(invocation.implementationNodeId);
+		if (invocation.resolvedSignatureId !== null && resolvedSignature === undefined)
+			issue(
+				'DANGLING_REFERENCE',
+				`$.invocations[${index}].resolvedSignatureId`,
+				'Invocation references an absent resolved Signature.'
+			);
+		if (invocation.implementationDeclarationId !== null && implementationDeclaration === undefined)
+			issue(
+				'DANGLING_REFERENCE',
+				`$.invocations[${index}].implementationDeclarationId`,
+				'Invocation references an absent implementation declaration.'
+			);
+		if (invocation.implementationNodeId !== null && implementationNode === undefined)
+			issue(
+				'DANGLING_REFERENCE',
+				`$.invocations[${index}].implementationNodeId`,
+				'Invocation references an absent implementation node.'
+			);
+		if (
+			source !== undefined &&
+			resolvedSignature !== undefined &&
+			(resolvedSignature.projectId !== source.projectId ||
+				resolvedSignature.programId !== source.programId)
+		)
+			issue(
+				'CROSS_PROJECT_REFERENCE',
+				`$.invocations[${index}].resolvedSignatureId`,
+				'Invocation resolved Signature must belong to the same Program and project.'
+			);
+		if (
+			implementationDeclaration !== undefined &&
+			implementationNode !== undefined &&
+			implementationDeclaration.nodeId !== implementationNode.id
+		)
+			issue(
+				'INVALID_VALUE',
+				`$.invocations[${index}].implementationDeclarationId`,
+				'Invocation implementation declaration and implementation node must identify one retained implementation.'
+			);
+		const typeCapabilityRequested = snapshot.requestedCapabilities.includes('TS_TYPE');
+		const syntaxOnlyReasons = [
+			'TYPE_CAPABILITY_NOT_REQUESTED',
+			'COMPILER_SIGNATURE_UNRESOLVED',
+			'SIGNATURE_DECLARATION_UNRETAINED'
+		] as const;
+		const signatureOnlyReasons = [
+			'IMPLEMENTATION_UNAVAILABLE',
+			'IMPLEMENTATION_NOT_UNIQUE',
+			'IMPLEMENTATION_NOT_DEEP_INDEXED'
+		] as const;
+		const targetCoherent =
+			invocation.targetState === 'SYNTAX_ONLY'
+				? invocation.resolvedSignatureId === null &&
+					invocation.implementationDeclarationId === null &&
+					invocation.implementationNodeId === null &&
+					syntaxOnlyReasons.includes(
+						invocation.resolutionReason as (typeof syntaxOnlyReasons)[number]
+					)
+				: invocation.targetState === 'SIGNATURE_RESOLVED'
+					? invocation.resolvedSignatureId !== null &&
+						invocation.implementationDeclarationId === null &&
+						invocation.implementationNodeId === null &&
+						signatureOnlyReasons.includes(
+							invocation.resolutionReason as (typeof signatureOnlyReasons)[number]
+						)
+					: invocation.resolvedSignatureId !== null &&
+						invocation.implementationNodeId !== null &&
+						invocation.resolutionReason === 'IMPLEMENTATION_IDENTIFIED';
+		if (!targetCoherent)
+			issue(
+				'INVALID_VALUE',
+				`$.invocations[${index}]`,
+				'Invocation target state, reason, Signature, and implementation evidence are incoherent.'
+			);
+		if (
+			(invocation.resolutionReason === 'TYPE_CAPABILITY_NOT_REQUESTED') !==
+			(!typeCapabilityRequested)
+		)
+			issue(
+				'INVALID_VALUE',
+				`$.invocations[${index}].resolutionReason`,
+				'Invocation target reason must reflect whether TS_TYPE was requested.'
+			);
+		if (invocation.resolutionProvenanceId === null) {
+			if (invocation.resolutionReason !== 'TYPE_CAPABILITY_NOT_REQUESTED')
+				issue(
+					'DANGLING_REFERENCE',
+					`$.invocations[${index}].resolutionProvenanceId`,
+					'Attempted invocation target resolution requires compiler type provenance.'
+				);
+		} else if (source !== undefined)
+			compilerTypeProvenance(
+				invocation.resolutionProvenanceId,
+				source.projectId,
+				`$.invocations[${index}].resolutionProvenanceId`
+			);
 	}
 	function validateLiteralsEntry3(
 		index: number,
@@ -7509,11 +7862,25 @@ function validateStaticSemanticSnapshotUnsafe(
 		emitted('PROVENANCE', provenanceIds);
 	}
 	emitPresenceLedger();
-	const frameworkMembers = snapshot.projects.flatMap((project) =>
-		project.frameworkCandidates.map((candidate) => `${project.id}\0${candidate}`)
+	const frameworkCandidates = snapshot.projects.flatMap((project) =>
+		project.frameworkCandidates.map((candidate) => ({
+			candidate,
+			member: `${project.id}\0${candidate}`,
+			project
+		}))
 	);
 	function emitPresenceLedger2(): void {
-		emitted('FRAMEWORK_CANDIDATE', frameworkMembers, [], frameworkMembers);
+		emitted(
+			'FRAMEWORK_CANDIDATE',
+			frameworkCandidates.map(({ member }) => member),
+			[],
+			frameworkCandidates
+				.filter(
+					({ candidate, project }) =>
+						!hasExactFrameworkCandidateCoverage(snapshot, project, candidate)
+				)
+				.map(({ member }) => member)
+		);
 		emitted('CONTEXT_INPUT', [], contextIds);
 		for (const values of [
 			snapshot.literals.map((record) => record.nodeId),
@@ -7593,12 +7960,11 @@ function validateStaticSemanticSnapshotUnsafe(
 				));
 		const frameworkSyntaxPartial =
 			capability === 'TS_SYNTAX' &&
-			(snapshot.projects.some((project) => project.frameworkCandidates.length > 0) ||
-				snapshot.populations.some(
-					(population) =>
-						population.kind === 'FRAMEWORK_CANDIDATE' &&
-						(population.failed > 0 || population.unknown > 0 || population.unsupported > 0)
-				));
+			snapshot.populations.some(
+				(population) =>
+					population.kind === 'FRAMEWORK_CANDIDATE' &&
+					(population.failed > 0 || population.unknown > 0 || population.unsupported > 0)
+			);
 		const parserRecoveryPartial =
 			(capability === 'TS_SYNTAX' || capability === 'TS_SYMBOL' || capability === 'TS_TYPE') &&
 			snapshot.diagnostics.some(

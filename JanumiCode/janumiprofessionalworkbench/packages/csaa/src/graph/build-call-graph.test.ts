@@ -444,6 +444,75 @@ describe('buildCallGraph', () => {
 		}
 	});
 
+	it('binds exact inline targets to compiler signatures, provenance, and the identical implementation node', () => {
+		const semanticSnapshot = snapshot(
+			fixtureFromSource('function direct(): number { return 1; }\n(() => 2)();\ndirect();')
+		);
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const exactSite = callSites(outcome.graph).find((site) => site.resolutionClass === 'EXACT');
+		expect(exactSite).toMatchObject({
+			dispatchClass: 'INLINE_CALLABLE',
+			reasonCode: 'INLINE_CALLABLE_EXACT_SYNTAX_TARGET',
+			targetNodeIds: [expect.any(String)]
+		});
+		if (exactSite === undefined) throw new Error('Expected an exact inline call site.');
+		const invocation = semanticSnapshot.invocations.find(
+			(record) => record.id === exactSite.invocationId
+		)!;
+		expect(invocation).toMatchObject({
+			implementationNodeId: expect.any(String),
+			resolutionProvenanceId: expect.any(String),
+			resolvedSignatureId: expect.any(String),
+			targetState: 'IMPLEMENTATION_IDENTIFIED'
+		});
+		const target = outcome.graph.nodes.find((node) => node.id === exactSite.targetNodeIds[0]);
+		expect(target).toMatchObject({
+			kind: 'CALLABLE_TARGET',
+			semanticNodeId: invocation.implementationNodeId
+		});
+		const targetEdge = outcome.graph.edges.find(
+			(edge) =>
+				edge.invocationId === exactSite.invocationId &&
+				edge.relationKind !== 'CALL_SITE_OWNERSHIP'
+		);
+		expect(targetEdge).toMatchObject({
+			candidateRank: null,
+			evidenceClass: 'R-SEM',
+			provenanceIds: expect.arrayContaining([invocation.resolutionProvenanceId]),
+			relationCode: 'REL-067',
+			relationKind: 'CONFIRMED_CALL_TARGET',
+			resolutionClass: 'EXACT',
+			targetState: 'CONFIRMED'
+		});
+		expect(
+			callSites(outcome.graph).find((site) => site.invocationId !== exactSite.invocationId)
+		).toMatchObject({ dispatchClass: 'DIRECT_REFERENCE', resolutionClass: 'CANDIDATE_SET' });
+		expect(
+			outcome.graph.relationLaneCoverage.find((lane) => lane.lane === 'CONFIRMED')
+		).toMatchObject({ state: 'PARTIAL' });
+		expect(validateCallGraph(outcome.graph, semanticSnapshot)).toEqual({ issues: [], state: 'VALID' });
+
+		for (const mutate of [
+			(record: typeof invocation) => ({ ...record, resolvedSignatureId: null }),
+			(record: typeof invocation) => ({ ...record, resolutionProvenanceId: null }),
+			(record: typeof invocation) => ({
+				...record,
+				implementationNodeId: semanticSnapshot.astNodes.find(
+					(node) => node.id !== record.implementationNodeId
+				)!.id
+			})
+		] as const) {
+			const mutatedSnapshot = {
+				...semanticSnapshot,
+				invocations: semanticSnapshot.invocations.map((record) =>
+					record.id === invocation.id ? mutate(invocation) : record
+				)
+			} as StaticSemanticSnapshot;
+			expect(validateCallGraph(outcome.graph, mutatedSnapshot).state).toBe('INVALID');
+		}
+	});
+
 	it('bounds classification work independently of graph populations', () => {
 		const semanticSnapshot = snapshot(fixture('CALLS'));
 		const outcome = buildBoundedCallGraph(graphRequest(semanticSnapshot), semanticSnapshot, {
@@ -545,7 +614,7 @@ describe('buildCallGraph', () => {
 	it('refuses mandatory per-invocation edge and limitation minima before classification', () => {
 		const semanticSnapshot = snapshot(fixture('CALLS'));
 		const invocationCount = semanticSnapshot.invocations.length;
-		const minimumLimitations = 3 + Number(semanticSnapshot.health === 'PARTIAL') + invocationCount;
+		const minimumLimitations = 2 + Number(semanticSnapshot.health === 'PARTIAL');
 		for (const scenario of [
 			{ key: 'maxEdges' as const, value: invocationCount * 2 - 1 },
 			{ key: 'maxLimitations' as const, value: minimumLimitations - 1 }
@@ -628,14 +697,14 @@ describe('buildCallGraph', () => {
 
 		const representedClasses = new Set(sites.map((site) => site.resolutionClass));
 		expect(representedClasses).toEqual(
-			new Set(['CANDIDATE_SET', 'EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED'])
+			new Set(['EXACT', 'CANDIDATE_SET', 'EXTERNAL_DISPATCH', 'UNRESOLVED', 'UNSUPPORTED'])
 		);
-		expect(sites.some((site) => site.resolutionClass === 'EXACT')).toBe(false);
+		expect(sites.some((site) => site.resolutionClass === 'EXACT')).toBe(true);
 		expect(graph.coverage).toMatchObject({
 			candidateSetCallSites: sites.filter((site) => site.resolutionClass === 'CANDIDATE_SET')
 				.length,
 			closure: 'OPEN',
-			exactCallSites: 0,
+			exactCallSites: sites.filter((site) => site.resolutionClass === 'EXACT').length,
 			expectedCallSites: semanticSnapshot.invocations.length,
 			externalDispatchCallSites: sites.filter(
 				(site) => site.resolutionClass === 'EXTERNAL_DISPATCH'
@@ -742,8 +811,8 @@ describe('buildCallGraph', () => {
 				}),
 				expect.objectContaining({
 					dispatchClass: 'INLINE_CALLABLE',
-					reasonCode: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
-					resolutionClass: 'CANDIDATE_SET'
+					reasonCode: 'INLINE_CALLABLE_EXACT_SYNTAX_TARGET',
+					resolutionClass: 'EXACT'
 				}),
 				expect.objectContaining({
 					reasonCode: 'RESOLVED_EXTERNAL_OR_CONTEXT_ONLY_SYMBOL',
@@ -864,12 +933,19 @@ describe('buildCallGraph', () => {
 			semanticSnapshot.references.map((reference) => [reference.id, reference])
 		);
 		const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+		const invocationById = new Map(
+			semanticSnapshot.invocations.map((invocation) => [invocation.id, invocation])
+		);
 		for (const site of sites.filter((entry) => entry.resolutionClass === 'CANDIDATE_SET')) {
 			const source = sourceById.get(site.sourceId)!;
+			const invocation = invocationById.get(site.invocationId)!;
 			const expectedCallSiteProvenance = [
 				...new Set([
 					source.provenanceId,
 					...(source.syntaxProvenanceId === null ? [] : [source.syntaxProvenanceId]),
+					...(invocation.resolutionProvenanceId === null
+						? []
+						: [invocation.resolutionProvenanceId]),
 					...site.referenceIds.flatMap((referenceId) => {
 						const reference = referenceById.get(referenceId)!;
 						return [reference.resolutionProvenanceId, reference.structuralProvenanceId];

@@ -289,14 +289,16 @@ describe('generated-context evidence runner', () => {
 		expect(checked).toMatchObject({ difference: null, ok: true, subjectId: written.subjectId });
 	});
 
-	it('keeps check mode observational and never observes or executes the current generator', () => {
+	it('observes the current generator closure in check mode without executing it', () => {
 		const root = fixture();
 		run(root, 'write');
+		let observations = 0;
 		let synchronizations = 0;
 		const checked = runGeneratedContextEvidenceForTest({
 			mode: 'check',
 			observeGenerator: () => {
-				throw new Error('check mode observed the current generator');
+				observations += 1;
+				return testObservation(root);
 			},
 			repositoryRoot: root,
 			synchronize: () => {
@@ -304,10 +306,11 @@ describe('generated-context evidence runner', () => {
 			}
 		});
 		expect(checked.ok).toBe(true);
+		expect(observations).toBe(2);
 		expect(synchronizations).toBe(0);
 	});
 
-	it('detects authored and generated-output drift while preserving historical generator evidence', () => {
+	it('detects authored, generated-output, and installed-generator drift', () => {
 		const root = fixture();
 		run(root, 'write');
 		write(root, 'apps/rph-demo/src/index.ts', 'export const value = 2;\n');
@@ -323,12 +326,12 @@ describe('generated-context evidence runner', () => {
 		const absolute = join(root, ...RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH.split('/'));
 		const beforeGeneratorUpdate = readFileSync(absolute, 'utf8');
 		write(root, 'node_modules/@sveltejs/kit/svelte-kit.js', 'export const changed = true;\n');
-		expect(run(root, 'check').ok).toBe(true);
+		expect(run(root, 'check').ok).toBe(false);
 		run(root, 'write');
 		expect(readFileSync(absolute, 'utf8')).not.toBe(beforeGeneratorUpdate);
 	});
 
-	it('checks historical runtime evidence independently of the current host profile', () => {
+	it('detects historical runtime evidence that differs from the current bound profile', () => {
 		const root = fixture();
 		run(root, 'write');
 		const absolute = join(root, ...RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH.split('/'));
@@ -355,22 +358,44 @@ describe('generated-context evidence runner', () => {
 			}
 		};
 		writeFileSync(absolute, canonicalJson(rewritten), 'utf8');
+		let synchronizations = 0;
 		const checked = runGeneratedContextEvidenceForTest({
 			mode: 'check',
-			observeGenerator: () => {
-				throw new Error('check mode observed the current host profile');
-			},
+			observeGenerator: testObservation,
 			repositoryRoot: root,
 			synchronize: () => {
-				throw new Error('check mode executed the historical profile');
+				synchronizations += 1;
 			}
 		});
-		expect(checked.ok).toBe(true);
+		expect(checked.ok).toBe(false);
+		expect(synchronizations).toBe(0);
 		expect(checked.record.executionManifest.runtime).toMatchObject({
-			architecture: 'arm64',
+			architecture: 'x64',
 			platform: 'linux',
-			version: 'v99.1.2'
+			version: 'v24.0.0'
 		});
+	});
+
+	it('rejects a generator observation that changes before check completion', () => {
+		const root = fixture();
+		run(root, 'write');
+		let observations = 0;
+		expect(() =>
+			runGeneratedContextEvidenceForTest({
+				mode: 'check',
+				observeGenerator: (repositoryRoot) => {
+					observations += 1;
+					const observation = testObservation(repositoryRoot);
+					return observations === 1
+						? observation
+						: { ...observation, nodeExecutable: `${observation.nodeExecutable}.changed` };
+				},
+				repositoryRoot: root,
+				synchronize: () => {
+					throw new Error('check mode executed the generator');
+				}
+			})
+		).toThrow('SvelteKit generator identity changed before check completion.');
 	});
 
 	it('rejects execution configuration evidence that does not reconcile with bound inputs', () => {

@@ -150,6 +150,15 @@ function request(overrides: Partial<SemanticBudgets> = {}): BuildStaticSemanticS
 	};
 }
 
+const RAW_SYNTAX_ONLY_INVOCATION_TARGET = {
+	implementationDeclarationOrdinal: null,
+	implementationNodeOrdinal: null,
+	implementationSourceOrdinal: null,
+	resolutionReason: 'TYPE_CAPABILITY_NOT_REQUESTED',
+	resolvedSignatureOrdinal: null,
+	targetState: 'SYNTAX_ONLY'
+} as const;
+
 function subject(programRecipe = recipe()): FrozenSubject {
 	const logicalPath = programRecipe.rootNames[0]!;
 	return {
@@ -2103,6 +2112,7 @@ describe('semantic snapshot normalization', () => {
 			],
 			invocations: [
 				{
+					...RAW_SYNTAX_ONLY_INVOCATION_TARGET,
 					argumentNodeOrdinals: [11],
 					calleeNodeOrdinal: 10,
 					invocationKind: 'TAGGED_TEMPLATE',
@@ -2112,6 +2122,7 @@ describe('semantic snapshot normalization', () => {
 					templateNodeOrdinal: 11
 				},
 				{
+					...RAW_SYNTAX_ONLY_INVOCATION_TARGET,
 					argumentNodeOrdinals: [8],
 					calleeNodeOrdinal: 7,
 					invocationKind: 'NEW',
@@ -2121,6 +2132,7 @@ describe('semantic snapshot normalization', () => {
 					templateNodeOrdinal: null
 				},
 				{
+					...RAW_SYNTAX_ONLY_INVOCATION_TARGET,
 					argumentNodeOrdinals: [5],
 					calleeNodeOrdinal: 4,
 					invocationKind: 'CALL',
@@ -2722,6 +2734,7 @@ describe('semantic snapshot normalization', () => {
 				],
 				invocations: [
 					{
+						...RAW_SYNTAX_ONLY_INVOCATION_TARGET,
 						argumentNodeOrdinals: [],
 						calleeNodeOrdinal: 2,
 						invocationKind: 'TAGGED_TEMPLATE',

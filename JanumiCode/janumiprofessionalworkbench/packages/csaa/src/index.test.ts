@@ -590,10 +590,10 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		expect(publicSurface).not.toHaveProperty('canonicalSemanticJsonWitnessWithProgress');
 		expect(publicSurface).not.toHaveProperty('canonicalSemanticJsonPrefixedSha256');
 		expect(publicSurface).not.toHaveProperty('compareCanonicalSemanticJsonStrings');
-		expect(SEMANTIC_EXTRACTION_VERSION).toBe('jan-csaa-typescript-static/0.7.0');
-		expect(SEMANTIC_OPERATION_VERSION).toBe('jan-csaa-build-static-semantic-snapshot/4.0.0');
+		expect(SEMANTIC_EXTRACTION_VERSION).toBe('jan-csaa-typescript-static/0.8.0');
+		expect(SEMANTIC_OPERATION_VERSION).toBe('jan-csaa-build-static-semantic-snapshot/5.0.0');
 		expect(SEMANTIC_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-semantic-request/3.0.0');
-		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/7.0.0');
+		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/8.0.0');
 		expect(STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION).toBe(
 			'jan-csaa-static-semantic-snapshot-progress/1.0.0'
 		);

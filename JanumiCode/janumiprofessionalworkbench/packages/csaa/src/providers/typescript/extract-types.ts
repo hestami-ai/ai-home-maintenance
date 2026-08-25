@@ -20,6 +20,7 @@ import {
 } from '../../semantic/canonical.js';
 import type {
 	RawSemanticOverloadSet,
+	RawSemanticInvocation,
 	RawSemanticSignature,
 	RawSemanticSignatureParameter,
 	RawSemanticType,
@@ -59,11 +60,19 @@ export interface TypeScriptTypeSourceBridge {
 	readonly sourceOrdinal: number;
 }
 
+export interface TypeScriptInvocationBridge {
+	readonly invocationKind: RawSemanticInvocation['invocationKind'];
+	readonly node: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression;
+	readonly nodeOrdinal: number;
+	readonly sourceOrdinal: number;
+}
+
 export interface ExtractTypeScriptTypesInput {
 	readonly assignabilityRequests: readonly SemanticAssignabilityRequest[];
 	readonly checker: ts.TypeChecker;
 	readonly declarations: readonly TypeScriptTypeDeclarationBridge[];
 	readonly guard: TypeScriptTypeExtractionGuard;
+	readonly invocations: readonly TypeScriptInvocationBridge[];
 	readonly nodeAnchorForNode: (node: ts.Node) => TypeScriptTypeNodeAnchor | null;
 	readonly projectKey: string;
 	readonly resolveCheckerContextDigest: () => string;
@@ -72,6 +81,7 @@ export interface ExtractTypeScriptTypesInput {
 }
 
 export interface RawTypeScriptTypeProjection {
+	readonly invocationResolutions: readonly RawTypeScriptInvocationResolution[];
 	readonly overloadSets: readonly RawSemanticOverloadSet[];
 	readonly signatureParameters: readonly RawSemanticSignatureParameter[];
 	readonly signatures: readonly RawSemanticSignature[];
@@ -79,6 +89,18 @@ export interface RawTypeScriptTypeProjection {
 	readonly typeRelations: readonly RawSemanticTypeRelation[];
 	readonly types: readonly RawSemanticType[];
 }
+
+export type RawTypeScriptInvocationResolution = Pick<
+	RawSemanticInvocation,
+	| 'implementationDeclarationOrdinal'
+	| 'implementationNodeOrdinal'
+	| 'implementationSourceOrdinal'
+	| 'nodeOrdinal'
+	| 'resolutionReason'
+	| 'resolvedSignatureOrdinal'
+	| 'sourceOrdinal'
+	| 'targetState'
+>;
 
 type RootTypeAnchor = Extract<
 	RawSemanticTypeAcquisitionAnchor,
@@ -203,6 +225,15 @@ interface PendingOverloadSet {
 	readonly callableSymbolOrdinal: number;
 	readonly members: readonly PendingOverloadMember[];
 	overloadSetOrdinal: number;
+}
+
+interface PendingInvocationResolution {
+	readonly implementation: TypeScriptTypeDeclarationBridge | null;
+	readonly implementationNode: ts.Declaration | null;
+	readonly nodeOrdinal: number;
+	readonly reason: RawSemanticInvocation['resolutionReason'];
+	readonly signature: PendingSignature | null;
+	readonly sourceOrdinal: number;
 }
 
 interface PendingTypeOfRelation {
@@ -442,6 +473,7 @@ interface TypeExtractionState {
 	readonly canonicalSignatureByDeclaration: Map<number, ts.Signature | undefined>;
 	readonly checker: ts.TypeChecker;
 	readonly declarationByNode: WeakMap<ts.Declaration, TypeScriptTypeDeclarationBridge>;
+	readonly declarationByOrdinal: ReadonlyMap<number, TypeScriptTypeDeclarationBridge>;
 	readonly displayPathReplacements: readonly DisplayPathReplacement[];
 	readonly guard: TypeScriptTypeExtractionGuard;
 	readonly input: ExtractTypeScriptTypesInput;
@@ -459,6 +491,7 @@ interface TypeExtractionState {
 	readonly selectorNodes: Map<string, SelectorNodeBinding | null>;
 	readonly selectorTypeCache: Map<string, PendingType | null>;
 	readonly symbolOrdinalBySymbol: Map<ts.Symbol, number>;
+	readonly symbolOrdinalByDeclaration: ReadonlyMap<number, number>;
 }
 
 function indexDeclarationBridges(input: ExtractTypeScriptTypesInput): DeclarationBridgeIndex {
@@ -504,6 +537,20 @@ function indexSymbolBridges(
 	))
 		indexSymbolBridge(symbol, symbolOrdinalBySymbol, declarationByOrdinal);
 	return symbolOrdinalBySymbol;
+}
+
+function indexSymbolOrdinalsByDeclaration(
+	input: ExtractTypeScriptTypesInput
+): ReadonlyMap<number, number> {
+	const result = new Map<number, number>();
+	for (const symbol of input.symbols)
+		for (const declaration of symbol.declarations) {
+			const existing = result.get(declaration.declarationOrdinal);
+			if (existing !== undefined && existing !== symbol.symbolOrdinal)
+				throw new Error('Type extraction received a declaration in multiple canonical symbols.');
+			result.set(declaration.declarationOrdinal, symbol.symbolOrdinal);
+		}
+	return result;
 }
 
 const extensionPattern = /(?:\.d\.(?:cts|mts|ts)|\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx))$/iu;
@@ -651,6 +698,7 @@ function createTypeExtractionState(input: ExtractTypeScriptTypesInput): TypeExtr
 		canonicalSignatureByDeclaration: new Map(),
 		checker: input.checker,
 		declarationByNode,
+		declarationByOrdinal,
 		displayPathReplacements: buildDisplayPathReplacements(input),
 		guard: input.guard,
 		input,
@@ -667,7 +715,8 @@ function createTypeExtractionState(input: ExtractTypeScriptTypesInput): TypeExtr
 		pendingTypesByObject: new Map(),
 		selectorNodes: new Map(),
 		selectorTypeCache: new Map(),
-		symbolOrdinalBySymbol
+		symbolOrdinalBySymbol,
+		symbolOrdinalByDeclaration: indexSymbolOrdinalsByDeclaration(input)
 	};
 	indexSelectorNodes(state);
 	return state;
@@ -1344,6 +1393,227 @@ function collectSymbolTypeFacts(state: TypeExtractionState): void {
 	const processedDeclarationOrdinals = new Set<number>();
 	for (const symbol of sortedSymbols)
 		collectSymbolFacts(state, symbol, processedDeclarationOrdinals);
+}
+
+function invocationCallee(
+	node: TypeScriptInvocationBridge['node']
+): ts.LeftHandSideExpression | ts.Expression {
+	if (ts.isTaggedTemplateExpression(node)) return node.tag;
+	return node.expression;
+}
+
+function invocationSignatureKind(
+	invocationKind: TypeScriptInvocationBridge['invocationKind']
+): SemanticSignatureKind {
+	return invocationKind === 'NEW' ? 'CONSTRUCT' : 'CALL';
+}
+
+function declarationHasExecutableBody(declaration: ts.Declaration): boolean {
+	return (
+		(ts.isFunctionDeclaration(declaration) ||
+			ts.isFunctionExpression(declaration) ||
+			ts.isArrowFunction(declaration) ||
+			ts.isMethodDeclaration(declaration) ||
+			ts.isConstructorDeclaration(declaration) ||
+			ts.isGetAccessorDeclaration(declaration) ||
+			ts.isSetAccessorDeclaration(declaration)) &&
+		declaration.body !== undefined
+	);
+}
+
+function implementationCandidates(
+	state: TypeExtractionState,
+	resolvedDeclaration: ts.Signature['declaration']
+): readonly ts.Declaration[] {
+	if (
+		resolvedDeclaration === undefined ||
+		resolvedDeclaration.kind === ts.SyntaxKind.JSDocSignature
+	)
+		return [];
+	const directBridge = state.declarationByNode.get(resolvedDeclaration);
+	const symbolOrdinal =
+		directBridge === undefined
+			? null
+			: (state.symbolOrdinalByDeclaration.get(directBridge.declarationOrdinal) ?? null);
+	const candidates = new Map<ts.Declaration, ts.Declaration>();
+	if (declarationHasExecutableBody(resolvedDeclaration))
+		candidates.set(resolvedDeclaration, resolvedDeclaration);
+	if (symbolOrdinal !== null)
+		for (const declaration of state.input.symbols.find(
+			(candidate) => candidate.symbolOrdinal === symbolOrdinal
+		)?.declarations ?? [])
+			if (declarationHasExecutableBody(declaration.declaration))
+				candidates.set(declaration.declaration, declaration.declaration);
+	return [...candidates.values()].sort((left, right) => {
+		const leftAnchor = state.input.nodeAnchorForNode(left);
+		const rightAnchor = state.input.nodeAnchorForNode(right);
+		return (
+			(leftAnchor?.sourceOrdinal ?? Number.MAX_SAFE_INTEGER) -
+				(rightAnchor?.sourceOrdinal ?? Number.MAX_SAFE_INTEGER) ||
+			(leftAnchor?.nodeOrdinal ?? Number.MAX_SAFE_INTEGER) -
+				(rightAnchor?.nodeOrdinal ?? Number.MAX_SAFE_INTEGER)
+		);
+	});
+}
+
+function resolvedPendingSignature(
+	state: TypeExtractionState,
+	binding: TypeScriptInvocationBridge,
+	resolved: ts.Signature
+): PendingSignature | null {
+	const callee = invocationCallee(binding.node);
+	const calleeAnchor = state.input.nodeAnchorForNode(callee);
+	if (calleeAnchor === null) return null;
+	const calleeType = runQuery(
+		state,
+		'invocation-callee-type',
+		`${String(binding.sourceOrdinal)}\0${String(binding.nodeOrdinal)}`,
+		() => state.checker.getTypeAtLocation(callee)
+	);
+	const pendingType = discoverType(state, calleeType, {
+		kind: 'NODE',
+		nodeOrdinal: calleeAnchor.nodeOrdinal,
+		queryMode: 'TYPE_AT_LOCATION',
+		sourceOrdinal: calleeAnchor.sourceOrdinal
+	});
+	addTypeOf(
+		state,
+		{
+			kind: 'AST_NODE',
+			nodeOrdinal: calleeAnchor.nodeOrdinal,
+			sourceOrdinal: calleeAnchor.sourceOrdinal
+		},
+		'TYPE_AT_LOCATION',
+		pendingType
+	);
+	const signatureKind = invocationSignatureKind(binding.invocationKind);
+	const compilerKind =
+		signatureKind === 'CALL' ? ts.SignatureKind.Call : ts.SignatureKind.Construct;
+	const candidates = runQuery(
+		state,
+		'invocation-callee-signatures',
+		`${String(binding.sourceOrdinal)}\0${String(binding.nodeOrdinal)}\0${signatureKind}`,
+		() => [...state.checker.getSignaturesOfType(calleeType, compilerKind)]
+	);
+	let providerOrdinal = candidates.findIndex((candidate) => candidate === resolved);
+	if (providerOrdinal < 0 && resolved.declaration !== undefined) {
+		const matching = candidates
+			.map((candidate, ordinal) => ({ candidate, ordinal }))
+			.filter(({ candidate }) => candidate.declaration === resolved.declaration);
+		if (matching.length === 1) providerOrdinal = matching[0]!.ordinal;
+	}
+	if (providerOrdinal >= 0) {
+		const signature = candidates[providerOrdinal]!;
+		const declaration =
+			signature.declaration === undefined
+				? null
+				: (state.declarationByNode.get(signature.declaration) ?? null);
+		return discoverSignature(state, signature, {
+			declaration,
+			key: `INVOCATION:${String(binding.sourceOrdinal)}:${String(binding.nodeOrdinal)}`,
+			owner: { kind: 'TYPE', type: pendingType },
+			providerOrdinal,
+			signatureKind
+		});
+	}
+	const declaration =
+		resolved.declaration === undefined
+			? null
+			: (state.declarationByNode.get(resolved.declaration) ?? null);
+	if (declaration === null) return null;
+	const canonical = canonicalSignatureForDeclaration(state, declaration);
+	if (canonical === undefined) return null;
+	const symbolOrdinal = state.symbolOrdinalByDeclaration.get(declaration.declarationOrdinal);
+	return discoverSignature(state, canonical, {
+		declaration,
+		key: `INVOCATION_DECLARATION:${String(binding.sourceOrdinal)}:${String(binding.nodeOrdinal)}`,
+		owner:
+			symbolOrdinal === undefined
+				? { declarationOrdinal: declaration.declarationOrdinal, kind: 'DECLARATION' }
+				: { kind: 'SYMBOL', symbolOrdinal },
+		providerOrdinal: null,
+		signatureKind
+	});
+}
+
+function collectInvocationResolution(
+	state: TypeExtractionState,
+	binding: TypeScriptInvocationBridge
+): PendingInvocationResolution {
+	state.guard.check();
+	const resolved = runQuery(
+		state,
+		'invocation-resolved-signature',
+		`${String(binding.sourceOrdinal)}\0${String(binding.nodeOrdinal)}`,
+		() => state.checker.getResolvedSignature(binding.node)
+	);
+	if (resolved === undefined)
+		return {
+			implementation: null,
+			implementationNode: null,
+			nodeOrdinal: binding.nodeOrdinal,
+			reason: 'COMPILER_SIGNATURE_UNRESOLVED',
+			signature: null,
+			sourceOrdinal: binding.sourceOrdinal
+		};
+	const signature = resolvedPendingSignature(state, binding, resolved);
+	if (signature === null)
+		return {
+			implementation: null,
+			implementationNode: null,
+			nodeOrdinal: binding.nodeOrdinal,
+			reason: 'SIGNATURE_DECLARATION_UNRETAINED',
+			signature: null,
+			sourceOrdinal: binding.sourceOrdinal
+		};
+	const implementations = implementationCandidates(state, resolved.declaration);
+	if (implementations.length === 0)
+		return {
+			implementation: null,
+			implementationNode: null,
+			nodeOrdinal: binding.nodeOrdinal,
+			reason: 'IMPLEMENTATION_UNAVAILABLE',
+			signature,
+			sourceOrdinal: binding.sourceOrdinal
+		};
+	if (implementations.length > 1)
+		return {
+			implementation: null,
+			implementationNode: null,
+			nodeOrdinal: binding.nodeOrdinal,
+			reason: 'IMPLEMENTATION_NOT_UNIQUE',
+			signature,
+			sourceOrdinal: binding.sourceOrdinal
+		};
+	const implementationNode = implementations[0]!;
+	if (state.input.nodeAnchorForNode(implementationNode) === null)
+		return {
+			implementation: null,
+			implementationNode: null,
+			nodeOrdinal: binding.nodeOrdinal,
+			reason: 'IMPLEMENTATION_NOT_DEEP_INDEXED',
+			signature,
+			sourceOrdinal: binding.sourceOrdinal
+		};
+	return {
+		implementation: state.declarationByNode.get(implementationNode) ?? null,
+		implementationNode,
+		nodeOrdinal: binding.nodeOrdinal,
+		reason: 'IMPLEMENTATION_IDENTIFIED',
+		signature,
+		sourceOrdinal: binding.sourceOrdinal
+	};
+}
+
+function collectInvocationResolutions(
+	state: TypeExtractionState
+): readonly PendingInvocationResolution[] {
+	return [...state.input.invocations]
+		.sort(
+			(left, right) =>
+				left.sourceOrdinal - right.sourceOrdinal || left.nodeOrdinal - right.nodeOrdinal
+		)
+		.map((binding) => collectInvocationResolution(state, binding));
 }
 
 function loadTypeIdentity(
@@ -2103,6 +2373,36 @@ function projectTypes(
 	});
 }
 
+function projectInvocationResolutions(
+	state: TypeExtractionState,
+	pendingResolutions: readonly PendingInvocationResolution[]
+): RawTypeScriptInvocationResolution[] {
+	return pendingResolutions.map((pending) => {
+		state.guard.addFact();
+		const implementationAnchor =
+			pending.implementationNode === null
+				? null
+				: state.input.nodeAnchorForNode(pending.implementationNode);
+		if (pending.implementationNode !== null && implementationAnchor === null)
+			throw new Error('Invocation implementation lost its retained AST anchor.');
+		return {
+			implementationDeclarationOrdinal: pending.implementation?.declarationOrdinal ?? null,
+			implementationNodeOrdinal: implementationAnchor?.nodeOrdinal ?? null,
+			implementationSourceOrdinal: implementationAnchor?.sourceOrdinal ?? null,
+			nodeOrdinal: pending.nodeOrdinal,
+			resolutionReason: pending.reason,
+			resolvedSignatureOrdinal: pending.signature?.signatureOrdinal ?? null,
+			sourceOrdinal: pending.sourceOrdinal,
+			targetState:
+				pending.signature === null
+					? 'SYNTAX_ONLY'
+					: implementationAnchor === null
+						? 'SIGNATURE_RESOLVED'
+						: 'IMPLEMENTATION_IDENTIFIED'
+		};
+	});
+}
+
 function typeParameterConstraintState(
 	pending: PendingTypeParameter
 ): RawSemanticTypeParameter['constraintState'] {
@@ -2345,6 +2645,7 @@ export function extractTypeScriptTypes(
 	const state = createTypeExtractionState(input);
 	collectAssignabilityRelations(state);
 	collectSymbolTypeFacts(state);
+	const pendingInvocationResolutions = collectInvocationResolutions(state);
 	drainPendingWork(state);
 	const pendingOverloadSets = buildPendingOverloadSets(state);
 	const sortedTypes = assignTypeOrdinals(state);
@@ -2352,6 +2653,7 @@ export function extractTypeScriptTypes(
 	const sortedTypeParameters = assignTypeParameterOrdinals(state);
 	const allSignatureParameters = assignSignatureParameterOrdinals(sortedSignatures);
 	const types = projectTypes(state, sortedTypes);
+	const invocationResolutions = projectInvocationResolutions(state, pendingInvocationResolutions);
 	const typeParameters = projectTypeParameters(state, sortedTypeParameters);
 	const signatureParameters = projectSignatureParameters(state, allSignatureParameters);
 	const signatures = projectSignatures(state, sortedSignatures);
@@ -2362,6 +2664,7 @@ export function extractTypeScriptTypes(
 	const typeRelations = buildTypeRelations(state, sortedTypeParameters, sortedOverloadSets);
 	state.guard.check();
 	return {
+		invocationResolutions,
 		overloadSets,
 		signatureParameters,
 		signatures,

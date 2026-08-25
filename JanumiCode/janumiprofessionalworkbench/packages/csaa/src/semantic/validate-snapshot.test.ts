@@ -288,6 +288,15 @@ function reviseProvenance(
 	};
 }
 
+const SYNTAX_ONLY_INVOCATION_TARGET = {
+	implementationDeclarationId: null,
+	implementationNodeId: null,
+	resolutionProvenanceId: null,
+	resolutionReason: 'TYPE_CAPABILITY_NOT_REQUESTED',
+	resolvedSignatureId: null,
+	targetState: 'SYNTAX_ONLY'
+} as const;
+
 function fixture(
 	logicalPath = 'src/index.ts',
 	contents = '',
@@ -671,7 +680,8 @@ function fixture(
 				scriptKind: 3,
 				scriptKindName: 'TS',
 				syntaxProvenanceId: sourceSyntaxProvenance.id,
-				textLength: contents.length
+				textLength: contents.length,
+				transformation: null
 			}
 		],
 		symbols: [],
@@ -1649,10 +1659,10 @@ function withDeclarationOwnedPairTypeParameters(): StaticSemanticSnapshot {
 			const declarationId = declarationIds.get(spec.name)!;
 			const parameterTypeId = parameterTypes.find((type) => type.display === spec.name)!.id;
 			return {
-				constraintState: 'MISSING',
+				constraintState: 'MISSING' as const,
 				constraintTypeId: null,
 				declarationId,
-				defaultState: 'MISSING',
+				defaultState: 'MISSING' as const,
 				defaultTypeId: null,
 				id: semanticTypeParameterId({ declarationId, ordinal, owner }),
 				name: spec.name,
@@ -1664,7 +1674,7 @@ function withDeclarationOwnedPairTypeParameters(): StaticSemanticSnapshot {
 				provenanceId: typeProvenance.id
 			};
 		}
-	);
+	).sort((left, right) => (left.id < right.id ? -1 : 1));
 	const constraintRelations: StaticSemanticSnapshot['typeRelations'] = typeParameters.map(
 		(parameter) => {
 			const preimage = {
@@ -2212,7 +2222,7 @@ describe('bounded semantic snapshot validation', () => {
 			state: 'VALID'
 		});
 		expect(
-			validateSnapshot({ ...snapshot, schemaVersion: 'jan-csaa-semantic-snapshot/8.0.0' })
+			validateSnapshot({ ...snapshot, schemaVersion: 'jan-csaa-semantic-snapshot/9.0.0' })
 		).toMatchObject({ state: 'INVALID', issues: [{ code: 'UNSUPPORTED_SCHEMA_VERSION' }] });
 	});
 
@@ -2338,9 +2348,11 @@ describe('bounded semantic snapshot validation', () => {
 			state: 'VALID'
 		});
 		const owner = snapshot.declarations.find((declaration) => declaration.name === 'Pair')!;
-		const parameters = snapshot.typeParameters.filter(
-			(parameter) => parameter.owner.kind === 'DECLARATION' && parameter.owner.id === owner.id
-		);
+		const parameters = snapshot.typeParameters
+			.filter(
+				(parameter) => parameter.owner.kind === 'DECLARATION' && parameter.owner.id === owner.id
+			)
+			.sort((left, right) => left.ordinal - right.ordinal);
 		expect(parameters.map((parameter) => parameter.ordinal)).toEqual([0, 1]);
 		for (const parameter of parameters) {
 			expect(parameter.declarationId).not.toBeNull();
@@ -3384,7 +3396,7 @@ describe('bounded semantic snapshot validation', () => {
 
 	it('binds the literal operation, traversal profile, and expected-empty decision into the snapshot identity', () => {
 		const snapshot = fixture();
-		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/7.0.0');
+		expect(SEMANTIC_SNAPSHOT_SCHEMA_VERSION).toBe('jan-csaa-semantic-snapshot/8.0.0');
 		for (const probe of [
 			{ ...snapshot, astTraversalProfile: 'typescript-private-traversal/1' },
 			{ ...snapshot, operationVersion: 'jan-csaa-build-static-semantic-snapshot/0.9.0' }
@@ -4821,6 +4833,7 @@ describe('bounded semantic snapshot validation', () => {
 		);
 		const expressionNode = callAst.astNodes.find((node) => node.parentId === callNode.id)!;
 		const call = {
+			...SYNTAX_ONLY_INVOCATION_TARGET,
 			argumentNodeIds: [],
 			calleeNodeId: expressionNode.id,
 			id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
@@ -4828,7 +4841,6 @@ describe('bounded semantic snapshot validation', () => {
 			nodeId: callNode.id,
 			optional: false,
 			sourceId: callNode.sourceId,
-			targetState: 'SYNTAX_ONLY' as const,
 			templateNodeId: null
 		};
 		const callSnapshot: StaticSemanticSnapshot = {
@@ -4999,6 +5011,7 @@ describe('bounded semantic snapshot validation', () => {
 		);
 		const constructorNode = newAst.astNodes.find((node) => node.parentId === newNode.id)!;
 		const newInvocation = {
+			...SYNTAX_ONLY_INVOCATION_TARGET,
 			argumentNodeIds: [],
 			calleeNodeId: constructorNode.id,
 			id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: newNode.id }),
@@ -5006,7 +5019,6 @@ describe('bounded semantic snapshot validation', () => {
 			nodeId: newNode.id,
 			optional: false as const,
 			sourceId: newNode.sourceId,
-			targetState: 'SYNTAX_ONLY' as const,
 			templateNodeId: null
 		};
 		const newSnapshot: StaticSemanticSnapshot = {
@@ -5060,6 +5072,7 @@ describe('bounded semantic snapshot validation', () => {
 				node.structuralRoles.includes(AST_STRUCTURAL_ROLES.invocationTemplate)
 		)!;
 		const taggedInvocation = {
+			...SYNTAX_ONLY_INVOCATION_TARGET,
 			argumentNodeIds: [] as const,
 			calleeNodeId: tagNode.id,
 			id: semanticInvocationSiteId({ invocationKind: 'TAGGED_TEMPLATE', nodeId: taggedNode.id }),
@@ -5067,7 +5080,6 @@ describe('bounded semantic snapshot validation', () => {
 			nodeId: taggedNode.id,
 			optional: false as const,
 			sourceId: taggedNode.sourceId,
-			targetState: 'SYNTAX_ONLY' as const,
 			templateNodeId: templateNode.id
 		};
 		const taggedSnapshot: StaticSemanticSnapshot = {
@@ -5132,6 +5144,7 @@ describe('bounded semantic snapshot validation', () => {
 		const newCallee = completeAst.astNodes.find((node) => node.parentId === newNode.id)!;
 		const invocations = [
 			{
+				...SYNTAX_ONLY_INVOCATION_TARGET,
 				argumentNodeIds: [],
 				calleeNodeId: callCallee.id,
 				id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
@@ -5139,10 +5152,10 @@ describe('bounded semantic snapshot validation', () => {
 				nodeId: callNode.id,
 				optional: false,
 				sourceId: callNode.sourceId,
-				targetState: 'SYNTAX_ONLY' as const,
 				templateNodeId: null
 			},
 			{
+				...SYNTAX_ONLY_INVOCATION_TARGET,
 				argumentNodeIds: [],
 				calleeNodeId: newCallee.id,
 				id: semanticInvocationSiteId({ invocationKind: 'NEW', nodeId: newNode.id }),
@@ -5150,7 +5163,6 @@ describe('bounded semantic snapshot validation', () => {
 				nodeId: newNode.id,
 				optional: false as const,
 				sourceId: newNode.sourceId,
-				targetState: 'SYNTAX_ONLY' as const,
 				templateNodeId: null
 			}
 		].sort((left, right) => (left.id < right.id ? -1 : 1));
@@ -7305,6 +7317,7 @@ describe('bounded semantic snapshot validation', () => {
 		);
 		const callee = withCallee.astNodes.find((node) => node.parentId === callNode.id)!;
 		const call = {
+			...SYNTAX_ONLY_INVOCATION_TARGET,
 			argumentNodeIds: [],
 			calleeNodeId: callee.id,
 			id: semanticInvocationSiteId({ invocationKind: 'CALL', nodeId: callNode.id }),
@@ -7312,7 +7325,6 @@ describe('bounded semantic snapshot validation', () => {
 			nodeId: callNode.id,
 			optional: false,
 			sourceId: callNode.sourceId,
-			targetState: 'SYNTAX_ONLY' as const,
 			templateNodeId: null
 		};
 		const callSnapshot: StaticSemanticSnapshot = {
@@ -8511,9 +8523,27 @@ describe('bounded semantic snapshot validation', () => {
 			}),
 			'Referenced type parameter is absent.'
 		);
-		const declarationOwnedSignature = replaceSignature(rich, {
-			owner: { id: firstSignature.declarationId!, kind: 'DECLARATION' }
-		});
+		const mismatchedDeclarationOwner = rich.signatures.find((signature) => {
+			if (signature.declarationId === null) return false;
+			const declaration = rich.declarations.find(
+				(candidate) => candidate.id === signature.declarationId
+			);
+			return declaration?.symbolId !== rich.overloadSets[0]!.callableSymbolId;
+		})!;
+		const declarationOwnedSignature = {
+			...rich,
+			signatures: rich.signatures.map((signature) =>
+				signature.id === mismatchedDeclarationOwner.id
+					? {
+							...signature,
+							owner: {
+								id: mismatchedDeclarationOwner.declarationId!,
+								kind: 'DECLARATION' as const
+							}
+						}
+					: signature
+			)
+		};
 		expectMessage(
 			declarationOwnedSignature,
 			'Overload membership role and callable owner are incoherent with its Signature.'

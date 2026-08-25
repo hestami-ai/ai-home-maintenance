@@ -50,6 +50,7 @@ import {
 } from '../../semantic/syntax-projection.js';
 import { assertCanonicalRelativePath } from '../../subject/paths.js';
 import { extractTypeScriptSymbols } from './extract-symbols.js';
+import type { RawTypeScriptSymbolProjection } from './extract-symbols.js';
 
 export const RAW_DIAGNOSTIC_FAMILIES = [
 	'CONFIGURATION',
@@ -276,6 +277,8 @@ export interface ExtractStaticRawInput {
 	readonly budgets: SemanticBudgets;
 	readonly checker: ts.TypeChecker;
 	readonly clock?: SemanticOperationClock;
+	/** Exact live-context roots required to interpret transformed sources; never project roots. */
+	readonly compilerSupportRootNames?: readonly string[];
 	readonly deadlineMs: number;
 	readonly diagnosticFamilies: readonly StaticRawDiagnosticFamilyInput[];
 	readonly evidenceState?: RawCompilerSourceBinding['verificationState'];
@@ -1333,10 +1336,16 @@ function projectInvocation(state: SourceSyntaxState, nodeOrdinal: number, node: 
 			retainedOrdinal(state, argument, 'Invocation argument')
 		),
 		calleeNodeOrdinal: retainedOrdinal(state, parts.callee, 'Invocation callee'),
+		implementationDeclarationOrdinal: null,
+		implementationNodeOrdinal: null,
+		implementationSourceOrdinal: null,
 		invocationKind,
 		nodeOrdinal,
 		optional: invocationKind === 'CALL' && (node.flags & ts.NodeFlags.OptionalChain) !== 0,
+		resolutionReason: 'TYPE_CAPABILITY_NOT_REQUESTED',
+		resolvedSignatureOrdinal: null,
 		sourceOrdinal: state.sourceOrdinal,
+		targetState: 'SYNTAX_ONLY',
 		templateNodeOrdinal:
 			parts.template === null ? null : retainedOrdinal(state, parts.template, 'Invocation template')
 	});
@@ -1652,13 +1661,27 @@ function partialityReasons(
 			message: `Frozen project ${project.configPath} has incomplete roots or project-configuration diagnostics.`,
 			path: project.configPath
 		});
-	if (project.frameworkCandidates.length > 0)
-		reasons.push({
-			capability: 'TS_SYNTAX',
-			code: 'FRAMEWORK_CANDIDATES_UNSUPPORTED',
-			message: 'Framework candidates are retained but not syntax-indexed by Slice 3A.',
-			path: project.configPath
-		});
+	for (const candidate of project.frameworkCandidates) {
+		const covered = sources.some(
+			(source) =>
+				source.logicalPath === candidate &&
+				source.analysisDisposition === 'DEEP_INDEXED' &&
+				source.origin === 'VIRTUAL' &&
+				source.mapping.state === 'EXACT' &&
+				source.transformation?.authored.logicalPath === candidate &&
+				source.transformation.virtual.origin === 'VIRTUAL' &&
+				source.transformation.virtual.contentBytes === source.bytes &&
+				source.transformation.virtual.contentSha256 === source.contentSha256 &&
+				source.transformation.virtual.contentCharacters === source.textLength
+		);
+		if (!covered)
+			reasons.push({
+				capability: 'TS_SYNTAX',
+				code: 'FRAMEWORK_CANDIDATES_UNSUPPORTED',
+				message: `Framework candidate ${candidate} has no exact, deep-indexed virtual-source witness.`,
+				path: candidate
+			});
+	}
 	for (const family of diagnosticFamilies)
 		if (family.state === 'FAILED' || family.coverage === 'BOUNDED') {
 			reasons.push({
@@ -1833,6 +1856,7 @@ function assertProjectIdentity(
 		input.projectKey,
 		input.project.configPath,
 		...input.programRecipe.rootNames,
+		...(input.compilerSupportRootNames ?? []),
 		...input.programRecipe.projectReferences,
 		...input.project.frameworkCandidates
 	])
@@ -1840,11 +1864,21 @@ function assertProjectIdentity(
 }
 
 function assertProgramRoots(input: ExtractStaticRawInput, recipeRoots: readonly string[]): void {
+	const declaredSupportRoots = input.compilerSupportRootNames ?? [];
+	const supportRoots = canonicalSet(declaredSupportRoots);
+	if (!sameStrings(declaredSupportRoots, supportRoots))
+		fail('INVALID_INPUT', 'Compiler support roots must be a unique canonical set.');
+	const expectedRoots = canonicalSet([...recipeRoots, ...supportRoots]);
+	if (expectedRoots.length !== recipeRoots.length + supportRoots.length)
+		fail('INVALID_INPUT', 'Compiler support roots must not overlap authoritative ProgramRecipe roots.');
 	const programRoots = canonicalSet(
 		input.program.getRootFileNames().map((path) => checkedLogicalPath(input, path))
 	);
-	if (!sameStrings(recipeRoots, programRoots))
-		fail('IDENTITY_MISMATCH', 'Program roots do not reproduce the authoritative ProgramRecipe.');
+	if (!sameStrings(expectedRoots, programRoots))
+		fail(
+			'IDENTITY_MISMATCH',
+			'Program roots do not reproduce the authoritative ProgramRecipe plus declared compiler support roots.'
+		);
 }
 
 function resolveProgramSourceFiles(input: ExtractStaticRawInput): readonly ProgramSourceEntry[] {
@@ -1949,7 +1983,7 @@ function sourceDisposition(
 	entry: ProgramSourceEntry,
 	recipeRoots: readonly string[]
 ): SourceAnalysisDisposition {
-	return evidence.byteBudgetClass === 'FROZEN_SUBJECT'
+	return evidence.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT'
 		? frozenSourceDisposition(evidence, entry.logicalPath)
 		: liveSourceDisposition(evidence, entry, recipeRoots);
 }
@@ -1972,7 +2006,10 @@ function buildRawSource(
 	recipeRoots: readonly string[],
 	sourceOrdinal: number
 ): RawSemanticSource {
-	const scriptKind = scriptKindFromLogicalPath(entry.logicalPath);
+	const scriptKind =
+		evidence.transformation === undefined || evidence.transformation === null
+			? scriptKindFromLogicalPath(entry.logicalPath)
+			: ts.ScriptKind.TS;
 	const scriptKindName = sourceScriptKindName(scriptKind, entry.logicalPath);
 	return {
 		analysisDisposition: disposition.analysisDisposition,
@@ -1993,7 +2030,8 @@ function buildRawSource(
 		scriptKind,
 		scriptKindName,
 		sourceOrdinal,
-		textLength: entry.sourceFile.text.length
+		textLength: entry.sourceFile.text.length,
+		transformation: evidence.transformation ?? null
 	};
 }
 
@@ -2056,6 +2094,36 @@ function collectSourceSyntax(
 	return collection;
 }
 
+function bindInvocationResolutions(
+	invocations: readonly RawSemanticInvocation[],
+	resolutions: RawTypeScriptSymbolProjection['invocationResolutions'],
+	includeTypes: boolean
+): readonly RawSemanticInvocation[] {
+	if (!includeTypes) {
+		if (resolutions.length !== 0)
+			fail('INVALID_INPUT', 'Type-disabled extraction unexpectedly produced invocation targets.');
+		return invocations;
+	}
+	const byKey = new Map<string, (typeof resolutions)[number]>();
+	for (const resolution of resolutions) {
+		const key = `${String(resolution.sourceOrdinal)}\0${String(resolution.nodeOrdinal)}`;
+		if (byKey.has(key))
+			fail('INVALID_INPUT', 'Type extraction produced duplicate invocation-target evidence.');
+		byKey.set(key, resolution);
+	}
+	const bound = invocations.map((invocation) => {
+		const key = `${String(invocation.sourceOrdinal)}\0${String(invocation.nodeOrdinal)}`;
+		const resolution = byKey.get(key);
+		if (resolution === undefined)
+			fail('INVALID_INPUT', 'Type extraction omitted retained invocation-target evidence.');
+		byKey.delete(key);
+		return { ...invocation, ...resolution };
+	});
+	if (byKey.size !== 0)
+		fail('INVALID_INPUT', 'Type extraction produced invocation-target evidence outside syntax.');
+	return bound;
+}
+
 function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemanticProjectExtraction {
 	const guard = new ExtractionGuard(input);
 	guard.check();
@@ -2113,6 +2181,11 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 	});
 
 	const diagnosticProjection = projectDiagnostics(input, input.diagnosticFamilies, sources, guard);
+	const boundInvocations = bindInvocationResolutions(
+		invocations,
+		symbolProjection.invocationResolutions,
+		includeTypes
+	);
 	guard.check();
 	const result: RawStaticSemanticProjectExtraction = {
 		aliases: symbolProjection.aliases,
@@ -2123,7 +2196,7 @@ function extractStaticRawActive(input: ExtractStaticRawInput): RawStaticSemantic
 		diagnosticFamilies: diagnosticProjection.families,
 		diagnostics: diagnosticProjection.diagnostics,
 		evidenceState: input.evidenceState ?? 'VERIFIED_COMPILER_INPUT',
-		invocations,
+		invocations: boundInvocations,
 		literals,
 		moduleExports: symbolProjection.moduleExports,
 		moduleResolutions: symbolProjection.moduleResolutions,

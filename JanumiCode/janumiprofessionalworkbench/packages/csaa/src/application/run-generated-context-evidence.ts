@@ -524,10 +524,7 @@ function sameGenerator(
 	left: SvelteKitSyncGeneratorObservation,
 	right: SvelteKitSyncGeneratorObservation
 ): boolean {
-	return (
-		canonicalJson({ executionManifest: left.executionManifest, generator: left.generator }) ===
-		canonicalJson({ executionManifest: right.executionManifest, generator: right.generator })
-	);
+	return canonicalJson(left) === canonicalJson(right);
 }
 
 function resolveEvidenceSubject(repositoryRoot: string): FrozenSubject {
@@ -720,23 +717,31 @@ function runGeneratedContextEvidenceUnlocked(
 	const target = resolve(repositoryRoot, RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH);
 	assertMutationPathConfined(repositoryRoot, target, 'Generated-context evidence target');
 	assertRegularExistingFile(target, 'Generated-context evidence target');
+	const observeGenerator = options.observeGenerator ?? observeSvelteKitSyncGenerator;
 	if (options.mode === 'check') {
 		const actual = readExistingEvidence(target);
 		if (actual === null) throw new Error('Required generated-context evidence is absent.');
 		const recorded = parseGeneratedContextEvidenceRecord(actual);
 		if (recorded.generator.id !== SVELTE_KIT_SYNC_GENERATOR_ID)
 			throw new Error('Generated-context evidence names an unsupported generator.');
+		const generator = observeGenerator(repositoryRoot);
+		if (generator.generator.id !== SVELTE_KIT_SYNC_GENERATOR_ID)
+			throw new Error('Observed an unsupported generated-context generator.');
 		const subject = resolveEvidenceSubject(repositoryRoot);
 		const record = createGeneratedContextEvidenceRecord({
 			evidenceSource: RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH,
-			executionManifest: recorded.executionManifest,
+			executionManifest: generator.executionManifest,
 			generatedContextPath: RPH_DEMO_GENERATED_CONTEXT_PATH,
-			generator: recorded.generator,
+			generator: generator.generator,
 			subject
 		});
-		const freshness = verifyFrozenSubject(subject, { rootLocator: repositoryRoot });
-		if (freshness.state !== 'CURRENT')
-			throw new Error('Generated-context subject changed before check completion.');
+		assertEvidenceInputsCurrent(
+			repositoryRoot,
+			subject,
+			generator,
+			observeGenerator,
+			'before check completion'
+		);
 		if (!readExistingEvidence(target)?.equals(actual))
 			throw new Error('Generated-context evidence changed before check completion.');
 		const expected = canonicalJson(record);
@@ -750,7 +755,6 @@ function runGeneratedContextEvidenceUnlocked(
 			subjectId: subject.descriptor.subjectId
 		};
 	}
-	const observeGenerator = options.observeGenerator ?? observeSvelteKitSyncGenerator;
 	const beforeSync = observeGenerator(repositoryRoot);
 	let generator = beforeSync;
 	let replayRecord: GeneratedContextEvidenceRecord | null = null;

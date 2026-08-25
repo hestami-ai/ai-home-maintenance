@@ -1,4 +1,4 @@
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { isProxy } from 'node:util/types';
 import ts from 'typescript';
 import {
@@ -47,6 +47,8 @@ import {
 	ProgramRecipeMaterializationError,
 	type MaterializedProgramRecipe
 } from '../providers/typescript/materialize-program-recipe.js';
+import { TYPESCRIPT_PROJECT_EXTRA_FILE_EXTENSIONS } from '../providers/typescript/file-extension-profile.js';
+import { SVELTE2TSX_SHIM_LOGICAL_PATH } from '../providers/svelte/svelte-virtual-source.js';
 import { assertCanonicalRelativePath, canonicalPathKey } from '../subject/paths.js';
 import { verifyFrozenSubject } from '../subject/freshness.js';
 import { isFrozenSubjectCapability } from '../subject/frozen-store.js';
@@ -943,7 +945,14 @@ function parseConfiguration(
 		readFile: (path) => host.readFile(path),
 		useCaseSensitiveFileNames: host.useCaseSensitiveFileNames()
 	};
-	const parsed = ts.getParsedCommandLineOfConfigFile(materialized.configFilePath, {}, parseHost);
+	const parsed = ts.getParsedCommandLineOfConfigFile(
+		materialized.configFilePath,
+		{},
+		parseHost,
+		undefined,
+		undefined,
+		TYPESCRIPT_PROJECT_EXTRA_FILE_EXTENSIONS
+	);
 	if (parsed === undefined)
 		throw new ProgramRecipeMaterializationError(
 			'INVALID_RECIPE',
@@ -998,18 +1007,29 @@ export function collectStaticDiagnosticFamily(
 function constructProject(
 	environment: CompilerEnvironment,
 	entry: MaterializedProject,
+	repositoryRoot: string,
 	assertWithinDeadline: () => void
 ): ConstructedProject {
 	assertWithinDeadline();
 	const host = environment.createProjectHost(entry.project.programRecipe, entry.materialized);
 	const configurationDiagnostics = parseConfiguration(host, entry.project, entry.materialized);
 	assertWithinDeadline();
+	const rootNames =
+		entry.project.frameworkCandidates.length === 0
+			? entry.materialized.rootNames
+			: [
+					...entry.materialized.rootNames,
+					resolve(repositoryRoot, SVELTE2TSX_SHIM_LOGICAL_PATH)
+				].sort(compare);
 	const program = ts.createProgram({
 		configFileParsingDiagnostics: configurationDiagnostics,
 		host,
-		options: entry.materialized.compilerOptions,
+		options:
+			entry.project.frameworkCandidates.length === 0
+				? entry.materialized.compilerOptions
+				: { ...entry.materialized.compilerOptions, allowNonTsExtensions: true },
 		projectReferences: entry.materialized.projectReferences,
-		rootNames: entry.materialized.rootNames
+		rootNames
 	});
 	const checker = program.getTypeChecker();
 	const diagnosticFamilies: readonly StaticRawDiagnosticFamilyInput[] = [
@@ -1107,6 +1127,7 @@ function compilerSourceResolver(
 					state: 'NOT_APPLICABLE'
 				},
 				origin: observation.origin,
+				transformation: null,
 				verificationState
 			};
 		}
@@ -1118,6 +1139,7 @@ function compilerSourceResolver(
 		);
 		if (artifacts.length !== 1) return undefined;
 		const artifact = artifacts[0]!;
+		const virtual = observation.byteBudgetClass === 'VIRTUAL_TRANSFORM';
 		return {
 			artifact: {
 				disposition: artifact.disposition,
@@ -1128,8 +1150,15 @@ function compilerSourceResolver(
 			bytes: observation.contentBytes,
 			contentSha256: observation.contentSha256,
 			logicalPath,
-			mapping: { reason: 'Exact frozen-subject artifact match.', state: 'EXACT' },
+			mapping: virtual
+				? {
+						reason:
+							'Pinned deterministic virtual source with exact authored identity and strict source-map point evidence.',
+						state: 'EXACT'
+					}
+				: { reason: 'Exact frozen-subject artifact match.', state: 'EXACT' },
 			origin: observation.origin,
+			transformation: virtual ? structuredClone(observation.transformation) : null,
 			verificationState
 		};
 	};
@@ -1302,6 +1331,7 @@ interface StaticRawExtractionPassInput<T> {
 	readonly projectResult: (raw: RawStaticSemanticProjectExtraction) => T;
 	readonly projects: readonly MaterializedProject[];
 	readonly providerBinding: StaticSemanticOperationBudgetProviderBinding;
+	readonly repositoryRoot: string;
 	readonly subject: FrozenSubject;
 }
 
@@ -1310,7 +1340,12 @@ function extractProjectResult<T>(
 	entry: MaterializedProject,
 	budgetLedger: ReturnType<typeof createStaticRawExtractionBudgetLedger>
 ): T {
-	const constructed = constructProject(pass.environment, entry, pass.assertWithinDeadline);
+	const constructed = constructProject(
+		pass.environment,
+		entry,
+		pass.repositoryRoot,
+		pass.assertWithinDeadline
+	);
 	const evidence = pass.evidenceForProject(entry.project.configPath);
 	if (evidence.attribution.projectKey !== entry.project.configPath)
 		throw new CompilerInputCaptureError(
@@ -1324,6 +1359,10 @@ function extractProjectResult<T>(
 		budgets: pass.budgets,
 		checker: constructed.checker,
 		clock: pass.clock,
+		compilerSupportRootNames:
+			constructed.project.frameworkCandidates.length === 0
+				? []
+				: [SVELTE2TSX_SHIM_LOGICAL_PATH],
 		deadlineMs: pass.deadlineMs,
 		diagnosticFamilies: constructed.diagnosticFamilies,
 		evidenceState: evidence.verificationState,
@@ -1691,6 +1730,7 @@ export function buildStaticSemanticSnapshot(
 			projectResult: (raw) => raw,
 			projects: materializedProjects,
 			providerBinding: operationBudgetProviderBinding,
+			repositoryRoot: request.rootLocator,
 			subject
 		});
 		phase = 'CAPTURE';
@@ -1771,6 +1811,7 @@ export function buildStaticSemanticSnapshot(
 			projectResult: (raw) => raw,
 			projects: materializedProjects,
 			providerBinding: operationBudgetProviderBinding,
+			repositoryRoot: request.rootLocator,
 			subject
 		});
 		const replayRaw = replayPass.results;

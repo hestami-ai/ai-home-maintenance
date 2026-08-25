@@ -7,9 +7,9 @@ import type {
 } from './subject.js';
 
 export const SEMANTIC_REQUEST_SCHEMA_VERSION = 'jan-csaa-semantic-request/3.0.0' as const;
-export const SEMANTIC_SNAPSHOT_SCHEMA_VERSION = 'jan-csaa-semantic-snapshot/7.0.0' as const;
-export const SEMANTIC_OPERATION_VERSION = 'jan-csaa-build-static-semantic-snapshot/4.0.0' as const;
-export const SEMANTIC_EXTRACTION_VERSION = 'jan-csaa-typescript-static/0.7.0' as const;
+export const SEMANTIC_SNAPSHOT_SCHEMA_VERSION = 'jan-csaa-semantic-snapshot/8.0.0' as const;
+export const SEMANTIC_OPERATION_VERSION = 'jan-csaa-build-static-semantic-snapshot/5.0.0' as const;
+export const SEMANTIC_EXTRACTION_VERSION = 'jan-csaa-typescript-static/0.8.0' as const;
 export const SEMANTIC_CANONICAL_PROFILE = 'jan-csaa-semantic-canonical/1.0.0' as const;
 export const SEMANTIC_AST_TRAVERSAL_PROFILE =
 	'typescript-public-normalized-ast-with-jsdoc/1.0.0' as const;
@@ -231,6 +231,7 @@ export type SourceOrigin =
 	| 'GENERATED'
 	| 'GENERATED_DECLARATION'
 	| 'WORKSPACE_BUILD_DECLARATION'
+	| 'VIRTUAL'
 	| 'EXTERNAL_DECLARATION'
 	| 'TOOLCHAIN_LIBRARY'
 	| 'CONFIGURATION'
@@ -240,6 +241,45 @@ export interface SourceMappingRecord {
 	readonly reason: string;
 	readonly state:
 		'EXACT' | 'PARTIAL' | 'AMBIGUOUS' | 'UNAVAILABLE' | 'CONFLICTING' | 'NOT_APPLICABLE';
+}
+
+/** Exact, serialized identity for one deterministic authored-to-virtual source transform. */
+export interface SemanticSourceTransformationRecord {
+	readonly adapter: {
+		readonly adapter: string;
+		readonly adapterVersion: string;
+		readonly svelteVersion: string;
+		readonly svelte2tsxVersion: string;
+		readonly typescriptVersion: string;
+	};
+	readonly authored: {
+		readonly contentBytes: number;
+		readonly contentCharacters: number;
+		readonly contentSha256: string;
+		readonly encoding: 'UTF8_WITHOUT_BOM';
+		readonly logicalPath: string;
+		readonly origin: 'AUTHORED';
+	};
+	readonly id: string;
+	readonly idProfile: string;
+	readonly schemaVersion: string;
+	readonly sourceMap: {
+		readonly canonicalJsonBytes: number;
+		readonly canonicalJsonSha256: string;
+		readonly decoderVersion: string;
+		readonly generatedLines: number;
+		readonly mappingState: 'EXACT_SEGMENT_POINTS_ONLY';
+		readonly segmentCount: number;
+	};
+	readonly transformProfile: string;
+	readonly virtual: {
+		readonly contentBytes: number;
+		readonly contentCharacters: number;
+		readonly contentSha256: string;
+		readonly logicalPath: string;
+		readonly origin: 'VIRTUAL';
+		readonly scriptKind: 'JS' | 'TS';
+	};
 }
 
 interface CompilerInputObservationBase {
@@ -258,6 +298,15 @@ export type CompilerInputObservation = CompilerInputObservationBase &
 				readonly contentSha256: string;
 				readonly operation: 'READ_FILE';
 				readonly result: 'PRESENT';
+		  }
+		| {
+				readonly byteBudgetClass: 'VIRTUAL_TRANSFORM';
+				readonly contentBytes: number;
+				readonly contentSha256: string;
+				readonly operation: 'READ_FILE';
+				readonly origin: 'VIRTUAL';
+				readonly result: 'PRESENT';
+				readonly transformation: SemanticSourceTransformationRecord;
 		  }
 		| { readonly operation: 'READ_FILE'; readonly result: 'ABSENT' }
 		| { readonly operation: 'FILE_EXISTS'; readonly result: 'PRESENT' | 'ABSENT' }
@@ -361,6 +410,7 @@ export interface SemanticSourceRecord {
 	readonly scriptKindName: string;
 	readonly syntaxProvenanceId: SemanticProvenanceId | null;
 	readonly textLength: number;
+	readonly transformation: SemanticSourceTransformationRecord | null;
 }
 
 export interface SemanticAstNodeRecord {
@@ -818,10 +868,22 @@ export type SemanticLiteralRecord = SemanticLiteralRecordBase &
 interface SemanticInvocationSiteRecordBase {
 	readonly calleeNodeId: SemanticNodeId;
 	readonly id: SemanticInvocationSiteId;
+	readonly implementationDeclarationId: SemanticDeclarationId | null;
+	readonly implementationNodeId: SemanticNodeId | null;
 	readonly invocationKind: 'CALL' | 'NEW' | 'TAGGED_TEMPLATE';
 	readonly nodeId: SemanticNodeId;
+	readonly resolutionProvenanceId: SemanticProvenanceId | null;
+	readonly resolutionReason:
+		| 'TYPE_CAPABILITY_NOT_REQUESTED'
+		| 'COMPILER_SIGNATURE_UNRESOLVED'
+		| 'SIGNATURE_DECLARATION_UNRETAINED'
+		| 'IMPLEMENTATION_UNAVAILABLE'
+		| 'IMPLEMENTATION_NOT_UNIQUE'
+		| 'IMPLEMENTATION_NOT_DEEP_INDEXED'
+		| 'IMPLEMENTATION_IDENTIFIED';
+	readonly resolvedSignatureId: SemanticSignatureId | null;
 	readonly sourceId: SemanticSourceId;
-	readonly targetState: 'SYNTAX_ONLY';
+	readonly targetState: 'SYNTAX_ONLY' | 'SIGNATURE_RESOLVED' | 'IMPLEMENTATION_IDENTIFIED';
 }
 
 export type SemanticInvocationSiteRecord = SemanticInvocationSiteRecordBase &

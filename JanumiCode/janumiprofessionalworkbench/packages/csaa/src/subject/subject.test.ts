@@ -1671,13 +1671,13 @@ describe('generated context and subject identity', () => {
 		};
 	}
 
-	it('keeps Svelte as framework-only and reports present generated context UNKNOWN/PARTIAL', () => {
+	it('retains Svelte compiler roots and reports present generated context UNKNOWN/PARTIAL', () => {
 		const outcome = resolved(svelteFixture(true));
 		const app = outcome.subject.projects.find(
 			(item) => item.configPath === 'apps/demo/tsconfig.json'
 		)!;
 		expect(outcome.completeness).toBe('PARTIAL');
-		expect(app.fileNames).not.toContain('apps/demo/src/page.svelte');
+		expect(app.fileNames).toContain('apps/demo/src/page.svelte');
 		expect(app.frameworkCandidates).toEqual(['apps/demo/src/page.svelte']);
 		expect(outcome.subject.generatedContexts).toEqual([
 			expect.objectContaining({ freshness: 'UNKNOWN', path: 'apps/demo/.svelte-kit/tsconfig.json' })
@@ -2449,7 +2449,7 @@ describe('live JPWB and inventory projection', () => {
 		// grows with the public report contract and root-surface assertions.
 		expect(counts.get('scripts/tsconfig.json')).toBe(36);
 		expect(counts.get('verif/tsconfig.json')).toBe(48);
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(84);
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		expect(
 			subject.projects.find((project) => project.configPath === 'apps/rph-demo/tsconfig.json')
 				?.frameworkCandidates

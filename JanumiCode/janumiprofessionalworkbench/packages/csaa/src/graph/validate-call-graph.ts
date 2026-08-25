@@ -240,8 +240,8 @@ const EXPECTED_RELATION_LANE_COVERAGE = [
 	{
 		lane: 'CONFIRMED' as const,
 		reason:
-			'Invocation-specific resolved signatures and dispatch-closure evidence are not retained.',
-		state: 'NOT_SUPPORTED' as const
+			'Compiler-resolved signatures plus a retained inline implementation support exact inline targets; other dispatch remains open.',
+		state: 'PARTIAL' as const
 	},
 	{
 		lane: 'INFERRED' as const,
@@ -292,6 +292,7 @@ const REASON_CODES = [
 	'COMPUTED_ELEMENT_DISPATCH',
 	'DYNAMIC_CALLEE_EXPRESSION',
 	'DYNAMIC_IMPORT_CALL',
+	'INLINE_CALLABLE_EXACT_SYNTAX_TARGET',
 	'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
 	'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
 	'MULTIPLE_CALLEE_REFERENCE_CANDIDATES',
@@ -1614,6 +1615,9 @@ function buildExpectedClassification(
 			...new Set([
 				state.source.provenanceId,
 				...(state.source.syntaxProvenanceId === null ? [] : [state.source.syntaxProvenanceId]),
+				...(state.invocation.resolutionProvenanceId === null
+					? []
+					: [state.invocation.resolutionProvenanceId]),
 				...(includeReferenceProvenance
 					? referenceIds.flatMap((id) => {
 							const reference = referenceById.get(id);
@@ -1655,14 +1659,23 @@ function classifyDirectCallee(
 			resolutionClass: 'UNSUPPORTED',
 			resolvedSymbolIds: []
 		});
-	if (inline.length === 1)
+	if (inline.length === 1) {
+		const target = inline[0]!;
+		const exact =
+			state.invocation.targetState === 'IMPLEMENTATION_IDENTIFIED' &&
+			state.invocation.resolvedSignatureId !== null &&
+			state.invocation.resolutionProvenanceId !== null &&
+			state.invocation.implementationNodeId === target.node.id;
 		return buildExpectedClassification(context, state, {
-			reasonCode: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
+			reasonCode: exact
+				? 'INLINE_CALLABLE_EXACT_SYNTAX_TARGET'
+				: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
 			referenceIds: [],
-			resolutionClass: 'CANDIDATE_SET',
-			resolvedSymbolIds: [...inline[0]!.symbolIds],
+			resolutionClass: exact ? 'EXACT' : 'CANDIDATE_SET',
+			resolvedSymbolIds: [...target.symbolIds],
 			targetSpecs: inline
 		});
+	}
 	if (inline.length > 1)
 		return buildExpectedClassification(context, state, {
 			reasonCode: 'MULTIPLE_CALLEE_REFERENCE_CANDIDATES',
@@ -1885,18 +1898,22 @@ function expectedCallClassifications(
 
 function expectedInferenceState(
 	candidateCount: number,
+	exactCount: number,
 	orderedCount: number
 ): CallGraphEpistemicState['inferenceState'] {
-	if (candidateCount === 0) return 'UNRESOLVED';
+	if (exactCount === orderedCount) return 'NONE';
+	if (candidateCount === 0 && exactCount === 0) return 'UNRESOLVED';
 	if (candidateCount === orderedCount) return 'CANDIDATE';
 	return 'MIXED';
 }
 
 function expectedSupportBasis(
 	candidateCount: number,
+	exactCount: number,
 	allUnsupported: boolean
 ): CallGraphEpistemicState['supportBasis'] {
 	if (candidateCount > 0) return 'COMPILER_BOUND_STATIC_CANDIDATE';
+	if (exactCount > 0) return 'COMPILER_CONFIRMED';
 	if (allUnsupported) return 'UNSUPPORTED';
 	return 'NO_TARGET_EVIDENCE';
 }
@@ -1913,6 +1930,9 @@ function expectedGlobalEpistemic(
 	const candidateCount = ordered.filter(
 		(classification) => classification.resolutionClass === 'CANDIDATE_SET'
 	).length;
+	const exactCount = ordered.filter(
+		(classification) => classification.resolutionClass === 'EXACT'
+	).length;
 	const allUnsupported = ordered.every(
 		(classification) => classification.resolutionClass === 'UNSUPPORTED'
 	);
@@ -1921,8 +1941,8 @@ function expectedGlobalEpistemic(
 		conflictState: 'NOT_EVALUATED',
 		executionHealth: 'PARTIAL',
 		freshness: 'SNAPSHOT_BOUND',
-		inferenceState: expectedInferenceState(candidateCount, ordered.length),
-		supportBasis: expectedSupportBasis(candidateCount, allUnsupported)
+		inferenceState: expectedInferenceState(candidateCount, exactCount, ordered.length),
+		supportBasis: expectedSupportBasis(candidateCount, exactCount, allUnsupported)
 	};
 }
 
@@ -2013,8 +2033,11 @@ function expectedCoverage(
 	const candidateTargetEdges = ordered
 		.filter((classification) => classification.resolutionClass === 'CANDIDATE_SET')
 		.reduce((total, classification) => total + classification.targetCallableNodeIds.length, 0);
+	const exactTargetEdges = count('EXACT');
 	const frontierCount = ordered.filter(
-		(classification) => classification.resolutionClass !== 'CANDIDATE_SET'
+		(classification) =>
+			classification.resolutionClass !== 'CANDIDATE_SET' &&
+			classification.resolutionClass !== 'EXACT'
 	).length;
 	return {
 		candidateSetCallSites: count('CANDIDATE_SET'),
@@ -2027,7 +2050,7 @@ function expectedCoverage(
 		ownershipEdges: snapshot.invocations.length,
 		reconciles: ordered.length === snapshot.invocations.length,
 		representedCallSites: snapshot.invocations.length,
-		targetEdges: candidateTargetEdges + frontierCount,
+		targetEdges: candidateTargetEdges + exactTargetEdges + frontierCount,
 		unresolvedCallSites: count('UNRESOLVED'),
 		unsupportedCallSites: count('UNSUPPORTED'),
 		wholeProgramReachability: 'NOT_CLAIMED'
@@ -2677,16 +2700,24 @@ function validateCallSiteExpectation(
 		);
 		return;
 	}
+	if (
+		node.resolutionClass === 'EXACT' &&
+		expectedClassification.resolutionClass !== 'EXACT'
+	)
+		issues.add(
+			'CONFORMANCE_OVERCLAIM',
+			`${path}.resolutionClass`,
+			'Exact resolution is not supported by the bound invocation signature and identical retained inline implementation.'
+		);
 	const expectedTargetNodeIds =
-		expectedClassification.resolutionClass === 'CANDIDATE_SET'
+		expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
+		expectedClassification.resolutionClass === 'EXACT'
 			? expectedClassification.targetCallableNodeIds
 			: [
 					callGraphFrontierNodeId(
 						graph.id,
 						node.invocationId,
-						expectedClassification.resolutionClass === 'EXACT'
-							? 'UNSUPPORTED'
-							: expectedClassification.resolutionClass
+						expectedClassification.resolutionClass
 					)
 				];
 	if (
@@ -2733,12 +2764,6 @@ function validateCallSiteReferences(
 				`${path}.resolvedSymbolIds[${symbolIndex}]`,
 				'Absent resolved symbol.'
 			);
-	if (node.resolutionClass === 'EXACT')
-		issues.add(
-			'CONFORMANCE_OVERCLAIM',
-			`${path}.resolutionClass`,
-			'Exact call targets are unavailable in this producer.'
-		);
 }
 
 function validateCallSiteNode(
@@ -3064,7 +3089,9 @@ function validateCandidateInferenceBasis(
 		limitationKinds: [
 			...new Set([
 				'CANDIDATE_SET_OPEN',
-				'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
+				...(invocation.resolvedSignatureId === null
+					? ['INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED']
+					: []),
 				...(expectedClassification.dispatchClass === 'MEMBER_REFERENCE' ||
 				expectedClassification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
 					? ['DYNAMIC_DISPATCH_NOT_CLOSED']
@@ -3149,6 +3176,54 @@ function validateCandidateEdge(
 		);
 }
 
+function validateConfirmedEdge(
+	context: SemanticValidationContext,
+	edge: Extract<CallGraphEdge, { relationKind: 'CONFIRMED_CALL_TARGET' }>,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	path: string
+): void {
+	const { expectedClassifications, issues, nodeById, snapshot } = context;
+	const expectedClassification = expectedClassifications.get(edge.invocationId);
+	const targetNode = nodeById.get(edge.target.nodeId);
+	if (
+		expectedClassification?.resolutionClass !== 'EXACT' ||
+		!same(edge.epistemic, expectedResolutionEpistemic('EXACT', snapshot))
+	)
+		issues.add(
+			'INVALID_VALUE',
+			`${path}.epistemic`,
+			'Confirmed-edge epistemic dimensions require independently derived exact evidence.'
+		);
+	const expectedTargetId = expectedClassification?.targetCallableNodeIds[0];
+	if (
+		edge.evidenceClass !== 'R-SEM' ||
+		edge.relationCode !== 'REL-067' ||
+		edge.resolutionClass !== 'EXACT' ||
+		edge.targetState !== 'CONFIRMED' ||
+		edge.candidateRank !== null ||
+		targetNode?.kind !== 'CALLABLE_TARGET' ||
+		expectedClassification?.targetCallableNodeIds.length !== 1 ||
+		edge.target.nodeId !== expectedTargetId ||
+		targetNode.semanticNodeId !== invocation.implementationNodeId
+	)
+		issues.add(
+			'INVALID_VALUE',
+			path,
+			'Confirmed edge lane, state, target, or independently derived implementation identity is incompatible.'
+		);
+	if (
+		invocation.targetState !== 'IMPLEMENTATION_IDENTIFIED' ||
+		invocation.resolvedSignatureId === null ||
+		invocation.resolutionProvenanceId === null ||
+		!edge.provenanceIds.includes(invocation.resolutionProvenanceId)
+	)
+		issues.add(
+			'CONFORMANCE_OVERCLAIM',
+			path,
+			'Confirmed edge lacks a retained resolved signature, unique implementation, or compiler-resolution provenance.'
+		);
+}
+
 function validateFrontierEdge(
 	context: SemanticValidationContext,
 	edge: CallGraphEdge,
@@ -3215,11 +3290,7 @@ function validateTargetEdge(
 			'Target edge must originate at its call-site node.'
 		);
 	if (edge.relationKind === 'CONFIRMED_CALL_TARGET')
-		issues.add(
-			'CONFORMANCE_OVERCLAIM',
-			path,
-			'Confirmed call-target edges are unavailable in this producer.'
-		);
+		validateConfirmedEdge(context, edge, invocation, path);
 	else if (edge.relationKind === 'CANDIDATE_CALL_TARGET')
 		validateCandidateEdge(context, edge, invocation, path);
 	else validateFrontierEdge(context, edge, path);
@@ -3284,15 +3355,14 @@ function validateInvocationExpectation(
 ): void {
 	const { graph, issues } = context;
 	const expectedTargetIds =
-		expectedClassification.resolutionClass === 'CANDIDATE_SET'
+		expectedClassification.resolutionClass === 'CANDIDATE_SET' ||
+		expectedClassification.resolutionClass === 'EXACT'
 			? [...expectedClassification.targetCallableNodeIds]
 			: [
 					callGraphFrontierNodeId(
 						graph.id,
 						invocation.id,
-						expectedClassification.resolutionClass === 'EXACT'
-							? 'UNSUPPORTED'
-							: expectedClassification.resolutionClass
+						expectedClassification.resolutionClass
 					)
 				];
 	if (!same(targetIds, expectedTargetIds))
@@ -3312,8 +3382,18 @@ function validateInvocationExpectation(
 				'$.edges',
 				`Invocation ${invocation.id} candidate-edge population differs from independent semantic derivation.`
 			);
+	} else if (expectedClassification.resolutionClass === 'EXACT') {
+		if (
+			frontiers.length !== 0 ||
+			targets.length !== 1 ||
+			targets[0]?.relationKind !== 'CONFIRMED_CALL_TARGET'
+		)
+			issues.add(
+				'POPULATION_MISMATCH',
+				'$.edges',
+				`Invocation ${invocation.id} confirmed-edge population differs from independent semantic derivation.`
+			);
 	} else if (
-		expectedClassification.resolutionClass !== 'EXACT' &&
 		(frontiers.length !== 1 ||
 			targets.length !== 1 ||
 			targets[0]?.relationKind !== 'UNRESOLVED_CALL_TARGET')
@@ -3322,6 +3402,34 @@ function validateInvocationExpectation(
 			'POPULATION_MISMATCH',
 			'$.edges',
 			`Invocation ${invocation.id} frontier population differs from independent semantic derivation.`
+		);
+}
+
+function validateExactInvocationPopulation(
+	context: SemanticValidationContext,
+	invocation: StaticSemanticSnapshot['invocations'][number],
+	frontiers: readonly Extract<CallGraphNode, { kind: 'FRONTIER' }>[],
+	targets: readonly CallGraphEdge[]
+): void {
+	const { issues, nodeById } = context;
+	if (frontiers.length !== 0)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.nodes',
+			`Exact invocation ${invocation.id} must not have a frontier node.`
+		);
+	const target = targets[0];
+	const targetNode = target === undefined ? undefined : nodeById.get(target.target.nodeId);
+	if (
+		targets.length !== 1 ||
+		target?.relationKind !== 'CONFIRMED_CALL_TARGET' ||
+		targetNode?.kind !== 'CALLABLE_TARGET' ||
+		targetNode.semanticNodeId !== invocation.implementationNodeId
+	)
+		issues.add(
+			'POPULATION_MISMATCH',
+			'$.edges',
+			`Exact invocation ${invocation.id} must have one confirmed edge to its retained implementation.`
 		);
 }
 
@@ -3416,7 +3524,9 @@ function validateInvocationSite(
 		);
 	if (site.resolutionClass === 'CANDIDATE_SET')
 		validateCandidateInvocationPopulation(context, invocation, frontiers, targets);
-	else if (site.resolutionClass !== 'EXACT')
+	else if (site.resolutionClass === 'EXACT')
+		validateExactInvocationPopulation(context, invocation, frontiers, targets);
+	else
 		validateFrontierInvocationPopulation(context, invocation, site, frontiers, targets);
 }
 
@@ -3545,12 +3655,6 @@ function validateCoverageTotals(context: SemanticValidationContext): void {
 			'$.layers[0].coverage',
 			'Layer coverage differs from top-level coverage.'
 		);
-	if (coverage.exactCallSites !== 0)
-		issues.add(
-			'CONFORMANCE_OVERCLAIM',
-			'$.coverage.exactCallSites',
-			'Exact-call count must remain zero in producer 0.1.0.'
-		);
 }
 
 function globalLimitationKey(kind: string): string {
@@ -3566,8 +3670,13 @@ function invocationLimitationKeys(
 	classification: ExpectedCallClassification
 ): string[] {
 	const { id, sourceId } = invocation;
+	const signatureKeys =
+		invocation.resolvedSignatureId === null
+			? [invocationLimitationKey('INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED', id, sourceId)]
+			: [];
 	if (classification.resolutionClass === 'CANDIDATE_SET')
 		return [
+			...signatureKeys,
 			invocationLimitationKey('CANDIDATE_SET_OPEN', id, sourceId),
 			...(classification.dispatchClass === 'MEMBER_REFERENCE' ||
 			classification.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
@@ -3576,15 +3685,16 @@ function invocationLimitationKeys(
 		];
 	if (classification.resolutionClass === 'EXTERNAL_DISPATCH')
 		return [
+			...signatureKeys,
 			invocationLimitationKey('EXTERNAL_DISPATCH_FRONTIER', id, sourceId),
 			...(classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED'
 				? [invocationLimitationKey('CALLABLE_VALUE_FLOW_NOT_MODELED', id, sourceId)]
 				: [])
 		];
 	if (classification.resolutionClass === 'UNRESOLVED')
-		return [invocationLimitationKey('UNRESOLVED_TARGET_FRONTIER', id, sourceId)];
+		return [...signatureKeys, invocationLimitationKey('UNRESOLVED_TARGET_FRONTIER', id, sourceId)];
 	if (classification.resolutionClass === 'UNSUPPORTED')
-		return [invocationLimitationKey('UNSUPPORTED_TARGET_FRONTIER', id, sourceId)];
+		return [...signatureKeys, invocationLimitationKey('UNSUPPORTED_TARGET_FRONTIER', id, sourceId)];
 	return [];
 }
 
@@ -3593,7 +3703,6 @@ function expectedLimitationKeySet(context: SemanticValidationContext): string[] 
 	const expectedLimitationKeys = [
 		globalLimitationKey('CALLER_CONTEXT_COARSENED'),
 		globalLimitationKey('ENTRY_MECHANISM_NOT_ANALYZED'),
-		globalLimitationKey('INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED'),
 		...(snapshot.health === 'PARTIAL' ? [globalLimitationKey('SEMANTIC_INPUT_PARTIAL')] : [])
 	];
 	for (const invocation of snapshot.invocations) {

@@ -692,6 +692,12 @@ class StaticSemanticOperationBudgetSessionImpl implements StaticSemanticOperatio
 							...snapshot.declarations.map((record) => sourceProjectId(record.sourceId)),
 							...snapshot.moduleExports.map((record) => sourceProjectId(record.sourceId)),
 							...snapshot.moduleResolutions.map((record) => sourceProjectId(record.sourceId)),
+							...snapshot.invocations
+								.filter(
+									(record) =>
+										record.resolutionReason !== 'TYPE_CAPABILITY_NOT_REQUESTED'
+								)
+								.map((record) => sourceProjectId(record.sourceId)),
 							...snapshot.overloadSets.map((record) => record.projectId),
 							...snapshot.references.map((record) => sourceProjectId(record.sourceId)),
 							...snapshot.signatureParameters.map((record) =>

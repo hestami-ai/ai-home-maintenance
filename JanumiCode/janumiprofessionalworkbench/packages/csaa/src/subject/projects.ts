@@ -10,6 +10,10 @@ import type {
 } from '../contracts/subject.js';
 import type { SubjectCapture } from './capture-model.js';
 import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
+import {
+	TYPESCRIPT_PROJECT_EXTRA_FILE_EXTENSIONS,
+	isSvelteAuthoredSourcePath
+} from '../providers/typescript/file-extension-profile.js';
 import { canonicalPathKey, isInsideRoot, repositoryRelativePath } from './paths.js';
 import { workspacePathByName } from './workspaces.js';
 
@@ -484,7 +488,10 @@ export function recordProjectDirectoryQueries(
 		const parsed = ts.getParsedCommandLineOfConfigFile(
 			resolve(capture.realRoot, ...configPath.split('/')),
 			{},
-			recording.host
+			recording.host,
+			undefined,
+			undefined,
+			TYPESCRIPT_PROJECT_EXTRA_FILE_EXTENSIONS
 		);
 		for (const reference of parsed?.projectReferences ?? []) {
 			const target = referenceConfigPath(capture, ts.resolveProjectReferencePath(reference));
@@ -679,43 +686,33 @@ function projectRootDisposition(
 	return 'INCOMPLETE';
 }
 
-function owningWorkspace(
-	workspaces: readonly WorkspaceSubjectRecord[],
-	configPath: string
-): WorkspaceSubjectRecord | undefined {
-	return workspaces
-		.filter(
-			(item) =>
-				configPath === `${item.path}/tsconfig.json` || configPath.startsWith(`${item.path}/`)
-		)
-		.sort((left, right) => right.path.length - left.path.length)[0];
-}
-
 function frameworkCandidatePaths(
 	capture: SubjectCapture,
-	workspace: WorkspaceSubjectRecord | undefined
+	compilerRoots: readonly string[]
 ): string[] {
-	if (workspace === undefined) return [];
-	return capture.artifacts
-		.filter(
-			(artifact) =>
-				artifact.roles.includes('FRAMEWORK_CANDIDATE') &&
-				artifact.path.startsWith(`${workspace.path}/`)
-		)
-		.map((artifact) => artifact.path);
+	const candidates = compilerRoots.filter(isSvelteAuthoredSourcePath);
+	for (const path of candidates) {
+		const artifact = capture.artifacts.find((entry) => entry.path === path);
+		if (artifact === undefined || !artifact.roles.includes('FRAMEWORK_CANDIDATE'))
+			fail(
+				'CONFIG_REQUIRED_MISSING',
+				`Framework compiler root lacks its frozen framework-candidate classification: ${path}.`,
+				path,
+				'incompatible'
+			);
+	}
+	return candidates;
 }
 
 function projectStatus(
 	incompleteRoots: boolean,
 	rootDisposition: ProjectSubjectRecord['rootDisposition'],
-	configDiagnostics: readonly SubjectDiagnostic[],
-	frameworkCandidateCount: number
+	configDiagnostics: readonly SubjectDiagnostic[]
 ): ProjectSubjectRecord['status'] {
 	const partial =
 		incompleteRoots ||
 		rootDisposition === 'INCOMPLETE' ||
-		configDiagnostics.some((item) => item.severity === 'ERROR') ||
-		frameworkCandidateCount > 0;
+		configDiagnostics.some((item) => item.severity === 'ERROR');
 	return partial ? 'PARTIAL' : 'COMPLETE';
 }
 
@@ -775,7 +772,14 @@ export function discoverProjects(
 			'REPLAY',
 			new Map(capture.typescriptDirectoryRecordings)
 		);
-		const parsed = ts.getParsedCommandLineOfConfigFile(absoluteConfig, {}, replay.host);
+		const parsed = ts.getParsedCommandLineOfConfigFile(
+			absoluteConfig,
+			{},
+			replay.host,
+			undefined,
+			undefined,
+			TYPESCRIPT_PROJECT_EXTRA_FILE_EXTENSIONS
+		);
 		if (parsed === undefined)
 			fail('CONFIG_MALFORMED', `TypeScript could not parse ${configPath}.`, configPath);
 		const accessed = replay.accessed;
@@ -810,15 +814,9 @@ export function discoverProjects(
 		const explicitEmpty = hasExplicitlyEmptyFileSet(raw);
 		const kind = projectKind(configPath, explicitEmpty);
 		const rootDisposition = projectRootDisposition(fileNames.length, explicitEmpty);
-		const workspace = owningWorkspace(workspaces, configPath);
-		const frameworkCandidates = frameworkCandidatePaths(capture, workspace);
+		const frameworkCandidates = frameworkCandidatePaths(capture, fileNames);
 		const configDiagnostics = allTsDiagnostics.map((value) => convertDiagnostic(capture, value));
-		const status = projectStatus(
-			incompleteRoots,
-			rootDisposition,
-			configDiagnostics,
-			frameworkCandidates.length
-		);
+		const status = projectStatus(incompleteRoots, rootDisposition, configDiagnostics);
 		const closure: ConfigurationClosureRecord[] = [...accessed]
 			.map((path) => {
 				const artifact = capture.artifacts.find((item) => item.path === path);

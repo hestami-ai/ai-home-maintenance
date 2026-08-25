@@ -23,6 +23,7 @@ import type {
 	SemanticSignatureKind,
 	SemanticSignatureSemanticKind,
 	SemanticSourceModuleKind,
+	SemanticSourceTransformationRecord,
 	SemanticTypeCategory,
 	SemanticTypeIdentityBasis,
 	SemanticTypeQueryMode,
@@ -74,12 +75,13 @@ export interface RawCompilerSourceBinding {
 		readonly primaryClass: ArtifactPrimaryClass;
 		readonly roles: readonly ArtifactSemanticRole[];
 	} | null;
-	readonly byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT';
+	readonly byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT' | 'VIRTUAL_TRANSFORM';
 	readonly bytes: number;
 	readonly contentSha256: string;
 	readonly logicalPath: string;
 	readonly mapping: SourceMappingRecord;
 	readonly origin: SourceOrigin;
+	readonly transformation?: SemanticSourceTransformationRecord | null;
 	readonly verificationState: 'CAPTURED_COMPILER_INPUT' | 'VERIFIED_COMPILER_INPUT';
 }
 
@@ -112,6 +114,7 @@ export interface RawSemanticSource {
 	readonly scriptKindName: string;
 	readonly sourceOrdinal: number;
 	readonly textLength: number;
+	readonly transformation?: SemanticSourceTransformationRecord | null;
 }
 
 export interface RawSemanticAstNode {
@@ -447,10 +450,23 @@ export interface RawSemanticLiteral {
 export interface RawSemanticInvocation {
 	readonly argumentNodeOrdinals: readonly number[];
 	readonly calleeNodeOrdinal: number;
+	readonly implementationDeclarationOrdinal: number | null;
+	readonly implementationNodeOrdinal: number | null;
+	readonly implementationSourceOrdinal: number | null;
 	readonly invocationKind: 'CALL' | 'NEW' | 'TAGGED_TEMPLATE';
 	readonly nodeOrdinal: number;
 	readonly optional: boolean;
+	readonly resolutionReason:
+		| 'TYPE_CAPABILITY_NOT_REQUESTED'
+		| 'COMPILER_SIGNATURE_UNRESOLVED'
+		| 'SIGNATURE_DECLARATION_UNRETAINED'
+		| 'IMPLEMENTATION_UNAVAILABLE'
+		| 'IMPLEMENTATION_NOT_UNIQUE'
+		| 'IMPLEMENTATION_NOT_DEEP_INDEXED'
+		| 'IMPLEMENTATION_IDENTIFIED';
+	readonly resolvedSignatureOrdinal: number | null;
 	readonly sourceOrdinal: number;
+	readonly targetState: 'SYNTAX_ONLY' | 'SIGNATURE_RESOLVED' | 'IMPLEMENTATION_IDENTIFIED';
 	readonly templateNodeOrdinal: number | null;
 }
 

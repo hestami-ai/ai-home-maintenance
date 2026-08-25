@@ -14,6 +14,7 @@ import {
 	type CompilerInputObservation,
 	type SemanticBudgets,
 	type SemanticContextInputId,
+	type SemanticSourceTransformationRecord,
 	type SourceOrigin
 } from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
@@ -34,6 +35,12 @@ import type {
 import { validateProgramRecipePolicy } from '../../semantic/program-recipe-policy.js';
 import type { StaticSemanticOperationBudgetProviderBinding } from '../../semantic/operation-budget-provider-binding.js';
 import { readFrozenSubjectArtifact } from '../../subject/frozen-store.js';
+import {
+	SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
+	SvelteVirtualSourceError,
+	transformSvelteVirtualSource,
+	type SvelteVirtualSourceLimits
+} from '../svelte/svelte-virtual-source.js';
 import { CompilerPathError, FrozenCompilerPathResolver } from './compiler-paths.js';
 import {
 	materializeProgramRecipe,
@@ -246,6 +253,7 @@ const ORIGINS = new Set<SourceOrigin>([
 	'GENERATED',
 	'GENERATED_DECLARATION',
 	'WORKSPACE_BUILD_DECLARATION',
+	'VIRTUAL',
 	'EXTERNAL_DECLARATION',
 	'TOOLCHAIN_LIBRARY',
 	'CONFIGURATION',
@@ -262,6 +270,41 @@ const DEFAULT_READ_LIMITS: CompilerInputReadLimits = {
 	maxQueryMetadataBytes: Number.MAX_SAFE_INTEGER,
 	maxReadBytes: 128 * 1024 * 1024
 };
+
+function svelteTransformLimits(maxPathCharacters: number): SvelteVirtualSourceLimits {
+	return Object.freeze({
+		...SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
+		maxPathCharacters: Math.min(
+			maxPathCharacters,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxPathCharacters
+		)
+	});
+}
+
+function transformFrozenSvelte(
+	authoredBytes: Uint8Array,
+	authoredLogicalPath: string,
+	maxPathCharacters: number
+): { readonly bytes: Uint8Array; readonly evidence: SemanticSourceTransformationRecord } {
+	try {
+		const transformed = transformSvelteVirtualSource({
+			authoredBytes,
+			authoredLogicalPath,
+			limits: svelteTransformLimits(maxPathCharacters)
+		});
+		return {
+			bytes: new TextEncoder().encode(transformed.virtualSourceText),
+			evidence: transformed.evidence
+		};
+	} catch (error) {
+		if (error instanceof SvelteVirtualSourceError && error.code === 'BUDGET_EXCEEDED')
+			fail('BUDGET_EXCEEDED', `Svelte virtual-source transformation exceeded its bound: ${authoredLogicalPath}.`);
+		fail(
+			'CONTEXT_UNAVAILABLE',
+			`Frozen Svelte source could not be transformed by the pinned virtual-source adapter: ${authoredLogicalPath}.`
+		);
+	}
+}
 
 function fail(code: CompilerInputCaptureError['code'], message: string): never {
 	throw new CompilerInputCaptureError(code, message);
@@ -877,7 +920,7 @@ function assertMinimumObservationBudget(
 		case 'READ_FILE':
 		case 'FILE_EXISTS':
 		case 'REALPATH':
-			payload = { ...base, operation: query.operation, result: 'ABSENT' };
+			payload = { ...base, operation: query.operation, result: 'ABSENT' } as CompilerObservationPayload;
 			break;
 		case 'DIRECTORY_EXISTS':
 			payload = { ...base, operation: query.operation, result: 'DIRECTORY' };
@@ -1745,7 +1788,11 @@ function boundaryObservation(
 		case 'FILE_EXISTS':
 		case 'REALPATH':
 			return Object.freeze({
-				observation: emit({ ...base, operation: query.operation, result: 'ABSENT' }),
+				observation: emit({
+					...base,
+					operation: query.operation,
+					result: 'ABSENT'
+				} as CompilerObservationPayload),
 				query
 			});
 		case 'DIRECTORY_EXISTS':
@@ -1925,10 +1972,24 @@ export class LiveCompilerInputReader {
 			});
 		const artifact = this.paths.frozenArtifact(query.logicalPath);
 		let bytes: Uint8Array | undefined;
-		let byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT' | undefined;
+		let byteBudgetClass:
+			| 'FROZEN_SUBJECT'
+			| 'LIVE_COMPILER_CONTEXT'
+			| 'VIRTUAL_TRANSFORM'
+			| undefined;
+		let transformation: SemanticSourceTransformationRecord | undefined;
 		if (artifact !== undefined) {
 			bytes = this.frozenArtifactBytes(artifact);
-			byteBudgetClass = 'FROZEN_SUBJECT';
+			if (query.logicalPath.toLowerCase().endsWith('.svelte')) {
+				const transformed = transformFrozenSvelte(
+					bytes,
+					query.logicalPath,
+					limits.maxPathCharacters
+				);
+				bytes = transformed.bytes;
+				transformation = transformed.evidence;
+				byteBudgetClass = 'VIRTUAL_TRANSFORM';
+			} else byteBudgetClass = 'FROZEN_SUBJECT';
 		} else if (context.liveRegion && this.paths.isLiveFilePermitted(query.logicalPath)) {
 			const absolutePath = this.paths.toAbsolute(query.logicalPath);
 			const kind = statKind(absolutePath);
@@ -1940,18 +2001,27 @@ export class LiveCompilerInputReader {
 		}
 		checkDeadline(limits);
 		if (bytes === undefined || byteBudgetClass === undefined) return absentRead();
-		return Object.freeze({
-			bytes: bytes.slice(),
-			observation: emit({
-				...base,
-				byteBudgetClass,
-				contentBytes: bytes.byteLength,
-				contentSha256: sha256(bytes),
-				operation: 'READ_FILE',
-				result: 'PRESENT'
-			}),
-			query
-		});
+		const observation =
+			transformation === undefined
+				? emit({
+						...base,
+						byteBudgetClass: byteBudgetClass as 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT',
+						contentBytes: bytes.byteLength,
+						contentSha256: sha256(bytes),
+						operation: 'READ_FILE',
+						result: 'PRESENT'
+					})
+				: emit({
+						...base,
+						byteBudgetClass: 'VIRTUAL_TRANSFORM',
+						contentBytes: bytes.byteLength,
+						contentSha256: sha256(bytes),
+						operation: 'READ_FILE',
+						origin: 'VIRTUAL',
+						result: 'PRESENT',
+						transformation
+					});
+		return Object.freeze({ bytes: bytes.slice(), observation, query });
 	}
 
 	private fileExistsKind(
@@ -2573,7 +2643,11 @@ export class CompilerInputJournal {
 	}
 }
 
-function observationAllowedKeys(operation: string, result: string): readonly string[] {
+function observationAllowedKeys(
+	operation: string,
+	result: string,
+	byteBudgetClass: unknown
+): readonly string[] {
 	const base = [
 		'id',
 		'invocationCount',
@@ -2584,7 +2658,9 @@ function observationAllowedKeys(operation: string, result: string): readonly str
 		'resultDigest'
 	];
 	if (operation === 'READ_FILE' && result === 'PRESENT')
-		return [...base, 'byteBudgetClass', 'contentBytes', 'contentSha256'];
+		return byteBudgetClass === 'VIRTUAL_TRANSFORM'
+			? [...base, 'byteBudgetClass', 'contentBytes', 'contentSha256', 'transformation']
+			: [...base, 'byteBudgetClass', 'contentBytes', 'contentSha256'];
 	if (operation === 'GET_DIRECTORIES') return [...base, 'resultEntries', 'scannedEntries'];
 	if (operation === 'READ_DIRECTORY')
 		return [
@@ -2646,7 +2722,9 @@ function assertCapturedObservationBinding(
 	paths: FrozenCompilerPathResolver
 ): void {
 	const expectedOrigin =
-		query.operation === 'CURRENT_DIRECTORY' || query.operation === 'USE_CASE_SENSITIVE_FILE_NAMES'
+		observation.byteBudgetClass === 'VIRTUAL_TRANSFORM'
+			? 'VIRTUAL'
+			: query.operation === 'CURRENT_DIRECTORY' || query.operation === 'USE_CASE_SENSITIVE_FILE_NAMES'
 			? 'CONFIGURATION'
 			: paths.recordedOrigin(query.logicalPath);
 	if (
@@ -2736,10 +2814,13 @@ function assertCapturedPresentFileMetadata(
 	query: CompilerInputQuery,
 	paths: FrozenCompilerPathResolver
 ): void {
+	const artifact = paths.frozenArtifact(query.logicalPath);
 	const expectedBudgetClass =
-		paths.frozenArtifact(query.logicalPath) === undefined
+		artifact === undefined
 			? 'LIVE_COMPILER_CONTEXT'
-			: 'FROZEN_SUBJECT';
+			: query.logicalPath.toLowerCase().endsWith('.svelte')
+				? 'VIRTUAL_TRANSFORM'
+				: 'FROZEN_SUBJECT';
 	if (
 		observation.byteBudgetClass !== expectedBudgetClass ||
 		typeof observation.contentBytes !== 'number' ||
@@ -2749,6 +2830,15 @@ function assertCapturedPresentFileMetadata(
 		!SHA256.test(observation.contentSha256)
 	)
 		fail('INVALID_CAPTURE', 'Captured present file metadata or byte-budget class is invalid.');
+	if (expectedBudgetClass === 'VIRTUAL_TRANSFORM') {
+		if (observation.transformation === undefined)
+			fail('INVALID_CAPTURE', 'Captured virtual source lacks transformation evidence.');
+		try {
+			canonicalSemanticJson(observation.transformation);
+		} catch {
+			fail('INVALID_CAPTURE', 'Captured virtual-source transformation evidence is not inert canonical data.');
+		}
+	}
 }
 
 function assertCapturedOperationEvidence(
@@ -2840,17 +2930,52 @@ function assertCapturedFrozenBytes(
 		);
 }
 
+function assertCapturedVirtualBytes(
+	bytes: Uint8Array,
+	observation: Readonly<Record<string, unknown>>,
+	query: CompilerInputQuery,
+	paths: FrozenCompilerPathResolver,
+	budgets: SemanticBudgets
+): void {
+	const artifact = paths.frozenArtifact(query.logicalPath);
+	const authoritative =
+		artifact === undefined ? undefined : readFrozenSubjectArtifact(paths.subject, artifact.path);
+	if (
+		artifact === undefined ||
+		authoritative === undefined ||
+		!bytesReproduceArtifact(authoritative, artifact)
+	)
+		fail('FROZEN_BYTES_UNAVAILABLE', `Frozen Svelte bytes are unavailable for ${query.logicalPath}.`);
+	const expected = transformFrozenSvelte(
+		authoritative,
+		query.logicalPath,
+		budgets.maxPathCharacters
+	);
+	if (
+		canonicalSemanticJson(expected.evidence) !== canonicalSemanticJson(observation.transformation) ||
+		expected.bytes.byteLength !== bytes.byteLength ||
+		expected.bytes.some((byte, index) => byte !== bytes[index])
+	)
+		fail(
+			'INVALID_CAPTURE',
+			`Captured virtual bytes do not reproduce the authoritative frozen Svelte transform: ${query.logicalPath}.`
+		);
+}
+
 function validateCapturedPresentBytes(
 	entry: Readonly<Record<string, unknown>>,
 	observation: Readonly<Record<string, unknown>>,
 	query: CompilerInputQuery,
-	paths: FrozenCompilerPathResolver
+	paths: FrozenCompilerPathResolver,
+	budgets: SemanticBudgets
 ): Uint8Array {
 	const bytes = inertBytes(entry.bytes, 'CapturedCompilerInput.bytes');
 	if (bytes.byteLength !== observation.contentBytes || sha256(bytes) !== observation.contentSha256)
 		fail('INVALID_CAPTURE', 'Captured bytes do not reproduce the present file observation.');
 	if (observation.byteBudgetClass === 'FROZEN_SUBJECT')
 		assertCapturedFrozenBytes(bytes, observation, query, paths);
+	if (observation.byteBudgetClass === 'VIRTUAL_TRANSFORM')
+		assertCapturedVirtualBytes(bytes, observation, query, paths, budgets);
 	return bytes;
 }
 
@@ -2886,7 +3011,11 @@ function validateCapturedEntry(
 		exactKeys(
 			observation,
 			'CapturedCompilerInput.observation',
-			observationAllowedKeys(observation.operation, observation.result),
+			observationAllowedKeys(
+				observation.operation,
+				observation.result,
+				observation.byteBudgetClass
+			),
 			'INVALID_CAPTURE'
 		);
 		assertCapturedObservationBinding(observation, query, paths);
@@ -2909,7 +3038,7 @@ function validateCapturedEntry(
 				query
 			});
 		return cloneCaptured({
-			bytes: validateCapturedPresentBytes(entry, observation, query, paths),
+			bytes: validateCapturedPresentBytes(entry, observation, query, paths, budgets),
 			observation: observation as unknown as CompilerInputObservation,
 			query
 		});

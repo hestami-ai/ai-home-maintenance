@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
-import { TYPESCRIPT_PROVIDER_VERSION, type SemanticBudgets } from '../../contracts/semantic.js';
+import {
+	TYPESCRIPT_PROVIDER_VERSION,
+	type CompilerInputObservation,
+	type SemanticBudgets
+} from '../../contracts/semantic.js';
 import type { FrozenSubject, ProgramRecipe } from '../../contracts/subject.js';
 import { sha256 } from '../../inventory/canonical.js';
 import { canonicalSemanticJson } from '../../semantic/canonical.js';
@@ -36,6 +40,7 @@ import {
 	normalizeSemanticBudgets,
 	recheckCompilerInputJournal,
 	takeCompilerInputOperationBudgetWitness,
+	type CapturedCompilerInput,
 	type CompilerInputQuery,
 	type FrozenCompilerCapture,
 	type VerifiedCompilerCapture
@@ -907,6 +912,116 @@ describe('sealed capture, freshness, and replay', () => {
 			'INVALID_CAPTURE'
 		);
 		expectCode(() => capture.finalize(), CompilerInputCaptureError, 'INVALID_CAPTURE');
+	});
+
+	it('captures, rechecks, and replays exact Svelte virtual bytes while refusing subject or transformation drift', () => {
+		const path = 'src/Component.svelte';
+		const initial = '<script lang="ts">export let name: string;</script><p>Hello {name}</p>\n';
+		const root = temporaryRoot();
+		const frozen = subject({ [path]: initial });
+		const query = { logicalPath: path, operation: 'READ_FILE' as const };
+		const exact = session(root, frozen);
+		const captured = exact.capture(query);
+		expect(captured.observation).toMatchObject({
+			byteBudgetClass: 'VIRTUAL_TRANSFORM',
+			logicalPath: path,
+			origin: 'VIRTUAL',
+			result: 'PRESENT',
+			transformation: {
+				authored: { logicalPath: path, origin: 'AUTHORED' },
+				virtual: { origin: 'VIRTUAL', scriptKind: 'TS' }
+			}
+		});
+		if (
+			captured.observation.operation !== 'READ_FILE' ||
+			captured.observation.result !== 'PRESENT' ||
+			captured.observation.byteBudgetClass !== 'VIRTUAL_TRANSFORM' ||
+			captured.bytes === undefined
+		)
+			throw new Error('Expected exact virtual-source capture.');
+		expect(captured.bytes.byteLength).toBe(captured.observation.transformation.virtual.contentBytes);
+		expect(sha256(captured.bytes)).toBe(
+			captured.observation.transformation.virtual.contentSha256
+		);
+		expect(Object.isFrozen(captured.observation.transformation)).toBe(true);
+		expect(Object.isFrozen(captured.observation.transformation.sourceMap)).toBe(true);
+		const verified = recheckCompilerInputJournal(exact.finalize());
+		const replay = replayJournal(frozen, verified, exact.recipe, exact.materialized);
+		const replayed = replay.replay(query, PROJECT_KEY);
+		expect(replayed.bytes).toEqual(captured.bytes);
+		replay.assertFullyConsumed();
+
+		const driftFrozen = subject({ [path]: initial });
+		const drift = session(root, driftFrozen);
+		drift.capture(query);
+		const driftFinalized = drift.finalize();
+		const changed = '<script lang="ts">export let count: number;</script><p>{count}</p>\n';
+		const artifact = driftFrozen.artifacts[0]!;
+		(driftFrozen.artifacts as FrozenSubject['artifacts'][number][])[0] = {
+			...artifact,
+			bytes: Buffer.byteLength(changed),
+			sha256: sha256(changed)
+		};
+		attachFrozenSubjectBytes(
+			driftFrozen,
+			new Map([[path, new TextEncoder().encode(changed)]])
+		);
+		expectCode(
+			() => recheckCompilerInputJournal(driftFinalized),
+			CompilerInputCaptureError,
+			'FROZEN_BYTES_UNAVAILABLE'
+		);
+
+		const corruptFrozen = subject({ [path]: initial });
+		const corrupt = session(root, corruptFrozen);
+		corrupt.capture(query);
+		const entriesByQuery = (
+			corrupt.journal as unknown as {
+				entriesByQuery: Map<string, CapturedCompilerInput>;
+			}
+		).entriesByQuery;
+		const stored = [...entriesByQuery.entries()][0];
+		if (stored === undefined) throw new Error('Expected one stored virtual-source input.');
+		const [key, entry] = stored;
+		if (
+			entry.observation.operation !== 'READ_FILE' ||
+			entry.observation.result !== 'PRESENT' ||
+			entry.observation.byteBudgetClass !== 'VIRTUAL_TRANSFORM'
+		)
+			throw new Error('Expected stored virtual-source evidence.');
+		const transformation = structuredClone(entry.observation.transformation);
+		(transformation.sourceMap as { canonicalJsonSha256: string }).canonicalJsonSha256 = '0'.repeat(64);
+		const { id: _oldId, resultDigest: _oldResultDigest, ...observationCore } = entry.observation;
+		type VirtualObservation = Extract<
+			CompilerInputObservation,
+			{ byteBudgetClass: 'VIRTUAL_TRANSFORM' }
+		>;
+		const resultInput = {
+			...observationCore,
+			transformation
+		} as Omit<VirtualObservation, 'id' | 'resultDigest'>;
+		const resultDigest = compilerInputResultDigest(resultInput);
+		const observationWithoutId = {
+			...resultInput,
+			resultDigest
+		} as Omit<VirtualObservation, 'id'>;
+		const id = semanticContextInputId({
+			...observationWithoutId,
+			subjectId: corruptFrozen.descriptor.subjectId
+		});
+		entriesByQuery.set(
+			key,
+			Object.freeze({
+				bytes: entry.bytes?.slice(),
+				observation: Object.freeze({ ...observationWithoutId, id }),
+				query: entry.query
+			}) as CapturedCompilerInput
+		);
+		expectCode(
+			() => recheckCompilerInputJournal(corrupt.finalize()),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
 	});
 
 	it('opens an immutable non-consuming lookup over only one verified project attribution', () => {

@@ -242,18 +242,10 @@ export interface ModuleResolutionCandidateRecord {
 }
 
 /** The exact PRESENT READ_FILE member of CompilerInputObservation, written explicitly. */
-export interface ModuleResolutionPresentReadFileObservation {
-	readonly byteBudgetClass: 'FROZEN_SUBJECT' | 'LIVE_COMPILER_CONTEXT';
-	readonly contentBytes: number;
-	readonly contentSha256: string;
-	readonly id: SemanticContextInputId;
-	readonly invocationCount: number;
-	readonly logicalPath: string;
-	readonly operation: 'READ_FILE';
-	readonly origin: SourceOrigin;
-	readonly result: 'PRESENT';
-	readonly resultDigest: string;
-}
+export type ModuleResolutionPresentReadFileObservation = Extract<
+	CompilerInputObservation,
+	{ readonly operation: 'READ_FILE'; readonly result: 'PRESENT' }
+>;
 
 export interface ModuleResolutionCapturedReadWitness {
 	readonly observation: ModuleResolutionPresentReadFileObservation;

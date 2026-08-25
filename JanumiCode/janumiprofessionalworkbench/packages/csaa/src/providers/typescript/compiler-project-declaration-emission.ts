@@ -8,6 +8,7 @@ import type {
 	SemanticProgramId,
 	SemanticProjectId,
 	SemanticSourceId,
+	SemanticSourceTransformationRecord,
 	SourceOrigin,
 	StaticSemanticSnapshot
 } from '../../contracts/semantic.js';
@@ -15,6 +16,7 @@ import { TYPESCRIPT_PROVIDER_VERSION } from '../../contracts/semantic.js';
 import type { SourceOriginProgramSourceIdentity } from '../../contracts/source-origin-correlation.js';
 import type { FrozenSubject } from '../../contracts/subject.js';
 import {
+	canonicalSemanticJson,
 	canonicalSemanticJsonWitnessWithProgress,
 	isUnicodeScalarString
 } from '../../semantic/canonical.js';
@@ -34,6 +36,18 @@ import {
 	sourceOriginProgramSourcePopulationDigest
 } from '../../semantic/source-origin-correlation-canonical.js';
 import { isFrozenSubjectCapability } from '../../subject/frozen-store.js';
+import {
+	SVELTE2TSX_PROVIDER_VERSION,
+	SVELTE_PROVIDER_VERSION,
+	SVELTE_TYPESCRIPT_PROVIDER_VERSION,
+	SVELTE_VIRTUAL_SOURCE_ADAPTER_VERSION,
+	SVELTE_VIRTUAL_SOURCE_ID_PROFILE,
+	SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
+	SVELTE_VIRTUAL_SOURCE_SCHEMA_VERSION,
+	SVELTE_VIRTUAL_SOURCE_TRANSFORM_PROFILE,
+	svelteVirtualLogicalPath
+} from '../svelte/svelte-virtual-source.js';
+import { STRICT_SOURCE_MAP_V3_DECODER_VERSION } from '../source-map/decode-source-map-v3.js';
 import type { CompilerInputQuery } from './compiler-input-journal.js';
 
 export const COMPILER_PROJECT_DECLARATION_EMISSION_VERSION =
@@ -278,6 +292,7 @@ const SOURCE_ORIGIN_VALUES = Object.freeze({
 	TOOLCHAIN_LIBRARY: true,
 	UNKNOWN: true,
 	VERIFICATION: true,
+	VIRTUAL: true,
 	WORKSPACE_BUILD_DECLARATION: true
 } satisfies Readonly<Record<SourceOrigin, true>>);
 
@@ -904,9 +919,22 @@ function programObservationDirectoryVariantKeys(
 	return null;
 }
 
-function programObservationVariantKeys(operation: unknown, result: unknown): readonly string[] {
+function programObservationVariantKeys(
+	operation: unknown,
+	result: unknown,
+	byteBudgetClass: unknown
+): readonly string[] {
 	if (operation === 'READ_FILE' && result === 'PRESENT')
-		return ['byteBudgetClass', 'contentBytes', 'contentSha256', 'operation', 'result'];
+		return byteBudgetClass === 'VIRTUAL_TRANSFORM'
+			? [
+					'byteBudgetClass',
+					'contentBytes',
+					'contentSha256',
+					'operation',
+					'result',
+					'transformation'
+				]
+			: ['byteBudgetClass', 'contentBytes', 'contentSha256', 'operation', 'result'];
 	if (isProgramObservationStatusOnlyVariant(operation, result)) return ['operation', 'result'];
 	const directoryKeys = programObservationDirectoryVariantKeys(operation, result);
 	if (directoryKeys !== null) return directoryKeys;
@@ -938,10 +966,262 @@ function validateProgramObservationBaseFields(observation: Record<string, unknow
 		fail('CAPTURE_UNAVAILABLE', 'Compiler Program input observation base fields are invalid.');
 }
 
-function validateProgramObservationReadFileEvidence(observation: Record<string, unknown>): void {
+function copiedTransformationInteger(value: unknown, maximum: number, label: string): number {
+	if (
+		typeof value !== 'number' ||
+		!Number.isSafeInteger(value) ||
+		value < 0 ||
+		value > maximum
+	)
+		fail('CAPTURE_UNAVAILABLE', `${label} is outside its bounded nonnegative range.`);
+	return value;
+}
+
+function copiedTransformationDigest(value: unknown, label: string): string {
+	if (typeof value !== 'string' || !/^[a-f0-9]{64}$/u.test(value))
+		fail('CAPTURE_UNAVAILABLE', `${label} is not an exact SHA-256 digest.`);
+	return value;
+}
+
+function copiedTransformationPath(value: unknown, label: string): string {
+	if (
+		typeof value !== 'string' ||
+		value.length === 0 ||
+		value.length > SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxPathCharacters ||
+		!isUnicodeScalarString(value)
+	)
+		fail('CAPTURE_UNAVAILABLE', `${label} is not a bounded Unicode-scalar path.`);
+	return value;
+}
+
+function copiedProgramObservationTransformation(
+	value: unknown,
+	observation: Readonly<Record<string, unknown>>,
+	ledger: ResourceLedger
+): SemanticSourceTransformationRecord {
+	const transformation = copiedBoundedProviderObject(
+		value,
+		8,
+		ledger,
+		'Compiler Program virtual-source transformation'
+	);
+	requireExactProviderKeys(
+		transformation,
+		[
+			'adapter',
+			'authored',
+			'id',
+			'idProfile',
+			'schemaVersion',
+			'sourceMap',
+			'transformProfile',
+			'virtual'
+		],
+		'Compiler Program virtual-source transformation'
+	);
+	const adapter = copiedBoundedProviderObject(
+		transformation.adapter,
+		5,
+		ledger,
+		'Compiler Program virtual-source adapter identity'
+	);
+	requireExactProviderKeys(
+		adapter,
+		['adapter', 'adapterVersion', 'svelte2tsxVersion', 'svelteVersion', 'typescriptVersion'],
+		'Compiler Program virtual-source adapter identity'
+	);
+	if (
+		adapter.adapter !== 'svelte2tsx' ||
+		adapter.adapterVersion !== SVELTE_VIRTUAL_SOURCE_ADAPTER_VERSION ||
+		adapter.svelte2tsxVersion !== SVELTE2TSX_PROVIDER_VERSION ||
+		adapter.svelteVersion !== SVELTE_PROVIDER_VERSION ||
+		adapter.typescriptVersion !== SVELTE_TYPESCRIPT_PROVIDER_VERSION
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program virtual-source adapter identity is invalid.');
+	const authoredInput = copiedBoundedProviderObject(
+		transformation.authored,
+		6,
+		ledger,
+		'Compiler Program virtual-source authored descriptor'
+	);
+	requireExactProviderKeys(
+		authoredInput,
+		['contentBytes', 'contentCharacters', 'contentSha256', 'encoding', 'logicalPath', 'origin'],
+		'Compiler Program virtual-source authored descriptor'
+	);
+	const authored = Object.freeze({
+		contentBytes: copiedTransformationInteger(
+			authoredInput.contentBytes,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxAuthoredBytes,
+			'Compiler Program virtual-source authored contentBytes'
+		),
+		contentCharacters: copiedTransformationInteger(
+			authoredInput.contentCharacters,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxAuthoredCharacters,
+			'Compiler Program virtual-source authored contentCharacters'
+		),
+		contentSha256: copiedTransformationDigest(
+			authoredInput.contentSha256,
+			'Compiler Program virtual-source authored contentSha256'
+		),
+		encoding: authoredInput.encoding as 'UTF8_WITHOUT_BOM',
+		logicalPath: copiedTransformationPath(
+			authoredInput.logicalPath,
+			'Compiler Program virtual-source authored logicalPath'
+		),
+		origin: authoredInput.origin as 'AUTHORED'
+	});
+	if (authored.encoding !== 'UTF8_WITHOUT_BOM' || authored.origin !== 'AUTHORED')
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program virtual-source authored descriptor is invalid.');
+	const sourceMapInput = copiedBoundedProviderObject(
+		transformation.sourceMap,
+		6,
+		ledger,
+		'Compiler Program virtual-source source-map evidence'
+	);
+	requireExactProviderKeys(
+		sourceMapInput,
+		[
+			'canonicalJsonBytes',
+			'canonicalJsonSha256',
+			'decoderVersion',
+			'generatedLines',
+			'mappingState',
+			'segmentCount'
+		],
+		'Compiler Program virtual-source source-map evidence'
+	);
+	const sourceMap = Object.freeze({
+		canonicalJsonBytes: copiedTransformationInteger(
+			sourceMapInput.canonicalJsonBytes,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxMapCharacters,
+			'Compiler Program virtual-source canonical map bytes'
+		),
+		canonicalJsonSha256: copiedTransformationDigest(
+			sourceMapInput.canonicalJsonSha256,
+			'Compiler Program virtual-source canonical map digest'
+		),
+		decoderVersion: sourceMapInput.decoderVersion as typeof STRICT_SOURCE_MAP_V3_DECODER_VERSION,
+		generatedLines: copiedTransformationInteger(
+			sourceMapInput.generatedLines,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedLines,
+			'Compiler Program virtual-source generated line count'
+		),
+		mappingState: sourceMapInput.mappingState as 'EXACT_SEGMENT_POINTS_ONLY',
+		segmentCount: copiedTransformationInteger(
+			sourceMapInput.segmentCount,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxMapSegments,
+			'Compiler Program virtual-source map segment count'
+		)
+	});
+	if (
+		sourceMap.decoderVersion !== STRICT_SOURCE_MAP_V3_DECODER_VERSION ||
+		sourceMap.mappingState !== 'EXACT_SEGMENT_POINTS_ONLY'
+	)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program virtual-source source-map evidence is invalid.');
+	const virtualInput = copiedBoundedProviderObject(
+		transformation.virtual,
+		6,
+		ledger,
+		'Compiler Program virtual-source virtual descriptor'
+	);
+	requireExactProviderKeys(
+		virtualInput,
+		['contentBytes', 'contentCharacters', 'contentSha256', 'logicalPath', 'origin', 'scriptKind'],
+		'Compiler Program virtual-source virtual descriptor'
+	);
+	const virtual = Object.freeze({
+		contentBytes: copiedTransformationInteger(
+			virtualInput.contentBytes,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedBytes,
+			'Compiler Program virtual-source virtual contentBytes'
+		),
+		contentCharacters: copiedTransformationInteger(
+			virtualInput.contentCharacters,
+			SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxGeneratedCharacters,
+			'Compiler Program virtual-source virtual contentCharacters'
+		),
+		contentSha256: copiedTransformationDigest(
+			virtualInput.contentSha256,
+			'Compiler Program virtual-source virtual contentSha256'
+		),
+		logicalPath: copiedTransformationPath(
+			virtualInput.logicalPath,
+			'Compiler Program virtual-source virtual logicalPath'
+		),
+		origin: virtualInput.origin as 'VIRTUAL',
+		scriptKind: virtualInput.scriptKind as 'JS' | 'TS'
+	});
+	if (virtual.origin !== 'VIRTUAL' || (virtual.scriptKind !== 'JS' && virtual.scriptKind !== 'TS'))
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program virtual-source virtual descriptor is invalid.');
+	let expectedVirtualPath: string;
+	try {
+		expectedVirtualPath = svelteVirtualLogicalPath(authored.logicalPath, virtual.scriptKind);
+	} catch {
+		return fail(
+			'CAPTURE_UNAVAILABLE',
+			'Compiler Program virtual-source logical paths are outside the exact adapter profile.'
+		);
+	}
+	if (
+		expectedVirtualPath !== virtual.logicalPath ||
+		observation.logicalPath !== authored.logicalPath ||
+		observation.origin !== 'VIRTUAL' ||
+		observation.contentBytes !== virtual.contentBytes ||
+		observation.contentSha256 !== virtual.contentSha256 ||
+		transformation.idProfile !== SVELTE_VIRTUAL_SOURCE_ID_PROFILE ||
+		transformation.schemaVersion !== SVELTE_VIRTUAL_SOURCE_SCHEMA_VERSION ||
+		transformation.transformProfile !== SVELTE_VIRTUAL_SOURCE_TRANSFORM_PROFILE
+	)
+		fail(
+			'CAPTURE_UNAVAILABLE',
+			'Compiler Program virtual-source transformation does not bind its observation.'
+		);
+	const copied = Object.freeze({
+		adapter: Object.freeze({
+			adapter: 'svelte2tsx' as const,
+			adapterVersion: SVELTE_VIRTUAL_SOURCE_ADAPTER_VERSION,
+			svelte2tsxVersion: SVELTE2TSX_PROVIDER_VERSION,
+			svelteVersion: SVELTE_PROVIDER_VERSION,
+			typescriptVersion: SVELTE_TYPESCRIPT_PROVIDER_VERSION
+		}),
+		authored,
+		id: copiedTransformationDigest(
+			transformation.id,
+			'Compiler Program virtual-source transformation ID'
+		),
+		idProfile: SVELTE_VIRTUAL_SOURCE_ID_PROFILE,
+		schemaVersion: SVELTE_VIRTUAL_SOURCE_SCHEMA_VERSION,
+		sourceMap,
+		transformProfile: SVELTE_VIRTUAL_SOURCE_TRANSFORM_PROFILE,
+		virtual
+	});
+	const expectedId = createHash('sha256')
+		.update(
+			canonicalSemanticJson({
+				adapter: copied.adapter,
+				authored: copied.authored,
+				idProfile: copied.idProfile,
+				sourceMap: copied.sourceMap,
+				transformProfile: copied.transformProfile,
+				virtual: copied.virtual
+			}),
+			'utf8'
+		)
+		.digest('hex');
+	if (copied.id !== expectedId)
+		fail('CAPTURE_UNAVAILABLE', 'Compiler Program virtual-source transformation ID is invalid.');
+	return copied;
+}
+
+function validateProgramObservationReadFileEvidence(
+	observation: Record<string, unknown>,
+	ledger: ResourceLedger
+): void {
 	if (
 		(observation.byteBudgetClass !== 'FROZEN_SUBJECT' &&
-			observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT') ||
+			observation.byteBudgetClass !== 'LIVE_COMPILER_CONTEXT' &&
+			observation.byteBudgetClass !== 'VIRTUAL_TRANSFORM') ||
 		typeof observation.contentBytes !== 'number' ||
 		!Number.isSafeInteger(observation.contentBytes) ||
 		observation.contentBytes < 0 ||
@@ -949,6 +1229,17 @@ function validateProgramObservationReadFileEvidence(observation: Record<string, 
 		!/^[a-f0-9]{64}$/u.test(observation.contentSha256)
 	)
 		fail('CAPTURE_UNAVAILABLE', 'Compiler Program READ_FILE content evidence is invalid.');
+	if (observation.byteBudgetClass === 'VIRTUAL_TRANSFORM')
+		observation.transformation = copiedProgramObservationTransformation(
+			observation.transformation,
+			observation,
+			ledger
+		);
+	else if (observation.origin === 'VIRTUAL')
+		fail(
+			'CAPTURE_UNAVAILABLE',
+			'Compiler Program virtual source requires VIRTUAL_TRANSFORM byte evidence.'
+		);
 }
 
 function copiedProgramObservationDirectoryEntries(
@@ -1023,7 +1314,7 @@ function copiedProgramObservation(
 	const operation = observation.operation;
 	const result = observation.result;
 	const baseKeys = ['id', 'invocationCount', 'logicalPath', 'origin', 'resultDigest'] as const;
-	const variantKeys = programObservationVariantKeys(operation, result);
+	const variantKeys = programObservationVariantKeys(operation, result, observation.byteBudgetClass);
 	requireExactProviderKeys(
 		observation,
 		[...baseKeys, ...variantKeys],
@@ -1031,7 +1322,7 @@ function copiedProgramObservation(
 	);
 	validateProgramObservationBaseFields(observation);
 	if (operation === 'READ_FILE' && result === 'PRESENT')
-		validateProgramObservationReadFileEvidence(observation);
+		validateProgramObservationReadFileEvidence(observation, ledger);
 	if (operation === 'GET_DIRECTORIES' || operation === 'READ_DIRECTORY')
 		copiedProgramObservationDirectoryEntries(observation, ledger);
 	if (operation === 'READ_DIRECTORY')

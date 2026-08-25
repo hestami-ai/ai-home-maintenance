@@ -162,9 +162,51 @@ const KEYS: Readonly<Record<string, readonly string[]>> = {
 		'scriptKind',
 		'scriptKindName',
 		'syntaxProvenanceId',
-		'textLength'
+		'textLength',
+		'transformation'
 	],
 	mapping: ['reason', 'state'],
+	transformation: [
+		'adapter',
+		'authored',
+		'id',
+		'idProfile',
+		'schemaVersion',
+		'sourceMap',
+		'transformProfile',
+		'virtual'
+	],
+	'transformation-adapter': [
+		'adapter',
+		'adapterVersion',
+		'svelte2tsxVersion',
+		'svelteVersion',
+		'typescriptVersion'
+	],
+	'transformation-authored': [
+		'contentBytes',
+		'contentCharacters',
+		'contentSha256',
+		'encoding',
+		'logicalPath',
+		'origin'
+	],
+	'transformation-source-map': [
+		'canonicalJsonBytes',
+		'canonicalJsonSha256',
+		'decoderVersion',
+		'generatedLines',
+		'mappingState',
+		'segmentCount'
+	],
+	'transformation-virtual': [
+		'contentBytes',
+		'contentCharacters',
+		'contentSha256',
+		'logicalPath',
+		'origin',
+		'scriptKind'
+	],
 	node: [
 		'end',
 		'fullStart',
@@ -374,9 +416,14 @@ const KEYS: Readonly<Record<string, readonly string[]>> = {
 		'argumentNodeIds',
 		'calleeNodeId',
 		'id',
+		'implementationDeclarationId',
+		'implementationNodeId',
 		'invocationKind',
 		'nodeId',
 		'optional',
+		'resolutionProvenanceId',
+		'resolutionReason',
+		'resolvedSignatureId',
 		'sourceId',
 		'targetState',
 		'templateNodeId'
@@ -465,6 +512,12 @@ const OBJECT_CHILD: Readonly<Record<string, string>> = {
 	'provenance.provider': 'provider',
 	'epistemic.supportBasis': 'support-basis',
 	'source.mapping': 'mapping',
+	'source.transformation': 'transformation-or-null',
+	'transformation.adapter': 'transformation-adapter',
+	'transformation.authored': 'transformation-authored',
+	'transformation.sourceMap': 'transformation-source-map',
+	'transformation.virtual': 'transformation-virtual',
+	'compiler-input.transformation': 'transformation',
 	'assignability-request.source': 'type-selector',
 	'assignability-request.target': 'type-selector',
 	'type-parameter.owner': 'typed-ref',
@@ -566,6 +619,8 @@ const PATH_SCALAR_FIELDS = new Set([
 	'project.configPath',
 	'recipe.configPath',
 	'source.logicalPath',
+	'transformation-authored.logicalPath',
+	'transformation-virtual.logicalPath',
 	'type-selector.logicalPath'
 ]);
 const PATH_ARRAY_FIELDS = new Set([
@@ -609,6 +664,13 @@ const NUMBER_FIELDS = new Set([
 	'source.bytes',
 	'source.scriptKind',
 	'source.textLength',
+	'transformation-authored.contentBytes',
+	'transformation-authored.contentCharacters',
+	'transformation-source-map.canonicalJsonBytes',
+	'transformation-source-map.generatedLines',
+	'transformation-source-map.segmentCount',
+	'transformation-virtual.contentBytes',
+	'transformation-virtual.contentCharacters',
 	'node.end',
 	'node.fullStart',
 	'node.kind',
@@ -696,6 +758,10 @@ const NULLABLE_STRING_FIELDS = new Set([
 	'type-relation.sourceTypeId',
 	'type-relation.targetTypeId',
 	'type-relation.typeId',
+	'invocation.implementationDeclarationId',
+	'invocation.implementationNodeId',
+	'invocation.resolutionProvenanceId',
+	'invocation.resolvedSignatureId',
 	'invocation.templateNodeId',
 	'assignment.valueNodeId',
 	'diagnostic.path',
@@ -792,6 +858,7 @@ const ENUM_FIELDS: Readonly<Record<string, readonly string[]>> = {
 		'GENERATED',
 		'GENERATED_DECLARATION',
 		'WORKSPACE_BUILD_DECLARATION',
+		'VIRTUAL',
 		'EXTERNAL_DECLARATION',
 		'TOOLCHAIN_LIBRARY',
 		'CONFIGURATION',
@@ -805,6 +872,11 @@ const ENUM_FIELDS: Readonly<Record<string, readonly string[]>> = {
 		'CONFLICTING',
 		'NOT_APPLICABLE'
 	],
+	'transformation-authored.encoding': ['UTF8_WITHOUT_BOM'],
+	'transformation-authored.origin': ['AUTHORED'],
+	'transformation-source-map.mappingState': ['EXACT_SEGMENT_POINTS_ONLY'],
+	'transformation-virtual.origin': ['VIRTUAL'],
+	'transformation-virtual.scriptKind': ['JS', 'TS'],
 	'literal.valueState': ['EXACT', 'DIGEST_ONLY'],
 	'declaration-candidate.candidateRole': [
 		'BINDING',
@@ -973,7 +1045,16 @@ const ENUM_FIELDS: Readonly<Record<string, readonly string[]>> = {
 		'TEMPLATE_TAIL'
 	],
 	'invocation.invocationKind': ['CALL', 'NEW', 'TAGGED_TEMPLATE'],
-	'invocation.targetState': ['SYNTAX_ONLY'],
+	'invocation.resolutionReason': [
+		'TYPE_CAPABILITY_NOT_REQUESTED',
+		'COMPILER_SIGNATURE_UNRESOLVED',
+		'SIGNATURE_DECLARATION_UNRETAINED',
+		'IMPLEMENTATION_UNAVAILABLE',
+		'IMPLEMENTATION_NOT_UNIQUE',
+		'IMPLEMENTATION_NOT_DEEP_INDEXED',
+		'IMPLEMENTATION_IDENTIFIED'
+	],
+	'invocation.targetState': ['SYNTAX_ONLY', 'SIGNATURE_RESOLVED', 'IMPLEMENTATION_IDENTIFIED'],
 	'assignment.assignmentKind': ['BINARY', 'INITIALIZER', 'PREFIX_UPDATE', 'POSTFIX_UPDATE'],
 	'diagnostic.category': ['WARNING', 'ERROR', 'SUGGESTION', 'MESSAGE'],
 	'diagnostic-related.category': ['WARNING', 'ERROR', 'SUGGESTION', 'MESSAGE'],
@@ -987,7 +1068,11 @@ const ENUM_FIELDS: Readonly<Record<string, readonly string[]>> = {
 	],
 	'diagnostic.locationKind': ['NONE', 'PATH', 'SOURCE'],
 	'diagnostic-message.textEncoding': ['UNICODE_SCALAR', 'UTF16_CODE_UNITS_HEX'],
-	'compiler-input.byteBudgetClass': ['FROZEN_SUBJECT', 'LIVE_COMPILER_CONTEXT'],
+	'compiler-input.byteBudgetClass': [
+		'FROZEN_SUBJECT',
+		'LIVE_COMPILER_CONTEXT',
+		'VIRTUAL_TRANSFORM'
+	],
 	'compiler-input.operation': [
 		'READ_FILE',
 		'FILE_EXISTS',
@@ -1007,6 +1092,7 @@ const ENUM_FIELDS: Readonly<Record<string, readonly string[]>> = {
 		'GENERATED',
 		'GENERATED_DECLARATION',
 		'WORKSPACE_BUILD_DECLARATION',
+		'VIRTUAL',
 		'EXTERNAL_DECLARATION',
 		'TOOLCHAIN_LIBRARY',
 		'CONFIGURATION',
@@ -1072,9 +1158,20 @@ function isCaseSensitivityResult(result: unknown): boolean {
 	return result === 'CASE_SENSITIVE' || result === 'CASE_INSENSITIVE';
 }
 
-function compilerInputReadFileKeys(result: unknown): readonly string[] | undefined {
+function compilerInputReadFileKeys(
+	result: unknown,
+	byteBudgetClass: unknown
+): readonly string[] | undefined {
 	if (result === 'PRESENT')
-		return [...COMPILER_INPUT_BASE_KEYS, 'byteBudgetClass', 'contentBytes', 'contentSha256'];
+		return byteBudgetClass === 'VIRTUAL_TRANSFORM'
+			? [
+					...COMPILER_INPUT_BASE_KEYS,
+					'byteBudgetClass',
+					'contentBytes',
+					'contentSha256',
+					'transformation'
+				]
+			: [...COMPILER_INPUT_BASE_KEYS, 'byteBudgetClass', 'contentBytes', 'contentSha256'];
 	if (result === 'ABSENT') return COMPILER_INPUT_BASE_KEYS;
 	return undefined;
 }
@@ -1105,7 +1202,7 @@ function compilerInputKeys(
 	const result = record.result;
 	switch (operation) {
 		case 'READ_FILE':
-			return compilerInputReadFileKeys(result);
+			return compilerInputReadFileKeys(result, record.byteBudgetClass);
 		case 'FILE_EXISTS':
 			return isPresenceResult(result) ? COMPILER_INPUT_BASE_KEYS : undefined;
 		case 'DIRECTORY_EXISTS':
@@ -1224,6 +1321,7 @@ function isScalarContext(context: string): boolean {
 function nullableContextInner(context: string): string | undefined {
 	if (context.startsWith('list-or-null:')) return `list:${context.slice(13)}`;
 	if (context === 'span-or-null') return 'span';
+	if (context === 'transformation-or-null') return 'transformation';
 	return undefined;
 }
 

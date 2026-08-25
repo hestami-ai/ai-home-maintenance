@@ -111,8 +111,8 @@ const RELATION_LANE_COVERAGE: readonly CallGraphRelationLaneCoverage[] = (
 		{
 			lane: 'CONFIRMED',
 			reason:
-				'Invocation-specific resolved signatures and dispatch-closure evidence are not retained.',
-			state: 'NOT_SUPPORTED'
+				'Compiler-resolved signatures plus a retained inline implementation support exact inline targets; other dispatch remains open.',
+			state: 'PARTIAL'
 		},
 		{
 			lane: 'INFERRED',
@@ -480,15 +480,20 @@ function globalEpistemic(
 	const candidateCount = classifications.filter(
 		(classification) => classification.resolutionClass === 'CANDIDATE_SET'
 	).length;
+	const exactCount = classifications.filter(
+		(classification) => classification.resolutionClass === 'EXACT'
+	).length;
 	const allUnsupported = classifications.every(
 		(classification) => classification.resolutionClass === 'UNSUPPORTED'
 	);
 	let inferenceState: CallGraphEpistemicState['inferenceState'];
-	if (candidateCount === 0) inferenceState = 'UNRESOLVED';
+	if (exactCount === classifications.length) inferenceState = 'NONE';
+	else if (candidateCount === 0 && exactCount === 0) inferenceState = 'UNRESOLVED';
 	else if (candidateCount === classifications.length) inferenceState = 'CANDIDATE';
 	else inferenceState = 'MIXED';
 	let supportBasis: CallGraphEpistemicState['supportBasis'];
 	if (candidateCount > 0) supportBasis = 'COMPILER_BOUND_STATIC_CANDIDATE';
+	else if (exactCount > 0) supportBasis = 'COMPILER_CONFIRMED';
 	else if (allUnsupported) supportBasis = 'UNSUPPORTED';
 	else supportBasis = 'NO_TARGET_EVIDENCE';
 	return {
@@ -1105,7 +1110,10 @@ function beginClassification(
 	inlineSpecs.sort((left, right) => compareText(left.node.id, right.node.id));
 	const baseProvenance = sortedUnique([
 		source.provenanceId,
-		...(source.syntaxProvenanceId === null ? [] : [source.syntaxProvenanceId])
+		...(source.syntaxProvenanceId === null ? [] : [source.syntaxProvenanceId]),
+		...(invocation.resolutionProvenanceId === null
+			? []
+			: [invocation.resolutionProvenanceId])
 	]);
 	const base: ClassificationBase = {
 		dispatchClass: resolutionDispatchClass(callee, [], inlineSpecs),
@@ -1158,12 +1166,19 @@ function classifyInlineTargets(state: ClassificationState): CallClassification |
 		if (targetNodeId === undefined) throw new Error('Inline callable target node is missing.');
 		state.projection.classificationSteps.consume(targetSpec.symbolIds.size);
 		consumeSortInspections(state.projection.classificationSteps, targetSpec.symbolIds.size);
+		const exact =
+			state.invocation.targetState === 'IMPLEMENTATION_IDENTIFIED' &&
+			state.invocation.resolvedSignatureId !== null &&
+			state.invocation.resolutionProvenanceId !== null &&
+			state.invocation.implementationNodeId === targetSpec.node.id;
 		return {
 			...state.base,
 			provenanceIds: state.baseProvenance,
-			reasonCode: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
+			reasonCode: exact
+				? 'INLINE_CALLABLE_EXACT_SYNTAX_TARGET'
+				: 'INLINE_CALLABLE_WITHOUT_RESOLVED_SIGNATURE',
 			referenceIds: [],
-			resolutionClass: 'CANDIDATE_SET',
+			resolutionClass: exact ? 'EXACT' : 'CANDIDATE_SET',
 			resolvedSymbolIds: sortedUnique(targetSpec.symbolIds),
 			targetCallableNodeIds: [targetNodeId],
 			targetSpecs: inlineSpecs
@@ -1518,7 +1533,10 @@ function projectCallSiteNodes(
 		const invocationNode = projection.index.nodeById.get(classification.invocation.nodeId)!;
 		const callSiteId = callGraphCallSiteNodeId(projection.graphId, classification.invocation.id);
 		let targetNodeIds = classification.targetCallableNodeIds;
-		if (classification.resolutionClass !== 'CANDIDATE_SET') {
+		if (
+			classification.resolutionClass !== 'CANDIDATE_SET' &&
+			classification.resolutionClass !== 'EXACT'
+		) {
 			const frontierNode = frontierNodeFor(classification, invocationNode, projection);
 			frontierNodes.push(frontierNode);
 			targetNodeIds = [frontierNode.id];
@@ -1601,6 +1619,7 @@ function candidateTargetEdge(
 	target: CallGraphNode,
 	candidateRank: number,
 	targetSpecBySemanticNodeId: Map<SemanticAstNodeRecord['id'], CallableSpec>,
+	invocation: SemanticInvocationSiteRecord,
 	projection: Projection
 ): CallGraphEdge {
 	const snapshot = projection.snapshot;
@@ -1643,7 +1662,9 @@ function candidateTargetEdge(
 			]),
 			limitationKinds: sortedUnique([
 				'CANDIDATE_SET_OPEN',
-				'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
+				...(invocation.resolvedSignatureId === null
+					? (['INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED'] as const)
+					: []),
 				...(callSite.dispatchClass === 'MEMBER_REFERENCE' ||
 				callSite.dispatchClass === 'LITERAL_ELEMENT_REFERENCE'
 					? (['DYNAMIC_DISPATCH_NOT_CLOSED'] as const)
@@ -1666,6 +1687,45 @@ function candidateTargetEdge(
 		subjectId: snapshot.subjectId,
 		target: targetEndpoint,
 		targetState: 'CANDIDATE'
+	};
+}
+
+function confirmedTargetEdge(
+	callSite: CallGraphCallSiteNode,
+	target: CallGraphNode,
+	projection: Projection
+): CallGraphEdge {
+	if (target.kind !== 'CALLABLE_TARGET')
+		throw new Error('An exact call target must be a retained callable target.');
+	const snapshot = projection.snapshot;
+	const sourceEndpoint = endpoint(callSite);
+	const targetEndpoint = endpoint(target);
+	return {
+		candidateRank: null,
+		epistemic: epistemicForResolution('EXACT', snapshot),
+		evidenceClass: 'R-SEM',
+		graphId: projection.graphId,
+		id: callGraphEdgeId({
+			candidateRank: null,
+			graph: projection.graphId,
+			invocationId: callSite.invocationId,
+			relationKind: 'CONFIRMED_CALL_TARGET',
+			source: sourceEndpoint,
+			target: targetEndpoint
+		}),
+		invocationId: callSite.invocationId,
+		layerId: projection.layerId,
+		method: CALL_GRAPH_METHOD,
+		provenanceIds: sortedUnique([...callSite.provenanceIds, ...target.provenanceIds]),
+		relationCode: 'REL-067',
+		relationKind: 'CONFIRMED_CALL_TARGET',
+		resolutionClass: 'EXACT',
+		semanticSnapshotId: snapshot.id,
+		source: sourceEndpoint,
+		sourceLocations: callSite.sourceLocations,
+		subjectId: snapshot.subjectId,
+		target: targetEndpoint,
+		targetState: 'CONFIRMED'
 	};
 }
 
@@ -1714,13 +1774,23 @@ function pushTargetEdges(
 	callSite: CallGraphCallSiteNode,
 	nodeByGraphId: Map<CallGraphNodeId, CallGraphNode>,
 	targetSpecBySemanticNodeId: Map<SemanticAstNodeRecord['id'], CallableSpec>,
+	invocation: SemanticInvocationSiteRecord,
 	projection: Projection
 ): void {
 	for (const [index, targetNodeId] of callSite.targetNodeIds.entries()) {
 		const target = nodeByGraphId.get(targetNodeId)!;
-		if (callSite.resolutionClass === 'CANDIDATE_SET')
+		if (callSite.resolutionClass === 'EXACT')
+			edges.push(confirmedTargetEdge(callSite, target, projection));
+		else if (callSite.resolutionClass === 'CANDIDATE_SET')
 			edges.push(
-				candidateTargetEdge(callSite, target, index + 1, targetSpecBySemanticNodeId, projection)
+				candidateTargetEdge(
+					callSite,
+					target,
+					index + 1,
+					targetSpecBySemanticNodeId,
+					invocation,
+					projection
+				)
 			);
 		else edges.push(unresolvedTargetEdge(callSite, target, callSite.resolutionClass, projection));
 	}
@@ -1740,7 +1810,14 @@ function projectEdges(
 		);
 		const owner = nodeByGraphId.get(callSite.ownerNodeId)!;
 		edges.push(ownershipEdge(callSite, owner, projection));
-		pushTargetEdges(edges, callSite, nodeByGraphId, targetSpecBySemanticNodeId, projection);
+		pushTargetEdges(
+			edges,
+			callSite,
+			nodeByGraphId,
+			targetSpecBySemanticNodeId,
+			classification.invocation,
+			projection
+		);
 		if (!classification.provenanceIds.every((id) => projection.index.provenanceIds.has(id)))
 			throw new Error(`Invocation ${callSite.invocationId} has missing provenance.`);
 	}
@@ -1754,6 +1831,14 @@ function appendClassificationLimitations(
 	limitations: CallGraphLimitation[],
 	classification: CallClassification
 ): void {
+	if (classification.invocation.resolvedSignatureId === null)
+		limitations.push(
+			limitation(
+				'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
+				'The compiler did not retain a resolved Signature identity for this invocation.',
+				classification.invocation
+			)
+		);
 	switch (classification.resolutionClass) {
 		case 'CANDIDATE_SET':
 			limitations.push(
@@ -1811,7 +1896,7 @@ function appendClassificationLimitations(
 			);
 			break;
 		case 'EXACT':
-			throw new Error('The initial call graph producer cannot classify exact targets.');
+			break;
 	}
 }
 
@@ -1820,10 +1905,6 @@ function buildLimitations(
 	classifications: readonly CallClassification[]
 ): CallGraphLimitation[] {
 	const limitations: CallGraphLimitation[] = [
-		limitation(
-			'INVOCATION_SPECIFIC_SIGNATURE_NOT_RETAINED',
-			'The semantic snapshot records syntactic invocation sites but not invocation-specific resolved signatures or dispatch closure.'
-		),
 		limitation(
 			'ENTRY_MECHANISM_NOT_ANALYZED',
 			'The twelve reachability entry-mechanism classes remain outside this static call projection.'
@@ -1862,7 +1943,7 @@ function baseProjectedPopulation(
 	const invocationCount = snapshot.invocations.length;
 	return {
 		edges: checkedPopulationAdd(invocationCount, invocationCount),
-		limitations: checkedPopulationAdd(3 + Number(snapshot.health === 'PARTIAL'), invocationCount),
+		limitations: 2 + Number(snapshot.health === 'PARTIAL'),
 		nodes: checkedPopulationAdd(
 			checkedPopulationAdd(snapshot.sources.length, callableCount),
 			invocationCount
@@ -1871,9 +1952,11 @@ function baseProjectedPopulation(
 }
 
 function classificationLimitationCount(classification: CallClassification): number {
+	const missingSignature = Number(classification.invocation.resolvedSignatureId === null);
 	switch (classification.resolutionClass) {
 		case 'CANDIDATE_SET':
 			return (
+				missingSignature +
 				1 +
 				Number(
 					classification.dispatchClass === 'MEMBER_REFERENCE' ||
@@ -1881,12 +1964,16 @@ function classificationLimitationCount(classification: CallClassification): numb
 				)
 			);
 		case 'EXTERNAL_DISPATCH':
-			return 1 + Number(classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED');
+			return (
+				missingSignature +
+				1 +
+				Number(classification.reasonCode === 'CALLABLE_VALUE_FLOW_NOT_MODELED')
+			);
 		case 'UNRESOLVED':
 		case 'UNSUPPORTED':
-			return 1;
+			return missingSignature + 1;
 		case 'EXACT':
-			throw new Error('The initial call graph producer cannot classify exact targets.');
+			return 0;
 	}
 }
 
@@ -1971,11 +2058,14 @@ function classifyProjection(
 			edges: checkedPopulationAdd(population.edges, targetEdgeCount(classification) - 1),
 			limitations: checkedPopulationAdd(
 				population.limitations,
-				classificationLimitationCount(classification) - 1
+				classificationLimitationCount(classification)
 			),
 			nodes: checkedPopulationAdd(
 				population.nodes,
-				Number(classification.resolutionClass !== 'CANDIDATE_SET')
+				Number(
+					classification.resolutionClass !== 'CANDIDATE_SET' &&
+						classification.resolutionClass !== 'EXACT'
+				)
 			)
 		};
 		if (budgets !== null && populationExceeds(population, budgets))
@@ -2001,7 +2091,7 @@ function buildCoverage(
 		candidateTargetEdges: edges.filter((edge) => edge.relationKind === 'CANDIDATE_CALL_TARGET')
 			.length,
 		closure: 'OPEN',
-		exactCallSites: 0,
+		exactCallSites: callSiteNodes.filter((node) => node.resolutionClass === 'EXACT').length,
 		expectedCallSites: snapshot.invocations.length,
 		externalDispatchCallSites: callSiteNodes.filter(
 			(node) => node.resolutionClass === 'EXTERNAL_DISPATCH'

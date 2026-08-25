@@ -18,6 +18,11 @@ import {
 	sourceOriginProgramSourcePopulationDigest
 } from '../../semantic/source-origin-correlation-canonical.js';
 import {
+	SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
+	transformSvelteVirtualSource,
+	type SvelteVirtualSourceEvidence
+} from '../svelte/svelte-virtual-source.js';
+import {
 	CompilerProjectDeclarationEmissionError,
 	compilerProjectDeclarationEmissionCompilerProgramCapability,
 	compilerProjectDeclarationEmissionTypeScriptPublicApi,
@@ -115,6 +120,54 @@ function mockFinalizedEvidence(
 				finalize: () => transform(session.finalize())
 			});
 		});
+}
+
+function virtualSourceEvidence(): SvelteVirtualSourceEvidence {
+	return transformSvelteVirtualSource({
+		authoredBytes: new TextEncoder().encode(
+			'<script lang="ts">export let name: string;</script><p>Hello {name}</p>'
+		),
+		authoredLogicalPath: 'packages/demo/src/Component.svelte',
+		limits: { ...SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS }
+	}).evidence;
+}
+
+function evidenceWithVirtualObservation(
+	evidence: CompilerProjectProgramEvidence,
+	transformation: SvelteVirtualSourceEvidence
+): CompilerProjectProgramEvidence {
+	const records = [...evidence.inputRecords];
+	const index = records.findIndex(
+		(record) =>
+			record.stage === 'PROGRAM_CONSTRUCTION' &&
+			record.observation.operation === 'READ_FILE' &&
+			record.observation.result === 'PRESENT'
+	);
+	if (index < 0) throw new Error('Fixture has no Program-construction present read.');
+	const record = records[index]!;
+	if (record.observation.operation !== 'READ_FILE' || record.observation.result !== 'PRESENT')
+		throw new Error('Selected fixture record is not a present read.');
+	const delta = transformation.virtual.contentBytes - record.observation.contentBytes;
+	records[index] = {
+		...record,
+		observation: {
+			...record.observation,
+			byteBudgetClass: 'VIRTUAL_TRANSFORM',
+			contentBytes: transformation.virtual.contentBytes,
+			contentSha256: transformation.virtual.contentSha256,
+			logicalPath: transformation.authored.logicalPath,
+			origin: 'VIRTUAL',
+			transformation
+		},
+		query: { logicalPath: transformation.authored.logicalPath, operation: 'READ_FILE' }
+	};
+	return {
+		...evidence,
+		attributedReadBytes: evidence.attributedReadBytes + delta,
+		compilerHostReadBytes: evidence.compilerHostReadBytes + delta,
+		inputRecords: records,
+		programCompilerHostReadBytes: evidence.programCompilerHostReadBytes + delta
+	};
 }
 
 describe('compiler project declaration emission capability', () => {
@@ -1134,6 +1187,12 @@ describe('compiler project declaration emission capability', () => {
 			const records = [...evidence.inputRecords];
 			for (let index = 0; index < origins.length; index += 1) {
 				const record = records[index]!;
+				if (
+					record.observation.operation === 'READ_FILE' &&
+					record.observation.result === 'PRESENT' &&
+					record.observation.byteBudgetClass === 'VIRTUAL_TRANSFORM'
+				)
+					throw new Error('Fixture unexpectedly selected a virtual source observation.');
 				records[index] = {
 					...record,
 					observation: { ...record.observation, origin: origins[index]! }
@@ -1145,6 +1204,73 @@ describe('compiler project declaration emission capability', () => {
 		const result = emitCompilerProjectDeclaration(fixture.inputs, emissionLimits());
 		expect(result.emissionWitness.programInputAttemptPopulationDigest).toMatch(/^[a-f0-9]{64}$/u);
 		spy.mockRestore();
+	});
+
+	it('accepts exact virtual-transform evidence and refuses nested drift or accessors', () => {
+		const exact = virtualSourceEvidence();
+		const accepted = mockFinalizedEvidence((evidence) =>
+			evidenceWithVirtualObservation(evidence, exact)
+		);
+		expect(
+			emitCompilerProjectDeclaration(fixture.inputs, emissionLimits()).emissionWitness
+				.programInputAttemptPopulationDigest
+		).toMatch(/^[a-f0-9]{64}$/u);
+		accepted.mockRestore();
+
+		for (const mutate of [
+			(value: Record<string, unknown>) => {
+				value.id = '0'.repeat(64);
+			},
+			(value: Record<string, unknown>) => {
+				(value.adapter as Record<string, unknown>).adapterVersion = 'drifted-adapter';
+			},
+			(value: Record<string, unknown>) => {
+				(value.authored as Record<string, unknown>).logicalPath = 'packages/demo/src/Other.svelte';
+			},
+			(value: Record<string, unknown>) => {
+				(value.virtual as Record<string, unknown>).logicalPath = '.csaa-virtual/svelte2tsx/drift.ts';
+			},
+			(value: Record<string, unknown>) => {
+				(value.sourceMap as Record<string, unknown>).segmentCount =
+					SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxMapSegments + 1;
+			}
+		]) {
+			const transformed = structuredClone(exact) as unknown as Record<string, unknown>;
+			mutate(transformed);
+			const spy = mockFinalizedEvidence((evidence) =>
+				evidenceWithVirtualObservation(
+					evidence,
+					transformed as unknown as SvelteVirtualSourceEvidence
+				)
+			);
+			expect(
+				errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+			).toBe('CAPTURE_UNAVAILABLE');
+			spy.mockRestore();
+		}
+
+		let accessorReads = 0;
+		const accessorEvidence = structuredClone(exact) as unknown as Record<string, unknown>;
+		const sourceMap = { ...(accessorEvidence.sourceMap as Record<string, unknown>) };
+		Object.defineProperty(sourceMap, 'canonicalJsonSha256', {
+			enumerable: true,
+			get() {
+				accessorReads += 1;
+				throw new Error('nested transformation accessor');
+			}
+		});
+		accessorEvidence.sourceMap = sourceMap;
+		const accessorSpy = mockFinalizedEvidence((evidence) =>
+			evidenceWithVirtualObservation(
+				evidence,
+				accessorEvidence as unknown as SvelteVirtualSourceEvidence
+			)
+		);
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('PROVIDER_FAILURE');
+		expect(accessorReads).toBe(0);
+		accessorSpy.mockRestore();
 	});
 
 	it('validates every retained compiler input query/observation container variant', () => {

@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -28,6 +35,7 @@ import { semanticPopulation } from './population.js';
 import { CompilerInputCaptureError } from '../providers/typescript/compiler-input-journal.js';
 import * as staticRawExtraction from '../providers/typescript/extract-static-raw.js';
 import { ProgramRecipeMaterializationError } from '../providers/typescript/materialize-program-recipe.js';
+import { SVELTE2TSX_SHIM_LOGICAL_PATH } from '../providers/svelte/svelte-virtual-source.js';
 import {
 	buildStaticSemanticSnapshot,
 	collectStaticDiagnosticFamily,
@@ -2098,20 +2106,67 @@ describe('buildStaticSemanticSnapshot', () => {
 		});
 	});
 
-	it('returns an honestly partial snapshot for retained unsupported framework syntax', () => {
+	it('captures, rechecks, and deep-indexes an admitted Svelte virtual source', () => {
 		const root = fixture();
 		write(
 			root,
 			'packages/demo/src/View.svelte',
 			'<script lang="ts">export let value: number;</script>\n'
 		);
+		write(root, SVELTE2TSX_SHIM_LOGICAL_PATH, readFileSync(SVELTE2TSX_SHIM_LOGICAL_PATH, 'utf8'));
+		json(root, 'packages/demo/tsconfig.json', {
+			compilerOptions: {
+				module: 'ESNext',
+				moduleResolution: 'Bundler',
+				noEmit: true,
+				strict: true,
+				target: 'ES2022'
+			},
+			files: ['src/index.ts', 'src/View.svelte']
+		});
 		const subject = resolved(root);
 		const outcome = buildStaticSemanticSnapshot(
 			semanticRequest(root, subject.descriptor.subjectId),
 			{ subject }
 		);
-		expect(outcome.outcome, JSON.stringify(outcome)).toBe('partial');
-		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		expect(
+			outcome.outcome,
+			JSON.stringify(
+				outcome.outcome === 'complete' || outcome.outcome === 'partial'
+					? {
+							capabilities: outcome.snapshot.capabilities,
+							limitations: outcome.snapshot.limitations,
+							populations: outcome.snapshot.populations.filter(
+								(population) => population.kind === 'FRAMEWORK_CANDIDATE'
+							),
+							projects: outcome.snapshot.projects.map((project) => ({
+								health: project.health,
+								partialityReasons: project.partialityReasons
+							})),
+							shimSources: outcome.snapshot.sources
+								.filter((source) => source.logicalPath.includes('svelte-shims'))
+								.map((source) => ({
+									logicalPath: source.logicalPath,
+									moduleKind: source.moduleKind
+								})),
+							unknownNameDiagnostics: outcome.snapshot.diagnostics
+								.filter((diagnostic) => diagnostic.code === '2304')
+								.map((diagnostic) => diagnostic.message),
+							unresolvedReferences: outcome.snapshot.references
+								.filter((reference) => reference.resolutionState === 'UNRESOLVED')
+								.map((reference) => ({
+									name: outcome.snapshot.astNodes.find((node) => node.id === reference.nodeId)
+										?.syntacticIdentifierText,
+									role: reference.role,
+									source: outcome.snapshot.sources.find(
+										(source) => source.id === reference.sourceId
+									)?.logicalPath
+								}))
+						}
+					: outcome
+			)
+		).toBe('complete');
+		if (outcome.outcome !== 'complete') throw new Error(JSON.stringify(outcome));
 		expect(
 			validateStaticSemanticSnapshot(outcome.snapshot, {}, { frozenSubject: subject })
 		).toEqual({ issues: [], state: 'VALID' });
@@ -2126,14 +2181,140 @@ describe('buildStaticSemanticSnapshot', () => {
 		expect(
 			outcome.snapshot.capabilities.find((capability) => capability.capability === 'TS_SYNTAX')
 				?.state
-		).toBe('PARTIAL');
+		).toBe('SUPPORTED');
 		expect(outcome.snapshot.projects[0]?.frameworkCandidates).toContain(
 			'packages/demo/src/View.svelte'
 		);
-		expect(outcome.diagnostics).toContainEqual(
-			expect.objectContaining({ code: 'CAPABILITY_UNSUPPORTED', severity: 'WARNING' })
+		expect(
+			outcome.snapshot.compilerInputs.find(
+				(input) =>
+					input.operation === 'READ_FILE' &&
+					input.result === 'PRESENT' &&
+					input.logicalPath === 'packages/demo/src/View.svelte'
+			)
+		).toMatchObject({ byteBudgetClass: 'VIRTUAL_TRANSFORM', origin: 'VIRTUAL' });
+		expect(
+			outcome.snapshot.sources.find(
+				(source) => source.logicalPath === 'packages/demo/src/View.svelte'
+			)
+		).toMatchObject({
+			analysisDisposition: 'DEEP_INDEXED',
+			mapping: { state: 'EXACT' },
+			origin: 'VIRTUAL',
+			transformation: {
+				authored: { logicalPath: 'packages/demo/src/View.svelte', origin: 'AUTHORED' },
+				virtual: { origin: 'VIRTUAL' }
+			}
+		});
+		const transformedSourceIndex = outcome.snapshot.sources.findIndex(
+			(source) => source.logicalPath === 'packages/demo/src/View.svelte'
 		);
-	});
+		const virtualInputIndex = outcome.snapshot.compilerInputs.findIndex(
+			(input) =>
+				input.operation === 'READ_FILE' &&
+				input.result === 'PRESENT' &&
+				input.byteBudgetClass === 'VIRTUAL_TRANSFORM'
+		);
+		const transformedSource = outcome.snapshot.sources[transformedSourceIndex]!;
+		const virtualInput = outcome.snapshot.compilerInputs[virtualInputIndex]!;
+		if (
+			transformedSource.transformation === null ||
+			virtualInput.operation !== 'READ_FILE' ||
+			virtualInput.result !== 'PRESENT' ||
+			virtualInput.byteBudgetClass !== 'VIRTUAL_TRANSFORM'
+		)
+			throw new Error('Expected exact transformed source and compiler-input witnesses.');
+		const alteredDigest =
+			transformedSource.transformation.sourceMap.canonicalJsonSha256 === 'f'.repeat(64)
+				? 'e'.repeat(64)
+				: 'f'.repeat(64);
+		const sourceMapMutation: StaticSemanticSnapshot = {
+			...outcome.snapshot,
+			sources: outcome.snapshot.sources.map((source, index) =>
+				index === transformedSourceIndex
+					? {
+							...source,
+							transformation: {
+								...transformedSource.transformation!,
+								sourceMap: {
+									...transformedSource.transformation!.sourceMap,
+									canonicalJsonSha256: alteredDigest
+								}
+							}
+						}
+					: source
+			)
+		};
+		expect(
+			validateStaticSemanticSnapshot(sourceMapMutation, {}, { frozenSubject: subject }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					path: `$.sources[${transformedSourceIndex}].transformation.id`
+				}),
+				expect.objectContaining({
+					path: `$.sources[${transformedSourceIndex}].transformation`
+				})
+			])
+		);
+		const authoredMutation: StaticSemanticSnapshot = {
+			...outcome.snapshot,
+			compilerInputs: outcome.snapshot.compilerInputs.map((input, index) =>
+				index === virtualInputIndex
+					? {
+							...virtualInput,
+							transformation: {
+								...virtualInput.transformation,
+								authored: {
+									...virtualInput.transformation.authored,
+									contentSha256: alteredDigest
+								}
+							}
+						}
+					: input
+			)
+		};
+		expect(
+			validateStaticSemanticSnapshot(authoredMutation, {}, { frozenSubject: subject }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					path: `$.compilerInputs[${virtualInputIndex}].transformation.id`
+				}),
+				expect.objectContaining({
+					code: 'FROZEN_EVIDENCE_REQUIRED',
+					path: '$validationContext.frozenSubject.artifacts'
+				})
+			])
+		);
+		const virtualPathMutation: StaticSemanticSnapshot = {
+			...outcome.snapshot,
+			sources: outcome.snapshot.sources.map((source, index) =>
+				index === transformedSourceIndex
+					? {
+							...source,
+							transformation: {
+								...transformedSource.transformation!,
+								virtual: {
+									...transformedSource.transformation!.virtual,
+									logicalPath: '.csaa-virtual/svelte2tsx/wrong.svelte.ts'
+								}
+							}
+						}
+					: source
+			)
+		};
+		expect(
+			validateStaticSemanticSnapshot(virtualPathMutation, {}, { frozenSubject: subject }).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					path: `$.sources[${transformedSourceIndex}].transformation.virtual.logicalPath`
+				})
+			])
+		);
+		expect(outcome.diagnostics).toEqual([]);
+	}, 30_000);
 
 	it('fails closed without a snapshot when semantic extraction exceeds a requested budget', () => {
 		const root = fixture();

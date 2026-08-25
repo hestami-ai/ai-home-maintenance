@@ -842,7 +842,10 @@ function assertSnapshotBudgets(
 			state.raw.symbols.length +
 			state.raw.typeParameters.length +
 			state.raw.typeRelations.length +
-			state.raw.types.length,
+			state.raw.types.length +
+			state.raw.invocations.filter(
+				(invocation) => invocation.resolutionReason !== 'TYPE_CAPABILITY_NOT_REQUESTED'
+			).length,
 		0
 	);
 	if (totalSources > input.request.budgets.maxSources)
@@ -991,7 +994,6 @@ interface SyntaxRecords {
 	readonly assignments: SemanticAssignmentRecord[];
 	readonly astNodes: SemanticAstNodeRecord[];
 	readonly declarationCandidates: SemanticDeclarationCandidateRecord[];
-	readonly invocations: SemanticInvocationSiteRecord[];
 	readonly literals: SemanticLiteralRecord[];
 }
 
@@ -1103,6 +1105,7 @@ function collectLiterals(
 }
 
 function collectInvocations(
+	context: NormalizationContext,
 	state: ProjectState,
 	nodeByOrdinal: NodeIdByOrdinal,
 	invocations: SemanticInvocationSiteRecord[]
@@ -1111,13 +1114,61 @@ function collectInvocations(
 		const sourceId =
 			state.sourceIds.get(raw.sourceOrdinal) ?? fail('Invocation source ordinal is absent.');
 		const nodeId = nodeByOrdinal(raw.sourceOrdinal, raw.nodeOrdinal);
+		const resolvedSignatureId =
+			raw.resolvedSignatureOrdinal === null
+				? null
+				: (state.signatureIds.get(raw.resolvedSignatureOrdinal) ??
+					fail('Invocation references an absent resolved Signature ordinal.'));
+		const implementationDeclarationId =
+			raw.implementationDeclarationOrdinal === null
+				? null
+				: (state.declarationIds.get(raw.implementationDeclarationOrdinal) ??
+					fail('Invocation references an absent implementation declaration ordinal.'));
+		const implementationNodeId =
+			raw.implementationNodeOrdinal === null || raw.implementationSourceOrdinal === null
+				? null
+				: nodeByOrdinal(raw.implementationSourceOrdinal, raw.implementationNodeOrdinal);
+		const implementationCoordinatesCoherent =
+			(raw.implementationNodeOrdinal === null) === (raw.implementationSourceOrdinal === null);
+		const targetCoherent =
+			raw.targetState === 'SYNTAX_ONLY'
+				? resolvedSignatureId === null &&
+					implementationDeclarationId === null &&
+					implementationNodeId === null &&
+					[
+						'TYPE_CAPABILITY_NOT_REQUESTED',
+						'COMPILER_SIGNATURE_UNRESOLVED',
+						'SIGNATURE_DECLARATION_UNRETAINED'
+					].includes(raw.resolutionReason)
+				: raw.targetState === 'SIGNATURE_RESOLVED'
+					? resolvedSignatureId !== null &&
+						implementationDeclarationId === null &&
+						implementationNodeId === null &&
+						[
+							'IMPLEMENTATION_UNAVAILABLE',
+							'IMPLEMENTATION_NOT_UNIQUE',
+							'IMPLEMENTATION_NOT_DEEP_INDEXED'
+						].includes(raw.resolutionReason)
+					: resolvedSignatureId !== null &&
+						implementationNodeId !== null &&
+						raw.resolutionReason === 'IMPLEMENTATION_IDENTIFIED';
+		if (!implementationCoordinatesCoherent || !targetCoherent)
+			fail('Invocation target evidence is incoherent.');
 		const base = {
 			calleeNodeId: nodeByOrdinal(raw.sourceOrdinal, raw.calleeNodeOrdinal),
 			id: semanticInvocationSiteId({ invocationKind: raw.invocationKind, nodeId }),
+			implementationDeclarationId,
+			implementationNodeId,
 			invocationKind: raw.invocationKind,
 			nodeId,
+			resolutionProvenanceId:
+				raw.resolutionReason === 'TYPE_CAPABILITY_NOT_REQUESTED'
+					? null
+					: provenanceId(context, state, 'TS_TYPE', typeLimitations(state, context.multiProgram)),
+			resolutionReason: raw.resolutionReason,
+			resolvedSignatureId,
 			sourceId,
-			targetState: 'SYNTAX_ONLY' as const
+			targetState: raw.targetState
 		};
 		if (raw.invocationKind === 'CALL')
 			invocations.push({
@@ -1153,6 +1204,14 @@ function collectInvocations(
 	}
 }
 
+function buildInvocations(context: NormalizationContext): SemanticInvocationSiteRecord[] {
+	const invocations: SemanticInvocationSiteRecord[] = [];
+	for (const state of context.states)
+		collectInvocations(context, state, nodeIdByOrdinalFor(state), invocations);
+	invocations.sort((left, right) => compare(left.id, right.id));
+	return invocations;
+}
+
 function collectAssignments(
 	state: ProjectState,
 	nodeByOrdinal: NodeIdByOrdinal,
@@ -1182,7 +1241,6 @@ function collectProjectSyntaxRecords(state: ProjectState, records: SyntaxRecords
 	const nodeByOrdinal = nodeIdByOrdinalFor(state);
 	collectDeclarationCandidates(state, nodeByOrdinal, records.declarationCandidates);
 	collectLiterals(state, nodeByOrdinal, records.literals);
-	collectInvocations(state, nodeByOrdinal, records.invocations);
 	collectAssignments(state, nodeByOrdinal, records.assignments);
 }
 
@@ -1191,14 +1249,12 @@ function buildSyntaxRecords(states: readonly ProjectState[]): SyntaxRecords {
 		assignments: [],
 		astNodes: [],
 		declarationCandidates: [],
-		invocations: [],
 		literals: []
 	};
 	for (const state of states) collectProjectSyntaxRecords(state, records);
 	records.astNodes.sort((left, right) => compare(left.id, right.id));
 	records.declarationCandidates.sort((left, right) => compare(left.id, right.id));
 	records.literals.sort((left, right) => compare(left.nodeId, right.nodeId));
-	records.invocations.sort((left, right) => compare(left.id, right.id));
 	records.assignments.sort((left, right) => compare(left.nodeId, right.nodeId));
 	return records;
 }
@@ -3120,7 +3176,11 @@ function collectSources(
 				raw.analysisDisposition === 'DEEP_INDEXED'
 					? provenanceId(context, state, 'TS_SYNTAX', syntaxLimitations, id)
 					: null,
-			textLength: raw.textLength
+			textLength: raw.textLength,
+			transformation:
+				raw.transformation === undefined || raw.transformation === null
+					? null
+					: structuredClone(raw.transformation)
 		});
 	}
 }
@@ -3281,10 +3341,8 @@ function tsProjectIsPartial(states: readonly ProjectState[]): boolean {
 }
 
 function tsSyntaxIsPartial(states: readonly ProjectState[]): boolean {
-	return states.some(
-		(state) =>
-			state.raw.project.partialityReasons.some((reason) => reason.capability === 'TS_SYNTAX') ||
-			state.raw.project.frameworkCandidates.length > 0
+	return states.some((state) =>
+		state.raw.project.partialityReasons.some((reason) => reason.capability === 'TS_SYNTAX')
 	);
 }
 
@@ -3362,6 +3420,41 @@ interface SnapshotRecordSets {
 	readonly types: readonly SemanticTypeRecord[];
 }
 
+function hasExactFrameworkCandidateCoverage(
+	project: SemanticProjectRecord,
+	candidate: string,
+	sources: readonly SemanticSourceRecord[],
+	compilerInputs: readonly CompilerInputObservation[]
+): boolean {
+	const source = sources.find(
+		(record) =>
+			record.projectId === project.id &&
+			record.logicalPath === candidate &&
+			record.analysisDisposition === 'DEEP_INDEXED' &&
+			record.origin === 'VIRTUAL' &&
+			record.mapping.state === 'EXACT' &&
+			record.transformation !== null &&
+			record.transformation.authored.logicalPath === candidate &&
+			record.transformation.virtual.origin === 'VIRTUAL' &&
+			record.transformation.virtual.contentBytes === record.bytes &&
+			record.transformation.virtual.contentSha256 === record.contentSha256 &&
+			record.transformation.virtual.contentCharacters === record.textLength
+	);
+	if (source?.transformation === null || source === undefined) return false;
+	return compilerInputs.some(
+		(observation) =>
+			observation.operation === 'READ_FILE' &&
+			observation.result === 'PRESENT' &&
+			observation.byteBudgetClass === 'VIRTUAL_TRANSFORM' &&
+			observation.origin === 'VIRTUAL' &&
+			observation.logicalPath === candidate &&
+			observation.contentBytes === source.bytes &&
+			observation.contentSha256 === source.contentSha256 &&
+			canonicalSemanticJson(observation.transformation) ===
+				canonicalSemanticJson(source.transformation)
+	);
+}
+
 function buildPopulationValues({
 	aliases,
 	assignments,
@@ -3388,10 +3481,21 @@ function buildPopulationValues({
 	typeRelations,
 	types
 }: SnapshotRecordSets): Readonly<Record<SemanticPopulationKind, SemanticPopulationMembers>> {
-	const frameworkMembers = sortedUnique(
-		projects.flatMap((project) =>
-			project.frameworkCandidates.map((candidate) => `${project.id}\0${candidate}`)
-		)
+	const frameworkCandidates = projects.flatMap((project) =>
+		project.frameworkCandidates.map((candidate) => ({
+			candidate,
+			member: `${project.id}\0${candidate}`,
+			project
+		}))
+	);
+	const frameworkMembers = sortedUnique(frameworkCandidates.map(({ member }) => member));
+	const unsupportedFrameworkMembers = sortedUnique(
+		frameworkCandidates
+			.filter(
+				({ candidate, project }) =>
+					!hasExactFrameworkCandidateCoverage(project, candidate, sources, compilerInputs)
+			)
+			.map(({ member }) => member)
 	);
 	return {
 		PROJECT: members(projects.map((record) => record.id)),
@@ -3510,7 +3614,7 @@ function buildPopulationValues({
 		ASSIGNMENT: members(assignments.map((record) => record.nodeId)),
 		DIAGNOSTIC: members(diagnostics.map((record) => record.id)),
 		PROVENANCE: members(provenances.map((record) => record.id)),
-		FRAMEWORK_CANDIDATE: members(frameworkMembers, [], frameworkMembers),
+		FRAMEWORK_CANDIDATE: members(frameworkMembers, [], unsupportedFrameworkMembers),
 		CONTEXT_INPUT: members(
 			[],
 			compilerInputs.map((record) => record.id)
@@ -3573,14 +3677,14 @@ export function normalizeStaticSemanticSnapshot(
 	assignNodeIdentities(states);
 	const { diagnostics, occurrenceIdsByProject } = buildDiagnostics(context);
 
-	const { assignments, astNodes, declarationCandidates, invocations, literals } =
-		buildSyntaxRecords(states);
+	const { assignments, astNodes, declarationCandidates, literals } = buildSyntaxRecords(states);
 	const scopes = buildScopes(context);
 
 	const { aliases, declarations, moduleExports, moduleResolutions, references, symbols } =
 		buildSymbolFacts(context);
 	const { overloadSets, signatureParameters, signatures, typeParameters, typeRelations, types } =
 		buildTypeFacts(context);
+	const invocations = buildInvocations(context);
 	const sources = buildSources(context, diagnostics);
 
 	const { programs, projects } = buildProgramsAndProjects(
