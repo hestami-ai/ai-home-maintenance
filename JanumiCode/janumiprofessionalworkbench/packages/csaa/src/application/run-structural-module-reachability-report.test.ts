@@ -192,11 +192,13 @@ describe('runStructuralModuleReachabilityReport', () => {
 			{ distance: 2, path: 'packages/demo/src/entry.ts' }
 		]);
 		expect(
-			first.result.evidence.witnessEdges.map((edge) => ({
-				source: pathByNode.get(edge.source.nodeId),
-				specifier: edge.specifier,
-				target: pathByNode.get(edge.target.nodeId)
-			}))
+			first.result.evidence.witnessEdges
+				.map((edge) => ({
+					source: pathByNode.get(edge.source.nodeId),
+					specifier: edge.specifier,
+					target: pathByNode.get(edge.target.nodeId)
+				}))
+				.sort((left, right) => (left.source ?? '').localeCompare(right.source ?? ''))
 		).toEqual([
 			{
 				source: 'packages/demo/src/entry.ts',

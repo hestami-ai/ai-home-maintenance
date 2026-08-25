@@ -394,6 +394,14 @@ const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const temporaryRoots: string[] = [];
 const STRUCTURAL_SCC_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_SCC vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
+const WORKING_CHANGE_SET_PROVENANCE = [
+	'packages/csaa/src/contracts/working-change-set.ts',
+	'packages/csaa/src/subject/bind-working-change-set.ts',
+	'packages/csaa/src/subject/git-readonly.ts',
+	'packages/csaa/src/subject/observe-working-change-set.ts',
+	'packages/csaa/src/subject/resolve-working-subject.test.ts',
+	'packages/csaa/src/subject/resolve-working-subject.ts'
+] as const;
 const STRUCTURAL_MODULE_REACHABILITY_ONLY_SMOKE_COMMAND =
 	'CSAA_REPOSITORY_SMOKE=1 CSAA_REPOSITORY_SMOKE_PROFILE=STRUCTURAL CSAA_REPOSITORY_SMOKE_SUITE=STRUCTURAL_MODULE_REACHABILITY vitest run --disableConsoleIntercept packages/csaa/src/semantic/repository-smoke.test.ts';
 const STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND =
@@ -4333,6 +4341,13 @@ describe('JPWB population non-vacuity', () => {
 
 		const noSemanticImplementation = fixture();
 		write(noSemanticImplementation, 'package.json', manifest(['packages/*', 'apps/*']));
+		write(
+			noSemanticImplementation,
+			'packages/csaa/package.json',
+			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
+		);
+		for (const path of WORKING_CHANGE_SET_PROVENANCE)
+			write(noSemanticImplementation, path, 'export {};\n');
 		expect(() =>
 			collectInventory({ repositoryRoot: noSemanticImplementation, requireJpwbPopulations: true })
 		).toThrow(
@@ -4401,6 +4416,7 @@ describe('JPWB population non-vacuity', () => {
 			JSON.stringify({ name: '@janumipwb/rph-domain', private: true, version: '0.0.0' })
 		);
 		const semanticPaths = [
+			...WORKING_CHANGE_SET_PROVENANCE,
 			'packages/csaa/src/contracts/semantic.ts',
 			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
 			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
@@ -4528,6 +4544,7 @@ describe('JPWB population non-vacuity', () => {
 			JSON.stringify({ name: '@janumipwb/csaa', private: true, version: '0.0.0' })
 		);
 		const requiredPaths = [
+			...WORKING_CHANGE_SET_PROVENANCE,
 			'packages/csaa/src/contracts/semantic.ts',
 			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
 			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
@@ -4622,6 +4639,7 @@ describe('JPWB population non-vacuity', () => {
 			JSON.stringify({ name: '@janumipwb/rph-contracts', private: true, version: '0.0.0' })
 		);
 		const requiredPaths = [
+			...WORKING_CHANGE_SET_PROVENANCE,
 			'packages/csaa/src/contracts/semantic.ts',
 			'packages/csaa/src/providers/typescript/compiler-input-journal.ts',
 			'packages/csaa/src/providers/typescript/extract-static-raw.ts',
@@ -5450,8 +5468,8 @@ describe('JPWB population non-vacuity', () => {
 				).length,
 			0
 		);
-		const verificationAssetCount = readdirSync(join(ROOT, 'verif'), { withFileTypes: true }).filter(
-			(entry) => entry.isFile() && entry.name.endsWith('.ts')
+		const verificationAssetCount = inventory.subject.selectedFiles.filter(
+			(file) => file.path.startsWith('verif/') && file.subjectArtifactClass === 'VERIFICATION'
 		).length;
 		expect(inventory.workspaces).toHaveLength(manifestCount);
 		const verificationAssets = inventory.verificationAssets.filter((asset) =>
@@ -5463,6 +5481,11 @@ describe('JPWB population non-vacuity', () => {
 		expect(
 			verificationAssets.find((asset) => asset.path === 'verif/arrow-command-census.ts')
 		).toMatchObject({ disposition: ARROW_COMMAND_CENSUS_INTEGRATION_STRATEGY });
+		expect(
+			verificationAssets.find(
+				(asset) => asset.path === 'verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json'
+			)
+		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
 		expect(inventory.dependencyBoundary.analyzedPerimeter).toEqual(['packages']);
 		expect(inventory.dependencyBoundary.enforcementPerimeter).toEqual(['apps', 'packages']);
 	});

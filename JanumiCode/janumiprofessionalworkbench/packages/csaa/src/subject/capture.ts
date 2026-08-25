@@ -90,7 +90,7 @@ function rootFileCandidate(name: string): boolean {
 	return (
 		name === 'package.json' ||
 		/^(?:bun\.lock|bunfig\.toml|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/u.test(name) ||
-		/^(?:tsconfig|turbo|vitest|vite|eslint|prettier|sonar|\.dependency-cruiser)[^/]*\.(?:json|[cm]?[jt]s|toml|ya?ml|properties)$/u.test(
+		/^(?:tsconfig|turbo|vitest|vite|playwright|eslint|prettier|sonar|\.dependency-cruiser)[^/]*\.(?:json|[cm]?[jt]s|toml|ya?ml|properties)$/u.test(
 			name
 		) ||
 		/^\.(?:gitignore|prettierignore|prettierrc|eslintignore)/u.test(name)

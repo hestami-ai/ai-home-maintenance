@@ -186,12 +186,21 @@ function subject(programRecipe = recipe()): FrozenSubject {
 		generatedContexts: [],
 		population: {
 			analyzed: 1,
+			capturedRecords: 1,
+			capturedRecordsReconcile: true,
 			discovered: 1,
+			discoveredPhysicalFiles: 1,
 			excluded: 0,
+			excludedRecords: 0,
+			excludedPhysicalFiles: 0,
 			failed: 0,
 			included: 1,
+			includedDispositionReconciles: true,
 			inventoryOnly: 0,
-			reconciles: true
+			knownPhysicalLowerBoundReconciles: true,
+			physicalPopulationReconciles: true,
+			reconciles: true,
+			reconciliationScope: 'EXACT_PHYSICAL_POPULATION'
 		},
 		projects: [
 			{
@@ -231,7 +240,9 @@ function subject(programRecipe = recipe()): FrozenSubject {
 			scope: { kind: 'REPOSITORY' },
 			subjectKind: 'WORKTREE'
 		},
-		workspaces: []
+		testPopulations: [],
+		workspaces: [],
+		workingChangeSet: null
 	};
 }
 

@@ -24,3 +24,9 @@ export function hasFrozenSubjectArtifact(subject: FrozenSubject, path: string): 
 export function isFrozenSubjectCapability(value: unknown): value is FrozenSubject {
 	return value !== null && typeof value === 'object' && byteStores.has(value as FrozenSubject);
 }
+
+export function transferFrozenSubjectBytes(source: FrozenSubject, target: FrozenSubject): void {
+	const bytes = byteStores.get(source);
+	if (bytes === undefined) throw new Error('Source FrozenSubject byte capability is unavailable.');
+	attachFrozenSubjectBytes(target, bytes);
+}

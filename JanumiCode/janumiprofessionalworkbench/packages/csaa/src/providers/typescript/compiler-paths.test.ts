@@ -79,6 +79,9 @@ function generatedContext(
 		freshness: 'CURRENT',
 		freshnessBasis: 'fixture',
 		freshnessEvidence: [],
+		generator: null,
+		outputManifestDigest: DIGEST,
+		outputPaths: [path],
 		path,
 		selectedInput,
 		sha256

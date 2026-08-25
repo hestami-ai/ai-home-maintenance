@@ -19,8 +19,8 @@ function hasSegment(path: string, segment: string): boolean {
 
 function isTest(path: string): boolean {
 	return (
-		/(^|\/)(test|tests|__tests__|e2e)(\/|$)/u.test(path) ||
-		/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path)
+		/(^|\/)(test|tests|__tests__|e2e|e2e-live)(\/|$)/u.test(path) ||
+		/\.(?:test|spec|e2e)\.[cm]?[jt]sx?$/u.test(path)
 	);
 }
 
@@ -89,7 +89,7 @@ function classifyProjectConfiguration(path: string): ArtifactClassification | un
 
 function classifyToolConfiguration(path: string): ArtifactClassification | undefined {
 	if (
-		/(^|\/)(?:vite|vitest|svelte|eslint|prettier|turbo|sonar-project|dependency-cruiser)[^/]*\.(?:[cm]?[jt]s|json|ya?ml|properties)$/u.test(
+		/(^|\/)(?:(?:vite|playwright|svelte|eslint|prettier)(?:\.[^/]+)?\.config\.[cm]?[jt]s|vitest(?:\.[^/]+)?\.(?:config|projects)\.[cm]?[jt]s|turbo\.json|sonar-project\.properties)$/u.test(
 			path
 		) ||
 		/^\.(?:dependency-cruiser|prettier|eslint)[^/]*$/u.test(path)
@@ -104,6 +104,18 @@ function classifyToolConfiguration(path: string): ArtifactClassification | undef
 			roles: executableCompilerInput
 				? ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'CONFIGURATION']
 				: ['ANALYSIS_INPUT', 'CONFIGURATION']
+		};
+	}
+	return undefined;
+}
+
+function classifyGovernedVerificationArtifact(path: string): ArtifactClassification | undefined {
+	if (/^verif\/csaa\/[^/]+\.evidence\.json$/u.test(path)) {
+		return {
+			disposition: 'ANALYZED',
+			primaryClass: 'VERIFICATION',
+			reason: 'Governed verification evidence is an explicit assurance input.',
+			roles: ['ANALYSIS_INPUT', 'VERIFICATION']
 		};
 	}
 	return undefined;
@@ -142,7 +154,7 @@ function classifySvelteSource(path: string): ArtifactClassification | undefined 
 
 function classifyScriptSource(path: string): ArtifactClassification | undefined {
 	if (path.startsWith('scripts/') || hasSegment(path, 'scripts')) {
-		const generator = /(?:^|[-_.])(gen|generate|generator)(?:[-_.]|$)/u.test(path);
+		const generator = /(?:^|[-_.])(gen|generate|generated|generator)(?:[-_.]|$)/u.test(path);
 		return {
 			disposition: 'ANALYZED',
 			primaryClass: generator ? 'GENERATOR_SOURCE' : 'SCRIPT',
@@ -174,7 +186,9 @@ function classifyCompilerSource(
 			disposition: 'ANALYZED',
 			primaryClass: 'VERIFICATION',
 			reason: 'Verification code is an explicit assurance input.',
-			roles: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'VERIFICATION']
+			roles: isTest(path)
+				? ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'TEST', 'VERIFICATION']
+				: ['ANALYSIS_INPUT', 'COMPILER_CANDIDATE', 'VERIFICATION']
 		};
 	if (isTest(path))
 		return {
@@ -227,6 +241,8 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 	if (projectConfiguration !== undefined) return projectConfiguration;
 	const toolConfiguration = classifyToolConfiguration(path);
 	if (toolConfiguration !== undefined) return toolConfiguration;
+	const governedVerificationArtifact = classifyGovernedVerificationArtifact(path);
+	if (governedVerificationArtifact !== undefined) return governedVerificationArtifact;
 	const sourceJson = classifySourceJson(path);
 	if (sourceJson !== undefined) return sourceJson;
 	const svelteSource = classifySvelteSource(path);

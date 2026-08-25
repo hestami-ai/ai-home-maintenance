@@ -156,17 +156,28 @@ function syntheticSubject(): FrozenSubject {
 		generatedContexts: [],
 		population: {
 			analyzed: artifacts.filter((artifact) => artifact.disposition === 'ANALYZED').length,
+			capturedRecords: artifacts.length,
+			capturedRecordsReconcile: true,
 			discovered: artifacts.length,
+			discoveredPhysicalFiles: artifacts.length,
 			excluded: 0,
+			excludedRecords: 0,
+			excludedPhysicalFiles: 0,
 			failed: 0,
 			included: artifacts.length,
+			includedDispositionReconciles: true,
 			inventoryOnly: artifacts.filter((artifact) => artifact.disposition === 'INVENTORY_ONLY')
 				.length,
-			reconciles: true
+			knownPhysicalLowerBoundReconciles: true,
+			physicalPopulationReconciles: true,
+			reconciles: true,
+			reconciliationScope: 'EXACT_PHYSICAL_POPULATION'
 		},
 		projects: [],
 		request,
-		workspaces: []
+		testPopulations: [],
+		workspaces: [],
+		workingChangeSet: null
 	};
 	attachFrozenSubjectBytes(
 		subject,

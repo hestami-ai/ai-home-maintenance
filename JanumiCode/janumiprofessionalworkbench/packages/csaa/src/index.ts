@@ -41,11 +41,33 @@ export * from './contracts/structural-module-reachability-report.js';
 export * from './contracts/structural-scc-analysis.js';
 export * from './contracts/structural-scc-report.js';
 export * from './contracts/subject.js';
+export * from './contracts/working-change-set.js';
 export * from './inventory/canonical.js';
 export * from './inventory/collect-inventory.js';
 export * from './inventory/project-subject-for-inventory.js';
 export * from './inventory/render-inventory.js';
 export * from './inventory/run-inventory.js';
+export {
+	GENERATED_CONTEXT_EVIDENCE_OPERATION_VERSION,
+	runGeneratedContextEvidence,
+	type GeneratedContextEvidenceDifference,
+	type GeneratedContextEvidenceMode,
+	type RunGeneratedContextEvidenceOptions,
+	type RunGeneratedContextEvidenceResult
+} from './application/run-generated-context-evidence.js';
+export {
+	observeSvelteKitSyncGenerator,
+	RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH,
+	RPH_DEMO_GENERATED_CONTEXT_PATH,
+	RPH_DEMO_PROJECT_ROOT,
+	SVELTE_KIT_GENERATOR_ENTRY,
+	SVELTE_KIT_GENERATOR_MANIFEST,
+	SVELTE_KIT_LOCKFILE,
+	SVELTE_KIT_PACKAGE_NAME,
+	SVELTE_KIT_SYNC_GENERATOR_ID,
+	type SvelteKitSyncGeneratorObservation
+} from './subject/svelte-kit-generator.js';
+export * from './subject/resolve-working-subject.js';
 export {
 	buildStaticSemanticSnapshot,
 	STATIC_SEMANTIC_SNAPSHOT_PROGRESS_SCHEMA_VERSION,

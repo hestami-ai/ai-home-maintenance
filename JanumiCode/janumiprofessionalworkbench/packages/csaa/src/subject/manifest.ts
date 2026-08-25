@@ -7,9 +7,10 @@ import type {
 	ResolveSubjectRequest,
 	SubjectDescriptor,
 	SubjectDiagnostic,
+	TestPopulationRecord,
 	WorkspaceSubjectRecord
 } from '../contracts/subject.js';
-import { SUBJECT_ID_ALGORITHM_VERSION, SUBJECT_SCHEMA_VERSION } from '../contracts/subject.js';
+import { SUBJECT_SCHEMA_VERSION } from '../contracts/subject.js';
 import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
 import type { SubjectCapture } from './capture-model.js';
 import { attachFrozenSubjectBytes } from './frozen-store.js';
@@ -18,6 +19,8 @@ import {
 	subjectFilterPolicyId,
 	subjectOutputPolicyId
 } from './policy.js';
+import { discoverTestPopulations } from './test-populations.js';
+import { computeSubjectId } from './subject-identity.js';
 
 function deepFreeze<T>(value: T): T {
 	if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -40,6 +43,7 @@ export function subjectConfigurationPreimage(
 	artifacts: readonly CapturedArtifactRecord[],
 	generatedContexts: readonly GeneratedContextRecord[],
 	projects: readonly ProjectSubjectRecord[],
+	testPopulations: readonly TestPopulationRecord[],
 	workspaces: readonly WorkspaceSubjectRecord[]
 ) {
 	const configurationArtifacts = artifacts.filter((artifact) =>
@@ -59,14 +63,26 @@ export function subjectConfigurationPreimage(
 			sha256: artifact.sha256
 		})),
 		generatedContexts: generatedContexts.map(
-			({ consumerProject, path, selectedInput, sha256: digest }) => ({
+			({
 				consumerProject,
+				generator,
+				outputManifestDigest,
+				outputPaths,
+				path,
+				selectedInput,
+				sha256: digest
+			}) => ({
+				consumerProject,
+				generator,
+				outputManifestDigest,
+				outputPaths,
 				path,
 				selectedInput,
 				sha256: digest
 			})
 		),
 		projects: projects.map((project) => project.programRecipe),
+		testPopulations,
 		workspaces
 	};
 }
@@ -92,6 +108,11 @@ function artifactIsWithinExplicitScope(
 	scopedWorkspaces: readonly WorkspaceSubjectRecord[]
 ): boolean {
 	if (artifact.primaryClass === 'LOCKFILE') return true;
+	if (
+		artifact.roles.includes('TEST') &&
+		scopedWorkspaces.some((workspace) => artifact.path.startsWith(`${workspace.path}/`))
+	)
+		return true;
 	return (
 		artifact.primaryClass === 'TOOL_CONFIGURATION' &&
 		(!artifact.path.includes('/') ||
@@ -123,6 +144,12 @@ function applyExplicitScope(
 	const scopedWorkspaces = workspaces.filter((workspace) =>
 		workspaceIsWithinRequiredPaths(workspace, required)
 	);
+	const withinScopedWorkspace = (path: string) =>
+		scopedWorkspaces.some((workspace) => path.startsWith(`${workspace.path}/`));
+	const fullTestDiscovery = discoverTestPopulations(capture);
+	for (const population of fullTestDiscovery.populations)
+		for (const path of [...population.includedPaths, ...population.excludedPaths])
+			if (withinScopedWorkspace(path)) required.add(path);
 	required.add('package.json');
 	for (const workspace of scopedWorkspaces) required.add(workspace.manifestPath);
 	for (const artifact of capture.artifacts) {
@@ -164,6 +191,7 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 		inputs.workspaces
 	);
 	const capture = scoped.capture;
+	const testDiscovery = discoverTestPopulations(capture);
 	const artifacts = [...capture.artifacts].sort((left, right) => (left.path < right.path ? -1 : 1));
 	const excludedArtifacts = [...capture.excludedArtifacts].sort((left, right) =>
 		left.path < right.path ? -1 : 1
@@ -184,6 +212,7 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 				artifacts,
 				inputs.generatedContexts,
 				inputs.projects,
+				testDiscovery.populations,
 				scoped.workspaces
 			)
 		)
@@ -220,9 +249,7 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 		configurationDigest,
 		exclusionPolicyIds
 	};
-	const subjectId = sha256(
-		`JAN-CSAA-SUBJECT\0${SUBJECT_ID_ALGORITHM_VERSION}\0${canonicalJson(identityPreimage)}`
-	);
+	const subjectId = computeSubjectId(identityPreimage);
 	const classCounts = new Map<
 		CapturedArtifactRecord['primaryClass'],
 		{ physicalFileCount: number | 'UNKNOWN'; recordCount: number }
@@ -268,27 +295,58 @@ export function buildFrozenSubject(inputs: ManifestInputs): FrozenSubject {
 			count + (typeof artifact.physicalFileCount === 'number' ? artifact.physicalFileCount : 0),
 		0
 	);
+	const excludedPhysicalFiles = excludedArtifacts.some(
+		(artifact) => artifact.physicalFileCount === 'UNKNOWN'
+	)
+		? ('UNKNOWN' as const)
+		: excluded;
 	const discovered = capture.discoveredArtifactCount;
+	const includedPartitionReconciles = included === analyzed + inventoryOnly;
+	const knownPhysicalLowerBoundReconciles = discovered === included + excluded;
+	if (!knownPhysicalLowerBoundReconciles)
+		throw new Error('Subject known physical population lower bound does not reconcile.');
+	if (excludedPhysicalFiles !== 'UNKNOWN' && discovered !== included + excludedPhysicalFiles)
+		throw new Error('Subject physical population does not reconcile.');
+	const physicalPopulationReconciles =
+		excludedPhysicalFiles === 'UNKNOWN' ? ('UNKNOWN' as const) : (true as const);
+	const discoveredPhysicalFiles =
+		excludedPhysicalFiles === 'UNKNOWN' ? ('UNKNOWN' as const) : discovered;
+	const excludedRecords = excludedArtifacts.length;
+	const capturedRecords = artifacts.length + excludedRecords;
 	const population = {
 		analyzed,
+		capturedRecords,
+		capturedRecordsReconcile: true as const,
 		discovered,
+		discoveredPhysicalFiles,
 		excluded,
+		excludedRecords,
+		excludedPhysicalFiles,
 		failed: 0,
 		included,
+		includedDispositionReconciles: true as const,
 		inventoryOnly,
-		reconciles: discovered === included + excluded && included === analyzed + inventoryOnly
+		knownPhysicalLowerBoundReconciles: true as const,
+		physicalPopulationReconciles,
+		reconciles: includedPartitionReconciles && knownPhysicalLowerBoundReconciles,
+		reconciliationScope:
+			excludedPhysicalFiles === 'UNKNOWN'
+				? ('CAPTURED_RECORDS_ONLY' as const)
+				: ('EXACT_PHYSICAL_POPULATION' as const)
 	};
 	if (!population.reconciles) throw new Error('Subject population does not reconcile.');
 	const subject: FrozenSubject = {
 		artifacts,
 		descriptor,
-		diagnostics: [...inputs.diagnostics],
+		diagnostics: [...inputs.diagnostics, ...testDiscovery.diagnostics],
 		excludedArtifacts,
 		generatedContexts: [...inputs.generatedContexts],
 		population,
 		projects: [...inputs.projects],
 		request: { ...inputs.request, rootLocator: '<runtime>' },
-		workspaces: [...scoped.workspaces]
+		testPopulations: [...testDiscovery.populations],
+		workspaces: [...scoped.workspaces],
+		workingChangeSet: null
 	};
 	deepFreeze(subject);
 	attachFrozenSubjectBytes(subject, capture.bytesByPath);

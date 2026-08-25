@@ -28,7 +28,9 @@ describe('CSAA product dependency boundary', () => {
 		expect(rootManifest.scripts.boundary).toMatch(
 			/^depcruise packages --config .* && bun run scripts\/csaa-product-boundary\.ts$/
 		);
-		expect(rootManifest.scripts['gate:fast']).toMatch(/^bun run csaa:inventory:check && /);
+		expect(rootManifest.scripts['gate:fast']).toMatch(
+			/^bun run csaa:generated-context:check && bun run csaa:inventory:check && /
+		);
 	});
 
 	it('rejects representative package and app imports of CSAA', () => {

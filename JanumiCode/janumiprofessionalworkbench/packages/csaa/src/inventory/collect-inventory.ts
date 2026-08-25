@@ -392,9 +392,18 @@ import {
 	type WorkspaceInventory
 } from '../contracts/inventory.js';
 import type { FrozenSubject } from '../contracts/subject.js';
+import {
+	WORKING_CHANGE_SET_METHOD,
+	WORKING_CHANGE_SET_SCHEMA_VERSION
+} from '../contracts/working-change-set.js';
 import { readFrozenSubjectArtifact } from '../subject/frozen-store.js';
 import { subjectConfigurationPreimage } from '../subject/manifest.js';
-import { compareText, sortUniqueBy } from './canonical.js';
+import {
+	RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH,
+	RPH_DEMO_GENERATED_CONTEXT_PATH,
+	SVELTE_KIT_SYNC_GENERATOR_ID
+} from '../subject/svelte-kit-generator.js';
+import { canonicalJson, compareText, sortUniqueBy } from './canonical.js';
 import { projectSubjectForInventory } from './project-subject-for-inventory.js';
 
 type JsonObject = Record<string, unknown>;
@@ -406,6 +415,14 @@ const TYPESCRIPT_AST_PROVENANCE = [
 	'packages/csaa/src/providers/typescript/frozen-compiler-host.ts',
 	'packages/csaa/src/semantic/build-static-semantic-snapshot.ts',
 	'packages/csaa/src/semantic/monotonic-operation-clock.ts'
+] as const;
+const WORKING_CHANGE_SET_PROVENANCE = [
+	'packages/csaa/src/contracts/working-change-set.ts',
+	'packages/csaa/src/subject/bind-working-change-set.ts',
+	'packages/csaa/src/subject/git-readonly.ts',
+	'packages/csaa/src/subject/observe-working-change-set.ts',
+	'packages/csaa/src/subject/resolve-working-subject.test.ts',
+	'packages/csaa/src/subject/resolve-working-subject.ts'
 ] as const;
 
 const TYPESCRIPT_SYMBOL_PROVENANCE = [
@@ -1380,14 +1397,27 @@ function assuranceSurfaces(
 	files: readonly SelectedFileRecord[],
 	rootCommands: readonly CommandInventory[]
 ): AssuranceSurfaceInventory {
-	const unitTests = files
-		.filter((file) => /\.test\.[cm]?[jt]sx?$/.test(file.path))
-		.map((file) => file.path);
-	const e2e = files
-		.filter((file) => /(?:\/e2e(?:-live)?\/|\.e2e\.)/.test(file.path))
-		.map((file) => file.path);
-	const deterministicFiles = e2e.filter((path) => !/(?:\/e2e-live\/|\/live\/|\.live\.)/.test(path));
-	const liveFiles = e2e.filter((path) => /(?:\/e2e-live\/|\/live\/|\.live\.)/.test(path));
+	const sourcePopulation = subject.testPopulations.find(
+		(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+	);
+	const distPopulation = subject.testPopulations.find(
+		(population) => population.provider === 'VITEST' && population.profile === 'DIST'
+	);
+	if (
+		sourcePopulation !== undefined &&
+		distPopulation !== undefined &&
+		canonicalJson(sourcePopulation.includedPaths) !== canonicalJson(distPopulation.includedPaths)
+	)
+		throw new Error('Vitest SOURCE and DIST configured test populations differ.');
+	const deterministicPopulation = subject.testPopulations.find(
+		(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+	);
+	const livePopulation = subject.testPopulations.find(
+		(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'LIVE'
+	);
+	const unitTests = sourcePopulation?.includedPaths ?? [];
+	const deterministicFiles = deterministicPopulation?.includedPaths ?? [];
+	const liveFiles = livePopulation?.includedPaths ?? [];
 	const vitestConfig = files.find((file) => file.path === 'vitest.config.ts');
 	const projectsConfig = files.find((file) => file.path === 'vitest.projects.ts');
 	const coverageObject = vitestConfig
@@ -1416,7 +1446,10 @@ function assuranceSurfaces(
 		e2e: {
 			deterministicFiles,
 			liveFiles,
-			state: e2e.length > 0 ? 'NOT_RUN' : 'NOT_CONFIGURED'
+			state:
+				deterministicPopulation !== undefined || livePopulation !== undefined
+					? 'NOT_RUN'
+					: 'NOT_CONFIGURED'
 		},
 		mutation: {
 			commands: mutationCommands,
@@ -1428,6 +1461,7 @@ function assuranceSurfaces(
 				: null,
 			state: mutationCommands.length > 0 ? 'NOT_RUN' : 'NOT_CONFIGURED'
 		},
+		testPopulations: subject.testPopulations,
 		unitTests: {
 			files: unitTests,
 			passWithNoTestsValues: projectsConfig
@@ -1779,7 +1813,11 @@ function verificationAssets(
 	configuredCommands: readonly CommandInventory[]
 ): VerificationAssetInventory[] {
 	const assetPaths = files
-		.filter((file) => /^(?:verif|scripts)\/.*\.ts$/.test(file.path))
+		.filter(
+			(file) =>
+				/^(?:verif|scripts)\/.*\.ts$/u.test(file.path) ||
+				(file.path.startsWith('verif/') && file.subjectArtifactClass === 'VERIFICATION')
+		)
 		.map((file) => file.path);
 	const baselines = files.filter((file) => /^verif\/[^/]+\.baseline\.json$/.test(file.path));
 	const testSources = new Map(
@@ -1797,7 +1835,7 @@ function verificationAssets(
 		const text = frozenText(subject, path);
 		const stem = basename(path).replace(/\.test\.ts$|\.data\.ts$|\.ts$/, '');
 		const isTest = path.endsWith('.test.ts');
-		const isData = path.endsWith('.data.ts');
+		const isData = path.endsWith('.data.ts') || path.endsWith('.evidence.json');
 		const role = verificationAssetRole(path, projectsText, isTest, isData, configuredCommands);
 		const associatedBaselines = baselines
 			.filter(
@@ -1846,6 +1884,13 @@ function capabilities(): CapabilityInventory[] {
 			provider: INVENTORY_GENERATOR_ID,
 			provenance: ['packages/csaa/src/inventory/collect-inventory.ts'],
 			state: 'IMPLEMENTED'
+		},
+		{
+			explanation: `The implementation-local ${WORKING_CHANGE_SET_SCHEMA_VERSION} capability resolves a raw-worktree-byte-comparable non-bare Git worktree through ${WORKING_CHANGE_SET_METHOD}: an initial bounded read-only Git observation, ordinary immutable FrozenSubject capture, exact base-to-frozen-byte change binding, final Git reobservation, final selected-byte and mode reconciliation, and one whole-sequence retry. It binds the exact full base commit, object format, linked-checkout identity, repository prefix, full provider identity, raw-byte comparison policy, tracked add/modify/delete/mode/artifact-kind changes, exact globally unambiguous rename/copy lineage, selected untracked inputs, excluded output/policy/outside/index state, population counts, and separate change, exclusion, and worktree-state digests. A clean worktree binds revision=HEAD; selected raw-byte changes bind parentRevision=HEAD; index-only changes remain explicitly excluded local state and do not alter frozen subject identity. It fails closed for sparse or unmerged state, skip-worktree, assume-unchanged, gitlinks, selected symlinks/special files, unsupported object or path identities, automatic checkout or selected-path working-tree transformations, races, and aggregate Git byte/deadline exhaustion. Raw after-byte SHA-256 remains distinct from Git blob identity. Plain non-Git resolveSubject and inventory generation retain filesystem-only UNKNOWN revision metadata; unified coding-agent operations must opt into resolveWorkingSubject. This local schema is not a registered JAN-CSAA-007 WorkingChangeSetRecord, does not support similarity lineage, filtered/smudged worktrees, recursive submodules, bare/unborn repositories, revision materialization, persistence, cross-revision comparison, findings, gates, or authority, and therefore remains PARTIAL.`,
+			id: 'working-change-set',
+			provider: 'git',
+			provenance: WORKING_CHANGE_SET_PROVENANCE,
+			state: 'PARTIAL'
 		},
 		{
 			explanation: `The first two bounded DWP-004 increments project every compiler-observed module occurrence into a validated TypeScript module-dependency graph and normalize exact-schema-validated dependency-cruiser 16.10.4 JSON evidence for conservative, context-bound comparison. Provider aggregates never replace compiler occurrence edges; qualified target agreement, unresolved agreement, collapsed corroboration, incomparable scope/context differences, and unqualified observed differences remain distinct. This contract cannot promote a difference to conflict without later validated context-equivalence and closed-perimeter evidence. An implementation-local preliminary coding-agent report facade under ${MODULE_DEPENDENCY_REPORT_OPERATION_VERSION} admits one explicit bounded project set, reuses the exact validated CAP-010 evidence pipeline, preflights the complete selected graph's exact node, edge, and limitation populations before graph construction, independently validates the constructed graph, verifies final selected-captured-subject currentness, and emits one maxResultBytes-bounded admitted partial ${MODULE_DEPENDENCY_REPORT_SCHEMA_VERSION} report with the full occurrence-edge population, both indexes, layer manifests, full project/source identity evidence, and ${MODULE_DEPENDENCY_REPORT_RESULT_SCHEMA_VERSION} result; successful graph evidence is never truncated and small refusal envelopes remain emit-able. Its request schema is ${MODULE_DEPENDENCY_REPORT_REQUEST_SCHEMA_VERSION}, its exact supported selection is ${JSON.stringify(MODULE_DEPENDENCY_REPORT_SELECTION)}, its analysis authority is ${MODULE_DEPENDENCY_REPORT_AUTHORITY}, authority transfer is ${MODULE_DEPENDENCY_REPORT_AUTHORITY_TRANSFER}, and gate effect is ${MODULE_DEPENDENCY_REPORT_GATE_EFFECT}. Even an embedded COMPLETE/CLOSED graph is closed only within the selected compiler module-resolution projection; the facade and CAP-004 status remain PARTIAL. Final CURRENT_FOR_CAPTURED_SUBJECT is scoped to SELECTED_CAPTURED_SUBJECT_ONLY and neither establishes persistent or cross-revision currentness nor turns a zero edge or incoming-edge population into unused, dead, orphan, irrelevant, non-impacting, or safe-removal proof. The facade is not a registered JAN-CSAA-007 OperationResponse, does not complete DWP-004, DWP-005, or DWP-006, and publishes ${MODULE_DEPENDENCY_REPORT_NONCLAIMS.join(', ')}. Its bounded best-effort JSONL progress transport is excluded from report identity and evidence. The machine-facing coding-agent invocation bun run --silent csaa:analyze:module-dependency is CONFIGURED_NOT_RUN by inventory generation. The package root exports the report contract, runner, progress-event schema, and transport schema/limits/types; the parsed-request command adapter, JSONL progress writer, population preflight, failure classifier, and internal project-context admission/capture seams remain trust-bound implementation details and are not package-root exports. Manifest dependencies, resolved component instances, inferred or observed runtime dependencies, dependency-cruiser or external corroborating-provider execution beyond the internal TypeScript capture, architecture discovery or violation, graph algorithms, query, slicing, impact, flow, and cross-Program composition are not implemented by this facade.`,
@@ -2361,7 +2406,100 @@ function assertRequiredSelectedPaths(
 	}
 }
 
+function assertJpwbTestPopulations(subject: FrozenSubject): void {
+	const expectedProfiles = [
+		['PLAYWRIGHT', 'DETERMINISTIC'],
+		['PLAYWRIGHT', 'LIVE'],
+		['VITEST', 'DIST'],
+		['VITEST', 'SOURCE']
+	] as const;
+	if (subject.testPopulations.length !== expectedProfiles.length)
+		throw new Error('Required JPWB configured test-population profile set is incompatible.');
+	for (const [provider, profile] of expectedProfiles) {
+		const matches = subject.testPopulations.filter(
+			(population) => population.provider === provider && population.profile === profile
+		);
+		if (
+			matches.length !== 1 ||
+			matches[0]!.status !== 'COMPLETE' ||
+			!matches[0]!.reconciles ||
+			matches[0]!.included === 0
+		)
+			throw new Error(`Required JPWB ${provider} ${profile} test population is not closed.`);
+	}
+	const population = (provider: 'PLAYWRIGHT' | 'VITEST', profile: string) =>
+		subject.testPopulations.find(
+			(candidate) => candidate.provider === provider && candidate.profile === profile
+		)!.includedPaths;
+	const source = population('VITEST', 'SOURCE');
+	const dist = population('VITEST', 'DIST');
+	if (canonicalJson(source) !== canonicalJson(dist))
+		throw new Error('Required JPWB Vitest SOURCE and DIST populations differ.');
+	const artifactPaths = subject.artifacts.map((artifact) => artifact.path);
+	const expectedUnit = artifactPaths.filter((path) =>
+		/^(?:verif\/.*|packages\/[^/]+\/src\/.*|apps\/[^/]+\/src\/.*)\.test\.ts$/u.test(path)
+	);
+	const expectedDeterministic = artifactPaths.filter((path) =>
+		/^apps\/rph-demo\/e2e\/.*\.e2e\.ts$/u.test(path)
+	);
+	const expectedLive = artifactPaths.filter((path) =>
+		/^apps\/rph-demo\/e2e-live\/.*\.live\.ts$/u.test(path)
+	);
+	for (const [actual, expected, name] of [
+		[source, expectedUnit, 'Vitest'],
+		[population('PLAYWRIGHT', 'DETERMINISTIC'), expectedDeterministic, 'Playwright deterministic'],
+		[population('PLAYWRIGHT', 'LIVE'), expectedLive, 'Playwright live']
+	] as const)
+		if (canonicalJson(actual) !== canonicalJson(expected))
+			throw new Error(`Required JPWB ${name} test population differs from its independent census.`);
+}
+
+function assertJpwbGeneratedContext(
+	subject: FrozenSubject,
+	configuredCommands: readonly CommandInventory[]
+): void {
+	const contexts = subject.generatedContexts.filter(
+		(context) => context.path === RPH_DEMO_GENERATED_CONTEXT_PATH
+	);
+	if (
+		contexts.length !== 2 ||
+		contexts.some(
+			(context) =>
+				context.freshness !== 'CURRENT' ||
+				context.generator?.id !== SVELTE_KIT_SYNC_GENERATOR_ID ||
+				context.outputPaths.length < 2 ||
+				!context.outputPaths.includes(RPH_DEMO_GENERATED_CONTEXT_PATH)
+		)
+	)
+		throw new Error('Required JPWB SvelteKit generated context is not current and closed.');
+	if (
+		!subject.artifacts.some(
+			(artifact) => artifact.path === RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH
+		)
+	)
+		throw new Error('Required JPWB SvelteKit generated-context evidence is absent.');
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:generated-context',
+		'bun run scripts/csaa-generated-context.ts --write'
+	);
+	assertJpwbAssuranceCommandExact(
+		configuredCommands,
+		'csaa:generated-context:check',
+		'bun run scripts/csaa-generated-context.ts --check'
+	);
+	const gateFast = configuredCommands.find(
+		(command) => command.owner === '.' && command.name === 'gate:fast'
+	)?.command;
+	if (
+		gateFast === undefined ||
+		!gateFast.startsWith('bun run csaa:generated-context:check && bun run csaa:inventory:check && ')
+	)
+		throw new Error('Required JPWB generated-context and inventory gate order is incompatible.');
+}
+
 function assertJpwbNonVacuity(
+	subject: FrozenSubject,
 	rootManifest: JsonObject,
 	workspaces: readonly WorkspaceInventory[],
 	files: readonly SelectedFileRecord[],
@@ -2496,6 +2634,11 @@ function assertJpwbNonVacuity(
 		JPWB_STRUCTURAL_MODULE_REACHABILITY_REPORT_COMMAND
 	);
 	const selectedPaths = new Set(files.map((file) => file.path));
+	assertRequiredSelectedPaths(
+		selectedPaths,
+		WORKING_CHANGE_SET_PROVENANCE,
+		'Required JPWB Git-bound Working Change Set implementation or verification source'
+	);
 	assertRequiredSelectedPaths(
 		selectedPaths,
 		TYPESCRIPT_SEMANTIC_PROVENANCE,
@@ -2685,6 +2828,8 @@ function assertJpwbNonVacuity(
 		TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE,
 		'Required JPWB source origin correlation implementation or verification source'
 	);
+	assertJpwbTestPopulations(subject);
+	assertJpwbGeneratedContext(subject, configuredCommands);
 }
 
 export function collectInventory(options: CollectInventoryOptions): InventoryDocument {
@@ -2701,7 +2846,14 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 	const configuredCommands = commands(rootManifest, workspaces);
 	const assets = verificationAssets(resolvedSubject, selectedFiles, configuredCommands);
 	if (options.requireJpwbPopulations) {
-		assertJpwbNonVacuity(rootManifest, workspaces, selectedFiles, assets, configuredCommands);
+		assertJpwbNonVacuity(
+			resolvedSubject,
+			rootManifest,
+			workspaces,
+			selectedFiles,
+			assets,
+			configuredCommands
+		);
 	}
 	const inventory: InventoryDocument = {
 		artifactPopulations: artifactPopulations(selectedFiles, resolvedSubject),
@@ -2718,6 +2870,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 				resolvedSubject.artifacts,
 				resolvedSubject.generatedContexts,
 				resolvedSubject.projects,
+				resolvedSubject.testPopulations,
 				resolvedSubject.workspaces
 			),
 			dirtyState: 'UNKNOWN',

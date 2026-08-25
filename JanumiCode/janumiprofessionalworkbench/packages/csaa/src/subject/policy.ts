@@ -1,6 +1,7 @@
 import type { ArtifactPrimaryClass, ResolveSubjectRequest } from '../contracts/subject.js';
 import ts from 'typescript';
 import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
+import { isUnicodeScalarString } from '../semantic/canonical.js';
 import {
 	assertCanonicalRelativePath,
 	assertNoCanonicalPathCollisions,
@@ -164,14 +165,23 @@ function validateGeneratedContextEvidence(
 	for (const evidence of records) {
 		assertCanonicalRelativePath(evidence.path);
 		assertCanonicalRelativePath(evidence.source);
-		if (
-			[evidence.generatorInputDigest, evidence.recordedInputDigest, evidence.source].some(
-				(value) => value.trim() === ''
-			)
-		)
+		if (evidence.source.trim() === '' || evidence.path === evidence.source)
 			throw new Error(`Generated-context evidence is incomplete: ${evidence.path}`);
+		for (const identity of [evidence.generator.id, evidence.generator.version])
+			if (
+				typeof identity !== 'string' ||
+				identity.length === 0 ||
+				identity.length > 1_024 ||
+				!isUnicodeScalarString(identity)
+			)
+				throw new Error(`Generated-context generator identity is invalid: ${evidence.path}`);
+		if (!/^[0-9a-f]{64}$/u.test(evidence.generator.implementationDigest))
+			throw new Error(
+				`Generated-context generator implementation digest is invalid: ${evidence.path}`
+			);
 	}
 	assertNoCanonicalPathCollisions(records.map((evidence) => evidence.path));
+	assertNoCanonicalPathCollisions(records.map((evidence) => evidence.source));
 }
 
 function validateExplicitProjectScope(scope: ResolveSubjectRequest['scope']): void {
@@ -200,6 +210,15 @@ export function validateRequestPaths(request: ResolveSubjectRequest): void {
 	validateFilterPatterns(request.filters);
 	validateDeclaredOutputs(request.outputs);
 	validateGeneratedContextEvidence(request.generatedContextEvidence);
+	for (const evidence of request.generatedContextEvidence ?? [])
+		if (
+			request.outputs.some(
+				(output) => canonicalPathKey(output) === canonicalPathKey(evidence.source)
+			)
+		)
+			throw new Error(
+				`Generated-context evidence source cannot be a declared output: ${evidence.source}`
+			);
 	validateExplicitProjectScope(request.scope);
 	if (request.operationVersion.trim() === '')
 		throw new Error('Operation version must be nonempty.');

@@ -14,18 +14,24 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	GENERATED_CONTEXT_EXECUTION_MANIFEST_SCHEMA_VERSION,
+	GENERATED_CONTEXT_SVELTE_KIT_SYNC_GENERATOR_ID,
 	SUBJECT_POLICY_VERSION,
 	SUBJECT_REQUEST_SCHEMA_VERSION,
+	type GeneratedContextExecutionManifest,
 	type ResolveSubjectRequest
 } from '../contracts/subject.js';
 import { collectInventory } from '../inventory/collect-inventory.js';
-import { canonicalJson, sha256 } from '../inventory/canonical.js';
+import { canonicalJson, compareText, sha256 } from '../inventory/canonical.js';
 import { projectSubjectForInventory } from '../inventory/project-subject-for-inventory.js';
 import { renderInventoryMarkdown } from '../inventory/render-inventory.js';
 import { classifyArtifact } from './artifacts.js';
 import { captureSubject } from './capture.js';
 import type { SubjectCapture } from './capture-model.js';
-import { assessGeneratedContextFreshness } from './generated-context.js';
+import {
+	assessGeneratedContextFreshness,
+	createGeneratedContextEvidenceRecord
+} from './generated-context.js';
 import { readFrozenSubjectArtifact } from './frozen-store.js';
 import {
 	assertCanonicalRelativePath,
@@ -49,6 +55,12 @@ import {
 } from './projects.js';
 import { resolveSubject } from './resolve-subject.js';
 import { verifyFrozenSubject } from './freshness.js';
+import { generatedContextExecutionManifestDigest } from './svelte-kit-execution-closure.js';
+import {
+	discoverTestPopulations,
+	JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST,
+	vitestProjectDiscoverySyntaxDigest
+} from './test-populations.js';
 import { discoverWorkspaces, WorkspaceDiscoveryFailure } from './workspaces.js';
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -85,6 +97,43 @@ function fixture(): string {
 	);
 	json(root, 'tsconfig.json', { files: [], include: [] });
 	write(root, 'bun.lock', 'fixture lock\n');
+	return root;
+}
+
+function copyRepositoryFile(root: string, path: string): void {
+	write(root, path, readFileSync(join(REPOSITORY_ROOT, ...path.split('/')), 'utf8'));
+}
+
+function testPopulationFixture(): string {
+	const root = fixture();
+	const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as Record<
+		string,
+		unknown
+	>;
+	manifest.workspaces = ['packages/*', 'apps/*'];
+	json(root, 'package.json', manifest);
+	json(root, 'apps/demo/package.json', { name: '@fixture/app', private: true });
+	json(root, 'apps/demo/tsconfig.json', { include: ['src'] });
+	write(root, 'packages/demo/src/value.test.ts', 'export const packageTest = true;\n');
+	write(root, 'apps/demo/src/view.test.ts', 'export const appTest = true;\n');
+	write(root, 'verif/proof.test.ts', 'export const verificationTest = true;\n');
+	write(root, 'docs/other.test.ts', 'export const unconfiguredTest = true;\n');
+	copyRepositoryFile(root, 'vitest.config.ts');
+	copyRepositoryFile(root, 'vitest.dist.config.ts');
+	copyRepositoryFile(root, 'vitest.projects.ts');
+	write(
+		root,
+		'apps/demo/playwright.config.ts',
+		"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.journey.ts' });\n"
+	);
+	write(
+		root,
+		'apps/demo/playwright.live.config.ts',
+		"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './e2e-live', testMatch: '**/*.live.ts' });\n"
+	);
+	write(root, 'apps/demo/scenarios/first.journey.ts', 'export const journey = true;\n');
+	write(root, 'apps/demo/scenarios/support.ts', 'export const support = true;\n');
+	write(root, 'apps/demo/e2e-live/network.live.ts', 'export const live = true;\n');
 	return root;
 }
 
@@ -229,6 +278,18 @@ describe('repository path and artifact policy', () => {
 			primaryClass: 'TEST_SOURCE',
 			roles: expect.arrayContaining(['TEST'])
 		});
+		expect(classifyArtifact('apps/demo/e2e-live/journey.live.ts')).toMatchObject({
+			primaryClass: 'TEST_SOURCE',
+			roles: expect.arrayContaining(['TEST'])
+		});
+		expect(classifyArtifact('packages/demo/src/connection.live.ts')).toMatchObject({
+			primaryClass: 'PRODUCTION_SOURCE',
+			roles: expect.not.arrayContaining(['TEST'])
+		});
+		expect(classifyArtifact('verif/proof.test.ts')).toMatchObject({
+			primaryClass: 'VERIFICATION',
+			roles: expect.arrayContaining(['TEST', 'VERIFICATION'])
+		});
 		expect(classifyArtifact('packages/demo/src/gen/gen-schema.ts')).toMatchObject({
 			primaryClass: 'GENERATOR_SOURCE',
 			roles: expect.arrayContaining(['GENERATOR'])
@@ -246,6 +307,25 @@ describe('repository path and artifact policy', () => {
 		expect(classifyArtifact('vitest.config.ts')).toMatchObject({
 			primaryClass: 'TOOL_CONFIGURATION',
 			roles: expect.arrayContaining(['COMPILER_CANDIDATE', 'CONFIGURATION'])
+		});
+		expect(classifyArtifact('apps/demo/playwright.config.ts')).toMatchObject({
+			primaryClass: 'TOOL_CONFIGURATION',
+			roles: expect.arrayContaining(['COMPILER_CANDIDATE', 'CONFIGURATION'])
+		});
+		expect(classifyArtifact('packages/csaa/src/subject/svelte-kit-generator.ts')).toMatchObject({
+			primaryClass: 'PRODUCTION_SOURCE',
+			roles: expect.arrayContaining(['COMPILER_CANDIDATE', 'PRODUCTION'])
+		});
+		expect(
+			classifyArtifact('verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json')
+		).toMatchObject({
+			disposition: 'ANALYZED',
+			primaryClass: 'VERIFICATION',
+			roles: expect.arrayContaining(['ANALYSIS_INPUT', 'VERIFICATION'])
+		});
+		expect(classifyArtifact('scripts/csaa-generated-context.ts')).toMatchObject({
+			primaryClass: 'GENERATOR_SOURCE',
+			roles: expect.arrayContaining(['GENERATOR', 'SCRIPT'])
 		});
 		expect(
 			classifyArtifact(
@@ -345,6 +425,258 @@ describe('repository path and artifact policy', () => {
 				})
 			],
 			outcome: 'unavailable'
+		});
+	});
+});
+
+describe('configured test population discovery', () => {
+	function discovered(root: string) {
+		return discoverTestPopulations(captureSubject(request(root)));
+	}
+
+	it('derives exact source, artifact, deterministic, and live selections from captured configuration', () => {
+		const result = discovered(testPopulationFixture());
+		const source = result.populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		const dist = result.populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'DIST'
+		)!;
+		expect(source).toMatchObject({
+			populationClosure: 'CLOSED_FOR_CAPTURED_TEST_ARTIFACTS',
+			reconciles: true,
+			status: 'COMPLETE'
+		});
+		expect(source.includedPaths).toEqual([
+			'apps/demo/src/view.test.ts',
+			'packages/demo/src/value.test.ts',
+			'verif/proof.test.ts'
+		]);
+		expect(dist.includedPaths).toEqual(source.includedPaths);
+		expect(source.excludedPaths).toContain('apps/demo/e2e-live/network.live.ts');
+
+		const deterministic = result.populations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+		)!;
+		const live = result.populations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'LIVE'
+		)!;
+		expect(deterministic).toMatchObject({
+			includedPaths: ['apps/demo/scenarios/first.journey.ts'],
+			status: 'COMPLETE'
+		});
+		expect(live).toMatchObject({
+			includedPaths: ['apps/demo/e2e-live/network.live.ts'],
+			status: 'COMPLETE'
+		});
+	});
+
+	it('binds discovered populations and partial diagnostics into repository and explicit-project subjects', () => {
+		const root = testPopulationFixture();
+		const repository = resolved(root);
+		expect(repository.subject.testPopulations).toHaveLength(4);
+		expect(
+			repository.subject.testPopulations.every((population) => population.status === 'COMPLETE')
+		).toBe(true);
+		const scoped = resolved(root, {
+			scope: { kind: 'EXPLICIT_PROJECTS', projects: ['apps/demo/tsconfig.json'] }
+		});
+		expect(
+			scoped.subject.testPopulations.find(
+				(population) =>
+					population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+			)
+		).toMatchObject({
+			includedPaths: ['apps/demo/scenarios/first.journey.ts'],
+			status: 'COMPLETE'
+		});
+		expect(
+			scoped.subject.testPopulations.find(
+				(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'LIVE'
+			)
+		).toMatchObject({
+			includedPaths: ['apps/demo/e2e-live/network.live.ts'],
+			status: 'COMPLETE'
+		});
+
+		write(
+			root,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.{journey,spec}.ts' });\n"
+		);
+		const partial = resolved(root);
+		expect(partial.completeness).toBe('PARTIAL');
+		expect(partial.diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'TEST_POPULATION_PARTIAL' })])
+		);
+	});
+
+	it('pins the JPWB dynamic Vitest discovery implementation by semantic tokens', () => {
+		const source = readFileSync(join(REPOSITORY_ROOT, 'vitest.projects.ts'), 'utf8');
+		expect(vitestProjectDiscoverySyntaxDigest(source)).toBe(
+			JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST
+		);
+		expect(vitestProjectDiscoverySyntaxDigest(`// harmless comment\n${source}`)).toBe(
+			JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST
+		);
+		expect(
+			vitestProjectDiscoverySyntaxDigest(source.replace('return n;', 'return n + 1;'))
+		).not.toBe(JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST);
+	});
+
+	it('fails open for decoy factory calls and changed dynamic workspace discovery', () => {
+		const decoyRoot = testPopulationFixture();
+		const config = readFileSync(join(decoyRoot, 'vitest.config.ts'), 'utf8');
+		write(
+			decoyRoot,
+			'vitest.config.ts',
+			`${config.replace('projects: projectsFor(true)', 'projects: projectsFor(false)')}\nconst decoy = { projects: projectsFor(true) };\n`
+		);
+		const decoy = discovered(decoyRoot).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		expect(decoy).toMatchObject({
+			limitations: expect.arrayContaining(['VITEST_PROJECT_FACTORY_NOT_BOUND_WITH_EXTENDS_TRUE']),
+			populationClosure: 'OPEN',
+			status: 'PARTIAL'
+		});
+
+		const changedFactoryRoot = testPopulationFixture();
+		const projects = readFileSync(join(changedFactoryRoot, 'vitest.projects.ts'), 'utf8');
+		write(
+			changedFactoryRoot,
+			'vitest.projects.ts',
+			projects.replace(
+				"const pkgDir = join(ROOT, 'packages');",
+				"return [];\n\tconst pkgDir = join(ROOT, 'packages');"
+			)
+		);
+		const changedFactory = discovered(changedFactoryRoot).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		expect(changedFactory).toMatchObject({
+			limitations: expect.arrayContaining(['VITEST_PROJECT_DISCOVERY_IMPLEMENTATION_UNRECOGNIZED']),
+			populationClosure: 'OPEN',
+			status: 'PARTIAL'
+		});
+
+		const fakeDefineConfigRoot = testPopulationFixture();
+		const fakeConfig = readFileSync(join(fakeDefineConfigRoot, 'vitest.config.ts'), 'utf8');
+		write(
+			fakeDefineConfigRoot,
+			'vitest.config.ts',
+			fakeConfig.replace("from 'vitest/config'", "from 'fixture-vitest/config'")
+		);
+		const fakeDefineConfig = discovered(fakeDefineConfigRoot).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		expect(fakeDefineConfig).toMatchObject({
+			limitations: expect.arrayContaining(['VITEST_DEFINE_CONFIG_EXPORT_NOT_STATIC_AND_UNIQUE']),
+			populationClosure: 'OPEN',
+			status: 'PARTIAL'
+		});
+
+		const typeOnlyProjectsRoot = testPopulationFixture();
+		const typeOnlyConfig = readFileSync(join(typeOnlyProjectsRoot, 'vitest.config.ts'), 'utf8');
+		write(
+			typeOnlyProjectsRoot,
+			'vitest.config.ts',
+			typeOnlyConfig.replace(
+				"import { projectsFor } from './vitest.projects.js';",
+				"import type { projectsFor } from './vitest.projects.js';"
+			)
+		);
+		const typeOnlyProjects = discovered(typeOnlyProjectsRoot).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		expect(typeOnlyProjects).toMatchObject({
+			limitations: expect.arrayContaining([
+				'VITEST_PROJECT_CONFIGURATION_IMPORT_NOT_RESOLVED',
+				'VITEST_PROJECT_FACTORY_NOT_BOUND_WITH_EXTENDS_TRUE'
+			]),
+			populationClosure: 'OPEN',
+			status: 'PARTIAL'
+		});
+	});
+
+	it('changes the resolved selection identity for configured glob and exclusion changes', () => {
+		const root = testPopulationFixture();
+		const baseline = discovered(root).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		write(root, 'packages/demo/src/value.spec.ts', 'export const packageSpec = true;\n');
+		const projects = readFileSync(join(root, 'vitest.projects.ts'), 'utf8');
+		write(
+			root,
+			'vitest.projects.ts',
+			projects.replace("include: ['src/**/*.test.ts']", "include: ['src/**/*.spec.ts']")
+		);
+		const changed = discovered(root).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		expect(changed.selectionDigest).not.toBe(baseline.selectionDigest);
+		expect(changed.includedPaths).toContain('packages/demo/src/value.spec.ts');
+		expect(changed.includedPaths).not.toContain('packages/demo/src/value.test.ts');
+		expect(changed).toMatchObject({
+			limitations: expect.arrayContaining(['VITEST_PROJECT_DISCOVERY_IMPLEMENTATION_UNRECOGNIZED']),
+			status: 'PARTIAL'
+		});
+	});
+
+	it('models Playwright ignores and arbitrary profiles while rejecting unsupported or overriding syntax', () => {
+		const root = testPopulationFixture();
+		write(root, 'apps/demo/scenarios/skip.journey.ts', 'export const skipped = true;\n');
+		write(
+			root,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.journey.ts', testIgnore: '**/skip.journey.ts' });\n"
+		);
+		write(
+			root,
+			'playwright.smoke.config.ts',
+			"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './verif/root-scenarios', testMatch: '**/*.smoke.ts' });\n"
+		);
+		write(root, 'verif/root-scenarios/root.smoke.ts', 'export const smoke = true;\n');
+		const result = discovered(root);
+		const deterministic = result.populations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+		)!;
+		expect(deterministic).toMatchObject({
+			excludePatterns: ['apps/demo/scenarios/**/skip.journey.ts'],
+			includedPaths: ['apps/demo/scenarios/first.journey.ts'],
+			status: 'COMPLETE'
+		});
+		expect(
+			result.populations.find(
+				(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'SMOKE'
+			)
+		).toMatchObject({
+			includedPaths: ['verif/root-scenarios/root.smoke.ts'],
+			status: 'COMPLETE'
+		});
+
+		write(
+			root,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from '@playwright/test';\nconst dynamic = {};\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.{journey,spec}.ts', ...dynamic });\n"
+		);
+		const unsupported = discovered(root).populations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+		)!;
+		expect(unsupported).toMatchObject({ populationClosure: 'OPEN', status: 'PARTIAL' });
+
+		write(
+			root,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from '@playwright/test';\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.journey.ts', projects: [{ name: 'override', testMatch: '**/*.spec.ts' }] });\n"
+		);
+		const projectOverride = discovered(root).populations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+		)!;
+		expect(projectOverride).toMatchObject({
+			limitations: expect.arrayContaining(['PLAYWRIGHT_PROJECT_SELECTION_OVERRIDE_UNMODELED']),
+			populationClosure: 'OPEN',
+			status: 'PARTIAL'
 		});
 	});
 });
@@ -1184,18 +1516,159 @@ describe('generated context and subject identity', () => {
 		manifest.workspaces = ['packages/*', 'apps/*'];
 		json(root, 'package.json', manifest);
 		json(root, 'apps/demo/package.json', { name: '@fixture/app', private: true });
+		write(root, 'apps/demo/svelte.config.js', 'export default {};\n');
 		write(root, 'apps/demo/src/page.svelte', '<script lang="ts">let value = 1;</script>\n');
 		write(root, 'apps/demo/src/index.ts', 'export const app = true;\n');
 		json(root, 'apps/demo/tsconfig.json', {
 			extends: './.svelte-kit/tsconfig.json',
 			compilerOptions: { allowJs: true }
 		});
-		if (withGenerated)
+		if (withGenerated) {
 			json(root, 'apps/demo/.svelte-kit/tsconfig.json', {
 				compilerOptions: { noEmit: true },
 				include: ['../src/**/*.ts', '../src/**/*.svelte', './types/**/$types.d.ts']
 			});
+			write(
+				root,
+				'apps/demo/.svelte-kit/types/route/$types.d.ts',
+				'export type RouteParams = Record<string, never>;\n'
+			);
+		}
 		return root;
+	}
+
+	function fixtureGenerator(root: string): {
+		readonly executionManifest: GeneratedContextExecutionManifest;
+		readonly generator: {
+			readonly id: typeof GENERATED_CONTEXT_SVELTE_KIT_SYNC_GENERATOR_ID;
+			readonly implementationDigest: string;
+			readonly version: '2.69.2';
+		};
+	} {
+		const executionManifest: GeneratedContextExecutionManifest = {
+			containmentPolicy:
+				'node-permission-declared-input-absence-and-bound-package-read-empty-generated-and-scratch-read-write-bound-addons-and-child-process/2.0.0',
+			configurationEntrypoints: [
+				{
+					imports: [],
+					path: 'apps/demo/svelte.config.js',
+					sha256: sha256(readFileSync(join(root, 'apps/demo/svelte.config.js')))
+				}
+			],
+			environment: [
+				{ name: 'CI', value: '1' },
+				{ name: 'FORCE_COLOR', value: '0' },
+				{ name: 'MODE', value: 'production' },
+				{ name: 'NODE_ENV', value: 'production' },
+				{ name: 'NODE_NO_WARNINGS', value: '1' },
+				{ name: 'NO_COLOR', value: '1' },
+				{ name: 'TZ', value: 'UTC' }
+			].sort((left, right) => compareText(left.name, right.name)),
+			environmentPolicy: 'closed-svelte-kit-sync-environment/1.0.0',
+			executionLimitations: [
+				'CHILD_PROCESS_EXECUTABLE_IDENTITY_AND_EFFECTS_NOT_BOUND_OR_OS_SANDBOXED',
+				'NATIVE_ADDON_EFFECTS_NOT_FILESYSTEM_NETWORK_MEMORY_OR_OS_SANDBOXED',
+				'NETWORK_DENIAL_NOT_ENFORCED_BY_NODE_PERMISSION_MODEL'
+			],
+			generatedOutputRoot: {
+				access: 'READ_WRITE',
+				baseline: 'EMPTY_PHYSICAL_DIRECTORY',
+				path: 'apps/demo/.svelte-kit',
+				replay: 'RESET_TO_EMPTY_BEFORE_EACH_SYNCHRONIZATION'
+			},
+			invocation: ['svelte-kit.js', 'sync', '--mode', 'production'],
+			lockfile: { path: 'bun.lock', sha256: sha256(readFileSync(join(root, 'bun.lock'))) },
+			missingOptionalPackages: [],
+			packages: [
+				{
+					bytes: 1,
+					fileCount: 1,
+					integrity: `sha512-${'A'.repeat(86)}==`,
+					locator: 'node_modules/@sveltejs/kit',
+					lockKey: '@sveltejs/kit',
+					manifestSha256: 'c'.repeat(64),
+					name: '@sveltejs/kit',
+					treeSha256: 'd'.repeat(64),
+					version: '2.69.2'
+				},
+				{
+					bytes: 1,
+					fileCount: 1,
+					integrity: `sha512-${'A'.repeat(86)}==`,
+					locator: 'node_modules/typescript',
+					lockKey: 'typescript',
+					manifestSha256: '1'.repeat(64),
+					name: 'typescript',
+					treeSha256: '2'.repeat(64),
+					version: '5.9.2'
+				},
+				{
+					bytes: 1,
+					fileCount: 1,
+					integrity: `sha512-${'A'.repeat(86)}==`,
+					locator: 'node_modules/vite',
+					lockKey: 'vite',
+					manifestSha256: '3'.repeat(64),
+					name: 'vite',
+					treeSha256: '4'.repeat(64),
+					version: '7.1.5'
+				}
+			],
+			readGrantProfile: 'svelte-kit-sync-project-defaults/1.0.0',
+			repositoryReadGrants: [
+				...[
+					'apps/demo/.env',
+					'apps/demo/.env.local',
+					'apps/demo/.env.production',
+					'apps/demo/.env.production.local',
+					'apps/demo/static',
+					'apps/demo/svelte.config.ts',
+					'apps/demo/vite.config.cjs',
+					'apps/demo/vite.config.cts',
+					'apps/demo/vite.config.js',
+					'apps/demo/vite.config.mjs',
+					'apps/demo/vite.config.mts',
+					'apps/demo/vite.config.ts'
+				].map((path) => ({ kind: 'ABSENT_PATH' as const, path })),
+				...[
+					'apps/demo/package.json',
+					'apps/demo/svelte.config.js',
+					'apps/demo/tsconfig.json',
+					'bun.lock',
+					'package.json'
+				].map((path) => ({ kind: 'FILE' as const, path })),
+				{ kind: 'DIRECTORY' as const, path: 'apps/demo/src' },
+				{ kind: 'DIRECTORY' as const, path: 'node_modules/@sveltejs/kit' },
+				{ kind: 'DIRECTORY' as const, path: 'node_modules/typescript' },
+				{ kind: 'DIRECTORY' as const, path: 'node_modules/vite' }
+			].sort((left, right) => compareText(left.path, right.path)),
+			runtime: {
+				architecture: 'x64',
+				engine: 'node',
+				executableBytes: 1,
+				executableSha256: 'e'.repeat(64),
+				platform: 'linux',
+				version: 'v24.0.0',
+				versionsDigest: 'f'.repeat(64)
+			},
+			scratchRoots: [
+				{
+					access: 'READ_WRITE',
+					baseline: 'EMPTY_PHYSICAL_DIRECTORY',
+					lifecycle: 'RESET_BEFORE_EACH_SYNCHRONIZATION_AND_RESTORE_AFTER_OPERATION',
+					path: 'node_modules/.vite-temp'
+				}
+			],
+			schemaVersion: GENERATED_CONTEXT_EXECUTION_MANIFEST_SCHEMA_VERSION
+		};
+		return {
+			executionManifest,
+			generator: {
+				id: GENERATED_CONTEXT_SVELTE_KIT_SYNC_GENERATOR_ID,
+				implementationDigest: generatedContextExecutionManifestDigest(executionManifest),
+				version: '2.69.2'
+			}
+		};
 	}
 
 	it('keeps Svelte as framework-only and reports present generated context UNKNOWN/PARTIAL', () => {
@@ -1227,53 +1700,129 @@ describe('generated context and subject identity', () => {
 		});
 	});
 
-	it('models CURRENT, STALE, and UNKNOWN freshness without changing byte identity semantics', () => {
+	it('derives CURRENT and STALE from a captured canonical generation record', () => {
 		expect(assessGeneratedContextFreshness()).toMatchObject({ freshness: 'UNKNOWN' });
-		expect(
-			assessGeneratedContextFreshness({
-				generatorInputDigest: 'a',
-				recordedInputDigest: 'a',
-				source: 'record'
-			})
-		).toMatchObject({ freshness: 'CURRENT' });
-		expect(
-			assessGeneratedContextFreshness({
-				generatorInputDigest: 'a',
-				recordedInputDigest: 'b',
-				source: 'record'
-			})
-		).toMatchObject({ freshness: 'STALE' });
 		const root = svelteFixture(true);
+		const fixtureIdentity = fixtureGenerator(root);
 		const evidenceBase = {
+			generator: fixtureIdentity.generator,
 			path: 'apps/demo/.svelte-kit/tsconfig.json',
 			source: 'verif/generated-context-record.json'
 		};
-		const current = resolved(root, {
-			generatedContextEvidence: [
-				{ ...evidenceBase, generatorInputDigest: 'same', recordedInputDigest: 'same' }
-			]
-		}).subject;
-		const stale = resolved(root, {
-			generatedContextEvidence: [
-				{ ...evidenceBase, generatorInputDigest: 'new', recordedInputDigest: 'old' }
-			]
-		}).subject;
+		const record = createGeneratedContextEvidenceRecord({
+			evidenceSource: evidenceBase.source,
+			executionManifest: fixtureIdentity.executionManifest,
+			generatedContextPath: evidenceBase.path,
+			generator: evidenceBase.generator,
+			subject: resolved(root).subject
+		});
+		write(root, evidenceBase.source, canonicalJson(record));
+		const current = resolved(root, { generatedContextEvidence: [evidenceBase] }).subject;
 		expect(current.generatedContexts[0]?.freshness).toBe('CURRENT');
+		expect(current.generatedContexts[0]?.freshnessEvidence).toEqual([
+			evidenceBase.source,
+			fixtureIdentity.generator.id,
+			fixtureIdentity.generator.implementationDigest,
+			fixtureIdentity.generator.version,
+			record.inputManifestDigest,
+			record.generatedOutputManifestDigest
+		]);
+		expect(record.generatedOutputManifest.map((output) => output.path)).toEqual([
+			'apps/demo/.svelte-kit/tsconfig.json',
+			'apps/demo/.svelte-kit/types/route/$types.d.ts'
+		]);
+
+		write(root, 'apps/demo/src/index.ts', 'export const app = false;\n');
+		const stale = resolved(root, { generatedContextEvidence: [evidenceBase] }).subject;
 		expect(stale.generatedContexts[0]?.freshness).toBe('STALE');
-		expect(current.descriptor.subjectId).toBe(stale.descriptor.subjectId);
+		write(root, 'apps/demo/src/index.ts', 'export const app = true;\n');
+		write(
+			root,
+			'apps/demo/.svelte-kit/types/route/$types.d.ts',
+			'export type RouteParams = { changed: true };\n'
+		);
+		const staleOutput = resolved(root, { generatedContextEvidence: [evidenceBase] }).subject;
+		expect(staleOutput.generatedContexts[0]?.freshness).toBe('STALE');
+	});
+
+	it('cannot manufacture generated-context CURRENT from an absent or malformed evidence source', () => {
+		const root = svelteFixture(true);
+		const fixtureIdentity = fixtureGenerator(root);
+		const evidence = {
+			generator: fixtureIdentity.generator,
+			path: 'apps/demo/.svelte-kit/tsconfig.json',
+			source: 'verif/generated-context-record.json'
+		};
+		const absent = resolved(root, { generatedContextEvidence: [evidence] });
+		expect(absent.subject.generatedContexts[0]?.freshness).toBe('UNKNOWN');
+		expect(absent.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'GENERATED_CONTEXT_EVIDENCE_INVALID' })
+			])
+		);
+
+		write(root, evidence.source, '{"schemaVersion":"fabricated"}\n');
+		const malformed = resolved(root, { generatedContextEvidence: [evidence] });
+		expect(malformed.subject.generatedContexts[0]?.freshness).toBe('UNKNOWN');
+		expect(malformed.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'GENERATED_CONTEXT_EVIDENCE_INVALID' })
+			])
+		);
+	});
+
+	it('rejects evidence whose generator identity differs from the declared generator', () => {
+		const root = svelteFixture(true);
+		const fixtureIdentity = fixtureGenerator(root);
+		const source = 'verif/generated-context-record.json';
+		const record = createGeneratedContextEvidenceRecord({
+			evidenceSource: source,
+			executionManifest: fixtureIdentity.executionManifest,
+			generatedContextPath: 'apps/demo/.svelte-kit/tsconfig.json',
+			generator: fixtureIdentity.generator,
+			subject: resolved(root).subject
+		});
+		write(root, source, canonicalJson(record));
+		const outcome = resolved(root, {
+			generatedContextEvidence: [
+				{
+					generator: { ...fixtureIdentity.generator, version: '2.0.0' },
+					path: record.generatedContext.path,
+					source
+				}
+			]
+		});
+		expect(outcome.subject.generatedContexts[0]?.freshness).toBe('UNKNOWN');
+		expect(outcome.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'GENERATED_CONTEXT_EVIDENCE_INVALID',
+					message: 'Generated-context evidence record names a different generator identity.'
+				})
+			])
+		);
 	});
 
 	it.runIf(process.platform === 'win32')(
 		'matches generated-context evidence by canonical Windows path identity',
 		() => {
 			const root = svelteFixture(true);
+			const fixtureIdentity = fixtureGenerator(root);
+			const source = 'verif/generated-context-record.json';
+			const record = createGeneratedContextEvidenceRecord({
+				evidenceSource: source,
+				executionManifest: fixtureIdentity.executionManifest,
+				generatedContextPath: 'apps/demo/.svelte-kit/tsconfig.json',
+				generator: fixtureIdentity.generator,
+				subject: resolved(root).subject
+			});
+			write(root, source, canonicalJson(record));
 			const subject = resolved(root, {
 				generatedContextEvidence: [
 					{
-						generatorInputDigest: 'same',
+						generator: fixtureIdentity.generator,
 						path: 'APPS/DEMO/.SVELTE-KIT/TSCONFIG.JSON',
-						recordedInputDigest: 'same',
-						source: 'verif/generated-context-record.json'
+						source: 'VERIF/GENERATED-CONTEXT-RECORD.JSON'
 					}
 				]
 			}).subject;
@@ -1478,6 +2027,33 @@ describe('generated context and subject identity', () => {
 				absentOutput.population.excluded +
 				absentOutput.population.failed
 		);
+		expect(absentOutput.population).toMatchObject({
+			excludedPhysicalFiles: 'UNKNOWN',
+			physicalPopulationReconciles: 'UNKNOWN',
+			reconciles: true,
+			reconciliationScope: 'CAPTURED_RECORDS_ONLY'
+		});
+	});
+
+	it('does not project collapsed excluded directories as an exact physical population', () => {
+		const root = fixture();
+		write(root, 'packages/demo/dist/one.js', 'export const one = 1;\n');
+		write(root, 'packages/demo/dist/nested/two.js', 'export const two = 2;\n');
+		const subject = resolved(root).subject;
+		expect(subject.excludedArtifacts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					path: 'packages/demo/dist',
+					physicalFileCount: 'UNKNOWN'
+				})
+			])
+		);
+		expect(subject.population).toMatchObject({
+			excludedPhysicalFiles: 'UNKNOWN',
+			physicalPopulationReconciles: 'UNKNOWN',
+			reconciles: true,
+			reconciliationScope: 'CAPTURED_RECORDS_ONLY'
+		});
 	});
 
 	it.runIf(process.platform === 'win32')(
@@ -1802,6 +2378,12 @@ describe('capture safety, immutability, freshness, and reconciliation', () => {
 		expect(subject.population.included).toBe(
 			subject.population.analyzed + subject.population.inventoryOnly
 		);
+		expect(subject.population).toMatchObject({
+			excludedPhysicalFiles: 0,
+			physicalPopulationReconciles: true,
+			reconciles: true,
+			reconciliationScope: 'EXACT_PHYSICAL_POPULATION'
+		});
 		expect(verifyFrozenSubject(subject, { rootLocator: root }).state).toBe('CURRENT');
 		write(root, 'packages/demo/src/new.ts', 'export const added = true;\n');
 		const freshness = verifyFrozenSubject(subject, { rootLocator: root });
@@ -1865,13 +2447,47 @@ describe('live JPWB and inventory projection', () => {
 		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report commands
 		// import their bounded implementation closures into the scripts program; the verification program also
 		// grows with the public report contract and root-surface assertions.
-		expect(counts.get('scripts/tsconfig.json')).toBe(35);
+		expect(counts.get('scripts/tsconfig.json')).toBe(36);
 		expect(counts.get('verif/tsconfig.json')).toBe(48);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(84);
 		expect(
 			subject.projects.find((project) => project.configPath === 'apps/rph-demo/tsconfig.json')
 				?.frameworkCandidates
 		).toHaveLength(11);
+		const unitPaths = subject.artifacts
+			.map((artifact) => artifact.path)
+			.filter((path) =>
+				['apps/*/src/**/*.test.ts', 'packages/*/src/**/*.test.ts', 'verif/**/*.test.ts'].some(
+					(pattern) => globMatches(path, pattern)
+				)
+			);
+		const source = subject.testPopulations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
+		const dist = subject.testPopulations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'DIST'
+		)!;
+		expect(source).toMatchObject({ reconciles: true, status: 'COMPLETE' });
+		expect(source.includedPaths).toEqual(unitPaths);
+		expect(dist.includedPaths).toEqual(source.includedPaths);
+		const deterministic = subject.testPopulations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+		)!;
+		const live = subject.testPopulations.find(
+			(population) => population.provider === 'PLAYWRIGHT' && population.profile === 'LIVE'
+		)!;
+		expect(deterministic).toMatchObject({
+			includedPaths: subject.artifacts
+				.map((artifact) => artifact.path)
+				.filter((path) => globMatches(path, 'apps/rph-demo/e2e/**/*.e2e.ts')),
+			status: 'COMPLETE'
+		});
+		expect(live).toMatchObject({
+			includedPaths: subject.artifacts
+				.map((artifact) => artifact.path)
+				.filter((path) => globMatches(path, 'apps/rph-demo/e2e-live/**/*.live.ts')),
+			status: 'COMPLETE'
+		});
 	}, 30_000);
 
 	it('projects the same subject paths, classes, hashes, roots, and identity into JAN-CSAA-005', () => {
@@ -1881,6 +2497,18 @@ describe('live JPWB and inventory projection', () => {
 			requireJpwbPopulations: true
 		});
 		expect(inventory.subject.subjectId).toBe(subject.descriptor.subjectId);
+		expect(inventory.assuranceSurfaces.testPopulations).toEqual(subject.testPopulations);
+		expect(inventory.assuranceSurfaces.unitTests.files).toEqual(
+			subject.testPopulations.find(
+				(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+			)?.includedPaths
+		);
+		expect(inventory.assuranceSurfaces.e2e.deterministicFiles).toEqual(
+			subject.testPopulations.find(
+				(population) =>
+					population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+			)?.includedPaths
+		);
 		expect(
 			inventory.subject.selectedFiles.map(({ bytes, path, sha256 }) => ({ bytes, path, sha256 }))
 		).toEqual(subject.artifacts.map(({ bytes, path, sha256 }) => ({ bytes, path, sha256 })));
@@ -1951,25 +2579,27 @@ describe('live JPWB and inventory projection', () => {
 		);
 		expect(inventory.subject.resolutionCompleteness).toBe('PARTIAL');
 		expect(inventory.subject.generatedContexts).toEqual(
-			expect.arrayContaining([expect.objectContaining({ freshness: 'UNKNOWN' })])
+			expect.arrayContaining([
+				expect.objectContaining({
+					freshness: 'CURRENT',
+					generator: expect.objectContaining({ id: '@sveltejs/kit:svelte-kit-sync' })
+				})
+			])
 		);
 		const app = inventory.typescriptProjects.find(
 			(project) => project.path === 'apps/rph-demo/tsconfig.json'
 		);
 		expect(app).toMatchObject({
-			generatedContexts: [expect.objectContaining({ freshness: 'UNKNOWN' })],
+			generatedContexts: [expect.objectContaining({ freshness: 'CURRENT' })],
 			rootDisposition: 'COMPILER_ROOTS',
 			status: 'PARTIAL'
 		});
-		expect(app?.partialityReasons.map((reason) => reason.code)).toEqual(
-			expect.arrayContaining([
-				'FRAMEWORK_CANDIDATES_PRESENT',
-				'GENERATED_CONTEXT_FRESHNESS_UNKNOWN'
-			])
-		);
+		expect(app?.partialityReasons.map((reason) => reason.code)).toEqual([
+			'FRAMEWORK_CANDIDATES_PRESENT'
+		]);
 		const markdown = renderInventoryMarkdown(inventory);
 		expect(markdown).toContain('| `apps/rph-demo/tsconfig.json` | `PARTIAL` | `COMPILER_ROOTS` |');
-		expect(markdown).toContain('`UNKNOWN: apps/rph-demo/.svelte-kit/tsconfig.json`');
-		expect(markdown).toContain('`GENERATED_CONTEXT_FRESHNESS_UNKNOWN`');
+		expect(markdown).toContain('`CURRENT: apps/rph-demo/.svelte-kit/tsconfig.json`');
+		expect(markdown).not.toContain('`GENERATED_CONTEXT_FRESHNESS_UNKNOWN`');
 	}, 30_000);
 });

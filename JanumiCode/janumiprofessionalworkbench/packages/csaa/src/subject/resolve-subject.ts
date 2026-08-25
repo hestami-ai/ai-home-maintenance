@@ -270,8 +270,8 @@ export function resolveSubjectInternal(
 				request: resolvedRequest,
 				workspaces: workspaceDiscovery.workspaces
 			});
-			const completeness = resolutionCompleteness(projectDiscovery.projects, diagnostics);
-			return { completeness, diagnostics, outcome: 'resolved', subject };
+			const completeness = resolutionCompleteness(subject.projects, subject.diagnostics);
+			return { completeness, diagnostics: subject.diagnostics, outcome: 'resolved', subject };
 		} catch (error) {
 			if (isRetryableResolutionFailure(error) && attempt < 2) continue;
 			return resolutionFailureOutcome(error, request.rootLocator);

@@ -95,7 +95,7 @@ function unchangedSourceRequest(): string {
 		schemaVersion: WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION,
 		seed: {
 			id: 'seed:adapter-unchanged',
-			logicalPath: 'packages/csaa/src/contracts/inventory.ts',
+			logicalPath: 'packages/csaa/src/contracts/arrow-command-census.ts',
 			operation: 'EDIT',
 			projectConfigPath: 'packages/csaa/tsconfig.json',
 			schemaVersion: WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_SEED_SCHEMA_VERSION,

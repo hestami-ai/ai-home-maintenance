@@ -182,7 +182,9 @@ const SUBJECT_SHELL_KEYS = [
 	'population',
 	'projects',
 	'request',
-	'workspaces'
+	'testPopulations',
+	'workspaces',
+	'workingChangeSet'
 ] as const;
 const GRAPH_SHELL_KEYS = [
 	'arrowObservationId',
@@ -387,7 +389,7 @@ function materializeInputs(value: unknown): CommandEventContractOverlayBuildInpu
 			]
 		],
 		['$inputs.commandHandlerGraph', commandHandlerGraph, ['edges', 'nodes']],
-		['$inputs.subject', subject, ['artifacts']],
+		['$inputs.subject', subject, ['artifacts', 'testPopulations']],
 		['$inputs.arrowObservation', arrowObservation, ['declaredArrows', 'declaredSites']]
 	] as const)
 		for (const key of arrayKeys) assertOrdinaryArray(record[key], `${path}.${key}`);

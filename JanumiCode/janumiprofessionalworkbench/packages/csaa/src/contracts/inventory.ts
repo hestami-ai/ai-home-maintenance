@@ -1,14 +1,17 @@
-import type {
-	ArtifactPrimaryClass,
-	GeneratedContextRecord,
-	ProgramRecipe,
-	SubjectDiagnostic,
-	WorkspaceSubjectRecord
+import {
+	SUBJECT_SCHEMA_VERSION,
+	type ArtifactPrimaryClass,
+	type GeneratedContextGeneratorIdentity,
+	type GeneratedContextRecord,
+	type ProgramRecipe,
+	type SubjectDiagnostic,
+	type TestPopulationRecord,
+	type WorkspaceSubjectRecord
 } from './subject.js';
 
-export const INVENTORY_SCHEMA_VERSION = 'jan-csaa-005.inventory/2.0.0' as const;
+export const INVENTORY_SCHEMA_VERSION = 'jan-csaa-005.inventory/3.0.0' as const;
 export const INVENTORY_GENERATOR_ID = 'jan-csaa-inventory' as const;
-export const INVENTORY_GENERATOR_VERSION = '0.2.0' as const;
+export const INVENTORY_GENERATOR_VERSION = '0.3.0' as const;
 
 export type KnowledgeState =
 	| 'IMPLEMENTED'
@@ -51,11 +54,15 @@ export interface InventorySubjectDescriptor {
 		}[];
 		readonly generatedContexts: readonly {
 			readonly consumerProject: string;
+			readonly generator: GeneratedContextGeneratorIdentity | null;
+			readonly outputManifestDigest: string;
+			readonly outputPaths: readonly string[];
 			readonly path: string;
 			readonly selectedInput: boolean;
 			readonly sha256: string;
 		}[];
 		readonly projects: readonly ProgramRecipe[];
+		readonly testPopulations: readonly TestPopulationRecord[];
 		readonly workspaces: readonly WorkspaceSubjectRecord[];
 	};
 	readonly dirtyState: 'UNKNOWN';
@@ -69,7 +76,7 @@ export interface InventorySubjectDescriptor {
 	readonly revision: null;
 	readonly resolutionCompleteness: 'COMPLETE' | 'PARTIAL';
 	readonly resolutionDiagnostics: readonly SubjectDiagnostic[];
-	readonly schemaVersion: 'jan-csaa-subject/1.1.0';
+	readonly schemaVersion: typeof SUBJECT_SCHEMA_VERSION;
 	readonly selectedFileCount: number;
 	readonly selectedFiles: readonly SelectedFileRecord[];
 	readonly subjectId: string;
@@ -215,6 +222,7 @@ export interface AssuranceSurfaceInventory {
 		readonly runnerPath: string | null;
 		readonly state: KnowledgeState;
 	};
+	readonly testPopulations: readonly TestPopulationRecord[];
 	readonly unitTests: {
 		readonly files: readonly string[];
 		readonly passWithNoTestsValues: readonly boolean[];
