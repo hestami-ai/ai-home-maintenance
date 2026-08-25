@@ -1,0 +1,92 @@
+{
+	"request": {
+		"budgets": {
+			"maxFactCount": 10000,
+			"maxInputBytes": 250000,
+			"maxOutputBytes": 250000,
+			"maxStringCharacters": 20000
+		},
+		"checkedAt": "2026-08-25T06:13:14.968Z",
+		"commandChecks": [
+			{
+				"availability": "UNAVAILABLE",
+				"commandName": "codeql",
+				"exactCommand": "Get-Command -Name codeql -CommandType Application,ExternalScript -ErrorAction SilentlyContinue",
+				"provider": "CODEQL",
+				"resolutionKind": null,
+				"resolvedExecutablePath": null
+			},
+			{
+				"availability": "UNAVAILABLE",
+				"commandName": "joern",
+				"exactCommand": "Get-Command -Name joern -CommandType Application,ExternalScript -ErrorAction SilentlyContinue",
+				"provider": "JOERN",
+				"resolutionKind": null,
+				"resolvedExecutablePath": null
+			}
+		],
+		"environment": {
+			"environmentId": "jpwb-csaa-win32-path-20260825",
+			"platform": "win32"
+		},
+		"nativeNeed": {
+			"capabilityId": "JAN-CSAA-W4-DWP-009",
+			"rationale": "CodeQL and Joern were not resolved on the current process PATH; installation, network, upload, licensing, and system configuration were not authorized or performed.",
+			"state": "UNKNOWN"
+		},
+		"operationVersion": "jan-csaa-assess-advanced-cpg-provider-entry/0.1.0",
+		"providerPreference": ["CODEQL", "JOERN"],
+		"qualification": null,
+		"schemaVersion": "jan-csaa-advanced-cpg-provider-entry-request/0.1.0"
+	},
+	"result": {
+		"analysisAuthority": "NONE",
+		"checkedAt": "2026-08-25T06:13:14.968Z",
+		"commandChecks": [
+			{
+				"availability": "UNAVAILABLE",
+				"commandName": "codeql",
+				"exactCommand": "Get-Command -Name codeql -CommandType Application,ExternalScript -ErrorAction SilentlyContinue",
+				"provider": "CODEQL",
+				"resolutionKind": null,
+				"resolvedExecutablePath": null
+			},
+			{
+				"availability": "UNAVAILABLE",
+				"commandName": "joern",
+				"exactCommand": "Get-Command -Name joern -CommandType Application,ExternalScript -ErrorAction SilentlyContinue",
+				"provider": "JOERN",
+				"resolutionKind": null,
+				"resolvedExecutablePath": null
+			}
+		],
+		"contentDigest": "cc4ce98dd8f856bff9f7e2e2e17f4455ae80a2999f70dc735d6759d157694db2",
+		"disposition": "DEFER",
+		"entryPredicate": {
+			"needState": "UNKNOWN",
+			"providerAvailability": "UNAVAILABLE",
+			"qualificationState": "NOT_PERFORMED",
+			"state": "DEFERRED"
+		},
+		"environment": {
+			"environmentId": "jpwb-csaa-win32-path-20260825",
+			"platform": "win32"
+		},
+		"gateEffect": "NONE",
+		"nativeCsaaDependency": "INDEPENDENT",
+		"nonclaims": [
+			"CODEQL_OR_JOERN_INSTALLATION_AUTHORITY",
+			"EXTERNAL_PROVIDER_LICENSE_APPROVAL",
+			"NATIVE_CSAA_DEPENDENCY_ON_EXPERIMENTAL_PROVIDER",
+			"NETWORK_OR_UPLOAD_AUTHORITY",
+			"PROVIDER_AVAILABILITY_OUTSIDE_RECORDED_ENVIRONMENT",
+			"PROVIDER_QUALIFICATION_WHEN_DISPOSITION_IS_NOT_ADOPT_BOUNDED_ADAPTER",
+			"SYSTEM_CONFIGURATION_AUTHORITY"
+		],
+		"qualification": null,
+		"reasons": ["NO_PROVIDER_AVAILABLE"],
+		"schemaVersion": "jan-csaa-advanced-cpg-provider-disposition/0.1.0",
+		"selectedProvider": null,
+		"wireShape": "CLOSED_EXACT"
+	}
+}
