@@ -177,7 +177,7 @@ function deepFreeze<T>(value: T, active = new WeakSet<object>()): T {
 	return Object.freeze(value);
 }
 
-interface AdjacencyProjection {
+export interface StructuralSccAdjacencyProjection {
 	readonly edges: readonly {
 		readonly id: StructuralSccAnalysisInputs['graph']['edges'][number]['id'];
 		readonly source: StructuralSccAnalysisInputs['graph']['nodes'][number]['id'];
@@ -187,8 +187,13 @@ interface AdjacencyProjection {
 	readonly upstreamClosure: 'CLOSED' | 'OPEN';
 }
 
+export type StructuralSccPartitionProjection = Pick<
+	StructuralSccAdjacencyProjection,
+	'edges' | 'nodeIds'
+>;
+
 type AdjacencyProjectionResult =
-	| { readonly projection: AdjacencyProjection; readonly state: 'VALID' }
+	| { readonly projection: StructuralSccAdjacencyProjection; readonly state: 'VALID' }
 	| { readonly state: 'BUDGET_EXCEEDED' | 'INVALID' };
 
 function dataObject(value: unknown): value is Record<PropertyKey, unknown> {
@@ -226,8 +231,8 @@ function projectedNodeIds(
 function projectedEdges(
 	graphEdges: StructuralSccAnalysisInputs['graph']['edges'],
 	edgeLength: number
-): AdjacencyProjection['edges'][number][] | null {
-	const edges: AdjacencyProjection['edges'][number][] = [];
+): StructuralSccAdjacencyProjection['edges'][number][] | null {
+	const edges: StructuralSccAdjacencyProjection['edges'][number][] = [];
 	for (let index = 0; index < edgeLength; index += 1) {
 		const descriptor = Reflect.getOwnPropertyDescriptor(graphEdges, String(index));
 		if (descriptor === undefined || !('value' in descriptor) || !dataObject(descriptor.value))
@@ -261,9 +266,9 @@ function projectedEdges(
 		)
 			return null;
 		edges.push({
-			id: idDescriptor.value as AdjacencyProjection['edges'][number]['id'],
-			source: sourceId.value as AdjacencyProjection['edges'][number]['source'],
-			target: targetId.value as AdjacencyProjection['edges'][number]['target']
+			id: idDescriptor.value as StructuralSccAdjacencyProjection['edges'][number]['id'],
+			source: sourceId.value as StructuralSccAdjacencyProjection['edges'][number]['source'],
+			target: targetId.value as StructuralSccAdjacencyProjection['edges'][number]['target']
 		});
 	}
 	return edges;
@@ -271,7 +276,7 @@ function projectedEdges(
 
 function projectedUpstreamClosure(
 	graph: StructuralSccAnalysisInputs['graph']
-): AdjacencyProjection['upstreamClosure'] | null {
+): StructuralSccAdjacencyProjection['upstreamClosure'] | null {
 	const coverageDescriptor = Reflect.getOwnPropertyDescriptor(graph, 'coverage');
 	if (
 		coverageDescriptor === undefined ||
@@ -515,7 +520,7 @@ interface TarjanTraversal {
 	readonly onActive: Set<string>;
 }
 
-function tarjanAdjacency(projection: AdjacencyProjection): Map<string, string[]> {
+function tarjanAdjacency(projection: StructuralSccPartitionProjection): Map<string, string[]> {
 	const adjacency = new Map<string, string[]>(
 		projection.nodeIds.map((nodeId) => [nodeId, [] as string[]])
 	);
@@ -579,7 +584,10 @@ function finishTarjanFrame(
 		components.push(popTarjanComponent(frame.nodeId, traversal));
 }
 
-function tarjan(projection: AdjacencyProjection): readonly (readonly string[])[] {
+/** Shared deterministic SCC partition primitive; package-root registration is intentionally absent. */
+export function structuralSccNodeGroups(
+	projection: StructuralSccPartitionProjection
+): readonly (readonly string[])[] {
 	const traversal: TarjanTraversal = {
 		active: [],
 		adjacency: tarjanAdjacency(projection),
@@ -617,7 +625,7 @@ function componentCycleKind(
 function materialize(
 	inputs: StructuralSccAnalysisInputs,
 	request: StructuralSccAnalysisRequest,
-	projection: AdjacencyProjection
+	projection: StructuralSccAdjacencyProjection
 ): StructuralSccAnalysisSnapshot | null {
 	const inputDigest = structuralSccAnalysisInputDigest({ ...inputs, request });
 	const analysisId = structuralSccAnalysisId({
@@ -625,7 +633,7 @@ function materialize(
 		semanticSnapshotId: request.semanticSnapshotId,
 		subjectId: request.subjectId
 	});
-	const nodeGroups = tarjan(projection);
+	const nodeGroups = structuralSccNodeGroups(projection);
 	if (nodeGroups.length > request.budgets.maxComponents) return null;
 	const componentIdByNode = new Map<string, ReturnType<typeof structuralSccComponentId>>();
 	const componentIds = nodeGroups.map((nodeIds) => structuralSccComponentId(analysisId, nodeIds));
@@ -634,7 +642,7 @@ function materialize(
 	const internalEdgeIdsByComponent = new Map(
 		componentIds.map((componentId) => [
 			componentId,
-			[] as AdjacencyProjection['edges'][number]['id'][]
+			[] as StructuralSccAdjacencyProjection['edges'][number]['id'][]
 		])
 	);
 	const selfLoopComponents = new Set<(typeof componentIds)[number]>();
