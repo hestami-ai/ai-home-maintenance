@@ -272,6 +272,7 @@ export function isRequestedPath(path: string, request: ResolveSubjectRequest): b
 }
 
 export function exclusionForDirectory(name: string, path: string): ExclusionDecision | null {
+	if (path === 'packages/csaa/src/providers/coverage') return null;
 	if (name === '.svelte-kit')
 		return {
 			policyId: 'jan-csaa-exclude-build/1',
