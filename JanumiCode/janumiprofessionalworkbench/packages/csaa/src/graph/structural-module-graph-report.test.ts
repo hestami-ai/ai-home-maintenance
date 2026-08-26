@@ -433,4 +433,186 @@ describe('structural module graph report facade', () => {
 			)
 		).toMatchObject({ diagnostics: [{ code: 'REQUEST_INVALID' }], outcome: 'unavailable' });
 	});
+
+	it('rejects malformed nested request records and populations at their exact boundaries', () => {
+		const graph = closedFixtureGraph();
+		const request = requestFor(graph);
+		const expandedEntryIds = [...request.entryNodeIds] as string[] & { extra?: boolean };
+		expandedEntryIds.extra = true;
+		const accessorEntryIds = [...request.entryNodeIds];
+		Object.defineProperty(accessorEntryIds, '0', {
+			enumerable: true,
+			get: () => request.entryNodeIds[0]
+		});
+		const cases: readonly [value: unknown, code: string, path: string][] = [
+			[{ ...request, entryNodeIds: null }, 'REQUEST_INVALID', '$.entryNodeIds'],
+			[{ ...request, entryNodeIds: expandedEntryIds }, 'REQUEST_INVALID', '$.entryNodeIds'],
+			[{ ...request, entryNodeIds: accessorEntryIds }, 'REQUEST_INVALID', '$.entryNodeIds'],
+			[{ ...request, entryNodeIds: [1] }, 'REQUEST_INVALID', '$.entryNodeIds'],
+			[
+				{
+					...request,
+					entryNodeIds: ['x'.repeat(request.budgets.maxRequestStringUtf16CodeUnits)]
+				},
+				'REQUEST_STRING_BUDGET_EXHAUSTED',
+				'$.entryNodeIds'
+			],
+			[
+				{
+					...request,
+					budgets: {
+						...request.budgets,
+						analysis: { ...request.budgets.analysis, unexpected: 1 }
+					}
+				},
+				'REQUEST_INVALID',
+				'$.budgets.analysis'
+			],
+			[
+				{
+					...request,
+					budgets: {
+						...request.budgets,
+						analysis: { ...request.budgets.analysis, maxNodes: -1 }
+					}
+				},
+				'REQUEST_INVALID',
+				'$.budgets.analysis.maxNodes'
+			],
+			[
+				{ ...request, budgets: { ...request.budgets, unexpected: 1 } },
+				'REQUEST_INVALID',
+				'$.budgets'
+			],
+			[
+				{ ...request, budgets: { ...request.budgets, maxResultBytes: -1 } },
+				'REQUEST_INVALID',
+				'$.budgets.maxResultBytes'
+			],
+			[
+				{
+					...request,
+					budgets: {
+						...request.budgets,
+						maxResultBytes: STRUCTURAL_MODULE_GRAPH_REPORT_SAFETY_CEILINGS.maxResultBytes + 1
+					}
+				},
+				'REQUEST_BUDGET_EXCEEDS_SAFETY_CEILING',
+				'$.budgets.maxResultBytes'
+			],
+			[
+				{ ...request, sourceGraph: { ...request.sourceGraph, contentDigest: 1 } },
+				'REQUEST_INVALID',
+				'$.sourceGraph.contentDigest'
+			],
+			[
+				{ ...request, sourceGraph: { ...request.sourceGraph, unexpected: 1 } },
+				'REQUEST_INVALID',
+				'$.sourceGraph'
+			],
+			[
+				{ ...request, sourceGraph: { ...request.sourceGraph, graphKind: 'OTHER' } },
+				'REQUEST_INVALID',
+				'$.sourceGraph.graphKind'
+			],
+			[{ ...request, slice: { ...request.slice, unexpected: 1 } }, 'REQUEST_INVALID', '$.slice'],
+			[
+				{ ...request, slice: { ...request.slice, direction: 'SIDEWAYS' } },
+				'REQUEST_INVALID',
+				'$.slice.direction'
+			],
+			[{ ...request, entrySurfaceClosure: 'UNKNOWN' }, 'REQUEST_INVALID', '$.entrySurfaceClosure']
+		];
+
+		for (const [value, code, path] of cases)
+			expect(runStructuralModuleGraphReport(value, graph)).toMatchObject({
+				diagnostics: [{ code, path }],
+				outcome: 'unavailable'
+			});
+	});
+
+	it('validates malformed unavailable and partial candidates independently', () => {
+		const graph = closedFixtureGraph();
+		const request = requestFor(graph);
+		const baseline = partialReport(graph, request);
+		const unsupportedRequest = { ...request, schemaVersion: 'unsupported' };
+		const unavailable = runStructuralModuleGraphReport(unsupportedRequest, graph);
+		if (unavailable.outcome !== 'unavailable') throw new Error('Expected unavailable report.');
+
+		expect(
+			validateStructuralModuleGraphReport(
+				{ ...unavailable, unexpected: true },
+				unsupportedRequest,
+				graph
+			)
+		).toMatchObject({ issues: [{ code: 'SHAPE_INVALID' }] });
+		expect(
+			validateStructuralModuleGraphReport(
+				{ ...unavailable, operationVersion: 'wrong' },
+				unsupportedRequest,
+				graph
+			)
+		).toMatchObject({ issues: [{ code: 'SHAPE_INVALID' }] });
+
+		const changedPopulation = structuredClone(unavailable) as unknown as {
+			diagnostics: Array<{ code: string; message: string; path: string | null; phase: string }>;
+		};
+		changedPopulation.diagnostics[0] = {
+			...changedPopulation.diagnostics[0]!,
+			message: 'different independently invalid population'
+		};
+		expect(
+			validateStructuralModuleGraphReport(changedPopulation, unsupportedRequest, graph)
+		).toMatchObject({ issues: [{ code: 'POPULATION_MISMATCH' }] });
+		expect(validateStructuralModuleGraphReport(BigInt(1), request, graph)).toMatchObject({
+			issues: [{ code: 'SHAPE_INVALID' }]
+		});
+		expect(
+			validateStructuralModuleGraphReport({ ...baseline, registryStatus: 'wrong' }, request, graph)
+		).toMatchObject({ issues: [{ code: 'SHAPE_INVALID' }] });
+	});
+
+	it('detects source-graph mutation during derivation and internal validation', () => {
+		const graph = closedFixtureGraph();
+		const request = requestFor(graph);
+		const changingGraph = (stableReads: number): ModuleDependencyGraphSnapshot => {
+			let reads = 0;
+			const value = { ...graph };
+			Object.defineProperty(value, 'contentDigest', {
+				configurable: true,
+				enumerable: true,
+				get: () => (reads++ < stableReads ? graph.contentDigest : 'changed')
+			});
+			return value as ModuleDependencyGraphSnapshot;
+		};
+
+		expect(runStructuralModuleGraphReport(request, changingGraph(1))).toMatchObject({
+			diagnostics: [{ code: 'SOURCE_GRAPH_REFERENCE_MISMATCH' }],
+			outcome: 'unavailable'
+		});
+		expect(runStructuralModuleGraphReport(request, changingGraph(2))).toMatchObject({
+			diagnostics: [{ code: 'INTERNAL_VALIDATION_FAILED' }],
+			outcome: 'unavailable',
+			state: 'failed'
+		});
+	});
+
+	it('fails both public report boundaries closed when graph access throws', () => {
+		const graph = closedFixtureGraph();
+		const request = requestFor(graph);
+		const baseline = partialReport(graph, request);
+		const hostile = new Proxy(graph, {
+			get() {
+				throw new Error('hostile graph access');
+			}
+		});
+		expect(validateStructuralModuleGraphReport(baseline, request, hostile)).toMatchObject({
+			issues: [{ code: 'SHAPE_INVALID' }],
+			state: 'INVALID'
+		});
+		expect(runStructuralModuleGraphReport(request, hostile)).toMatchObject({
+			diagnostics: [{ code: 'REQUEST_INVALID' }],
+			outcome: 'unavailable'
+		});
+	});
 });

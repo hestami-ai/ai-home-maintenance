@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -12,6 +16,12 @@ import {
 	type AgentOperationRequest,
 	type AgentOperationResponse
 } from '../agent/agent-operation-protocol.js';
+import { canonicalSemanticJson } from '../semantic/canonical.js';
+import {
+	codingAgentCliArtifactReference,
+	publishCodingAgentCliJsonArtifact,
+	readCodingAgentCliJsonArtifact
+} from './coding-agent-cli-artifact-store.js';
 import {
 	CODING_AGENT_CLI_EXIT_CODES,
 	CODING_AGENT_CLI_IMPLEMENTATION_STATE,
@@ -24,6 +34,7 @@ import {
 	codingAgentCliInputDigest,
 	type CodingAgentCliOperationInput
 } from './coding-agent-cli-contract.js';
+import { ContentAddressedCodingAgentCliArtifactStore } from './content-addressed-coding-agent-cli-artifact-store.js';
 import { runCodingAgentCli, type CodingAgentCliHandlerContext } from './run-coding-agent-cli.js';
 
 const A = 'a'.repeat(64);
@@ -498,6 +509,95 @@ describe('coding-agent CLI contract and routing foundation', () => {
 		expect(run.stderr).not.toContain('result:one');
 	});
 
+	it('commits a host artifact transaction only after terminal response validation', async () => {
+		const request = requestFor('query');
+		const transaction = {
+			begin: vi.fn(),
+			commit: vi.fn(),
+			rollback: vi.fn()
+		};
+		const run = await runCodingAgentCli(argvFor('query', request), {
+			artifactTransaction: transaction,
+			handlers: { query: () => [success(request)] },
+			now: () => RESPONSE_AT
+		});
+		expect(run).toMatchObject({ exitCode: 0, state: 'COMPLETED' });
+		expect(transaction.begin).toHaveBeenCalledOnce();
+		expect(transaction.commit).toHaveBeenCalledOnce();
+		expect(transaction.rollback).not.toHaveBeenCalled();
+	});
+
+	it('withholds a terminal artifact reference when the durable transaction cannot commit', async () => {
+		const request = requestFor('query');
+		const transaction = {
+			begin: vi.fn(),
+			commit: vi.fn(() => {
+				throw new Error('store unavailable');
+			}),
+			rollback: vi.fn()
+		};
+		const run = await runCodingAgentCli(argvFor('query', request), {
+			artifactTransaction: transaction,
+			handlers: { query: () => [success(request)] },
+			now: () => RESPONSE_AT
+		});
+		expect(run).toMatchObject({
+			exitCode: 3,
+			terminalResponse: {
+				exitCategory: 'INCOMPLETE_OR_UNSUPPORTED',
+				refusal: { reasonCode: 'CAPABILITY_UNAVAILABLE' }
+			}
+		});
+		expect(run.stdout).not.toContain('result:one');
+		expect(transaction.rollback).toHaveBeenCalledOnce();
+	});
+
+	it('reports typed cancellation when the host aborts during a rejected transaction commit', async () => {
+		const request = requestFor('query');
+		const controller = new AbortController();
+		const transaction = {
+			begin: vi.fn(),
+			commit: vi.fn(() => {
+				controller.abort();
+				throw new Error('commit interrupted');
+			}),
+			rollback: vi.fn()
+		};
+		const run = await runCodingAgentCli(argvFor('query', request), {
+			artifactTransaction: transaction,
+			handlers: { query: () => [success(request)] },
+			now: () => RESPONSE_AT,
+			signal: controller.signal
+		});
+		expect(run).toMatchObject({
+			exitCode: 3,
+			terminalResponse: {
+				capability: { executionHealth: 'cancelled' },
+				refusal: { code: 'CSAA-E-EXECUTION-CANCELLED' },
+				state: 'cancelled'
+			}
+		});
+		expect(run.stdout).not.toContain('result:one');
+		expect(transaction.rollback).toHaveBeenCalledOnce();
+	});
+
+	it('rolls back staged artifacts when a validated handler stream is internally invalid', async () => {
+		const request = requestFor('query');
+		const transaction = {
+			begin: vi.fn(),
+			commit: vi.fn(),
+			rollback: vi.fn()
+		};
+		const run = await runCodingAgentCli(argvFor('query', request), {
+			artifactTransaction: transaction,
+			handlers: { query: () => [] },
+			now: () => RESPONSE_AT
+		});
+		expect(run).toMatchObject({ exitCode: 5 });
+		expect(transaction.commit).not.toHaveBeenCalled();
+		expect(transaction.rollback).toHaveBeenCalledOnce();
+	});
+
 	it('preserves partial and failed-expectation terminal categories without human reinterpretation', async () => {
 		const request = requestFor('impact');
 		const partialRun = await runCodingAgentCli(argvFor('impact', request), {
@@ -572,6 +672,155 @@ describe('coding-agent CLI contract and routing foundation', () => {
 		});
 	});
 
+	it('reports a locator operation timeout before resolution as a typed execution interruption', async () => {
+		const input = { ...inputFor('inventory'), subjectInputRef: 'locator:repo' };
+		const baseRequest = requestFor('inventory', input, {
+			subjectInput: {
+				kind: 'SUBJECT_LOCATOR',
+				locatorDigest: A,
+				locatorRef: 'locator:repo',
+				resolutionPolicyRef: 'policy:exact'
+			}
+		});
+		const request = {
+			...baseRequest,
+			budgets: { ...baseRequest.budgets, timeoutMs: 1 }
+		};
+		const run = await runCodingAgentCli(argvFor('inventory', request, input), {
+			handlers: { inventory: () => new Promise<readonly unknown[]>(() => undefined) },
+			now: () => RESPONSE_AT
+		});
+		if (run.state !== 'COMPLETED') throw new Error(run.stderr);
+
+		expect(run).toMatchObject({
+			exitCode: 3,
+			terminalResponse: {
+				capability: { executionHealth: 'timed-out' },
+				currentness: {
+					status: 'unknown',
+					subject: {
+						kind: 'NOT_APPLICABLE',
+						reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+					}
+				},
+				refusal: { code: 'CSAA-E-EXECUTION-TIMED-OUT' },
+				state: 'timed-out',
+				subjectResolution: {
+					kind: 'NOT_APPLICABLE',
+					reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+				}
+			}
+		});
+		expect(validateAgentOperationExchange(request, run.terminalResponse)).toMatchObject({
+			state: 'VALID'
+		});
+		expect(
+			validateAgentOperationExchange(request, {
+				...run.terminalResponse,
+				capability: { ...run.terminalResponse.capability, executionHealth: 'succeeded' }
+			})
+		).toMatchObject({ state: 'REFUSED' });
+		expect(
+			validateAgentOperationExchange(request, {
+				...run.terminalResponse,
+				subjectResolution: { kind: 'NOT_APPLICABLE', reasonCode: 'UNRELATED_REASON' }
+			})
+		).toMatchObject({ state: 'REFUSED' });
+	});
+
+	it('reports a cancelled locator operation before resolution without invoking its handler', async () => {
+		const input = { ...inputFor('snapshot'), subjectInputRef: 'locator:repo' };
+		const request = requestFor('snapshot', input, {
+			subjectInput: {
+				kind: 'SUBJECT_LOCATOR',
+				locatorDigest: A,
+				locatorRef: 'locator:repo',
+				resolutionPolicyRef: 'policy:exact'
+			}
+		});
+		const controller = new AbortController();
+		controller.abort();
+		const handler = vi.fn((_context: CodingAgentCliHandlerContext) => [success(request)]);
+		const run = await runCodingAgentCli(argvFor('snapshot', request, input), {
+			handlers: { snapshot: handler },
+			now: () => RESPONSE_AT,
+			signal: controller.signal
+		});
+		if (run.state !== 'COMPLETED') throw new Error(run.stderr);
+
+		expect(handler).not.toHaveBeenCalled();
+		expect(run).toMatchObject({
+			exitCode: 3,
+			terminalResponse: {
+				capability: { executionHealth: 'cancelled' },
+				refusal: { code: 'CSAA-E-EXECUTION-CANCELLED' },
+				state: 'cancelled',
+				subjectResolution: {
+					kind: 'NOT_APPLICABLE',
+					reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+				}
+			}
+		});
+		expect(validateAgentOperationExchange(request, run.terminalResponse)).toMatchObject({
+			state: 'VALID'
+		});
+	});
+
+	it('terminally withholds a late persistent artifact from a noncooperative timed-out handler', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'jan-csaa-cli-timeout-rollback-'));
+		try {
+			const input = inputFor('query');
+			const baseRequest = requestFor('query', input);
+			const request = {
+				...baseRequest,
+				budgets: { ...baseRequest.budgets, timeoutMs: 1 }
+			};
+			const store = new ContentAddressedCodingAgentCliArtifactStore(root);
+			const lateValue = { late: true };
+			const lateReference = codingAgentCliArtifactReference(canonicalSemanticJson(lateValue));
+			let lateError: unknown;
+			let markHandlerSettled!: () => void;
+			const handlerSettled = new Promise<void>((resolve) => {
+				markHandlerSettled = resolve;
+			});
+
+			const run = await runCodingAgentCli(argvFor('query', request, input), {
+				artifactTransaction: store,
+				handlers: {
+					query: async ({ signal }) => {
+						await new Promise<void>((resolve) => {
+							if (signal.aborted) resolve();
+							else signal.addEventListener('abort', () => resolve(), { once: true });
+						});
+						await new Promise((resolve) => setTimeout(resolve, 10));
+						try {
+							await publishCodingAgentCliJsonArtifact(store, lateValue, 1024);
+						} catch (error) {
+							lateError = error;
+						} finally {
+							markHandlerSettled();
+						}
+						return [success(request)];
+					}
+				},
+				now: () => RESPONSE_AT
+			});
+			await handlerSettled;
+
+			expect(run).toMatchObject({
+				exitCode: 3,
+				terminalResponse: { state: 'timed-out' }
+			});
+			expect(lateError).toMatchObject({ code: 'ARTIFACT_STORE_FAILED' });
+			const reopened = new ContentAddressedCodingAgentCliArtifactStore(root);
+			await expect(
+				readCodingAgentCliJsonArtifact(reopened, lateReference, 1024)
+			).rejects.toMatchObject({ code: 'ARTIFACT_NOT_FOUND' });
+		} finally {
+			rmSync(root, { force: true, recursive: true });
+		}
+	});
+
 	it('honors an already-cancelled host signal without invoking the operation handler', async () => {
 		const request = requestFor('query');
 		const controller = new AbortController();
@@ -582,6 +831,7 @@ describe('coding-agent CLI contract and routing foundation', () => {
 			now: () => RESPONSE_AT,
 			signal: controller.signal
 		});
+		if (run.state !== 'COMPLETED') throw new Error(run.stderr);
 		expect(handler).not.toHaveBeenCalled();
 		expect(run).toMatchObject({
 			exitCode: 3,
@@ -591,6 +841,46 @@ describe('coding-agent CLI contract and routing foundation', () => {
 				state: 'cancelled'
 			}
 		});
+		expect(
+			validateAgentOperationExchange(request, {
+				...run.terminalResponse,
+				subjectResolution: {
+					kind: 'NOT_APPLICABLE',
+					reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+				}
+			})
+		).toMatchObject({ state: 'REFUSED' });
+	});
+
+	it('returns typed cancellation before beginning a production artifact transaction', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'jan-csaa-cli-pre-cancel-'));
+		try {
+			const request = requestFor('query');
+			const controller = new AbortController();
+			controller.abort();
+			const handler = vi.fn((_context: CodingAgentCliHandlerContext) => [success(request)]);
+			const store = new ContentAddressedCodingAgentCliArtifactStore(root);
+			const begin = vi.spyOn(store, 'begin');
+			const run = await runCodingAgentCli(argvFor('query', request), {
+				artifactTransaction: store,
+				handlers: { query: handler },
+				now: () => RESPONSE_AT,
+				signal: controller.signal
+			});
+
+			expect(begin).not.toHaveBeenCalled();
+			expect(handler).not.toHaveBeenCalled();
+			expect(run).toMatchObject({
+				exitCode: 3,
+				terminalResponse: {
+					capability: { executionHealth: 'cancelled' },
+					refusal: { code: 'CSAA-E-EXECUTION-CANCELLED' },
+					state: 'cancelled'
+				}
+			});
+		} finally {
+			rmSync(root, { force: true, recursive: true });
+		}
 	});
 
 	it('routes exact forbidden and not-found subject outcomes without a substitute subject', async () => {

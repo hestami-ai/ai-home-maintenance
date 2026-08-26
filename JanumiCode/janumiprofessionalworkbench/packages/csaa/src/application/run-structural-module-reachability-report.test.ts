@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_NONCLAIMS,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
@@ -12,6 +12,7 @@ import {
 import { canonicalSemanticJson } from '../semantic/canonical.js';
 import {
 	runStructuralModuleReachabilityReport,
+	runStructuralModuleReachabilityReportWithCapturedSubject,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_NONCLAIMS,
 	STRUCTURAL_MODULE_REACHABILITY_REPORT_PROGRESS_SCHEMA_VERSION,
 	type StructuralModuleReachabilityReportProgressEvent,
@@ -72,6 +73,7 @@ function fixture(): string {
 		"import { absent } from './absent.js';\nexport const unrelated = absent;\n"
 	);
 	write(root, 'bun.lock', 'fixture lock\n');
+	json(root, 'verif/retained-evidence.json', { evidence: 'retained' });
 	return root;
 }
 
@@ -137,6 +139,52 @@ afterEach(() => {
 });
 
 describe('runStructuralModuleReachabilityReport', () => {
+	it('captures trusted additional artifacts in the exact predecessor subject identity', () => {
+		const root = fixture();
+		const baseline = runStructuralModuleReachabilityReportWithCapturedSubject(request(), {
+			repositoryRoot: root
+		});
+		const retained = runStructuralModuleReachabilityReportWithCapturedSubject(request(), {
+			additionalArtifacts: ['verif/retained-evidence.json'],
+			repositoryRoot: root
+		});
+		expect(retained.outcome.outcome).toBe('partial');
+		expect(retained.subject?.request.scope).toMatchObject({
+			additionalArtifacts: ['verif/retained-evidence.json'],
+			kind: 'EXPLICIT_PROJECTS'
+		});
+		expect(retained.subject?.artifacts.map((artifact) => artifact.path)).toContain(
+			'verif/retained-evidence.json'
+		);
+		expect(retained.subject?.descriptor.subjectId).not.toBe(baseline.subject?.descriptor.subjectId);
+	});
+
+	it('captures the trusted exact filter policy in the predecessor subject identity', () => {
+		const root = fixture();
+		const baseline = runStructuralModuleReachabilityReportWithCapturedSubject(request(), {
+			repositoryRoot: root
+		});
+		const subjectFilters = {
+			exclude: [],
+			include: [
+				'package.json',
+				'packages/demo/package.json',
+				'packages/demo/tsconfig.json',
+				'packages/demo/src/entry.ts',
+				'packages/demo/src/leaf.ts',
+				'packages/demo/src/middle.ts',
+				'packages/demo/src/unrelated.ts'
+			]
+		};
+		const filtered = runStructuralModuleReachabilityReportWithCapturedSubject(request(), {
+			repositoryRoot: root,
+			subjectFilters
+		});
+		expect(filtered.outcome.outcome).toBe('partial');
+		expect(filtered.subject?.request.filters).toEqual(subjectFilters);
+		expect(filtered.subject?.descriptor.subjectId).not.toBe(baseline.subject?.descriptor.subjectId);
+	});
+
 	it('renders deterministic reverse structural importer candidates and original import witnesses', () => {
 		const root = fixture();
 		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
@@ -413,6 +461,28 @@ describe('runStructuralModuleReachabilityReport', () => {
 		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
 	});
 
+	it('uses deterministic elapsed time when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementationOnce(() => {
+			throw new Error('clock unavailable');
+		});
+		try {
+			const outcome = runStructuralModuleReachabilityReport(
+				{},
+				{
+					onProgress: (event) => progress.push(event),
+					repositoryRoot: root
+				}
+			);
+			expect(outcome).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', outcome: 'unavailable' });
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
+	});
+
 	it('fails closed on hostile shape, traversal, excess ceilings, and absent paths', () => {
 		const root = fixture();
 		const extra = { ...request(), unexpected: true };
@@ -456,6 +526,356 @@ describe('runStructuralModuleReachabilityReport', () => {
 		}
 	});
 
+	it('admits only exact versions, direction, budgets, paths, and dense unique project arrays', () => {
+		const root = fixture();
+		const base = request();
+		const inherited = Object.assign(Object.create({ inherited: true }), base);
+		const nonEnumerable = { ...base };
+		Object.defineProperty(nonEnumerable, 'schemaVersion', {
+			enumerable: false,
+			value: base.schemaVersion
+		});
+		const sparseProjects: string[] = [];
+		sparseProjects.length = 1;
+
+		const cases: readonly {
+			readonly code: string;
+			readonly state?: 'incompatible' | 'resource-refused';
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', value: inherited },
+			{ code: 'REQUEST_SHAPE_INVALID', value: nonEnumerable },
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				value: { ...base, budgets: { ...base.budgets, maxResultBytes: 0 } }
+			},
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				value: { ...base, schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				value: { ...base, operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_DIRECTION_INVALID',
+				value: { ...base, direction: 'SIDEWAYS' }
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				value: { ...base, criterionLogicalPath: '' }
+			},
+			{
+				code: 'REQUEST_PATH_BUDGET_EXCEEDED',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						semantic: { ...base.budgets.semantic, maxPathCharacters: 1 }
+					}
+				}
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				value: { ...base, subjectProjectConfigPaths: ['bad*path.json'] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: {} }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: [] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_BUDGET_EXCEEDED',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						subject: { ...base.budgets.subject, maxProjects: 1 }
+					},
+					subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/other/tsconfig.json']
+				}
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: sparseProjects }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: {
+					...base,
+					subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/demo/tsconfig.json']
+				}
+			}
+		];
+
+		for (const malformed of cases) {
+			const outcome = runStructuralModuleReachabilityReport(malformed.value, {
+				repositoryRoot: root
+			});
+			expect(outcome, malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: malformed.state ?? 'incompatible'
+			});
+		}
+	});
+
+	it('classifies bounded, forbidden, missing, incompatible, and ambiguous subjects', () => {
+		const budgetRoot = fixture();
+		const base = request();
+		const budget = runStructuralModuleReachabilityReportWithCapturedSubject(
+			request({
+				budgets: {
+					...base.budgets,
+					subject: { ...base.budgets.subject, maxFiles: 1 }
+				}
+			}),
+			{ repositoryRoot: budgetRoot }
+		);
+		expect(budget.outcome).toMatchObject({
+			code: 'SUBJECT_RESOURCE_REFUSED',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'resource-refused'
+		});
+		expect(budget).toMatchObject({ repositoryRoot: null, resultBytes: null, subject: null });
+
+		const forbiddenRoot = fixture();
+		json(forbiddenRoot, 'packages/demo/tsconfig.json', {
+			compilerOptions: { noLib: true },
+			include: ['src/*/../outside.ts']
+		});
+		const forbidden = runStructuralModuleReachabilityReport(request(), {
+			repositoryRoot: forbiddenRoot
+		});
+		expect(forbidden).toMatchObject({
+			code: 'SUBJECT_FORBIDDEN',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const missingRoot = fixture();
+		rmSync(join(missingRoot, 'package.json'));
+		const missing = runStructuralModuleReachabilityReport(request(), {
+			repositoryRoot: missingRoot
+		});
+		expect(missing).toMatchObject({
+			code: 'SUBJECT_NOT_FOUND',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const incompatibleRoot = fixture();
+		write(incompatibleRoot, 'packages/demo/package.json', '{ malformed');
+		const incompatible = runStructuralModuleReachabilityReport(request(), {
+			repositoryRoot: incompatibleRoot
+		});
+		expect(incompatible).toMatchObject({
+			code: 'SUBJECT_INCOMPATIBLE',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const ambiguousRoot = fixture();
+		json(ambiguousRoot, 'packages/other/package.json', {
+			name: '@fixture/reachability-report',
+			private: true,
+			version: '0.0.0'
+		});
+		write(ambiguousRoot, 'packages/other/src/index.ts', 'export const other = true;\n');
+		const ambiguous = runStructuralModuleReachabilityReport(request(), {
+			repositoryRoot: ambiguousRoot
+		});
+		expect(ambiguous).toMatchObject({
+			code: 'SUBJECT_AMBIGUOUS',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+	}, 60_000);
+
+	it('distinguishes directory selectors and an unavailable repository root', () => {
+		const root = fixture();
+		for (const [candidate, code, stage] of [
+			[
+				request({
+					projectConfigPath: 'packages/demo',
+					subjectProjectConfigPaths: ['packages/demo']
+				}),
+				'PROJECT_PATH_INVALID',
+				'SUBJECT'
+			],
+			[
+				request({
+					subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/demo']
+				}),
+				'PROJECT_PATH_INVALID',
+				'SUBJECT'
+			],
+			[
+				request({ criterionLogicalPath: 'packages/demo/src' }),
+				'CRITERION_PATH_INVALID',
+				'CRITERION'
+			]
+		] as const) {
+			const outcome = runStructuralModuleReachabilityReport(candidate, { repositoryRoot: root });
+			expect(outcome, code).toMatchObject({
+				code,
+				outcome: 'unavailable',
+				stage,
+				state: 'incompatible'
+			});
+		}
+
+		const invalidRoot = runStructuralModuleReachabilityReport(request(), {
+			repositoryRoot: join(root, 'missing-root')
+		});
+		expect(invalidRoot).toMatchObject({
+			code: 'REPOSITORY_ROOT_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+		expect(structuralModuleReachabilityReportExitCode(invalidRoot)).toBe(4);
+	});
+
+	it('rejects a criterion that is analyzed only by another captured project', () => {
+		const root = fixture();
+		json(root, 'packages/other/package.json', {
+			name: '@fixture/reachability-other',
+			private: true,
+			version: '0.0.0'
+		});
+		json(root, 'packages/other/tsconfig.json', {
+			compilerOptions: {
+				module: 'NodeNext',
+				moduleResolution: 'NodeNext',
+				noEmit: true,
+				noLib: true,
+				strict: true,
+				target: 'ES2022'
+			},
+			files: ['src/other.ts']
+		});
+		write(root, 'packages/other/src/other.ts', 'export const other = true;\n');
+
+		const outcome = runStructuralModuleReachabilityReport(
+			request({
+				criterionLogicalPath: 'packages/other/src/other.ts',
+				subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/other/tsconfig.json']
+			}),
+			{ repositoryRoot: root }
+		);
+		expect(outcome).toMatchObject({
+			code: 'CRITERION_OUTSIDE_PROJECT',
+			outcome: 'unavailable',
+			stage: 'CRITERION',
+			state: 'incompatible'
+		});
+	}, 60_000);
+
+	it('reports stale and unavailable currentness without replacing captured reachability evidence', () => {
+		for (const [expectedState, mutate] of [
+			[
+				'STALE',
+				(root: string) => write(root, 'packages/demo/src/leaf.ts', 'export const leaf = 2;\n')
+			],
+			['UNAVAILABLE', (root: string) => write(root, 'package.json', '{ malformed')]
+		] as const) {
+			const root = fixture();
+			let mutated = false;
+			const outcome = runStructuralModuleReachabilityReport(request(), {
+				onProgress: (event) => {
+					if (
+						!mutated &&
+						event.kind === 'REPORT_STAGE' &&
+						event.phase === 'ANALYSIS' &&
+						event.state === 'COMPLETED'
+					) {
+						mutated = true;
+						mutate(root);
+					}
+				},
+				repositoryRoot: root
+			});
+			expect(mutated, expectedState).toBe(true);
+			expect(outcome.outcome, expectedState).toBe('partial');
+			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(outcome.result.currentness.state).toBe(expectedState);
+			expect(outcome.stageOutcomes.currentness.state).toBe(expectedState);
+			expect(outcome.result.analysis.members).toHaveLength(3);
+			if (expectedState === 'STALE')
+				expect(outcome.result.currentness.changedPaths).toContain('packages/demo/src/leaf.ts');
+			else expect(outcome.result.currentness.diagnosticCodes).toContain('CONFIG_MALFORMED');
+		}
+	}, 60_000);
+
+	it('renders forward structural dependency candidates', () => {
+		const root = fixture();
+		const outcome = runStructuralModuleReachabilityReport(
+			request({ criterionLogicalPath: 'packages/demo/src/entry.ts', direction: 'FORWARD' }),
+			{ repositoryRoot: root }
+		);
+		expect(outcome.outcome).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		const pathByNode = new Map(
+			outcome.result.evidence.nodes.flatMap((node) =>
+				node.kind === 'SOURCE' ? [[node.id, node.logicalPath] as const] : []
+			)
+		);
+		expect(outcome.result.interpretation).toBe('STRUCTURAL_DEPENDENCY_CANDIDATES');
+		expect(outcome.result.analysis.members.map((member) => pathByNode.get(member.nodeId))).toEqual([
+			'packages/demo/src/entry.ts',
+			'packages/demo/src/middle.ts',
+			'packages/demo/src/leaf.ts'
+		]);
+	}, 60_000);
+
+	it('refuses independent graph-population and traversal budgets at the analysis stage', () => {
+		const root = fixture();
+		for (const budgetKey of [
+			'maxEdges',
+			'maxNodes',
+			'maxReachableNodes',
+			'maxTraversalSteps',
+			'maxWitnessEdges'
+		] as const) {
+			const baseline = request();
+			const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+			const outcome = runStructuralModuleReachabilityReport(
+				request({
+					budgets: {
+						...baseline.budgets,
+						reachability: { ...baseline.budgets.reachability, [budgetKey]: 1 }
+					}
+				}),
+				{ onProgress: (event) => progress.push(event), repositoryRoot: root }
+			);
+			expect(outcome, budgetKey).toMatchObject({
+				code: 'STRUCTURAL_MODULE_REACHABILITY_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'ANALYSIS',
+				state: 'resource-refused'
+			});
+			expect(structuralModuleReachabilityReportExitCode(outcome)).toBe(3);
+			expect(progress.at(-1), budgetKey).toMatchObject({
+				detailCode: 'BUDGET_EXCEEDED',
+				kind: 'REPORT_STAGE',
+				phase: 'ANALYSIS',
+				state: 'FAILED'
+			});
+		}
+	}, 60_000);
+
 	it('refuses an over-budget result instead of returning an empty successful population', () => {
 		const root = fixture();
 		const outcome = runStructuralModuleReachabilityReport(
@@ -470,6 +890,45 @@ describe('runStructuralModuleReachabilityReport', () => {
 		});
 		expect(structuralModuleReachabilityReportExitCode(outcome)).toBe(3);
 	});
+
+	it('contains a canonical result serialization failure at the exact terminal stage', () => {
+		const root = fixture();
+		const progress: StructuralModuleReachabilityReportProgressEvent[] = [];
+		let byteLength: ReturnType<typeof vi.spyOn> | undefined;
+		try {
+			const outcome = runStructuralModuleReachabilityReport(request(), {
+				onProgress: (event) => {
+					progress.push(event);
+					if (
+						byteLength === undefined &&
+						event.kind === 'REPORT_STAGE' &&
+						event.phase === 'RESULT' &&
+						event.state === 'STARTED'
+					)
+						byteLength = vi.spyOn(Buffer, 'byteLength').mockImplementation(() => {
+							throw new Error('synthetic canonical byte measurement failure');
+						});
+				},
+				repositoryRoot: root
+			});
+			expect(byteLength).toBeDefined();
+			expect(outcome).toMatchObject({
+				code: 'RESULT_SERIALIZATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'RESULT',
+				state: 'failed'
+			});
+			expect(structuralModuleReachabilityReportExitCode(outcome)).toBe(4);
+			expect(progress.at(-1)).toMatchObject({
+				detailCode: 'RESULT_SERIALIZATION_FAILED',
+				kind: 'REPORT_STAGE',
+				phase: 'RESULT',
+				state: 'FAILED'
+			});
+		} finally {
+			byteLength?.mockRestore();
+		}
+	}, 60_000);
 
 	it('reports exact canonical snapshot bytes when the semantic snapshot budget refuses the run', () => {
 		const root = fixture();

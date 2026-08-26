@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	PROJECT_CONTEXT_REPORT_NONCLAIMS,
 	PROJECT_CONTEXT_REPORT_OPERATION_VERSION,
@@ -14,6 +14,7 @@ import { canonicalSemanticJson } from '../semantic/canonical.js';
 import {
 	PROJECT_CONTEXT_REPORT_PROGRESS_NONCLAIMS,
 	PROJECT_CONTEXT_REPORT_PROGRESS_SCHEMA_VERSION,
+	admitProjectContextReportRequest,
 	captureProjectContextReportPipeline,
 	captureSemanticReportPipeline,
 	projectContextReportExitCode,
@@ -327,6 +328,37 @@ describe('runProjectContextReport', () => {
 		expect(outcome.stageOutcomes.currentness.state).toBe('STALE');
 	}, 90_000);
 
+	it('reports unavailable currentness when the captured subject can no longer be resolved', () => {
+		const root = fixture();
+		let invalidated = false;
+		const outcome = runProjectContextReport(request(), {
+			onProgress: (event) => {
+				if (
+					!invalidated &&
+					event.kind === 'REPORT_STAGE' &&
+					event.phase === 'PROJECT_CONTEXT' &&
+					event.state === 'COMPLETED'
+				) {
+					invalidated = true;
+					write(root, 'package.json', '{ malformed');
+				}
+			},
+			repositoryRoot: root
+		});
+		expect(invalidated).toBe(true);
+		expect(outcome.outcome).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		expect(outcome.result.currentness).toMatchObject({
+			changedPaths: [],
+			state: 'UNAVAILABLE'
+		});
+		expect(outcome.result.currentness.diagnosticCodes).toContain('CONFIG_MALFORMED');
+		expect(outcome.stageOutcomes.currentness).toEqual({
+			diagnosticCodes: outcome.result.currentness.diagnosticCodes,
+			state: 'UNAVAILABLE'
+		});
+	}, 90_000);
+
 	it('fails closed on hostile shapes, traversal, excessive ceilings, and absent projects', () => {
 		const root = fixture();
 		const extra = { ...request(), unexpected: true };
@@ -360,6 +392,194 @@ describe('runProjectContextReport', () => {
 			expect(outcome, code).toMatchObject({ code, outcome: 'unavailable' });
 			expect(projectContextReportExitCode(outcome), code).toBe(exitCode);
 		}
+	});
+
+	it('admits exact data and rejects malformed version, path, and project-list boundaries', () => {
+		const base = request();
+		const admitted = admitProjectContextReportRequest(base);
+		expect(admitted.outcome).toBe('admitted');
+		if (admitted.outcome !== 'admitted') throw new Error(JSON.stringify(admitted));
+		expect(admitted.request).toEqual(base);
+		expect(admitted.request).not.toBe(base);
+		expect(Object.isFrozen(admitted.request)).toBe(true);
+
+		const inherited = Object.assign(Object.create({ inherited: true }) as object, base);
+		const wrongProjectPrototype = ['tsconfig.json'];
+		Object.setPrototypeOf(wrongProjectPrototype, null);
+		const sparseProjects: string[] = [];
+		sparseProjects.length = 1;
+
+		const cases: readonly {
+			readonly code: string;
+			readonly path: string;
+			readonly state?: 'incompatible' | 'resource-refused';
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: inherited },
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				path: '$.schemaVersion',
+				value: { ...base, schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				path: '$.operationVersion',
+				value: { ...base, operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				path: '$.subjectProjectConfigPaths[0]',
+				value: { ...base, subjectProjectConfigPaths: [''] }
+			},
+			{
+				code: 'REQUEST_PATH_BUDGET_EXCEEDED',
+				path: '$.subjectProjectConfigPaths[0]',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						semantic: { ...base.budgets.semantic, maxPathCharacters: 1 }
+					}
+				}
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				path: '$.subjectProjectConfigPaths[0]',
+				value: { ...base, subjectProjectConfigPaths: ['bad*path.json'] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: wrongProjectPrototype }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: [] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_BUDGET_EXCEEDED',
+				path: '$.subjectProjectConfigPaths',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						subject: { ...base.budgets.subject, maxProjects: 1 }
+					},
+					subjectProjectConfigPaths: ['tsconfig.json', 'projects/left/tsconfig.json']
+				}
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: sparseProjects }
+			}
+		];
+
+		for (const malformed of cases) {
+			expect(admitProjectContextReportRequest(malformed.value), malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'rejected',
+				path: malformed.path,
+				state: malformed.state ?? 'incompatible'
+			});
+		}
+	});
+
+	it('classifies bounded, forbidden, missing, incompatible, and ambiguous subject capture', () => {
+		const budgetRoot = fixture();
+		const baseline = request();
+		const budget = runProjectContextReport(
+			request({
+				budgets: {
+					...baseline.budgets,
+					subject: { ...baseline.budgets.subject, maxFiles: 1 }
+				}
+			}),
+			{ repositoryRoot: budgetRoot }
+		);
+		expect(budget).toMatchObject({
+			code: 'SUBJECT_RESOURCE_REFUSED',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'resource-refused'
+		});
+
+		const forbiddenRoot = fixture();
+		const forbidden = captureSemanticReportPipeline(request(), {
+			repositoryRoot: forbiddenRoot,
+			subjectFilters: { exclude: [], include: ['../outside/**'] }
+		});
+		expect(forbidden).toMatchObject({
+			code: 'SUBJECT_FORBIDDEN',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const missingRoot = fixture();
+		const missing = captureProjectContextReportPipeline(request(), {
+			additionalArtifacts: ['verif/missing.ts'],
+			repositoryRoot: missingRoot
+		});
+		expect(missing).toMatchObject({
+			code: 'SUBJECT_NOT_FOUND',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const incompatibleRoot = fixture();
+		write(incompatibleRoot, 'projects/left/package.json', '{ malformed');
+		const incompatible = runProjectContextReport(request(), { repositoryRoot: incompatibleRoot });
+		expect(incompatible).toMatchObject({
+			code: 'SUBJECT_INCOMPATIBLE',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const ambiguousRoot = fixture();
+		json(ambiguousRoot, 'projects/duplicate/package.json', {
+			name: '@fixture/left',
+			private: true,
+			version: '0.0.0'
+		});
+		write(ambiguousRoot, 'projects/duplicate/src/index.ts', 'export const duplicate = true;\n');
+		const ambiguous = runProjectContextReport(request(), { repositoryRoot: ambiguousRoot });
+		expect(ambiguous).toMatchObject({
+			code: 'SUBJECT_AMBIGUOUS',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+	}, 90_000);
+
+	it('rejects directory subjects and invalid roots at their distinct terminal boundaries', () => {
+		const root = fixture();
+		const directory = runProjectContextReport(
+			request({ subjectProjectConfigPaths: ['projects'] }),
+			{ repositoryRoot: root }
+		);
+		expect(directory).toMatchObject({
+			code: 'PROJECT_PATH_INVALID',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const invalidRoot = runProjectContextReport(request(), {
+			repositoryRoot: join(root, 'missing-root')
+		});
+		expect(invalidRoot).toMatchObject({
+			code: 'REPOSITORY_ROOT_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+		expect(projectContextReportExitCode(invalidRoot)).toBe(4);
 	});
 
 	it('refuses every constraining project-context population/input budget without partial evidence', () => {
@@ -464,6 +684,28 @@ describe('runProjectContextReport', () => {
 		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
+	});
+
+	it('uses a deterministic elapsed-time fallback when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: ProjectContextReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementationOnce(() => {
+			throw new Error('clock unavailable');
+		});
+		try {
+			const outcome = runProjectContextReport(
+				{},
+				{
+					onProgress: (event) => progress.push(event),
+					repositoryRoot: root
+				}
+			);
+			expect(outcome).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', outcome: 'unavailable' });
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
 	});
 
 	it('adds successor-owned artifacts only to the internal same-subject capture seam', () => {

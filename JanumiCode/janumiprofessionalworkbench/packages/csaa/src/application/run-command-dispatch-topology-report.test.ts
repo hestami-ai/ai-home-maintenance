@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -38,6 +40,7 @@ import type {
 import {
 	admitCommandDispatchTopologyReportRequest,
 	commandDispatchTopologyReportExitCode,
+	runCommandDispatchTopologyReport,
 	runCommandDispatchTopologyReportWithDependencies,
 	type CommandDispatchTopologyReportProgressEvent,
 	type CommandDispatchTopologyReportRuntimeDependencies
@@ -291,6 +294,49 @@ describe('runCommandDispatchTopologyReport', { timeout: 60_000 }, () => {
 		});
 	});
 
+	it('rejects non-data request records and invalid scalar versions through the public facade', async () => {
+		const nonEnumerable = { ...request() };
+		Object.defineProperty(nonEnumerable, 'schemaVersion', {
+			enumerable: false,
+			value: COMMAND_DISPATCH_TOPOLOGY_REPORT_REQUEST_SCHEMA_VERSION
+		});
+		for (const malformed of [new Date(), nonEnumerable]) {
+			expect(admitCommandDispatchTopologyReportRequest(malformed)).toMatchObject({
+				code: 'REQUEST_SHAPE_INVALID',
+				outcome: 'rejected'
+			});
+		}
+		expect(
+			admitCommandDispatchTopologyReportRequest({
+				...request(),
+				operationVersion: 'unsupported'
+			})
+		).toMatchObject({ code: 'REQUEST_OPERATION_INCOMPATIBLE', outcome: 'rejected' });
+		expect(
+			admitCommandDispatchTopologyReportRequest({
+				...request(),
+				schemaVersion: 'unsupported'
+			})
+		).toMatchObject({ code: 'REQUEST_SCHEMA_INCOMPATIBLE', outcome: 'rejected' });
+		const base = request();
+		expect(
+			admitCommandDispatchTopologyReportRequest({
+				...base,
+				budgets: { ...base.budgets, maxResultBytes: 0 }
+			})
+		).toMatchObject({ code: 'REQUEST_BUDGET_INVALID', outcome: 'rejected' });
+
+		const publicOutcome = await runCommandDispatchTopologyReport(null, {
+			repositoryRoot: 'unused-for-rejected-request'
+		});
+		expect(publicOutcome).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST'
+		});
+		expect(commandDispatchTopologyReportExitCode(publicOutcome)).toBe(2);
+	});
+
 	it('emits full same-subject dispatch evidence and complete progress framing', async () => {
 		const { calls, dependencies, fixture, observations } = syntheticDependencies();
 		const progress: CommandDispatchTopologyReportProgressEvent[] = [];
@@ -350,6 +396,244 @@ describe('runCommandDispatchTopologyReport', { timeout: 60_000 }, () => {
 					.map((event) => event.state)
 			).toEqual(['STARTED', 'COMPLETED']);
 		expect(commandDispatchTopologyReportExitCode(outcome)).toBe(3);
+	});
+
+	it('classifies injected predecessor, selection, build, validation, and freshness failures', async () => {
+		const { dependencies, fixture } = syntheticDependencies();
+		const diagnostic = (code: string) => ({
+			code,
+			message: `Synthetic ${code}.`,
+			path: null,
+			phase: 'REQUEST'
+		});
+		const validation = (state: 'BUDGET_EXHAUSTED' | 'INVALID') => ({
+			issues: [
+				{
+					code: 'SYNTHETIC_VALIDATION_FAILURE',
+					message: `Synthetic ${state}.`,
+					path: '$.synthetic'
+				}
+			],
+			state
+		});
+		const run = (overrides: Partial<CommandDispatchTopologyReportRuntimeDependencies>) =>
+			runCommandDispatchTopologyReportWithDependencies(
+				fixtureRequest(fixture),
+				{ repositoryRoot: fixture.root },
+				{ ...dependencies, ...overrides }
+			);
+
+		const predecessorUnavailable = await run({
+			captureHandler: (async () => ({
+				code: 'SYNTHETIC_PREDECESSOR_UNAVAILABLE',
+				diagnostics: [
+					{
+						code: 'SYNTHETIC_PREDECESSOR_DIAGNOSTIC',
+						message: 'Synthetic predecessor diagnostic.',
+						path: null,
+						phase: 'SYNTHETIC',
+						predecessorSource: null,
+						severity: 'ERROR',
+						source: 'REPORT'
+					}
+				],
+				outcome: 'unavailable',
+				stage: 'SUBJECT',
+				state: 'failed'
+			})) as unknown as CommandDispatchTopologyReportRuntimeDependencies['captureHandler']
+		});
+		expect(predecessorUnavailable).toMatchObject({
+			code: 'SYNTHETIC_PREDECESSOR_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'failed'
+		});
+
+		for (const [validator, validationState, state] of [
+			['validateObservation', 'INVALID', 'failed'],
+			['validateObservation', 'BUDGET_EXHAUSTED', 'resource-refused'],
+			['validateHandlerGraph', 'INVALID', 'failed'],
+			['validateHandlerGraph', 'BUDGET_EXHAUSTED', 'resource-refused']
+		] as const) {
+			const outcome = await run({
+				[validator]: (() => validation(validationState)) as never
+			});
+			expect(outcome).toMatchObject({
+				code: 'PREDECESSOR_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'PREDECESSOR_PIPELINE',
+				state
+			});
+		}
+
+		const selectionUnavailable = await run({
+			selectCommandBus: (() => {
+				throw new Error('synthetic selector failure');
+			}) as CommandDispatchTopologyReportRuntimeDependencies['selectCommandBus']
+		});
+		expect(selectionUnavailable).toMatchObject({
+			code: 'COMMAND_BUS_SELECTION_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'COMMAND_DISPATCH_TOPOLOGY',
+			state: 'incompatible'
+		});
+
+		for (const [code, state] of [
+			['BUDGET_EXCEEDED', 'resource-refused'],
+			['REQUEST_INVALID', 'incompatible'],
+			['GRAPH_VALIDATION_FAILED', 'failed']
+		] as const) {
+			const outcome = await run({
+				buildTopology: (() => ({
+					diagnostics: [diagnostic(code)],
+					outcome: 'unavailable'
+				})) as CommandDispatchTopologyReportRuntimeDependencies['buildTopology']
+			});
+			expect(outcome).toMatchObject({
+				code: 'COMMAND_DISPATCH_TOPOLOGY_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'COMMAND_DISPATCH_TOPOLOGY',
+				state
+			});
+		}
+
+		for (const [validationState, state] of [
+			['INVALID', 'failed'],
+			['BUDGET_EXHAUSTED', 'resource-refused']
+		] as const) {
+			const outcome = await run({
+				validateTopology: (() =>
+					validation(
+						validationState
+					)) as CommandDispatchTopologyReportRuntimeDependencies['validateTopology']
+			});
+			expect(outcome).toMatchObject({
+				code: 'TOPOLOGY_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'COMMAND_DISPATCH_TOPOLOGY',
+				state
+			});
+		}
+
+		const freshnessUnavailable = await run({
+			verifySubject: (() => {
+				throw new Error('synthetic freshness failure');
+			}) as CommandDispatchTopologyReportRuntimeDependencies['verifySubject']
+		});
+		expect(freshnessUnavailable).toMatchObject({
+			outcome: 'partial',
+			result: { currentness: { state: 'UNAVAILABLE' } }
+		});
+	});
+
+	it('contains malformed predecessor telemetry and fails closed at diagnostic, serialization, and internal boundaries', async () => {
+		const nullOptions = await runCommandDispatchTopologyReport(null, null as never);
+		expect(nullOptions).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', stage: 'REQUEST' });
+
+		const { dependencies, fixture } = syntheticDependencies();
+		const progress: CommandDispatchTopologyReportProgressEvent[] = [];
+		const telemetry = await runCommandDispatchTopologyReportWithDependencies(
+			fixtureRequest(fixture),
+			{
+				onProgress(event) {
+					progress.push(event);
+					return Promise.reject(new Error('contained progress rejection'));
+				},
+				repositoryRoot: fixture.root
+			},
+			{
+				...dependencies,
+				async captureHandler(predecessorRequest, options) {
+					options.onProgress?.(1n as never);
+					const captured = await dependencies.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					return {
+						...captured,
+						diagnostics: [
+							{
+								code: 'SYNTHETIC_PREDECESSOR_WARNING',
+								message: `${fixture.root} synthetic warning.`,
+								path: null,
+								phase: 'SYNTHETIC',
+								predecessorSource: null,
+								severity: 'WARNING',
+								source: 'REPORT'
+							}
+						]
+					};
+				}
+			}
+		);
+		expect(telemetry.outcome).toBe('partial');
+		expect(progress.some((event) => event.kind === 'PREDECESSOR_REPORT')).toBe(true);
+
+		const diagnosticFailure = await runCommandDispatchTopologyReportWithDependencies(
+			fixtureRequest(fixture),
+			{ repositoryRoot: fixture.root },
+			{
+				...dependencies,
+				buildTopology: (() => ({
+					diagnostics: [
+						'$.budgets',
+						'$request.budgets.maxEdges',
+						'$request.unsupported',
+						join(fixture.root, 'synthetic.ts'),
+						'../escape',
+						'x'.repeat(10_000)
+					].map((path) => ({
+						code: 'GRAPH_VALIDATION_FAILED' as const,
+						message: `${fixture.root} synthetic diagnostic.`,
+						path,
+						phase: 'VALIDATE' as const
+					})),
+					outcome: 'unavailable'
+				})) as CommandDispatchTopologyReportRuntimeDependencies['buildTopology']
+			}
+		);
+		expect(diagnosticFailure).toMatchObject({
+			code: 'COMMAND_DISPATCH_TOPOLOGY_UNAVAILABLE',
+			diagnostics: expect.arrayContaining([
+				expect.objectContaining({ path: '$.budgets.commandDispatchTopology' }),
+				expect.objectContaining({ path: '$.budgets.commandDispatchTopology.maxEdges' }),
+				expect.objectContaining({ path: null })
+			]),
+			state: 'failed'
+		});
+
+		const serializationFailure = await runCommandDispatchTopologyReportWithDependencies(
+			fixtureRequest(fixture),
+			{ repositoryRoot: fixture.root },
+			{
+				...dependencies,
+				verifySubject: (() => ({
+					changedPaths: [1n] as never,
+					diagnostics: [],
+					state: 'STALE'
+				})) as typeof verifyFrozenSubject
+			}
+		);
+		expect(serializationFailure).toMatchObject({
+			code: 'RESULT_SERIALIZATION_FAILED',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+
+		const internalFailure = await runCommandDispatchTopologyReportWithDependencies(
+			fixtureRequest(fixture),
+			{ repositoryRoot: fixture.root },
+			{
+				...dependencies,
+				captureHandler: async () => {
+					throw new Error('synthetic predecessor failure');
+				}
+			}
+		);
+		expect(internalFailure).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(commandDispatchTopologyReportExitCode(internalFailure)).toBe(4);
 	});
 
 	it('rejects forged retained dispatch identity even if an injected validator says valid', async () => {

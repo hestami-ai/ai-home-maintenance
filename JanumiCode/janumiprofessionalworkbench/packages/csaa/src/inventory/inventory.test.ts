@@ -984,11 +984,66 @@ describe('inventory discovery and identity', () => {
 			version: '5.9.3'
 		});
 		expect(dependencyCruiser).toMatchObject({
-			adapterState: 'UNIMPLEMENTED',
+			adapterCapabilities: [
+				'current-dependency-cruiser-differential',
+				'dependency-graph-corroboration'
+			],
+			adapterState: 'INVENTORY_INTEGRATED',
 			configurationState: 'NOT_CONFIGURED',
 			gateState: 'NOT_GATE_WIRED',
 			installationState: 'NOT_LOCKED'
 		});
+		expect(
+			inventory.providers.find((provider) => provider.name === '@vitest/coverage-v8')
+		).toMatchObject({
+			adapterCapabilities: ['test-coverage-ingestion'],
+			adapterState: 'INVENTORY_INTEGRATED'
+		});
+		expect(inventory.providers.find((provider) => provider.name === 'eslint')).toMatchObject({
+			adapterCapabilities: ['eslint-result-ingestion'],
+			adapterState: 'INVENTORY_INTEGRATED'
+		});
+		expect(inventory.providers.find((provider) => provider.name === 'vitest')).toMatchObject({
+			adapterCapabilities: ['vitest-result-ingestion'],
+			adapterState: 'INVENTORY_INTEGRATED'
+		});
+	});
+
+	it('cites current dependency-cruiser differential evidence only when it is selected', () => {
+		const profiles = [
+			{
+				path: 'verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json',
+				selectedText:
+					'inventory generation records that path as provenance but does not execute the runner, independently validate the evidence'
+			},
+			{
+				path: 'verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json',
+				selectedText:
+					'inventory generation records that path as provenance but does not independently validate it'
+			}
+		] as const;
+		for (const profile of profiles) {
+			const root = fixture();
+			const absent = collectInventory({ repositoryRoot: root }).capabilities.find(
+				(capability) => capability.id === 'current-dependency-cruiser-differential'
+			);
+			expect(absent?.provenance).not.toContain(profile.path);
+			expect(absent?.explanation).toContain(`No selected ${profile.path} is present`);
+
+			write(root, profile.path, '{}\n');
+			const selected = collectInventory({ repositoryRoot: root }).capabilities.find(
+				(capability) => capability.id === 'current-dependency-cruiser-differential'
+			);
+			expect(selected?.provenance).toContain(profile.path);
+			expect(selected?.explanation).toContain(
+				`The selected subject includes ${profile.path}; ${profile.selectedText}`
+			);
+			expect(selected?.explanation).toContain('REVIEWED_DIFFERENTIAL_EVIDENCE_ONLY authority');
+			expect(selected?.explanation).toContain(
+				'optional dependency-cruiser metadata interpretation, negative-coverage closure'
+			);
+			expect(selected?.explanation).toContain('neither evidence check is a repository gate');
+		}
 	});
 
 	it('reports bounded semantic and graph capability provenance without widening claims', () => {
@@ -1007,11 +1062,14 @@ describe('inventory discovery and identity', () => {
 			'declaration-context-analysis',
 			'frozen-program-construction',
 			'guard-classification-static-overlay',
+			'jpwb-harmonization-native-projection',
 			'logical-graph-composition',
+			'module-code-slice',
 			'module-resolution-trace',
 			'project-context-graph',
 			'read-write-access-projection',
 			'semantic-source-query',
+			'semantic-snapshot-comparison',
 			'source-origin-correlation',
 			'static-module-impact-candidates',
 			'structural-module-reachability-analysis',
@@ -2391,13 +2449,193 @@ describe('inventory discovery and identity', () => {
 		expect(readWriteExplanation).toContain('parsed-request command adapter');
 		for (const nonclaim of READ_WRITE_ACCESS_REPORT_NONCLAIMS)
 			expect(readWriteExplanation).toContain(nonclaim);
-		for (const id of ['code-property-graph', 'control-flow', 'data-flow', 'security-query']) {
+		const reconciledPartialCapabilities = [
+			[
+				'runtime-traces',
+				'jpwb-deterministic-runtime-trace',
+				'packages/csaa/src/providers/runtime/import-runtime-trace.ts'
+			],
+			[
+				'hybrid-runtime-evaluation',
+				'jan-csaa-harmonization-hybrid-runtime',
+				'packages/csaa/src/providers/runtime/evaluate-hybrid-runtime.ts'
+			],
+			[
+				'test-coverage-ingestion',
+				'vitest-v8-coverage',
+				'packages/csaa/src/providers/coverage/import-vitest-v8-coverage.ts'
+			],
+			[
+				'security-query',
+				'jan-csaa-native-jpwb-security',
+				'packages/csaa/src/providers/security/observe-jpwb-security.ts'
+			],
+			[
+				'eslint-result-ingestion',
+				'eslint',
+				'packages/csaa/src/providers/eslint/import-eslint-json.ts'
+			],
+			[
+				'vitest-result-ingestion',
+				'vitest',
+				'packages/csaa/src/providers/vitest/import-vitest-json.ts'
+			],
+			[
+				'four-valued-query-operation',
+				'implementation-local-four-valued-query-operation',
+				'packages/csaa/src/query/four-valued-query-operation.ts'
+			],
+			[
+				'module-code-slice',
+				'typescript+validated-module-dependency-graph',
+				'packages/csaa/src/query/module-code-slice.ts'
+			],
+			[
+				'semantic-snapshot-comparison',
+				'typescript+implementation-local-semantic-snapshot-comparison',
+				'packages/csaa/src/impact/semantic-snapshot-comparison.ts'
+			],
+			[
+				'harmonization-first-increment-rule-evaluation',
+				'implementation-local-harmonization-rule-evaluator',
+				'packages/csaa/src/rules/harmonization-first-increment-rules.ts'
+			],
+			[
+				'harmonization-benchmark-accounting',
+				'implementation-local-harmonization-benchmark-accounting',
+				'packages/csaa/src/rules/harmonization-benchmark-accounting.ts'
+			],
+			[
+				'jpwb-harmonization-native-projection',
+				'typescript-public-ast-plus-bounded-schema-and-registry-projection',
+				'packages/csaa/src/rules/jpwb-harmonization-native-projection.ts'
+			],
+			[
+				'coding-agent-cli-process',
+				'jan-csaa-coding-agent-cli',
+				'packages/csaa/src/cli/run-coding-agent-process.ts'
+			],
+			[
+				'content-addressed-persistence',
+				'jan-csaa-content-addressed-file-store',
+				'packages/csaa/src/persistence/content-addressed-file-store.ts'
+			],
+			[
+				'advanced-cpg-provider-disposition',
+				null,
+				'verif/csaa/experimental/dwp-009.local-provider-disposition.evidence.json'
+			],
+			[
+				'current-dependency-cruiser-differential',
+				'typescript+dependency-cruiser',
+				'packages/csaa/src/graph/run-current-dependency-cruiser-differential.ts'
+			]
+		] as const;
+		for (const [id, provider, provenance] of reconciledPartialCapabilities) {
 			expect(capabilities.get(id)).toMatchObject({
-				explanation: expect.stringContaining('no control-flow, data-flow'),
+				provider,
+				provenance: expect.arrayContaining([provenance]),
+				state: 'PARTIAL'
+			});
+		}
+		expect(capabilities.get('runtime-traces')?.explanation).toContain(
+			'inventory generation neither executes subject code nor imports a current trace'
+		);
+		expect(capabilities.get('hybrid-runtime-evaluation')?.explanation).toContain(
+			'derives exactly five rule-specific DFG or TAINT prerequisite rows from exact retained FrozenSubject bytes'
+		);
+		expect(capabilities.get('hybrid-runtime-evaluation')?.provenance).toContain(
+			'packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.ts'
+		);
+		expect(capabilities.get('security-query')?.explanation).toContain(
+			'applies exactly three bounded public-TypeScript-AST rules'
+		);
+		expect(capabilities.get('test-coverage-ingestion')?.explanation).toContain(
+			'Inventory generation does not run Vitest or ingest a current coverage output'
+		);
+		expect(capabilities.get('module-code-slice')?.explanation).toContain(
+			'validated-module-dependency-bounded-may-slice/1.0.0'
+		);
+		expect(capabilities.get('jpwb-harmonization-native-projection')?.explanation).toContain(
+			'a separate current-JPWB production-composition smoke independently resolves and verifies the bounded subject'
+		);
+		expect(capabilities.get('jpwb-harmonization-native-projection')?.explanation).toContain(
+			'five DETECTED, zero NOT_DETECTED, and 18 UNSUPPORTED'
+		);
+		expect(capabilities.get('jpwb-harmonization-native-projection')?.provenance).toContain(
+			'packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.explanation).toContain(
+			'A focused production-host golden executes persistent artifact put/get and all seven operations through independent Bun processes'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.provenance).toContain(
+			'packages/csaa/src/cli/coding-agent-process.spawn.integration.test.ts'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.provenance).toContain(
+			'packages/csaa/command-subjects/current-jpwb-coding-agent/tsconfig.json'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.explanation).toContain(
+			'A separate current-JPWB production-composition smoke executes all seven operations over one sound bounded exact subject'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.explanation).toContain(
+			'five source-bound hybrid prerequisite rows'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.provenance).toContain(
+			'scripts/csaa-technical-completion.ts'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.provenance).toContain(
+			'scripts/mutants/tree-baseline.ts'
+		);
+		expect(capabilities.get('coding-agent-cli-process')?.explanation).toContain(
+			'captures the exact staged index'
+		);
+		expect(capabilities.get('content-addressed-persistence')).toMatchObject({
+			provenance: expect.arrayContaining([
+				'verif/csaa/dwp-007.content-addressed-store.cold-warm.evidence.json',
+				'verif/csaa/dwp-007.persistence-selection.evidence.json'
+			])
+		});
+		expect(capabilities.get('content-addressed-persistence')?.explanation).toContain(
+			'A checked empirical evidence artifact records five real cold/warm pairs'
+		);
+		expect(capabilities.get('content-addressed-persistence')?.explanation).toContain(
+			'chooses CONTENT_ADDRESSED_FILES'
+		);
+		expect(capabilities.get('advanced-cpg-provider-disposition')?.explanation).toContain(
+			'DEFER disposition'
+		);
+		expect(capabilities.get('advanced-cpg-provider-disposition')?.explanation).toContain(
+			'no install, network, upload, license, system change'
+		);
+		expect(capabilities.get('current-dependency-cruiser-differential')?.explanation).toContain(
+			'The broad asymmetric profile captures one exact packages/rph-contracts/tsconfig.build.json compiler slice'
+		);
+		expect(capabilities.get('current-dependency-cruiser-differential')?.explanation).toContain(
+			'The aligned G4 profile fixes dependency-cruiser to the exact ten authored build-root files'
+		);
+		expect(capabilities.get('current-dependency-cruiser-differential')?.explanation).toContain(
+			'CLOSED_FOR_EXACT_BUILD_ROOT_AND_REPRESENTED_RELATION_POPULATIONS'
+		);
+		expect(capabilities.get('current-dependency-cruiser-differential')?.explanation).toContain(
+			'No selected verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json is present'
+		);
+		expect(capabilities.get('current-dependency-cruiser-differential')?.explanation).toContain(
+			'No selected verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json is present'
+		);
+		for (const id of ['code-property-graph', 'control-flow', 'data-flow']) {
+			expect(capabilities.get(id)).toMatchObject({
+				explanation: expect.stringContaining(
+					'Universal code-property-graph, control-flow, and data-flow support is not implemented'
+				),
 				provider: null,
 				state: 'UNIMPLEMENTED'
 			});
 		}
+		expect(
+			[...capabilities.values()]
+				.filter((capability) => capability.state === 'UNIMPLEMENTED')
+				.map((capability) => capability.id)
+		).toEqual(['code-property-graph', 'control-flow', 'data-flow']);
 		expect(
 			inventory.unknowns.some((entry) =>
 				entry.statement.includes('Program construction remains deferred')
@@ -2635,9 +2873,11 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			"source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures"
 		);
-		expect(semanticBoundary).toContain('JAN-CSAA-CAP-030 code slicing');
 		expect(semanticBoundary).toContain(
-			'graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses'
+			'broader JAN-CSAA-CAP-030 code slicing beyond the implemented module-dependency-bounded may-slice'
+		);
+		expect(semanticBoundary).toContain(
+			'graph algorithms beyond these bounded SCC, single-criterion module-reachability, and module-dependency-bounded may-slice analyses'
 		);
 		expect(semanticBoundary).toContain(
 			'graph composition beyond the exact declared two-layer mapping'
@@ -2646,7 +2886,30 @@ describe('inventory discovery and identity', () => {
 		expect(semanticBoundary).toContain(
 			'Inventory generation executes or benchmarks none of these analysis providers'
 		);
+		expect(semanticBoundary).toContain(
+			'The source-evidenced PARTIAL additions are a four-valued query facade, a dependency-bounded module may-slice, semantic-source comparison, 23-rule evaluation and native projection, all-75 benchmark accounting'
+		);
+		expect(semanticBoundary).toContain(
+			'product performance thresholds or SLOs, external G10 acceptance, repository-wide G4/G5/G6 passage, and gate or analysis authority remain unclaimed'
+		);
+		expect(semanticBoundary).toContain(
+			'DWP-009 has only a dated local DEFER disposition with CodeQL and Joern unavailable in the recorded environment; it does not implement a code property graph'
+		);
 		expect(semanticBoundary).toContain('generalized state-machine inference');
+		expect(
+			inventory.unknowns.some((entry) =>
+				entry.statement.includes(
+					'The Vitest V8 coverage adapter is implemented, but inventory generation does not invoke it'
+				)
+			)
+		).toBe(true);
+		expect(
+			inventory.unknowns.some((entry) =>
+				entry.statement.includes(
+					'Runtime-trace, bounded native-security, ESLint, Vitest, and coverage import surfaces are implemented but not invoked by inventory generation'
+				)
+			)
+		).toBe(true);
 		const verificationAuthority = inventory.unknowns.find((entry) =>
 			entry.statement.includes('Existing graph-relevant verif censuses remain authoritative')
 		);
@@ -5484,6 +5747,24 @@ describe('JPWB population non-vacuity', () => {
 		expect(
 			verificationAssets.find(
 				(asset) => asset.path === 'verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json'
+			)
+		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
+		expect(
+			verificationAssets.find(
+				(asset) =>
+					asset.path === 'verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json'
+			)
+		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
+		expect(
+			verificationAssets.find(
+				(asset) =>
+					asset.path ===
+					'verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json'
+			)
+		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
+		expect(
+			verificationAssets.find(
+				(asset) => asset.path === 'verif/csaa/dwp-007.persistence-selection.evidence.json'
 			)
 		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
 		expect(inventory.dependencyBoundary.analyzedPerimeter).toEqual(['packages']);

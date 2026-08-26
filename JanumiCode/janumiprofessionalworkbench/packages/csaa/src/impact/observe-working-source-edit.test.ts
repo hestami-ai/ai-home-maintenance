@@ -13,6 +13,7 @@ import {
 	bindWorkingSourceEditObservation,
 	isWorkingSourceEditObservationError,
 	observeWorkingSourceEdit,
+	sameWorkingSourceEditCapture,
 	verifyWorkingSourceEditObservation,
 	workingSourceEditTextRanges,
 	type WorkingSourceEditObservationError
@@ -21,7 +22,8 @@ import {
 const temporaryRoots: string[] = [];
 
 afterEach(() => {
-	for (const root of temporaryRoots.splice(0)) rmSync(root, { force: true, recursive: true });
+	for (const root of temporaryRoots.splice(0))
+		rmSync(root, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 function testGitEnvironment(): NodeJS.ProcessEnv {
@@ -102,7 +104,7 @@ function supportsSha256Repositories(): boolean {
 		});
 		return result.error === undefined && result.status === 0;
 	} finally {
-		rmSync(root, { force: true, recursive: true });
+		rmSync(root, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 	}
 }
 
@@ -142,6 +144,121 @@ function observe(
 }
 
 describe('working source edit observation', () => {
+	it('rejects invalid observation budgets, roots, paths, base identities, clocks, and provider lookup', () => {
+		const validRoot = mkdtempSync(join(tmpdir(), 'csaa-working-edit-admission-'));
+		temporaryRoots.push(validRoot);
+		const valid = {
+			budgets: budgets(),
+			expectedHeadOid: 'a'.repeat(40),
+			logicalPath: 'source.ts',
+			rootLocator: validRoot
+		};
+		for (const invalidBudget of [
+			budgets({ maxGitMetadataBytes: 0 }),
+			budgets({ maxGitOperationDurationMs: -0 }),
+			budgets({
+				maxSourceBytes:
+					WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.observation.maxSourceBytes + 1
+			})
+		])
+			expect(
+				observationError(() => observeWorkingSourceEdit({ ...valid, budgets: invalidBudget })).code
+			).toBe('OBSERVATION_BUDGET_INVALID');
+
+		const ordinaryFile = join(validRoot, 'ordinary-file');
+		writeFileSync(ordinaryFile, 'file');
+		for (const rootLocator of ['relative', join(validRoot, 'missing'), ordinaryFile])
+			expect(observationError(() => observeWorkingSourceEdit({ ...valid, rootLocator })).code).toBe(
+				'REPOSITORY_ROOT_INVALID'
+			);
+
+		const pathCases: readonly [string, string, string][] = [
+			['bad\0path', 'SOURCE_PATH_INVALID', 'incompatible'],
+			['bad\ud800', 'SOURCE_PATH_INVALID', 'incompatible'],
+			['../escape.ts', 'SOURCE_PATH_INVALID', 'incompatible'],
+			['x'.repeat(valid.budgets.maxPathCharacters + 1), 'SOURCE_PATH_INVALID', 'resource-refused']
+		];
+		for (const [logicalPath, code, state] of pathCases)
+			expect(
+				observationError(() => observeWorkingSourceEdit({ ...valid, logicalPath }))
+			).toMatchObject({ code, state });
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit({ ...valid, expectedHeadOid: 'A'.repeat(40) })
+			).code
+		).toBe('BASE_COMMIT_OID_INVALID');
+		const nonRepositoryError = observationError(() => observeWorkingSourceEdit(valid));
+		expect(nonRepositoryError).toMatchObject({
+			code: 'GIT_OPERATION_FAILED',
+			stage: 'GIT_PROVIDER'
+		});
+
+		const bareRoot = mkdtempSync(join(tmpdir(), 'csaa-working-edit-bare-'));
+		temporaryRoots.push(bareRoot);
+		git(bareRoot, ['init', '--bare', '--quiet']);
+		expect(
+			observationError(() => observeWorkingSourceEdit({ ...valid, rootLocator: bareRoot }))
+		).toMatchObject({ code: 'GIT_WORKTREE_REQUIRED', stage: 'GIT_PROVIDER' });
+
+		const subject = repository({ 'source.ts': 'export const value = 1;\n' });
+		writeFileSync(join(subject.root, 'source.ts'), 'export const value = 2;\n');
+		const observable = {
+			budgets: budgets(),
+			expectedHeadOid: subject.headOid,
+			logicalPath: 'source.ts',
+			rootLocator: subject.root
+		};
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit(observable, {
+					clockSources: {
+						monotonicNow: () => {
+							throw new Error('clock failed');
+						},
+						wallNow: () => 1
+					}
+				})
+			).code
+		).toBe('GIT_OBSERVATION_CLOCK_FAILED');
+		let monotonicCalls = 0;
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit(observable, {
+					clockSources: {
+						monotonicNow: () => {
+							monotonicCalls += 1;
+							if (monotonicCalls === 1) return 0;
+							throw new Error('clock failed after admission');
+						},
+						wallNow: () => 1
+					}
+				})
+			).code
+		).toBe('GIT_OBSERVATION_CLOCK_FAILED');
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit(observable, {
+					clockSources: {
+						monotonicNow: () => 0,
+						wallNow: () => Number.MAX_SAFE_INTEGER
+					}
+				})
+			).code
+		).toBe('GIT_OBSERVATION_CLOCK_FAILED');
+
+		const pathEntries = Object.keys(process.env).filter((key) => key.toUpperCase() === 'PATH');
+		const inherited = pathEntries.map((key) => [key, process.env[key]] as const);
+		try {
+			for (const key of pathEntries) delete process.env[key];
+			expect(observationError(() => observeWorkingSourceEdit(observable)).code).toBe(
+				'GIT_PROVIDER_UNAVAILABLE'
+			);
+		} finally {
+			for (const [key, value] of inherited) if (value !== undefined) process.env[key] = value;
+		}
+		expect(isWorkingSourceEditObservationError(new Error('ordinary'))).toBe(false);
+	});
+
 	it('captures one nested raw edit with literal path identity while ignoring other-path state', () => {
 		const before = 'export const face = "\ud83c\ude00";\n';
 		const after = 'export const face = "\ud83d\ude00";\n';
@@ -223,6 +340,13 @@ describe('working source edit observation', () => {
 		expect(observationError(() => observe(untracked, 'source.ts')).code).toBe(
 			'HEAD_TREE_ENTRY_MISSING'
 		);
+
+		const directoryReplacement = repository({ 'source.ts': 'export const value = 1;\n' });
+		unlinkSync(join(directoryReplacement.root, 'source.ts'));
+		mkdirSync(join(directoryReplacement.root, 'source.ts'));
+		expect(observationError(() => observe(directoryReplacement, 'source.ts')).code).toBe(
+			'SOURCE_NOT_REGULAR'
+		);
 	});
 
 	it('refuses a symlink-mode immutable tree entry before reading the worktree path', () => {
@@ -260,6 +384,10 @@ describe('working source edit observation', () => {
 			afterRange: { endUtf16: 14, startUtf16: 7 },
 			beforeRange: { endUtf16: 7, startUtf16: 7 }
 		});
+		expect(workingSourceEditTextRanges('A😀x', 'A😁x')).toEqual({
+			afterRange: { endUtf16: 3, startUtf16: 1 },
+			beforeRange: { endUtf16: 3, startUtf16: 1 }
+		});
 	});
 
 	it('refuses source and Git metadata resource excess with safe typed diagnostics', () => {
@@ -278,14 +406,47 @@ describe('working source edit observation', () => {
 		expect(metadataError.message).not.toContain(subject.root);
 	});
 
+	it('refuses an over-budget nested repository path and a base OID of the wrong object format', () => {
+		const subject = repository({ 'nested/source.ts': 'export const value = 1;\n' });
+		writeFileSync(join(subject.root, 'nested', 'source.ts'), 'export const value = 2;\n');
+		const nestedRoot = join(subject.root, 'nested');
+		expect(
+			observationError(() =>
+				observe(
+					subject,
+					'source.ts',
+					nestedRoot,
+					budgets({ maxPathCharacters: 'source.ts'.length })
+				)
+			).code
+		).toBe('SOURCE_PATH_BUDGET_EXCEEDED');
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit({
+					budgets: budgets(),
+					expectedHeadOid: 'a'.repeat(64),
+					logicalPath: 'nested/source.ts',
+					rootLocator: subject.root
+				})
+			).code
+		).toBe('BASE_COMMIT_OBJECT_FORMAT_MISMATCH');
+	});
+
 	it('scrubs inherited Git redirection and unsafe empty or repository PATH entries', () => {
-		const subject = repository({ 'source.ts': 'export const value = 1;\n' });
+		const subject = repository({
+			'nested/source.ts': 'export const nested = 1;\n',
+			'source.ts': 'export const value = 1;\n'
+		});
 		const decoy = repository({ 'source.ts': 'export const decoy = true;\n' });
 		writeFileSync(join(subject.root, 'source.ts'), 'export const value = 2;\n');
+		writeFileSync(join(subject.root, 'nested', 'source.ts'), 'export const nested = 2;\n');
 		writeFileSync(join(subject.root, '.gitattributes'), 'source.ts filter=csaa-hostile\n');
 		git(subject.root, ['config', 'filter.csaa-hostile.clean', 'false']);
 		git(subject.root, ['config', 'filter.csaa-hostile.smudge', 'false']);
 		git(subject.root, ['config', 'filter.csaa-hostile.process', 'false']);
+		const decoyExecutableRoot = mkdtempSync(join(tmpdir(), 'csaa-working-edit-decoy-bin-'));
+		temporaryRoots.push(decoyExecutableRoot);
+		mkdirSync(join(decoyExecutableRoot, process.platform === 'win32' ? 'git.exe' : 'git'));
 		const inherited = new Map<string, string | undefined>();
 		for (const key of [
 			'GIT_DIR',
@@ -310,10 +471,19 @@ describe('working source edit observation', () => {
 				process.env.LD_PRELOAD = '/csaa/definitely-missing-preload-library.so';
 			}
 			process.env.PAGER = 'false';
-			process.env.PATH = `${subject.root}${delimiter}${delimiter}${process.env.PATH ?? ''}`;
+			process.env.PATH = [
+				join(subject.root, 'missing-bin'),
+				join(subject.root, 'source.ts'),
+				decoyExecutableRoot,
+				subject.root,
+				'',
+				process.env.PATH ?? ''
+			].join(delimiter);
 			const capture = observe(subject, 'source.ts');
 			expect(capture.observation.git.headOid).toBe(subject.headOid);
 			expect(capture.observation.source.after.sha256).toBe(sha256('export const value = 2;\n'));
+			const nestedCapture = observe(subject, 'source.ts', join(subject.root, 'nested'));
+			expect(nestedCapture.observation.source.repositoryPath).toBe('nested/source.ts');
 		} finally {
 			for (const [key, value] of inherited)
 				if (value === undefined) delete process.env[key];
@@ -421,5 +591,67 @@ describe('working source edit observation', () => {
 		expect(stale.code).toBe('WORKING_SOURCE_EDIT_OBSERVATION_STALE');
 		expect(stale.stage).toBe('CURRENTNESS');
 		expect(stale.state).toBe('stale');
+	});
+
+	it('fails closed when currentness setup throws or current bytes change, and re-verifies exact captures', () => {
+		const subject = repository({ 'source.ts': 'export const value = 1;\n' });
+		const edited = 'export const value = 2;\n';
+		writeFileSync(join(subject.root, 'source.ts'), edited);
+		const options = {
+			budgets: budgets(),
+			expectedHeadOid: subject.headOid,
+			logicalPath: 'source.ts',
+			rootLocator: subject.root
+		};
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit(options, {
+					beforeCurrentnessRecheck() {
+						throw new Error('synthetic setup failure');
+					}
+				})
+			)
+		).toMatchObject({ code: 'CURRENTNESS_RECHECK_SETUP_FAILED', state: 'failed' });
+
+		writeFileSync(join(subject.root, 'source.ts'), edited);
+		expect(
+			observationError(() =>
+				observeWorkingSourceEdit(options, {
+					beforeCurrentnessRecheck() {
+						writeFileSync(join(subject.root, 'source.ts'), 'export const value = 3;\n');
+					}
+				})
+			)
+		).toMatchObject({ code: 'SOURCE_CHANGED_DURING_CAPTURE', state: 'stale' });
+
+		writeFileSync(join(subject.root, 'source.ts'), edited);
+		const capture = observeWorkingSourceEdit(options);
+		const verified = verifyWorkingSourceEditObservation(capture);
+		expect(sameWorkingSourceEditCapture(capture, verified)).toBe(true);
+		expect(
+			observationError(() =>
+				verifyWorkingSourceEditObservation({
+					...capture,
+					budgets: budgets({ maxGitMetadataBytes: 1 })
+				})
+			)
+		).toMatchObject({ state: 'resource-refused' });
+		expect(
+			sameWorkingSourceEditCapture(capture, {
+				...verified,
+				currentBytes: Uint8Array.of(0)
+			})
+		).toBe(false);
+
+		const vanished = repository({ 'source.ts': 'export const value = 1;\n' });
+		writeFileSync(join(vanished.root, 'source.ts'), 'export const value = 2;\n');
+		const vanishedCapture = observe(vanished, 'source.ts');
+		unlinkSync(join(vanished.root, 'source.ts'));
+		expect(
+			observationError(() => verifyWorkingSourceEditObservation(vanishedCapture))
+		).toMatchObject({
+			code: 'WORKING_SOURCE_EDIT_OBSERVATION_STALE',
+			state: 'stale'
+		});
 	});
 });

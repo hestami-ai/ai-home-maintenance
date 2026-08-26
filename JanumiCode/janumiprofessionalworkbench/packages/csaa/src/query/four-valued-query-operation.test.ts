@@ -270,6 +270,52 @@ describe('four-valued query operation contract', () => {
 			'SHORT_CIRCUITED'
 		]);
 	});
+
+	it('rejects a non-plain request shell', () => {
+		class RequestShell {}
+		const candidate = Object.assign(new RequestShell(), request(value('root', 'TRUE')));
+		expect(validateFourValuedQueryOperationRequest(candidate)).toMatchObject({
+			diagnostic: { code: 'REQUEST_SHAPE_INVALID' },
+			state: 'REFUSED'
+		});
+	});
+
+	it('rejects an embedded request that can no longer reproduce an evaluated outcome', () => {
+		const candidate = mutableRecord(structuredClone(evaluatedReport(value('root', 'TRUE'))));
+		const retainedRequest = mutableRecord(candidate.request);
+		retainedRequest.budgets = {
+			...mutableRecord(retainedRequest.budgets),
+			maxResultBytes: 1
+		};
+		expect(validateFourValuedQueryEvaluationReport(candidate)).toMatchObject({
+			diagnostic: { code: 'EVALUATED_REPORT_INVALID' },
+			state: 'INVALID'
+		});
+	});
+
+	it('accounts for a quantifier node skipped by a decisive logical operand', () => {
+		const expression: FourValuedExpression = {
+			kind: 'AND',
+			nodeId: 'root-with-skipped-quantifier',
+			operands: [
+				value('decisive-false-for-quantifier', 'FALSE'),
+				{
+					closure: 'CLOSED',
+					completeness: 'COMPLETE',
+					kind: 'ALL',
+					members: [],
+					nodeId: 'skipped-all'
+				}
+			]
+		};
+		const outcome = runFourValuedQueryOperation(request(expression, { mode: 'SHORT_CIRCUIT' }));
+		expect(outcome).toMatchObject({
+			outcome: 'evaluated',
+			result: {
+				explanation: { accounting: { shortCircuitedQuantifierNodes: 1 } }
+			}
+		});
+	});
 });
 
 describe('four-valued query operation admission and budgets', () => {
@@ -297,6 +343,46 @@ describe('four-valued query operation admission and budgets', () => {
 			state: 'REFUSED'
 		});
 		expect(getterHits).toBe(0);
+	});
+
+	it('admits supplementary Unicode scalars and distinguishes invalid from excessive budgets', () => {
+		expect(
+			runFourValuedQueryOperation(
+				request(value('literal-\u{1f642}', 'TRUE'), {
+					executionId: 'execution:\u{1f642}',
+					query: {
+						id: 'query:\u{1f642}',
+						purpose: 'Exercise a valid supplementary Unicode scalar.',
+						version: '0.1.0'
+					}
+				})
+			)
+		).toMatchObject({ outcome: 'evaluated' });
+		const base = request(value('root', 'TRUE'));
+		expect(
+			runFourValuedQueryOperation({
+				...base,
+				budgets: { ...base.budgets, maxExplanationRecords: 0 }
+			})
+		).toMatchObject({
+			code: 'REQUEST_BUDGET_INVALID',
+			outcome: 'unavailable',
+			state: 'incompatible'
+		});
+		expect(
+			runFourValuedQueryOperation({
+				...base,
+				budgets: {
+					...base.budgets,
+					maxExplanationRecords:
+						FOUR_VALUED_QUERY_OPERATION_SAFETY_CEILINGS.maxExplanationRecords + 1
+				}
+			})
+		).toMatchObject({
+			code: 'REQUEST_BUDGET_INVALID',
+			outcome: 'unavailable',
+			state: 'resource-refused'
+		});
 	});
 
 	it('rejects open shells, nested budget drift, proxies, bad versions, modes, and text', () => {
@@ -560,6 +646,30 @@ describe('four-valued query evaluated-report validation', () => {
 		expectDeeplyFrozen(validation);
 	});
 
+	it('reconstructs NOT, ALL, and ANY evaluated reports exactly', () => {
+		const expressions: readonly FourValuedExpression[] = [
+			{ kind: 'NOT', nodeId: 'not-root', operand: value('not-leaf', 'FALSE') },
+			{
+				closure: 'CLOSED',
+				completeness: 'COMPLETE',
+				kind: 'ALL',
+				members: [value('all-leaf', 'TRUE')],
+				nodeId: 'all-root'
+			},
+			{
+				closure: 'OPEN',
+				completeness: 'INCOMPLETE',
+				kind: 'ANY',
+				members: [value('any-leaf', 'UNKNOWN')],
+				nodeId: 'any-root'
+			}
+		];
+		for (const candidateExpression of expressions)
+			expect(
+				validateFourValuedQueryEvaluationReport(evaluatedReport(candidateExpression))
+			).toMatchObject({ state: 'VALID' });
+	});
+
 	it('rejects envelope, conclusion, evidence, trace, accounting, query, and nonclaim drift', () => {
 		const report = evaluatedReport(expression, { mode: 'SHORT_CIRCUIT' });
 		const tamperers: readonly ((candidate: Record<string, unknown>) => void)[] = [
@@ -638,6 +748,136 @@ describe('four-valued query evaluated-report validation', () => {
 			state: 'INVALID'
 		});
 		expect(proxyTrapHits).toBe(0);
+	});
+
+	it('rejects bounded closed-data and normalized-expression corruption modes', () => {
+		const invalid = (candidate: unknown): void => {
+			expect(validateFourValuedQueryEvaluationReport(candidate)).toMatchObject({
+				diagnostic: { code: 'EVALUATED_REPORT_INVALID', stage: 'RESULT' },
+				state: 'INVALID'
+			});
+		};
+		const normalized = (candidate: Record<string, unknown>): Record<string, unknown> =>
+			mutableRecord(mutableRecord(mutableRecord(candidate.result).evaluation).expression);
+		const nodes = (candidate: Record<string, unknown>): Record<string, unknown>[] =>
+			mutableArray(normalized(candidate).nodes).map((node) => mutableRecord(node));
+		const nodeById = (
+			candidate: Record<string, unknown>,
+			nodeId: string
+		): Record<string, unknown> => {
+			const node = nodes(candidate).find((entry) => entry.nodeId === nodeId);
+			if (node === undefined) throw new Error(`Missing fixture node ${nodeId}.`);
+			return node;
+		};
+		const report = evaluatedReport(expression, { mode: 'SHORT_CIRCUIT' });
+		const mutate = (
+			base: FourValuedQueryOperationEvaluatedOutcome,
+			change: (candidate: Record<string, unknown>) => void
+		): Record<string, unknown> => {
+			const candidate = mutableRecord(structuredClone(base));
+			change(candidate);
+			return candidate;
+		};
+
+		let nested: Record<string, unknown> = { leaf: true };
+		for (let index = 0; index < 130; index += 1) nested = { next: nested };
+		invalid(
+			mutate(report, (candidate) => {
+				mutableRecord(candidate.request).query = nested;
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				mutableRecord(candidate.request).expressionNodeCount = Number.NaN;
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				class NonPlainArray extends Array<unknown> {}
+				candidate.diagnostics = new NonPlainArray();
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				const trace = mutableArray(mutableRecord(mutableRecord(candidate.result).evaluation).trace);
+				Object.defineProperty(trace, '0', {
+					enumerable: false,
+					value: trace[0]
+				});
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				Object.setPrototypeOf(mutableRecord(candidate.result), Date.prototype);
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				Object.defineProperty(candidate, 'bad\ud800', { enumerable: true, value: true });
+			})
+		);
+		invalid(null);
+
+		const normalizedCases: readonly ((candidate: Record<string, unknown>) => void)[] = [
+			(candidate) => {
+				mutableArray(normalized(candidate).nodes)[0] = null;
+			},
+			(candidate) => {
+				nodes(candidate)[0]!.nodeId = nodes(candidate)[1]!.nodeId;
+			},
+			(candidate) => {
+				mutableArray(nodeById(candidate, 'report-root').childNodeIds).push('report-true');
+			},
+			(candidate) => {
+				normalized(candidate).rootNodeId = 'missing-root';
+			},
+			(candidate) => {
+				mutableArray(nodeById(candidate, 'report-root').childNodeIds)[0] = 'report-root';
+			},
+			(candidate) => {
+				nodeById(candidate, 'report-false').truth = 7;
+			},
+			(candidate) => {
+				nodeById(candidate, 'report-false').kind = 'UNSUPPORTED';
+			},
+			(candidate) => {
+				mutableArray(normalized(candidate).nodes).push({
+					childNodeIds: [],
+					kind: 'VALUE',
+					nodeId: 'unreachable',
+					truth: 'TRUE'
+				});
+			}
+		];
+		for (const change of normalizedCases) invalid(mutate(report, change));
+
+		const notReport = evaluatedReport({
+			kind: 'NOT',
+			nodeId: 'not-root',
+			operand: value('not-leaf', 'TRUE')
+		});
+		invalid(
+			mutate(notReport, (candidate) => {
+				nodeById(candidate, 'not-root').childNodeIds = [];
+			})
+		);
+		invalid(
+			mutate(report, (candidate) => {
+				nodeById(candidate, 'report-root').childNodeIds = [];
+			})
+		);
+		const allReport = evaluatedReport({
+			closure: 'CLOSED',
+			completeness: 'COMPLETE',
+			kind: 'ALL',
+			members: [value('all-leaf', 'TRUE')],
+			nodeId: 'all-root'
+		});
+		invalid(
+			mutate(allReport, (candidate) => {
+				nodeById(candidate, 'all-root').closure = 'BROKEN';
+			})
+		);
 	});
 
 	it('rejects cyclic, shared, sparse, symbol-bearing, and non-scalar report data', () => {

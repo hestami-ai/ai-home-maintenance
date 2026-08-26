@@ -236,6 +236,140 @@ describe('four-valued semantic query algebra', () => {
 		});
 		expect(Object.isFrozen(negated)).toBe(true);
 	});
+
+	it('rejects each reachable malformed AST, population, mode, and leaf-output boundary', () => {
+		const leaf = equals('leaf', 'origin', 'AUTHORED');
+		const nonEnumerableOperands = [leaf];
+		Object.defineProperty(nonEnumerableOperands, '0', {
+			enumerable: false,
+			value: leaf
+		});
+		const missingProjection = { ...source('missing') } as Record<string, unknown>;
+		delete missingProjection.projectId;
+		for (const [expression, code] of [
+			[1, 'AST_INVALID'],
+			[{ field: 'origin', kind: 'EQUALS', nodeId: '', value: 'AUTHORED' }, 'AST_INVALID'],
+			[
+				{ field: 'unregistered', kind: 'EQUALS', nodeId: 'unknown-field', value: 'AUTHORED' },
+				'AST_INVALID'
+			],
+			[
+				{ kind: 'AND', nodeId: 'non-enumerable', operands: nonEnumerableOperands },
+				'AST_BUDGET_EXCEEDED'
+			]
+		] as const)
+			expectRefused(input(expression as SemanticSourceQueryExpression), code);
+		expectRefused(
+			input(leaf, [missingProjection as unknown as SemanticSourceRecord]),
+			'POPULATION_INVALID'
+		);
+		expectRefused(input(leaf, [source('duplicate'), source('duplicate')]), 'POPULATION_INVALID');
+		expectRefused({ ...input(leaf), mode: 'PARTIAL' }, 'INPUT_INVALID');
+
+		const invalidLeaves: readonly unknown[] = [
+			{ ...leafResult('T'), evidenceRefs: [1] },
+			{
+				...leafResult('T'),
+				epistemic: {
+					...epistemic(),
+					supportBasis: { ...epistemic().supportBasis, kind: 'invented' }
+				}
+			},
+			{ ...leafResult('T'), epistemic: { ...epistemic(), capabilityCoverage: 'invented' } },
+			{ ...leafResult('T'), evidencePair: { falseSupport: 2, trueSupport: 0 } },
+			{
+				applicability: { ...notApplicable.applicability, reasonCode: '' },
+				disposition: 'not-applicable'
+			},
+			{ disposition: 'invented' }
+		];
+		for (const invalidLeaf of invalidLeaves)
+			expectRefused(
+				input(leaf, [source('one')], {
+					evaluateLeaf: () => invalidLeaf as SemanticSourceQueryLeafEvaluation
+				}),
+				'LEAF_EVALUATION_FAILED'
+			);
+	});
+
+	it('covers fixed algebra ceilings and every capability/non-applicability composition', () => {
+		expect(() => truthForEvidencePair({ falseSupport: 2, trueSupport: 0 } as never)).toThrow(
+			/Evidence support/u
+		);
+		expect(() =>
+			semanticQueryNot({
+				...notApplicable,
+				applicability: {
+					...notApplicable.applicability,
+					applicabilityBasis: Array.from({ length: 65 }, (_, index) => `basis:${index}`)
+				}
+			})
+		).toThrow(/fixed vector ceiling/u);
+		expect(() =>
+			semanticQueryOr(
+				Array.from({ length: SEMANTIC_SOURCE_QUERY_SAFETY_CEILINGS.maxFanout + 1 }, () =>
+					applicable('T')
+				) as unknown as [SemanticQueryProjection, ...SemanticQueryProjection[]]
+			)
+		).toThrow(/fanout ceiling/u);
+
+		const logical: SemanticSourceQueryExpression = {
+			kind: 'AND',
+			nodeId: 'root',
+			operands: [equals('child', 'origin', 'AUTHORED')]
+		};
+		for (const capabilityCoverage of [
+			'excluded',
+			'not-analyzed',
+			'unsupported',
+			'partial'
+		] as const) {
+			const evaluation = evaluated(
+				input(logical, [source(capabilityCoverage)], {
+					evaluateLeaf: () => ({
+						...leafResult('T'),
+						epistemic: epistemic('succeeded', { capabilityCoverage })
+					})
+				})
+			);
+			expect(evaluation.recordResults[0]).toMatchObject({
+				epistemic: { effective: { capabilityCoverage } }
+			});
+		}
+
+		const allNotApplicable = evaluated(
+			input(
+				{
+					kind: 'AND',
+					nodeId: 'na-root',
+					operands: [equals('na-left', 'origin', 'AUTHORED'), equals('na-right', 'rootFile', true)]
+				},
+				[source('na-logical')],
+				{
+					evaluateLeaf: () => ({ ...notApplicable }) as SemanticSourceQueryLeafEvaluation
+				}
+			)
+		);
+		expect(allNotApplicable.recordResults[0]).toMatchObject({ disposition: 'not-applicable' });
+	});
+
+	it('contains an unexpected input-inspection failure at the public boundary', () => {
+		const getPrototypeOf = vi.spyOn(Object, 'getPrototypeOf').mockImplementationOnce(() => {
+			throw new Error('synthetic input inspection failure');
+		});
+		let outcome!: ReturnType<typeof evaluateSemanticSourceQuery>;
+		try {
+			outcome = evaluateSemanticSourceQuery(
+				input(equals('leaf-after-inspection-failure', 'origin', 'AUTHORED'))
+			);
+		} finally {
+			getPrototypeOf.mockRestore();
+		}
+		expect(outcome).toMatchObject({
+			diagnostic: { code: 'INPUT_INVALID', phase: 'REQUEST' },
+			state: 'REFUSED'
+		});
+	});
 });
 
 describe('evaluateSemanticSourceQuery', () => {
@@ -406,6 +540,24 @@ describe('evaluateSemanticSourceQuery', () => {
 			).recordResults[0];
 			expect(result).toMatchObject({ disposition: 'applicable-result', truth: 'T' });
 		}
+	});
+
+	it('admits the contract-defined VIRTUAL source origin', () => {
+		const evaluation = evaluated(
+			input(equals('virtual-origin', 'origin', 'VIRTUAL'), [
+				source('virtual', { origin: 'VIRTUAL' })
+			])
+		);
+		expect(evaluation.recordResults).toHaveLength(1);
+		expect(evaluation.recordResults[0]).toMatchObject({
+			disposition: 'applicable-result',
+			truth: 'T'
+		});
+		expect(evaluation.coverage).toMatchObject({
+			counts: { supportedTrue: 1 },
+			partitionsReconcile: true,
+			populationRecords: 1
+		});
 	});
 
 	it('preserves U, C, and not-applicable as distinct per-record partitions', () => {

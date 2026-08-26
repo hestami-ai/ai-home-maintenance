@@ -1304,6 +1304,12 @@ const PROVENANCE_KEYS = [
 const MAX_FACTS = 64;
 const MAX_PROVENANCE = 16;
 const MAX_SET_MEMBERS = 64;
+/**
+ * Explicit population identities remain bounded and are never replaced by a lossy census token.
+ * The current JPWB exact coding-agent subject measures 365 members for its widest native rule;
+ * 512 retains roughly 40% capacity headroom while preserving exact member-level evidence.
+ */
+export const HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS = 512;
 const MAX_STRING_CHARACTERS = 2_048;
 const MAX_RESULT_BYTES = 512 * 1024;
 
@@ -1582,7 +1588,7 @@ function materializeRequest(value: unknown): AdmittedEvaluationRequest {
 	);
 	const populationMembers = inspectDenseArray(
 		populationRecord.values.get('members'),
-		MAX_SET_MEMBERS,
+		HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS,
 		'request.population.members'
 	).map((member, index) => textValue(member, `request.population.members[${index}]`));
 	if (new Set(populationMembers).size !== populationMembers.length)

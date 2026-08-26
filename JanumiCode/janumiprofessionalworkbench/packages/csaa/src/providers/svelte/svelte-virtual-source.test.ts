@@ -180,8 +180,13 @@ describe('Svelte virtual-source adapter', () => {
 
 	it('deep-indexes transformed bytes at the authored .svelte Program identity', () => {
 		const authoredLogicalPath = 'apps/demo/src/Counter.svelte';
-		const transformed = transformSvelteVirtualSource(input(TYPESCRIPT_COMPONENT, authoredLogicalPath));
-		const authoredPath = resolve('C:/virtual-repository', authoredLogicalPath).replaceAll('\\', '/');
+		const transformed = transformSvelteVirtualSource(
+			input(TYPESCRIPT_COMPONENT, authoredLogicalPath)
+		);
+		const authoredPath = resolve('C:/virtual-repository', authoredLogicalPath).replaceAll(
+			'\\',
+			'/'
+		);
 		const options: ts.CompilerOptions = {
 			allowNonTsExtensions: true,
 			module: ts.ModuleKind.ESNext,
@@ -359,6 +364,21 @@ describe('Svelte virtual-source adapter', () => {
 			'.csaa-virtual/svelte2tsx/apps/demo/src/View.svelte.js'
 		);
 		failure(() => svelteVirtualLogicalPath('../escape.svelte', 'TS'), 'INPUT_INVALID');
+		failure(() => svelteVirtualLogicalPath('apps/demo/src/View.ts', 'TS'), 'INPUT_INVALID');
+		failure(
+			() => svelteVirtualLogicalPath('apps/demo/src/View.svelte', 'INVALID' as never),
+			'INPUT_INVALID'
+		);
+		failure(() => svelteVirtualLogicalPath('apps/demo/src/View.svelte', 'TS', -1), 'INPUT_INVALID');
+		failure(
+			() =>
+				svelteVirtualLogicalPath(
+					'apps/demo/src/View.svelte',
+					'TS',
+					SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxPathCharacters + 1
+				),
+			'INPUT_INVALID'
+		);
 		failure(
 			() => svelteVirtualLogicalPath('apps/demo/src/View.svelte', 'TS', 5),
 			'BUDGET_EXCEEDED'

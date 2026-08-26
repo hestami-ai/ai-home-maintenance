@@ -1519,6 +1519,149 @@ describe('dependency-cruiser output normalization', () => {
 		}
 	});
 
+	it('fails closed over hostile JSON descriptors, cycles, scalars, and work budgets', () => {
+		const cases: Array<(value: MutableRecord) => void> = [
+			(value) => {
+				const modules = value.modules as unknown[];
+				const first = modules[0];
+				Object.defineProperty(modules, '0', {
+					configurable: true,
+					enumerable: true,
+					get: () => first
+				});
+			},
+			(value) => {
+				(value.modules as unknown as MutableRecord).extra = null;
+			},
+			(value) => {
+				value.modules = new Array(5);
+			},
+			(value) => {
+				const first = (value.modules as MutableRecord[])[0]!;
+				Object.defineProperty(first, 'hostile', {
+					configurable: true,
+					enumerable: true,
+					get: () => 'not retained'
+				});
+			},
+			(value) => {
+				(value.modules as MutableRecord[])[0]!['\ud800'] = null;
+			},
+			(value) => {
+				const budgets = (value.invocation as MutableRecord).budgets as MutableRecord;
+				(value.modules as MutableRecord[])[0]!['x'.repeat(Number(budgets.maxStringLength) + 1)] =
+					null;
+			},
+			(value) => {
+				const budgets = (value.invocation as MutableRecord).budgets as MutableRecord;
+				budgets.maxTotalStringCharacters = 1;
+			},
+			(value) => {
+				const budgets = (value.invocation as MutableRecord).budgets as MutableRecord;
+				let nested: MutableRecord = {};
+				for (let depth = 0; depth <= Number(budgets.maxJsonDepth); depth += 1) nested = { nested };
+				(value.modules as MutableRecord[])[0]!.nested = nested;
+			},
+			(value) => {
+				(value.modules as MutableRecord[])[0]!.unsupported = 1n;
+			},
+			(value) => {
+				(value.modules as MutableRecord[])[0]!.nonPlain = new Date(0);
+			},
+			(value) => {
+				const cycle: MutableRecord = {};
+				cycle.self = cycle;
+				(value.modules as MutableRecord[])[0]!.cycle = cycle;
+			},
+			(value) => {
+				const budgets = (value.invocation as MutableRecord).budgets as MutableRecord;
+				(value.modules as MutableRecord[])[0]!.oversized = new Array(
+					Number(budgets.maxModules) + 1
+				).fill(null);
+			}
+		];
+
+		for (const mutate of cases) {
+			const hostile = normalize() as unknown as MutableRecord;
+			mutate(hostile);
+			expect(() => validateDependencyCruiserObservation(hostile)).not.toThrow();
+			expect(validateDependencyCruiserObservation(hostile).state).not.toBe('VALID');
+		}
+
+		const hostile = normalize() as unknown as MutableRecord;
+		const modules = hostile.modules as MutableRecord[];
+		modules[0] = new Proxy(modules[0]!, {
+			ownKeys: () => {
+				throw new Error('hostile key enumeration');
+			}
+		});
+		expect(validateDependencyCruiserObservation(hostile)).toMatchObject({
+			issues: [{ code: 'INVALID_SHAPE', path: '$' }],
+			state: 'INVALID'
+		});
+	});
+
+	it('rejects malformed target variants and closed observation discriminants', () => {
+		const cases: Array<(value: DependencyCruiserObservation) => void> = [
+			(value) => {
+				const entry = value.dependencies.find(
+					(candidate) => candidate.target.kind === 'RESOLVED_LOCAL_PATH'
+				)!;
+				(entry.target as unknown as MutableRecord).path = null;
+			},
+			(value) => {
+				const entry = value.nonLocalModules.find(
+					(candidate) => candidate.target.kind === 'CORE_MODULE'
+				)!;
+				(entry.target as unknown as MutableRecord).name = '';
+			},
+			(value) => {
+				const entry = value.nonLocalModules.find(
+					(candidate) => candidate.target.kind === 'UNRESOLVED'
+				)!;
+				(entry.target as unknown as MutableRecord).specifier = '';
+			},
+			(value) => {
+				(value.modules[0] as unknown as MutableRecord).dependentsWitness = 'UNKNOWN';
+			},
+			(value) => {
+				(value.nonLocalModules[0] as unknown as MutableRecord).valid = false;
+			},
+			(value) => {
+				delete (value.summary as unknown as MutableRecord).warn;
+			},
+			(value) => {
+				(value.limitations[0] as unknown as MutableRecord).reason = '';
+			}
+		];
+
+		for (const mutate of cases) {
+			const forged = normalize();
+			mutate(forged);
+			expect(validateDependencyCruiserObservation(forged).state).toBe('INVALID');
+		}
+	});
+
+	it('fails normalization closed when invocation key enumeration is hostile', () => {
+		const rawText = JSON.stringify(validRaw());
+		const invocation = new Proxy(binding(rawText), {
+			ownKeys: () => {
+				throw new Error('hostile key enumeration');
+			}
+		});
+
+		expect(normalizeDependencyCruiserOutput(rawText, invocation)).toEqual({
+			diagnostics: [
+				{
+					code: 'RAW_SHAPE_INVALID',
+					message: 'Dependency-cruiser normalization failed closed.',
+					path: '$raw'
+				}
+			],
+			outcome: 'unavailable'
+		});
+	});
+
 	it('bounds diagnostics for repeated hostile members without throwing', () => {
 		const hostile = clone(normalize()) as unknown as MutableRecord;
 		hostile.modules = [null, null, null, null];
@@ -1528,5 +1671,207 @@ describe('dependency-cruiser output normalization', () => {
 			issues: [{ code: 'INVALID_SHAPE' }],
 			state: 'BUDGET_EXHAUSTED'
 		});
+	});
+
+	it('accounts JSON object keys and scalar values separately before schema admission', () => {
+		for (const [rawText, maximum, code] of [
+			[JSON.stringify({ ['x'.repeat(65)]: 0 }), 64, 'BUDGET_EXCEEDED'],
+			[JSON.stringify({ a: 'x'.repeat(64) }), 64, 'BUDGET_EXCEEDED'],
+			['{"a":"\\ud800"}', 100, 'RAW_SHAPE_INVALID']
+		] as const) {
+			const invocation = binding(rawText);
+			(invocation.budgets as unknown as MutableRecord).maxStringLength = 100;
+			(invocation.budgets as unknown as MutableRecord).maxTotalStringCharacters = maximum;
+			expect(normalizeDependencyCruiserOutput(rawText, invocation)).toMatchObject({
+				diagnostics: [{ code }],
+				outcome: 'unavailable'
+			});
+		}
+	});
+
+	it('independently rejects each remaining malformed provider-wire field and JSON budget boundary', () => {
+		const moduleAt = (value: MutableRecord): MutableRecord =>
+			(value.modules as MutableRecord[])[0]!;
+		const dependencyAt = (value: MutableRecord): MutableRecord =>
+			(moduleAt(value).dependencies as MutableRecord[])[0]!;
+		const violationAt = (value: MutableRecord): MutableRecord =>
+			((value.summary as MutableRecord).violations as MutableRecord[])[0]!;
+
+		const cases: Array<[() => MutableRecord, (value: MutableRecord) => void]> = [
+			[
+				validRaw,
+				(value) => {
+					delete value.modules;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).coreModule = 'false';
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).license = 1;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).instability = 'unstable';
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					dependencyAt(value).dependencyTypes = ['unknown-type'];
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					(moduleAt(value).rules as MutableRecord[])[0]!.severity = 'fatal';
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					(violationAt(value).cycle as MutableRecord[])[0]!.name = 1;
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					(violationAt(value).rule as MutableRecord).severity = 'fatal';
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					violationAt(value).metrics = null;
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					((violationAt(value).metrics as MutableRecord).from as MutableRecord).instability =
+						'unknown';
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					violationAt(value).from = 1;
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					violationAt(value).type = 'unknown';
+				}
+			],
+			[
+				evidenceRichRaw,
+				(value) => {
+					violationAt(value).comment = 1;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					(value.summary as MutableRecord).violations = {};
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					((value.summary as MutableRecord).optionsUsed as MutableRecord).baseDir = 1;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					value.modules = null;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					value.summary = null;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					(value.summary as MutableRecord).optionsUsed = null;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).source = 1;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).dependencies = null;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					dependencyAt(value).module = 1;
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					dependencyAt(value).moduleSystem = 'esm';
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					dependencyAt(value).protocol = 'https:';
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					moduleAt(value).dependents = [1];
+				}
+			],
+			[
+				validRaw,
+				(value) => {
+					(value.summary as MutableRecord).ruleSetUsed = null;
+				}
+			]
+		];
+
+		for (const [factory, mutate] of cases) {
+			const raw = factory();
+			mutate(raw);
+			expectNormalizationDiagnostic(raw, 'RAW_SHAPE_INVALID');
+		}
+
+		const keyHeavy = Object.fromEntries(
+			Array.from({ length: 30 }, (_, index) => [`key-${index.toString().padStart(2, '0')}`, 0])
+		) as MutableRecord;
+		expectNormalizationDiagnostic(keyHeavy, 'BUDGET_EXCEEDED', undefined, (invocation) => {
+			(invocation.budgets as unknown as MutableRecord).maxTotalStringCharacters = 100;
+		});
+
+		expectNormalizationDiagnostic(
+			{ x: 'x'.repeat(120) },
+			'BUDGET_EXCEEDED',
+			undefined,
+			(invocation) => {
+				(invocation.budgets as unknown as MutableRecord).maxTotalStringCharacters = 100;
+			}
+		);
+		expectNormalizationDiagnostic({ x: '\ud800' }, 'RAW_SHAPE_INVALID');
 	});
 });

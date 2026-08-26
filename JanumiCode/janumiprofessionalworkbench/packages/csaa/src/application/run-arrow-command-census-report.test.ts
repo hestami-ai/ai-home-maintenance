@@ -52,6 +52,7 @@ import type { verifyFrozenSubject } from '../subject/freshness.js';
 import type { resolveSubject } from '../subject/resolve-subject.js';
 import {
 	admitArrowCommandCensusReportRequest,
+	arrowCommandCensusReportExitCode,
 	runArrowCommandCensusReport,
 	runArrowCommandCensusReportWithDependencies,
 	type ArrowCommandCensusReportProgressEvent,
@@ -307,6 +308,98 @@ function dependencies(
 }
 
 describe('arrow-command-census report', () => {
+	it('rejects malformed request records, budgets, paths, and project arrays without invoking production work', async () => {
+		const topLevelNonEnumerable = { ...acceptedRequest() };
+		Object.defineProperty(topLevelNonEnumerable, 'schemaVersion', {
+			enumerable: false,
+			value: ARROW_COMMAND_CENSUS_REPORT_REQUEST_SCHEMA_VERSION
+		});
+		for (const malformed of [new Date(), topLevelNonEnumerable]) {
+			expect(admitArrowCommandCensusReportRequest(malformed)).toMatchObject({
+				code: 'REQUEST_SHAPE_INVALID',
+				outcome: 'rejected'
+			});
+		}
+
+		for (const [overrides, code, state] of [
+			[
+				{ budgets: { ...acceptedRequest().budgets, maxResultBytes: 0 } },
+				'REQUEST_BUDGET_INVALID',
+				'incompatible'
+			],
+			[
+				{
+					budgets: {
+						...acceptedRequest().budgets,
+						maxResultBytes: ARROW_COMMAND_CENSUS_REPORT_SAFETY_CEILINGS.maxResultBytes + 1
+					}
+				},
+				'REQUEST_BUDGET_EXCEEDS_SAFETY_CEILING',
+				'resource-refused'
+			],
+			[{ schemaVersion: 'unsupported' }, 'REQUEST_SCHEMA_VERSION_UNSUPPORTED', 'incompatible'],
+			[{ operationVersion: 'unsupported' }, 'REQUEST_OPERATION_VERSION_UNSUPPORTED', 'incompatible']
+		] as const) {
+			expect(
+				admitArrowCommandCensusReportRequest({ ...acceptedRequest(), ...overrides })
+			).toMatchObject({ code, outcome: 'rejected', state });
+		}
+
+		expect(
+			admitArrowCommandCensusReportRequest({
+				...acceptedRequest(),
+				subjectProjectConfigPaths: ['../escape.json']
+			})
+		).toMatchObject({ code: 'REQUEST_PATH_INVALID', outcome: 'rejected' });
+
+		const customPrototype = [projectPath];
+		Object.setPrototypeOf(customPrototype, null);
+		const sparse = [projectPath, 'fixture/other.json'];
+		delete sparse[1];
+		const expanded = Object.assign([projectPath], { extra: true });
+		const nonEnumerableItem = [projectPath];
+		Object.defineProperty(nonEnumerableItem, '0', { enumerable: false, value: projectPath });
+		for (const subjectProjectConfigPaths of [
+			customPrototype,
+			[],
+			sparse,
+			expanded,
+			nonEnumerableItem,
+			[projectPath, projectPath]
+		]) {
+			expect(
+				admitArrowCommandCensusReportRequest({
+					...acceptedRequest(),
+					subjectProjectConfigPaths
+				})
+			).toMatchObject({ code: 'REQUEST_PROJECTS_INVALID', outcome: 'rejected' });
+		}
+
+		const oneProject = acceptedRequest();
+		expect(
+			admitArrowCommandCensusReportRequest({
+				...oneProject,
+				budgets: {
+					...oneProject.budgets,
+					subject: { ...oneProject.budgets.subject, maxProjects: 1 }
+				},
+				subjectProjectConfigPaths: [projectPath, 'fixture/other.json']
+			})
+		).toMatchObject({
+			code: 'REQUEST_PROJECTS_BUDGET_EXCEEDED',
+			outcome: 'rejected',
+			state: 'resource-refused'
+		});
+
+		const publicOutcome = await runArrowCommandCensusReport(null, { repositoryRoot: root });
+		expect(publicOutcome).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST'
+		});
+		expect(arrowCommandCensusReportExitCode(publicOutcome)).toBe(2);
+	});
+
 	it('requires explicit acknowledgement of the side-effecting retained execution boundary', () => {
 		const { executionSelection: _executionSelection, ...missing } = acceptedRequest();
 		expect(admitArrowCommandCensusReportRequest(missing)).toMatchObject({
@@ -579,6 +672,215 @@ describe('arrow-command-census report', () => {
 			diagnostics: [{ path: '$.budgets.observation' }],
 			outcome: 'unavailable',
 			state: 'resource-refused'
+		});
+	});
+
+	it('maps every subject-resolution outcome and budget refusal to its stable terminal identity', async () => {
+		const subjectDiagnostic = (code: string) => ({
+			code,
+			message: `Synthetic ${code}.`,
+			path: null,
+			phase: 'SUBJECT',
+			severity: 'ERROR'
+		});
+		for (const { code, resolution, state } of [
+			{
+				code: 'SUBJECT_NOT_FOUND',
+				resolution: { diagnostics: [], outcome: 'not-found' },
+				state: 'incompatible'
+			},
+			{
+				code: 'SUBJECT_AMBIGUOUS',
+				resolution: { diagnostics: [], outcome: 'ambiguous' },
+				state: 'incompatible'
+			},
+			{
+				code: 'SUBJECT_FORBIDDEN',
+				resolution: { diagnostics: [], outcome: 'forbidden' },
+				state: 'incompatible'
+			},
+			{
+				code: 'SUBJECT_INCOMPATIBLE',
+				resolution: { diagnostics: [], outcome: 'incompatible' },
+				state: 'incompatible'
+			},
+			{
+				code: 'SUBJECT_UNAVAILABLE',
+				resolution: { diagnostics: [], outcome: 'unavailable' },
+				state: 'failed'
+			},
+			{
+				code: 'SUBJECT_RESOURCE_REFUSED',
+				resolution: {
+					diagnostics: [subjectDiagnostic('SUBJECT_BUDGET_EXHAUSTED')],
+					outcome: 'unavailable'
+				},
+				state: 'resource-refused'
+			}
+		] as const) {
+			const outcome = await runArrowCommandCensusReportWithDependencies(
+				acceptedRequest(),
+				{ repositoryRoot: root },
+				dependencies({
+					resolveSubject: (() => resolution) as unknown as typeof resolveSubject
+				})
+			);
+			expect(outcome).toMatchObject({ code, outcome: 'unavailable', stage: 'SUBJECT', state });
+		}
+	});
+
+	it('classifies artifact-set refusal, incompatibility, and producer failure independently', async () => {
+		for (const [diagnosticCode, state] of [
+			['BUDGET_EXHAUSTED', 'resource-refused'],
+			['REQUIRED_ARTIFACT_MISSING', 'incompatible'],
+			['POPULATION_RECONCILIATION_FAILED', 'failed']
+		] as const) {
+			const outcome = await runArrowCommandCensusReportWithDependencies(
+				acceptedRequest(),
+				{ repositoryRoot: root },
+				dependencies({
+					buildArtifactSet: (() => ({
+						diagnostics: [
+							{
+								code: diagnosticCode,
+								message: `Synthetic ${diagnosticCode}.`,
+								path: null,
+								phase: 'RECONCILE'
+							}
+						],
+						outcome: 'unavailable'
+					})) as typeof buildArrowCommandCensusArtifactSet
+				})
+			);
+			expect(outcome).toMatchObject({
+				code: 'ARTIFACT_SET_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'ARTIFACT_SET',
+				state
+			});
+			expect(arrowCommandCensusReportExitCode(outcome)).toBe(
+				state === 'resource-refused' ? 3 : state === 'incompatible' ? 2 : 4
+			);
+		}
+	});
+
+	it('fails closed at repository, path, progress, currentness, serialization, and internal boundaries', async () => {
+		const nullOptions = await runArrowCommandCensusReport(null, null as never);
+		expect(nullOptions).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', stage: 'REQUEST' });
+
+		const missingRoot = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ repositoryRoot: join(root, 'missing-root') },
+			dependencies()
+		);
+		expect(missingRoot).toMatchObject({
+			code: 'REPOSITORY_ROOT_UNAVAILABLE',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+
+		for (const path of ['fixture', 'fixture/missing.json']) {
+			const invalidProject = await runArrowCommandCensusReportWithDependencies(
+				{ ...acceptedRequest(), subjectProjectConfigPaths: [path] },
+				{ repositoryRoot: root },
+				dependencies()
+			);
+			expect(invalidProject).toMatchObject({
+				code: 'PROJECT_PATH_INVALID',
+				stage: 'SUBJECT',
+				state: 'incompatible'
+			});
+		}
+
+		const malformedProgress = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ onProgress: () => Promise.reject(new Error('contained sink')), repositoryRoot: root },
+			dependencies({
+				observeCensus: (async (_request, _inputs, options) => {
+					options?.onProgress?.(1n as never);
+					return retainedOutcome;
+				}) as typeof observeArrowCommandCensus
+			})
+		);
+		expect(malformedProgress.outcome).toBe('partial');
+
+		const diagnosticSubject = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ repositoryRoot: root },
+			dependencies({
+				resolveSubject: (() => ({
+					...resolvedSubject(),
+					diagnostics: [
+						{
+							code: 'SYNTHETIC_SUBJECT_WARNING',
+							message: `${root} synthetic warning.`,
+							path: join(root, projectPath),
+							phase: 'CAPTURE',
+							severity: 'WARNING'
+						},
+						{
+							code: 'SYNTHETIC_INVALID_PATH_WARNING',
+							message: 'Synthetic invalid path.',
+							path: '../escape',
+							phase: 'CAPTURE',
+							severity: 'WARNING'
+						}
+					]
+				})) as unknown as typeof resolveSubject
+			})
+		);
+		expect(diagnosticSubject).toMatchObject({
+			diagnostics: [
+				expect.objectContaining({ message: expect.stringContaining('<repository-root>') }),
+				expect.objectContaining({ path: null })
+			],
+			outcome: 'partial'
+		});
+
+		const unavailableFreshness = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ repositoryRoot: root },
+			dependencies({
+				verifySubject: (() => {
+					throw new Error('synthetic freshness failure');
+				}) as typeof verifyFrozenSubject
+			})
+		);
+		expect(unavailableFreshness).toMatchObject({
+			outcome: 'partial',
+			result: { currentness: { state: 'UNAVAILABLE' } }
+		});
+
+		const serializationFailure = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ repositoryRoot: root },
+			dependencies({
+				verifySubject: (() => ({
+					changedPaths: [1n] as never,
+					diagnostics: [],
+					state: 'STALE'
+				})) as typeof verifyFrozenSubject
+			})
+		);
+		expect(serializationFailure).toMatchObject({
+			code: 'RESULT_SERIALIZATION_FAILED',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+
+		const internalFailure = await runArrowCommandCensusReportWithDependencies(
+			acceptedRequest(),
+			{ repositoryRoot: root },
+			dependencies({
+				resolveSubject: (() => {
+					throw new Error('synthetic dependency failure');
+				}) as typeof resolveSubject
+			})
+		);
+		expect(internalFailure).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			stage: 'RESULT',
+			state: 'failed'
 		});
 	});
 

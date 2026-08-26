@@ -309,4 +309,127 @@ describe('advanced CPG provider entry predicate and disposition', () => {
 			'Advanced CPG provider entry request is invalid.'
 		);
 	});
+
+	it('rejects every remaining closed-wire and qualification boundary without inspecting accessors', () => {
+		type MutableRecord = Record<PropertyKey, unknown>;
+		const invalidCandidates: unknown[] = [];
+
+		invalidCandidates.push({ ...request(), unexpectedUndefined: undefined });
+		const cyclic = structuredClone(request()) as unknown as MutableRecord;
+		cyclic.qualification = cyclic;
+		invalidCandidates.push(cyclic);
+
+		class PreferenceArray extends Array<string> {}
+		const subclassed = structuredClone(request()) as unknown as MutableRecord;
+		subclassed.providerPreference = new PreferenceArray('CODEQL', 'JOERN');
+		invalidCandidates.push(subclassed);
+
+		const arrayProperty = structuredClone(request()) as unknown as MutableRecord;
+		const preference = arrayProperty.providerPreference as string[] & MutableRecord;
+		preference.extra = true;
+		invalidCandidates.push(arrayProperty);
+
+		const nonplain = structuredClone(request()) as unknown as MutableRecord;
+		nonplain.environment = new Date();
+		invalidCandidates.push(nonplain);
+
+		const symbolKey = structuredClone(request()) as unknown as MutableRecord;
+		symbolKey[Symbol('unexpected')] = true;
+		invalidCandidates.push(symbolKey);
+		invalidCandidates.push(null);
+
+		const controlCharacter = structuredClone(request()) as unknown as MutableRecord;
+		(controlCharacter.environment as MutableRecord).environmentId = 'bad\u0001id';
+		invalidCandidates.push(controlCharacter);
+
+		const budgetShape = structuredClone(request()) as unknown as MutableRecord;
+		(budgetShape.budgets as MutableRecord).extra = 1;
+		invalidCandidates.push(budgetShape);
+
+		const budgetValue = structuredClone(request()) as unknown as MutableRecord;
+		(budgetValue.budgets as MutableRecord).maxFactCount = 0;
+		invalidCandidates.push(budgetValue);
+
+		const commandShape = structuredClone(request()) as unknown as MutableRecord;
+		(commandShape.commandChecks as unknown[])[0] = null;
+		invalidCandidates.push(commandShape);
+
+		const unavailableResolution = structuredClone(request()) as unknown as MutableRecord;
+		((unavailableResolution.commandChecks as unknown[])[0] as MutableRecord).resolutionKind =
+			'APPLICATION';
+		invalidCandidates.push(unavailableResolution);
+
+		const availableResolution = structuredClone(availableRequest()) as unknown as MutableRecord;
+		((availableResolution.commandChecks as unknown[])[0] as MutableRecord).resolvedExecutablePath =
+			'';
+		invalidCandidates.push(availableResolution);
+
+		const qualificationShape = structuredClone(availableRequest()) as unknown as MutableRecord;
+		qualificationShape.qualification = {};
+		invalidCandidates.push(qualificationShape);
+
+		for (const candidate of invalidCandidates)
+			expect(() => assessAdvancedCpgProviderEntry(candidate)).toThrow(
+				'Advanced CPG provider entry request is invalid.'
+			);
+
+		const invalidQualifications = [
+			{
+				...qualifyingEvidence(),
+				setup: { ...qualifyingEvidence().setup, installationPerformed: 'no' as never }
+			},
+			{
+				...qualifyingEvidence(),
+				setup: { ...qualifyingEvidence().setup, setupDescription: '' }
+			},
+			{
+				...qualifyingEvidence(),
+				comparison: { ...qualifyingEvidence().comparison, nativeFactCount: -1 }
+			},
+			{
+				...qualifyingEvidence(),
+				comparison: {
+					...qualifyingEvidence().comparison,
+					operationsFit: 'UNSUPPORTED' as never
+				}
+			}
+		];
+		for (const qualification of invalidQualifications)
+			expect(() => assessAdvancedCpgProviderEntry(availableRequest(qualification))).toThrow(
+				'Advanced CPG provider entry request is invalid.'
+			);
+	});
+
+	it('records hand-check failure and rejects an unknown need despite provider availability', () => {
+		const evidence = qualifyingEvidence();
+		const handCheckFailure: AdvancedCpgProviderQualificationEvidence = {
+			...evidence,
+			comparison: { ...evidence.comparison, handCheckedPositiveDetectedCount: 0 }
+		};
+		expect(assessAdvancedCpgProviderEntry(availableRequest(handCheckFailure))).toMatchObject({
+			disposition: 'REJECT_FOR_CURRENT_NEED',
+			reasons: ['HAND_CHECK_FAILED']
+		});
+
+		const unknownAvailable = availableRequest();
+		expect(
+			assessAdvancedCpgProviderEntry({
+				...unknownAvailable,
+				nativeNeed: { ...unknownAvailable.nativeNeed, state: 'UNKNOWN' }
+			})
+		).toMatchObject({
+			disposition: 'REJECT_FOR_CURRENT_NEED',
+			reasons: ['NO_PROVEN_ENTRY_NEED']
+		});
+	});
+
+	it('fails validation closed when result wire inspection itself fails', () => {
+		const result = assessAdvancedCpgProviderEntry(request());
+		const hostile = new Proxy(result, {
+			ownKeys: () => {
+				throw new Error('synthetic result inspection failure');
+			}
+		});
+		expect(validateAdvancedCpgProviderDisposition(request(), hostile)).toBe(false);
+	});
 });

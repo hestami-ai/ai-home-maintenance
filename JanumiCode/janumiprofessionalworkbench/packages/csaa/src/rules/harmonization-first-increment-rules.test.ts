@@ -13,6 +13,7 @@ import {
 	HARMONIZATION_FIRST_INCREMENT_ANALYSIS_AUTHORITY,
 	HARMONIZATION_FIRST_INCREMENT_FIXTURE_SUBJECT,
 	HARMONIZATION_FIRST_INCREMENT_GATE_EFFECT,
+	HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS,
 	HARMONIZATION_FIRST_INCREMENT_NONCLAIMS,
 	HARMONIZATION_FIRST_INCREMENT_OPERATION_VERSION,
 	HARMONIZATION_FIRST_INCREMENT_RULE_PROFILES,
@@ -268,6 +269,189 @@ describe('harmonization first-increment hostile admission and accounting', () =>
 		expect(getterCalls).toBe(0);
 	});
 
+	it('rejects every closed request shape, scalar, population, fact, and provenance invariant', () => {
+		const cases: readonly {
+			readonly code: string;
+			readonly mutate: (request: DeepMutable<HarmonizationFirstIncrementEvaluationRequest>) => void;
+			readonly ruleId?: string;
+		}[] = [
+			{
+				code: 'REQUEST_RECORD_PROTOTYPE_INVALID',
+				mutate(request) {
+					Object.setPrototypeOf(request, { hostile: true });
+				}
+			},
+			{
+				code: 'REQUEST_RECORD_SYMBOL_KEY',
+				mutate(request) {
+					Object.defineProperty(request, Symbol('hostile'), { enumerable: true, value: true });
+				}
+			},
+			{
+				code: 'REQUEST_RECORD_KEYS_INVALID',
+				mutate(request) {
+					(request as unknown as Record<string, unknown>).extra = true;
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_INVALID',
+				mutate(request) {
+					request.facts = {} as never;
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_SYMBOL_KEY',
+				mutate(request) {
+					Object.defineProperty(request.facts, Symbol('hostile'), {
+						enumerable: true,
+						value: true
+					});
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_NOT_DENSE',
+				mutate(request) {
+					Object.defineProperty(request.facts, 'extra', { enumerable: true, value: true });
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_ELEMENT_INVALID',
+				mutate(request) {
+					Object.defineProperty(request.facts, '0', {
+						configurable: true,
+						enumerable: true,
+						get() {
+							throw new Error('must not execute');
+						}
+					});
+				}
+			},
+			{
+				code: 'REQUEST_SHA256_INVALID',
+				mutate(request) {
+					request.currentness.sourceSha256 = 'A'.repeat(64);
+				}
+			},
+			{
+				code: 'REQUEST_ENUM_INVALID',
+				mutate(request) {
+					request.currentness.state = 'BROKEN' as never;
+				}
+			},
+			{
+				code: 'REQUEST_INTEGER_INVALID',
+				mutate(request) {
+					request.population.count = -1;
+				}
+			},
+			{
+				code: 'REQUEST_SET_DUPLICATE',
+				mutate(request) {
+					const fact = request.facts.find((candidate) => Array.isArray(candidate.value))!;
+					const value = fact.value as string[];
+					fact.value = [value[0]!, value[0]!] as never;
+				},
+				ruleId: 'JAN-CSAA-HARMONIZATION-022'
+			},
+			{
+				code: 'REQUEST_RULE_UNSUPPORTED',
+				mutate(request) {
+					request.ruleId = 'JAN-CSAA-HARMONIZATION-999';
+				}
+			},
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				mutate(request) {
+					(request as unknown as Record<string, unknown>).schemaVersion = 'unsupported';
+				}
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				mutate(request) {
+					(request as unknown as Record<string, unknown>).operationVersion = 'unsupported';
+				}
+			},
+			{
+				code: 'REQUEST_CURRENTNESS_DEPENDENCY_DUPLICATE',
+				mutate(request) {
+					request.currentness.invalidationDependencyIds = ['source:a', 'source:a'];
+				}
+			},
+			{
+				code: 'REQUEST_STALE_DEPENDENCY_MISSING',
+				mutate(request) {
+					request.currentness.state = 'CALLER_DECLARED_STALE';
+					request.currentness.invalidationDependencyIds = [];
+				}
+			},
+			{
+				code: 'REQUEST_POPULATION_MEMBER_DUPLICATE',
+				mutate(request) {
+					request.population.members = ['fixture-member', 'fixture-member'];
+					request.population.count = 2;
+				}
+			},
+			{
+				code: 'REQUEST_CAPABILITY_DUPLICATE',
+				mutate(request) {
+					request.availableCapabilities = [
+						request.availableCapabilities[0]!,
+						request.availableCapabilities[0]!
+					];
+				}
+			},
+			{
+				code: 'REQUEST_FACT_UNEXPECTED',
+				mutate(request) {
+					request.facts[0]!.key = 'unexpectedFact';
+				}
+			},
+			{
+				code: 'REQUEST_FACT_TYPE_INVALID',
+				mutate(request) {
+					const fact = request.facts.find(
+						(candidate) => candidate.key === 'registeredPrefixMembershipEnforced'
+					)!;
+					fact.value = 1;
+				},
+				ruleId: 'JAN-CSAA-HARMONIZATION-030'
+			},
+			{
+				code: 'REQUEST_FACT_DUPLICATE',
+				mutate(request) {
+					request.facts.push(structuredClone(request.facts[0]!));
+				}
+			},
+			{
+				code: 'REQUEST_PROVENANCE_DUPLICATE',
+				mutate(request) {
+					request.provenance.push(structuredClone(request.provenance[0]!));
+				}
+			},
+			{
+				code: 'EVALUATION_FACT_SET_INCOMPLETE',
+				mutate(request) {
+					request.facts = [];
+				}
+			},
+			{
+				code: 'REQUEST_ENUM_INVALID',
+				mutate(request) {
+					request.executionDisposition = 'BROKEN' as never;
+				}
+			}
+		];
+		for (const testCase of cases) {
+			const request = mutableRequest(testCase.ruleId);
+			testCase.mutate(request);
+			const outcome = evaluateHarmonizationFirstIncrementRule(request);
+			expect(outcome, testCase.code).toMatchObject({
+				diagnostics: [{ code: testCase.code }],
+				outcome: 'unavailable'
+			});
+		}
+	});
+
 	it('refuses oversized sparse data before traversal and rejects malformed scalar text', () => {
 		const sparse = mutableRequest();
 		const hostileFacts: unknown[] = [];
@@ -292,6 +476,50 @@ describe('harmonization first-increment hostile admission and accounting', () =>
 		expect(populationMismatchOutcome.outcome).toBe('unavailable');
 		if (populationMismatchOutcome.outcome !== 'unavailable') throw new Error('Expected refusal.');
 		expect(populationMismatchOutcome.diagnostics[0].code).toBe('REQUEST_POPULATION_COUNT_MISMATCH');
+	});
+
+	it('admits the explicit population ceiling, refuses the next member, and retains the narrower fact-set ceiling', () => {
+		const membersAtCeiling = Array.from(
+			{ length: HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS },
+			(_, index) => `member-${String(index).padStart(3, '0')}`
+		);
+		const atCeiling = mutableRequest();
+		atCeiling.population = {
+			...atCeiling.population,
+			count: membersAtCeiling.length,
+			members: membersAtCeiling
+		};
+		const admitted = evaluateHarmonizationFirstIncrementRule(atCeiling);
+		expect(admitted.outcome, JSON.stringify(admitted)).toBe('evaluated');
+		if (admitted.outcome === 'evaluated')
+			expect(admitted.result.population.members).toHaveLength(
+				HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS
+			);
+
+		const beyondCeiling = mutableRequest();
+		beyondCeiling.population = {
+			...beyondCeiling.population,
+			count: membersAtCeiling.length + 1,
+			members: [...membersAtCeiling, 'member-512']
+		};
+		const refusedPopulation = evaluateHarmonizationFirstIncrementRule(beyondCeiling);
+		expect(refusedPopulation).toMatchObject({
+			diagnostics: [{ code: 'REQUEST_ARRAY_BUDGET_EXCEEDED', path: 'request.population.members' }],
+			outcome: 'unavailable',
+			state: 'resource-refused'
+		});
+
+		const oversizedFactSet = mutableRequest('JAN-CSAA-HARMONIZATION-022');
+		oversizedFactSet.facts = oversizedFactSet.facts.map((fact) => ({
+			...fact,
+			value: Array.from({ length: 65 }, (_, index) => `P${index}`)
+		}));
+		const refusedFactSet = evaluateHarmonizationFirstIncrementRule(oversizedFactSet);
+		expect(refusedFactSet).toMatchObject({
+			diagnostics: [{ code: 'REQUEST_ARRAY_BUDGET_EXCEEDED' }],
+			outcome: 'unavailable',
+			state: 'resource-refused'
+		});
 	});
 
 	it('refuses a canonical terminal result that exceeds the fixed byte ceiling', () => {

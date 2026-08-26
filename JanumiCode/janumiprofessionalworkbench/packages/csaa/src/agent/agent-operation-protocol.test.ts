@@ -389,6 +389,104 @@ describe('agent operation request protocol', () => {
 		expectRequestRefused(accessor, 'MESSAGE_INVALID');
 		expect(getterHits).toBe(0);
 	});
+
+	it('enforces every closed request binding without coercing hostile object or collection shapes', () => {
+		expect(
+			validateAgentOperationRequest(
+				request({
+					work: {
+						...request().work,
+						changeContract: { kind: 'NOT_APPLICABLE', reasonCode: 'NO_CHANGE' }
+					}
+				})
+			)
+		).toMatchObject({ state: 'VALID' });
+		expect(
+			validateAgentOperationRequest(
+				request({
+					currentnessRequirement: { kind: 'REQUIRE_EXACT_SUBJECT', subjectId: 'subject:one' }
+				})
+			)
+		).toMatchObject({ state: 'VALID' });
+
+		const customPrototype = Object.assign(Object.create({ inherited: true }) as object, request());
+		const withSymbol = { ...request(), [Symbol('hostile')]: true };
+		const { requestId: _requestId, ...withoutRequestId } = request();
+		const nonEnumerableReference = ['question:caller-impact'];
+		Object.defineProperty(nonEnumerableReference, '0', {
+			enumerable: false,
+			value: 'question:caller-impact'
+		});
+		const invalidCases: readonly unknown[] = [
+			customPrototype,
+			withSymbol,
+			{ ...withoutRequestId, wrongRequestId: 'request:one' },
+			request({ requestId: 'request:\ud83d\ude00' }),
+			request({ requestId: 'request:\udc00' }),
+			request({ messageKind: 'response' as never }),
+			request({ requestedAt: '2026-08-25' }),
+			request({
+				operationInput: { ...request().operationInput, inputDigest: 'A'.repeat(64) }
+			}),
+			request({
+				capabilityRequirement: {
+					...request().capabilityRequirement,
+					necessity: 'OPTIONAL' as never
+				}
+			}),
+			request({
+				capabilityRequirement: {
+					...request().capabilityRequirement,
+					affectedQuestionRefs: {} as never
+				}
+			}),
+			request({
+				capabilityRequirement: {
+					...request().capabilityRequirement,
+					affectedQuestionRefs: nonEnumerableReference
+				}
+			}),
+			request({
+				capabilityRequirement: {
+					...request().capabilityRequirement,
+					affectedQuestionRefs: ['bad\ud800']
+				}
+			}),
+			request({
+				work: {
+					...request().work,
+					changeContract: { kind: 'BROKEN' } as never
+				}
+			}),
+			request({ subjectInput: { kind: 'NOT_APPLICABLE', reasonCode: 'NO_SUBJECT' } }),
+			request({ subjectInput: { kind: 'BROKEN' } as never }),
+			request({ currentnessRequirement: { kind: 'BROKEN' } as never })
+		];
+		for (const candidate of invalidCases) expectRequestRefused(candidate, 'MESSAGE_INVALID');
+	});
+
+	it('admits the bounded large-artifact output ceiling and refuses one byte beyond it', () => {
+		expect(AGENT_OPERATION_PROTOCOL_SAFETY_CEILINGS.maxOutputBytes).toBe(128 * 1024 * 1024);
+		expect(
+			validateAgentOperationRequest(
+				request({
+					budgets: {
+						...request().budgets,
+						maxOutputBytes: AGENT_OPERATION_PROTOCOL_SAFETY_CEILINGS.maxOutputBytes
+					}
+				})
+			)
+		).toMatchObject({ state: 'VALID' });
+		expectRequestRefused(
+			request({
+				budgets: {
+					...request().budgets,
+					maxOutputBytes: AGENT_OPERATION_PROTOCOL_SAFETY_CEILINGS.maxOutputBytes + 1
+				}
+			}),
+			'BUDGET_REFUSED'
+		);
+	});
 });
 
 describe('agent operation response protocol', () => {
@@ -661,6 +759,106 @@ describe('agent operation response protocol', () => {
 				'CURRENTNESS_INVALID'
 			);
 	});
+
+	it('rejects incomplete capability, currentness, continuation, and response-union states', () => {
+		const capabilityCases: readonly AgentCapabilityStatus[] = [
+			capability({ coverageRefs: [] }),
+			capability({
+				capabilityCoverage: 'partial',
+				coverageRefs: [],
+				excludedRegionRefs: [],
+				limitationRefs: [],
+				unknownRegionRefs: []
+			}),
+			capability({ capabilityCoverage: 'unsupported', coverageRefs: [], limitationRefs: [] }),
+			capability({ capabilityCoverage: 'excluded', coverageRefs: [], excludedRegionRefs: [] }),
+			capability({
+				capabilityCoverage: 'not-analyzed',
+				coverageRefs: [],
+				limitationRefs: [],
+				unknownRegionRefs: []
+			}),
+			capability({ conflictRefs: ['conflict:hidden'] })
+		];
+		for (const invalidCapability of capabilityCases)
+			expectResponseRefused({ ...partial(), capability: invalidCapability }, 'CAPABILITY_INVALID');
+
+		const currentnessCases: readonly [AgentCurrentnessStatus, string][] = [
+			[currentness({ invalidationRefs: [], status: 'invalidated' }), 'CURRENTNESS_INVALID'],
+			[currentness({ freshnessEvidenceRefs: [], status: 'stale' }), 'CURRENTNESS_INVALID'],
+			[currentness({ freshnessEvidenceRefs: [], status: 'unknown' }), 'CURRENTNESS_INVALID'],
+			[currentness({ subject: { kind: 'BROKEN' } as never }), 'MESSAGE_INVALID'],
+			[currentness({ snapshot: { kind: 'BROKEN' } as never }), 'MESSAGE_INVALID']
+		];
+		for (const [invalidCurrentness, code] of currentnessCases)
+			expectResponseRefused({ ...partial(), currentness: invalidCurrentness }, code);
+
+		const basePartial = partial() as Extract<AgentOperationResponse, { outcome: 'partial' }>;
+		expect(
+			validateAgentOperationResponse({
+				...basePartial,
+				partial: {
+					...basePartial.partial,
+					continuation: { kind: 'NONE', reasonCode: 'NO_CONTINUATION' }
+				}
+			})
+		).toMatchObject({ state: 'VALID' });
+		expectResponseRefused(
+			{
+				...basePartial,
+				partial: { ...basePartial.partial, continuation: { kind: 'BROKEN' } }
+			},
+			'MESSAGE_INVALID'
+		);
+		expectResponseRefused(
+			{
+				...basePartial,
+				partial: {
+					...basePartial.partial,
+					admittedResultRefs: [],
+					completedRegionRefs: []
+				}
+			},
+			'MESSAGE_INVALID'
+		);
+
+		const unresolved = {
+			currentness: unresolvedCurrentness(),
+			subjectResolution: {
+				kind: 'NOT_FOUND' as const,
+				locatorDigest: A,
+				reasonCode: 'NO_MATCH'
+			}
+		};
+		const unionCases: readonly [unknown, string][] = [
+			[{ ...success(), messageKind: 'request' }, 'MESSAGE_INVALID'],
+			[{ ...success(), protocolVersion: 'future/9.0.0' }, 'PROTOCOL_UNSUPPORTED'],
+			[{ ...success(), operationVersion: 'query/9.0.0' }, 'OPERATION_UNSUPPORTED'],
+			[{ ...success(), outcome: 'broken' }, 'MESSAGE_INVALID'],
+			[{ ...progress(), exitCategory: 'SUCCESS' }, 'MESSAGE_INVALID'],
+			[{ ...progress(), ...unresolved }, 'MESSAGE_INVALID'],
+			[{ ...success(), ...unresolved }, 'MESSAGE_INVALID'],
+			[{ ...basePartial, exitCategory: 'SUCCESS' }, 'MESSAGE_INVALID'],
+			[{ ...basePartial, ...unresolved }, 'MESSAGE_INVALID']
+		];
+		for (const [candidate, code] of unionCases) expectResponseRefused(candidate, code);
+
+		const ambiguous = errorResponse() as Extract<AgentOperationResponse, { outcome: 'error' }>;
+		expectResponseRefused(
+			{
+				...ambiguous,
+				subjectResolution: {
+					candidateDisclosure: { kind: 'BROKEN' },
+					kind: 'AMBIGUOUS'
+				}
+			},
+			'MESSAGE_INVALID'
+		);
+		expectResponseRefused(
+			{ ...ambiguous, subjectResolution: { kind: 'BROKEN' } },
+			'MESSAGE_INVALID'
+		);
+	});
 });
 
 describe('agent operation exchange and canonical serialization', () => {
@@ -720,6 +918,52 @@ describe('agent operation exchange and canonical serialization', () => {
 		};
 		expect(validateAgentOperationExchange(historicalRequest, historicalResponse)).toMatchObject({
 			state: 'VALID'
+		});
+	});
+
+	it('binds exact-subject requests and rejects interrupted resolution of a caller-resolved subject', () => {
+		const exactRequest = request({
+			currentnessRequirement: { kind: 'REQUIRE_EXACT_SUBJECT', subjectId: 'subject:other' }
+		});
+		expect(validateAgentOperationExchange(exactRequest, success(exactRequest))).toMatchObject({
+			diagnostic: { code: 'EXCHANGE_MISMATCH' },
+			state: 'REFUSED'
+		});
+
+		const candidateRequest = request();
+		const base = errorResponse(candidateRequest) as Extract<
+			AgentOperationResponse,
+			{ outcome: 'error' }
+		>;
+		const interrupted: AgentOperationResponse = {
+			...base,
+			capability: capability({
+				capabilityCoverage: 'unsupported',
+				coverageRefs: [],
+				executionHealth: 'cancelled',
+				limitationRefs: ['limit:cancelled']
+			}),
+			currentness: unresolvedCurrentness(),
+			exitCategory: 'INCOMPLETE_OR_UNSUPPORTED',
+			refusal: {
+				...base.refusal,
+				code: 'CSAA-E-EXECUTION-CANCELLED',
+				reasonCode: 'CANCELLED'
+			},
+			state: 'cancelled',
+			subjectResolution: {
+				kind: 'NOT_APPLICABLE',
+				reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+			}
+		};
+		expect(validateAgentOperationResponse(interrupted)).toMatchObject({ state: 'VALID' });
+		expect(validateAgentOperationExchange(candidateRequest, interrupted)).toMatchObject({
+			diagnostic: { code: 'EXCHANGE_MISMATCH' },
+			state: 'REFUSED'
+		});
+		expect(serializeAgentProtocolMessage(candidateRequest, 0)).toMatchObject({
+			diagnostic: { code: 'SERIALIZATION_BUDGET_EXCEEDED' },
+			state: 'REFUSED'
 		});
 	});
 

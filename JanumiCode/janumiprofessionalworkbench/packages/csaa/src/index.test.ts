@@ -498,9 +498,9 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 		);
 		expect(runWorkingSourceEditImpactCandidateReport).toBeTypeOf('function');
 		expect(workingSourceEditImpactCandidateReportExitCode).toBeTypeOf('function');
-		expect(publicSurface).not.toHaveProperty('observeWorkingSourceEdit');
-		expect(publicSurface).not.toHaveProperty('bindWorkingSourceEditObservation');
-		expect(publicSurface).not.toHaveProperty('verifyWorkingSourceEditObservation');
+		expect(publicSurface.observeWorkingSourceEdit).toBeTypeOf('function');
+		expect(publicSurface.bindWorkingSourceEditObservation).toBeTypeOf('function');
+		expect(publicSurface.verifyWorkingSourceEditObservation).toBeTypeOf('function');
 		expect(runStructuralModuleReachabilityReport).toBeTypeOf('function');
 		expect(publicSurface).not.toHaveProperty(
 			'runStructuralModuleReachabilityReportWithCapturedSubject'
@@ -598,9 +598,9 @@ describe('@janumipwb/csaa public semantic and graph surface', () => {
 			'jan-csaa-static-semantic-snapshot-progress/1.0.0'
 		);
 		expect(TYPESCRIPT_PROVIDER_VERSION).toBe('5.9.3');
-		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/0.1.0');
+		expect(CALL_GRAPH_OPERATION_VERSION).toBe('jan-csaa-build-call-graph/1.0.0');
 		expect(CALL_GRAPH_REQUEST_SCHEMA_VERSION).toBe('jan-csaa-call-graph-request/1.0.0');
-		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/1.0.0');
+		expect(CALL_GRAPH_SCHEMA_VERSION).toBe('jan-csaa-call-graph/2.0.0');
 		expect(CALL_GRAPH_REPORT_OPERATION_VERSION).toBe('jan-csaa-report-call-graph/0.1.0');
 		expect(CALL_GRAPH_REPORT_REQUEST_SCHEMA_VERSION).toBe(
 			'jan-csaa-call-graph-report-request/0.1.0'

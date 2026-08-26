@@ -76,8 +76,8 @@ export const CONTENT_ADDRESSED_FILE_STORE_SCHEMAS = Object.freeze({
 
 export const CONTENT_ADDRESSED_FILE_STORE_SAFETY_CEILINGS = Object.freeze({
 	maxArtifacts: 4_096,
-	maxArtifactBytes: 16 * 1024 * 1024,
-	maxTotalArtifactBytes: 64 * 1024 * 1024,
+	maxArtifactBytes: 128 * 1024 * 1024,
+	maxTotalArtifactBytes: 1024 * 1024 * 1024,
 	maxMetadataBytes: 16 * 1024 * 1024,
 	maxDependencyReferences: 16_384,
 	maxDirectoryEntries: 16_384,

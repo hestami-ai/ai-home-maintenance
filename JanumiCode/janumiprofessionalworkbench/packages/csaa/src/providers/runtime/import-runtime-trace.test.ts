@@ -319,4 +319,97 @@ describe('supplied deterministic runtime traces and hybrid rows', () => {
 			'MALFORMED'
 		);
 	});
+
+	it('rejects malformed runtime coverage, event, artifact, and ordering boundaries', () => {
+		const fixture = providerFixture();
+		const context = providerContext(
+			fixture.root,
+			fixture.subject,
+			DETERMINISTIC_RUNTIME_TRACE_PROVIDER_ID
+		);
+		type MutableRecord = Record<string, unknown>;
+		const record = (value: unknown): MutableRecord => value as MutableRecord;
+		const array = (value: unknown): unknown[] => value as unknown[];
+		const event = (value: MutableRecord, index: number): MutableRecord =>
+			record(array(value.events)[index]);
+		const eventData = (value: MutableRecord, index: number): MutableRecord =>
+			record(event(value, index).data);
+		const malformedCases: readonly [string, (value: MutableRecord) => void][] = [
+			[
+				'unsupported finding ID',
+				(value) => {
+					record(value.coverage).findingIds = [9, 19, 45, 54, 999];
+				}
+			],
+			[
+				'duplicate finding ID',
+				(value) => {
+					record(value.coverage).findingIds = [9, 19, 45, 54, 54];
+				}
+			],
+			[
+				'noncanonical finding order',
+				(value) => {
+					record(value.coverage).findingIds = [19, 9, 45, 54, 55];
+				}
+			],
+			['invalid event timestamp', (value) => (event(value, 0).at = 'not-a-date')],
+			['noncanonical event timestamp', (value) => (event(value, 0).at = '2026-08-25T12:00:00.50Z')],
+			[
+				'event timestamp outside the run',
+				(value) => (event(value, 0).at = '2026-08-25T12:00:02.000Z')
+			],
+			['invalid digest', (value) => (eventData(value, 1).firstRequestSha256 = 'not-a-digest')],
+			['unsupported enum', (value) => (eventData(value, 0).identitySource = 'IMAGINARY')],
+			[
+				'nonboolean authentication marker',
+				(value) => (eventData(value, 0).authenticated = 'false')
+			],
+			['nonboolean authoring marker', (value) => (eventData(value, 2).material = 'true')],
+			[
+				'duplicate tool fields',
+				(value) => {
+					eventData(value, 7).fieldsPresent = ['ATTEMPT_ID', 'ATTEMPT_ID'];
+				}
+			],
+			['unsupported event kind', (value) => (event(value, 0).kind = 'UNKNOWN_EVENT')],
+			['unsupported schema', (value) => (value.schemaVersion = 'runtime-trace/0')],
+			[
+				'overlapping covered and missing findings',
+				(value) => {
+					record(value.coverage).missingFindingIds = [9];
+				}
+			],
+			[
+				'incomplete finding population',
+				(value) => {
+					record(value.coverage).findingIds = [9, 19, 45, 54];
+				}
+			],
+			[
+				'duplicate artifact path',
+				(value) => {
+					const artifacts = array(value.artifacts);
+					artifacts.push(structuredClone(artifacts[0]));
+				}
+			],
+			['noncontiguous event sequence', (value) => (event(value, 0).sequence = 1)],
+			[
+				'nonmonotonic event timestamp',
+				(value) => {
+					event(value, 0).at = '2026-08-25T12:00:00.900Z';
+					event(value, 1).at = '2026-08-25T12:00:00.100Z';
+				}
+			]
+		];
+
+		for (const [label, mutate] of malformedCases) {
+			const value = structuredClone(trace(context)) as unknown as MutableRecord;
+			mutate(value);
+			expect(importDeterministicRuntimeTrace(JSON.stringify(value), context), label).toMatchObject({
+				health: 'MALFORMED',
+				usableForCurrentSubject: false
+			});
+		}
+	});
 });

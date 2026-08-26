@@ -48,6 +48,7 @@ import {
 } from './run-project-context-report.js';
 import {
 	LOGICAL_GRAPH_COMPOSITION_REPORT_PROGRESS_NONCLAIMS,
+	admitLogicalGraphCompositionReportRequest,
 	logicalGraphCompositionReportExitCode,
 	runLogicalGraphCompositionReport,
 	runLogicalGraphCompositionReportWithDependencies,
@@ -213,6 +214,63 @@ afterAll(() => {
 });
 
 describe('runLogicalGraphCompositionReport', () => {
+	it('admits one exact request and rejects hostile exact-shape and version variants', () => {
+		const exact = request();
+		expect(admitLogicalGraphCompositionReportRequest(exact)).toEqual({
+			outcome: 'admitted',
+			request: exact
+		});
+
+		const customPrototype = Object.assign(Object.create({ inherited: true }) as object, request());
+		const invalidBudget = request();
+		const invalidZeroBudget = request();
+		(
+			invalidZeroBudget.budgets.logicalGraphComposition as unknown as {
+				maxConflictRecords: number;
+			}
+		).maxConflictRecords = -0;
+		const candidates: readonly (readonly [unknown, string, string])[] = [
+			[customPrototype, 'REQUEST_SHAPE_INVALID', '$'],
+			[{ ...request(), extra: true }, 'REQUEST_SHAPE_INVALID', '$'],
+			[
+				{
+					...request(),
+					operationVersion: 'jan-csaa-report-logical-graph-composition/unsupported'
+				},
+				'REQUEST_OPERATION_INCOMPATIBLE',
+				'$.operationVersion'
+			],
+			[
+				{
+					...request(),
+					schemaVersion: 'jan-csaa-logical-graph-composition-report-request/unsupported'
+				},
+				'REQUEST_SCHEMA_INCOMPATIBLE',
+				'$.schemaVersion'
+			],
+			[
+				{
+					...invalidBudget,
+					budgets: { ...invalidBudget.budgets, maxResultBytes: 0 }
+				},
+				'REQUEST_BUDGET_INVALID',
+				'$.budgets.maxResultBytes'
+			],
+			[
+				invalidZeroBudget,
+				'REQUEST_BUDGET_INVALID',
+				'$.budgets.logicalGraphComposition.maxConflictRecords'
+			]
+		];
+		for (const [candidate, code, path] of candidates)
+			expect(admitLogicalGraphCompositionReportRequest(candidate)).toMatchObject({
+				code,
+				outcome: 'rejected',
+				path,
+				state: 'incompatible'
+			});
+	});
+
 	it('returns one exact same-subject PARTIAL/OPEN composition with paired deferred progress', async () => {
 		const progress: LogicalGraphCompositionReportProgressEvent[] = [];
 		const capture = vi.fn(dependencies().captureProjectContext);
@@ -332,6 +390,68 @@ describe('runLogicalGraphCompositionReport', () => {
 		}
 	});
 
+	it('rejects null, relative, and accessor repository-root options without invoking accessors', async () => {
+		let touched = false;
+		const accessorOptions = Object.defineProperty({}, 'repositoryRoot', {
+			enumerable: true,
+			get() {
+				touched = true;
+				throw new Error('must not run');
+			}
+		});
+		for (const options of [null, { repositoryRoot: 'relative/path' }, accessorOptions]) {
+			const outcome = await runLogicalGraphCompositionReportWithDependencies(
+				request(),
+				options as unknown as Parameters<
+					typeof runLogicalGraphCompositionReportWithDependencies
+				>[1],
+				dependencies()
+			);
+			expect(outcome).toMatchObject({
+				code: 'REQUEST_INVALID',
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: 'incompatible'
+			});
+			expect(logicalGraphCompositionReportExitCode(outcome)).toBe(2);
+		}
+		expect(touched).toBe(false);
+	});
+
+	it('projects a trusted unavailable predecessor and rejects a non-canonical injected envelope', async () => {
+		const missingRequest = request({
+			subjectProjectConfigPaths: ['projects/missing/tsconfig.json']
+		});
+		const trusted = await runLogicalGraphCompositionReport(missingRequest, { repositoryRoot });
+		expect(trusted).toMatchObject({
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE'
+		});
+		expect(trusted.diagnostics.length).toBeGreaterThan(0);
+
+		const injected = await runLogicalGraphCompositionReportWithDependencies(
+			missingRequest,
+			{ repositoryRoot },
+			dependencies({
+				captureProjectContext: ((requestValue, options) => {
+					const outcome = captureProjectContextReportPipeline(requestValue, options);
+					if (outcome.outcome === 'captured') throw new Error('expected unavailable predecessor');
+					return {
+						...outcome,
+						forgedEnvelopeValue: 1n
+					} as unknown as ProjectContextReportPipelineOutcome;
+				}) as LogicalGraphCompositionReportRuntimeDependencies['captureProjectContext']
+			})
+		);
+		expect(injected).toMatchObject({
+			code: 'PREDECESSOR_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'failed'
+		});
+		expect(JSON.stringify(injected)).not.toContain('forgedEnvelopeValue');
+	});
+
 	it('refuses a lower-than-observed call-edge budget at the call producer', async () => {
 		const baseline = await runLogicalGraphCompositionReportWithDependencies(
 			request(),
@@ -356,6 +476,27 @@ describe('runLogicalGraphCompositionReport', () => {
 			code: 'CALL_GRAPH_VALIDATION_FAILED',
 			outcome: 'unavailable',
 			stage: 'CALL_GRAPH',
+			state: 'resource-refused'
+		});
+	});
+
+	it.each([
+		['module population', 'module', 'MODULE_DEPENDENCY_GRAPH_BUDGET_EXCEEDED'],
+		['composition links', 'composition', 'LOGICAL_GRAPH_COMPOSITION_VALIDATION_FAILED']
+	] as const)('refuses an admitted lower-than-observed %s budget', async (_label, kind, code) => {
+		const candidate = request();
+		if (kind === 'module')
+			(candidate.budgets.moduleDependencyGraph as { maxNodes: number }).maxNodes = 1;
+		else (candidate.budgets.logicalGraphComposition as { maxLinks: number }).maxLinks = 1;
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			candidate,
+			{ repositoryRoot },
+			dependencies()
+		);
+		expect(outcome).toMatchObject({
+			code,
+			outcome: 'unavailable',
+			stage: kind === 'module' ? 'MODULE_DEPENDENCY_GRAPH' : 'LOGICAL_GRAPH_COMPOSITION',
 			state: 'resource-refused'
 		});
 	});
@@ -540,6 +681,37 @@ describe('runLogicalGraphCompositionReport', () => {
 		}
 	);
 
+	it('contains a non-canonical injected predecessor metadata value during trusted replay', async () => {
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			request(),
+			{ repositoryRoot },
+			dependencies({
+				captureProjectContext: (requestValue, options) => ({
+					...captured,
+					diagnostics: [
+						...captured.diagnostics,
+						{
+							code: 'FORGED_NON_CANONICAL_DIAGNOSTIC',
+							message: 1n,
+							path: null,
+							phase: 'VALIDATE',
+							severity: 'ERROR',
+							source: 'PROJECT_CONTEXT'
+						}
+					] as unknown as ProjectContextReportPipelineCapture['diagnostics'],
+					request: effectiveCaptureRequest(requestValue, options)
+				})
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'PREDECESSOR_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'failed'
+		});
+		expect(JSON.stringify(outcome)).not.toContain('FORGED_NON_CANONICAL_DIAGNOSTIC');
+	});
+
 	it.each(['module', 'call', 'composition'] as const)(
 		'rejects structurally invalid forged %s producer output',
 		async (kind) => {
@@ -598,6 +770,56 @@ describe('runLogicalGraphCompositionReport', () => {
 			});
 		}
 	);
+
+	it('rejects an injected unavailable module producer envelope before graph inspection', async () => {
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			request(),
+			{ repositoryRoot },
+			dependencies({
+				buildModuleGraph: (() => ({
+					diagnostics: [
+						{
+							code: 'REQUEST_INVALID',
+							message: 'forged unavailable module producer envelope',
+							path: null,
+							phase: 'REQUEST'
+						}
+					],
+					outcome: 'unavailable'
+				})) as typeof buildModuleDependencyGraph
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'MODULE_DEPENDENCY_GRAPH_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'MODULE_DEPENDENCY_GRAPH',
+			state: 'failed'
+		});
+		expect(JSON.stringify(outcome)).not.toContain('forged unavailable module producer envelope');
+	});
+
+	it('rejects direct composition closure invariant drift before trusted replay', async () => {
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			request(),
+			{ repositoryRoot },
+			dependencies({
+				buildComposition: ((...args: Parameters<typeof buildLogicalGraphComposition>) => {
+					const built = buildLogicalGraphComposition(...args);
+					if (built.outcome === 'unavailable') return built;
+					return {
+						...built,
+						composition: { ...built.composition, health: 'COMPLETE' }
+					} as unknown as ReturnType<typeof buildLogicalGraphComposition>;
+				}) as typeof buildLogicalGraphComposition
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'LOGICAL_GRAPH_COMPOSITION_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'LOGICAL_GRAPH_COMPOSITION',
+			state: 'failed'
+		});
+	});
 
 	it.each(['module', 'call', 'composition'] as const)(
 		'rejects validation-passing forged %s producer diagnostics through trusted replay',
@@ -679,6 +901,51 @@ describe('runLogicalGraphCompositionReport', () => {
 			});
 			expect(JSON.stringify(outcome)).not.toContain('forged replay-only diagnostic');
 			expect(JSON.stringify(outcome)).not.toContain(repositoryRoot);
+		}
+	);
+
+	it.each(['module', 'call', 'composition'] as const)(
+		'contains non-canonical forged %s producer envelopes during trusted replay',
+		async (kind) => {
+			let overrides: Partial<LogicalGraphCompositionReportRuntimeDependencies>;
+			if (kind === 'module') {
+				overrides = {
+					buildModuleGraph: ((...args: Parameters<typeof buildModuleDependencyGraph>) => ({
+						...buildModuleDependencyGraph(...args),
+						forgedEnvelopeValue: 1n
+					})) as typeof buildModuleDependencyGraph
+				};
+			} else if (kind === 'call') {
+				overrides = {
+					buildCallGraph: ((...args: Parameters<typeof buildBoundedCallGraph>) => ({
+						...buildBoundedCallGraph(...args),
+						forgedEnvelopeValue: 1n
+					})) as typeof buildBoundedCallGraph
+				};
+			} else {
+				overrides = {
+					buildComposition: ((...args: Parameters<typeof buildLogicalGraphComposition>) => ({
+						...buildLogicalGraphComposition(...args),
+						forgedEnvelopeValue: 1n
+					})) as typeof buildLogicalGraphComposition
+				};
+			}
+			const outcome = await runLogicalGraphCompositionReportWithDependencies(
+				request(),
+				{ repositoryRoot },
+				dependencies(overrides)
+			);
+			expect(outcome).toMatchObject({
+				code:
+					kind === 'module'
+						? 'MODULE_DEPENDENCY_GRAPH_VALIDATION_FAILED'
+						: kind === 'call'
+							? 'CALL_GRAPH_VALIDATION_FAILED'
+							: 'LOGICAL_GRAPH_COMPOSITION_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				state: 'failed'
+			});
+			expect(JSON.stringify(outcome)).not.toContain('forgedEnvelopeValue');
 		}
 	);
 
@@ -864,6 +1131,35 @@ describe('runLogicalGraphCompositionReport', () => {
 		expect(JSON.stringify(outcome)).not.toContain(repositoryRoot);
 	});
 
+	it('contains a throwing final currentness verifier and completes the currentness stage', async () => {
+		const progress: LogicalGraphCompositionReportProgressEvent[] = [];
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			request(),
+			{ onProgress: (event) => progress.push(event), repositoryRoot },
+			dependencies({
+				verifySubject: (() => {
+					throw new Error(`currentness failure: ${repositoryRoot}`);
+				}) as typeof verifyFrozenSubject
+			})
+		);
+		expect(outcome).toMatchObject({
+			outcome: 'partial',
+			result: {
+				currentness: {
+					changedPaths: [],
+					diagnosticCodes: ['SUBJECT_CHANGED_DURING_RESOLUTION'],
+					state: 'UNAVAILABLE'
+				}
+			}
+		});
+		expect(progress.filter((event) => event.phase === 'CURRENTNESS')).toMatchObject([
+			{ state: 'STARTED' },
+			{ detailCode: 'UNAVAILABLE', state: 'COMPLETED' }
+		]);
+		expect(JSON.stringify(outcome)).not.toContain('currentness failure');
+		expect(JSON.stringify(outcome)).not.toContain(repositoryRoot);
+	});
+
 	it('counts the terminal LF exactly and refuses one byte below the complete report', async () => {
 		const withMax = (maxResultBytes: number) => {
 			const base = request();
@@ -916,5 +1212,33 @@ describe('runLogicalGraphCompositionReport', () => {
 		);
 		expect(throwing).toEqual(baseline);
 		expect(rejecting).toEqual(baseline);
+	});
+
+	it('fails a throwing predecessor closed while pairing the active deferred progress stage', async () => {
+		const progress: LogicalGraphCompositionReportProgressEvent[] = [];
+		const outcome = await runLogicalGraphCompositionReportWithDependencies(
+			request(),
+			{ onProgress: (event) => progress.push(event), repositoryRoot },
+			dependencies({
+				captureProjectContext: () => {
+					throw new Error(`predecessor failure: ${repositoryRoot}`);
+				}
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(logicalGraphCompositionReportExitCode(outcome)).toBe(4);
+		expect(progress.map((event) => [event.phase, event.state, event.detailCode])).toEqual([
+			['REQUEST_BIND', 'STARTED', null],
+			['REQUEST_BIND', 'COMPLETED', 'REQUEST_ADMITTED'],
+			['PREDECESSOR_PIPELINE', 'STARTED', null],
+			['PREDECESSOR_PIPELINE', 'FAILED', 'INTERNAL_FAILURE']
+		]);
+		expect(JSON.stringify(outcome)).not.toContain('predecessor failure');
+		expect(JSON.stringify(outcome)).not.toContain(repositoryRoot);
 	});
 });

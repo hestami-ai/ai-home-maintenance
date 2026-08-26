@@ -77,8 +77,10 @@ const FULL_GIT_OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const MAX_CALLER_ID_CHARACTERS = 4_096;
 
 interface AdmittedOptions {
+	readonly additionalArtifacts?: RunStaticModuleImpactCandidateReportOptions['additionalArtifacts'];
 	readonly onPredecessorProgress?: RunStaticModuleImpactCandidateReportOptions['onPredecessorProgress'];
 	readonly repositoryRoot: string;
+	readonly subjectFilters?: RunStaticModuleImpactCandidateReportOptions['subjectFilters'];
 }
 
 class ReportRequestError extends Error {
@@ -407,7 +409,11 @@ function materializeOptions(value: unknown): AdmittedOptions {
 	if (
 		keys.some(
 			(key) =>
-				typeof key !== 'string' || (key !== 'onPredecessorProgress' && key !== 'repositoryRoot')
+				typeof key !== 'string' ||
+				(key !== 'additionalArtifacts' &&
+					key !== 'onPredecessorProgress' &&
+					key !== 'repositoryRoot' &&
+					key !== 'subjectFilters')
 		) ||
 		!keys.includes('repositoryRoot')
 	)
@@ -432,13 +438,27 @@ function materializeOptions(value: unknown): AdmittedOptions {
 			'$options.repositoryRoot',
 			'failed'
 		);
-	const callbackDescriptor = Reflect.getOwnPropertyDescriptor(value, 'onPredecessorProgress');
-	if (callbackDescriptor === undefined) return { repositoryRoot: rootDescriptor.value };
+	const additionalArtifactsDescriptor = Reflect.getOwnPropertyDescriptor(
+		value,
+		'additionalArtifacts'
+	);
 	if (
-		!('value' in callbackDescriptor) ||
-		!callbackDescriptor.enumerable ||
-		(callbackDescriptor.value !== undefined &&
-			(typeof callbackDescriptor.value !== 'function' || isProxyValue(callbackDescriptor.value)))
+		additionalArtifactsDescriptor !== undefined &&
+		(!('value' in additionalArtifactsDescriptor) || !additionalArtifactsDescriptor.enumerable)
+	)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts must be an enumerable data property.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	const callbackDescriptor = Reflect.getOwnPropertyDescriptor(value, 'onPredecessorProgress');
+	if (
+		callbackDescriptor !== undefined &&
+		(!('value' in callbackDescriptor) ||
+			!callbackDescriptor.enumerable ||
+			(callbackDescriptor.value !== undefined &&
+				(typeof callbackDescriptor.value !== 'function' || isProxyValue(callbackDescriptor.value))))
 	)
 		throw new ReportRequestError(
 			'OPTIONS_PROGRESS_INVALID',
@@ -446,13 +466,39 @@ function materializeOptions(value: unknown): AdmittedOptions {
 			'$options.onPredecessorProgress',
 			'failed'
 		);
-	return callbackDescriptor.value === undefined
-		? { repositoryRoot: rootDescriptor.value }
-		: {
-				onPredecessorProgress:
-					callbackDescriptor.value as RunStaticModuleImpactCandidateReportOptions['onPredecessorProgress'],
-				repositoryRoot: rootDescriptor.value
-			};
+	const subjectFiltersDescriptor = Reflect.getOwnPropertyDescriptor(value, 'subjectFilters');
+	if (
+		subjectFiltersDescriptor !== undefined &&
+		(!('value' in subjectFiltersDescriptor) || !subjectFiltersDescriptor.enumerable)
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			'$options.subjectFilters must be an enumerable data property.',
+			'$options.subjectFilters',
+			'failed'
+		);
+	return {
+		...(additionalArtifactsDescriptor === undefined ||
+		additionalArtifactsDescriptor.value === undefined
+			? {}
+			: {
+					additionalArtifacts:
+						additionalArtifactsDescriptor.value as RunStaticModuleImpactCandidateReportOptions['additionalArtifacts']
+				}),
+		...(callbackDescriptor === undefined || callbackDescriptor.value === undefined
+			? {}
+			: {
+					onPredecessorProgress:
+						callbackDescriptor.value as RunStaticModuleImpactCandidateReportOptions['onPredecessorProgress']
+				}),
+		repositoryRoot: rootDescriptor.value,
+		...(subjectFiltersDescriptor === undefined || subjectFiltersDescriptor.value === undefined
+			? {}
+			: {
+					subjectFilters:
+						subjectFiltersDescriptor.value as RunStaticModuleImpactCandidateReportOptions['subjectFilters']
+				})
+	};
 }
 
 function diagnostic(
@@ -853,10 +899,14 @@ function runInternal(
 	const predecessorExecution = runStaticModuleImpactCandidateReportWithCapturedSubject(
 		predecessorRequest,
 		{
+			...(options.additionalArtifacts === undefined
+				? {}
+				: { additionalArtifacts: options.additionalArtifacts }),
 			...(options.onPredecessorProgress === undefined
 				? {}
 				: { onPredecessorProgress: options.onPredecessorProgress }),
-			repositoryRoot: initialCapture.repositoryRoot
+			repositoryRoot: initialCapture.repositoryRoot,
+			...(options.subjectFilters === undefined ? {} : { subjectFilters: options.subjectFilters })
 		}
 	);
 	const predecessor = predecessorExecution.outcome;
@@ -1043,10 +1093,14 @@ function runInternal(
 }
 
 export interface RunWorkingSourceEditImpactCandidateReportOptions {
+	/** Trusted artifacts retained in the exact predecessor frozen subject identity. */
+	readonly additionalArtifacts?: RunStaticModuleImpactCandidateReportOptions['additionalArtifacts'];
 	/** Exact predecessor progress stream; excluded from this terminal report identity. */
 	readonly onPredecessorProgress?: RunStaticModuleImpactCandidateReportOptions['onPredecessorProgress'];
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
+	/** Trusted exact filter policy retained in the predecessor frozen subject identity. */
+	readonly subjectFilters?: RunStaticModuleImpactCandidateReportOptions['subjectFilters'];
 }
 
 export function runWorkingSourceEditImpactCandidateReport(

@@ -68,6 +68,7 @@ import type { CommandHandlerGraphReportPipelineCapture } from './run-command-han
 import {
 	admitCommandEventContractOverlayReportRequest,
 	commandEventContractOverlayReportExitCode,
+	runCommandEventContractOverlayReport,
 	runCommandEventContractOverlayReportWithDependencies,
 	type CommandEventContractOverlayReportProgressEvent,
 	type CommandEventContractOverlayReportRuntimeDependencies
@@ -381,6 +382,197 @@ describe('runCommandEventContractOverlayReport', { timeout: 60_000 }, () => {
 			code: 'REQUEST_SHAPE_INVALID',
 			outcome: 'rejected'
 		});
+	});
+
+	it('rejects incompatible versions, execution selection, object provenance, and nonpositive budgets', () => {
+		const dataWithCustomPrototype = Object.assign(Object.create({ inherited: true }), request());
+		const invalidBudget = request();
+		const cases: ReadonlyArray<readonly [unknown, string, string]> = [
+			[null, 'REQUEST_SHAPE_INVALID', '$'],
+			[dataWithCustomPrototype, 'REQUEST_SHAPE_INVALID', '$'],
+			[
+				{ ...request(), operationVersion: 'command-event-contract-overlay-report/0.0.0' },
+				'REQUEST_OPERATION_INCOMPATIBLE',
+				'$.operationVersion'
+			],
+			[
+				{ ...request(), schemaVersion: 'command-event-contract-overlay-report-request/0.0.0' },
+				'REQUEST_SCHEMA_INCOMPATIBLE',
+				'$.schemaVersion'
+			],
+			[
+				{ ...request(), executionSelection: 'UNACKNOWLEDGED' },
+				'RETAINED_EXECUTION_NOT_ACKNOWLEDGED',
+				'$.executionSelection'
+			],
+			[
+				{
+					...invalidBudget,
+					budgets: {
+						...invalidBudget.budgets,
+						commandEventContractOverlay: {
+							...invalidBudget.budgets.commandEventContractOverlay,
+							maxCommands: 0
+						}
+					}
+				},
+				'REQUEST_BUDGET_INVALID',
+				'$.budgets.commandEventContractOverlay.maxCommands'
+			]
+		];
+		for (const [value, code, path] of cases)
+			expect(admitCommandEventContractOverlayReportRequest(value)).toMatchObject({
+				code,
+				outcome: 'rejected',
+				path
+			});
+	});
+
+	it('maps request and adapter failures through the public and dependency-injected boundaries', async () => {
+		const requestFailure = await runCommandEventContractOverlayReportWithDependencies(
+			null,
+			{ repositoryRoot: fixture.root },
+			dependencies()
+		);
+		expect(requestFailure).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'incompatible'
+		});
+		expect(commandEventContractOverlayReportExitCode(requestFailure)).toBe(2);
+
+		const adapterFailure = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			null as never,
+			dependencies()
+		);
+		expect(adapterFailure).toMatchObject({
+			code: 'REQUEST_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'incompatible'
+		});
+		const relativeRootFailure = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: 'relative/repository' },
+			dependencies()
+		);
+		expect(relativeRootFailure).toMatchObject({
+			code: 'REQUEST_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'incompatible'
+		});
+
+		const publicFailure = await runCommandEventContractOverlayReport(null, {
+			repositoryRoot: fixture.root
+		});
+		expect(publicFailure).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST'
+		});
+	});
+
+	it('forwards detached predecessor telemetry and preserves unavailable predecessor diagnostics', async () => {
+		const progress: CommandEventContractOverlayReportProgressEvent[] = [];
+		const outcome = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			{ onProgress: (event) => void progress.push(event), repositoryRoot: fixture.root },
+			dependencies({
+				async captureHandler(_predecessorRequest, options) {
+					options.onProgress?.({
+						detailCode: 'SYNTHETIC_PREDECESSOR',
+						state: 'COMPLETED'
+					} as never);
+					options.onProgress?.(1n as never);
+					return {
+						code: 'PREDECESSOR_SYNTHETIC_UNAVAILABLE',
+						diagnostics: [
+							{
+								code: 'SYNTHETIC_PREDECESSOR_DIAGNOSTIC',
+								message: 'Synthetic predecessor refusal.',
+								path: '$request',
+								phase: 'CAPTURE',
+								severity: 'ERROR',
+								source: 'REPORT'
+							}
+						],
+						outcome: 'unavailable',
+						state: 'failed',
+						subject: fixture.subject.descriptor
+					} as never;
+				}
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'PREDECESSOR_SYNTHETIC_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'failed'
+		});
+		expect(outcome.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: 'SYNTHETIC_PREDECESSOR_DIAGNOSTIC',
+				predecessorSource: 'REPORT',
+				source: 'PREDECESSOR_PIPELINE'
+			})
+		);
+		expect(progress).toContainEqual(
+			expect.objectContaining({ kind: 'PREDECESSOR_REPORT', phase: 'PREDECESSOR_PIPELINE' })
+		);
+	});
+
+	it('projects captured predecessor diagnostics through bounded repository-safe paths', async () => {
+		const base = dependencies();
+		const outcome = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				async captureHandler(predecessorRequest, options) {
+					const captured = await base.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					return {
+						...captured,
+						diagnostics: [
+							{
+								code: 'SYNTHETIC_REQUEST_PATH',
+								message: 'Synthetic request diagnostic.',
+								path: '$predecessor',
+								phase: 'VALIDATE',
+								severity: 'WARNING',
+								source: 'REPORT'
+							},
+							{
+								code: 'SYNTHETIC_ABSOLUTE_PATH',
+								message: 'Synthetic path under ' + fixture.root,
+								path: join(fixture.root, 'packages', 'rph-contracts'),
+								phase: 'VALIDATE',
+								severity: 'WARNING',
+								source: 'REPORT'
+							},
+							{
+								code: 'SYNTHETIC_NONCANONICAL_PATH',
+								message: 'Synthetic noncanonical path.',
+								path: '../outside.ts',
+								phase: 'VALIDATE',
+								severity: 'WARNING',
+								source: 'REPORT'
+							}
+						] as never
+					};
+				}
+			})
+		);
+		expect(outcome.outcome).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		expect(outcome.diagnostics.map((diagnostic) => diagnostic.path)).toEqual(
+			expect.arrayContaining(['$predecessor', 'packages/rph-contracts', null])
+		);
+		expect(outcome.diagnostics.map((diagnostic) => diagnostic.message).join('\n')).not.toContain(
+			fixture.root
+		);
 	});
 
 	it('returns one bounded same-subject partial overlay with forwarded progress', async () => {
@@ -778,6 +970,106 @@ describe('runCommandEventContractOverlayReport', { timeout: 60_000 }, () => {
 			expect.objectContaining({
 				code: 'UNSUPPORTED_VOCAB',
 				source: 'COMMAND_EVENT_CONTRACT_OVERLAY'
+			})
+		);
+	});
+
+	it('classifies builder budget and validation refusals and normalizes their nested paths', async () => {
+		const cases = [
+			{
+				code: 'BUDGET_EXCEEDED' as const,
+				path: '$request.budgets',
+				reportedPath: '$.budgets.commandEventContractOverlay',
+				state: 'resource-refused'
+			},
+			{
+				code: 'OVERLAY_VALIDATION_FAILED' as const,
+				path: '$request.private',
+				reportedPath: null,
+				state: 'failed'
+			},
+			{
+				code: 'REQUEST_INVALID' as const,
+				path: '$.budgets.maxCommands',
+				reportedPath: '$.budgets.commandEventContractOverlay.maxCommands',
+				state: 'incompatible'
+			}
+		];
+		for (const entry of cases) {
+			const outcome = await runCommandEventContractOverlayReportWithDependencies(
+				request(),
+				{ repositoryRoot: fixture.root },
+				dependencies({
+					buildOverlay() {
+						return {
+							diagnostics: [
+								{
+									code: entry.code,
+									message: 'Synthetic overlay refusal at ' + fixture.root,
+									path: entry.path,
+									phase: 'VALIDATE' as const
+								}
+							],
+							outcome: 'unavailable' as const
+						};
+					}
+				})
+			);
+			expect(outcome).toMatchObject({
+				code: 'COMMAND_EVENT_CONTRACT_OVERLAY_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'COMMAND_EVENT_CONTRACT_OVERLAY',
+				state: entry.state
+			});
+			expect(outcome.diagnostics).toContainEqual(
+				expect.objectContaining({
+					code: entry.code,
+					message: expect.not.stringContaining(fixture.root),
+					path: entry.reportedPath
+				})
+			);
+		}
+	});
+
+	it('fails closed on dependency exceptions and degrades final currentness exceptions', async () => {
+		const internalFailure = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				async captureHandler() {
+					throw new Error('synthetic predecessor exception');
+				}
+			})
+		);
+		expect(internalFailure).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(commandEventContractOverlayReportExitCode(internalFailure)).toBe(4);
+
+		const unavailableCurrentness = await runCommandEventContractOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				verifySubject() {
+					throw new Error('synthetic final currentness exception');
+				}
+			})
+		);
+		expect(unavailableCurrentness.outcome).toBe('partial');
+		if (unavailableCurrentness.outcome !== 'partial')
+			throw new Error(JSON.stringify(unavailableCurrentness));
+		expect(unavailableCurrentness.result.currentness).toMatchObject({
+			changedPaths: [],
+			diagnosticCodes: ['SUBJECT_CHANGED_DURING_RESOLUTION'],
+			state: 'UNAVAILABLE'
+		});
+		expect(unavailableCurrentness.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: 'SUBJECT_CHANGED_DURING_RESOLUTION',
+				source: 'CURRENTNESS'
 			})
 		);
 	});

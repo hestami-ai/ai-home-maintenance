@@ -48,7 +48,9 @@ import {
 } from './parse-worker-output.js';
 import { ARROW_COMMAND_CENSUS_WORKER_REQUEST_SCHEMA_VERSION } from './worker.js';
 
-const WORKER_PATH = fileURLToPath(new URL('./worker.ts', import.meta.url));
+const WORKER_PATH = fileURLToPath(
+	new URL(import.meta.url.endsWith('.ts') ? './worker.ts' : './worker.js', import.meta.url)
+);
 const ANALYZER_PATH = 'verif/arrow-command-census.ts';
 export const ARROW_COMMAND_CENSUS_PROGRESS_SCHEMA_VERSION =
 	'jan-csaa-arrow-command-census-progress/1.0.0' as const;

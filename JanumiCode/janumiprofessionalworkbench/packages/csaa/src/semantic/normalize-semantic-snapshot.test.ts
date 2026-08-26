@@ -3242,4 +3242,201 @@ describe('semantic snapshot normalization', () => {
 			})
 		);
 	});
+
+	it('fails closed on remaining raw identity and ownership contradictions', () => {
+		const expectRejection = (action: () => unknown, message: string): void => {
+			try {
+				action();
+			} catch (error) {
+				expect(error).toBeInstanceOf(SemanticNormalizationError);
+				expect((error as SemanticNormalizationError).message).toContain(message);
+				return;
+			}
+			throw new Error(`Expected semantic normalization failure containing: ${message}`);
+		};
+
+		const invocation = raw();
+		expectRejection(
+			() =>
+				normalize({
+					...invocation,
+					invocations: [
+						{
+							...RAW_SYNTAX_ONLY_INVOCATION_TARGET,
+							argumentNodeOrdinals: [],
+							calleeNodeOrdinal: 0,
+							invocationKind: 'CALL',
+							nodeOrdinal: 0,
+							optional: false,
+							resolutionReason: 'IMPLEMENTATION_UNAVAILABLE',
+							sourceOrdinal: 0,
+							targetState: 'SIGNATURE_RESOLVED',
+							templateNodeOrdinal: null
+						}
+					]
+				}),
+			'Invocation target evidence is incoherent.'
+		);
+
+		const scoped = raw();
+		expectRejection(
+			() =>
+				normalize({
+					...scoped,
+					scopes: scoped.scopes.map((scope, index) =>
+						index === 1 ? { ...scope, ownerNodeOrdinal: 0, sourceOrdinal: null } : scope
+					)
+				}),
+			'Scope 1 has an owner node without a source.'
+		);
+
+		const rejectTypeMutation = (
+			mutate: (base: RawStaticSemanticProjectExtraction) => RawStaticSemanticProjectExtraction,
+			message: string
+		): void => {
+			const base = typeRaw();
+			expectRejection(() => normalizeTypes(mutate(base)), message);
+		};
+
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				types: base.types.map((type, index) =>
+					index === 1
+						? {
+								...type,
+								fingerprintSha256: base.types[0]!.fingerprintSha256,
+								identityBasis: base.types[0]!.identityBasis
+							}
+						: type
+				)
+			}),
+			'contains duplicate type identity'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 0 ? { ...signature, providerOrdinal: -1 } : signature
+				)
+			}),
+			'Signature 0 provider ordinal is invalid.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 0 ? { ...signature, owner: { kind: 'SYMBOL', symbolOrdinal: 1 } } : signature
+				)
+			}),
+			'Signature 0 Symbol owner is incoherent.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 0 ? { ...signature, semanticKind: 'OVERLOAD_SIGNATURE' } : signature
+				)
+			}),
+			'Signature 0 lacks overload declaration evidence.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 0 ? { ...signature, declarationRole: 'OVERLOAD_DECLARATION' } : signature
+				)
+			}),
+			'Signature 0 overload role is incoherent.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 0
+						? {
+								...signature,
+								declarationRole: 'CALL_SIGNATURE',
+								semanticKind: 'IMPLEMENTATION_SIGNATURE'
+							}
+						: signature
+				)
+			}),
+			'Signature 0 lacks implementation declaration evidence.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatures: base.signatures.map((signature, index) =>
+					index === 1
+						? {
+								...signature,
+								declarationOrdinal: 0,
+								identityBasis: 'DECLARATION_ANCHORED',
+								owner: { declarationOrdinal: 0, kind: 'DECLARATION' },
+								providerOrdinal: null
+							}
+						: signature
+				)
+			}),
+			'contains duplicate Signature identity'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				typeParameters: base.typeParameters.map((parameter, index) =>
+					index === 0
+						? { ...parameter, defaultState: 'RESOLVED', defaultTypeOrdinal: 99 }
+						: parameter
+				)
+			}),
+			'Type fact references absent type 99.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				typeParameters: base.typeParameters.map((parameter, index) =>
+					index === 1
+						? {
+								...parameter,
+								ordinal: 0,
+								owner: { kind: 'SIGNATURE', signatureOrdinal: 0 }
+							}
+						: parameter
+				)
+			}),
+			'contains duplicate type-parameter identity'
+		);
+
+		const signatureParameter = (
+			signatureParameterOrdinal: number,
+			ordinal: number
+		): RawStaticSemanticProjectExtraction['signatureParameters'][number] => ({
+			declarationOrdinal: null,
+			name: 'value',
+			optional: false,
+			ordinal,
+			rest: false,
+			role: 'PARAMETER',
+			signatureOrdinal: 0,
+			signatureParameterOrdinal,
+			symbolOrdinal: null,
+			typeOrdinal: 0
+		});
+
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatureParameters: [signatureParameter(0, -1)]
+			}),
+			'Signature parameter 0 has an invalid ordinal.'
+		);
+		rejectTypeMutation(
+			(base) => ({
+				...base,
+				signatureParameters: [signatureParameter(0, 0), signatureParameter(1, 0)]
+			}),
+			'contains duplicate Signature-parameter identity'
+		);
+	});
 });

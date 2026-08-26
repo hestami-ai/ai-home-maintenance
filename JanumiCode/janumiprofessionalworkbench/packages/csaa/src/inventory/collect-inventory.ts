@@ -1053,17 +1053,167 @@ const TYPESCRIPT_ADAPTER_CAPABILITIES = [
 	'declaration-context-analysis',
 	'frozen-program-construction',
 	'guard-classification-static-overlay',
+	'jpwb-harmonization-native-projection',
 	'logical-graph-composition',
+	'module-code-slice',
 	'module-resolution-trace',
 	'project-context-graph',
 	'read-write-access-projection',
 	'semantic-source-query',
+	'semantic-snapshot-comparison',
 	'source-origin-correlation',
 	'static-module-impact-candidates',
 	'structural-module-reachability-analysis',
 	'structural-scc-analysis',
 	'working-source-edit-impact-candidates'
 ] as const;
+
+const PROVIDER_EVIDENCE_IMPORT_PROVENANCE = [
+	'packages/csaa/src/providers/runtime/provider-evidence.test.ts',
+	'packages/csaa/src/providers/runtime/provider-evidence.ts'
+] as const;
+
+const ESLINT_RESULT_INGESTION_PROVENANCE = [
+	...PROVIDER_EVIDENCE_IMPORT_PROVENANCE,
+	'packages/csaa/src/providers/eslint/import-eslint-json.test.ts',
+	'packages/csaa/src/providers/eslint/import-eslint-json.ts'
+] as const;
+
+const VITEST_RESULT_INGESTION_PROVENANCE = [
+	...PROVIDER_EVIDENCE_IMPORT_PROVENANCE,
+	'packages/csaa/src/providers/vitest/import-vitest-json.test.ts',
+	'packages/csaa/src/providers/vitest/import-vitest-json.ts'
+] as const;
+
+const VITEST_V8_COVERAGE_INGESTION_PROVENANCE = [
+	...PROVIDER_EVIDENCE_IMPORT_PROVENANCE,
+	'packages/csaa/src/providers/coverage/import-vitest-v8-coverage.test.ts',
+	'packages/csaa/src/providers/coverage/import-vitest-v8-coverage.ts',
+	'packages/csaa/src/providers/source-map/decode-source-map-v3.ts'
+] as const;
+
+const RUNTIME_TRACE_PROVENANCE = [
+	...PROVIDER_EVIDENCE_IMPORT_PROVENANCE,
+	'packages/csaa/src/providers/runtime/import-runtime-trace.test.ts',
+	'packages/csaa/src/providers/runtime/import-runtime-trace.ts'
+] as const;
+
+const HYBRID_RUNTIME_EVALUATION_PROVENANCE = [
+	...RUNTIME_TRACE_PROVENANCE,
+	'packages/csaa/src/cli/compose-coding-agent-cli-handlers.test.ts',
+	'packages/csaa/src/cli/compose-coding-agent-cli-handlers.ts',
+	'packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts',
+	'packages/csaa/src/providers/runtime/evaluate-hybrid-runtime.ts',
+	'packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.test.ts',
+	'packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.ts'
+] as const;
+
+const JPWB_NATIVE_SECURITY_PROVENANCE = [
+	'packages/csaa/src/providers/security/observe-jpwb-security.test.ts',
+	'packages/csaa/src/providers/security/observe-jpwb-security.ts'
+] as const;
+
+const FOUR_VALUED_QUERY_OPERATION_PROVENANCE = [
+	'packages/csaa/src/query/four-valued-query-algebra.test.ts',
+	'packages/csaa/src/query/four-valued-query-algebra.ts',
+	'packages/csaa/src/query/four-valued-query-operation.test.ts',
+	'packages/csaa/src/query/four-valued-query-operation.ts'
+] as const;
+
+const MODULE_CODE_SLICE_PROVENANCE = [
+	'packages/csaa/src/query/module-code-slice.test.ts',
+	'packages/csaa/src/query/module-code-slice.ts'
+] as const;
+
+const SEMANTIC_SNAPSHOT_COMPARISON_PROVENANCE = [
+	'packages/csaa/src/impact/semantic-snapshot-comparison.test.ts',
+	'packages/csaa/src/impact/semantic-snapshot-comparison.ts'
+] as const;
+
+const HARMONIZATION_RULE_EVALUATION_PROVENANCE = [
+	'packages/csaa/src/rules/harmonization-first-increment-rules.test.ts',
+	'packages/csaa/src/rules/harmonization-first-increment-rules.ts'
+] as const;
+
+const HARMONIZATION_BENCHMARK_ACCOUNTING_PROVENANCE = [
+	'packages/csaa/src/rules/harmonization-benchmark-accounting.test.ts',
+	'packages/csaa/src/rules/harmonization-benchmark-accounting.ts',
+	'packages/csaa/src/rules/harmonization-benchmark-baseline.ts'
+] as const;
+
+const JPWB_HARMONIZATION_NATIVE_PROJECTION_PROVENANCE = [
+	...HARMONIZATION_RULE_EVALUATION_PROVENANCE,
+	'packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts',
+	'packages/csaa/src/rules/jpwb-harmonization-native-projection.test.ts',
+	'packages/csaa/src/rules/jpwb-harmonization-native-projection.ts'
+] as const;
+
+const CODING_AGENT_CLI_PROCESS_PROVENANCE = [
+	'package.json',
+	'packages/csaa/README.md',
+	'packages/csaa/package.json',
+	'packages/csaa/command-subjects/current-jpwb-coding-agent/tsconfig.json',
+	'packages/csaa/src/cli/coding-agent-cli-contract.ts',
+	'packages/csaa/src/cli/coding-agent-process.spawn.integration.test.ts',
+	'packages/csaa/src/cli/compose-coding-agent-cli-handlers.test.ts',
+	'packages/csaa/src/cli/compose-coding-agent-cli-handlers.ts',
+	'packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts',
+	'packages/csaa/src/cli/run-coding-agent-cli.test.ts',
+	'packages/csaa/src/cli/run-coding-agent-cli.ts',
+	'packages/csaa/src/cli/run-coding-agent-process-host.test.ts',
+	'packages/csaa/src/cli/run-coding-agent-process-host.ts',
+	'packages/csaa/src/cli/run-coding-agent-process.test.ts',
+	'packages/csaa/src/cli/run-coding-agent-process.ts',
+	'packages/csaa/src/providers/emitted-worker-path-smoke.test.ts',
+	'scripts/csaa-coding-agent.ts',
+	'scripts/csaa-technical-completion.ts',
+	'scripts/mutants/ledger.ts',
+	'scripts/mutants/run.ts',
+	'scripts/mutants/tree-baseline.ts',
+	'verif/csaa-technical-completion.test.ts',
+	'verif/mutation-tree-baseline.test.ts'
+] as const;
+
+const CONTENT_ADDRESSED_PERSISTENCE_PROVENANCE = [
+	'packages/csaa/src/cli/content-addressed-coding-agent-cli-artifact-store.test.ts',
+	'packages/csaa/src/cli/content-addressed-coding-agent-cli-artifact-store.ts',
+	'packages/csaa/src/persistence/content-addressed-file-store.test.ts',
+	'packages/csaa/src/persistence/content-addressed-file-store.ts',
+	'packages/csaa/src/persistence/measure-content-addressed-file-store-performance.test.ts',
+	'packages/csaa/src/persistence/measure-content-addressed-file-store-performance.ts',
+	'packages/csaa/src/persistence/assess-dwp-007-persistence-selection.test.ts',
+	'packages/csaa/src/persistence/assess-dwp-007-persistence-selection.ts',
+	'packages/csaa/src/persistence/run-dwp-007-persistence-selection.ts',
+	'scripts/csaa-content-store-performance.ts',
+	'verif/csaa/dwp-007.content-addressed-store.cold-warm.evidence.json',
+	'verif/csaa/dwp-007.persistence-selection.evidence.json'
+] as const;
+
+const ADVANCED_CPG_PROVIDER_DISPOSITION_PROVENANCE = [
+	'packages/csaa/src/providers/experimental/assess-advanced-cpg-provider-entry.test.ts',
+	'packages/csaa/src/providers/experimental/assess-advanced-cpg-provider-entry.ts',
+	'verif/csaa/experimental/dwp-009.local-provider-disposition.evidence.json'
+] as const;
+
+const CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_PROVENANCE = [
+	...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
+	'package.json',
+	'packages/csaa/README.md',
+	'packages/csaa/package.json',
+	'packages/csaa/src/graph/assess-dependency-cruiser-differential.test.ts',
+	'packages/csaa/src/graph/assess-dependency-cruiser-differential.ts',
+	'packages/csaa/src/graph/current-dependency-cruiser-differential.integration.test.ts',
+	'packages/csaa/src/graph/run-current-dependency-cruiser-differential.test.ts',
+	'packages/csaa/src/graph/run-current-dependency-cruiser-differential.ts',
+	'packages/csaa/src/index-roadmap-completion.test.ts',
+	'packages/csaa/src/index.ts',
+	'scripts/csaa-dependency-cruiser-differential.ts'
+] as const;
+
+const CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_EVIDENCE_PATH =
+	'verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json';
+const CURRENT_DEPENDENCY_CRUISER_G4_CLOSURE_EVIDENCE_PATH =
+	'verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json';
 
 function canonicalProvenance(...paths: readonly string[]): string[] {
 	return [...new Set(paths)].sort(compareText);
@@ -1564,6 +1714,73 @@ const PROVIDERS = [
 	['vitest', ['unit-test']]
 ] as const;
 
+const PROVIDER_ADAPTER_CAPABILITIES = {
+	'@playwright/test': [],
+	'@vitest/coverage-v8': ['test-coverage-ingestion'],
+	'dependency-cruiser': [
+		'current-dependency-cruiser-differential',
+		'dependency-graph-corroboration'
+	],
+	eslint: ['eslint-result-ingestion'],
+	sonar: [],
+	typescript: TYPESCRIPT_ADAPTER_CAPABILITIES,
+	vitest: ['vitest-result-ingestion']
+} as const satisfies Record<(typeof PROVIDERS)[number][0], readonly string[]>;
+
+function providerAdapterProvenance(name: (typeof PROVIDERS)[number][0]): readonly string[] {
+	switch (name) {
+		case '@vitest/coverage-v8':
+			return VITEST_V8_COVERAGE_INGESTION_PROVENANCE;
+		case 'dependency-cruiser':
+			return CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_PROVENANCE;
+		case 'eslint':
+			return ESLINT_RESULT_INGESTION_PROVENANCE;
+		case 'typescript':
+			return [
+				...TYPESCRIPT_SEMANTIC_PROVENANCE,
+				...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
+				...TYPESCRIPT_MODULE_DEPENDENCY_REPORT_PROVENANCE,
+				...TYPESCRIPT_SEMANTIC_SOURCE_QUERY_PROVENANCE,
+				...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
+				...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
+				...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
+				...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
+				...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
+				...TYPESCRIPT_PROJECT_CONTEXT_REPORT_PROVENANCE,
+				...TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
+				...TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
+				...TYPESCRIPT_MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,
+				...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_DECLARATION_CONTEXT_REPORT_PROVENANCE,
+				...TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE,
+				...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
+				...TYPESCRIPT_READ_WRITE_ACCESS_REPORT_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
+				...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
+				...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
+				...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
+				...JPWB_COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
+				...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
+				...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
+				...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROVENANCE,
+				...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
+				...JPWB_COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
+				...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
+				...JPWB_GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
+				...MODULE_CODE_SLICE_PROVENANCE,
+				...SEMANTIC_SNAPSHOT_COMPARISON_PROVENANCE,
+				...JPWB_HARMONIZATION_NATIVE_PROJECTION_PROVENANCE
+			];
+		case 'vitest':
+			return VITEST_RESULT_INGESTION_PROVENANCE;
+		default:
+			return [];
+	}
+}
+
 function gateReachableScriptNames(rootScripts: ReadonlyMap<string, string>): Set<string> {
 	const reachable = new Set<string>();
 	const pending = ['gate', 'gate:fast'].filter((name) => rootScripts.has(name));
@@ -1647,9 +1864,10 @@ function providerInventory(
 		const gateEvidence = providerGateEvidence(gateReachable);
 		const configured = configurationPaths[name].length > 0;
 		const gateWired = gateEvidence[name].length > 0;
-		const inventoryIntegrated = name === 'typescript';
+		const adapterCapabilities = PROVIDER_ADAPTER_CAPABILITIES[name];
+		const inventoryIntegrated = adapterCapabilities.length > 0;
 		return {
-			adapterCapabilities: inventoryIntegrated ? TYPESCRIPT_ADAPTER_CAPABILITIES : [],
+			adapterCapabilities,
 			adapterState: inventoryIntegrated ? 'INVENTORY_INTEGRATED' : 'UNIMPLEMENTED',
 			configurationState: configured ? 'CONFIGURED' : 'NOT_CONFIGURED',
 			configuredState: configured ? 'CONFIGURED_NOT_RUN' : 'NOT_CONFIGURED',
@@ -1661,43 +1879,7 @@ function providerInventory(
 				...(lock ? [lock.path] : []),
 				...configurationPaths[name],
 				...gateEvidence[name],
-				...(inventoryIntegrated
-					? [
-							...TYPESCRIPT_SEMANTIC_PROVENANCE,
-							...TYPESCRIPT_MODULE_GRAPH_PROVENANCE,
-							...TYPESCRIPT_MODULE_DEPENDENCY_REPORT_PROVENANCE,
-							...TYPESCRIPT_SEMANTIC_SOURCE_QUERY_PROVENANCE,
-							...TYPESCRIPT_CALL_GRAPH_PROVENANCE,
-							...TYPESCRIPT_CALL_GRAPH_REPORT_PROVENANCE,
-							...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_PROVENANCE,
-							...TYPESCRIPT_LOGICAL_GRAPH_COMPOSITION_REPORT_PROVENANCE,
-							...TYPESCRIPT_PROJECT_CONTEXT_GRAPH_PROVENANCE,
-							...TYPESCRIPT_PROJECT_CONTEXT_REPORT_PROVENANCE,
-							...TYPESCRIPT_CONDITIONAL_EXPORT_RESOLUTION_PROVENANCE,
-							...TYPESCRIPT_MODULE_RESOLUTION_TRACE_PROVENANCE,
-							...TYPESCRIPT_MODULE_RESOLUTION_TRACE_REPORT_PROVENANCE,
-							...TYPESCRIPT_DECLARATION_CONTEXT_ANALYSIS_PROVENANCE,
-							...TYPESCRIPT_DECLARATION_CONTEXT_REPORT_PROVENANCE,
-							...TYPESCRIPT_SOURCE_ORIGIN_CORRELATION_PROVENANCE,
-							...TYPESCRIPT_READ_WRITE_ACCESS_GRAPH_PROVENANCE,
-							...TYPESCRIPT_READ_WRITE_ACCESS_REPORT_PROVENANCE,
-							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_ANALYSIS_PROVENANCE,
-							...TYPESCRIPT_STRUCTURAL_MODULE_REACHABILITY_REPORT_PROVENANCE,
-							...TYPESCRIPT_STATIC_MODULE_IMPACT_CANDIDATE_REPORT_PROVENANCE,
-							...TYPESCRIPT_WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_PROVENANCE,
-							...TYPESCRIPT_STRUCTURAL_SCC_ANALYSIS_PROVENANCE,
-							...TYPESCRIPT_STRUCTURAL_SCC_REPORT_PROVENANCE,
-							...JPWB_COMMAND_DISPATCH_TOPOLOGY_PROVENANCE,
-							...JPWB_COMMAND_DISPATCH_TOPOLOGY_REPORT_PROVENANCE,
-							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_PROVENANCE,
-							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_INPUT_PROVENANCE,
-							...JPWB_COMMAND_EVENT_CONTRACT_OVERLAY_REPORT_PROVENANCE,
-							...JPWB_COMMAND_HANDLER_GRAPH_PROVENANCE,
-							...JPWB_COMMAND_HANDLER_GRAPH_REPORT_PROVENANCE,
-							...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
-							...JPWB_GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE
-						]
-					: [])
+				...providerAdapterProvenance(name)
 			),
 			version
 		};
@@ -1868,15 +2050,14 @@ function verificationAssets(
 	});
 }
 
-function capabilities(): CapabilityInventory[] {
-	const unimplemented = [
-		'code-property-graph',
-		'control-flow',
-		'data-flow',
-		'runtime-traces',
-		'security-query',
-		'test-coverage-ingestion'
-	];
+function capabilities(files: readonly SelectedFileRecord[]): CapabilityInventory[] {
+	const unimplemented = ['code-property-graph', 'control-flow', 'data-flow'];
+	const currentDependencyCruiserDifferentialEvidenceSelected = files.some(
+		(file) => file.path === CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_EVIDENCE_PATH
+	);
+	const currentDependencyCruiserG4ClosureEvidenceSelected = files.some(
+		(file) => file.path === CURRENT_DEPENDENCY_CRUISER_G4_CLOSURE_EVIDENCE_PATH
+	);
 	return [
 		{
 			explanation: 'DWP-001 deterministically derives and verifies the repository inventory.',
@@ -2217,9 +2398,151 @@ function capabilities(): CapabilityInventory[] {
 			),
 			state: 'PARTIAL'
 		},
+		{
+			explanation:
+				'The jpwb-deterministic-runtime-trace 1.0.0 importer validates a closed runtime-event wire shape for the five allocated hybrid finding IDs and binds normalized evidence to provider identity, exact subject identity, dated run metadata, coverage, freshness, health, conflicts, and raw-artifact identity. It imports evidence only: inventory generation neither executes subject code nor imports a current trace, so current runtime health and any universal runtime graph remain NOT_RUN or UNKNOWN. Analysis authority and gate effect are NONE; this is PARTIAL runtime-trace support.',
+			id: 'runtime-traces',
+			provider: 'jpwb-deterministic-runtime-trace',
+			provenance: canonicalProvenance(...RUNTIME_TRACE_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local hybrid projector derives exactly five rule-specific DFG or TAINT prerequisite rows from exact retained FrozenSubject bytes at the fixed JPWB implementation paths for findings 9, 19, 45, 54, and 55. The coding-agent findings v2 handler always retains that source-bound projection and can import one optional caller-supplied deterministic trace without launching a provider or executing subject code. The evaluator reconciles only those five rows: unsupported or conflicting static regions remain UNSUPPORTED, absent runtime input is retained as runtimeTrace: null and runtimeEvaluation: null, and supplied but stale, unhealthy, partial, malformed, mismatched, or conflicting runtime evidence remains explicitly unusable with affected rows NOT_RUN. Focused tests cover exact five-row positive evaluation, provider-conflict refusal, and explanation replay tamper detection; the current-JPWB smoke supplies only an explicitly unusable negative control and makes no current-runtime claim. The projector does not implement a general DFG or taint engine, and no provider qualification, analysis authority, or gate effect is created.',
+			id: 'hybrid-runtime-evaluation',
+			provider: 'jan-csaa-harmonization-hybrid-runtime',
+			provenance: canonicalProvenance(...HYBRID_RUNTIME_EVALUATION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The vitest-v8-coverage 4.1.10 adapter validates and imports bounded V8 coverage JSON, reconciles exact included, uncovered, and missing source populations, validates supported source maps, and retains dated provider, subject, coverage, freshness, health, and raw-artifact evidence. Inventory generation does not run Vitest or ingest a current coverage output, so assuranceSurfaces.coverage.outputIdentity and current coverage health remain UNKNOWN or NOT_RUN. Analysis authority and gate effect are NONE.',
+			id: 'test-coverage-ingestion',
+			provider: 'vitest-v8-coverage',
+			provenance: canonicalProvenance(...VITEST_V8_COVERAGE_INGESTION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local JPWB native security observer applies exactly three bounded public-TypeScript-AST rules: unbound HUMAN principal construction, shell-enabled process execution, and secret-bearing diagnostic arguments. It reports explicit coverage, freshness, health, limitations, and source evidence with analysis authority and gate effect NONE. It is not a general security-query language, taint engine, whole-program security proof, or absence proof, and inventory generation does not execute it.',
+			id: 'security-query',
+			provider: 'jan-csaa-native-jpwb-security',
+			provenance: canonicalProvenance(...JPWB_NATIVE_SECURITY_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The eslint 9.39.5 JSON adapter validates and imports bounded file and message observations with provider, subject, raw-artifact, coverage, freshness, health, and conflict evidence. Adapter availability does not establish a current lint run, rule correctness, repository conformance, or gate authority; inventory generation imports no ESLint output.',
+			id: 'eslint-result-ingestion',
+			provider: 'eslint',
+			provenance: canonicalProvenance(...ESLINT_RESULT_INGESTION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The Vitest 4.1.10 JSON adapter validates and imports bounded file and assertion observations with provider, subject, raw-artifact, coverage, freshness, health, and conflict evidence. Adapter availability does not establish a current test run, behavioral correctness, repository conformance, or gate authority; inventory generation imports no Vitest output.',
+			id: 'vitest-result-ingestion',
+			provider: 'vitest',
+			provenance: canonicalProvenance(...VITEST_RESULT_INGESTION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local unregistered 0.1.0 four-valued query operation validates a bounded closed request, reuses the exact T/F/U/C algebra and semantic-source evaluator, and returns bounded explanation accounting. It confers analysis authority, authority transfer, and gate effect NONE and does not complete full CAP-029, DWP-005, DWP-006, G5, finding, remediation, disposition, or registered-operation requirements.',
+			id: 'four-valued-query-operation',
+			provider: 'implementation-local-four-valued-query-operation',
+			provenance: canonicalProvenance(...FOUR_VALUED_QUERY_OPERATION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The JAN-CSAA-CAP-030 PARTIAL module code-slice operation implements validated-module-dependency-bounded-may-slice/1.0.0 over one validated module graph and explicit criteria with complete bounded witnesses and frontiers. It does not implement call-graph or data-flow slicing, prove irrelevance or safe removal, complete DWP-005/DWP-006, or confer finding, remediation, disposition, or gate authority.',
+			id: 'module-code-slice',
+			provider: 'typescript+validated-module-dependency-graph',
+			provenance: canonicalProvenance(...MODULE_CODE_SLICE_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The JAN-CSAA-CAP-032 PARTIAL semantic snapshot comparison implements exact-source-path-plus-unique-content-lineage/1.0.0 for bounded semantic source-record populations. It does not establish exhaustive cross-revision lineage, symbol, declaration, or graph deltas, behavior preservation, non-impact, safe removal, gate decisions, remediation, or disposition authority.',
+			id: 'semantic-snapshot-comparison',
+			provider: 'typescript+implementation-local-semantic-snapshot-comparison',
+			provenance: canonicalProvenance(...SEMANTIC_SNAPSHOT_COMPARISON_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local unregistered harmonization first-increment evaluator supplies bounded profiles and deterministic evaluation for the frozen 23-rule exemplar set over admitted caller observations. It has analysis authority, authority transfer, and gate effect NONE and does not by itself extract repository facts, reproduce current defects, qualify a provider, activate G5, or complete DWP-005/DWP-006.',
+			id: 'harmonization-first-increment-rule-evaluation',
+			provider: 'implementation-local-harmonization-rule-evaluator',
+			provenance: canonicalProvenance(...HARMONIZATION_RULE_EVALUATION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local unregistered benchmark-accounting operation accounts for all 75 frozen harmonization rows and the DETECTED, NOT_DETECTED, UNSUPPORTED, NOT_APPLICABLE, and NOT_RUN status population. It is accounting rather than detector execution or benchmark passage and confers analysis authority, authority transfer, and gate effect NONE.',
+			id: 'harmonization-benchmark-accounting',
+			provider: 'implementation-local-harmonization-benchmark-accounting',
+			provenance: canonicalProvenance(...HARMONIZATION_BENCHMARK_ACCOUNTING_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local unregistered JPWB native projection performs bounded public-TypeScript-AST plus schema and registry projection for the frozen 23-rule first increment and feeds those observations to the existing evaluator. The projector operates over exact FrozenSubject bytes and accepts caller-supplied currentness; a separate current-JPWB production-composition smoke independently resolves and verifies the bounded subject before capture, before and after projection, and after verification, observes all 23 rows as five DETECTED, zero NOT_DETECTED, and 18 UNSUPPORTED, and preserves exact subject bytes. Analysis authority, authority transfer, and gate effect are NONE. It is not general-purpose taint, whole-program dynamic reachability, security absence, benchmark passage, all-75 accounting, or human normative adjudication.',
+			id: 'jpwb-harmonization-native-projection',
+			provider: 'typescript-public-ast-plus-bounded-schema-and-registry-projection',
+			provenance: canonicalProvenance(...JPWB_HARMONIZATION_NATIVE_PROJECTION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local unregistered coding-agent CLI admits and routes the seven versioned inventory, snapshot, query, impact, findings, explain, and verify commands through explicit handlers, bounded JSON output, typed exit codes, content-addressed artifact persistence, and a process host. A focused production-host golden executes persistent artifact put/get and all seven operations through independent Bun processes, covers exits 0, 2, 3, 4, and 5 plus stale, budget, cancellation, and unsupported refusals, and verifies byte-for-byte subject immutability. A separate current-JPWB production-composition smoke executes all seven operations over one sound bounded exact subject, including a semantic query, static impact candidates, 23-row RUN native findings, five source-bound hybrid prerequisite rows, explicit fail-closed handling of an unusable runtime-control artifact, exact native-and-hybrid explanation replay, conjunctive workflow verification, independent currentness, and exact source-byte preservation. The serialized csaa:completion:check command additionally verifies controlled evidence and the full repository gate; its mutation phase captures the exact staged index, refuses unstaged tracked bytes or later index drift, restores every mutation to the staged candidate, and confers analysis authority and gate effect NONE. These bounded workflows do not establish provider execution for every repository or input lane, external G10 corpus acceptance, network use, subject-code execution, source mutation, or gate activation.',
+			id: 'coding-agent-cli-process',
+			provider: 'jan-csaa-coding-agent-cli',
+			provenance: canonicalProvenance(...CODING_AGENT_CLI_PROCESS_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The rebuildable content-addressed file store implements versioned immutable generations, exact invalidation dependencies, reader pins, bounded publication, recovery, corruption quarantine, concurrency controls, retention, and a coding-agent artifact-store adapter with focused clean/incremental equivalence, crash, cancellation, corruption, concurrency, and retention tests. A checked empirical evidence artifact records five real cold/warm pairs with exact artifact and generation identity, dependency invalidation, computed/reused accounting, and a current benchmark-source digest. The checked DWP-007 selection assessment chooses CONTENT_ADDRESSED_FILES because that already implemented eligible store satisfies the bounded technical acceptance criteria; better-sqlite3 produced Node transaction, migration-rollback, and WAL-reader evidence but no completion record under the active Bun host, while Bun built-in SQLite is a different unimplemented adapter. Startup has no product threshold or SLO, the selection makes no provider-qualification claim, and cache contents remain non-authoritative and rebuildable.',
+			id: 'content-addressed-persistence',
+			provider: 'jan-csaa-content-addressed-file-store',
+			provenance: canonicalProvenance(...CONTENT_ADDRESSED_PERSISTENCE_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The DWP-009 local advanced-CPG provider entry assessor and checked evidence record a DEFER disposition for the observed Windows environment: CodeQL and Joern were unavailable on the recorded PATH, qualification was not performed, need remained UNKNOWN, native CSAA remained INDEPENDENT, and analysis authority and gate effect are NONE. The evidence authorizes no install, network, upload, license, system change, provider availability claim outside that environment, or code-property-graph capability.',
+			id: 'advanced-cpg-provider-disposition',
+			provider: null,
+			provenance: canonicalProvenance(...ADVANCED_CPG_PROVIDER_DISPOSITION_PROVENANCE),
+			state: 'PARTIAL'
+		},
+		{
+			explanation:
+				'The implementation-local current dependency-cruiser runner retains two distinct profiles. The broad asymmetric profile captures one exact packages/rph-contracts/tsconfig.build.json compiler slice, separately observes dependency-cruiser over whole apps/packages, and compares only the truthful overlap; provider rows outside the compiler slice remain incomparable. After an exact digest is reviewed and source-bound, the broad profile can emit PARTIAL evidence with REVIEWED_DIFFERENTIAL_EVIDENCE_ONLY authority and gate effect NONE. The aligned G4 profile fixes dependency-cruiser to the exact ten authored build-root files, requires equality among compiler roots, deep authored compiler sources, provider inputs, and provider modules, reconciles every represented compiler/provider relation with zero observed differences, and can retain CLOSED_FOR_EXACT_BUILD_ROOT_AND_REPRESENTED_RELATION_POPULATIONS only after its exact digest is reviewed and source-bound. Both profiles recheck subject and provider identity under explicit budgets and retain analysis authority and gate effect NONE. Compiler/provider resolution-context equivalence, optional dependency-cruiser metadata interpretation, negative-coverage closure beyond the represented exact-slice populations, multi-project or repository-wide closure, provider qualification, architecture compliance, repository-wide G4 passage, and gate activation remain explicit nonclaims. Root and package-local discovery/check/write commands, the package-root export, focused tests, and operational README exist; neither evidence check is a repository gate. ' +
+				(currentDependencyCruiserDifferentialEvidenceSelected
+					? `The selected subject includes ${CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_EVIDENCE_PATH}; inventory generation records that path as provenance but does not execute the runner, independently validate the evidence, or claim repository-wide equivalence, negative-coverage closure, G4 passage, provider qualification, or repository-gate authority.`
+					: `No selected ${CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_EVIDENCE_PATH} is present; inventory generation does not execute the separately configured broad runner or claim repository-wide equivalence, negative-coverage closure, provider qualification, or repository-gate authority.`) +
+				(currentDependencyCruiserG4ClosureEvidenceSelected
+					? ` The selected subject includes ${CURRENT_DEPENDENCY_CRUISER_G4_CLOSURE_EVIDENCE_PATH}; inventory generation records that path as provenance but does not independently validate it or promote its bounded slice closure to repository-wide G4 passage.`
+					: ` No selected ${CURRENT_DEPENDENCY_CRUISER_G4_CLOSURE_EVIDENCE_PATH} is present; inventory generation makes no bounded same-perimeter closure claim.`),
+			id: 'current-dependency-cruiser-differential',
+			provider: 'typescript+dependency-cruiser',
+			provenance: canonicalProvenance(
+				...CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_PROVENANCE,
+				...(currentDependencyCruiserDifferentialEvidenceSelected
+					? [CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_EVIDENCE_PATH]
+					: []),
+				...(currentDependencyCruiserG4ClosureEvidenceSelected
+					? [CURRENT_DEPENDENCY_CRUISER_G4_CLOSURE_EVIDENCE_PATH]
+					: [])
+			),
+			state: 'PARTIAL'
+		},
 		...unimplemented.map((id): CapabilityInventory => ({
 			explanation:
-				'Not implemented by the current bounded DWP-004 graph increments; no control-flow, data-flow, code-property, security, coverage, or runtime graph support is inferred from semantic snapshots, module/call graphs, or installed tools.',
+				'Universal code-property-graph, control-flow, and data-flow support is not implemented by the current bounded increments and is not inferred from semantic snapshots, partial graph projections, bounded provider imports, native rules, or installed tools.',
 			id,
 			provider: null,
 			provenance: ['packages/csaa/src/contracts/inventory.ts'],
@@ -2858,7 +3181,7 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 	const inventory: InventoryDocument = {
 		artifactPopulations: artifactPopulations(selectedFiles, resolvedSubject),
 		assuranceSurfaces: assuranceSurfaces(resolvedSubject, selectedFiles, configuredCommands),
-		capabilities: capabilities(),
+		capabilities: capabilities(selectedFiles),
 		commands: configuredCommands,
 		dependencyBoundary: dependencyBoundary(resolvedSubject, selectedFiles, rootManifest),
 		generator: { id: INVENTORY_GENERATOR_ID, version: INVENTORY_GENERATOR_VERSION },
@@ -2947,23 +3270,55 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					...JPWB_GUARD_CLASSIFICATION_OVERLAY_PROVENANCE,
 					...JPWB_GUARD_CLASSIFICATION_OVERLAY_REPORT_PROVENANCE,
 					...DEPENDENCY_CRUISER_CORROBORATION_PROVENANCE,
+					...RUNTIME_TRACE_PROVENANCE,
+					...HYBRID_RUNTIME_EVALUATION_PROVENANCE,
+					...VITEST_V8_COVERAGE_INGESTION_PROVENANCE,
+					...JPWB_NATIVE_SECURITY_PROVENANCE,
+					...ESLINT_RESULT_INGESTION_PROVENANCE,
+					...VITEST_RESULT_INGESTION_PROVENANCE,
+					...FOUR_VALUED_QUERY_OPERATION_PROVENANCE,
+					...MODULE_CODE_SLICE_PROVENANCE,
+					...SEMANTIC_SNAPSHOT_COMPARISON_PROVENANCE,
+					...HARMONIZATION_RULE_EVALUATION_PROVENANCE,
+					...HARMONIZATION_BENCHMARK_ACCOUNTING_PROVENANCE,
+					...JPWB_HARMONIZATION_NATIVE_PROJECTION_PROVENANCE,
+					...CODING_AGENT_CLI_PROCESS_PROVENANCE,
+					...CONTENT_ADDRESSED_PERSISTENCE_PROVENANCE,
+					...ADVANCED_CPG_PROVIDER_DISPOSITION_PROVENANCE,
+					...CURRENT_DEPENDENCY_CRUISER_DIFFERENTIAL_PROVENANCE,
+					'capabilities#advanced-cpg-provider-disposition',
 					'capabilities#arrow-command-census',
 					'capabilities#call-graph',
+					'capabilities#coding-agent-cli-process',
 					'capabilities#command-dispatch-static-topology',
 					'capabilities#command-event-contract-static-overlay',
 					'capabilities#command-handler-static-projection',
+					'capabilities#content-addressed-persistence',
+					'capabilities#current-dependency-cruiser-differential',
+					'capabilities#eslint-result-ingestion',
+					'capabilities#four-valued-query-operation',
 					'capabilities#guard-enforcement-ledger',
 					'capabilities#guard-classification-static-overlay',
 					'capabilities#dependency-graph',
+					'capabilities#harmonization-benchmark-accounting',
+					'capabilities#harmonization-first-increment-rule-evaluation',
+					'capabilities#hybrid-runtime-evaluation',
+					'capabilities#jpwb-harmonization-native-projection',
 					'capabilities#logical-graph-composition',
+					'capabilities#module-code-slice',
 					'capabilities#project-context-graph',
+					'capabilities#runtime-traces',
+					'capabilities#security-query',
 					'capabilities#conditional-export-resolution',
 					'capabilities#declaration-context-analysis',
 					'capabilities#module-resolution-trace',
 					'capabilities#source-origin-correlation',
 					'capabilities#read-write-access-graph',
 					'capabilities#semantic-source-query',
+					'capabilities#semantic-snapshot-comparison',
 					'capabilities#state-machine-graph',
+					'capabilities#test-coverage-ingestion',
+					'capabilities#vitest-result-ingestion',
 					'capabilities#working-source-edit-impact-candidates',
 					'capabilities#structural-module-reachability-analysis',
 					'capabilities#structural-scc-analysis',
@@ -2979,9 +3334,10 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					`The preliminary guard-classification-overlay report facade exposes the exact same-subject retained-arrow, command-handler, retained-guard, generated-state, and guard-classification evidence while preserving PARTIAL/OPEN status, retained verifier authority, candidate factory associations, helper/no-command frontiers, and explicit non-consumption of command-dispatch and command-event evidence. Its configured command csaa:analyze:guard-classification-overlay is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary command-event-contract-overlay report facade exposes the exact same-subject retained-arrow, command-handler, COMMANDS/EVENTS registry, vocabulary, retained event-census, and command-event overlay evidence while preserving PARTIAL/OPEN status, retained event-surface authority, exact/candidate/unresolved predecessor attribution, an empty CAP-028 inference lane, dated static EMITTED meaning, and explicit non-consumption of command-dispatch, guard-enforcement, and guard-classification evidence. Its configured command csaa:analyze:command-event-contract-overlay is CONFIGURED_NOT_RUN by inventory generation. ` +
 					`The preliminary logical-graph-composition report facade exposes one exact same-subject project-context, module-dependency, call, and two-layer reference-only composition evidence set while preserving PARTIAL/OPEN status, every predecessor limitation, and no query, slice, impact, finding, remediation, dead-code, safe-removal, DWP completion, registered-operation, or gate authority. Its configured command csaa:analyze:logical-graph-composition is CONFIGURED_NOT_RUN by inventory generation. ` +
-					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary DWP-005 coding-agent surfaces now include the bounded semantic-source query and one caller-declared whole-source static module impact-candidate projection over reverse CAP-027 reachability; neither completes DWP-005. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge, the complete selected open static call projection with every retained invocation and candidate/frontier edge, the complete bounded generated JPWB state-machine topology projection for one exact generated source, the exact selected retained arrow-command census evidence and baseline comparison, the exact same-subject COMMANDS-to-HANDLERS static projection with retained arrow sites, occurrences, exact/candidate lanes, and explicit frontiers, the exact selected retained guard-enforcement-ledger audit and classification evidence, the exact same-subject retained guard, generated state, handler, and guard-classification overlay evidence, and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies, callers, handlers, arrows, or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary semantic-source-query, static-module-impact-candidates, project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC and single-criterion module-reachability analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, JAN-CSAA-CAP-030 code slicing, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED." +
+					"TypeScript compiler roots from DWP-002 are consumed by current DWP-003 frozen Program construction and TS_PROJECT/TS_SYNTAX/TS_SYMBOL/TS_TYPE extraction. Semantic-snapshot duration enforcement uses a wall-anchored monotonic operation clock; maxDurationMs remains a caller-supplied operation budget and runaway guard, not an empirical runtime, expected duration, product ceiling, or SLO. The first seventeen bounded DWP-004 increments implement the validated compiler module-dependency projection, pure exact-schema-validated dependency-cruiser 16.10.4 output normalization and context-bound comparison, a deliberately partial static call graph with total call-site/frontier accounting, an implementation-local generated JPWB state-machine topology projection, an exact FrozenSubject- and executor-bound wrapper around the retained arrow-command census, a Program-local read/write access projection with explicit unsupported frontiers, a static JPWB command-registry-to-handler projection with separately preserved deterministic and candidate attribution lanes, a compositional static command-bus topology overlay with candidate-only references to predecessor handler targets, an exact FrozenSubject- and executor-bound wrapper around the retained guard-enforcement ledger, a compositional static guard-classification overlay that preserves retained judgments while reconciling exact transition, command-occurrence, anchor-containment, candidate factory, and helper-frontier evidence, a static command-event-contract overlay that reconciles generated command declarations and event schemas with exact vocabulary and dated retained event-surface evidence while preserving their distinct meanings, a deterministic structural SCC analysis that exactly partitions the selected independently validated directed module graph while preserving its explicit upstream-closure status, a deterministic static module-reachability traversal that is complete only within one independently validated graph and one explicit criterion while carrying that graph's upstream closure and limitations, a preliminary coding-agent report facade for that same CAP-027 slice over one explicit project/logical-path criterion and direction while preserving structural-only meaning and selected-captured-subject-only currentness, an exact reference-only semanticSourceId composition of independently validated module and call graph layers that preserves their identities, coverage, and limitations without constructing a universal code property graph, an exact FrozenSubject-bound project/program/source context projection with declared project-reference closure and no inferred variants, a bounded exact-key conditional-export resolution for one selected frozen workspace package, consumer source and Program, subpath, mode, platform, and ordered condition set with explicit unsupported frontiers, and a bounded exact resolved module-resolution trace for one literal bare workspace-package root import using an in-memory verified project-scoped compiler capture and exact types/NODE/IMPORT conditional-export predecessor. Preliminary DWP-005 coding-agent surfaces now include the bounded semantic-source query and one caller-declared whole-source static module impact-candidate projection over reverse CAP-027 reachability; neither completes DWP-005. Preliminary coding-agent report facades expose the complete bounded compiler module-dependency projection with every occurrence edge, the complete selected open static call projection with every retained invocation and candidate/frontier edge, the complete bounded generated JPWB state-machine topology projection for one exact generated source, the exact selected retained arrow-command census evidence and baseline comparison, the exact same-subject COMMANDS-to-HANDLERS static projection with retained arrow sites, occurrences, exact/candidate lanes, and explicit frontiers, the exact selected retained guard-enforcement-ledger audit and classification evidence, the exact same-subject retained guard, generated state, handler, and guard-classification overlay evidence, and the complete bounded Program-local read/write projection with exact project/source mappings while preserving PARTIAL capability status and all upstream closure limitations; zero recorded dependencies, callers, handlers, arrows, or accesses do not prove unused, dead, orphan, irrelevant, non-impacting, or safe-to-remove code. One preliminary coding-agent report command now composes the CAP-010/CAP-012/CAP-011 chain for one exact request while preserving its partial status and treating compiler-capture and CONTEXT_ONLY-target currentness as NOT_ASSESSED. One bounded DWP-003 semantic-completion increment implements only one exact zero-hop direct or one-hop same-root local-only package-root export declaration binding in the CAP-011 selected declaration target, with a complete same-root terminal declaration set and explicit empty augmentation and ambient-effect populations. A preliminary coding-agent report facade composes CAP-010/CAP-012/CAP-011/CAP-013 for one exact importer, workspace package, and export request, preserves the predecessor nonclaims as nested evidence, and limits final currentness to the selected captured subject while compiler capture and the CONTEXT_ONLY declaration target remain NOT_ASSESSED. A separate self-contained bounded DWP-003 semantic-completion increment implements only the strict flat external version-3 declaration-map source-origin slice over one exact FrozenSubject and StaticSemanticSnapshot, with no CAP-013 predecessor, no range inference, and caller-supplied target/map captures reconciled to an exact fresh declaration emission. Inventory generation executes or benchmarks none of these analysis providers and does not execute the retained event-surface gate; the preliminary semantic-source-query, static-module-impact-candidates, project-context, module-dependency, call-graph, state-machine-graph, arrow-command-census, command-handler-graph, command-dispatch-topology, guard-enforcement-ledger, guard-classification-overlay, command-event-contract-overlay, read/write-access, module-resolution-trace, declaration-context, structural SCC, or structural module-reachability report coding-agent commands; or the configured structural SCC, structural module-reachability, logical graph composition, project context graph, conditional export resolution, module resolution trace, declaration context analysis, and source origin correlation smoke commands. Cross-Program symbol or binding reconciliation, project variants beyond frozen ProgramRecipe witnesses, invocation-specific resolved signatures, JAN-CSAA-CAP-011 path-alias or module-resolution surfaces beyond the selected exact resolved-only slice, conditional-export patterns, arrays, package imports maps, external package maps, automatic undeclared loader conditions, broader declaration-file populations, cross-file or cross-Program merge analysis, module or global augmentation analysis, ambient-effect analysis, CAP-002 declaration or symbol consumption by the declaration-context slice, CAP-013 declaration-context consumption by the source-origin slice, source-map range inference or formats beyond the strict selected external declaration map, persistent or cross-revision filesystem freshness/currentness beyond the preliminary facades' final selected-captured-subject observation, compiler-capture or CONTEXT_ONLY-target filesystem currentness, checked-in build-output provenance or build authority from ignored local caller captures, CAP-023 generated-to-authored lineage, manifest/runtime dependency layers, graph algorithms beyond these bounded SCC, single-criterion module-reachability, and module-dependency-bounded may-slice analyses, graph composition beyond the exact declared two-layer mapping, control-flow and JAN-CSAA-CAP-007 data-flow graphs, generalized state-machine inference, broader JAN-CSAA-CAP-030 code slicing beyond the implemented module-dependency-bounded may-slice, runtime guard enforcement, runtime command dispatch, runtime event emission, and runtime command performability remain UNKNOWN, NOT_CLAIMED, or UNIMPLEMENTED." +
 					' The additional working-source-edit-impact-candidates surface validates only one selected path-local raw edit before reusing the static module importer-candidate projection; none of the three preliminary DWP-005 surfaces completes DWP-005. Inventory generation also does not execute the working-source-edit-impact-candidates report command. ' +
-					'The aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, working-source-edit-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition.'
+					'The aggregate unexecuted preliminary report-command population includes semantic-source-query, static-module-impact-candidates, working-source-edit-impact-candidates, command-dispatch-topology, guard-classification-overlay, command-event-contract-overlay, and logical-graph-composition. ' +
+					'The source-evidenced PARTIAL additions are a four-valued query facade, a dependency-bounded module may-slice, semantic-source comparison, 23-rule evaluation and native projection, all-75 benchmark accounting, five source-bound hybrid prerequisite rows plus bounded runtime/coverage/ESLint/Vitest imports, three native JPWB security rules, a seven-command coding-agent CLI/process surface, selected rebuildable content-addressed persistence with checked selection and cold/warm evidence, and broad-asymmetric plus exact-build-root dependency-cruiser profiles. Inventory generation executes none of them; current-run health for unexecuted provider/import surfaces, product performance thresholds or SLOs, external G10 acceptance, repository-wide G4/G5/G6 passage, and gate or analysis authority remain unclaimed. DWP-009 has only a dated local DEFER disposition with CodeQL and Joern unavailable in the recorded environment; it does not implement a code property graph.'
 			},
 			{
 				provenance: canonicalProvenance(
@@ -3066,14 +3422,24 @@ export function collectInventory(options: CollectInventoryOptions): InventoryDoc
 					'Physical files under excluded build, cache, dependency, and generated-output trees are intentionally not enumerated; their included count is zero and their physical count remains UNKNOWN.'
 			},
 			{
-				provenance: ['assuranceSurfaces.coverage.outputIdentity'],
+				provenance: canonicalProvenance(
+					...VITEST_V8_COVERAGE_INGESTION_PROVENANCE,
+					'assuranceSurfaces.coverage.outputIdentity',
+					'capabilities#test-coverage-ingestion'
+				),
 				statement:
-					'Coverage output identity is UNKNOWN until a coverage adapter explicitly ingests an output.'
+					'The Vitest V8 coverage adapter is implemented, but inventory generation does not invoke it; coverage output identity and current-run coverage health remain UNKNOWN until a caller explicitly imports a validated output.'
 			},
 			{
-				provenance: ['capabilities'],
+				provenance: canonicalProvenance(
+					...RUNTIME_TRACE_PROVENANCE,
+					...JPWB_NATIVE_SECURITY_PROVENANCE,
+					...ESLINT_RESULT_INGESTION_PROVENANCE,
+					...VITEST_RESULT_INGESTION_PROVENANCE,
+					'capabilities'
+				),
 				statement:
-					'Runtime, network, security-query, and external-provider health remain NOT_RUN or UNIMPLEMENTED.'
+					'Runtime-trace, bounded native-security, ESLint, Vitest, and coverage import surfaces are implemented but not invoked by inventory generation; their current-run health remains NOT_RUN or UNKNOWN. Network execution remains unimplemented, and bounded native rules do not establish general security-query, taint, whole-program, or security-absence support.'
 			}
 		],
 		verificationAssets: assets,

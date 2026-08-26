@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	CALL_GRAPH_REPORT_AUTHORITY,
@@ -144,6 +144,90 @@ describe('runCallGraphReport', () => {
 			'SUBJECT_ID_MISMATCH'
 		] as const)
 			expect(classifyCallGraphFailureState([diagnostic(code)]), code).toBe('failed');
+	});
+
+	it('rejects exact request shape, version, property, and predecessor-admission violations', () => {
+		const root = fixture();
+		const accessor = { ...request() };
+		Object.defineProperty(accessor, 'operationVersion', {
+			enumerable: true,
+			get: () => CALL_GRAPH_REPORT_OPERATION_VERSION
+		});
+		const cases: ReadonlyArray<readonly [unknown, string, string]> = [
+			[Object.assign(Object.create({ inherited: true }), request()), 'REQUEST_SHAPE_INVALID', '$'],
+			[{ ...request(), unexpected: true }, 'REQUEST_SHAPE_INVALID', '$'],
+			[accessor, 'REQUEST_SHAPE_INVALID', '$.operationVersion'],
+			[
+				{ ...request(), operationVersion: 'call-graph-report/0.0.0' },
+				'REQUEST_OPERATION_INCOMPATIBLE',
+				'$.operationVersion'
+			],
+			[
+				{ ...request(), schemaVersion: 'call-graph-report-request/0.0.0' },
+				'REQUEST_SCHEMA_INCOMPATIBLE',
+				'$.schemaVersion'
+			]
+		];
+		for (const [value, code, path] of cases) {
+			const outcome = runCallGraphReport(value, { repositoryRoot: root });
+			expect(outcome).toMatchObject({ code, outcome: 'unavailable', stage: 'REQUEST' });
+			if (outcome.outcome !== 'unavailable') throw new Error(JSON.stringify(outcome));
+			expect(outcome.diagnostics).toContainEqual(expect.objectContaining({ path }));
+		}
+
+		const predecessorRefusal = runCallGraphReport(
+			{ ...request(), subjectProjectConfigPaths: [] },
+			{ repositoryRoot: root }
+		);
+		expect(predecessorRefusal).toMatchObject({ outcome: 'unavailable', stage: 'REQUEST' });
+	});
+
+	it('uses stable elapsed telemetry when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: CallGraphReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => {
+			throw new Error('synthetic monotonic clock failure');
+		});
+		try {
+			const outcome = runCallGraphReport(request(), {
+				onProgress: (event) => void progress.push(event),
+				repositoryRoot: root
+			});
+			expect(outcome.outcome).toBe('partial');
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
+	});
+
+	it('projects unavailable predecessor diagnostics and contains hostile adapter options', () => {
+		const missingRoot = join(tmpdir(), 'csaa-call-graph-report-missing-root');
+		rmSync(missingRoot, { force: true, recursive: true });
+		const unavailable = runCallGraphReport(request(), { repositoryRoot: missingRoot });
+		expect(unavailable).toMatchObject({
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE'
+		});
+		expect(unavailable.diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ source: 'PREDECESSOR_PIPELINE' })])
+		);
+
+		const hostileOptions = {} as { readonly repositoryRoot: string };
+		Object.defineProperty(hostileOptions, 'repositoryRoot', {
+			enumerable: true,
+			get() {
+				throw new Error('synthetic adapter option failure');
+			}
+		});
+		const internal = runCallGraphReport(request(), hostileOptions);
+		expect(internal).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(callGraphReportExitCode(internal)).toBe(4);
 	});
 
 	it(

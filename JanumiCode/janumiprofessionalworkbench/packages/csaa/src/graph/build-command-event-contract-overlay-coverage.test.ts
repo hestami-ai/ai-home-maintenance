@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Buffer } from 'node:buffer';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
 	COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH,
@@ -92,14 +93,18 @@ function inputsWithArtifact(
 	path:
 		| typeof COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH
 		| typeof COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
-	contents: string | Uint8Array
+	contents: string | Uint8Array,
+	sourceFixture: CommandEventContractOverlayFixture = fixture
 ): CommandEventContractOverlayBuildInputs {
 	const replacement =
 		typeof contents === 'string' ? new TextEncoder().encode(contents) : contents.slice();
-	const subject = structuredClone(fixture.subject) as FrozenSubject;
+	const subject = structuredClone(sourceFixture.subject) as FrozenSubject;
 	const allBytes = new Map<string, Uint8Array>();
-	for (const artifact of fixture.subject.artifacts)
-		allBytes.set(artifact.path, selectedArtifactBytes(artifact.path));
+	for (const artifact of sourceFixture.subject.artifacts) {
+		const bytes = readFrozenSubjectArtifact(sourceFixture.subject, artifact.path);
+		if (bytes === undefined) throw new Error(`Fixture artifact ${artifact.path} is absent.`);
+		allBytes.set(artifact.path, bytes);
+	}
 	allBytes.set(path, replacement);
 	const artifacts = subject.artifacts.map((artifact) =>
 		artifact.path === path
@@ -114,11 +119,11 @@ function inputsWithArtifact(
 		artifactPath: path
 	};
 	return {
-		...fixture.inputs,
+		...sourceFixture.inputs,
 		request:
 			path === COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
-				? { ...fixture.request, vocabArtifact: selector }
-				: { ...fixture.request, retainedCensusArtifact: selector },
+				? { ...sourceFixture.request, vocabArtifact: selector }
+				: { ...sourceFixture.request, retainedCensusArtifact: selector },
 		subject
 	};
 }
@@ -262,6 +267,10 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 			enumerable: true,
 			get: () => fixture.observation.contentDigest
 		});
+		const symbolObservation = {
+			...fixture.observation,
+			[Symbol('unexpected')]: true
+		};
 		const cases: unknown[] = [
 			null,
 			wrongPrototype,
@@ -273,6 +282,7 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 				arrowObservation: Object.assign(Object.create({ inherited: true }), fixture.observation)
 			},
 			{ ...fixture.inputs, arrowObservation: accessorObservation },
+			{ ...fixture.inputs, arrowObservation: symbolObservation },
 			{
 				...fixture.inputs,
 				semanticSnapshot: {
@@ -286,6 +296,13 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 				request: {
 					...fixture.request,
 					budgets: { ...fixture.request.budgets, maxDiagnostics: 0 }
+				}
+			},
+			{
+				...fixture.inputs,
+				request: {
+					...fixture.request,
+					budgets: { ...fixture.request.budgets, maxCommands: -1 }
 				}
 			},
 			{ ...fixture.inputs, request: { ...fixture.request, subjectId: '' } },
@@ -450,6 +467,45 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 		);
 	});
 
+	it('independently rejects project/program ownership changed after predecessor validation', () => {
+		const semanticSnapshot = structuredClone(fixture.snapshot) as StaticSemanticSnapshot;
+		const project = semanticSnapshot.projects.find(
+			(candidate) => candidate.configPath === COMMAND_EVENT_CONTRACT_OVERLAY_PROJECT_CONFIG_PATH
+		)!;
+		const program = semanticSnapshot.programs.find(
+			(candidate) => candidate.id === project.programId
+		)!;
+		const byteLength = Buffer.byteLength;
+		let mutated = false;
+		const measurement = vi.spyOn(Buffer, 'byteLength').mockImplementation((value, encoding) => {
+			if (!mutated && typeof value === 'string' && value.includes('registryFacts')) {
+				Object.assign(program as unknown as { projectId: string }, {
+					projectId: 'semantic:project-post-validation-mismatch'
+				});
+				mutated = true;
+			}
+			return byteLength(value, encoding);
+		});
+		try {
+			const outcome = buildCommandEventContractOverlay({
+				...fixture.inputs,
+				semanticSnapshot
+			});
+			expect(mutated).toBe(true);
+			expect(outcome).toMatchObject({
+				diagnostics: [
+					{
+						code: 'INPUT_POPULATION_MISMATCH',
+						message: 'Generated-registry semantic project/program ownership is inconsistent.'
+					}
+				],
+				outcome: 'unavailable'
+			});
+		} finally {
+			measurement.mockRestore();
+		}
+	});
+
 	it('rejects compiler-backed generated-registry grammar variants ignored by the predecessor graph', () => {
 		const eventsBlock = /export const EVENTS = \{[\s\S]*?\} as const;/u;
 		const shifted = createCommandEventContractOverlayFixtureWithRegistrySourceTransform(
@@ -511,7 +567,9 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 
 	it('rejects event-only semantic identity corruptions after validating the predecessor graph', () => {
 		const eventDeclaration = fixture.snapshot.declarations.find(
-			(declaration) => declaration.name === 'RuntimeOnlyPayloadSchema'
+			(declaration) =>
+				declaration.sourceId === fixture.request.eventRegistry.sourceId &&
+				declaration.name === 'RuntimeOnlyPayloadSchema'
 		);
 		if (
 			eventDeclaration === undefined ||
@@ -522,7 +580,10 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 		const eventDeclarationId = eventDeclaration.id;
 		const eventSymbolId = eventDeclaration.symbolId;
 		const eventReference = fixture.snapshot.references.find(
-			(reference) => reference.resolvedSymbolId === eventSymbolId && reference.role === 'SYMBOL_USE'
+			(reference) =>
+				reference.sourceId === fixture.request.eventRegistry.sourceId &&
+				reference.resolvedSymbolId === eventSymbolId &&
+				reference.role === 'SYMBOL_USE'
 		);
 		if (eventReference === undefined)
 			throw new Error('Fixture event payload reference is unavailable.');
@@ -578,6 +639,52 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 			unresolved.cleanup();
 		}
 	}, 30_000);
+
+	it('preserves a compiler-backed command with no handler registration as an empty reference set', () => {
+		const unregistered = createCommandEventContractOverlayFixtureWithRegistrySourceTransform(
+			(source) =>
+				source.replace(
+					'export const COMMANDS = {',
+					`export const COMMANDS = {
+	UnregisteredWork: {
+		payload: StartWorkPayloadSchema,
+		targetAggregateType: 'WORK',
+		emitsEvent: 'WorkStarted',
+		firstSlice: false
+	},`
+				)
+		);
+		try {
+			const vocabBytes = readFrozenSubjectArtifact(
+				unregistered.subject,
+				COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH
+			);
+			if (vocabBytes === undefined) throw new Error('Fixture vocab artifact is absent.');
+			const vocab = JSON.parse(new TextDecoder().decode(vocabBytes)) as {
+				commands: Record<string, unknown>[];
+			};
+			vocab.commands.push({
+				commandType: 'UnregisteredWork',
+				emitsEvent: 'WorkStarted',
+				payloadFields: [],
+				targetAggregateType: 'WORK'
+			});
+			const outcome = buildCommandEventContractOverlay(
+				inputsWithArtifact(
+					COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH,
+					JSON.stringify(vocab),
+					unregistered
+				)
+			);
+			expect(outcome.outcome).toBe('partial');
+			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(
+				outcome.overlay.commands.find((command) => command.commandName === 'UnregisteredWork')
+			).toMatchObject({ handlerReferences: [] });
+		} finally {
+			unregistered.cleanup();
+		}
+	}, 60_000);
 
 	it('orders two compiler-backed command contracts deterministically', () => {
 		const twoCommands = createTwoCommandEventContractOverlayFixture();
@@ -691,6 +798,88 @@ describe('buildCommandEventContractOverlay public branch coverage', { timeout: 3
 			])
 		);
 		expect(noBindings.overlay.coverage.reconciles).toBe(false);
+	});
+
+	it('accepts a UTF-8 BOM on a retained JSON artifact without changing its population', () => {
+		const vocabBytes = selectedArtifactBytes(COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH);
+		const withBom = new Uint8Array(vocabBytes.byteLength + 3);
+		withBom.set([0xef, 0xbb, 0xbf]);
+		withBom.set(vocabBytes, 3);
+		const outcome = buildCommandEventContractOverlay(
+			inputsWithArtifact(COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH, withBom)
+		);
+		expect(outcome.outcome).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		expect(outcome.overlay.coverage).toEqual(baseline.coverage);
+		expect(outcome.overlay.commands.map((command) => command.commandName)).toEqual(
+			baseline.commands.map((command) => command.commandName)
+		);
+	});
+
+	it('deep-freezes shared semantically equal constructed containers exactly once', () => {
+		const stringifyJson = JSON.stringify;
+		let aliased = false;
+		const serializer = vi.spyOn(JSON, 'stringify').mockImplementation((value: unknown) => {
+			if (
+				!aliased &&
+				value !== null &&
+				typeof value === 'object' &&
+				'layers' in value &&
+				'contentDigest' in value
+			) {
+				const overlay = value as CommandEventContractOverlaySnapshot;
+				const inference = overlay.layers[1]!;
+				Object.assign(inference as unknown as { eventIds: typeof inference.eventIds }, {
+					eventIds: inference.commandIds
+				});
+				aliased = true;
+			}
+			return stringifyJson(value);
+		});
+		try {
+			const outcome = buildCommandEventContractOverlay(fixture.inputs);
+			expect(aliased).toBe(true);
+			expect(outcome.outcome).toBe('partial');
+			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(outcome.overlay.layers[1]?.eventIds).toBe(outcome.overlay.layers[1]?.commandIds);
+			expect(Object.isFrozen(outcome.overlay.layers[1]?.eventIds)).toBe(true);
+		} finally {
+			serializer.mockRestore();
+		}
+	});
+
+	it('fails closed when the serialized constructed overlay does not validate', () => {
+		const stringifyJson = JSON.stringify;
+		let corrupted = false;
+		const serializer = vi.spyOn(JSON, 'stringify').mockImplementation((value: unknown) => {
+			if (
+				!corrupted &&
+				value !== null &&
+				typeof value === 'object' &&
+				'coverage' in value &&
+				'contentDigest' in value
+			) {
+				corrupted = true;
+				((value as CommandEventContractOverlaySnapshot).coverage as { commands: number }).commands =
+					0;
+			}
+			return stringifyJson(value);
+		});
+		try {
+			const outcome = buildCommandEventContractOverlay(fixture.inputs);
+			expect(corrupted).toBe(true);
+			expect(outcome).toMatchObject({
+				diagnostics: [
+					{
+						code: 'OVERLAY_VALIDATION_FAILED',
+						phase: 'VALIDATE'
+					}
+				],
+				outcome: 'unavailable'
+			});
+		} finally {
+			serializer.mockRestore();
+		}
 	});
 
 	it('rejects malformed retained census grammar and exposes bound-not-pinned frontiers', () => {

@@ -9,10 +9,12 @@ import {
 	type CommandEventContractOverlaySnapshot,
 	type CommandEventContractOverlayValidationOptions
 } from '../contracts/command-event-contract-overlay.js';
+import type { StaticSemanticSnapshot } from '../contracts/semantic.js';
 import type { FrozenSubject } from '../contracts/subject.js';
 import { sha256 } from '../inventory/canonical.js';
 import { attachFrozenSubjectBytes, readFrozenSubjectArtifact } from '../subject/frozen-store.js';
 import { buildCommandEventContractOverlay } from './build-command-event-contract-overlay.js';
+import { buildCommandHandlerGraph } from './build-command-handler-graph.js';
 import {
 	createCommandEventContractOverlayFixture,
 	type CommandEventContractOverlayFixture
@@ -98,6 +100,25 @@ function inputsWithArtifact(
 				? { ...fixture.request, vocabArtifact: selector }
 				: { ...fixture.request, retainedCensusArtifact: selector },
 		subject
+	};
+}
+
+function inputsWithRebuiltCommandHandlerGraph(
+	semanticSnapshot: StaticSemanticSnapshot
+): CommandEventContractOverlayBuildInputs {
+	const graphOutcome = buildCommandHandlerGraph(
+		fixture.graphRequest,
+		semanticSnapshot,
+		fixture.observation,
+		fixture.subject
+	);
+	if (graphOutcome.outcome !== 'partial')
+		throw new Error(`Mutated predecessor graph failed: ${JSON.stringify(graphOutcome)}`);
+	return {
+		...fixture.inputs,
+		commandHandlerGraph: graphOutcome.graph,
+		request: { ...fixture.request, commandHandlerGraphId: graphOutcome.graph.id },
+		semanticSnapshot
 	};
 }
 
@@ -495,6 +516,52 @@ describe('command-event overlay public-validator coverage', { timeout: 120_000 }
 		);
 	});
 
+	it('fails closed when an attached frozen capability omits a selected artifact body', () => {
+		const subject = structuredClone(fixture.subject) as FrozenSubject;
+		const bytesByPath = new Map<string, Uint8Array>();
+		for (const artifact of fixture.subject.artifacts)
+			if (artifact.path !== COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH)
+				bytesByPath.set(artifact.path, artifactBytes(artifact.path));
+		attachFrozenSubjectBytes(subject, bytesByPath);
+		expectIssue(
+			validate(baseline, { ...fixture.inputs, subject }),
+			'INVALID',
+			'POPULATION_MISMATCH',
+			'$'
+		);
+	});
+
+	it('does not silently admit a detached semantic declaration into the bound input population', () => {
+		const semanticSnapshot = structuredClone(fixture.snapshot) as StaticSemanticSnapshot;
+		const selected = semanticSnapshot.declarations.find(
+			(declaration) => declaration.sourceId === fixture.request.eventRegistry.sourceId
+		);
+		if (selected === undefined) throw new Error('Fixture semantic declaration is unavailable.');
+		Object.assign(
+			semanticSnapshot as unknown as {
+				declarations: StaticSemanticSnapshot['declarations'];
+			},
+			{
+				declarations: [
+					...semanticSnapshot.declarations,
+					{
+						...selected,
+						id: 'semantic:declaration-detached' as never,
+						name: 'DetachedSemanticDeclaration',
+						nodeId: null,
+						symbolId: null
+					}
+				]
+			}
+		);
+		expectIssue(
+			validate(baseline, inputsWithRebuiltCommandHandlerGraph(semanticSnapshot)),
+			'INVALID',
+			'POPULATION_MISMATCH',
+			'$'
+		);
+	});
+
 	it('independently rejects malformed vocab JSON and semantic vocab rows', () => {
 		const vocab = JSON.parse(artifactText(COMMAND_EVENT_CONTRACT_OVERLAY_VOCAB_PATH)) as {
 			bindings: Record<string, unknown>[];
@@ -647,5 +714,23 @@ describe('command-event overlay public-validator coverage', { timeout: 120_000 }
 			)
 		])
 			expectIssue(validate(baseline, inputs), 'INVALID', 'POPULATION_MISMATCH', '$');
+	});
+
+	it('retains an unknown pinned event as an explicit unmatched frontier', () => {
+		const census = artifactText(COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH);
+		const changed = census.replace(
+			"'RuntimeOnly', 'WorkAudited', 'WorkStarted'",
+			"'OrphanPinned', 'RuntimeOnly', 'WorkAudited', 'WorkStarted'"
+		);
+		expect(changed).not.toBe(census);
+		expectIssue(
+			validate(
+				baseline,
+				inputsWithArtifact(COMMAND_EVENT_CONTRACT_OVERLAY_RETAINED_CENSUS_PATH, changed)
+			),
+			'INVALID',
+			'POPULATION_MISMATCH',
+			'$'
+		);
 	});
 });

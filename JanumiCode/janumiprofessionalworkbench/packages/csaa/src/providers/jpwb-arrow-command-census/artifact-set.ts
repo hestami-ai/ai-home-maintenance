@@ -24,7 +24,7 @@ import type {
 } from '../../contracts/subject.js';
 import { canonicalJson, compareText, sha256 } from '../../inventory/canonical.js';
 import { resolveFrozenModuleClosure } from '../../subject/analyzer-closure.js';
-import { classifyArtifact } from '../../subject/artifacts.js';
+import { classifyArtifactForProjects } from '../../subject/artifacts.js';
 import {
 	isFrozenSubjectCapability,
 	readFrozenSubjectArtifact
@@ -372,7 +372,7 @@ function bindArtifact(
 				)
 			};
 		const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-		const expectedClass = classifyArtifact(artifact.path, source);
+		const expectedClass = classifyArtifactForProjects(artifact.path, source, subject.projects);
 		if (
 			artifact.canonicalPathKey !== canonicalPathKey(artifact.path) ||
 			!Number.isSafeInteger(artifact.bytes) ||

@@ -257,6 +257,50 @@ export function classifyArtifact(path: string, content?: string): ArtifactClassi
 	};
 }
 
+function reconcileProjectClassification(
+	classification: ArtifactClassification,
+	selectedInConfigurationClosure: boolean,
+	selectedAsCompilerRoot: boolean
+): ArtifactClassification {
+	const reconciled =
+		!selectedInConfigurationClosure ||
+		classification.primaryClass === 'MANIFEST' ||
+		classification.primaryClass === 'GENERATED_CONFIGURATION' ||
+		classification.primaryClass === 'PROJECT_CONFIGURATION'
+			? classification
+			: {
+					disposition: 'ANALYZED' as const,
+					primaryClass: 'PROJECT_CONFIGURATION' as const,
+					reason: 'Captured TypeScript configuration-closure input.',
+					roles: ['ANALYSIS_INPUT', 'CONFIGURATION'] as const
+				};
+	if (!selectedAsCompilerRoot) return reconciled;
+	const alreadyCandidate = reconciled.roles.includes('COMPILER_CANDIDATE');
+	return {
+		...reconciled,
+		disposition: 'ANALYZED',
+		reason: alreadyCandidate
+			? reconciled.reason
+			: `${reconciled.reason} TypeScript project discovery selected this artifact as a compiler root.`,
+		roles: [
+			...new Set([...reconciled.roles, 'ANALYSIS_INPUT' as const, 'COMPILER_CANDIDATE' as const])
+		].sort((left, right) => Number(left > right) - Number(left < right))
+	};
+}
+
+/** Reproduces the classification recorded after exact TypeScript project discovery. */
+export function classifyArtifactForProjects(
+	path: string,
+	content: string | undefined,
+	projects: readonly ProjectSubjectRecord[]
+): ArtifactClassification {
+	return reconcileProjectClassification(
+		classifyArtifact(path, content),
+		projects.some((project) => project.configClosure.some((record) => record.path === path)),
+		projects.some((project) => project.fileNames.includes(path))
+	);
+}
+
 export function reconcileConfigurationClosure(
 	capture: SubjectCapture,
 	projects: readonly ProjectSubjectRecord[]
@@ -268,34 +312,13 @@ export function reconcileConfigurationClosure(
 	return {
 		...capture,
 		artifacts: capture.artifacts.map((artifact) => {
-			const reconciled =
-				!closurePaths.has(artifact.path) ||
-				artifact.primaryClass === 'MANIFEST' ||
-				artifact.primaryClass === 'GENERATED_CONFIGURATION' ||
-				artifact.primaryClass === 'PROJECT_CONFIGURATION'
-					? artifact
-					: {
-							...artifact,
-							disposition: 'ANALYZED' as const,
-							primaryClass: 'PROJECT_CONFIGURATION' as const,
-							reason: 'Captured TypeScript configuration-closure input.',
-							roles: ['ANALYSIS_INPUT', 'CONFIGURATION'] as const
-						};
-			if (!compilerRootPaths.has(artifact.path)) return reconciled;
-			const alreadyCandidate = reconciled.roles.includes('COMPILER_CANDIDATE');
 			return {
-				...reconciled,
-				disposition: 'ANALYZED',
-				reason: alreadyCandidate
-					? reconciled.reason
-					: `${reconciled.reason} TypeScript project discovery selected this artifact as a compiler root.`,
-				roles: [
-					...new Set([
-						...reconciled.roles,
-						'ANALYSIS_INPUT' as const,
-						'COMPILER_CANDIDATE' as const
-					])
-				].sort((a, b) => Number(a > b) - Number(a < b))
+				...artifact,
+				...reconcileProjectClassification(
+					artifact,
+					closurePaths.has(artifact.path),
+					compilerRootPaths.has(artifact.path)
+				)
 			};
 		})
 	};

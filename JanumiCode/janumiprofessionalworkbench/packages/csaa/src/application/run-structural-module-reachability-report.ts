@@ -39,7 +39,8 @@ import {
 	type FrozenSubject,
 	type SubjectResolutionOutcome,
 	type SubjectBudgets,
-	type SubjectDiagnostic
+	type SubjectDiagnostic,
+	type SubjectFilters
 } from '../contracts/subject.js';
 import { buildModuleDependencyGraph } from '../graph/build-module-dependency-graph.js';
 import {
@@ -920,6 +921,8 @@ function selectCriterion(
 }
 
 export interface RunStructuralModuleReachabilityReportOptions {
+	/** Trusted same-process artifacts that must participate in the same frozen subject identity. */
+	readonly additionalArtifacts?: readonly string[];
 	/**
 	 * Trusted-host telemetry callback. Exceptions/rejections are suppressed and events are excluded
 	 * from report identity/evidence. The callback runs synchronously, can mutate trusted host state,
@@ -928,6 +931,8 @@ export interface RunStructuralModuleReachabilityReportOptions {
 	readonly onProgress?: (event: StructuralModuleReachabilityReportProgressEvent) => unknown;
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
+	/** Trusted exact filter policy that must participate in the same frozen subject identity. */
+	readonly subjectFilters?: SubjectFilters;
 }
 
 function runStructuralModuleReachabilityReportInternal(
@@ -1003,13 +1008,16 @@ function runStructuralModuleReachabilityReportInternal(
 	const subjectOutcome = resolveSubject({
 		budgets: request.budgets.subject,
 		expectEmpty: false,
-		filters: { exclude: [], include: [] },
+		filters: options.subjectFilters ?? { exclude: [], include: [] },
 		operationVersion: STRUCTURAL_MODULE_REACHABILITY_REPORT_OPERATION_VERSION,
 		outputs: [],
 		policyVersion: SUBJECT_POLICY_VERSION,
 		rootLocator: repositoryRoot,
 		schemaVersion: SUBJECT_REQUEST_SCHEMA_VERSION,
 		scope: {
+			...(options.additionalArtifacts === undefined || options.additionalArtifacts.length === 0
+				? {}
+				: { additionalArtifacts: options.additionalArtifacts }),
 			kind: 'EXPLICIT_PROJECTS',
 			projects: resolvedSubjectProjects.map((project) => project.path)
 		},

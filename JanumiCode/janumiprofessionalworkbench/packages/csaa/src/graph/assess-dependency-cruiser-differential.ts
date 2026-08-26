@@ -21,8 +21,7 @@ export const DEPENDENCY_CRUISER_DIFFERENTIAL_SCHEMA_VERSION =
 	'jan-csaa-dependency-cruiser-differential-acceptance/0.1.0' as const;
 export const DEPENDENCY_CRUISER_DIFFERENTIAL_OPERATION_VERSION =
 	'jan-csaa-assess-dependency-cruiser-differential/0.1.0' as const;
-export const DEPENDENCY_CRUISER_DIFFERENTIAL_STATUS =
-	'IMPLEMENTATION_LOCAL_UNREGISTERED' as const;
+export const DEPENDENCY_CRUISER_DIFFERENTIAL_STATUS = 'IMPLEMENTATION_LOCAL_UNREGISTERED' as const;
 export const DEPENDENCY_CRUISER_DIFFERENTIAL_AUTHORITY =
 	'REVIEWED_DIFFERENTIAL_EVIDENCE_ONLY' as const;
 export const DEPENDENCY_CRUISER_DIFFERENTIAL_GATE_EFFECT = 'NONE' as const;
@@ -32,12 +31,15 @@ export const DEPENDENCY_CRUISER_DIFFERENTIAL_NONCLAIMS = Object.freeze([
 	'FULL_DWP_004_COMPLETION',
 	'G4_PASS',
 	'NEGATIVE_COVERAGE_CLOSED',
+	'OPTIONAL_DEPENDENCY_CRUISER_METADATA_INTERPRETATION',
 	'PROVIDER_AUTHORITY',
 	'PROVIDER_QUALIFICATION',
 	'REPOSITORY_CURRENTNESS'
 ] as const);
 
 const SUPPORTED_LIMITATIONS = new Set([
+	'DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED',
+	'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED',
 	'PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY',
 	'SUMMARY_VIOLATIONS_DIGEST_ONLY'
 ]);
@@ -59,9 +61,7 @@ export interface DependencyCruiserDifferentialAcceptanceRequest {
 
 export interface DependencyCruiserDifferentialEvidence {
 	readonly acceptanceState:
-		| 'ACCEPTED_REVIEWED_PARTIAL_DIFFERENTIAL'
-		| 'BASELINE_REQUIRED'
-		| 'DIFFERENTIAL_DRIFT';
+		'ACCEPTED_REVIEWED_PARTIAL_DIFFERENTIAL' | 'BASELINE_REQUIRED' | 'DIFFERENTIAL_DRIFT';
 	readonly authority: typeof DEPENDENCY_CRUISER_DIFFERENTIAL_AUTHORITY;
 	readonly capabilityStatus: typeof DEPENDENCY_CRUISER_DIFFERENTIAL_STATUS;
 	readonly comparison: DependencyProviderComparisonSnapshot;
@@ -209,7 +209,8 @@ function positiveInteger(value: unknown, maximum: number): value is number {
 }
 
 function canonicalPaths(value: unknown): readonly string[] | null {
-	if (!Array.isArray(value) || value.length === 0 || value.some((path) => !validPath(path))) return null;
+	if (!Array.isArray(value) || value.length === 0 || value.some((path) => !validPath(path)))
+		return null;
 	const sorted = [...value].sort(compareText);
 	if (sorted.some((path, index) => index > 0 && path === sorted[index - 1])) return null;
 	return canonicalSemanticJson(value) === canonicalSemanticJson(sorted) ? sorted : null;
@@ -252,7 +253,10 @@ function unavailable(
 	phase: DependencyCruiserDifferentialDiagnostic['phase'],
 	path: string | null = null
 ): DependencyCruiserDifferentialOutcome {
-	return deepFreeze({ diagnostics: [diagnostic(code, message, phase, path)], outcome: 'unavailable' });
+	return deepFreeze({
+		diagnostics: [diagnostic(code, message, phase, path)],
+		outcome: 'unavailable'
+	});
 }
 
 function under(path: string, root: string): boolean {
@@ -330,9 +334,13 @@ function providerSemanticProjection(observation: DependencyCruiserObservation): 
 			subjectRoot: observation.invocation.subjectRoot
 		},
 		limitations: observation.limitations,
-		modules: observation.modules.map(({ dependencyIds: _dependencyIds, id: _id, ...module }) => module),
+		modules: observation.modules.map(
+			({ dependencyIds: _dependencyIds, id: _id, ...module }) => module
+		),
 		nonLocalModules: observation.nonLocalModules.map(({ id: _id, ...module }) => module),
-		reverseLinks: observation.reverseLinks.map(({ dependencyIds: _dependencyIds, ...link }) => link),
+		reverseLinks: observation.reverseLinks.map(
+			({ dependencyIds: _dependencyIds, ...link }) => link
+		),
 		summary: observation.summary
 	};
 }
@@ -367,17 +375,32 @@ export function dependencyCruiserDifferentialSemanticDigest(
 	observation: DependencyCruiserObservation,
 	graph: ModuleDependencyGraphSnapshot
 ): { readonly differentialDigest: string; readonly providerSemanticDigest: string } {
-	const providerSemanticDigest = sha256(canonicalSemanticJson(providerSemanticProjection(observation)));
+	const providerSemanticDigest = sha256(
+		canonicalSemanticJson(providerSemanticProjection(observation))
+	);
 	return {
-		differentialDigest: sha256(
-			canonicalSemanticJson({
-				comparison: comparisonSemanticProjection(comparison),
-				graphContentDigest: graph.contentDigest,
-				providerSemanticDigest
-			})
+		differentialDigest: dependencyCruiserDifferentialDigestFromComponents(
+			comparison,
+			graph.contentDigest,
+			providerSemanticDigest
 		),
 		providerSemanticDigest
 	};
+}
+
+/** Recomputes the reviewed semantic identity from the complete persisted comparison projection. */
+export function dependencyCruiserDifferentialDigestFromComponents(
+	comparison: DependencyProviderComparisonSnapshot,
+	graphContentDigest: string,
+	providerSemanticDigest: string
+): string {
+	return sha256(
+		canonicalSemanticJson({
+			comparison: comparisonSemanticProjection(comparison),
+			graphContentDigest,
+			providerSemanticDigest
+		})
+	);
 }
 
 function evidenceContentDigest(
@@ -496,7 +519,10 @@ function inputAcceptanceFailure(
 		observation.invocation.baseDir !== '.' ||
 		!providerBaseMappingIsBound(observation) ||
 		request.expectedInputPaths.some(
-			(inputPath) => !frozenSubject.workspaces.some((workspace) => under(workspace.path, inputPath))
+			(inputPath) =>
+				!frozenSubject.workspaces.some(
+					(workspace) => under(workspace.path, inputPath) || under(inputPath, workspace.path)
+				)
 		) ||
 		observation.modules.some(
 			(module) => !request.expectedInputPaths.some((root) => under(module.sourcePath, root))
@@ -542,7 +568,11 @@ export function assessDependencyCruiserDifferential(
 	try {
 		const request = parseRequest(requestValue);
 		if (request === null)
-			return unavailable('REQUEST_INVALID', 'The request is not an exact supported record.', 'REQUEST');
+			return unavailable(
+				'REQUEST_INVALID',
+				'The request is not an exact supported record.',
+				'REQUEST'
+			);
 		const acceptedInputs = inputAcceptanceFailure(
 			request,
 			frozenSubject,
@@ -557,7 +587,12 @@ export function assessDependencyCruiserDifferential(
 			graph,
 			observation
 		);
-		const compared = compareDependencyProviders(compareRequest, semanticSnapshot, graph, observation);
+		const compared = compareDependencyProviders(
+			compareRequest,
+			semanticSnapshot,
+			graph,
+			observation
+		);
 		if (compared.outcome === 'unavailable')
 			return unavailable(
 				'SOURCE_INVALID',

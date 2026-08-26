@@ -1,0 +1,1959 @@
+{
+  "analysisAuthority": "NONE",
+  "capabilityStatus": "PARTIAL",
+  "contentDigest": "da6a790fbaa214b517223bcaa3cae2cec642c7526abdb1a93a971ab068ab603e",
+  "currentness": {
+    "changedPaths": [],
+    "checkedAfterProviderExecution": true,
+    "checkedAtFinalEvidenceBoundary": true,
+    "declarationContextState": "CONTEXT_ONLY_NOT_RECHECKED_AFTER_PROVIDER",
+    "state": "CURRENT_FOR_CAPTURED_SUBJECT_AT_PROVIDER_AND_FINAL_BOUNDARIES"
+  },
+  "differential": {
+    "acceptanceState": "ACCEPTED_REVIEWED_PARTIAL_DIFFERENTIAL",
+    "authority": "REVIEWED_DIFFERENTIAL_EVIDENCE_ONLY",
+    "capabilityStatus": "IMPLEMENTATION_LOCAL_UNREGISTERED",
+    "comparison": {
+      "canonicalProfile": "jan-csaa-dependency-provider-comparison-canonical/1.0.0",
+      "comparisonContextDigest": "4649af736ec015e85aef1c80177cf048947a70bed922c1e85c4cb5c75c62c489",
+      "contentDigest": "eab660f3a8e1eee93bb813994fd763d084fd079cb7dc30b7a73809355e603f11",
+      "coverage": {
+        "agreementRecords": 24,
+        "compilerEdgesRepresented": 34,
+        "compilerEdgesTotal": 34,
+        "corroborationRecords": 1,
+        "dependencyCruiserDependenciesRepresented": 25,
+        "dependencyCruiserDependenciesTotal": 25,
+        "incomparableRecords": 9,
+        "observedDifferenceRecords": 0,
+        "reconciles": true,
+        "recordCount": 34
+      },
+      "dependencyCruiserObservationId": "depcruise-observation-682ca9947ea19aa1f5b8fb57abcf714cdf6cb55a520dcedd0cd81993d88c8813",
+      "fullJanCsaa007Conformance": "NOT_CLAIMED",
+      "graphId": "graph:module-dependency-219c78b9bb6d9a9498814ee1e387a73cfd11547cc94390657f6b5b2d41b74aef",
+      "health": "PARTIAL",
+      "id": "dependency-provider-comparison:3ed0f3e6b4b3976c915d9b4258d0343f15fb35942c34f2b120cf0f6661a5d386",
+      "limitations": [
+        {
+          "affectedRecordCount": 0,
+          "kind": "CONFLICT_QUALIFICATION_UNAVAILABLE",
+          "rationale": "This contract has no validated context-equivalence or closed-perimeter attestation, so observed differences cannot become conflicts."
+        },
+        {
+          "affectedRecordCount": 9,
+          "kind": "NEGATIVE_COVERAGE_NOT_CLOSED",
+          "rationale": "This implementation-local harness does not carry a separately validated closed-perimeter attestation."
+        },
+        {
+          "affectedRecordCount": 25,
+          "kind": "PROVIDER_AGGREGATES_OCCURRENCES",
+          "rationale": "dependency-cruiser dependency rows aggregate syntax occurrences and never replace compiler occurrence edges."
+        },
+        {
+          "affectedRecordCount": 0,
+          "kind": "RESOLUTION_CONTEXT_NOT_PROVEN_EQUIVALENT",
+          "rationale": "Compiler and dependency-cruiser contexts are digest-bound but not proven equivalent by this harness."
+        },
+        {
+          "affectedRecordCount": 1,
+          "kind": "TARGET_MODEL_DIFFERENCE",
+          "rationale": "Compiler ambient/external targets and dependency-cruiser runtime/core targets do not share an exact artifact identity."
+        },
+        {
+          "affectedRecordCount": 34,
+          "kind": "TYPE_ONLY_PARTITION_NOT_REPRODUCED",
+          "rationale": "The current compiler graph does not reproduce dependency-cruiser's element-level type-only partition, so comparison uses a coarser key."
+        }
+      ],
+      "method": "compiler-occurrence-to-dependency-cruiser-aggregate-correlation/1.0.0",
+      "negativeCoverage": {
+        "rationale": "This implementation-local harness does not carry a separately validated closed-perimeter attestation.",
+        "state": "OPEN"
+      },
+      "operationVersion": "jan-csaa-compare-dependency-providers/0.1.0",
+      "records": [
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-bd9903d0d0299cf8d96d4575857879be8ee7043dc35231f13fa388bbbb666167"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-468a113545c8805ff86906c554d67f142cb82cd42c9277fc7d1c14ed153d0f04"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:f02aa6969363478c1866856db81c863c4f7dfae4ef17d4c86e3b0ba3ebdec8d1",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-0d4848930341bf564eb16030211b097f6900eb39d6acca0efef946f4b8e800ad",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/objects.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-b6a40d2b1b6b98b70fd68285d0ab9c61de51ce0cae7d19b91d646f2188cfaa78"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0597b10b134750f200f86c82a5e32cec70b3e9cff9a2ac56544541c7cce6bc6a"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-f6d41396d3e08dc6d2a8b383c7fc6c986a39277d238164d1d6d35a3d64b51362"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:54e00f90f51387ba0244950574ed75647fa2d5c0f2df3784ac2efdea04f5de0b",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-0d4848930341bf564eb16030211b097f6900eb39d6acca0efef946f4b8e800ad",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./envelopes.js",
+            "sourcePath": "packages/rph-contracts/src/objects.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-bdeee50c311cbae6a31580f37fe095ab79250fefd23eea9a33c818c096f2b4c8"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:6f659c7d7dea7b79c1a35733c8b3a5c14b004203e6cda40287fbf174e7e8895c",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-0d4848930341bf564eb16030211b097f6900eb39d6acca0efef946f4b8e800ad",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/objects.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-7416175cfcb4b9eac7f54e53fa3a8edcd582512eeccb4d237a385fab8904f0fd"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-a5ee8ed56797be2c10537c1806d399c1fcada4fcf3510b6dcc6c029b85a7e74c"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:5ac8e1db7f2dbe0f3c0143050501dfdcd050f46d84ea09c59cf0e35989f74f29",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2c636b6e54968e1e490ff6f99376e6313a4dbf2c6333510df08f1527e971bfea",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/messages.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-ca9c0317c297199c67d395d29b930d2d1804f6c3ffdf2b5c78e07ead5f010dbb"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0597b10b134750f200f86c82a5e32cec70b3e9cff9a2ac56544541c7cce6bc6a"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-bd5ddc55f9aa2415e8129172ff35e010b7fdb0fe8888fd9ebb3ffa9c86bce451"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:95e03982749797be3606a50b5170484b1981b468b2a3fb6cb8650904294594fa",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2c636b6e54968e1e490ff6f99376e6313a4dbf2c6333510df08f1527e971bfea",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./envelopes.js",
+            "sourcePath": "packages/rph-contracts/src/messages.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-0a211387b52407f0624e94cedbf234b5d82f77ea83cd0af8505a90569bb22288"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-fdaca3f63b41e594861282b57c5667273fb8370c335a8537c6758414019e4194"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-2d3399439db0b66454e0e8b0fdac6da09a3d908682600fc82c8c04862c952a61"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:6732dfc63443d203937812f32fe60f9309b755967265fa1c45cd7bf2726450f6",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2c636b6e54968e1e490ff6f99376e6313a4dbf2c6333510df08f1527e971bfea",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./objects.js",
+            "sourcePath": "packages/rph-contracts/src/messages.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-772963df2f3f661b18bca8a8f6cc897d77ffe245ba67c85d5d387e99532784ea"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:365f5f2da99296493f80db290838f86142099ba1d0d2b35b02df3fbd374a5722",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2c636b6e54968e1e490ff6f99376e6313a4dbf2c6333510df08f1527e971bfea",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/messages.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-f2159e713d3be4619744a474fef9db5586bd47f6a5220cb8170a8c83dfcec56f"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-37cd4c9858ed272bf713199dc16d82283eaa5e113ef1ef33432c34eb84c8fdda"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:d819706238732ebcf0667793c8d38ac6dcb257e8e1e303f88f4d7e552e39910d",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2dec558d6f5cf85f9087ecc4a57cfca58d4c7e0b7b9170d0299cbaea0b8f7895",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/errors.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-cbaffc864bf58761e1ad57b881fc2d7ac9852ebd8def641c8474d17e0bc5ea1d"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:44f4c7963f9cfb5132369b6db1abf21ead68b5306f31b5cec81baa3e6135a2cf",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-2dec558d6f5cf85f9087ecc4a57cfca58d4c7e0b7b9170d0299cbaea0b8f7895",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/errors.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "CORROBORATION",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-09011243d181f92bd55aade78492b72126879567e037aeda24c321fc3d921fb3"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_AMBIENT"
+            ],
+            "targetLogicalPaths": [],
+            "targetNodeIds": [
+              "graph-node:resolution-target-906e405f4ece2c202ddf20f56c485cbd95238e4ff51b1817360a3a87cfd530f9"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-9e09e0856a1ddfa9a465143597e933cee8316f8fd28eda043d1c888162ca31b0"
+            ],
+            "dependencyTypes": [
+              "core",
+              "import"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "CORE_MODULE"
+            ],
+            "targetLogicalPaths": []
+          },
+          "disposition": "PRESENCE_ONLY_TARGET_MODEL_DIFFERENT",
+          "id": "dependency-comparison-record:0f83b993db400959bba211881c271002f093954d36b8603c56ce5fbe53ddfa89",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-3612a600a92aba05f3b1c003468a1dc79754b1aca50ce2127a523fbc7b796bf7",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "crypto",
+            "sourcePath": "packages/rph-contracts/src/hash.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers observe the relation, but their ambient/runtime target models are not identity-equivalent."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-99809a831481eecc041e12b058edc6bc8cd2b6392d054d9c8222a52f9ea4d687"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:b1569c40ddd214dceb14a711d1f6f17a23fa9e9415d7b0e35db67271c7881b55",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-7361c0d05fb1dba3d5f5c41cce8e3edb3648683a03d01acf40230fc03cea8cfa",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/common.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-cc26cb72d0395272ab19e3d517e78dd2b91a0e848e0c17997181a9c207fb2f86"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0757476a6d58a8d66245e84bd23663151397e7f5097fbee6c25ad54f7be76d44"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-dbfa062ca1082a69943ffdf2d9d1f58e545d63ce5ca6e120dcad02226cf741b0"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:ea65c42af766b3b956d406b0ba8d0f12b4f2955996f371f9c151d4a60073518a",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./common.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-6d9375ae09317b62d36e5a1259158076459e0ff182e4b502ae873ee17c61aae4"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-258b71a176e7391710f65ffae89e344ba722756d0d88fe039c396de9c95cf71c"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:20ee993115b940f7997472786e3f567214af93d59527f89f87400021ee6416bb",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-ed89d6d646103fe577d5bfe68d769b3c7fb2cba40202c302fc3e49813447fb13"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0597b10b134750f200f86c82a5e32cec70b3e9cff9a2ac56544541c7cce6bc6a"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-88f47dda865cb0a7939e1b53d5489557881b879bdf39a2829b93c79f1919ebf7"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:84d1df2f7f4cb15c9ca2f230dff89e7b83357e9f5d172326bb97e64ed643515d",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./envelopes.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-9e4d0e2699fd41afb57882dd25d47683ac5218f7e5799baec1808191b6a46745"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-68d3a294ba8546c16a49fc942625992e5ffe6a1d54060795926b8deaa2d13c45"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-26d8519dc83a1fc51918d22292e7344de36b8e1bfb1a7d04c763becd183e94a9"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:06b436b31d6351a7a27e271191df39af7edfe828a27f426cd2bf76aef4591d20",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./errors.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-b4334bdea8892ad74d6af7e7494995dff99dbb4e630f01ba5e7babf2e57879e1"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/ids.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8fccb2bf8c729741b1e87384731a4f165ddf956763e797c367a8eee14397e144"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-923c923b0529c3a7c1b09576d08459ce6355f9510b3712cf05c77d82bce284f4"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/ids.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:dc228336e607a57254aa4ba83e094675acc2dfe46ce61e39f855b237c937d605",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./ids.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-e14bde5b1f37f78a1bb04e03b0ad3a0c61a494d284567521ab17cc6231acd9d8"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/messages.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-166424314aeafe345969e64c99f1d5a2e5601dac758dbf5d860a92c8ff32d731"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-0d14c581ac8736113e0d18498f948c494f733cca6351552ce747e43b81a625b8"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/messages.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:031df5b7fa74d634f29e8a0c9352c049bc9722f8b7919c4f2e97b66db5ed97cb",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./messages.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-f9bd8c113525a0758e2895636cd7e3a4237c2b41390214498068f03aa19f603b"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-fdaca3f63b41e594861282b57c5667273fb8370c335a8537c6758414019e4194"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-76453a7d96e1178eaaea55c808e1e9af24f6b1f0c95141de118a154d90d2fee1"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:c56f6938fa163f3bce7843d8c50ecc7226fdac40c2fcbb0fbf63f6a27126aa2a",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./objects.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-f7bd28cd15f15b11cb13e0ae31f8d71ad9fdf908b93ab4b506caff7db7ccc6f6"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "EXPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/validate.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-92e7ae42aef6d50d7da1ab0d3729286edb23bea3b81fcad55ed07eac49960886"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-b2e7baaaf3ef80c91945e3570fe9d9da99de941b797ae25d7d922e0b6bf829ee"
+            ],
+            "dependencyTypes": [
+              "export",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/validate.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:a7c67c6bce5dc3edcb865c60d7c9c8f68f7b6844551573b635ab1b2a20ef0ea1",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-78a1ba32a0a3e10cd4bc13d48bb1c3fce4d101133c7882745500414829013362",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./validate.js",
+            "sourcePath": "packages/rph-contracts/src/index.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-7da42119220547fb5c3ce0710d99d5fda7c705c13eb3f2f10a6a994e4bb5a3cd"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:959389369ea0b2f75b66ab3070dc29b55a2ade55ca35a2cee8f2683844c0f62f",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c329784434a56f46d0160b46120185692e650c6e6ef8e4f283268f32bc2488ac",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/enums.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-826e9c320ff8e9817f03b96e66c49fd22cfdd744e69cc5837b42b3af487dfc7c"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0757476a6d58a8d66245e84bd23663151397e7f5097fbee6c25ad54f7be76d44"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-558294f8ad97133a5adbb898392834493e687a3ae63e3209132217776d98cc2a"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:33693d3066aed89a3b871ba650abc591bae9ced098ce4de13ed3b44014bd07f2",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./common.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-33fd9c1b2a8dd7e8bc4ca878dba8d2ac55a22df67887d6026f25d07192d611cb"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-b452ec7334a96fa1d6905f853c2fe566b176c3d5ea046be9a08f10b414499f76"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:ba5ad0a0ba132390cb8a172f47dc5be8bb3ab16eeb73eb53e2d2bd873fe38158",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-9b92ccdcc7dc7d5170e949d11a7e452f96c2806bb99427b2931900613fde4605"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0597b10b134750f200f86c82a5e32cec70b3e9cff9a2ac56544541c7cce6bc6a"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-de59182821649217eaf10faaeb84c8a1ae86dd4f2df7ba7f4cd68be8eb86c3ae"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/envelopes.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:509380b3a79ba48c42b87a862814e8187638f7c6b3a8ac645cf07e4153faf52d",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./envelopes.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-0ae68055d62162f26b3b76e6f03d71e970f8e45e6e99820f10a276c1a21d9b28"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-68d3a294ba8546c16a49fc942625992e5ffe6a1d54060795926b8deaa2d13c45"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-7c570aee2b3575a4f0b988eaf34dc8715c2690fc44cd1e5588b040590bfc8ef8"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:314e37f29ab4edeb815b2847f1c174db97a840e7932a935b062e14c1fef370ac",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./errors.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-cbc6a421ad27b4e414ddda3c7caa4e9c90a7534dbfc35e082a62bfe07dfecb37"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/messages.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-166424314aeafe345969e64c99f1d5a2e5601dac758dbf5d860a92c8ff32d731"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-cc461f1c71d9a3e4ecec09f5e4870c30a2ee3c421a7af5850f86536a8b15bb7b"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/messages.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:5803a2ab33ae0658d04a85d0d4dcd4230d6099a1210269dfccea4d413f88ba7b",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./messages.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-aa4fcc6bfb221c1a8c9ced1cdbcb59beb075edd8717d7aec06e8771a76ef8dc1"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-fdaca3f63b41e594861282b57c5667273fb8370c335a8537c6758414019e4194"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-e908623415ac93f016cd25e1271a6f8b0b0c50434cf98cccd46397e745d8af76"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/objects.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:fc47677aa49ec21bcd8a826a26956b5be9dcc7011ddc334a91fdc4a8e20293fb",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./objects.js",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-114699a3fa49039203e02ac7177fea881e3ef6ed4e2efc2500bb03b9dde1683e"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:93e1b849e757297932141e6515a04bb683a686cbce6ffa1039c542c94c2436d0",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-c60d2866da62fe986fa48678e5e99f16724060ec32915a5346031853706534c9",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/validate.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-5eddd185420e0945775ff3b9020d5680b86dc78048893880c7dcae1c47209c5d"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/ulid/dist/index.d.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-395b109a7cdc518b149881081cb15148f4f57ec7c21f54286d61d83fac47dfc4"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:b53b4feb42f0ff6df770f2a495d77b072ee220f2ce658f7bc05aa81457fda401",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ddf11aec17437139f9dea01baba53a7f6aabeda03cb0dee73ba4ea489e1d80a7",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "ulid",
+            "sourcePath": "packages/rph-contracts/src/ids.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-154b73adeda0a7e62bb7526f24547ee7435378fb8be24ed6d021c827a6c2ed37"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:aaf00ad52a2aa98fc612850499087ff9df4fec1adf4009dfdb0da11a36fd8f89",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ddf11aec17437139f9dea01baba53a7f6aabeda03cb0dee73ba4ea489e1d80a7",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/ids.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-218e173971c89c32531b08fc8becc91b28621f9dda6917591fb3d9fde0676f32"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-0757476a6d58a8d66245e84bd23663151397e7f5097fbee6c25ad54f7be76d44"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-169f0474e548ecbc7d31c9be3ce4312551d2da5f5cdbb9d500748f146ab90a7c"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/common.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:4d2b8579956ef2001acabdffd9d404fe345f6d6afd78a24444565ef9aef9a99e",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ee5f250490b1e95b1970d32d2f710beeb15930b175ea3b8add95284eb86fb891",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./common.js",
+            "sourcePath": "packages/rph-contracts/src/envelopes.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-ad8b643824b82de7ce24343f83ae449bde60a789316b3d53d3f34c5346f5bec3"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8e01486ebabd9b47bb90379d5d152420c660de29c9a04ba4a09ea9a3e7d2cbf2"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-8d1bda6b9d859e296474047780020c05d81407aa5826e9e034b3bdf02a853622"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/enums.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:7d3ade392fd751a6783282f1dfcdf415660f45ccb3b3a02e792aa35e6ebd777f",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ee5f250490b1e95b1970d32d2f710beeb15930b175ea3b8add95284eb86fb891",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./enums.js",
+            "sourcePath": "packages/rph-contracts/src/envelopes.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-9d62f86ae23f66e07c82663de713729efd409233eb5cf79fad50defcfeb6256c"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-68d3a294ba8546c16a49fc942625992e5ffe6a1d54060795926b8deaa2d13c45"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-2f22f8931b7a9bea693b991ffda3936d4265aa527b8b27b4d0e8555d7a9b8df6"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/errors.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:9cdbae900a74e5bf17f837b1c42ee7bfc55af421db262c684db37a34d0b6dbec",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ee5f250490b1e95b1970d32d2f710beeb15930b175ea3b8add95284eb86fb891",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./errors.js",
+            "sourcePath": "packages/rph-contracts/src/envelopes.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "AGREEMENT",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-cbee2fd25c98e91e313232240111e70334be00fe2341f06abb767600fa8e3f23"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_SOURCE"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/ids.ts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-8fccb2bf8c729741b1e87384731a4f165ddf956763e797c367a8eee14397e144"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [
+              "depcruise-dependency-f67380de4c50abd555d7a06ecc8d6c321046f68e388956b6054abad786170d76"
+            ],
+            "dependencyTypes": [
+              "import",
+              "local"
+            ],
+            "rowCount": 1,
+            "targetKinds": [
+              "RESOLVED_LOCAL_PATH"
+            ],
+            "targetLogicalPaths": [
+              "packages/rph-contracts/src/ids.ts"
+            ]
+          },
+          "disposition": "AGREE_EXACT_TARGET",
+          "id": "dependency-comparison-record:8403708b038574491ca4cc412e4c03fb4df65006d1b35ffe9f876aa0b6f031f2",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ee5f250490b1e95b1970d32d2f710beeb15930b175ea3b8add95284eb86fb891",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "./ids.js",
+            "sourcePath": "packages/rph-contracts/src/envelopes.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "Both providers identify the same canonical local source target."
+        },
+        {
+          "assessment": "INCOMPARABLE",
+          "compiler": {
+            "edgeIds": [
+              "graph-edge:module-occurrence-48566b4289822d4c686497ac5cf903e4dcbf13c04a042764ce5501385415dc89"
+            ],
+            "occurrenceCount": 1,
+            "relationKinds": [
+              "IMPORT_OCCURRENCE"
+            ],
+            "resolutionStates": [
+              "RESOLVED_EXTERNAL"
+            ],
+            "targetLogicalPaths": [
+              "node_modules/zod/index.d.cts"
+            ],
+            "targetNodeIds": [
+              "graph-node:source-363e684f0414e63aaaa46f938007e5ba35ce5dafa363ecb29d00560190466d04"
+            ]
+          },
+          "dependencyCruiser": {
+            "dependencyIds": [],
+            "dependencyTypes": [],
+            "rowCount": 0,
+            "targetKinds": [],
+            "targetLogicalPaths": []
+          },
+          "disposition": "UNKNOWN_PROVIDER_PARTIAL",
+          "id": "dependency-comparison-record:e9d9dc605cb0007f9bbeb9ec68a9f54454fb9fa610e4c5e27b48315dc49c51ef",
+          "key": {
+            "importerBinding": "EXACT_GRAPH_SOURCE",
+            "importerSemanticSourceId": "semantic:source-ee5f250490b1e95b1970d32d2f710beeb15930b175ea3b8add95284eb86fb891",
+            "moduleSystem": "es6",
+            "normalizedSpecifier": "zod",
+            "sourcePath": "packages/rph-contracts/src/envelopes.ts",
+            "typeOnlyPartition": "COARSENED_NOT_COMPARED"
+          },
+          "rationale": "The provider observation is partial, so provider absence is unknown."
+        }
+      ],
+      "resolutionContext": {
+        "compilerContextDigest": "32bcc69a56bd17be3a394447eee7556d932341944e8d6b2c414c6079389a86a9",
+        "providerContextDigest": "7114b982809008396ce90c614599bdb116521a3033152db532c38d7d8725cf76",
+        "rationale": "Compiler and dependency-cruiser contexts are digest-bound but not proven equivalent by this harness.",
+        "state": "UNKNOWN"
+      },
+      "schemaVersion": "jan-csaa-dependency-provider-comparison/1.0.0",
+      "semanticSnapshotId": "static:ts-snapshot-227defa5029bfa07ba6ec27e0cea863fea78ae455e85bbfa7947c53f942fd024",
+      "subjectId": "7965eaff3fa9729bca2a3f76388da4518f2b40e73008dba92306399929b91ac9"
+    },
+    "configWitness": {
+      "capturedArtifactSha256": "b6ab835ee37df0655d1771051b2da639a4c2576de3bfa3af43c1f8531b624811",
+      "observationSha256": "b6ab835ee37df0655d1771051b2da639a4c2576de3bfa3af43c1f8531b624811",
+      "path": ".dependency-cruiser.cjs",
+      "state": "EXACT_CAPTURED_MATCH"
+    },
+    "contentDigest": "6586496ccc5d96ea4e2b9082886e50ce8ad6afd2132b2d866b1ac2281917d10b",
+    "coverage": {
+      "comparisonRecords": 34,
+      "compilerEdges": 34,
+      "dependencyCruiserDependencies": 25,
+      "expectedInputPaths": 10,
+      "observedDifferenceRecords": 0,
+      "providerModules": 10,
+      "reconciles": true
+    },
+    "currentness": {
+      "basis": "FROZEN_SUBJECT_CAPTURE_AND_BOUND_PROVIDER_INVOCATION",
+      "state": "CURRENT_FOR_CAPTURED_SUBJECT_ONLY"
+    },
+    "differentialDigest": "ee28cb7b72ddf76651da24ec675a701a69917d2afb532cfa3a81849fa14856ea",
+    "expectedDifferentialDigest": "ee28cb7b72ddf76651da24ec675a701a69917d2afb532cfa3a81849fa14856ea",
+    "gateEffect": "NONE",
+    "graph": {
+      "contentDigest": "e89e0d58b5a4f2685b8d48c4bedb48e6e86751cc9c174c661aaefed9bf506c1e",
+      "graphId": "graph:module-dependency-219c78b9bb6d9a9498814ee1e387a73cfd11547cc94390657f6b5b2d41b74aef",
+      "semanticSnapshotId": "static:ts-snapshot-227defa5029bfa07ba6ec27e0cea863fea78ae455e85bbfa7947c53f942fd024"
+    },
+    "nonclaims": [
+      "ARCHITECTURE_RULE_COMPLIANCE",
+      "CONTEXT_EQUIVALENCE",
+      "FULL_DWP_004_COMPLETION",
+      "G4_PASS",
+      "NEGATIVE_COVERAGE_CLOSED",
+      "OPTIONAL_DEPENDENCY_CRUISER_METADATA_INTERPRETATION",
+      "PROVIDER_AUTHORITY",
+      "PROVIDER_QUALIFICATION",
+      "REPOSITORY_CURRENTNESS"
+    ],
+    "observation": {
+      "contentDigest": "08c24d9d4529f51268a0d1c2bb3ec29eb0bcff34c4eb99bd26456190f1d7e321",
+      "id": "depcruise-observation-682ca9947ea19aa1f5b8fb57abcf714cdf6cb55a520dcedd0cd81993d88c8813",
+      "invocationDigest": "3f85c1db38901be42a979127b5e8353493c3542ef3107bc91957ed6867def2ae",
+      "limitations": [
+        "MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED",
+        "PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY"
+      ],
+      "providerSemanticDigest": "0b6597b9ec8af02cdd0ce028b34a970b6d3c421796c112b8d172520c6f48071e"
+    },
+    "perimeterWitness": {
+      "expectedInputPaths": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "state": "EXACT_INVOCATION_MATCH"
+    },
+    "schemaVersion": "jan-csaa-dependency-cruiser-differential-acceptance/0.1.0",
+    "subjectId": "7965eaff3fa9729bca2a3f76388da4518f2b40e73008dba92306399929b91ac9",
+    "wireShape": "CLOSED_EXACT"
+  },
+  "discovery": {
+    "acceptanceState": "BASELINE_REQUIRED",
+    "closureDigest": "951c6e3c623feaa898824cf37bb129c633982f688b409f3d985ad2998400d648",
+    "differentialDigest": "ee28cb7b72ddf76651da24ec675a701a69917d2afb532cfa3a81849fa14856ea",
+    "evidenceContentDigest": "b2445dd9826aba5a2c6369fb9807c2ff75e62d629b14b04e07f8d4ebad3ec6b9"
+  },
+  "execution": {
+    "args": [
+      "node_modules/dependency-cruiser/bin/dependency-cruise.mjs",
+      "packages/rph-contracts/src/common.ts",
+      "packages/rph-contracts/src/enums.ts",
+      "packages/rph-contracts/src/envelopes.ts",
+      "packages/rph-contracts/src/errors.ts",
+      "packages/rph-contracts/src/hash.ts",
+      "packages/rph-contracts/src/ids.ts",
+      "packages/rph-contracts/src/index.ts",
+      "packages/rph-contracts/src/messages.ts",
+      "packages/rph-contracts/src/objects.ts",
+      "packages/rph-contracts/src/validate.ts",
+      "--config",
+      ".dependency-cruiser.cjs",
+      "--output-type",
+      "json"
+    ],
+    "durationMs": 934.8737000000001,
+    "executable": "node_modules/dependency-cruiser/bin/dependency-cruise.mjs",
+    "exitStatus": 0,
+    "finishedAt": "2026-08-26T06:04:45.370Z",
+    "networkUse": "NONE",
+    "shell": false,
+    "stageOrder": "PROVIDER_COMPLETE_BEFORE_SEMANTIC_MATERIALIZATION",
+    "startedAt": "2026-08-26T06:04:44.435Z",
+    "stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 20684,
+      "sha256": "2cb4f72c916e706cfb3c5d08018dead538504295b8717caa2043f0ba0c3c4f9e"
+    },
+    "subjectEntryPoints": [],
+    "timeoutMs": 600000
+  },
+  "g4Closure": {
+    "claim": "EXACT_BUILD_ROOT_AND_REPRESENTED_RELATION_POPULATIONS_CLOSED_WITH_NO_OBSERVED_DIFFERENCE",
+    "comparison": {
+      "agreementRecords": 24,
+      "comparisonRecords": 34,
+      "corroborationRecords": 1,
+      "incomparableRecords": 9,
+      "observedDifferenceRecords": 0,
+      "reconciles": true
+    },
+    "compiler": {
+      "deepIndexedSourcePaths": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "edgeSourcePaths": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "edges": 34,
+      "projectPath": "packages/rph-contracts/tsconfig.build.json",
+      "rootNames": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ]
+    },
+    "contextEquivalence": "UNKNOWN",
+    "populationClosure": {
+      "compilerEdgesRepresented": true,
+      "compilerRootsEqualProviderInputs": true,
+      "compilerSourcesEqualProviderModules": true,
+      "providerDependenciesRepresented": true,
+      "relationImporterPathsWithinExactRoots": true,
+      "state": "CLOSED_FOR_EXACT_BUILD_ROOT_AND_REPRESENTED_RELATION_POPULATIONS"
+    },
+    "provider": {
+      "dependencies": 25,
+      "dependencySourcePaths": [
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "inputPaths": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "modulePaths": [
+        "packages/rph-contracts/src/common.ts",
+        "packages/rph-contracts/src/enums.ts",
+        "packages/rph-contracts/src/envelopes.ts",
+        "packages/rph-contracts/src/errors.ts",
+        "packages/rph-contracts/src/hash.ts",
+        "packages/rph-contracts/src/ids.ts",
+        "packages/rph-contracts/src/index.ts",
+        "packages/rph-contracts/src/messages.ts",
+        "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/validate.ts"
+      ],
+      "modules": 10
+    },
+    "state": "CLOSED_NO_OBSERVED_DIFFERENCE",
+    "underlyingComparisonNegativeCoverage": "OPEN"
+  },
+  "gateEffect": "NONE",
+  "graph": {
+    "contentDigest": "e89e0d58b5a4f2685b8d48c4bedb48e6e86751cc9c174c661aaefed9bf506c1e",
+    "edges": 34,
+    "id": "graph:module-dependency-219c78b9bb6d9a9498814ee1e387a73cfd11547cc94390657f6b5b2d41b74aef",
+    "nodes": 260,
+    "reconciles": true,
+    "representedModuleResolutions": 34,
+    "representedSources": 259
+  },
+  "nonclaims": [
+    "ARCHITECTURE_RULE_COMPLIANCE",
+    "COMPILER_PROVIDER_RESOLUTION_CONTEXT_EQUIVALENCE",
+    "DECLARATION_CONTEXT_POST_PROVIDER_CURRENTNESS",
+    "FULL_DWP_004_COMPLETION",
+    "G4_REPOSITORY_GATE_ACTIVATION",
+    "HOSTILE_CONFIGURATION_SECURITY_SANDBOX",
+    "MULTI_PROJECT_SEMANTIC_CLOSURE",
+    "NEGATIVE_COVERAGE_BEYOND_EXACT_BUILD_ROOT_AND_RELATION_POPULATIONS",
+    "OPTIONAL_DEPENDENCY_CRUISER_METADATA_INTERPRETATION",
+    "PERSISTENT_OR_CROSS_REVISION_CURRENTNESS",
+    "PROVIDER_QUALIFICATION",
+    "REPOSITORY_WIDE_G4_PASS",
+    "RPH_CONTRACTS_CHECK_TYPES_PROJECT_CLOSURE",
+    "TARGET_SEMANTIC_EQUIVALENCE",
+    "TRANSITIVE_PROVIDER_INSTALLATION_CLOSURE",
+    "WHOLE_APPS_PACKAGES_COMPILER_CLOSURE",
+    "WHOLE_APPS_PACKAGES_PROVIDER_DIFFERENTIAL_CLOSURE"
+  ],
+  "operationVersion": "jan-csaa-run-current-dependency-cruiser-g4-closure/0.1.0",
+  "provider": {
+    "config": {
+      "path": ".dependency-cruiser.cjs",
+      "sha256": "b6ab835ee37df0655d1771051b2da639a4c2576de3bfa3af43c1f8531b624811"
+    },
+    "entry": {
+      "path": "node_modules/dependency-cruiser/bin/dependency-cruise.mjs",
+      "sha256": "cc203df32711a4a0a1fbbba262132ff6dd8074831896013361e6eb69f681f627"
+    },
+    "id": "dependency-cruiser",
+    "inputPaths": [
+      "packages/rph-contracts/src/common.ts",
+      "packages/rph-contracts/src/enums.ts",
+      "packages/rph-contracts/src/envelopes.ts",
+      "packages/rph-contracts/src/errors.ts",
+      "packages/rph-contracts/src/hash.ts",
+      "packages/rph-contracts/src/ids.ts",
+      "packages/rph-contracts/src/index.ts",
+      "packages/rph-contracts/src/messages.ts",
+      "packages/rph-contracts/src/objects.ts",
+      "packages/rph-contracts/src/validate.ts"
+    ],
+    "lock": {
+      "path": "bun.lock",
+      "sha256": "eedb184599be189cac5ad15bd2d54dea4ee1f4ae1e104cd4d213b7d25f88dc52"
+    },
+    "packageManifest": {
+      "path": "node_modules/dependency-cruiser/package.json",
+      "sha256": "b731489b2dad460cadf249696460ab9634002489b04580507bb703b98ab84d20"
+    },
+    "version": "16.10.4"
+  },
+  "resourceGuard": {
+    "admittedContextArtifacts": 38,
+    "admittedContextDirectoryEntries": 109,
+    "admittedManifestDerivedDeclarationRoots": 11,
+    "admittedProviderDependencies": 25,
+    "admittedProviderModules": 10,
+    "admittedSubjectIncludeFilters": 40,
+    "maxContextPopulationRecords": 100000,
+    "maxProcessRssBytes": 6442450944,
+    "maxProviderDependencies": 250000,
+    "maxProviderModules": 25000,
+    "maxRawBytes": 268435456,
+    "memoryCheckpointState": "WITHIN_BOUND_AT_ALL_OPERATION_CHECKPOINTS",
+    "rawBytes": 20684
+  },
+  "reviewedBaseline": {
+    "baseDifferentialDigest": "ee28cb7b72ddf76651da24ec675a701a69917d2afb532cfa3a81849fa14856ea",
+    "expectedClosureDigest": "951c6e3c623feaa898824cf37bb129c633982f688b409f3d985ad2998400d648",
+    "state": "EXACT_MATCH"
+  },
+  "schemaVersion": "jan-csaa-current-dependency-cruiser-g4-closure-evidence/0.1.0",
+  "semanticSnapshot": {
+    "contextDigest": "07747889b6007eb42d17b4b675e2c71dfc1018a064efda05791e63121ffbc651",
+    "declarationContext": {
+      "authority": "CONTEXT_ONLY",
+      "currentness": "NOT_RECHECKED_AFTER_PROVIDER",
+      "manifestDerivedRoots": 11,
+      "source": "CAPTURED_WORKSPACE_MANIFEST_EXPORTS_TYPES"
+    },
+    "id": "static:ts-snapshot-227defa5029bfa07ba6ec27e0cea863fea78ae455e85bbfa7947c53f942fd024",
+    "moduleResolutions": 34,
+    "projectionBoundary": "EXACT_RPH_CONTRACTS_BUILD_ROOT_FILE_PERIMETER",
+    "sources": 259,
+    "validationState": "VALID"
+  },
+  "subject": {
+    "artifacts": 78,
+    "contextArtifacts": 38,
+    "contextConfigurations": 25,
+    "contextWorkspaceManifests": 13,
+    "dirtyState": "UNKNOWN",
+    "populationReconciles": true,
+    "projectPaths": [
+      "packages/rph-contracts/tsconfig.build.json"
+    ],
+    "projects": 1,
+    "sourceIncludeFilters": [
+      "packages/rph-contracts/src/**"
+    ],
+    "subjectId": "7965eaff3fa9729bca2a3f76388da4518f2b40e73008dba92306399929b91ac9",
+    "workspaces": 13
+  },
+  "wireShape": "CLOSED_EXACT"
+}

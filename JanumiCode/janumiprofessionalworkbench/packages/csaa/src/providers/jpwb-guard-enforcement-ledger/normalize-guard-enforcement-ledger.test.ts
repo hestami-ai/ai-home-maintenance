@@ -838,4 +838,34 @@ describe('normalizeGuardEnforcementLedgerObservation', () => {
 		nonCanonical.subjectId = 1n;
 		expect(validateGuardEnforcementLedgerObservation(nonCanonical).state).toBe('INVALID');
 	});
+
+	it('classifies nested non-plain containers and subject-bound artifact-set failures', () => {
+		const nonPlain = structuredClone(
+			normalizeGuardEnforcementLedgerObservation(normalizationInput())
+		);
+		Object.setPrototypeOf(nonPlain.limitations[0]!, { hostile: true });
+		expect(validateGuardEnforcementLedgerObservation(nonPlain)).toMatchObject({
+			issues: [{ code: 'SHAPE_INVALID' }],
+			state: 'INVALID'
+		});
+
+		const unsupportedArtifactSet = structuredClone(
+			normalizeGuardEnforcementLedgerObservation(normalizationInput())
+		);
+		(
+			unsupportedArtifactSet.artifactSet as unknown as {
+				schemaVersion: string;
+			}
+		).schemaVersion = 'unsupported';
+		expect(validateGuardEnforcementLedgerObservation(unsupportedArtifactSet)).toMatchObject({
+			issues: [{ code: 'ARTIFACT_SET_INVALID', path: '$.artifactSet' }],
+			state: 'INVALID'
+		});
+
+		const subjectBound = normalizeGuardEnforcementLedgerObservation(normalizationInput());
+		expect(validateGuardEnforcementLedgerObservation(subjectBound, {} as never)).toMatchObject({
+			issues: [{ code: 'SUBJECT_MISMATCH', path: '$.artifactSet' }],
+			state: 'INVALID'
+		});
+	});
 });

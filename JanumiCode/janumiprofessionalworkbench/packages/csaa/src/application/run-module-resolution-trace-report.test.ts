@@ -26,6 +26,8 @@ import {
 import {
 	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_NONCLAIMS,
 	MODULE_RESOLUTION_TRACE_REPORT_PROGRESS_SCHEMA_VERSION,
+	admitModuleResolutionTraceReportRequest,
+	captureModuleResolutionTraceReportPipeline,
 	moduleResolutionTraceReportExitCode,
 	runModuleResolutionTraceReport,
 	type ModuleResolutionTraceReportProgressEvent
@@ -500,5 +502,285 @@ describe('runModuleResolutionTraceReport', () => {
 		});
 		expect(failed).toMatchObject({ code: 'REPOSITORY_ROOT_UNAVAILABLE', state: 'failed' });
 		expect(moduleResolutionTraceReportExitCode(failed)).toBe(4);
+	});
+
+	it('admits an exact request and rejects malformed scalar, path, and project-list boundaries', () => {
+		const selected = fixture();
+		const base = request(selected);
+		const admitted = admitModuleResolutionTraceReportRequest(base);
+		expect(admitted.outcome).toBe('admitted');
+		if (admitted.outcome !== 'admitted') throw new Error(JSON.stringify(admitted));
+		expect(admitted.request).not.toBe(base);
+		expect(admitted.request).toEqual(base);
+		expect(Object.isFrozen(admitted.request)).toBe(true);
+
+		const inherited = Object.assign(Object.create({ inherited: true }) as object, base);
+		const nonEnumerable = { ...base };
+		Object.defineProperty(nonEnumerable, 'packageName', {
+			enumerable: false,
+			value: base.packageName
+		});
+		const wrongProjectPrototype = ['tsconfig.json'];
+		Object.setPrototypeOf(wrongProjectPrototype, null);
+		const sparseProjects: string[] = [];
+		sparseProjects.length = 1;
+		const nonEnumerableProject = ['tsconfig.json'];
+		Object.defineProperty(nonEnumerableProject, '0', {
+			enumerable: false,
+			value: 'tsconfig.json'
+		});
+
+		const cases: readonly {
+			readonly code: string;
+			readonly path: string;
+			readonly state?: 'incompatible' | 'resource-refused';
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: null },
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: inherited },
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: { ...base, unexpected: true } },
+			{
+				code: 'REQUEST_SHAPE_INVALID',
+				path: '$.packageName',
+				value: nonEnumerable
+			},
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				path: '$.budgets.maxResultBytes',
+				value: { ...base, budgets: { ...base.budgets, maxResultBytes: 0 } }
+			},
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				path: '$.schemaVersion',
+				value: { ...base, schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				path: '$.operationVersion',
+				value: { ...base, operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				path: '$.importer.logicalPath',
+				value: { ...base, importer: { ...base.importer, logicalPath: '' } }
+			},
+			{
+				code: 'REQUEST_PATH_BUDGET_EXCEEDED',
+				path: '$.importer.logicalPath',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						semantic: { ...base.budgets.semantic, maxPathCharacters: 1 }
+					}
+				}
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				path: '$.importer.logicalPath',
+				value: { ...base, importer: { ...base.importer, logicalPath: 'bad*path.ts' } }
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				path: '$.importer.logicalPath',
+				value: { ...base, importer: { ...base.importer, logicalPath: '../escape.ts' } }
+			},
+			{
+				code: 'REQUEST_IMPORTER_INVALID',
+				path: '$.importer.specifierNodeStart',
+				value: { ...base, importer: { ...base.importer, specifierNodeStart: -1 } }
+			},
+			{
+				code: 'REQUEST_PACKAGE_INVALID',
+				path: '$.packageName',
+				value: { ...base, packageName: '' }
+			},
+			{
+				code: 'REQUEST_PACKAGE_INVALID',
+				path: '$.packageName',
+				value: { ...base, packageName: '../target' }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: wrongProjectPrototype }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: [] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_BUDGET_EXCEEDED',
+				path: '$.subjectProjectConfigPaths',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						subject: { ...base.budgets.subject, maxProjects: 1 }
+					},
+					subjectProjectConfigPaths: ['tsconfig.json', 'packages/consumer/tsconfig.json']
+				}
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: sparseProjects }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths[0]',
+				value: { ...base, subjectProjectConfigPaths: nonEnumerableProject }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...base, subjectProjectConfigPaths: ['tsconfig.json', 'tsconfig.json'] }
+			}
+		];
+
+		for (const malformed of cases) {
+			const admission = admitModuleResolutionTraceReportRequest(malformed.value);
+			expect(admission, malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'rejected',
+				path: malformed.path,
+				state: malformed.state ?? 'incompatible'
+			});
+		}
+	});
+
+	it(
+		'captures exact predecessor identity for a same-process successor and preserves unavailable terminals',
+		{ timeout: 120_000 },
+		() => {
+			const selected = fixture();
+			const captured = captureModuleResolutionTraceReportPipeline(request(selected), {
+				repositoryRoot: selected.root
+			});
+			expect(captured.outcome).toBe('captured');
+			if (captured.outcome !== 'captured') throw new Error(JSON.stringify(captured));
+			expect(Object.isFrozen(captured)).toBe(true);
+			expect(captured.repositoryRoot).toBe(selected.root);
+			expect(captured.semanticSnapshot.subjectId).toBe(captured.frozenSubject.descriptor.subjectId);
+			expect(captured.projectContextGraph.subjectId).toBe(
+				captured.frozenSubject.descriptor.subjectId
+			);
+			expect(captured.conditionalExportResolution.subjectId).toBe(
+				captured.frozenSubject.descriptor.subjectId
+			);
+			expect(captured.moduleResolutionTrace.subjectId).toBe(
+				captured.frozenSubject.descriptor.subjectId
+			);
+			expect(captured.predecessorStageOutcomes).toMatchObject({
+				conditionalExport: { outcome: 'partial' },
+				moduleResolutionTrace: { outcome: 'partial' },
+				projectContext: { outcome: 'partial' },
+				semanticSnapshot: { outcome: expect.stringMatching(/^(?:complete|partial)$/u) },
+				subject: { outcome: 'resolved' }
+			});
+
+			const unavailable = captureModuleResolutionTraceReportPipeline(
+				request(selected, { subjectProjectConfigPaths: ['missing.json'] }),
+				{ repositoryRoot: selected.root }
+			);
+			expect(unavailable).toMatchObject({
+				code: 'PROJECT_PATH_INVALID',
+				outcome: 'unavailable',
+				stage: 'SUBJECT',
+				state: 'incompatible'
+			});
+		}
+	);
+
+	it(
+		'refuses bounded subject, project-context, and trace construction without partial evidence',
+		{ timeout: 120_000 },
+		() => {
+			const selected = fixture();
+			const base = request(selected);
+			const cases = [
+				{
+					budgets: {
+						...base.budgets,
+						subject: { ...base.budgets.subject, maxFiles: 1 }
+					},
+					code: 'SUBJECT_RESOURCE_REFUSED',
+					stage: 'SUBJECT'
+				},
+				{
+					budgets: {
+						...base.budgets,
+						projectContext: { ...base.budgets.projectContext, maxSources: 0 }
+					},
+					code: 'PROJECT_CONTEXT_UNAVAILABLE',
+					stage: 'PROJECT_CONTEXT'
+				},
+				{
+					budgets: {
+						...base.budgets,
+						conditionalExport: { ...base.budgets.conditionalExport, maxAstNodes: 1 }
+					},
+					code: 'CONDITIONAL_EXPORT_UNAVAILABLE',
+					stage: 'CONDITIONAL_EXPORT'
+				},
+				{
+					budgets: {
+						...base.budgets,
+						moduleResolutionTrace: {
+							...base.budgets.moduleResolutionTrace,
+							maxAstNodes: 1
+						}
+					},
+					code: 'MODULE_RESOLUTION_TRACE_UNAVAILABLE',
+					stage: 'MODULE_RESOLUTION_TRACE'
+				}
+			] as const;
+
+			for (const bounded of cases) {
+				const outcome = runModuleResolutionTraceReport(
+					request(selected, { budgets: bounded.budgets }),
+					{ repositoryRoot: selected.root }
+				);
+				expect(outcome, bounded.stage).toMatchObject({
+					code: bounded.code,
+					outcome: 'unavailable',
+					stage: bounded.stage,
+					state: 'resource-refused'
+				});
+				if (outcome.outcome === 'unavailable') {
+					expect(outcome.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+						'BUDGET_EXCEEDED'
+					);
+				}
+			}
+		}
+	);
+
+	it('fails closed for directory project selectors and contains rejected progress observers', async () => {
+		const selected = fixture();
+		const directory = runModuleResolutionTraceReport(
+			request(selected, { subjectProjectConfigPaths: ['packages'] }),
+			{ repositoryRoot: selected.root }
+		);
+		expect(directory).toMatchObject({
+			code: 'PROJECT_PATH_INVALID',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const rejectedObserver = runModuleResolutionTraceReport(null, {
+			onProgress: () => Promise.reject(new Error('observer failure')),
+			repositoryRoot: selected.root
+		});
+		expect(rejectedObserver).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST'
+		});
+		await Promise.resolve();
 	});
 });

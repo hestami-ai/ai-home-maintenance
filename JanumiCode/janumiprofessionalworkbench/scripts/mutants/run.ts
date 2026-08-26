@@ -10,14 +10,19 @@
 // specifier to `src`, so no rebuild is needed and the trap cannot recur here BY CONSTRUCTION rather than by
 // remembering.
 //
-// SAFETY. The file is restored in a `finally`, and the run ABORTS if `git status --porcelain` is not clean at
-// the end — a mutation harness that leaves a mutant behind is worse than none, and one of the review agents in
-// this repo did exactly that mid-run.
+// SAFETY. The file is restored in a `finally`, and the run ABORTS unless the tracked worktree matches the exact
+// staged index baseline at every checkpoint — a mutation harness that leaves a mutant behind is worse than none,
+// and one of the review agents in this repo did exactly that mid-run.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
+import {
+	captureMutationTreeBaseline,
+	mutationTreeMatchesBaseline,
+	type MutationTreeBaseline
+} from './tree-baseline.js';
 import { gradeControl, gradeNamedVictim, nonCompletion } from './verdict.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -134,7 +139,7 @@ const sh = (
 		// failure would be LOUD (`ENOENT` through `nonCompletion`) rather than silent. Dropping the shell also
 		// removes an interpolation layer from every path this runner passes.
 		maxBuffer: 64 * 1024 * 1024,
-		env: { ...process.env, ...env },
+		env: { ...process.env, ...env }
 		// ⚠ NO `maxBuffer` HERE, AND ITS ABSENCE IS DELIBERATE (REG-F-168). I added `maxBuffer: 64MB` as the fix
 		// for the truncation described below, then DROVE it: **it changed nothing.** Measured under Bun, same
 		// child, all four combinations:
@@ -149,29 +154,16 @@ const sh = (
 	});
 
 /**
- * Is the working tree free of MODIFICATIONS? The harness must never leave a mutant behind.
- *
- * `--untracked-files=no` deliberately. What this guard exists to catch is a leaked mutation, and a mutation is always
- * an edit to an existing tracked file — the runner reads `m.file` before it writes, so it cannot create one. Counting
- * untracked files as dirt therefore blocks nothing dangerous and blocks something ordinary: adding a test in the same
- * change as the mutant that proves it. That is a bad trade, because a harness which refuses to run until the tree is
- * pristine is a harness that gets run less often, and this one earns its keep by being run.
- */
-/**
  * The paths cleanliness is judged over: the three source trees, PLUS every directory a declared mutant actually
  * targets — DERIVED from the ledger rather than listed.
  *
  * ⚠ THE HARDCODED LIST HAD A HOLE AND WIDENING IT BY HAND WOULD HAVE BEEN THE WRONG FIX. `scripts` was absent, so
  * a mutant declared against the runner or the ledger could leak and nothing would notice. But simply adding
- * `scripts` would forbid running the harness while a NEW ledger entry is uncommitted — and that is the workflow
- * that found REG-F-097 (a run over an edited ledger reported the NO_COMPILE that exposed the missing type gate).
+ * `scripts` would forbid running the harness while a NEW ledger entry is unstaged — and that is the workflow that
+ * found REG-F-097 (a run over an edited ledger reported the NO_COMPILE that exposed the missing type gate).
  * Deriving from `m.file` gets both: no mutant target can be outside the check, and a directory nothing mutates
- * imposes nothing — but it is no longer free. RE-MEASURED at HEAD: five entries target `scripts/mutants/measured.ts`
- * (four from REG-F-116, one from REG-F-120), so since 2026-08-12 `scripts` IS in the derived set and a run over an
- * UNCOMMITTED ledger or runner edit now aborts at `treeIsClean`. That is the price of closing the leak hole; do NOT
- * re-hardcode the three trees to buy the workflow back. ⚠ The trigger test this paragraph used to state was itself
- * mis-specified — nothing targets `run.ts`, the widening came from a SIBLING in the same tree, so a reader applying
- * that test literally would have re-confirmed the stale sentence forever.
+ * imposes nothing. A deliberately STAGED ledger or runner edit is now part of the exact index baseline and is safe
+ * to measure; an unstaged edit still aborts. Do NOT re-hardcode the three trees to buy an unstaged workflow back.
  */
 const CLEANLINESS_PATHS = [
 	...new Set([
@@ -182,9 +174,21 @@ const CLEANLINESS_PATHS = [
 	])
 ];
 
+let mutationTreeBaseline: MutationTreeBaseline | null = null;
+
+/**
+ * Does the tracked worktree still equal the exact index captured before the run?
+ *
+ * This deliberately admits a fully staged candidate: every mutation becomes an UNSTAGED delta against that index,
+ * normal restoration writes the captured candidate bytes, and crash recovery checks the target out FROM THE INDEX.
+ * The index-entry fingerprint also makes concurrent staging fail closed rather than silently changing the subject.
+ * Untracked files remain outside the check because declared mutants can only edit an existing tracked target.
+ */
 function treeIsClean(): boolean {
-	const r = sh('git', ['status', '--porcelain', '--untracked-files=no', '--', ...CLEANLINESS_PATHS]);
-	return (r.stdout ?? '').trim() === '';
+	return (
+		mutationTreeBaseline !== null &&
+		mutationTreeMatchesBaseline(sh, CLEANLINESS_PATHS, mutationTreeBaseline)
+	);
 }
 
 /**
@@ -500,7 +504,12 @@ function jsonReportFor(m: DeclaredMutant): string | undefined {
  * part: `gradeControl` is pure so fixtures can enter the arms no healthy run can reach.
  */
 function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
-	const { verdict, detail } = gradeControl(passed, failedFiles(CONTROL_REPORT), baseline, m.expectSurvive ?? '');
+	const { verdict, detail } = gradeControl(
+		passed,
+		failedFiles(CONTROL_REPORT),
+		baseline,
+		m.expectSurvive ?? ''
+	);
 	return { mutant: m, verdict, detail };
 }
 
@@ -688,7 +697,8 @@ function gradeRunOutcome({ m, run, out, target, unnamed, baselineGreen }: GradeI
 	// runner stating a finding about the guard on the strength of a process that never reported a test result.
 	// This is REG-F-116's rule applied to the fields it did not reach: a non-measurement must say so.
 	const incomplete = nonCompletion(run);
-	if (incomplete !== null) return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
+	if (incomplete !== null)
+		return { mutant: m, verdict: 'INCONCLUSIVE', detail: incomplete, victims };
 	if (m.expectSurvive !== undefined) return controlVerdict(m, run.status === 0);
 	if (unnamed)
 		return {
@@ -697,7 +707,12 @@ function gradeRunOutcome({ m, run, out, target, unnamed, baselineGreen }: GradeI
 			detail: summarise(out),
 			victims
 		};
-	const graded = gradeNamedVictim(baselineGreen, run.status === 0, target.join(', '), summarise(out));
+	const graded = gradeNamedVictim(
+		baselineGreen,
+		run.status === 0,
+		target.join(', '),
+		summarise(out)
+	);
 	return { mutant: m, verdict: graded.verdict, detail: graded.detail, victims };
 }
 
@@ -1005,10 +1020,12 @@ const errorLines = (s: string): string =>
 // spelling of ESC that escapes the rule — it checks the raw character, `\x…` and `\u…` alike. Measured against the
 // installed rule source, not assumed.
 const summarise = (s: string): string =>
-	(s
-		.split('\n')
-		.filter((l) => l.includes('Tests '))
-		.at(-1) ?? '')
+	(
+		s
+			.split('\n')
+			.filter((l) => l.includes('Tests '))
+			.at(-1) ?? ''
+	)
 		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
 		.trim();
 
@@ -1035,8 +1052,12 @@ function recoverAbandonedMutant(): void {
 
 recoverAbandonedMutant();
 
+mutationTreeBaseline = captureMutationTreeBaseline(sh, CLEANLINESS_PATHS);
+
 if (!treeIsClean()) {
-	console.error('ABORT: working tree is not clean — refusing to mutate over uncommitted changes.');
+	console.error(
+		'ABORT: tracked worktree does not match a stable staged index baseline — refusing to mutate.'
+	);
 	process.exit(2);
 }
 
@@ -1096,8 +1117,8 @@ for (const m of selected) {
 		console.error(
 			[
 				'',
-				'ABORTED: the tree went dirty mid-run. Nothing after this point was measured.',
-				'Restore with `git checkout -- packages`, then re-run with NOTHING else touching the tree —',
+				'ABORTED: the tracked worktree or index changed mid-run. Nothing after this point was measured.',
+				'Restore the intended staged baseline, then re-run with NOTHING else touching the tree —',
 				'in particular, never run a manual mutation while a full run is in flight.'
 			].join('\n')
 		);
@@ -1106,7 +1127,9 @@ for (const m of selected) {
 }
 
 if (!treeIsClean()) {
-	console.error('\nFAIL: the working tree is DIRTY after the run — a mutant was left behind.');
+	console.error(
+		'\nFAIL: the tracked worktree or index differs from the staged baseline after the run.'
+	);
 	process.exit(2);
 }
 
@@ -1226,7 +1249,12 @@ console.log(
 
 // INCONCLUSIVE prints WITH the failures, and the ordering is deliberate: it is listed LAST so that a run which is
 // partly unmeasured cannot be skimmed as if the measured part were the whole story.
-for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE'), ...by('INCONCLUSIVE')])
+for (const r of [
+	...by('SURVIVED'),
+	...by('UNANCHORED'),
+	...by('NO_COMPILE'),
+	...by('INCONCLUSIVE')
+])
 	console.log(
 		`\n${r.verdict}: ${r.mutant.id}\n  guard: ${r.mutant.why}\n  from:  ${r.mutant.source}\n  ${r.detail}`
 	);

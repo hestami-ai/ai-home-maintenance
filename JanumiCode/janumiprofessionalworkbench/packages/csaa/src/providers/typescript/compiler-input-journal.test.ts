@@ -32,6 +32,7 @@ import {
 	CompilerInputJournal,
 	LiveCompilerInputReader,
 	ReplayCompilerInputJournal,
+	assertVerifiedCompilerCaptureSnapshotBinding,
 	createVerifiedCompilerProjectInputLookup,
 	createVerifiedCompilerProjectInputLookupSet,
 	exactVerifiedCompilerInputQueryBucketEntry,
@@ -939,10 +940,10 @@ describe('sealed capture, freshness, and replay', () => {
 			captured.bytes === undefined
 		)
 			throw new Error('Expected exact virtual-source capture.');
-		expect(captured.bytes.byteLength).toBe(captured.observation.transformation.virtual.contentBytes);
-		expect(sha256(captured.bytes)).toBe(
-			captured.observation.transformation.virtual.contentSha256
+		expect(captured.bytes.byteLength).toBe(
+			captured.observation.transformation.virtual.contentBytes
 		);
+		expect(sha256(captured.bytes)).toBe(captured.observation.transformation.virtual.contentSha256);
 		expect(Object.isFrozen(captured.observation.transformation)).toBe(true);
 		expect(Object.isFrozen(captured.observation.transformation.sourceMap)).toBe(true);
 		const verified = recheckCompilerInputJournal(exact.finalize());
@@ -962,10 +963,7 @@ describe('sealed capture, freshness, and replay', () => {
 			bytes: Buffer.byteLength(changed),
 			sha256: sha256(changed)
 		};
-		attachFrozenSubjectBytes(
-			driftFrozen,
-			new Map([[path, new TextEncoder().encode(changed)]])
-		);
+		attachFrozenSubjectBytes(driftFrozen, new Map([[path, new TextEncoder().encode(changed)]]));
 		expectCode(
 			() => recheckCompilerInputJournal(driftFinalized),
 			CompilerInputCaptureError,
@@ -990,7 +988,9 @@ describe('sealed capture, freshness, and replay', () => {
 		)
 			throw new Error('Expected stored virtual-source evidence.');
 		const transformation = structuredClone(entry.observation.transformation);
-		(transformation.sourceMap as { canonicalJsonSha256: string }).canonicalJsonSha256 = '0'.repeat(64);
+		(transformation.sourceMap as { canonicalJsonSha256: string }).canonicalJsonSha256 = '0'.repeat(
+			64
+		);
 		const { id: _oldId, resultDigest: _oldResultDigest, ...observationCore } = entry.observation;
 		type VirtualObservation = Extract<
 			CompilerInputObservation,
@@ -3312,9 +3312,597 @@ describe('compiler-input defensive closure', () => {
 		exercise('ABSENT');
 		exercise('DIRECTORY');
 	});
+
+	it('fails closed on corrupt intrinsic collection and authority operations at the finalized boundary', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const query = { logicalPath: 'missing.ts', operation: 'FILE_EXISTS' as const };
+		const attempt = () => {
+			const value = session(root, frozen);
+			value.capture(query);
+			return value;
+		};
+		const reject = (
+			value: ReturnType<typeof attempt>,
+			restore: () => void,
+			code: CompilerInputCaptureError['code'] = 'INVALID_CAPTURE'
+		): void => {
+			try {
+				expectCode(() => value.finalize(), CompilerInputCaptureError, code);
+			} finally {
+				restore();
+			}
+		};
+
+		const nonArrayAttempt = attempt();
+		const nonArray = vi.spyOn(Array, 'isArray').mockReturnValueOnce(false);
+		reject(nonArrayAttempt, () => nonArray.mockRestore());
+
+		const wrongPrototypeAttempt = attempt();
+		const getPrototypeOf = Object.getPrototypeOf.bind(Object);
+		const wrongPrototype = vi
+			.spyOn(Object, 'getPrototypeOf')
+			.mockImplementation((value) => (Array.isArray(value) ? null : getPrototypeOf(value)));
+		reject(wrongPrototypeAttempt, () => wrongPrototype.mockRestore());
+
+		const oversizedLengthAttempt = attempt();
+		const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor.bind(Object);
+		const oversizedLength = vi
+			.spyOn(Object, 'getOwnPropertyDescriptor')
+			.mockImplementation((value, key) => {
+				const descriptor = getOwnPropertyDescriptor(value, key);
+				return Array.isArray(value) && key === 'length' && descriptor !== undefined
+					? { ...descriptor, value: BUDGETS.maxCompilerQueries + 1 }
+					: descriptor;
+			});
+		reject(oversizedLengthAttempt, () => oversizedLength.mockRestore(), 'BUDGET_EXCEEDED');
+
+		const expandoAttempt = attempt();
+		const ownKeys = Reflect.ownKeys.bind(Reflect);
+		const expando = vi
+			.spyOn(Reflect, 'ownKeys')
+			.mockImplementation((value) =>
+				Array.isArray(value) ? [...ownKeys(value), 'extra'] : ownKeys(value)
+			);
+		reject(expandoAttempt, () => expando.mockRestore());
+
+		const missingElementAttempt = attempt();
+		const missingElement = vi
+			.spyOn(Object, 'getOwnPropertyDescriptor')
+			.mockImplementation((value, key) =>
+				Array.isArray(value) && key === '0' ? undefined : getOwnPropertyDescriptor(value, key)
+			);
+		reject(missingElementAttempt, () => missingElement.mockRestore());
+
+		const inspectionFailureAttempt = attempt();
+		const inspectionFailure = vi.spyOn(Array, 'isArray').mockImplementationOnce(() => {
+			throw new TypeError('injected array inspection failure');
+		});
+		reject(inspectionFailureAttempt, () => inspectionFailure.mockRestore());
+
+		const recordInspectionAttempt = attempt();
+		const recordInspection = vi.spyOn(Object, 'getPrototypeOf').mockImplementation((value) => {
+			if (
+				value !== null &&
+				typeof value === 'object' &&
+				!Array.isArray(value) &&
+				Object.hasOwn(value, 'observation') &&
+				Object.hasOwn(value, 'query')
+			)
+				throw new TypeError('injected record inspection failure');
+			return getPrototypeOf(value);
+		});
+		reject(recordInspectionAttempt, () => recordInspection.mockRestore());
+
+		const byteAttempt = session(root, subject({ 'present.ts': 'export const present = true;\n' }));
+		byteAttempt.capture({ logicalPath: 'present.ts', operation: 'READ_FILE' });
+		const byteInspection = vi.spyOn(Object, 'getPrototypeOf').mockImplementation((value) => {
+			if (value instanceof Uint8Array) throw new TypeError('injected byte inspection failure');
+			return getPrototypeOf(value);
+		});
+		reject(byteAttempt, () => byteInspection.mockRestore());
+
+		const entryFieldsAttempt = attempt();
+		const objectKeys = Object.keys.bind(Object);
+		const extraEntryField = vi.spyOn(Object, 'keys').mockImplementation((value) => {
+			const keys = objectKeys(value);
+			return value !== null &&
+				typeof value === 'object' &&
+				Object.hasOwn(value, 'observation') &&
+				Object.hasOwn(value, 'query')
+				? [...keys, 'extra']
+				: keys;
+		});
+		reject(entryFieldsAttempt, () => extraEntryField.mockRestore());
+
+		const sveltePath = 'src/App.svelte';
+		const svelteAttempt = () => {
+			const value = session(root, subject({ [sveltePath]: '<h1>valid</h1>\n' }));
+			value.capture({ logicalPath: sveltePath, operation: 'READ_FILE' });
+			return value;
+		};
+		const missingTransformationAttempt = svelteAttempt();
+		const missingTransformation = vi
+			.spyOn(Object, 'getOwnPropertyDescriptor')
+			.mockImplementation((value, key) => {
+				const descriptor = getOwnPropertyDescriptor(value, key);
+				return key === 'transformation' &&
+					descriptor !== undefined &&
+					value !== null &&
+					typeof value === 'object' &&
+					Object.hasOwn(value, 'operation')
+					? { ...descriptor, value: undefined }
+					: descriptor;
+			});
+		reject(missingTransformationAttempt, () => missingTransformation.mockRestore());
+
+		const hostileTransformationAttempt = svelteAttempt();
+		const hostileTransformationValue = new Proxy(Object.create(null) as object, {
+			ownKeys: () => {
+				throw new TypeError('injected transformation inspection failure');
+			}
+		});
+		const hostileTransformation = vi
+			.spyOn(Object, 'getOwnPropertyDescriptor')
+			.mockImplementation((value, key) => {
+				const descriptor = getOwnPropertyDescriptor(value, key);
+				return key === 'transformation' &&
+					descriptor !== undefined &&
+					value !== null &&
+					typeof value === 'object' &&
+					Object.hasOwn(value, 'operation')
+					? { ...descriptor, value: hostileTransformationValue }
+					: descriptor;
+			});
+		reject(hostileTransformationAttempt, () => hostileTransformation.mockRestore());
+
+		const originAttempt = attempt();
+		const originInspection = vi
+			.spyOn(originAttempt.paths, 'recordedOrigin')
+			.mockImplementation(() => {
+				throw new TypeError('injected origin inspection failure');
+			});
+		reject(originAttempt, () => originInspection.mockRestore());
+	});
+
+	it('rejects excessive and equal-width wrong query fields before observation', () => {
+		const root = temporaryRoot();
+		const excessive = {
+			a: 1,
+			b: 2,
+			c: 3,
+			d: 4,
+			e: 5,
+			logicalPath: 'missing.ts',
+			operation: 'FILE_EXISTS'
+		};
+		expectCode(
+			() => session(root, subject({})).capture(excessive as unknown as CompilerInputQuery),
+			CompilerInputCaptureError,
+			'INVALID_QUERY'
+		);
+		expectCode(
+			() =>
+				session(root, subject({})).capture({
+					operation: 'FILE_EXISTS',
+					unexpected: 'missing.ts'
+				} as unknown as CompilerInputQuery),
+			CompilerInputCaptureError,
+			'INVALID_QUERY'
+		);
+	});
+
+	it('distinguishes READ_DIRECTORY query buckets by array length and exact UTF-16 value', () => {
+		const base = {
+			depth: null,
+			excludes: [] as readonly string[],
+			extensions: ['.ts'] as readonly string[],
+			includes: ['src/**'] as readonly string[],
+			logicalPath: '.',
+			operation: 'READ_DIRECTORY' as const
+		};
+		expect(
+			exactVerifiedCompilerInputQueryBucketEntry([{ query: base }], {
+				...base,
+				excludes: ['generated/**']
+			})
+		).toBeUndefined();
+		expect(
+			exactVerifiedCompilerInputQueryBucketEntry([{ query: { ...base, excludes: ['a'] } }], {
+				...base,
+				excludes: ['b']
+			})
+		).toBeUndefined();
+	});
+
+	it('fails closed when the injected duration clock throws or returns an invalid value', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const paths = new FrozenCompilerPathResolver(frozen, root, true);
+		const reader = new LiveCompilerInputReader(frozen, paths, true);
+		for (const clock of [
+			() => {
+				throw new Error('injected clock failure');
+			},
+			() => Number.NaN
+		])
+			expectCode(
+				() => new CompilerInputJournal(reader, BUDGETS, 0, clock),
+				CompilerInputCaptureError,
+				'BUDGET_EXCEEDED'
+			);
+	});
+
+	it('fails closed when a mutable metadata limit narrows after minimum observation admission', () => {
+		const root = temporaryRoot();
+		const value = session(root, subject({ 'virtual/inside.ts': 'export {};\n' }));
+		const now = Date.now();
+		let metadataLimitReads = 0;
+		const limits = {
+			allowPresentRead: true,
+			clock: () => now,
+			deadlineMs: now + 10_000,
+			maxDirectoryEntries: BUDGETS.maxDirectoryEntries,
+			maxPathCharacters: BUDGETS.maxPathCharacters,
+			get maxQueryMetadataBytes() {
+				metadataLimitReads += 1;
+				return metadataLimitReads < 3 ? BUDGETS.maxCompilerInputMetadataBytes : 1;
+			},
+			maxReadBytes: BUDGETS.maxContextFileBytes
+		};
+		expectCode(
+			() => value.reader.observe({ logicalPath: 'virtual', operation: 'GET_DIRECTORIES' }, limits),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+		expect(metadataLimitReads).toBe(3);
+	});
+
+	it('contains hostile path-authority classifications during public observation', () => {
+		const specialRoot = temporaryRoot();
+		const special = session(specialRoot, subject({}));
+		vi.spyOn(special.paths, 'toAbsolute').mockReturnValue(
+			process.platform === 'win32' ? '\\\\.\\NUL' : '/dev/null'
+		);
+		expect(
+			special.reader.observe({
+				logicalPath: 'node_modules/pkg/special.d.ts',
+				operation: 'FILE_EXISTS'
+			}).observation
+		).toMatchObject({ result: 'ABSENT' });
+
+		const invalidStat = session(temporaryRoot(), subject({}));
+		vi.spyOn(invalidStat.paths, 'toAbsolute').mockReturnValue('\0');
+		expectCode(
+			() =>
+				invalidStat.reader.observe({
+					logicalPath: 'node_modules/pkg/unreadable.d.ts',
+					operation: 'FILE_EXISTS'
+				}),
+			CompilerInputCaptureError,
+			'CONTEXT_UNAVAILABLE'
+		);
+
+		const boundary = session(temporaryRoot(), subject({}));
+		vi.spyOn(boundary.paths, 'isBoundaryPath').mockReturnValue(true);
+		expectCode(
+			() => boundary.reader.observe({ logicalPath: '.', operation: 'CURRENT_DIRECTORY' }),
+			CompilerInputCaptureError,
+			'INVALID_QUERY'
+		);
+
+		const virtual = session(
+			temporaryRoot(),
+			subject({ 'virtual/inside.ts': 'export const inside = true;\n' })
+		);
+		const virtualChildren = virtual.paths.virtualChildren.bind(virtual.paths);
+		vi.spyOn(virtual.paths, 'virtualChildren').mockImplementation((logicalPath) =>
+			logicalPath === 'virtual'
+				? Object.freeze([Object.freeze({ kind: 'FILE' as const, logicalPath: 'outside.ts' })])
+				: virtualChildren(logicalPath)
+		);
+		expect(
+			virtual.reader.observe({
+				depth: null,
+				excludes: [],
+				extensions: ['.ts'],
+				includes: ['**/*'],
+				logicalPath: 'virtual',
+				operation: 'READ_DIRECTORY'
+			}).observation
+		).toMatchObject({ resultEntries: [], scannedEntries: 1 });
+
+		const liveRoot = temporaryRoot();
+		write(liveRoot, 'node_modules/pkg/index.d.ts', 'export declare const live: true;\n');
+		const live = session(liveRoot, subject({}));
+		const authorize = live.paths.authorizeEnumeratedChild.bind(live.paths);
+		vi.spyOn(live.paths, 'authorizeEnumeratedChild').mockImplementation(
+			(parentLogicalPath, entryName) => {
+				const authorized = authorize(parentLogicalPath, entryName);
+				return parentLogicalPath === 'node_modules/pkg'
+					? Object.freeze({ ...authorized, logicalPath: 'outside/index.d.ts' })
+					: authorized;
+			}
+		);
+		expect(
+			live.reader.observe({
+				depth: null,
+				excludes: [],
+				extensions: ['.d.ts'],
+				includes: ['**/*'],
+				logicalPath: 'node_modules/pkg',
+				operation: 'READ_DIRECTORY'
+			}).observation
+		).toMatchObject({ resultEntries: [], scannedEntries: 1 });
+
+		const invalidRealpath = session(liveRoot, subject({}));
+		const toAbsolute = invalidRealpath.paths.toAbsolute.bind(invalidRealpath.paths);
+		let rootResolutions = 0;
+		vi.spyOn(invalidRealpath.paths, 'toAbsolute').mockImplementation((logicalPath) => {
+			if (logicalPath === 'node_modules/pkg' && ++rootResolutions === 2) return '\0';
+			return toAbsolute(logicalPath);
+		});
+		expectCode(
+			() =>
+				invalidRealpath.reader.observe({
+					depth: null,
+					excludes: [],
+					extensions: ['.d.ts'],
+					includes: ['**/*'],
+					logicalPath: 'node_modules/pkg',
+					operation: 'READ_DIRECTORY'
+				}),
+			CompilerInputCaptureError,
+			'CONTEXT_UNAVAILABLE'
+		);
+	});
+
+	it('enforces result-stage directory budgets and deduplicates shared virtual/live children', () => {
+		const limits = (
+			overrides: Partial<{
+				readonly maxDirectoryEntries: number;
+				readonly maxQueryMetadataBytes: number;
+			}> = {}
+		) => ({
+			allowPresentRead: true,
+			deadlineMs: Date.now() + 10_000,
+			maxDirectoryEntries: overrides.maxDirectoryEntries ?? 100,
+			maxPathCharacters: BUDGETS.maxPathCharacters,
+			maxQueryMetadataBytes: overrides.maxQueryMetadataBytes ?? 16_384,
+			maxReadBytes: BUDGETS.maxContextFileBytes
+		});
+		const emptyObservationBytes = (observation: CompilerInputObservation): number =>
+			Buffer.byteLength(
+				canonicalSemanticJson({ ...observation, resultEntries: [], scannedEntries: 0 }),
+				'utf8'
+			);
+
+		const scanRoot = temporaryRoot();
+		const scanFiles = Object.fromEntries(
+			Array.from({ length: 10 }, (_, index) => [`scan/file-${String(index)}.ts`, 'export {};\n'])
+		);
+		const scan = session(scanRoot, subject(scanFiles));
+		const scanQuery = { logicalPath: 'scan', operation: 'GET_DIRECTORIES' as const };
+		const scanBaseline = scan.reader.observe(scanQuery).observation;
+		expectCode(
+			() =>
+				scan.reader.observe(
+					scanQuery,
+					limits({ maxQueryMetadataBytes: emptyObservationBytes(scanBaseline) })
+				),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+		expectCode(
+			() => scan.reader.observe(scanQuery, limits({ maxDirectoryEntries: 0 })),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+
+		const retainRoot = temporaryRoot();
+		const retain = session(retainRoot, subject({ 'retain/sub/file.ts': 'export {};\n' }));
+		const retainQuery = { logicalPath: 'retain', operation: 'GET_DIRECTORIES' as const };
+		const retainBaseline = retain.reader.observe(retainQuery).observation;
+		expectCode(
+			() =>
+				retain.reader.observe(
+					retainQuery,
+					limits({ maxQueryMetadataBytes: emptyObservationBytes(retainBaseline) })
+				),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+
+		const sharedRoot = temporaryRoot();
+		const workspacePath = 'packages/good';
+		const workspaceFile = `${workspacePath}/sub/index.ts`;
+		const workspaceSource = 'export const workspace = true;\n';
+		write(sharedRoot, workspaceFile, workspaceSource);
+		mkdirSync(join(sharedRoot, 'node_modules/@fixture'), { recursive: true });
+		symlinkSync(
+			join(sharedRoot, ...workspacePath.split('/')),
+			join(sharedRoot, 'node_modules/@fixture/pkg'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+		const workspace = {
+			exports: [],
+			kind: 'PACKAGE',
+			manifestPath: `${workspacePath}/package.json`,
+			name: '@fixture/pkg',
+			path: workspacePath,
+			private: true,
+			provenance: [],
+			workspacePatterns: []
+		} as FrozenSubject['workspaces'][number];
+		const shared = session(
+			sharedRoot,
+			subject({ [workspaceFile]: workspaceSource }, { workspaces: [workspace] })
+		);
+		expect(
+			shared.reader.observe({
+				logicalPath: 'node_modules/@fixture/pkg',
+				operation: 'GET_DIRECTORIES'
+			}).observation
+		).toMatchObject({ resultEntries: ['node_modules/@fixture/pkg/sub'], scannedEntries: 2 });
+	});
+
+	it('maps Svelte transform budget and malformed-byte failures to journal error codes', () => {
+		const root = temporaryRoot();
+		const logicalPath = 'src/App.svelte';
+		const bounded = session(root, subject({ [logicalPath]: '<h1>valid</h1>\n' }));
+		expectCode(
+			() =>
+				bounded.reader.observe(
+					{ logicalPath, operation: 'READ_FILE' },
+					{
+						allowPresentRead: true,
+						deadlineMs: Date.now() + 10_000,
+						maxDirectoryEntries: 100,
+						maxPathCharacters: logicalPath.length,
+						maxQueryMetadataBytes: 16_384,
+						maxReadBytes: 16_384
+					}
+				),
+			CompilerInputCaptureError,
+			'BUDGET_EXCEEDED'
+		);
+
+		const malformed = subject({ [logicalPath]: 'x' });
+		const invalidBytes = Uint8Array.of(0xff);
+		const artifact = malformed.artifacts[0] as unknown as { bytes: number; sha256: string };
+		artifact.bytes = invalidBytes.byteLength;
+		artifact.sha256 = sha256(invalidBytes);
+		attachFrozenSubjectBytes(malformed, new Map([[logicalPath, invalidBytes]]));
+		expectCode(
+			() => session(root, malformed).reader.observe({ logicalPath, operation: 'READ_FILE' }),
+			CompilerInputCaptureError,
+			'CONTEXT_UNAVAILABLE'
+		);
+	});
+
+	it('rejects a self-consistent forged invocation population at finalized validation', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const attempt = session(root, frozen);
+		const query = { logicalPath: 'missing.ts', operation: 'FILE_EXISTS' as const };
+		const authentic = attempt.reader.observe(query);
+		const { id: _id, resultDigest: _resultDigest, ...payload } = authentic.observation;
+		const forgedPayload = {
+			...payload,
+			invocationCount: BUDGETS.maxCompilerQueryInvocations + 1
+		};
+		const resultDigest = compilerInputResultDigest(forgedPayload);
+		const observation = {
+			...forgedPayload,
+			id: semanticContextInputId({
+				...forgedPayload,
+				resultDigest,
+				subjectId: frozen.descriptor.subjectId
+			}),
+			resultDigest
+		} as CompilerInputObservation;
+		vi.spyOn(attempt.reader, 'observe').mockReturnValue({ ...authentic, observation });
+		attempt.capture(query);
+		expectCode(() => attempt.finalize(), CompilerInputCaptureError, 'BUDGET_EXCEEDED');
+	});
+
+	it('binds verified snapshots to exact subject capabilities, closures, and program contexts', () => {
+		const root = temporaryRoot();
+		const frozen = subject({});
+		const capture = session(root, frozen);
+		capture.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		const verified = recheckCompilerInputJournal(capture.finalize());
+		const snapshot = {
+			compilerInputs: verified.observations,
+			contextDigest: verified.closureDigest,
+			subjectId: frozen.descriptor.subjectId
+		};
+		expect(() =>
+			assertVerifiedCompilerCaptureSnapshotBinding(frozen, verified, snapshot)
+		).not.toThrow();
+		expectCode(
+			() => assertVerifiedCompilerCaptureSnapshotBinding(subject({}), verified, snapshot),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+		expectCode(
+			() =>
+				assertVerifiedCompilerCaptureSnapshotBinding(frozen, verified, {
+					...snapshot,
+					contextDigest: 'f'.repeat(64)
+				}),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+
+		const attribution = verified.projectAttributions[0]!;
+		expectCode(
+			() =>
+				createVerifiedCompilerProjectInputLookup(frozen, verified, {
+					...snapshot,
+					configPath: PROJECT_KEY,
+					contextInputIds: attribution.contextInputIds,
+					materializedRecipeDigest: attribution.materializedRecipeDigest,
+					programContextDigest: 'e'.repeat(64),
+					projectResolutionDigest: capture.recipe.projectResolutionDigest
+				}),
+			CompilerInputCaptureError,
+			'INVALID_CAPTURE'
+		);
+	});
+
+	it('rethrows an unknown alias-topology failure after validated recheck admission', () => {
+		const root = temporaryRoot();
+		const capture = session(root, subject({}));
+		capture.capture({ logicalPath: 'missing.ts', operation: 'FILE_EXISTS' });
+		const finalized = capture.finalize();
+		const sentinel = new Error('injected alias topology failure');
+		vi.spyOn(capture.paths, 'assertWorkspaceAliasTopologyUnchanged').mockImplementation(() => {
+			throw sentinel;
+		});
+		expect(() => recheckCompilerInputJournal(finalized)).toThrow(sentinel);
+	});
 });
 
 describe('compiler-input operation budget witnesses', () => {
+	it('orders multiple directory contributions in exact CAPTURE budget evidence', () => {
+		const root = temporaryRoot();
+		const frozen = subject({
+			'a/inside.ts': 'export const a = true;\n',
+			'b/inside.ts': 'export const b = true;\n'
+		});
+		const startedAtMs = Date.now();
+		const capture = session(root, frozen, true, BUDGETS, startedAtMs, () => startedAtMs);
+		for (const logicalPath of ['b', 'a'])
+			capture.capture({ logicalPath, operation: 'GET_DIRECTORIES' });
+		const finalized = capture.finalize();
+		const operation = createStaticSemanticOperationBudgetSession(
+			BUDGETS,
+			startedAtMs,
+			() => startedAtMs
+		);
+		const binding = operation.providerBinding();
+		const evidence = takeCompilerInputOperationBudgetWitness(
+			issueFrozenCompilerCaptureOperationBudgetWitness(binding, finalized),
+			binding,
+			'CAPTURE',
+			sha256(canonicalSemanticJson(normalizeSemanticBudgets(BUDGETS)))
+		);
+		const directoryClaim = evidence.populationClaims.find(
+			(claim) => claim.population === 'DIRECTORY_ENTRIES'
+		);
+		expect(directoryClaim).toMatchObject({ mode: 'SUM', phase: 'CAPTURE' });
+		if (directoryClaim?.mode !== 'SUM')
+			throw new Error('Expected directory contribution evidence.');
+		expect(directoryClaim.contributions).toHaveLength(2);
+		expect(directoryClaim.contributions.map((contribution) => contribution.amount)).toEqual([1, 1]);
+		expect(directoryClaim.contributions.map((contribution) => contribution.key)).toEqual(
+			[...directoryClaim.contributions]
+				.map((contribution) => contribution.key)
+				.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+		);
+	});
+
 	it('derives exact CAPTURE and RECHECK populations while recording only defensible CAPTURE host multiplicity', () => {
 		const root = temporaryRoot();
 		const contextText = 'export declare const generated: true;\n';

@@ -37,6 +37,10 @@ function report(filePath: string): string {
 	]);
 }
 
+function parsedReport(filePath: string): Array<Record<string, unknown>> {
+	return JSON.parse(report(filePath)) as Array<Record<string, unknown>>;
+}
+
 describe('ESLint machine-output evidence adapter', () => {
 	it('imports a real-small JSON formatter result while retaining only digests for sensitive text', () => {
 		const fixture = providerFixture();
@@ -141,5 +145,95 @@ describe('ESLint machine-output evidence adapter', () => {
 		]);
 		expect(correlation).toMatchObject({ state: 'CONFLICTING' });
 		expect(correlation.conflicts[0]?.providerIds).toEqual(['dependency-cruiser', 'typescript']);
+	});
+
+	it('normalizes error details, optional payloads, and deterministic file order', () => {
+		const fixture = providerFixture();
+		const context = providerContext(fixture.root, fixture.subject, ESLINT_JSON_PROVIDER_ID);
+		const first = parsedReport(join(fixture.root, 'packages/demo/src/index.test.ts'))[0]!;
+		const firstMessage = (first.messages as Array<Record<string, unknown>>)[0]!;
+		Object.assign(firstMessage, {
+			endColumn: 12,
+			endLine: 1,
+			fatal: true,
+			fix: { range: [0, 1], text: '' },
+			messageId: null,
+			nodeType: null,
+			ruleId: null,
+			severity: 2,
+			suggestions: []
+		});
+		Object.assign(first, {
+			errorCount: 1,
+			fatalErrorCount: 1,
+			fixableErrorCount: 1,
+			fixableWarningCount: 0,
+			suppressedMessages: [],
+			usedDeprecatedRules: [],
+			warningCount: 0
+		});
+		const second = parsedReport(join(fixture.root, 'packages/demo/src/index.ts'))[0]!;
+		const result = importEslintJson(JSON.stringify([first, second]), context);
+		expect(result.health).toBe('HEALTHY');
+		expect(result.observations.map((observation) => observation.path)).toEqual([
+			'packages/demo/src/index.test.ts',
+			'packages/demo/src/index.ts'
+		]);
+		expect(result.observations[0]!.messages[0]).toMatchObject({
+			endColumn: 12,
+			endLine: 1,
+			fatal: true,
+			messageId: null,
+			nodeType: null,
+			ruleId: null,
+			severity: 2
+		});
+		expect(result.redactions).toEqual(
+			expect.arrayContaining([
+				'ESLINT_MESSAGE_TEXT_AND_FIX_PAYLOAD',
+				'ESLINT_SOURCE_TEXT',
+				'ESLINT_SUPPRESSED_MESSAGE_PAYLOAD'
+			])
+		);
+	});
+
+	it('refuses hostile text, invalid message fields, duplicate files, and counter overclaims', () => {
+		const fixture = providerFixture();
+		const context = providerContext(fixture.root, fixture.subject, ESLINT_JSON_PROVIDER_ID);
+		const mutateMessage = (field: string, value: unknown): Array<Record<string, unknown>> => {
+			const root = parsedReport(join(fixture.root, 'packages/demo/src/index.ts'));
+			const message = (root[0]!.messages as Array<Record<string, unknown>>)[0]!;
+			message[field] = value;
+			return root;
+		};
+		for (const malformed of [
+			mutateMessage('message', 0),
+			mutateMessage('message', '\u0000'),
+			mutateMessage('message', '\ud800'),
+			mutateMessage('message', '\udc00'),
+			mutateMessage('severity', 3),
+			mutateMessage('fatal', 'yes'),
+			mutateMessage('endLine', 0),
+			mutateMessage('endColumn', 0)
+		])
+			expect(importEslintJson(JSON.stringify(malformed), context).health).toBe('MALFORMED');
+
+		const reversed = mutateMessage('endLine', 1);
+		Object.assign((reversed[0]!.messages as Array<Record<string, unknown>>)[0]!, { endColumn: 7 });
+		expect(importEslintJson(JSON.stringify(reversed), context).health).toBe('MALFORMED');
+		const outside = parsedReport(join(fixture.root, 'packages/demo/src/missing.ts'));
+		expect(importEslintJson(JSON.stringify(outside), context).health).toBe('MALFORMED');
+		const duplicate = parsedReport(join(fixture.root, 'packages/demo/src/index.ts'));
+		duplicate.push({ ...duplicate[0]! });
+		expect(importEslintJson(JSON.stringify(duplicate), context).health).toBe('MALFORMED');
+		for (const field of ['fixableErrorCount', 'fixableWarningCount']) {
+			const overclaim = parsedReport(join(fixture.root, 'packages/demo/src/index.ts'));
+			overclaim[0]![field] = 2;
+			expect(importEslintJson(JSON.stringify(overclaim), context).health).toBe('MALFORMED');
+		}
+		const scalarText = parsedReport(join(fixture.root, 'packages/demo/src/index.ts'));
+		(scalarText[0]!.messages as Array<Record<string, unknown>>)[0]!.message =
+			'Valid scalar pair \ud83d\ude00';
+		expect(importEslintJson(JSON.stringify(scalarText), context).health).toBe('HEALTHY');
 	});
 });

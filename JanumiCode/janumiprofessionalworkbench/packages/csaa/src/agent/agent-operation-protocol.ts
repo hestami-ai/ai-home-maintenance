@@ -25,7 +25,7 @@ export const AGENT_OPERATION_PROTOCOL_SAFETY_CEILINGS = Object.freeze({
 	maxEdges: 5_000_000,
 	maxMessageBytes: 1_048_576,
 	maxNodes: 1_000_000,
-	maxOutputBytes: 16_777_216,
+	maxOutputBytes: 128 * 1024 * 1024,
 	maxReferenceCount: 128,
 	maxResults: 250_000,
 	maxTimeoutMs: 3_600_000
@@ -1503,6 +1503,10 @@ function validateSubjectResolutionErrorCompatibility(
 ): void {
 	const compatible =
 		subjectResolution.kind === 'RESOLVED' ||
+		(subjectResolution.kind === 'NOT_APPLICABLE' &&
+			subjectResolution.reasonCode === 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION' &&
+			(refusal.code === 'CSAA-E-EXECUTION-CANCELLED' ||
+				refusal.code === 'CSAA-E-EXECUTION-TIMED-OUT')) ||
 		((subjectResolution.kind === 'NOT_FOUND' || subjectResolution.kind === 'AMBIGUOUS') &&
 			refusal.code === 'CSAA-E-SUBJECT-UNIDENTIFIED') ||
 		(subjectResolution.kind === 'FORBIDDEN' && refusal.code === 'CSAA-E-AUTH-UNAUTHORIZED') ||
@@ -1692,6 +1696,20 @@ function validateResponseInternal(value: unknown): AgentOperationResponse {
 		const refusal = validateRefusal(inspected.values.get('refusal'));
 		validateSubjectResolutionErrorCompatibility(subjectResolution, refusal);
 		const rule = ERROR_PROTOCOL_RULES[refusal.code];
+		const requiredExecutionHealth =
+			refusal.code === 'CSAA-E-EXECUTION-CANCELLED'
+				? 'cancelled'
+				: refusal.code === 'CSAA-E-EXECUTION-TIMED-OUT'
+					? 'timed-out'
+					: refusal.code === 'CSAA-E-EXECUTION-BUDGET-REFUSED'
+						? 'resource-exhausted'
+						: null;
+		if (requiredExecutionHealth !== null && capability.executionHealth !== requiredExecutionHealth)
+			refuse(
+				'CAPABILITY_INVALID',
+				'VALIDATE_MESSAGE',
+				'The execution refusal conflicts with capability execution health.'
+			);
 		if (
 			inspected.values.get('state') !== rule.state ||
 			inspected.values.get('exitCategory') !== rule.exitCategory
@@ -1781,6 +1799,16 @@ export function validateAgentOperationExchange(
 	return validationOutcome(() => {
 		const request = validateRequestInternal(requestValue);
 		const response = validateResponseInternal(responseValue);
+		if (
+			request.subjectInput.kind === 'RESOLVED_SUBJECT' &&
+			response.subjectResolution.kind === 'NOT_APPLICABLE' &&
+			response.subjectResolution.reasonCode === 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+		)
+			refuse(
+				'EXCHANGE_MISMATCH',
+				'VALIDATE_EXCHANGE',
+				'A caller-resolved subject cannot be reported as interrupted before subject resolution.'
+			);
 		if (
 			response.requestId !== request.requestId ||
 			response.requestDigest !== sha256(canonicalJson(request)) ||

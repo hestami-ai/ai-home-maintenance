@@ -6,7 +6,8 @@ import type {
 } from '../contracts/command-handler-graph.js';
 import type { StaticSemanticSnapshot } from '../contracts/semantic.js';
 import type { FrozenSubject } from '../contracts/subject.js';
-import { compareText } from '../inventory/canonical.js';
+import { compareText, sha256 } from '../inventory/canonical.js';
+import { attachFrozenSubjectBytes, readFrozenSubjectArtifact } from '../subject/frozen-store.js';
 import { buildCommandHandlerGraph } from './build-command-handler-graph.js';
 import { commandHandlerGraphContentDigest } from './command-handler-graph-canonical.js';
 import {
@@ -93,6 +94,43 @@ function expectSnapshotRejected(snapshot: StaticSemanticSnapshot): void {
 		issues: expect.arrayContaining([expect.objectContaining({ code: 'SHAPE_INVALID' })]),
 		state: 'INVALID'
 	});
+}
+
+function frozenSubjectWithArtifactBytes(
+	subject: FrozenSubject,
+	path: string,
+	replacement: Uint8Array
+): FrozenSubject {
+	const artifacts = structuredClone(subject.artifacts);
+	const replaced = artifacts.find((artifact) => artifact.path === path);
+	if (replaced === undefined) throw new Error(`Expected frozen artifact ${path}.`);
+	(replaced as { bytes: number }).bytes = replacement.byteLength;
+	(replaced as { sha256: string }).sha256 = sha256(replacement);
+	const cloned = { ...subject, artifacts } as FrozenSubject;
+	const store = new Map<string, Uint8Array>();
+	for (const artifact of subject.artifacts) {
+		const bytes =
+			artifact.path === path ? replacement : readFrozenSubjectArtifact(subject, artifact.path);
+		if (bytes === undefined) throw new Error(`Expected frozen bytes for ${artifact.path}.`);
+		store.set(artifact.path, bytes);
+	}
+	attachFrozenSubjectBytes(cloned, store);
+	return cloned;
+}
+
+function snapshotWithSourceBytes(
+	snapshot: StaticSemanticSnapshot,
+	path: string,
+	bytes: Uint8Array,
+	textLength: number
+): StaticSemanticSnapshot {
+	const cloned = structuredClone(snapshot) as StaticSemanticSnapshot;
+	const source = cloned.sources.find((candidate) => candidate.logicalPath === path);
+	if (source === undefined) throw new Error(`Expected semantic source ${path}.`);
+	(source as { bytes: number }).bytes = bytes.byteLength;
+	(source as { contentSha256: string }).contentSha256 = sha256(bytes);
+	(source as { textLength: number }).textLength = textLength;
+	return cloned;
 }
 
 describe('command-handler graph validator defensive coverage', () => {
@@ -213,6 +251,19 @@ describe('command-handler graph validator defensive coverage', () => {
 	it('exercises constructed-graph inspection and fail-closed exception paths directly', () => {
 		expect(
 			validateConstructedCommandHandlerGraph(
+				directGraph,
+				direct.snapshot,
+				direct.observation,
+				direct.subject,
+				directGraph.graphInputDigest,
+				null as unknown as CommandHandlerGraphValidationOptions
+			)
+		).toMatchObject({
+			issues: [expect.objectContaining({ code: 'SHAPE_INVALID', path: '$validationOptions' })],
+			state: 'INVALID'
+		});
+		expect(
+			validateConstructedCommandHandlerGraph(
 				'too long',
 				direct.snapshot,
 				direct.observation,
@@ -304,6 +355,23 @@ describe('command-handler graph validator defensive coverage', () => {
 		const danglingReference = structuredClone(direct.snapshot) as StaticSemanticSnapshot;
 		(danglingReference.references[0] as { nodeId: string }).nodeId = 'node:absent';
 		expectSnapshotRejected(danglingReference);
+
+		const site = directGraph.nodes.find((node) => node.kind === 'DECLARED_ARROW_SITE');
+		if (site?.kind !== 'DECLARED_ARROW_SITE' || site.semanticSiteNodeId === null)
+			throw new Error('Expected one semantic arrow-site node.');
+		const semanticSiteNodeId = site.semanticSiteNodeId;
+		const cyclicParent = structuredClone(direct.snapshot) as StaticSemanticSnapshot;
+		const cyclicSiteNode = cyclicParent.astNodes.find((node) => node.id === semanticSiteNodeId);
+		if (cyclicSiteNode === undefined) throw new Error('Expected the semantic arrow-site AST node.');
+		(cyclicSiteNode as { parentId: string }).parentId = cyclicSiteNode.id;
+		expectSnapshotRejected(cyclicParent);
+
+		const absentParent = structuredClone(direct.snapshot) as StaticSemanticSnapshot;
+		const detachedSiteNode = absentParent.astNodes.find((node) => node.id === semanticSiteNodeId);
+		if (detachedSiteNode === undefined)
+			throw new Error('Expected the detached arrow-site AST node.');
+		(detachedSiteNode as { parentId: string }).parentId = 'node:absent';
+		expectSnapshotRejected(absentParent);
 	});
 
 	it('independently rejects malformed registry extraction facts', () => {
@@ -446,6 +514,128 @@ describe('command-handler graph validator defensive coverage', () => {
 		expectSnapshotRejected(mismatchedSource);
 	});
 
+	it('rejects lost frozen-byte capability and handles BOM-marked compiler source encodings', () => {
+		const detachedSubject = {
+			...direct.subject,
+			artifacts: [...direct.subject.artifacts]
+		} as FrozenSubject;
+		expect(
+			validateCommandHandlerGraph(directGraph, direct.snapshot, direct.observation, detachedSubject)
+		).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'SHAPE_INVALID',
+					message: expect.stringContaining('does not match semantic identity')
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const sitePath = direct.observation.declaredSites.find((site) => site.source.path !== null)
+			?.source.path;
+		if (sitePath === null || sitePath === undefined)
+			throw new Error('Expected one path-bound retained arrow site.');
+		for (const [name, bytes, textLength, failure] of [
+			['UTF-16LE odd', Uint8Array.of(0xff, 0xfe, 0x41), 1, 'UTF-16LE source has an odd byte count'],
+			['UTF-16LE', Uint8Array.of(0xff, 0xfe, 0x41, 0x00), 1, null],
+			['UTF-16BE odd', Uint8Array.of(0xfe, 0xff, 0x00), 1, 'UTF-16BE source has an odd byte count'],
+			['UTF-16BE', Uint8Array.of(0xfe, 0xff, 0x00, 0x41), 1, null]
+		] as const) {
+			const snapshot = snapshotWithSourceBytes(direct.snapshot, sitePath, bytes, textLength);
+			const subject = frozenSubjectWithArtifactBytes(direct.subject, sitePath, bytes);
+			const digest = sha256(bytes);
+			const graph = finalized(directGraph, (draft) => {
+				for (const selector of [draft.commandRegistry, draft.handlerRegistry])
+					if (selector.logicalPath === sitePath)
+						(selector as { contentSha256: string }).contentSha256 = digest;
+			});
+			const result = validateCommandHandlerGraph(graph, snapshot, direct.observation, subject);
+			expect(result.state, name).toBe('INVALID');
+			if (failure !== null)
+				expect(result.issues, name).toEqual(
+					expect.arrayContaining([
+						expect.objectContaining({
+							code: 'SHAPE_INVALID',
+							message: expect.stringContaining(failure)
+						})
+					])
+				);
+		}
+	});
+
+	it('rejects duplicate, detached, and non-reproducible observed arrow sites', () => {
+		const duplicateObservation = structuredClone(direct.observation);
+		const observedSite = duplicateObservation.declaredSites[0];
+		if (observedSite === undefined) throw new Error('Expected one declared arrow site.');
+		(
+			duplicateObservation as unknown as {
+				declaredSites: typeof duplicateObservation.declaredSites;
+			}
+		).declaredSites = [...duplicateObservation.declaredSites, structuredClone(observedSite)];
+		const duplicateResult = validateCommandHandlerGraph(
+			directGraph,
+			direct.snapshot,
+			duplicateObservation,
+			direct.subject
+		);
+		expect(duplicateResult).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'SHAPE_INVALID',
+					message: expect.stringContaining('site identities are not unique')
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const detachedObservation = structuredClone(direct.observation);
+		const detachedSite = detachedObservation.declaredSites[0];
+		if (detachedSite === undefined) throw new Error('Expected one detachable arrow site.');
+		(detachedSite.source as { path: null }).path = null;
+		const detachedResult = validateCommandHandlerGraph(
+			directGraph,
+			direct.snapshot,
+			detachedObservation,
+			direct.subject
+		);
+		expect(detachedResult).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: 'REGISTRY_POPULATION_MISMATCH' })
+			]),
+			state: 'INVALID'
+		});
+
+		const tableObservation = structuredClone(direct.observation);
+		const tableSite = tableObservation.declaredSites[0];
+		if (tableSite === undefined) throw new Error('Expected one table-bindable arrow site.');
+		(tableSite.source as { locator: string }).locator = 'STEP_COMMAND_SPECS.StartWork';
+		const missingTableDeclaration = structuredClone(direct.snapshot) as StaticSemanticSnapshot;
+		(
+			missingTableDeclaration as unknown as {
+				declarations: StaticSemanticSnapshot['declarations'];
+			}
+		).declarations = missingTableDeclaration.declarations.filter(
+			(declaration) => declaration.name !== 'STEP_COMMAND_SPECS'
+		);
+		const missingTableResult = validateCommandHandlerGraph(
+			directGraph,
+			missingTableDeclaration,
+			tableObservation,
+			direct.subject
+		);
+		expect(missingTableResult).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'SHAPE_INVALID',
+					message: expect.stringContaining(
+						'Registry STEP_COMMAND_SPECS does not bind one exact semantic declaration'
+					)
+				})
+			]),
+			state: 'INVALID'
+		});
+	});
+
 	it('re-derives unresolved handler populations from semantic facts', () => {
 		const registration = directGraph.nodes.find((node) => node.kind === 'HANDLER_REGISTRATION');
 		if (registration === undefined) throw new Error('Expected a handler registration.');
@@ -485,6 +675,84 @@ describe('command-handler graph validator defensive coverage', () => {
 		});
 	});
 
+	it('rejects incomplete factory invocation, callee reference, and callable populations', () => {
+		const registration = factoryGraph.nodes.find((node) => node.kind === 'HANDLER_REGISTRATION');
+		if (registration === undefined) throw new Error('Expected a factory handler registration.');
+		const terminalReference = factory.snapshot.references.find(
+			(reference) =>
+				reference.nodeId === registration.targetNodeId && reference.resolvedSymbolId !== null
+		);
+		if (
+			terminalReference?.resolvedSymbolId === null ||
+			terminalReference?.resolvedSymbolId === undefined
+		)
+			throw new Error('Expected a resolved factory-result reference.');
+		const terminalSymbol = factory.snapshot.symbols.find(
+			(symbol) => symbol.id === terminalReference.resolvedSymbolId
+		);
+		if (terminalSymbol === undefined) throw new Error('Expected the factory-result symbol.');
+		const terminalDeclarationIds = new Set(terminalSymbol.declarationIds);
+		const terminalDeclarationNodeIds = new Set(
+			factory.snapshot.declarations.flatMap((declaration) =>
+				terminalDeclarationIds.has(declaration.id) && declaration.nodeId !== null
+					? [declaration.nodeId]
+					: []
+			)
+		);
+		const initializer = factory.snapshot.assignments.find(
+			(assignment) =>
+				terminalDeclarationNodeIds.has(assignment.nodeId) &&
+				assignment.assignmentKind === 'INITIALIZER' &&
+				assignment.valueNodeId !== null
+		);
+		if (initializer?.valueNodeId === null || initializer?.valueNodeId === undefined)
+			throw new Error('Expected the factory-result initializer.');
+		const invocation = factory.snapshot.invocations.find(
+			(candidate) => candidate.nodeId === initializer.valueNodeId
+		);
+		if (invocation === undefined) throw new Error('Expected the factory invocation.');
+
+		const missingInvocation = structuredClone(factory.snapshot) as StaticSemanticSnapshot;
+		(
+			missingInvocation as unknown as { invocations: StaticSemanticSnapshot['invocations'] }
+		).invocations = missingInvocation.invocations.filter(
+			(candidate) => candidate.nodeId !== invocation.nodeId
+		);
+		expectIssue(factoryGraph, 'REGISTRY_POPULATION_MISMATCH', {
+			...factory,
+			snapshot: missingInvocation
+		});
+
+		const missingCalleeReference = structuredClone(factory.snapshot) as StaticSemanticSnapshot;
+		for (const reference of missingCalleeReference.references)
+			if (reference.nodeId === invocation.calleeNodeId)
+				(reference as { resolvedSymbolId: null }).resolvedSymbolId = null;
+		expectIssue(factoryGraph, 'REGISTRY_POPULATION_MISMATCH', {
+			...factory,
+			snapshot: missingCalleeReference
+		});
+
+		const factoryReference = factory.snapshot.references.find(
+			(reference) =>
+				reference.nodeId === invocation.calleeNodeId && reference.resolvedSymbolId !== null
+		);
+		if (
+			factoryReference?.resolvedSymbolId === null ||
+			factoryReference?.resolvedSymbolId === undefined
+		)
+			throw new Error('Expected a resolved factory callee reference.');
+		const missingFactoryCallable = structuredClone(factory.snapshot) as StaticSemanticSnapshot;
+		const factorySymbol = missingFactoryCallable.symbols.find(
+			(symbol) => symbol.id === factoryReference.resolvedSymbolId
+		);
+		if (factorySymbol === undefined) throw new Error('Expected the factory callee symbol.');
+		(factorySymbol as unknown as { declarationIds: [] }).declarationIds = [];
+		expectIssue(factoryGraph, 'REGISTRY_POPULATION_MISMATCH', {
+			...factory,
+			snapshot: missingFactoryCallable
+		});
+	});
+
 	it('checks top-level bindings, metadata, authority, limitations, selectors, and budgets', () => {
 		const malformedPopulations = structuredClone(directGraph) as unknown as { nodes: null };
 		malformedPopulations.nodes = null;
@@ -521,6 +789,12 @@ describe('command-handler graph validator defensive coverage', () => {
 				'SOURCE_BINDING_MISMATCH',
 				(draft) => {
 					(draft.commandRegistry as unknown as Record<string, unknown>).unexpected = true;
+				}
+			],
+			[
+				'SOURCE_BINDING_MISMATCH',
+				(draft) => {
+					(draft.handlerRegistry as unknown as Record<string, unknown>).unexpected = true;
 				}
 			],
 			[
@@ -628,6 +902,20 @@ describe('command-handler graph validator defensive coverage', () => {
 				(site.observationSource as unknown as Record<string, unknown>).unexpected = true;
 			}),
 			'FIELD_SET_INVALID'
+		);
+
+		expectIssue(
+			finalized(factoryGraph, (draft) => {
+				const frontier = draft.nodes.find((node) => node.kind === 'FRONTIER');
+				if (frontier?.kind !== 'FRONTIER') throw new Error('Expected a frontier node.');
+				const hostile = frontier as unknown as Record<string, unknown>;
+				hostile.frontierKind = 'UNSUPPORTED_FRONTIER';
+				delete hostile.commandNodeId;
+				delete hostile.registrationNodeId;
+				delete hostile.siteNodeId;
+			}),
+			'REGISTRY_POPULATION_MISMATCH',
+			factory
 		);
 	});
 

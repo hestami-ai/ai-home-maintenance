@@ -104,7 +104,8 @@ function resolved(root: string, outputs: readonly string[] = []) {
 }
 
 afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true });
+	for (const root of roots.splice(0))
+		rmSync(root, { force: true, maxRetries: 10, recursive: true, retryDelay: 100 });
 });
 
 describe('Git-bound Working Change Set subject resolution', () => {
@@ -519,4 +520,105 @@ describe('Git-bound Working Change Set subject resolution', () => {
 			else process.env.GIT_WORK_TREE = originalGitWorkTree;
 		}
 	}, 15_000);
+
+	it('rejects every incompatible Working Change Set request boundary before Git observation', () => {
+		const { subject } = fixture();
+		const base = request(subject);
+		const invalid = [
+			{ ...base, schemaVersion: 'unsupported' },
+			{ ...base, policyVersion: 'unsupported' },
+			{ ...base, subjectKind: 'SNAPSHOT' },
+			{ ...base, rootLocator: 'relative/repository' },
+			{ ...base, outputs: ['../escape'] }
+		] as unknown as readonly ResolveSubjectRequest[];
+
+		for (const candidate of invalid)
+			expect(resolveWorkingSubject(candidate)).toMatchObject({
+				diagnostics: [expect.objectContaining({ code: 'WORKING_CHANGE_SET_INCOMPATIBLE' })],
+				outcome: 'incompatible'
+			});
+	});
+
+	it('retries and settles on a deletion that occurs during final artifact reconciliation', () => {
+		const { subject } = fixture();
+		const target = join(subject, 'packages/demo/src/index.ts');
+		let deleted = false;
+		const outcome = resolveWorkingSubject(request(subject), {
+			afterFinalArtifactRead: (_attempt, path) => {
+				if (deleted || path !== 'packages/demo/src/index.ts') return;
+				deleted = true;
+				rmSync(target);
+			}
+		});
+		expect(deleted).toBe(true);
+		expect(outcome.outcome).toBe('resolved');
+	});
+
+	it('classifies a selected file changed to a directory during final reconciliation as incompatible', () => {
+		const { subject } = fixture();
+		const target = join(subject, 'packages/demo/src/index.ts');
+		const outcome = resolveWorkingSubject(request(subject), {
+			afterFinalArtifactRead: (_attempt, path) => {
+				if (path !== 'packages/demo/src/index.ts') return;
+				rmSync(target);
+				mkdirSync(target);
+			}
+		});
+		expect(outcome).toMatchObject({
+			diagnostics: [expect.objectContaining({ code: 'WORKING_CHANGE_SET_INCOMPATIBLE' })],
+			outcome: 'incompatible'
+		});
+	});
+
+	it('classifies a selected file changed to a directory before binding as incompatible', () => {
+		const { subject } = fixture();
+		const target = join(subject, 'packages/demo/src/index.ts');
+		const outcome = resolveWorkingSubject(request(subject), {
+			afterSubjectResolution: () => {
+				rmSync(target);
+				mkdirSync(target);
+			}
+		});
+		expect(outcome).toMatchObject({
+			diagnostics: [expect.objectContaining({ code: 'WORKING_CHANGE_SET_INCOMPATIBLE' })],
+			outcome: 'incompatible'
+		});
+	});
+
+	it('records dirty repository state outside a nested subject without revealing its path', () => {
+		const { repository, subject } = fixture();
+		write(repository, 'outside-subject.ts', 'export const outside = true;\n');
+		const frozen = resolved(subject);
+		expect(frozen.workingChangeSet?.excludedLocalState).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ kind: 'OUTSIDE_SUBJECT_PERIMETER', path: null })
+			])
+		);
+	});
+
+	it('applies the explicit-project perimeter while binding base and index paths', () => {
+		const { subject } = fixture();
+		const scoped = request(subject);
+		const outcome = resolveWorkingSubject({
+			...scoped,
+			scope: {
+				additionalArtifacts: ['verif/result.json'],
+				kind: 'EXPLICIT_PROJECTS',
+				projects: ['packages/demo/tsconfig.json']
+			}
+		});
+		expect(outcome.outcome).toBe('resolved');
+	});
+
+	it('emits artifact-kind evidence for an exact cross-class rename', () => {
+		const { subject } = fixture();
+		renameSync(
+			join(subject, 'packages/demo/src/delete-me.ts'),
+			join(subject, 'packages/demo/delete-me.md')
+		);
+		const frozen = resolved(subject);
+		expect(frozen.workingChangeSet?.includedUntrackedEntries.map(({ kind }) => kind)).toEqual(
+			expect.arrayContaining(['ARTIFACT_KIND_CHANGE', 'RENAME'])
+		);
+	});
 });

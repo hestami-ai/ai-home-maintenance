@@ -56,7 +56,8 @@ import type {
 	FrozenSubject,
 	SubjectBudgets,
 	SubjectCompleteness,
-	SubjectDiagnostic
+	SubjectDiagnostic,
+	SubjectFilters
 } from '../contracts/subject.js';
 import { evaluateSemanticSourceQuery } from '../query/evaluate-semantic-source-query.js';
 import { hasValidatedStaticSemanticSnapshotCapability } from '../semantic/build-static-semantic-snapshot.js';
@@ -69,8 +70,10 @@ import {
 } from '../semantic/canonical.js';
 import { verifyFrozenSubject } from '../subject/freshness.js';
 import { isFrozenSubjectCapability } from '../subject/frozen-store.js';
+import { subjectFilterPolicyId } from '../subject/policy.js';
 import {
 	assertCanonicalRelativePath,
+	canonicalPathKey,
 	repositoryRelativePath,
 	resolveRepositoryRoot
 } from '../subject/paths.js';
@@ -192,9 +195,13 @@ export interface SemanticSourceQueryReportProgressEvent {
 }
 
 export interface RunSemanticSourceQueryReportOptions {
+	/** Trusted same-process artifacts that must participate in the same frozen subject identity. */
+	readonly additionalArtifacts?: readonly string[];
 	readonly onProgress?: (event: SemanticSourceQueryReportProgressEvent) => unknown;
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
+	/** Trusted exact filter policy that must participate in the same frozen subject identity. */
+	readonly subjectFilters?: SubjectFilters;
 }
 
 interface ProgressRecorder {
@@ -661,11 +668,22 @@ function subjectCompleteness(subject: FrozenSubject): SubjectCompleteness {
 function exactCaptureReconciles(
 	capture: StableSemanticCapture,
 	admission: SemanticSourceQueryReportAdmission,
-	repositoryRoot: string
+	repositoryRoot: string,
+	additionalArtifacts: readonly string[],
+	subjectFilters: SubjectFilters
 ): boolean {
 	try {
 		const subject = capture.frozenSubject;
 		const snapshot = capture.semanticSnapshot;
+		const subjectScope = subject.request.scope;
+		if (subjectScope.kind !== 'EXPLICIT_PROJECTS') return false;
+		const actualAdditionalArtifacts = (subjectScope.additionalArtifacts ?? [])
+			.map((path) => canonicalPathKey(assertCanonicalRelativePath(path)))
+			.sort();
+		const expectedAdditionalArtifacts = additionalArtifacts
+			.map((path) => canonicalPathKey(assertCanonicalRelativePath(path)))
+			.sort();
+		const expectedFilterRequest = { ...subject.request, filters: subjectFilters };
 		return (
 			capture.outcome === 'semantic-captured' &&
 			capture.repositoryRoot === repositoryRoot &&
@@ -681,10 +699,13 @@ function exactCaptureReconciles(
 			snapshot.assignabilityRequests.length === 0 &&
 			canonicalSemanticJson(subject.request.budgets) ===
 				canonicalSemanticJson(admission.budgets.subject) &&
-			subject.request.scope.kind === 'EXPLICIT_PROJECTS' &&
-			canonicalSemanticJson(subject.request.scope.projects) ===
+			canonicalSemanticJson(subjectScope.projects) ===
 				canonicalSemanticJson(admission.predecessorRequest.subjectProjectConfigPaths) &&
-			(subject.request.scope.additionalArtifacts?.length ?? 0) === 0 &&
+			actualAdditionalArtifacts.length === new Set(actualAdditionalArtifacts).size &&
+			expectedAdditionalArtifacts.length === new Set(expectedAdditionalArtifacts).size &&
+			canonicalSemanticJson(actualAdditionalArtifacts) ===
+				canonicalSemanticJson(expectedAdditionalArtifacts) &&
+			subjectFilterPolicyId(subject.request) === subjectFilterPolicyId(expectedFilterRequest) &&
 			subject.descriptor.subjectId === snapshot.subjectId
 		);
 	} catch {
@@ -1194,9 +1215,15 @@ async function runInternal(
 
 	progress.start('SEMANTIC_CAPTURE');
 	let predecessorOutcome: SemanticReportPipelineOutcome;
+	let additionalArtifacts: readonly string[];
+	let subjectFilters: SubjectFilters;
 	try {
+		additionalArtifacts = options.additionalArtifacts ?? [];
+		subjectFilters = options.subjectFilters ?? { exclude: [], include: [] };
 		predecessorOutcome = await dependencies.captureSemantic(admission.predecessorRequest, {
-			repositoryRoot
+			additionalArtifacts,
+			repositoryRoot,
+			subjectFilters
 		});
 	} catch {
 		progress.fail([], 'SEMANTIC_CAPTURE_UNAVAILABLE');
@@ -1237,7 +1264,9 @@ async function runInternal(
 			request
 		);
 	}
-	if (!exactCaptureReconciles(capture, admission, repositoryRoot)) {
+	if (
+		!exactCaptureReconciles(capture, admission, repositoryRoot, additionalArtifacts, subjectFilters)
+	) {
 		progress.fail([], 'SEMANTIC_CAPTURE_VALIDATION_FAILED');
 		return failure(
 			'SEMANTIC_CAPTURE_VALIDATION_FAILED',

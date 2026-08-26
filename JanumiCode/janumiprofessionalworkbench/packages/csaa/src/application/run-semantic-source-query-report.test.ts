@@ -30,6 +30,8 @@ import {
 } from './run-project-context-report.js';
 import {
 	SEMANTIC_SOURCE_QUERY_REPORT_PROGRESS_NONCLAIMS,
+	admitSemanticSourceQueryReportRequest,
+	runSemanticSourceQueryReport,
 	runSemanticSourceQueryReportWithDependencies,
 	semanticSourceQueryReportExitCode,
 	type SemanticSourceQueryReportProgressEvent,
@@ -219,6 +221,260 @@ afterAll(() => {
 });
 
 describe('runSemanticSourceQueryReport', () => {
+	it('admits only exact closed report requests and detaches the admitted value', () => {
+		const copy = () =>
+			JSON.parse(canonicalSemanticJson(request())) as unknown as Record<string, unknown>;
+		const cases: Array<(candidate: Record<string, unknown>) => void> = [
+			(candidate) => Object.setPrototypeOf(candidate, { inherited: true }),
+			(candidate) => (candidate.extra = true),
+			(candidate) => {
+				const requestBudgets = candidate.budgets as Record<string, unknown>;
+				requestBudgets.maxDiagnostics = 0;
+			},
+			(candidate) => {
+				const requestBudgets = candidate.budgets as Record<string, unknown>;
+				requestBudgets.maxResultBytes = Number.MAX_SAFE_INTEGER;
+			},
+			(candidate) => (candidate.operationVersion = 'unsupported'),
+			(candidate) => (candidate.schemaVersion = 'unsupported'),
+			(candidate) => (candidate.executionId = ''),
+			(candidate) => (candidate.executionId = '\ud800'),
+			(candidate) => (candidate.subjectProjectConfigPaths = []),
+			(candidate) => (candidate.expression = { kind: 'UNKNOWN', nodeId: 'invalid' })
+		];
+
+		expect(admitSemanticSourceQueryReportRequest(null)).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'rejected',
+			path: '$'
+		});
+		for (const mutate of cases) {
+			const candidate = copy();
+			mutate(candidate);
+			expect(admitSemanticSourceQueryReportRequest(candidate).outcome).toBe('rejected');
+		}
+
+		let invoked = false;
+		const accessor = copy();
+		Object.defineProperty(accessor, 'executionId', {
+			enumerable: true,
+			get() {
+				invoked = true;
+				return 'execution-accessor';
+			}
+		});
+		expect(admitSemanticSourceQueryReportRequest(accessor)).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'rejected',
+			path: '$.executionId'
+		});
+		expect(invoked).toBe(false);
+
+		const source = request();
+		const admitted = admitSemanticSourceQueryReportRequest(source);
+		expect(admitted.outcome).toBe('admitted');
+		if (admitted.outcome !== 'admitted') throw new Error('Expected admitted request.');
+		expect(admitted.request).toEqual(source);
+		expect(admitted.request).not.toBe(source);
+		expect(Object.isFrozen(admitted.request)).toBe(true);
+		expect(Object.isFrozen(admitted.request.expression)).toBe(true);
+	});
+
+	it('fails closed for invalid roots, unavailable capture, and best-effort progress sinks', async () => {
+		const invalidOptions = [
+			null,
+			{ repositoryRoot: 'relative/path' },
+			{ repositoryRoot: join(tmpdir(), 'csaa-semantic-source-query-report-missing-root') }
+		] as const;
+		const outcomes = [];
+		for (const options of invalidOptions)
+			outcomes.push(
+				await runSemanticSourceQueryReportWithDependencies(
+					request(),
+					options as never,
+					dependencies()
+				)
+			);
+		expect(outcomes.map((outcome) => ('code' in outcome ? outcome.code : null))).toEqual([
+			'REQUEST_INVALID',
+			'REQUEST_INVALID',
+			'REPOSITORY_ROOT_UNAVAILABLE'
+		]);
+
+		const captureUnavailable = await runSemanticSourceQueryReportWithDependencies(
+			request(),
+			{ repositoryRoot },
+			dependencies({
+				captureSemantic() {
+					throw new Error('capture unavailable');
+				}
+			})
+		);
+		expect(captureUnavailable).toMatchObject({
+			code: 'SEMANTIC_CAPTURE_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'SEMANTIC_CAPTURE',
+			state: 'failed'
+		});
+
+		let deliveries = 0;
+		const terminal = await runSemanticSourceQueryReportWithDependencies(
+			{ ...request(), operationVersion: 'unsupported' } as never,
+			{
+				onProgress() {
+					deliveries += 1;
+					if (deliveries === 1) return Promise.reject(new Error('best-effort rejection'));
+					throw new Error('best-effort throw');
+				},
+				repositoryRoot
+			},
+			dependencies()
+		);
+		expect(terminal).toMatchObject({ code: 'REQUEST_OPERATION_INCOMPATIBLE' });
+		expect(deliveries).toBeGreaterThan(1);
+		expect(semanticSourceQueryReportExitCode(terminal)).toBe(2);
+
+		const defaultOutcome = await runSemanticSourceQueryReport(
+			{ ...request(), schemaVersion: 'unsupported' },
+			{ repositoryRoot }
+		);
+		expect(defaultOutcome).toMatchObject({ code: 'REQUEST_SCHEMA_INCOMPATIBLE' });
+		expect(semanticSourceQueryReportExitCode(defaultOutcome)).toBe(2);
+		expect(semanticSourceQueryReportExitCode(captureUnavailable)).toBe(4);
+	});
+
+	it('contains exact dependency, capture, evaluation, and result-budget failures', async () => {
+		const proxiedEvaluator = new Proxy(evaluateSemanticSourceQuery, {});
+		const invalidDependency = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'proxy-dependency' }),
+			{ repositoryRoot },
+			dependencies({ evaluateQuery: proxiedEvaluator })
+		);
+		expect(invalidDependency).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT'
+		});
+
+		const wrongCapture = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'wrong-capture-outcome' }),
+			{ repositoryRoot },
+			dependencies({
+				captureSemantic: () => ({ ...captured, outcome: 'unavailable' }) as never
+			})
+		);
+		expect(wrongCapture).toMatchObject({
+			code: 'SEMANTIC_CAPTURE_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'SEMANTIC_CAPTURE'
+		});
+
+		const cyclicEvaluation: Record<string, unknown> = { state: 'EVALUATED' };
+		cyclicEvaluation.evaluation = cyclicEvaluation;
+		const cyclic = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'cyclic-evaluation' }),
+			{ repositoryRoot },
+			dependencies({
+				evaluateQuery: (() => cyclicEvaluation) as unknown as typeof evaluateSemanticSourceQuery
+			})
+		);
+		expect(cyclic).toMatchObject({
+			code: 'QUERY_EVALUATION_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'QUERY_EVALUATE'
+		});
+
+		const populationRefused = await runSemanticSourceQueryReportWithDependencies(
+			request({
+				budgets: {
+					...budgets(),
+					query: { ...budgets().query, maxPopulation: 1 }
+				},
+				executionId: 'population-refused'
+			}),
+			{ repositoryRoot },
+			dependencies()
+		);
+		expect(populationRefused).toMatchObject({
+			outcome: 'unavailable',
+			stage: 'QUERY_EVALUATE',
+			state: 'resource-refused'
+		});
+
+		const recordsRefused = await runSemanticSourceQueryReportWithDependencies(
+			request({
+				budgets: { ...budgets(), maxResultRecords: 1 },
+				executionId: 'records-refused'
+			}),
+			{ repositoryRoot },
+			dependencies()
+		);
+		expect(recordsRefused).toMatchObject({
+			code: 'RESULT_RECORD_BUDGET_EXCEEDED',
+			outcome: 'unavailable',
+			state: 'resource-refused'
+		});
+
+		const noisyVerifier = (() => ({
+			changedPaths: ['$.captured', '../escape'],
+			diagnostics: [
+				{
+					code: 'SUBJECT_CHANGED_DURING_RESOLUTION',
+					message: 'first currentness diagnostic',
+					path: '$.captured',
+					phase: 'FRESHNESS',
+					severity: 'WARNING'
+				},
+				{
+					code: 'SUBJECT_CHANGED_DURING_RESOLUTION',
+					message: 'second currentness diagnostic',
+					path: '../escape',
+					phase: 'FRESHNESS',
+					severity: 'WARNING'
+				}
+			],
+			state: 'STALE'
+		})) as unknown as typeof verifyFrozenSubject;
+		const preCurrentDiagnosticsRefused = await runSemanticSourceQueryReportWithDependencies(
+			request({
+				budgets: { ...budgets(), maxDiagnostics: 1 },
+				executionId: 'pre-current-diagnostics-refused'
+			}),
+			{ repositoryRoot },
+			dependencies({ verifySubject: noisyVerifier })
+		);
+		expect(preCurrentDiagnosticsRefused).toMatchObject({
+			code: 'RESULT_DIAGNOSTIC_BUDGET_EXCEEDED',
+			outcome: 'unavailable',
+			stage: 'QUERY_EVALUATE',
+			state: 'resource-refused'
+		});
+
+		const roomyDiagnostics = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'roomy-current-diagnostics' }),
+			{ repositoryRoot },
+			dependencies({ verifySubject: noisyVerifier })
+		);
+		if (roomyDiagnostics.outcome !== 'partial') throw new Error(JSON.stringify(roomyDiagnostics));
+		const diagnosticsRefused = await runSemanticSourceQueryReportWithDependencies(
+			request({
+				budgets: {
+					...budgets(),
+					maxDiagnostics: roomyDiagnostics.diagnostics.length - 1
+				},
+				executionId: 'final-current-diagnostics-refused'
+			}),
+			{ repositoryRoot },
+			dependencies({ verifySubject: noisyVerifier })
+		);
+		expect(diagnosticsRefused).toMatchObject({
+			code: 'RESULT_DIAGNOSTIC_BUDGET_EXCEEDED',
+			outcome: 'unavailable',
+			stage: 'CURRENTNESS',
+			state: 'resource-refused'
+		});
+	});
+
 	it('returns compact exact partitions, node-total traces, metadata identities, and deferred progress', async () => {
 		const progress: SemanticSourceQueryReportProgressEvent[] = [];
 		let telemetryWasDeferred = true;
@@ -290,14 +546,14 @@ describe('runSemanticSourceQueryReport', () => {
 		).toEqual(['projects/app/src/alpha.ts', 'projects/app/src/external.d.ts']);
 		expect(
 			outcome.result.partitions.supportedNonmatches.map((id) => byId.get(id)?.logicalPath)
-		).toEqual(['projects/app/src/beta.ts']);
+		).toEqual(['projects/app/src/View.svelte', 'projects/app/src/beta.ts']);
 		expect(outcome.result.partitions).toMatchObject({
 			conflict: [],
 			notApplicable: [],
 			unevaluated: [],
 			unknown: []
 		});
-		expect(outcome.result.evaluations).toHaveLength(3);
+		expect(outcome.result.evaluations).toHaveLength(4);
 		expect(
 			outcome.result.evaluations.every(
 				(evaluation) =>
@@ -355,6 +611,103 @@ describe('runSemanticSourceQueryReport', () => {
 		).toBe(true);
 	});
 
+	it('forwards and reconciles the exact additional-artifact population and filter policy', async () => {
+		const additionalArtifacts = ['projects/app/package.json', 'bun.lock'] as const;
+		const subjectFilters = {
+			exclude: [] as const,
+			include: [
+				'package.json',
+				'projects/app/tsconfig.json',
+				'projects/app/src/alpha.ts',
+				'projects/app/src/beta.ts',
+				'projects/app/src/external.d.ts',
+				'projects/app/src/View.svelte',
+				'projects/app/package.json',
+				'bun.lock'
+			] as const
+		};
+		let observedAdditionalArtifacts: readonly string[] | undefined;
+		let observedCaptureOutcome: SemanticReportPipelineOutcome | undefined;
+		let observedSubjectFilters: unknown;
+		const stopAfterReconciliation = vi.fn(() => {
+			throw new Error('The focused seam test stops after exact capture reconciliation.');
+		}) as unknown as typeof evaluateSemanticSourceQuery;
+		const outcome = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'additional-artifacts' }),
+			{ additionalArtifacts, repositoryRoot, subjectFilters },
+			dependencies({
+				captureSemantic: (requestValue, options) => {
+					observedAdditionalArtifacts = options.additionalArtifacts;
+					observedSubjectFilters = options.subjectFilters;
+					observedCaptureOutcome = captureSemanticReportPipeline(requestValue, options);
+					return observedCaptureOutcome;
+				},
+				evaluateQuery: stopAfterReconciliation
+			})
+		);
+		expect(observedAdditionalArtifacts).toEqual(additionalArtifacts);
+		expect(observedSubjectFilters).toEqual(subjectFilters);
+		expect(
+			stopAfterReconciliation,
+			JSON.stringify({ observedCaptureOutcome, outcome })
+		).toHaveBeenCalledOnce();
+		expect(outcome).toMatchObject({
+			code: 'QUERY_EVALUATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'QUERY_EVALUATE',
+			state: 'failed'
+		});
+	});
+
+	it('refuses a captured subject whose additional-artifact population mismatches the option', async () => {
+		const additionalArtifacts = ['bun.lock', 'projects/app/package.json'] as const;
+		let observedAdditionalArtifacts: readonly string[] | undefined;
+		const outcome = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'additional-artifact-mismatch' }),
+			{ additionalArtifacts, repositoryRoot },
+			dependencies({
+				captureSemantic: (requestValue, options) => {
+					observedAdditionalArtifacts = options.additionalArtifacts;
+					return captureSemanticReportPipeline(requestValue, {
+						additionalArtifacts: ['bun.lock'],
+						repositoryRoot: options.repositoryRoot
+					});
+				}
+			})
+		);
+		expect(observedAdditionalArtifacts).toEqual(additionalArtifacts);
+		expect(outcome).toMatchObject({
+			code: 'SEMANTIC_CAPTURE_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'SEMANTIC_CAPTURE',
+			state: 'failed'
+		});
+	});
+
+	it('refuses a captured subject whose filter policy mismatches the trusted option', async () => {
+		const subjectFilters = {
+			exclude: [] as const,
+			include: ['projects/app/src/alpha.ts'] as const
+		};
+		const outcome = await runSemanticSourceQueryReportWithDependencies(
+			request({ executionId: 'subject-filter-mismatch' }),
+			{ repositoryRoot, subjectFilters },
+			dependencies({
+				captureSemantic: (requestValue, options) =>
+					captureSemanticReportPipeline(requestValue, {
+						repositoryRoot: options.repositoryRoot,
+						subjectFilters: { exclude: [], include: [] }
+					})
+			})
+		);
+		expect(outcome).toMatchObject({
+			code: 'SEMANTIC_CAPTURE_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'SEMANTIC_CAPTURE',
+			state: 'failed'
+		});
+	});
+
 	it('keeps zero matches bounded to the retained PARTIAL/open population', async () => {
 		const outcome = await runSemanticSourceQueryReportWithDependencies(
 			request({ executionId: 'zero-match', expression: zeroMatchExpression() }),
@@ -364,7 +717,7 @@ describe('runSemanticSourceQueryReport', () => {
 		expect(outcome.outcome).toBe('partial');
 		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
 		expect(outcome.result.partitions.supportedMatches).toEqual([]);
-		expect(outcome.result.partitions.supportedNonmatches).toHaveLength(3);
+		expect(outcome.result.partitions.supportedNonmatches).toHaveLength(4);
 		expect(outcome.result.population).toMatchObject({
 			globalClosure: 'OPEN',
 			semanticHealth: 'PARTIAL',

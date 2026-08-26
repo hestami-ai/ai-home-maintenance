@@ -16,6 +16,7 @@ import { sha256 } from '../inventory/canonical.js';
 import { canonicalSemanticJson } from '../semantic/canonical.js';
 import {
 	runStaticModuleImpactCandidateReport,
+	runStaticModuleImpactCandidateReportWithCapturedSubject,
 	staticModuleImpactCandidateReportExitCode
 } from './run-static-module-impact-candidate-report.js';
 
@@ -67,6 +68,7 @@ function fixture(): string {
 		"import { absent } from './absent.js';\nexport const unrelated = absent;\n"
 	);
 	write(root, 'bun.lock', 'fixture lock\n');
+	json(root, 'verif/retained-evidence.json', { evidence: 'retained' });
 	return root;
 }
 
@@ -182,6 +184,39 @@ afterEach(() => {
 });
 
 describe('runStaticModuleImpactCandidateReport', () => {
+	it('forwards trusted artifacts and the exact filter policy into the reachability predecessor', () => {
+		const root = fixture();
+		const subjectFilters = {
+			exclude: [],
+			include: [
+				'package.json',
+				'packages/demo/package.json',
+				'packages/demo/tsconfig.json',
+				'packages/demo/src/entry.ts',
+				'packages/demo/src/leaf.ts',
+				'packages/demo/src/middle.ts',
+				'packages/demo/src/unrelated.ts',
+				'verif/retained-evidence.json'
+			]
+		};
+		const execution = runStaticModuleImpactCandidateReportWithCapturedSubject(request(), {
+			additionalArtifacts: ['verif/retained-evidence.json'],
+			repositoryRoot: root,
+			subjectFilters
+		});
+		expect(execution.outcome.outcome).toBe('partial');
+		expect(execution.subject?.request.scope).toMatchObject({
+			additionalArtifacts: ['verif/retained-evidence.json'],
+			kind: 'EXPLICIT_PROJECTS'
+		});
+		expect(execution.subject?.artifacts.map((artifact) => artifact.path)).toContain(
+			'verif/retained-evidence.json'
+		);
+		expect(execution.subject?.request.filters).toEqual(subjectFilters);
+		if (execution.outcome.outcome !== 'partial') throw new Error(JSON.stringify(execution.outcome));
+		expect(execution.outcome.subject.subjectId).toBe(execution.subject?.descriptor.subjectId);
+	});
+
 	it('projects deterministic possible importer candidates with complete native-edge witnesses', () => {
 		const root = fixture();
 		const progress: unknown[] = [];
@@ -537,6 +572,205 @@ describe('runStaticModuleImpactCandidateReport', () => {
 			state: 'failed'
 		});
 		expect(proxyTrapHits).toBe(0);
+
+		let additionalAccessorHits = 0;
+		const accessorArtifacts = ['verif/retained-evidence.json'];
+		Object.defineProperty(accessorArtifacts, '0', {
+			enumerable: true,
+			get() {
+				additionalAccessorHits += 1;
+				return 'verif/retained-evidence.json';
+			}
+		});
+		const accessorArtifactsOutcome = runStaticModuleImpactCandidateReport(request(), {
+			additionalArtifacts: accessorArtifacts,
+			repositoryRoot: root
+		});
+		expect(accessorArtifactsOutcome).toMatchObject({
+			code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+		expect(additionalAccessorHits).toBe(0);
+
+		for (const additionalArtifacts of [
+			new Proxy(['verif/retained-evidence.json'], {}),
+			['../escape.json'],
+			['verif/retained-evidence.json', 'verif/retained-evidence.json']
+		]) {
+			const outcome = runStaticModuleImpactCandidateReport(request(), {
+				additionalArtifacts,
+				repositoryRoot: root
+			});
+			expect(outcome).toMatchObject({
+				code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: 'failed'
+			});
+		}
+
+		let filterAccessorHits = 0;
+		const accessorFilters = { exclude: [] } as {
+			exclude: readonly string[];
+			include?: readonly string[];
+		};
+		Object.defineProperty(accessorFilters, 'include', {
+			enumerable: true,
+			get() {
+				filterAccessorHits += 1;
+				return ['packages/**'];
+			}
+		});
+		const accessorFiltersOutcome = runStaticModuleImpactCandidateReport(request(), {
+			repositoryRoot: root,
+			subjectFilters: accessorFilters as { exclude: readonly string[]; include: readonly string[] }
+		});
+		expect(accessorFiltersOutcome).toMatchObject({
+			code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+		expect(filterAccessorHits).toBe(0);
+	});
+
+	it('fails closed across exact request, option, artifact, and filter admission boundaries', () => {
+		const root = fixture();
+		const customRequest = Object.assign(Object.create({ inherited: true }), request());
+		const customOptions = Object.assign(Object.create({ inherited: true }), {
+			repositoryRoot: root
+		});
+		const extraArtifacts: string[] & { extra?: boolean } = [];
+		extraArtifacts.extra = true;
+		const extraFilters: string[] & { extra?: boolean } = [];
+		extraFilters.extra = true;
+		const additionalAccessor = { repositoryRoot: root } as Record<string, unknown>;
+		Object.defineProperty(additionalAccessor, 'additionalArtifacts', {
+			enumerable: true,
+			get: () => ['verif/retained-evidence.json']
+		});
+		const filtersAccessor = { repositoryRoot: root } as Record<string, unknown>;
+		Object.defineProperty(filtersAccessor, 'subjectFilters', {
+			enumerable: true,
+			get: () => ({ exclude: [], include: [] })
+		});
+		const cases: ReadonlyArray<{
+			readonly code: string;
+			readonly options?: unknown;
+			readonly requestValue?: unknown;
+		}> = [
+			{ code: 'REQUEST_SHAPE_INVALID', requestValue: null },
+			{ code: 'REQUEST_SHAPE_INVALID', requestValue: customRequest },
+			{ code: 'REQUEST_SHAPE_INVALID', requestValue: { ...request(), extra: true } },
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				requestValue: {
+					...request(),
+					budgets: { ...request().budgets, maxCandidateWitnessHops: 0 }
+				}
+			},
+			{
+				code: 'REQUEST_BUDGET_EXCEEDS_SAFETY_CEILING',
+				requestValue: {
+					...request(),
+					budgets: { ...request().budgets, maxCandidateWitnessHops: Number.MAX_SAFE_INTEGER }
+				}
+			},
+			{
+				code: 'REQUEST_OPERATION_INCOMPATIBLE',
+				requestValue: { ...request(), operationVersion: 'old' }
+			},
+			{ code: 'REQUEST_SCHEMA_INCOMPATIBLE', requestValue: { ...request(), schemaVersion: 'old' } },
+			{
+				code: 'REQUEST_SEED_SCHEMA_INCOMPATIBLE',
+				requestValue: { ...request(), seed: { ...request().seed, schemaVersion: 'old' } }
+			},
+			{
+				code: 'REQUEST_SEED_INVALID',
+				requestValue: { ...request(), seed: { ...request().seed, operation: 'DELETE' } }
+			},
+			{
+				code: 'REQUEST_SEED_INVALID',
+				requestValue: { ...request(), seed: { ...request().seed, id: '' } }
+			},
+			{
+				code: 'REQUEST_SEED_DIGEST_INVALID',
+				requestValue: { ...request(), seed: { ...request().seed, expectedArtifactSha256: 'BAD' } }
+			},
+			{ code: 'OPTIONS_SHAPE_INVALID', options: [] },
+			{ code: 'OPTIONS_SHAPE_INVALID', options: customOptions },
+			{ code: 'OPTIONS_SHAPE_INVALID', options: { repositoryRoot: root, extra: true } },
+			{ code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID', options: additionalAccessor },
+			{
+				code: 'OPTIONS_PROGRESS_INVALID',
+				options: { onPredecessorProgress: 1, repositoryRoot: root }
+			},
+			{ code: 'OPTIONS_SUBJECT_FILTERS_INVALID', options: filtersAccessor },
+			{
+				code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				options: { additionalArtifacts: new Array(10_001), repositoryRoot: root }
+			},
+			{
+				code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				options: { additionalArtifacts: extraArtifacts, repositoryRoot: root }
+			},
+			{
+				code: 'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				options: { additionalArtifacts: [0], repositoryRoot: root }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: null }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: { exclude: [] } }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: { exclude: 0, include: [] } }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: {
+					repositoryRoot: root,
+					subjectFilters: { exclude: new Array(10_001), include: [] }
+				}
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: { exclude: extraFilters, include: [] } }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: { exclude: [0], include: [] } }
+			},
+			{
+				code: 'OPTIONS_SUBJECT_FILTERS_INVALID',
+				options: { repositoryRoot: root, subjectFilters: { exclude: ['../escape'], include: [] } }
+			}
+		];
+		for (const testCase of cases) {
+			const outcome = runStaticModuleImpactCandidateReport(
+				'requestValue' in testCase ? testCase.requestValue : request(),
+				(testCase.options ?? { repositoryRoot: root }) as Parameters<
+					typeof runStaticModuleImpactCandidateReport
+				>[1]
+			);
+			expect(outcome).toMatchObject({ code: testCase.code, outcome: 'unavailable' });
+		}
+		const incompatible = runStaticModuleImpactCandidateReport(
+			{ ...request(), operationVersion: 'old' },
+			{ repositoryRoot: root }
+		);
+		expect(staticModuleImpactCandidateReportExitCode(incompatible)).toBe(2);
+		const failed = runStaticModuleImpactCandidateReport(
+			request(),
+			[] as unknown as Parameters<typeof runStaticModuleImpactCandidateReport>[1]
+		);
+		expect(staticModuleImpactCandidateReportExitCode(failed)).toBe(4);
 	});
 
 	it('refuses the outer projection when only the predecessor fits maxResultBytes', () => {

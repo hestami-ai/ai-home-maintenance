@@ -40,6 +40,7 @@ import type { CommandHandlerGraphReportPipelineCapture } from './run-command-han
 import {
 	admitGuardClassificationOverlayReportRequest,
 	guardClassificationOverlayReportExitCode,
+	runGuardClassificationOverlayReport,
 	runGuardClassificationOverlayReportWithDependencies,
 	type GuardClassificationOverlayReportProgressEvent,
 	type GuardClassificationOverlayReportRuntimeDependencies
@@ -195,6 +196,58 @@ describe('runGuardClassificationOverlayReport', { timeout: 60_000 }, () => {
 		});
 	});
 
+	it('rejects non-data request records and invalid scalar versions through the public facade', async () => {
+		const nonEnumerable = { ...request() };
+		Object.defineProperty(nonEnumerable, 'schemaVersion', {
+			enumerable: false,
+			value: GUARD_CLASSIFICATION_OVERLAY_REPORT_REQUEST_SCHEMA_VERSION
+		});
+		for (const malformed of [new Date(), nonEnumerable]) {
+			expect(admitGuardClassificationOverlayReportRequest(malformed)).toMatchObject({
+				code: 'REQUEST_SHAPE_INVALID',
+				outcome: 'rejected'
+			});
+		}
+		expect(
+			admitGuardClassificationOverlayReportRequest({
+				...request(),
+				operationVersion: 'unsupported'
+			})
+		).toMatchObject({ code: 'REQUEST_OPERATION_INCOMPATIBLE', outcome: 'rejected' });
+		expect(
+			admitGuardClassificationOverlayReportRequest({
+				...request(),
+				schemaVersion: 'unsupported'
+			})
+		).toMatchObject({ code: 'REQUEST_SCHEMA_INCOMPATIBLE', outcome: 'rejected' });
+		const base = request();
+		expect(
+			admitGuardClassificationOverlayReportRequest({
+				...base,
+				budgets: { ...base.budgets, maxResultBytes: 0 }
+			})
+		).toMatchObject({ code: 'REQUEST_BUDGET_INVALID', outcome: 'rejected' });
+		expect(
+			admitGuardClassificationOverlayReportRequest({
+				...base,
+				budgets: {
+					...base.budgets,
+					guardArtifactSet: { ...base.budgets.guardArtifactSet, maxArtifacts: 0 }
+				}
+			})
+		).toMatchObject({ code: 'REQUEST_BUDGET_INVALID', outcome: 'rejected' });
+
+		const publicOutcome = await runGuardClassificationOverlayReport(null, {
+			repositoryRoot: fixture.root
+		});
+		expect(publicOutcome).toMatchObject({
+			code: 'REQUEST_SHAPE_INVALID',
+			outcome: 'unavailable',
+			stage: 'REQUEST'
+		});
+		expect(guardClassificationOverlayReportExitCode(publicOutcome)).toBe(2);
+	});
+
 	it('emits one complete validated same-subject partial overlay and bounded ordered progress', async () => {
 		const progress: GuardClassificationOverlayReportProgressEvent[] = [];
 		const observed: {
@@ -276,6 +329,421 @@ describe('runGuardClassificationOverlayReport', { timeout: 60_000 }, () => {
 				value: Buffer.byteLength(canonicalSemanticJson(outcome), 'utf8') + 1
 			})
 		);
+	});
+
+	it('classifies each injected producer and validation-stage failure deterministically', async () => {
+		const diagnostic = (code: string) => ({
+			code,
+			message: `Synthetic ${code}.`,
+			path: null,
+			phase: 'REQUEST',
+			severity: 'ERROR'
+		});
+		const validation = (state: 'BUDGET_EXHAUSTED' | 'INVALID') => ({
+			issues: [
+				{
+					code: 'SYNTHETIC_VALIDATION_FAILURE',
+					message: `Synthetic ${state}.`,
+					path: '$.synthetic'
+				}
+			],
+			state
+		});
+		const run = (overrides: Partial<GuardClassificationOverlayReportRuntimeDependencies>) =>
+			runGuardClassificationOverlayReportWithDependencies(
+				request(),
+				{ repositoryRoot: fixture.root },
+				dependencies(overrides)
+			);
+
+		const predecessorUnavailable = await run({
+			captureHandler: (async () => ({
+				code: 'SYNTHETIC_PREDECESSOR_UNAVAILABLE',
+				diagnostics: [
+					{
+						...diagnostic('SYNTHETIC_PREDECESSOR_DIAGNOSTIC'),
+						predecessorSource: null,
+						source: 'REPORT'
+					}
+				],
+				outcome: 'unavailable',
+				stage: 'SUBJECT',
+				state: 'failed'
+			})) as unknown as GuardClassificationOverlayReportRuntimeDependencies['captureHandler']
+		});
+		expect(predecessorUnavailable).toMatchObject({
+			code: 'SYNTHETIC_PREDECESSOR_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'failed'
+		});
+
+		for (const [validator, validationState, state] of [
+			['validateObservation', 'INVALID', 'failed'],
+			['validateObservation', 'BUDGET_EXHAUSTED', 'resource-refused'],
+			['validateHandlerGraph', 'INVALID', 'failed'],
+			['validateHandlerGraph', 'BUDGET_EXHAUSTED', 'resource-refused']
+		] as const) {
+			const outcome = await run({
+				[validator]: (() => validation(validationState)) as never
+			});
+			expect(outcome).toMatchObject({
+				code: 'PREDECESSOR_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'PREDECESSOR_PIPELINE',
+				state
+			});
+		}
+
+		for (const [code, state] of [
+			['BUDGET_EXHAUSTED', 'resource-refused'],
+			['REQUEST_INVALID', 'incompatible'],
+			['POPULATION_RECONCILIATION_FAILED', 'failed']
+		] as const) {
+			const outcome = await run({
+				buildGuardArtifactSet: (() => ({
+					diagnostics: [diagnostic(code)],
+					outcome: 'unavailable'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['buildGuardArtifactSet']
+			});
+			expect(outcome).toMatchObject({
+				code: 'GUARD_ARTIFACT_SET_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'GUARD_ARTIFACT_SET',
+				state
+			});
+		}
+
+		const projectedGuardArtifactDiagnostics = await run({
+			buildGuardArtifactSet: (() => ({
+				diagnostics: [
+					'fixture/relative.ts',
+					'../escape',
+					'$.budgets',
+					'$request.budgets.maxArtifacts',
+					'$request.unsupported'
+				].map((path) => ({
+					...diagnostic('POPULATION_RECONCILIATION_FAILED'),
+					path
+				})),
+				outcome: 'unavailable'
+			})) as GuardClassificationOverlayReportRuntimeDependencies['buildGuardArtifactSet']
+		});
+		expect(projectedGuardArtifactDiagnostics).toMatchObject({
+			code: 'GUARD_ARTIFACT_SET_UNAVAILABLE',
+			diagnostics: expect.arrayContaining([
+				expect.objectContaining({ path: 'fixture/relative.ts' }),
+				expect.objectContaining({ path: '$.budgets.guardArtifactSet' }),
+				expect.objectContaining({ path: '$.budgets.guardArtifactSet.maxArtifacts' }),
+				expect.objectContaining({ path: null })
+			]),
+			state: 'failed'
+		});
+
+		for (const [validationState, state] of [
+			['INVALID', 'failed'],
+			['BUDGET_EXHAUSTED', 'resource-refused']
+		] as const) {
+			const outcome = await run({
+				validateGuardArtifactSet: (() =>
+					validation(
+						validationState
+					)) as GuardClassificationOverlayReportRuntimeDependencies['validateGuardArtifactSet']
+			});
+			expect(outcome).toMatchObject({
+				code: 'GUARD_ARTIFACT_SET_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'GUARD_ARTIFACT_SET',
+				state
+			});
+		}
+
+		for (const [code, state] of [
+			['BUDGET_EXHAUSTED', 'resource-refused'],
+			['REQUEST_INVALID', 'incompatible'],
+			['EXECUTOR_FAILED', 'failed']
+		] as const) {
+			const outcome = await run({
+				observeGuard: (async () => ({
+					diagnostics: [diagnostic(code)],
+					outcome: 'unavailable'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['observeGuard']
+			});
+			expect(outcome).toMatchObject({
+				code: 'GUARD_OBSERVATION_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'GUARD_ENFORCEMENT_LEDGER',
+				state
+			});
+		}
+
+		for (const [validationState, state] of [
+			['INVALID', 'failed'],
+			['BUDGET_EXHAUSTED', 'resource-refused']
+		] as const) {
+			const outcome = await run({
+				validateGuardObservation: (() =>
+					validation(
+						validationState
+					)) as GuardClassificationOverlayReportRuntimeDependencies['validateGuardObservation']
+			});
+			expect(outcome).toMatchObject({
+				code: 'GUARD_OBSERVATION_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'GUARD_ENFORCEMENT_LEDGER',
+				state
+			});
+		}
+
+		for (const [code, state] of [
+			['BUDGET_EXHAUSTED', 'resource-refused'],
+			['REQUEST_INVALID', 'incompatible'],
+			['MALFORMED_GENERATED_TABLE', 'failed']
+		] as const) {
+			const outcome = await run({
+				observeState: (() => ({
+					diagnostics: [diagnostic(code)],
+					outcome: 'unavailable'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['observeState']
+			});
+			expect(outcome).toMatchObject({
+				code: 'STATE_OBSERVATION_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'STATE_TOPOLOGY_OBSERVATION',
+				state
+			});
+		}
+
+		const invalidStateObservation = await run({
+			validateStateObservation: (() =>
+				validation(
+					'INVALID'
+				)) as GuardClassificationOverlayReportRuntimeDependencies['validateStateObservation']
+		});
+		expect(invalidStateObservation).toMatchObject({
+			code: 'STATE_OBSERVATION_VALIDATION_FAILED',
+			outcome: 'unavailable',
+			stage: 'STATE_TOPOLOGY_OBSERVATION',
+			state: 'failed'
+		});
+
+		for (const [code, state] of [
+			['BUDGET_EXHAUSTED', 'resource-refused'],
+			['REQUEST_INVALID', 'incompatible'],
+			['GRAPH_VALIDATION_FAILED', 'failed']
+		] as const) {
+			const outcome = await run({
+				buildStateGraph: (() => ({
+					diagnostics: [diagnostic(code)],
+					outcome: 'unavailable'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['buildStateGraph']
+			});
+			expect(outcome).toMatchObject({
+				code: 'STATE_MACHINE_GRAPH_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'STATE_MACHINE_GRAPH',
+				state
+			});
+		}
+	});
+
+	it('contains malformed forwarded telemetry and fails closed at selector, freshness, and internal boundaries', async () => {
+		const nullOptions = await runGuardClassificationOverlayReport(null, null as never);
+		expect(nullOptions).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', stage: 'REQUEST' });
+
+		const base = dependencies();
+		const progress: GuardClassificationOverlayReportProgressEvent[] = [];
+		const forwarded = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{
+				onProgress(event) {
+					progress.push(event);
+					return Promise.reject(new Error('contained progress rejection'));
+				},
+				repositoryRoot: fixture.root
+			},
+			dependencies({
+				async captureHandler(predecessorRequest, options) {
+					options.onProgress?.({ detailCode: 'SYNTHETIC', state: 'COMPLETED' } as never);
+					options.onProgress?.(1n as never);
+					return base.captureHandler(predecessorRequest, options);
+				},
+				async observeGuard(guardRequest, inputs, options) {
+					options?.onProgress?.({ phase: 'VALIDATE', state: 'COMPLETED' } as never);
+					options?.onProgress?.(1n as never);
+					return base.observeGuard(guardRequest, inputs, options);
+				}
+			})
+		);
+		expect(forwarded.outcome).toBe('partial');
+		expect(progress.some((event) => event.kind === 'PREDECESSOR_REPORT')).toBe(true);
+		expect(progress.some((event) => event.kind === 'GUARD_ADAPTER')).toBe(true);
+
+		const selectorBase = dependencies();
+		const selectorUnavailable = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				async captureHandler(predecessorRequest, options) {
+					const captured = await selectorBase.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					const semanticSnapshot = structuredClone(captured.semanticSnapshot);
+					Object.assign(semanticSnapshot, {
+						sources: semanticSnapshot.sources.filter(
+							(source) => source.logicalPath !== 'packages/rph-contracts/src/messages.ts'
+						)
+					});
+					return { ...captured, semanticSnapshot };
+				},
+				validateHandlerGraph: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateHandlerGraph']
+			})
+		);
+		expect(selectorUnavailable).toMatchObject({
+			code: 'REGISTRY_SELECTION_UNAVAILABLE',
+			stage: 'GUARD_CLASSIFICATION_OVERLAY',
+			state: 'incompatible'
+		});
+
+		const sourceBase = dependencies();
+		const stateSourceUnavailable = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				async captureHandler(predecessorRequest, options) {
+					const captured = await sourceBase.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					const semanticSnapshot = structuredClone(captured.semanticSnapshot);
+					Object.assign(semanticSnapshot, {
+						sources: semanticSnapshot.sources.filter(
+							(source) => source.logicalPath !== 'packages/rph-domain/src/transitions.data.ts'
+						)
+					});
+					return { ...captured, semanticSnapshot };
+				},
+				validateHandlerGraph: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateHandlerGraph']
+			})
+		);
+		expect(stateSourceUnavailable).toMatchObject({
+			code: 'STATE_SOURCE_BINDING_UNAVAILABLE',
+			stage: 'STATE_TOPOLOGY_OBSERVATION',
+			state: 'incompatible'
+		});
+
+		const missingArtifactBase = dependencies();
+		const missingStateArtifact = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				buildGuardArtifactSet: (() => ({
+					artifactSet: fixture.guardArtifactSet,
+					diagnostics: [],
+					outcome: 'complete'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['buildGuardArtifactSet'],
+				async captureHandler(predecessorRequest, options) {
+					const captured = await missingArtifactBase.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					return {
+						...captured,
+						frozenSubject: {
+							...captured.frozenSubject,
+							artifacts: captured.frozenSubject.artifacts.filter(
+								(artifact) => artifact.path !== 'packages/rph-domain/src/transitions.data.ts'
+							)
+						}
+					};
+				},
+				observeGuard: (async () => ({
+					diagnostics: [],
+					observation: fixture.guardObservation,
+					outcome: 'complete'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['observeGuard'],
+				validateGuardArtifactSet: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateGuardArtifactSet'],
+				validateGuardObservation: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateGuardObservation'],
+				validateHandlerGraph: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateHandlerGraph'],
+				validateObservation: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateObservation']
+			})
+		);
+		expect(missingStateArtifact).toMatchObject({
+			code: 'STATE_SOURCE_BINDING_UNAVAILABLE',
+			stage: 'STATE_TOPOLOGY_OBSERVATION',
+			state: 'incompatible'
+		});
+
+		const expectedEmptyBase = dependencies();
+		const incompatibleSnapshotContract = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				buildOverlay: (() =>
+					buildGuardClassificationOverlay(
+						fixture.inputs
+					)) as GuardClassificationOverlayReportRuntimeDependencies['buildOverlay'],
+				async captureHandler(predecessorRequest, options) {
+					const captured = await expectedEmptyBase.captureHandler(predecessorRequest, options);
+					if (captured.outcome !== 'captured') return captured;
+					return {
+						...captured,
+						semanticSnapshot: { ...captured.semanticSnapshot, expectedEmpty: true }
+					};
+				},
+				validateHandlerGraph: (() => ({
+					issues: [],
+					state: 'VALID'
+				})) as GuardClassificationOverlayReportRuntimeDependencies['validateHandlerGraph']
+			})
+		);
+		expect(incompatibleSnapshotContract).toMatchObject({
+			code: 'EVIDENCE_IDENTITY_MISMATCH',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+
+		const freshnessUnavailable = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				verifySubject: (() => {
+					throw new Error('synthetic freshness failure');
+				}) as typeof verifyFrozenSubject
+			})
+		);
+		expect(freshnessUnavailable).toMatchObject({
+			outcome: 'partial',
+			result: { currentness: { state: 'UNAVAILABLE' } }
+		});
+
+		const internalFailure = await runGuardClassificationOverlayReportWithDependencies(
+			request(),
+			{ repositoryRoot: fixture.root },
+			dependencies({
+				captureHandler: (async () => {
+					throw new Error('synthetic predecessor failure');
+				}) as GuardClassificationOverlayReportRuntimeDependencies['captureHandler']
+			})
+		);
+		expect(internalFailure).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			stage: 'RESULT',
+			state: 'failed'
+		});
 	});
 
 	it('refuses full-output truncation and keeps a small terminal refusal envelope', async () => {

@@ -150,9 +150,9 @@ describe('the mutant ledger is internally coherent', () => {
 	// WHY THIS IS HERE AND NOT IN `gate:fast` AS A NEW STEP. The obvious fix to REG-F-100 was "add
 	// `bun run mutants:preflight` to gate:fast". It does not work, for three measured reasons:
 	//
-	//   1. **PREFLIGHT ABORTS ON A DIRTY TREE.** `treeIsClean()` runs at `run.ts` module scope, BEFORE any
-	//      preflight branching, and exits 2. `gate:fast` is the thing you run on uncommitted work — the one
-	//      condition under which preflight refuses to start.
+	//   1. **PREFLIGHT ABORTS ON AN UNSTAGED TREE.** `treeIsClean()` runs at `run.ts` module scope, BEFORE any
+	//      preflight branching, and exits 2. A deliberately staged candidate is admitted against its exact index
+	//      fingerprint; ordinary `gate:fast` work may still be unstaged, which preflight correctly refuses to mutate.
 	//   2. **PREFLIGHT MUTATES THE TREE.** It APPLIES each mutant and runs `tsc` on the mutated project before
 	//      stopping. That is ~154 file writes and ~154 typechecks, and a killed process can strand a mutation
 	//      (which is why `run.ts` carries crash recovery at all). A pre-commit gate must not be able to leave a

@@ -1654,8 +1654,8 @@ function withDeclarationOwnedPairTypeParameters(): StaticSemanticSnapshot {
 			unsupportedStructureKinds: []
 		};
 	});
-	const typeParameters: StaticSemanticSnapshot['typeParameters'] = parameterSpecs.map(
-		(spec, ordinal) => {
+	const typeParameters: StaticSemanticSnapshot['typeParameters'] = parameterSpecs
+		.map((spec, ordinal) => {
 			const declarationId = declarationIds.get(spec.name)!;
 			const parameterTypeId = parameterTypes.find((type) => type.display === spec.name)!.id;
 			return {
@@ -1673,8 +1673,8 @@ function withDeclarationOwnedPairTypeParameters(): StaticSemanticSnapshot {
 				projectId: source.projectId,
 				provenanceId: typeProvenance.id
 			};
-		}
-	).sort((left, right) => (left.id < right.id ? -1 : 1));
+		})
+		.sort((left, right) => (left.id < right.id ? -1 : 1));
 	const constraintRelations: StaticSemanticSnapshot['typeRelations'] = typeParameters.map(
 		(parameter) => {
 			const preimage = {
@@ -4919,6 +4919,45 @@ describe('bounded semantic snapshot validation', () => {
 		).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.invocations[0]' })
+			])
+		);
+
+		const danglingTarget: StaticSemanticSnapshot['invocations'][number] = {
+			...call,
+			implementationDeclarationId: `semantic:declaration-${'f'.repeat(64)}` as never,
+			implementationNodeId: `semantic:node-${'f'.repeat(64)}` as never,
+			resolutionReason: 'IMPLEMENTATION_IDENTIFIED',
+			resolvedSignatureId: `semantic:signature-${'f'.repeat(64)}` as never,
+			targetState: 'IMPLEMENTATION_IDENTIFIED'
+		};
+		expect(validateSnapshot({ ...callSnapshot, invocations: [danglingTarget] }).issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: '$.invocations[0].resolvedSignatureId' }),
+				expect.objectContaining({ path: '$.invocations[0].implementationDeclarationId' }),
+				expect.objectContaining({ path: '$.invocations[0].implementationNodeId' }),
+				expect.objectContaining({ path: '$.invocations[0].resolutionReason' }),
+				expect.objectContaining({ path: '$.invocations[0].resolutionProvenanceId' })
+			])
+		);
+
+		expect(
+			validateSnapshot({
+				...callSnapshot,
+				invocations: [
+					{
+						...call,
+						resolutionReason: 'IMPLEMENTATION_UNAVAILABLE',
+						targetState: 'SIGNATURE_RESOLVED'
+					}
+				]
+			}).issues
+		).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message:
+						'Invocation target state, reason, Signature, and implementation evidence are incoherent.',
+					path: '$.invocations[0]'
+				})
 			])
 		);
 
@@ -9864,6 +9903,24 @@ describe('bounded semantic snapshot validation', () => {
 				]),
 				state: 'INVALID'
 			});
+		}
+	});
+
+	it('derives every remaining public TypeScript type category and bounded structure flag', () => {
+		const base = withCallAndConstructOverloadFacts();
+		for (const flags of [
+			ts.TypeFlags.Index,
+			ts.TypeFlags.Conditional,
+			ts.TypeFlags.IndexedAccess,
+			ts.TypeFlags.Substitution,
+			ts.TypeFlags.TemplateLiteral,
+			ts.TypeFlags.StringMapping
+		]) {
+			const malformed: StaticSemanticSnapshot = {
+				...base,
+				types: base.types.map((type, index) => (index === 0 ? { ...type, flags } : type))
+			};
+			expect(validateSnapshot(malformed, {}, contextForSnapshot(malformed)).state).toBe('INVALID');
 		}
 	});
 });

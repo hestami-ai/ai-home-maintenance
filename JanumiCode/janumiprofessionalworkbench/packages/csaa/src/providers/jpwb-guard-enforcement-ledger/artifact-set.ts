@@ -29,7 +29,7 @@ import type {
 	FrozenSubject
 } from '../../contracts/subject.js';
 import { canonicalJson, compareText, sha256 } from '../../inventory/canonical.js';
-import { classifyArtifact } from '../../subject/artifacts.js';
+import { classifyArtifactForProjects } from '../../subject/artifacts.js';
 import {
 	isFrozenSubjectCapability,
 	readFrozenSubjectArtifact
@@ -493,7 +493,7 @@ function bindArtifact(
 		const bytes = readFrozenSubjectArtifact(subject, artifact.path);
 		if (bytes === undefined) throw new Error('bytes unavailable');
 		const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-		const expected = classifyArtifact(artifact.path, source);
+		const expected = classifyArtifactForProjects(artifact.path, source, subject.projects);
 		if (
 			artifact.canonicalPathKey !== canonicalPathKey(artifact.path) ||
 			!Number.isSafeInteger(artifact.bytes) ||

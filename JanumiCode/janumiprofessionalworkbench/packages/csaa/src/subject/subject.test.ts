@@ -219,6 +219,8 @@ describe('repository path and artifact policy', () => {
 	it('keeps display case, applies injected case rules, and rejects dot/backslash/collisions', () => {
 		expect(canonicalPathKey('Packages/Demo.ts', false)).toBe('packages/demo.ts');
 		expect(canonicalPathKey('Packages/Demo.ts', true)).toBe('Packages/Demo.ts');
+		expect(canonicalPathKey('Packages/Demo.ts', 'win32')).toBe('packages/demo.ts');
+		expect(canonicalPathKey('Packages/Demo.ts', 'posix')).toBe('Packages/Demo.ts');
 		expect(assertCanonicalRelativePath('packages/demo.ts')).toBe('packages/demo.ts');
 		expect(() => assertCanonicalRelativePath('packages\\demo.ts')).toThrow('Non-canonical');
 		expect(() => assertCanonicalRelativePath('packages/./demo.ts')).toThrow('Non-canonical');
@@ -432,6 +434,12 @@ describe('repository path and artifact policy', () => {
 describe('configured test population discovery', () => {
 	function discovered(root: string) {
 		return discoverTestPopulations(captureSubject(request(root)));
+	}
+
+	function vitestSource(root: string) {
+		return discovered(root).populations.find(
+			(population) => population.provider === 'VITEST' && population.profile === 'SOURCE'
+		)!;
 	}
 
 	it('derives exact source, artifact, deterministic, and live selections from captured configuration', () => {
@@ -678,6 +686,235 @@ describe('configured test population discovery', () => {
 			populationClosure: 'OPEN',
 			status: 'PARTIAL'
 		});
+	});
+
+	it('fails open across conservative static Vitest project-shape boundaries', () => {
+		const root = testPopulationFixture();
+		write(
+			root,
+			'vitest.projects.ts',
+			`
+const dynamic = {};
+function packagesWithTests() { return []; }
+function appsWithTests() { return []; }
+export function projectsFor() {
+	return [
+		{ [dynamic]: true, test: { root: '.', include: ['verif/**/*.test.ts'], passWithNoTests: false } },
+		{ test: dynamic },
+		{
+			test: {
+				root: './packages/demo',
+				include: dynamic,
+				exclude: dynamic,
+				passWithNoTests: true
+			}
+		},
+		...packagesWithTests().map(() => {
+			return {
+				test: {
+					root: './packages/demo',
+					include: ['src/**/*.test.ts'],
+					exclude: ['src/value.test.ts'],
+					passWithNoTests: false
+				}
+			};
+		}),
+		...appsWithTests().map(() => ({
+			test: {
+				root: '.',
+				include: ['verif/**/*.test.ts'],
+				passWithNoTests: false
+			}
+		})),
+		42
+	];
+}
+`
+		);
+
+		expect(vitestSource(root)).toMatchObject({
+			limitations: expect.arrayContaining([
+				'VITEST_PROJECT_TEST_CONFIGURATION_NOT_STATIC',
+				'VITEST_PROJECT_SELECTION_NOT_STATIC',
+				'VITEST_PROJECT_EXCLUSION_NOT_STATIC',
+				'VITEST_PROJECT_FACTORY_ELEMENT_UNMODELED',
+				'VITEST_EMPTY_POPULATION_DOES_NOT_FAIL_CLOSED'
+			]),
+			status: 'PARTIAL'
+		});
+	});
+
+	it.each([
+		{
+			limitation: 'VITEST_PROJECT_FACTORY_DEFINITION_NOT_STATIC_AND_UNIQUE',
+			name: 'a non-function project factory',
+			source: 'export const projectsFor = () => [];\n'
+		},
+		{
+			limitation: 'VITEST_PROJECT_FACTORY_RETURN_NOT_STATIC_AND_UNIQUE',
+			name: 'a project factory without one return',
+			source: 'export function projectsFor() {}\n'
+		},
+		{
+			limitation: 'VITEST_PROJECT_FACTORY_RETURN_NOT_ARRAY_LITERAL',
+			name: 'a project factory returning a non-array',
+			source: 'export function projectsFor() { return {}; }\n'
+		},
+		{
+			limitation: 'VITEST_PROJECT_FACTORY_ELEMENT_UNMODELED',
+			name: 'a spread without a map projection',
+			source:
+				'function packagesWithTests() { return []; }\n' +
+				'export function projectsFor() { return [...packagesWithTests()]; }\n'
+		},
+		{
+			limitation: 'VITEST_PROJECT_FACTORY_ELEMENT_UNMODELED',
+			name: 'a mapped factory call with arguments',
+			source:
+				'function packagesWithTests() { return []; }\n' +
+				"export function projectsFor() { return [...packagesWithTests(1).map(() => ({ test: { root: '.', include: ['**/*.test.ts'], passWithNoTests: false } }))]; }\n"
+		}
+	])('fails open for $name', ({ limitation, source }) => {
+		const root = testPopulationFixture();
+		write(root, 'vitest.projects.ts', source);
+		expect(vitestSource(root)).toMatchObject({
+			limitations: expect.arrayContaining([limitation]),
+			status: 'PARTIAL'
+		});
+	});
+
+	it('rejects a statically modeled Vitest exclusion that escapes the repository', () => {
+		const root = testPopulationFixture();
+		write(
+			root,
+			'vitest.projects.ts',
+			`
+function packagesWithTests() { return []; }
+function appsWithTests() { return []; }
+export function projectsFor() {
+	return [
+		...packagesWithTests().map(() => ({
+			test: {
+				root: '.',
+				include: ['verif/**/*.test.ts'],
+				exclude: ['../../../escape'],
+				passWithNoTests: false
+			}
+		})),
+		...appsWithTests().map(() => ({
+			test: {
+				root: '.',
+				include: ['verif/**/*.test.ts'],
+				passWithNoTests: false
+			}
+		}))
+	];
+}
+`
+		);
+		expect(vitestSource(root)).toMatchObject({
+			limitations: expect.arrayContaining([
+				'VITEST_PROJECT_SELECTION_UNSUPPORTED_OR_ESCAPES_REPOSITORY'
+			]),
+			status: 'PARTIAL'
+		});
+	});
+
+	it.each([
+		{
+			name: 'an object-binding conflict',
+			suffix: '\nconst { defineConfig } = { defineConfig: null };\n'
+		},
+		{
+			name: 'a namespace-import conflict',
+			suffix: "\nimport * as defineConfig from 'fixture-conflict';\n"
+		},
+		{
+			name: 'a function-binding conflict',
+			suffix: '\nfunction defineConfig() { return null; }\n'
+		}
+	])('rejects $name for defineConfig', ({ suffix }) => {
+		const root = testPopulationFixture();
+		const source = readFileSync(join(root, 'vitest.config.ts'), 'utf8');
+		write(root, 'vitest.config.ts', `${source}${suffix}`);
+		expect(vitestSource(root)).toMatchObject({
+			limitations: expect.arrayContaining(['VITEST_DEFINE_CONFIG_EXPORT_NOT_STATIC_AND_UNIQUE']),
+			status: 'PARTIAL'
+		});
+	});
+
+	it('rejects conflicting, missing, and non-call project bindings', () => {
+		const conflicting = testPopulationFixture();
+		const source = readFileSync(join(conflicting, 'vitest.config.ts'), 'utf8');
+		write(
+			conflicting,
+			'vitest.config.ts',
+			`${source}\nconst { projectsFor } = { projectsFor: null };\n`
+		);
+		expect(vitestSource(conflicting).limitations).toEqual(
+			expect.arrayContaining(['VITEST_PROJECT_CONFIGURATION_IMPORT_NOT_RESOLVED'])
+		);
+
+		const missingTest = testPopulationFixture();
+		write(
+			missingTest,
+			'vitest.config.ts',
+			"import { defineConfig } from 'vitest/config';\n" +
+				"import { projectsFor } from './vitest.projects.js';\n" +
+				'export default defineConfig({});\n'
+		);
+		expect(vitestSource(missingTest).limitations).toEqual(
+			expect.arrayContaining([
+				'VITEST_ROOT_TEST_CONFIGURATION_NOT_STATIC',
+				'VITEST_PROJECT_FACTORY_NOT_BOUND_WITH_EXTENDS_TRUE'
+			])
+		);
+
+		const nonCall = testPopulationFixture();
+		write(
+			nonCall,
+			'vitest.config.ts',
+			"import { defineConfig } from 'vitest/config';\n" +
+				"import { projectsFor } from './vitest.projects.js';\n" +
+				'export default defineConfig({ test: { projects: [] } });\n'
+		);
+		expect(vitestSource(nonCall).limitations).toEqual(
+			expect.arrayContaining(['VITEST_PROJECT_FACTORY_NOT_BOUND_WITH_EXTENDS_TRUE'])
+		);
+	});
+
+	it('fails open for unreadable Vitest and malformed or falsely bound Playwright configurations', () => {
+		const unreadable = testPopulationFixture();
+		writeFileSync(join(unreadable, 'vitest.config.ts'), Buffer.from([0xff]));
+		expect(vitestSource(unreadable).limitations).toEqual(
+			expect.arrayContaining(['VITEST_CONFIGURATION_UNREADABLE_OR_MALFORMED'])
+		);
+
+		const malformed = testPopulationFixture();
+		write(
+			malformed,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from '@playwright/test';\nexport default defineConfig({\n"
+		);
+		expect(
+			discovered(malformed).populations.find(
+				(population) =>
+					population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+			)?.limitations
+		).toEqual(expect.arrayContaining(['PLAYWRIGHT_CONFIGURATION_UNREADABLE_OR_MALFORMED']));
+
+		const falseBinding = testPopulationFixture();
+		write(
+			falseBinding,
+			'apps/demo/playwright.config.ts',
+			"import { defineConfig } from 'fixture-playwright';\nexport default defineConfig({ testDir: './scenarios', testMatch: '**/*.journey.ts' });\n"
+		);
+		expect(
+			discovered(falseBinding).populations.find(
+				(population) =>
+					population.provider === 'PLAYWRIGHT' && population.profile === 'DETERMINISTIC'
+			)?.limitations
+		).toEqual(expect.arrayContaining(['PLAYWRIGHT_DEFINE_CONFIG_EXPORT_NOT_STATIC_AND_UNIQUE']));
 	});
 });
 
@@ -2385,10 +2622,14 @@ describe('capture safety, immutability, freshness, and reconciliation', () => {
 			reconciliationScope: 'EXACT_PHYSICAL_POPULATION'
 		});
 		expect(verifyFrozenSubject(subject, { rootLocator: root }).state).toBe('CURRENT');
-		write(root, 'packages/demo/src/new.ts', 'export const added = true;\n');
+		write(root, 'packages/demo/src/z-new.ts', 'export const zAdded = true;\n');
+		write(root, 'packages/demo/src/a-new.ts', 'export const aAdded = true;\n');
 		const freshness = verifyFrozenSubject(subject, { rootLocator: root });
 		expect(freshness.state).toBe('STALE');
-		expect(freshness.changedPaths).toContain('packages/demo/src/new.ts');
+		expect(freshness.changedPaths).toEqual([
+			'packages/demo/src/a-new.ts',
+			'packages/demo/src/z-new.ts'
+		]);
 	});
 
 	it('rejects an output beneath an escaping symlink and duplicate in-root aliases', () => {
@@ -2445,11 +2686,22 @@ describe('live JPWB and inventory projection', () => {
 		expect(counts.get('packages/rph-contracts/tsconfig.json')).toBe(28);
 		expect(counts.get('packages/rph-contracts/tsconfig.build.json')).toBe(10);
 		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report commands
-		// import their bounded implementation closures into the scripts program; the verification program also
-		// grows with the public report contract and root-surface assertions.
-		expect(counts.get('scripts/tsconfig.json')).toBe(36);
-		expect(counts.get('verif/tsconfig.json')).toBe(48);
+		// import their bounded implementation closures into the scripts program; the mutation baseline helper is
+		// also a scripts-project root. The verification program grows with public contract assertions.
+		expect(counts.get('scripts/tsconfig.json')).toBe(41);
+		expect(counts.get('verif/tsconfig.json')).toBe(50);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
+		for (const path of [
+			'package.json',
+			'packages/rph-contracts/package.json',
+			'packages/rph-domain/package.json'
+		]) {
+			const manifest = subject.artifacts.find((artifact) => artifact.path === path);
+			expect(manifest?.roles, path).toContain('COMPILER_CANDIDATE');
+			expect(manifest?.reason, path).toContain(
+				'TypeScript project discovery selected this artifact as a compiler root.'
+			);
+		}
 		expect(
 			subject.projects.find((project) => project.configPath === 'apps/rph-demo/tsconfig.json')
 				?.frameworkCandidates
@@ -2577,7 +2829,7 @@ describe('live JPWB and inventory projection', () => {
 		expect(sha256(`JAN-CSAA-SUBJECT\0${'1\0'}${canonicalJson(identityPreimage)}`)).toBe(
 			inventory.subject.subjectId
 		);
-		expect(inventory.subject.resolutionCompleteness).toBe('PARTIAL');
+		expect(inventory.subject.resolutionCompleteness).toBe('COMPLETE');
 		expect(inventory.subject.generatedContexts).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -2592,13 +2844,13 @@ describe('live JPWB and inventory projection', () => {
 		expect(app).toMatchObject({
 			generatedContexts: [expect.objectContaining({ freshness: 'CURRENT' })],
 			rootDisposition: 'COMPILER_ROOTS',
-			status: 'PARTIAL'
+			status: 'COMPLETE'
 		});
 		expect(app?.partialityReasons.map((reason) => reason.code)).toEqual([
 			'FRAMEWORK_CANDIDATES_PRESENT'
 		]);
 		const markdown = renderInventoryMarkdown(inventory);
-		expect(markdown).toContain('| `apps/rph-demo/tsconfig.json` | `PARTIAL` | `COMPILER_ROOTS` |');
+		expect(markdown).toContain('| `apps/rph-demo/tsconfig.json` | `COMPLETE` | `COMPILER_ROOTS` |');
 		expect(markdown).toContain('`CURRENT: apps/rph-demo/.svelte-kit/tsconfig.json`');
 		expect(markdown).not.toContain('`GENERATED_CONTEXT_FRESHNESS_UNKNOWN`');
 	}, 30_000);

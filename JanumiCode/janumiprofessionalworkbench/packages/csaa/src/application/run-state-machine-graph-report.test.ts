@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	STATE_MACHINE_GRAPH_REPORT_AUTHORITY,
@@ -199,6 +199,104 @@ describe('runStateMachineGraphReport', () => {
 				observationDiagnostic('MALFORMED_GENERATED_TABLE')
 			])
 		).toBe('incompatible');
+		expect(
+			classifyStateMachineObservationFailureState([observationDiagnostic('SUBJECT_ID_MISMATCH')])
+		).toBe('failed');
+	});
+
+	it('rejects exact request-shape, version, path, and nonpositive-budget violations', () => {
+		const root = fixture();
+		const accessor = { ...request() };
+		Object.defineProperty(accessor, 'operationVersion', {
+			enumerable: true,
+			get: () => STATE_MACHINE_GRAPH_REPORT_OPERATION_VERSION
+		});
+		const base = request();
+		const cases: ReadonlyArray<readonly [unknown, string, string]> = [
+			[Object.assign(Object.create({ inherited: true }), request()), 'REQUEST_SHAPE_INVALID', '$'],
+			[{ ...request(), unexpected: true }, 'REQUEST_SHAPE_INVALID', '$'],
+			[accessor, 'REQUEST_SHAPE_INVALID', '$.operationVersion'],
+			[
+				{ ...request(), operationVersion: 'state-machine-graph-report/0.0.0' },
+				'REQUEST_OPERATION_INCOMPATIBLE',
+				'$.operationVersion'
+			],
+			[
+				{ ...request(), schemaVersion: 'state-machine-graph-report-request/0.0.0' },
+				'REQUEST_SCHEMA_INCOMPATIBLE',
+				'$.schemaVersion'
+			],
+			[
+				withGraphBudgets(base, { maxNodes: 0 }),
+				'REQUEST_BUDGET_INVALID',
+				'$.budgets.stateMachineGraph.maxNodes'
+			],
+			[
+				{ ...request(), source: { ...request().source, logicalPath: '' } },
+				'REQUEST_PATH_INVALID',
+				'$.source.logicalPath'
+			]
+		];
+		for (const [value, code, path] of cases) {
+			const outcome = runStateMachineGraphReport(value, { repositoryRoot: root });
+			expect(outcome).toMatchObject({ code, outcome: 'unavailable', stage: 'REQUEST' });
+			if (outcome.outcome !== 'unavailable') throw new Error(JSON.stringify(outcome));
+			expect(outcome.diagnostics).toContainEqual(expect.objectContaining({ path }));
+		}
+
+		const predecessorRefusal = runStateMachineGraphReport(
+			{ ...request(), subjectProjectConfigPaths: [] },
+			{ repositoryRoot: root }
+		);
+		expect(predecessorRefusal).toMatchObject({ outcome: 'unavailable', stage: 'REQUEST' });
+	});
+
+	it('uses a stable zero elapsed fallback when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: StateMachineGraphReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => {
+			throw new Error('synthetic monotonic clock failure');
+		});
+		try {
+			const outcome = runStateMachineGraphReport(request(), {
+				onProgress: (event) => void progress.push(event),
+				repositoryRoot: root
+			});
+			expect(outcome.outcome).toBe('partial');
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
+	});
+
+	it('maps unavailable predecessor diagnostics and contains hostile adapter options', () => {
+		const missingRoot = join(tmpdir(), 'csaa-state-machine-report-missing-root');
+		rmSync(missingRoot, { force: true, recursive: true });
+		const unavailable = runStateMachineGraphReport(request(), { repositoryRoot: missingRoot });
+		expect(unavailable).toMatchObject({
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE'
+		});
+		expect(unavailable.diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ source: 'PREDECESSOR_PIPELINE' })])
+		);
+
+		const hostileOptions = {} as { readonly repositoryRoot: string };
+		Object.defineProperty(hostileOptions, 'repositoryRoot', {
+			enumerable: true,
+			get() {
+				throw new Error('synthetic adapter option failure');
+			}
+		});
+		const internal = runStateMachineGraphReport(request(), hostileOptions);
+		expect(internal).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(stateMachineGraphReportExitCode(internal)).toBe(4);
 	});
 
 	it(

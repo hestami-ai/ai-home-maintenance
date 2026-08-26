@@ -1,11 +1,4 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -2713,5 +2706,82 @@ describe('buildStaticSemanticSnapshot', () => {
 			],
 			outcome: 'unavailable'
 		});
+	});
+
+	it('maps remaining provider and capture refusal codes to their exact public outcomes', () => {
+		const root = fixture();
+		const subject = resolved(root);
+		const request = semanticRequest(root, subject.descriptor.subjectId);
+		const cases = [
+			{
+				code: 'PROGRAM_RECIPE_MISMATCH',
+				error: new staticRawExtraction.StaticRawExtractionError(
+					'IDENTITY_MISMATCH',
+					'forced identity mismatch'
+				),
+				outcome: 'incompatible'
+			},
+			{
+				code: 'FROZEN_BYTES_UNAVAILABLE',
+				error: new staticRawExtraction.StaticRawExtractionError(
+					'SOURCE_EVIDENCE_MISSING',
+					'forced source evidence refusal'
+				),
+				outcome: 'unavailable'
+			},
+			{
+				code: 'COMPILER_CONTEXT_FORBIDDEN',
+				error: new staticRawExtraction.StaticRawExtractionError(
+					'PATH_MAPPING_FAILED',
+					'forced path mapping refusal'
+				),
+				outcome: 'unavailable'
+			},
+			{
+				code: 'SEMANTIC_VALIDATION_FAILED',
+				error: new staticRawExtraction.StaticRawExtractionError(
+					'UNSUPPORTED_SYNTAX',
+					'forced unsupported syntax'
+				),
+				outcome: 'unavailable'
+			},
+			{
+				code: 'COMPILER_CONTEXT_UNAVAILABLE',
+				error: new CompilerInputCaptureError(
+					'CONTEXT_UNAVAILABLE',
+					'forced context unavailability'
+				),
+				outcome: 'unavailable'
+			},
+			{
+				code: 'PROGRAM_RECIPE_MISMATCH',
+				error: new CompilerInputCaptureError('INVALID_QUERY', 'forced invalid query'),
+				outcome: 'incompatible'
+			},
+			{
+				code: 'SEMANTIC_VALIDATION_FAILED',
+				error: new CompilerInputCaptureError('DUPLICATE_QUERY', 'forced duplicate query'),
+				outcome: 'unavailable'
+			}
+		] as const;
+
+		for (const testCase of cases) {
+			const extraction = vi
+				.spyOn(staticRawExtraction, 'extractStaticRaw')
+				.mockImplementation(() => {
+					throw testCase.error;
+				});
+			const outcome = (() => {
+				try {
+					return buildStaticSemanticSnapshot(request, { subject });
+				} finally {
+					extraction.mockRestore();
+				}
+			})();
+			expect(outcome).toMatchObject({
+				diagnostics: [expect.objectContaining({ code: testCase.code })],
+				outcome: testCase.outcome
+			});
+		}
 	});
 });

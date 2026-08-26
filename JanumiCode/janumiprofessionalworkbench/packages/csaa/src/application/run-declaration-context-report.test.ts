@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DECLARATION_CONTEXT_ANALYSIS_NONCLAIMS } from '../contracts/declaration-context-analysis.js';
 import {
@@ -11,6 +11,7 @@ import {
 	DECLARATION_CONTEXT_REPORT_PREDECESSOR_NONCLAIMS,
 	DECLARATION_CONTEXT_REPORT_REQUEST_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_REPORT_SAFETY_CEILINGS,
+	DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION,
 	DECLARATION_CONTEXT_REPORT_SELECTION,
 	type DeclarationContextReportBudgets,
 	type DeclarationContextReportRequest
@@ -287,8 +288,8 @@ describe('runDeclarationContextReport', () => {
 			const outcome = runDeclarationContextReport(request(selected), {
 				repositoryRoot: selected.root
 			});
-			expect(outcome.outcome).toBe('partial');
 			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(outcome.outcome).toBe('partial');
 			expect(outcome.result.binding).toMatchObject({
 				aliasHops: 0,
 				declarationCount: 1,
@@ -366,6 +367,357 @@ describe('runDeclarationContextReport', () => {
 			});
 		}
 	);
+
+	it('rejects non-data records, incompatible versions, invalid export names, and inconsistent local budgets', () => {
+		const selected = fixture();
+		const base = request(selected);
+		const inherited = Object.assign(Object.create({ inherited: true }) as object, base);
+		const exportBudget = {
+			...base.budgets.declarationContext,
+			maxInputStringCharacters: 1
+		};
+		const shortReadBudget = {
+			...base.budgets.declarationContext,
+			maxReadBytes: base.budgets.declarationContext.maxProgramReadBytes - 1
+		};
+		const cases: readonly {
+			readonly code: string;
+			readonly path: string;
+			readonly state?: 'incompatible' | 'resource-refused';
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: inherited },
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: { ...base, unexpected: true } },
+			{
+				code: 'REQUEST_OPERATION_INCOMPATIBLE',
+				path: '$.operationVersion',
+				value: { ...base, operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_SCHEMA_INCOMPATIBLE',
+				path: '$.schemaVersion',
+				value: { ...base, schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_EXPORT_NAME_INVALID',
+				path: '$.exportName',
+				value: { ...base, exportName: '' }
+			},
+			{
+				code: 'REQUEST_EXPORT_NAME_BUDGET_EXCEEDED',
+				path: '$.exportName',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: { ...base.budgets, declarationContext: exportBudget },
+					exportName: 'ab'
+				}
+			},
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				path: '$.budgets.declarationContext.maxReadBytes',
+				value: {
+					...base,
+					budgets: { ...base.budgets, declarationContext: shortReadBudget }
+				}
+			}
+		];
+
+		for (const malformed of cases) {
+			const outcome = runDeclarationContextReport(malformed.value, {
+				repositoryRoot: selected.root
+			});
+			expect(outcome, malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: malformed.state ?? 'incompatible'
+			});
+			expect(outcome.diagnostics[0], malformed.code).toMatchObject({ path: malformed.path });
+		}
+
+		for (const value of [0, -0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+			const outcome = runDeclarationContextReport(
+				{
+					...base,
+					budgets: {
+						...base.budgets,
+						declarationContext: {
+							...base.budgets.declarationContext,
+							maxDeclarations: value
+						}
+					}
+				},
+				{ repositoryRoot: selected.root }
+			);
+			expect(outcome, String(value)).toMatchObject({
+				code: 'REQUEST_BUDGET_INVALID',
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: 'incompatible'
+			});
+		}
+	});
+
+	it('contains rejected telemetry and retains a monotonic zero fallback when the host clock fails', async () => {
+		const baseline = runDeclarationContextReport({}, { repositoryRoot: process.cwd() });
+		const events: DeclarationContextReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => {
+			throw new Error('The trusted-host monotonic clock is unavailable.');
+		});
+		let observed;
+		try {
+			observed = runDeclarationContextReport(
+				{},
+				{
+					onProgress: (event) => {
+						events.push(event);
+						return Promise.reject(new Error('Rejected telemetry remains out of band.'));
+					},
+					repositoryRoot: process.cwd()
+				}
+			);
+		} finally {
+			clock.mockRestore();
+		}
+
+		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
+		expect(events).toHaveLength(2);
+		expect(events.every((event) => event.elapsedMs === 0)).toBe(true);
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	});
+
+	it(
+		'preserves bounded declaration diagnostics while redacting absolute and rejecting escaping paths',
+		{ timeout: 120_000 },
+		async () => {
+			const selected = fixture();
+			const baseline = runDeclarationContextReport(request(selected), {
+				repositoryRoot: selected.root
+			});
+			expect(baseline.outcome).toBe('partial');
+			if (baseline.outcome !== 'partial') throw new Error(JSON.stringify(baseline));
+			const analysis = baseline.result.evidence.declarationContextAnalysis;
+			vi.resetModules();
+			vi.doMock('../semantic/build-declaration-context-analysis.js', () => ({
+				buildDeclarationContextAnalysis: () => ({
+					analysis,
+					diagnostics: [
+						{
+							code: 'VALIDATION_FAILED',
+							message: `Validation warning under ${selected.root}.`,
+							path: join(selected.root, 'packages/module-target/dist/index.d.ts'),
+							phase: 'ANALYSIS_VALIDATE'
+						},
+						{
+							code: 'VALIDATION_FAILED',
+							message: 'Validation warning outside the selected root.',
+							path: '../outside.d.ts',
+							phase: 'ANALYSIS_VALIDATE'
+						}
+					],
+					outcome: 'partial'
+				})
+			}));
+
+			try {
+				const isolated = await import('./run-declaration-context-report.js');
+				const outcome = isolated.runDeclarationContextReport(request(selected), {
+					repositoryRoot: selected.root
+				});
+				expect(outcome.outcome).toBe('partial');
+				if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+				expect(outcome.diagnostics.slice(-2).map((diagnostic) => diagnostic.path)).toEqual([
+					'packages/module-target/dist/index.d.ts',
+					null
+				]);
+				expect(outcome.stageOutcomes.declarationContext.diagnosticCodes).toEqual([
+					'VALIDATION_FAILED',
+					'VALIDATION_FAILED'
+				]);
+				expect(canonicalSemanticJson(outcome)).not.toContain(selected.root);
+			} finally {
+				vi.doUnmock('../semantic/build-declaration-context-analysis.js');
+				vi.resetModules();
+			}
+		}
+	);
+
+	it('classifies an unrecognized declaration-analysis failure as failed', async () => {
+		const selected = fixture();
+		vi.resetModules();
+		vi.doMock('../semantic/build-declaration-context-analysis.js', () => ({
+			buildDeclarationContextAnalysis: () => ({
+				diagnostics: [
+					{
+						code: 'VALIDATION_FAILED',
+						message: 'The declaration analysis did not validate.',
+						path: null,
+						phase: 'ANALYSIS_VALIDATE'
+					}
+				],
+				outcome: 'unavailable'
+			})
+		}));
+
+		try {
+			const isolated = await import('./run-declaration-context-report.js');
+			const outcome = isolated.runDeclarationContextReport(request(selected), {
+				repositoryRoot: selected.root
+			});
+			expect(outcome).toMatchObject({
+				code: 'DECLARATION_CONTEXT_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'DECLARATION_CONTEXT',
+				state: 'failed'
+			});
+		} finally {
+			vi.doUnmock('../semantic/build-declaration-context-analysis.js');
+			vi.resetModules();
+		}
+	});
+
+	it('retains capture-bound evidence when the final currentness observer fails closed', async () => {
+		const selected = fixture();
+		let verificationCalls = 0;
+		vi.resetModules();
+		vi.doMock('../subject/freshness.js', async (importOriginal) => {
+			const actual = await importOriginal<typeof import('../subject/freshness.js')>();
+			return {
+				...actual,
+				verifyFrozenSubject: (...args: Parameters<typeof actual.verifyFrozenSubject>) => {
+					verificationCalls += 1;
+					if (verificationCalls === 5) throw new Error('Final currentness could not be observed.');
+					return actual.verifyFrozenSubject(...args);
+				}
+			};
+		});
+
+		try {
+			const isolated = await import('./run-declaration-context-report.js');
+			const outcome = isolated.runDeclarationContextReport(request(selected), {
+				repositoryRoot: selected.root
+			});
+			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(outcome.outcome).toBe('partial');
+			expect(verificationCalls).toBe(5);
+			expect(outcome.result.currentness).toMatchObject({
+				changedPaths: [],
+				diagnosticCodes: ['SUBJECT_CHANGED_DURING_RESOLUTION'],
+				state: 'UNAVAILABLE'
+			});
+		} finally {
+			vi.doUnmock('../subject/freshness.js');
+			vi.resetModules();
+		}
+	});
+
+	it(
+		'rejects declaration evidence that does not reconcile with the captured subject identity',
+		{ timeout: 120_000 },
+		async () => {
+			const selected = fixture();
+			const baseline = runDeclarationContextReport(request(selected), {
+				repositoryRoot: selected.root
+			});
+			expect(baseline.outcome).toBe('partial');
+			if (baseline.outcome !== 'partial') throw new Error(JSON.stringify(baseline));
+			const analysis = {
+				...baseline.result.evidence.declarationContextAnalysis,
+				subjectId: 'non-reconciling-subject'
+			};
+			vi.resetModules();
+			vi.doMock('../semantic/build-declaration-context-analysis.js', () => ({
+				buildDeclarationContextAnalysis: () => ({ analysis, diagnostics: [], outcome: 'partial' })
+			}));
+
+			try {
+				const isolated = await import('./run-declaration-context-report.js');
+				const outcome = isolated.runDeclarationContextReport(request(selected), {
+					repositoryRoot: selected.root
+				});
+				expect(outcome).toMatchObject({
+					code: 'EVIDENCE_IDENTITY_MISMATCH',
+					outcome: 'unavailable',
+					stage: 'RESULT',
+					state: 'failed'
+				});
+			} finally {
+				vi.doUnmock('../semantic/build-declaration-context-analysis.js');
+				vi.resetModules();
+			}
+		}
+	);
+
+	it('fails closed when canonical terminal-report serialization is unavailable', async () => {
+		const selected = fixture();
+		vi.resetModules();
+		vi.doMock('../semantic/canonical.js', async (importOriginal) => {
+			const actual = await importOriginal<typeof import('../semantic/canonical.js')>();
+			return {
+				...actual,
+				canonicalSemanticJsonWitness: (value: unknown) => {
+					const record = value as Readonly<Record<string, unknown>>;
+					if (
+						value !== null &&
+						typeof value === 'object' &&
+						record.schemaVersion === DECLARATION_CONTEXT_REPORT_SCHEMA_VERSION &&
+						record.outcome === 'partial'
+					)
+						throw new Error('Canonical report serialization is unavailable.');
+					return actual.canonicalSemanticJsonWitness(value);
+				}
+			};
+		});
+
+		try {
+			const isolated = await import('./run-declaration-context-report.js');
+			const outcome = isolated.runDeclarationContextReport(request(selected), {
+				repositoryRoot: selected.root
+			});
+			expect(outcome).toMatchObject({
+				code: 'RESULT_SERIALIZATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'RESULT',
+				state: 'failed'
+			});
+		} finally {
+			vi.doUnmock('../semantic/canonical.js');
+			vi.resetModules();
+		}
+	});
+
+	it('fails closed when the trusted host throws while supplying its fixed repository root', () => {
+		const selected = fixture();
+		const events: DeclarationContextReportProgressEvent[] = [];
+		const options = new Proxy(
+			{
+				onProgress: (event: DeclarationContextReportProgressEvent) => events.push(event),
+				repositoryRoot: selected.root
+			},
+			{
+				get(target, property, receiver) {
+					if (property === 'repositoryRoot')
+						throw new Error('The trusted host could not supply its fixed root.');
+					return Reflect.get(target, property, receiver);
+				}
+			}
+		);
+		const outcome = runDeclarationContextReport(request(selected), options);
+
+		expect(outcome).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(declarationContextReportExitCode(outcome)).toBe(4);
+		expect(events.at(-1)).toMatchObject({
+			detailCode: 'INTERNAL_FAILURE',
+			phase: 'PREDECESSOR_PIPELINE',
+			state: 'FAILED'
+		});
+	});
 
 	it('rejects hostile request shapes and absolute-ceiling excess before analysis', () => {
 		const selected = fixture();

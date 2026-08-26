@@ -3339,5 +3339,145 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts'],
 		why: "THE CONTROL NEEDS ITS OWN MUTANT. A broker that asserted the WRONG type would satisfy both refusal tests above perfectly \u2014 non-PWAs still refused \u2014 while breaking authoring for every real PWA. Only the control ('the broker still returns the real PWA, PUBLISHED and not fabricated') can catch that, and it reddens in the opposite direction from its two siblings. \u26a0 It shares an anchor with F201-broker-fabricates-draft-for-any-object by design: the same one line is the whole guard, and the two mutations of it fail in OPPOSITE directions, which is what distinguishes a real assertion from one that merely refuses a lot.",
 		source: 'REG-F-201'
+	},
+	// ── JAN-CSAA total-capability completion: load-bearing fail-closed seams ───────────────────────────────────
+	{
+		id: 'CSAA-M1-four-valued-short-circuit-inverts-the-decisive-truth',
+		file: 'packages/csaa/src/query/four-valued-query-algebra.ts',
+		find: "\tif (node.kind === 'OR' || node.kind === 'ANY') return 'TRUE';",
+		replace: "\tif (node.kind === 'OR' || node.kind === 'ANY') return 'FALSE';",
+		expectRed: ['packages/csaa/src/query/four-valued-query-algebra.test.ts'],
+		why: 'A short-circuit witness is sound only when OR and ANY stop on TRUE while AND and ALL stop on FALSE. Inverting the OR/ANY decisive truth makes the optimized evaluator disagree with the eager four-valued algebra.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M2-native-projection-ignores-an-intersecting-unknown-population',
+		file: 'packages/csaa/src/rules/jpwb-harmonization-native-projection.ts',
+		find: "\treturn intersects ? 'OPEN' : 'EXACT_RULE_ELIGIBLE_PATH_POPULATION';",
+		replace: "\treturn 'EXACT_RULE_ELIGIBLE_PATH_POPULATION';",
+		expectRed: ['packages/csaa/src/rules/jpwb-harmonization-native-projection.test.ts'],
+		why: 'A rule projection may close an eligible-path population only when no positive or unknown excluded record intersects it. Ignoring that intersection converts missing physical files into an absence conclusion.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M3-content-store-reuses-across-a-changed-dependency-digest',
+		file: 'packages/csaa/src/persistence/content-addressed-file-store.ts',
+		find: '\t\t\t\tprior.dependencyDigest === dependencies &&\n',
+		replace: '',
+		expectRed: ['packages/csaa/src/persistence/content-addressed-file-store.test.ts'],
+		why: 'Incremental reuse is valid only when the exact dependency identities still hash to the prior dependency digest. Dropping this limb returns stale bytes after an input change while presenting them as a current generation.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M4-verification-accepts-any-passing-assertion',
+		file: 'packages/csaa/src/cli/compose-coding-agent-cli-handlers.ts',
+		find: '\t\t\t\tassertionResults.every((assertion) => assertion.passed);',
+		replace: '\t\t\t\tassertionResults.some((assertion) => assertion.passed);',
+		expectRed: ['packages/csaa/src/cli/compose-coding-agent-cli-handlers.test.ts'],
+		why: 'Workflow verification is conjunctive: every declared assertion and both snapshot bindings must pass. Accepting one green assertion hides a simultaneously failed exact expectation and wrongly returns workflow completion.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M5-cancelled-commit-is-misreported-as-store-unavailable',
+		file: 'packages/csaa/src/cli/run-coding-agent-cli.ts',
+		find: "\t\t\t\t} catch {\n\t\t\t\t\tawait rollbackArtifactTransaction(options.artifactTransaction);\n\t\t\t\t\tif (signalAborted(options.signal))\n\t\t\t\t\t\treturn interruptedResult(invocation.request, responseAt, 'CANCELLED');",
+		replace:
+			"\t\t\t\t} catch {\n\t\t\t\t\tawait rollbackArtifactTransaction(options.artifactTransaction);\n\t\t\t\t\tif (false)\n\t\t\t\t\t\treturn interruptedResult(invocation.request, responseAt, 'CANCELLED');",
+		expectRed: ['packages/csaa/src/cli/run-coding-agent-cli.test.ts'],
+		why: 'If cancellation interrupts a rejected durable commit, rollback must be followed by the typed CANCELLED refusal. Falling through to store-unavailable erases the trusted host cancellation and gives the caller the wrong retry and currentness semantics.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M6-explanation-skips-hybrid-evidence-replay-equality',
+		file: 'packages/csaa/src/cli/compose-coding-agent-cli-handlers.ts',
+		find: '\t\t\t\tcanonicalSemanticJson(replayedHybridEvidence) !==\n\t\t\t\t\tcanonicalSemanticJson(findings.hybridEvidence)',
+		replace: '\t\t\t\tfalse',
+		expectRed: ['packages/csaa/src/cli/compose-coding-agent-cli-handlers.test.ts'],
+		why: 'Explanation may accept stored hybrid evidence only when exact current frozen bytes and the referenced trace reproduce it canonically. Removing that equality lets a content-addressed findings artifact carry tampered runtime evidence into an apparently replayed explanation.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M7-hybrid-projector-analyzes-an-inventory-only-artifact',
+		file: 'packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.ts',
+		find: "\tif (artifact.disposition !== 'ANALYZED' || artifact.bytes < 0 || !SHA256.test(artifact.sha256))",
+		replace: '\tif (artifact.bytes < 0 || !SHA256.test(artifact.sha256))',
+		expectRed: ['packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.test.ts'],
+		why: 'The five hybrid prerequisites are source-analysis claims, so an INVENTORY_ONLY artifact is not an admitted source region even when bytes and digest are present. Dropping the disposition guard promotes a non-analysis census artifact into DFG or taint evidence.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M8-persistence-validator-accepts-the-unimplemented-sqlite-backend',
+		file: 'packages/csaa/src/persistence/assess-dwp-007-persistence-selection.ts',
+		find: "\texactJson(\n\t\trecord.selection,\n\t\t{\n\t\t\tacceptance: 'TECHNICAL_ACCEPTANCE_SATISFIED_WITHOUT_SLO',\n\t\t\treasons: [\n\t\t\t\t'SELECTED_BACKEND_PASSES_EVERY_REQUIRED_CRITERION',\n\t\t\t\t'BETTER_SQLITE3_IS_NOT_A_BUN_WINDOWS_SAFE_IMPLEMENTED_CSAA_STORE',\n\t\t\t\t'BUN_SQLITE_BUILTIN_WOULD_REQUIRE_A_DIFFERENT_UNIMPLEMENTED_ADAPTER',\n\t\t\t\t'REUSING_THE_VALIDATED_FILE_STORE_AVOIDS_SEMANTIC_AND_MIGRATION_RISK'\n\t\t\t],\n\t\t\tselectedBackend: 'CONTENT_ADDRESSED_FILES',",
+		replace:
+			"\texactJson(\n\t\trecord.selection,\n\t\t{\n\t\t\tacceptance: 'TECHNICAL_ACCEPTANCE_SATISFIED_WITHOUT_SLO',\n\t\t\treasons: [\n\t\t\t\t'SELECTED_BACKEND_PASSES_EVERY_REQUIRED_CRITERION',\n\t\t\t\t'BETTER_SQLITE3_IS_NOT_A_BUN_WINDOWS_SAFE_IMPLEMENTED_CSAA_STORE',\n\t\t\t\t'BUN_SQLITE_BUILTIN_WOULD_REQUIRE_A_DIFFERENT_UNIMPLEMENTED_ADAPTER',\n\t\t\t\t'REUSING_THE_VALIDATED_FILE_STORE_AVOIDS_SEMANTIC_AND_MIGRATION_RISK'\n\t\t\t],\n\t\t\tselectedBackend: 'SQLITE_BETTER_SQLITE3',",
+		expectRed: ['packages/csaa/src/persistence/assess-dwp-007-persistence-selection.test.ts'],
+		why: 'The checked decision selected the already implemented file store and explicitly found better-sqlite3 ineligible on the active Bun/Windows host. A validator that canonizes SQLite would admit a forged decision for an adapter that was never implemented or accepted.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M9-g4-closes-over-a-wider-provider-module-population',
+		file: 'packages/csaa/src/graph/run-current-dependency-cruiser-differential.ts',
+		find: '\t\t!samePaths(deepIndexedSourcePaths, expected) ||\n\t\t!samePaths(providerInputPaths, expected) ||\n\t\t!samePaths(providerModulePaths, expected)',
+		replace:
+			'\t\t!samePaths(deepIndexedSourcePaths, expected) ||\n\t\t!samePaths(providerInputPaths, expected) ||\n\t\tfalse',
+		expectRed: ['packages/csaa/src/graph/run-current-dependency-cruiser-differential.test.ts'],
+		why: 'The G4 witness is same-perimeter evidence only if the provider module population equals the exact compiler build-root source population. Ignoring one extra provider module silently widens one side and invalidates the closure claim.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M10-g4-closes-despite-an-observed-provider-difference',
+		file: 'packages/csaa/src/graph/run-current-dependency-cruiser-differential.ts',
+		find: '\t\tcomparison.observedDifferenceRecords !== 0 ||',
+		replace: '\t\tfalse ||',
+		expectRed: ['packages/csaa/src/graph/run-current-dependency-cruiser-differential.test.ts'],
+		why: 'The same-perimeter population witness is insufficient when the two providers retain even one observed difference. Dropping this refusal converts bounded disagreement into a closed-no-difference record.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M11-native-projection-ignores-a-missing-mandatory-governed-source',
+		file: 'packages/csaa/src/rules/jpwb-harmonization-native-projection.ts',
+		find: '\t\tseed !== null && missingMandatoryInputIds.length === 0 && uncertainties.length === 0;',
+		replace: '\t\tseed !== null && uncertainties.length === 0;',
+		expectRed: ['packages/csaa/src/rules/jpwb-harmonization-native-projection.test.ts'],
+		why: 'A detector seed cannot close a rule when its governed mandatory source is absent. Ignoring the mandatory-input population promotes partial source coverage into a conclusive native finding.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M12-pre-operation-recapture-accepts-a-different-subject',
+		file: 'packages/csaa/src/cli/compose-coding-agent-cli-handlers.ts',
+		find: '\tif (recapturedSubjectId !== snapshotArtifact.snapshot.subjectId)',
+		replace: '\tif (false)',
+		expectRed: ['packages/csaa/src/cli/compose-coding-agent-cli-handlers.test.ts'],
+		why: 'A current subject is still stale for this workflow when it is not the exact subject bound to the stored snapshot. Removing the identity refusal lets the owning operation run against a substituted pre-operation capture.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M13-technical-completion-skips-the-full-repository-gate',
+		file: 'scripts/csaa-technical-completion.ts',
+		find: '\tfor (const step of CSAA_TECHNICAL_COMPLETION_STEPS) executeStep(step);',
+		replace:
+			"\tfor (const step of CSAA_TECHNICAL_COMPLETION_STEPS.filter((step) => step.label !== 'FULL_REPOSITORY_GATE')) executeStep(step);",
+		expectRed: ['verif/csaa-technical-completion.test.ts'],
+		why: 'Technical completion is the exact serialized conjunction of every retained evidence check, the current workflow, and the repository gate. Skipping the last step must not yield the same completion record.',
+		source: 'JAN-CSAA completion review 2026-08-25'
+	},
+	{
+		id: 'CSAA-M14-mutation-baseline-admits-an-unstaged-edit',
+		file: 'scripts/mutants/tree-baseline.ts',
+		find: '\tif (!completedSuccessfully(worktree)) return null;',
+		replace: '\tif (false) return null;',
+		expectRed: ['verif/mutation-tree-baseline.test.ts'],
+		why: 'A staged candidate is safe to mutate only while its tracked worktree still equals the index. Ignoring the worktree comparison would admit a pre-existing edit or a leaked prior mutant as the next measurement baseline.',
+		source: 'JAN-CSAA completion review 2026-08-26'
+	},
+	{
+		id: 'CSAA-M15-mutation-baseline-ignores-index-replacement',
+		file: 'scripts/mutants/tree-baseline.ts',
+		find: '\treturn current !== null && current.indexEntries === baseline.indexEntries;',
+		replace: '\treturn current !== null;',
+		expectRed: ['verif/mutation-tree-baseline.test.ts'],
+		why: 'The staged index is part of the measured subject. Accepting any clean current index would let concurrent staging replace the candidate between mutants while the runner continued to report one coherent mutation result.',
+		source: 'JAN-CSAA completion review 2026-08-26'
 	}
 ];

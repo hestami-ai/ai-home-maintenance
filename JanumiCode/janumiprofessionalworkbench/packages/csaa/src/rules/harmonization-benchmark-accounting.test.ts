@@ -199,6 +199,219 @@ describe('harmonization benchmark baseline', () => {
 		});
 		expectDeeplyFrozen(HARMONIZATION_BENCHMARK_ROWS);
 	});
+
+	it('rejects exact-record, dense-array, scalar, budget, and version boundary violations', () => {
+		const cases: readonly {
+			readonly code: string;
+			readonly mutate: (candidate: MutableRequest) => void;
+		}[] = [
+			{
+				code: 'REQUEST_SHAPE_INVALID',
+				mutate: (candidate) => Object.setPrototypeOf(candidate, { hostile: true })
+			},
+			{
+				code: 'REQUEST_ARRAY_INVALID',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.unsupportedCapabilities = {} as never;
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_INVALID',
+				mutate: (candidate) => {
+					Object.defineProperty(candidate.assessments[0]!.unsupportedCapabilities, 'extra', {
+						enumerable: true,
+						value: true
+					});
+				}
+			},
+			{
+				code: 'REQUEST_ARRAY_INVALID',
+				mutate: (candidate) => {
+					const capabilities = candidate.assessments[0]!.unsupportedCapabilities;
+					Object.defineProperty(capabilities, '0', {
+						configurable: true,
+						enumerable: false,
+						value: capabilities[0],
+						writable: true
+					});
+				}
+			},
+			{
+				code: 'REQUEST_ENUM_INVALID',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.status = 'BROKEN' as never;
+				}
+			},
+			{
+				code: 'REQUEST_DIGEST_INVALID',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.rule.ruleContentSha256 = 'A'.repeat(64);
+				}
+			},
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				mutate: (candidate) => {
+					candidate.budgets.maxEvidenceRecords = 0;
+				}
+			},
+			{
+				code: 'REQUEST_RESULT_BUDGET_TOO_SMALL',
+				mutate: (candidate) => {
+					candidate.budgets.maxResultBytes =
+						HARMONIZATION_BENCHMARK_ACCOUNTING_MIN_RESULT_BYTES - 1;
+				}
+			},
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				mutate: (candidate) => {
+					candidate.schemaVersion = 'unsupported' as never;
+				}
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				mutate: (candidate) => {
+					candidate.operationVersion = 'unsupported' as never;
+				}
+			}
+		];
+		for (const testCase of cases) {
+			const candidate = request();
+			testCase.mutate(candidate);
+			expectUnavailable(candidate, testCase.code);
+		}
+	});
+
+	it('rejects incoherent evidence, provenance, currentness, capability, and status semantics', () => {
+		const cases: readonly {
+			readonly code: string;
+			readonly mutate: (candidate: MutableRequest) => void;
+		}[] = [
+			{
+				code: 'REQUEST_EVIDENCE_ID_DUPLICATE',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'DETECTED');
+					candidate.assessments[0]!.evidence.records.push(
+						structuredClone(candidate.assessments[0]!.evidence.records[0]!)
+					);
+				}
+			},
+			{
+				code: 'REQUEST_EVIDENCE_DISPOSITION_INCOHERENT',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.evidence.disposition = 'PRESENT';
+				}
+			},
+			{
+				code: 'REQUEST_PROVENANCE_BUDGET_EXCEEDED',
+				mutate: (candidate) => {
+					candidate.budgets.maxProvenanceRecords = 1;
+					bindImplementedAssessment(candidate.assessments[0]!, 'DETECTED');
+					bindImplementedAssessment(candidate.assessments[1]!, 'NOT_DETECTED');
+				}
+			},
+			{
+				code: 'REQUEST_PROVENANCE_ID_DUPLICATE',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'DETECTED');
+					candidate.assessments[0]!.provenance.records.push(
+						structuredClone(candidate.assessments[0]!.provenance.records[0]!)
+					);
+				}
+			},
+			{
+				code: 'REQUEST_PROVENANCE_DISPOSITION_INCOHERENT',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.provenance.disposition = 'ANALYSIS_BOUND';
+				}
+			},
+			{
+				code: 'REQUEST_CURRENTNESS_BUDGET_EXCEEDED',
+				mutate: (candidate) => {
+					candidate.budgets.maxInvalidationDependencyIds = 1;
+					bindImplementedAssessment(candidate.assessments[0]!, 'NOT_RUN', { stale: true });
+					bindImplementedAssessment(candidate.assessments[1]!, 'NOT_RUN', { stale: true });
+				}
+			},
+			{
+				code: 'REQUEST_CURRENTNESS_DEPENDENCY_DUPLICATE',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'NOT_RUN', { stale: true });
+					candidate.assessments[0]!.currentness.invalidationDependencyIds = [
+						'dependency:a',
+						'dependency:a'
+					];
+				}
+			},
+			{
+				code: 'REQUEST_CURRENTNESS_DEPENDENCY_ORDER_INVALID',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'NOT_RUN', { stale: true });
+					candidate.assessments[0]!.currentness.invalidationDependencyIds = [
+						'dependency:z',
+						'dependency:a'
+					];
+				}
+			},
+			{
+				code: 'REQUEST_CAPABILITY_DUPLICATE',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.unsupportedCapabilities = ['CALL', 'CALL'];
+				}
+			},
+			{
+				code: 'REQUEST_CAPABILITY_NOT_REQUIRED',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.unsupportedCapabilities = ['AST'];
+				}
+			},
+			{
+				code: 'REQUEST_CONCLUSIVE_STATUS_UNSUPPORTED',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'DETECTED');
+					candidate.assessments[0]!.evidence = { disposition: 'ABSENT', records: [] };
+				}
+			},
+			{
+				code: 'REQUEST_CONCLUSIVE_RUN_PROVENANCE_MISSING',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'DETECTED');
+					candidate.assessments[0]!.provenance.records[0]!.kind = 'PROVIDER';
+				}
+			},
+			{
+				code: 'REQUEST_NOT_APPLICABLE_UNSUPPORTED',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'NOT_APPLICABLE');
+					candidate.assessments[0]!.evidence.records[0]!.kind = 'EXECUTION';
+				}
+			},
+			{
+				code: 'REQUEST_UNSUPPORTED_STATUS_INCOHERENT',
+				mutate: (candidate) => {
+					candidate.assessments[0]!.unsupportedCapabilities = [];
+				}
+			},
+			{
+				code: 'REQUEST_NOT_RUN_STATUS_INCOHERENT',
+				mutate: (candidate) => {
+					bindImplementedAssessment(candidate.assessments[0]!, 'NOT_RUN', { stale: true });
+					candidate.assessments[0]!.currentness.state = 'CALLER_DECLARED_CURRENT';
+				}
+			}
+		];
+		for (const testCase of cases) {
+			const candidate = request();
+			testCase.mutate(candidate);
+			expectUnavailable(candidate, testCase.code);
+		}
+	});
+
+	it('rejects invalid zero-detector execution identities', () => {
+		for (const executionId of ['', '\ud800'])
+			expect(() => createUnimplementedHarmonizationBenchmarkAccountingRequest(executionId)).toThrow(
+				TypeError
+			);
+	});
 });
 
 describe('harmonization benchmark total accounting', () => {

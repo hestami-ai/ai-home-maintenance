@@ -3,7 +3,7 @@ import type {
 	ModuleDependencyGraphNode,
 	ModuleDependencyGraphSourceNode
 } from '../contracts/graph.js';
-import type { FrozenSubject } from '../contracts/subject.js';
+import type { FrozenSubject, SubjectFilters } from '../contracts/subject.js';
 import {
 	STATIC_MODULE_IMPACT_CANDIDATE_ANALYSIS_AUTHORITY,
 	STATIC_MODULE_IMPACT_CANDIDATE_AUTHORITY_TRANSFER,
@@ -48,6 +48,8 @@ import {
 	isProxyValue,
 	isUnicodeScalarString
 } from '../semantic/canonical.js';
+import { assertCanonicalRelativePath, canonicalPathKey } from '../subject/paths.js';
+import { validateBoundedPattern } from '../subject/policy.js';
 import {
 	runStructuralModuleReachabilityReportWithCapturedSubject,
 	type StructuralModuleReachabilityReportProgressEvent
@@ -90,10 +92,221 @@ interface AdmittedRequestShell {
 }
 
 interface AdmittedOptions {
+	readonly additionalArtifacts?: readonly string[];
 	readonly onPredecessorProgress?: (
 		event: StructuralModuleReachabilityReportProgressEvent
 	) => unknown;
 	readonly repositoryRoot: string;
+	readonly subjectFilters?: SubjectFilters;
+}
+
+function materializeAdditionalArtifacts(value: unknown): readonly string[] {
+	if (
+		!Array.isArray(value) ||
+		isProxyValue(value) ||
+		Reflect.getPrototypeOf(value) !== Array.prototype
+	)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts must be an exact non-proxy data array.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+	if (
+		lengthDescriptor === undefined ||
+		!('value' in lengthDescriptor) ||
+		typeof lengthDescriptor.value !== 'number' ||
+		!Number.isSafeInteger(lengthDescriptor.value) ||
+		lengthDescriptor.value < 0 ||
+		lengthDescriptor.value > STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.subject.maxFiles
+	)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts has an invalid or excessive length.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	const length = lengthDescriptor.value;
+	const ownKeys = Reflect.ownKeys(value);
+	if (
+		ownKeys.some((key) => typeof key !== 'string') ||
+		ownKeys.length !== length + 1 ||
+		!ownKeys.includes('length') ||
+		Array.from({ length }, (_, index) => String(index)).some((key) => !ownKeys.includes(key))
+	)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts must be dense and have no extra properties.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	const paths: string[] = [];
+	for (let index = 0; index < length; index += 1) {
+		const path = `$options.additionalArtifacts[${index}]`;
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !('value' in descriptor) || !descriptor.enumerable)
+			throw new ReportRequestError(
+				'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				`${path} must be an enumerable data property.`,
+				path,
+				'failed'
+			);
+		if (
+			typeof descriptor.value !== 'string' ||
+			descriptor.value.length === 0 ||
+			descriptor.value.length >
+				STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.semantic.maxPathCharacters ||
+			!isUnicodeScalarString(descriptor.value)
+		)
+			throw new ReportRequestError(
+				'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				`${path} must be one nonempty bounded Unicode scalar string.`,
+				path,
+				'failed'
+			);
+		try {
+			paths.push(assertCanonicalRelativePath(descriptor.value));
+		} catch {
+			throw new ReportRequestError(
+				'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+				`${path} must be one canonical repository-relative path.`,
+				path,
+				'failed'
+			);
+		}
+	}
+	const canonicalKeys = paths.map((path) => canonicalPathKey(path));
+	if (new Set(canonicalKeys).size !== canonicalKeys.length)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts contains duplicate canonical paths.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	return Object.freeze(paths);
+}
+
+function materializeFilterPatterns(value: unknown, path: string): readonly string[] {
+	if (
+		!Array.isArray(value) ||
+		isProxyValue(value) ||
+		Reflect.getPrototypeOf(value) !== Array.prototype
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			`${path} must be an exact non-proxy data array.`,
+			path,
+			'failed'
+		);
+	const lengthDescriptor = Reflect.getOwnPropertyDescriptor(value, 'length');
+	const length =
+		lengthDescriptor !== undefined &&
+		'value' in lengthDescriptor &&
+		typeof lengthDescriptor.value === 'number'
+			? lengthDescriptor.value
+			: -1;
+	if (
+		!Number.isSafeInteger(length) ||
+		length < 0 ||
+		length > STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.subject.maxFiles
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			`${path} has an invalid or excessive length.`,
+			path,
+			'failed'
+		);
+	const ownKeys = Reflect.ownKeys(value);
+	if (
+		ownKeys.some((key) => typeof key !== 'string') ||
+		ownKeys.length !== length + 1 ||
+		!ownKeys.includes('length') ||
+		Array.from({ length }, (_, index) => String(index)).some((key) => !ownKeys.includes(key))
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			`${path} must be dense and have no extra properties.`,
+			path,
+			'failed'
+		);
+	const patterns: string[] = [];
+	for (let index = 0; index < length; index += 1) {
+		const itemPath = `${path}[${index}]`;
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+		if (
+			descriptor === undefined ||
+			!('value' in descriptor) ||
+			!descriptor.enumerable ||
+			typeof descriptor.value !== 'string' ||
+			descriptor.value.length >
+				STATIC_MODULE_IMPACT_CANDIDATE_REPORT_SAFETY_CEILINGS.semantic.maxPathCharacters ||
+			!isUnicodeScalarString(descriptor.value)
+		)
+			throw new ReportRequestError(
+				'OPTIONS_SUBJECT_FILTERS_INVALID',
+				`${itemPath} must be one bounded Unicode scalar filter pattern.`,
+				itemPath,
+				'failed'
+			);
+		try {
+			validateBoundedPattern(descriptor.value);
+		} catch {
+			throw new ReportRequestError(
+				'OPTIONS_SUBJECT_FILTERS_INVALID',
+				`${itemPath} must be one valid repository-relative filter pattern.`,
+				itemPath,
+				'failed'
+			);
+		}
+		patterns.push(descriptor.value);
+	}
+	return Object.freeze(patterns);
+}
+
+function materializeSubjectFilters(value: unknown): SubjectFilters {
+	if (value === null || typeof value !== 'object' || Array.isArray(value) || isProxyValue(value))
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			'$options.subjectFilters must be an exact non-proxy data object.',
+			'$options.subjectFilters',
+			'failed'
+		);
+	const prototype = Reflect.getPrototypeOf(value);
+	const keys = Reflect.ownKeys(value);
+	if (
+		(prototype !== Object.prototype && prototype !== null) ||
+		keys.some((key) => typeof key !== 'string') ||
+		keys.length !== 2 ||
+		!keys.includes('exclude') ||
+		!keys.includes('include')
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			'$options.subjectFilters must contain only exclude and include.',
+			'$options.subjectFilters',
+			'failed'
+		);
+	const exclude = Reflect.getOwnPropertyDescriptor(value, 'exclude');
+	const include = Reflect.getOwnPropertyDescriptor(value, 'include');
+	if (
+		exclude === undefined ||
+		!('value' in exclude) ||
+		!exclude.enumerable ||
+		include === undefined ||
+		!('value' in include) ||
+		!include.enumerable
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			'$options.subjectFilters entries must be enumerable data properties.',
+			'$options.subjectFilters',
+			'failed'
+		);
+	return Object.freeze({
+		exclude: materializeFilterPatterns(exclude.value, '$options.subjectFilters.exclude'),
+		include: materializeFilterPatterns(include.value, '$options.subjectFilters.include')
+	});
 }
 
 class ReportRequestError extends Error {
@@ -185,7 +398,11 @@ function materializeOptions(value: unknown): AdmittedOptions {
 	if (
 		keys.some(
 			(key) =>
-				typeof key !== 'string' || (key !== 'onPredecessorProgress' && key !== 'repositoryRoot')
+				typeof key !== 'string' ||
+				(key !== 'additionalArtifacts' &&
+					key !== 'onPredecessorProgress' &&
+					key !== 'repositoryRoot' &&
+					key !== 'subjectFilters')
 		) ||
 		!keys.includes('repositoryRoot')
 	)
@@ -208,13 +425,31 @@ function materializeOptions(value: unknown): AdmittedOptions {
 			'$options.repositoryRoot',
 			'failed'
 		);
-	const callbackDescriptor = Reflect.getOwnPropertyDescriptor(value, 'onPredecessorProgress');
-	if (callbackDescriptor === undefined) return { repositoryRoot: rootDescriptor.value };
+	const additionalArtifactsDescriptor = Reflect.getOwnPropertyDescriptor(
+		value,
+		'additionalArtifacts'
+	);
 	if (
-		!('value' in callbackDescriptor) ||
-		!callbackDescriptor.enumerable ||
-		(callbackDescriptor.value !== undefined &&
-			(typeof callbackDescriptor.value !== 'function' || isProxyValue(callbackDescriptor.value)))
+		additionalArtifactsDescriptor !== undefined &&
+		(!('value' in additionalArtifactsDescriptor) || !additionalArtifactsDescriptor.enumerable)
+	)
+		throw new ReportRequestError(
+			'OPTIONS_ADDITIONAL_ARTIFACTS_INVALID',
+			'$options.additionalArtifacts must be an enumerable data property.',
+			'$options.additionalArtifacts',
+			'failed'
+		);
+	const additionalArtifacts =
+		additionalArtifactsDescriptor === undefined || additionalArtifactsDescriptor.value === undefined
+			? undefined
+			: materializeAdditionalArtifacts(additionalArtifactsDescriptor.value);
+	const callbackDescriptor = Reflect.getOwnPropertyDescriptor(value, 'onPredecessorProgress');
+	if (
+		callbackDescriptor !== undefined &&
+		(!('value' in callbackDescriptor) ||
+			!callbackDescriptor.enumerable ||
+			(callbackDescriptor.value !== undefined &&
+				(typeof callbackDescriptor.value !== 'function' || isProxyValue(callbackDescriptor.value))))
 	)
 		throw new ReportRequestError(
 			'OPTIONS_PROGRESS_INVALID',
@@ -222,14 +457,33 @@ function materializeOptions(value: unknown): AdmittedOptions {
 			'$options.onPredecessorProgress',
 			'failed'
 		);
-	return callbackDescriptor.value === undefined
-		? { repositoryRoot: rootDescriptor.value }
-		: {
-				onPredecessorProgress: callbackDescriptor.value as (
+	const onPredecessorProgress =
+		callbackDescriptor === undefined || callbackDescriptor.value === undefined
+			? undefined
+			: (callbackDescriptor.value as (
 					event: StructuralModuleReachabilityReportProgressEvent
-				) => unknown,
-				repositoryRoot: rootDescriptor.value
-			};
+				) => unknown);
+	const subjectFiltersDescriptor = Reflect.getOwnPropertyDescriptor(value, 'subjectFilters');
+	if (
+		subjectFiltersDescriptor !== undefined &&
+		(!('value' in subjectFiltersDescriptor) || !subjectFiltersDescriptor.enumerable)
+	)
+		throw new ReportRequestError(
+			'OPTIONS_SUBJECT_FILTERS_INVALID',
+			'$options.subjectFilters must be an enumerable data property.',
+			'$options.subjectFilters',
+			'failed'
+		);
+	const subjectFilters =
+		subjectFiltersDescriptor === undefined || subjectFiltersDescriptor.value === undefined
+			? undefined
+			: materializeSubjectFilters(subjectFiltersDescriptor.value);
+	return Object.freeze({
+		...(additionalArtifacts === undefined ? {} : { additionalArtifacts }),
+		...(onPredecessorProgress === undefined ? {} : { onPredecessorProgress }),
+		repositoryRoot: rootDescriptor.value,
+		...(subjectFilters === undefined ? {} : { subjectFilters })
+	});
 }
 
 function callerId(value: unknown, path: string): string {
@@ -649,10 +903,16 @@ function runInternal(
 	const predecessorExecution = runStructuralModuleReachabilityReportWithCapturedSubject(
 		predecessorRequest(shell),
 		{
+			...(admittedOptions.additionalArtifacts === undefined
+				? {}
+				: { additionalArtifacts: admittedOptions.additionalArtifacts }),
 			...(admittedOptions.onPredecessorProgress === undefined
 				? {}
 				: { onProgress: admittedOptions.onPredecessorProgress }),
-			repositoryRoot: admittedOptions.repositoryRoot
+			repositoryRoot: admittedOptions.repositoryRoot,
+			...(admittedOptions.subjectFilters === undefined
+				? {}
+				: { subjectFilters: admittedOptions.subjectFilters })
 		}
 	);
 	const predecessor = predecessorExecution.outcome;
@@ -951,12 +1211,16 @@ function runInternal(
 }
 
 export interface RunStaticModuleImpactCandidateReportOptions {
+	/** Trusted same-process artifacts that must participate in the predecessor frozen subject. */
+	readonly additionalArtifacts?: readonly string[];
 	/** Exact predecessor CAP-027 progress stream; excluded from this terminal report identity. */
 	readonly onPredecessorProgress?: (
 		event: StructuralModuleReachabilityReportProgressEvent
 	) => unknown;
 	/** Absolute fixed worktree root supplied by the adapter, never by the wire request. */
 	readonly repositoryRoot: string;
+	/** Trusted exact filter policy that must participate in the predecessor frozen subject. */
+	readonly subjectFilters?: SubjectFilters;
 }
 
 /** @internal Same-process handoff used by trusted facades that must recheck final currentness. */

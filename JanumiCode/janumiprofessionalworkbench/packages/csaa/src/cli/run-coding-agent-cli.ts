@@ -20,6 +20,7 @@ import {
 	serializeCodingAgentCliDiagnostic,
 	type CodingAgentCliInvocation
 } from './coding-agent-cli-contract.js';
+import type { CodingAgentCliArtifactTransaction } from './coding-agent-cli-artifact-store.js';
 
 export interface CodingAgentCliHandlerContext {
 	readonly implementationState: typeof CODING_AGENT_CLI_IMPLEMENTATION_STATE;
@@ -37,6 +38,8 @@ export type CodingAgentCliHandlers = Partial<
 >;
 
 export interface RunCodingAgentCliOptions {
+	/** Optional host transaction. Persistent outputs publish only after terminal validation. */
+	readonly artifactTransaction?: CodingAgentCliArtifactTransaction;
 	readonly handlers?: CodingAgentCliHandlers;
 	/** Supplies the response timestamp only. Tests and deterministic clients should inject it. */
 	readonly now?: () => string;
@@ -259,9 +262,18 @@ function interruptedResponse(
 	responseAt: string,
 	kind: 'CANCELLED' | 'TIMED_OUT'
 ): Exclude<AgentOperationResponse, { readonly outcome: 'progress' }> {
-	if (request.subjectInput.kind !== 'RESOLVED_SUBJECT')
-		return unavailableResponse(request, responseAt);
 	const timedOut = kind === 'TIMED_OUT';
+	const subjectResolution: AgentSubjectResolutionOutcome =
+		request.subjectInput.kind === 'RESOLVED_SUBJECT'
+			? {
+					kind: 'RESOLVED',
+					resolutionEvidenceRefs: ['subject-resolution:caller-bound-resolved-subject-input'],
+					subjectId: request.subjectInput.subjectId
+				}
+			: {
+					kind: 'NOT_APPLICABLE',
+					reasonCode: 'OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'
+				};
 	return {
 		capability: {
 			affectedQuestionRefs: request.capabilityRequirement.affectedQuestionRefs,
@@ -280,7 +292,10 @@ function interruptedResponse(
 			qualificationState: 'UNKNOWN',
 			unknownRegionRefs: ['region:unfinished-operation']
 		},
-		currentness: callerBoundCurrentness(request.subjectInput.subjectId),
+		currentness:
+			request.subjectInput.kind === 'RESOLVED_SUBJECT'
+				? callerBoundCurrentness(request.subjectInput.subjectId)
+				: unresolvedCurrentness('OPERATION_INTERRUPTED_BEFORE_SUBJECT_RESOLUTION'),
 		exitCategory: 'INCOMPLETE_OR_UNSUPPORTED',
 		messageKind: 'response',
 		operation: request.operation,
@@ -309,11 +324,7 @@ function interruptedResponse(
 		responseAt,
 		responseId: responseId(request, timedOut ? 'timed-out' : 'cancelled'),
 		state: timedOut ? 'timed-out' : 'cancelled',
-		subjectResolution: {
-			kind: 'RESOLVED',
-			resolutionEvidenceRefs: ['subject-resolution:caller-bound-resolved-subject-input'],
-			subjectId: request.subjectInput.subjectId
-		},
+		subjectResolution,
 		warningRefs: [timedOut ? 'warning:operation-timed-out' : 'warning:operation-cancelled']
 	};
 }
@@ -358,6 +369,92 @@ function internalFailureResult(
 	if (validation.state !== 'VALID')
 		throw new Error('The CLI internal-failure envelope is invalid.');
 	return completed(request, response, serializeTerminal(request, response), '');
+}
+
+function interruptedResult(
+	request: AgentOperationRequest,
+	responseAt: string,
+	kind: 'CANCELLED' | 'TIMED_OUT'
+): CodingAgentCliRunResult {
+	const response = interruptedResponse(request, responseAt, kind);
+	const validation = validateAgentOperationExchange(request, response);
+	if (validation.state !== 'VALID') return internalFailureResult(request, responseAt);
+	return completed(request, response, serializeTerminal(request, response), '');
+}
+
+function signalAborted(signal: AbortSignal | undefined): boolean {
+	return signal?.aborted === true;
+}
+
+function artifactStoreUnavailableResult(
+	request: AgentOperationRequest,
+	responseAt: string
+): CodingAgentCliRunResult {
+	const resolved = request.subjectInput.kind === 'RESOLVED_SUBJECT';
+	const subjectResolution: AgentSubjectResolutionOutcome = resolved
+		? {
+				kind: 'RESOLVED',
+				resolutionEvidenceRefs: ['subject-resolution:caller-bound-resolved-subject-input'],
+				subjectId: request.subjectInput.subjectId
+			}
+		: {
+				diagnosticRefs: ['diagnostic:cli-artifact-store-unavailable'],
+				kind: 'UNAVAILABLE',
+				retryState: 'RETRYABLE'
+			};
+	const response: Exclude<AgentOperationResponse, { readonly outcome: 'progress' }> = {
+		capability: {
+			...unimplementedCapability(request),
+			capabilityCoverage: 'not-analyzed',
+			executionHealth: 'unavailable',
+			implementationState: 'IMPLEMENTED',
+			limitationRefs: ['limit:cli-artifact-store-unavailable']
+		},
+		currentness: resolved
+			? callerBoundCurrentness(request.subjectInput.subjectId)
+			: unresolvedCurrentness('ARTIFACT_STORE_UNAVAILABLE'),
+		exitCategory: 'INCOMPLETE_OR_UNSUPPORTED',
+		messageKind: 'response',
+		operation: request.operation,
+		operationVersion: request.operationVersion,
+		outcome: 'error',
+		protocolVersion: request.protocolVersion,
+		refusal: {
+			attemptedEvidenceRefs: ['evidence:cli-artifact-transaction'],
+			blockedActionRef: `action:${request.operation}-result-publication`,
+			blockedClaimRefs: ['claim:requested-analysis-result'],
+			code: 'CSAA-E-CAPABILITY-NOT-ANALYZED',
+			failedPredicateRef: 'predicate:durable-artifact-transaction-available',
+			fallbackLimitRefs: ['limit:no-persisted-result-admitted'],
+			provenanceRefs: ['provenance:cli-artifact-store'],
+			reasonCode: 'CAPABILITY_UNAVAILABLE',
+			requiredNextActionRef: 'next:recover-artifact-store-and-retry',
+			residualRiskRef: 'risk:requested-analysis-result-not-persisted',
+			responsibleOwnerRef: 'owner:csaa-root-integration',
+			retryability: 'RETRYABLE',
+			unaffectedScopeRefs: []
+		},
+		requestDigest: requestDigest(request),
+		requestId: request.requestId,
+		responseAt,
+		responseId: responseId(request, 'artifact-store-unavailable'),
+		state: 'failed',
+		subjectResolution,
+		warningRefs: ['warning:cli-artifact-store-unavailable']
+	};
+	const validation = validateAgentOperationExchange(request, response);
+	if (validation.state !== 'VALID') return internalFailureResult(request, responseAt);
+	return completed(request, response, serializeTerminal(request, response), '');
+}
+
+async function rollbackArtifactTransaction(
+	transaction: CodingAgentCliArtifactTransaction | undefined
+): Promise<void> {
+	try {
+		await transaction?.rollback();
+	} catch {
+		// Rollback is best-effort after the host has already withheld terminal publication.
+	}
 }
 
 function validateHandlerSequence(
@@ -534,28 +631,63 @@ export async function runCodingAgentCli(
 			''
 		);
 	}
+	if (signalAborted(options.signal))
+		return interruptedResult(invocation.request, responseAt, 'CANCELLED');
+	let transactionBegun = false;
 	try {
+		if (options.artifactTransaction !== undefined) {
+			try {
+				await options.artifactTransaction.begin(options.signal);
+				transactionBegun = true;
+			} catch {
+				if (signalAborted(options.signal))
+					return interruptedResult(invocation.request, responseAt, 'CANCELLED');
+				return artifactStoreUnavailableResult(invocation.request, responseAt);
+			}
+		}
 		const controlled = await invokeHandlerWithControl(handler, invocation, options.signal);
 		if (controlled.kind === 'CANCELLED' || controlled.kind === 'TIMED_OUT') {
-			const response = interruptedResponse(invocation.request, responseAt, controlled.kind);
-			const validation = validateAgentOperationExchange(invocation.request, response);
-			if (validation.state !== 'VALID')
-				return internalFailureResult(invocation.request, responseAt);
-			return completed(
-				invocation.request,
-				response,
-				serializeTerminal(invocation.request, response),
-				''
-			);
+			if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
+			return interruptedResult(invocation.request, responseAt, controlled.kind);
 		}
-		if (controlled.kind === 'FAILED') return internalFailureResult(invocation.request, responseAt);
+		if (controlled.kind === 'FAILED') {
+			if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
+			return internalFailureResult(invocation.request, responseAt);
+		}
 		const responses = validateHandlerSequence(invocation.request, controlled.value);
-		if (responses === null) return internalFailureResult(invocation.request, responseAt);
-		return (
-			routeHandlerResponses(invocation.request, responses) ??
-			internalFailureResult(invocation.request, responseAt)
-		);
+		if (responses === null) {
+			if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
+			return internalFailureResult(invocation.request, responseAt);
+		}
+		const routed = routeHandlerResponses(invocation.request, responses);
+		if (routed === null) {
+			if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
+			return internalFailureResult(invocation.request, responseAt);
+		}
+		const terminal = responses.at(-1)!;
+		if (terminal.outcome === 'progress') {
+			if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
+			return internalFailureResult(invocation.request, responseAt);
+		}
+		const publish =
+			terminal.exitCategory === 'SUCCESS' ||
+			terminal.exitCategory === 'INCOMPLETE_OR_UNSUPPORTED' ||
+			terminal.exitCategory === 'FAILED_EXPECTATION';
+		if (transactionBegun) {
+			if (publish) {
+				try {
+					await options.artifactTransaction!.commit();
+				} catch {
+					await rollbackArtifactTransaction(options.artifactTransaction);
+					if (signalAborted(options.signal))
+						return interruptedResult(invocation.request, responseAt, 'CANCELLED');
+					return artifactStoreUnavailableResult(invocation.request, responseAt);
+				}
+			} else await rollbackArtifactTransaction(options.artifactTransaction);
+		}
+		return routed;
 	} catch {
+		if (transactionBegun) await rollbackArtifactTransaction(options.artifactTransaction);
 		return internalFailureResult(invocation.request, responseAt);
 	}
 }

@@ -124,4 +124,151 @@ describe('Vitest V8 coverage evidence adapter', () => {
 			usableForCurrentSubject: false
 		});
 	});
+
+	it('rejects malformed denominator, range, digest, and source-map boundaries', () => {
+		const fixture = providerFixture();
+		const source = fixture.subject.artifacts.find(
+			(artifact) => artifact.path === 'packages/demo/src/index.ts'
+		)!;
+		const context = providerContext(fixture.root, fixture.subject, VITEST_V8_COVERAGE_PROVIDER_ID);
+		const malformedCases: readonly [string, (value: ReturnType<typeof coverage>) => void][] = [
+			[
+				'duplicate denominator paths',
+				(value) => value.includedSources.push('packages/demo/src/index.ts')
+			],
+			[
+				'noncanonical denominator order',
+				(value) => {
+					value.includedSources = ['packages/demo/src/index.ts', 'package.json'];
+				}
+			],
+			[
+				'nonboolean block coverage marker',
+				(value) => Object.assign(value.scripts[0]!.functions[0]!, { isBlockCoverage: 'yes' })
+			],
+			[
+				'empty or reversed range',
+				(value) => {
+					value.scripts[0]!.functions[0]!.ranges[0]!.endOffset = 0;
+				}
+			],
+			[
+				'missing function root range',
+				(value) => {
+					value.scripts[0]!.functions[0]!.ranges = [];
+				}
+			],
+			[
+				'child range escaping the root',
+				(value) => {
+					value.scripts[0]!.functions[0]!.ranges.push({
+						count: 1,
+						endOffset: 21,
+						startOffset: 1
+					});
+				}
+			],
+			[
+				'unsupported schema',
+				(value) => Object.assign(value, { schemaVersion: 'vitest-v8-coverage/0' })
+			],
+			[
+				'empty denominator',
+				(value) => {
+					value.includedSources = [];
+				}
+			],
+			[
+				'denominator outside the subject',
+				(value) => {
+					value.includedSources = ['packages/demo/src/absent.ts'];
+				}
+			],
+			[
+				'classification outside the denominator',
+				(value) => {
+					value.missingSources = ['packages/demo/src/index.test.ts'];
+				}
+			],
+			[
+				'overlapping missing and uncovered populations',
+				(value) => {
+					value.includedSources = ['packages/demo/src/index.test.ts', 'packages/demo/src/index.ts'];
+					value.missingSources = ['packages/demo/src/index.test.ts'];
+					value.uncoveredSources = ['packages/demo/src/index.test.ts'];
+				}
+			],
+			[
+				'script outside the denominator',
+				(value) => {
+					value.includedSources = ['packages/demo/src/index.test.ts'];
+				}
+			],
+			[
+				'script classified twice',
+				(value) => {
+					value.uncoveredSources = ['packages/demo/src/index.ts'];
+				}
+			],
+			[
+				'invalid source digest',
+				(value) => {
+					value.scripts[0]!.sourceSha256 = 'not-a-digest';
+				}
+			],
+			[
+				'source-map generated-file mismatch',
+				(value) => {
+					value.scripts[0]!.sourceMap.file = 'packages/demo/generated/other.js';
+				}
+			],
+			[
+				'source-map source mismatch',
+				(value) => {
+					value.scripts[0]!.sourceMap.sources = ['../src/index.test.ts'];
+				}
+			],
+			[
+				'incompletely classified denominator',
+				(value) => {
+					value.includedSources = ['packages/demo/src/index.test.ts', 'packages/demo/src/index.ts'];
+				}
+			]
+		];
+
+		for (const [label, mutate] of malformedCases) {
+			const value = coverage(source.sha256);
+			mutate(value);
+			expect(importVitestV8Coverage(JSON.stringify(value), context), label).toMatchObject({
+				health: 'MALFORMED',
+				usableForCurrentSubject: false
+			});
+		}
+	});
+
+	it('materializes and canonically orders explicit uncovered-source observations', () => {
+		const fixture = providerFixture();
+		const source = fixture.subject.artifacts.find(
+			(artifact) => artifact.path === 'packages/demo/src/index.ts'
+		)!;
+		const value = coverage(source.sha256);
+		value.includedSources = ['packages/demo/src/index.test.ts', 'packages/demo/src/index.ts'];
+		value.uncoveredSources = ['packages/demo/src/index.test.ts'];
+
+		const result = importVitestV8Coverage(
+			JSON.stringify(value),
+			providerContext(fixture.root, fixture.subject, VITEST_V8_COVERAGE_PROVIDER_ID)
+		);
+		expect(result).toMatchObject({
+			coverage: { state: 'COMPLETE' },
+			health: 'HEALTHY',
+			usableForCurrentSubject: true
+		});
+		expect(
+			result.observations.map((observation) => [observation.sourcePath, observation.state])
+		).toEqual([
+			['packages/demo/src/index.test.ts', 'UNCOVERED'],
+			['packages/demo/src/index.ts', 'COVERED']
+		]);
+	});
 });

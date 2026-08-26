@@ -5,6 +5,9 @@
 	"type": "module",
 	"description": "Deterministic code-semantic analysis and assurance tooling for JPWB.",
 	"license": "AGPL-3.0-only",
+	"bin": {
+		"csaa-coding-agent": "./dist/cli/csaa-coding-agent-bin.js"
+	},
 	"exports": {
 		".": {
 			"source": "./src/index.ts",
@@ -17,6 +20,7 @@
 	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
+		"README.md",
 		"THIRD_PARTY_NOTICES.md"
 	],
 	"dependencies": {
@@ -27,7 +31,14 @@
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"check-types": "tsc --noEmit -p tsconfig.json"
+		"check-types": "tsc --noEmit -p tsconfig.json",
+		"dependency-cruiser-differential": "bun ../../scripts/csaa-dependency-cruiser-differential.ts --write",
+		"dependency-cruiser-differential:check": "bun ../../scripts/csaa-dependency-cruiser-differential.ts --check",
+		"dependency-cruiser-g4": "bun ../../scripts/csaa-dependency-cruiser-differential.ts --g4-write",
+		"dependency-cruiser-g4:check": "bun ../../scripts/csaa-dependency-cruiser-differential.ts --g4-check",
+		"dependency-cruiser-g4:json": "bun ../../scripts/csaa-dependency-cruiser-differential.ts --g4-json",
+		"persistence-selection": "bun src/persistence/run-dwp-007-persistence-selection.ts --write",
+		"persistence-selection:check": "bun src/persistence/run-dwp-007-persistence-selection.ts --check"
 	},
 	"devDependencies": {
 		"@janumipwb/typescript-config": "workspace:*"

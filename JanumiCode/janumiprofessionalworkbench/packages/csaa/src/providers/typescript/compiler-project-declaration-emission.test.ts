@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import type { StaticSemanticSnapshot } from '../../contracts/semantic.js';
 import type { SourceOriginProgramSourceIdentity } from '../../contracts/source-origin-correlation.js';
+import * as monotonicOperationClock from '../../semantic/monotonic-operation-clock.js';
 import {
 	CompilerProjectProgramCapabilityError,
 	type CompilerProjectProgramEvidence,
@@ -1228,11 +1229,30 @@ describe('compiler project declaration emission capability', () => {
 				(value.authored as Record<string, unknown>).logicalPath = 'packages/demo/src/Other.svelte';
 			},
 			(value: Record<string, unknown>) => {
-				(value.virtual as Record<string, unknown>).logicalPath = '.csaa-virtual/svelte2tsx/drift.ts';
+				(value.virtual as Record<string, unknown>).logicalPath =
+					'.csaa-virtual/svelte2tsx/drift.ts';
 			},
 			(value: Record<string, unknown>) => {
 				(value.sourceMap as Record<string, unknown>).segmentCount =
 					SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS.maxMapSegments + 1;
+			},
+			(value: Record<string, unknown>) => {
+				(value.authored as Record<string, unknown>).contentSha256 = 'not-a-digest';
+			},
+			(value: Record<string, unknown>) => {
+				(value.authored as Record<string, unknown>).logicalPath = '';
+			},
+			(value: Record<string, unknown>) => {
+				(value.authored as Record<string, unknown>).encoding = 'UTF16';
+			},
+			(value: Record<string, unknown>) => {
+				(value.sourceMap as Record<string, unknown>).decoderVersion = 'drifted-decoder';
+			},
+			(value: Record<string, unknown>) => {
+				(value.virtual as Record<string, unknown>).origin = 'AUTHORED';
+			},
+			(value: Record<string, unknown>) => {
+				(value.authored as Record<string, unknown>).logicalPath = 'packages/demo/src/Component.ts';
 			}
 		]) {
 			const transformed = structuredClone(exact) as unknown as Record<string, unknown>;
@@ -1271,6 +1291,32 @@ describe('compiler project declaration emission capability', () => {
 		).toBe('PROVIDER_FAILURE');
 		expect(accessorReads).toBe(0);
 		accessorSpy.mockRestore();
+
+		const virtualWithoutTransformSpy = mockFinalizedEvidence((evidence) => {
+			const records = [...evidence.inputRecords];
+			const index = records.findIndex(
+				(record) =>
+					record.observation.operation === 'READ_FILE' &&
+					record.observation.result === 'PRESENT' &&
+					record.observation.byteBudgetClass !== 'VIRTUAL_TRANSFORM'
+			);
+			if (index < 0) throw new Error('Fixture has no ordinary present read.');
+			const record = records[index]!;
+			if (record.observation.operation !== 'READ_FILE' || record.observation.result !== 'PRESENT')
+				throw new Error('Selected fixture record is not a present read.');
+			records[index] = {
+				...record,
+				observation: {
+					...record.observation,
+					origin: 'VIRTUAL'
+				}
+			};
+			return { ...evidence, inputRecords: records };
+		});
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('CAPTURE_UNAVAILABLE');
+		virtualWithoutTransformSpy.mockRestore();
 	});
 
 	it('validates every retained compiler input query/observation container variant', () => {
@@ -1867,5 +1913,176 @@ describe('compiler project declaration emission capability', () => {
 		expect(
 			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
 		).toBe('PROVIDER_FAILURE');
+	});
+
+	it('descriptor-checks remaining provider boundary variants before semantic use', () => {
+		const clockSpy = vi
+			.spyOn(monotonicOperationClock, 'createMonotonicOperationClock')
+			.mockImplementationOnce(() => {
+				throw new Error('monotonic clock unavailable');
+			});
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('BUDGET_EXCEEDED');
+		clockSpy.mockRestore();
+
+		const getSourceFiles = compilerProjectDeclarationEmissionTypeScriptPublicApi.getSourceFiles;
+		const noncanonicalIndexSpy = vi
+			.spyOn(compilerProjectDeclarationEmissionTypeScriptPublicApi, 'getSourceFiles')
+			.mockImplementation((program) => {
+				const sources = new Array<ts.SourceFile>(1);
+				Object.defineProperty(sources, '01', {
+					configurable: true,
+					enumerable: true,
+					value: getSourceFiles(program)[0]!
+				});
+				return sources;
+			});
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('PROVIDER_FAILURE');
+		noncanonicalIndexSpy.mockRestore();
+
+		const rejectRecord = (
+			replace: (record: CompilerProjectProgramEvidence['inputRecords'][number]) => {
+				readonly observation: unknown;
+				readonly query: unknown;
+			},
+			expectedCode: CompilerProjectDeclarationEmissionError['code']
+		): void => {
+			const spy = mockFinalizedEvidence((evidence) => {
+				const records = [...evidence.inputRecords];
+				const record = records[0]!;
+				const replacement = replace(record);
+				records[0] = {
+					...record,
+					observation: replacement.observation as typeof record.observation,
+					query: replacement.query as typeof record.query
+				};
+				return { ...evidence, inputRecords: records };
+			});
+			try {
+				expect(
+					errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+				).toBe(expectedCode);
+			} finally {
+				spy.mockRestore();
+			}
+		};
+
+		rejectRecord((record) => ({ observation: record.observation, query: [] }), 'PROVIDER_FAILURE');
+		rejectRecord(
+			(record) => ({
+				observation: record.observation,
+				query: { extra: true, logicalPath: 'left.ts', operation: 'FILE_EXISTS' }
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+		rejectRecord(
+			(record) => ({
+				observation: record.observation,
+				query: { operation: 'FILE_EXISTS', wrong: 'left.ts' }
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+		rejectRecord(
+			(record) => ({
+				observation: record.observation,
+				query: {
+					depth: null,
+					excludes: [],
+					extensions: [String.fromCharCode(0xd800)],
+					includes: [],
+					logicalPath: '.',
+					operation: 'READ_DIRECTORY'
+				}
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+		rejectRecord(
+			(record) => ({
+				observation: {
+					id: record.observation.id,
+					invocationCount: record.observation.invocationCount,
+					logicalPath: 'left.ts',
+					operation: 'FILE_EXISTS',
+					origin: record.observation.origin,
+					result: 'DIRECTORY',
+					resultDigest: record.observation.resultDigest
+				},
+				query: record.query
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+		rejectRecord(
+			(record) => ({
+				observation: {
+					id: record.observation.id,
+					invocationCount: record.observation.invocationCount,
+					logicalPath: 'right.ts',
+					operation: 'FILE_EXISTS',
+					origin: record.observation.origin,
+					result: 'PRESENT',
+					resultDigest: record.observation.resultDigest
+				},
+				query: { logicalPath: 'left.ts', operation: 'FILE_EXISTS' }
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+		rejectRecord(
+			(record) => ({
+				observation: {
+					depth: null,
+					excludes: [],
+					extensions: ['.ts'],
+					id: record.observation.id,
+					includes: ['right/**/*'],
+					invocationCount: record.observation.invocationCount,
+					logicalPath: 'packages/origin/src',
+					operation: 'READ_DIRECTORY',
+					origin: record.observation.origin,
+					result: 'DIRECTORY',
+					resultDigest: record.observation.resultDigest,
+					resultEntries: [],
+					scannedEntries: 0
+				},
+				query: {
+					depth: null,
+					excludes: [],
+					extensions: ['.ts'],
+					includes: ['left/**/*'],
+					logicalPath: 'packages/origin/src',
+					operation: 'READ_DIRECTORY'
+				}
+			}),
+			'CAPTURE_UNAVAILABLE'
+		);
+
+		const evidenceArraySpy = mockFinalizedEvidence(
+			() => [] as unknown as CompilerProjectProgramEvidence
+		);
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('PROVIDER_FAILURE');
+		evidenceArraySpy.mockRestore();
+
+		const emitArraySpy = vi
+			.spyOn(compilerProjectDeclarationEmissionTypeScriptPublicApi, 'emit')
+			.mockReturnValueOnce([] as unknown as ts.EmitResult);
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('PROVIDER_FAILURE');
+		emitArraySpy.mockRestore();
+
+		const diagnosticsObjectSpy = vi
+			.spyOn(compilerProjectDeclarationEmissionTypeScriptPublicApi, 'emit')
+			.mockReturnValueOnce({
+				diagnostics: {},
+				emitSkipped: false
+			} as unknown as ts.EmitResult);
+		expect(
+			errorOf(() => emitCompilerProjectDeclaration(fixture.inputs, emissionLimits())).code
+		).toBe('PROVIDER_FAILURE');
+		diagnosticsObjectSpy.mockRestore();
 	});
 });

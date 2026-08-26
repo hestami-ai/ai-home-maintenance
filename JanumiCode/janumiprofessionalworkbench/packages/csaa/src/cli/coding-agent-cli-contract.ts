@@ -16,7 +16,7 @@ export const CODING_AGENT_CLI_INPUT_CONTRACT_ID = 'jan-csaa-coding-agent-cli-inp
 export const CODING_AGENT_CLI_IMPLEMENTATION_STATE = 'IMPLEMENTATION_LOCAL_UNREGISTERED' as const;
 
 export const CODING_AGENT_CLI_NONCLAIMS = Object.freeze([
-	'This CLI foundation is implementation-local and is not a registered JAN-CSAA capability or package binary.',
+	'This implementation-local package binary is not a governance-registered JAN-CSAA capability and confers no authority.',
 	'The foundation validates and routes exact protocol messages but does not itself resolve subjects, execute analysis providers, use the network, execute subject code, mutate source, or activate a gate.',
 	'Operation handlers remain explicit root-integration dependencies; an absent handler returns a typed unavailable or unsupported response rather than an empty success.',
 	'Only versioned JSON stdout is supported; filesystem output paths and human-output reinterpretations are intentionally unavailable.'

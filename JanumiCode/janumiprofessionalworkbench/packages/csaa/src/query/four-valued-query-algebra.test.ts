@@ -157,6 +157,66 @@ describe('four-valued evidence-pair algebra', () => {
 			}
 		}
 	});
+
+	it('rejects hostile array ownership, descriptors, kinds, identities, and quantifier completeness', () => {
+		const proxiedOperands = new Proxy([value('proxy-child', 'TRUE')], {});
+		const sparseOperands = new Array<FourValuedExpression>(1);
+		const nonEnumerableOperands = [value('hidden-child', 'TRUE')];
+		Object.defineProperty(nonEnumerableOperands, '0', {
+			enumerable: false,
+			value: nonEnumerableOperands[0]
+		});
+		const sharedOperands = [value('shared-child', 'TRUE')];
+		const accessor = { kind: 'VALUE', nodeId: 'accessor' } as Record<string, unknown>;
+		Object.defineProperty(accessor, 'truth', {
+			enumerable: true,
+			get: () => 'TRUE'
+		});
+		for (const expression of [
+			accessor,
+			{ kind: 'AND', nodeId: 'proxy-array', operands: proxiedOperands },
+			{ kind: 'AND', nodeId: 'sparse-array', operands: sparseOperands },
+			{ kind: 'AND', nodeId: 'hidden-array', operands: nonEnumerableOperands },
+			{
+				kind: 'AND',
+				nodeId: 'shared-array-root',
+				operands: [
+					{ kind: 'AND', nodeId: 'shared-array-left', operands: sharedOperands },
+					{ kind: 'OR', nodeId: 'shared-array-right', operands: sharedOperands }
+				]
+			},
+			{ kind: 'UNREGISTERED', nodeId: 'unknown-kind' },
+			{
+				kind: 'AND',
+				nodeId: 'duplicate-root',
+				operands: [value('duplicate', 'TRUE'), value('duplicate', 'FALSE')]
+			},
+			{
+				closure: 'CLOSED',
+				completeness: 'BROKEN',
+				kind: 'ALL',
+				members: [],
+				nodeId: 'bad-completeness'
+			}
+		])
+			expectRefused(input(expression as unknown as FourValuedExpression), 'AST_INVALID');
+		expectRefused(
+			input(value('bad-mode', 'TRUE'), { mode: 'INCREMENTAL' as never }),
+			'INPUT_INVALID'
+		);
+	});
+
+	it('rejects malformed standalone truth vectors, evidence pairs, and population boundaries', () => {
+		expect(() => fourValuedAnd([] as unknown as [FourValuedTruth, ...FourValuedTruth[]])).toThrow(
+			/bounded vector/u
+		);
+		expect(() =>
+			fourValuedTruthForEvidencePair({ falseSupport: 2, trueSupport: 0 } as never)
+		).toThrow(/evidence pair/u);
+		expect(() => fourValuedAll([], { closure: 'CLOSED', completeness: 'BROKEN' } as never)).toThrow(
+			/population boundary/u
+		);
+	});
 });
 
 describe('bounded ALL and ANY quantifiers', () => {

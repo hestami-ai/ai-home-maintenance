@@ -1061,6 +1061,119 @@ describe('generated-context evidence runner', () => {
 		expect(() => run(root, 'check')).toThrow('Generation record is not valid UTF-8.');
 	});
 
+	it('walks the complete bound read closure before reporting an unavailable executable', () => {
+		const root = fixture();
+		write(root, 'apps/rph-demo/src/nested/feature.ts', 'export const nested = true;\n');
+		write(root, 'node_modules/typescript/package.json', '{}\n');
+		write(root, 'node_modules/vite/package.json', '{}\n');
+		const missingExecutable = join(root, 'missing-node-executable');
+
+		expect(() =>
+			runGeneratedContextEvidenceForTest({
+				isolateGeneratedOutput: true,
+				mode: 'write',
+				observeGenerator: (repositoryRoot) => ({
+					...testObservation(repositoryRoot),
+					nodeExecutable: missingExecutable
+				}),
+				repositoryRoot: root
+			})
+		).toThrow('SvelteKit synchronization could not run:');
+	});
+
+	it('refuses a required-absent read grant that becomes present', () => {
+		const root = fixture();
+		write(root, 'apps/rph-demo/static/present.txt', 'now present\n');
+
+		expect(() =>
+			runGeneratedContextEvidenceForTest({
+				isolateGeneratedOutput: true,
+				mode: 'write',
+				observeGenerator: testObservation,
+				repositoryRoot: root
+			})
+		).toThrow('Generated-context required-absent path is now present: apps/rph-demo/static');
+	});
+
+	it('removes a first publication when its post-commit hook fails', () => {
+		const root = fixture();
+		const absolute = join(root, ...RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH.split('/'));
+
+		expect(() =>
+			run(root, 'write', {
+				afterCommit: () => {
+					throw new Error('injected first-publication failure');
+				}
+			})
+		).toThrow('injected first-publication failure');
+		expect(existsSync(absolute)).toBe(false);
+	});
+
+	it('detects committed-byte replacement even when the post-commit hook returns', () => {
+		const root = fixture();
+		const absolute = join(root, ...RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH.split('/'));
+		const concurrent = '{"concurrent":"committed-validation"}\n';
+
+		expect(() =>
+			run(root, 'write', {
+				afterCommit: () => writeFileSync(absolute, concurrent, 'utf8')
+			})
+		).toThrow('newer bytes were preserved');
+		expect(readFileSync(absolute, 'utf8')).toBe(concurrent);
+	});
+
+	it('surfaces publication-lock replacement after a successful operation', () => {
+		const root = fixture();
+		const lock = join(root, ...`${RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH}.lock`.split('/'));
+
+		expect(() =>
+			run(root, 'write', {
+				afterCommit: () => writeFileSync(lock, 'replacement lock', 'utf8')
+			})
+		).toThrow('Generated-context evidence publication lock changed concurrently.');
+		expect(readFileSync(lock, 'utf8')).toBe('replacement lock');
+	});
+
+	it('aggregates an operation failure with a concurrent lock-release failure', () => {
+		const root = fixture();
+		const lock = join(root, ...`${RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH}.lock`.split('/'));
+
+		expect(() =>
+			runGeneratedContextEvidenceForTest({
+				mode: 'write',
+				observeGenerator: testObservation,
+				repositoryRoot: root,
+				synchronize: () => {
+					writeFileSync(lock, 'replacement lock', 'utf8');
+					throw new Error('injected synchronization failure');
+				}
+			})
+		).toThrow('Generated-context operation and publication-lock release both failed.');
+	});
+
+	it('rejects a directory at the evidence-file location', () => {
+		const root = fixture();
+		const absolute = join(root, ...RPH_DEMO_GENERATED_CONTEXT_EVIDENCE_PATH.split('/'));
+		mkdirSync(absolute, { recursive: true });
+
+		expect(() => run(root, 'check')).toThrow(
+			'Generated-context evidence target is not a regular file.'
+		);
+	});
+
+	it('validates the physical repository root through the public wrapper', () => {
+		const root = fixture();
+		const repositoryFile = join(root, 'repository-file');
+		writeFileSync(repositoryFile, 'not a directory\n', 'utf8');
+
+		expect(() =>
+			publicApi.runGeneratedContextEvidence({
+				mode: 'check',
+				repositoryRoot: repositoryFile
+			})
+		).toThrow('Generated-context repository root is not a physical directory.');
+	});
+
 	it('does not expose test-only generated-context seams from the package root', () => {
 		expect('runGeneratedContextEvidenceForTest' in publicApi).toBe(false);
 	});

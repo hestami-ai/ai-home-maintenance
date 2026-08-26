@@ -50,7 +50,9 @@ import {
 } from '../contracts/static-module-impact-candidate-report.js';
 import type {
 	FrozenSubject,
+	FrozenSubjectFreshness,
 	ResolveSubjectRequest,
+	SubjectFilters,
 	SubjectResolutionOutcome
 } from '../contracts/subject.js';
 import {
@@ -63,21 +65,43 @@ import {
 	type BuildStaticSemanticSnapshotRuntimeOptions,
 	type StaticSemanticSnapshotProgressEvent
 } from '../semantic/build-static-semantic-snapshot.js';
-import { canonicalSemanticJson } from '../semantic/canonical.js';
+import { canonicalSemanticJson, canonicalSemanticJsonWitness } from '../semantic/canonical.js';
 import { validateStaticSemanticSnapshot } from '../semantic/validate-snapshot.js';
+import { verifyFrozenSubject } from '../subject/freshness.js';
 import { resolveSubject } from '../subject/resolve-subject.js';
 import { runInventory, type RunInventoryResult } from '../inventory/run-inventory.js';
 import { canonicalJson as canonicalInventoryJson } from '../inventory/canonical.js';
 import {
-	HARMONIZATION_FIRST_INCREMENT_CAPABILITY,
-	HARMONIZATION_FIRST_INCREMENT_EVALUATION_OUTCOME_SCHEMA_VERSION,
-	HARMONIZATION_FIRST_INCREMENT_EVALUATION_REQUEST_SCHEMA_VERSION,
-	HARMONIZATION_FIRST_INCREMENT_OPERATION_VERSION,
-	evaluateHarmonizationFirstIncrementRule,
-	type HarmonizationFirstIncrementEvaluationOutcome,
-	type HarmonizationFirstIncrementEvaluationRequest,
-	type HarmonizationFirstIncrementEvaluationResult
-} from '../rules/harmonization-first-increment-rules.js';
+	JPWB_HARMONIZATION_NATIVE_PROJECTION_DEFAULT_BUDGETS,
+	JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION,
+	JPWB_HARMONIZATION_NATIVE_PROJECTION_OUTCOME_SCHEMA_VERSION,
+	JPWB_HARMONIZATION_NATIVE_PROJECTION_REQUEST_SCHEMA_VERSION,
+	JPWB_HARMONIZATION_NATIVE_PROJECTION_RESULT_SCHEMA_VERSION,
+	runJpwbHarmonizationNativeProjection,
+	type JpwbHarmonizationNativeProjectionBudgets,
+	type JpwbHarmonizationNativeProjectionOutcome,
+	type JpwbHarmonizationNativeProjectionResult,
+	type JpwbHarmonizationNativeRuleProjection
+} from '../rules/jpwb-harmonization-native-projection.js';
+import {
+	evaluateProjectedHybridRuntimeRows,
+	JPWB_HYBRID_STATIC_PROJECTION_SCHEMA_VERSION,
+	projectJpwbHybridStaticPrerequisites,
+	type JpwbHybridStaticPrerequisiteProjection
+} from '../providers/runtime/project-hybrid-static-prerequisites.js';
+import {
+	importDeterministicRuntimeTrace,
+	type DeterministicRuntimeTraceObservation
+} from '../providers/runtime/import-runtime-trace.js';
+import {
+	ENRICHED_PROVIDER_EVIDENCE_SCHEMA_VERSION,
+	type ProviderEvidenceResult,
+	type ProviderRunInput
+} from '../providers/runtime/provider-evidence.js';
+import {
+	HYBRID_RUNTIME_EVALUATION_SCHEMA_VERSION,
+	type HybridRuntimeEvaluationResult
+} from '../providers/runtime/evaluate-hybrid-runtime.js';
 import {
 	CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS,
 	CodingAgentCliArtifactError,
@@ -112,13 +136,13 @@ export const CODING_AGENT_CLI_INVENTORY_REQUEST_VERSION =
 export const CODING_AGENT_CLI_INVENTORY_RESULT_VERSION =
 	'jan-csaa-coding-agent-inventory-result/0.1.0' as const;
 export const CODING_AGENT_CLI_FINDINGS_REQUEST_VERSION =
-	'jan-csaa-coding-agent-findings-request/0.1.0' as const;
+	'jan-csaa-coding-agent-findings-request/2.0.0' as const;
 export const CODING_AGENT_CLI_FINDINGS_RESULT_VERSION =
-	'jan-csaa-coding-agent-findings-result/0.1.0' as const;
+	'jan-csaa-coding-agent-findings-result/2.0.0' as const;
 export const CODING_AGENT_CLI_EXPLANATION_PROFILE_VERSION =
-	'jan-csaa-coding-agent-explanation-profile/0.1.0' as const;
+	'jan-csaa-coding-agent-explanation-profile/1.0.0' as const;
 export const CODING_AGENT_CLI_EXPLANATION_RESULT_VERSION =
-	'jan-csaa-coding-agent-explanation-result/0.1.0' as const;
+	'jan-csaa-coding-agent-explanation-result/1.0.0' as const;
 export const CODING_AGENT_CLI_VERIFICATION_EXPECTATION_VERSION =
 	'jan-csaa-coding-agent-verification-expectation/0.1.0' as const;
 export const CODING_AGENT_CLI_VERIFICATION_RESULT_VERSION =
@@ -126,14 +150,14 @@ export const CODING_AGENT_CLI_VERIFICATION_RESULT_VERSION =
 
 export const CODING_AGENT_CLI_LOCAL_CAPABILITIES = Object.freeze({
 	explain: 'IMPLEMENTATION_LOCAL_EXACT_FINDING_EXPLANATION',
-	findings: HARMONIZATION_FIRST_INCREMENT_CAPABILITY,
+	findings: 'IMPLEMENTATION_LOCAL_JPWB_HARMONIZATION_FINDINGS',
 	inventory: 'IMPLEMENTATION_LOCAL_REPOSITORY_INVENTORY',
 	verify: 'IMPLEMENTATION_LOCAL_ARTIFACT_WORKFLOW_VERIFICATION'
 } as const);
 
 export const CODING_AGENT_CLI_LOCAL_CAPABILITY_VERSIONS = Object.freeze({
-	explain: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.explain}@0.1.0`,
-	findings: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.findings}@0.1.0`,
+	explain: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.explain}@1.0.0`,
+	findings: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.findings}@2.0.0`,
 	inventory: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.inventory}@0.1.0`,
 	verify: `${CODING_AGENT_CLI_LOCAL_CAPABILITIES.verify}@0.1.0`
 } as const);
@@ -141,10 +165,12 @@ export const CODING_AGENT_CLI_LOCAL_CAPABILITY_VERSIONS = Object.freeze({
 export const CODING_AGENT_CLI_COMPOSITION_STATE = 'IMPLEMENTATION_LOCAL_UNREGISTERED' as const;
 
 export const CODING_AGENT_CLI_COMPOSITION_NONCLAIMS = Object.freeze([
-	'This composition is implementation-local and is not package-root registered, installed as a binary, or G6 completion evidence.',
+	'This package-root-exported binary composition is implementation-local and is not a governance-registered JAN-CSAA capability or gate.',
 	'Inventory, findings, exact-evidence explanation, and artifact-workflow verification are implementation-local adapters rather than registered JAN-CSAA operations or qualified providers.',
-	'Findings evaluate only exact caller-supplied observations through the first-increment rule evaluator; this composition performs no native repository fact projection and preserves UNSUPPORTED and NOT_RUN.',
-	'Explanation copies exact stored finding, rule, trace, evidence, currentness, and provenance fields and creates no inferred causal or remediation claim.',
+	'Findings project all 23 first-increment rules and five rule-specific hybrid static prerequisites from exact retained FrozenSubject bytes; each row closes only an independently reconciled eligible population and preserves UNSUPPORTED, NOT_RUN, stale, conflict, and open regions.',
+	'Optional runtime enrichment imports one caller-supplied deterministic trace without executing subject code and evaluates only the five allocated hybrid rows; it makes no general-purpose DFG, taint, or runtime-provider claim.',
+	'Native projection currentness remains caller-declared inside the provider result; this composition separately resolves and verifies the exact subject before and after projection.',
+	'Explanation independently recaptures and replays the exact stored native projection and hybrid evidence envelope, copies exact rule, fact, population, evidence, currentness, and provenance fields, and creates no inferred causal or remediation claim.',
 	'Verification compares bounded stored artifacts to caller-declared exact expectations; it is not test execution, behavior preservation, conformance, acceptance, disposition, or gate authority.',
 	'Snapshot, query, and impact responses preserve their owning operations limitations and cannot create gates, remediation, non-impact, safe-removal, or behavior-preservation authority.',
 	'Only content-addressed canonical JSON artifacts are consumed or published; artifact references are never interpreted as filesystem paths.',
@@ -154,9 +180,11 @@ export const CODING_AGENT_CLI_COMPOSITION_NONCLAIMS = Object.freeze([
 export const CODING_AGENT_CLI_COMPOSITION_SAFETY_CEILINGS = Object.freeze({
 	maxVerificationAssertions: 32,
 	maxVerificationArtifactBytes: CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS.maxOutputBytes,
-	maxVerificationDistinctArtifacts: 4,
+	maxVerificationDistinctArtifacts: 8,
 	maxVerificationPathDepth: 32,
 	maxProgressResponses: 16,
+	maxRuntimeFreshnessWindowMs: 31 * 24 * 60 * 60 * 1_000,
+	nativeProjectionWrapperReservationBytes: 32_768,
 	outputEnvelopeReservationBytes: 65_536
 } as const);
 
@@ -200,7 +228,18 @@ export interface CodingAgentCliInventoryResultArtifact {
 }
 
 export interface CodingAgentCliFindingsResultArtifact {
-	readonly evaluationOutcome: HarmonizationFirstIncrementEvaluationOutcome;
+	readonly currentness: {
+		readonly afterProjection: FrozenSubjectFreshness;
+		readonly basis: 'INDEPENDENT_EXACT_FROZEN_SUBJECT_BYTE_RECHECK_BEFORE_AND_AFTER';
+		readonly beforeProjection: FrozenSubjectFreshness;
+	};
+	readonly nativeProjectionOutcome: JpwbHarmonizationNativeProjectionOutcome;
+	readonly hybridEvidence: {
+		readonly runtimeEvaluation: HybridRuntimeEvaluationResult | null;
+		readonly runtimeTrace: ProviderEvidenceResult<DeterministicRuntimeTraceObservation> | null;
+		readonly runtimeTraceRef: string | null;
+		readonly staticProjection: JpwbHybridStaticPrerequisiteProjection;
+	};
 	readonly ruleProfileRef: string;
 	readonly schemaVersion: typeof CODING_AGENT_CLI_FINDINGS_RESULT_VERSION;
 	readonly snapshotId: string;
@@ -208,9 +247,22 @@ export interface CodingAgentCliFindingsResultArtifact {
 	readonly subjectId: string;
 }
 
+export interface CodingAgentCliHybridRuntimeEvidenceRequestArtifact {
+	readonly assessedAt: string;
+	readonly freshnessWindowMs: number;
+	readonly kind: 'SUPPLIED_DETERMINISTIC_RUNTIME_TRACE';
+	readonly run: ProviderRunInput;
+	readonly traceRef: string;
+}
+
 export interface CodingAgentCliFindingsRequestArtifact {
-	readonly evaluationRequest: HarmonizationFirstIncrementEvaluationRequest;
-	readonly kind: 'HARMONIZATION_FIRST_INCREMENT_FINDINGS_REQUEST';
+	readonly budgets: JpwbHarmonizationNativeProjectionBudgets;
+	readonly executionDisposition: 'NOT_RUN' | 'RUN';
+	readonly executionId: string;
+	readonly hybridRuntimeEvidence: CodingAgentCliHybridRuntimeEvidenceRequestArtifact | null;
+	readonly hybridStaticObservedAt: string;
+	readonly kind: 'JPWB_HARMONIZATION_NATIVE_FINDINGS_REQUEST';
+	readonly operationVersion: typeof JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION;
 	readonly schemaVersion: typeof CODING_AGENT_CLI_FINDINGS_REQUEST_VERSION;
 	readonly snapshotRef: string;
 }
@@ -218,24 +270,23 @@ export interface CodingAgentCliFindingsRequestArtifact {
 export interface CodingAgentCliExplanationProfileArtifact {
 	readonly evaluationId: string;
 	readonly findingFingerprint: string | null;
+	readonly findingId: number;
 	readonly kind: 'EXACT_FINDING_EXPLANATION_PROFILE';
 	readonly schemaVersion: typeof CODING_AGENT_CLI_EXPLANATION_PROFILE_VERSION;
 }
 
 export interface CodingAgentCliExplanationResultArtifact {
 	readonly analysisAuthority: 'NONE';
-	readonly evaluation: {
-		readonly currentness: HarmonizationFirstIncrementEvaluationResult['currentness'];
-		readonly evaluationId: string;
-		readonly evidence: HarmonizationFirstIncrementEvaluationResult['evidence'];
-		readonly finding: HarmonizationFirstIncrementEvaluationResult['finding'];
-		readonly population: HarmonizationFirstIncrementEvaluationResult['population'];
-		readonly provenance: HarmonizationFirstIncrementEvaluationResult['provenance'];
-		readonly rule: HarmonizationFirstIncrementEvaluationResult['rule'];
-		readonly status: HarmonizationFirstIncrementEvaluationResult['status'];
-		readonly statusRationale: string;
-	};
 	readonly gateEffect: 'NONE';
+	readonly nativeProjection: {
+		readonly capability: JpwbHarmonizationNativeProjectionResult['capability'];
+		readonly currentRepositoryStatusTotals: JpwbHarmonizationNativeProjectionResult['currentRepositoryStatusTotals'];
+		readonly currentness: JpwbHarmonizationNativeProjectionResult['currentness'];
+		readonly executionId: string;
+		readonly resultWitness: { readonly bytes: number; readonly sha256: string };
+	};
+	readonly projection: JpwbHarmonizationNativeRuleProjection;
+	readonly replayCurrentness: CodingAgentCliFindingsResultArtifact['currentness'];
 	readonly schemaVersion: typeof CODING_AGENT_CLI_EXPLANATION_RESULT_VERSION;
 	readonly source: {
 		readonly findingsResultRef: string;
@@ -300,7 +351,6 @@ export interface CodingAgentCliCompositionDependencies {
 		options: { readonly subject: FrozenSubject },
 		runtimeOptions?: BuildStaticSemanticSnapshotRuntimeOptions
 	) => StaticSemanticSnapshotOutcome;
-	readonly evaluateFinding: typeof evaluateHarmonizationFirstIncrementRule;
 	readonly inventory: (options: {
 		readonly mode: 'json';
 		readonly repositoryRoot: string;
@@ -311,11 +361,13 @@ export interface CodingAgentCliCompositionDependencies {
 		options: RunSemanticSourceQueryReportOptions
 	) => Promise<SemanticSourceQueryReportOutcome>;
 	readonly resolveSubject: (request: ResolveSubjectRequest) => SubjectResolutionOutcome;
+	readonly projectFindings: typeof runJpwbHarmonizationNativeProjection;
 	readonly staticImpact: (
 		request: unknown,
 		options: RunStaticModuleImpactCandidateReportOptions
 	) => StaticModuleImpactCandidateReportOutcome;
 	readonly validateSnapshot: typeof validateStaticSemanticSnapshot;
+	readonly verifySubject: typeof verifyFrozenSubject;
 	readonly workingImpact: (
 		request: unknown,
 		options: RunWorkingSourceEditImpactCandidateReportOptions
@@ -331,12 +383,13 @@ export interface ComposeCodingAgentCliHandlersOptions {
 
 const DEFAULT_DEPENDENCIES: CodingAgentCliCompositionDependencies = Object.freeze({
 	buildSnapshot: buildStaticSemanticSnapshot,
-	evaluateFinding: evaluateHarmonizationFirstIncrementRule,
 	inventory: runInventory,
+	projectFindings: runJpwbHarmonizationNativeProjection,
 	query: runSemanticSourceQueryReport,
 	resolveSubject,
 	staticImpact: runStaticModuleImpactCandidateReport,
 	validateSnapshot: validateStaticSemanticSnapshot,
+	verifySubject: verifyFrozenSubject,
 	workingImpact: runWorkingSourceEditImpactCandidateReport
 });
 
@@ -374,6 +427,13 @@ class CompositionError extends Error {
 	) {
 		super(message);
 		this.name = 'CompositionError';
+	}
+}
+
+class FrozenSubjectWitnessRequiredError extends Error {
+	constructor(readonly artifact: CodingAgentCliSnapshotResultArtifact) {
+		super('The semantic snapshot requires its exact authored FrozenSubject witness.');
+		this.name = 'FrozenSubjectWitnessRequiredError';
 	}
 }
 
@@ -507,32 +567,66 @@ function stableDependencies(
 	return Object.freeze({ ...DEFAULT_DEPENDENCIES, ...overrides });
 }
 
-const DEPTH_BUDGET_KEYS = new Set(['maxAstDepth', 'maxConfigDepth', 'maxDepth']);
-const EDGE_BUDGET_KEYS = new Set([
-	'maxCandidateWitnessHops',
-	'maxCompilerFacts',
-	'maxCompilerQueries',
-	'maxCompilerQueryInvocations',
-	'maxEdges',
-	'maxEvaluations',
-	'maxMemberships',
-	'maxTraceNodes',
-	'maxWitnessHops'
+type DomainBudgetLimit = 'ARTIFACT_BYTES' | 'DEPTH' | 'EDGES' | 'NODES' | 'RESULTS' | 'TIMEOUT';
+
+/**
+ * Exhaustive scalar leaves admitted by the seven coding-agent operation adapters. The mapping is
+ * deliberately explicit: an owning report may impose a narrower ceiling, but no nested operation
+ * artifact may expand beyond its enclosing AgentOperationRequest resource authority.
+ */
+const DOMAIN_BUDGET_LIMITS = Object.freeze({
+	maxArtifacts: 'NODES',
+	maxAstDepth: 'DEPTH',
+	maxAstNodes: 'NODES',
+	maxBytes: 'ARTIFACT_BYTES',
+	maxCandidateWitnessHops: 'EDGES',
+	maxCompilerFacts: 'EDGES',
+	maxCompilerInputMetadataBytes: 'ARTIFACT_BYTES',
+	maxCompilerQueries: 'EDGES',
+	maxCompilerQueryInvocations: 'EDGES',
+	maxConfigDepth: 'DEPTH',
+	maxContextBytes: 'ARTIFACT_BYTES',
+	maxContextFileBytes: 'ARTIFACT_BYTES',
+	maxContextFiles: 'NODES',
+	maxDepth: 'DEPTH',
+	maxDiagnosticCharacters: 'ARTIFACT_BYTES',
+	maxDiagnostics: 'RESULTS',
+	maxDirectoryEntries: 'NODES',
+	maxDurationMs: 'TIMEOUT',
+	maxEdges: 'EDGES',
+	maxEvaluations: 'EDGES',
+	maxFanout: 'EDGES',
+	maxFiles: 'NODES',
+	maxFrontierRecords: 'NODES',
+	maxGitMetadataBytes: 'ARTIFACT_BYTES',
+	maxGitOperationDurationMs: 'TIMEOUT',
+	maxInputRecords: 'NODES',
+	maxInputStringCharacters: 'ARTIFACT_BYTES',
+	maxLiteralCharacters: 'ARTIFACT_BYTES',
+	maxNodes: 'NODES',
+	maxPathCharacters: 'ARTIFACT_BYTES',
+	maxPopulation: 'NODES',
+	maxProjects: 'NODES',
+	maxReachableNodes: 'NODES',
+	maxResultBytes: 'ARTIFACT_BYTES',
+	maxResultRecords: 'RESULTS',
+	maxScopes: 'NODES',
+	maxSnapshotBytes: 'ARTIFACT_BYTES',
+	maxSourceBytes: 'ARTIFACT_BYTES',
+	maxSources: 'NODES',
+	maxTraceNodes: 'NODES',
+	maxTraversalSteps: 'EDGES',
+	maxWitnessEdges: 'EDGES'
+} as const satisfies Readonly<Record<string, DomainBudgetLimit>>);
+
+const DOMAIN_BUDGET_RECORD_KEYS = new Set([
+	'observation',
+	'query',
+	'reachability',
+	'semantic',
+	'staticImpact',
+	'subject'
 ]);
-const NODE_BUDGET_KEYS = new Set([
-	'maxAstNodes',
-	'maxFiles',
-	'maxFrontierRecords',
-	'maxInputRecords',
-	'maxNodes',
-	'maxOutputRecords',
-	'maxPopulation',
-	'maxPrograms',
-	'maxProjects',
-	'maxSources'
-]);
-const RESULT_BUDGET_KEYS = new Set(['maxResultRecords', 'maxResults']);
-const TIME_BUDGET_KEYS = new Set(['maxDurationMs', 'maxGitOperationDurationMs']);
 
 function assertBudgetValue(value: unknown, maximum: number, path: string): void {
 	if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1)
@@ -542,6 +636,27 @@ function assertBudgetValue(value: unknown, maximum: number, path: string): void 
 			'BUDGET',
 			`${path} exceeds the enclosing agent-operation resource budget.`
 		);
+}
+
+function domainBudgetMaximum(
+	limit: DomainBudgetLimit,
+	request: AgentOperationRequest,
+	artifactBudget: number
+): number {
+	switch (limit) {
+		case 'ARTIFACT_BYTES':
+			return artifactBudget;
+		case 'DEPTH':
+			return request.budgets.maxDepth;
+		case 'EDGES':
+			return request.budgets.maxEdges;
+		case 'NODES':
+			return request.budgets.maxNodes;
+		case 'RESULTS':
+			return request.budgets.maxResults;
+		case 'TIMEOUT':
+			return request.budgets.timeoutMs;
+	}
 }
 
 function assertDomainBudgetEnvelope(
@@ -556,32 +671,14 @@ function assertDomainBudgetEnvelope(
 	const record = dataRecord(value, path);
 	for (const [key, child] of record.values) {
 		const childPath = `${path}.${key}`;
-		if (key === 'maxResultBytes' || key === 'maxSnapshotBytes') {
-			assertBudgetValue(child, artifactBudget, childPath);
+		if (Object.hasOwn(DOMAIN_BUDGET_LIMITS, key)) {
+			const limit = DOMAIN_BUDGET_LIMITS[key as keyof typeof DOMAIN_BUDGET_LIMITS];
+			assertBudgetValue(child, domainBudgetMaximum(limit, request, artifactBudget), childPath);
 			continue;
 		}
-		if (DEPTH_BUDGET_KEYS.has(key)) {
-			assertBudgetValue(child, request.budgets.maxDepth, childPath);
-			continue;
-		}
-		if (EDGE_BUDGET_KEYS.has(key)) {
-			assertBudgetValue(child, request.budgets.maxEdges, childPath);
-			continue;
-		}
-		if (NODE_BUDGET_KEYS.has(key)) {
-			assertBudgetValue(child, request.budgets.maxNodes, childPath);
-			continue;
-		}
-		if (RESULT_BUDGET_KEYS.has(key)) {
-			assertBudgetValue(child, request.budgets.maxResults, childPath);
-			continue;
-		}
-		if (TIME_BUDGET_KEYS.has(key)) {
-			assertBudgetValue(child, request.budgets.timeoutMs, childPath);
-			continue;
-		}
-		if (child !== null && typeof child === 'object' && !Array.isArray(child))
-			assertDomainBudgetEnvelope(child, request, artifactBudget, childPath, depth + 1);
+		if (!DOMAIN_BUDGET_RECORD_KEYS.has(key))
+			throw new CompositionError('INVALID', `${childPath} is not a registered operation budget.`);
+		assertDomainBudgetEnvelope(child, request, artifactBudget, childPath, depth + 1);
 	}
 }
 
@@ -1336,7 +1433,8 @@ function materializeSnapshotRequestArtifact(
 
 function materializeSnapshotResultArtifact(
 	value: unknown,
-	validateSnapshot: typeof validateStaticSemanticSnapshot
+	validateSnapshot: typeof validateStaticSemanticSnapshot,
+	frozenSubject?: FrozenSubject
 ): CodingAgentCliSnapshotResultArtifact {
 	const envelope = exactRecord(
 		value,
@@ -1358,8 +1456,18 @@ function materializeSnapshotResultArtifact(
 	} catch (error) {
 		throw artifactError(error as CodingAgentCliArtifactError);
 	}
-	const validation = validateSnapshot(snapshotValue);
-	if (validation.state !== 'VALID')
+	const validation = validateSnapshot(
+		snapshotValue,
+		{},
+		frozenSubject === undefined ? {} : { frozenSubject }
+	);
+	const requiresFrozenSubjectWitness =
+		frozenSubject === undefined &&
+		validation.state === 'INVALID' &&
+		validation.issues.length === 1 &&
+		validation.issues[0]?.code === 'FROZEN_EVIDENCE_REQUIRED' &&
+		validation.issues[0].path === '$validationContext.frozenSubject';
+	if (validation.state !== 'VALID' && !requiresFrozenSubjectWitness)
 		throw new CompositionError('INVALID', 'The referenced semantic snapshot is invalid.');
 	const snapshot = snapshotValue as StaticSemanticSnapshot;
 	if (
@@ -1373,13 +1481,15 @@ function materializeSnapshotResultArtifact(
 	const diagnostics = envelope.values.get('diagnostics');
 	if (!Array.isArray(diagnostics) || isProxy(diagnostics))
 		throw new CompositionError('INVALID', 'The referenced snapshot diagnostics are invalid.');
-	return {
+	const artifact: CodingAgentCliSnapshotResultArtifact = {
 		buildOutcome,
 		captureRequestRef,
 		diagnostics: diagnostics as StaticSemanticSnapshotOutcome['diagnostics'],
 		schemaVersion: CODING_AGENT_CLI_SNAPSHOT_RESULT_VERSION,
 		snapshot
 	};
+	if (requiresFrozenSubjectWitness) throw new FrozenSubjectWitnessRequiredError(artifact);
+	return artifact;
 }
 
 function materializeInventoryRequestArtifact(
@@ -1432,7 +1542,7 @@ async function recaptureSnapshotSubject(
 	dependencies: CodingAgentCliCompositionDependencies,
 	snapshotArtifact: CodingAgentCliSnapshotResultArtifact,
 	context: CodingAgentCliHandlerContext
-): Promise<void> {
+): Promise<{ readonly freshness: FrozenSubjectFreshness; readonly subject: FrozenSubject }> {
 	assertNotCancelled(context);
 	const captureRequest = materializeSnapshotRequestArtifact(
 		await readCodingAgentCliJsonArtifact(
@@ -1461,22 +1571,271 @@ async function recaptureSnapshotSubject(
 			recapturedSubjectId,
 			snapshotArtifact.snapshot.id
 		);
+	const freshness = dependencies.verifySubject(resolution.subject, { rootLocator: repositoryRoot });
+	assertNotCancelled(context);
+	if (freshness.state !== 'CURRENT')
+		throw new CompositionError(
+			'STALE',
+			'The independently verified recaptured subject is not current.',
+			recapturedSubjectId,
+			snapshotArtifact.snapshot.id
+		);
+	return Object.freeze({ freshness, subject: resolution.subject });
+}
+
+async function loadValidatedSnapshotResultArtifact(
+	request: AgentOperationRequest,
+	artifactBudget: number,
+	repositoryRoot: string,
+	artifactStore: CodingAgentCliArtifactStore,
+	dependencies: CodingAgentCliCompositionDependencies,
+	reference: string,
+	context: CodingAgentCliHandlerContext
+): Promise<{
+	readonly artifact: CodingAgentCliSnapshotResultArtifact;
+	readonly recaptured?: {
+		readonly freshness: FrozenSubjectFreshness;
+		readonly subject: FrozenSubject;
+	};
+}> {
+	const value = await readCodingAgentCliJsonArtifact(artifactStore, reference, artifactBudget);
+	try {
+		return Object.freeze({
+			artifact: materializeSnapshotResultArtifact(value, dependencies.validateSnapshot)
+		});
+	} catch (error) {
+		if (!(error instanceof FrozenSubjectWitnessRequiredError)) throw error;
+		const recaptured = await recaptureSnapshotSubject(
+			request,
+			artifactBudget,
+			repositoryRoot,
+			artifactStore,
+			dependencies,
+			error.artifact,
+			context
+		);
+		return Object.freeze({
+			artifact: materializeSnapshotResultArtifact(
+				value,
+				dependencies.validateSnapshot,
+				recaptured.subject
+			),
+			recaptured
+		});
+	}
+}
+
+function trustedAdditionalArtifactsForCapturedSubject(subject: FrozenSubject): readonly string[] {
+	const scope = subject.request.scope;
+	if (scope.kind !== 'EXPLICIT_PROJECTS') return Object.freeze([]);
+	return Object.freeze([...(scope.additionalArtifacts ?? [])]);
+}
+
+function trustedSubjectFiltersForCapturedSubject(subject: FrozenSubject): SubjectFilters {
+	return Object.freeze({
+		exclude: Object.freeze([...subject.request.filters.exclude]),
+		include: Object.freeze([...subject.request.filters.include])
+	});
+}
+
+function boundedFindingsString(value: unknown, path: string, maximum = 2_048): string {
+	if (typeof value !== 'string' || value.length === 0 || value.length > maximum)
+		throw new CompositionError('INVALID', `${path} must be one bounded nonempty string.`);
+	return value;
+}
+
+function findingsSha256(value: unknown, path: string): string {
+	const text = boundedFindingsString(value, path, 64);
+	if (!/^[a-f0-9]{64}$/u.test(text))
+		throw new CompositionError('INVALID', `${path} must be one lowercase SHA-256 digest.`);
+	return text;
+}
+
+function findingsTimestamp(value: unknown, path: string): string {
+	const text = boundedFindingsString(value, path, 32);
+	if (
+		!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u.test(text) ||
+		Number.isNaN(Date.parse(text))
+	)
+		throw new CompositionError('INVALID', `${path} must be one canonical UTC timestamp.`);
+	const canonical = new Date(Date.parse(text)).toISOString();
+	if (text !== canonical && text !== canonical.replace('.000Z', 'Z'))
+		throw new CompositionError('INVALID', `${path} must be one canonical UTC timestamp.`);
+	return text;
+}
+
+function materializeProviderRun(value: unknown): ProviderRunInput {
+	const path = '$findingsRequest.hybridRuntimeEvidence.run';
+	const record = exactRecord(
+		value,
+		[
+			'command',
+			'endedAt',
+			'environmentSha256',
+			'outputComplete',
+			'profile',
+			'provider',
+			'runId',
+			'startedAt',
+			'subjectId',
+			'subjectManifestSha256',
+			'termination'
+		],
+		path
+	);
+	const command = denseArray(record.values.get('command'), 256, `${path}.command`).map(
+		(argument, index) => boundedFindingsString(argument, `${path}.command[${index}]`)
+	);
+	if (command.length === 0)
+		throw new CompositionError('INVALID', `${path}.command must not be empty.`);
+	const providerPath = `${path}.provider`;
+	const provider = exactRecord(
+		record.values.get('provider'),
+		['configurationSha256', 'dependencyClosureSha256', 'executableSha256', 'id', 'version'],
+		providerPath
+	);
+	const terminationPath = `${path}.termination`;
+	const terminationRecord = dataRecord(record.values.get('termination'), terminationPath);
+	const terminationKind = terminationRecord.values.get('kind');
+	let termination: ProviderRunInput['termination'];
+	if (terminationKind === 'EXITED') {
+		const exact = exactRecord(
+			record.values.get('termination'),
+			['exitCode', 'kind'],
+			terminationPath
+		);
+		const exitCode = exact.values.get('exitCode');
+		if (typeof exitCode !== 'number' || !Number.isSafeInteger(exitCode))
+			throw new CompositionError('INVALID', `${terminationPath}.exitCode must be a safe integer.`);
+		termination = Object.freeze({ exitCode, kind: 'EXITED' });
+	} else if (terminationKind === 'CRASHED') {
+		const exact = exactRecord(
+			record.values.get('termination'),
+			['kind', 'signal'],
+			terminationPath
+		);
+		const signal = exact.values.get('signal');
+		if (
+			signal !== null &&
+			(typeof signal !== 'string' || signal.length === 0 || signal.length > 256)
+		)
+			throw new CompositionError('INVALID', `${terminationPath}.signal is invalid.`);
+		termination = Object.freeze({
+			kind: 'CRASHED',
+			signal: signal as string | null
+		});
+	} else if (terminationKind === 'TIMED_OUT') {
+		const exact = exactRecord(
+			record.values.get('termination'),
+			['budgetMs', 'kind'],
+			terminationPath
+		);
+		const budgetMs = exact.values.get('budgetMs');
+		if (typeof budgetMs !== 'number' || !Number.isSafeInteger(budgetMs) || budgetMs < 1)
+			throw new CompositionError('INVALID', `${terminationPath}.budgetMs must be positive.`);
+		termination = Object.freeze({ budgetMs, kind: 'TIMED_OUT' });
+	} else throw new CompositionError('INVALID', `${terminationPath}.kind is unsupported.`);
+	return Object.freeze({
+		command: Object.freeze(command),
+		endedAt: findingsTimestamp(record.values.get('endedAt'), `${path}.endedAt`),
+		environmentSha256: findingsSha256(
+			record.values.get('environmentSha256'),
+			`${path}.environmentSha256`
+		),
+		outputComplete: requiredBoolean(record, 'outputComplete', path),
+		profile: boundedFindingsString(record.values.get('profile'), `${path}.profile`, 256),
+		provider: Object.freeze({
+			configurationSha256: findingsSha256(
+				provider.values.get('configurationSha256'),
+				`${providerPath}.configurationSha256`
+			),
+			dependencyClosureSha256: findingsSha256(
+				provider.values.get('dependencyClosureSha256'),
+				`${providerPath}.dependencyClosureSha256`
+			),
+			executableSha256: findingsSha256(
+				provider.values.get('executableSha256'),
+				`${providerPath}.executableSha256`
+			),
+			id: boundedFindingsString(provider.values.get('id'), `${providerPath}.id`, 256),
+			version: boundedFindingsString(provider.values.get('version'), `${providerPath}.version`, 256)
+		}),
+		runId: boundedFindingsString(record.values.get('runId'), `${path}.runId`, 256),
+		startedAt: findingsTimestamp(record.values.get('startedAt'), `${path}.startedAt`),
+		subjectId: boundedFindingsString(record.values.get('subjectId'), `${path}.subjectId`),
+		subjectManifestSha256: findingsSha256(
+			record.values.get('subjectManifestSha256'),
+			`${path}.subjectManifestSha256`
+		),
+		termination
+	});
+}
+
+function materializeHybridRuntimeEvidenceRequest(
+	value: unknown
+): CodingAgentCliHybridRuntimeEvidenceRequestArtifact | null {
+	if (value === null) return null;
+	const path = '$findingsRequest.hybridRuntimeEvidence';
+	const record = exactRecord(
+		value,
+		['assessedAt', 'freshnessWindowMs', 'kind', 'run', 'traceRef'],
+		path
+	);
+	if (record.values.get('kind') !== 'SUPPLIED_DETERMINISTIC_RUNTIME_TRACE')
+		throw new CompositionError('INVALID', `${path}.kind is unsupported.`);
+	const freshnessWindowMs = record.values.get('freshnessWindowMs');
+	if (
+		typeof freshnessWindowMs !== 'number' ||
+		!Number.isSafeInteger(freshnessWindowMs) ||
+		freshnessWindowMs < 0 ||
+		freshnessWindowMs > CODING_AGENT_CLI_COMPOSITION_SAFETY_CEILINGS.maxRuntimeFreshnessWindowMs
+	)
+		throw new CompositionError('INVALID', `${path}.freshnessWindowMs is outside its ceiling.`);
+	return Object.freeze({
+		assessedAt: findingsTimestamp(record.values.get('assessedAt'), `${path}.assessedAt`),
+		freshnessWindowMs,
+		kind: 'SUPPLIED_DETERMINISTIC_RUNTIME_TRACE',
+		run: materializeProviderRun(record.values.get('run')),
+		traceRef: exactArtifactReference(
+			boundedFindingsString(record.values.get('traceRef'), `${path}.traceRef`, 128),
+			`${path}.traceRef`
+		)
+	});
 }
 
 function materializeFindingsRequestArtifact(
 	value: unknown,
-	expectedSnapshotRef: string
+	expectedSnapshotRef: string,
+	request: AgentOperationRequest,
+	artifactBudget: number
 ): CodingAgentCliFindingsRequestArtifact {
 	const record = exactRecord(
 		value,
-		['evaluationRequest', 'kind', 'schemaVersion', 'snapshotRef'],
+		[
+			'budgets',
+			'executionDisposition',
+			'executionId',
+			'hybridRuntimeEvidence',
+			'hybridStaticObservedAt',
+			'kind',
+			'operationVersion',
+			'schemaVersion',
+			'snapshotRef'
+		],
 		'$findingsRequest'
 	);
 	if (
-		record.values.get('kind') !== 'HARMONIZATION_FIRST_INCREMENT_FINDINGS_REQUEST' ||
+		record.values.get('kind') !== 'JPWB_HARMONIZATION_NATIVE_FINDINGS_REQUEST' ||
 		record.values.get('schemaVersion') !== CODING_AGENT_CLI_FINDINGS_REQUEST_VERSION
 	)
 		throw new CompositionError('INVALID', 'The findings request contract is unsupported.');
+	if (
+		record.values.get('operationVersion') !== JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION
+	)
+		throw new CompositionError(
+			'INVALID',
+			'The native projection operation version is unsupported.'
+		);
 	const snapshotRef = exactArtifactReference(
 		requiredString(record, 'snapshotRef', '$findingsRequest'),
 		'$findingsRequest.snapshotRef'
@@ -1486,20 +1845,270 @@ function materializeFindingsRequestArtifact(
 			'INVALID',
 			'The findings request does not bind the exact CLI snapshot artifact.'
 		);
-	const evaluationRequest = record.values.get('evaluationRequest');
-	const evaluationRecord = dataRecord(evaluationRequest, '$findingsRequest.evaluationRequest');
+	const budgetsValue = record.values.get('budgets');
+	const budgetsRecord = exactRecord(
+		budgetsValue,
+		['maxArtifacts', 'maxAstNodes', 'maxDurationMs', 'maxResultBytes', 'maxSourceBytes'],
+		'$findingsRequest.budgets'
+	);
+	const nativeArtifactBudget =
+		artifactBudget -
+		CODING_AGENT_CLI_COMPOSITION_SAFETY_CEILINGS.nativeProjectionWrapperReservationBytes;
+	if (nativeArtifactBudget < 1)
+		throw new CompositionError(
+			'BUDGET',
+			'The findings output budget cannot reserve the native projection wrapper.'
+		);
+	assertDomainBudgetEnvelope(
+		budgetsValue,
+		request,
+		nativeArtifactBudget,
+		'$findingsRequest.budgets'
+	);
+	const budgets = Object.fromEntries(
+		budgetsRecord.values
+	) as unknown as JpwbHarmonizationNativeProjectionBudgets;
+	for (const [key, ceiling] of Object.entries(
+		JPWB_HARMONIZATION_NATIVE_PROJECTION_DEFAULT_BUDGETS
+	)) {
+		const candidate = budgets[key as keyof JpwbHarmonizationNativeProjectionBudgets];
+		if (
+			typeof candidate !== 'number' ||
+			!Number.isSafeInteger(candidate) ||
+			candidate < 1 ||
+			candidate > ceiling
+		)
+			throw new CompositionError(
+				candidate > ceiling ? 'BUDGET' : 'INVALID',
+				`$findingsRequest.budgets.${key} exceeds the composition safety ceiling.`
+			);
+	}
+	const executionDisposition = record.values.get('executionDisposition');
+	if (executionDisposition !== 'RUN' && executionDisposition !== 'NOT_RUN')
+		throw new CompositionError('INVALID', 'The findings execution disposition is invalid.');
+	const executionId = requiredString(record, 'executionId', '$findingsRequest');
+	if (executionId.length > 2_048)
+		throw new CompositionError('INVALID', 'The findings execution identity is too long.');
+	const hybridStaticObservedAt = requiredString(
+		record,
+		'hybridStaticObservedAt',
+		'$findingsRequest'
+	);
 	if (
-		evaluationRecord.values.get('schemaVersion') !==
-			HARMONIZATION_FIRST_INCREMENT_EVALUATION_REQUEST_SCHEMA_VERSION ||
-		evaluationRecord.values.get('operationVersion') !==
-			HARMONIZATION_FIRST_INCREMENT_OPERATION_VERSION
+		!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/u.test(
+			hybridStaticObservedAt
+		) ||
+		Number.isNaN(Date.parse(hybridStaticObservedAt))
 	)
-		throw new CompositionError('INVALID', 'The rule-evaluation request version is unsupported.');
+		throw new CompositionError(
+			'INVALID',
+			'The hybrid static observation time must be canonical millisecond UTC.'
+		);
+	const hybridRuntimeEvidence = materializeHybridRuntimeEvidenceRequest(
+		record.values.get('hybridRuntimeEvidence')
+	);
 	return {
-		evaluationRequest: evaluationRequest as HarmonizationFirstIncrementEvaluationRequest,
-		kind: 'HARMONIZATION_FIRST_INCREMENT_FINDINGS_REQUEST',
+		budgets,
+		executionDisposition,
+		executionId,
+		hybridRuntimeEvidence,
+		hybridStaticObservedAt,
+		kind: 'JPWB_HARMONIZATION_NATIVE_FINDINGS_REQUEST',
+		operationVersion: JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION,
 		schemaVersion: CODING_AGENT_CLI_FINDINGS_REQUEST_VERSION,
 		snapshotRef
+	};
+}
+
+function materializeCurrentFreshness(value: unknown, path: string): FrozenSubjectFreshness {
+	const record = exactRecord(value, ['changedPaths', 'diagnostics', 'state'], path);
+	if (record.values.get('state') !== 'CURRENT')
+		throw new CompositionError('STALE', `${path} does not establish currentness.`);
+	const changedPaths = denseArray(
+		record.values.get('changedPaths'),
+		200_001,
+		`${path}.changedPaths`
+	);
+	const diagnostics = denseArray(record.values.get('diagnostics'), 200_001, `${path}.diagnostics`);
+	if (changedPaths.length !== 0)
+		throw new CompositionError('STALE', `${path} reports changed paths while marked current.`);
+	return {
+		changedPaths: changedPaths as readonly string[],
+		diagnostics: diagnostics as FrozenSubjectFreshness['diagnostics'],
+		state: 'CURRENT'
+	};
+}
+
+function materializeNativeProjectionOutcome(
+	value: unknown
+): Extract<JpwbHarmonizationNativeProjectionOutcome, { readonly outcome: 'projected' }> {
+	const outcome = exactRecord(
+		value,
+		['diagnostics', 'outcome', 'result', 'schemaVersion', 'state'],
+		'$findingsResult.nativeProjectionOutcome'
+	);
+	if (
+		outcome.values.get('schemaVersion') !==
+			JPWB_HARMONIZATION_NATIVE_PROJECTION_OUTCOME_SCHEMA_VERSION ||
+		outcome.values.get('outcome') !== 'projected' ||
+		outcome.values.get('state') !== 'projected' ||
+		denseArray(
+			outcome.values.get('diagnostics'),
+			1,
+			'$findingsResult.nativeProjectionOutcome.diagnostics'
+		).length !== 0
+	)
+		throw new CompositionError('INVALID', 'The stored native projection outcome is invalid.');
+	const resultValue = outcome.values.get('result');
+	const result = exactRecord(
+		resultValue,
+		[
+			'analysisAuthority',
+			'authorityTransfer',
+			'capability',
+			'currentness',
+			'currentRepositoryStatusTotals',
+			'executionId',
+			'facadeNonclaims',
+			'projections',
+			'resultWitness',
+			'schemaVersion'
+		],
+		'$findingsResult.nativeProjectionOutcome.result'
+	);
+	if (
+		result.values.get('schemaVersion') !==
+			JPWB_HARMONIZATION_NATIVE_PROJECTION_RESULT_SCHEMA_VERSION ||
+		result.values.get('analysisAuthority') !== 'NONE' ||
+		result.values.get('authorityTransfer') !== 'NONE' ||
+		denseArray(
+			result.values.get('projections'),
+			23,
+			'$findingsResult.nativeProjectionOutcome.result.projections'
+		).length !== 23
+	)
+		throw new CompositionError('INVALID', 'The stored native projection result is invalid.');
+	const witness = exactRecord(
+		result.values.get('resultWitness'),
+		['bytes', 'sha256'],
+		'$findingsResult.nativeProjectionOutcome.result.resultWitness'
+	);
+	const resultWithoutWitness = Object.fromEntries(
+		[...result.values].filter(([key]) => key !== 'resultWitness')
+	);
+	const expectedWitness = canonicalSemanticJsonWitness(resultWithoutWitness);
+	if (
+		witness.values.get('bytes') !== expectedWitness.bytes ||
+		witness.values.get('sha256') !== expectedWitness.sha256
+	)
+		throw new CompositionError(
+			'INVALID',
+			'The stored native projection witness does not reconcile.'
+		);
+	return value as Extract<
+		JpwbHarmonizationNativeProjectionOutcome,
+		{ readonly outcome: 'projected' }
+	>;
+}
+
+function materializeHybridEvidence(
+	value: unknown
+): CodingAgentCliFindingsResultArtifact['hybridEvidence'] {
+	const path = '$findingsResult.hybridEvidence';
+	const record = exactRecord(
+		value,
+		['runtimeEvaluation', 'runtimeTrace', 'runtimeTraceRef', 'staticProjection'],
+		path
+	);
+	const staticProjectionValue = record.values.get('staticProjection');
+	const staticProjection = exactRecord(
+		staticProjectionValue,
+		[
+			'analysisAuthority',
+			'budgets',
+			'freshness',
+			'gateEffect',
+			'limitations',
+			'observedAt',
+			'operationVersion',
+			'population',
+			'prerequisites',
+			'projector',
+			'rows',
+			'schemaVersion',
+			'subject'
+		],
+		`${path}.staticProjection`
+	);
+	if (
+		staticProjection.values.get('schemaVersion') !== JPWB_HYBRID_STATIC_PROJECTION_SCHEMA_VERSION ||
+		staticProjection.values.get('analysisAuthority') !== 'NONE' ||
+		staticProjection.values.get('gateEffect') !== 'NONE'
+	)
+		throw new CompositionError('INVALID', 'The stored hybrid static projection is invalid.');
+
+	const runtimeTraceRefValue = record.values.get('runtimeTraceRef');
+	const runtimeTraceRef =
+		runtimeTraceRefValue === null
+			? null
+			: exactArtifactReference(
+					boundedFindingsString(runtimeTraceRefValue, `${path}.runtimeTraceRef`, 128),
+					`${path}.runtimeTraceRef`
+				);
+	const runtimeTraceValue = record.values.get('runtimeTrace');
+	const runtimeEvaluationValue = record.values.get('runtimeEvaluation');
+	if (runtimeTraceRef === null) {
+		if (runtimeTraceValue !== null || runtimeEvaluationValue !== null)
+			throw new CompositionError(
+				'INVALID',
+				'The stored hybrid evidence has runtime output without a runtime trace reference.'
+			);
+	} else {
+		const runtimeTrace = exactRecord(
+			runtimeTraceValue,
+			[
+				'adapter',
+				'analysisAuthority',
+				'availability',
+				'conflicts',
+				'coverage',
+				'diagnostics',
+				'freshness',
+				'gateEffect',
+				'health',
+				'observations',
+				'provider',
+				'rawArtifact',
+				'redactions',
+				'run',
+				'schemaVersion',
+				'subject',
+				'usableForCurrentSubject'
+			],
+			`${path}.runtimeTrace`
+		);
+		const runtimeEvaluation = exactRecord(
+			runtimeEvaluationValue,
+			['analysisAuthority', 'evaluator', 'gateEffect', 'rows', 'schemaVersion', 'subjectId'],
+			`${path}.runtimeEvaluation`
+		);
+		if (
+			runtimeTrace.values.get('schemaVersion') !== ENRICHED_PROVIDER_EVIDENCE_SCHEMA_VERSION ||
+			runtimeTrace.values.get('analysisAuthority') !== 'NONE' ||
+			runtimeTrace.values.get('gateEffect') !== 'NONE' ||
+			runtimeEvaluation.values.get('schemaVersion') !== HYBRID_RUNTIME_EVALUATION_SCHEMA_VERSION ||
+			runtimeEvaluation.values.get('analysisAuthority') !== 'NONE' ||
+			runtimeEvaluation.values.get('gateEffect') !== 'NONE'
+		)
+			throw new CompositionError('INVALID', 'The stored hybrid runtime evidence is invalid.');
+	}
+
+	return {
+		runtimeEvaluation: runtimeEvaluationValue as HybridRuntimeEvaluationResult | null,
+		runtimeTrace:
+			runtimeTraceValue as ProviderEvidenceResult<DeterministicRuntimeTraceObservation> | null,
+		runtimeTraceRef,
+		staticProjection: staticProjectionValue as JpwbHybridStaticPrerequisiteProjection
 	};
 }
 
@@ -1507,7 +2116,9 @@ function materializeFindingsResultArtifact(value: unknown): CodingAgentCliFindin
 	const record = exactRecord(
 		value,
 		[
-			'evaluationOutcome',
+			'currentness',
+			'hybridEvidence',
+			'nativeProjectionOutcome',
 			'ruleProfileRef',
 			'schemaVersion',
 			'snapshotId',
@@ -1518,20 +2129,32 @@ function materializeFindingsResultArtifact(value: unknown): CodingAgentCliFindin
 	);
 	if (record.values.get('schemaVersion') !== CODING_AGENT_CLI_FINDINGS_RESULT_VERSION)
 		throw new CompositionError('INVALID', 'The findings result contract is unsupported.');
-	const evaluationOutcome = record.values.get('evaluationOutcome');
-	const outcomeRecord = dataRecord(evaluationOutcome, '$findingsResult.evaluationOutcome');
+	const currentnessRecord = exactRecord(
+		record.values.get('currentness'),
+		['afterProjection', 'basis', 'beforeProjection'],
+		'$findingsResult.currentness'
+	);
 	if (
-		outcomeRecord.values.get('schemaVersion') !==
-			HARMONIZATION_FIRST_INCREMENT_EVALUATION_OUTCOME_SCHEMA_VERSION ||
-		outcomeRecord.values.get('outcome') !== 'evaluated' ||
-		outcomeRecord.values.get('state') !== 'evaluated'
+		currentnessRecord.values.get('basis') !==
+		'INDEPENDENT_EXACT_FROZEN_SUBJECT_BYTE_RECHECK_BEFORE_AND_AFTER'
 	)
-		throw new CompositionError(
-			'INVALID',
-			'The stored findings outcome is not an evaluated result.'
-		);
+		throw new CompositionError('INVALID', 'The findings currentness basis is unsupported.');
 	return {
-		evaluationOutcome: evaluationOutcome as HarmonizationFirstIncrementEvaluationOutcome,
+		currentness: {
+			afterProjection: materializeCurrentFreshness(
+				currentnessRecord.values.get('afterProjection'),
+				'$findingsResult.currentness.afterProjection'
+			),
+			basis: 'INDEPENDENT_EXACT_FROZEN_SUBJECT_BYTE_RECHECK_BEFORE_AND_AFTER',
+			beforeProjection: materializeCurrentFreshness(
+				currentnessRecord.values.get('beforeProjection'),
+				'$findingsResult.currentness.beforeProjection'
+			)
+		},
+		hybridEvidence: materializeHybridEvidence(record.values.get('hybridEvidence')),
+		nativeProjectionOutcome: materializeNativeProjectionOutcome(
+			record.values.get('nativeProjectionOutcome')
+		),
 		ruleProfileRef: exactArtifactReference(
 			requiredString(record, 'ruleProfileRef', '$findingsResult'),
 			'$findingsResult.ruleProfileRef'
@@ -1546,10 +2169,78 @@ function materializeFindingsResultArtifact(value: unknown): CodingAgentCliFindin
 	};
 }
 
+async function projectHybridEvidence(
+	findingsRequest: CodingAgentCliFindingsRequestArtifact,
+	recaptured: { readonly freshness: FrozenSubjectFreshness; readonly subject: FrozenSubject },
+	repositoryRoot: string,
+	artifactStore: CodingAgentCliArtifactStore,
+	context: CodingAgentCliHandlerContext
+): Promise<CodingAgentCliFindingsResultArtifact['hybridEvidence']> {
+	let staticProjection: JpwbHybridStaticPrerequisiteProjection;
+	try {
+		staticProjection = projectJpwbHybridStaticPrerequisites({
+			freshness: recaptured.freshness,
+			observedAt: findingsRequest.hybridStaticObservedAt,
+			subject: recaptured.subject
+		});
+	} catch (error) {
+		if (error instanceof TypeError)
+			throw new CompositionError(
+				'INVALID',
+				'The source-bound hybrid static prerequisite request was refused.'
+			);
+		throw error;
+	}
+	assertNotCancelled(context);
+	const runtimeRequest = findingsRequest.hybridRuntimeEvidence;
+	if (runtimeRequest === null)
+		return Object.freeze({
+			runtimeEvaluation: null,
+			runtimeTrace: null,
+			runtimeTraceRef: null,
+			staticProjection
+		});
+
+	const rawTrace = await readCodingAgentCliJsonArtifact(
+		artifactStore,
+		runtimeRequest.traceRef,
+		CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS.maxInputBytes
+	);
+	assertNotCancelled(context);
+	try {
+		const runtimeTrace = importDeterministicRuntimeTrace(canonicalInventoryJson(rawTrace), {
+			assessedAt: runtimeRequest.assessedAt,
+			freshnessWindowMs: runtimeRequest.freshnessWindowMs,
+			repositoryRoot,
+			run: runtimeRequest.run,
+			subject: recaptured.subject
+		});
+		const runtimeEvaluation = evaluateProjectedHybridRuntimeRows({
+			assessedAt: runtimeRequest.assessedAt,
+			projection: staticProjection,
+			trace: runtimeTrace
+		});
+		assertNotCancelled(context);
+		return Object.freeze({
+			runtimeEvaluation,
+			runtimeTrace,
+			runtimeTraceRef: runtimeRequest.traceRef,
+			staticProjection
+		});
+	} catch (error) {
+		if (error instanceof TypeError)
+			throw new CompositionError(
+				'INVALID',
+				'The supplied deterministic runtime trace request was refused.'
+			);
+		throw error;
+	}
+}
+
 function materializeExplanationProfile(value: unknown): CodingAgentCliExplanationProfileArtifact {
 	const record = exactRecord(
 		value,
-		['evaluationId', 'findingFingerprint', 'kind', 'schemaVersion'],
+		['evaluationId', 'findingFingerprint', 'findingId', 'kind', 'schemaVersion'],
 		'$explanationProfile'
 	);
 	if (
@@ -1567,9 +2258,13 @@ function materializeExplanationProfile(value: unknown): CodingAgentCliExplanatio
 			'INVALID',
 			'$explanationProfile.findingFingerprint must be a lowercase SHA-256 or null.'
 		);
+	const findingId = record.values.get('findingId');
+	if (typeof findingId !== 'number' || !Number.isSafeInteger(findingId) || findingId < 1)
+		throw new CompositionError('INVALID', '$explanationProfile.findingId is invalid.');
 	return {
 		evaluationId: requiredString(record, 'evaluationId', '$explanationProfile'),
 		findingFingerprint,
+		findingId,
 		kind: 'EXACT_FINDING_EXPLANATION_PROFILE',
 		schemaVersion: CODING_AGENT_CLI_EXPLANATION_PROFILE_VERSION
 	};
@@ -1984,6 +2679,17 @@ function snapshotHandler(
 					subjectId,
 					snapshot.id
 				);
+			const afterBuild = dependencies.verifySubject(resolution.subject, {
+				rootLocator: repositoryRoot
+			});
+			assertNotCancelled(context);
+			if (afterBuild.state !== 'CURRENT')
+				throw new CompositionError(
+					'STALE',
+					'The exact frozen subject changed during static semantic snapshot construction.',
+					subjectId,
+					snapshot.id
+				);
 			assertCurrentnessRequirement(request, subjectId, snapshot.id, basisReference);
 			const resultArtifact: CodingAgentCliSnapshotResultArtifact = {
 				buildOutcome: outcome.outcome,
@@ -2040,10 +2746,16 @@ function queryHandler(
 			operationCapabilityAccepted(request, 'JAN-CSAA-CAP-029');
 			const artifactBudget = outputArtifactBudget(request);
 			assertNotCancelled(context);
-			const snapshotArtifact = materializeSnapshotResultArtifact(
-				await readCodingAgentCliJsonArtifact(artifactStore, input.snapshotRef, artifactBudget),
-				dependencies.validateSnapshot
+			const loadedSnapshot = await loadValidatedSnapshotResultArtifact(
+				request,
+				artifactBudget,
+				repositoryRoot,
+				artifactStore,
+				dependencies,
+				input.snapshotRef,
+				context
 			);
+			const snapshotArtifact = loadedSnapshot.artifact;
 			const expectedSnapshot = snapshotArtifact.snapshot;
 			assertSubjectInputBinding(request, input.snapshotRef, expectedSnapshot.subjectId);
 			assertCurrentnessRequirement(
@@ -2052,6 +2764,14 @@ function queryHandler(
 				expectedSnapshot.id,
 				input.snapshotRef
 			);
+			const additionalArtifacts =
+				loadedSnapshot.recaptured === undefined
+					? Object.freeze([])
+					: trustedAdditionalArtifactsForCapturedSubject(loadedSnapshot.recaptured.subject);
+			const subjectFilters =
+				loadedSnapshot.recaptured === undefined
+					? Object.freeze({ exclude: Object.freeze([]), include: Object.freeze([]) })
+					: trustedSubjectFiltersForCapturedSubject(loadedSnapshot.recaptured.subject);
 			const queryRequest = reportRequestEnvelope(
 				await readCodingAgentCliJsonArtifact(
 					artifactStore,
@@ -2066,10 +2786,12 @@ function queryHandler(
 			);
 			const stages: string[] = [];
 			const outcome = await dependencies.query(queryRequest, {
+				additionalArtifacts,
 				onProgress: (event: SemanticSourceQueryReportProgressEvent): void => {
 					stages.push(`QUERY_${event.phase}_${event.state}`);
 				},
-				repositoryRoot
+				repositoryRoot,
+				subjectFilters
 			});
 			assertNotCancelled(context);
 			if (outcome.outcome === 'unavailable')
@@ -2136,10 +2858,16 @@ function impactHandler(
 			operationCapabilityAccepted(request, 'JAN-CSAA-CAP-031');
 			const artifactBudget = outputArtifactBudget(request);
 			assertNotCancelled(context);
-			const snapshotArtifact = materializeSnapshotResultArtifact(
-				await readCodingAgentCliJsonArtifact(artifactStore, input.snapshotRef, artifactBudget),
-				dependencies.validateSnapshot
+			const loadedSnapshot = await loadValidatedSnapshotResultArtifact(
+				request,
+				artifactBudget,
+				repositoryRoot,
+				artifactStore,
+				dependencies,
+				input.snapshotRef,
+				context
 			);
+			const snapshotArtifact = loadedSnapshot.artifact;
 			const expectedSnapshot = snapshotArtifact.snapshot;
 			assertSubjectInputBinding(request, input.snapshotRef, expectedSnapshot.subjectId);
 			assertCurrentnessRequirement(
@@ -2148,6 +2876,14 @@ function impactHandler(
 				expectedSnapshot.id,
 				input.snapshotRef
 			);
+			const additionalArtifacts =
+				loadedSnapshot.recaptured === undefined
+					? Object.freeze([])
+					: trustedAdditionalArtifactsForCapturedSubject(loadedSnapshot.recaptured.subject);
+			const subjectFilters =
+				loadedSnapshot.recaptured === undefined
+					? Object.freeze({ exclude: Object.freeze([]), include: Object.freeze([]) })
+					: trustedSubjectFiltersForCapturedSubject(loadedSnapshot.recaptured.subject);
 			const changeRequest = await readCodingAgentCliJsonArtifact(
 				artifactStore,
 				input.changeSetRef,
@@ -2169,10 +2905,12 @@ function impactHandler(
 					'$impactRequest'
 				);
 				outcome = dependencies.staticImpact(changeRequest, {
+					additionalArtifacts,
 					onPredecessorProgress: (event): void => {
 						stages.push(`IMPACT_PREDECESSOR_${event.phase}_${event.state}`);
 					},
-					repositoryRoot
+					repositoryRoot,
+					subjectFilters
 				});
 			} else if (
 				schemaVersion === WORKING_SOURCE_EDIT_IMPACT_CANDIDATE_REPORT_REQUEST_SCHEMA_VERSION
@@ -2187,10 +2925,12 @@ function impactHandler(
 					'$impactRequest'
 				);
 				outcome = dependencies.workingImpact(changeRequest, {
+					additionalArtifacts,
 					onPredecessorProgress: (event): void => {
 						stages.push(`IMPACT_PREDECESSOR_${event.phase}_${event.state}`);
 					},
-					repositoryRoot
+					repositoryRoot,
+					subjectFilters
 				});
 			} else {
 				throw new CompositionError('INVALID', 'The impact request schema version is unsupported.');
@@ -2281,51 +3021,90 @@ function findingsHandler(
 				);
 			localOperationCapabilityAccepted(request, 'findings');
 			const artifactBudget = outputArtifactBudget(request);
-			const snapshotArtifact = materializeSnapshotResultArtifact(
-				await readCodingAgentCliJsonArtifact(artifactStore, input.snapshotRef, artifactBudget),
-				dependencies.validateSnapshot
-			);
-			const snapshot = snapshotArtifact.snapshot;
-			assertSubjectInputBinding(request, input.snapshotRef, snapshot.subjectId);
-			assertCurrentnessRequirement(request, snapshot.subjectId, snapshot.id, input.snapshotRef);
-			await recaptureSnapshotSubject(
+			const loadedSnapshot = await loadValidatedSnapshotResultArtifact(
 				request,
 				artifactBudget,
 				repositoryRoot,
 				artifactStore,
 				dependencies,
-				snapshotArtifact,
+				input.snapshotRef,
 				context
 			);
+			const snapshotArtifact = loadedSnapshot.artifact;
+			const snapshot = snapshotArtifact.snapshot;
+			assertSubjectInputBinding(request, input.snapshotRef, snapshot.subjectId);
+			assertCurrentnessRequirement(request, snapshot.subjectId, snapshot.id, input.snapshotRef);
+			const recaptured =
+				loadedSnapshot.recaptured ??
+				(await recaptureSnapshotSubject(
+					request,
+					artifactBudget,
+					repositoryRoot,
+					artifactStore,
+					dependencies,
+					snapshotArtifact,
+					context
+				));
 			const findingsRequest = materializeFindingsRequestArtifact(
 				await readCodingAgentCliJsonArtifact(
 					artifactStore,
 					input.ruleProfileRef,
 					CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS.maxInputBytes
 				),
-				input.snapshotRef
+				input.snapshotRef,
+				request,
+				artifactBudget
 			);
-			const outcome = dependencies.evaluateFinding(findingsRequest.evaluationRequest);
+			const outcome = dependencies.projectFindings({
+				budgets: findingsRequest.budgets,
+				executionDisposition: findingsRequest.executionDisposition,
+				executionId: findingsRequest.executionId,
+				freshness: recaptured.freshness,
+				operationVersion: JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION,
+				schemaVersion: JPWB_HARMONIZATION_NATIVE_PROJECTION_REQUEST_SCHEMA_VERSION,
+				subject: recaptured.subject
+			});
 			assertNotCancelled(context);
-			if (outcome.outcome !== 'evaluated')
+			if (outcome.outcome !== 'projected')
 				throw new CompositionError(
 					outcome.state === 'resource-refused' ? 'BUDGET' : 'INVALID',
-					'The first-increment rule evaluator did not admit an evaluation result.',
+					'The native harmonization projector did not admit a projection result.',
 					snapshot.subjectId,
 					snapshot.id
 				);
-			if (
-				outcome.result.currentness.frozenSubjectId !== snapshot.subjectId ||
-				!outcome.result.currentness.invalidationDependencyIds.includes(input.snapshotRef)
-			)
+			if (outcome.result.currentness.frozenSubjectId !== snapshot.subjectId)
 				throw new CompositionError(
 					'INVALID',
-					'The rule observation does not bind the exact subject and snapshot dependency.',
+					'The native projection does not bind the exact snapshot subject.',
+					snapshot.subjectId,
+					snapshot.id
+				);
+			const hybridEvidence = await projectHybridEvidence(
+				findingsRequest,
+				recaptured,
+				repositoryRoot,
+				artifactStore,
+				context
+			);
+			const afterProjection = dependencies.verifySubject(recaptured.subject, {
+				rootLocator: repositoryRoot
+			});
+			assertNotCancelled(context);
+			if (afterProjection.state !== 'CURRENT')
+				throw new CompositionError(
+					'STALE',
+					'The exact frozen subject changed during native findings projection.',
 					snapshot.subjectId,
 					snapshot.id
 				);
 			const result: CodingAgentCliFindingsResultArtifact = {
-				evaluationOutcome: outcome,
+				currentness: {
+					afterProjection,
+					basis: 'INDEPENDENT_EXACT_FROZEN_SUBJECT_BYTE_RECHECK_BEFORE_AND_AFTER',
+					beforeProjection: recaptured.freshness
+				},
+				hybridEvidence,
+				nativeProjectionOutcome: outcome,
 				ruleProfileRef: input.ruleProfileRef,
 				schemaVersion: CODING_AGENT_CLI_FINDINGS_RESULT_VERSION,
 				snapshotId: snapshot.id,
@@ -2342,7 +3121,14 @@ function findingsHandler(
 				responseAt,
 				snapshot.subjectId,
 				published.reference,
-				[`FINDINGS_EVALUATION_${outcome.result.status}`]
+				[
+					`FINDINGS_NATIVE_PROJECTED_${outcome.result.projections.length}_RULES`,
+					`FINDINGS_HYBRID_STATIC_PROJECTED_${hybridEvidence.staticProjection.population.conclusive}_CONCLUSIVE_${hybridEvidence.staticProjection.population.unsupported}_UNSUPPORTED_${hybridEvidence.staticProjection.population.conflicting}_CONFLICTING`,
+					hybridEvidence.runtimeTrace === null
+						? 'FINDINGS_HYBRID_RUNTIME_TRACE_NOT_SUPPLIED'
+						: `FINDINGS_HYBRID_RUNTIME_TRACE_${hybridEvidence.runtimeTrace.health}_${hybridEvidence.runtimeEvaluation!.rows.length}_ROWS`,
+					'FINDINGS_SUBJECT_RECHECKED_CURRENT_AFTER_PROJECTION'
+				]
 			);
 			return Object.freeze([
 				...progress,
@@ -2385,11 +3171,6 @@ function explainHandler(
 			const findings = materializeFindingsResultArtifact(
 				await readCodingAgentCliJsonArtifact(artifactStore, input.resultRef, artifactBudget)
 			);
-			if (findings.evaluationOutcome.outcome !== 'evaluated')
-				throw new CompositionError(
-					'INVALID',
-					'The explanation source is not an evaluated finding.'
-				);
 			assertSubjectInputBinding(request, input.resultRef, findings.subjectId);
 			assertCurrentnessRequirement(
 				request,
@@ -2397,10 +3178,16 @@ function explainHandler(
 				findings.snapshotId,
 				input.resultRef
 			);
-			const snapshotArtifact = materializeSnapshotResultArtifact(
-				await readCodingAgentCliJsonArtifact(artifactStore, findings.snapshotRef, artifactBudget),
-				dependencies.validateSnapshot
+			const loadedSnapshot = await loadValidatedSnapshotResultArtifact(
+				request,
+				artifactBudget,
+				repositoryRoot,
+				artifactStore,
+				dependencies,
+				findings.snapshotRef,
+				context
 			);
+			const snapshotArtifact = loadedSnapshot.artifact;
 			if (
 				snapshotArtifact.snapshot.id !== findings.snapshotId ||
 				snapshotArtifact.snapshot.subjectId !== findings.subjectId
@@ -2409,31 +3196,57 @@ function explainHandler(
 					'INVALID',
 					'The findings source does not bind its exact stored snapshot.'
 				);
-			await recaptureSnapshotSubject(
-				request,
-				artifactBudget,
-				repositoryRoot,
-				artifactStore,
-				dependencies,
-				snapshotArtifact,
-				context
-			);
+			const recaptured =
+				loadedSnapshot.recaptured ??
+				(await recaptureSnapshotSubject(
+					request,
+					artifactBudget,
+					repositoryRoot,
+					artifactStore,
+					dependencies,
+					snapshotArtifact,
+					context
+				));
 			const findingsRequest = materializeFindingsRequestArtifact(
 				await readCodingAgentCliJsonArtifact(
 					artifactStore,
 					findings.ruleProfileRef,
 					CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS.maxInputBytes
 				),
-				findings.snapshotRef
+				findings.snapshotRef,
+				request,
+				artifactBudget
 			);
-			const replayed = dependencies.evaluateFinding(findingsRequest.evaluationRequest);
+			const replayed = dependencies.projectFindings({
+				budgets: findingsRequest.budgets,
+				executionDisposition: findingsRequest.executionDisposition,
+				executionId: findingsRequest.executionId,
+				freshness: recaptured.freshness,
+				operationVersion: JPWB_HARMONIZATION_NATIVE_PROJECTION_OPERATION_VERSION,
+				schemaVersion: JPWB_HARMONIZATION_NATIVE_PROJECTION_REQUEST_SCHEMA_VERSION,
+				subject: recaptured.subject
+			});
+			const replayedHybridEvidence = await projectHybridEvidence(
+				findingsRequest,
+				recaptured,
+				repositoryRoot,
+				artifactStore,
+				context
+			);
+			const afterReplay = dependencies.verifySubject(recaptured.subject, {
+				rootLocator: repositoryRoot
+			});
 			if (
-				replayed.outcome !== 'evaluated' ||
-				canonicalSemanticJson(replayed) !== canonicalSemanticJson(findings.evaluationOutcome)
+				afterReplay.state !== 'CURRENT' ||
+				replayed.outcome !== 'projected' ||
+				canonicalSemanticJson(replayed) !==
+					canonicalSemanticJson(findings.nativeProjectionOutcome) ||
+				canonicalSemanticJson(replayedHybridEvidence) !==
+					canonicalSemanticJson(findings.hybridEvidence)
 			)
 				throw new CompositionError(
-					'INVALID',
-					'The stored finding does not reproduce from its exact stored rule observation.'
+					afterReplay.state === 'CURRENT' ? 'INVALID' : 'STALE',
+					'The stored native and hybrid findings evidence does not reproduce from current exact frozen bytes.'
 				);
 			const profile = materializeExplanationProfile(
 				await readCodingAgentCliJsonArtifact(
@@ -2442,9 +3255,17 @@ function explainHandler(
 					CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS.maxInputBytes
 				)
 			);
-			const findingFingerprint = replayed.result.finding?.findingFingerprint ?? null;
+			const projection = replayed.result.projections.find(
+				(candidate) => candidate.findingId === profile.findingId
+			);
+			if (projection === undefined || projection.evaluation.outcome !== 'evaluated')
+				throw new CompositionError(
+					'INVALID',
+					'The explanation profile does not select one evaluated native projection.'
+				);
+			const findingFingerprint = projection.evaluation.result.finding?.findingFingerprint ?? null;
 			if (
-				profile.evaluationId !== replayed.result.evaluationId ||
+				profile.evaluationId !== projection.evaluation.result.evaluationId ||
 				profile.findingFingerprint !== findingFingerprint
 			)
 				throw new CompositionError(
@@ -2453,18 +3274,20 @@ function explainHandler(
 				);
 			const result: CodingAgentCliExplanationResultArtifact = {
 				analysisAuthority: 'NONE',
-				evaluation: {
-					currentness: replayed.result.currentness,
-					evaluationId: replayed.result.evaluationId,
-					evidence: replayed.result.evidence,
-					finding: replayed.result.finding,
-					population: replayed.result.population,
-					provenance: replayed.result.provenance,
-					rule: replayed.result.rule,
-					status: replayed.result.status,
-					statusRationale: replayed.result.statusRationale
-				},
 				gateEffect: 'NONE',
+				nativeProjection: {
+					capability: replayed.result.capability,
+					currentRepositoryStatusTotals: replayed.result.currentRepositoryStatusTotals,
+					currentness: replayed.result.currentness,
+					executionId: replayed.result.executionId,
+					resultWitness: replayed.result.resultWitness
+				},
+				projection,
+				replayCurrentness: {
+					afterProjection: afterReplay,
+					basis: 'INDEPENDENT_EXACT_FROZEN_SUBJECT_BYTE_RECHECK_BEFORE_AND_AFTER',
+					beforeProjection: recaptured.freshness
+				},
 				schemaVersion: CODING_AGENT_CLI_EXPLANATION_RESULT_VERSION,
 				source: {
 					findingsResultRef: input.resultRef,
@@ -2521,22 +3344,29 @@ function verifyHandler(
 				throw new CompositionError('INTERNAL', 'The verify handler received a mismatched command.');
 			localOperationCapabilityAccepted(request, 'verify');
 			const artifactBudget = outputArtifactBudget(request);
-			const snapshotArtifact = materializeSnapshotResultArtifact(
-				await readCodingAgentCliJsonArtifact(artifactStore, input.subjectInputRef, artifactBudget),
-				dependencies.validateSnapshot
-			);
-			const snapshot = snapshotArtifact.snapshot;
-			assertSubjectInputBinding(request, input.subjectInputRef, snapshot.subjectId);
-			assertCurrentnessRequirement(request, snapshot.subjectId, snapshot.id, input.subjectInputRef);
-			await recaptureSnapshotSubject(
+			const loadedSnapshot = await loadValidatedSnapshotResultArtifact(
 				request,
 				artifactBudget,
 				repositoryRoot,
 				artifactStore,
 				dependencies,
-				snapshotArtifact,
+				input.subjectInputRef,
 				context
 			);
+			const snapshotArtifact = loadedSnapshot.artifact;
+			const snapshot = snapshotArtifact.snapshot;
+			assertSubjectInputBinding(request, input.subjectInputRef, snapshot.subjectId);
+			assertCurrentnessRequirement(request, snapshot.subjectId, snapshot.id, input.subjectInputRef);
+			if (loadedSnapshot.recaptured === undefined)
+				await recaptureSnapshotSubject(
+					request,
+					artifactBudget,
+					repositoryRoot,
+					artifactStore,
+					dependencies,
+					snapshotArtifact,
+					context
+				);
 			const expectation = materializeVerificationExpectation(
 				await readCodingAgentCliJsonArtifact(
 					artifactStore,

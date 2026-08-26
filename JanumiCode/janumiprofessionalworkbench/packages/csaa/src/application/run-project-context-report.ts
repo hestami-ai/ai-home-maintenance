@@ -35,6 +35,7 @@ import {
 	type SubjectBudgets,
 	type SubjectCompleteness,
 	type SubjectDiagnostic,
+	type SubjectFilters,
 	type SubjectResolutionOutcome
 } from '../contracts/subject.js';
 import { buildProjectContextGraph } from '../graph/build-project-context-graph.js';
@@ -104,6 +105,10 @@ const INTERNAL_CAPTURE_PROJECT_CONTEXT_BUDGET_CEILINGS = Object.freeze({
 	maxTraversalSteps: Number.MAX_SAFE_INTEGER
 } satisfies ProjectContextGraphBudgets);
 const FORBIDDEN_PATH_PATTERN_CHARACTERS = new Set(['*', '?', '[', ']', '{', '}']);
+const EMPTY_SUBJECT_FILTERS: SubjectFilters = Object.freeze({
+	exclude: Object.freeze([]),
+	include: Object.freeze([])
+});
 
 interface DiagnosticLike {
 	readonly code: string;
@@ -329,6 +334,8 @@ export interface CaptureProjectContextReportPipelineOptions {
 	readonly projectContextBudgets?: ProjectContextGraphBudgets;
 	/** Absolute fixed worktree root supplied by the successor facade. */
 	readonly repositoryRoot: string;
+	/** Successor-owned exact filter policy that must participate in the same frozen subject identity. */
+	readonly subjectFilters?: SubjectFilters;
 }
 
 /** Trusted same-process evidence handoff for bounded successor report facades. */
@@ -1044,6 +1051,7 @@ function runProjectContextReportInternal(
 	captureMode: 'NONE' | 'PROJECT_CONTEXT' | 'SEMANTIC' = 'NONE',
 	includeTypeCapability = false,
 	additionalArtifacts: readonly string[] = [],
+	subjectFilters: SubjectFilters = EMPTY_SUBJECT_FILTERS,
 	projectContextBudgetOverride?: ProjectContextGraphBudgets
 ):
 	| ProjectContextReportOutcome
@@ -1101,7 +1109,7 @@ function runProjectContextReportInternal(
 	const subjectOutcome = resolveSubject({
 		budgets: request.budgets.subject,
 		expectEmpty: false,
-		filters: { exclude: [], include: [] },
+		filters: subjectFilters,
 		operationVersion: PROJECT_CONTEXT_REPORT_OPERATION_VERSION,
 		outputs: [],
 		policyVersion: SUBJECT_POLICY_VERSION,
@@ -1515,6 +1523,7 @@ export function captureProjectContextReportPipeline(
 			'PROJECT_CONTEXT',
 			options.includeTypeCapability === true,
 			options.additionalArtifacts ?? [],
+			options.subjectFilters ?? EMPTY_SUBJECT_FILTERS,
 			options.projectContextBudgets
 		);
 		if (outcome.outcome === 'captured') return outcome;
@@ -1544,7 +1553,8 @@ export function captureSemanticReportPipeline(
 			progress,
 			'SEMANTIC',
 			options.includeTypeCapability === true,
-			options.additionalArtifacts ?? []
+			options.additionalArtifacts ?? [],
+			options.subjectFilters ?? EMPTY_SUBJECT_FILTERS
 		);
 		if (outcome.outcome === 'semantic-captured') return outcome;
 		if (outcome.outcome === 'captured')

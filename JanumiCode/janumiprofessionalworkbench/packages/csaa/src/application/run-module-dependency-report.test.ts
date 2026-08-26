@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ModuleDependencyGraphBuildDiagnostic } from '../contracts/graph.js';
 import {
@@ -143,6 +143,95 @@ describe('runModuleDependencyReport', () => {
 			'SUBJECT_ID_MISMATCH'
 		] as const)
 			expect(classifyModuleDependencyGraphFailureState([diagnostic(code)]), code).toBe('failed');
+	});
+
+	it('rejects exact request shape, version, property, budget, and predecessor violations', () => {
+		const root = fixture();
+		const accessor = { ...request() };
+		Object.defineProperty(accessor, 'operationVersion', {
+			enumerable: true,
+			get: () => MODULE_DEPENDENCY_REPORT_OPERATION_VERSION
+		});
+		const cases: ReadonlyArray<readonly [unknown, string, string]> = [
+			[Object.assign(Object.create({ inherited: true }), request()), 'REQUEST_SHAPE_INVALID', '$'],
+			[{ ...request(), unexpected: true }, 'REQUEST_SHAPE_INVALID', '$'],
+			[accessor, 'REQUEST_SHAPE_INVALID', '$.operationVersion'],
+			[
+				{ ...request(), operationVersion: 'module-dependency-report/0.0.0' },
+				'REQUEST_OPERATION_INCOMPATIBLE',
+				'$.operationVersion'
+			],
+			[
+				{ ...request(), schemaVersion: 'module-dependency-report-request/0.0.0' },
+				'REQUEST_SCHEMA_INCOMPATIBLE',
+				'$.schemaVersion'
+			],
+			[
+				withGraphBudgets(request(), { maxEdges: 0 }),
+				'REQUEST_BUDGET_INVALID',
+				'$.budgets.moduleDependency.maxEdges'
+			]
+		];
+		for (const [value, code, path] of cases) {
+			const outcome = runModuleDependencyReport(value, { repositoryRoot: root });
+			expect(outcome).toMatchObject({ code, outcome: 'unavailable', stage: 'REQUEST' });
+			if (outcome.outcome !== 'unavailable') throw new Error(JSON.stringify(outcome));
+			expect(outcome.diagnostics).toContainEqual(expect.objectContaining({ path }));
+		}
+
+		const predecessorRefusal = runModuleDependencyReport(
+			{ ...request(), subjectProjectConfigPaths: [] },
+			{ repositoryRoot: root }
+		);
+		expect(predecessorRefusal).toMatchObject({ outcome: 'unavailable', stage: 'REQUEST' });
+	});
+
+	it('uses stable elapsed telemetry when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: ModuleDependencyReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => {
+			throw new Error('synthetic monotonic clock failure');
+		});
+		try {
+			const outcome = runModuleDependencyReport(request(), {
+				onProgress: (event) => void progress.push(event),
+				repositoryRoot: root
+			});
+			expect(outcome.outcome).toBe('partial');
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
+	});
+
+	it('projects unavailable predecessor diagnostics and contains hostile adapter options', () => {
+		const missingRoot = join(tmpdir(), 'csaa-module-dependency-report-missing-root');
+		rmSync(missingRoot, { force: true, recursive: true });
+		const unavailable = runModuleDependencyReport(request(), { repositoryRoot: missingRoot });
+		expect(unavailable).toMatchObject({
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE'
+		});
+		expect(unavailable.diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ source: 'PREDECESSOR_PIPELINE' })])
+		);
+
+		const hostileOptions = {} as { readonly repositoryRoot: string };
+		Object.defineProperty(hostileOptions, 'repositoryRoot', {
+			enumerable: true,
+			get() {
+				throw new Error('synthetic adapter option failure');
+			}
+		});
+		const internal = runModuleDependencyReport(request(), hostileOptions);
+		expect(internal).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(moduleDependencyReportExitCode(internal)).toBe(4);
 	});
 
 	it(

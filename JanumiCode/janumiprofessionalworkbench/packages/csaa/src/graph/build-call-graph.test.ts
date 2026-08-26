@@ -30,7 +30,7 @@ import { resolveSubject } from '../subject/resolve-subject.js';
 import { buildBoundedCallGraph, buildCallGraph } from './build-call-graph.js';
 import { callGraphContentDigest } from './call-graph-content.js';
 import { callGraphEdgeId } from './call-graph-ids.js';
-import { validateCallGraph } from './validate-call-graph.js';
+import { validateCallGraph, validateConstructedCallGraph } from './validate-call-graph.js';
 
 const temporaryRoots: string[] = [];
 
@@ -473,8 +473,7 @@ describe('buildCallGraph', () => {
 		});
 		const targetEdge = outcome.graph.edges.find(
 			(edge) =>
-				edge.invocationId === exactSite.invocationId &&
-				edge.relationKind !== 'CALL_SITE_OWNERSHIP'
+				edge.invocationId === exactSite.invocationId && edge.relationKind !== 'CALL_SITE_OWNERSHIP'
 		);
 		expect(targetEdge).toMatchObject({
 			candidateRank: null,
@@ -491,7 +490,10 @@ describe('buildCallGraph', () => {
 		expect(
 			outcome.graph.relationLaneCoverage.find((lane) => lane.lane === 'CONFIRMED')
 		).toMatchObject({ state: 'PARTIAL' });
-		expect(validateCallGraph(outcome.graph, semanticSnapshot)).toEqual({ issues: [], state: 'VALID' });
+		expect(validateCallGraph(outcome.graph, semanticSnapshot)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
 
 		for (const mutate of [
 			(record: typeof invocation) => ({ ...record, resolvedSignatureId: null }),
@@ -1707,6 +1709,191 @@ void StaticOwner;
 		}
 	});
 
+	it('rejects unexpected keys at every nested wire boundary and contains hostile nested arrays', () => {
+		const semanticSnapshot = snapshot(fixtureFromSource('function target(): void {}\ntarget();'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const nodeIndex = graph.nodes.findIndex((node) => node.sourceLocations.length > 0);
+		const edgeIndex = graph.edges.findIndex(
+			(edge) => edge.relationKind === 'CANDIDATE_CALL_TARGET'
+		);
+		const candidateEdge = graph.edges[edgeIndex];
+		expect(nodeIndex).toBeGreaterThanOrEqual(0);
+		expect(edgeIndex).toBeGreaterThanOrEqual(0);
+		expect(candidateEdge?.relationKind).toBe('CANDIDATE_CALL_TARGET');
+		expect(graph.limitations.length).toBeGreaterThan(0);
+
+		const cases: ReadonlyArray<{
+			readonly mutate: (value: CallGraphSnapshot) => unknown;
+			readonly name: string;
+			readonly path: string;
+		}> = [
+			{
+				mutate: (value) => ({ ...value, coverage: { ...value.coverage, unexpected: true } }),
+				name: 'coverage exact keys',
+				path: '$.coverage'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					limitations: value.limitations.map((entry, index) =>
+						index === 0 ? { ...entry, unexpected: true } : entry
+					)
+				}),
+				name: 'limitation exact keys',
+				path: '$.limitations[0]'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					entryMechanismCoverage: value.entryMechanismCoverage.map((entry, index) =>
+						index === 0 ? { ...entry, unexpected: true } : entry
+					)
+				}),
+				name: 'entry coverage exact keys',
+				path: '$.entryMechanismCoverage[0]'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					relationLaneCoverage: value.relationLaneCoverage.map((entry, index) =>
+						index === 0 ? { ...entry, unexpected: true } : entry
+					)
+				}),
+				name: 'lane coverage exact keys',
+				path: '$.relationLaneCoverage[0]'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					forwardIndex: value.forwardIndex.map((entry, index) =>
+						index === 0 ? { ...entry, unexpected: true } : entry
+					)
+				}),
+				name: 'index exact keys',
+				path: '$.forwardIndex[0]'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					nodes: value.nodes.map((node, index) =>
+						index === nodeIndex ? { ...node, unexpected: true } : node
+					)
+				}),
+				name: 'node exact keys',
+				path: `$.nodes[${nodeIndex}]`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					nodes: value.nodes.map((node, index) => {
+						if (index !== nodeIndex) return node;
+						return {
+							...node,
+							sourceLocations: [{ ...node.sourceLocations[0]!, unexpected: true }]
+						};
+					})
+				}),
+				name: 'source location exact keys',
+				path: `$.nodes[${nodeIndex}].sourceLocations[0]`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge, index) =>
+						index === edgeIndex ? { ...edge, unexpected: true } : edge
+					)
+				}),
+				name: 'edge exact keys',
+				path: `$.edges[${edgeIndex}]`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge, index) =>
+						index === edgeIndex ? { ...edge, source: { ...edge.source, unexpected: true } } : edge
+					)
+				}),
+				name: 'endpoint exact keys',
+				path: `$.edges[${edgeIndex}].source`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge, index) =>
+						index === edgeIndex && edge.relationKind === 'CANDIDATE_CALL_TARGET'
+							? {
+									...edge,
+									inferenceBasis: { ...edge.inferenceBasis, unexpected: true }
+								}
+							: edge
+					)
+				}),
+				name: 'inference-basis exact keys',
+				path: `$.edges[${edgeIndex}].inferenceBasis`
+			}
+		];
+
+		for (const scenario of cases) {
+			const validation = validateCallGraph(scenario.mutate(graph), semanticSnapshot, {
+				maxIssues: 8
+			});
+			expect(validation.state, scenario.name).toBe('INVALID');
+			expect(validation.issues, scenario.name).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ code: 'INVALID_SHAPE', path: scenario.path })
+				])
+			);
+		}
+
+		const nonArrayPopulations = {
+			...graph,
+			edges: null,
+			entryMechanismCoverage: null,
+			forwardIndex: null,
+			layers: null,
+			limitations: null,
+			nodes: null,
+			relationLaneCoverage: null,
+			reverseIndex: null
+		};
+		expect(validateCallGraph(nonArrayPopulations, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([expect.objectContaining({ code: 'INVALID_SHAPE' })]),
+			state: 'INVALID'
+		});
+
+		const invalidInputDigest = { ...graph, graphInputDigest: 'not-a-sha256' } as CallGraphSnapshot;
+		expect(validateCallGraph(invalidInputDigest, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_VALUE', path: '$.graphInputDigest' })
+			]),
+			state: 'INVALID'
+		});
+		expect(validateConstructedCallGraph(graph, semanticSnapshot, 'not-a-sha256')).toMatchObject({
+			issues: [
+				expect.objectContaining({
+					code: 'INVALID_VALUE',
+					path: '$validationInput.graphInputDigest'
+				})
+			],
+			state: 'INVALID'
+		});
+
+		const hostileNodes = new Proxy([...graph.nodes], {
+			get(target, property, receiver) {
+				if (property === 'entries') throw new Error('synthetic nested-array trap');
+				return Reflect.get(target, property, receiver);
+			}
+		});
+		expect(validateCallGraph({ ...graph, nodes: hostileNodes }, semanticSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: 'INVALID_SHAPE', path: '$' })
+			]),
+			state: 'INVALID'
+		});
+	});
+
 	it('bounds hostile call-graph populations and stops at the issue budget', () => {
 		const semanticSnapshot = snapshot(fixture('CALLS'));
 		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
@@ -1719,6 +1906,21 @@ void StaticOwner;
 
 		const overlong = <T>(seed: readonly T[], length: number): T[] =>
 			Array.from({ length }, (_, index) => seed[index % seed.length]!);
+		const inferenceInputMaximum =
+			semanticSnapshot.astNodes.length +
+			semanticSnapshot.declarations.length +
+			semanticSnapshot.invocations.length +
+			semanticSnapshot.overloadSets.length +
+			semanticSnapshot.provenances.length +
+			semanticSnapshot.references.length +
+			semanticSnapshot.signatures.length +
+			semanticSnapshot.sources.length +
+			semanticSnapshot.symbols.length +
+			semanticSnapshot.typeRelations.length;
+		const inferenceInputSeed = [
+			candidateEdge.inferenceBasis.inputIds[0] ?? semanticSnapshot.astNodes[0]!.id
+		];
+		expect(candidateEdge.sourceLocations.length).toBeGreaterThan(0);
 		const cases: readonly {
 			mutate: (value: CallGraphSnapshot) => unknown;
 			path: string;
@@ -1751,6 +1953,54 @@ void StaticOwner;
 						edge.id === candidateEdge.id
 							? {
 									...candidateEdge,
+									provenanceIds: overlong(
+										semanticSnapshot.provenances.map((record) => record.id),
+										semanticSnapshot.provenances.length + 1
+									)
+								}
+							: edge
+					)
+				}),
+				path: `$.edges[${graph.edges.findIndex((edge) => edge.id === candidateEdge.id)}].provenanceIds`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge) =>
+						edge.id === candidateEdge.id
+							? {
+									...candidateEdge,
+									sourceLocations: overlong(candidateEdge.sourceLocations, 5)
+								}
+							: edge
+					)
+				}),
+				path: `$.edges[${graph.edges.findIndex((edge) => edge.id === candidateEdge.id)}].sourceLocations`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge) =>
+						edge.id === candidateEdge.id
+							? {
+									...candidateEdge,
+									inferenceBasis: {
+										...candidateEdge.inferenceBasis,
+										inputIds: overlong(inferenceInputSeed, inferenceInputMaximum + 1)
+									}
+								}
+							: edge
+					)
+				}),
+				path: `$.edges[${graph.edges.findIndex((edge) => edge.id === candidateEdge.id)}].inferenceBasis.inputIds`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					edges: value.edges.map((edge) =>
+						edge.id === candidateEdge.id
+							? {
+									...candidateEdge,
 									inferenceBasis: {
 										...candidateEdge.inferenceBasis,
 										limitationKinds: overlong(candidateEdge.inferenceBasis.limitationKinds, 100)
@@ -1760,6 +2010,51 @@ void StaticOwner;
 					)
 				}),
 				path: `$.edges[${graph.edges.findIndex((edge) => edge.id === candidateEdge.id)}].inferenceBasis.limitationKinds`
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					layers: [
+						{
+							...value.layers[0]!,
+							edgeIds: overlong(
+								value.edges.map((edge) => edge.id),
+								value.edges.length + 1
+							)
+						}
+					]
+				}),
+				path: '$.layers[0].edgeIds'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					layers: [
+						{
+							...value.layers[0]!,
+							nodeIds: overlong(
+								value.nodes.map((node) => node.id),
+								value.nodes.length + 1
+							)
+						}
+					]
+				}),
+				path: '$.layers[0].nodeIds'
+			},
+			{
+				mutate: (value) => ({
+					...value,
+					layers: [
+						{
+							...value.layers[0]!,
+							provenanceIds: overlong(
+								semanticSnapshot.provenances.map((record) => record.id),
+								semanticSnapshot.provenances.length + 1
+							)
+						}
+					]
+				}),
+				path: '$.layers[0].provenanceIds'
 			},
 			{
 				mutate: (value) => ({
@@ -3191,5 +3486,350 @@ void StaticOwner;
 			]),
 			state: 'INVALID'
 		});
+	});
+
+	it('rejects every malformed bounded projection-options shell', () => {
+		const semanticSnapshot = snapshot(fixture('ZERO'));
+		const request = graphRequest(semanticSnapshot);
+		const budgets = {
+			maxClassificationSteps: 100,
+			maxEdges: 100,
+			maxLimitations: 100,
+			maxNodes: 100
+		};
+		const inherited = Object.assign(Object.create({ inherited: true }) as Record<string, unknown>, {
+			budgets
+		});
+		const accessor = {};
+		Object.defineProperty(accessor, 'budgets', {
+			enumerable: true,
+			get: () => budgets
+		});
+		for (const options of [
+			null,
+			inherited,
+			{ budgets, unexpected: true },
+			accessor,
+			{ budgets: { ...budgets, unexpected: 1 } },
+			{ budgets: { ...budgets, maxEdges: 0 } }
+		] as never[])
+			expect(buildBoundedCallGraph(request, semanticSnapshot, options)).toMatchObject({
+				diagnostics: [{ code: 'REQUEST_INVALID', path: '$options' }],
+				outcome: 'unavailable'
+			});
+	});
+
+	it('keeps non-construct class calls and primitive callees explicit without inventing targets', () => {
+		const semanticSnapshot = snapshot(
+			fixtureFromSource(`
+(class {})();
+1();
+`)
+		);
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const sites = callSites(outcome.graph);
+		expect(sites).toHaveLength(2);
+		expect(sites.every((site) => site.resolutionClass !== 'EXACT')).toBe(true);
+		expect(validateCallGraph(outcome.graph, semanticSnapshot)).toEqual({
+			issues: [],
+			state: 'VALID'
+		});
+	});
+
+	it('names remaining node epistemic, source-binding, association, and manifest failures', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const sourceRegion = graph.nodes.find((node) => node.kind === 'SOURCE_REGION');
+		const callable = graph.nodes.find(
+			(node) =>
+				node.kind === 'CALLABLE_TARGET' &&
+				node.declarationIds.some((id) =>
+					semanticSnapshot.declarations.some(
+						(declaration) => declaration.id === id && declaration.symbolId !== null
+					)
+				)
+		);
+		const site = graph.nodes.find(
+			(node) => node.kind === 'CALL_SITE' && node.referenceIds.length > 0
+		);
+		const frontier = graph.nodes.find((node) => node.kind === 'FRONTIER');
+		if (
+			sourceRegion?.kind !== 'SOURCE_REGION' ||
+			callable?.kind !== 'CALLABLE_TARGET' ||
+			site?.kind !== 'CALL_SITE' ||
+			frontier?.kind !== 'FRONTIER'
+		)
+			throw new Error('The CALLS fixture lacks a required graph-node family.');
+		const differentSource = (sourceId: string) =>
+			semanticSnapshot.sources.find((source) => source.id !== sourceId);
+		const callableOtherSource = differentSource(callable.sourceId);
+		const frontierOtherSource = differentSource(frontier.sourceId);
+		if (callableOtherSource === undefined || frontierOtherSource === undefined)
+			throw new Error('The CALLS fixture needs a second semantic source.');
+
+		const mutatedNode = (
+			nodeId: CallGraphNode['id'],
+			patch: Record<string, unknown>
+		): CallGraphSnapshot =>
+			repairedGraph(graph, {
+				nodes: graph.nodes.map((node) =>
+					node.id === nodeId ? { ...node, ...patch } : node
+				) as CallGraphNode[]
+			});
+		for (const [nodeId, patch, message] of [
+			[
+				sourceRegion.id,
+				{ epistemic: { ...sourceRegion.epistemic, freshness: 'STALE' } },
+				'Source-region epistemic dimensions do not match structural compiler evidence.'
+			],
+			[
+				callable.id,
+				{ projectId: 'semantic:project-other' as typeof callable.projectId },
+				'Callable source/program/project binding mismatch.'
+			],
+			[
+				callable.id,
+				{
+					programId: callableOtherSource.programId,
+					projectId: callableOtherSource.projectId,
+					sourceId: callableOtherSource.id
+				},
+				'Callable AST node belongs to another source.'
+			],
+			[
+				callable.id,
+				{ epistemic: { ...callable.epistemic, freshness: 'STALE' } },
+				'Callable-target epistemic dimensions do not match structural compiler evidence.'
+			],
+			[
+				site.id,
+				{ projectId: 'semantic:project-other' as typeof site.projectId },
+				'Call-site source/program/project binding mismatch.'
+			],
+			[site.id, { referenceIds: ['semantic:reference-missing'] }, 'Absent callee reference.'],
+			[site.id, { targetNodeIds: [sourceRegion.id] }, 'target manifest mismatch.'],
+			[site.id, { ownerNodeId: 'call-graph-node:missing' }, 'owner is absent.'],
+			[
+				frontier.id,
+				{ epistemic: { ...frontier.epistemic, freshness: 'STALE' } },
+				'Frontier epistemic dimensions do not match the independently derived resolution class.'
+			],
+			[
+				frontier.id,
+				{ sourceId: frontierOtherSource.id },
+				'Frontier source differs from its invocation.'
+			],
+			[
+				frontier.id,
+				{
+					sourceLocations: frontier.sourceLocations.map((location, index) =>
+						index === 0 ? { ...location, end: location.end - 1 } : location
+					)
+				},
+				'Frontier location mismatch.'
+			]
+		] as const)
+			expectIndependentIssue(mutatedNode(nodeId, patch), semanticSnapshot, message);
+
+		const declaration = semanticSnapshot.declarations.find(
+			(candidate) => candidate.symbolId !== null && callable.declarationIds.includes(candidate.id)
+		);
+		if (declaration?.symbolId === undefined || declaration.symbolId === null)
+			throw new Error('The fixture callable needs a symbol-bearing declaration.');
+		expectIndependentIssue(
+			mutatedNode(callable.id, {
+				symbolIds: callable.symbolIds.filter((id) => id !== declaration.symbolId)
+			}),
+			semanticSnapshot,
+			'Declaration symbol is absent from this callable target.'
+		);
+
+		const otherReference = semanticSnapshot.references.find(
+			(reference) => reference.sourceId !== site.sourceId
+		);
+		if (otherReference !== undefined)
+			expectIndependentIssue(
+				mutatedNode(site.id, { referenceIds: [otherReference.id] }),
+				semanticSnapshot,
+				'Callee reference belongs to another source.'
+			);
+
+		const duplicateCallable = {
+			...callable,
+			id: `${callable.id}-duplicate` as CallGraphNode['id']
+		};
+		expectIndependentIssue(
+			repairedGraph(graph, { nodes: [...graph.nodes, duplicateCallable] }),
+			semanticSnapshot,
+			'Duplicate callable-target projection.'
+		);
+	});
+
+	it('rejects remaining edge epistemic, invocation-topology, and layer-parity overclaims', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+		const graph = outcome.graph;
+		const sites = callSites(graph);
+		const exactSite = sites.find((site) => site.resolutionClass === 'EXACT');
+		const candidateSite = sites.find((site) => site.resolutionClass === 'CANDIDATE_SET');
+		const frontierSite = sites.find(
+			(site) => site.resolutionClass !== 'EXACT' && site.resolutionClass !== 'CANDIDATE_SET'
+		);
+		const frontierTemplate = graph.nodes.find((node) => node.kind === 'FRONTIER');
+		const unresolvedEdge = graph.edges.find(
+			(edge) => edge.relationKind === 'UNRESOLVED_CALL_TARGET'
+		);
+		if (
+			exactSite === undefined ||
+			candidateSite === undefined ||
+			frontierSite === undefined ||
+			frontierTemplate?.kind !== 'FRONTIER' ||
+			unresolvedEdge?.relationKind !== 'UNRESOLVED_CALL_TARGET'
+		)
+			throw new Error('The CALLS fixture lacks exact, candidate, and frontier topology.');
+
+		const ownership = graph.edges.find((edge) => edge.relationKind === 'CALL_SITE_OWNERSHIP');
+		if (ownership === undefined) throw new Error('Missing ownership edge.');
+		expectIndependentIssue(
+			repairedGraph(graph, {
+				edges: graph.edges.map((edge) =>
+					edge.id === ownership.id
+						? { ...edge, epistemic: { ...edge.epistemic, freshness: 'STALE' } }
+						: edge
+				) as CallGraphEdge[]
+			}),
+			semanticSnapshot,
+			'Ownership-edge epistemic dimensions must remain structural.'
+		);
+
+		const frontierFor = (
+			site: CallGraphCallSiteNode,
+			suffix: string
+		): Extract<CallGraphNode, { kind: 'FRONTIER' }> => ({
+			...frontierTemplate,
+			id: `${frontierTemplate.id}-${suffix}` as typeof frontierTemplate.id,
+			invocationId: site.invocationId,
+			sourceId: site.sourceId,
+			sourceLocations: site.sourceLocations
+		});
+		const exactFrontierGraph = repairedGraph(graph, {
+			nodes: [...graph.nodes, frontierFor(exactSite, 'exact')]
+		});
+		expectIndependentIssue(
+			exactFrontierGraph,
+			semanticSnapshot,
+			'confirmed-edge population differs from independent semantic derivation.'
+		);
+		expectIndependentIssue(exactFrontierGraph, semanticSnapshot, 'must not have a frontier node.');
+		expectIndependentIssue(
+			repairedGraph(graph, { nodes: [...graph.nodes, frontierFor(candidateSite, 'candidate')] }),
+			semanticSnapshot,
+			'Candidate invocation'
+		);
+
+		const withoutFrontierTarget = repairedGraph(graph, {
+			edges: graph.edges.filter(
+				(edge) =>
+					!(
+						edge.invocationId === frontierSite.invocationId &&
+						edge.relationKind === 'UNRESOLVED_CALL_TARGET'
+					)
+			)
+		});
+		expectIndependentIssue(
+			withoutFrontierTarget,
+			semanticSnapshot,
+			'frontier population differs from independent semantic derivation.'
+		);
+		expectIndependentIssue(
+			withoutFrontierTarget,
+			semanticSnapshot,
+			'must have one explicit frontier target.'
+		);
+
+		const mixedEdge: CallGraphEdge = {
+			...unresolvedEdge,
+			id: `${unresolvedEdge.id}-candidate-mix` as typeof unresolvedEdge.id,
+			invocationId: candidateSite.invocationId,
+			source: { kind: 'CALL_SITE', nodeId: candidateSite.id },
+			sourceLocations: candidateSite.sourceLocations
+		};
+		expectIndependentIssue(
+			repairedGraph(graph, { edges: [...graph.edges, mixedEdge] }),
+			semanticSnapshot,
+			'mixes candidate and non-candidate targets.'
+		);
+
+		const parityDraft = {
+			...graph,
+			layers: [{ ...graph.layers[0]!, limitations: [] }]
+		} as CallGraphSnapshot;
+		expectIndependentIssue(
+			{ ...parityDraft, contentDigest: callGraphContentDigest(parityDraft) },
+			semanticSnapshot,
+			'Layer limitations differ.'
+		);
+		const epistemicDraft = {
+			...graph,
+			layers: [
+				{
+					...graph.layers[0]!,
+					epistemic: { ...graph.layers[0]!.epistemic, freshness: 'STALE' as const }
+				}
+			]
+		} as CallGraphSnapshot;
+		expectIndependentIssue(
+			{ ...epistemicDraft, contentDigest: callGraphContentDigest(epistemicDraft) },
+			semanticSnapshot,
+			'Layer epistemic dimensions differ.'
+		);
+	});
+
+	it('contains graph-input projection failures and inconsistent semantic provenance ownership', () => {
+		const semanticSnapshot = snapshot(fixture('CALLS'));
+		const outcome = buildCallGraph(graphRequest(semanticSnapshot), semanticSnapshot);
+		if (outcome.outcome === 'unavailable') throw new Error(JSON.stringify(outcome));
+
+		const hostileSnapshot = { ...semanticSnapshot } as StaticSemanticSnapshot;
+		Object.defineProperty(hostileSnapshot, 'assignments', {
+			enumerable: true,
+			get() {
+				throw new Error('hostile assignment projection');
+			}
+		});
+		expect(validateCallGraph(outcome.graph, hostileSnapshot)).toMatchObject({
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: 'GRAPH_INPUT_MISMATCH',
+					message: 'hostile assignment projection'
+				})
+			]),
+			state: 'INVALID'
+		});
+
+		const boundProvenance = semanticSnapshot.provenances.find(
+			(provenance) => provenance.sourceId !== null
+		);
+		if (boundProvenance === undefined) throw new Error('Missing source-bound provenance.');
+		const mismatchedSnapshot = {
+			...semanticSnapshot,
+			provenances: semanticSnapshot.provenances.map((provenance) =>
+				provenance.id === boundProvenance.id
+					? {
+							...provenance,
+							projectId: 'semantic:project-other' as typeof provenance.projectId
+						}
+					: provenance
+			)
+		} as StaticSemanticSnapshot;
+		expectIndependentIssue(
+			outcome.graph,
+			mismatchedSnapshot,
+			'Provenance source and project identities are inconsistent.'
+		);
 	});
 });

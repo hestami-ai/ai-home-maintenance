@@ -51,7 +51,9 @@ import {
 import { validateGuardEnforcementLedgerObservation } from './validate-guard-enforcement-ledger.js';
 import { GUARD_ENFORCEMENT_LEDGER_WORKER_REQUEST_SCHEMA_VERSION } from './worker.js';
 
-const WORKER_PATH = fileURLToPath(new URL('./worker.ts', import.meta.url));
+const WORKER_PATH = fileURLToPath(
+	new URL(import.meta.url.endsWith('.ts') ? './worker.ts' : './worker.js', import.meta.url)
+);
 const ANALYZER_PATH = 'verif/guard-enforcement-ledger.ts';
 const DATA_PATH = 'verif/guard-enforcement-ledger.data.ts';
 const TERMINATION_GRACE_MS = 250;

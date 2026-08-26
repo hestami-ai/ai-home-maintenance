@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type {
 	ModuleDependencyGraphNodeId,
@@ -362,5 +362,52 @@ describe('module code slice', () => {
 			{ ...request('FORWARD'), edgeFamilies: new Proxy(['IMPORT_OCCURRENCE'], {}) },
 			'REQUEST_INVALID'
 		);
+	});
+
+	it('rejects every remaining reachable request-schema and criterion boundary', () => {
+		const symbolBearing = { ...request('FORWARD') } as Record<PropertyKey, unknown>;
+		Object.defineProperty(symbolBearing, Symbol('unexpected'), { enumerable: true, value: true });
+		const annotatedFamilies = ['IMPORT_OCCURRENCE'] as string[] & Record<string, unknown>;
+		annotatedFamilies.metadata = 'unexpected';
+		for (const candidate of [
+			symbolBearing,
+			{ ...request('FORWARD'), subjectId: '' },
+			{ ...request('FORWARD'), edgeFamilies: annotatedFamilies },
+			{ ...request('FORWARD'), budgets: { ...defaultBudgets, maxDepth: -1 } },
+			{ ...request('FORWARD'), schemaVersion: 'module-code-slice-request/0.0.0' },
+			{ ...request('FORWARD'), operationVersion: 'module-code-slice/0.0.0' },
+			{ ...request('FORWARD'), direction: 'SIDEWAYS' },
+			{ ...request('FORWARD'), edgeFamilies: [] },
+			{ ...request('FORWARD'), edgeFamilies: ['UNREGISTERED_RELATION'] }
+		])
+			expectUnavailable(candidate, 'REQUEST_INVALID');
+
+		const absentCriterion = {
+			...request('FORWARD'),
+			fromNodeId: 'absent-node' as ModuleDependencyGraphNodeId
+		};
+		expectUnavailable(absentCriterion, 'REQUEST_INVALID');
+		expect(
+			validateModuleCodeSliceOutcome(absentCriterion, {}, fixture.graph, fixture.snapshot)
+		).toMatchObject({
+			issues: [{ code: 'EXPECTED_OUTCOME_UNAVAILABLE' }],
+			state: 'INVALID'
+		});
+	});
+
+	it('contains an unexpected request-inspection failure at the public boundary', () => {
+		const getPrototypeOf = vi.spyOn(Object, 'getPrototypeOf').mockImplementationOnce(() => {
+			throw new Error('synthetic request inspection failure');
+		});
+		let outcome!: ModuleCodeSliceOutcome;
+		try {
+			outcome = buildModuleCodeSlice(request('FORWARD'), fixture.graph, fixture.snapshot);
+		} finally {
+			getPrototypeOf.mockRestore();
+		}
+		expect(outcome).toMatchObject({
+			diagnostics: [{ code: 'REQUEST_INVALID' }],
+			outcome: 'unavailable'
+		});
 	});
 });

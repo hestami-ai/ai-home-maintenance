@@ -44,6 +44,10 @@ export default defineConfig({
 		// scheduling contention. These are test-harness watchdogs, measured against the complete suite; they are not
 		// CSAA operation budgets, product ceilings, or SLOs.
 		hookTimeout: 60_000,
+		// Match the source-coverage gate's measured four-worker profile. The default host-sized pool caused
+		// Windows Git/process fixtures to contend on temporary handles and exceed their local watchdogs.
+		// This is test-runner concurrency, not a CSAA operation budget or product resource ceiling.
+		maxWorkers: 4,
 		testTimeout: 60_000,
 		projects: projectsFor(true)
 	}

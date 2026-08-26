@@ -14,6 +14,7 @@ coverage/
 # Local tooling / scratch (SonarLint remediation tracker, test-harness sqlite DBs).
 .sonar-remediation/
 .janumicode/
+/.csaa/
 
 # --- IMPORTANT: re-include our source (case-insensitive Windows collision) ---
 # The PARENT repo's aggregated .gitignore contains a Swift-template rule `Packages/`. Because

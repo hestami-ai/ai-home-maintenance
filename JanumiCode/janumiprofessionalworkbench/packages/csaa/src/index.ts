@@ -574,3 +574,36 @@ export * from './subject/projects.js';
 export { resolveSubject } from './subject/resolve-subject.js';
 export type { SubjectResolutionHooks } from './subject/resolve-subject.js';
 export * from './subject/workspaces.js';
+
+// Coding-agent, persistence, analysis, and enriched-evidence implementation-candidate surfaces.
+// These remain advisory and preserve the authority, currentness, coverage, and gate-effect limits
+// carried by their owning contracts; this export block makes no roadmap-completion claim.
+export * from './agent/agent-operation-protocol.js';
+export * from './cli/index.js';
+export * from './persistence/content-addressed-file-store.js';
+export * from './persistence/assess-dwp-007-persistence-selection.js';
+export * from './persistence/measure-content-addressed-file-store-performance.js';
+export * from './query/four-valued-query-algebra.js';
+export * from './query/four-valued-query-operation.js';
+export * from './query/module-code-slice.js';
+export * from './impact/observe-working-source-edit.js';
+export * from './impact/semantic-snapshot-comparison.js';
+export * from './rules/harmonization-benchmark-accounting.js';
+export * from './rules/harmonization-benchmark-baseline.js';
+export * from './rules/harmonization-first-increment-rules.js';
+export * from './rules/jpwb-harmonization-native-projection.js';
+export * from './providers/coverage/import-vitest-v8-coverage.js';
+export * from './providers/eslint/import-eslint-json.js';
+export * from './providers/experimental/assess-advanced-cpg-provider-entry.js';
+export * from './providers/runtime/evaluate-hybrid-runtime.js';
+export * from './providers/runtime/import-runtime-trace.js';
+export * from './providers/runtime/project-hybrid-static-prerequisites.js';
+export * from './providers/runtime/provider-evidence.js';
+export * from './providers/security/observe-jpwb-security.js';
+export * from './providers/svelte/svelte-virtual-source.js';
+export * from './providers/vitest/import-vitest-json.js';
+export * from './graph/analyze-structural-module-graph.js';
+export * from './graph/assess-dependency-cruiser-differential.js';
+export * from './graph/build-structural-workspace-dependency-graph.js';
+export * from './graph/run-current-dependency-cruiser-differential.js';
+export * from './graph/structural-module-graph-report.js';

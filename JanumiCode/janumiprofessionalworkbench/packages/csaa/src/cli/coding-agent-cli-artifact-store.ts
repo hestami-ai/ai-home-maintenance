@@ -7,7 +7,8 @@ export const CODING_AGENT_CLI_ARTIFACT_REFERENCE_PREFIX = 'artifact:sha256:' as 
 
 export const CODING_AGENT_CLI_ARTIFACT_SAFETY_CEILINGS = Object.freeze({
 	maxInputBytes: 1_048_576,
-	maxOutputBytes: 16_777_216
+	maxOutputBytes: 128 * 1024 * 1024,
+	maxTransportBytes: 16 * 1024 * 1024
 } as const);
 
 export type CodingAgentCliArtifactErrorCode =
@@ -32,12 +33,23 @@ export class CodingAgentCliArtifactError extends Error {
 }
 
 /**
- * Trust-bound storage port. Implementations may persist outside the subject tree, but this
- * package supplies only an in-memory implementation and never interprets a reference as a path.
+ * Trust-bound storage port. Implementations may persist outside the subject tree. Supplied
+ * in-memory and content-addressed implementations never interpret an artifact reference as a path.
  */
 export interface CodingAgentCliArtifactStore {
 	read(reference: string): Promise<Uint8Array | null> | Uint8Array | null;
 	write(reference: string, bytes: Uint8Array): Promise<void> | void;
+}
+
+/**
+ * Optional host transaction used to delay persistent publication until one terminal response.
+ * A rollback implementation must terminally refuse later writes from the rolled-back invocation;
+ * cooperative cancellation cannot guarantee that an untrusted handler settles before the CLI returns.
+ */
+export interface CodingAgentCliArtifactTransaction {
+	begin(signal?: AbortSignal): Promise<void> | void;
+	commit(): Promise<void> | void;
+	rollback(): Promise<void> | void;
 }
 
 export interface CodingAgentCliPublishedArtifact {

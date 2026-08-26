@@ -22,6 +22,7 @@ import {
 	type ExtractStaticRawInput,
 	type StaticRawDiagnosticFamilyInput
 } from './extract-static-raw.js';
+import * as typeScriptSymbolExtraction from './extract-symbols.js';
 
 const BUDGETS: SemanticBudgets = {
 	maxAstDepth: 128,
@@ -3008,5 +3009,249 @@ const constructable = class NamedClass {};
 			() => extractStaticRaw(extractionInput(testProgram, ['src/non-scalar-name.ts'])),
 			'INVALID_INPUT'
 		);
+	});
+
+	it('fails closed on direct deadline callbacks and compiler-support input contradictions', () => {
+		const testProgram = createTestProgram({
+			'src/direct-boundary.ts': 'export const value = 1;\n'
+		});
+		const reject = (
+			overrides: Partial<ExtractStaticRawInput>,
+			code: StaticRawExtractionError['code']
+		): void =>
+			expectTypedFailure(
+				() => extractStaticRaw(extractionInput(testProgram, ['src/direct-boundary.ts'], overrides)),
+				code
+			);
+
+		reject(
+			{
+				assertWithinDeadline: () => {
+					throw new StaticRawExtractionError('DEADLINE_EXCEEDED', 'provider deadline refusal');
+				}
+			},
+			'DEADLINE_EXCEEDED'
+		);
+		reject(
+			{
+				assertWithinDeadline: () => {
+					throw new Error('deadline callback unavailable');
+				}
+			},
+			'DEADLINE_EXCEEDED'
+		);
+		reject(
+			{
+				clock: () => {
+					throw new Error('deadline clock unavailable');
+				}
+			},
+			'DEADLINE_EXCEEDED'
+		);
+		reject({ clock: () => Number.NaN }, 'DEADLINE_EXCEEDED');
+		reject({ resolveCheckerContextDigest: undefined as never }, 'INVALID_INPUT');
+		reject({ assignabilityRequests: [{} as never] }, 'INVALID_INPUT');
+		reject(
+			{
+				compilerSupportRootNames: ['src/direct-boundary.ts', 'src/direct-boundary.ts']
+			},
+			'INVALID_INPUT'
+		);
+		reject({ compilerSupportRootNames: ['src/direct-boundary.ts'] }, 'INVALID_INPUT');
+	});
+
+	it('encodes non-scalar compiler displays and rejects unmapped absolute display paths', () => {
+		const source = 'export type Value = string;\n';
+		const checkerWithDisplay = (display: string): ts.TypeChecker => {
+			const testProgram = createTestProgram({ 'src/display.ts': source });
+			const checker = testProgram.program.getTypeChecker();
+			return new Proxy(checker, {
+				get(target, property) {
+					if (property === 'typeToString') return () => display;
+					const value = Reflect.get(target, property, target) as unknown;
+					return typeof value === 'function' ? value.bind(target) : value;
+				}
+			});
+		};
+
+		const encodedProgram = createTestProgram({ 'src/display.ts': source });
+		const encoded = extractStaticRaw(
+			extractionInput(encodedProgram, ['src/display.ts'], {
+				checker: checkerWithDisplay(String.fromCharCode(0xd800)),
+				includeTypes: true
+			})
+		);
+		expect(encoded.types.some((type) => type.display.startsWith('utf16-code-units:'))).toBe(true);
+
+		const rejectedProgram = createTestProgram({ 'src/display.ts': source });
+		expectTypedFailure(
+			() =>
+				extractStaticRaw(
+					extractionInput(rejectedProgram, ['src/display.ts'], {
+						checker: checkerWithDisplay('import("/outside/leak").Unsafe'),
+						includeTypes: true
+					})
+				),
+			'INVALID_INPUT'
+		);
+	});
+
+	it('distinguishes unresolved, non-unique, and context-only invocation implementations', () => {
+		const constructorText = [
+			'export class Built {',
+			'  constructor(readonly value: string) {}',
+			'}',
+			'new Built("ok");',
+			''
+		].join('\n');
+		const constructorProgram = createTestProgram({ 'src/constructor.ts': constructorText });
+		const constructorRaw = extractStaticRaw(
+			extractionInput(constructorProgram, ['src/constructor.ts'], { includeTypes: true })
+		);
+		expect(
+			constructorRaw.signatures.some((signature) => signature.signatureKind === 'CONSTRUCT')
+		).toBe(true);
+
+		const unresolvedText = 'declare function call(): void;\ncall();\n';
+		const unresolvedProgram = createTestProgram({ 'src/unresolved.ts': unresolvedText });
+		const unresolvedChecker = unresolvedProgram.program.getTypeChecker();
+		const unresolvedProxy = new Proxy(unresolvedChecker, {
+			get(target, property) {
+				if (property === 'getResolvedSignature') return () => undefined;
+				const value = Reflect.get(target, property, target) as unknown;
+				return typeof value === 'function' ? value.bind(target) : value;
+			}
+		});
+		const unresolvedRaw = extractStaticRaw(
+			extractionInput(unresolvedProgram, ['src/unresolved.ts'], {
+				checker: unresolvedProxy,
+				includeTypes: true
+			})
+		);
+		expect(unresolvedRaw.invocations[0]).toMatchObject({
+			resolutionReason: 'COMPILER_SIGNATURE_UNRESOLVED',
+			targetState: 'SYNTAX_ONLY'
+		});
+
+		const ambiguousText = [
+			'export function duplicate(value: string): number { return 1; }',
+			'export function duplicate(value: number): number { return 2; }',
+			'duplicate("value");',
+			''
+		].join('\n');
+		const ambiguousProgram = createTestProgram({ 'src/ambiguous.ts': ambiguousText });
+		const ambiguousRaw = extractStaticRaw(
+			extractionInput(ambiguousProgram, ['src/ambiguous.ts'], { includeTypes: true })
+		);
+		expect(ambiguousRaw.invocations[0]).toMatchObject({
+			resolutionReason: 'IMPLEMENTATION_NOT_UNIQUE',
+			targetState: 'SIGNATURE_RESOLVED'
+		});
+
+		const rootText = "import { imported } from './context';\nimported();\n";
+		const contextText = 'export function imported(): string { return "ok"; }\n';
+		const contextProgram = createTestProgram(
+			{
+				'src/context.ts': contextText,
+				'src/root.ts': rootText
+			},
+			['src/root.ts']
+		);
+		const bindings = new Map<string, RawCompilerSourceBinding>([
+			['src/root.ts', frozenBinding('src/root.ts', rootText)],
+			[
+				'src/context.ts',
+				{
+					artifact: null,
+					byteBudgetClass: 'LIVE_COMPILER_CONTEXT',
+					bytes: Buffer.byteLength(contextText, 'utf8'),
+					contentSha256: sha256(contextText),
+					logicalPath: 'src/context.ts',
+					mapping: { reason: 'Exact live context.', state: 'EXACT' },
+					origin: 'GENERATED_DECLARATION',
+					verificationState: 'VERIFIED_COMPILER_INPUT'
+				}
+			]
+		]);
+		const contextRaw = extractStaticRaw(
+			extractionInput(contextProgram, ['src/root.ts'], { includeTypes: true }, bindings)
+		);
+		expect(contextRaw.invocations[0]).toMatchObject({
+			resolutionReason: 'IMPLEMENTATION_NOT_DEEP_INDEXED',
+			targetState: 'SIGNATURE_RESOLVED'
+		});
+	});
+
+	it('fails closed when type projection contradicts retained invocation syntax', () => {
+		type Projection = ReturnType<typeof typeScriptSymbolExtraction.extractTypeScriptSymbols>;
+		const actualExtractSymbols = typeScriptSymbolExtraction.extractTypeScriptSymbols;
+
+		const rejectProjection = (
+			includeTypes: boolean,
+			transform: (projection: Projection) => Projection
+		): void => {
+			const testProgram = createTestProgram({
+				'src/invocation.ts': 'export function call(): void {}\ncall();\n'
+			});
+			const spy = vi
+				.spyOn(typeScriptSymbolExtraction, 'extractTypeScriptSymbols')
+				.mockImplementationOnce((input) => transform(actualExtractSymbols(input)));
+			try {
+				expectTypedFailure(
+					() =>
+						extractStaticRaw(extractionInput(testProgram, ['src/invocation.ts'], { includeTypes })),
+					'INVALID_INPUT'
+				);
+			} finally {
+				spy.mockRestore();
+			}
+		};
+
+		rejectProjection(false, (projection) => ({
+			...projection,
+			invocationResolutions: [null as never]
+		}));
+		rejectProjection(true, (projection) => {
+			const resolution = projection.invocationResolutions[0]!;
+			return {
+				...projection,
+				invocationResolutions: [resolution, resolution]
+			};
+		});
+		rejectProjection(true, (projection) => ({
+			...projection,
+			invocationResolutions: []
+		}));
+		rejectProjection(true, (projection) => {
+			const resolution = projection.invocationResolutions[0]!;
+			return {
+				...projection,
+				invocationResolutions: [
+					resolution,
+					{ ...resolution, nodeOrdinal: resolution.nodeOrdinal + 1_000_000 }
+				]
+			};
+		});
+	});
+
+	it('projects the defensive default-variable carrier taxonomy', () => {
+		const testProgram = createTestProgram({
+			'src/default-variable.ts': 'export const value = 1;\n'
+		});
+		const sourceFile = testProgram.program.getSourceFile(absolute('src/default-variable.ts'))!;
+		const statement = sourceFile.statements[0] as ts.VariableStatement;
+		const exportModifier = statement.modifiers?.find(
+			(modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
+		);
+		expect(exportModifier).toBeDefined();
+		Object.defineProperty(exportModifier!, 'kind', {
+			configurable: true,
+			value: ts.SyntaxKind.DefaultKeyword
+		});
+
+		const raw = extractStaticRaw(extractionInput(testProgram, ['src/default-variable.ts']));
+		expect(
+			raw.declarationCandidates.find((candidate) => candidate.syntacticName === 'value')
+		).toMatchObject({ exportSyntax: 'DEFAULT' });
 	});
 });

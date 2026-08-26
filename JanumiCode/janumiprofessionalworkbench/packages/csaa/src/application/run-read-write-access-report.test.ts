@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	PROJECT_CONTEXT_REPORT_OPERATION_VERSION,
@@ -17,6 +17,7 @@ import {
 	READ_WRITE_ACCESS_REPORT_OPERATION_VERSION,
 	READ_WRITE_ACCESS_REPORT_REQUEST_SCHEMA_VERSION,
 	READ_WRITE_ACCESS_REPORT_SAFETY_CEILINGS,
+	READ_WRITE_ACCESS_REPORT_SCHEMA_VERSION,
 	type ReadWriteAccessReportRequest
 } from '../contracts/read-write-access-report.js';
 import type { ReadWriteAccessGraphBuildDiagnostic } from '../contracts/read-write-access-graph.js';
@@ -434,6 +435,339 @@ describe('runReadWriteAccessReport', () => {
 		expect(outcome.result.facadeNonclaims).toContain(
 			'ZERO_RECORDED_ACCESS_AS_UNUSED_UNREAD_UNWRITTEN_DEAD_IRRELEVANT_NON_IMPACT_OR_SAFE_REMOVAL'
 		);
+	});
+
+	it('rejects non-data records, incompatible versions, invalid local budgets, and invalid predecessor input', () => {
+		const root = fixture();
+		const inherited = Object.assign(Object.create({ inherited: true }) as object, request());
+		const cases: readonly {
+			readonly code: string;
+			readonly path: string;
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: inherited },
+			{ code: 'REQUEST_SHAPE_INVALID', path: '$', value: { ...request(), unexpected: true } },
+			{
+				code: 'REQUEST_OPERATION_INCOMPATIBLE',
+				path: '$.operationVersion',
+				value: { ...request(), operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_SCHEMA_INCOMPATIBLE',
+				path: '$.schemaVersion',
+				value: { ...request(), schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				path: '$.subjectProjectConfigPaths',
+				value: { ...request(), subjectProjectConfigPaths: [] }
+			}
+		];
+
+		for (const malformed of cases) {
+			const outcome = runReadWriteAccessReport(malformed.value, { repositoryRoot: root });
+			expect(outcome, malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: 'incompatible'
+			});
+			expect(outcome.diagnostics[0], malformed.code).toMatchObject({ path: malformed.path });
+			expect(readWriteAccessReportExitCode(outcome), malformed.code).toBe(2);
+		}
+
+		for (const value of [0, -0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+			const outcome = runReadWriteAccessReport(withReadWriteBudget(request(), 'maxEdges', value), {
+				repositoryRoot: root
+			});
+			expect(outcome, String(value)).toMatchObject({
+				code: 'REQUEST_BUDGET_INVALID',
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: 'incompatible'
+			});
+		}
+	});
+
+	it('contains rejected telemetry and retains a monotonic zero fallback when the host clock fails', async () => {
+		const root = fixture();
+		const baseline = runReadWriteAccessReport({}, { repositoryRoot: root });
+		const progress: ReadWriteAccessReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => {
+			throw new Error('The trusted-host monotonic clock is unavailable.');
+		});
+		let observed;
+		try {
+			observed = runReadWriteAccessReport(
+				{},
+				{
+					onProgress: (event) => {
+						progress.push(event);
+						return Promise.reject(new Error('Rejected telemetry remains out of band.'));
+					},
+					repositoryRoot: root
+				}
+			);
+		} finally {
+			clock.mockRestore();
+		}
+
+		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
+		expect(progress).toHaveLength(2);
+		expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	});
+
+	it('retains capture-bound evidence when final selected-subject currentness becomes unavailable', () => {
+		const root = fixture();
+		let removed = false;
+		const outcome = runReadWriteAccessReport(request(), {
+			onProgress: (event) => {
+				if (!removed && event.phase === 'CURRENTNESS' && event.state === 'STARTED') {
+					removed = true;
+					rmSync(join(root, 'projects/left/tsconfig.json'));
+				}
+			},
+			repositoryRoot: root
+		});
+
+		expect(removed).toBe(true);
+		expect(outcome.outcome).toBe('partial');
+		if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+		expect(outcome.result.currentness).toMatchObject({
+			changedPaths: [],
+			scope: 'SELECTED_CAPTURED_SUBJECT_ONLY',
+			state: 'UNAVAILABLE'
+		});
+		expect(outcome.result.currentness.diagnosticCodes).toContain('REFERENCE_REQUIRED_MISSING');
+		expect(outcome.result.evidence.readWriteAccessGraph.coverage.accessOccurrences).toBeGreaterThan(
+			0
+		);
+	});
+
+	it('preserves predecessor resource refusal without publishing graph evidence', () => {
+		const root = fixture();
+		const baseline = request();
+		const outcome = runReadWriteAccessReport(
+			request({
+				budgets: {
+					...baseline.budgets,
+					subject: { ...baseline.budgets.subject, maxFiles: 1 }
+				}
+			}),
+			{ repositoryRoot: root }
+		);
+
+		expect(outcome).toMatchObject({
+			code: 'SUBJECT_RESOURCE_REFUSED',
+			outcome: 'unavailable',
+			stage: 'PREDECESSOR_PIPELINE',
+			state: 'resource-refused'
+		});
+		expect(outcome).not.toHaveProperty('result');
+		expect(
+			outcome.diagnostics.every((diagnostic) => diagnostic.source === 'PREDECESSOR_PIPELINE')
+		).toBe(true);
+	});
+
+	it('fails closed when the trusted host throws while supplying the fixed repository root', () => {
+		const root = fixture();
+		const progress: ReadWriteAccessReportProgressEvent[] = [];
+		const options = new Proxy(
+			{
+				onProgress: (event: ReadWriteAccessReportProgressEvent) => progress.push(event),
+				repositoryRoot: root
+			},
+			{
+				get(target, property, receiver) {
+					if (property === 'repositoryRoot')
+						throw new Error('The trusted host could not supply its fixed root.');
+					return Reflect.get(target, property, receiver);
+				}
+			}
+		);
+		const outcome = runReadWriteAccessReport(request(), options);
+
+		expect(outcome).toMatchObject({
+			code: 'INTERNAL_FAILURE',
+			outcome: 'unavailable',
+			stage: 'RESULT',
+			state: 'failed'
+		});
+		expect(readWriteAccessReportExitCode(outcome)).toBe(4);
+		expect(progress.at(-1)).toMatchObject({
+			detailCode: 'INTERNAL_FAILURE',
+			phase: 'PREDECESSOR_PIPELINE',
+			state: 'FAILED'
+		});
+	});
+
+	it('fails closed when independently validated graph evidence is structurally inconsistent', async () => {
+		const root = fixture();
+		vi.resetModules();
+		vi.doMock('../graph/build-read-write-access-graph.js', async (importOriginal) => {
+			const actual =
+				await importOriginal<typeof import('../graph/build-read-write-access-graph.js')>();
+			return {
+				...actual,
+				buildReadWriteAccessGraph: (
+					...args: Parameters<typeof actual.buildReadWriteAccessGraph>
+				) => {
+					const outcome = actual.buildReadWriteAccessGraph(...args);
+					if (outcome.outcome !== 'partial') return outcome;
+					return {
+						...outcome,
+						graph: {
+							...outcome.graph,
+							coverage: {
+								...outcome.graph.coverage,
+								edges: outcome.graph.coverage.edges + 1
+							}
+						}
+					};
+				}
+			};
+		});
+
+		try {
+			const isolated = await import('./run-read-write-access-report.js');
+			const outcome = isolated.runReadWriteAccessReport(request(), { repositoryRoot: root });
+			expect(outcome).toMatchObject({
+				code: 'GRAPH_VALIDATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'READ_WRITE_ACCESS',
+				state: 'failed'
+			});
+			expect(
+				outcome.diagnostics.some(
+					(diagnostic) =>
+						diagnostic.source === 'READ_WRITE_ACCESS' && diagnostic.phase === 'VALIDATE'
+				)
+			).toBe(true);
+		} finally {
+			vi.doUnmock('../graph/build-read-write-access-graph.js');
+			vi.resetModules();
+		}
+	});
+
+	it('redacts absolute graph diagnostics and rejects paths outside the fixed repository root', async () => {
+		const root = fixture();
+		vi.resetModules();
+		vi.doMock('../graph/build-read-write-access-graph.js', () => ({
+			buildReadWriteAccessGraph: () => ({
+				diagnostics: [
+					{
+						code: 'UNSAFE_SEMANTIC_INPUT',
+						message: `Unsafe source under ${root}.`,
+						path: join(root, 'projects/left/src/alpha.ts'),
+						phase: 'CLASSIFY'
+					},
+					{
+						code: 'UNSAFE_SEMANTIC_INPUT',
+						message: 'Unsafe source outside the selected root.',
+						path: '../outside.ts',
+						phase: 'CLASSIFY'
+					}
+				],
+				outcome: 'unavailable'
+			})
+		}));
+
+		try {
+			const isolated = await import('./run-read-write-access-report.js');
+			const outcome = isolated.runReadWriteAccessReport(request(), { repositoryRoot: root });
+			expect(outcome).toMatchObject({
+				code: 'READ_WRITE_ACCESS_UNAVAILABLE',
+				outcome: 'unavailable',
+				stage: 'READ_WRITE_ACCESS',
+				state: 'failed'
+			});
+			expect(outcome.diagnostics.slice(-2).map((diagnostic) => diagnostic.path)).toEqual([
+				'projects/left/src/alpha.ts',
+				null
+			]);
+			expect(canonicalSemanticJson(outcome)).not.toContain(root);
+		} finally {
+			vi.doUnmock('../graph/build-read-write-access-graph.js');
+			vi.resetModules();
+		}
+	});
+
+	it('rejects a graph that passes its validator but does not reconcile with captured evidence', async () => {
+		const root = fixture();
+		const baseline = runReadWriteAccessReport(request(), { repositoryRoot: root });
+		expect(baseline.outcome).toBe('partial');
+		if (baseline.outcome !== 'partial') throw new Error(JSON.stringify(baseline));
+		const nonReconcilingGraph = {
+			...baseline.result.evidence.readWriteAccessGraph,
+			subjectId: 'non-reconciling-subject'
+		};
+		vi.resetModules();
+		vi.doMock('../graph/build-read-write-access-graph.js', () => ({
+			buildReadWriteAccessGraph: () => ({
+				diagnostics: [],
+				graph: nonReconcilingGraph,
+				outcome: 'partial'
+			})
+		}));
+		vi.doMock('../graph/validate-read-write-access-graph.js', () => ({
+			validateReadWriteAccessGraph: () => ({ issues: [], state: 'VALID' })
+		}));
+
+		try {
+			const isolated = await import('./run-read-write-access-report.js');
+			const outcome = isolated.runReadWriteAccessReport(request(), { repositoryRoot: root });
+			expect(outcome).toMatchObject({
+				code: 'EVIDENCE_IDENTITY_MISMATCH',
+				outcome: 'unavailable',
+				stage: 'RESULT',
+				state: 'failed'
+			});
+			expect(outcome.diagnostics.at(-1)).toMatchObject({
+				code: 'EVIDENCE_IDENTITY_MISMATCH',
+				source: 'REPORT'
+			});
+		} finally {
+			vi.doUnmock('../graph/build-read-write-access-graph.js');
+			vi.doUnmock('../graph/validate-read-write-access-graph.js');
+			vi.resetModules();
+		}
+	});
+
+	it('fails closed when canonical terminal-report serialization is unavailable', async () => {
+		const root = fixture();
+		vi.resetModules();
+		vi.doMock('../semantic/canonical.js', async (importOriginal) => {
+			const actual = await importOriginal<typeof import('../semantic/canonical.js')>();
+			return {
+				...actual,
+				canonicalSemanticJsonWitness: (value: unknown) => {
+					const record = value as Readonly<Record<string, unknown>>;
+					if (
+						value !== null &&
+						typeof value === 'object' &&
+						record.schemaVersion === READ_WRITE_ACCESS_REPORT_SCHEMA_VERSION &&
+						record.outcome === 'partial'
+					)
+						throw new Error('Canonical report serialization is unavailable.');
+					return actual.canonicalSemanticJsonWitness(value);
+				}
+			};
+		});
+
+		try {
+			const isolated = await import('./run-read-write-access-report.js');
+			const outcome = isolated.runReadWriteAccessReport(request(), { repositoryRoot: root });
+			expect(outcome).toMatchObject({
+				code: 'RESULT_SERIALIZATION_FAILED',
+				outcome: 'unavailable',
+				stage: 'RESULT',
+				state: 'failed'
+			});
+		} finally {
+			vi.doUnmock('../semantic/canonical.js');
+			vi.resetModules();
+		}
 	});
 
 	it('rejects hostile wire values without invoking accessors and enforces absolute ceilings', () => {

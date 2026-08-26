@@ -6,7 +6,7 @@ import {
 	cleanupProviderFixtures,
 	providerFixture
 } from '../runtime/provider-evidence.test-support.js';
-import { observeJpwbNativeSecurity } from './observe-jpwb-security.js';
+import { JPWB_NATIVE_SECURITY_LIMITS, observeJpwbNativeSecurity } from './observe-jpwb-security.js';
 
 afterEach(cleanupProviderFixtures);
 
@@ -99,5 +99,88 @@ describe('bounded native JPWB security observations', () => {
 			subject: fixture.subject
 		});
 		expect(stale).toMatchObject({ findings: [], freshness: 'STALE', health: 'STALE' });
+	});
+
+	it('rejects malformed timestamps and source-population admission boundaries', () => {
+		const fixture = providerFixture();
+		const validSource = 'export const value = 1;\n';
+		const options = {
+			observedAt: '2026-08-25T12:00:02.000Z',
+			repositoryRoot: fixture.root,
+			sources: [{ path: 'packages/demo/src/index.ts', source: validSource }],
+			subject: fixture.subject
+		};
+		expect(() => observeJpwbNativeSecurity({ ...options, observedAt: 'not-a-date' })).toThrow(
+			'Native security observedAt must be UTC ISO-8601.'
+		);
+
+		const malformedPopulations: readonly { readonly name: string; readonly sources: unknown }[] = [
+			{
+				name: 'excessive source population',
+				sources: Array.from(
+					{ length: JPWB_NATIVE_SECURITY_LIMITS.maxFiles + 1 },
+					() => options.sources[0]
+				)
+			},
+			{
+				name: 'duplicate source path',
+				sources: [options.sources[0], options.sources[0]]
+			},
+			{
+				name: 'unsupported source extension',
+				sources: [{ path: 'package.json', source: '{}' }]
+			},
+			{
+				name: 'source outside the subject',
+				sources: [{ path: 'packages/demo/src/missing.ts', source: validSource }]
+			},
+			{
+				name: 'nonstring source',
+				sources: [{ path: 'packages/demo/src/index.ts', source: 1 }]
+			}
+		];
+		for (const candidate of malformedPopulations)
+			expect(
+				observeJpwbNativeSecurity({
+					...options,
+					sources: candidate.sources as typeof options.sources
+				}),
+				candidate.name
+			).toMatchObject({ findings: [], health: 'MALFORMED' });
+	});
+
+	it('rejects parser diagnostics while safely traversing computed names and indirect calls', () => {
+		const malformedSource = 'export function broken( {\n';
+		const malformedFixture = providerFixture({
+			'packages/demo/src/broken.ts': malformedSource
+		});
+		expect(
+			observeJpwbNativeSecurity({
+				observedAt: '2026-08-25T12:00:02.000Z',
+				repositoryRoot: malformedFixture.root,
+				sources: [{ path: 'packages/demo/src/broken.ts', source: malformedSource }],
+				subject: malformedFixture.subject
+			})
+		).toMatchObject({ findings: [], health: 'MALFORMED' });
+
+		const boundarySource = [
+			"export const principal = { [String('principalKind')]: 'HUMAN' };",
+			'(function indirect() {})();',
+			'console.error(secretToken, laterValue);',
+			''
+		].join('\n');
+		const boundaryFixture = providerFixture({
+			'packages/demo/src/server/boundary.ts': boundarySource
+		});
+		const result = observeJpwbNativeSecurity({
+			observedAt: '2026-08-25T12:00:02.000Z',
+			repositoryRoot: boundaryFixture.root,
+			sources: [{ path: 'packages/demo/src/server/boundary.ts', source: boundarySource }],
+			subject: boundaryFixture.subject
+		});
+		expect(result).toMatchObject({ health: 'HEALTHY' });
+		expect(result.findings.map((finding) => finding.ruleId)).toEqual([
+			'JPWB-SEC-003_SECRET_BEARING_DIAGNOSTIC_ARGUMENT'
+		]);
 	});
 });

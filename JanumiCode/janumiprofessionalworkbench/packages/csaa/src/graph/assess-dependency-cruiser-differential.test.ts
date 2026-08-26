@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { DependencyCruiserObservation } from '../contracts/dependency-cruiser.js';
+import { dependencyCruiserObservationContentDigest } from '../providers/dependency-cruiser/normalize-output.js';
 import {
 	DEPENDENCY_CRUISER_DIFFERENTIAL_OPERATION_VERSION,
 	DEPENDENCY_CRUISER_DIFFERENTIAL_REQUEST_SCHEMA_VERSION,
@@ -20,7 +22,8 @@ function fixture(): StructuralWorkspaceDependencyFixture {
 }
 
 function request(
-	expectedDifferentialDigest: string | null
+	expectedDifferentialDigest: string | null,
+	expectedInputPaths: readonly string[] = ['apps', 'packages']
 ): DependencyCruiserDifferentialAcceptanceRequest {
 	return {
 		budgets: {
@@ -33,9 +36,31 @@ function request(
 		},
 		configPath: '.dependency-cruiser.cjs',
 		expectedDifferentialDigest,
-		expectedInputPaths: ['apps', 'packages'],
+		expectedInputPaths,
 		operationVersion: DEPENDENCY_CRUISER_DIFFERENTIAL_OPERATION_VERSION,
 		schemaVersion: DEPENDENCY_CRUISER_DIFFERENTIAL_REQUEST_SCHEMA_VERSION
+	};
+}
+
+function withLimitation(
+	observation: DependencyCruiserObservation,
+	code: string
+): DependencyCruiserObservation {
+	const limitations = [
+		...observation.limitations.filter((limitation) => limitation.code !== code),
+		{
+			code,
+			fields: ['fixture.optional'],
+			reason: 'Synthetic normalized optional-metadata limitation fixture.'
+		}
+	].sort((left, right) => (left.code < right.code ? -1 : left.code > right.code ? 1 : 0));
+	const candidate = {
+		...observation,
+		limitations
+	} as unknown as DependencyCruiserObservation;
+	return {
+		...candidate,
+		contentDigest: dependencyCruiserObservationContentDigest(candidate)
 	};
 }
 
@@ -44,6 +69,30 @@ afterEach(() => {
 });
 
 describe('assessDependencyCruiserDifferential', () => {
+	it('accepts an exact file-input perimeter contained by selected workspaces', () => {
+		const value = fixture();
+		const inputPaths = [
+			'apps/demo/src/main.ts',
+			'packages/a/src/a.ts',
+			'packages/b/src/b.ts'
+		] as const;
+		const observation = createStructuralWorkspaceDependencyObservation(value, { inputPaths });
+		const discovery = assessDependencyCruiserDifferential(
+			request(null, inputPaths),
+			value.frozenSubject,
+			value.semanticSnapshot,
+			value.graph,
+			observation
+		);
+		expect(discovery).toMatchObject({
+			diagnostics: [{ code: 'BASELINE_REQUIRED' }],
+			evidence: {
+				perimeterWitness: { expectedInputPaths: inputPaths, state: 'EXACT_INVOCATION_MATCH' }
+			},
+			outcome: 'rejected'
+		});
+	});
+
 	it('requires review before accepting deterministic partial differential evidence', () => {
 		const value = fixture();
 		const observation = createStructuralWorkspaceDependencyObservation(value);
@@ -84,7 +133,12 @@ describe('assessDependencyCruiserDifferential', () => {
 		});
 		if (accepted.outcome !== 'accepted') throw new Error(JSON.stringify(accepted));
 		expect(accepted.evidence.nonclaims).toEqual(
-			expect.arrayContaining(['CONTEXT_EQUIVALENCE', 'G4_PASS', 'PROVIDER_QUALIFICATION'])
+			expect.arrayContaining([
+				'CONTEXT_EQUIVALENCE',
+				'G4_PASS',
+				'OPTIONAL_DEPENDENCY_CRUISER_METADATA_INTERPRETATION',
+				'PROVIDER_QUALIFICATION'
+			])
 		);
 		expect(accepted.evidence.comparison.health).toBe('PARTIAL');
 		expect(accepted.evidence.comparison.negativeCoverage.state).toBe('OPEN');
@@ -180,6 +234,50 @@ describe('assessDependencyCruiserDifferential', () => {
 		});
 	});
 
+	it.each(['DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED', 'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED'])(
+		'retains relation-irrelevant normalized limitation %s in partial evidence',
+		(code) => {
+			const value = fixture();
+			const observation = withLimitation(
+				createStructuralWorkspaceDependencyObservation(value),
+				code
+			);
+			const discovery = assessDependencyCruiserDifferential(
+				request(null),
+				value.frozenSubject,
+				value.semanticSnapshot,
+				value.graph,
+				observation
+			);
+			expect(discovery).toMatchObject({
+				diagnostics: [{ code: 'BASELINE_REQUIRED' }],
+				evidence: {
+					acceptanceState: 'BASELINE_REQUIRED',
+					observation: { limitations: expect.arrayContaining([code]) }
+				},
+				outcome: 'rejected'
+			});
+			if (discovery.outcome !== 'rejected') throw new Error(JSON.stringify(discovery));
+			const accepted = assessDependencyCruiserDifferential(
+				request(discovery.evidence.differentialDigest),
+				value.frozenSubject,
+				value.semanticSnapshot,
+				value.graph,
+				observation
+			);
+			expect(accepted).toMatchObject({
+				evidence: {
+					acceptanceState: 'ACCEPTED_REVIEWED_PARTIAL_DIFFERENTIAL',
+					nonclaims: expect.arrayContaining([
+						'OPTIONAL_DEPENDENCY_CRUISER_METADATA_INTERPRETATION'
+					]),
+					observation: { limitations: expect.arrayContaining([code]) }
+				},
+				outcome: 'accepted'
+			});
+		}
+	);
+
 	it('fails closed on configuration, perimeter, and unsupported normalization drift', () => {
 		const value = fixture();
 		const configDrift = assessDependencyCruiserDifferential(
@@ -211,10 +309,28 @@ describe('assessDependencyCruiserDifferential', () => {
 			value.frozenSubject,
 			value.semanticSnapshot,
 			value.graph,
-			createStructuralWorkspaceDependencyObservation(value, { ignoredModuleField: true })
+			withLimitation(
+				createStructuralWorkspaceDependencyObservation(value),
+				'FOLDERS_NOT_INTERPRETED'
+			)
 		);
 		expect(unsupported).toMatchObject({
 			diagnostics: [{ code: 'UNSUPPORTED_OBSERVATION_SURFACE' }],
+			outcome: 'unavailable'
+		});
+
+		const unknown = assessDependencyCruiserDifferential(
+			request(null),
+			value.frozenSubject,
+			value.semanticSnapshot,
+			value.graph,
+			withLimitation(
+				createStructuralWorkspaceDependencyObservation(value),
+				'UNKNOWN_OPTIONAL_METADATA_NOT_INTERPRETED'
+			)
+		);
+		expect(unknown).toMatchObject({
+			diagnostics: [{ code: 'SOURCE_INVALID' }],
 			outcome: 'unavailable'
 		});
 	});

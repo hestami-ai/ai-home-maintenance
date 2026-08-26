@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	STRUCTURAL_SCC_REPORT_NONCLAIMS,
 	STRUCTURAL_SCC_REPORT_OPERATION_VERSION,
@@ -299,6 +299,28 @@ describe('runStructuralSccReport', () => {
 		expect(canonicalSemanticJson(observed)).toBe(canonicalSemanticJson(baseline));
 	});
 
+	it('uses deterministic elapsed time when the monotonic clock is unavailable', () => {
+		const root = fixture();
+		const progress: StructuralSccReportProgressEvent[] = [];
+		const clock = vi.spyOn(process.hrtime, 'bigint').mockImplementationOnce(() => {
+			throw new Error('clock unavailable');
+		});
+		try {
+			const outcome = runStructuralSccReport(
+				{},
+				{
+					onProgress: (event) => progress.push(event),
+					repositoryRoot: root
+				}
+			);
+			expect(outcome).toMatchObject({ code: 'REQUEST_SHAPE_INVALID', outcome: 'unavailable' });
+			expect(progress.length).toBeGreaterThan(0);
+			expect(progress.every((event) => event.elapsedMs === 0)).toBe(true);
+		} finally {
+			clock.mockRestore();
+		}
+	});
+
 	it('fails closed on hostile shapes, traversal, excessive ceilings, and absent projects', () => {
 		const root = fixture();
 		const extra = { ...request(), unexpected: true };
@@ -331,6 +353,232 @@ describe('runStructuralSccReport', () => {
 			expect(structuralSccReportExitCode(outcome)).toBe(exitCode);
 		}
 	});
+
+	it('rejects malformed scalar, path, and project-list boundaries exactly', () => {
+		const root = fixture();
+		const base = request();
+		const inherited = Object.assign(Object.create({ inherited: true }) as object, base);
+		const nonEnumerable = { ...base };
+		Object.defineProperty(nonEnumerable, 'schemaVersion', {
+			enumerable: false,
+			value: base.schemaVersion
+		});
+		const wrongProjectPrototype = ['packages/demo/tsconfig.json'];
+		Object.setPrototypeOf(wrongProjectPrototype, null);
+		const sparseProjects: string[] = [];
+		sparseProjects.length = 1;
+
+		const cases: readonly {
+			readonly code: string;
+			readonly path?: string;
+			readonly state?: 'incompatible' | 'resource-refused';
+			readonly value: unknown;
+		}[] = [
+			{ code: 'REQUEST_SHAPE_INVALID', value: inherited },
+			{ code: 'REQUEST_SHAPE_INVALID', value: nonEnumerable },
+			{
+				code: 'REQUEST_BUDGET_INVALID',
+				value: { ...base, budgets: { ...base.budgets, maxResultBytes: 0 } }
+			},
+			{
+				code: 'REQUEST_SCHEMA_VERSION_UNSUPPORTED',
+				value: { ...base, schemaVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_OPERATION_VERSION_UNSUPPORTED',
+				value: { ...base, operationVersion: 'unsupported' }
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				value: { ...base, subjectProjectConfigPaths: [''] }
+			},
+			{
+				code: 'REQUEST_PATH_BUDGET_EXCEEDED',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						semantic: { ...base.budgets.semantic, maxPathCharacters: 1 }
+					}
+				}
+			},
+			{
+				code: 'REQUEST_PATH_INVALID',
+				value: { ...base, subjectProjectConfigPaths: ['bad*path.json'] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: wrongProjectPrototype }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: [] }
+			},
+			{
+				code: 'REQUEST_PROJECTS_BUDGET_EXCEEDED',
+				state: 'resource-refused',
+				value: {
+					...base,
+					budgets: {
+						...base.budgets,
+						subject: { ...base.budgets.subject, maxProjects: 1 }
+					},
+					subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/other/tsconfig.json']
+				}
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: { ...base, subjectProjectConfigPaths: sparseProjects }
+			},
+			{
+				code: 'REQUEST_PROJECTS_INVALID',
+				value: {
+					...base,
+					subjectProjectConfigPaths: ['packages/demo/tsconfig.json', 'packages/demo/tsconfig.json']
+				}
+			}
+		];
+
+		for (const malformed of cases) {
+			const outcome = runStructuralSccReport(malformed.value, { repositoryRoot: root });
+			expect(outcome, malformed.code).toMatchObject({
+				code: malformed.code,
+				outcome: 'unavailable',
+				stage: 'REQUEST',
+				state: malformed.state ?? 'incompatible'
+			});
+		}
+	});
+
+	it('classifies bounded, forbidden, missing, incompatible, and ambiguous subjects', () => {
+		const budgetRoot = fixture();
+		const base = request();
+		const budget = runStructuralSccReport(
+			request({
+				budgets: {
+					...base.budgets,
+					subject: { ...base.budgets.subject, maxFiles: 1 }
+				}
+			}),
+			{ repositoryRoot: budgetRoot }
+		);
+		expect(budget).toMatchObject({
+			code: 'SUBJECT_RESOURCE_REFUSED',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'resource-refused'
+		});
+
+		const forbiddenRoot = fixture();
+		json(forbiddenRoot, 'packages/demo/tsconfig.json', {
+			compilerOptions: { noLib: true },
+			include: ['src/*/../outside.ts']
+		});
+		const forbidden = runStructuralSccReport(request(), { repositoryRoot: forbiddenRoot });
+		expect(forbidden).toMatchObject({
+			code: 'SUBJECT_FORBIDDEN',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const missingRoot = fixture();
+		rmSync(join(missingRoot, 'package.json'));
+		const missing = runStructuralSccReport(request(), { repositoryRoot: missingRoot });
+		expect(missing).toMatchObject({
+			code: 'SUBJECT_NOT_FOUND',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const incompatibleRoot = fixture();
+		write(incompatibleRoot, 'packages/demo/package.json', '{ malformed');
+		const incompatible = runStructuralSccReport(request(), { repositoryRoot: incompatibleRoot });
+		expect(incompatible).toMatchObject({
+			code: 'SUBJECT_INCOMPATIBLE',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const ambiguousRoot = fixture();
+		json(ambiguousRoot, 'packages/other/package.json', {
+			name: '@fixture/scc-report',
+			private: true,
+			version: '0.0.0'
+		});
+		write(ambiguousRoot, 'packages/other/src/index.ts', 'export const other = true;\n');
+		const ambiguous = runStructuralSccReport(request(), { repositoryRoot: ambiguousRoot });
+		expect(ambiguous).toMatchObject({
+			code: 'SUBJECT_AMBIGUOUS',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+	}, 60_000);
+
+	it('rejects directory project selectors and invalid repository roots distinctly', () => {
+		const root = fixture();
+		const directory = runStructuralSccReport(
+			request({ subjectProjectConfigPaths: ['packages/demo'] }),
+			{ repositoryRoot: root }
+		);
+		expect(directory).toMatchObject({
+			code: 'PROJECT_PATH_INVALID',
+			outcome: 'unavailable',
+			stage: 'SUBJECT',
+			state: 'incompatible'
+		});
+
+		const invalidRoot = runStructuralSccReport(request(), {
+			repositoryRoot: join(root, 'missing-root')
+		});
+		expect(invalidRoot).toMatchObject({
+			code: 'REPOSITORY_ROOT_UNAVAILABLE',
+			outcome: 'unavailable',
+			stage: 'REQUEST',
+			state: 'failed'
+		});
+		expect(structuralSccReportExitCode(invalidRoot)).toBe(4);
+	});
+
+	it('reports stale and unavailable currentness without changing captured SCC evidence', () => {
+		for (const [expectedState, mutate] of [
+			[
+				'STALE',
+				(root: string) => write(root, 'packages/demo/src/leaf.ts', 'export const leaf = 2;\n')
+			],
+			['UNAVAILABLE', (root: string) => write(root, 'package.json', '{ malformed')]
+		] as const) {
+			const root = fixture();
+			let mutated = false;
+			const outcome = runStructuralSccReport(request(), {
+				onProgress: (event) => {
+					if (
+						!mutated &&
+						event.kind === 'REPORT_STAGE' &&
+						event.phase === 'ANALYSIS' &&
+						event.state === 'COMPLETED'
+					) {
+						mutated = true;
+						mutate(root);
+					}
+				},
+				repositoryRoot: root
+			});
+			expect(mutated, expectedState).toBe(true);
+			expect(outcome.outcome, expectedState).toBe('partial');
+			if (outcome.outcome !== 'partial') throw new Error(JSON.stringify(outcome));
+			expect(outcome.result.currentness.state).toBe(expectedState);
+			expect(outcome.stageOutcomes.currentness.state).toBe(expectedState);
+			expect(outcome.result.analysis.coverage.partitionReconciles).toBe(true);
+			if (expectedState === 'STALE')
+				expect(outcome.result.currentness.changedPaths).toContain('packages/demo/src/leaf.ts');
+			else expect(outcome.result.currentness.diagnosticCodes).toContain('CONFIG_MALFORMED');
+		}
+	}, 60_000);
 
 	it('refuses result and SCC population budgets without returning a partial population', () => {
 		const root = fixture();
