@@ -133,6 +133,16 @@ const EMITTED_2026_08_04 = new Set([
 	'PwaPublished', 'PwaRetired', 'PwaSubmittedForReview', 'PwaValidated', 'PwuChallenged',
 	'PwuInvalidated', 'PwuMarkedReady', 'PwuProposed', 'PwuReshapingStarted', 'PwuShapingStarted',
 	'PwuStateChanged', 'PwuSuperseded', 'PwuTypeDefined', 'PwuTypeRedefined', 'PwuTypeRemoved',
+	// ⚠ THE TWO BELOW ADDED 2026-08-21 (REG-D-044 S-1b), ARGUED RATHER THAN BUMPED. Both are emitted by
+	// `advancePwuLifecycle` from `beginPwuRecomposition` / `completePwuRecomposition` (pwu.ts), driving
+	// PWU.workLifecycleState SATISFIED -> RECOMPOSING and RECOMPOSING -> RECOMPOSED — the two arrows that
+	// until today were performable through the generic setter by anyone with nothing cited (REG-F-085).
+	// ⚠ THE §26 REFERENCE SEED NEVER OCCUPIES EITHER STATE, so neither event is reachable from the seed
+	// and neither can be proven emitted by driving it. They are proven by
+	// packages/rph-application/src/handlers/pwu-recomposition.test.ts, which is also their registered
+	// EXPLICIT_DRIVE_SITE in pwu-fold-drive-sites.test.ts. That is the whole reason that map exists.
+	'PwuRecomposed',
+	'PwuRecompositionBegun',
 	// ⚠ 'RecompositionAccepted' ADDED 2026-08-21 (REG-D-044 / S-1a), and this is an ARGUED edit rather than a
 	// count bump, which is what this snapshot exists to force. `acceptRecomposition` (decomposition.ts) emits it
 	// through `advanceStatus`'s `eventType`, driving RecompositionContract.status COMPOSABLE -> SATISFIED — the

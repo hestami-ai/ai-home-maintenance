@@ -411,6 +411,16 @@ export const EscalatePwuPayloadSchema = z.strictObject({
 	supportingObjectIds: z.array(z.string()).optional()
 });
 export type EscalatePwuPayload = z.infer<typeof EscalatePwuPayloadSchema>;
+export const BeginPwuRecompositionPayloadSchema = z.strictObject({
+	recompositionContractId: z.string(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type BeginPwuRecompositionPayload = z.infer<typeof BeginPwuRecompositionPayloadSchema>;
+export const CompletePwuRecompositionPayloadSchema = z.strictObject({
+	recompositionContractId: z.string(),
+	supportingObjectIds: z.array(z.string()).optional()
+});
+export type CompletePwuRecompositionPayload = z.infer<typeof CompletePwuRecompositionPayloadSchema>;
 export const UnblockPwuPayloadSchema = z.strictObject({
 	recoveryReason: z.string(),
 	supportingObjectIds: z.array(z.string()).optional()
@@ -1420,6 +1430,16 @@ export const PwuEscalatedPayloadSchema = z.strictObject({
 	workLifecycleState: WorkLifecycleStateSchema
 });
 export type PwuEscalatedPayload = z.infer<typeof PwuEscalatedPayloadSchema>;
+export const PwuRecompositionBegunPayloadSchema = z.strictObject({
+	recompositionContractId: z.string(),
+	workLifecycleState: WorkLifecycleStateSchema
+});
+export type PwuRecompositionBegunPayload = z.infer<typeof PwuRecompositionBegunPayloadSchema>;
+export const PwuRecomposedPayloadSchema = z.strictObject({
+	recompositionContractId: z.string(),
+	workLifecycleState: WorkLifecycleStateSchema
+});
+export type PwuRecomposedPayload = z.infer<typeof PwuRecomposedPayloadSchema>;
 export const PwuUnblockedPayloadSchema = z.strictObject({
 	recoveryReason: z.string(),
 	recoveredFrom: WorkLifecycleStateSchema,
@@ -2115,6 +2135,18 @@ export const COMMANDS = {
 		emitsEvent: 'PwuEscalated',
 		firstSlice: false
 	},
+	BeginPwuRecomposition: {
+		payload: BeginPwuRecompositionPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
+		emitsEvent: 'PwuRecompositionBegun',
+		firstSlice: false
+	},
+	CompletePwuRecomposition: {
+		payload: CompletePwuRecompositionPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
+		emitsEvent: 'PwuRecomposed',
+		firstSlice: false
+	},
 	UnblockPwu: {
 		payload: UnblockPwuPayloadSchema,
 		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
@@ -2672,6 +2704,11 @@ export const EVENTS = {
 	ObligationWaived: { payload: ObligationWaivedPayloadSchema, aggregateType: 'Obligation' },
 	PwuAbandoned: { payload: PwuAbandonedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuEscalated: { payload: PwuEscalatedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
+	PwuRecompositionBegun: {
+		payload: PwuRecompositionBegunPayloadSchema,
+		aggregateType: 'ProfessionalWorkUnit'
+	},
+	PwuRecomposed: { payload: PwuRecomposedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuUnblocked: { payload: PwuUnblockedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuBaselined: { payload: PwuBaselinedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
 	PwuBlocked: { payload: PwuBlockedPayloadSchema, aggregateType: 'ProfessionalWorkUnit' },
@@ -3178,16 +3215,16 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 	{
 		commandType: 'BeginRecomposition',
 		eventType: 'RecompositionStarted',
-		machine: 'PWU.workLifecycleState',
-		from: 'SATISFIED',
-		to: 'RECOMPOSING'
+		machine: 'RecompositionContract.status',
+		from: 'READY | CONFLICTED | INSUFFICIENT',
+		to: 'EVALUATING'
 	},
 	{
 		commandType: 'CompleteRecomposition',
 		eventType: 'RecompositionCompleted',
-		machine: 'PWU.workLifecycleState',
-		from: 'RECOMPOSING',
-		to: 'RECOMPOSED'
+		machine: 'RecompositionContract.status',
+		from: 'EVALUATING',
+		to: 'COMPOSABLE | CONFLICTED | INSUFFICIENT'
 	},
 	{
 		commandType: 'InvalidateEvidence',
@@ -3412,6 +3449,20 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'PWU.workLifecycleState',
 		from: 'SATISFIED | RECOMPOSED',
 		to: 'BASELINED'
+	},
+	{
+		commandType: 'BeginPwuRecomposition',
+		eventType: 'PwuRecompositionBegun',
+		machine: 'PWU.workLifecycleState',
+		from: 'SATISFIED',
+		to: 'RECOMPOSING'
+	},
+	{
+		commandType: 'CompletePwuRecomposition',
+		eventType: 'PwuRecomposed',
+		machine: 'PWU.workLifecycleState',
+		from: 'RECOMPOSING',
+		to: 'RECOMPOSED'
 	},
 	{
 		commandType: 'BlockPwu',

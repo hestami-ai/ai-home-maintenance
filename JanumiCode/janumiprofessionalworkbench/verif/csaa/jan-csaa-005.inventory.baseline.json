@@ -38,15 +38,15 @@
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 48,
+      "discovered": 49,
       "excluded": 0,
       "failed": 0,
-      "included": 48,
+      "included": 49,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 48
+      "successfullyInventoried": 49
     },
     {
       "artifactClass": "SOURCE",
@@ -62,27 +62,27 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 477,
+      "discovered": 478,
       "excluded": 0,
       "failed": 0,
-      "included": 477,
+      "included": 478,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 477
+      "successfullyInventoried": 478
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 55,
+      "discovered": 57,
       "excluded": 0,
       "failed": 0,
-      "included": 55,
+      "included": 57,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 55
+      "successfullyInventoried": 57
     }
   ],
   "assuranceSurfaces": {
@@ -377,7 +377,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 519,
+        "discovered": 522,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 46,
@@ -430,13 +430,13 @@
           "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
         ],
         "failed": 0,
-        "id": "ef611bcb3194af88555b66193206de08499c49cfb9a9af7826e88fe569b4c852",
+        "id": "5da413320362b21ac09d1081839d310367c982cab5dee54e9cf5bab6e69fad48",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 473,
+        "included": 476,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -739,6 +739,7 @@
           "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
           "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
           "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+          "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
           "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
           "packages/rph-application/src/handlers/pwu.test.ts",
           "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -889,6 +890,8 @@
           "verif/event-surface-census.test.ts",
           "verif/evidence-gate-reachability.test.ts",
           "verif/guard-enforcement-ledger.test.ts",
+          "verif/harmonization-reconciliation.test.ts",
+          "verif/invariant-verdict-census.test.ts",
           "verif/lifecycle-arrow-declarations.test.ts",
           "verif/mutant-ledger.test.ts",
           "verif/mutant-verdict.test.ts",
@@ -922,7 +925,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "786e1673e8cba089a6480a6b85d01c9af772ccc2d0d83409e41481fcc83bad8c",
+        "selectionDigest": "c9a2df5004cd21eef741ac50ff3317474a97ce3c08cb8ded7bd63b8aec040ded",
         "status": "COMPLETE"
       },
       {
@@ -930,7 +933,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 519,
+        "discovered": 522,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 46,
@@ -983,13 +986,13 @@
           "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
         ],
         "failed": 0,
-        "id": "563b9200695180e648a92d7e70b3638433b3bda87d435fb8103d26a527cb60b5",
+        "id": "2806428a696a5b88fc85210a1bd4c84288164a5ff8d5665e5ef6d8b3fde9d6a8",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 473,
+        "included": 476,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1292,6 +1295,7 @@
           "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
           "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
           "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+          "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
           "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
           "packages/rph-application/src/handlers/pwu.test.ts",
           "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -1442,6 +1446,8 @@
           "verif/event-surface-census.test.ts",
           "verif/evidence-gate-reachability.test.ts",
           "verif/guard-enforcement-ledger.test.ts",
+          "verif/harmonization-reconciliation.test.ts",
+          "verif/invariant-verdict-census.test.ts",
           "verif/lifecycle-arrow-declarations.test.ts",
           "verif/mutant-ledger.test.ts",
           "verif/mutant-verdict.test.ts",
@@ -1475,7 +1481,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "9dc2e98a50056bf3d511d05f8614859df6e3310fdc20055f2991d81ca30a4011",
+        "selectionDigest": "70ac896021a9898909006dbd39b4dc4e86f4ff82cfa5fb8feaddec6be10ec7a3",
         "status": "COMPLETE"
       }
     ],
@@ -1782,6 +1788,7 @@
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
         "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+        "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
         "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
         "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -1932,6 +1939,8 @@
         "verif/event-surface-census.test.ts",
         "verif/evidence-gate-reachability.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
+        "verif/harmonization-reconciliation.test.ts",
+        "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/mutant-verdict.test.ts",
@@ -5197,14 +5206,14 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "841cae00ff585cdc05939d1d4a332476938257e2fdddd6b8fbc57292375e1310",
+    "configurationDigest": "6afa9ffba9d00dddf908c7b359a3952018c2d51b9c3088597351f60134ecb6c2",
     "configurationPreimage": {
       "artifacts": [
         {
           "artifactClass": "TOOL_CONFIGURATION",
-          "bytes": 3234,
+          "bytes": 3253,
           "path": ".dependency-cruiser.cjs",
-          "sha256": "b6ab835ee37df0655d1771051b2da639a4c2576de3bfa3af43c1f8531b624811"
+          "sha256": "40cb8cc68ac40d0bb5f6ffaecc2c07998a87d3fc392c0cc98deaed43c0dcba88"
         },
         {
           "artifactClass": "TOOL_CONFIGURATION",
@@ -6987,7 +6996,7 @@
           "configPath": "packages/rph-application/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "ffa274dc6af84375ea4c66e35b2d8f4bca14da8d3e970c2895024576abcd13aa",
+          "projectResolutionDigest": "2aa2807ac89006956876b63df9bd3085daa1f73a4a3de32262fa66879d5b6da8",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7095,6 +7104,7 @@
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
             "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
             "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+            "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
             "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
             "packages/rph-application/src/handlers/pwu.test.ts",
             "packages/rph-application/src/handlers/pwu.ts",
@@ -8163,12 +8173,13 @@
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "b5022f6312157fda7c0f8e4417cfe2033344f881f0b7a0d309ed68b5383cc344",
+          "projectResolutionDigest": "e91020e675ce4086f07e2c7aa9f449d633c33d3f5c801d56bb797397d9675f52",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
           },
           "rootNames": [
+            "scripts/census/derive-invariant-limbs.ts",
             "scripts/csaa-arrow-command-census.ts",
             "scripts/csaa-call-graph.ts",
             "scripts/csaa-coding-agent.ts",
@@ -8281,7 +8292,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "48d0ec56e82bf3e31ffa606480203132e8f53753a3d9f33ea5faeb3ff0d7d184",
+          "projectResolutionDigest": "282a29706ea181b5c676b4cefd195b3956bddaad98a7ad502e164b21d9c86981",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8313,6 +8324,8 @@
             "verif/guard-enforcement-ledger.data.ts",
             "verif/guard-enforcement-ledger.test.ts",
             "verif/guard-enforcement-ledger.ts",
+            "verif/harmonization-reconciliation.test.ts",
+            "verif/invariant-verdict-census.test.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
             "verif/mutant-verdict.test.ts",
@@ -8550,7 +8563,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 519,
+          "discovered": 522,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 46,
@@ -8603,13 +8616,13 @@
             "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
           ],
           "failed": 0,
-          "id": "ef611bcb3194af88555b66193206de08499c49cfb9a9af7826e88fe569b4c852",
+          "id": "5da413320362b21ac09d1081839d310367c982cab5dee54e9cf5bab6e69fad48",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 473,
+          "included": 476,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -8912,6 +8925,7 @@
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
             "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
             "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+            "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
             "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
             "packages/rph-application/src/handlers/pwu.test.ts",
             "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -9062,6 +9076,8 @@
             "verif/event-surface-census.test.ts",
             "verif/evidence-gate-reachability.test.ts",
             "verif/guard-enforcement-ledger.test.ts",
+            "verif/harmonization-reconciliation.test.ts",
+            "verif/invariant-verdict-census.test.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
             "verif/mutant-verdict.test.ts",
@@ -9095,7 +9111,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "786e1673e8cba089a6480a6b85d01c9af772ccc2d0d83409e41481fcc83bad8c",
+          "selectionDigest": "c9a2df5004cd21eef741ac50ff3317474a97ce3c08cb8ded7bd63b8aec040ded",
           "status": "COMPLETE"
         },
         {
@@ -9103,7 +9119,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 519,
+          "discovered": 522,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 46,
@@ -9156,13 +9172,13 @@
             "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
           ],
           "failed": 0,
-          "id": "563b9200695180e648a92d7e70b3638433b3bda87d435fb8103d26a527cb60b5",
+          "id": "2806428a696a5b88fc85210a1bd4c84288164a5ff8d5665e5ef6d8b3fde9d6a8",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 473,
+          "included": 476,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9465,6 +9481,7 @@
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
             "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
             "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+            "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
             "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
             "packages/rph-application/src/handlers/pwu.test.ts",
             "packages/rph-application/src/handlers/recomposition.test.ts",
@@ -9615,6 +9632,8 @@
             "verif/event-surface-census.test.ts",
             "verif/evidence-gate-reachability.test.ts",
             "verif/guard-enforcement-ledger.test.ts",
+            "verif/harmonization-reconciliation.test.ts",
+            "verif/invariant-verdict-census.test.ts",
             "verif/lifecycle-arrow-declarations.test.ts",
             "verif/mutant-ledger.test.ts",
             "verif/mutant-verdict.test.ts",
@@ -9648,7 +9667,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "9dc2e98a50056bf3d511d05f8614859df6e3310fdc20055f2991d81ca30a4011",
+          "selectionDigest": "70ac896021a9898909006dbd39b4dc4e86f4ff82cfa5fb8feaddec6be10ec7a3",
           "status": "COMPLETE"
         }
       ],
@@ -10337,7 +10356,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "648604adaa5a4e60e0ba087773b21f489fb8257cff840523b01d5f88259b2fa6",
+    "fileManifestDigest": "98634791eb56c1123c1926a94f173f96a63bb7128a074e57332c7ce4510d793d",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10348,7 +10367,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "ee7ecd1a46632010e20ae647a4edf82653ff41db355bec17e854910da9763f93",
+          "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10386,7 +10405,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "ee7ecd1a46632010e20ae647a4edf82653ff41db355bec17e854910da9763f93",
+          "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10443,13 +10462,13 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1244,
+    "selectedFileCount": 1248,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 3234,
+        "bytes": 3253,
         "path": ".dependency-cruiser.cjs",
-        "sha256": "b6ab835ee37df0655d1771051b2da639a4c2576de3bfa3af43c1f8531b624811",
+        "sha256": "40cb8cc68ac40d0bb5f6ffaecc2c07998a87d3fc392c0cc98deaed43c0dcba88",
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       },
       {
@@ -11574,9 +11593,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 23194,
+        "bytes": 23364,
         "path": "packages/csaa/README.md",
-        "sha256": "5540c890d696f4b95c0f67f655b9ec109be3b114950b41d96d52cb01818c4775",
+        "sha256": "fff9cf5be087cb1fbed86f7f77b38d31e78fd52e0da0bc8d290de499b08ff7a8",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -12458,7 +12477,7 @@
         "artifactClass": "TEST",
         "bytes": 36892,
         "path": "packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts",
-        "sha256": "e8ebb551d4f0d0bd1809974e79a3bc9102304a8673878cabf3273ec07041ec14",
+        "sha256": "c09dbf304f582f934c5529d3a91eb8d8a4d37b2bea12839d6ef455ffbc4cd953",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -13149,9 +13168,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 6073,
+        "bytes": 6296,
         "path": "packages/csaa/src/graph/current-dependency-cruiser-differential.integration.test.ts",
-        "sha256": "2dd9a8e519ab624d4f5b72541724431f0a1956ce95c7412e78e8dc4aca851ed7",
+        "sha256": "95f3ed5c694cc3a0d27ca60a2a3bd275d5c99be940621c845fcaae358367cd92",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -13249,14 +13268,14 @@
         "artifactClass": "TEST",
         "bytes": 36453,
         "path": "packages/csaa/src/graph/run-current-dependency-cruiser-differential.test.ts",
-        "sha256": "73955e1c5830eaf6b56683fa75e0fd36a71c143c4f867a4add3f5c2958624c40",
+        "sha256": "0c21988f928e61081bab336466439a27f73d050a639c9766307a6958acbd5e44",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
         "bytes": 72488,
         "path": "packages/csaa/src/graph/run-current-dependency-cruiser-differential.ts",
-        "sha256": "3847cfdc17c8d0d0a7d85df5d91f7bf6d36ca21080f00526bc97b98eae5ed573",
+        "sha256": "a0fd0023e1f1704c698b8a7ff53693485eeb048043487c8fd18cee0c008590fd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -13522,7 +13541,7 @@
         "artifactClass": "TEST",
         "bytes": 3281,
         "path": "packages/csaa/src/index-roadmap-completion.test.ts",
-        "sha256": "bfad16376a652a72a3dff20bf9d03c504685f9c1fd8148f6d0a9341ef2d30381",
+        "sha256": "043ae88c9e77961d0852dcf5c26cc07968ffa89f4362b72ae0dfbf67c83da4e6",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -13541,9 +13560,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 4250,
+        "bytes": 4894,
         "path": "packages/csaa/src/inventory/boundary-policy.test.ts",
-        "sha256": "3cd8efc018ec84c6c705b4dc4ebfdc37200df1a51a18455df091d7db3a6e1af5",
+        "sha256": "4a53c36b7bf7438a49717da85eb963adcb20614c2f4d7af2658b99d82b3986d4",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -13886,7 +13905,7 @@
         "artifactClass": "TEST",
         "bytes": 11063,
         "path": "packages/csaa/src/providers/jpwb-guard-enforcement-ledger/observe-guard-enforcement-ledger.integration.test.ts",
-        "sha256": "284b30b9b945801ddde3741c7a56713c46c0a5b66fb35792981a9a891c1ae43f",
+        "sha256": "d9d7e1d3215559b969379a6116607e2179afc0def2a12d70b7c967a4189ea8b4",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -14369,7 +14388,7 @@
         "artifactClass": "SOURCE",
         "bytes": 84086,
         "path": "packages/csaa/src/rules/harmonization-first-increment-rules.ts",
-        "sha256": "7d239130a96e4c284715253f5c517d2d40886bcd4196e9e31ccc9db57ae80d09",
+        "sha256": "a6549d0449a95745f8a26a6fa18be555a5fc4188f30d3efae075e5b34c74dabc",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -14866,7 +14885,7 @@
         "artifactClass": "TEST",
         "bytes": 102802,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "7c0009db241fcd08c13f6157d382d22c979cfeed6bfd2ac1d124145a709e7542",
+        "sha256": "56fb417a6728ba5b7fd4b2a5e2fb91037d423697da65ba66bcaa512a7fc326a1",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -15599,9 +15618,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 10331,
+        "bytes": 11956,
         "path": "packages/rph-application/src/handlers/generic-setter-scope.test.ts",
-        "sha256": "8a4a66bcafef5f70652e86b7da617fd53044d2be059246ac57eae94832ead593",
+        "sha256": "da4c466f97622600de0aeaf5a4d7714f93ba59802328c999be876cb63e4181b0",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -15732,6 +15751,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 18847,
+        "path": "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
+        "sha256": "a24c30469c412ea3e3dbeb26cc3dfe85149e4de9276e8487e7cf2101fd43d847",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 6968,
         "path": "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "sha256": "2bddb4930408df42c5e80bc0034dcf2eab326fae2d88ba77e6fc3af876b7f045",
@@ -15746,9 +15772,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 85708,
+        "bytes": 94779,
         "path": "packages/rph-application/src/handlers/pwu.ts",
-        "sha256": "41276c4821eedf63615963fc62bacc77b08a9fdf540485e32dae3bf3ba5d5273",
+        "sha256": "6c72e6cbef33ae6cbe0d973f9b0d4757ee0626792051cff70f087a156dfab349",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -15760,9 +15786,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8677,
+        "bytes": 8828,
         "path": "packages/rph-application/src/handlers/registry.ts",
-        "sha256": "fae93454edf3e3e3bc04e0d93c7bbcca6cef671a3bfb854c9f7e45e27a485cdd",
+        "sha256": "674e97524e029c3011fa03c1d6e20330742eb955395bf7d5e5091eb8b965d07d",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -17013,9 +17039,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 125200,
+        "bytes": 127164,
         "path": "packages/rph-contracts/src/messages.ts",
-        "sha256": "26f92de59848019bed6bc2706f1d23244c81a688a47a851b5d4170079f921d4a",
+        "sha256": "d7422c4fb4fb548a02f34210bec8883f71260c54f4c690f1d2772ef9a3113a60",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -17041,9 +17067,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 11874,
+        "bytes": 12234,
         "path": "packages/rph-contracts/src/validate.test.ts",
-        "sha256": "d73cd6ca011a294e1cdfbcc6a41fbf4aae91e2f880241c7d1b61d0c65997069e",
+        "sha256": "2927965cc80be9f7041b4806228d742e158f9fbf08a415a15141d64ec4905815",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -17083,9 +17109,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 371061,
+        "bytes": 380652,
         "path": "packages/rph-contracts/vocab/m3-commands-events.json",
-        "sha256": "241afa792f2b48e8f4be160f10967dd4941750a411b08f326133e95f8a8c39bb",
+        "sha256": "e7a8353c3cf6f59f7033b15e70ef8aedc79a3090da97bf2b11f8d087df3eb67d",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -17195,9 +17221,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 326104,
+        "bytes": 337095,
         "path": "packages/rph-domain/src/enforcement-register.ts",
-        "sha256": "ce6e20883c1272a34bd405a1550a72afdc0d41af52f807765ef8b12e7f910147",
+        "sha256": "684146a537f997c1e23a32f5c91529e8088b81f64b67b318dd20f5aeeb962253",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -17307,9 +17333,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 17511,
+        "bytes": 19821,
         "path": "packages/rph-domain/src/pwu-lifecycle-command-spec.ts",
-        "sha256": "734f0b1b04225bf30aa45022d3ac39f006cbb2923a42a7c8e71464ed6847c589",
+        "sha256": "8abb4b549617aa161863669b306e326e6a345a5d1a23f5f6115ca77d6ac4fd83",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -17720,9 +17746,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 10107,
+        "bytes": 11298,
         "path": "packages/rph-engine/src/pwu-fold-drive-sites.test.ts",
-        "sha256": "68905fcbd1a35883510f565bc4931b4533559c1de5288af9301cbbe915962b91",
+        "sha256": "569f102d6073f9b054492a5a75912c8bb21d0c8228f3892836776f8ea49ce201",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -18308,9 +18334,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 8003,
+        "bytes": 8729,
         "path": "packages/rph-projections/src/pwu-replay.ts",
-        "sha256": "4344f9f1086e6cf47987b80627c1b842c90c4ac06446e2f83e3bf7f5f193b185",
+        "sha256": "2bb4e6f4689aa57dcdd942eae68e21acbb011b6c0fd8e9ca3acc46cc67ce5b08",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -18403,6 +18429,13 @@
         "path": "packages/typescript-config/package.json",
         "sha256": "74f6d6a5e3a27fe6136d6c5e542217265c12b8e802ac760b5693eaec5f5b617c",
         "subjectArtifactClass": "MANIFEST"
+      },
+      {
+        "artifactClass": "SCRIPT",
+        "bytes": 9450,
+        "path": "scripts/census/derive-invariant-limbs.ts",
+        "sha256": "b75d066dad94fe7bd5ce402a78697991e736a1bf888bfb1f355e37532f638314",
+        "subjectArtifactClass": "SCRIPT"
       },
       {
         "artifactClass": "SCRIPT",
@@ -18588,9 +18621,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 297404,
+        "bytes": 303182,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "b8b848468fde2887e544d2c9499aa0bb139537f2034a8a46c27dbdabca7e2d8b",
+        "sha256": "cd68b8372b42c37fc4662ec05ecc8db4bdd2a30040b98c07afe379880c283786",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -18602,9 +18635,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 76020,
+        "bytes": 75699,
         "path": "scripts/mutants/run.ts",
-        "sha256": "3c2636c93240cc523fecdbff2e33920d0fec590401666fda866e209238f9f96e",
+        "sha256": "30bf7729450a7ebae0932823e94421a1749e0928e59cebb5a4f11cfb8ae449e2",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -18644,9 +18677,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 1566,
+        "bytes": 1613,
         "path": "scripts/tracker/bun-sqlite.d.ts",
-        "sha256": "24cde54610f1b9010a62cc1224311ce6ab612834cee46993aedb4bb7efdeed52",
+        "sha256": "b43894c0ade9e274f8a02719cc69ec5e268254dc40ec0847f08171fd985a09a4",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -18658,9 +18691,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 15532,
+        "bytes": 15973,
         "path": "scripts/tracker/core.ts",
-        "sha256": "da71eea592d8014bd0c7fd49aa86707f72753432db7da2d78764270416192602",
+        "sha256": "7ea9a605459bb25022557b709cdaa6eeaa9685d3b889dacd12756e3955718532",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -18847,16 +18880,16 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 7087945,
+        "bytes": 7028184,
         "path": "verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json",
-        "sha256": "0cb535d8e33f1ee205b00b6aa7884964e96f17eefbee457007eedffcbb5ff2d4",
+        "sha256": "55f3b4a9643c9559539c76a68d925f00cc941c3edea50431e660ca7e75b7a658",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
         "bytes": 77820,
         "path": "verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json",
-        "sha256": "f0bba7628a28afa94c2afcd67c5aa36936aacd22af7a7a089c262ccf129b7b91",
+        "sha256": "ca4410100d683a1d1116b0f390cdbf0fc729b430414d7a87a074a56caf841494",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -18891,7 +18924,7 @@
         "artifactClass": "VERIFICATION",
         "bytes": 78070,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "31ffaab22ed5096a62b42bb55eaeb43d7a855ad68c603f94e44c648a2612727c",
+        "sha256": "facb80996bc3162681e5e4dade8fabe624e0485274215b769943f66a5bfc92a0",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -18924,9 +18957,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 20693,
+        "bytes": 21527,
         "path": "verif/event-surface-census.test.ts",
-        "sha256": "ca1e396b9d3756c8018c54ae8e9b995929c34c715ef56f7ea6875b1d847fb4ca",
+        "sha256": "7206b5bfce9acf7ddd1b84a4583e6601d6e82cf6c0e3b47e0b3d193d04cbf336",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -18938,16 +18971,16 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 111511,
+        "bytes": 112613,
         "path": "verif/guard-enforcement-ledger.data.ts",
-        "sha256": "5b7b57d8336229102927c55cee71d841a5a97df17a176f9155c468c93e99a782",
+        "sha256": "a54575989330e2d71f0e109970a6bf923e752de4092a06edb9188c683be27094",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
         "bytes": 19242,
         "path": "verif/guard-enforcement-ledger.test.ts",
-        "sha256": "9386d1e56b12a4fe1a962bba106c0a79eb150cdc64727e819cd3755000b11a71",
+        "sha256": "0a871f65f2db138a8da51d64f5f8bb0bb1537772136540e62d7d7139dee27963",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -18959,9 +18992,23 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 15755,
+        "bytes": 7583,
+        "path": "verif/harmonization-reconciliation.test.ts",
+        "sha256": "f20e1ed2dbad01510aca61efbea9a48ac2ca3dffc10b885fdc9522d9d65a6765",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 93918,
+        "path": "verif/invariant-verdict-census.test.ts",
+        "sha256": "bf26f5d04ddfcef8bb89f0d9b8c981bc335afb0916d010bef83b064cadee3af2",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 16329,
         "path": "verif/lifecycle-arrow-declarations.test.ts",
-        "sha256": "ddd9ba4b292a7328b24eb76c7b7e5d4d9daf284bddace114b212959fb71a2235",
+        "sha256": "beac0f704e2b150b339618e809be12ad74bf32a2edc810be42d37615c9ffcc29",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19008,9 +19055,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 6807,
+        "bytes": 8439,
         "path": "verif/recomposition-ungoverned.test.ts",
-        "sha256": "22270eeb6571b359081a6339bb90582fa996848956a6d19a54287e2e1ae04091",
+        "sha256": "f5acb0437fea658df37552318441853be034c9bd4050efe53ae2c47f2b74014a",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19036,9 +19083,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 4262,
+        "bytes": 6205,
         "path": "verif/source-is-reviewable.test.ts",
-        "sha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
+        "sha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19064,9 +19111,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 24367,
+        "bytes": 24653,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "004363fa407992a692a8413386b0e1db30047da49974c79593234aa9f741e03d",
+        "sha256": "ee24cdbca6c93ddf7fb2e04c40e0d7f5f87b08587dd334a45c02f6f6dfc1cf8f",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19154,7 +19201,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "90473a13ec9d62ee1c380f22654790e403e666f2347d52c99e90e04fa0eb80d4",
+    "subjectId": "ac466337d9e7350ae88c0a2a0e784466eb7caa314b941ae4627178ea142523e7",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -19182,7 +19229,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "ee7ecd1a46632010e20ae647a4edf82653ff41db355bec17e854910da9763f93",
+            "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -19316,7 +19363,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "ee7ecd1a46632010e20ae647a4edf82653ff41db355bec17e854910da9763f93",
+            "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -20608,7 +20655,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 126,
+      "candidateArtifactCount": 127,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -20737,6 +20784,7 @@
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
         "packages/rph-application/src/handlers/pwa-version-binding.test.ts",
         "packages/rph-application/src/handlers/pwu-readiness-contract.test.ts",
+        "packages/rph-application/src/handlers/pwu-recomposition.test.ts",
         "packages/rph-application/src/handlers/pwu-undeclared-arrow.test.ts",
         "packages/rph-application/src/handlers/pwu.test.ts",
         "packages/rph-application/src/handlers/pwu.ts",
@@ -21666,7 +21714,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 41,
+      "candidateArtifactCount": 42,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -21695,6 +21743,7 @@
       ],
       "references": [],
       "resolvedRootFiles": [
+        "scripts/census/derive-invariant-limbs.ts",
         "scripts/csaa-arrow-command-census.ts",
         "scripts/csaa-call-graph.ts",
         "scripts/csaa-coding-agent.ts",
@@ -21773,7 +21822,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 50,
+      "candidateArtifactCount": 52,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -21828,6 +21877,8 @@
         "verif/guard-enforcement-ledger.data.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/guard-enforcement-ledger.ts",
+        "verif/harmonization-reconciliation.test.ts",
+        "verif/invariant-verdict-census.test.ts",
         "verif/lifecycle-arrow-declarations.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/mutant-verdict.test.ts",
@@ -22655,6 +22706,21 @@
   ],
   "verificationAssets": [
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/census/derive-invariant-limbs.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "b75d066dad94fe7bd5ce402a78697991e736a1bf888bfb1f355e37532f638314",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
+      "gateCarriers": [
+        "UNMAPPED"
+      ],
+      "path": "scripts/census/derive-invariant-limbs.ts",
+      "provenance": [
+        "scripts/census/derive-invariant-limbs.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/csaa-arrow-command-census.ts at execution time.",
       "associatedBaselines": [],
       "contentSha256": "3931e2a90df9ec88458c9cc78b2dda3f332f8103793e6a36c3dfffe1d1cc5b27",
@@ -23058,7 +23124,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "b8b848468fde2887e544d2c9499aa0bb139537f2034a8a46c27dbdabca7e2d8b",
+      "contentSha256": "cd68b8372b42c37fc4662ec05ecc8db4bdd2a30040b98c07afe379880c283786",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -23091,7 +23157,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/run.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "3c2636c93240cc523fecdbff2e33920d0fec590401666fda866e209238f9f96e",
+      "contentSha256": "30bf7729450a7ebae0932823e94421a1749e0928e59cebb5a4f11cfb8ae449e2",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -23191,7 +23257,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/bun-sqlite.d.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "24cde54610f1b9010a62cc1224311ce6ab612834cee46993aedb4bb7efdeed52",
+      "contentSha256": "b43894c0ade9e274f8a02719cc69ec5e268254dc40ec0847f08171fd985a09a4",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
@@ -23222,7 +23288,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/core.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "da71eea592d8014bd0c7fd49aa86707f72753432db7da2d78764270416192602",
+      "contentSha256": "7ea9a605459bb25022557b709cdaa6eeaa9685d3b889dacd12756e3955718532",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -23272,6 +23338,7 @@
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
+        "verif/invariant-verdict-census.test.ts",
         "verif/tracker-ingest.test.ts",
         "verif/tracker-name-match.test.ts"
       ],
@@ -23582,7 +23649,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/dwp-004.current-dependency-cruiser-differential.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "0cb535d8e33f1ee205b00b6aa7884964e96f17eefbee457007eedffcbb5ff2d4",
+      "contentSha256": "55f3b4a9643c9559539c76a68d925f00cc941c3edea50431e660ca7e75b7a658",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -23597,7 +23664,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/dwp-004.rph-contracts-build-same-perimeter-differential.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "f0bba7628a28afa94c2afcd67c5aa36936aacd22af7a7a089c262ccf129b7b91",
+      "contentSha256": "ca4410100d683a1d1116b0f390cdbf0fc729b430414d7a87a074a56caf841494",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -23642,7 +23709,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "31ffaab22ed5096a62b42bb55eaeb43d7a855ad68c603f94e44c648a2612727c",
+      "contentSha256": "facb80996bc3162681e5e4dade8fabe624e0485274215b769943f66a5bfc92a0",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -23722,7 +23789,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/event-surface-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "ca1e396b9d3756c8018c54ae8e9b995929c34c715ef56f7ea6875b1d847fb4ca",
+      "contentSha256": "7206b5bfce9acf7ddd1b84a4583e6601d6e82cf6c0e3b47e0b3d193d04cbf336",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -23756,7 +23823,7 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "5b7b57d8336229102927c55cee71d841a5a97df17a176f9155c468c93e99a782",
+      "contentSha256": "a54575989330e2d71f0e109970a6bf923e752de4092a06edb9188c683be27094",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -23773,7 +23840,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/guard-enforcement-ledger.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "9386d1e56b12a4fe1a962bba106c0a79eb150cdc64727e819cd3755000b11a71",
+      "contentSha256": "0a871f65f2db138a8da51d64f5f8bb0bb1537772136540e62d7d7139dee27963",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -23805,9 +23872,41 @@
       "role": "ANALYZER"
     },
     {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/harmonization-reconciliation.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "f20e1ed2dbad01510aca61efbea9a48ac2ca3dffc10b885fdc9522d9d65a6765",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/harmonization-reconciliation.test.ts"
+      ],
+      "path": "verif/harmonization-reconciliation.test.ts",
+      "provenance": [
+        "verif/harmonization-reconciliation.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "bf26f5d04ddfcef8bb89f0d9b8c981bc335afb0916d010bef83b064cadee3af2",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/invariant-verdict-census.test.ts"
+      ],
+      "path": "verif/invariant-verdict-census.test.ts",
+      "provenance": [
+        "verif/invariant-verdict-census.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/lifecycle-arrow-declarations.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "ddd9ba4b292a7328b24eb76c7b7e5d4d9daf284bddace114b212959fb71a2235",
+      "contentSha256": "beac0f704e2b150b339618e809be12ad74bf32a2edc810be42d37615c9ffcc29",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -23919,7 +24018,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/recomposition-ungoverned.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "22270eeb6571b359081a6339bb90582fa996848956a6d19a54287e2e1ae04091",
+      "contentSha256": "f5acb0437fea658df37552318441853be034c9bd4050efe53ae2c47f2b74014a",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -23983,7 +24082,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/source-is-reviewable.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "776dba78facf9b610307fe03f6a5768f71258aa74d3470cd145352a6a8133ecb",
+      "contentSha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24047,7 +24146,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "004363fa407992a692a8413386b0e1db30047da49974c79593234aa9f741e03d",
+      "contentSha256": "ee24cdbca6c93ddf7fb2e04c40e0d7f5f87b08587dd334a45c02f6f6dfc1cf8f",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

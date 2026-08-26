@@ -30,7 +30,7 @@ describe('@janumipwb/csaa implementation-candidate public surface', () => {
 			'702f5a25ee3316c43a4066d3d0cd95bb860950a1a24663b4b43b4c3962a5e355'
 		);
 		expect(publicSurface.CURRENT_DEPENDENCY_CRUISER_REVIEWED_DIFFERENTIAL_DIGEST).toBe(
-			'b4eddb605074ed4554dbc7999c075a2585c290faf37e9668b104ee5a692fa825'
+			'f83f2f4ef78e45b1f1bf3dadea85d9ff6a6d4d023a96d12e3b3c8abc7b4ca2aa'
 		);
 		expect(publicSurface.runStructuralModuleGraphReport).toBeTypeOf('function');
 	});

@@ -63,7 +63,11 @@ export type PwuLifecycleCommandType =
 	| 'EscalatePwu'
 	| 'BaselinePwu'
 	| 'AbandonPwu'
-	| 'RejectPwu';
+	| 'RejectPwu'
+	// REG-D-044 S-1b. The two PWU recomposition acts, MOVED here out of `PWU_GENERIC_SETTER_SPECS` rather
+	// than copied — `allClaimedArrows().length` must stay 61, and a copy would push it to 63.
+	| 'BeginPwuRecomposition'
+	| 'CompletePwuRecomposition';
 
 export const PWU_LIFECYCLE_COMMAND_SPECS: Readonly<
 	Record<PwuLifecycleCommandType, PwuLifecycleCommandSpec>
@@ -170,6 +174,24 @@ export const PWU_LIFECYCLE_COMMAND_SPECS: Readonly<
 		eventType: 'PwuRejected',
 		sourceStates: ['UNDER_ASSURANCE']
 	},
+	// ── REG-D-044 S-1b — the recomposition pair, and they MUST arrive together ────────────────────────────
+	// Membership of `PWU_SEMANTIC_LIFECYCLE_COMMANDS` refuses the generic setter with NO fallback, so half
+	// the pair does not leave an arrow half-governed — it leaves it UNPERFORMABLE. Ship Begin alone and a
+	// PWU can never enter RECOMPOSING; ship Complete alone and anything parked in RECOMPOSING is stranded,
+	// its only other exits being abandonment and supersession. That is REG-F-083's one-way door, created
+	// deliberately, one increment after this repository recorded the first one as a defect.
+	BeginPwuRecomposition: {
+		commandType: 'BeginPwuRecomposition',
+		target: 'RECOMPOSING',
+		eventType: 'PwuRecompositionBegun',
+		sourceStates: ['SATISFIED']
+	},
+	CompletePwuRecomposition: {
+		commandType: 'CompletePwuRecomposition',
+		target: 'RECOMPOSED',
+		eventType: 'PwuRecomposed',
+		sourceStates: ['RECOMPOSING']
+	},
 };
 
 /**
@@ -203,12 +225,17 @@ export function checkDeclaredSource(
 // ── THE GENERIC SETTER'S ARROWS — REG-F-119, and the other half of REG-F-114's ruling ────────────────────────
 //
 // `ChangePwuState` performs the PWU's MAIN LIFECYCLE SPINE, and until now the census could not see one arrow of
-// it. The eleven semantically named commands above declare 49 of the machine's 57 arrows — and every one of those
-// is a PERIPHERAL act: abandon, supersede, block, challenge, invalidate, reject. The eight below are the path the
-// workbench actually drives:
+// it. The semantically named commands above declare most of the machine's 57 arrows — and until W-4.5 every one
+// of those was a PERIPHERAL act: abandon, supersede, block, challenge, invalidate, reject. The six below are the
+// path the workbench actually drives:
 //
-//     READY -> PLANNED -> EXECUTING -> EVIDENCE_PENDING -> UNDER_ASSURANCE -> SATISFIED -> RECOMPOSING
-//         -> RECOMPOSED            (and UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED)
+//     READY -> PLANNED -> EXECUTING -> EVIDENCE_PENDING -> UNDER_ASSURANCE -> SATISFIED
+//                                  (and UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED)
+//
+// ⚠ THE SPINE USED TO RUN TWO HOPS FURTHER, TO `RECOMPOSING` AND `RECOMPOSED`, AND THE TAIL BEING HERE WAS THE
+// DEFECT REG-F-085 PINNED. Both arrows carry ratified guards; the setter checks neither, so the tail of the
+// main spine was the one stretch of it performable by anyone with nothing cited. REG-D-044 S-1b moved both to
+// named commands. What remains below is the part of the spine that is genuinely unguarded BY DESIGN.
 //
 // The setter is invisible to the census for a structural reason: its target is `payload.newState`, resolved at
 // RUNTIME, so its call site declares NOTHING — not a destination, let alone an arrow. That is the same shape
@@ -216,9 +243,11 @@ export function checkDeclaredSource(
 // the declaration as DATA.** This table is that ruling applied to the fourth idiom.
 //
 // ── ⚠ TRANSCRIBED, NOT DERIVED, AND THE REASON IS A CONTROL THAT WOULD OTHERWISE BE UNFALSIFIABLE ─────────────
-// REG-F-072 says the generic setter may not target a state a named command owns, so these eight targets are
-// exactly the COMPLEMENT of the eleven above, minus `PROPOSED` — which is the BIRTH and the only state of the
-// twenty with no in-edge at all. It is therefore tempting to COMPUTE this table from that complement. **Do not.**
+// REG-F-072 says the generic setter may not target a state a named command owns, so these six targets are
+// exactly the COMPLEMENT of the thirteen above, minus `PROPOSED` — which is the BIRTH and the only state of the
+// twenty with no in-edge at all. (Eleven and eight until 2026-08-21; the TOTAL PARTITION REG-F-192 records —
+// owned + generic + the birth = 20, one owner per state — is preserved by the move, which is the point of
+// moving rather than copying.) It is therefore tempting to COMPUTE this table from that complement. **Do not.**
 // `verif/lifecycle-arrow-declarations.test.ts` asks whether any ratified arrow is unaccounted for by ANY command.
 // If these targets were the complement BY CONSTRUCTION, the union of the two tables would cover every state
 // NECESSARILY, and that gate could never fail — a control that cannot fail, authored inside the increment meant
@@ -268,19 +297,14 @@ export const PWU_GENERIC_SETTER_SPECS: Readonly<Record<string, PwuLifecycleComma
 		target: 'CONDITIONALLY_SATISFIED',
 		eventType: 'PwuStateChanged',
 		sourceStates: ['UNDER_ASSURANCE']
-	},
-	RECOMPOSING: {
-		commandType: 'ChangePwuState',
-		target: 'RECOMPOSING',
-		eventType: 'PwuStateChanged',
-		sourceStates: ['SATISFIED']
-	},
-	RECOMPOSED: {
-		commandType: 'ChangePwuState',
-		target: 'RECOMPOSED',
-		eventType: 'PwuStateChanged',
-		sourceStates: ['RECOMPOSING']
 	}
+	// ⚠ `RECOMPOSING` AND `RECOMPOSED` WERE HERE UNTIL 2026-08-21 (REG-D-044 S-1b), AND THEY WERE MOVED,
+	// NOT COPIED. They are now `BeginPwuRecomposition` / `CompletePwuRecomposition` in the table above.
+	// The two arrows change OWNER, not existence: `allClaimedArrows().length` is 61 before and after, which
+	// is the cheap tell that a copy did not happen. Until this move the ratified guards on both arrows —
+	// "Parent exists and recomposition is required" and "Recomposition contract satisfied" — were enforced
+	// by NOTHING, because the setter branches on neither (REG-F-085, pinned in
+	// `verif/recomposition-ungoverned.test.ts` and carried as UNENFORCED in C-0b).
 };
 
 // ── THE RECOVERY COMMAND'S ARROWS — JAN-PWUWP W-5.5, under REG-D-043 and REG-F-193 ───────────────────────────

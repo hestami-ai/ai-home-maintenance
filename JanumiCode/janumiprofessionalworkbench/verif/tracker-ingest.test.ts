@@ -253,7 +253,10 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		);
 		// 266 -> 267: AcceptRecomposition (REG-D-044 / S-1a) is a new code-side capability, DECLARED like every
 		// other one until an observation raises it. The count moving is the census SEEING the new command.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 267 }]);
+		// 267 -> 269: BeginPwuRecomposition and CompletePwuRecomposition (REG-D-044 S-1b). +2 for two
+		// COMMANDS; their two events do not move this number, because EVENTS is not one of the four w2
+		// populations — which is why S-1a's one command plus one event moved it by exactly 1.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 269 }]);
 	});
 });
 

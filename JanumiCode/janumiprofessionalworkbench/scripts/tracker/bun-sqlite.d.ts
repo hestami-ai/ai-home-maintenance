@@ -5,7 +5,7 @@
  * `types: ["node"]`, and its own header records the reason a wider tooling surface is refused —
  * "a second lib level in tooling is what later gets copied into a package." Installing bun-types
  * workspace-wide to satisfy three scripts is that failure in dependency form. This file declares
- * the four methods the tracker calls and nothing else; if the tracker grows past it, THAT is the
+	 * the five methods the tracker calls and nothing else; if the tracker grows past it, THAT is the
  * moment to argue for the real types, with a use in hand.
  *
  * ⚠ RUNTIME SPLIT, recorded because it was DRIVEN not assumed (2026-08-20): better-sqlite3 does
@@ -27,6 +27,7 @@ declare module 'bun:sqlite' {
 		);
 		exec(sql: string): void;
 		prepare(sql: string): Statement;
+		transaction<T>(callback: () => T): () => T;
 		close(): void;
 	}
 }

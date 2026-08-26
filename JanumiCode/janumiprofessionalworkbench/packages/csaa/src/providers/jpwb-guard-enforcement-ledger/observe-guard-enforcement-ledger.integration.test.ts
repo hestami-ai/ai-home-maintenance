@@ -223,9 +223,9 @@ describe('JPWB retained guard-enforcement ledger real-subject integration', () =
 				// 'a recomposed result requires an explicit assessment' moved ARROW_UNREACHABLE -> ENFORCED in
 				// verif/guard-enforcement-ledger.data.ts. The TOTAL is preserved (82); one row changed bucket.
 				{ count: 20, disposition: 'ARROW_UNREACHABLE' },
-				{ count: 16, disposition: 'ENFORCED' },
+				{ count: 18, disposition: 'ENFORCED' },
 				{ count: 2, disposition: 'REDUNDANT_WITH_MACHINE' },
-				{ count: 44, disposition: 'UNENFORCED' }
+				{ count: 42, disposition: 'UNENFORCED' }
 			],
 			enforcedAnchorBroken: [],
 			enforcedWithoutSite: [],

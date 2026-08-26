@@ -2688,8 +2688,8 @@ describe('live JPWB and inventory projection', () => {
 		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report commands
 		// import their bounded implementation closures into the scripts program; the mutation baseline helper is
 		// also a scripts-project root. The verification program grows with public contract assertions.
-		expect(counts.get('scripts/tsconfig.json')).toBe(41);
-		expect(counts.get('verif/tsconfig.json')).toBe(50);
+		expect(counts.get('scripts/tsconfig.json')).toBe(42);
+		expect(counts.get('verif/tsconfig.json')).toBe(52);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',

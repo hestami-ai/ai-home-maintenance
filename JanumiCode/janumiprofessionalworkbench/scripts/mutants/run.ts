@@ -1011,14 +1011,11 @@ const errorLines = (s: string): string =>
 // declared lib level rather than raising a second one for two lines: a divergent `lib` in tooling is the kind of
 // thing that gets copied into a package.
 //
-// ⚠ AND THE ANSI STRIPPER STAYS A `new RegExp(String.raw…)` RATHER THAN A REGEX LITERAL, WHICH SONAR (S6325) ASKS
-// FOR AND WHICH IS INDEED THE IDENTICAL PATTERN. The pattern's FIRST CHARACTER IS A RAW ESC (0x1b) — invisible in
-// every editor and in the Sonar message itself, which renders it as if the pattern began with `\[`. ESLint's
-// `no-control-regex` (on by default via `js.configs.recommended`, and `eslint .` covers `scripts/`) inspects only
-// `Literal` nodes: a regex literal is one and would be REPORTED, a `String.raw` tagged template is not and is
-// therefore not reached. So the "cosmetic" rewrite converts a clean lint into a failing one, and there is no
-// spelling of ESC that escapes the rule — it checks the raw character, `\x…` and `\u…` alike. Measured against the
-// installed rule source, not assumed.
+// ⚠ THE ANSI STRIPPER STAYS A `new RegExp(...)` RATHER THAN A REGEX LITERAL, WHICH SONAR (S6325) ASKS FOR.
+// ESLint's `no-control-regex` (on by default via `js.configs.recommended`, and `eslint .` covers `scripts/`)
+// inspects regex literals and rejects an ESC regardless of whether it is written directly, as `\x1b`, or as
+// `\u001b`. Computing ESC with `String.fromCharCode(27)` keeps the source free of the invisible raw control
+// character while preserving the measured ANSI-stripping behavior.
 const summarise = (s: string): string =>
 	(
 		s
@@ -1026,7 +1023,7 @@ const summarise = (s: string): string =>
 			.filter((l) => l.includes('Tests '))
 			.at(-1) ?? ''
 	)
-		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
+		.replaceAll(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
 		.trim();
 
 // ── CRASH RECOVERY, added after this runner LOST a mutant ────────────────────────────────────────────────────

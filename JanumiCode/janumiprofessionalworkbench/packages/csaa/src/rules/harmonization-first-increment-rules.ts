@@ -1306,7 +1306,7 @@ const MAX_PROVENANCE = 16;
 const MAX_SET_MEMBERS = 64;
 /**
  * Explicit population identities remain bounded and are never replaced by a lossy census token.
- * The current JPWB exact coding-agent subject measures 365 members for its widest native rule;
+ * The current JPWB exact coding-agent subject measures 371 members for its widest native rule;
  * 512 retains roughly 40% capacity headroom while preserving exact member-level evidence.
  */
 export const HARMONIZATION_FIRST_INCREMENT_MAX_POPULATION_MEMBERS = 512;

@@ -230,3 +230,121 @@ approaches, three judges on separate lenses. The reordering in §3 came from the
 grep over `packages/`+`apps/`+`verif/`, §3(b) by reading the pin's header, §3(c) against both schemas.
 ⚠ The judges were given the approaches, not each other's verdicts; the split (2–1 for RAC, with the dissenting
 lens ranking it LAST) is real disagreement and is recorded rather than averaged away.
+
+---
+
+## 6. ADDENDUM — S-1b's shape, settled 2026-08-21 under REG-D-029
+
+§4 specified S-1b as *"mint the two PWU acts"* and named them by their §8.1 prose labels. Grounding the build found
+that under-specified in three ways, each of which changes what gets written. Recorded here rather than discovered
+mid-implementation.
+
+### 6.1 The names were not available, and the corpus does not reserve them
+
+`BeginRecomposition` / `CompleteRecomposition` already exist and drive `RecompositionContract.status`. The question
+is whether the corpus RESERVES those identifiers for the PWU arrows — in which case the honest repair is to free the
+names — or merely names an ACT that some command must cause.
+
+**It reserves nothing.** The camelCase verbs appear in the corpus exactly twice, at CDM:2036-2037, inside a `text`
+fence under *"## 34.1 Work commands"* whose framing sentence is CDM:2012: *"The first implementation should expose
+commands and queries rather than unrestricted CRUD."* §34 assigns **no target object to any verb**. `grep -c -i
+recompos` over RPH-DOC-007 — the document that would schematize a command interface — returns **0** (positive
+controls on the same file: `decompos` = 1, `PWU` = 19).
+
+The camelCase parenthetical everything downstream relies on — `"Begin recomposition (beginRecomposition;
+RecompositionStarted)"` — is **not in the corpus**. It lives at `packages/rph-domain/vocab/m2-transitions.json:174`
+and `transitions.data.ts:258`, carrying `"note": "§8.1"`, under a machine whose `sourceSection` certifies §8.1 as
+VERBATIM. §8.1 (CDM:632) has no parenthetical. **An authored gloss is riding inside a row labelled ratified** — and
+the contract-side binding in the same file is labelled honestly (`"note": "RECONSTRUCTED"`).
+
+⚠ **AND §8.1's "Command" column routinely names acts owned by other aggregates.** CDM:634 puts *"Promote baseline"*
+on the PWU's `-> BASELINED` arrow; `promoteBaseline` is a §34.4 Governance command driving `Baseline.status`. The
+repository did not retarget it — **it minted `BaselinePwu` and kept both**, recording why in the vocab
+(`m3-commands-events.json:1610`): *"`promoteBaseline` advances Baseline.status and says so in comment; nothing moved
+the PWU … Without a named command here, retiring that setter at W-7 would make BASELINED — a declared TERMINAL state
+with ratified RPH-PWU-010 over it — unreachable."* Recomposition is that same shape one row up the same table. **So
+minting is not a novel move here; it is the move this repository already made, shipped, and recorded.**
+
+**DECIDED: `BeginPwuRecomposition` / `CompletePwuRecomposition`**, events `PwuRecompositionBegun` / `PwuRecomposed`.
+The command names are not invented for this increment — REG-F-085's own body uses both, twice (*"a
+`CompletePwuRecomposition` built honestly could never fire"*, *"`BeginPwuRecomposition` is buildable now"*).
+⚠ The event names deliberately avoid `PwuRecompositionStarted`, which would CONTAIN the existing
+`RecompositionStarted` as a substring — this repository has substring-matching readers (mutation anchors, the
+ledger CONTROL's `indexOf`, the dispatch census's literal scan), and a containment relation between two live event
+names is a latent ambiguity in every one of them.
+
+### 6.2 ⚠ THE ROADMAP'S A-2 WAS A REMEDY THE REGISTER HAD ALREADY RETRACTED
+
+S-1a's roadmap carried a deferred item: *"`messages.ts:3156-3170` BINDINGS wrongly declare `BeginRecomposition` /
+`CompleteRecomposition` drive `PWU.workLifecycleState`; fix both rows."* **That is REG-F-082's original remedy,
+which REG-F-082 itself struck before it was applied**, at JPWB-REG-005, verbatim: *"**CORRECTED 2026-08-09, BEFORE
+THE FIX WAS APPLIED. THE FINDING STANDS; THE REMEDY I PRESCRIBED WAS WRONG AND WOULD HAVE DESTROYED EVIDENCE.**"*
+Its reason: `RecompositionContract.status` has no `RECOMPOSING` and no `RECOMPOSED`, so relocating the rows
+unchanged writes two arrows that **do not exist**.
+
+I filed A-2 without grepping the register for the row I was proposing to change. The entry that owns the question
+was open, on point, and had already refuted me.
+
+**REG-F-082's live merge target is the specification**, verbatim: *"the binding table needs **four rows, not two
+relocated ones**: the two contract arrows the handlers actually perform, plus the two PWU arrows once something
+performs them. **Status:** OPEN, and its remedy now depends on W-4.6, which is itself BLOCKED (see REG-F-085)."*
+**S-1b is the thing that performs them**, so the dependency discharges here and the four rows become writable for
+the first time:
+
+| # | command | machine | arrow |
+|---|---|---|---|
+| 1 | `BeginRecomposition` | `RecompositionContract.status` | `READY / CONFLICTED / INSUFFICIENT -> EVALUATING` |
+| 2 | `CompleteRecomposition` | `RecompositionContract.status` | `EVALUATING -> COMPOSABLE / CONFLICTED / INSUFFICIENT` |
+| 3 | `BeginPwuRecomposition` | `PWU.workLifecycleState` | `SATISFIED -> RECOMPOSING` |
+| 4 | `CompletePwuRecomposition` | `PWU.workLifecycleState` | `RECOMPOSING -> RECOMPOSED` |
+
+⚠ **AND THE EVIDENCE REG-F-082 FEARED LOSING IS NOT IN THE BINDING TABLE.** Its worry was that canon names
+`beginRecomposition` on the PWU arrow and a correction would erase that. It does not: the ratified trigger lives in
+`transitions.data.ts` / `m2-transitions.json`, which S-1b does not touch and which C-0d reads as its third
+independent witness. Rows 1-2 additionally carry the fact in their `note`. **The record moves to where it is true;
+nothing is deleted.**
+
+### 6.3 REG-Q-028 is OPEN, on point, and the roadmap never mentioned it
+
+*"Which PWU carries RECOMPOSING/RECOMPOSED is unstated; **state-machine implementations must not invent it.**"* Its
+**safe default is the answer this increment adopts, not an answer this increment authors**: *"where it is silent,
+treat recomposition as **parent-owned (the contract holder)** and file a finding before persisting any child-side
+recomposition state."*
+
+**CONSEQUENCE, and it is load-bearing on the guard's shape:** the PWU that moves `SATISFIED -> RECOMPOSING` is the
+one the contract names in `parentWorkUnitId`. §8.1's trigger *"Parent exists and recomposition is required"*
+therefore reads as: **a RecompositionContract exists naming this PWU as its parent, and it requires children.**
+That is a literal reading of both conjuncts, not a paraphrase, and it needs no invention — which is exactly what
+REG-Q-028 forbids. The guard ENFORCES the safe default rather than RESOLVING the question, and S-1b's register
+entry must say so in those terms: **REG-Q-028 stays OPEN.**
+
+### 6.4 The authority to mint the two events, stated because the roadmap cited none
+
+**REG-D-029**, verbatim: *"This grant is that Decision, for the PWU write path specifically: **the missing
+lifecycle commands and their payload/event shapes may be AUTHORED**."* Its limit: *"**It does not RATIFY
+anything.** Every shape authored under it is `UNRATIFIED-AUTHORED`."* Precedent is REG-D-032's `PwuEscalated` —
+*"the first PWU lifecycle event this programme authored from scratch"* — where the ACT was ratified and only the
+contract shape was missing. Identical here: §8.1 ratifies both arrows and both triggers; only the shape is absent.
+
+⚠ The roadmap minted two events at B-4 as a replay-fold housekeeping note, **with no authority named anywhere in
+the document**. That is precisely how an authored shape acquires borrowed authority, and this register has recorded
+the pattern repeatedly. Both `sourceSection` strings must carry REG-D-029 and the `UNRATIFIED-AUTHORED` annotation.
+
+### 6.5 A slot that goes dead, marked rather than left live
+
+`RecompositionStarted` and `RecompositionCompleted` each declare an OPTIONAL `workLifecycleState` field whose vocab
+note is *"parent PWU SATISFIED->RECOMPOSING"* / *"…RECOMPOSING->RECOMPOSED"*. `decomposition.ts:610-615` records the
+handler author declining to populate it: *"this handler advances the CONTRACT, never the parent PWU. Emitting a
+lifecycle state no transition produced would be a fabricated fact in an append-only record."*
+
+Once `PwuRecompositionBegun` / `PwuRecomposed` record that fact, those two slots are **permanently dead**. Left
+live-looking they are a standing invitation to "wire the unused field", which would reintroduce the
+one-event-two-aggregates write AGG-1 forbids and for which REG-F-046 records this repository has **no remedy tier**.
+Their notes must say so by name.
+
+### 6.6 What S-1b still does NOT close, stated so it is not later claimed
+
+REG-Q-028 (parent-vs-child ownership — honoured, not answered); REG-F-042's eight unimplemented DEC-6 checks;
+REG-F-041's child-existence and paired-contract limbs; REG-F-043's remaining unevaluated guards; and REG-F-076's
+live safe default, which **binds this increment's prose**: no artifact here may state that this repository has a
+single rule for what authorizes a governance act.

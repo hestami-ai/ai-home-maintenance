@@ -3479,5 +3479,55 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutation-tree-baseline.test.ts'],
 		why: 'The staged index is part of the measured subject. Accepting any clean current index would let concurrent staging replace the candidate between mutants while the runner continued to report one coherent mutation result.',
 		source: 'JAN-CSAA completion review 2026-08-26'
+	},
+	// ── REG-D-044 S-1b — the two PWU recomposition arrows, and the first mutants this surface has ever had ──
+	// REG-F-194 recorded the general form on the increment before this one: "an increment that added a command, a
+	// guard limb, a census idiom and a fail-closed refusal declared ZERO new mutants, so nothing in this gate
+	// names any of W-5.5's new logic. The green tells me I broke nothing that was already measured — it says
+	// nothing whatever about what I just built." S-1a repeated it. These five are the correction.
+	{
+		id: 'MU-F085B-begin-accepts-a-contract-for-another-parent',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tif (s.parentWorkUnitId !== pwuId) return undefined;",
+		replace: "\tif (false && s.parentWorkUnitId !== pwuId) return undefined;",
+		expectRed: ['packages/rph-application/src/handlers/pwu-recomposition.test.ts'],
+		why: "DROPS THE PARENT-MATCH LIMB, so ANY RecompositionContract in the store discharges §8.1's \"Parent exists\" for ANY PWU. ⚠ THIS IS THE LIMB THAT CARRIES REG-Q-028, which is OPEN: canon does not say whether RECOMPOSING/RECOMPOSED ride on the parent or the child, and its recorded SAFE DEFAULT is parent-owned. Deleting the check does not pick the other side of an open question — it abandons the question, admitting a contract that names neither. `&& ` rather than a bare `if (false)`: the ledger's V-2c lesson records that `if (cond) -> if (false)` makes the block statically dead and tsc then reports 21 such mutants as unreachable-code NO_COMPILE.",
+		source: 'REG-D-044 S-1b (REG-Q-028 safe default)'
+	},
+	{
+		id: 'MU-F085B-begin-admits-an-empty-composition',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tif ((contract.requiredChildWorkUnitIds ?? []).length === 0) {",
+		replace: "\tif ((contract.requiredChildWorkUnitIds ?? []).length < 0) {",
+		expectRed: ['packages/rph-application/src/handlers/pwu-recomposition.test.ts'],
+		why: "RESTORES THE VACUOUS RUNG one object over from where REG-F-041 S-0 closed it. §8.1's trigger has TWO conjuncts — \"Parent exists AND recomposition is required\" — and this is the second. A contract requiring no children makes every downstream child-acceptability check trivially true, so a parent could enter RECOMPOSING on a composition of nothing. `< 0` rather than deleting the block: it keeps the branch live to the compiler while the condition can never hold, and it is a DIFFERENT mutation from the S-0 pair's `>= 0` so the two cannot be confused in a run summary.",
+		source: 'REG-D-044 S-1b (OBJ-1; REG-F-041 S-0 one object over)'
+	},
+	{
+		id: 'MU-F085B-complete-accepts-the-candidate-state',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tif (contract.status !== 'SATISFIED') {",
+		replace: "\tif (contract.status !== 'COMPOSABLE') {",
+		expectRed: ['packages/rph-application/src/handlers/pwu-recomposition.test.ts'],
+		why: "THE WHOLE INCREMENT IN ONE LINE, and it is the mutation REG-F-085 said a build agent would be TEMPTED to ship: accept COMPOSABLE and \"silently weaken a ratified guard — substituting 'no contradiction found' for 'contract satisfied'\". Three independent lanes converged on exactly this reading and it was refuted — §8.1's other cross-object rows cite enum literals in the same lowercase participle form. MEASURED, not predicted: reddens the accept case, the COMPOSABLE-refusal case and the fold control; it does NOT redden the ownership control, which is how the two claims are kept distinct.",
+		source: 'REG-D-044 Ruling 1'
+	},
+	{
+		id: 'MU-F085B-the-setter-performs-both-arrows-again',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: "\tRECOMPOSING: 'BeginPwuRecomposition',\n\tRECOMPOSED: 'CompletePwuRecomposition'",
+		replace: "\tRECOMPOSING: 'BeginPwuRecomposition'",
+		expectRed: ['verif/recomposition-ungoverned.test.ts'],
+		why: "THE CONTROL'S OWN MUTANT, AND IT IS DELIBERATELY NOT A GUARD MUTATION. Every guard above can be perfect while the generic setter still performs both arrows on an empty citation list — which is precisely the state REG-F-085 pinned for twelve days. It also ships HALF THE PAIR, the failure mode the roadmap called worse than doing nothing: `rejectArrowOwnedBySemanticCommand` has no fallback, so RECOMPOSING stays owned while RECOMPOSED becomes settable by anyone. ⚠ ONE VICTIM, AND THE CHOICE IS THE CLAIM: the inverted REG-F-085 pin, whose whole existence is that these two arrows were performable through the setter. The guard tests in pwu-recomposition.test.ts stay GREEN under this mutation — measured — which is the evidence that the ownership record and the guard records are independent rather than one fact asserted twice. A longer expectRed list would have been a LOWER bar.",
+		source: 'REG-F-072 / PER-3; feedback: a control needs its own mutant'
+	},
+	{
+		id: 'MU-F085B-the-fold-forgets-both-new-events',
+		file: 'packages/rph-projections/src/pwu-replay.ts',
+		find: "\t\tcase 'PwuRecompositionBegun':\n\t\tcase 'PwuRecomposed':\n",
+		replace: '',
+		expectRed: ['packages/rph-application/src/handlers/pwu-recomposition.test.ts'],
+		why: "THE OMISSION THIS FILE RECORDS SHIPPING THREE TIMES — W-1 latent, W-4.5 found by accident, W-5 shipped DEAD with 1203 tests green. Without these labels both events fall to `default: return axes` and a replay carries the OLD workLifecycleState forward, diverging the rebuild from the object. ⚠ THE SEED CANNOT CATCH THIS: the §26 reference undertaking never occupies RECOMPOSING or RECOMPOSED, which is exactly why `pwu-fold-drive-sites.test.ts` demands a NAMED drive site and why the victim below is a test that calls `expectPwuReplayEquivalence` after EACH hop rather than only at the end.",
+		source: 'REG-F-084 / JAN-PWUWP B-4'
 	}
 ];

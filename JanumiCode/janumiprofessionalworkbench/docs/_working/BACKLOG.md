@@ -45,14 +45,26 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
 
 ### ✅ LANDED — original item, kept for its measurements
 
-- [ ] **REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**
+- [x] ~~**REG-F-202: the de minimis floor must never be skippable — remove floor-waiver discharge.**~~ — **LANDED.**
   **THE QUESTION IS SETTLED; this is execution, not design.** ASR-3 (JPWB-DOC-003:249, ratified) —
   *"The de minimis assurance floor is UNCONDITIONAL. Risk proportionality governs assurance above a
   mandatory floor; it never makes the floor optional."* `waiverDischargesFloorPolicy`
   (`handlers/floor-gate.ts`) is an UNRATIFIED EXTRAPOLATION: the general §8.15/§12.2 waiver mechanism
   applied to the three REQUIRED floor policies, which canon exempts from that relief. RPH-GOV-005
   anchors on ASR-14 and governs how a waiver BEHAVES — it never granted a waiver reach over the floor.
-  **⚠ DESIGNED, DRIVEN AND MEASURED 2026-08-20 — then REVERTED deliberately, unfinished rather than rushed.**
+  **⚠ CORRECTED 2026-08-21, FOUND BY W-3b's OWN TRIAL MAPPING. THIS PARAGRAPH WAS STALE AND CONTRADICTED THE
+  SECTION HEADING FOUR LINES ABOVE IT** — the heading already read *"✅ LANDED"* while the body below said the
+  change had been reverted. **The code settles it: LANDED.** `floor-gate.ts:254-262` carries the deletion notice
+  for `openFindingCodes` / `FloorWaiver` / `effectiveFloorWaivers` / `waiverDischargesFloorPolicy`, and the W-3b
+  trial drove `CompleteExecutionStep` against an artifact carrying no floor assessment and got
+  *"...(floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING). ... The
+  floor is unconditional: no governance waiver discharges it."*
+  ⚠ **AND THE STALENESS WAS LOAD-BEARING, WHICH IS WHY IT IS RECORDED RATHER THAN QUIETLY FIXED.** A W-3b lane
+  reading this paragraph would have scored ASR-3 UNENFORCED on a rule that is enforced on two planes. That is the
+  REG-F-120 shape — a record maintained after the condition it describes had changed — reaching an audit through
+  its own INPUT rather than its output. The original sentence is struck rather than deleted, because the
+  measurements beneath it are real and were reused:
+  ~~**⚠ DESIGNED, DRIVEN AND MEASURED 2026-08-20 — then REVERTED deliberately, unfinished rather than rushed.**~~
   The change was applied end-to-end in a working tree, the red was proven, the breakage was measured, and the
   tree was returned to green because half-removing an enforcement site is the one way to make this worse. Nothing
   below is a hypothesis; every number was observed.
@@ -437,17 +449,40 @@ Retire items by STRIKING in place (`~~item~~` + disposition + commit), never by 
   retire it and name the real one. The census index (`f200-deferrals.ndjson`) answers the deferral
   question today, but the other four registers have the same hole and no index.
 
+- [x] ~~**13 register entries owed by `HARMONIZATION-FINDINGS.md`'s re-dispositioned "Refuted (32)"**~~
+  — **✅ FILED 2026-08-23 as REG-F-263..271 and REG-Q-070..073** (13 entries over 12 items), plus item
+  **#31 found ALREADY FILED as REG-F-246** by a drafter who searched rather than trusting the assignment —
+  REG-F-246 landed in `a4a19057`, AFTER the sweep that declared the debt, so the sweep could not see it.
+  All 32 dispositions now name their entry, and `verif/harmonization-reconciliation.test.ts` reconciles the
+  two artifacts (15 TRUE / 13 FALSE / 4 OUT OF SCOPE pinned; every claimed ordinal must exist as a heading;
+  items 5 and 7 named as already-covered by REG-D-026 rather than counted away).
+  ⚠ **The line contract is now GATED, not just documented.** Lines 1-120 of that file are cited eleven
+  times, twice from append-only `JPWB-REG-005`, so the 32 originals may not move; the gate asserts the six
+  cited lines by name and its mutant — one blank line inserted — reddens with the citation it would break.
+
 - [ ] **A format-conformance RATCHET** — `format:check` is red for 267 files and is invoked by no
   gate, so the standing "conformance arrives edit-by-edit" policy has no measurement and cannot
   fail. A ratchet (the count may not increase, pinned the way the mutation ratchets are) makes the
   policy real without triggering the REG-F-194 wholesale-reformat churn trap. Design-first: it
   changes `gate:fast`.
-- [ ] **Push `main` to origin** — 30 commits ahead as of 2026-08-20, carrying REG-F-199..202 and the
-  whole ground-truth programme. NOT done autonomously: history on this branch is shared and pushing is
-  outward-facing. Needs an explicit go-ahead.
+- [ ] **Push `main` to origin** — ~~30 commits ahead as of 2026-08-20~~ **74 commits ahead as of
+  2026-08-23**, carrying REG-F-199..202, the whole ground-truth programme, and the W-3b invariant
+  enforcement census with REG-F-203..245 / REG-Q-053..062. NOT done autonomously: history on this
+  branch is shared and pushing is outward-facing. Needs an explicit go-ahead.
 - [ ] **W-3b: the 192 invariants' prose→code mapping** — judgment work (lanes + refuters, the
   REG-F-197 pattern), deliberately NOT done by grep in W-3. The canon 62 FAM-N invariants are the
   priority slice.
+  **⚠ THE PRIORITY SLICE IS COMPLETE (V-0..V-6, 2026-08-23) AND THE ITEM STAYS OPEN, because it is
+  scoped to 192 and the census covers 62.** Delivered: **307 limbs over the canon 62**, every one
+  verdicted and every one refuted (128 OVERTURNED / 179 HELD), on a two-axis ladder; **53 register
+  entries (REG-F-203..245, REG-Q-053..062)** closing **67 limbs**. `filing = UNFILED` is **zero**.
+  ⚠ **AND THAT IS NOT THE CLOSE CONDITION IT LOOKS LIKE.** `NEAR_MISS` means *a filing exists and does
+  NOT cover this limb* — the limb is unfiled, with a decoy attached — so **21 limbs still owe an entry**
+  and the real debt is 39 of which 18 are discharged. See `DESIGN-invariant-enforcement-mapping.md` §17
+  and the V-7 list at the end of `ROADMAP-invariant-enforcement-mapping.md`.
+  **Still out of scope of the census entirely:** the 130 non-canon invariants (RPH CDM 102, Assurance
+  Policy §39 20, Contract Package §35 8), JPWB-SPEC-001's 14 surface invariants, CON-000's 12 axioms,
+  and `cap:projection` (0/8).
 - [x] ~~**Implementation ground-truth program**~~ — **W-0..W-5 ALL LANDED 2026-08-20 (REG-F-198)**:
   substrate + ingest + census + measured verdicts + DRIVEN bridge + `tracker:build` in `gate:fast`.
   Remaining program residue: W-3b invariant mapping (below), the query-name delta (below), and the

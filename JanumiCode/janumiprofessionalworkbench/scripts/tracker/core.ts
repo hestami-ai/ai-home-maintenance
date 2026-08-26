@@ -281,76 +281,82 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 	const db = new Database(dbPath, { create: true });
 	db.exec('PRAGMA journal_mode = MEMORY;');
 	db.exec(DDL);
-	const insertSource = db.prepare('INSERT INTO sources (path, sha256, parser) VALUES (?, ?, ?)');
-	for (const path of SOURCE_DOCS) {
-		const absolute = join(repoRoot, path);
-		if (!existsSync(absolute)) fail(`source document missing: ${path}`);
-		insertSource.run(
-			path,
-			createHash('sha256').update(readFileSync(absolute)).digest('hex'),
-			ingested.parsers.get(path) ?? 'hash-only:w0'
+	// The corpus is large enough that one disk autocommit per derived row can exceed Vitest's fixed
+	// hook budget under whole-suite contention. One transaction preserves the exact same real build
+	// while making the derived index atomic and avoiding thousands of independent fsync boundaries.
+	const writeDerivedIndex = db.transaction(() => {
+		const insertSource = db.prepare('INSERT INTO sources (path, sha256, parser) VALUES (?, ?, ?)');
+		for (const path of SOURCE_DOCS) {
+			const absolute = join(repoRoot, path);
+			if (!existsSync(absolute)) fail(`source document missing: ${path}`);
+			insertSource.run(
+				path,
+				createHash('sha256').update(readFileSync(absolute)).digest('hex'),
+				ingested.parsers.get(path) ?? 'hash-only:w0'
+			);
+		}
+		// An ingested id colliding with a census id would silently shadow authored ground truth — refuse.
+		const censusIds = new Set(census.items.map((i) => i.id));
+		for (const i of ingested.items)
+			if (censusIds.has(i.id)) fail(`ingested id '${i.id}' collides with a census record id`);
+		const insertItem = db.prepare(
+			'INSERT INTO items (id, kind, name, anchor_doc, anchor_text, origin, created_at, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
 		);
-	}
-	// An ingested id colliding with a census id would silently shadow authored ground truth — refuse.
-	const censusIds = new Set(census.items.map((i) => i.id));
-	for (const i of ingested.items)
-		if (censusIds.has(i.id)) fail(`ingested id '${i.id}' collides with a census record id`);
-	const insertItem = db.prepare(
-		'INSERT INTO items (id, kind, name, anchor_doc, anchor_text, origin, created_at, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
-	);
-	const insertFts = db.prepare(
-		'INSERT INTO items_fts (id, name, anchor_text, evidence) VALUES (?, ?, ?, ?)'
-	);
-	for (const item of census.items) {
-		insertItem.run(
-			item.id,
-			item.kind,
-			item.name,
-			item.anchor_doc ?? null,
-			item.anchor_text ?? null,
-			item.origin,
-			item.created_at
+		const insertFts = db.prepare(
+			'INSERT INTO items_fts (id, name, anchor_text, evidence) VALUES (?, ?, ?, ?)'
 		);
-		insertFts.run(item.id, item.name, item.anchor_text ?? '', '');
-	}
-	const applySupersede = db.prepare('UPDATE items SET superseded_by = ? WHERE id = ?');
-	for (const s of census.supersedes) applySupersede.run(s.superseded_by, s.id);
-	const insertVerdict = db.prepare(
-		'INSERT INTO verdicts (item_id, verdict, evidence, method, measured_at) VALUES (?, ?, ?, ?, ?)'
-	);
-	for (const v of census.verdicts)
-		insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
-	const insertRef = db.prepare('INSERT INTO refs (from_id, to_id, kind) VALUES (?, ?, ?)');
-	for (const r of census.refs) insertRef.run(r.from_id, r.to_id, r.kind);
-	for (const i of ingested.items) {
-		insertItem.run(
-			i.id,
-			i.kind,
-			i.name,
-			i.anchor_doc ?? null,
-			i.anchor_text ?? null,
-			i.origin,
-			i.created_at
+		for (const item of census.items) {
+			insertItem.run(
+				item.id,
+				item.kind,
+				item.name,
+				item.anchor_doc ?? null,
+				item.anchor_text ?? null,
+				item.origin,
+				item.created_at
+			);
+			insertFts.run(item.id, item.name, item.anchor_text ?? '', '');
+		}
+		const applySupersede = db.prepare('UPDATE items SET superseded_by = ? WHERE id = ?');
+		for (const s of census.supersedes) applySupersede.run(s.superseded_by, s.id);
+		const insertVerdict = db.prepare(
+			'INSERT INTO verdicts (item_id, verdict, evidence, method, measured_at) VALUES (?, ?, ?, ?, ?)'
 		);
-		insertFts.run(i.id, i.name, i.anchor_text ?? '', '');
-	}
-	for (const v of ingested.verdicts)
-		insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
-	for (const r of ingested.refs) insertRef.run(r.from_id, r.to_id, r.kind);
-	const insertAttr = db.prepare('INSERT INTO attrs (item_id, key, value) VALUES (?, ?, ?)');
-	for (const a of ingested.attrs) insertAttr.run(a.item_id, a.key, a.value);
-	for (const a of census.attrs) insertAttr.run(a.item_id, a.key, a.value);
-	// THE DANGLING-VERDICT LAW, enforced POST-MERGE (moved from loadRecords in W-3): a measured
-	// verdict or classification may target an ingested item, but never a nonexistent one — a
-	// verdict about nothing is how a roster decays back into a count.
-	const allIds = new Set<string>([
-		...census.items.map((i) => i.id),
-		...ingested.items.map((i) => i.id)
-	]);
-	for (const v of census.verdicts)
-		if (!allIds.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
-	for (const a of census.attrs)
-		if (!allIds.has(a.item_id)) fail(`attr for unknown item '${a.item_id}'`);
+		for (const v of census.verdicts)
+			insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
+		const insertRef = db.prepare('INSERT INTO refs (from_id, to_id, kind) VALUES (?, ?, ?)');
+		for (const r of census.refs) insertRef.run(r.from_id, r.to_id, r.kind);
+		for (const i of ingested.items) {
+			insertItem.run(
+				i.id,
+				i.kind,
+				i.name,
+				i.anchor_doc ?? null,
+				i.anchor_text ?? null,
+				i.origin,
+				i.created_at
+			);
+			insertFts.run(i.id, i.name, i.anchor_text ?? '', '');
+		}
+		for (const v of ingested.verdicts)
+			insertVerdict.run(v.item_id, v.verdict, v.evidence, v.method, v.measured_at);
+		for (const r of ingested.refs) insertRef.run(r.from_id, r.to_id, r.kind);
+		const insertAttr = db.prepare('INSERT INTO attrs (item_id, key, value) VALUES (?, ?, ?)');
+		for (const a of ingested.attrs) insertAttr.run(a.item_id, a.key, a.value);
+		for (const a of census.attrs) insertAttr.run(a.item_id, a.key, a.value);
+		// THE DANGLING-VERDICT LAW, enforced POST-MERGE (moved from loadRecords in W-3): a measured
+		// verdict or classification may target an ingested item, but never a nonexistent one — a
+		// verdict about nothing is how a roster decays back into a count.
+		const allIds = new Set<string>([
+			...census.items.map((i) => i.id),
+			...ingested.items.map((i) => i.id)
+		]);
+		for (const v of census.verdicts)
+			if (!allIds.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
+		for (const a of census.attrs)
+			if (!allIds.has(a.item_id)) fail(`attr for unknown item '${a.item_id}'`);
+	});
+	writeDerivedIndex();
 	return db;
 }
 

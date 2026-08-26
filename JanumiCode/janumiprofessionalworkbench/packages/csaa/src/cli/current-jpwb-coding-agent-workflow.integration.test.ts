@@ -156,7 +156,7 @@ const IMPACT_BUDGETS = Object.freeze({
 });
 
 // This one-process smoke deliberately remains a bounded useful-partial subject, not the native
-// exemplar-closure corpus. Its widest exact native-rule population measures 365 members and stays
+// exemplar-closure corpus. Its widest exact native-rule population measures 371 members and stays
 // explicit under the calibrated 512-member ceiling; larger populations still fail closed rather
 // than collapsing into a census surrogate. All 23 positive/nearby-negative native profiles are
 // exercised separately. These exact additions admit the five hybrid source prerequisites while
@@ -764,8 +764,8 @@ describe('current JPWB production coding-agent workflow', () => {
 				const widestProjection = nativeResult.projections.find(
 					(projection) => projection.findingId === 31
 				);
-				expect(widestProjection?.population).toMatchObject({ count: 365 });
-				expect(widestProjection?.population.members).toHaveLength(365);
+				expect(widestProjection?.population).toMatchObject({ count: 371 });
+				expect(widestProjection?.population.members).toHaveLength(371);
 				expect(
 					canonicalSemanticJsonWitness(findingsResult.nativeProjectionOutcome).bytes
 				).toBeLessThanOrEqual(NATIVE_BUDGETS.maxResultBytes);

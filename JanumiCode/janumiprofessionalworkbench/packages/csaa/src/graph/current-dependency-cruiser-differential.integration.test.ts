@@ -82,18 +82,17 @@ describe('current dependency-cruiser differential repository integration', () =>
 				acceptanceState: 'ACCEPTED_REVIEWED_PARTIAL_DIFFERENTIAL',
 				authority: 'REVIEWED_DIFFERENTIAL_EVIDENCE_ONLY',
 				coverage: {
-					comparisonRecords: 4_822,
+					comparisonRecords: 4_781,
 					compilerEdges: 34,
-					dependencyCruiserDependencies: 4_871,
+					dependencyCruiserDependencies: 4_825,
 					observedDifferenceRecords: 0,
-					providerModules: 958,
+					providerModules: 940,
 					reconciles: true
 				},
 				differentialDigest: CURRENT_DEPENDENCY_CRUISER_REVIEWED_DIFFERENTIAL_DIGEST,
 				gateEffect: 'NONE',
 				observation: {
 					limitations: [
-						'DEPENDENCY_OPTIONAL_FIELDS_NOT_INTERPRETED',
 						'MODULE_OPTIONAL_FIELDS_NOT_INTERPRETED',
 						'PROVIDER_RESOLUTION_OPTIONS_DIGEST_ONLY',
 						'SUMMARY_VIOLATIONS_DIGEST_ONLY'
@@ -110,13 +109,21 @@ describe('current dependency-cruiser differential repository integration', () =>
 			subject: { projectPaths: ['packages/rph-contracts/tsconfig.build.json'] }
 		});
 		expect(evidence.provider.inputPaths).toEqual(['apps', 'packages']);
+		const generated = /(^|\/)\.svelte-kit\//u;
+		expect(
+			evidence.differential.comparison.records.some(
+				(record) =>
+					generated.test(record.key.sourcePath) ||
+					record.dependencyCruiser.targetLogicalPaths.some((path) => generated.test(path))
+			)
+		).toBe(false);
 		expect(evidence.differential.comparison).toMatchObject({
 			coverage: {
 				agreementRecords: 24,
 				corroborationRecords: 1,
-				incomparableRecords: 4_797,
+				incomparableRecords: 4_756,
 				observedDifferenceRecords: 0,
-				recordCount: 4_822,
+				recordCount: 4_781,
 				reconciles: true
 			},
 			negativeCoverage: { state: 'OPEN' },

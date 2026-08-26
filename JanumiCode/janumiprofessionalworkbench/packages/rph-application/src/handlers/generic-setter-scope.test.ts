@@ -6,7 +6,11 @@
 // events, outbox, and command receipt. **No generic CRUD/PATCH path**, UI local state, RPH worker, validator,
 // projection worker, broker message, agent output, or informal approval bypasses this pipeline."*
 //
-// ⚠ THE SIX PAIRS ARE HARDCODED HERE, NOT IMPORTED FROM `PWU_SEMANTIC_LIFECYCLE_COMMANDS`.
+// ⚠ THE EIGHT PAIRS ARE HARDCODED HERE, NOT IMPORTED FROM `PWU_SEMANTIC_LIFECYCLE_COMMANDS`.
+// (SIX until 2026-08-21; RECOMPOSING and RECOMPOSED joined the owned set under REG-D-044 S-1b. ⚠ THIS FILE
+// STAYED GREEN THROUGH THAT CHANGE WITH ZERO EDITS — which is the cost of proving classification rather than
+// totality: it cannot notice that its own coverage went stale. The two cases below are owed by DISCIPLINE,
+// not by the gate, and they were added because the increment's own review asked what the gate could not.)
 // A table-driven test that reads the same table the handler reads can only prove TOTALITY — every row has a case.
 // It cannot prove the CLASSIFICATION, because mutating a row flips the generated expectation along with the
 // behaviour and the test stays green. This repository already records that tautology recurring inside its own
@@ -17,6 +21,7 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
 
 const TS = '2026-08-08T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H7100';
@@ -185,6 +190,25 @@ describe('REG-F-072 — ChangePwuState may not perform an arrow a semantic comma
 		// silently accepted. The ownership limb for INVALIDATED is covered by the table's own type narrowing —
 		// `advancePwuLifecycle`'s target union — and by `invalidatePwu` remaining the only writer.
 		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+	});
+
+	// REG-D-044 S-1b. Both arrows were performable through this setter by ANYONE with `supportingObjectIds: []`
+	// until today — the defect REG-F-085 pinned — so these two cases assert the classification that closed it.
+	// `verif/recomposition-ungoverned.test.ts` asserts the same refusals from the other direction, as the
+	// inverted defect pin; this file asserts them as ownership, which is a different claim about the same
+	// behaviour: THAT the setter refuses, and that the refusal NAMES the owner a caller must reach for instead.
+	it('REJECTS SATISFIED -> RECOMPOSING, naming BeginPwuRecomposition', () => {
+		toReady();
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'SATISFIED');
+		refusedAsOwned(chg('SATISFIED', 'RECOMPOSING'), 'BeginPwuRecomposition');
+		expect(lifecycle()).toBe('SATISFIED');
+	});
+
+	it('REJECTS RECOMPOSING -> RECOMPOSED, naming CompletePwuRecomposition', () => {
+		toReady();
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'RECOMPOSING');
+		refusedAsOwned(chg('RECOMPOSING', 'RECOMPOSED'), 'CompletePwuRecomposition');
+		expect(lifecycle()).toBe('RECOMPOSING');
 	});
 
 	// ── WHAT IT MUST NOT TOUCH ───────────────────────────────────────────────────────────────────────────────

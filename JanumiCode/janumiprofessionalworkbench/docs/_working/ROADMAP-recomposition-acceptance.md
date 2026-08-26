@@ -86,34 +86,126 @@ wearing a control's label**. Its complement (`return true`) reddens the refusal 
 
 ## S-1b — the PWU arrows, guarded literally
 
-Only after S-1a, because `SATISFIED` must be reachable first — that is the whole reason REG-F-085 blocked.
+**REVISED 2026-08-21 against DESIGN §6.** The first draft of this section named the two acts by their §8.1 prose
+labels, prescribed a binding-row fix the register had already retracted, and cited no authority for the two events
+it minted. All three are corrected below; §6 carries the reasoning. Only after S-1a, because `SATISFIED` must be
+reachable first — that is the whole reason REG-F-085 blocked.
 
-**B-1 · Mint BOTH PWU acts in ONE commit.** §8.1 names them: *"Begin recomposition"* (SATISFIED→RECOMPOSING,
-*"Parent exists and recomposition is required"*) and *"Complete recomposition"* (RECOMPOSING→RECOMPOSED,
-*"Recomposition contract satisfied"*). ⚠ `PWU_SEMANTIC_LIFECYCLE_COMMANDS` membership refuses the generic setter
-**with no fallback**, so shipping half the pair makes an arrow UNPERFORMABLE rather than governed — worse than
-today. `verif/recomposition-ungoverned.test.ts` loops BOTH guard strings and would catch it.
+**Guarantee claimed, exactly:** `PWU.workLifecycleState` reaches `RECOMPOSING` only when a RecompositionContract
+names this PWU as its parent AND requires at least one child; and reaches `RECOMPOSED` only when that contract's
+`status` is the enum literal `SATISFIED`. **NOT claimed:** that the recomposition was correct (DEC-6's nine checks
+— REG-F-042 measures eight as unimplemented), nor that the parent-vs-child ownership question is answered
+(REG-Q-028 — its SAFE DEFAULT is enforced, the question stays OPEN).
 
-**B-2 · The guard is LITERAL.** `recompositionContractBacksPwu(ctx, pwuId, contractId)` requires
-`status === 'SATISFIED'` and `parentWorkUnitId === pwuId`. **No COMPOSABLE fallback, no disclosure carve-out** —
-REG-D-044 Ruling 1 closed that.
+**B-0 · Names, decided in DESIGN §6.1.** Commands `BeginPwuRecomposition` / `CompletePwuRecomposition` (both names
+already used in REG-F-085's own body); events `PwuRecompositionBegun` / `PwuRecomposed`. ⚠ **NOT
+`PwuRecompositionStarted`** — it contains the existing `RecompositionStarted` as a substring, and this repository
+has at least three substring-matching readers (mutation anchors, `recomposition-ungoverned`'s `indexOf` CONTROL,
+`command-dispatch-census`'s literal scan). Authority for the shapes: **REG-D-029**, annotated
+`UNRATIFIED-AUTHORED`, precedent REG-D-032's `PwuEscalated`.
 
-**B-3 · Move the spec rows, do not copy them.** `PWU_GENERIC_SETTER_SPECS` (`pwu-lifecycle-command-spec.ts`)
-still declares `ChangePwuState` performs both arrows; it must MOVE to the semantic table, and the
-`PwuLifecycleCommandType` union must extend. Counts: `lifecycle-arrow-declarations.test.ts` 11/8 → 13/6 and
-`{semantic 49, genericSetter 8, recovery 4}` → `{51, 6, 4}`; `allClaimedArrows().length = 61` **unchanged**
-(arrows change owner, not count).
+**B-1 · Mint BOTH PWU acts in ONE commit.** ⚠ `PWU_SEMANTIC_LIFECYCLE_COMMANDS` membership refuses the generic
+setter **with no fallback** — verified at `pwu.ts:1422`, a two-branch total whose only escape is
+`owner === undefined`. Ship the RECOMPOSING row without its command and the state becomes reachable by NOTHING;
+ship RECOMPOSED's without its command and any PWU parked in RECOMPOSING is stranded (its only other exits are
+`SupersedePwu` / `AbandonPwu`). **Half the pair is worse than today**, not merely incomplete.
 
-**B-4 · ⚠ THE OMISSION THAT SHIPPED THREE TIMES.** `packages/rph-projections/src/pwu-replay.ts`'s PWU axis fold
-ends `default: return axes`. New `PwuRecompositionBegun`/`PwuRecomposed` events MUST be added to its named case
-group **in the same commit**, or replay carries the old `workLifecycleState` forward and diverges from the
-object. That file's own comments record this exact miss shipping W-1 (latent), W-4.5 (found by accident) and W-5
-(shipped dead with 1203 tests green). `pwu-fold-drive-sites.test.ts` additionally demands an `EXPLICIT_DRIVE_SITES`
-entry per semantic command, each naming a test that calls `expectPwuReplayEquivalence`.
+**B-2 · The guards are LITERAL, and each conjunct is independently mutable.** One shared loader
+`recompositionContractForPwu(ctx, pwuId, contractId)` — `objectType === 'RECOMPOSITION_CONTRACT'` and
+`parentWorkUnitId === pwuId` (**REG-Q-028's safe default, enforced not resolved**) — then one distinct conjunct per
+command:
+- `BeginPwuRecomposition` — §8.1 *"Parent exists and recomposition is required"*: the contract loads, and
+  `requiredChildWorkUnitIds.length > 0`. Both halves of the trigger, read literally.
+- `CompletePwuRecomposition` — §8.1 *"Recomposition contract satisfied"*: `status === 'SATISFIED'`, **the enum
+  literal**. No `COMPOSABLE` fallback and no disclosure carve-out — REG-D-044 Ruling 1 closed that, and the reading
+  survived an adversary set specifically to break it.
 
-**B-5 · Retire the pin PROPERLY.** `verif/recomposition-ungoverned.test.ts` exists *"so that fixing it FORCES the
-register entry to be revisited rather than left stale."* Invert its assertions IN PLACE, keep its runtime↔ledger
-conjunction so the two records stay coupled, and move REG-F-085 to CLOSED in the same commit.
+**B-3 · Move the spec rows, do not copy them.** `PWU_GENERIC_SETTER_SPECS.RECOMPOSING` / `.RECOMPOSED`
+(`pwu-lifecycle-command-spec.ts:272-283`) MOVE into `PWU_LIFECYCLE_COMMAND_SPECS`, and `PwuLifecycleCommandType`
+extends 11 → 13 (that union is what makes `check-types` a gate on the move; `PWU_GENERIC_SETTER_SPECS` is
+`Record<string, …>` and is NOT type-protected, so deleting its rows is silent to `tsc`). Counts, re-derived by
+executing the tables: `lifecycle-arrow-declarations.test.ts` 11 → 13 and 8 → 6; the by-arrow split
+`{semantic 49, genericSetter 8, recovery 4}` → `{51, 6, 4}`; **`allClaimedArrows().length` stays 61** — a COPY
+pushes it to 63, which is the cheap tell. `arrow-census-coverage.test.ts` moves on NOTHING (185/182/167 all hold);
+a copy would show 185 → 187 rows against 182 distinct, the census's own signature for a duplicated declaration.
+
+**B-4 · ⚠ THE OMISSION THAT SHIPPED THREE TIMES.** `pwu-replay.ts`'s fold ends `default: return axes` (:144-145).
+Both events join the named case group at :123-133 **in the same commit**. ⚠ That group's body reads
+`p.workLifecycleState` (:139) — so both events MUST declare that field, or they need their own case, exactly as
+`PwuBaselined` does for carrying `newState` instead. `pwu-fold-drive-sites.test.ts` then demands an
+`EXPLICIT_DRIVE_SITES` entry per event, keyed by EVENT type, naming a file that calls `expectPwuReplayEquivalence`
+and a title occurring EXACTLY ONCE; its `uncovered` pin goes 9 → 11 names in sort order.
+⚠ **BEING IN THE RIGHT COMMIT IS NECESSARY AND NOT SUFFICIENT** — W-5 added its two fold cases in exactly the right
+commit and both were still dead code, with a mutant deleting BOTH leaving 1203 tests green. The drive site is what
+makes the case load-bearing.
+
+**B-5 · The four binding rows (REG-F-082), NOT two corrected ones.** DESIGN §6.2. Rows 1-2 retarget
+`BeginRecomposition` / `CompleteRecomposition` to `RecompositionContract.status` **with their real alternations**
+(`READY|CONFLICTED|INSUFFICIENT -> EVALUATING`; `EVALUATING -> COMPOSABLE|CONFLICTED|INSUFFICIENT` — note the
+existing `note` strings say `EVALUATING->SATISFIED`, which is now AcceptRecomposition's arrow and was already
+stale); rows 3-4 are NEW, for the two new commands. **Both copies of the claim must move** — the `bindings[]` row
+(which generates `BINDINGS`) and the `commands[].drives*` triple (which the generator does NOT emit and which
+`verif/binding-row-truth.ts` reads alone; its own comment records that this copy "had never been read by any
+control at all, and it carried four of the five defects"). Then `bun run gen` — **the package-level `gen`, never
+`gen:messages` alone, which skips prettier and produces a file `format:check` rejects.** REG-F-082 CLOSES here.
+
+**B-6 · Mark the dead slots.** The optional `workLifecycleState` field on `RecompositionStarted` /
+`RecompositionCompleted` becomes permanently unpopulatable once the PWU events exist. Say so in both notes, naming
+AGG-1 and REG-F-046 — an unmarked live-looking slot is an invitation to reintroduce the cross-plane write.
+
+**B-7 · Retire the pin PROPERLY, and close two entries.** `verif/recomposition-ungoverned.test.ts` exists *"so that
+fixing it FORCES the register entry to be revisited rather than left stale."* Invert its two `ACCEPTED` assertions
+IN PLACE, invert the committed-state assertion (the PWU must NOT have moved), and flip its ledger CONTROL from
+`UNENFORCED` to `ENFORCED` so the runtime↔ledger conjunction survives. ⚠ **THE CONTROL LOCATES ROWS BY
+`ledger.indexOf(guard)` AND REGEXES THE FIRST `disposition:` WITHIN 400 CHARS** — S-1a tripped exactly this by
+quoting another row's guard string inside its own evidence prose. Neither rewritten evidence block may contain the
+other guard's literal text. **REG-F-085 and REG-F-082 both move to CLOSED in this commit**, each by STRIKING its
+old `**Status:**` line as `- ~~…~~` and adding a replacement — REG-F-085 is no longer grandfathered in
+`register-status.test.ts`, so two live statuses or zero both redden.
+
+**B-8 · Gates that MOVE, each verified at HEAD by measurement rather than prediction.**
+| gate | at HEAD | after |
+|---|---|---|
+| `lifecycle-arrow-declarations.test.ts` | 11 / 8 / 61, `{49,8,4}` | 13 / 6 / **61**, `{51,6,4}` |
+| `guard-enforcement-ledger.test.ts` COUNTS | `ENFORCED 16, UNENFORCED 44` | `18 / 42` (total **82 preserved**) |
+| `csaa/…/observe-guard-enforcement-ledger.integration.test.ts` | `16 ENFORCED, 44 UNENFORCED` | `18 / 42` |
+| `validate.test.ts` registry ids | 356 | **360** (2 commands + 2 events; count what `gen` emits, do not assume) |
+| `tracker-ingest.test.ts` w2 census | `n: 267` | **269** (+1 per COMMAND only; EVENTS is not a w2 population) |
+| `event-surface-census.test.ts` `EMITTED_2026_08_04` | — | +2 names, an **ARGUED dated edit**, not a count bump |
+| `pwu-fold-drive-sites.test.ts` `uncovered` | 9 names | **11**, plus 2 `EXPLICIT_DRIVE_SITES` rows |
+| `csaa/jan-csaa-005.inventory.baseline.json` | — | regenerate with `bun run csaa:inventory`; NEVER hand-edit |
+| `arrow-census-coverage` · `binding-row-truth` · `trigger-claim-truth` · `replay-conformance` · `generic-setter-scope` | — | **NO CHANGE** — each verified by running it, not by assuming |
+
+⚠ **`generic-setter-scope.test.ts` STAYS GREEN WITH ZERO EDITS, AND THAT IS THE PROBLEM.** Its six pairs are
+hardcoded *"NOT imported from `PWU_SEMANTIC_LIFECYCLE_COMMANDS`"* precisely so it proves CLASSIFICATION rather than
+totality — which means it cannot notice that its own coverage just went stale. It will report green over 6 of 8
+owned targets. **Two cases and the header's "SIX" are owed by discipline, not by the gate.**
+
+⚠ **`trigger-claim-truth` is CONDITIONAL ON THE NAMES AND MUST BE RE-RUN.** Its resolver scans every ratified
+trigger for `/\b([a-z]+[A-Z][a-zA-Z]*)\b/`, capitalises, and counts a claim if the token names a real command —
+so **adding a command can move `namingAKnownCommand` with no trigger text changing at all.** The chosen names
+appear in no trigger, which is why the prediction is NO CHANGE; verify by running.
+
+**B-9 · Mutants — the first increment to declare any for this surface.** S-1a added ZERO ledger entries, and
+REG-F-194 already recorded the general form: *"an increment that added a command, a guard limb, a census idiom and
+a fail-closed refusal declared ZERO new mutants, so nothing in this gate names any of W-5.5's new logic. The green
+tells me I broke nothing that was already measured — it says nothing whatever about what I just built."*
+
+| id | mutation | must redden |
+|---|---|---|
+| `MU-F085B-begin-needs-no-contract` | drop the parent-match conjunct | Begin's wrong-parent refusal |
+| `MU-F085B-begin-admits-an-empty-composition` | `length > 0` → `>= 0` | Begin's no-children refusal |
+| `MU-F085B-complete-accepts-the-candidate` | `'SATISFIED'` → `'COMPOSABLE'` | Complete's COMPOSABLE refusal |
+| `MU-F085B-the-setter-performs-the-arrows-again` | delete both `PWU_SEMANTIC_LIFECYCLE_COMMANDS` rows | `recomposition-ungoverned` |
+| `MU-F085B-the-fold-forgets-the-two-events` | delete both `case` labels | the replay-equivalence CONTROL |
+⚠ **THE CONTROL'S OWN MUTANT IS UNCONDITIONAL REFUSAL**, not a `SATISFIED`→`COMPOSABLE` swap. The swap reddens a
+REFUSAL test this same document authored — a main-test mutant wearing a control's label.
+⚠ **ANCHOR COLLISION IS THE LIKELIEST RED AND IT FIRES BEFORE ANY MUTATION RUNS.** Two new handlers written into
+`pwu.ts` will structurally mirror the existing eleven; `F114-a-spec-quietly-drops-an-arrow` anchors on a bare
+`sourceStates: [...]` line and `F119-a-transcribed-source-drifts-from-the-machine` on a whole 5-line
+`PWU_GENERIC_SETTER_SPECS` entry. Run `./node_modules/.bin/vitest run verif/mutant-ledger.test.ts` **before**
+committing — that is the cheap half, and it is what caught S-1a's `UNANCHORED` before any mutation was attempted.
+⚠ **`bun run mutants` REFUSES A DIRTY TREE** (`ABORTED_DIRTY`), so mutants are committed first and measured after.
 
 ---
 

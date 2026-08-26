@@ -53,6 +53,23 @@ describe('CSAA product dependency boundary', () => {
 		expect(from.test('packages/csaa/src/index.ts')).toBe(false);
 	});
 
+	it('excludes generated and ignored output trees from dependency observations', () => {
+		const config = require(`${ROOT}.dependency-cruiser.cjs`) as {
+			options: { exclude: { path: string } };
+		};
+		const exclude = new RegExp(config.options.exclude.path);
+		for (const path of [
+			'apps/rph-demo/.svelte-kit/generated/client/app.js',
+			'apps/rph-demo/.turbo/cache.json',
+			'packages/rph-domain/coverage/index.html',
+			'packages/rph-domain/dist/index.js',
+			'packages/rph-domain/node_modules/zod/index.js'
+		]) {
+			expect(exclude.test(path)).toBe(true);
+		}
+		expect(exclude.test('apps/rph-demo/src/lib/pwaFlow.ts')).toBe(false);
+	});
+
 	it('executes a non-vacuous focused scan over both product perimeters', () => {
 		const result = inspectProductBoundary(ROOT);
 		expect(result.perimeter).toEqual(['apps', 'packages']);

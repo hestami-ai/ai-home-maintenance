@@ -211,8 +211,13 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 	// The three numbers are asserted SEPARATELY rather than as `11 + 8` or as one total: a single figure would go
 	// green if a row moved between the tables, and which table owns an arrow is exactly what REG-F-072 is about.
 	it('CONTROL — the three tables together claim all 61 arrows this slice is sized against', () => {
-		expect(Object.keys(PWU_LIFECYCLE_COMMAND_SPECS).length, 'command specs').toBe(11);
-		expect(Object.keys(PWU_GENERIC_SETTER_SPECS).length, 'generic setter specs').toBe(8);
+		// 11 -> 13 and 8 -> 6 (2026-08-21, REG-D-044 S-1b): `BeginPwuRecomposition` and
+		// `CompletePwuRecomposition` took RECOMPOSING and RECOMPOSED off the generic setter. ⚠ THE TOTAL
+		// BELOW IS THE CHECK THAT MATTERS AND IT DOES NOT MOVE: the two arrows changed OWNER, not
+		// existence. A COPY instead of a MOVE would push 61 to 63, which is the cheap tell — and it is why
+		// these three are pinned separately rather than as one sum.
+		expect(Object.keys(PWU_LIFECYCLE_COMMAND_SPECS).length, 'command specs').toBe(13);
+		expect(Object.keys(PWU_GENERIC_SETTER_SPECS).length, 'generic setter specs').toBe(6);
 		// W-5.5 — one recovery command declaring four arrows. Pinned separately from the other two for the same
 		// reason they are pinned separately from each other: a single total would go green if an arrow moved
 		// between tables, and WHICH table owns an arrow is exactly what REG-F-072 is about.
@@ -257,6 +262,8 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 				recovery: arrows.filter((a) => recovery.has(a)).length
 			},
 			'the split this slice is sized against'
-		).toEqual({ semantic: 49, genericSetter: 8, recovery: 4 });
+			// 49/8 -> 51/6 (REG-D-044 S-1b). Same two arrows, other side of the ownership line; the three
+			// numbers still sum to 61.
+		).toEqual({ semantic: 51, genericSetter: 6, recovery: 4 });
 	});
 });

@@ -78,6 +78,18 @@ const EXPLICIT_DRIVE_SITES: Readonly<Record<string, { file: string; title: strin
 	PwuUnblocked: {
 		file: '../../rph-application/src/handlers/block-escalate.test.ts',
 		title: 'CONTROL — an unblocked PWU rebuilds from its own event stream'
+	},
+	// REG-D-044 S-1b. ⚠ BOTH ARE DRIVEN BY THE SAME TEST, AND THAT IS NOT LAZINESS — the arrows are sequential
+	// on one PWU (SATISFIED -> RECOMPOSING -> RECOMPOSED), so a single drive that asserts replay equivalence
+	// after EACH hop is a stronger claim than two isolated ones: it catches a fold case that reads the right
+	// field but carries the wrong axis forward. The seed cannot cover either — it never occupies either state.
+	PwuRecompositionBegun: {
+		file: '../../rph-application/src/handlers/pwu-recomposition.test.ts',
+		title: 'CONTROL — a recomposed PWU rebuilds from its own event stream'
+	},
+	PwuRecomposed: {
+		file: '../../rph-application/src/handlers/pwu-recomposition.test.ts',
+		title: 'CONTROL — a recomposed PWU rebuilds from its own event stream'
 	}
 };
 
@@ -184,6 +196,12 @@ describe('REG-F-084 — every owned PWU lifecycle event is emitted by some test'
 			'PwuChallenged',
 			'PwuEscalated',
 			'PwuInvalidated',
+			// REG-D-044 S-1b. The §26 trace moves the CONTRACT to SATISFIED and goes straight to a Decision and a
+			// Baseline — it never puts a PWU into RECOMPOSING at all. So these two are uncovered by the seed for a
+			// stronger reason than the others: not "the seed happens not to", but "the ratified worked scenario
+			// does not traverse these states".
+			'PwuRecomposed',
+			'PwuRecompositionBegun',
 			'PwuRejected',
 			'PwuReshapingStarted',
 			'PwuSuperseded',
