@@ -526,6 +526,71 @@ describe('W-3b — the invariant enforcement census', () => {
 		).toBe(0);
 	});
 
+	// ── ⚠ THE DEBT IS DISCHARGED BY RE-AUTHORING, NOT BY STAMPING ─────────────────────────────────────────
+	// The count above is a PROVENANCE FACT and must not move: `owed_for_verdict` records the arm an `owed` was
+	// AUTHORED FOR, so the 43 stays 43 forever. What was owed was never "make the number smaller" — it was
+	// "read the row and say what the CURRENT arm owes". That answer goes in a SECOND field, leaving the
+	// original prose and its provenance intact, which is the pattern `destination_arm_evidence_owed` already
+	// established when it kept its `ORIGINAL:` record after being discharged.
+	//
+	// ⚠ AND ONE ROW IS HELD RATHER THAN RECONCILED, WHICH IS THE HONEST STATE AND NOT AN EXEMPTION.
+	// `limb:REL-3:3` holds `UNENFORCED_DEAD_PREDICATE` against its own recorded data — `classifyValidatorResult`
+	// IS called, at `packages/rph-assurance/src/floor.ts:316`, while that arm's only definition anywhere
+	// (DESIGN:101) is *"a kernel predicate implements the limb and nothing calls it"*. It is expected to move.
+	// Authoring its `owed` now would author it TWICE FOR TWO ARMS IN ONE WEEK — manufacturing precisely the
+	// orphaning this whole field exists to record. The hold is named here so it cannot become a silent skip.
+	it('every stale `owed` is re-authored for the arm the row now holds, or is HELD with its reason', () => {
+		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
+
+		const unreconciled = stale
+			.filter((v) => !v.owed_reconciled && !v.owed_reconciled_held)
+			.map((v) => String(v.limb_id));
+		expect(unreconciled, 'a stale `owed` that nobody re-read is the debt, not the count').toEqual([]);
+
+		// The re-authored text must be authored FOR THE ARM THE ROW HOLDS. Without this the new field could
+		// itself go stale on the next arm move and nothing would say so — the defect one level up.
+		const wrongArm = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled_for_verdict) !== String(v.verdict))
+			.map((v) => String(v.limb_id));
+		expect(wrongArm, 'the re-authored `owed` records the arm it was written for, and it must be current')
+			.toEqual([]);
+
+		// ⚠ THE ANTI-STAMP ASSERTION. This gate's whole premise is that re-authoring needs the row rather than
+		// a script. Copying `owed` into `owed_reconciled` would satisfy every check above while doing none of
+		// the work, and it is the cheapest possible way to fake this discharge.
+		const stamped = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled).trim() === String(v.owed ?? '').trim())
+			.map((v) => String(v.limb_id));
+		expect(stamped, 'a re-authored `owed` that is byte-identical to the orphaned one was not re-authored')
+			.toEqual([]);
+
+		const thin = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled).length < 120)
+			.map((v) => String(v.limb_id));
+		expect(thin, 'a one-line re-authoring is a stamp with extra words').toEqual([]);
+
+		// Every disposition is one of the three the reconciliation admits, and each was adversarially checked.
+		const DISPOSITIONS = new Set(['STILL_CORRECT', 'SUPERSEDED', 'DISCHARGED']);
+		const badDisposition = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => !DISPOSITIONS.has(String(v.owed_reconciled_disposition)))
+			.map((v) => String(v.limb_id));
+		expect(badDisposition).toEqual([]);
+
+		// The hold is a NAMED SET of one. A second row appearing here is a new decision, not a detail.
+		const held = stale.filter((v) => v.owed_reconciled_held).map((v) => String(v.limb_id));
+		expect(held, 'the rows held back from re-authoring, and why each is held').toEqual(['limb:REL-3:3']);
+		expect(
+			String(stale.find((v) => String(v.limb_id) === 'limb:REL-3:3')?.owed_reconciled_held ?? ''),
+			'a hold must state the arm move it is waiting on, or it is indistinguishable from a skip'
+		).toContain('floor.ts:316');
+
+		expect(stale.filter((v) => v.owed_reconciled).length, 're-authored').toBe(42);
+	});
+
 	// The one part of the class that IS mechanically decidable, and it is decidable from the LADDER rather than
 	// from wording: an `owed` written to accompany an ENFORCED_* verdict cannot state the filing owed by a live
 	// divergence, because the two arms are mutually exclusive. Named individually so the list shrinks visibly.

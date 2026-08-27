@@ -1231,3 +1231,112 @@ The stale-`owed` debt went **42 → 43** (`REL-2:3`'s move) and the superseded-n
 narrative it outlived is now *marked* as outlived instead of silently standing. Neither is repaired by
 stamping: `owed_for_verdict` records the arm an `owed` was **authored for**, and rewriting it would make a
 provenance fact false.
+---
+
+## 23. ⚠ V-12 — THE FIFTH VOCABULARY GAP IS ANSWERED BY THE CORPUS, AND THE 43 ARE RE-AUTHORED
+
+### 23.1 The gap is real, is SIX rows, and still does not get an arm
+
+Three derivations from different starting points — the ladder's own semantics, the call graph, and the row
+prose — returned **9 / 7 / 7** members and **two of the three recommended MINT_THE_ARM.** Adjudicated, the
+population is **6**: `limb:REL-2:3`, `limb:ASR-3:1`, `limb:ASR-2:3`, `limb:ASR-6:5`, `limb:ASR-16:2` firm,
+plus `limb:REL-3:3` at MEDIUM — five invariant families, five production artifacts, each verified at the
+code rather than read off the row.
+
+**Six is a class, so the one-member objection does not apply and is not what settles this.** The
+recommendation is **DO_NOT_MINT**, on three grounds:
+
+**FIRST — THE CORPUS HAS ALREADY ADJUDICATED THIS EXACT MECHANISM, ON ONE OF THESE ROWS, AND ALL THREE
+DERIVATIONS CUT THE SENTENCE BEFORE ITS VERDICT.** `packages/rph-domain/src/enforcement-register.ts:3205-3209`,
+`RPH-BAS-002`'s `whyNoPredicate` — the register entry for `limb:ASR-16:2` — reads in full (verified
+byte-exact this session; positive control: 22 `whyNoPredicate` entries in that file, so the field is a live
+convention):
+
+> *"`findVersionMismatches` is NOT dead — it is called on this very dispatch, so naming it would fail
+> `deadPredicate`'s first clause. What is defective is the ARGUMENT it is given. A census over the symbol
+> would stay green forever while the rule went unenforced, **which is precisely the case the
+> OBSERVED_ADMISSION arm was added for.**"*
+
+One derivation offered the truncated half as a positive control **for** minting. **The sentence's own
+conclusion is the opposite.** The register's author considered this mechanism, on this row, having seen the
+whole thing, and ruled that `UNENFORCED_OBSERVED_ADMISSION` is the arm that exists for it. That is not a
+tiebreaker; it is the answer already on file — `search the register first`, and it was dispositive.
+
+**SECOND — THE ARM WOULD REPLACE A TRUE AND STRONGER FACT WITH A NARROWER ONE, ON HALF ITS OWN POPULATION.**
+`verdict` is a single scalar per row. For three of the six, `UNENFORCED_OBSERVED_ADMISSION` is *correct*:
+the forbidden arrangement was driven through `Engine.dispatch` and accepted, which is the strongest thing a
+census row can say. A twelfth arm could only be held **instead** of that. **These rows carry TWO facts on a
+ONE-VALUE axis, and the instrument for a second fact is a FIELD, not an arm.**
+
+**THIRD — THE DEFINITION IS NOT YET CRISP, AND THAT WAS A STATED CONDITION.** Four of the ten claimed
+members fail on boundaries, each toward a *different* neighbour — `ASR-6:4` into `UNENFORCED_NO_SHAPE` (no
+value exists to stipulate), `ASR-2:2` into a missing reader, `ASR-2:1` into a comparison never made,
+`ASR-17:3` into `PARTIAL`. **A boundary that three careful derivations placed differently on 40% of the
+candidates is not ready to become a closed vocabulary value.**
+
+**THE COST WAS MEASURED, NOT FEARED.** Minting would redden the distribution pin (`:256-257`), **silently
+narrow** the two `DRIVEN_ARMS` assertions at `:270`/`:281` unless the arm were added to `:125` in the same
+commit — *the live form of the V-4 hazard that ran green for six commits* — redden two hard verdict pins at
+`:965` and `:1016`, falsify the `what_the_move_costs` text the gate asserts at `:967`, and **orphan a FOURTH
+provenance field nobody had counted**: `destination_arm_evidence` (9,360 chars), authored solely to satisfy
+the arm the row would be leaving. §21.4 records that these cannot be repaired by stamping.
+
+### 23.2 The 43 stale `owed` fields are re-authored — 42 written, 1 held
+
+The debt was never *"make the number smaller"*. `owed_for_verdict` is a **provenance fact** and the count
+stays **43 forever**. What was owed is *"read the row and say what the CURRENT arm owes"*, and that answer
+now lives in a second field — `owed_reconciled` — leaving the orphaned prose and its provenance intact.
+This is the pattern `destination_arm_evidence_owed` established when it kept its `ORIGINAL:` record after
+discharge.
+
+Dispositions after adversarial verification (**29 of 43 CORRECTED, 14 upheld**): **41 SUPERSEDED,
+1 DISCHARGED, 1 STILL_CORRECT.**
+
+**⚠ `limb:REL-3:3` IS HELD, NOT SKIPPED.** It is expected to change arms (§23.3). Authoring its `owed` now
+would author it **twice for two arms in one week** — manufacturing precisely the orphaning the field exists
+to record. The hold is a named set of one in the gate, so it cannot decay into a silent skip.
+
+**The gate's three mutants are driven and distinguished BY MESSAGE**, because an arrangement that trips two
+guards proves neither: copying `owed` verbatim into `owed_reconciled` reddens *"byte-identical to the
+orphaned one"*; a stale `owed_reconciled_for_verdict` reddens *"must be current"*; a hold without its reason
+reddens *"indistinguishable from a skip"*. **A first attempt at the stamp mutant tripped the wrong
+assertion** — it targeted a row whose `owed` was empty, so copying it merely removed the field — and the
+anti-stamp leg was unexercised until the target was changed to one with an 821-character `owed`.
+
+### 23.3 ⚠ WHAT THE GAP CENSUS FOUND INSTEAD, AND IT IS THE MORE ACTIONABLE FINDING
+
+**FOUR OF THE ELEVEN `UNENFORCED_DEAD_PREDICATE` ROWS — 36% OF THAT ARM — HOLD IT AGAINST THEIR OWN RECORDED
+DATA.** That arm's only definition anywhere (DESIGN:101) is *"a kernel predicate implements the limb and
+**nothing calls it**"*. Each of these four cites an artifact something **does** call, verified at HEAD:
+
+| row | artifact | production call site |
+|---|---|---|
+| `limb:ASR-3:1` | `evaluateApplicability` | two sites, both verified |
+| `limb:ASR-6:5`, `limb:ASR-6:4` | `evidenceAdmissibility` | `handlers/assurance.ts:552` |
+| `limb:REL-3:3` | `classifyValidatorResult` | `floor.ts:316` |
+
+**This is the V-10 finding that moved `REL-2:3`, unapplied to four siblings.** Destinations: `ASR-3:1`,
+`ASR-6:5`, `REL-3:3` → `UNENFORCED_OBSERVED_ADMISSION` (each has a driven admission); `ASR-6:4` → adjudicate
+`NO_SHAPE`.
+
+**⚠ AND THE STALE-`owed` DEBT WILL RISE FROM 43 TO 45 WHEN THEY MOVE. COUNT THAT RISE; DO NOT STAMP IT.**
+`ASR-3:1`, `ASR-6:4` and `ASR-6:5` are **not currently in the 43 at all** — their `owed_for_verdict` equals
+their `verdict` today. **Five of the six gap members are invisible to the stale-`owed` phase**, which is
+worth stating plainly: that phase is *not* a proxy for the rows this decision touches.
+
+**A GLOSS DRIFT, CONFIRMED AND EXTENDED.** `limb:PER-7:1` and `limb:ASR-14:4` define
+`UNENFORCED_DEAD_PREDICATE` as *"a check exists and CANNOT FAIL"* — **a definition present nowhere in the
+corpus.** `REL-3:3`'s own refuter drifts the same way. An arm re-defined inside the rows that hold it is how
+a vocabulary stops meaning what its definition says.
+
+### 23.4 What is owed instead of an arm
+
+1. **Move the four off-definition `DEAD_PREDICATE` rows** to the arms their own evidence supports.
+2. **Generalise `what_the_move_costs` from a name to a rule.** It exists on **exactly one row in 307**,
+   standing in for six — §21.3's *"a hand-listed exception set is a vocabulary gap wearing an allowlist"*,
+   with a population of one. It should be a gated field required on every row meeting the derived predicate,
+   naming the artifact, its production call site, and the stipulated input at `file:line`.
+3. **Build the argument-side gate the register already specified** at `enforcement-register.ts:3207` —
+   *"a census over the symbol would stay green forever"*, and **every symbol-reachability instrument in this
+   repository passes on all six members.** Predicted red, named first: un-aliasing
+   `reviewedItems: candidateItems` at `handlers/governance.ts:929` must redden it; re-aliasing must green it.
