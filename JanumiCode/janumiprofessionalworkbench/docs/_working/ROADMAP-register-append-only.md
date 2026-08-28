@@ -147,6 +147,50 @@ JPWB-DOC-004 §10 — measured with a control: the 7 `DOC-004` hits in `verif/` 
 DOC-004, a different artifact with §20/§31/§32 sections JPWB-DOC-004 does not have. Items 1–7 are equally
 unenforced; item 8 is no worse and no better.
 
+## ✅ R-7 — the two remaining corpus merges — **DONE 2026-08-28**
+
+**`JPWB-DOC-004` is now v1.5.0**, carrying two new §10 items, appended after item 8 and never renumbered.
+
+- **Item 9 — re-derive a figure at the point of writing** (from `REG-F-278`). ⚠ It merged as a NEW item
+  rather than an amendment to item 8, on a distinction worth keeping: **item 8's remedy cannot detect this
+  defect.** Item 8 discharges a load-bearing mutable value by *dating the reading* — and dating a figure
+  that was already false when measured yields **a dated false figure wearing the appearance of a checked
+  one**. Item 8 guards DECAY; item 9 guards TRANSCRIPTION. They are independently violable.
+- **Item 10 — an annotation never moves the lines it annotates** (from `REG-F-277`, refined by `REG-F-281`),
+  with both travelling constraints from `scripts/tracker/ingest.ts:109`.
+
+**Not §9, and the reason was measured rather than preferred.** §9's `governs:` bullet confines it to
+JPWB-REG-005, while the rules' trigger fires on any artifact cited by line — under-scoping is the defect
+`REG-F-275` had already corrected once. The artifact also already runs traffic **§9 → §10** (`:322` routes
+out to item 8), and the §9 form would have shifted 22 lines where the §10 append shifts 2.
+
+⚠ **The ordinal-citation count in the brief was low by ~7×.** It said "at least three live sites"; the
+derived answer is **23 live sites across 5 files** — eleven of them inside the append-only register, and
+seven live rows in the CSAA Requirement Ledger pinning `§10 item 1`…`item 7`. Renumbering was never
+available.
+
+---
+
+## ⚠ R-8 — forty stale status claims, RECORDED not swept (`REG-F-284`) — **OPEN**
+
+Three independent derivations plus adjudication found **40 stale clauses across 37 entries**, where a
+hand-pass had found 3 — and **all three of those were mine, from the last two days.** The oldest has stood
+since **2026-07-16**.
+
+⚠ **Four were already ruled MERGED by this register's own `### Closure sweep — 2026-07-24` (`:162`)** and
+still read `DECIDED — MERGE PENDING` at HEAD. `REG-F-095` swept the same class on 2026-08-09 by grepping a
+**literal phrase**, struck `REG-D-001..007`, and stopped — the four survivors use different wording.
+
+**Five were repaired; 28 were not, and the difference is measured cost.** A strike inserts a line; the five
+sit below every citation target in the file, so their repair moves nothing. The other 28 are scattered from
+`:55` and would shift thousands of targets — which is `§10 item 10`, merged the same day.
+
+**What would close the class is an instrument.** `verif/register-status.test.ts` checks a status is
+*readable*; nothing checks it is *true*. A gate over the supersession graph would have caught **9 of 40** —
+the limit is stated, not hidden. Scoped, not built.
+
+---
+
 ## Superseded open item
 
 **`REG-F-273`'s drafting rule still has no home.** Its merge target is `JPWB-DOC-004` (agent conduct) or

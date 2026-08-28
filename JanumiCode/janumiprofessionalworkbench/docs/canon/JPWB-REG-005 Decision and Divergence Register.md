@@ -25620,7 +25620,8 @@ of live entry text landed under it — including twice on the entry REG-F-273 ci
 - **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
   of one bullet of **REG-F-273** (its stated REASON; its drafting rule is re-affirmed unchanged) ·
 - ~~**Status:** OPEN~~
-- **Status:** **MERGED 2026-08-27 AS TO THE DRAFTING RULE.** Carried by `JPWB-DOC-004 §10 item 8`. Its Repository leg landed the same day (`verif/register-append-only.test.ts`). Its annotation leg is discharged by **REG-F-277**, which supersedes the prescribed in-bullet FORM on measurement. Its stated coverage limit is closed by **REG-F-280** (bigram refuted). Its date clause is superseded by **REG-F-278**. ⚠ **Still owed:** the correcting entry for `70e4f33b`, whose sentence about this register's own history is false in place.
+- ~~**Status:** **MERGED 2026-08-27 AS TO THE DRAFTING RULE.** Carried by `JPWB-DOC-004 §10 item 8`. Its Repository leg landed the same day (`verif/register-append-only.test.ts`). Its annotation leg is discharged by **REG-F-277**, which supersedes the prescribed in-bullet FORM on measurement. Its stated coverage limit is closed by **REG-F-280** (bigram refuted). Its date clause is superseded by **REG-F-278**. ⚠ **Still owed:** the correcting entry for `70e4f33b`, whose sentence about this register's own history is false in place.~~
+- **Status:** **MERGED 2026-08-27 AS TO THE DRAFTING RULE; ITS RESIDUALS ARE NOW DISCHARGED.** Carried by `JPWB-DOC-004 §10 item 8`. Repository leg landed the same day (`verif/register-append-only.test.ts`). Annotation leg discharged by **REG-F-277**, whose FORM was then superseded by **REG-F-281**. Coverage limit closed by **REG-F-280**. Date clause superseded by **REG-F-278**. ⚠ **The `70e4f33b` correcting entry this status previously advertised as *still owed* was FILED 2026-08-28 as `REG-F-282`** — the clause stood false for one day and is recorded in the census at **REG-F-284**.
 
 - **THE DEFECT.** This register's `changeProcedure` (`:19`) reads *"Append-only after ratification … Entries
   are never destructively edited; a correction is a superseding entry citing the entry it supersedes."*
@@ -25743,7 +25744,9 @@ property, repeated undated, and false by thirteen days when written
 minting an arm for it in a sentence all three derivations cut before its verdict
 
 - **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — disposes the standing
-  *"fifth vocabulary gap"* item of the W-3b programme · **Status:** CLOSED (the gap is answered; the four
+  *"fifth vocabulary gap"* item of the W-3b programme
+- ~~**Status:** CLOSED (the gap is answered; the four~~
+- **Status:** **CLOSED** (the gap is answered). ⚠ **The count in the superseded status was wrong and the openness is spent:** it is **THREE** off-definition rows, not four — `limb:REL-3:3` was adjudicated and REFUSED, its arm resting on a predicate with zero production callers while the called one the finding cited is that row's own fourth reinforcing observation — and all three moves are APPLIED. See **REG-F-279**.
   off-definition rows below are OPEN and tracked separately)
 
 - **THE QUESTION.** `limb:REL-2:3`'s `what_the_move_costs` recorded that no arm in the ladder expresses
@@ -25809,7 +25812,8 @@ was measured and it invalidates 543 line-number citations in an artifact that ca
 
 - **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — discharges the
   annotation leg of **REG-F-274** and supersedes ONE CLAUSE of it (the prescribed FORM of the annotation) ·
-  **Status:** OPEN
+- ~~**Status:** OPEN~~
+- **Status:** **MERGED 2026-08-28 AS TO THE FORM RULE.** Carried by `JPWB-DOC-004 §10 item 10` (v1.5.0), as refined by `REG-F-281`. ⚠ Its headline figure — *"invalidates 543 line-number citations"* — is superseded by `REG-F-283`; the figure sits in this entry's TITLE and cannot be corrected in place.
 
 - **WHAT THIS DISCHARGES.** `REG-F-274` records 26 confirmed in-place rewrites of live entry text and
   prescribes, deliberately in place of a sweep: *"Append a one-line pointer to each affected bullet
@@ -25903,7 +25907,7 @@ completed by a pointer and nothing is revived.**
 
 - **Merge target:** **This register** (the annotations) · **Corpus** for the form rule — *an annotation that
   must not move existing line numbers belongs at the end of an append-only artifact, not in its body* — which
-  is a drafting rule and belongs with `JPWB-DOC-004 §10 item 8`. Status: OPEN.
+  is a drafting rule and belongs with `JPWB-DOC-004 §10 item 8`. Status: OPEN. ⚠ **MERGED 2026-08-28 as `JPWB-DOC-004 §10 item 10`** (artifact v1.5.0), appended after item 9 — never renumbered, because §10 ordinals are cited from 23 live sites, eleven of them inside this register. See the entry's bolded status below.
 
 ---
 
@@ -25911,7 +25915,9 @@ completed by a pointer and nothing is revived.**
 STOPPED on 2026-08-10, and this correction is an append because that entry's own subject forbids the edit
 
 - **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
-  of **REG-F-274**, filed earlier the same day · **Status:** OPEN
+  of **REG-F-274**, filed earlier the same day
+- ~~**Status:** OPEN~~
+- **Status:** **MERGED 2026-08-28 AS TO THE RE-DERIVATION RULE.** Carried by `JPWB-DOC-004 §10 item 9` (v1.5.0). ⚠ It merged as a NEW item rather than an amendment to item 8, on the ground that **item 8's remedy cannot detect this defect**: a dated reading tells a reader when to re-check a value, and dating a figure that was already false when measured yields a dated false figure. Item 8 guards DECAY; item 9 guards TRANSCRIPTION.
 
 - **THE CORRECTED FACT.** `REG-F-274` states the 26 confirmed in-place rewrites ran *"beginning 2026-08-02 …
   and running to 2026-08-21."* **The second date is false.** All 26 fall between **2026-08-02 and
@@ -26094,7 +26100,9 @@ the sanctioned act, and the register's own shape is what makes that unavoidable
 and REG-F-273 closes
 
 - **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — discharges
-  **REG-F-273**'s own closure condition and refines the form rule of **REG-F-277** · **Status:** CLOSED
+  **REG-F-273**'s own closure condition and refines the form rule of **REG-F-277**
+- ~~**Status:** CLOSED~~
+- **Status:** **CLOSED 2026-08-28.** `REG-F-273` closed on it, and its own corpus leg — the annotation form rule — is now carried by `JPWB-DOC-004 §10 item 10` (v1.5.0). Nothing remains owed.
 
 - **WHAT THIS DISCHARGES.** `REG-F-273` has stood **MERGED as to its drafting rule, OPEN as to its own
   closure condition** since 2026-08-27: *"CLOSES when a one-line ⚠ SUPERSEDED IN PART pointer is appended at
@@ -26167,7 +26175,7 @@ and REG-F-273 closes
 
 - **Merge target:** **This register** (the six pointers, applied) · **Corpus** for the refined form rule,
   which belongs with `JPWB-DOC-004 §10 item 8` as a drafting rule about annotating an append-only artifact.
-  Status: CLOSED as to `REG-F-273`; the corpus merge of the form rule is OPEN.
+  Status: CLOSED as to `REG-F-273`; the corpus merge of the form rule is OPEN. ⚠ **THAT MERGE LANDED 2026-08-28** as `JPWB-DOC-004 §10 item 10`; see the entry's bolded status below.
 
 
 ---
@@ -26306,3 +26314,122 @@ unstruck because it was right"*: a claim about striking, made by the hand that d
   superseding entry citing the entry it supersedes"*). **No corpus change and no repository change is
   owed:** the rule and the instrument both already exist. **Status:** OPEN — open only as to the optional
   same-line strike above; the sentence is corrected by this entry whether or not that is applied.
+
+---
+
+### REG-F-283 — REG-F-277's headline 543 is withdrawn: the split its own sentence asserts is arithmetically impossible, and no extraction rule reproduces the count
+
+- **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes the FIGURES in **REG-F-277**'s heading and in its first measurement bullet, and nothing else of it · **Status:** OPEN
+
+- **WHAT IS SUPERSEDED, EXACTLY.** `REG-F-277`'s heading reads *"it invalidates 543 line-number citations in an artifact that cannot correct them"*, and its measurement bullet reads *"**594** line-number citations matched in the register; **543** sit at or below the first insertion and therefore shift — **364** of them by 34 lines."* **Those three figures are withdrawn.** The finding they were offered in support of — the appendix form, and the reason for it — is **not** withdrawn and is stronger below. Quoting them here is examination, not assertion (DOC-004 §10 item 8's non-example).
+
+- **⚠ THE SENTENCE IS FALSE UNDER THE READING ITS OWN WORDS CARRY, AND THIS IS RULE-INDEPENDENT.** *"Sit at or below the first insertion"* says where a citation SITS. **Nothing sits above `:473`.** The lowest line of this register carrying any 3-to-5-digit line-number citation is **`:479`** — read at `89936730` and again at `ce42fca0` — and the count of citations positioned in lines 1–472 is **0** at both readings (0 of 5,741, then 0 of 5,776). Crude control on the same instrument, with a known-opposite expected value: `sed -n '1,472p' … | grep -c -E ':[0-9]{3,}'` returns **0** where `sed -n '473,1200p'` returns **10**. **So under that reading the split is total, not 543 of 594, whatever the extraction rule** — and a citation that merely moves is not thereby wrong; only one whose TARGET moves is.
+
+- **AND UNDER THE ONLY OTHER READING IT IS NOT REPRODUCIBLE.** Taking the sentence to mean *the cited line* is at or below `:473`: **2,016 rule combinations were evaluated at each of three revisions** — `89936730` (the 25,799-line artifact `REG-F-277` measured), `024b8c9c` (the commit that appended it), `ce42fca0`. **No combination yields a total of 594, and none yields the triple.** Closest by summed relative error: 650 / 650 / 263. Four alternative citation forms fail (`L<nnnn>` = 351, *"line NNNN"* prose = 207, `#L<n>` = 0), as do bullet grain (1,320), the whole canon directory (6,715), the whole tree (722) and eight grep-shaped counts (`:\d{3,}` occurrences = 5,766; `REG-005:\d+` = 209). **And no instrument exists to appeal to:** nothing under `scripts/` or `verif/` computes it — `verif/register-citations.test.ts` resolves entry IDs, not line numbers — and `docs/_working/DESIGN-register-append-only.md:242` repeats the same three figures with no rule either. **A measurement published without its rule is not a measurement a later reader can check.**
+
+- **THE SPREAD, WITH ITS SPLITTER PUBLISHED (`REG-F-272:25137`).** Citations whose target is at or below `:473`, measured on `89936730` — TOTAL / target ≥ 473 / target > 3309:
+  | rule | total | stale | by the full 34 |
+  |---|---|---|---|
+  | unambiguous register targets (`REG-005:N`, `REG-x-nnn:N`), per-line code span | 131 | **121** | 81 |
+  | same, no code-span requirement | 226 | **209** | 123 |
+  | same, tree-wide — every artifact citing into this register | 722 | **567** | 265 |
+  | register-internal incl. bare `` `:NNNN` ``, per-line span, 3–5 digits | 2,958 | **2,065** | 893 |
+  | same, no code-span requirement | 3,513 | **2,465** | 1,064 |
+  | whole-document backtick pairing, any prefix, 3–5 digits | 589 | **428** | 191 |
+  | every `:NNN` token incl. external-file citations (over-count: `foo.ts:123` does not go stale) | 4,982 | 3,044 | 1,003 |
+  **The splitter, in descending order of how much it moves the number: (1) does a bare `` `:NNNN` `` count — a factor of ~16, and it is genuinely ambiguous, since many bare citations continue a filename named earlier in the sentence (`floor.ts:250, 364, 380`) and target another file; (2) must the token sit in a code span, and is pairing per-line or per-document; (3) 3-digit versus 4–5-digit, which alone decides any numerator, since only a 3-digit target can fall above `:473`; (4) this register alone versus every artifact that cites into it.** Ranges count as one citation; counting endpoints separately adds 1,042 to the last row. **No exact partition is asserted and no rate is published.**
+
+- **THE HARM IS DRIVEN, NOT ARGUED — AND `REG-F-277`'s DECISION IS UNDISTURBED.** Performing the insertion (34 lines at 28 bullet anchors from `:473`) takes this register 26,308 → 26,342 at `ce42fca0` and takes the verifiable subset from **20 of 20 correct to 17**, naming `REG-F-072:2255` twice and `REG-F-134:3564`. **Under every rule above, the in-bullet form invalidates between 121 and 2,465 citations this artifact can never repair.** The appendix was the right call; only the number in the title was wrong. `REG-F-277`'s gate leg — the forbidden-act mutant collapsing from nine lost words to one and then to zero — turns on no count and is not touched.
+
+- **⚠ AND THE POPULATION WAS SCOPED TOO NARROWLY, WHICH MOVES AGAINST THE ENTRY AND NOT FOR IT.** `REG-F-277` counted only *"in the register"*. Read at `89936730`, a further **496** unambiguous register-targeting citations live elsewhere in the tree — **376** in `docs/tracking/w3b/invariant-verdicts.ndjson`, **84** in `JPWB-SPEC-001`, **16** in `HARMONIZATION-FINDINGS.md`, **8** in the Conferral Sheet, **12** across `docs/_working/` — **358** of them targeting lines at or below `:473`; at `ce42fca0` it is 503 and 364. Those go stale too. **The mitigation the entry never claimed is that, unlike this register, every one of them can be corrected in place.**
+
+- **THE VERIFIABLE SUBSET IS CONFIRMED, RE-DERIVED, AND CARRIES ONE CORRECTION.** At `89936730`: **17 entry-qualified citations, all 17 inside the entry they name** — `REG-F-277` and `REG-F-281` are exactly right. Re-derived at `ce42fca0`: **20, all 20 inside.** ⚠ **17 is right only because the extractor does not require a code span:** a strict per-line CommonMark scanner returns **16** (and **19** at HEAD), losing `REG-F-134:3564` at `:25573`/`:25575`, whose line carries a stray backtick inside a quoted string that breaks run pairing. ⚠ **And the convention is reliable INSIDE this register and not outside it:** tree-wide the subset is **32 testable, 31 inside, 1 outside** — `REG-F-123:3235` in `docs/_working/ROADMAP-derived-capsule-closure.md:138`, against REG-F-123's span of 3429–3441 read at `ce42fca0`. **Controls, each with a known-opposite expected value, all fired:** mutating `REG-F-245:14904` → `:14000` moves OUTSIDE 0 → 1; a fabricated `REG-F-999:12345` comes back UNRESOLVED, not INSIDE; stripping the literal `REG-005:` collapses that class 216 → 0.
+
+- **⚠ THE FORM IS AN APPEND BECAUSE NO POINTER CAN REACH A HEADING.** `REG-F-281`'s form C extends a bullet's last line; `REG-F-277`'s appendix annotates at the end of the artifact. **Neither corrects a title.** This entry is appended below every existing line, so it moves no target and can falsify nothing. **What CAN be repaired in place is `docs/_working/DESIGN-register-append-only.md:242`**, which is not append-only and carries all three withdrawn figures verbatim; that repair is owed and is not performed here.
+
+- **⚠⚠ AND THIS IS THE SECOND ORCHESTRATOR-SYNTHESIS FIGURE IN TWO DAYS THAT AN INDEPENDENT EXTRACTOR COULD NOT REPRODUCE.** `REG-F-281` recorded **117** against an independent **223 minimum** and published the range rather than a number. **The common form is not arithmetic and not this artifact: it is a count produced inside a synthesis, restated in a heading, and shipped without the rule that would let anyone re-derive it.** `REG-F-278` names the same shape from a third direction. The standing remedy is `REG-F-272`'s: **publish the splitter with the figure, or publish no figure.**
+
+- **WHAT IS NOT CLAIMED.** **Not** that 543 is too high or too low — it corresponds to no rule tried, so no direction of error is asserted, and it does fall inside the 121–2,465 band. **Not** that `REG-F-277`'s decision, its 28 pointers, its 22 annotated entries, or `REG-F-274`'s count of 26, its 103–163 range or its keystone are disturbed; none is re-opened. **Not** that any reader was misled: the only downstream consumer found draws the same conclusion the corrected spread supports. **Not** that the tree-wide row is complete — bare citations in other artifacts that mean *this register* are unresolvable and excluded, so 722 is a floor. **Not** that `REG-F-123:3235` was wrong when authored; only that it is wrong at both readings taken here.
+
+- **RECONCILIATION.** Withdraws three figures from `REG-F-277` and nothing else. Closes no census limb. Does not re-open `REG-F-274`, `REG-F-273`, `REG-F-281` or `REG-F-282`.
+
+- **Merge target:** **This register** (this entry) · **Repository** — an instrument for the citation extractor, so the next agent measures rather than re-derives, and so the 20/20 verifiable subset becomes a gate rather than a reading · **`docs/_working/DESIGN-register-append-only.md:242`**, correctable in place. `**Status:**` OPEN.
+
+---
+---
+
+### REG-F-284 — forty stale claims stand in this register's status and owed clauses, the oldest since
+2026-07-16, and four of them were ruled MERGED by this register's own closure sweep a month ago
+
+- **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — records a census; sweeps
+  nothing · **Status:** OPEN
+
+- **THE FINDING.** An entry's **status line** and its **owed clauses** are the text a reader uses to decide
+  what work remains. They are also, exactly, what `JPWB-DOC-004 §10 item 8` forbids asserting as a standing
+  fact — and **nothing checks them.** `verif/register-status.test.ts` checks that each entry has exactly one
+  readable status; **it cannot check whether that status is true.** Derived from three independent
+  procedures — the status vocabulary, the owed-work language, and the supersession graph — and adjudicated:
+  **forty stale clauses across thirty-seven entries and two ministerial blocks.**
+
+- **⚠ THE HAND-PASS FOUND THREE, AND ALL THREE WERE MINE, FROM THE LAST TWO DAYS.** They sit in the
+  `REG-F-27x`/`28x` cluster, in the last 900 lines of a 26,000-line file. **Thirty-seven of the forty are
+  outside that cluster, and the oldest has stood since 2026-07-16.** A hand-pass finds what it recently
+  wrote; that is not a census, and treating it as one is how a class becomes invisible.
+
+- **⚠⚠ THE REGISTER HAD ALREADY RULED ON FOUR OF THEM — A MONTH AGO, IN THIS FILE.** `### Closure sweep —
+  2026-07-24 (ministerial, per REG-D-010)` at `:162` states that its closure conditions fired and records
+  the resulting statuses, naming `REG-D-001..D-009` and `REG-F-003`/`REG-F-004`. **At HEAD, `REG-D-008`
+  (`:104`), `REG-D-009` (`:112`), `REG-F-003` (`:459`) and `REG-F-004` (`:465`) all still read `DECIDED —
+  MERGE PENDING`.** Verified at each line.
+  > **The ruling exists and the statuses never received it.** This is *search the register first*, failing
+  > not because nobody searched but because **a closure sweep is not indexed by the entries it closes.**
+
+- **⚠ AND A LATER SWEEP HIT THE SAME CLASS AND STOPPED, BECAUSE IT KEYED ON A LITERAL PHRASE.** `REG-F-095`
+  performed this repair on 2026-08-09 by grepping *"closes on canon ratification"*, struck `REG-D-001..007`
+  — the strikes are visible at `:55-98` — and went no further. **The four survivors say *"countersign via
+  Ratify Sheet"*, *"closes on DOC-003 ratification"* and *"closes when DOC-004 is ratified"* instead.** A
+  keyword sweep narrows silently and reports success; this is the fourth time this programme has recorded
+  that shape, and the first time the narrowing was invisible for nineteen days.
+
+- **⚠ MY OWN DERIVATION FOUND NINE, AND THE REASON IS INSTRUCTIVE.** Its entry extractor matched
+  `^### REG-[A-Z]-\d{3}` — **so it could not see the two headings in this file that are not entry ids**,
+  `### Hygiene passes` (`:159`) and `### Closure sweep` (`:162`). **The record that settles four of the forty
+  was structurally invisible to the instrument built to find them.** Its supersession-edge regex also
+  required bold `**REG-x-nnn**` and found 13 edges where the broadened form finds 222 — **a 17× undercount**
+  from a formatting assumption.
+
+- **THE SPLIT, AND IT DETERMINES THE REMEDY.** **33 are repairable by the sanctioned strike-and-replace** —
+  the status is superseded in place, struck, with the replacement as its own line. **7 cannot be**: the
+  stale text sits in an entry's HEADING or in body prose, where striking would rewrite history, and those
+  need a superseding entry. Two of the seven are already filed (`REG-F-283` for `REG-F-277`'s headline
+  figure; this entry for the rest).
+
+- **⚠ THIS ENTRY SWEEPS NOTHING, AND THE REASON IS THE RULE MERGED TODAY.** The 33 strikes are scattered
+  from `:55` onward, and **a strike inserts a line**: performing all 33 would shift thousands of citation
+  targets in an artifact that can never repair them. `JPWB-DOC-004 §10 item 10` — merged today from
+  `REG-F-277`/`REG-F-281` — is exactly this constraint. **The five repaired here are repaired only because
+  their cost was measured at ZERO:** `REG-F-274`, `REG-F-276`, `REG-F-277`, `REG-F-278` and `REG-F-281` all
+  sit below every line-citation target in the file, so striking them moves nothing.
+  **The other 28 are recorded and left**, the same decision `REG-F-277` made for the 26 and for the same
+  measured reason. **A repair whose cost exceeds the defect is not a repair.**
+
+- **THE REMEDY, ORDERED.** (1) The four closure-sweep survivors — `REG-D-008`, `REG-D-009`, `REG-F-003`,
+  `REG-F-004` — are the highest value: their correct status is *already ruled* and merely unrecorded, so the
+  repair creates no meaning and needs no adjudication. (2) The rest are repaired opportunistically, when an
+  entry is being touched for another reason and the line-shift is already being paid. (3) **What would
+  actually close this class is an instrument**: `verif/register-status.test.ts` checks that a status is
+  *readable*; nothing checks that it is *true*. A gate that reads the supersession graph and reddens when an
+  entry advertises work a later entry claims to have discharged would have caught 9 of the 40 — **not all
+  of them, and that limit is stated rather than hidden.**
+
+- **WHAT IS NOT CLAIMED.** **No rate and no denominator** (`REG-F-272:25136`): forty is a count over an
+  adjudicated set from three procedures, not a partition of the register's ~401 entries, and the procedures
+  disagreed (22 / 22 / 13 before adjudication). **The forty are not all equally wrong** — some are a stale
+  count, some an owed clause discharged elsewhere, some a status contradicted by a later entry; the entry
+  does not flatten them. **And none of the forty is an error by its author.** Every one was true when
+  written. The defect is the standing assertion of a value a later act could move, which is the class
+  `JPWB-DOC-004 §10 item 8` exists to name.
+
+- **Merge target:** **This register** (the census) · **Repository**, for the truth-checking gate at (3),
+  which is scoped here and not built. Status: OPEN.
+
