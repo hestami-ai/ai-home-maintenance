@@ -26432,4 +26432,79 @@ unstruck because it was right"*: a claim about striking, made by the hand that d
 
 - **Merge target:** **This register** (the census) · **Repository**, for the truth-checking gate at (3),
   which is scoped here and not built. Status: OPEN.
+---
+
+### REG-F-285 — the status-truth gate is BUILT, and it corrects REG-F-284's own catch estimate: eight, not
+nine, and the ninth was a question that was NARROWED rather than discharged
+
+- **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — discharges the
+  Repository leg of **REG-F-284** and supersedes ONE FIGURE in it · **Status:** CLOSED
+
+- **WHAT LANDED.** `verif/register-status-truth.test.ts` (783 lines, 9 tests). `REG-F-284` named the gap in
+  terms: *"`verif/register-status.test.ts` checks that a status is READABLE; nothing checks that it is
+  TRUE."* This is the instrument for the half the register can witness about itself — **an entry whose live
+  status advertises owed work that a LATER block claims to have discharged, and which does not name that
+  block.**
+
+- **⚠ IT CORRECTS `REG-F-284`'s CATCH FIGURE, AND THE CORRECTION IS INSTRUCTIVE.** That entry says the gate
+  *"would have caught 9 of 40"*. **Measured on the shipped file: EIGHT of the 36 distinct ids the 40 clauses
+  resolve to, plus one the census did not list.** The ninth was presumably `REG-Q-052`, and **the graph
+  correctly cannot have it**: the Stage A notation *NARROWS* that question (*"STAGE A SATISFIED; OPEN FOR
+  STAGE B ONLY"*) rather than discharging it, so no discharge edge exists and none should.
+  > ⚠ **AND THE 9 WAS VERY NEARLY RIGHT FOR THE WRONG REASON.** It came from the orchestrator's own crude
+  > graph, which returned **nine hits of which only TWO were actually stale** — seven were false positives,
+  > one of them matching *"blocked"* inside *"UNBLOCKED"*. The shipped gate returns **eight true with none
+  > false.** A figure that is nearly right by accident is the hardest kind to catch, and this one survived
+  > into canon for a day.
+
+- **THE EIGHT.** All four closure-sweep survivors — `REG-D-008`, `REG-D-009`, `REG-F-003`, `REG-F-004` — via
+  the ministerial block's arrow grammar `REG-D-001..D-009 → MERGED`, **which uses no verb at all**; plus
+  `REG-F-045` ← `REG-D-040`, `REG-Q-051` ← `REG-D-017`, `REG-D-019` ← `REG-D-020`, `REG-F-083` ← `REG-D-043`.
+  **And a ninth finding the census missed:** `REG-F-014` ← `REG-F-040`, whose live status still asks to be
+  *"re-titled"* — the very act `REG-F-040` superseded and forbade.
+
+- **⚠⚠ THE DESIGN THAT WON WAS CORRECTED BY ITS OWN ADJUDICATOR, ON A SENTENCE IT HAD HALF-QUOTED.** The
+  supersession-graph design claimed *"11 findings, ZERO unverified."* Re-driven, **two of its three
+  extra-census findings are refuted by the second half of the sentence it quoted the first half of**:
+  - `REG-D-021` ← `REG-D-022` — the next words at `:1870` are *"`REG-D-021` otherwise remains effective"*.
+  - `REG-F-087` ← `REG-F-121` — *"supersedes REG-F-087's …"* is a **POSSESSIVE**: what is superseded is the
+    safe default, and four lines above, `REG-F-121` says *"THE PRIOR ENTRIES ARE NOT EDITED, and that is
+    deliberate."* **The gate would have demanded a repair the register forbids in terms.**
+  **The extractor was corrected rather than the findings suppressed**, with two guards derived from the
+  register itself — a `preserves()` check whose guard words are **§1's own status tokens split into words,
+  not a phrase list**, and a possessive check. Measured cost: **3 edges of 56 dropped, ZERO findings lost.**
+
+- **WHY NOT THE OTHER TWO STRATEGIES.** A closure-condition design is the one `REG-F-095` used, and it is
+  what narrowed silently in 2026-08 by keying on a literal phrase. A merge-target design leaves the register
+  and checks the world, which is the only way to reach what the graph cannot — and *"the artifact carries
+  it"* is a judgement, so its false-positive rate could not be stated. **The false-positive rate decided
+  this, not the catch rate**, which is the same ground `REG-F-280` refuted the bigram gate on two days ago.
+
+- **THE CONTROLS, AND THE PAIR THAT MATTERS.** Two mutants redden with distinct messages: dropping a known
+  id reddens *"a LATER block claims to have done"*; adding a non-stale id reddens *"the list is
+  SHRINK-ONLY"*. **And the discriminating pair:** an appended entry is GREEN; a discharge pair whose target
+  **cites** its discharger is GREEN; **the same pair with the target silent is RED**, naming it. The two
+  differ in one clause, so the gate is shown to detect the defect rather than to react to edits — the
+  property the bigram design could not produce.
+
+- **⚠ THE RATCHET INHERITS 9 AND MAY ONLY SHRINK**, by id, in the shape `register-status.test.ts`
+  established. **A repair must be removed from `KNOWN` deliberately**, and the gate reddens if a
+  grandfathered id starts conforming and nobody removed it — otherwise the list rots into an allowlist,
+  which this programme has recorded as its own defect class.
+
+- **⚠ AND THE BLOCK IDS ARE SLUGS, NOT LINE NUMBERS.** The two ministerial blocks are keyed
+  `ministerial:closure-sweep` and `ministerial:hygiene-passes` **from their heading text**, because this
+  register's repair idiom inserts lines and a `@162` id would rot the moment the class it watches is
+  repaired. That is `JPWB-DOC-004 §10 item 10` applied to the instrument's own internals.
+
+- **THE COVERAGE LIMIT, MEASURED AND ATTRIBUTED RATHER THAN LEFT AS A RESIDUAL.** Of the 28 not caught:
+  **15** have no discharge claim anywhere in the register — nothing to witness; **9** carry the stale clause
+  somewhere other than the status's owed-work claim; **2** have two live statuses, which is
+  `register-status.test.ts`'s population, not this one's; **1** states the discharge only in body prose;
+  **1** already names its discharger. **This gate closes the witnessable half and says so.**
+
+- **RECONCILIATION.** Discharges `REG-F-284`'s Repository leg. Supersedes its *"9 of 40"* figure only.
+  Repairs none of the 28 — that decision and its measured reason stand.
+
+- **Merge target:** **Repository** — landed. Status: CLOSED.
 

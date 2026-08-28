@@ -185,9 +185,28 @@ still read `DECIDED — MERGE PENDING` at HEAD. `REG-F-095` swept the same class
 sit below every citation target in the file, so their repair moves nothing. The other 28 are scattered from
 `:55` and would shift thousands of targets — which is `§10 item 10`, merged the same day.
 
-**What would close the class is an instrument.** `verif/register-status.test.ts` checks a status is
-*readable*; nothing checks it is *true*. A gate over the supersession graph would have caught **9 of 40** —
-the limit is stated, not hidden. Scoped, not built.
+**What would close the class is an instrument** — ✅ **BUILT 2026-08-28 (`REG-F-285`):**
+`verif/register-status-truth.test.ts`, 783 lines, 9 tests.
+
+⚠ **It caught 8, not the 9 this roadmap estimated** — and the estimate was nearly right for the wrong
+reason. The crude graph behind it returned **nine hits of which only two were actually stale** (one matched
+*"blocked"* inside *"UNBLOCKED"*); the shipped gate returns **eight true with none false**. The ninth,
+`REG-Q-052`, the graph correctly cannot have: its Stage A notation **narrows** the question rather than
+discharging it. **A figure nearly right by accident is the hardest kind to catch.**
+
+⚠ **The winning design was corrected by its own adjudicator on a half-quoted sentence** — two of three
+extra findings are refuted by the second half of the sentence quoted. One (`REG-F-087`) would have demanded
+a repair the register forbids in terms. The extractor was corrected, not the findings suppressed: guards
+derived from **§1's own status tokens, not a phrase list**, at a cost of 3 edges of 56 and zero findings lost.
+
+**The discriminating control is the point:** an appended entry is GREEN; a discharge pair whose target
+**cites** its discharger is GREEN; the same pair with the target silent is **RED**. One clause apart.
+
+⚠ **And the gate's guard-control grew on the day it shipped — from the entry announcing it.** `REG-F-285`
+says it discharges *"`REG-F-284`'s Repository leg"*, and the possessive guard drops that edge. **The entry
+that describes the guard also trips it**, because a partial discharge is naturally written as a possessive.
+The control pins the dropped set **by name, not by count**, which is why this read as a decision rather than
+a regression.
 
 ---
 

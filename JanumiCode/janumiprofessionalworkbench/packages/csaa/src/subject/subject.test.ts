@@ -2690,7 +2690,10 @@ describe('live JPWB and inventory projection', () => {
 		// also a scripts-project root. The verification program grows with public contract assertions.
 		expect(counts.get('scripts/tsconfig.json')).toBe(42);
 		// 52 -> 53: `verif/register-append-only.test.ts`, the instrument for JPWB-REG-005's append-only rule.
-		expect(counts.get('verif/tsconfig.json')).toBe(53);
+		// 53 -> 54: `verif/register-status-truth.test.ts`, which checks a register status is TRUE and not
+		// merely readable (REG-F-285). Both are what the comment above means by "the verification program
+		// grows with public contract assertions".
+		expect(counts.get('verif/tsconfig.json')).toBe(54);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',
