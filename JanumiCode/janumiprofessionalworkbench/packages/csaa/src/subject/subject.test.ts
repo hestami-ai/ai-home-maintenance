@@ -2689,7 +2689,8 @@ describe('live JPWB and inventory projection', () => {
 		// import their bounded implementation closures into the scripts program; the mutation baseline helper is
 		// also a scripts-project root. The verification program grows with public contract assertions.
 		expect(counts.get('scripts/tsconfig.json')).toBe(42);
-		expect(counts.get('verif/tsconfig.json')).toBe(52);
+		// 52 -> 53: `verif/register-append-only.test.ts`, the instrument for JPWB-REG-005's append-only rule.
+		expect(counts.get('verif/tsconfig.json')).toBe(53);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',

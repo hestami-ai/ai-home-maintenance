@@ -314,10 +314,26 @@ of the record: the general form is **`UNFILED ∪ NEAR_MISS` must be zero**, and
   The non-closure still holds **on substance**, measured with eight probes over both entries, every zero
   controlled by a non-zero on the sibling.
 
-- **The 43 stale `owed` fields** — all on FILED or NOT_APPLICABLE rows, where a stale `owed` misleads a
-  reader but cannot misdirect a filing.
-- **The fifth vocabulary gap** the ladder cannot express (§22.1): a correct, unit-tested artifact that
-  governs nothing. `REL-2:3` is on the nearest arm and its `what_the_move_costs` field says what was lost.
+- ✅ ~~**The 43 stale `owed` fields**~~ — **RE-AUTHORED (V-12, §23.2): 42 written, 1 held.** The count
+  stays **43 forever** because `owed_for_verdict` is a PROVENANCE FACT; the discharge is a second field,
+  `owed_reconciled`, authored for the arm the row now holds. 29 of 43 dispositions were CORRECTED on
+  adversarial verification. ⚠ `limb:REL-3:3` is **HELD, not skipped** — it is about to change arms, and
+  authoring its `owed` now would author it twice for two arms in one week.
+- ✅ ~~**The fifth vocabulary gap**~~ — **ANSWERED BY THE CORPUS (V-12, §23.1): DO_NOT_MINT.** The population
+  is **6, not 1** — so the one-member objection never applied — but
+  `enforcement-register.ts:3205-3209` already ruled on this exact mechanism, on one of these very rows:
+  *"a census over the symbol would stay green forever while the rule went unenforced, **which is precisely
+  the case the OBSERVED_ADMISSION arm was added for**."* ⚠ **All three derivations truncated that sentence
+  before its verdict, and two inverted it** into a positive control FOR minting.
+- ✅ ~~**FOUR OF THE ELEVEN `UNENFORCED_DEAD_PREDICATE` ROWS hold it against their own recorded data**~~ —
+  **APPLIED 2026-08-27, AND IT IS THREE, NOT FOUR (`REG-F-279`).** `ASR-3:1`, `ASR-6:4` and `ASR-6:5` moved
+  to `UNENFORCED_OBSERVED_ADMISSION`, each with the arm's required **same-site sibling control driven**.
+  ⚠ **`REL-3:3` WAS REFUSED**: its arm rests on `impactedObjects` (zero production callers, gated
+  two-directionally), and the called predicate the finding cited is that row's own **fourth reinforcing
+  observation** — *a row that offers four pieces of evidence does not thereby rest on all four.* Three of
+  eleven is **27%**. Distribution `DEAD_PREDICATE 11 → 8`, `OBSERVED_ADMISSION 65 → 68`.
+  ⚠ **And the predicted debt figure was wrong too:** 43 → **46**, not 45 — three rows entering a set of 43
+  is 46. Re-authored 42 → 45; `REL-3:3` remains the one HELD row. **Derived from the file, not carried.**
 - **The general form of the REG-F-272 defect**: an append-only entry that asserts another row's CENSUS
   BOOKKEEPING makes a claim with an expiry date in an artifact that forbids correcting it in place. Cite a
   sibling's SUBSTANCE, not its arm word or filing status — or date it.

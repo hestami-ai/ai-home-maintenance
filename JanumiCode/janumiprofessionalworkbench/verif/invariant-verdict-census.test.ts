@@ -253,8 +253,16 @@ describe('W-3b — the invariant enforcement census', () => {
 			// was RIGHT. `UNENFORCED_DEAD_PREDICATE` means, by its only definition anywhere, "a kernel predicate
 			// implements the limb and nothing calls it" — and something calls it. The row conceded it in its own
 			// `census` and `sibling_control` fields; the arm was refuted by the row's own data.
-			UNENFORCED_OBSERVED_ADMISSION: 65,
-			UNENFORCED_DEAD_PREDICATE: 11,
+			// ⚠ 65 -> 68 / 11 -> 8 (V-13). Three rows held `UNENFORCED_DEAD_PREDICATE` AGAINST THEIR OWN
+			// RECORDED DATA: that arm's only definition (DESIGN:101) is "a kernel predicate implements the limb
+			// and NOTHING CALLS IT", and `limb:ASR-3:1`, `limb:ASR-6:4` and `limb:ASR-6:5` each cite an artifact
+			// with production call sites. Each move was DRIVEN and carries the arm's required same-site sibling
+			// control. ⚠ A FOURTH ROW WAS PROPOSED AND REFUSED: `limb:REL-3:3` STAYS, because its arm rests on
+			// `impactedObjects` (zero production callers) and the called predicate the proposal cited is that
+			// row's own FOURTH REINFORCING OBSERVATION, not the arm's carrier — the proposal was right about the
+			// class and wrong about that member.
+			UNENFORCED_OBSERVED_ADMISSION: 68,
+			UNENFORCED_DEAD_PREDICATE: 8,
 			UNENFORCED_NO_SHAPE: 21,
 			UNENFORCED_NO_SUBJECT: 5
 		});
@@ -460,7 +468,9 @@ describe('W-3b — the invariant enforcement census', () => {
 		// recorded `arm_doubt` argued the verdict was wrong, an adjudication agreed, and a refuter upheld
 		// that with corrections. **A row entering this set on a SETTLED doubt is the instrument working**,
 		// not a regression: the narrative it outlived is now MARKED as outlived instead of silently standing.
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(81);
+		// 81 -> 84: the three V-13 arm moves each set `superseded_verdict`, which is what this counts. The
+		// narrative each row was written for is now marked as outlived rather than silently standing.
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(84);
 	});
 
 	// ── ⚠ GATE THE PROVENANCE, BECAUSE THE PROSE CANNOT BE GATED ───────────────────────────────────────────
@@ -507,7 +517,13 @@ describe('W-3b — the invariant enforcement census', () => {
 		// 42 -> 43: `limb:REL-2:3`'s arm moved on an adjudicated doubt, orphaning its `owed` exactly as the
 		// NO_SUBJECT split orphaned five. Same rule, same refusal to stamp: the field records the arm an
 		// `owed` was AUTHORED FOR, and rewriting it would make a provenance fact false.
-		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(43);
+		// ⚠ 43 -> 46, AND THE RISE IS THE INSTRUMENT WORKING. Moving three rows off `UNENFORCED_DEAD_PREDICATE`
+		// orphaned three more `owed` fields — for the fifth time on this programme an arm move has orphaned
+		// prose. The debt is COUNTED UP rather than stamped down; each of the three carries a re-authored
+		// `owed` below, so the reconciled figure rises with it.
+		// ⚠ The V-12 adjudication predicted 45. It is 46: three rows entering a set of 43 is 46, and the
+		// predicted figure was carried rather than derived. Derived here from the file.
+		expect(stale.length, 'rows whose `owed` was written for an arm they no longer hold').toBe(46);
 		expect(
 			stale.filter((v) => String(v.arm_split_from ?? '') === 'UNENFORCED_NO_SHAPE').length,
 			'the subset the NO_SUBJECT split orphaned, in this commit'
@@ -524,6 +540,71 @@ describe('W-3b — the invariant enforcement census', () => {
 			stale.filter((v) => OWES_A_FILING.has(String(v.filing))).length,
 			'the subset that blocks the close: these rows owe a filing and describe the wrong one'
 		).toBe(0);
+	});
+
+	// ── ⚠ THE DEBT IS DISCHARGED BY RE-AUTHORING, NOT BY STAMPING ─────────────────────────────────────────
+	// The count above is a PROVENANCE FACT and must not move: `owed_for_verdict` records the arm an `owed` was
+	// AUTHORED FOR, so the 43 stays 43 forever. What was owed was never "make the number smaller" — it was
+	// "read the row and say what the CURRENT arm owes". That answer goes in a SECOND field, leaving the
+	// original prose and its provenance intact, which is the pattern `destination_arm_evidence_owed` already
+	// established when it kept its `ORIGINAL:` record after being discharged.
+	//
+	// ⚠ AND ONE ROW IS HELD RATHER THAN RECONCILED, WHICH IS THE HONEST STATE AND NOT AN EXEMPTION.
+	// `limb:REL-3:3` holds `UNENFORCED_DEAD_PREDICATE` against its own recorded data — `classifyValidatorResult`
+	// IS called, at `packages/rph-assurance/src/floor.ts:316`, while that arm's only definition anywhere
+	// (DESIGN:101) is *"a kernel predicate implements the limb and nothing calls it"*. It is expected to move.
+	// Authoring its `owed` now would author it TWICE FOR TWO ARMS IN ONE WEEK — manufacturing precisely the
+	// orphaning this whole field exists to record. The hold is named here so it cannot become a silent skip.
+	it('every stale `owed` is re-authored for the arm the row now holds, or is HELD with its reason', () => {
+		const stale = verdicts.filter((v) => String(v.owed_for_verdict) !== String(v.verdict));
+
+		const unreconciled = stale
+			.filter((v) => !v.owed_reconciled && !v.owed_reconciled_held)
+			.map((v) => String(v.limb_id));
+		expect(unreconciled, 'a stale `owed` that nobody re-read is the debt, not the count').toEqual([]);
+
+		// The re-authored text must be authored FOR THE ARM THE ROW HOLDS. Without this the new field could
+		// itself go stale on the next arm move and nothing would say so — the defect one level up.
+		const wrongArm = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled_for_verdict) !== String(v.verdict))
+			.map((v) => String(v.limb_id));
+		expect(wrongArm, 'the re-authored `owed` records the arm it was written for, and it must be current')
+			.toEqual([]);
+
+		// ⚠ THE ANTI-STAMP ASSERTION. This gate's whole premise is that re-authoring needs the row rather than
+		// a script. Copying `owed` into `owed_reconciled` would satisfy every check above while doing none of
+		// the work, and it is the cheapest possible way to fake this discharge.
+		const stamped = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled).trim() === String(v.owed ?? '').trim())
+			.map((v) => String(v.limb_id));
+		expect(stamped, 'a re-authored `owed` that is byte-identical to the orphaned one was not re-authored')
+			.toEqual([]);
+
+		const thin = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => String(v.owed_reconciled).length < 120)
+			.map((v) => String(v.limb_id));
+		expect(thin, 'a one-line re-authoring is a stamp with extra words').toEqual([]);
+
+		// Every disposition is one of the three the reconciliation admits, and each was adversarially checked.
+		const DISPOSITIONS = new Set(['STILL_CORRECT', 'SUPERSEDED', 'DISCHARGED']);
+		const badDisposition = stale
+			.filter((v) => v.owed_reconciled)
+			.filter((v) => !DISPOSITIONS.has(String(v.owed_reconciled_disposition)))
+			.map((v) => String(v.limb_id));
+		expect(badDisposition).toEqual([]);
+
+		// The hold is a NAMED SET of one. A second row appearing here is a new decision, not a detail.
+		const held = stale.filter((v) => v.owed_reconciled_held).map((v) => String(v.limb_id));
+		expect(held, 'the rows held back from re-authoring, and why each is held').toEqual(['limb:REL-3:3']);
+		expect(
+			String(stale.find((v) => String(v.limb_id) === 'limb:REL-3:3')?.owed_reconciled_held ?? ''),
+			'a hold must state the arm move it is waiting on, or it is indistinguishable from a skip'
+		).toContain('floor.ts:316');
+
+		expect(stale.filter((v) => v.owed_reconciled).length, 're-authored').toBe(45);
 	});
 
 	// The one part of the class that IS mechanically decidable, and it is decidable from the LADDER rather than

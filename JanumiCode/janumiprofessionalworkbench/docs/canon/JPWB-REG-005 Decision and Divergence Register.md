@@ -12534,7 +12534,7 @@ there is no act, automatic or manual, that turns the first into the second.
   content never inferred) is a NEAR_MISS against ledger `:291-294`; limbs 1-4, 6 and 8 are already
   FILED or NOT_APPLICABLE. The `AssertObligation`
   arrow rows in `verif/guard-enforcement-ledger.data.ts` (`:49`, `:53`, `:163`, `:297`) are DEC/§10.2
-  rows about an existing obligation's status machine and are untouched by this entry.
+  rows about an existing obligation's status machine and are untouched by this entry. ⚠ **SUPERSEDED IN PART BY REG-F-273 (2026-08-23)** as to this bullet's two sibling-census citations only — *"is a NEAR_MISS against REG-F-228's component (4)"* (`limb:ASR-9:10`) and *"is a NEAR_MISS against ledger `:291-294`"* (`limb:ASR-9:5`) — which read the record correctly when written (`filing: NEAR_MISS` on both rows as at `857128a7`, `docs/tracking/w3b/invariant-verdicts.ndjson`): the defect is not the value but the citing of one, since *"It closes nothing else"* was pinned to a sibling's `filing` field, which the census edits in place by design and the very next revision of that file, `a4a19057`, moved for every near-miss row at once — the arm did not move with it (`verdict: UNENFORCED_NO_SHAPE` on both rows at both commits) — while an entry here can only be appended to and can never follow it; `limb:ASR-9:10` is answered on its own subject by **REG-Q-067** (nothing in this engine can say that scope was DEFERRED) and `limb:ASR-9:5` by **REG-F-260** (nothing in the engine ever dereferences an evidence reference), and the census row rather than this one is the reconcilable record for their state. **Not re-opened:** this entry's finding, its closure of `limb:ASR-9:9`, and the substance relied on here — the five named carriers, and the proof that the "future obligation" carrier is unreachable from a residual though an obligation is mintable at `reference-undertaking.ts:530` — stand, and this entry is not edited, per §1.
 
 - **Merge target:** BOTH — **Corpus**, for the mechanism adjudication in remedy (1) and the ratified
   chain at `docs/canon/_extracts/extract-doc006.md:44`; **Repository**, for
@@ -12708,7 +12708,7 @@ past the execution-plan approval gate
   - **`REG-F-211`** closes the adjacent sibling `limb:DEC-4:5` (*"superseded by a stronger
     constraint"*), a constraint-plane defect. Siblings `limb:DEC-4:1`, `:2` and `:6` are recorded
     NEAR_MISS against `RPH-CNS-001`/`REG-F-006`/`RPH-CNS-002`, all three on the constraint plane. **No
-    sibling entry touches the assumption plane**, so nothing here is re-filed from one.
+    sibling entry touches the assumption plane**, so nothing here is re-filed from one. ⚠ **SUPERSEDED IN PART BY REG-F-273 (2026-08-23)**, as to the sibling-census clause in this bullet only — it was true when written, and what REG-F-273 records is the CITATION of a mutable value, not the value cited: the status token was borrowed from those three siblings' `filing` field in `docs/tracking/w3b/invariant-verdicts.ndjson`, a record edited in place by design and reconciled against this register by `verif/invariant-verdict-census.test.ts`, so a single later filing pass trued up the row there and falsified the sentence here. ⚠ **And the reason that second copy rots is the MEASURED one, not REG-F-273's stated premise, which REG-F-274 (2026-08-27) supersedes as to that reason alone:** not that this register admits no in-place correction — REG-F-274 measured that it does — but that the correcting hand reaches an entry's status lines and leaves its substance to rot, and that an audit record is read AT REVISIONS, so even a later repair reaches no reader who arrived before it. The three siblings have each since been closed by an entry of their own — **REG-F-255**, **REG-F-256** and **REG-F-257** — each of which quotes this clause as its reason for existing and re-affirms that this entry closes `limb:DEC-4:7`, the assumption plane; so the constraint-plane reading, the conclusion above, and this entry's finding and its closure all stand, corrected by this APPEND and not by an edit, per §1. (The drafting rule is carried into `JPWB-DOC-004 §10 item 8` at version 1.4.0, as corrected by REG-F-274 and widened by REG-F-275; and the same clause recurs in shorthand at the census-reconciliation bullet below, which REG-F-273 names as a separate site of its own.)
   - **`verif/guard-enforcement-ledger.data.ts:213`** is the closest thing to a filing of this
     sentence, and it is the sharpest proof that this limb was never disposed of: its key enumerates the
     limbs of the very text — *"obligations allocated/retained, mandatory constraints propagated,
@@ -12818,7 +12818,7 @@ past the execution-plan approval gate
   the assumption plane. ⚠ It also does **not** dispose of DEC-2's neighbouring clause *"material
   assumptions and affected children;"* (`JPWB-DOC-003:215`), which is a **recording** duty on the
   contract, not a **propagation** duty onto children; REG-F-210 closed DEC-2 limbs 3 and 8 and left
-  that one where it was.
+  that one where it was. ⚠ **SUPERSEDED IN PART BY REG-F-273 (2026-08-23)**, as to the shorthand *"`:1`, `:2`, `:6` recorded NEAR_MISS against `RPH-CNS-001`, `REG-F-006` and `RPH-CNS-002`"* and to nothing else in this bullet: read at the revision that authored this entry, **`857128a7`**, the three rows did carry that value, and what the supersession reaches is the transcription, not the finding — a sibling row's `filing` field in `docs/tracking/w3b/invariant-verdicts.ndjson`, a record the census is designed to edit in place, copied as a standing fact into an entry that can never be edited to follow it. It moved the same day, in one commit: the V-7 pass **`a4a19057`** (*"W-3b V-7: the near misses are filed, and the filing debt reaches zero"*) discharged every row then carrying that value, and at that revision each of the three rows' `filed_entry` names its own closing entry — **REG-F-255** (`:1`), **REG-F-256** (`:2`), **REG-F-257** (`:6`) — each of which quotes this clause's full-id twin at `:12709` as its own reason for existing; this shorthand occurrence is the one no `limb:XXX:N` sweep can see, which is why it is pointed at separately. ⚠ Those three entries also record, independently of REG-F-273, that the enclosing phrase *"already disposed of elsewhere"* does not follow from this parenthetical, so the scope above is strict: this pointer corrects the copied value and neither endorses nor disturbs the inference that value was recruited to support. **Nothing here is re-opened:** all three siblings remain constraint-plane clauses and each of their closing entries distinguishes itself from this entry's assumption plane in terms, so *"It closes nothing else"* holds and this entry's closure of `limb:DEC-4:7` stands, unedited, per this register's `changeProcedure` (`:19`).
 
 - **Merge target:** Repository — `packages/rph-application/src/handlers/decomposition.ts` (reader),
   `packages/rph-domain/src/decomposition.ts` (kernel predicate),
@@ -13186,7 +13186,7 @@ canonically-unwaivable subject is the one thing no predicate can see
   may grant it (REG-D-036; and the `pwu.ts:1404` docblock disclosing the missing tier field), `:6` on a
   policy waiving its OWN blocking finding. **This limb alone asks WHAT KIND of finding is being
   waived** — a discriminator `requestWaiver` never resolves and `resolveWaiverAuthorization` never
-  reads.
+  reads. ⚠ **SUPERSEDED IN PART by `REG-F-273`**, as to the parenthetical at `:13184-13185` alone: it separated `:3` from its siblings by reading the `filing` field of `docs/tracking/w3b/invariant-verdicts.ndjson` — the census record that OWNS that value and is edited in place by design — and the W-3b V-7 pass (`a4a19057`) retired that field's `NEAR_MISS` arm wholesale, `REG-F-247` being the entry that carries `:3` thereafter, which moves the sibling tally counted off it as well. The clause was true when written and was falsified by a later act, not by its author; what `REG-F-273` supersedes is the CITING of a mutable bookkeeping value to draw the distinction, not the value cited. The substance is untouched — each ASR-14 sibling keys on a different question — and neither this finding nor its closure of `limb:ASR-14:5` is re-opened.
 
 - **Merge target:** BOTH. **Repository** — `packages/rph-application/src/handlers/governance.ts`,
   `packages/rph-application/src/handlers/waiver-authorization.ts`,
@@ -15979,7 +15979,7 @@ through a ratified command, and the engine then parks an assessment until one is
   and the missing diagnostic surface, **REG-F-244**) and **`limb:PER-12:7`** (purgeability,
   **REG-F-245**). This entry alone concerns
   a canon PERMISSION the engine converts into an OBLIGATION; the other two concern EXCLUSIONS the engine
-  fails to hold and a PERMISSION the engine cannot perform.
+  fails to hold and a PERMISSION the engine cannot perform. ⚠ **SUPERSEDED IN PART BY REG-F-273 (2026-08-23), as to one status word above and to nothing else.** The clause *"`limb:PER-12:4` is NEAR_MISS against **REG-F-230**"* was true at the tree of the commit that wrote it (`857128a7`, W-3b V-6) — the defect REG-F-273 records is CITING A MUTABLE VALUE HERE AT ALL, not the value cited: that row's `filing`/`filed_entry` fields are owned by `docs/tracking/w3b/invariant-verdicts.ndjson`, which is edited in place by design, and the V-7 filing pass `a4a19057` discharged the filing debt the same day and named **REG-F-249** in `filed_entry` there — a field this append-only register cannot follow, which is why the ledger row and not this line is the record that owns that limb's disposition. **This entry is not edited, per §1, and nothing else here is disturbed: REG-F-273 is `Class: RECORD`, and its Class line scopes it to a CLAUSE of this entry, expressly without re-opening its finding.** REG-F-230 does rule PER-12 out of its own scope at `:10345-10347`, that sentence and the hand-back it establishes still stand, and this entry's QUESTION and its closure of `limb:PER-12:3` are untouched.
 
 - **THE QUESTION.** **Does *"there is no obligation to solicit or procure a trace"* bind POLICY AUTHORS —
   in which case a `CreateAssurancePolicy` naming volunteered reasoning as required evidence must be
@@ -25146,7 +25146,7 @@ Both entries were adversarially verified and both were amended.
     not by a filing pass** — the same second mechanism that inverted REG-F-234's own clause. Sibling
     assertions resting on a still-live token were true row by row when I checked them against the HEAD
     ledger (`limb:PER-3:1`, `limb:OBJ-3:1`, `limb:OBJ-2:1`, `limb:OBJ-2:2`, `limb:OBJ-2:5`,
-    `limb:ASR-9:4`, `limb:ASR-16:4`, `limb:PER-12:2` and `:5`, `limb:REL-2:2`).
+    `limb:ASR-9:4`, `limb:ASR-16:4`, `limb:PER-12:2` and `:5`, `limb:REL-2:2`). ⚠ **SUPERSEDED IN PART BY REG-F-273 (2026-08-23), as to the *"the tenth is not `NEAR_MISS`"* sentence alone:** the derivation beneath it parsed `verdict`, `superseded_verdict` and `filing` — all three read correctly — but never `verdict_before_migration`, the field into which the V-4 ladder split (`f63c4b00`) moved the composite arm REG-Q-053 quotes. What presents here as an ARM RE-SCORING is therefore that migration renaming the pre-split value `superseded_verdict` carries, on a row REG-F-273 traced through every revision of `invariant-verdicts.ndjson` as unmoved since `2dff1d42`: REG-Q-053's clause was true when written, and REG-F-273 records it as not falsified at that entry's own reading of that ledger — so the defect is once again a quoted token compared against a mutable ledger rather than any misreading of one. **Nothing else in this bullet is disturbed:** this entry's finding — that an append-only artifact must not assert a mutable ledger's value — stands and is strengthened by REG-F-273, which corrects only its example and re-opens no finding. This entry is not edited, per §1.
   - **THE DISCIPLINE PROPOSED — cite a sibling's SUBSTANCE, not its bookkeeping; and where the
     bookkeeping is genuinely the point, DATE IT.** Concretely, in a CENSUS RECONCILIATION bullet or any
     sentence disposing of a sibling limb: (i) distinguish rows by **mechanism, file and field** — the
@@ -25477,7 +25477,9 @@ and EIGHT such claims are already false at HEAD in an artifact that forbids corr
 **Date:** 2026-08-23 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes one clause
 each of **REG-F-235**, **REG-F-237** and **REG-Q-062**, **two** clauses of **REG-F-236**, and one clause
 of **REG-F-272** (its *"the tenth is not `NEAR_MISS`"*), without re-opening any of their findings ·
-**Status:** OPEN
+- ~~**Status:** OPEN~~
+- ~~**Status:** **MERGED 2026-08-27 AS TO THE DRAFTING RULE — OPEN as to its own closure condition.** The rule is carried by `JPWB-DOC-004 §10 item 8` (version 1.4.0), merged under the sponsor's election of DOC-004 over this register's §1: DOC-004's `governs:` already claims *"drafting standards for any normative text the agent itself authors"* and this register's `doesNotGovern` already cedes agent conduct to it, so both sides of the boundary agree. Item 8 carries the rule as corrected by REG-F-274 (the measured reason) and widened by REG-F-275 (any artifact, this register included). ⚠ **This entry does NOT close outright:** the six *"⚠ SUPERSEDED IN PART"* pointers it names as its own closure condition are still owed, and closing it here would be a fabricated closure.~~
+- **Status:** **CLOSED 2026-08-28.** Its closure condition is discharged by **REG-F-281**: all six `⚠ SUPERSEDED IN PART` pointers are applied, at the end of the bullet holding each corrected clause, by INLINE EXTENSION — a third form that satisfies this entry's condition literally while adding no line and so moving no citation. ⚠ The sixth site was NOT in this entry's own list, which named *"the six sites"* and enumerated five; it was recovered from the supersedes clause and is `REG-F-272:25141-25145`. The drafting rule remains merged at `JPWB-DOC-004 §10 item 8`.
 
 - **THE DEFECT, IN ONE PARAGRAPH.** `REG-F-272` corrected one clause of `REG-F-234` that asserted a
   sibling row's bookkeeping — *"is scored UNENFORCED_DEAD_PREDICATE … and is filed NEAR_MISS"* —
@@ -25612,3 +25614,695 @@ of **REG-F-272** (its *"the tenth is not `NEAR_MISS`"*), without re-opening any 
   no pointer never reaches the reader it exists to protect. ⚠ Each pointer must itself obey the rule
   above: name the closing ENTRY ID and the mechanism, never the new arm word.
   No repository change; the ledger is correct at HEAD and it is the register that trails it. Status: OPEN.
+### REG-F-274 — the register's own append-only rule has never had an instrument, and 26 in-place rewrites
+of live entry text landed under it — including twice on the entry REG-F-273 cites as proof that cannot happen
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
+  of one bullet of **REG-F-273** (its stated REASON; its drafting rule is re-affirmed unchanged) ·
+- ~~**Status:** OPEN~~
+- **Status:** **MERGED 2026-08-27 AS TO THE DRAFTING RULE.** Carried by `JPWB-DOC-004 §10 item 8`. Its Repository leg landed the same day (`verif/register-append-only.test.ts`). Its annotation leg is discharged by **REG-F-277**, which supersedes the prescribed in-bullet FORM on measurement. Its stated coverage limit is closed by **REG-F-280** (bigram refuted). Its date clause is superseded by **REG-F-278**. ⚠ **Still owed:** the correcting entry for `70e4f33b`, whose sentence about this register's own history is false in place.
+
+- **THE DEFECT.** This register's `changeProcedure` (`:19`) reads *"Append-only after ratification … Entries
+  are never destructively edited; a correction is a superseding entry citing the entry it supersedes."*
+  **Nothing has ever checked it.** Adjudicated over 71 commits by five readers and five adversarial
+  verifiers: **26 confirmed in-place rewrites of live entry text**, the first landing **2026-08-02 — nine
+  days after REG-D-010 ratified this register** — and running to 2026-08-21. They cluster on `**Status:**`
+  and `**Merge target:**`, the two most load-bearing fields an OPEN entry has.
+
+- **⚠ THE SANCTIONED IDIOM EXISTS AND IS THE EXCEPTION.** Retiring text by striking it (`~~old~~` plus an
+  appended replacement, as at `:57`) preserves everything. **9 lines carry a struck `~~**Status:**` against
+  445 carrying `Status:`.** Four of the 26 commits apply the strike correctly *in the same hunk* as a
+  violation, so this is **selective application, not ignorance of the idiom** — and why it is selective is
+  not known and is not claimed.
+
+- **⚠⚠ THE KEYSTONE, AND IT IS REG-F-273'S OWN CITED EXAMPLE.** That entry names **`REG-F-072:2255`** as
+  proof of a stale claim sitting uncorrectable in an append-only artifact — its census figures
+  `UNENFORCED 44 · ARROW_UNREACHABLE 22 · ENFORCED 14 · REDUNDANT_WITH_MACHINE 2`, false at HEAD against
+  `verif/guard-enforcement-ledger.test.ts:59-62` which pins **42 / 20 / 18 / 2**. **That entry's
+  Merge-target/Status line was destructively rewritten IN PLACE TWICE ON 2026-08-08** — by `8cfc341b`, then
+  by `174047b8` — **and `174047b8` is the commit that authored the stale figures in the same hunk.**
+  > **The register rewrote that entry's BOOKKEEPING twice in one day and left its SUBSTANCE to rot for
+  > nineteen days.** The correction mechanism was available, was used twice on that exact line, and still
+  > did not reach the claim.
+
+- **WHAT THIS DOES TO REG-F-273 — THE PREMISE FALLS, THE REMEDY IS STRENGTHENED.** Read normatively its
+  clause is true: the rule does say entries are never destructively edited. Read as a DESCRIPTION of the
+  artifact — which is what makes the harm bite — it is **false**. The remedy survives on three grounds:
+  (1) the in-place edits **do not reach the stale claims**, which the keystone proves on the entry's own
+  example; (2) an audit record is read **at revisions**, and in-place correction does nothing for any reader
+  before it; (3) the in-place edits **are themselves the defect** — a remedy repaired by pointing at them
+  would license `c61d92cf`, which erased a live fourteen-document obligation, and `fb5d7cbd`, which erased a
+  standing ratchet still true when deleted. **The reason is restated as the measured one: the register
+  corrects its status lines in place and its substance never.**
+
+- **⚠ NO RATE IS PUBLISHED, PER REG-F-272 `:25136`.** Two independent splitters move the candidate
+  population — the history traversal (`--no-merges` = 298 commits; `-m --first-parent` = 200) and the
+  line-eligibility rule — and they move it comparably. Three defensible derivations give **103, 106, 130,
+  131 and 163**. **The published figure is a RANGE, 103–163, and no member of it is "the" number.** The
+  adjudicated **26 of 71 is a FLOOR, not a total**: the readers answered about the candidate lines they were
+  handed rather than each commit's full diff, so `fb5d7cbd` rewrote four entry lines not three, `29b14912`
+  five not two, and `d4be2574` was graded *"nothing removed"* while deleting `REG-F-020`'s Status line.
+  **That batching defect was the commissioning agent's, and it is recorded rather than absorbed.**
+
+- **THE INSTRUMENT.** `verif/register-append-only.test.ts` — an entry-scoped unigram word-count contract
+  against the register at a pinned commit, with a whole-file count absolving a word that merely relocated.
+  **The two obvious designs were built and REJECTED BY MEASUREMENT:** a history assertion over git deletions
+  flags 6 of 9 compliant strikes; an n-gram shingle contract flags 12 of 12, because re-wrapping destroys
+  every n-gram. **Driven, not predicted:** the forbidden act (a live line rewritten in place, on disk)
+  **REDDENS**, naming `REG-F-049: lost ["COMPLETE","at","audit","corrected",…]`; the sanctioned act (the
+  same line struck and replaced) **STAYS GREEN**; and the fail-closed path **fired on the first run**, on a
+  real bug — `git show <rev>:<path>` resolves from the repository root, and this package is a subdirectory.
+  ⚠ **The green mutant is what makes this a control rather than a tripwire**: without it, "the gate
+  reddened" would prove only that it reacts to edits, not that it tells the forbidden act from the permitted
+  one. **No grandfather list is needed** — the baseline pins the current state, so the 26 are absorbed and
+  the gate guards forward only. **Coverage limit, stated as a limit:** a rewrite that deletes a word and
+  re-adds it elsewhere *within the same entry* passes; bigram strengthening would close that, was not
+  measured, and is therefore not claimed.
+
+- **THE 26 ARE NOT SWEPT.** Rewriting them would be a large unreviewed edit to the audit record — the
+  argument `verif/register-status.test.ts:74` already accepted when it grandfathered 63 entries BY ID.
+  Append a one-line pointer to each affected bullet instead. **Prioritise by truth at removal:** four
+  removed text still TRUE AND LIVE (`c61d92cf`, `fb5d7cbd`, `5fd041f3`, `574cc1e6`); **`70e4f33b` needs a
+  correcting entry regardless**, because a sentence still standing at `:560` says a prescription *"is kept
+  unstruck because it was right"* while the same commit deleted half of it — **false about this register's
+  own history**; the remainder removed a claim the removing commit had itself just falsified.
+  ⚠ **`git log -S` is the wrong instrument for that sweep** and would hide the keystone: the `REG-F-072`
+  double rewrite retained the phrase whose occurrences `-S` watches, so it returns only one of the two.
+
+- **RECONCILIATION.** Closes no census limb. Supersedes ONE CLAUSE of one bullet of `REG-F-273`; that
+  entry's numerator of eight is **not re-derived and not endorsed here**, and `REG-F-235`, `REG-F-236`,
+  `REG-F-237` and `REG-Q-062` are **not re-opened**. No claim is made that the in-place edits misled a
+  downstream reader — where checkable they did not (`REG-F-183` cites the appended bullet rather than the
+  overwritten status; `REG-F-199` reads `REG-F-006` correctly).
+
+- **Merge target:** **Repository** — `verif/register-append-only.test.ts` (landed) — and **Corpus** for the
+  drafting rule, jointly with `REG-F-273` and `REG-F-275`. Design: `docs/_working/DESIGN-register-append-only.md`.
+  Status: OPEN.
+
+---
+
+### REG-F-275 — REG-F-272 carries the very defect REG-F-273 generalised it to find: a claim about a mutable
+property, repeated undated, and false by thirteen days when written
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
+  of **REG-F-272** and WIDENS the drafting rule of **REG-F-273**
+- ~~**Status:** OPEN~~
+- **Status:** **MERGED 2026-08-27.** The widening is carried verbatim by `JPWB-DOC-004 §10 item 8` in the words *"including the one the text is being written into"*, and item 8 additionally names the present perfect as the tense in which a missing date hides — which is the grammatical form this entry's own finding took. ⚠ Its correction of `REG-F-272`'s heading claim is a record, not a merge, and is not discharged by this status.
+
+- **THE DEFECT.** `REG-F-272:25182` states that `REG-F-040` reached its disposition *"having found that **no
+  heading in this register has ever been struck**."* **Three headings were struck on 2026-08-10** —
+  `REG-F-105` (`:3055`), `REG-F-106` (`:3090`), `REG-F-108` (`:3142`). `REG-F-272` was written **2026-08-23**
+  (commit `0dc48b4d`). **The claim was false by thirteen days when it was repeated.**
+
+- **⚠ REG-F-040 WAS RIGHT.** It wrote that on 2026-08-06 (commit `041ef77c`), when it was true. **The defect
+  is not the original finding but its UNDATED REPETITION**, in the present perfect, as though it were a
+  standing property rather than a measurement with a date.
+
+- **⚠⚠ AND THIS IS WHY REG-F-273'S RULE IS RIGHT AND ITS SCOPE IS TOO NARROW.** That rule names *a sibling
+  row's CENSUS BOOKKEEPING*. **This is not census bookkeeping.** It is a **finding about this register's own
+  state** — exactly as mutable, and mutable by the very acts `REG-F-274` records. **`REG-F-273` generalised
+  `REG-F-272` while hunting precisely this class of defect, and did not find the instance sitting inside the
+  entry it was generalising.**
+
+- **THE REMEDY — WIDEN THE SCOPE, DO NOT REPLACE THE RULE.** `REG-F-273`'s three limbs stand. Limb 1's scope
+  widens from *"a sibling row's bookkeeping"* to **"any claim about a mutable property of an artifact,
+  including this register itself."** Limb 3 — *"where the claim is load-bearing, DATE IT"* — **would have
+  caught this**, and is the operative half for this class: a finding about a mutable property is citable if
+  and only if it carries the date or commit at which it was measured.
+
+- **RECONCILIATION.** Closes no census limb. Supersedes the clause of `REG-F-272` quoted above and nothing
+  else; that entry's substance — the falsified `REG-F-234` clause, the precedents at `:632` and `:1098`, and
+  its disposition — is untouched, as is its closure. `REG-F-040` is **not** superseded: it was correct when
+  written, which is the whole point.
+
+- **Merge target:** **Corpus**, jointly with `REG-F-273` and `REG-F-274`. Status: OPEN.
+
+---
+
+### REG-F-276 — the fifth vocabulary gap is SIX rows, not one, and the corpus had already ruled against
+minting an arm for it in a sentence all three derivations cut before its verdict
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — disposes the standing
+  *"fifth vocabulary gap"* item of the W-3b programme · **Status:** CLOSED (the gap is answered; the four
+  off-definition rows below are OPEN and tracked separately)
+
+- **THE QUESTION.** `limb:REL-2:3`'s `what_the_move_costs` recorded that no arm in the ladder expresses
+  *"a correct, unit-tested, general artifact that EXISTS and GOVERNS NOTHING"* — unfailable on the governed
+  arrangement because its inputs are stipulated upstream. Three derivations from independent starting points
+  (ladder semantics, the call graph, the row prose) returned **9 / 7 / 7** members; **two of three
+  recommended minting a twelfth arm.** Adjudicated, the population is **6**, over five invariant families
+  and five production artifacts, each verified at the code at HEAD.
+
+- **⚠⚠ THE DISPOSITION IS DO_NOT_MINT, AND THE REASON IS THAT THIS REGISTER'S OWN CORPUS ALREADY RULED.**
+  `packages/rph-domain/src/enforcement-register.ts:3205-3209`, `RPH-BAS-002`'s `whyNoPredicate` — the entry
+  for `limb:ASR-16:2`, one of the six — reads in full (verified byte-exact; positive control: 22
+  `whyNoPredicate` entries in that file):
+  > *"`findVersionMismatches` is NOT dead — it is called on this very dispatch, so naming it would fail
+  > `deadPredicate`'s first clause. What is defective is the ARGUMENT it is given. A census over the symbol
+  > would stay green forever while the rule went unenforced, **which is precisely the case the
+  > OBSERVED_ADMISSION arm was added for.**"*
+
+  **One derivation offered the truncated half as a positive control FOR minting. The sentence's own
+  conclusion is the opposite.** The author considered this mechanism, on this row, and ruled that
+  `UNENFORCED_OBSERVED_ADMISSION` is the arm that exists for it. **Search the register first** — it was
+  dispositive, and the six-member population means the one-member objection never had to be reached.
+
+- **TWO FURTHER GROUNDS.** (1) **The arm would replace a TRUE and STRONGER fact with a narrower one on half
+  its own population** — for three of the six, the forbidden arrangement was driven through
+  `Engine.dispatch` and ACCEPTED, the strongest thing a census row can say, and `verdict` is a single
+  scalar. **These rows carry two facts on a one-value axis; the instrument for a second fact is a FIELD.**
+  (2) **The definition is not crisp** — four of the ten claimed members fail toward four *different*
+  neighbours. A boundary three careful derivations placed differently on 40% of candidates is not ready to
+  be a closed vocabulary value.
+
+- **THE COST WAS MEASURED, NOT FEARED.** Minting would redden the distribution pin
+  (`verif/invariant-verdict-census.test.ts:256-257`), **silently narrow** the two `DRIVEN_ARMS` assertions
+  at `:270`/`:281` unless the arm were added at `:125` in the same commit — *the live form of the V-4 hazard
+  that ran green for six commits* — redden two hard verdict pins at `:965` and `:1016`, falsify the
+  `what_the_move_costs` text asserted at `:967`, and **orphan a FOURTH provenance field nobody had counted**:
+  `destination_arm_evidence` (9,360 chars), authored solely to satisfy the arm the row would be leaving.
+
+- **⚠ WHAT THE CENSUS FOUND INSTEAD, AND IT IS THE MORE ACTIONABLE FINDING — OPEN.** **Four of the eleven
+  `UNENFORCED_DEAD_PREDICATE` rows — 36% of that arm — hold it against their own recorded data.** That arm's
+  only definition anywhere is *"a kernel predicate implements the limb and NOTHING CALLS IT"*, and each of
+  these cites an artifact something **does** call, verified at HEAD: `limb:ASR-3:1` (`evaluateApplicability`,
+  two production sites), `limb:ASR-6:5` and `limb:ASR-6:4` (`evidenceAdmissibility`, `handlers/assurance.ts:552`),
+  `limb:REL-3:3` (`classifyValidatorResult`, `floor.ts:316`). **This is the V-10 finding that moved
+  `REL-2:3`, unapplied to four siblings.** ⚠ **The stale-`owed` debt will rise from 43 to 45 when they move.
+  COUNT THAT RISE; DO NOT STAMP IT.** And a **gloss drift** is confirmed: `limb:PER-7:1` and `limb:ASR-14:4`
+  define that arm as *"a check exists and CANNOT FAIL"* — **a definition present nowhere in the corpus.**
+
+- **RECONCILIATION.** Closes the *"fifth vocabulary gap"* item. Closes no census limb and moves no row.
+  `limb:REL-2:3` **stays on `UNENFORCED_OBSERVED_ADMISSION`** and its `what_the_move_costs` stands unchanged
+  — it recorded a real gap, and the answer is that the gap is held by a FIELD rather than an arm.
+
+- **Merge target:** **Repository** — (1) generalise `what_the_move_costs` from a one-row note into a gated
+  field required on every row meeting the derived predicate; (2) build the **argument-side** gate this
+  corpus already specified at `enforcement-register.ts:3207`, since *every symbol-reachability instrument in
+  this repository passes on all six members*. **Predicted red, named first:** un-aliasing
+  `reviewedItems: candidateItems` at `packages/rph-application/src/handlers/governance.ts:929` must redden
+  it, and re-aliasing must green it. Status: OPEN for those two; the gap question itself is CLOSED.
+---
+
+### REG-F-277 — the 26 destructive edits are annotated as an APPENDIX, because the prescribed in-bullet form
+was measured and it invalidates 543 line-number citations in an artifact that cannot correct them
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — discharges the
+  annotation leg of **REG-F-274** and supersedes ONE CLAUSE of it (the prescribed FORM of the annotation) ·
+  **Status:** OPEN
+
+- **WHAT THIS DISCHARGES.** `REG-F-274` records 26 confirmed in-place rewrites of live entry text and
+  prescribes, deliberately in place of a sweep: *"Append a one-line pointer to each affected bullet
+  instead."* **28 pointers over 22 entries were authored, adversarially verified, and are recorded below.**
+
+- **⚠⚠ AND THE PRESCRIBED FORM WAS PERFORMED, MEASURED, AND REVERTED — IT COSTS MORE THAN IT REPAIRS.**
+  The 28 pointers were applied to the bullets exactly as prescribed. Applying them inserts 34 lines into the
+  body of the register at 28 sites between `:473` and `:3309`, **and every line-number citation below an
+  insertion moves.** Measured on the artifact, not estimated:
+  - **594** line-number citations matched in the register; **543** sit at or below the first insertion and
+    therefore shift — **364 of them by 34 lines.**
+  - The strictly verifiable subset — citations of the form `` `REG-x-nnn:NNNN` `` whose target can be tested
+    against that entry's own line span — is **17, and all 17 land inside the entry they name at HEAD.**
+    **The convention is maintained and reliable, which is exactly why breaking it is expensive.**
+  - **This register cannot repair them.** A stale line citation inside an append-only artifact is permanent.
+  **So the pointers were reverted from the body and re-issued here, where they shift nothing.** The register
+  is back to 17/17 and the citations are intact.
+
+- **⚠ THE APPENDIX FORM ALSO PRESERVES THE INSTRUMENT, WHICH THE IN-BULLET FORM WAS ERODING.**
+  `verif/register-append-only.test.ts` absolves a lost word when it reappears in an entry that existed at the
+  baseline. **An in-bullet pointer quotes the very text the destructive edit removed, into the very entry
+  that lost it** — so the annotation systematically re-supplies the words the gate is watching for.
+  Driven: with the in-bullet pointers applied, the gate's forbidden-act mutant fell from naming **nine** lost
+  words to **one**, and a second attempt keyed on the commit hash `3f70bcfe` fell to **zero**, because the
+  annotation quoted the hash too. **`REG-F-274`'s remedy was eroding `REG-F-274`'s gate.** A NEW entry cannot
+  absolve — the gate counts "elsewhere" only over baseline-existing entries — so the appendix form is the one
+  that leaves the instrument at full strength. The gate's mutants now DERIVE a once-only token at run time
+  and fail loudly if none exists, rather than trusting a hard-coded one twice invalidated in a day.
+
+- **WHAT IS LOST BY THE APPENDIX FORM, STATED PLAINLY.** `REG-F-273` argued for the in-bullet form because
+  *"a superseding entry with no pointer never reaches the reader it exists to protect."* **That cost is
+  real and is accepted here**: a reader who opens `REG-F-049` and reads only that entry will not see this.
+  The trade was 28 co-located pointers against 543 permanently stale citations plus a degraded gate, and it
+  was made on measurement. Every annotation below names its entry id, so a reader who greps the entry id —
+  the same act that finds any superseding entry in this register — finds it.
+
+
+**A. THE SIX WHOSE REMOVED TEXT WAS STILL TRUE AND LIVE — RESTATED, NOT MERELY POINTED AT.**
+The obligation vanished with the words, so a pointer alone would leave it discharged by accident.
+
+  - **REG-F-029** · `7a62881a` — **⚠ TEXT REMOVED IN PLACE AT `7a62881a` (2026-08-05) — REG-F-274.** The safe default that stood at exactly this point was overwritten rather than struck. It read: *"Default: the precondition stays withdrawn **and the kernel stays deferred** until the drive cites a policy per PWU kind. Enforcing first would refuse the canonical drive for asking a real question badly — a green suite that had stopped assessing rather than one that had started checking, which is the trade REG-F-015/016 record from the other side."* **Both limbs were true and owed when deleted** — that commit authored the concern's policy and wired no kernel — and the replacement it wrote carried only the withdrawal limb. It is restored immediately below. (That replacement line was in turn deleted outright at `6b05bb1e`, a separate act of the same class.)
+    - **RESTATED AND LIVE AGAIN:** - **THE SAFE DEFAULT AS IT STOOD, RESTORED VERBATIM FROM THE TEXT `7a62881a` DELETED (REG-F-274).** As written on 2026-08-05 and true when deleted, word for word: *"Default: the precondition stays withdrawn and the kernel stays deferred until the drive cites a policy per PWU kind. Enforcing first would refuse the canonical drive for asking a real question badly — a green suite that had stopped assessing rather than one that had started checking, which is the trade REG-F-015/016 record from the other side."* **Its referents, since the sentence is terse:** *the precondition* is the §5.1 applicability precondition on `RequestAssuranceAssessment`; *the kernel* is `policyApplicability`, then carried DEFERRED in the dead-kernel census. **Both limbs were live at the moment of deletion, and both have since been discharged** — the deferral limb when `policyApplicability` was wired (this entry's dead-kernel bullet) and the withdrawal limb at this entry's closure — so this is restored as a DATED RECORD of what stood, **not as a default that still binds.** ⚠ **And the condition it names is not the condition the closure met:** it said *"until the drive cites a policy per PWU **kind**"*, where `earnAssurance` in fact selects **DECLARED ∩ DETERMINED per PWU** and assesses the resulting SET — the difference the entry's own correction bullets record, and the reason the deleted wording is reproduced rather than modernised. What is not time-bound is the trade the sentence names: **a suite that goes green by ceasing to assess, rather than by starting to check, is a failure this register has recorded from REG-F-015 onward.**
+  - **REG-F-028** · `574cc1e6` — **⚠ TEXT REMOVED IN PLACE AT `574cc1e6` (2026-08-05) — REG-F-274.** This line replaced one that carried a VERDICT and not only bookkeeping: *"It is deliberately NOT folded into REG-F-024: a vocabulary migration touching seeded types, projections and E2E does not belong inside a scope reconciliation, and REG-F-024's fix is correct and complete on its own terms."* It was overwritten, not struck. **The separation verdict was true when deleted and is true still; it is restored immediately below.** Its trailing clause about the state of REG-F-024's own fix is a claim about a mutable property as at 2026-08-05 and is deliberately NOT restored.
+    - **RESTATED AND LIVE AGAIN:** - **THE SEPARATION VERDICT, RESTORED VERBATIM FROM THE TEXT `574cc1e6` DELETED (REG-F-274), AND STILL TRUE.** The overwritten line's verdict read, word for word: *"It is deliberately NOT folded into REG-F-024: a vocabulary migration touching seeded types, projections and E2E does not belong inside a scope reconciliation, and REG-F-024's fix is correct and complete on its own terms."* **Its first half stands at HEAD, checked rather than assumed:** the two findings were opened, worked and dispositioned as **separate entries** and were never merged — so a later reader must not collapse them into one finding, nor read either's disposition as covering the other. ⚠ **Its trailing clause is a claim about a mutable property and is deliberately NOT re-asserted as current.** REG-F-024's own entry records the second writer that multi-agent review found in that very fix **later the same day** (`4d409580`, 2026-08-05) — *"AND THE FIX COVERED ONE OF TWO WRITERS"* — so restating *"correct and complete on its own terms"* undated would author, inside the annotation that exists to prevent it, exactly the defect REG-F-273 limb 2 forbids. **The verdict is restored; the bookkeeping that travelled with it is not.**
+  - **REG-F-033** · `fb5d7cbd` — ⚠ TEXT REMOVED IN PLACE AT `fb5d7cbd` (REG-F-274), AND IT WAS STILL TRUE AND STILL BINDING WHEN DELETED. This line carried a STANDING RATCHET: *"the five fields remain undelivered **by decision**. `**Status:**` OPEN, GATED AND COUNTED. The number may only fall, and closing `candidateChildren` requires a sponsor act (which composition tree the reference PWA publishes) plus templates for the kinds it would name."* It was deleted rather than struck and replaced by nothing — `requires a sponsor act`, `closing \`candidateChildren\`` and `undelivered **by decision**` all return 0 in this register at 2026-08-27, against a firing control of 4 for `may only fall` (none of the four in this entry) and 24 for `sponsor act`. **LIVE — RESTATED IMMEDIATELY BELOW.**
+    - **RESTATED AND LIVE AGAIN:** - **RESTATED (REG-F-274) — the standing ratchet `fb5d7cbd` removed in place, restored here because it went out with the words and nothing replaced it.** The count of undelivered `pwuTemplate` fields **may only FALL**; **closing `candidateChildren` requires a sponsor act** — which composition tree the reference PWA publishes — **plus templates for the kinds it would name**; and the fields that remain undelivered are undelivered **BY DECISION**, not by omission. The 2026-08-06 narrowing SATISFIED that requirement for the wiring it performed — it records a sponsor direction on its own face — and did not ABOLISH it: the remainder this line still names, the 50 candidate kinds with no template and `ARCHITECTURE_DECISION` described but parented by nobody, is closable only the same way. ⚠ **And the ratchet is a DIRECTION that no gate carries.** `packages/rph-engine/src/ontology-delivery-census.test.ts` pins exact equalities — `expect(candidates.size).toBe(63)`, the un-templated kinds `.toHaveLength(50)`, `archAuthored.toHaveLength(11)`, read there on 2026-08-27 — and an exact pin reddens in BOTH directions, so it forces a deliberate edit without saying which way an edit may go. Until a gate enforces the direction, this restatement is what binds.
+  - **REG-F-014** · `5fd041f3` — ⚠ TEXT REMOVED IN PLACE AT `5fd041f3` (REG-F-274), AND THE SENTENCE ABOVE OVERSTATES WHAT SURVIVED: the prescription was NOT kept unstruck in full — the same commit deleted its first half, *"The minimal fix is `proposeDecision` binding `authority` the way `requestWaiver` already does, or refusing when `p.authority.actorId !== command.issuedBy.actorId` **without a delegation record**"*, together with *"`**Status:**` OPEN"* and the merge target's open-ended scope, *"`handlers/governance.ts` (`proposeDecision`), **plus whatever the provenance-field survey turns up**"* (`The minimal fix is`, `p.authority.actorId` and `provenance-field survey` all return 0 here at 2026-08-27, against a firing control of 9 for `requestWaiver`). **TWO HALVES WERE STILL LIVE — RESTATED IMMEDIATELY BELOW.**
+    - **RESTATED AND LIVE AGAIN:** - **RESTATED (REG-F-274) — the two live halves `5fd041f3` deleted from this entry's Disposition and Merge target.** (1) **THE SURVEY'S SCOPE IS OPEN-ENDED, NOT A LIST.** The merge target read *"plus whatever the provenance-field survey turns up"*; the same commit narrowed it to a fixed set of four, `fb5d7cbd` re-counted it, and REG-F-040 measured three — and REG-F-040's own account names the mechanism of the error: a residual found *under* instance 4's heading was banked as a limb of it, because *"a residual discovered under a heading is not a limb of that heading."* **The obligation is to DERIVE the population of caller-supplied provenance/authority fields, not to work a hand-written list of instances**; an enumeration is what this entry has been corrected for three times. (2) **THE REFUSAL IS CONDITIONAL ON THERE BEING NO DELEGATION RECORD.** The prescription refused *"when `p.authority.actorId !== command.issuedBy.actorId` **without a delegation record**"*; `proposeDecision` refuses unconditionally today only because this repository has no delegation object, which this entry still records above as a sponsor question and a new ratified shape. **If that shape is ever ratified, the unconditional refusal becomes wrong and must admit it** — the qualification is the part that vanished with the words.
+  - **REG-F-049** · `c61d92cf` — ⚠ TEXT REMOVED IN PLACE AT `c61d92cf` (2026-08-07) (REG-F-274): this bullet previously read *"**Merge target:** This register (the audit), and every design record under `docs/_working/` carrying an RPH citation. `**Status:**` OPEN."* A CLASS-scoped obligation was overwritten, unstruck and with no superseding entry, by one naming a single corrected file. Measured 2026-08-27 at `89936730`, entry-scoped: `every design record under` = **0** and **`docs/_working` = 0 — this entry no longer names the class anywhere** — against firing controls on the same entry, `3f70bcfe` = **1**, and on the same instrument, `docs/_working` = **399** file-wide. **STILL LIVE, and restated in the bullet below**, because the obligation is the thing that vanished with the words.
+    - **RESTATED AND LIVE AGAIN:** - **⚠ THE SCOPE THIS MERGE TARGET USED TO CARRY, RESTORED AS A LIVE OBLIGATION (REG-F-274).** Until `c61d92cf` this entry's merge target ranged over *"every design record under `docs/_working/` carrying an RPH citation"* — **a class, not a file.** `3f70bcfe`'s own subject line calls itself *"Citation audit, first document"* and it touched exactly one, `DESIGN-accountability-substrate.md`; the rest of the class was never revisited, and the replacement text records the singular *"the design record"* as though it had been. **Measured at HEAD `89936730` on 2026-08-27, derived from the filesystem rather than from a list: 24 of the 67 `.md` design records under `docs/_working/` cite `RPH-DOC-0`, and 2 of those 24 contain the phrase `historical material`** (positive control: the phrase-match instrument returns nonzero on the same corpus, naming `DESIGN-accountability-substrate.md` and `HARMONIZATION-FINDINGS.md`). **At `c61d92cf` the same measurement — same needle, same `.md` restriction — gave 15 of the 29 `.md` records then present citing, and 1 labelled**, so fourteen were live on the day the obligation over them was deleted. ⚠ **AND THE OBLIGATION IS REFRAMED BY REG-D-034 (2026-08-09), NOT SIMPLY RESTORED — restating it unchanged would re-impose a rule the sponsor has since amended.** B1 now admits the source corpora as SOURCE OF RECORD, authoritative for DETAIL, so the test each citation must pass is no longer *"does it say historical material in the same sentence"* but the narrower question this entry's own head-note states: ***"is this claim a PRINCIPLE (canon governs, per B3) or a DETAIL (source governs)?"*** **What is owed is that question asked of the twenty-four. What `c61d92cf` removed is any record that anything is owed of them at all.**
+  - **REG-F-024** · `ec60af4f` — ⚠ TEXT REMOVED IN PLACE AT `ec60af4f` (2026-08-05 10:47 -0400) (REG-F-274): this entry's Merge-target bullet previously read *"Repository — `seedFloorPolicies`'s object-type scope, once the §16 plane-agnostic reconciliation lands; then the precondition. `**Status:**` OPEN. Blocks the operative half of REG-F-022's second instance: the scope now REACHES the runtime and is still not CONSULTED, which is the same defect one step further along and is recorded as such rather than claimed closed."* Overwritten unstruck, with no superseding entry. **Two limbs, two different truths at removal.** The §16 precondition was falsified by the very commit that deleted it — its replacement shows item 23 ruling the other way (*"Never interpret the missing wire shape as permission to omit or hide the floor"*) and the scope was fixed without waiting for §16. **The REG-F-022 limb was TRUE AND LIVE when deleted** — that commit's own account says the precondition *"stays withdrawn"* — and is restated in the bullet below. Measured 2026-08-27 at `89936730`, entry-scoped: `Blocks the operative half` = **0** and **`REG-F-022` = 0 — the cross-reference is gone from this entry entirely, against 35 occurrences file-wide** — with firing controls on the same entry (`54 drives` = 1, `Merge target` = 1). ⚠ **Read this pointer against the bullet it is appended to, and then against the design record that bullet quotes.** `DESIGN-floor-declared-scope.md` exists in exactly one commit — **this one** — and its item D-4 does not stop where this entry quotes it: after *"Correct the record in place"* it continues *"Each is corrected where it stands, **per the standing practice of striking rather than deleting**."* **D-4 prescribed a STRIKE, and the same hunk applied the strike idiom correctly to the diagnosis bullet above** (*"⚠ THE DIAGNOSIS BELOW IS WRONG AND IS CORRECTED 2026-08-05 (same entry, kept in place). It read: …"*) **while deleting this Merge-target bullet outright** — the same-hunk selectivity REG-F-274 counts four times, here inside the very commit that wrote the instruction to strike.
+    - **RESTATED AND LIVE AGAIN:** - **⚠ THE CROSS-REFERENCE THIS ENTRY USED TO CARRY, RESTORED WITH ITS DISCHARGE (REG-F-274).** Until `ec60af4f` this entry recorded that it **blocked the operative half of REG-F-022's second instance** — *"the scope now REACHES the runtime and is still not CONSULTED, which is the same defect one step further along and is recorded as such rather than claimed closed."* **It was true when it was deleted:** the commit that deleted it says in its own replacement text that the applicability precondition stays withdrawn. **It is discharged now, and the discharge is stated as code rather than as bookkeeping so this restatement cannot rot the way the deleted line would have:** `packages/rph-application/src/handlers/assurance.ts:1302-1313` calls `policyApplicability` over the subject and refuses unless `applicabilityPermitsAssessment(outcome)` — **read directly at HEAD `89936730` on 2026-08-27**, and `git log -S` over that file returns exactly one commit for either symbol, `6b05bb1e`. The record is restored because the relation was **erased rather than discharged**: the erasure landed at 10:47 and the discharge at `6b05bb1e` (2026-08-05 13:10 -0400) — **two hours and twenty-two minutes later the same day**, on the fourth attempt at wiring the §5.1 determination and the first that held — and between the two acts this entry carried no trace that the relation had ever been recorded.
+
+**B. THE REMAINDER — the removing commit had itself already falsified the claim, so the record is
+completed by a pointer and nothing is revived.**
+
+  - **REG-F-109** · `b33f4dd2` — **⚠ TEXT REMOVED IN PLACE AT `b33f4dd2` (2026-08-10) — REG-F-274.** Four live lines of this entry were overwritten rather than struck: its original title; its status (*"OPEN — measured, not yet dispositioned"*); the whole bullet *"THE QUESTION THIS RAISES (not answered here): should a material PWU reshape bump `semanticVersion`? DOC-002 §9 distinguishes a shape revision from a lifecycle move, and `MarkPwuReady` already carries `expectedSemanticVersion` as a staleness guard — a guard against a change that cannot currently happen. Two ratified mechanisms both point at a version that never moves."*; and the merge target *"Corpus then Repository"*. **Moot at removal:** the same commit refuted the §9 citation the question rested on, established the PWU shape as write-once, and withdrew the corpus item. The staleness-guard observation and the safe default survive in substance in the bullets above, and the original title survives near-verbatim in REG-F-106's cross-reference; **only *"Two ratified mechanisms both point at a version that never moves"* is preserved nowhere, checked.**
+  - **REG-F-106** · `368fecd6` — **⚠ TEXT REMOVED IN PLACE AT `368fecd6` (2026-08-10) — REG-F-274.** Three live lines were overwritten rather than struck: this entry's original title (*"S-3: the two defects DESIGN §7 listed for `/decisions` are ONE, and retiring the propose form is the sponsor's call, not mine"*); this line's original status (*"disclosure SHIPPED; **the retire-vs-scope choice is ESCALATED, deliberately undecided here**"*); and the whole escalation bullet (*"THE QUESTION FOR THE SPONSOR, in one sentence: should `/decisions` remain a REGISTER (list, approve, grant, deny) with proposing removed, or keep a propose form scoped to the three types no gate reads? Neither is obviously right, and the demo's purpose — showing what a governance act IS — argues both ways: removal makes the surface honest by subtraction, scoping makes it honest by demonstration."*). **Moot at removal:** the same commit is the ruling that refuted both options and closed the escalation, and both options are named and answered in the refutation bullet below. ⚠ **The heading's `~~REG-F-106~~` strikes the ID only** — the title text it replaced survives nowhere in this register, checked; and the *"argues both ways"* framing of the escalation survives nowhere either.
+  - **REG-F-022** · `de09e77d` — **⚠ TEXT REMOVED IN PLACE AT `de09e77d` (2026-08-04) — REG-F-274.** Two live bullets of this entry were rewritten rather than struck, and **they are not of equal weight, so they are graded separately.** **(1) THE *"NOT A ONE-LINE FIX"* BULLET these notes hang from** had read: *"DOC-004 §6.1's `EvidenceRequirement` carries `id`, `evidenceType`, `description`, `purpose` and `cardinality`. **The ontology carries only the type.** … but delivering it means minting requirement ids and authoring descriptions, purposes and cardinalities for 12 policies. **That is authoring work against a ratified schema, not a mapping a compiler can check**"*. **That one WAS falsified by its own commit**, which measured `EvidenceRequirementSchema` as a `z.strictObject` of **NINE** fields, not five. **(2) THE STATEMENT BULLET** had read *"**12 of 12** ratified catalog policies declare it"*; the word `ratified` was not deleted but **moved into a parenthetical in place** — *"the policies are ratified transcriptions; this field on them is self-declared AUTHORED"*. ⚠ **That second claim was NOT false, and is recorded here as not false**, because the commit's own correction says *"The **policies** are ratified and machine-checked transcriptions; **the field** is not"* — `ratified` was predicated of the policies, which it truly is. **The rewrite removed an ambiguity, not a falsehood, and its substance survives in the replacement.** **It follows that this entry's HEADING — *"Twelve of twelve **ratified** policies declare which evidence they require"* — is CORRECT as it stands and needs no correcting entry**, notwithstanding that the same commit ruled the FIELD authored: the heading predicates `ratified` of the policies too. Checked so it is not re-derived as a `70e4f33b`-class standing falsehood.
+  - **REG-F-020** · `9d21d38f` — **⚠ TEXT REMOVED IN PLACE AT `9d21d38f` (2026-08-04) — REG-F-274.** **The strike above covers only the FIRST sentence of the bullet it retires; three further sentences of that same bullet were deleted UNSTRUCK in the same edit:** *"Every event type the Reference Undertaking does not emit is unmeasured, and this entry is a worked example of what that costs. A census of *declared event types never emitted by the drive* would close the class rather than the instance — the same move the dead-kernel and command-dispatch censuses made for their own blind spots. It is not done here, and it is the natural next increment."* The same commit also overwrote this entry's merge-target status (*"OPEN, NARROWED — the instance is fixed; the register's dependence on drive coverage is not"*). **Moot at removal:** that commit built the total ledger and recorded why it was preferred to the never-emitted census those sentences proposed, and the residual blind spot they name survives in the THREE LIMITS bullet below (*"43 declared types are still emitted by nothing and remain unmeasured"*).
+  - **REG-F-072** · `8cfc341b+174047b8` — **⚠ TEXT REMOVED IN PLACE AT `8cfc341b` (2026-08-08) — REG-F-274.** This line was overwritten rather than struck. What that edit took was its status word (*"`**Status:**` OPEN."*) and the bare *"**Safe default:**"* label; the merge-target sentence and the safe-default sentence themselves were carried through word for word, so the substantive loss is confined to the status. **Moot at removal:** the same commit performed the partial closure its replacement text recorded. ⚠ **AND THIS LINE WAS REWRITTEN IN PLACE TWICE ON 2026-08-08** — by `8cfc341b`, then by `174047b8` — which is REG-F-274's keystone: the correction mechanism was available and was spent twice on this one line, and REG-F-274 (2026-08-27) records that it never reached the census figures this entry carries. — ⚠ TEXT REMOVED IN PLACE AT `174047b8` (REG-F-274) — the SECOND in-place rewrite of this same line on 2026-08-08, after `8cfc341b` earlier the same day. It read *"`**Status:**` PARTLY CLOSED 2026-08-08 — the generic-setter bypass is closed structurally; **C-0b (the standing control over declared guards) remains OPEN**, and so does the 33-text residue. **Safe default (still binding):** no document may describe a declared arrow guard as a control until this census records it ENFORCED"* (`no document may describe a declared arrow guard as a control` and `33-text` both return 0 here at 2026-08-27, against a firing control of 11 for `no document may describe`). MOOT as to C-0b and the safe default: this same commit landed the ledger and replaced the prohibition with it. ⚠ The 33-text residue is neither discharged nor recoverable — this same commit records that the old and new populations *"cannot be reconciled row by row"* — and its substance survives only as the ledger's UNENFORCED disposition, whose current value is held by `verif/guard-enforcement-ledger.test.ts:59-62`, not by the figures this commit wrote two bullets below.
+  - **REG-F-114** · `09d771ba` — **⚠ TEXT REMOVED IN PLACE AT `09d771ba` (2026-08-10) — REG-F-274.** This line was overwritten rather than struck; the clause it lost was the safe default's measurement — *"it describes ~38% of the ratified arrow surface, and the missing 62% is missing because the commands do not declare their arrows."* **Moot at removal:** the same commit moved arrow coverage past that figure (115 → 164 of 304 arrows) and its replacement retains *"up from 38%"*, **so the superseded number is preserved and nothing here is unrecoverable.** ⚠ Recorded nonetheless because **this entry's `**Date:**` line was struck-and-replaced CORRECTLY in the same commit** — two hunks of one diff, the sanctioned `~~strike~~`-plus-replacement idiom applied to one line of the entry and not to the other. That is REG-F-274's *"selective application, not ignorance of the idiom"*, evidenced on a single commit.
+  - **REG-F-015** · `334d7012` — ⚠ TEXT REMOVED IN PLACE AT `334d7012` (REG-F-274): the bullet this replaced said the corpus-wide sweep for unasserted arranging dispatches was *"the honest follow-up"*, and carried a programme-level tally — *"this programme has now shipped **two** distinct instances of evidence-that-cannot-fail (three controls in JAN-VERIF, this file)"* — while the old merge-target line read *"**OPEN** for the corpus-wide sweep … `**Status:**` OPEN (sweep)"*. The SWEEP obligation is MOOT: this same commit ran it, and its result is the bullets above. The TALLY is deliberately **not** restated as live — it was a count true as recorded on 2026-08-03, no successor count exists in this register, and `evidence-that-cannot-fail` / `distinct instances` both return 0 here at 2026-08-27 against a firing control of 32 for `cannot fail`.
+  - **REG-F-023** · `bd9cb745` — ⚠ HEADING REWRITTEN IN PLACE AT `bd9cb745` (REG-F-274). This entry was filed as *"REG-F-023 — Eleven declared states no arrow can reach, two of them entire machines, and both of those are assurance axes"*. The COUNT is moot — the same commit's own correction below reduces eleven to five on JAN-CMDPRE-SPEC-001 §2 — but the words were replaced rather than struck, and the entry's own **Statement** still reads ELEVEN, so heading and body now disagree with no strike to explain it. ⚠ This is the register's FIRST heading rewrite that LOST text (2026-08-05), one day before REG-F-040 (`:1101`) asserted *"no heading in this register has ever been struck or rewritten."*
+  - **REG-F-108** · `366d34c9` — ⚠ HEADING AND DATE LINE REWRITTEN IN PLACE AT `366d34c9` (REG-F-274). The heading read *"REG-F-108 — the `/decisions` empty-catalog guard has no reader, and neither demo seed can give it one"* with the id UNSTRUCK, and the Date line's status read *"OPEN — the guard stands as a fail-safe; the absence of a test is disclosed, not hidden"* (`stands as a fail-safe` and `disclosed, not hidden` both return 0 here at 2026-08-27, against a firing control of 1 for `fail-safe`). The FIRST clause is moot — this commit gave the guard a reader. The SECOND is not: `reference` and `empty` still cannot reach the branch, and only the `bare` mode this commit added can. ⚠ And the rewrite did not reach the register's own cross-reference: REG-F-106 `:3115` still describes this entry by its original heading, *"the empty-catalog guard has no reader — neither demo seed can reach it"*.
+  - **REG-F-108** · `366d34c9` — ⚠ TEXT REMOVED IN PLACE AT `366d34c9` (REG-F-274): this line replaced a recorded **Safe default** — *"the branch is annotated in `+page.svelte` and in the e2e as unreachable-from-seed"* — together with the two options it named, *"a third reset mode with no ontology, or a component-level test harness the demo does not currently have — neither worth building for one branch today, both preferable to a green tick that means nothing"* (`unreachable-from-seed`, `component-level` and `The honest options` all return 0 here at 2026-08-27, against a firing control of 195 for `Safe default`). MOOT as to the safe default and the first option: the same commit took the third-reset-mode option and the line above records the retirement. The SECOND option — a component-level test harness — is neither built nor declined anywhere in this register; it was retired by deletion rather than by a decision.
+  - **REG-F-012** · `70e4f33b` — ⚠ TEXT REMOVED IN PLACE AT `70e4f33b` (REG-F-274) — AND THE SENTENCE ABOVE IS FALSE ABOUT THIS REGISTER'S OWN HISTORY. There is no prescription below and none was kept unstruck: the same commit DELETED it. It read *"The fix is small (compare `commandType`, `targetAggregateId` and a payload hash against the receipt before returning `DUPLICATE`; refuse on mismatch) but it is a **behaviour change that will refuse commands the engine accepts today**, so it takes the REG-F-011 treatment: a caller/fixture survey first, then a red-first test written against the CONTRACT … rather than against a chosen error string. The refusal needs an error code; `RPH_IDEMPOTENCY_CONFLICT` is **not** among the ratified fifteen, so this also inherits REG-F-010's question of whether to carry the label in the message (the WP-11 discipline) or ratify a code"*, and the entry's then-current *"`**Status:**` OPEN"* went with it (`The fix is small (compare` and `REG-F-011 treatment` both return 0 here at 2026-08-27, against firing controls of 6 for `REG-F-011` and 11 for `RPH_IDEMPOTENCY_CONFLICT`). The prescription's CONTENT is moot — it was executed as it was deleted. **The claim that it was kept unstruck is not moot and is not true**, and is owed a correcting entry, not only this annotation.
+  - **REG-F-005** · `fb5d7cbd` — ⚠ TEXT REMOVED IN PLACE AT `fb5d7cbd` (REG-F-274): this line's status read *"`**Status:**` OPEN (remediation pending)"* before the 2026-08-06 re-measurement replaced it. MOOT and fully carried: the same commit's bullets above record what was remediated and what the refuter showed still remains, so nothing of substance is lost. Recorded because the words were replaced rather than struck — the fourth entry line this one commit rewrote in place, and the one the original classification missed.
+  - **REG-F-014** · `fb5d7cbd` — ⚠ TEXT REMOVED IN PLACE AT `fb5d7cbd` (REG-F-274) — the SECOND in-place rewrite of this line, after `5fd041f3` three days earlier (2026-08-03, then 2026-08-06). It read *"… (`proposeDecision`) **LANDED**; the four remaining provenance fields outstanding … `**Status:**` OPEN, NARROWED — one of five closed. A **delegation record** remains a sponsor question and a new ratified shape: canon says authority may be *delegated*, and this repository has no object for that …"*. MOOT: the delegation record is re-stated in the bullet directly above, and the arithmetic is superseded twice over. It is recoverable only because REG-F-040 preserves the whole progression — *"one of five"* → *"Four of five, not one of five"* → *"measured against the code, it is three"* — which is the discipline this deletion did not follow.
+  - **REG-F-024** · `fb5d7cbd` — ⚠ TEXT REMOVED IN PLACE AT `fb5d7cbd` (REG-F-274): this line read *"`**Status:**` OPEN, on a NEW and correct blocker. Wiring the precondition now gets **past** the floor and fails at step **#56** instead of #47, on a second vocabulary divergence filed as **REG-F-028** — so the precondition stays withdrawn, for a reason that is true this time"* (`the precondition stays withdrawn` returns 0 here at 2026-08-27; the phrase `on a NEW and correct blocker` survives only inside the sub-bullet below, which quotes it). MOOT: the same commit wired the precondition. ⚠ But the design item that ORDERED this edit named the mechanism it was to use, and the sub-bullet below omits that half: `docs/_working/DESIGN-floor-declared-scope.md:102-105` reads *"**D-4 — Correct the record in place.** … Each is corrected where it stands, **per the standing practice of striking rather than deleting**"*, while the quotation of D-4 below, labelled **verbatim**, stops at *"withdrawal comment"*.
+  - **REG-F-029** · `bdf16a0f` — ⚠ TEXT REMOVED IN PLACE AT `bdf16a0f` (REG-F-274): this line's status read simply *"`**Status:**` CLOSED."* before the 25-agent adversarial review recorded above narrowed it. MOOT — that same review refuted the kernel's headline judgement (`policyApplicability` treating `ApplicabilityExpression` as undefined by the corpus) and made the unqualified CLOSED false as it was being written — and the rest of the sentence survives word for word. Recorded because the status was replaced rather than struck.
+  - **REG-F-021** · `322eed27` — ⚠ TEXT REMOVED IN PLACE AT `322eed27` (REG-F-274): this bullet read *"AND BOTH EARLIER DISPOSITIONS OF IT WERE WRONG … **Both readings missed the arrow, because it is not written as a row.** … five were transcribed into `m2-transitions.json` and the sixth … was dropped, because its from-state is **QUANTIFIED** and a quantifier is not a row. So the arrow was RATIFIED the whole time and the transcription lost it"* (`because it is not written as a row` and `the transcription lost it` both return 0 here at 2026-08-27, against a firing control of 2 for `a quantifier is not a row`). MOOT: the same commit proved the row WAS transcribed, as `ANY_ACTIVE`, and that `gen-transitions.ts` discarded it one layer lower. **The mildest case in this sweep** — the superseded account is quoted verbatim in the sub-bullet immediately below, so nothing is unrecoverable; the defect is only that the parent bullet was rewritten in place while the sub-bullet it added says the account was *"kept in place rather than rewritten."*
+  - **REG-F-006** · `48169630` — ⚠ TEXT REMOVED IN PLACE AT `48169630` (2026-08-02 10:50 -0400) (REG-F-274): this bullet previously read *"Repository (handler + `decomposition-revise-conformance.test.ts` + the vocabulary provenance, all landed); … `**Status:**` OPEN AND UNSCHEDULED — B7 component discharged and the event payload now engine-enforced; the DOCS_STRONGER remediation (wire the existing M9 conservation kernel into the revise path) is held by no milestone."* Overwritten unstruck, with no superseding entry — `is held by no milestone` scores **0** in this entry (measured 2026-08-27 at `89936730`) against a firing control on the same entry, `DOCS_STRONGER` = **3**. **MOOT as a claim:** the same commit landed the DOCS_STRONGER component for DEC-3 and DEC-4 and reclassified DEC-2 from unscheduled to blocked. ⚠ **BUT IT LEFT THIS ENTRY CONTRADICTING ITSELF, WHICH IS NOT MOOT:** the sentence *"**Status here is therefore OPEN AND UNSCHEDULED**, stated plainly so it is not mistaken for queued"* still stands in the bullet opening *"How it went missing, which is the more useful record"* (`REG-005:480` at `89936730`) — a bullet this commit did not touch — while the replacement it wrote in the same hunk says in terms that DEC-2 *"IS NOT MERELY UNSCHEDULED — IT IS BLOCKED"* (`REG-005:485` at `89936730`). **Two statuses in one entry, made inconsistent by the rewrite that updated only one of them.** ⚠ **And this is the EARLIEST of the 26 in-place rewrites REG-F-274 records** — 2026-08-02, nine days after REG-D-010 ratified this register — earlier both by ancestry (`git merge-base --is-ancestor 48169630 d791416f` succeeds; the reverse fails) and by four and a half hours than `d791416f`, which the adjudication had recorded as the earliest. **No claim is made that it is the earliest in-place rewrite of this register at large**, a population REG-F-274 publishes only as the range 103–163.
+  - **REG-F-011** · `d791416f+17846478` — ⚠ TEXT REMOVED IN PLACE AT `d791416f` (2026-08-02 15:22 -0400) (REG-F-274): this bullet previously read *"Repository (`command-bus.ts`; `conformance-manifest.ts` for the miscitation). `packages/rph-contracts/src/envelopes.ts` is unchanged — `DomainCommandSchema` is correct; what is missing is anything asking it. `**Status:**` OPEN — measured and disclosed, remediation unscheduled."* Overwritten unstruck, with no superseding entry — `remediation unscheduled` scores **0** in this entry (measured 2026-08-27 at `89936730`) against a firing control on the same entry, `conformance-manifest.ts` = **1**. ⚠ **A whole-file count does NOT settle this one:** the identical phrase survives once elsewhere in the register, at `REG-005:515`, in a neighbouring entry's own status line, so only the entry-scoped count is evidence. **MOOT:** the same commit landed the crash half, which is exactly what made *"remediation unscheduled"* false, and it carried both still-owed limbs — the envelope validation and the `conformance-manifest.ts` miscitation — forward into the replacement it wrote. **This is the SECOND of the 26 in-place rewrites REG-F-274 adjudicates, four and a half hours after `48169630` the same day** — not the first, as the adjudication note recorded. **No claim is made about its rank among ALL of this register's in-place rewrites**, a population REG-F-274 publishes only as the range 103–163. — **⚠ TEXT REMOVED IN PLACE AT `17846478` (2026-08-04) — REG-F-274.** This line replaced one that read: *"Repository — `command-bus.ts` (crash half **LANDED**); **still owed: the envelope validation itself, and `conformance-manifest.ts` for the RPH-CON-001 miscitation.** … `**Status:**` OPEN, NARROWED — the contract violation (a throw where a `CommandResult` is promised) is closed; the unvalidated envelope and the miscitation remain."* It was overwritten, not struck. **Moot at removal:** the same commit landed the envelope validation and moved the three miscited rule ids onto their real subjects, so both items recorded as owed were discharged by the very act that deleted the record of their being owed.
+  - **REG-F-020** · `f3d318da` — ⚠ TEXT REMOVED IN PLACE AT `f3d318da` (2026-08-04 13:37 -0400) (REG-F-274) — **the text lost here is in this entry's Merge-target bullet (`REG-005:754` at `89936730`); this pointer is anchored on the bullet this same commit authored, because that Merge-target line already carries `6e26a4de`'s pointer and one anchor may carry only one.** That bullet then read *"Repository — `packages/rph-application/src/handlers/artifact.ts` (the instance), `verif/emitted-event-guard.ts` + `vitest.projects.ts` (the class), and the scope correction in `emitted-event-conformance.test.ts`. The vocab is unchanged and was correct throughout: `artifactId` was never part of the event's declared payload. `**Status:**` OPEN, NARROWED — the instance is fixed and the blind spot is gated at 21 known defects; **those twenty-one are real and unfixed**, each awaiting the deliberate one-at-a-time treatment the previous twelve got."* Overwritten unstruck, with no superseding entry — `those twenty-one are real and unfixed` scores **0** in this entry (measured 2026-08-27 at `89936730`) against a firing control on the same entry, `artifactId` = **2**. **MOOT:** the same commit fixed six of the twenty-one and established that the twenty-first (`PwuMarkedReady`) was never a defect, and the deleted `artifactId` ground still stands in substance in this entry's Statement bullet at `REG-005:727` (*"`ArtifactRecordedPayloadSchema` is a `z.strictObject` that does **not** declare `artifactId`"*).
+  - **REG-F-020** · `6e26a4de` — ⚠ TEXT REMOVED IN PLACE AT `6e26a4de` (2026-08-04 14:29 -0400, the THIRD in-place rewrite of this same bullet that day) (REG-F-274): it then read *"Repository — `packages/rph-application/src/handlers/{artifact,pwa-authoring}.ts` (six fixes), … The vocab is unchanged and was correct throughout. `**Status:**` OPEN, NARROWED — six fixed, **fifteen real defects remain gated and unfixed**, each awaiting the deliberate one-at-a-time treatment the previous twelve got."* Overwritten unstruck, with no superseding entry — `fifteen real defects remain` scores **0** in this entry (measured 2026-08-27 at `89936730`) against a firing control on the same entry, `artifactId` = **2**. **MOOT:** the same commit fixed fourteen of the fifteen in one orchestrated pass and recorded the fifteenth, `WaiverRequested`, as a reasoned refusal rather than a residue. ⚠ Recorded because the SHAPE is the finding, not the loss: **this ONE bullet's Merge-target/Status line was rewritten in place FOUR times in two hours and forty-eight minutes on 2026-08-04** — `9d21d38f` (12:17), `f3d318da` (13:37), here (14:29) and `d4be2574` (15:06), against a single authoring at `766e46bc` (10:51) — while the entry's substance was appended to correctly each time. **The register corrects its bookkeeping in place and its substance never**, which is REG-F-274's keystone reproduced on a second entry.
+  - **REG-F-063** · `af5f1e19` — ⚠ TEXT REMOVED IN PLACE AT `7db0fda7` (2026-08-08 06:54 -0400), reaching `main` fourteen seconds later in merge `af5f1e19` — the commit the adjudication names, and which introduced no register change of its own (`git diff af5f1e19^2 af5f1e19` over this file changes zero lines) (REG-F-274) — **AND THE LINE IT REWROTE IS THIS ENTRY'S HEADING.** The heading read *"…with nine states and eight arrows that no command can traverse"*; `eight` was overwritten with `FIFTEEN`, unstruck, with nothing in the heading itself recording that it had ever said anything else (`eight arrows` = **0** in this entry, measured 2026-08-27 at `89936730`, against a firing control on the same entry, `eight` = **1** — the correction annotation in the *"AND IT CANNOT MOVE"* bullet at `REG-005:2115`, where the superseded value IS preserved). **MOOT as a claim:** `eight` was counted from a printed excerpt rather than from the machine, and the merge that carried this correction also landed the C-0 census that read `transitions.data.ts` and reported fifteen — `7db0fda7` itself touched three documents and no code. **NOT moot as an ACT:** REG-F-040 recorded on 2026-08-06 (`041ef77c`) that *"there is no precedent to lean on: **no heading in this register has ever been struck or rewritten.**"* ⚠ **AND THAT CLAIM WAS ALREADY FALSE WHEN IT WAS MADE.** Derived rather than enumerated — every commit in this file's whole history whose diff removes a `### ` line: **`bd9cb745` (2026-08-05 06:39 -0400) rewrote REG-F-023's heading in place**, *"Eleven declared states no arrow can reach, two of them entire machines"* → *"Five declared states no arrow can reach, one of them an entire machine"*, and `git merge-base --is-ancestor bd9cb745 041ef77c` succeeds while the reverse fails. **So the "or rewritten" half fell a DAY BEFORE the entry asserting it, not two days after** — and REG-F-272 (`:25182`) and REG-F-275, written to correct REG-F-272 on precisely this claim, both re-quote it with that half cut, so neither instrument can see it. The full derived class of heading rewrites: `243f5c81` (2026-07-26, three REG-Q headings extended, nothing removed), `bd9cb745` (08-05), `7db0fda7` (08-08), and `f3866e4e`, `368fecd6`, `b33f4dd2`, `366d34c9` (all 2026-08-10).
+  - **REG-F-105** · `f3866e4e` — ⚠ TEXT REMOVED IN PLACE AT `f3866e4e` (2026-08-10) (REG-F-274): this bullet previously read *"**Date:** 2026-08-10 · **Type:** DIVERGENCE FINDING (S-2 of `ROADMAP-decision-subject-scope`) · **Class:** CORPUS GAP — **not** a repository defect. · `**Status:**` OPEN — escalated; a ratification act is required."*; the same commit also rewrote the HEADING (which read *"The corpus states \"a skipped mandatory step requires an authorized revision or waiver\" and defines NO FACT that makes a step mandatory"*) and deleted the bullet posing *"**THE QUESTION FOR GOVERNANCE, in one sentence:** … **Both answers are respectable; the present state — a ratified rule with no ratifiable input — is not.**"* All three unstruck. ⚠ **The omission was SELECTIVE, not ignorant: the same commit applied the sanctioned strike correctly to this entry's Safe default** (`~~**Safe default:** …~~ **LIFTED 2026-08-10:**`), which is still readable at the Merge-target bullet below. Measured 2026-08-27 at `89936730`, entry-scoped: `CORPUS GAP` = **0**, `QUESTION FOR GOVERNANCE` = **0**, and **`Class:` = 0 — this entry now carries no Class field at all** — against firing controls on the same entry (`Status:` = 1, `respectable` = 1, the surviving quotation of the horn the ruling closed). **MOOT as claims:** the ruling shipped `ExecutionStep.strength`, so the finding stopped being repository-neutral; and the commit ruled one of the two *"respectable"* horns out on ratified text (Coding Agent Guide §8.4 L844). **The corpus-side obligation did NOT vanish with the words** — it survives in this entry's *"STILL OWED TO GOVERNANCE"* bullet, item (1), *"ratify `ExecutionStep.strength` into DOC-002 §21, or name a different carrier"*, which is why this needs a pointer and not a restatement.
+
+- **⚠ ONE COMMIT NEEDS MORE THAN AN ANNOTATION, AND IT IS NOT DISCHARGED HERE.** `70e4f33b` left a sentence
+  **still standing** in `REG-F-012` claiming a prescription *"is kept unstruck because it was right"* —
+  while that same commit deleted half of it. **That sentence is false about this register's own history.**
+  It is annotated below, but a sentence that is false in place needs a correcting entry, and that entry is
+  still owed. `REG-F-274` named this and it remains named.
+
+- **RECONCILIATION.** Closes no census limb. Discharges `REG-F-274`'s annotation leg and supersedes its
+  prescribed FORM (in-bullet → appendix), on measurement. Does not disturb `REG-F-274`'s count of 26, its
+  floor-not-total caveat, its keystone, or its gate. Does not re-open any of the 22 annotated entries: each
+  entry's own finding stands, and what is recorded is only that text was removed without a superseding
+  record at the time.
+
+- **Merge target:** **This register** (the annotations) · **Corpus** for the form rule — *an annotation that
+  must not move existing line numbers belongs at the end of an append-only artifact, not in its body* — which
+  is a drafting rule and belongs with `JPWB-DOC-004 §10 item 8`. Status: OPEN.
+
+---
+
+### REG-F-278 — REG-F-274's date range is wrong: the destructive-edit practice is a nine-day burst that
+STOPPED on 2026-08-10, and this correction is an append because that entry's own subject forbids the edit
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
+  of **REG-F-274**, filed earlier the same day · **Status:** OPEN
+
+- **THE CORRECTED FACT.** `REG-F-274` states the 26 confirmed in-place rewrites ran *"beginning 2026-08-02 …
+  and running to 2026-08-21."* **The second date is false.** All 26 fall between **2026-08-02 and
+  2026-08-10** — author date and committer date both, all 26 hashes resolved, none after 2026-08-10. The
+  window opens nine days after `REG-D-010` ratified this register on 2026-07-24, and closes after **nine
+  days**.
+
+- **⚠ AND THE PRACTICE STOPPED — THE SAMPLE DID NOT MERELY THIN, WHICH IS THE CHECK THAT MAKES THIS A
+  FINDING RATHER THAN AN ARTIFACT.** Nine candidate commits dated **2026-08-17, 2026-08-20 and 2026-08-21**
+  were adjudicated in the same pass, and **none of the nine was destructive.** Later commits were looked at
+  and came back clean; the absence after 2026-08-10 is measured, not unsampled.
+
+- **HOW THE ERROR HAPPENED, BECAUSE THE MECHANISM IS REUSABLE.** The analysis synthesis conflated the
+  **CANDIDATE** range with the **CONFIRMED** range. `29b14912` (2026-08-21) is a candidate line-loss and is
+  **not** among the 26; the candidate population is a superset extending eleven days further, and the
+  sentence took its end date from the wrong set. *This is the same defect this programme has now filed three
+  times: a scope is an answer to a question, and reusing it silently answers a different question.*
+
+- **⚠⚠ AND IT IS THE THIRD CARRIED FIGURE IN TWO DAYS THAT WAS WRONG.** `REG-F-273` said four stale claims
+  and it was eight; its per-batch denominator of 76 was withdrawn entirely; and now this date. **The common
+  form is not arithmetic — it is a figure produced inside an agent's synthesis and then RESTATED BY THE
+  ORCHESTRATOR WITHOUT BEING RE-DERIVED.** All three were caught by re-deriving from the primary artifact,
+  none by re-reading the prose. **The rule that follows, and it is owed to the corpus: a figure that will be
+  written into canon is re-derived at the point of writing, from the primary artifact, or it is not
+  written.** This is `JPWB-DOC-004 §10 item 8`'s obligation pointed at the author rather than the reader.
+
+- **A HYPOTHESIS ABOUT THE STOP, OFFERED AS ONE.** `REG-F-040` (2026-08-06) is titled *"WHY THIS IS AN ENTRY
+  AND NOT AN EDIT"* — this register diagnosing the practice on itself, four days before the last instance.
+  **Not tested; no causal claim is made.** It is recorded because the next agent to ask *why* it stopped
+  should start there and should know it is unverified.
+
+- **⚠ WHAT "STOPPED" DOES NOT CLAIM.** The candidate population is DERIVED: a removed line becomes a
+  candidate only if its normalised text fails to reappear in the same commit and is absent at HEAD. **A
+  destructive edit whose exact words happen to recur elsewhere never becomes a candidate at all.** So the
+  claim is *no destructive edit was FOUND after 2026-08-10*, which is weaker than *none occurred*, and the
+  difference is not measured.
+
+- **⚠ THIS CORRECTION IS AN APPEND, AND THAT IS THE POINT.** `REG-F-274`'s subject is 26 entries corrected
+  by overwriting. **Correcting it by overwriting would have been the twenty-seventh.**
+
+- **WHAT SURVIVES UNCHANGED IN REG-F-274.** The count of 26; the floor-not-total caveat; the 103–163
+  candidate range and its two splitters; the keystone (`REG-F-072` rewritten twice on 2026-08-08 by commits
+  one of which authored the still-false census figures); the disposition of `REG-F-273`'s premise; and the
+  gate. **Only the end date changes** — and it changes the finding's SHAPE, from a standing habit to a burst
+  that ended, which is why it is filed rather than noted. **It raises the gate's value rather than lowering
+  it:** a practice that stopped by informal means can resume by informal means, and until today nothing
+  could have reported the relapse.
+
+- **RECONCILIATION.** Closes no census limb. Supersedes the date clause of `REG-F-274` and nothing else.
+
+- **Merge target:** **This register** (the correction) · **Corpus**, jointly with `REG-F-273/274/275`, for
+  the re-derivation rule. Status: OPEN.
+
+---
+
+### REG-F-279 — REG-F-276 said FOUR rows hold `UNENFORCED_DEAD_PREDICATE` against their own data; it is
+THREE, and the fourth was refused because a row's supporting observation is not its arm's carrier
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
+  of **REG-F-276**, filed earlier the same day · **Status:** CLOSED (the three moves are applied)
+
+- **THE CORRECTED FACT.** `REG-F-276` states that **four** of the eleven `UNENFORCED_DEAD_PREDICATE` rows —
+  *"36% of that arm"* — hold it against their own recorded data, naming `limb:ASR-3:1`, `limb:ASR-6:4`,
+  `limb:ASR-6:5` and `limb:REL-3:3`. **It is three.** `limb:REL-3:3` was adjudicated, adversarially
+  verified, and **REFUSED**; it stays on `UNENFORCED_DEAD_PREDICATE`. Three of eleven is **27%**.
+
+- **⚠ WHY THE FOURTH WAS WRONG, AND IT IS A DISTINCT ERROR MODE WORTH THE ENTRY.** `REG-F-276` cited
+  `classifyValidatorResult` (called at `packages/rph-assurance/src/floor.ts:316`) as the artifact
+  `limb:REL-3:3` holds the arm against. **That predicate IS called — and it is not what the row's arm rests
+  on.** The arm rests on `impactedObjects` (`packages/rph-domain/src/traceability.ts:208`), which has **zero
+  production call sites**, is gated two-directionally at `verif/dead-kernel-census.test.ts:285-288` and
+  `:396-403`, and is absent from the wiring site `packages/rph-application/src/handlers/assurance.ts`.
+  `classifyValidatorResult` appears in the row as its own **explicitly-labelled FOURTH REINFORCING
+  OBSERVATION**.
+  > **The proposal was right about the class and wrong about that member: it read a row's SUPPORTING
+  > OBSERVATION as its ARM'S BASIS.** This is EM-1 one level further in — not a sibling *limb* mistaken for
+  > the subject, but a sibling *observation inside the same row*. A row that offers four pieces of evidence
+  > does not thereby rest on all four, and the census records which one carries the arm.
+
+- **WHAT WAS APPLIED.** `limb:ASR-3:1`, `limb:ASR-6:4` and `limb:ASR-6:5` moved to
+  `UNENFORCED_OBSERVED_ADMISSION`, each with the arm's required **same-site sibling control** driven and
+  recorded, and each with a re-authored `owed`. The arm distribution moves
+  `UNENFORCED_DEAD_PREDICATE 11 → 8` and `UNENFORCED_OBSERVED_ADMISSION 65 → 68`, pinned at
+  `verif/invariant-verdict-census.test.ts:256-257`.
+
+- **⚠ AND THE PREDICTED DEBT FIGURE WAS ALSO WRONG.** `REG-F-276` states the stale-`owed` debt would rise
+  *"from 43 to 45"*. Three rows entering a set of 43 is **46**, and 46 is what the census now carries —
+  derived from the file rather than carried from the prediction. The re-authored count rises 42 → 45, and
+  `limb:REL-3:3` remains the one HELD row. **A predicted number is a hypothesis about work not yet done;
+  this one was arithmetic and it was still wrong.**
+
+- **WHAT SURVIVES UNCHANGED IN REG-F-276.** Its disposition — `DO_NOT_MINT` — and all three grounds,
+  including the dispositive one: `enforcement-register.ts:3205-3209` already ruled that this mechanism is
+  *"precisely the case the OBSERVED_ADMISSION arm was added for"*, a sentence all three derivations
+  truncated before its verdict. The six-member gap population, the measured mint cost, and the gloss-drift
+  finding all stand. **Only the count of off-definition rows, its percentage, and the predicted debt figure
+  change.**
+
+- **RECONCILIATION.** Closes the arm-move leg of `REG-F-276`. Moves three census rows; `limb:REL-3:3` is
+  untouched and its `owed_reconciled_held` field records why it is held rather than skipped.
+
+- **Merge target:** **Repository** — applied. Status: CLOSED.
+
+---
+
+### REG-F-280 — the deferred bigram strengthening is REFUTED BY MEASUREMENT, not deferred again: it reddens
+the sanctioned act, and the register's own shape is what makes that unavoidable
+
+- **Date:** 2026-08-27 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — closes the R-5 open
+  item of `DESIGN-register-append-only.md` · **Status:** CLOSED
+
+- **THE OPEN ITEM.** `REG-F-274`'s gate carries a stated coverage limit: *"a rewrite that deletes a word and
+  re-adds the same word elsewhere within the same entry … passes. Bigram strengthening would narrow it, was
+  not measured, and is therefore not claimed."* **It is now measured.**
+
+- **IT CLOSES THE HOLE.** Constructed adversary: delete a phrase from `REG-F-049`'s live line and re-add its
+  six tokens **scrambled** as a new bullet in the same entry. Unigram flags **0**; bigram flags the entry
+  and names the six lost pairs. The variant that re-adds them inside a *different* baseline entry is caught
+  too. **Both halves of the stated limit close.**
+
+- **⚠⚠ AND IT IS REFUTED ON COST, BY THE CONTROL THE GATE EXISTS TO PASS.** **MUTANT B — the SANCTIONED act,
+  a line retired by `~~strike~~` plus a replacement — REDDENS**, under both tokenizations tried. Beyond it:
+  - **7 of the 11** commit×entry pairs where the current gate correctly permits a real adjudicated compliant
+    strike are converted to RED.
+  - Over the **30** first-parent commits since 2026-08-11 — a window in which no destructive edit was found
+    — unigram reddens 12 and bigram reddens 26. **In every one of the 14 extra, not a single WORD was lost;
+    only adjacency was.**
+  - **On real history the detection gain is zero:** over the 26 confirmed destructive commits, unigram flags
+    26/26 and bigram flags 26/26, the same entry ids in every case.
+
+- **THE MECHANISM, READ RATHER THAN INFERRED — AND IT IS THE REGISTER'S OWN SHAPE.** Two causes, both of them
+  the sanctioned idiom: **(1) a strike destroys the bigrams at BOTH EDGES of the struck span**, which is why
+  the previously-rejected shingle contract flagged 12 of 12 and why n=2 inherits it more quietly; **(2) an
+  entry ends in a `Merge target:` / `Status:` trailer, so an APPEND INTO AN ENTRY LANDS MID-STREAM and severs
+  one pair at the junction.** A bare bullet added above the trailer — nothing struck, nothing removed — goes
+  RED. **That refutes the property that makes this gate survivable on an append-only artifact: that appends
+  are free.**
+
+- **NO TOKENIZATION ESCAPES IT, AND THE OBVIOUS REPAIR IS ALSO REFUTED.** Entry-wide tokenization survives
+  re-wrapping and dies on an interior append; per-line survives the append and dies on re-wrapping; **both
+  die on MUTANT B.** The natural fix — report a lost bigram only when one of its words is also lost as a
+  unigram — restores the strike and the append to green **and returns the constructed evasion to green too.
+  It is the unigram gate with extra steps.**
+
+- **THE DECISIVE ARGUMENT IS NOT THE RATE BUT WHAT GENERATES IT.** The false-positive rate does not merely
+  persist; **it scales with normal use of the register, and it fires hardest on the two acts the rule exists
+  to encourage — appending, and correcting by strike.** A gate that reddens when you obey it is a gate that
+  gets disabled, which this programme has already recorded twice as how instruments die here.
+
+- **WHAT IS NOT CLAIMED.** No claim that bigram has more false negatives (it caught 26/26 and no evasion
+  defeating bigram-but-not-unigram was searched for). No claim about n > 2. **No claim for the alternative
+  named below** — it is an untested hypothesis about code that does not exist, which is the status this
+  programme assigns to a recorded remedy.
+
+- **THE RESIDUAL HOLE STAYS OPEN AND STAYS STATED.** An author who deletes a phrase and re-adds its words
+  scrambled within the same entry passes. **That is a deliberate reconstructive act, not a slip, and the
+  instrument that would catch it costs more than the act it catches.** If it must be closed, the next thing
+  to measure is **not n=3 but an insertion-tolerant order check** — a longest-common-subsequence over the
+  entry's token stream, which is unaffected by pure insertion and would therefore pass the strike, the
+  re-wrap and the append while still failing the evasion. **Not measured. Not claimed.**
+
+- **⚠ THE DECISIVE CLAIM WAS RE-DRIVEN BY THE FILING AGENT, AND THE FIRST TWO ATTEMPTS FAILED TO REPRODUCE
+  IT — WHICH SHARPENED THE MECHANISM.** Striking the **whole line** and appending a replacement is **GREEN**
+  under bigram; so is a partial strike whose replacement lands where the tokens were not adjacent. The red
+  appears only when the strike's boundary falls **between two previously adjacent tokens** — reproduced
+  byte-exactly, `REG-F-049` losing `["at 3f70bcfe"]` when the struck span ends at `at` and the replacement
+  lands before the hash, with unigram GREEN on the identical input. **So the claim is not "a strike reddens"
+  but "a strike whose edge severs an adjacent pair reddens", which is precisely why the measured figure is 7
+  of 11 and not 11 of 11.** Recorded because a reader who tests the easy case will conclude this entry is
+  wrong: the first two reproductions here did.
+
+- **RECONCILIATION.** Closes R-5 by measurement rather than leaving it as an untested *"would"*. The gate is
+  unchanged; the design paper's coverage-limit sentence is superseded by this entry rather than rewritten.
+
+- **Merge target:** **Repository** — no code change; `docs/_working/DESIGN-register-append-only.md` §7 records
+  the measurement. Status: CLOSED.
+---
+
+### REG-F-281 — REG-F-273's six pointers are applied by INLINE EXTENSION, a third form that shifts nothing,
+and REG-F-273 closes
+
+- **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — discharges
+  **REG-F-273**'s own closure condition and refines the form rule of **REG-F-277** · **Status:** CLOSED
+
+- **WHAT THIS DISCHARGES.** `REG-F-273` has stood **MERGED as to its drafting rule, OPEN as to its own
+  closure condition** since 2026-08-27: *"CLOSES when a one-line ⚠ SUPERSEDED IN PART pointer is appended at
+  the END of the bullet holding each corrected clause … since a superseding entry with no pointer never
+  reaches the reader it exists to protect."* **All six pointers are now applied.** The entry closes.
+
+- **⚠ THE CLOSURE CONDITION NAMED "THE SIX SITES" AND LISTED FIVE.** `REG-F-273` supersedes one clause each
+  of `REG-F-235`, `REG-F-237` and `REG-Q-062`, **two** of `REG-F-236`, **and one of `REG-F-272`** — six
+  clauses over five entries. Its line list omits the `REG-F-272` one, which the entry names elsewhere, at
+  `:25536`, as `REG-F-272:25141-25145`. **The sixth was located from the supersedes clause rather than the
+  list**, and it is `REG-F-272`'s *"the tenth is not `NEAR_MISS`"*. A list that disagrees with its own count
+  is a cheap defect to catch and was nearly missed.
+
+- **⚠⚠ AND THE FORM IS A THIRD ONE, BECAUSE BOTH KNOWN FORMS ARE WRONG HERE.** `REG-F-277` faced the same
+  question for 26 pointers and reverted the in-bullet form to an appendix, because inserting lines into the
+  register's BODY moves every line citation below them. **Neither form is right for these six**, and a third
+  was measured instead:
+
+  | form | shifts citations | reaches the reader at the bullet |
+  |---|---|---|
+  | **A** — a new line inside the bullet (what `REG-F-273` literally prescribes) | **yes** | yes |
+  | **B** — an appendix (what `REG-F-277` adopted for the 26) | no | **no** |
+  | **C — INLINE EXTENSION: append to the END of the bullet's existing LAST LINE** | **no** | **yes** |
+
+  **Form C satisfies `REG-F-273`'s condition literally — the pointer IS at the end of the bullet — while
+  adding no line at all.** Driven: the register is 26,090 lines before and after; the set of indices whose
+  content differs is exactly the six target lines, and **every other line is byte-identical at the same
+  index**, so no citation anywhere in canon, code or `docs/_working` can go stale.
+
+- **THE GREEN IS A MEASUREMENT, NOT A VACUITY.** `verif/register-append-only.test.ts` passes under form C —
+  and the positive control with a KNOWN-OPPOSITE expected value is the same six clauses **deleted outright**,
+  which goes **RED naming all five entries**. So the instrument reacts to exactly these entries and form C's
+  green discriminates. `verif/register-status.test.ts` likewise passes, with its own opposite control: the
+  identical extension carrying a `Status:` token goes **RED**.
+
+- **⚠ TWO CONSTRAINTS THAT TRAVEL WITH THIS FORM, AND THE SECOND CAME FROM A CONSUMER, NOT A GATE.**
+  1. **The extended line must not carry `**Status:**`.** `scripts/tracker/ingest.ts:109` captures an entry's
+     status with a regex that runs **to END OF LINE** — extending such a line would swallow the pointer into
+     the tracker's recorded status. None of the six is such a line; the applier refuses one that is, and
+     that refusal is exercised by its own control.
+  2. **The pointer must carry no `Status:` token**, for the same reason. `REG-F-272` states the underlying
+     rule at `:25199`: the register admits exactly one Status line per entry.
+
+- **THE DISCLOSED COST, STATED BECAUSE IT IS REAL.** `git diff --numstat` scores form C as **6 added /
+  6 deleted** — it rewrites six lines' bytes rather than adding six lines. **That is a history-legibility
+  cost, not a content one**, and `git log -p` will show six modified lines rather than six pure additions.
+  It is the same distinction the ratified instrument was built on: a git-deletion assertion flags 6 of 9
+  adjudicated-compliant strikes and is the wrong instrument, which is why `verif/register-append-only.test.ts`
+  measures content survival instead.
+
+- **⚠ TWO CORRECTIONS TO THE BRIEF THAT COMMISSIONED THIS, BOTH DOWNWARD.** (1) The orchestrator estimated
+  **117** register-internal citations would move under form A; an independent extractor could not reproduce
+  that figure under any of four definitions and returned **223 minimum**. That is a claim about two
+  extractors and not a refutation of either — but it moves in the direction that makes form A worse, so it
+  does not change the trade. **No single figure is published; the range is 117–223 and the splitter is the
+  extraction rule.** (2) The brief said **14** of the 17 verifiable citations move under form A. It is
+  **13**: `REG-F-235:12528-12534` targets a line ABOVE its own bullet-end at `:12537`, and at the placement
+  `REG-F-273` actually prescribes — the END of the bullet — it does not move.
+
+- **RECONCILIATION.** Closes `REG-F-273` in full. Refines `REG-F-277`'s form rule from *"annotate at the end
+  of an append-only artifact"* to **"an annotation must not move existing line numbers; where the bullet's
+  last line can carry it, extend that line, and only otherwise use an appendix."** Does not re-open
+  `REG-F-235`, `REG-F-236`, `REG-F-237`, `REG-Q-062` or `REG-F-272`, whose findings and closures are
+  untouched — each pointer says so in terms.
+
+- **WHAT IS NOT CLAIMED.** Form C is not proposed for the 26 of `REG-F-277`: those were reverted for a
+  measured reason and re-issuing them inline was not measured. **No claim that form C is free of every cost**
+  — its git-legibility cost is stated above, and a line already at an unreasonable length would be a reason
+  not to use it (none of these six is; they run 87–100 characters).
+
+- **Merge target:** **This register** (the six pointers, applied) · **Corpus** for the refined form rule,
+  which belongs with `JPWB-DOC-004 §10 item 8` as a drafting rule about annotating an append-only artifact.
+  Status: CLOSED as to `REG-F-273`; the corpus merge of the form rule is OPEN.
+
+
+---
+
+### REG-F-282 — `70e4f33b` deleted REG-F-012's prescription and wrote, in the same hunk, that it *"is kept
+unstruck because it was right"*: a claim about striking, made by the hand that did not strike
+
+- **Date:** 2026-08-28 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — corrects one sentence
+  standing in **REG-F-012**; discharges the correcting entry that `REG-F-274` named as owed regardless of
+  the annotation sweep and that `REG-F-277` recorded as not discharged when it took the appendix form ·
+  `**Status:**` OPEN
+
+- **WHAT THE COMMIT DID, QUOTED FROM BOTH SIDES OF IT.** `70e4f33b` (2026-08-04 06:31:23 -0400) rewrote
+  `REG-F-012`'s Disposition bullet in place, in one hunk. From the pre-image
+  (`70e4f33b^:…/JPWB-REG-005 Decision and Divergence Register.md:550-551`) it **REMOVED** the whole of the
+  prescription — *"The fix is small (compare `commandType`, `targetAggregateId` and a payload hash against
+  the receipt before returning `DUPLICATE`; refuse on mismatch) but it is a **behaviour change that will
+  refuse commands the engine accepts today**, so it takes the REG-F-011 treatment: a caller/fixture survey
+  first, then a red-first test written against the CONTRACT — that a mismatched reuse is REFUSED with a
+  classified code — rather than against a chosen error string. The refusal needs an error code;
+  `RPH_IDEMPOTENCY_CONFLICT` is **not** among the ratified fifteen, so this also inherits REG-F-010's
+  question of whether to carry the label in the message (the WP-11 discipline) or ratify a code."* — and
+  the whole of the line beneath it, *"**Merge target:** Repository — `command-bus.ts` (the comparison), and
+  a probe. JPWB-DOC-003 §9 PER-5 is unchanged and correct: canon already states the rule. `**Status:**`
+  OPEN."* In their place it **ADDED** *"~~Recorded, not fixed.~~ **FIXED 2026-08-04 for two of PER-5's
+  three dimensions.** The prescription below was followed as written and is kept unstruck because it was
+  right."*, followed by five sub-bullets reporting the work done.
+
+- **⚠ THE ADDED SENTENCE IS FALSE — AND WHICH PART OF IT IS FALSE MATTERS, BECAUSE THE THREE CLAIMS IN IT
+  DO NOT STAND OR FALL TOGETHER.**
+  1. ***"was followed as written"* — a claim about the CODE, and it is TRUE.** All three comparisons the
+     deleted clause prescribed are performed in one expression:
+     `packages/rph-application/src/command-bus.ts:452-457` tests `prior.commandType`,
+     `prior.targetAggregateId` and `prior.payloadHash` before answering from a receipt. **This limb is not
+     the finding and is not disturbed.** It was false as to the payload dimension for the ninety-six
+     minutes between this commit and `ac1a0274` — and the same bullet said so in its own next sentence,
+     which is candour, not defect.
+  2. ***"the prescription below"* — the deixis names nothing.** At the moment the sentence was written
+     there was no prescription below it. The five sub-bullets it introduced are past-tense reports of
+     completed work (*"THE SURVEY. Instrumented across the whole suite…"*, *"Red-first, with both controls
+     already passing before the fix…"*); not one of them prescribes anything.
+  3. ***"is kept unstruck"* — a claim about THIS REGISTER'S OWN TEXT, and it is false, was false as it was
+     being written, and cannot become true.** The words it says were kept are not in the artifact. Nothing
+     was struck. The text was deleted.
+
+- **THE MEASUREMENT, AS A DATED READING OF THE RECORD THAT OWNS IT.** Read 2026-08-28 at `024b8c9c`,
+  scoped to `REG-F-012`'s own span: `The fix is small (compare` = **0**, `REG-F-011 treatment` = **0**,
+  `refuse on mismatch` = **0**, `and a probe` = **0**, `canon already states the rule:` = **0** — against
+  firing controls **on the same instrument and the same span**, `REG-F-011` = **1** and
+  `RPH_IDEMPOTENCY_CONFLICT` = **1**, both carried by the replacement text itself. ⚠ **A whole-file count
+  does not settle this one and now reads the wrong way:** the first three phrases score **1** file-wide,
+  all three on one line — `REG-F-277`'s appendix, which quotes them in order to correct them. Quoting is
+  not asserting (`JPWB-DOC-004 §10 item 8`), so the entry-scoped count is the evidence. **The 2026-08-27
+  reading moved the instrument it was taken with**, and that is recorded here so a later reader does not
+  mistake the 1 for survival.
+
+- **⚠⚠ AND THERE IS A SECOND PROOF THAT DOES NOT DEPEND ON WORD COUNTS AT ALL — A CROSS-REFERENCE LEFT
+  POINTING AT NOTHING.** The sub-bullet this same commit added ends *"…carries `IDEMPOTENCY_KEY_REUSED` in
+  the message — the WP-11 discipline **this entry named**"* (`REG-005:566` at `024b8c9c`). `WP-11` occurs
+  **exactly once** in the entry, in that referring clause. In the pre-image it also occurred exactly once —
+  **inside the deleted prescription**, which is where the entry named it. **The reference and its referent
+  never coexisted: one hunk added the pointer and removed the thing pointed at.** This is what defeats the
+  only serious defence the sentence has — that the surviving sub-bullets ARE the prescription, restated —
+  because a restatement does not leave a cross-reference dangling.
+
+- **⚠ THE IRONY IS THE FINDING, NOT A FLOURISH.** Measured over the one hunk: the added text contains
+  **exactly one strike**, `~~Recorded, not fixed.~~`, preserving **three words**; the same hunk deleted
+  **131** — 106 of prescription and 25 of Merge-target-and-Status.
+  > **A claim that a text was left unstruck is itself a claim about striking, and this one was written by
+  > the hand that, in the same hunk, struck three words and deleted a hundred and thirty-one.** The idiom
+  > exists so that exactly this claim can be checked against the artifact instead of taken on the author's
+  > word. Here it was applied to the three words that needed it least and withheld from the hundred that
+  > carried the obligation — `REG-F-274`'s *"selective application, not ignorance of the idiom"*,
+  > demonstrated by the very sentence that denies it.
+
+  ⚠ And the same bullet now demonstrates both idioms one line apart: the later correction of its arm word
+  was made **by striking** (`~~**FIXED 2026-08-04 for two of PER-5's three dimensions.**~~`), so the line
+  carries a compliant correction and a destructive one in the same breath.
+
+- **THE GRADE, SET BY A CONTROL WITH A KNOWN-OPPOSITE VALUE RATHER THAN BY THE FORMULA.** The same formula
+  appears once elsewhere in this register, in `REG-F-014`: *"The prescription below was followed exactly,
+  and is kept unstruck because it was right: \"a caller and fixture survey first, then a red-first test
+  written against the CONTRACT … rather than against a chosen message.\""* — and **there the prescription
+  is quoted inline in the same sentence**, so a reader can see what is being kept; `REG-F-277` grades that
+  instance an **overstatement**, since a different half of it went. **The formula is therefore not
+  inherently false, and the difference between the two instances is checkable: `REG-F-014` quotes its
+  prescription and `REG-F-012` quotes none of its own.** That is why this one alone needed an entry rather
+  than a pointer.
+
+- **WAS THE REMOVED CLAUSE TRUE WHEN IT WAS REMOVED? YES — AND IT WAS THE SPECIFICATION THE NEXT COMMIT
+  EXECUTED.** Two of its three comparisons had just landed; the third was outstanding, and `ac1a0274`
+  (2026-08-04 08:07:18 -0400) discharged it by exactly the mechanism the deleted words named — a stored
+  payload hash: `command_receipts.payload_hash` holding `contentHash(command.payload)`, added by the
+  `MIGRATIONS` ladder in `packages/rph-persistence/src/schema.ts` and compared at `command-bus.ts` as
+  above. ⚠ **But nothing of SUBSTANCE was lost with the words**, because the replacement carried the
+  payload obligation forward on its own face. So this is not one of the removals where an obligation
+  vanished; **what is wrong here is the RECORD, not the remedy** — which is precisely why an annotation
+  could not settle it.
+
+- **WHAT IS NOT DISTURBED, CHECKED RATHER THAN ASSUMED.** `REG-F-012`'s finding stands and its disposition
+  is sound on its merits, and the ground for saying so is a mechanism no later revision can move by
+  bookkeeping: the three-way comparison at `command-bus.ts:452-457`, the nullable `payload_hash` column
+  with its absent-is-skipped guard (`prior.payloadHash !== undefined &&`), and the forward migration that
+  put the column there. **This entry reaches one sentence of that entry's Disposition bullet and nothing
+  else in it.**
+
+- **A REFINEMENT, OFFERED WITHOUT SUPERSEDING.** `REG-F-274` and `REG-F-277` both describe this as the
+  commit deleting *"half"* of the prescription. Measured across the two commit objects, the removal was
+  **total as to TEXT** — none of the prescription's distinctive words is in the entry — and **partial as to
+  CONTENT**: the survey, the red-first shape and the error-code question are restated as accomplished,
+  while the behaviour-change warning, the `REG-F-011` citation and the *"against the CONTRACT rather than a
+  chosen error string"* discipline are not. *"Half"* is a fair content-scale estimate and is **left
+  standing**; the claim corrected here is the one about text, where the figure is zero.
+
+- **THE REMEDY, AND ITS ONE OPTION.** This entry is the correction; `:19` provides for no other kind.
+  ⚠ **A same-line strike of the false clause in `REG-F-012` is the sanctioned in-place form and is
+  line-neutral** — it appends characters to an existing line and inserts none, so it moves none of the
+  line-number citations whose cost `REG-F-277` measured before choosing the appendix. **It is NOT performed
+  here and is NOT claimed to pass `verif/register-append-only.test.ts`**, which was not driven against it.
+  The choice is left open rather than taken silently.
+
+- **WHAT THIS ENTRY DOES NOT CLAIM.** It does **not** claim any reader was misled: no citation of the false
+  clause was found in this register at the dated reading above, and **that is a claim about the search, not
+  about the corpus.** It does not claim intent. It does not claim `REG-F-012`'s substance was harmed, its
+  finding weakened, or its disposition wrong — the opposite was checked at the code. It does not re-open
+  `REG-F-012`, `REG-F-014`, `REG-F-274` or `REG-F-277`, and supersedes no clause of any of them. It does not
+  claim that any other commit `REG-F-277` annotates left a standing false sentence: only this instance and
+  the `REG-F-014` one already graded there were tested for that property.
+
+- **RECONCILIATION.** Closes no census limb. Discharges the correcting entry owed for `70e4f33b` and
+  nothing else. **Adds no rule:** the drafting obligation this violates is already carried by
+  `JPWB-DOC-004 §10 item 8`, and the act is already instrumented by `verif/register-append-only.test.ts`,
+  so this entry asks for neither a corpus amendment nor a gate.
+
+- **Merge target:** **This register** — the correction is this entry, per `:19` (*"a correction is a
+  superseding entry citing the entry it supersedes"*). **No corpus change and no repository change is
+  owed:** the rule and the instrument both already exist. **Status:** OPEN — open only as to the optional
+  same-line strike above; the sentence is corrected by this entry whether or not that is applied.
