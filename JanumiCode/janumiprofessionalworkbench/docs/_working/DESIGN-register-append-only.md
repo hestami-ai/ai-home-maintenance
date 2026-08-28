@@ -259,7 +259,7 @@ Instead, **append** a one-line pointer naming the commit that rewrote it and the
 - **Removed text still TRUE AND LIVE — four, needing their content restated:** `c61d92cf` (a
   fourteen-document obligation), `fb5d7cbd` (`REG-F-033`'s standing ratchet), `5fd041f3` (a named-site
   remedy prescription), `574cc1e6` (a still-true verdict on `REG-F-024`).
-- **`70e4f33b` needs a correcting entry regardless of restoration** — a sentence still standing at `:560`
+✅ ~~**`70e4f33b` needs a correcting entry regardless of restoration** — a sentence still standing at~~ **FILED 2026-08-28 as `REG-F-282`.** — a sentence still standing at `:560`
   says the prescription *"is kept unstruck because it was right"*, which is **false about the register's
   own history**: the same commit deleted half of it.
 - **The remainder** removed a claim the removing commit had itself just falsified, and need only an

@@ -80,7 +80,7 @@ commit that rewrote it and the text it removed.
 1. **Removed text still TRUE AND LIVE — four, needing their content restated:** `c61d92cf` (a live
    fourteen-document obligation), `fb5d7cbd` (`REG-F-033`'s standing ratchet), `5fd041f3` (a named-site
    remedy prescription), `574cc1e6` (a still-true verdict on `REG-F-024`).
-2. **`70e4f33b` needs a correcting entry regardless of restoration** — a sentence still standing at `:560`
+✅ ~~**`70e4f33b` needs a correcting entry regardless of restoration** — a sentence still standing at~~ **FILED 2026-08-28 as `REG-F-282`.** — a sentence still standing at `:560`
    claims a prescription *"is kept unstruck because it was right"* while the same commit deleted half of it.
    **That sentence is false about the register's own history.**
 3. **The remainder** removed a claim the removing commit had itself just falsified: annotation only.
@@ -92,6 +92,34 @@ commits. Only the diffs show it.
 ---
 
 ## R-5 — Bigram strengthening — ✅ **CLOSED 2026-08-27 (REG-F-280): REFUTED BY MEASUREMENT**
+
+---
+
+## ✅ R-6 — `REG-F-273`'s own six pointers — **DONE 2026-08-28 (`REG-F-281`), IN A THIRD FORM**
+
+`REG-F-273` had stood MERGED-as-to-the-rule / OPEN-as-to-its-own-closure since the merge. **All six pointers
+are applied and it now closes.**
+
+⚠ **Its closure condition said "the six sites" and listed FIVE.** The sixth — `REG-F-272:25141-25145`, its
+*"the tenth is not `NEAR_MISS`"* clause — was recovered from the supersedes clause, not the list.
+
+⚠ **NEITHER KNOWN FORM WAS RIGHT, so a third was measured.** Form A (a new line in the bullet) shifts
+citations; form B (the appendix, R-4's remedy) does not reach the reader at the bullet, which is the exact
+cost `REG-F-273` wrote its condition to avoid. **Form C — extend the bullet's existing LAST LINE — satisfies
+the condition literally and adds no line.** Driven: 26,090 lines before and after, and the set of differing
+indices is exactly the six targets with every other line byte-identical at the same index.
+
+**The green is a measurement:** the positive control is the same six clauses deleted outright, which reddens
+the gate naming all five entries. Two constraints travel with the form — the extended line must carry no
+`Status:` token, and neither may the pointer, because `scripts/tracker/ingest.ts:109` captures a status to
+END OF LINE. The applier refuses both, and both refusals are exercised by their own controls.
+
+**Disclosed cost:** git scores form C as 6 added / 6 deleted rather than 6 pure additions — a
+history-legibility cost, not a content one.
+
+⚠ **Two orchestrator figures were corrected downward:** the "117 citations move under form A" estimate could
+not be reproduced (an independent extractor returned 223 minimum, so the published figure is a **range,
+117–223, with the extraction rule as its splitter**), and "14 of 17 verifiable citations move" is **13**.
 
 The gate's known hole: a rewrite that deletes a word and re-adds the same word **elsewhere within the same
 entry** passes. Bigram counts would close it. **It was not measured, so it is not claimed** — and it is
