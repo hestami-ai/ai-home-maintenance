@@ -29,12 +29,12 @@
       "discovered": "UNKNOWN",
       "excluded": "UNKNOWN",
       "failed": 0,
-      "included": 132,
+      "included": 133,
       "provenance": [
         "subject.selectedFiles#artifactClass=OTHER",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 132
+      "successfullyInventoried": 133
     },
     {
       "artifactClass": "SCRIPT",
@@ -10356,7 +10356,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "98634791eb56c1123c1926a94f173f96a63bb7128a074e57332c7ce4510d793d",
+    "fileManifestDigest": "98b31e5828a189f0dcbb8920bc77dab34524cb43f7de3a5ae91f4e24410ff827",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10462,7 +10462,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1248,
+    "selectedFileCount": 1249,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11593,9 +11593,16 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 23364,
+        "bytes": 32408,
+        "path": "packages/csaa/CODING_AGENT_GUIDE.md",
+        "sha256": "5de1a589ae7884fe1e78ab3bfc28f2f5996d743a24f1b12cc8c9b151370eec7e",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 23547,
         "path": "packages/csaa/README.md",
-        "sha256": "fff9cf5be087cb1fbed86f7f77b38d31e78fd52e0da0bc8d290de499b08ff7a8",
+        "sha256": "0b25b63ec9f8ce597050fbf44be31d2d2ac1ecf8bae079432203ac1c4f2a807f",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -19201,7 +19208,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "ac466337d9e7350ae88c0a2a0e784466eb7caa314b941ae4627178ea142523e7",
+    "subjectId": "3b4fc9481766e920b454dabf6869f81e001bef8fb4aa34e0d0b43ffca3d49175",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [

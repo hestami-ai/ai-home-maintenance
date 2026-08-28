@@ -4,6 +4,8 @@ Deterministic, read-only code-semantic analysis and assurance tooling for the Ja
 
 This is an implementation-local, unregistered capability. It has analysis authority `NONE`, gate effect `NONE`, and does not approve a change, qualify a provider, establish behavioral correctness, or transfer governance authority.
 
+For task-oriented coding-agent recipes, request construction, use-case selection, failure handling, and handoff guidance, see the [CSAA Coding Agent Guide](./CODING_AGENT_GUIDE.md).
+
 ## Coding-agent entry points
 
 From the JPWB repository root:
@@ -88,7 +90,7 @@ Input:
 bun run csaa:agent -- query --request-json '<request-json>' --input-json '<input-json>' --output json
 ```
 
-The query request uses `jan-csaa-semantic-source-query-report-request/0.1.0`. The handler recaptures the exact stored snapshot subject and refuses stale or mismatched snapshot identity. Four-valued results retain `TRUE`, `FALSE`, `UNKNOWN`, and `CONFLICT`; unknown regions are not coerced to absence.
+The query request uses `jan-csaa-semantic-source-query-report-request/0.2.0`. The handler recaptures the exact stored snapshot subject and refuses stale or mismatched snapshot identity. Four-valued results retain `TRUE`, `FALSE`, `UNKNOWN`, and `CONFLICT`; unknown regions are not coerced to absence.
 
 ### 4. Impact
 
@@ -176,7 +178,7 @@ The protocol caps a terminal or progress message at 1 MiB and an internally pers
 
 The current-JPWB impact smoke is calibrated from an exact-subject run that consumed 676,278 predecessor input records, 11,035,042 string UTF-16 code units, and 131,897 output bytes including the terminal LF. Its admitted ceilings are therefore 1,000,000 input records, 16,000,000 string code units, and 1 MiB of result bytes; the measurements describe this smoke subject and are not universal repository-size claims.
 
-The same exact subject measures 365 explicit members for its widest native harmonization rule population. The first-increment evaluator and native projector share a 512-member ceiling, retaining about 40% headroom while continuing to refuse oversized populations instead of substituting a lossy census identity. A fixed-identity calibration of its 23-rule native projection measures 205,671 bytes; the production smoke admits 512 KiB and reasserts the actual identity-dependent outcome size against that bound.
+The same exact subject measures 371 explicit members for its widest native harmonization rule population. The first-increment evaluator and native projector share a 512-member ceiling, retaining about 40% headroom while continuing to refuse oversized populations instead of substituting a lossy census identity. A fixed-identity calibration of its 23-rule native projection measures 205,671 bytes; the production smoke admits 512 KiB and reasserts the actual identity-dependent outcome size against that bound.
 
 An earlier broad DWP-004 discovery reported a 4,737,843,200-byte aggregate-private high-water mark and a 4,157,128,704-byte working-set high-water mark. The current request sets `maxProcessRssBytes` to 6 GiB. The implementation compares the coordinating process's RSS with that bound at mandatory checkpoints and observes RSS reported during semantic-build progress. The blocking dependency-cruiser child is bounded by timeout and stdout/stderr limits; there is no implemented process-tree memory monitor. Accordingly, the evidence attests only `WITHIN_BOUND_AT_ALL_OPERATION_CHECKPOINTS`, not termination or no-write behavior on a child-process memory breach.
 

@@ -95,8 +95,8 @@ It now also answers a live but more tightly bound question: what exact repositor
 | Subject schema | `jan-csaa-subject/2.0.0` | DWP-002 subject contract |
 | Generator | `jan-csaa-inventory@0.3.0` | Selected generator source is included in the file-manifest digest |
 | Subject kind | `WORKTREE` | Working-tree file bytes; Git cleanliness is not a prerequisite |
-| Subject ID | `ac466337d9e7350ae88c0a2a0e784466eb7caa314b941ae4627178ea142523e7` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
-| File-manifest digest | `98634791eb56c1123c1926a94f173f96a63bb7128a074e57332c7ce4510d793d` | `1248 selected files` |
+| Subject ID | `3b4fc9481766e920b454dabf6869f81e001bef8fb4aa34e0d0b43ffca3d49175` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
+| File-manifest digest | `98b31e5828a189f0dcbb8920bc77dab34524cb43f7de3a5ae91f4e24410ff827` | `1249 selected files` |
 | Configuration digest | `6afa9ffba9d00dddf908c7b359a3952018c2d51b9c3088597351f60134ecb6c2` | Selected files classified as configuration |
 | Repository root | `.` | Machine-independent repository-relative identity |
 | Perimeter | `.dependency-cruiser.cjs`, `.github`, `.gitignore`, `.prettierignore`, `.prettierrc.json`, `apps`, `bun.lock`, `bunfig.toml`, `eslint.config.mjs`, `package.json`, `packages`, `scripts`, `sonar-project.properties`, `tsconfig.json`, `turbo.json`, `verif`, `vitest.config.ts`, `vitest.dist.config.ts`, `vitest.projects.ts` | Root workspace declaration and configured inventory roots |
@@ -109,7 +109,7 @@ It now also answers a live but more tightly bound question: what exact repositor
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | `CONFIGURATION` | 67 | 67 | 0 | 67 | 0 | `subject.selectedFiles#artifactClass=CONFIGURATION`, `subject.excludedArtifacts[*].physicalFileCount` |
 | `GENERATED_SOURCE` | 19 | 19 | 0 | 19 | 0 | `subject.selectedFiles#artifactClass=GENERATED_SOURCE`, `subject.excludedArtifacts[*].physicalFileCount` |
-| `OTHER` | UNKNOWN | 132 | UNKNOWN | 132 | 0 | `subject.selectedFiles#artifactClass=OTHER`, `subject.excludedArtifacts[*].physicalFileCount` |
+| `OTHER` | UNKNOWN | 133 | UNKNOWN | 133 | 0 | `subject.selectedFiles#artifactClass=OTHER`, `subject.excludedArtifacts[*].physicalFileCount` |
 | `SCRIPT` | 49 | 49 | 0 | 49 | 0 | `subject.selectedFiles#artifactClass=SCRIPT`, `subject.excludedArtifacts[*].physicalFileCount` |
 | `SOURCE` | 446 | 446 | 0 | 446 | 0 | `subject.selectedFiles#artifactClass=SOURCE`, `subject.excludedArtifacts[*].physicalFileCount` |
 | `TEST` | 478 | 478 | 0 | 478 | 0 | `subject.selectedFiles#artifactClass=TEST`, `subject.excludedArtifacts[*].physicalFileCount` |
