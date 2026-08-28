@@ -64,6 +64,7 @@ Maps each major section of the draft to its sources. Line references are to the 
 ## §10 Drafting standards for agent-authored normative text
 - Items 1-6: Brief §11 (L143-151), restated as agent obligations per Brief §5 DOC-004 scope (L85: "drafting standards for any normative text the agent authors (P6 edge rule)").
 - Item 7 (epistemic honesty / status conferred): Brief §10 item 2 (L135) + EngConst L281 (never invent rationale; label inference). C1 parenthetical: Brief §2 (L22).
+- Item 8 (mutable-value citation discipline): NOT a corpus distillation — merged from REG-005 REG-F-273 (the three limbs), REG-F-274 (the measured reason, replacing REG-F-273's refuted premise that the register cannot be corrected in place), REG-F-275 (limb 1 widened to any artifact, this register included). Non-example (quotation is not assertion) from REG-F-273's second failure mode. DOC-003 PER-11 and §7.1 routed by ID, not restated.
 
 ## §11 Worked example: the §9.7 over-application
 - Mandated by Brief §5 (L86) and Brief §9 case 1 (L121).

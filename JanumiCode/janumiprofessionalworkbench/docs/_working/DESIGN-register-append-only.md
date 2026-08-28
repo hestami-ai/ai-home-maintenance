@@ -11,9 +11,30 @@
 a superseding entry citing the entry it supersedes."** That rule has never been gated. Over the register's
 200-commit mainline history, between **103 and 163 removed lines** (the range is derivation-dependent —
 §3) are absent from the file at HEAD. Of 71 commits adjudicated by five readers and five adversarial
-verifiers, **26 are confirmed in-place rewrites** of live entry text, beginning **2026-08-02 — nine days
-after `REG-D-010` ratified the register** — and running to 2026-08-21. They cluster almost entirely on the
+verifiers, **26 are confirmed in-place rewrites** of live entry text. They cluster almost entirely on the
 two most load-bearing fields an open entry has: **`Status:` and `Merge target:`**.
+
+> **⚠ CORRECTED 2026-08-27, AND THE CORRECTION IS THE MORE INTERESTING FACT.** This paragraph first said
+> the practice ran *"from 2026-08-02 ... to 2026-08-21"*, carried from the analysis agent's synthesis.
+> **It is wrong.** All 26 confirmed edits fall between **2026-08-02 and 2026-08-10** — author and committer
+> dates both, all 26 hashes resolved. The synthesis had conflated the CANDIDATE range with the CONFIRMED
+> range: `29b14912` (2026-08-21) is a candidate and is **not** among the 26.
+>
+> **And the sample did not merely thin.** Nine candidate commits from 2026-08-17, 08-20 and 08-21 were
+> adjudicated, and **none was destructive**. So the practice is a **NINE-DAY BURST THAT STOPPED** — opening
+> nine days after `REG-D-010` ratified the register on 2026-07-24, closing 2026-08-10 — not the standing
+> habit the first draft described.
+>
+> **A hypothesis, offered as one and not as a finding:** `REG-F-040` (2026-08-06) is titled *"WHY THIS IS AN
+> ENTRY AND NOT AN EDIT"* — the register diagnosing the practice on itself, four days before the last
+> instance. **It was not tested and no causal claim is made.**
+>
+> ⚠ **"STOPPED" IS BOUNDED BY WHAT COULD BE SAMPLED.** The candidate population is derived (§2), and a
+> destructive edit whose exact words happen to recur elsewhere never becomes a candidate at all. So **no
+> destructive edit was FOUND after 2026-08-10**, which is not the same as none having occurred.
+>
+> **This raises the gate's value rather than lowering it.** The practice stopped by informal means, with
+> nothing enforcing it and nothing able to report a relapse. §7 is what makes the stop durable.
 
 The sanctioned idiom exists and is genuinely used — `~~struck~~` text plus an appended replacement, as at
 `:57`. **It is the exception, not the rule:** 9 lines carry a struck `~~**Status:**` against 445 carrying
@@ -182,7 +203,28 @@ Re-measured after the change — **MUTANT A back to all nine words, MUTANT B sti
 
 **Coverage limit, stated as a limit and not a claim:** a rewrite that deletes a word and re-adds the same
 word elsewhere *within the same entry*, or inside another entry that existed at the baseline, passes.
-Bigram strengthening would narrow it, was not measured, and is therefore not claimed.
+
+> **⚠ MEASURED 2026-08-27 (REG-F-280) — BIGRAM IS REFUTED, NOT DEFERRED.** It closes the hole (the
+> scrambled-re-add evasion reddens, where unigram flags nothing) and is refuted on cost by the control this
+> gate exists to pass: **MUTANT B, the sanctioned `~~strike~~`, REDDENS** under both tokenizations tried.
+> Also **7 of 11** real adjudicated compliant strikes, and **14 of 30** post-burst commits in which *not a
+> single word was lost*. On real history the gain is **zero** — 26/26 detected either way.
+>
+> **The mechanism is the register's own shape:** a strike destroys the bigrams at *both edges* of the struck
+> span, and an entry ending in a `Merge target:`/`Status:` trailer makes every in-entry append an insertion
+> that severs a pair at the junction — so **a bare append reddens**, destroying the one property that makes
+> this gate survivable here. No tokenization passes B, D and E; the obvious repair reopens the hole and is
+> "the unigram gate with extra steps".
+>
+> **Next to measure is not n=3 but an insertion-tolerant order check** (LCS over the entry's token stream),
+> which would pass the strike, the re-wrap and the append while still failing the evasion. **Not measured,
+> not claimed.**
+
+> **⚠ AND THE MUTANTS NOW DERIVE THEIR OWN TARGET, AFTER TWO HARD-CODED ONES WENT STALE IN ONE DAY.** V1
+> asserted a word COUNT and V2 a hard-coded commit hash; the §8 annotations re-supplied both **into the very
+> entry that lost them**, collapsing the forbidden-act mutant from nine words to one and then to zero. The
+> mutant now derives a token occurring EXACTLY ONCE in the register, inside a baseline entry, and **fails
+> loudly if none exists** rather than passing vacuously.
 
 ---
 
@@ -193,8 +235,24 @@ argument `verif/register-status.test.ts` already accepted when it grandfathered 
 by id rather than by count, with a shrink-only ratchet so a repair must be removed from the list
 deliberately. This gate takes the same shape.
 
-Instead, **append** to each affected bullet a one-line pointer naming the commit that rewrote it and the
-text it removed — the pointer form `REG-F-273` prescribes for its own six sites.
+Instead, **append** a one-line pointer naming the commit that rewrote it and the text it removed.
+
+> **⚠ THE IN-BULLET FORM WAS PERFORMED, MEASURED AND REVERTED (REG-F-277).** Applying 28 pointers to their
+> bullets inserts 34 lines into the register's body at 28 sites, **and every line-number citation below an
+> insertion moves**: 543 of 594 matched citations shift, 364 of them by 34 lines, in an artifact that can
+> never repair them. The strictly verifiable subset — entry-qualified `` `REG-x-nnn:NNNN` `` citations — is
+> **17, and all 17 land inside the entry they name at HEAD**, so the convention is maintained and reliable,
+> which is exactly what makes breaking it expensive.
+>
+> **And the in-bullet form was eroding this gate**, because a pointer quotes the removed text back into the
+> entry that lost it — the case §7's absolution forgives. Driven: the forbidden-act mutant fell from nine
+> lost words to one, then to zero. **A new entry cannot absolve**, so the appendix form leaves the
+> instrument at full strength.
+>
+> **The pointers therefore live in `REG-F-277` as an appendix**, keyed by entry id. The cost is real and
+> accepted: a reader who opens `REG-F-049` alone will not see it. **And the count of still-true-and-live
+> removals is SIX, not the four this section first listed** — the two extra were found by the annotation
+> pass, which read each removal at its commit rather than from the synthesis.
 
 **Prioritise by truth at removal**, which splits the 26 into three acts needing three repairs:
 

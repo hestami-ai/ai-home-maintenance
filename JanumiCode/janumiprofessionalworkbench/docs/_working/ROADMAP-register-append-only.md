@@ -40,7 +40,7 @@ are already absorbed and the gate guards forward only. That is the one respect i
 
 ---
 
-## R-2 — The superseding entry correcting `REG-F-273`'s REASON, not its rule — **OWED**
+## R-2 — The superseding entry correcting `REG-F-273`'s REASON, not its rule — ✅ **DONE 2026-08-27**
 
 `REG-F-273` argues that mutable-bookkeeping citations create *"claims with an expiry date in an artifact
 whose changeProcedure forbids correcting them in place."* **Read as a description of the artifact, that is
@@ -57,7 +57,7 @@ nineteen days later.
 
 ---
 
-## R-3 — `REG-F-272`'s undated claim, and widening the rule's SCOPE — **OWED**
+## R-3 — `REG-F-272`'s undated claim, and widening the rule's SCOPE — ✅ **DONE 2026-08-27**
 
 `REG-F-272:25182` repeats `REG-F-040`'s finding that *"no heading in this register has ever been struck"*.
 **Three headings were struck on 2026-08-10, thirteen days before that entry was written.** `REG-F-040` was
@@ -69,7 +69,7 @@ entry it was generalising.** The rule's scope must widen from *"a sibling row's 
 
 ---
 
-## R-4 — The 26, annotated rather than swept — **OWED, and deliberately not a sweep**
+## R-4 — The 26, annotated rather than swept — ✅ **DONE 2026-08-27 (REG-F-277), IN A DIFFERENT FORM**
 
 Rewriting 26 entries to restore them would be a large unreviewed edit to the audit record — the argument
 `register-status.test.ts` already accepted. **Append** a one-line pointer to each affected bullet naming the
@@ -91,7 +91,7 @@ commits. Only the diffs show it.
 
 ---
 
-## R-5 — Bigram strengthening — **DEFERRED, and deliberately not claimed**
+## R-5 — Bigram strengthening — ✅ **CLOSED 2026-08-27 (REG-F-280): REFUTED BY MEASUREMENT**
 
 The gate's known hole: a rewrite that deletes a word and re-adds the same word **elsewhere within the same
 entry** passes. Bigram counts would close it. **It was not measured, so it is not claimed** — and it is
@@ -99,7 +99,27 @@ recorded here rather than in the gate's comments so that the gate never appears 
 
 ---
 
-## Inherited open item
+## ✅ The inherited open item is CLOSED
+
+**`REG-F-273`'s drafting rule now has a home:** `JPWB-DOC-004 §10 item 8` (artifact version 1.4.0), merged
+under the sponsor's authorization. **The append-only argument turned out NOT to be dispositive** — an
+inserted bullet removes nothing, so REG-005 §1 was never foreclosed by it. What decided it is that
+**both sides of the boundary already agree**: `JPWB-DOC-004:17` `governs:` claims *"drafting standards for
+any normative text the agent itself authors"*, and `JPWB-REG-005:14` `doesNotGovern` cedes agent conduct to
+DOC-004. A §1 bullet also could not carry `REG-F-275`'s widened scope, which reaches invariant comments and
+ADRs, not just entries.
+
+⚠ **It is item 8 APPENDED, not inserted at its topical place after item 5** — §10 ordinals are cited from
+three live sites, one of them inside the append-only register at `:1374`. **Renumbering would falsify a live
+citation in an artifact that cannot correct it — the exact defect class item 8 exists to stop, committed in
+the act of merging it.**
+
+⚠ **Item 8 ships UNENFORCED, and that is stated rather than hidden.** Nothing in `verif/` reads
+JPWB-DOC-004 §10 — measured with a control: the 7 `DOC-004` hits in `verif/` are all the *RPH-corpus*
+DOC-004, a different artifact with §20/§31/§32 sections JPWB-DOC-004 does not have. Items 1–7 are equally
+unenforced; item 8 is no worse and no better.
+
+## Superseded open item
 
 **`REG-F-273`'s drafting rule still has no home.** Its merge target is `JPWB-DOC-004` (agent conduct) or
 this register's §1 entry discipline, **whichever the sponsor prefers.** R-2 and R-3 both amend that rule,

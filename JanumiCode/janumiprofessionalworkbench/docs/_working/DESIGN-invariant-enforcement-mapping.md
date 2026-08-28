@@ -1309,6 +1309,19 @@ anti-stamp leg was unexercised until the target was changed to one with an 821-c
 DATA.** That arm's only definition anywhere (DESIGN:101) is *"a kernel predicate implements the limb and
 **nothing calls it**"*. Each of these four cites an artifact something **does** call, verified at HEAD:
 
+> **⚠ CORRECTED 2026-08-27 (`REG-F-279`) — IT IS THREE, NOT FOUR, AND THE FOURTH IS THE INTERESTING ONE.**
+> `ASR-3:1`, `ASR-6:4` and `ASR-6:5` moved to `UNENFORCED_OBSERVED_ADMISSION`, each with the arm's required
+> **same-site sibling control driven**. **`limb:REL-3:3` was REFUSED and stays.** Its arm rests on
+> `impactedObjects` (`traceability.ts:208`) — **zero production call sites**, gated two-directionally at
+> `verif/dead-kernel-census.test.ts:285-288` and `:396-403`. `classifyValidatorResult` IS called, and it is
+> the row's own explicitly-labelled **FOURTH REINFORCING OBSERVATION**, not the arm's carrier.
+> **The finding was right about the class and wrong about that member: it read a row's SUPPORTING
+> OBSERVATION as its ARM'S BASIS** — EM-1 one level further in, not a sibling *limb* but a sibling
+> *observation inside the same row*. Three of eleven is **27%**.
+>
+> **And the predicted debt figure below is also wrong: 43 → 46, not 45.** Three rows entering a set of 43
+> is 46. Re-authored rises 42 → 45; `REL-3:3` remains the single HELD row. Derived from the file.
+
 | row | artifact | production call site |
 |---|---|---|
 | `limb:ASR-3:1` | `evaluateApplicability` | two sites, both verified |

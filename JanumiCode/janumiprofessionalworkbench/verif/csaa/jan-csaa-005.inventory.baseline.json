@@ -10364,7 +10364,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "1470f6f570a68cf7d094ca3673d78ccf9f1b3ebdb2b52fce173113c030c8c4f9",
+    "fileManifestDigest": "e207abbdc0a4a6535b220de6960c45f390c4a93178fc0924b58f0736ab44d19a",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -19007,9 +19007,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 98023,
+        "bytes": 99547,
         "path": "verif/invariant-verdict-census.test.ts",
-        "sha256": "11a57a1f5184411eee78978d11dea54ae8e48d8485a5712ede9bc64f3128a2fc",
+        "sha256": "20570e3dcd05e792c16427171747e55c14c9f9acdb6d0c2c8a1b361821aeb99d",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19070,9 +19070,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11177,
+        "bytes": 13809,
         "path": "verif/register-append-only.test.ts",
-        "sha256": "2c9fa4400ab6a5a4fc7ceb6dee987435b09f189f39c85470496765df67b58fa6",
+        "sha256": "441b56c678753fd6f3b15a0156bcf05418d4c5754be6aefb70448cf6a4176b70",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19216,7 +19216,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "06898921744f0a87c9051454700ea52a092ccdfbed770e0fc8c46fce67b82f72",
+    "subjectId": "d21b6b336c864dd10724a7c5d05264560239913ace0081a5890872211ee4ea2f",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -23906,7 +23906,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/invariant-verdict-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "11a57a1f5184411eee78978d11dea54ae8e48d8485a5712ede9bc64f3128a2fc",
+      "contentSha256": "20570e3dcd05e792c16427171747e55c14c9f9acdb6d0c2c8a1b361821aeb99d",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24050,7 +24050,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-append-only.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "2c9fa4400ab6a5a4fc7ceb6dee987435b09f189f39c85470496765df67b58fa6",
+      "contentSha256": "441b56c678753fd6f3b15a0156bcf05418d4c5754be6aefb70448cf6a4176b70",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

@@ -177,33 +177,78 @@ describe('JPWB-REG-005 is append-only', () => {
 	// performed — otherwise "it reddened" proves only that the gate reacts to edits, not that it tells the
 	// forbidden act from the permitted one. This repository has shipped three controls that could not fail;
 	// the distinguishing pair below is the reason this one is not a fourth.
-	const targetEntry = 'REG-F-049';
-	const liveLine =
-		'- **Merge target:** This register — **audit COMPLETE**; the design record was corrected at';
+	// ⚠⚠ THE MUTANT DERIVES ITS OWN TARGET, BECAUSE TWO HARD-CODED ONES WENT STALE IN ONE DAY.
+	//
+	// V1 anchored on a prefix of `REG-F-049`'s merge-target line and asserted a word COUNT (`> 3`). Appending
+	// the 28 `REG-F-274` pointers — one of them into that very entry — collapsed the count to 1, because the
+	// pointer re-introduced `corrected`, `register` and `audit` INSIDE the same entry.
+	// V2 hard-coded the commit hash `3f70bcfe` as a token no annotation would restore. **The annotation
+	// quoted it too**, so the entry's count for it never fell and the gate correctly said nothing.
+	//
+	// **That is the deeper finding and it is recorded rather than patched around: `REG-F-274`'s own remedy —
+	// annotate the bullet with what was removed — SYSTEMATICALLY RE-INTRODUCES the removed words into the
+	// entry that lost them, which is exactly the case §7's coverage limit forgives. The remedy erodes the
+	// instrument.** It does not make the gate useless: a real destructive edit is not accompanied by an
+	// annotation quoting what it removed. But it does mean a mutant may not assume any particular token
+	// survives the register's own maintenance.
+	//
+	// So the target is DERIVED at run time: a token that occurs EXACTLY ONCE in the whole register, inside an
+	// entry that existed at the baseline. Deleting it cannot be absolved at either level, by construction.
+	// If no such token exists the test FAILS rather than passing vacuously — the instrument reports that it
+	// can no longer prove detection instead of quietly proving nothing.
+	const pickUniqueTarget = (): { entry: string; line: string; token: string } => {
+		const fileCounts = wordCounts(current);
+		const baseIds = new Set(entriesById(baseline).keys());
+		const lines = current.split('\n');
+		let entry = '';
+		for (const raw of lines) {
+			const head = /^### ~{0,2}(REG-[A-Z]-\d{3})/.exec(raw);
+			if (head) {
+				entry = head[1] ?? '';
+				continue;
+			}
+			if (!entry || !baseIds.has(entry)) continue;
+			if (raw.length < 60) continue;
+			for (const m of unstrike(raw).matchAll(/[A-Za-z0-9_./:%-]{2,}/g)) {
+				if ((fileCounts.get(m[0]) ?? 0) === 1) return { entry, line: raw, token: m[0] };
+			}
+		}
+		return { entry: '', line: '', token: '' };
+	};
+	const target = pickUniqueTarget();
+
+	it('the mutants have a target that can prove detection', () => {
+		expect(
+			target.token,
+			'no token occurs exactly once inside a baseline entry, so neither mutant below can distinguish ' +
+				'detection from absolution. This is a REAL failure of the instrument, not a fixture problem.'
+		).not.toBe('');
+	});
 
 	it('MUTANT A — an in-place rewrite of a live line is REFUSED', () => {
-		expect(current, 'the mutant must anchor on real text').toContain(liveLine);
-		// The exact shape `c61d92cf` performed: the line overwritten, no strike, no superseding entry.
-		const mutated = current.replace(
-			liveLine,
-			'- **Merge target:** This register. **Status:** **CLOSED**.'
-		);
+		// The shape `c61d92cf` performed: the line overwritten, nothing struck, no superseding entry.
+		const mutated = current.replace(target.line, '- **Merge target:** This register. **Status:** **CLOSED**.');
 		expect(mutated, 'the mutation must actually change the file').not.toBe(current);
 		const lost = lostByEntry(baseline, mutated);
-		expect(lost.has(targetEntry), `${targetEntry} must be reported as having lost text`).toBe(true);
-		expect(lost.get(targetEntry)?.length ?? 0).toBeGreaterThan(3);
+		expect(lost.has(target.entry), `${target.entry} must be reported as having lost text`).toBe(true);
+		// Named, not counted. A count is a function of what else the register happens to contain; the absence
+		// of a token that occurred exactly once is not.
+		expect(
+			lost.get(target.entry) ?? [],
+			`the gate must name ${target.token}, the once-only token the rewrite removed`
+		).toContain(target.token);
 	});
 
 	it('MUTANT B — retiring the same line BY STRIKING it is PERMITTED', () => {
 		// `~~old~~` plus an appended replacement. Git scores this as a deletion too; the gate must not.
 		const mutated = current.replace(
-			liveLine,
-			`- ~~${liveLine.slice(2)}~~\n- **Status:** **CLOSED 2026-08-27** — retired by strike.`
+			target.line,
+			`- ~~${target.line.replace(/^- /, '')}~~\n- **Status:** **CLOSED 2026-08-27** — retired by strike.`
 		);
 		expect(mutated, 'the mutation must actually change the file').not.toBe(current);
 		const lost = lostByEntry(baseline, mutated);
 		expect(
-			lost.get(targetEntry) ?? [],
+			lost.get(target.entry) ?? [],
 			'striking preserves the text; a gate that reddens here cannot tell the sanctioned act from the ' +
 				'forbidden one, and would be satisfied by deleting the gate'
 		).toEqual([]);
