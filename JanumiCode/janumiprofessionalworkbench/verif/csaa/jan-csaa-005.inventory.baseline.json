@@ -10286,11 +10286,12 @@
         "id": "jan-csaa-exclude-build/1",
         "includedFileCount": 0,
         "physicalPopulationState": "EXCLUDED_BEFORE_ENUMERATION",
-        "policyRuleCount": 5,
+        "policyRuleCount": 6,
         "rules": [
           "Compiled output is not an authored compiler input.",
           "Coverage output is derived evidence, not a compiler input.",
           "E2E results are derived outputs.",
+          "Generated framework output is excluded except consumed configuration and declaration roots.",
           "Test results are derived outputs.",
           "Unconsumed generated framework output."
         ]
@@ -10323,8 +10324,9 @@
         "id": "jan-csaa-exclude-local-state/1",
         "includedFileCount": 0,
         "physicalPopulationState": "EXCLUDED_BEFORE_ENUMERATION",
-        "policyRuleCount": 1,
+        "policyRuleCount": 2,
         "rules": [
+          "Known mutation-runner transient state is not a source input.",
           "RPH demo harness state is outside the accepted DWP-002 subject."
         ]
       },
