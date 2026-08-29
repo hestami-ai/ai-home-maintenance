@@ -26906,3 +26906,84 @@ instruments, and BOTH of those defects were already written down in this corpus 
   from the shrink-only list, figures re-derived), `verif/register-status-truth.test.ts` (two corrections),
   `verif/register-citations.test.ts` (`REG-F-997` pinned as a fixture) · **This register** (the four repairs).
   Status: CLOSED.
+
+---
+
+### REG-D-045 — JAN-SLICE commissioned: verification and progress decompose by JOURNEY, not by layer; engine plane
+before surface plane; and the W7 product-behavior plane is promoted on its own ratified condition
+
+- **Date:** 2026-08-29 · **Type:** DECISION (sponsor direction, two rulings given in session) · **Class:**
+  DECISION — commissions a programme and rules two design forks · **Status:** EFFECTIVE — DESIGN FILED, ROADMAP OWED
+
+- **THE DIRECTION.** The sponsor directed verification and validation of implementation, and the closing of
+  implementation gaps, *"through thin vertical slices … we would need something like the capabilities and user
+  journeys and whatever else to develop some set of end-to-end test cases that can perhaps drive more clearly the
+  development in a holistic way in conjunction with the document corpus and perhaps even the registry."* The
+  JanumiCode v2 harness is **explicitly excluded**: the pattern is adopted, the machinery is not.
+
+- **RULING 1 — ENGINE PLANE BEFORE SURFACE PLANE.** Engine-level slices are built and admitted first; browser-level
+  slices follow. ⚠ **AND THE SPONSOR CORRECTED THE PREMISE OFFERED TO THEM.** The advice said browser cases *"need
+  the evidence surface built first"*; the sponsor observed that UI exists in `rph-demo`, and they are right —
+  **6 page routes, 37 specs, 77 Playwright tests green today.** The true statement is narrower: no browser path
+  crosses the **evidence stage**. `ProposeEvidence`, `AdmitEvidence` and `SubmitEvidenceForAssessment` appear ZERO
+  times in `apps/rph-demo/src` and `apps/rph-demo/e2e` (positive control: `CreatePwa` 3 files, `PromoteBaseline` 1,
+  `AbandonPwu` 1); more broadly **44 of 105 registered commands are unreachable from the browser**. The overbroad
+  claim is withdrawn and the narrow one carried.
+
+- **RULING 2 — THE W7 PRODUCT-BEHAVIOR PLANE IS PROMOTED.** `Actor`, `Capability`, `User Journey`, `Scenario` and
+  `Requirement` become first-class object types. **MEASURED:** none exists as an object-type literal today (0 hits
+  across `rph-contracts/src` and `rph-domain/src`; positive control: existing object-type literals → 78).
+  ⚠ **THIS DISCHARGES A RATIFIED DEFERRAL AND IS NOT THE CLOSING OF A DEFECT.** FSM §30.2 defers the plane
+  *"until the Product Realization PWA implementation proves the need."* The condition is PROOF OF NEED, and a
+  verification substrate keyed to capabilities and journeys is that proof — it cannot trace to objects that do not
+  exist. Recording it as remediation would misdescribe a design maturing as designed.
+
+- **⚠⚠ WHY A JOURNEY AND NOT A WAVE, MEASURED.** The W0–W10 programme is **11 code increments and ~9 gate
+  documents, ALL COMMITTED ON 2026-07-19** — one day, 2,770 insertions, laid over an engine already carrying ~261k.
+  It was a retrospective gating pass, not a build plan. Since that day **735 commits, of which ZERO name the
+  programme in their subject** (four name it in a body); the work continued under ~13 successor programme names.
+  **Five waves contributed zero lines** — W5, W6 and W7 were written for a brownfield legacy migration **that never
+  existed**. A wave is a horizontal LAYER, and a layer can be complete or absent but never thin; **a journey cuts
+  the other way and can be complete and small.** That property, not preference, is the whole argument.
+
+- **⚠⚠ THE SEED SET ALREADY EXISTS, AND IT SITS IN THE ONE HOLE THE SYSTEM LEFT ITSELF.** Of 125 ratified
+  conformance rules: 42 COVERED, 76 PARTIAL, **7 DEFERRED — all seven are `RPH-E2E-001..007`**, already written
+  Given/When/Then and already machine-readable. And `DEFERRABLE_PREFIXES` is `new Set(['RPH-E2E'])` — a set of one,
+  whose own docblock says in terms:
+  > *"A `DEFERRABLE_PREFIXES` entry removes the family from the question, so there is no claim left to
+  > over-[claim]. **It is the one manifest defect the overclaim gate is structurally blind to.**"*
+  **The only rule family whose remit is end-to-end journeys is the sole member of the set that exempts it from the
+  gate.** Removing it is the programme's first act, and the resulting RED must be recorded before anything is made
+  green — re-adding the prefix or restating the rules as PARTIAL is prohibited, and is exactly what `REG-F-013`
+  caught when `RPH-CMP` sat there under a reason both halves of which were false.
+
+- **⚠ AND THE EXPOSURE IS WIDER THAN THE SEVEN.** The conformance gate's only structural check on a citation is
+  that the cited FILE EXISTS. **Nothing checks that the cited test asserts the rule — 125 of 125.** Nineteen rules
+  cite something that is not a path, including the bare prose string `'rph-persistence + rph-domain'` standing for
+  eleven rules.
+
+- **⚠⚠ THE LEDGER IS DERIVED, NEVER AUTHORED — AND THE AUTHOR OF THE DESIGN IS AN INSTANCE OF THE DEFECT IT
+  PRESCRIBES AGAINST.** The master tracker's progress log stops at **2026-07-12** (recording *"338 tests"*; the
+  suite now runs 2,962), while ~19 `docs/_working/ROADMAP-*.md` files grew around it, fifteen write-once. Readership
+  is not the fix: that tracker IS read by four consumers and is still stale. **Divergence survives wherever the
+  reader's predicate is narrower than the claim the artifact makes** — demonstrated by `docs/tracking/w3b/`, born
+  ONE DAY after the anti-divergence index and invisible to it (`origin LIKE '%w3b%'` → 0; control `'%f200%'` → 21).
+  **`docs/_working/ROADMAP-register-append-only.md`, commit `460d134b`, was created by this same agent on this same
+  day** — the twentieth file, written during an audit of this very class. A design that prescribed only discipline
+  would fail exactly as that did, so the ledger MUST be generated, gated, and MUST retire what it replaces by
+  striking. **A JAN-SLICE that leaves the nineteen standing has become the twentieth**, and fails on that ground
+  alone whatever its test count.
+
+- **THE DIAGNOSIS IS PREDOMINANTLY COMPLETION, NOT REWORK.** W1 complete; W2/W3/W4/W8 finite completion with
+  nameable lists; W7/W9/W10 build, two of them out of first-increment scope by their own gates; W0/W5/W6
+  governance over an absent subject, to be retired by striking rather than scheduled. What runs today: **290 test
+  files / 2,962 tests green, 77 Playwright specs green.**
+
+- **Merge target:** **Repository** — `docs/_working/DESIGN-journey-slice-verification.md` (filed with this entry;
+  20 numbered obligations `SL-1`…`SL-W7-2`, six falsifiers). ⚠ **A `JAN-SLICE-DR-001 Detailed Implementation
+  Roadmap` IS OWED and no implementation is authorized until it is approved** — design doc, then roadmap, then
+  code, per standing sponsor rule. **Open and NOT decided here:** whether v1 is production-facing (`REG-Q-038`
+  carries no status line at all); whether `reconcile` — the one ratified WRITE verb with no command anywhere, 0 of
+  105 registry keys — is in scope; what `PARTIAL` should mean for 76 rules resolving on 11 citations; referential
+  integrity across the PWA version boundary, where `deprecatePwa` and `retirePwa` carry no in-use guard though
+  `DeletePwa` does. Status: EFFECTIVE.
