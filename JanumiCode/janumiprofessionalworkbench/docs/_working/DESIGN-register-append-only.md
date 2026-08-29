@@ -271,6 +271,55 @@ the occurrence count never changed and `-S` returns only `7afba73f`. **Only the 
 
 ---
 
+## 10. ⚠ THE ZERO-SHIFT STATUS REPAIR (2026-08-29) — and the two instruments it broke on the way in
+
+`REG-F-284` left 28 stale statuses unrepaired for one measured reason: **a strike inserts a line**, and those
+statuses sit above thousands of line-citation targets that would shift permanently. §7's `item 10` names that
+cost. So the class was recorded rather than repaired.
+
+**There is a form that repairs a status and adds no line.** Keep ONE line; put the NEW value first, strike the
+old in place behind it:
+
+```
+- **Merge target:** …unchanged, still live… **Status:** **MERGED 2026-07-24** — <the act, cited>; superseding ~~DECIDED — MERGE PENDING (countersign via Ratify Sheet).~~
+```
+
+The new value LEADS, so `scripts/tracker/ingest.ts:109` — whose status regex runs to END OF LINE — captures
+the right thing. The old is struck, not deleted, so the append-only gate stays green. **And the line count
+does not change, so nothing shifts.** Driven on the four closure-sweep survivors: 26,511 lines before and
+after.
+
+### 10.1 ⚠ The gates passed a semantically WRONG repair
+
+The first attempt struck the **whole line**, including a `Merge target:` clause that was still live — and
+**all three register gates passed it.** They check that text survives, that exactly one status is readable,
+and that a discharge is cited. **None checks that the right thing was struck.** The joins and the struck
+spans have to be read by a person; that limit is now stated rather than discovered again.
+
+### 10.2 ⚠ And the repair was INVISIBLE to the truth gate, for the reason its sibling had already written down
+
+All four entries stayed stale after being correctly repaired. `owedKind` stripped the `~~` MARKERS and kept
+their contents, so the retired text `~~DECIDED — MERGE PENDING~~` still matched the unsettled token
+`PENDING`.
+
+> `register-status.test.ts:49-51` names this exactly: *"a status struck mid-line would defeat this and is why
+> the count is asserted rather than the text."* **It was written as a hypothetical. The zero-shift form makes
+> it real**, and it arrived the same day the form was first used.
+
+The fix is one line — remove the struck SPAN, not the markers — and it is the semantics the register already
+has: **struck is retired.** The sibling gate needs no change: it counts live status lines rather than reading
+them, which is why its author asserted the count.
+
+### 10.3 What the form does not license
+
+**It is not a general licence to edit statuses in place.** It is the strike idiom compressed onto one line,
+and it is admissible only where the strike is a *supersession* — the old value retired, quoted verbatim,
+still readable. It does not admit deleting a value, editing one, or striking a neighbouring clause that is
+still live (§10.1). **And it does not repair a stale clause in a HEADING or in body prose**, which still needs
+a superseding entry.
+
+---
+
 ## 9. What is not claimed
 
 - **`REG-F-273`'s numerator of eight is not re-derived and not endorsed here.** Those eight limbs were not

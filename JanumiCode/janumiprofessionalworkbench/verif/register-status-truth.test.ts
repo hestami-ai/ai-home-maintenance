@@ -47,9 +47,14 @@
 // RATCHETS on `KNOWN` — the shape `register-status.test.ts` established — and `KNOWN` may only shrink.
 //
 // ── WHAT IT CATCHES, MEASURED RATHER THAN ESTIMATED ───────────────────────────────────────────────────────────
-// Driven over the register at HEAD: **9 findings — 8 of REG-F-284's 40, plus REG-F-014, which the census did not
-// list and which I read at its source.** No false positives: every one of the 9 was verified in the register's
-// own text.
+// Driven over the register at HEAD 313fcfa4 when this file shipped: **9 findings — 8 of REG-F-284's 40, plus
+// REG-F-014, which the census did not list and which I read at its source.** No false positives: every one of
+// the 9 was verified in the register's own text.
+//
+// ⚠ **RE-DERIVED 2026-08-29: FIVE.** The four closure-sweep survivors were repaired that day and removed from
+// `KNOWN`; the figure is re-derived here at the point of writing rather than left reading as current, per
+// `JPWB-DOC-004 §10 item 9`. The 9 is not struck because it is a DATED reading that was true at 313fcfa4 —
+// which is item 8's own discharge, and the distinction between the two items in one sentence.
 //
 // ⚠ **REG-F-284's ESTIMATE OF 9-OF-40 IS ONE TOO HIGH, AND CORRECTING IT IS THE POINT OF MEASURING.** The
 // measured answer is **8 of 40**. The ninth it presumably counted is `REG-Q-052`, and a supersession graph
@@ -454,11 +459,33 @@ export function liveStatus(b: Block): string | null {
 }
 
 /** Which §1 token this status is, or RESIDUAL, or null when it advertises nothing owed. */
+/**
+ * ⚠ A STRUCK SPAN IS RETIRED TEXT AND MUST NOT BE READ AS A LIVE CLAIM — and the first version of this
+ * function read it as one.
+ *
+ * It stripped the `~~` MARKERS and kept their contents, so `~~DECIDED — MERGE PENDING~~` still matched the
+ * unsettled token `PENDING`. That was invisible while every retirement in this register opened its line
+ * `- ~~`, which `register-status.test.ts:49-51` relies on and which is exactly why that gate asserts the
+ * COUNT of live status lines rather than their text — its docblock names "a status struck mid-line" as the
+ * thing that would defeat it.
+ *
+ * A mid-line strike arrived on 2026-08-29. Repairing a status by the normal form inserts a line, and the 27
+ * statuses `REG-F-284` left unrepaired sit above thousands of line-citation targets that would shift
+ * permanently (`JPWB-DOC-004 §10 item 10`). The form that avoids it keeps ONE line — the new value leading
+ * after `**Status:**`, the old struck in place behind it — and **this gate could not see the repair**: all
+ * four entries stayed stale after being correctly repaired, because their retired text still said PENDING.
+ *
+ * Removing the SPAN rather than the markers is the semantics the register already has: struck is retired.
+ */
+const unstrike = (s: string): string => s.replace(/~~[^~]*~~/g, ' ');
+
 export function owedKind(status: string, unsettled: readonly string[]): string | null {
-	const flat = stripCode(status).replace(/[*~]+/g, '').trim();
+	const flat = unstrike(stripCode(status))
+		.replace(/[*~]+/g, '')
+		.trim();
 	for (const u of unsettled)
 		if (new RegExp(`(^|[\\s:.;(])${u.replace(/ /g, '\\s*')}(\\b|$)`).test(flat)) return u;
-	return RESIDUAL.test(stripCode(status)) ? 'RESIDUAL' : null;
+	return RESIDUAL.test(unstrike(stripCode(status))) ? 'RESIDUAL' : null;
 }
 
 // ── THE FINDING ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -525,22 +552,22 @@ export function staleStatuses(text: string, options: EdgeOptions = {}): StaleSta
  * denominator (REG-F-272:25136), so this extends it rather than contradicting it, and it belongs in
  * REG-F-284's record when one is next appended.
  */
+// ✅ FOUR MORE REPAIRED AND REMOVED 2026-08-29 — REG-F-045, REG-Q-051, REG-D-019 and REG-F-083 — each by
+// the zero-shift form, each adjudicated against the WORLD (the repository and the canon) rather than
+// against another entry, and each structurally re-checked here before it was pasted. The ratchet is ONE.
 const KNOWN: Readonly<Record<string, readonly string[]>> = {
-	// Ruled `MERGED` by `### Closure sweep — 2026-07-24`; all four still read `DECIDED — MERGE PENDING`.
-	'REG-D-008': ['ministerial:closure-sweep'],
-	'REG-D-009': ['ministerial:closure-sweep'],
-	'REG-F-003': ['ministerial:closure-sweep'],
-	'REG-F-004': ['ministerial:closure-sweep'],
+	// ✅ REPAIRED 2026-08-29 AND REMOVED FROM THIS LIST DELIBERATELY, which is what a shrink-only ratchet is for.
+	// `REG-D-008`, `REG-D-009`, `REG-F-003` and `REG-F-004` were ruled MERGED by `### Closure sweep — 2026-07-24`
+	// and still read `DECIDED — MERGE PENDING` five weeks later. Each now carries `MERGED 2026-07-24` citing the
+	// sweep, repaired in a form that adds NO LINE — the new value leading after `**Status:**`, the old struck in
+	// place behind it — because a normal strike inserts a line above thousands of line-citation targets.
+	//
+	// ⚠ AND THE REPAIR WAS INVISIBLE TO THIS GATE UNTIL `owedKind` LEARNED TO DROP STRUCK SPANS. All four stayed
+	// stale after being correctly repaired, because their retired text still contained the word PENDING. That is
+	// the mid-line strike `register-status.test.ts:49-51` names as the thing that would defeat a text-reading
+	// check — and it arrived the day a zero-shift repair form was first used.
 	// Status still asks for a re-title REG-F-040 superseded and forbade. Not in REG-F-284; verified here.
-	'REG-F-014': ['REG-F-040'],
-	// `**Type:** DECISION RECORD (closes REG-F-045, filed 2026-08-06)`; REG-F-045 still reads `OPEN.`
-	'REG-F-045': ['REG-D-040'],
-	// `- **REG-Q-051 — SUPERSEDED / CLOSED FOR STAGE A:**` in REG-D-017's notation; still reads `OPEN.`
-	'REG-Q-051': ['REG-D-017'],
-	// `supersedes only the live \`EFFECTIVE — MERGE PENDING\` state of \`REG-D-019\`` — and it still reads it.
-	'REG-D-019': ['REG-D-020'],
-	// `**Closes the decision half of:** REG-F-083`; REG-F-083 still reads `OPEN`.
-	'REG-F-083': ['REG-D-043']
+	'REG-F-014': ['REG-F-040']
 };
 
 describe('P-5b — no entry advertises work a later entry has already discharged', () => {
@@ -595,10 +622,38 @@ describe('P-5b — no entry advertises work a later entry has already discharged
 			vocab.length
 		);
 		expect(dischargeEdges(text).length, 'discharge edges').toBeGreaterThan(30);
+		// ⚠ THIS LEG WAS A POPULATION FLOOR (`found.length > 4`), AND ITS PREMISE WAS FALSIFIED BY THE PROGRAMME'S
+		// OWN PROGRESS ON 2026-08-29, when 21 of REG-F-284's 40 were repaired and the live population fell to
+		// ONE. A floor over a population that is deliberately being driven to ZERO is a control that must
+		// eventually be weakened or deleted — the third time on this programme a control's premise has been
+		// overtaken by the work it was watching, and the first time the fix was to stop counting.
+		//
+		// **Detection is proved by CONSTRUCTION instead, so it still holds when the real population reaches zero.**
+		const probe = [
+			text,
+			'',
+			'### REG-Z-001 — synthetic probe target',
+			'',
+			'- **Date:** 2026-01-01 · **Status:** OPEN — the work remains owed.',
+			'',
+			'### REG-Z-002 — synthetic probe claimer',
+			'',
+			'- **Date:** 2026-12-31 · **Class:** RECORD — discharges **REG-Z-001** · **Status:** CLOSED',
+			''
+		].join('\n');
 		expect(
-			found.length,
-			'findings — a zero here would be the instrument, not the register'
-		).toBeGreaterThan(4);
+			staleStatuses(probe).map((f) => f.id),
+			'the detector must find a PLANTED stale status — this is what a zero in `found` would otherwise hide'
+		).toContain('REG-Z-001');
+		// ⚠ AND THE CONVERSE, so the probe discriminates rather than merely fires: the SAME pair, with the target
+		// citing its discharger, must NOT be found. One clause apart — without this the probe would pass for a
+		// detector that flags everything.
+		expect(
+			staleStatuses(
+				probe.replace('OPEN — the work remains owed.', 'OPEN — pending **REG-Z-002**.')
+			).map((f) => f.id),
+			'and it must NOT fire when the status cites its discharger'
+		).not.toContain('REG-Z-001');
 		// AND THE DECLARATION-SITE RESTRICTION IS STILL DOING WORK. If reading argument prose ever stopped
 		// adding edges, the restriction would be free and its measured cost (one real catch, REG-F-121) would
 		// be a claim about a reading nobody performs.

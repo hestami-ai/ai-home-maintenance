@@ -210,6 +210,42 @@ a regression.
 
 ---
 
+## ✅ R-9 — twenty-one of the forty repaired, by a form that adds no line — **DONE 2026-08-29 (`REG-F-286`)**
+
+R-8 left 28 unrepaired because **a strike inserts a line**. The **zero-shift form** — one line, new value
+leading, old struck in place behind it — satisfies §10 item 10 rather than evading it. 26,511 lines before
+and after.
+
+**17 applied, 9 refused, 1 left alone**, plus the 4 closure-sweep survivors = **21 repaired**. The ratchet
+fell **9 → 5 → 1**.
+
+⚠ **`REG-F-046` is CORRECT and was left alone** — the census fired because its blockers were dispositioned,
+and **a ruling that removes a BLOCKER is not a ruling that does the WORK.**
+
+⚠ **The repair was invisible to the gate built to catch it**, because `owedKind` kept the contents of struck
+spans and `~~…PENDING~~` still read as pending. `register-status.test.ts:49-51` had written the hazard down
+as a hypothetical — *"a status struck mid-line would defeat this"* — and the new form made it real the same
+day.
+
+⚠ **And the gates will not catch a WRONG strike.** A first attempt struck a still-live `Merge target:` clause
+and **all three passed it.** Every applied line was re-checked structurally against the file on disk.
+
+⚠ **Nine were refused, and the refusals cluster on a defect in my brief:** five agents shared one scratch
+directory; **batches 3 and 5 never noticed a sibling overwriting their files**, and 6 of the 9 refusals came
+from those two. **A shared scratch directory across parallel agents is a correctness hazard, not a tidiness
+one.**
+
+⚠ **A control's premise was falsified for the third time.** The non-vacuity floor `found.length > 4` fired
+once the population fell to one. A floor over a population being driven to zero must eventually be weakened
+or deleted — so it is now a **synthetic probe**, driven in both directions, that holds at a real population
+of zero.
+
+**Still owed:** the 9 refused — three of which (`REG-F-070`, `REG-D-016`, `REG-F-043`) carry **two live
+statuses** and are `register-status.test.ts`'s grandfathered population, which the one-status form cannot
+reach — and the clauses sitting in headings or body prose, which no status form repairs.
+
+---
+
 ## Superseded open item
 
 **`REG-F-273`'s drafting rule still has no home.** Its merge target is `JPWB-DOC-004` (agent conduct) or
