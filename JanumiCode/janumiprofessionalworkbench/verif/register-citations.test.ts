@@ -84,7 +84,7 @@ function citedIds(): Map<string, string[]> {
  * `register-status.test.ts` builds synthetic register text in its own controls; those ids are fixtures, not
  * references. Pinned BY NAME so a real dangling id can never be waved through as "probably a fixture".
  */
-const SYNTHETIC = new Set(['REG-F-998', 'REG-F-999']);
+const SYNTHETIC = new Set(['REG-F-997', 'REG-F-998', 'REG-F-999']);
 
 /**
  * Ids that are cited, are genuinely undefined, and are NOT this programme's to write.

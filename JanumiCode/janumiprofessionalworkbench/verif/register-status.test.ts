@@ -18,16 +18,22 @@
 // is wrapped in `~~…~~` and the replacement is a new line.
 //
 // ⚠ AND IT RATCHETS RATHER THAN MIGRATES, which is the same shape REG-D-042 ruled for tiers and the same shape
-// `absence-claims.test.ts` already uses next door. 63 of ~~209~~ **240** entries do not conform today — 56 with
-// every status struck and no replacement, 7 with two live statuses.
+// `absence-claims.test.ts` already uses next door. ~~63~~ **60** of ~~209~~ ~~240~~ **408** entries do not conform
+// today — 56 with every status struck and no replacement, ~~7~~ **4** with two live statuses.
 // ⚠ POPULATION RE-DERIVED 2026-08-14 (REG-F-149) by running THIS FILE'S OWN `entries()` over the register:
 // ~~**240**~~ — **403 as at 2026-08-28**, re-derived at the point of writing by running this file's own
 // heading pattern, per `JPWB-DOC-004 §10 item 9` (merged the same day). The 240 was correct on 2026-08-14
 // and the register has since grown by 68%; it is struck rather than overwritten because the earlier reading
-// is the record that the figure was CHECKED then, not merely asserted. The 63 is NOT stale — it is the length of the by-name GRANDFATHERED list below, which the gate
-// keeps honest. ⚠ THE 56/7 SPLIT WAS NOT RE-DERIVED and is left as written rather than silently reprinted
+// is the record that the figure was CHECKED then, not merely asserted. The ~~63~~ **60** is NOT stale — it is the length of the by-name GRANDFATHERED list below, which the gate
+// keeps honest. ⚠ ~~THE 56/7 SPLIT WAS NOT RE-DERIVED and is left as written rather than silently reprinted
 // as though it had been: correcting a figure beside an underived one is how REG-F-148's four defects were
-// made, and marking the boundary is cheaper than implying a check that did not happen. Rewriting 63 canon entries in one sweep would be a large
+// made, and marking the boundary is cheaper than implying a check that did not happen.~~ **THE SPLIT IS NOW
+// DERIVED, 2026-08-29, by running this file's own `entries()`: the full distribution is `{0: 56, 1: 348, 2: 4}`,
+// so 56 / 4 — and the standing marker above is discharged.** ⚠ **THE 56 BEING UNCHANGED IS A COINCIDENCE, NOT A
+// CONFIRMATION.** It was never checked between 2026-08-14 and today; it is right NOW, which is a different claim
+// from having been right throughout, and the two are easy to conflate when a re-derived figure happens to match.
+// The 7 → 4 moved for two distinct reasons that must not be merged: repairs closed some, and the mid-line strike
+// fix below revealed that `REG-F-047` and `REG-F-070` were never offenders at all. Rewriting ~~63~~ **60** canon entries in one sweep would be a large
 // unreviewed edit to the audit record itself. So they are GRANDFATHERED by id, new entries must conform, and the
 // list may only SHRINK.
 import { readFileSync } from 'node:fs';
@@ -64,7 +70,17 @@ export function entries(text: string): Entry[] {
 			// is not a status.** Stripping code spans is the narrowest rule that separates them, and it is
 			// narrower than "ignore lines containing backticks": a real status line may cite `RPH-EXE-002`.
 			.map((l) => l.replace(/`[^`]*`/g, ''))
-			.filter((l) => l.includes('**Status:**') && !l.trimStart().startsWith('- ~~')).length;
+			// ⚠ A LINE-OPENING STRIKE IS NOT THE ONLY STRIKE, and this file's own docblock said so as a
+			// hypothetical — *"a status struck mid-line would defeat this"* — for as long as the file has existed.
+			// The zero-shift repair form made it real: `- **WHAT STILL STANDS:** … ~~**Status:** OPEN.~~ **✅ CLOSED
+			// …**` retires a status WITHOUT opening the line `- ~~`, and the prefix test above counts the retired
+			// one as live. Both filters are kept rather than one: dropping struck SPANS handles the mid-line form,
+			// and the prefix test still handles a strike that OPENS on this line and closes on a later one, which
+			// the span regex cannot see. That residual is zero in the register today and the guard is what keeps
+			// it from being reintroduced silently.
+			.filter((l) => !l.trimStart().startsWith('- ~~'))
+			.map((l) => l.replace(/~~[^~]*~~/g, ' '))
+			.filter((l) => l.includes('**Status:**')).length;
 		out.push({ id: m[2]!, liveStatusLines: live });
 	}
 	return out;
@@ -84,11 +100,17 @@ const GRANDFATHERED: ReadonlySet<string> = new Set([
 	'REG-Q-031', 'REG-Q-032', 'REG-Q-033', 'REG-Q-034', 'REG-Q-035', 'REG-Q-036',
 	'REG-Q-037', 'REG-Q-038', 'REG-Q-039', 'REG-Q-040', 'REG-Q-041', 'REG-Q-042',
 	'REG-Q-043', 'REG-Q-044', 'REG-Q-045', 'REG-Q-046', 'REG-Q-047', 'REG-Q-048',
-	'REG-Q-049', 'REG-Q-050', 'REG-F-043', 'REG-F-047', 'REG-F-054', 'REG-F-067',
+	'REG-Q-049', 'REG-Q-050', 'REG-F-043', 'REG-F-054', 'REG-F-067',
 	// ⚠ 'REG-F-085' REMOVED 2026-08-21: REG-D-044 answered it and its status was repaired to a single live line.
 	// This list is SHRINK-ONLY and this gate caught the repair itself — "a repair happened, so remove them from
 	// the list deliberately" — which is the whole point of grandfathering by ID rather than by count.
-	'REG-F-070', 'REG-F-084'
+	// ⚠⚠ 'REG-F-047' AND 'REG-F-070' REMOVED 2026-08-29, AND THEY WERE NEVER OFFENDERS. Neither entry was
+	// repaired; the PARSER was. Each carries one live status and one struck MID-LINE, and the old prefix-only
+	// strike test counted the retired one as live — so both were grandfathered against a defect in the
+	// instrument rather than a defect in the register. Fixing `entries()` made them conform and this assertion
+	// fired, naming both, which is the first time this leg has been observed red. Grandfathering by ID is what
+	// made the correction visible: a COUNT would have absorbed it silently.
+	'REG-F-084'
 ]);
 
 describe('P-5 — every register entry states its status exactly once', () => {
@@ -135,5 +157,29 @@ describe('P-5 — every register entry states its status exactly once', () => {
 		expect(parsed.map((e) => e.id)).toEqual(['REG-F-999', 'REG-F-998']);
 		expect(parsed[0]!.liveStatusLines, 'the struck line must not count').toBe(1);
 		expect(parsed[1]!.liveStatusLines, 'a struck-only entry has no readable status').toBe(0);
+	});
+
+	// CONTROL 3 — A STRIKE THAT OPENS MID-LINE RETIRES JUST AS MUCH, AND A LIVE STATUS MID-LINE STILL COUNTS.
+	//
+	// ⚠ CONTROL 2 CANNOT CATCH THE DEFECT THIS ONE EXISTS FOR. Every strike in its fixture opens at the START of a
+	// line, which is precisely the form the old prefix-only test handled correctly — so it passed for the whole
+	// life of the defect and would have gone on passing. A control that only exercises the easy shape is not a
+	// control. This fixture is the shape the zero-shift repair form actually writes into the register, and it
+	// discriminates in BOTH directions in one fixture: the retired status is mid-line and must NOT count, the live
+	// status is ALSO mid-line and must count, so a span-removal that ran greedily to end-of-line would return 0
+	// and redden here rather than passing quietly.
+	it('CONTROL — a status struck MID-LINE does not count, and a LIVE one mid-line does', () => {
+		const fixture = [
+			'### REG-F-997 — a fixture whose retired status sits mid-line',
+			'- **WHAT STILL STANDS:** the limb below. ~~**Status:** OPEN — retired here.~~ **✅ CLOSED 2026-08-29.**',
+			'- **Merge target:** Repository — landed. **Status:** ✅ CLOSED — the live one, also mid-line.',
+			''
+		].join('\n');
+		const parsed = entries(fixture);
+		expect(parsed.map((e) => e.id)).toEqual(['REG-F-997']);
+		expect(
+			parsed[0]!.liveStatusLines,
+			'exactly one: the mid-line strike is retired, the mid-line live status is not'
+		).toBe(1);
 	});
 });

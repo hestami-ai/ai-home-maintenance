@@ -154,7 +154,7 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 - **Date:** 2026-07-24 · **Type:** DECISION (sponsor confirmation: "Confirm B", following three recorded sponsor evidence statements this session)
 - **Statement:** The constitution's thesis sentence is ratified **verbatim, variant B**: *"The Janumi Professional Workbench externalizes professional cognition into explicit, recursively decomposable and recomposable, continuously reconciled, governed representations, so that humans and AI can reason together while intent, evidence, authority, and coherence are preserved — managing professional work as the complex whole it is, not the merely complicated sum of its parts."* The confirmation carries the sponsor's two grounding arguments: (1) **structural** — "recursively composable" read against the reductionist default; the pairing states both directions with the recomposition obligation as the distinctive commitment (the irreversibility-of-reductionism test: decompose, understand every part, recompose, still missing something — that remainder is the complexity); (2) **temporal** — "complexity was in part captured by the Governed Stream and Narrative Memories concepts in terms of being able to answer questions like *'How did we get to this point?'* and *'Where can we credibly go from here?'*" — path-dependence as the second axis, with "credibly" carrying assurance weight.
 - **Disposition:** Merged same date: CON-000 §3 (thesis + two-axis gloss) v1.3.0; DOC-001 §2.4 "Complex, not merely complicated" + §4 root-inequality preamble, v1.1.0; DOC-002 §3 Complicated/Complex entry with the **Complex ≠ Complicated** guard, v1.2.0; DOC-003 Narrative Memory row gains its defining question, v1.3.0. Vision-tier altitude above the distinction (Professional Scenario / Professional Capability hierarchy) remains held per the sponsor's prior scoping ruling and REG-Q-039/REG-E-005/E-012.
-- **Merge target:** applied as listed. Closes **REG-E-001** — with which every Section E elicitation item is disposed: twenty deferred to safe defaults (REG-D-010), E-003 by sponsor voice (REG-D-015), E-001 by sponsor voice (this entry). **Status:** EFFECTIVE — MERGED.
+- **Merge target:** applied as listed. Closes **REG-E-001** — with which every Section E elicitation item is disposed: twenty deferred to safe defaults (REG-D-010), E-003 by sponsor voice (REG-D-015), E-001 by sponsor voice (this entry). **Status:** EFFECTIVE — MERGED. ⚠ **THE EXHAUSTIVENESS CLAUSE EARLIER ON THIS LINE IS THE 2026-07-24 READING AND IS DELIBERATELY NOT EDITED.** It was true when written: Section E was then `REG-E-001..022` — the range `REG-D-010` names as *"every elicitation item"* — and twenty deferred plus E-003 plus E-001 exhausts it. Section E has since grown to `REG-E-033`; `REG-E-032` carries a live `**Status:** OPEN.` and `REG-F-055` stands `EFFECTIVE — DISCLOSED, AWAITING REG-E-032`, so read at HEAD the clause tells a reader that no Section E work remains while an item is open and an entry is blocked on it. All three re-derived 2026-08-29. ⚠ **THE STATUS ITSELF IS CORRECT AND IS NOT SUPERSEDED, WHICH IS WHY NOTHING HERE IS STRUCK:** this decision did merge and `REG-E-001` is closed. The census that flagged this line proposed striking the whole line and restating the merge target — and that remedy is what produced a destructive edit to still-live prose on the first attempt. A stale HISTORICAL clause beside a CORRECT status is repaired by dating the clause, not by retiring the line.
 
 ### Hygiene passes — 2026-07-24 (ministerial, completing REG-D-014's Assure step)
 Two mechanical passes applied after the Cycle-000 regression re-run, recorded here because in-place mechanical corrections require an application record (the defect class the regression itself surfaced twice): **(1) Regression hygiene pass** — DOC-004 §2.1 duplicate rung renumbered (repository → rung 6); DOC-003 §11 preamble corrected to reflect the Q-043/044 closures; this §1's status vocabulary completed (EFFECTIVE — MERGE PENDING); §1 edit provenance recorded inline; the split DOC-002 provenance sidecar consolidated into "JPWB-DOC-002. Canonical Vocabulary.provenance.md". **(2) Micro-hygiene pass** (after the confirmation re-sweep found one carryover and one reduced-severity recurrence): §1's dual status enumeration normalized into a single list with CLOSED defined; DOC-003 version line advanced to 1.1.1 enumerating its §11 correction; this record itself. No meaning created or changed by either pass; every semantic act traces to REG-D-014.
@@ -1272,7 +1272,7 @@ Recorded at founding as session-known ground truth; the canon must not contradic
   **every clause of it is a separate hypothesis, and re-verifying one is not re-verifying the others.**
   ⚠ Note which way this cuts: the cost went UP here, but in REG-F-041 the blocker went AWAY. Re-verification is
   not a synonym for finding new obstacles — the same discipline unblocked one entry and re-priced another.
-- **THE RECORDED REMEDY IS UNDONE AND STILL RIGHT — C-0b strengthens it.** Renaming the field `guardDescription` at the source costs nothing behaviourally, and there is now a measured reason: for 68 of 82 texts the field describes a condition that is **not** enforced on that arrow, and for the 14 that are, the enforcement lives elsewhere and is recorded elsewhere. Calling it `guard` invites exactly the assumption this entry, its own headline, and three passes of this programme all made. **Status:** OPEN — the rename, and the 44 UNENFORCED rows one at a time.
+- **THE RECORDED REMEDY IS UNDONE AND STILL RIGHT — C-0b strengthens it.** Renaming the field `guardDescription` at the source costs nothing behaviourally, and there is now a measured reason: for 68 of 82 texts the field describes a condition that is **not** enforced on that arrow, and for the 14 that are, the enforcement lives elsewhere and is recorded elsewhere. Calling it `guard` invites exactly the assumption this entry, its own headline, and three passes of this programme all made. **Status:** OPEN — the rename, and the UNENFORCED rows one at a time: **42, not 44**, re-derived 2026-08-29 from `verif/guard-enforcement-ledger.data.ts` (82 rows — ENFORCED 18, UNENFORCED 42, ARROW_UNREACHABLE 20, REDUNDANT_WITH_MACHINE 2). ⚠ THE PROSE EARLIER ON THIS LINE IS THE 2026-08-09 READING AND IS DELIBERATELY NOT EDITED: `68 of 82` and `the 14 that are` read 64 and 18 on the same 2026-08-29 derivation. The RENAME limb is UNDONE and still owed — `TransitionSpec.guard` stands at `packages/rph-domain/src/transitions.data.ts:8` and `classifyTransition` (`stateMachine.ts:38-56`) still does not read it; superseding ~~OPEN — the rename, and the 44 UNENFORCED rows one at a time.~~
 
 ### REG-F-044 — The claim-assessment lifecycle was never built, and four findings I had been carrying separately are one hole: seven of eight ratified Claim states are unreachable and no command exists to reach them
 
@@ -2203,7 +2203,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **AND IT IS DEMONSTRATED, NOT INFERRED:** `execrem-wp12-authority.test.ts:378` abandons a PWU with `reasonCode: 'fixture'` and `supportingObjectIds: []`, and the dispatch is ACCEPTED.
 - **⚠ THIS IS THE OPPOSITE FAILURE FROM THE ONE C-0 HUNTS, AND C-0 IS STRUCTURALLY BLIND TO IT.** The census asks whether an arrow can be performed; this arrow can be performed **by too many actors**. An over-permissive arrow is invisible to a coverage census by construction, and would have stayed invisible if the triage had answered only the question it was asked. The general form: **a declared guard on an arrow is a claim, and no control in this repository checks that arrow guards are enforced.**
 - **Related, same family:** the ratified events `PwuAbandoned` and `PwuBlocked` are declared (messages.ts:1361, 1372) and registered (2543, 2545) and **emitted by no handler** — all 32 generic-setter arrows emit `PwuStateChanged` instead.
-- **Merge target:** Repository — an abandonment precondition citing an EFFECTIVE ABANDON Decision, plus the two ratified events. **Status:** ✅ CLOSED 2026-08-08 for the precondition; **the two ratified events remain OPEN** (see below). The prior safe default — *"until enforced, no document may describe abandonment as governance-controlled"* — is DISCHARGED for the enforcement half.
+- **Merge target:** Repository — an abandonment precondition citing an EFFECTIVE ABANDON Decision, plus the two ratified events. **Status:** ✅ FULLY CLOSED 2026-08-10 — the precondition landed 2026-08-08 as `resolveAbandonAuthorization`, wired then as the fourth limb of `changePwuState`'s guard chain and since moved off the generic setter by JAN-PWUWP W-1, so that at HEAD it guards `abandonPwu` (`pwu.ts:1223`) instead; the two-event residual went with that same W-1, as this entry's own ⚠ RE-MEASURED 2026-08-09 bullet records; and the demo-reachability limb closed 2026-08-10 with S-1a (`REG-F-104`). Verified at HEAD on 2026-08-29: `abandonPwu` (`pwu.ts:1218`) and `blockPwu` (`:993`) emit `PwuAbandoned`/`PwuBlocked` through `PWU_LIFECYCLE_COMMAND_SPECS` (`pwu-lifecycle-command-spec.ts:150` and `:132`), both commands are registered (`registry.ts:148` and `:153`), and the demo now dispatches `AbandonPwu` (`undertakings/[id]/+page.server.ts:1153`, the `abandonPwu` action at `:1115`) — the limb REG-F-077 held open. ⚠ The word **ratified** in this line's merge target is this entry's own overstatement, corrected below: both events carry `UNRATIFIED-AUTHORED` (`m3-commands-events.json`, re-verified 2026-08-29). The prior safe default is DISCHARGED in full, not merely for the enforcement half. Superseding ~~✅ CLOSED 2026-08-08 for the precondition; **the two ratified events remain OPEN** (see below). The prior safe default — *"until enforced, no document may describe abandonment as governance-controlled"* — is DISCHARGED for the enforcement half.~~
 - **WHAT SHIPPED.** `resolveAbandonAuthorization` (`handlers/abandon-authorization.ts`), seven ordered checks mirroring `resolveSkipAuthorization`, wired as the fourth limb of `changePwuState`'s guard chain (`pwu.ts`). Exists · is a DECISION · parses · `decisionType === 'ABANDON'` · `status === 'EFFECTIVE'` · names this PWU (RPH-GOV-005) · **binds this PWU at its current semantic version.** The three fixtures that abandoned on `reasonCode: 'fixture'` now propose and approve a real ABANDON Decision through the bus.
 - **⚠ THE SEVENTH CONJUNCT IS THE ONE I WOULD HAVE OMITTED, AND AN ADVERSARIAL PASS FOUND IT.** I had reasoned that version-pinning an abandonment would be *invented*, since only promotion is version-pinned in the corpus. **DOC-003 §8.7 ASR-15 (L307) settles it and I had not read it:** *"Every material Decision binds exact subjects **and semantic versions** … **A decision approving version n never authorizes version n+1.** … An approval whose actor, subject, **subject version**, type, and time cannot be identified is not authority — it is provenance at best."* Its WHY (L308) is the design rationale, not merely permission: *"authority that floats across versions … is indistinguishable from no governance at all."* Instance ten of the absence-of-evidence class — I concluded a requirement was absent after searching the wrong document.
 - **THE VERSION-DRIFT ARM IS DEFENDED AHEAD OF A CAPABILITY THAT DOES NOT EXIST, and that is recorded rather than hidden.** No PWU command bumps `semanticVersion` — `advanceStatus`'s `bumpSemanticVersion` is used only by `reviseIntent` and `reviseDecomposition`, and `changePwuState` commits `loaded.semanticVersion` unchanged — so genuine n→n+1 drift cannot be driven through the bus. That arm is tested at the resolver, against a decision built through the real store rather than a hand-written object. The *absent-pin* arm IS bus-reachable (a blanket decision taken before the work existed) and is tested there.
@@ -3573,7 +3573,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **MEASURED, IN THIS ORDER.** The gate landed FIRST and was run BEFORE any row was touched: **1 failed / 13 passed**, naming `"Replacement intent identified"` and all six arrows. Only then was the row corrected. Two CONTROLs were then verified BY HAND to fail on the thing they claim — a function returning `[]` unconditionally, and the one-space key mismatch — and **each reddened CONTROL 5 ALONE while the main assertion stayed GREEN**, which is precisely the hollow they exist to catch. Both are now declared mutants (`F134-the-dismissal-check-returns-nothing`, `F134-the-two-censuses-key-arrows-differently`).
 - **THE CENSUS MOVED IN THE DIRECTION THAT MAKES THE SYSTEM LOOK WORSE** — `ARROW_UNREACHABLE` 22→21, `UNENFORCED` 44→45 — which is what separates this from the reclassification the ledger's own docblock forbids (*"these are not a score to improve"*). The guard is enforced in a later increment, and only then does the count move back.
 - **⚠ DIRECTION TWO, RECORDED AND DELIBERATELY NOT FIXED HERE: THE REGISTER'S ONE GATED ARM IS GATED ON FORM, NOT CONTENT.** Of the four fields backing an `ENFORCED` row, two are checked for shape alone — `enforcedAt` by `toContain('packages/')` (satisfied by the literal `'packages/'`) and `declaredMutations` by `.length > 0` (satisfied by `['']`). Each has **exactly one** assertion in the repository, on adjacent lines of `enforcement-register.test.ts`. The field's own doc comment concedes it: *"Prose, checked by a reader, not by the gate."* **Positive control:** the same grep over `refusalMarker` returns five real assertion sites, so the search discriminates. Meanwhile `verif/guard-enforcement-ledger.ts`, one directory over, demands an anchor resolving **exactly once** in the file it names — *the unofficial instrument is stricter than the canonical one*. This is stated as a finding with its own predicted-`SURVIVED` mutants owed, because a claim that a check cannot fail must be DEMONSTRATED, not asserted.
-- **Merge target:** Repository — `verif/guard-enforcement-ledger.ts` (+`unreachabilityFaults`), `verif/guard-enforcement-ledger.test.ts` (+1 assertion, +2 CONTROLs, census re-pinned), `verif/guard-enforcement-ledger.data.ts` (one row corrected, its ground struck in place), `scripts/mutants/ledger.ts` (+2). **Safe default:** no disposition that DISCHARGES an obligation — `NOT_A_COMMAND_REFUSAL`, `ARROW_UNREACHABLE`, `REDUNDANT_WITH_MACHINE` — may be cited as evidence without re-deriving its ground at the time of citation. **Open:** the other 21 `ARROW_UNREACHABLE` rows are now gated but were not individually re-derived; `REDUNDANT_WITH_MACHINE` (2 rows, both driven at runtime with controls, one of which mutated the precondition to prove redundancy) stays ungated because its claim is not mechanically joinable; and the form-only backing checks above are unfixed.
+- **Merge target:** Repository — `verif/guard-enforcement-ledger.ts` (+`unreachabilityFaults`), `verif/guard-enforcement-ledger.test.ts` (+1 assertion, +2 CONTROLs, census re-pinned), `verif/guard-enforcement-ledger.data.ts` (one row corrected, its ground struck in place), `scripts/mutants/ledger.ts` (+2). **Safe default:** no disposition that DISCHARGES an obligation — `NOT_A_COMMAND_REFUSAL`, `ARROW_UNREACHABLE`, `REDUNDANT_WITH_MACHINE` — may be cited as evidence without re-deriving its ground at the time of citation. **Open:** the other 21 `ARROW_UNREACHABLE` rows are now gated but were not individually re-derived; `REDUNDANT_WITH_MACHINE` (2 rows, both driven at runtime with controls, one of which mutated the precondition to prove redundancy) stays ungated because its claim is not mechanically joinable; and the form-only backing checks above are unfixed. ⚠ **THE `21` EARLIER IN THIS CLAUSE IS THE 2026-08-13 READING.** `ARROW_UNREACHABLE` stands at **20** at HEAD, re-derived 2026-08-29 from `verif/guard-enforcement-ledger.data.ts` (82 rows — ENFORCED 18, UNENFORCED 42, ARROW_UNREACHABLE 20, REDUNDANT_WITH_MACHINE 2); this entry's own body records `UNENFORCED` moving 44 → 45 when written, and it reads **42** at HEAD. ⚠ **WHICH ACT MOVED EITHER FIGURE IS NOT ESTABLISHED HERE AND IS DELIBERATELY NOT ASSERTED.** The census that flagged this line proposed `531c4832`, and a proposed cause is a hypothesis until it is driven — a figure derived correctly and attached to the wrong mechanism is the defect this programme has recorded most often, so the drift is recorded and its cause is left open rather than guessed.
 ---
 
 ### REG-F-135 — the stranded intent is closed, and the guard moves out of the class nothing checks into the class that is checked
@@ -26812,3 +26812,97 @@ checker, and the batch that looked clean had simply drawn none of the work that 
 - **Merge target:** **This register** (the correction) · **Repository** — the corrected checker lives in the
   session's tooling, not in `verif/`, and is not gated; that is stated rather than implied. Status: OPEN.
 
+---
+
+### REG-F-290 — three entries were recorded as structurally unreachable and only one is; the defect was in my
+instruments, and BOTH of those defects were already written down in this corpus before I made them
+
+- **Date:** 2026-08-29 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes the closing
+  clause of **REG-F-286**, and one figure and one attribution in `verif/register-status-truth.test.ts` ·
+  **Status:** ✅ CLOSED — all four repairs applied, both instruments fixed, the population re-derived.
+
+- **WHAT WAS CLAIMED AND WHAT IS TRUE.** `REG-F-286` closed by naming nine refused repairs, of which three —
+  `REG-F-070`, `REG-D-016`, `REG-F-043` — *"carry two live statuses and are `register-status.test.ts`'s
+  grandfathered population, which a one-status form cannot reach at all."* **Measured: one of the three does.**
+  `REG-F-043` genuinely carries two. `REG-F-070` carries one. `REG-D-016` carries one. The other two refusals were
+  produced by my applier, not by the register — and a structural impossibility that is really a tool defect is the
+  most expensive kind of wrong record, because it closes an avenue that was never shut.
+
+- **⚠⚠ DEFECT ONE — A STRIKE THAT OPENS MID-LINE, AND A FIX THAT WAS NEVER PROPAGATED.** `REG-F-070`'s apparent
+  second status is `~~**Status:** OPEN — demo reachability only.~~`, on a bullet opening `- **WHAT STILL
+  STANDS:**`. A strike test that reads the line PREFIX counts that retired status as live.
+  > `verif/register-status.test.ts:49-51` has said so since the file was written: *"a status struck mid-line would
+  > defeat this and is why the count is asserted rather than the text."*
+  **I found this defect on 2026-08-28, fixed it in `owedKind` — dropping struck SPANS rather than their markers —
+  and never asked its general form.** It survived in the shipped gate and in the applier I wrote the next day.
+
+- **⚠⚠ DEFECT TWO — AN ENTRY ENDS AT THE NEXT `###` OF ANY KIND, AND THE SIBLING GATE HAD WRITTEN THE TRAP DOWN.**
+  My applier bounded each entry by the next `### REG-x-nnn`. `REG-D-016` is followed by two MINISTERIAL headings,
+  so its span ran twenty lines past the entry and swallowed Section B's shared preamble — *"All Section B entries:
+  … `**Status:** OPEN, unless stated otherwise`"* — a status line belonging to some fifty entries and to none.
+  > `verif/register-status-truth.test.ts:35-37`: *"An extractor anchored on `^### REG-` cannot see it — which is
+  > why REG-F-284's own derivation found 9 where the adjudicated answer was 40."*
+  **Written down, in this repository, one day before I walked into it.** Both sibling gates bound entries
+  correctly; only the tool written fresh did not. **A trap recorded in the corpus does not protect a NEW
+  instrument** — nothing carries the lesson across except the author remembering to look for it.
+
+- **⚠ THE CONTROL COULD NOT HAVE CAUGHT IT, AND THAT IS DEMONSTRATED RATHER THAN ASSERTED.** `CONTROL 2` strikes
+  only at the START of a line — precisely the form the defective test handled correctly, so it passed for the whole
+  life of the defect. **Driven both ways:** with the fix reverted, `CONTROL 2` stays GREEN while the new
+  `CONTROL 3` reddens on its own message (*"exactly one: the mid-line strike is retired, the mid-line live status
+  is not"* — expected 2 to be 1). `CONTROL 3` discriminates in both directions inside one fixture: the retired
+  status is mid-line and must not count, the live one is ALSO mid-line and must, so a span-removal that ran
+  greedily to end-of-line reddens here rather than passing quietly.
+
+- **⚠ THE GRANDFATHERED LIST HELD TWO ENTRIES THAT WERE NEVER OFFENDERS.** `REG-F-047` and `REG-F-070` were
+  grandfathered against a defect in the PARSER, not a defect in the register. Neither was ever repaired; fixing
+  `entries()` made both conform, and the SHRINK-ONLY leg fired for the first time in its life, naming both exactly.
+  **Grandfathering by ID is what made this visible — a COUNT would have absorbed it in silence.** That is the
+  argument the file makes for the form, and until now no event had tested it.
+
+- **THE POPULATION, RE-DERIVED AT THE POINT OF WRITING.** 408 entries; live-status distribution
+  `{0: 56, 1: 348, 2: 4}`; non-conforming **60**; grandfathered list 62 → **60**. This discharges the standing
+  marker *"THE 56/7 SPLIT WAS NOT RE-DERIVED"*: it is 56 / **4**. ⚠ **THE 56 BEING UNCHANGED IS A COINCIDENCE, NOT
+  A CONFIRMATION** — it was never checked in between, and "right now" is a different claim from "right throughout".
+  The 7 → 4 moved for two causes that must not be merged: repairs closed some, and the strike fix revealed that two
+  were never offenders at all.
+
+- **ALL FOUR REPAIRS ARE APPLIED, AND THE TWO THAT WERE REAL ERRORS WERE RE-AUTHORED.** `REG-F-070` and
+  `REG-F-043` needed no new form — the proposals were sound and only the applier refused them. `REG-D-016` and
+  `REG-F-134` were genuine authoring errors: the first rewrote live prose AHEAD of `**Status:**`; the second
+  offered a `Merge target:` line carrying no status at all. **Four lines changed, four added, zero line delta.**
+
+- **⚠⚠ THE CENSUS'S OWN RECORDED REMEDY IS WHAT BROKE THE PROSE IT WAS MEANT TO REPAIR.** For `REG-D-016` the
+  census wrote: *"whoever applies it must strike the whole line and restate the merge target unchanged."* Following
+  that instruction produced the destructive edit to still-live text which `JPWB-DOC-004 §10.1` forbids. The line
+  carries a stale HISTORICAL clause beside a CORRECT status, and **that shape is repaired by DATING the clause,
+  never by retiring the line** — striking it would retire a merge record that is still true. **A recorded remedy is
+  a hypothesis carrying the authority of a finding, which is exactly what makes it dangerous.**
+
+- **CORRECTED IN THE INSTRUMENT THAT CARRIED THE CLAIM.** `register-status-truth.test.ts` bucketed `REG-F-070` as a
+  two-live-status entry — it inherited the same defect, which is what a figure copied between instruments does. Its
+  *"32 it misses"* also contradicted the list directly beneath it: 15 + 9 + 2 + 1 + 1 = **28**. The 32 came from
+  40 − 8, counting CLAUSES against a denominator of distinct IDS.
+
+- **⚠ AN UNRESOLVED BOUNDARY, MARKED RATHER THAN CROSSED.** The census payload still on disk holds **42 clauses
+  over 37 distinct ids**; `REG-F-285` records 40 and 36. Whether that file was appended to after the figure was
+  written is NOT established from here — so the 28 above rests on the enumeration, which is checkable, and not on
+  the denominator. Correcting one figure from another underived one is how `REG-F-148`'s four defects were made.
+
+- **⚠ TWO CLAIMS WERE DROPPED FOR WANT OF DRIVING THEM.** The proposals dated the `44 → 42` move to `921803db` and
+  the `ARROW_UNREACHABLE` move to `531c4832`. **Neither was driven, so neither was written into canon.** What WAS
+  driven verified completely: the ledger distribution (82 rows — ENFORCED 18, UNENFORCED 42, ARROW_UNREACHABLE 20,
+  REDUNDANT_WITH_MACHINE 2); `classifyTransition` (`stateMachine.ts:38-56`) never reading `guard`;
+  `UNRATIFIED-AUTHORED` on both PWU events in `m3-commands-events.json`; and **8 of 8 line citations** in the
+  `REG-F-070` proposal. ⚠ **AND MY OWN FIRST COUNT OF THE LEDGER WAS THE WRONG INSTRUMENT** — a bare regex over
+  `disposition:` returned 85 rows because three matches sat inside evidence PROSE. The proposal's figure was right
+  and mine was not; the adjudicating agent had read the file and I had pattern-matched it.
+
+- **RECONCILIATION.** Supersedes `REG-F-286`'s closing clause naming three entries as unreachable — **one is**. Its
+  account of the zero-shift form, its nine refusals, and `REG-F-289`'s withdrawal of the shared-scratch causal
+  claim all stand unaltered.
+
+- **Merge target:** **Repository** — `verif/register-status.test.ts` (struck-span fix, `CONTROL 3`, two ids removed
+  from the shrink-only list, figures re-derived), `verif/register-status-truth.test.ts` (two corrections),
+  `verif/register-citations.test.ts` (`REG-F-997` pinned as a fixture) · **This register** (the four repairs).
+  Status: CLOSED.

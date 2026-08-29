@@ -62,14 +62,30 @@
 // STAGE B ONLY"*, and REG-D-017's own merge target says *"`REG-Q-052` remains OPEN only for Stage B"* — so no
 // discharge edge exists. The estimate was an orchestrator's guess about a script nobody ran; this is a count.
 //
-// ⚠ AND THE 32 IT MISSES ARE ATTRIBUTED MECHANICALLY RATHER THAN LEFT AS A RESIDUAL. **15** — REG-Q-052,
+// ⚠ AND THE ~~32~~ **28** IT MISSES ARE ATTRIBUTED MECHANICALLY RATHER THAN LEFT AS A RESIDUAL.
+// ⚠ **THE 32 CONTRADICTED THE LIST DIRECTLY BENEATH IT, 2026-08-29.** 15 + 9 + 2 + 1 + 1 = **28**, and the ids
+// are enumerated, so the enumeration is checkable and the headline figure was not. It came from 40 − 8, which
+// counts CLAUSES against a denominator of distinct IDS; `REG-F-285` records that the clauses resolve to fewer
+// ids than there are clauses, and 36 − 8 = 28 is the arithmetic that matches. ⚠ **AND THE 40/36 ITSELF IS NOT
+// RE-DERIVED HERE:** the census payload still on disk holds **42 clauses over 37 distinct ids**, and I cannot
+// establish from this file whether it was appended to after the 40 was written. The boundary is marked rather
+// than crossed — correcting one figure from another underived one is how this programme made REG-F-148's four
+// defects. What is certain and what this correction rests on is the sum of the list below.
+// **15** — REG-Q-052,
 // REG-D-017, REG-F-046, REG-F-029, REG-F-035, REG-F-037, REG-F-078, REG-F-074, REG-F-086, REG-F-113, REG-F-114,
 // REG-F-118, REG-F-155, REG-F-175, REG-F-177 — have NO discharge claim anywhere in the register; their
 // staleness was established by reading the CODE or the target artifact, and a supersession graph cannot see
 // that, by construction. **9** — REG-F-276, REG-F-281, REG-F-104, REG-F-133, REG-F-134, REG-F-192, REG-D-016,
 // REG-F-273, REG-F-277 — carry the stale clause somewhere other than the status's owed-work claim (a count, a
-// superlative, a heading, an indented `- **Merge target:**` continuation). **2** — REG-F-043, REG-F-070 — have
-// two live statuses and are `register-status.test.ts`'s population, not this file's. **1** — REG-F-121 — states
+// superlative, a heading, an indented `- **Merge target:**` continuation). ~~**2** — REG-F-043, REG-F-070 — have
+// two live statuses and are `register-status.test.ts`'s population, not this file's.~~ **1** — REG-F-043 — has
+// two live statuses and is that file's population, not this one's. ⚠ **REG-F-070 NEVER HAD TWO, 2026-08-29.**
+// Its second is `~~**Status:** OPEN — demo reachability only.~~`, struck MID-LINE on a bullet that opens
+// `- **WHAT STILL STANDS:**`, and the sibling gate's prefix-only strike test read the retired one as live. That
+// gate is fixed and REG-F-070 was removed from its grandfathered list; the claim here inherited the same defect,
+// which is what a figure copied between instruments does. ⚠ **ITS CORRECT BUCKET IS NOT RE-DERIVED HERE** — that
+// needs the extractor driven over the entry, not an inference from this correction, and the count above is
+// therefore stated as 28 on the strength of the enumeration rather than re-partitioned. **1** — REG-F-121 — states
 // the discharge only in body prose. **1** — REG-F-274 — already names its discharger and is correctly not a
 // finding. **This gate closes the supersession-visible part of the class and says so.**
 //
