@@ -26913,7 +26913,7 @@ instruments, and BOTH of those defects were already written down in this corpus 
 before surface plane; and the W7 product-behavior plane is promoted on its own ratified condition
 
 - **Date:** 2026-08-29 · **Type:** DECISION (sponsor direction, two rulings given in session) · **Class:**
-  DECISION — commissions a programme and rules two design forks · **Status:** EFFECTIVE — DESIGN FILED, ROADMAP OWED
+  DECISION — commissions a programme and rules two design forks · **Status:** EFFECTIVE — DESIGN AND ROADMAP BOTH FILED, the roadmap as `JAN-SLICE-DR-001` on 2026-08-29 (`REG-F-291`); implementation remains UNAUTHORIZED until the roadmap is approved. Superseding ~~EFFECTIVE — DESIGN FILED, ROADMAP OWED~~
 
 - **THE DIRECTION.** The sponsor directed verification and validation of implementation, and the closing of
   implementation gaps, *"through thin vertical slices … we would need something like the capabilities and user
@@ -26987,3 +26987,59 @@ before surface plane; and the W7 product-behavior plane is promoted on its own r
   105 registry keys — is in scope; what `PARTIAL` should mean for 76 rules resolving on 11 citations; referential
   integrity across the PWA version boundary, where `deprecatePwa` and `retirePwa` carry no in-use guard though
   `DeletePwa` does. Status: EFFECTIVE.
+
+---
+
+### REG-F-291 — JAN-SLICE-DR-001 filed, and its central prediction was DRIVEN before the roadmap was written; the
+roadmap also departs from house convention by refusing to record its own progress
+
+- **Date:** 2026-08-29 · **Type:** RECORD (roadmap filed) · **Class:** RECORD — discharges the roadmap leg of
+  **REG-D-045** · **Status:** ✅ CLOSED — roadmap filed; no implementation authorized by it.
+
+- **WHAT LANDED.** `docs/Journey Slice Verification/JAN-SLICE-DR-001 Detailed Implementation Roadmap.md` — 7 work
+  packages (`SWP-00`…`SWP-06`), a traceability matrix over all 20 design obligations, exit criteria, and a
+  self-critique naming the failure mode the programme is most likely to exhibit. **`PROPOSED`. It authorizes
+  nothing.**
+
+- **⚠⚠ THE PREDICTED RED WAS DRIVEN BEFORE THE ROADMAP WAS FILED, AND MATCHED BYTE-FOR-BYTE.** `SWP-00`'s whole
+  deliverable is a recorded failure, so a roadmap that merely *predicted* it would be asking the implementer to
+  trust a guess. `DEFERRABLE_PREFIXES` was emptied, the gate driven, and the message observed:
+  > `AssertionError: RPH-E2E-001 deferred but not a deferrable family: expected false to be true` — 1 failed, 8 passed.
+  The probe was reverted and `git diff --numstat` on the file returned **empty**. ⚠ **AND THE ROADMAP RECORDS WHY
+  ONLY ONE RULE IS NAMED:** the assertion sits inside the per-rule loop and fails on the first `DEFERRED` rule it
+  reaches. Six follow it. `SWP-00` must not be recorded as having exposed one rule — that would be the wrong
+  denominator taken from a true message.
+
+- **⚠ A DERIVED FINDING THAT CHANGES THE WORK: THE RATIFIED SEED SET DOES NOT COVER THE MANDATED SCENARIO CLASSES.**
+  The Product Realization PWA ontology mandates eight minimum scenario classes and says in terms: *"Not every
+  journey requires every class, but **inapplicability must be explicit**."* Read against the seven ratified
+  statements, **at least four classes have NO seed scenario** — user-error, permission-denied, data-unavailable,
+  cancellation — and `system-failure` is genuinely ambiguous. **The absence of a ratified scenario is NOT a reason
+  to call a class inapplicable**, and the roadmap says so: *"no one wrote one" is not a reason.* Only `normal`
+  (`RPH-E2E-001`) and `interrupted-or-resumed` (`RPH-E2E-006`) are unambiguous; every other assignment is marked
+  PROPOSED and must be ruled rather than inherited.
+
+- **⚠⚠ THE ROADMAP CARRIES NO `delivery_state`, DEPARTING FROM HOUSE CONVENTION DELIBERATELY.** Every sibling
+  `*-DR-001` puts `delivery_state:` in each work-package block. That field is a hand-authored progress claim — the
+  artifact the design's `SL-L1` prohibits — and the failure mode is measured rather than hypothetical: in one wave
+  roadmap, line 22 of a deferral table was corrected in place when its item was discharged and **line 21 was not**,
+  leaving a live claim a censused audit had already overturned. One row got the treatment; the row above it did
+  not. **Progress for JAN-SLICE comes from the generated ledger and nowhere else**; the roadmap states what must be
+  done and what "done" means, not what has been done, and must not be edited to say so.
+
+- **THE FAILURE MODE IS NAMED IN ADVANCE, AND GATED.** `SWP-04` — striking every superseded progress claim — has
+  no feature to show and no test forcing it, and is therefore the work package that will be skipped. It is given
+  its own gate (`verif/slice-subsumption.test.ts`, with a planted-duplicate control), ordered before `SWP-05`, and
+  `SWP-05` may run concurrently **only** once `SWP-04` is gated, *because concurrency is how `SWP-04` gets deferred
+  in practice.* The verdict is stated in advance: **a JAN-SLICE that lands `SWP-03` and leaves the nineteen
+  roadmaps standing has become the twentieth and fails on that ground alone, whatever its test count.**
+
+- **WHAT THE ROADMAP ADMITS IT DOES NOT KNOW.** The Slice declaration format is proposed and untested against a
+  real Slice; the scenario-class assignments are proposed; whether the seven statements are assertable against
+  today's engine is an ASSUMPTION tested at `SWP-02`, governed by `SL-8` if false; and `SL-S3`'s blast radius over
+  125 rules is unmeasured, which is why it is a SHOULD and why `SWP-01` must measure before anyone schedules it.
+
+- **RECONCILIATION.** Discharges `REG-D-045`'s roadmap leg; that entry's status is repaired in place by the
+  zero-shift form. Its two sponsor rulings and every measurement it carries stand unaltered.
+
+- **Merge target:** **Repository** — the roadmap document. Status: CLOSED.
