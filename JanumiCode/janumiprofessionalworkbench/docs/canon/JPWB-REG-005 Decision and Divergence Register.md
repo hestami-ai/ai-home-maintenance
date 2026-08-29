@@ -1036,7 +1036,7 @@ Recorded at founding as session-known ground truth; the canon must not contradic
 - **TWO DERIVATIONS, DISCLOSED:** §28.2's *"EVIDENCE_REQUIRED **or** UNASSESSED"* is a disjunction with no rule — resolved as *no assessment at all → UNASSESSED, underway-but-unconcluded → EVIDENCE_REQUIRED*, the only reading under which both ratified values are reachable. And **`ESCALATED` has no rung at all** — a ratified assessment disposition the aggregate enum has no member for; mapped to `INCONCLUSIVE` on §28.1's "strictest unresolved", and recorded as a genuine §28.2 gap rather than papered over. `critical` vs `blocking` rejection is deliberately not modelled: both rungs yield `REJECTED`, so modelling it would be false precision.
 - **A GATE OF MINE THAT WAS WEAKER THAN ITS NAME, CAUGHT BY ITS OWN MUTANT.** The §28.1 property test first varied ONE input against a `SATISFIED` baseline and asserted the result never weakened — so it never placed two non-satisfied verdicts in one set. When the mutant moved the `INCONCLUSIVE` rung **above** `REJECTED` (every rung individually correct, the table collectively mis-ordered), **the property stayed green** and only a precedence case caught it. Rewritten to the invariant as actually stated — over the SET, every ordered pair folding to the stricter — plus a three-element order-independence case, because a fold returning "the stricter of the first two" satisfies every pair. **A property test named for a general claim, checking a special case, is the `a-control-that-cannot-fail` shape wearing the strongest name in the file.**
 - **AND IT ANSWERS REG-F-023 FOR THIS ENUM.** All six values are now proved reachable, by witness — the question the reachability census could not ask because it correctly excluded a reduction.
-- **Merge target:** Repository — landed. **Status:** CLOSED; **REG-E-024(b) closes with it** (the axis is intended, specified, and now built; it was never a machine). Design note: `docs/_working/DESIGN-aggregate-assurance-disposition.md`. **Sub-items (a), (c) and (d) of REG-E-024 remain OPEN and are genuinely arrows.**
+- **Merge target:** Repository — landed. **Status:** CLOSED; **REG-E-024(b) closes with it** (the axis is intended, specified, and now built; it was never a machine). Design note: `docs/_working/DESIGN-aggregate-assurance-disposition.md`. ~~**Sub-items (a), (c) and (d) of REG-E-024 remain OPEN and are genuinely arrows.**~~ ⚠ **STALE THE SAME DAY:** `REG-E-024` is CLOSED IN FULL 2026-08-05 — (a) and (d) at `REG-F-037` on measurements that contradicted their own premises, (c) built at `REG-F-038`; the item itself carries that disposition and strikes each sub-item.
 
 ### REG-F-036 — Four open items closed in one pass, and three of the four were blocked by a claim about a NAME rather than about the content
 
@@ -2305,7 +2305,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **THE DEAD-SOURCE CHECK IS A COMPARISON, NOT A SECOND BASELINE.** C-0's `deadCovered()` already owns *"an arrow out of an unoccupiable source is dead"* and names five `Assumption.status` arrows (REG-F-071). Pinning them here too would mean fixing one dead arrow required editing two baselines with neither being authority — the split-population defect `machine-exclusions.ts` was created to end. C-0c instead asserts its set is a SUBSET of C-0's: the question C-0 cannot ask is whether the *vocab* claims a dead transition the *handlers* do not declare. Residue today: zero.
 - **MUTATION-MEASURED, five mutants, each with its predicted red named before it was run.** M1 reverted `CreateBaseline` to `DRAFT` through regen and build → the two occupancy checks reddened. M2 reverted the command-entry copy ONLY, with **no regeneration** → `excluded` reddened naming `vocab.commands:`, proving the unread copy is audited. M3 loosened the token resolver's alternation from `.every` to `.some` → **only CONTROL 2** reddened. M4 disabled the birth check → the main birth assertion went green-and-vacuous and **only CONTROL 3** reddened. M5 pointed the vocab reader at `BINDINGS` → **only CONTROL 1** reddened. Each control has its own distinct failure mode, and three of the five mutants are invisible to every main assertion.
 - **⚠ HALF THE SURFACE IS STILL UNCHECKABLE, AND THE NUMBER IS PINNED RATHER THAN BURIED.** 13 of 27 machines have no declared birth, so no claim naming them can be occupancy-checked — including `PWU.workLifecycleState`, `Decision.status` and `ExecutionPlan.status`, three of the busiest. The list is an assertion, so it shrinks deliberately as births are declared.
-- **Merge target:** Repository — C-0c, landed with this entry. **Status:** CLOSED for the five rows and the control; **the 13-machine unanalysed set remains OPEN** and is the natural next increment of C-0a. **Safe default:** no count derived from `BINDINGS` or from the command-entry `drives*` fields may be described as verified for a machine in the unanalysed list.
+- **Merge target:** Repository — C-0c, landed with this entry. **Status:** CLOSED for the five rows and the control; ~~**the 13-machine unanalysed set remains OPEN** and is the natural next increment of C-0a.~~ ⚠ **SUPERSEDED BY `REG-D-033` (2026-08-09):** births at 13 `createObject` sites took C-0c's `unanalysed` 13 → 3, and `REG-D-033` rules in terms that the three remaining are **not** more of the same work and that the list *"will not shrink by declaring further births"*; `REG-F-118` (2026-08-12) then declared births for two of them through `commitState`, leaving `ExecutionStep.stepState`, and in the same act gave `unanalysed` a SECOND cause — incomplete arrow coverage — taking it 3 → 18, with `REG-F-119` then 18 → 17. The count is therefore not re-numberable: `verif/binding-row-truth.test.ts` pins seventeen names over a different population (read 2026-08-29 at `cd1af5f2`). **Safe default:** no count derived from `BINDINGS` or from the command-entry `drives*` fields may be described as verified for a machine in the unanalysed list.
 
 ---
 
@@ -3279,7 +3279,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 
 ### REG-F-114 — REG-F-087’s residue RULED: the census is not under-reading, the COMMANDS are under-declaring
 - ~~**Date:** 2026-08-10 · **Type:** RULING on a recorded residue (REG-F-087) · **Status:** OPEN — ruled and specified; the implementation is a named increment and is not built here.~~
-- **Date:** 2026-08-10 (ruled) / 2026-08-10 (built) · **Type:** RULING + INCREMENT · **Status:** ✅ BUILT for `PWU.workLifecycleState`; `advanceIntent` is an identical second slice and is OPEN.
+- **Date:** 2026-08-10 (ruled) / 2026-08-10 (built) · **Type:** RULING + INCREMENT · **Status:** ✅ BUILT for `PWU.workLifecycleState`; ~~`advanceIntent` is an identical second slice and is OPEN.~~ ⚠ **BOTH HALVES FELL AT `REG-F-117` (2026-08-12):** `advanceIntent` is NOT an identical shape — its five sites already declared and enforced their source set, and only the machine attribution was missing — and it is now ✅ BUILT, taking the census from 164 to 170 arrows and 15 to 16 machines (`machinesSeen: 16`, pinned in `verif/arrow-census-coverage.test.ts`).
 - **THE RESIDUE, VERBATIM:** *"decide between teaching the reader every idiom (fragile; widening a reader is how C-0b dropped 30%) and normalising the handlers onto one idiom (invasive, but makes the reader’s assumption TRUE…)"*.
 
 - **⚠ OPTION (a) IS NOT MERELY FRAGILE — FOR ONE IDIOM IT IS IMPOSSIBLE, AND THAT CHANGES THE ANSWER.** `advancePwuLifecycle` (pwu.ts:382-393) takes `{ target, eventType, mutate?, eventPayload? }`. **There is no `from`.** The source state is resolved at RUNTIME — `canAdvanceWorkLifecycle(axes.workLifecycleState, args.target, axes)` (pwu.ts:399). **So the call site declares a DESTINATION, not an ARROW.** A reader taught this idiom could only recover the from-half by inferring it from the machine’s declared in-edges — which is not reading, it is FABRICATION, and it would make the census report arrows the code never declared. **Claiming coverage you cannot justify is strictly worse than admitting blindness**, and the census’s honest 38% would become a dishonest 100%.
@@ -3850,7 +3850,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 ---
 
 ### REG-F-155 — "census-blind" is at least two different facts, and nine of the eleven blind machines ARE named by a production handler
-- **Date:** 2026-08-14 · **Type:** SCOPING MEASUREMENT (a bound re-derived before anything is built on it) · **Status:** OPEN — measured and scoped, deliberately NOT fixed. **This raises a doubt about REG-F-150's residue rather than settling it.**
+- **Date:** 2026-08-14 · **Type:** SCOPING MEASUREMENT (a bound re-derived before anything is built on it) · **Status:** OPEN — measured and scoped, deliberately NOT fixed. ~~**This raises a doubt about REG-F-150's residue rather than settling it.**~~ ⚠ **THAT DOUBT WAS SETTLED BY `REG-F-156` THE SAME DAY:** all nine rows are SAFE, on a write-funnel derivation that does not consult the census, with two `AssuranceObservation` rows resting on thinner ground and named there. **The `OPEN` disposition here is untouched by that and stands** — `REG-F-156` says so in terms (*"REG-F-155's finding is unaffected"*), `REG-F-157` records *"OPEN. Nothing built"*, and `verif/arrow-census-coverage.test.ts` still pins the census-blind set at nine machines including `PWU.executionState` (read 2026-08-29 at `cd1af5f2`).
 - **WHY THIS WAS MEASURED AT ALL.** REG-F-150 closed the unreachability residual but found that **9 of 21 rows pass by construction**, because the census cannot see the machines they rest on. That entry treated "census-blind" as a single bound inherited from C-0. **It is not one thing, and the difference decides whether those nine rows are safe or false.**
 - **MEASURED: 11 blind machines, and NINE of them are NAMED, in code, by a production handler** — `AssuranceObservation.disposition`, `Constraint.status`, `Harness.status`, `Obligation.status`, `PWU.assuranceState`, `PWU.executionState`, `PWU.shapeIntegrityState`, `PwuType.status`, `Undertaking.status`. Only two are not: `AggregateAssuranceDisposition` (**0 states — the computed reduction REG-F-035 established is not a machine at all**, correctly excluded) and `AssuranceAssessment.disposition`.
 - **⚠ AND THE REFERENCES ARE CODE, NOT COMMENTS — CHECKED, BECAUSE A GREP CANNOT TELL THEM APART AND THAT DISTINCTION IS THE WHOLE FINDING.** Two were read directly and they have **DIFFERENT causes**:
@@ -4226,7 +4226,7 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 ---
 
 ### REG-F-177 — the compile leg re-typechecks a whole package to judge one line, and my first reading of what that costs was 4x wrong because I timed it outside the harness
-- **Date:** 2026-08-15 · **Type:** COST, and a MEASUREMENT-METHOD finding that outranks it · **Status:** ~~BUILT. The cost reading through the runner is OWED.~~ **BUILT, COSTED THROUGH THE RUNNER, AND ITS CONTROL DRIVEN WARM.** The full-run leg is owed at the next gate.
+- **Date:** 2026-08-15 · **Type:** COST, and a MEASUREMENT-METHOD finding that outranks it · **Status:** ✅ CLOSED — BUILT, COSTED THROUGH THE RUNNER, ITS CONTROL DRIVEN WARM, AND THE FULL-RUN LEG NOW MEASURED, which this entry’s own body already records: the full gate at `8420c5e7` takes the nine `tsc` legs from 685.6 s to 416.9 s at identical call counts, and the next run `3ccbbc22` takes `tsc packages/rph-application` to 151.2 s over 78 calls (avg 1.9 s). Re-read in the tree 2026-08-29 — `--incremental --tsBuildInfoFile` at `scripts/mutants/run.ts:433-434`, with `packages/typescript-config/base.json:9` holding the product check cold at `false` exactly as this entry required; superseding ~~BUILT. The cost reading through the runner is OWED.~~ ~~**BUILT, COSTED THROUGH THE RUNNER, AND ITS CONTROL DRIVEN WARM.** The full-run leg is owed at the next gate.~~
 - **THE COST BEING ATTACKED, read from the legs of the `6642430c` run (REG-F-174's rule).** `compileVerdict` runs `tsc --noEmit -p <pkg>/tsconfig.json` once per mutant, re-checking the ENTIRE package from scratch to judge a **one-line** edit. `tsc packages/rph-application` alone is **314.6 s over 78 calls** — and 78 is exactly the number of live ledger entries in that package, so it is one full re-check each. Across all nine packages the `tsc` legs total **685.6 s over 199 calls, 25.9 % of the run's 2 649.7 s**. It is the largest single addressable block in the table.
 - **THE CHANGE.** `--incremental --tsBuildInfoFile node_modules/.cache/jpwb-mutants/<pkg>.tsbuildinfo`, on the **runner's** `tsc` invocation only. **The product's own `check-types` stays a cold full check on purpose:** a speed knob that lives in the harness can be judged by the harness, and one that lives in `base.json` would silently become the gate every developer and every CI job trusts. `base.json` keeps `"incremental": false`.
 - **⚠ AND HERE IS THE FINDING THAT MATTERS MORE THAN THE OPTIMISATION: MY FIRST COST READING WAS 4x WRONG, BECAUSE I TIMED THE OPERATION OUTSIDE THE HARNESS THAT PAYS FOR IT.** Run from my shell, the *identical* command — `bunx tsc --noEmit -p packages/rph-application/tsconfig.json` — took **16.5 s, 16.1 s, 20.5 s** on three consecutive calls. Driven through the runner over three mutants in that same package, its own instrument reports **12.3 s over 3 calls, avg 4.1 s** — agreeing with the full run's 78-call average of **4.0 s** to within 2.5 %. **Fixed invocation overhead is not the explanation and was measured rather than assumed:** `bunx tsc --version` is **0.18 s**, `bun --version` **0.09 s**.
@@ -26579,4 +26579,236 @@ form broke two instruments on its way in — one of them the sibling gate that h
 
 - **Merge target:** **This register** (the repairs) · **Corpus** — the zero-shift status form belongs with
   `JPWB-DOC-004 §10 item 10`, whose constraint it satisfies rather than evades. Status: OPEN.
+
+### REG-F-287 — a whole-repository semantic snapshot is blocked by three walls in a fixed order, and only
+the first is a number; the ceilings everyone cites are uncalibrated and were never what stopped it
+
+- **Date:** 2026-08-29 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — CSAA implementation
+  evidence, analysis authority NONE, gate effect NONE; filed under the standing scope rule for the CSAA
+  coding agent to own · **Status:** OPEN
+
+- **WHY THIS WAS MEASURED.** A design question asked whether CSAA could answer concept-closure questions
+  ("where does this concept live, completely") over the whole repository. The prior design doc asserted the
+  attempt is *"refused at two named guards (`maxSources` 1,000 vs ~1,046; `maxAstNodes` 1,000,000 vs
+  2,234,175)"*. **The conclusion was right and every stated reason was wrong.** Nothing stops at those
+  guards. This entry records what actually stops it, in order, and separates a number someone chose from a
+  representation choice from a property of the runtime.
+
+- **⚠ THE THREE CEILINGS ARE UNCALIBRATED, AND THE REPOSITORY ALREADY SAYS SO IN WORDS.**
+  `SemanticBudgets` (`packages/csaa/src/contracts/semantic.ts:69-91`) is a bare
+  `Readonly<Record<SemanticBudgetKey, number>>` over 19 keys with **no exported default**; every caller
+  hardcodes its own. `maxSnapshotBytes` takes **eleven distinct values** across shipped non-test `csaa`
+  source. The `1,000 / 1,000,000 / 96 MiB` triple exists at **exactly one site**
+  (`packages/csaa/src/cli/current-jpwb-coding-agent-workflow.integration.test.ts:86-107`) and governs
+  **exactly one subject** — `packages/csaa/command-subjects/current-jpwb-coding-agent/tsconfig.json`, a
+  hand-written `files` list of 30 entries, 16 of them `.ts`, **405,580 bytes = 1.3%** of the repository's
+  31,289,211-byte CSAA subject. Measured utilization by the population they govern: sources **30/1,000 =
+  3.0%**, astNodes **37,860/1,000,000 = 3.79%**, canonical bytes 65,333,011/100,663,296 = 64.9%. Two of the
+  three are 26–33x oversized for what they bound. **A larger set is already shipped and green in the same
+  package** — `packages/csaa/src/semantic/repository-smoke.test.ts:2222-2239` uses `maxAstNodes 5,000,000`,
+  `maxSources 100,000`, `maxProjects 200`, `maxSnapshotBytes 1,000,000,000` — and the same file says it
+  outright at `:638-641`:
+  > *"Provisional runaway guards required by the budgeted APIs and test runner for this opt-in smoke. They
+  > are not empirically established operating ceilings, product defaults, SLOs, or acceptance targets."*
+
+  **No recorded justification or calibration for `1,000` / `1,000,000` / `96 MiB` exists anywhere in the
+  repository or the corpus.** The values were lifted 500x / 50x / 83x and the builder accepted them and
+  produced real snapshots. **The guards fail CLOSED, cleanly** — all four constraint trips returned
+  `outcome:'unavailable'|'incompatible'` with a typed diagnostic and no snapshot object. No truncation, no
+  silent corruption. That part is sound and is not the defect.
+
+- **⚠⚠ WALL 1 — A NUMBER, AND IT FIRES BEFORE EVERYTHING ELSE.** `maxProjects` is **10**; the live subject
+  holds **33** projects. `packages/csaa/src/semantic/build-static-semantic-snapshot.ts:1680` reads
+  `if (subject.projects.length > request.budgets.maxProjects) throw … 'Frozen project population exceeds
+  maxProjects.'` — **ten lines before** `materializeProgramRecipe` at `:1690`. Verified by reading the
+  ordering. From the shipped triple, `maxProjects` is the first wall, and it is not one of the three
+  ceilings anyone was citing. Category (a): movable by editing.
+
+- **⚠⚠ WALL 2 — ONE tsconfig LINE, AND IT KILLS WHOLE-REPOSITORY SCOPE IN THREE SECONDS.** With
+  `maxProjects` raised, REPOSITORY scope dies at **3,029 ms**, peak RSS only 397,836,288 B, never reaching a
+  budget: `{"outcome":"incompatible","diagnostics":[{"code":"PROGRAM_RECIPE_MISMATCH","message":"READ_DIRECTORY wildcard escaped its query root.","phase":"PROGRAM"}]}`.
+  Isolated to **exactly one of the 33 discovered projects** — `apps/rph-demo/e2e/tsconfig.json:7`, verbatim
+  `"include": ["**/*.ts", "../playwright.config.ts"]`. That project **alone** reproduces the identical
+  diagnostic in 3,547 ms; two controls whose `files` also escape upward build fine, so the trigger is the
+  wildcard-plus-parent-escape combination and not parent escape as such. Category (a)/(b) boundary: a
+  one-line repository fix, or a resolver that tolerates the shape.
+
+- **⚠⚠ WALL 3 — V8, AND THIS ONE IS NOT A NUMBER ANYONE CHOSE.** `MAX_STRING_LENGTH` on this runtime is
+  **536,870,888** bytes. `packages/csaa/src/semantic/canonical.ts:456` materializes the entire snapshot as
+  ONE JavaScript string — `const canonical = output.join('');` inside `canonicalSemanticJsonWithProgress`,
+  which `canonicalSemanticJson()` delegates to at `:418-420`. All 11 `packages/*/tsconfig.json`
+  (18,613,761 subject bytes = 60% of the repository subject) **FAILED after 237,974 ms at peak RSS
+  6,952,402,944 B**: `{"outcome":"unavailable","diagnostics":[{"code":"SEMANTIC_VALIDATION_FAILED","message":"Invalid string length","phase":"CAPTURE"}]}`.
+  All 11 projects completed CAPTURE first; the failure is serialization, not analysis. Category (b): a
+  representation choice, fixable only by chunked or streamed canonicalization.
+
+- **THE MEASURED COST CURVE, with every arbitrary ceiling lifted.** rung 1 `rph-contracts` (45 artifacts,
+  516,120 subject bytes): 372 sources, 36,798 astNodes, canonical **126,922,184 B**, build 110,783 ms, peak
+  RSS 983,801,856 B. rung 2 (+domain +ports, 3 tsconfigs): 1,047 sources, 103,474 astNodes, canonical
+  **250,625,168 B**, 221,573 ms, RSS 1,525,919,744 B. rung 3, the 7-package COMMAND_HANDLER closure (301
+  artifacts, 4,374,549 subject bytes = 14% of the repository): 2,537 sources, 329,662 astNodes, 44,563
+  symbols, canonical **661,282,488 B** at SERIALIZE (t=261,238 ms), RSS 2,460,348,416 B — **and its internal
+  VALIDATE phase had still not completed after a further ~832 s of CPU**, which is where observation
+  stopped. rung 4 and rung 5 failed as recorded above. Projected whole-repository if both blockers were
+  fixed: **~4.4 GiB canonical form, ~15 GB peak RSS, an hour or more, dominated by VALIDATE** — against a
+  store that caps one artifact at 128 MiB and one retained generation at 1 GiB.
+
+- **⚠ TWO CORRECTIONS AGAINST MY OWN EVIDENCE, BOTH FOUND BY ADVERSARIAL RE-MEASUREMENT.**
+  **(1)** The figure *"a measured 4,737,843,200-byte aggregate-private high-water mark"* is **withdrawn as
+  support for any snapshot claim.** It is prose only — it appears in `packages/csaa/README.md` and in a
+  comment at `run-current-dependency-cruiser-differential.ts:1247`, **zero** evidence artifacts under
+  `verif/` contain it, and the README attributes it to a **dependency-cruiser** discovery, not to a semantic
+  snapshot. Positive control: the same grep does return it from the three prose sites, so the instrument
+  finds it where it exists.
+  **(2)** The claim *"no ceiling edit rescues this"* is **not established by the byte argument.** The 81x
+  gap to a purpose-shaped index decomposes as roughly **15.7x population drops x 5.2x encoding**, and the
+  5.2x applies to the snapshot too: a columnar encoding with provenance de-inlined lands near **458 MB** —
+  over the 128 MiB per-artifact cap but **inside** the 1 GiB generation cap and inside a chunked store. What
+  actually defeats it is **build time and the VALIDATE phase**, not the byte ceilings. The conclusion holds;
+  that particular argument for it does not.
+
+- **WHAT THIS DOES AND DOES NOT ESTABLISH.** It establishes the failure order, the diagnostics, and the cost
+  curve for the current serialization at four scales on one machine. It does **not** establish that a
+  whole-repository snapshot is impossible in principle, does not measure a fixed pipeline, does not
+  establish hardware-independent figures, and confers no authority: CSAA analysis authority and gate effect
+  remain `NONE`.
+
+- **THE ADJACENT FACT THAT MAKES THIS ACTIONABLE.** A purpose-shaped retrieval index over the same
+  perimeter measures **28.0 MiB** — **0.292x the `maxSnapshotBytes` CSAA already ships** — builds cold in
+  62 s, loads in 278 ms, and answers find-all-references in 11–66 microseconds. The ceilings do not need
+  raising for that path; they need raising only for the path that does not fit anyway.
+
+- **Merge target:** **CSAA coding agent** — `build-static-semantic-snapshot.ts` (`maxProjects` default and
+  its ordering), `canonical.ts` (chunked serialization), and the uncalibrated budget triple ·
+  **Repository** — `apps/rph-demo/e2e/tsconfig.json:7`. **Safe default:** the three ceilings stay as they
+  are, because raising them changes nothing until walls 2 and 3 are addressed, and raising a guard whose
+  population is 3% utilized would remove a runaway bound without buying capability. Status: OPEN.
+
+### REG-F-288 — no tsconfig in this repository declares `references` or `paths`, so cross-package symbol
+resolution runs through gitignored `dist` and a mid-edit rename returns a silently wrong answer
+
+- **Date:** 2026-08-29 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — repository toolchain
+  topology; affects every consumer of TypeScript symbol resolution, not only CSAA · **Status:** OPEN
+
+- **THE TOPOLOGY, DERIVED.** Of the **34** tracked `tsconfig*.json` files in the workspace, **zero** declare
+  `references` and **zero** declare `paths`. Positive control: the same sweep does return one hit —
+  `packages/csaa/test-fixtures/project-context-command/tsconfig.json`, a deliberate test fixture — so the
+  pattern finds the construct where it exists. The root `tsconfig.json` carries `include: []` / `files: []`;
+  package configs use `include: ['src']`. This register already records the adjacent half of the same fact
+  from a different angle, in the mutation-run cost entry: *"Compilation is non-incremental by explicit
+  configuration — `"incremental": false` at `packages/typescript-config/base.json:9`, no `composite`, no
+  project references."*
+
+- **THE CONSEQUENCE.** With no `references` and no `paths`, a consumer package resolves
+  `@janumipwb/rph-*` through the **built** `packages/*/dist/*.d.ts` rather than through sibling source. The
+  emitted `declarationMap` then maps those declarations back to the **same source positions**, so a symbol
+  read through `dist` and the same symbol read from source are position-identical while being different
+  symbols.
+
+- **⚠⚠ THE MEASURED FAILURE — A DIRTY-TREE RENAME RETURNS A WRONG ANSWER WITH ZERO DIAGNOSTICS.** Renaming
+  the declaration `FLOOR_POLICY_IDS` to `FLOOR_POLICY_IDENTIFIERS` in an in-memory buffer (the state every
+  real rename happens in), the language service reported `symbolName=FLOOR_POLICY_IDENTIFIERS` with **35
+  references across 11 files — of which 34 sites literally read `FLOOR_POLICY_IDS`.** The consumer reported
+  **0 semantic diagnostics**. Nothing warned. **In a source-resolving program the identical edit is handled
+  correctly:** references collapse to **1** (the declaration alone) and the consumer errors verbatim —
+  *"'@janumipwb/rph-assurance' has no exported member named 'FLOOR_POLICY_IDS'. Did you mean
+  'FloorPolicyId'?"* The difference is the resolution path, nothing else.
+
+- **⚠ `dist` IS DISQUALIFYING AS AN EVIDENCE INPUT, ON FOUR INDEPENDENT GROUNDS.** It is gitignored
+  (`.gitignore:28`, `/packages/**/dist/`); it is untracked (`git ls-files` over it returns empty); it is
+  **absent from the CSAA subject perimeter** entirely; and it is routinely **stale** — at measurement time
+  `rph-product-realization-pwa`'s `dist` was already an hour behind its source. So the repository's
+  cross-package symbol answers currently depend on an artifact that no gate freezes, no subject captures,
+  and nothing guarantees is current.
+
+- **⚠ AND THE SAME QUERY IS SESSION-DEPENDENT, WHICH IS THE SECOND FAULT.** `findAllReferences` on
+  `FLOOR_POLICY_IDS` returns **40 references across 6 files** with only the declaring file open, and **74
+  across 16 files** after one consumer file per package has been opened — **the identical query, differing
+  only in which files were previously loaded.** Whichever number a tool records, it is recording session
+  history as if it were repository fact.
+
+- **WHAT THE CORRECT ANSWER IS WORTH, MEASURED — this is why the defect matters rather than merely
+  existing.** The type-aware answer for `FLOOR_POLICY_IDS` is **74**, and it reconciles exactly against the
+  lexical one: **86** ripgrep word-boundary occurrences **− 3** (a distinct local homonym at
+  `packages/rph-authoring/src/broker.ts:201`) **− 4** (another at
+  `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:33`) **− 5** (comment-only mentions) **= 74**. Plain
+  grep reports **90 line-hits, of which 17 (18.9%) are not references**, and it additionally **collapses**
+  `packages/rph-assurance/src/floor.ts:42`, which carries two occurrences on one line. **Both homonyms are
+  `const FLOOR_POLICY_IDS: ReadonlySet<string>` holding the SAME string values as the real export** —
+  precisely the shape that makes a lexeme-driven rename edit the wrong files.
+
+- **THE CONNECTION TO THE MOTIVATING FAILURE.** Commit `691aa014` renamed the concept *"de minimis floor"*
+  in 4 files and its own message calls it a *"display-only rename"*; the concept's population at that commit
+  was **85 sites across 33 files** in `apps/`+`packages/`. A correct symbol lane is one of the instruments
+  that would have bounded that work — and this entry records that, in this repository's current topology,
+  that instrument **silently returns the wrong set** for exactly the cross-package case a rename needs.
+
+- **WHAT THIS DOES NOT ESTABLISH.** It does not establish that adding `references`/`paths` is free — that
+  change alters build ordering, `composite` emit, and every consumer's resolution, and belongs to a separate
+  measured increment. It does not measure the effect on `bun run build` or `check-types` wall clock. It does
+  not claim the language service is unreliable in general: given a fixed source-resolving project definition
+  the same query was deterministic across three fresh processes, including one with shuffled root-file
+  order. **The defect is the repository's project topology, not the tool.**
+
+- **Merge target:** **Repository toolchain** — `packages/typescript-config/base.json` and the 34 package
+  configs (project references / `paths`, and whether `composite` is adopted). **Safe default:** until the
+  topology is fixed, **no cross-package find-all-references or rename result taken in a dirty tree may be
+  treated as complete**, and any tool that reports one must state the resolution path it used. Status: OPEN.
+---
+
+### REG-F-289 — REG-F-286 blamed a shared scratch directory for nine refused repairs; the cause was my own
+checker, and the batch that looked clean had simply drawn none of the work that failed
+
+- **Date:** 2026-08-29 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — supersedes ONE CLAUSE
+  of **REG-F-286** (its causal attribution) and corrects its count · **Status:** OPEN
+
+- **WHAT REG-F-286 CLAIMED.** That of 26 authored status repairs, 9 were refused, and that the refusals
+  clustered on a defect in the commissioning brief: five agents shared one scratch directory, *"batches 3 and
+  5 did not notice"* a sibling overwriting their files, and **6 of the 9 refusals came from those two**,
+  while *"batch 4, which used a private directory, produced none."*
+
+- **⚠⚠ THE CORRELATION IS REAL AND THE CAUSE IS WRONG — IT IS A CONFOUNDED COMPARISON.** The refusals track
+  the **VERDICT**, not the batch:
+
+  | verdict | refused |
+  |---|---|
+  | `STALE_REPAIR` | **1 of 15 — 7%** |
+  | `PARTLY_STALE` | **8 of 11 — 73%** |
+
+  **And batch 4's perfect record, which was the whole weight of the claim, is a composition effect: batch 4
+  drew ZERO `PARTLY_STALE` entries.** Holding the verdict fixed, the batches are 0/1, 2/3, 4/4, 0/0, 2/3 —
+  small numbers that support nothing. **I compared batches without holding the work type constant.**
+
+- **THE ACTUAL CAUSE WAS MY OWN CHECKER.** It required, for every repair, that *"the old status value appears
+  struck, byte-identical."* **That is right for `STALE_REPAIR`, which retires the whole status — and wrong
+  for `PARTLY_STALE`, which retires only the stale CLAUSE and leaves the rest live.** That is what *partly*
+  means. The check refused precisely the repair the verdict called for. Corrected to require, for
+  `PARTLY_STALE`, that the line strikes something it did not strike before — with the no-word-lost check
+  unchanged, so the retired text stays readable.
+
+- **THE COUNT CHANGES: 26 REPAIRED, NOT 21.** Five of the nine — `REG-F-035`, `REG-F-074`, `REG-F-114`,
+  `REG-F-155`, `REG-F-177` — were correct all along and are now applied. **Four remain refused, and those
+  four are genuine:** `REG-F-070`, `REG-D-016` and `REG-F-043` carry **two live status lines** and are
+  `register-status.test.ts`'s grandfathered population, which a one-status form cannot reach at all;
+  `REG-F-134` altered a still-live `Merge target:` clause, which is the §10.1 hazard and a real authoring
+  error.
+
+- **⚠ WHAT SURVIVES OF THE SCRATCH FINDING, STATED NARROWLY.** The clobbering **happened** — batch 1
+  reported it in terms (*"the keys changed under me"*), moved to a private directory, and re-ran its checks.
+  That is a measured event and giving parallel agents a shared scratch directory remains a real hazard.
+  **What is withdrawn is the inference that it caused these refusals.** An event that occurred and a defect
+  that occurred are not thereby the same defect — and the tell was available at the time: five of the six
+  "failures" had struck a clause rather than a value, which is a shape, not a corruption.
+
+- **⚠ AND THE SHAPE OF THE ERROR IS ONE THIS PROGRAMME HAS NOW MADE FOUR TIMES.** A figure was derived
+  correctly and attributed to the wrong mechanism — the same form as *"nine hits of which two were stale"*
+  (`REG-F-285`) and *"543 citations"* (`REG-F-283`). **Deriving a number is not auditing what it measures.**
+  Here the number (6 of 9 from two batches) was exactly right and the sentence around it was false.
+
+- **RECONCILIATION.** Supersedes `REG-F-286`'s causal clause and its count of 21. Its account of the
+  zero-shift form, the two instruments the form broke, and the refusal to paste unverified text all stand —
+  as does its record that the clobbering occurred.
+
+- **Merge target:** **This register** (the correction) · **Repository** — the corrected checker lives in the
+  session's tooling, not in `verif/`, and is not gated; that is stated rather than implied. Status: OPEN.
 
