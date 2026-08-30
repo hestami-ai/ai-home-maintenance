@@ -27284,7 +27284,7 @@ justifies it, and the architecture is decomposed 80 events before the Intent Bas
 
 - **Date:** 2026-08-30 · **Type:** DIVERGENCE FINDING · **Class:** FINDING — blocks the honest completion of
   `JAN-SLICE-SWP-02` and puts an interpretive question to the sponsor ·
-  **Status:** OPEN — the measurement is settled; the READING is not, and the reading decides the remedy.
+  **Status:** ✅ MEASUREMENT STANDS AND THE READING IS RULED — `REG-D-047` (2026-08-30, delegated authority) settles it as READING A (ORDER), on the authority chain rather than on preference: the manifest cites `§24`, `CON-000 B1` as amended by `REG-D-034` gives the source corpora authority for worked scenarios, and `§24` states the flow as a NUMBERED LIST 1..13. Both violated precedences are explicitly numbered there. The two violations are therefore product defects on the flagship journey and the engine owes a remedy. Superseding ~~OPEN — the measurement is settled; the READING is not, and the reading decides the remedy.~~
 
 - **WHAT WAS BEING DONE.** `SWP-02` admits `RPH-E2E-001` as the first Slice. Its ratified statement names a
   thirteen-act **flow** — *"(capture, discovery, formalize, Intent Fidelity/Completeness, human approval, Intent
@@ -27346,3 +27346,80 @@ justifies it, and the architecture is decomposed 80 events before the Intent Bas
   manifest records which. **Repository, once ruled** — under Reading A, the two precedence violations are product
   defects on the flagship journey and need their own remediation; `packages/rph-engine/src/slices/` carries the
   Slice either way. Status: OPEN.
+
+---
+
+### REG-D-047 — RULING under delegated authority: the RPH-E2E-001 flow is an ORDER, and the corpus already said
+so in a numbered list; the parenthetical that made it look ambiguous is a lossy compression of it
+
+- **Date:** 2026-08-30 · **Type:** DECISION (delegated authority, sponsor: *"author a solution for the ruling
+  using your delegated authority"*) · **Class:** DECISION — adjudicates the fork `REG-F-294` put to the sponsor ·
+  **Status:** EFFECTIVE — READING A (ORDER). `RPH-E2E-001` cannot pass today.
+
+- **THE RULING.** The thirteen-act parenthetical of `RPH-E2E-001` is an **ORDER**, not a set. The two precedence
+  violations `REG-F-294` measured are therefore **real violations of a ratified scenario**, not artifacts of a
+  reading. `SL-8` binds: `JAN-SLICE-SWP-02` admits the Slice **FAILING** on those clauses, and the engine owes a
+  remedy on its flagship journey.
+
+- **⚠⚠ AND THIS IS NOT A JUDGEMENT CALL. THE AUTHORITY CHAIN SETTLES IT, AND I ALMOST RULED BY PREFERENCE
+  INSTEAD.** Three links, each checked:
+  1. `packages/rph-domain/vocab/m12-conformance.json` carries `RPH-E2E-001` with **`"sourceRef": "§24"`**, and
+     that manifest is `CON-000 B1` shape authority. It names its own source.
+  2. §24 of the RPH *Executable Invariant and Conformance Test Specification* is the referent. **`CON-000 B1`, as
+     AMENDED by `REG-D-034` (sponsor ruling, 2026-08-09), admits the source corpora** — `docs/Recursive
+     Professional Harness/` among them — *"holding authority for DETAIL (state values, field semantics,
+     transition matrices, **worked scenarios**, and the depth canon compresses)."* An end-to-end scenario **is** a
+     worked scenario; this is the clause's own named category.
+  3. §24 gives the flow not as a parenthetical but as a **NUMBERED LIST, 1 through 13**, under a `### When`
+     heading in a Given/When/Then scenario. **SEARCHED, with the commands:** `grep -n 'RPH-E2E-001'` over the
+     specification located the heading at `:2122`, and `sed -n '2122,2153p'` read the block verbatim.
+     **POSITIVE CONTROL that the section is really structured this way and not read into:** the very next rule,
+     `RPH-E2E-002`, uses `### Given` / `### And` / `### When` / `### Then` with **no numbered list** — so the
+     numbering is present where the source describes a FLOW and absent where it describes a CONDITION. The form
+     discriminates, which is what makes its presence here evidence rather than decoration.
+     > *"4. runs Intent Fidelity and Completeness; 5. obtains human approval; 6. creates Intent Baseline;
+     > 7. creates Architecture PWU and decomposition;"*
+     **Both precedences `REG-F-294` found violated are explicitly numbered.** There is nothing to interpret.
+
+- **⚠ THE AMENDMENT THAT ANSWERS THIS QUESTION ALSO PREDICTS MY MISTAKE, IN ITS OWN TEXT.** `REG-D-034` admitted
+  the source corpora because *"canon is a DISTILLATION of them and measurably drops load-bearing detail — **four
+  of six questions escalated to the sponsor as 'canon does not define this' were answered in these documents**
+  (REG-F-093)."* This was very nearly the fifth. `REG-F-294` was filed with the fork stated as unruleable without
+  the sponsor, and the ruling was one `sed` away in a document the constitution had already admitted for exactly
+  this purpose. **Search the corpus before escalating** is a standing lesson this programme keeps re-learning,
+  and the clause that teaches it is the clause that answered the question.
+
+- **⚠⚠ THE REAL DEFECT IS THE COMPRESSION, AND IT IS THE MORE GENERAL FINDING.** §24 states the flow as an
+  ordered list. `m12-conformance.json` restates it as *"(capture, discovery, formalize, …)"* — a comma-separated
+  parenthetical. **The numbering is the only thing that carried the ordering, and the compression dropped it.**
+  Nothing was wrong with either document; the meaning was lost in the transcription between them, and the loss is
+  invisible at the destination. That is how a lossy compression differs from an error: the result reads as
+  complete. ⚠ **REMEDY OWED, DELIBERATELY NOT TAKEN IN THIS ENTRY:** the manifest's `statement` should carry the
+  ordering explicitly (numbered, or "then" between the acts), so the shape authority stops under-stating its own
+  source. Changing a shape-authority artifact is its own act and must not ride along inside a ruling.
+
+- **WHAT IS NOW TRUE OF THE ENGINE, AND IT IS A PRODUCT DEFECT ON THE FLAGSHIP JOURNEY.** Re-driven under this
+  ruling, the two violations stand as filed in `REG-F-294`: intent is APPROVED at event 65 while the Intent
+  Fidelity and Intent Completeness assessments that step 4 places ahead of step 5 complete at events 156 and 157;
+  and the architecture is decomposed and validated at events 83–86 while the Intent Baseline of step 6 is
+  promoted at event 165. **The approval precedes its own justification by 91 events.** `STA-2` forbids that shape
+  one level up for execution and satisfaction; here it is an approval and its assurance.
+
+- **WHAT `SWP-02` DOES, AND WHAT IT MUST NOT DO.** The Slice is built now. Its five outcome clauses are asserted
+  and pass. **Two ordering clauses are asserted and FAIL**, and the Slice is admitted failing per `SL-8`, citing
+  this ruling and `REG-F-294`. ⚠ **`it.fails` REMAINS PROHIBITED** — it converts a false clause into a green
+  suite, which is `SL-8`'s "weakened to green" in another costume. ⚠ **AND THE SLICE MUST NOT ASSERT THE ORDER BY
+  EVENT COUNT:** the assertion is a precedence between two named events, which is what the numbered list states.
+
+- **⚠ WHAT THIS RULING DOES NOT DECIDE.** It does not decide **how** the engine should be fixed. Making intent
+  approval refuse until its assessments exist is a command-precondition change on a ratified lifecycle, and
+  `REG-Q-067`'s hazard applies: a guard written now would settle by accident questions about what approval means
+  that nobody has asked. The defect is recorded; the remedy is a separate act with its own design.
+  It also does not rule on `RPH-E2E-002..007`, whose `### When` blocks are NOT numbered lists — **their form
+  differs and their reading is untouched by this.** That asymmetry is deliberate in the source: §24 numbers the
+  steps where a flow is described and does not where a condition is.
+
+- **Merge target:** **This register** (the ruling) · **Repository** —
+  `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` carries the ruling in its
+  docblock and cites this entry. **Owed and named, not done here:** the `m12-conformance.json` statement repair;
+  the engine remedy for the two precedence violations. Status: EFFECTIVE.
