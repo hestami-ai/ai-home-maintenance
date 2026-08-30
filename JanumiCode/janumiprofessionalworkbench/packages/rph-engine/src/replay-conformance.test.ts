@@ -363,6 +363,14 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// this restoration buys a governance guarantee rather than ordering fidelity — WHO assessed becomes a
 		// committed act with its own event, instead of arriving inside the verdict as
 		// `validatorResult.executionProvenance.evaluator`, a field of the answer the assessor produced.
-		expect(actual).toHaveLength(332);
+		// +1 to 333 (2026-08-30, JAN-SLICE-SWP-02a / REG-D-046 Ruling 2): the drive now mints the corpus's one
+		// real DEFERRAL — the offline residual — through `DeferScope`. ONE event for one governed fact.
+		//
+		// ⚠ THE ASSUMPTION WAS ALREADY THERE AND IS NOT THE DEFERRAL. `DetectAssumption` has recorded the offline
+		// residual since increment 26; ASR-9 limb 10 names assumption/constraint/residual-condition/baseline-scope
+		// statement/future-obligation as the things that CARRY deferred scope. The engine had every carrier and no
+		// deferral for any of them to carry — `grep -c -i defer` over the contracts returned 0/0/0. So this +1 is
+		// the CARRIED FACT arriving, not the carrier being duplicated.
+		expect(actual).toHaveLength(333);
 	});
 });

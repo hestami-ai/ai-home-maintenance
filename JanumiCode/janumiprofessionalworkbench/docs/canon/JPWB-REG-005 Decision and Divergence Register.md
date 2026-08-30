@@ -27544,3 +27544,74 @@ default, with no review condition; SWP-02a builds on it anyway and discloses the
 - **Merge target:** **Repository** — `packages/rph-contracts/vocab/` (the DEFERRAL object and the DeferScope
   command/ScopeDeferred event), regenerated rather than hand-edited; the handler and its registration in
   `handlers/registry.ts`; the carrier-link gate. **This register** — the disclosure above. Status: OPEN.
+
+---
+
+### REG-F-297 — JAN-SLICE-SWP-02a LANDED: the deferral plane exists as shape, act AND producer, and the
+repository refused every attempt to land less than all three
+
+- **Date:** 2026-08-30 · **Type:** RECORD (work package landed) · **Class:** RECORD — discharges
+  `JAN-SLICE-SWP-02a`; builds `REG-D-046` Ruling 2 · **Status:** ✅ CLOSED — driven, gated, and the one pin it
+  broke repaired.
+
+- **WHAT LANDED.** `DEFERRAL` as a first-class object (vocab-authored and REGENERATED, never hand-edited: 24
+  object types, 106 commands, 110 JSON schemas); `DeferScope` registered with three refusals; and the reference
+  undertaking now minting the corpus's one real deferral — the offline residual — taking the drive **332 → 333
+  events** with `ScopeDeferred` emitted. Suite: **209 of 210 files, 2,292 passed**, the single red being
+  `SWP-00`'s deliberate one.
+
+- **⚠⚠ THE REPOSITORY REFUSED EVERY PARTIAL LANDING, WHICH IS THE FINDING WORTH KEEPING.** Shape alone would have
+  been the hollow governed layer this register has already recorded. I did not have to remember that: **four
+  independent gates reddened, each naming a different half of the same defect** — `command-dispatch-census`
+  (*"a ratified, routable command whose handler has never run: its preconditions, its emitted payload and its
+  event-gate conformance are claims nothing checks"*), `event-surface-census` (bound but unemitted),
+  `binding-row-truth` (a machine `transitions.data.ts` does not declare), and `tracker-ingest` twice. The
+  apparatus enforced the discipline the design merely stated.
+
+- **⚠ THE TESTS I WROTE FOUND TWO REFUSALS THAT DID NOT EXIST.** `revisitCondition` is `z.string()` and
+  `carrierObjectIds` is `z.array(z.string())`, so an EMPTY condition and an EMPTY carrier list both validated and
+  were **ACCEPTED**. The refusal tests were written first, failed, and that is how the guards came to be written.
+  A deferral with no stated way back is not deferred — it is gone, wearing a governed name; a deferral naming no
+  carrier fails ASR-9 limb 10's first half outright.
+
+- **FIVE THINGS THE REPOSITORY CAUGHT THAT I GOT WRONG.** `drivesMachine: '(none)'` was an invention — the 18
+  mint-only commands OMIT the field. `mintId('dfr')` was called TWICE, which would have given the object and the
+  fact it records two different identities, silently. `AUTHORITY` did not exist; the drive's own literal did.
+  `ids.test.ts` compares `ID_PREFIXES` against the vocab and reddened until `'dfr'` was registered.
+  `validate.test.ts` pins the schema count: **360 → 363, +3 not +4**, the same arithmetic its own S-1b note
+  already records.
+
+- **⚠⚠ FORMATTING TOOK THREE ATTEMPTS, AND THE LESSON IS THAT THE THREE VOCAB FILES DISAGREE.**
+  `canonical-vocabulary.json` is **CRLF / 2-space**; `m1-object-fields.json` and `m3-commands-events.json` are
+  **LF / TAB**. A uniform write reformatted **2,780 lines** of the first and **3,302** of the second. The repair
+  then measured indent LENGTH — a tab is 1 — and wrote ONE SPACE, reformatting m1 again. And `m3` mixes `\uXXXX`
+  escapes with literal non-ASCII (87 and 1,406), so it **cannot be round-tripped by re-serialising at all**; its
+  entries are spliced as TEXT. **Final diffs: 7/2, 38/0, 103/0 — pure additions.** A generated-plane change whose
+  vocab diff is thousands of lines has told you nothing about what changed.
+
+- **THE ONE THING I BROKE, AND IT WAS MINE.** `replay-conformance.test.ts` pins the drive's event count; 332 → 333
+  is the deferral arriving. Repaired with the reason recorded inline, and with the distinction that matters: the
+  ASSUMPTION was already there and is a CARRIER, not the deferral. The engine had every carrier and no deferral
+  for any of them to carry. **The +1 is the carried fact arriving, not the carrier being duplicated.**
+
+- **⚠ A SCARE THAT WAS NOT REAL, CHECKED RATHER THAN ASSUMED.** A full-suite run taken MID-BUILD reported **48
+  failures**, most of them CSAA's. Attribution was measured before anything was touched: every named CSAA test
+  was re-run at HEAD and **all pass** (`run-command-event-contract-overlay-report` 18, plus four more, 78). They
+  were stale-`dist` artifacts of a half-completed regeneration. **A failure list taken during a build is not
+  evidence about the build's result**, and reporting those 48 as breakage — or worse, "fixing" another agent's
+  package on the strength of them — is the error that was one step away.
+
+- **⚠ AND ONE FAILURE WAS ABOUT MY OWN WORKING TREE.** `verif/mutation-tree-baseline.test.ts` failed in the suite
+  and passed alone. It asserts the mutation runner *"rejects unstaged or newly staged subject drift"* — and my
+  tree was full of exactly that. It cleared the moment the work was committed. A test that reads the git index is
+  measuring the session, not the code.
+
+- **WHAT WAS DELIBERATELY NOT BUILT.** No `status` field and no lifecycle: neither is traced to the professional
+  corpus, and both remain sponsor proposals. No precondition on any other command — Reading A says the engine
+  must REPRESENT deferral, not that anything must refuse without one; a guard there would forbid flows canon
+  permits (`AX-6`). And `IntentConstraintRefined` stays unemitted, with the reason recorded in three places.
+
+- **Merge target:** **Repository** — `packages/rph-contracts/vocab/` ×3 (regenerated), `handlers/deferral.ts` +
+  its test + registration, `reference-undertaking.ts` (the producer), and the census pins that legitimately moved.
+  **Owed and named:** the `contracts:gen:check` gate (`REG-F-295`) still does not exist, so this regeneration was
+  itself ungated. Status: CLOSED.
