@@ -27485,3 +27485,62 @@ no gate, and the shape authority the constitution names is the one artifact with
 
 - **Merge target:** **Repository** — a `contracts:gen:check` modelled on `slice-ledger.ts`, wired into
   `gate:fast`; and the general-form sweep over every other generated surface. Status: OPEN.
+
+---
+
+### REG-F-296 — the rule that a deferral must carry a review condition was itself DEFERRED, by a blanket safe
+default, with no review condition; SWP-02a builds on it anyway and discloses the ground it stands on
+
+- **Date:** 2026-08-30 · **Type:** DIVERGENCE FINDING (design constraint) · **Class:** FINDING — constrains
+  `JAN-SLICE-SWP-02a`, does not block it · **Status:** OPEN — disclosed; the field is built and its basis is
+  recorded rather than assumed.
+
+- **WHAT `SWP-02a` NEEDED, AND WHERE ITS GROUND TURNED OUT TO BE.** `REG-D-046` Ruling 2 requires the engine to
+  represent deferral as a first-class fact, and the shape must encode *"POSTPONED rather than abandoned"*. A
+  boolean or a `status: 'DEFERRED'` literal would be a field restating its own object type — this repository's
+  recorded hollow-field shape. The corpus offers something better: of the five Attention Item dispositions,
+  exactly one carries a mandatory qualifier. `JPWB-DOC-003 §3:101`, verbatim:
+  > *"the disposition vocabulary's meanings live here — addressed, delegated, **deferred with an explicit review
+  > condition**, accepted as risk, superseded — exact spellings are repository contracts (meanings NEW at
+  > drafting; confirm via REG-E-021)."*
+  **A required, non-empty `revisitCondition` is therefore the encoding**: scope with a named condition under
+  which it returns is postponed by construction; scope with none is abandoned. That is corpus-derived rather
+  than invented, which is what Reading A's shape needed.
+
+- **⚠⚠ AND THEN THE CITATION'S OWN FOOTNOTE LED SOMEWHERE.** DOC-003 says *"confirm via REG-E-021"*. `REG-E-021`
+  has **no entry of its own** — `JPWB-REG-005:1443` carries it as a bullet inside an elicitation list:
+  > *"**REG-E-021** — The Attention Item disposition vocabulary (addressed, delegated, deferred with review
+  > condition, accepted as risk, superseded) was **authored by the finalizer** to close DOC-001's cession; **the
+  > meanings are NEW.** *Default: stands as drafted*"*
+  And `REG-D-010` (`:116`) disposed it wholesale: *"every elicitation item (REG-E-001..022) is **DEFERRED** — its
+  recorded safe default"*.
+  **So the meaning of "deferred with an explicit review condition" was authored by a finalizer rather than
+  elicited, flagged NEW, referred to the sponsor for confirmation, and then DEFERRED to its safe default.** The
+  rule prescribing how a deferral must be recorded was itself deferred — by a blanket act, with no review
+  condition, which is precisely what the rule forbids. It stands as drafted because nobody said otherwise.
+
+- **⚠ AN INSTRUMENT NOTE: MY FIRST CONTROL FAILED THE SAME WAY AS ITS SUBJECT.** Testing whether `REG-E-021`
+  exists, I used `REG-E-001` as the positive control — and it returns **zero headings too**, which made "no
+  heading" look like "missing" for both. It is not: **only TWO Section E headings exist at all** (`REG-E-032`,
+  `REG-E-033`); items 001–031 live as bullets inside a list. A control that fails identically to its subject
+  reads as agreement, and this repository has recorded that shape before. The real instrument was enumerating
+  the headings that DO exist.
+
+- **WHAT THIS CHANGES, AND WHAT IT DOES NOT.** It does **not** block `SWP-02a`. `REG-D-010` is a ratified act and
+  "stands as drafted" is an effective disposition, so the meaning is operative. What changes is the honesty of
+  the build: `revisitCondition` is REQUIRED on the strength of a **finalizer-authored, sponsor-unconfirmed
+  meaning ratified by default**, not on a confirmed elicitation. That must be stated in the field's own doc
+  comment, because a later reader will otherwise take a required field for a settled obligation. ⚠ **If the
+  sponsor ever confirms `REG-E-021` differently, the requiredness of this field is what moves** — and the entry
+  to strike is this one.
+
+- **⚠ AND THE SHAPE IS WIDER THAN THE ROADMAP SAID, WITH THE CORPUS WINNING.** `JAN-SLICE-DR-001`'s `SWP-02a`
+  block says the deferral records *"the carrier object it is represented in"* — singular. `RPH-FIX-006`, read
+  verbatim from `m12-conformance.json`, is **conjunctive**: *"as an assumption or constraint, a residual
+  condition, a baseline scope statement, **and** a future implementation obligation where applicable."* The
+  carrier field is therefore `carrierObjectIds`, an ARRAY. The roadmap line was authored by me and is narrower
+  than the corpus it was meant to serve; the corpus governs.
+
+- **Merge target:** **Repository** — `packages/rph-contracts/vocab/` (the DEFERRAL object and the DeferScope
+  command/ScopeDeferred event), regenerated rather than hand-edited; the handler and its registration in
+  `handlers/registry.ts`; the carrier-link gate. **This register** — the disclosure above. Status: OPEN.
