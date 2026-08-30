@@ -111,6 +111,120 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(driveLive()).toContain('IntentCaptured');
 	});
 
+	// ── THE ORDER LIMB (REG-D-047, 2026-08-30) ───────────────────────────────────────────────────────────────
+	//
+	// ⚠ THE §26 TRACE HAS CARRIED `seq` SINCE IT WAS WRITTEN, AND UNTIL NOW NOTHING READ IT. Every limb of this
+	// oracle asked WHETHER an event type appears, never WHEN. The word `seq` occurred in this file only inside
+	// comments. So the engine could emit every expected event in an order the corpus never describes and the
+	// whole suite stayed green — which is exactly what it does.
+	//
+	// `REG-D-047` ruled the flow is an ORDER, on the authority chain rather than on preference: `m12-conformance
+	// .json` carries `RPH-E2E-001` with `sourceRef: "§24"`; `CON-000 B1` as amended by `REG-D-034` gives the
+	// source corpora authority for WORKED SCENARIOS; and §24 states the flow as a numbered list 1..13. §26's
+	// `seq` says the same thing a second way — assurance at 8-11 before `IntentApproved` at 14, the Intent
+	// Baseline at 15-16 before the Architecture PWU at 29. Two ratified artifacts, one order.
+	//
+	// ⚠ THE PRECEDENCES ARE DERIVED FROM `seq`, NEVER HAND-LISTED. Hand-listing is the defect one level up: a
+	// hand-check of fourteen pairs found TWO violations, and deriving all 458 found TWENTY-THREE. The rule used
+	// is the unambiguous one — A precedes B only when EVERY occurrence of A precedes EVERY occurrence of B in
+	// the trace — so nothing here rests on a judgement about which occurrence counts.
+	//
+	// ⚠ AND THE COMPARISON IS FIRST-OCCURRENCE, WHICH IS A CORRECTION. A first instrument compared LAST(A) to
+	// FIRST(B) and reported thirty violations. `DecompositionProposed -> DecompositionValidated` was among them,
+	// which is absurd: there are two decompositions and each pair is correctly ordered — last-proposed simply
+	// fell after first-validated. Comparing across instances of a repeated act measures the fixture's shape, not
+	// the journey's order.
+	//
+	// ⚠ AND THIS LIMB DOES NOT ASSERT SEQUENCE EQUALITY, WHICH THIS FILE'S OWN HEADER RULES OUT. The §26 trace
+	// is "representative rather than exhaustive" in its own words, so demanding the live stream match it position
+	// for position would be the wrong bar and would have to be weakened until it passed — the decorative-oracle
+	// failure this file was written to end. PRECEDENCE is strictly weaker than equality and survives the trace
+	// being representative: it claims only that where the corpus puts A wholly before B, the engine does not put
+	// B first. A representative trace can omit acts; it cannot invert the ones it names.
+	//
+	// ⚠ CONTROL AGAINST THE OTHER CONFOUND: the same derivation run against `seedWorkbench` — a DIFFERENT drive,
+	// 446 events across several undertakings rather than 332 across one — yields the SAME 23 of 198. The count
+	// is structural to the drive logic, not an artifact of what else the seed happens to build.
+	it('DEFICIENCY: 23 of 198 ratified §26 precedences are violated — the engine does the right acts in the wrong order', () => {
+		const expected = loadExpectedEvents();
+		const span = new Map<string, { min: number; max: number }>();
+		for (const r of expected) {
+			const s = span.get(r.event) ?? { min: Infinity, max: -Infinity };
+			span.set(r.event, { min: Math.min(s.min, r.seq), max: Math.max(s.max, r.seq) });
+		}
+		const pairs: [string, string][] = [];
+		for (const [a, sa] of span)
+			for (const [b, sb] of span) if (a !== b && sa.max < sb.min) pairs.push([a, b]);
+
+		const live = driveLive();
+		const firstAt = new Map<string, number>();
+		live.forEach((t, i) => {
+			if (!firstAt.has(t)) firstAt.set(t, i + 1);
+		});
+
+		// Pairs where the engine emits neither or only one member are not order defects — they are the emission
+		// deficiency the limb above already pins, and counting them here would double-report one fault as two.
+		const applicable = pairs.filter(([a, b]) => firstAt.has(a) && firstAt.has(b));
+		const violated = applicable
+			.filter(([a, b]) => firstAt.get(a)! > firstAt.get(b)!)
+			.map(([a, b]) => `${a} -> ${b}`)
+			.sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+
+		// PIN. A defect register, not a specification. It must only ever SHRINK. A name ADDED here is a
+		// REGRESSION: an ordering the corpus states, that the engine used to respect, and no longer does.
+		expect(violated).toEqual([
+			'AssumptionDetected -> BaselineApproved',
+			'AssumptionDetected -> BaselineSubmittedForReview',
+			'AssuranceAssessmentStarted -> ClaimAsserted',
+			'AssuranceAssessmentStarted -> DecompositionProposed',
+			'AssuranceAssessmentStarted -> DecompositionValidated',
+			'AssuranceAssessmentStarted -> EvidenceProposed',
+			'AssuranceAssessmentStarted -> ExecutionPlanActivated',
+			'AssuranceAssessmentStarted -> ExecutionPlanApproved',
+			'AssuranceAssessmentStarted -> ExecutionPlanProposed',
+			'AssuranceAssessmentStarted -> ExecutionStepStarted',
+			// ⚠ THE ONE THAT MATTERS MOST. The intent is APPROVED before the assurance §24 step 4 places ahead of
+			// step 5 has even STARTED. Clause (a) of RPH-E2E-001 — "ends with intent approved" — is true at the
+			// end of the run while the approval was not backed by that assessment when it was made. STA-2 forbids
+			// this shape one level up for execution and satisfaction; here it is an approval and its assurance.
+			'AssuranceAssessmentStarted -> IntentApproved',
+			'AssuranceAssessmentStarted -> PwuMarkedReady',
+			'AssuranceAssessmentStarted -> PwuShapingStarted',
+			'AssuranceObservationRecorded -> BaselineApproved',
+			'AssuranceObservationRecorded -> BaselineSubmittedForReview',
+			'AssuranceObservationRecorded -> PwuBaselined',
+			'ClaimAsserted -> DecompositionProposed',
+			'ClaimAsserted -> DecompositionValidated',
+			'ClaimAsserted -> PwuMarkedReady',
+			'DecisionEffective -> BaselineSubmittedForReview',
+			'DecisionProposed -> BaselineSubmittedForReview',
+			'PwuShapingStarted -> DecompositionProposed',
+			'PwuShapingStarted -> DecompositionValidated'
+		]);
+	});
+
+	// CONTROL — THE DERIVATION READS A REAL TRACE AND A REAL POPULATION. Every assertion above is satisfied by a
+	// derivation that produces no pairs at all: an empty `violated` would equal an empty pin and the limb would
+	// be green having measured nothing.
+	it('CONTROL — the precedence derivation has a real population', () => {
+		const expected = loadExpectedEvents();
+		const types = new Set(expected.map((e) => e.event));
+		expect(types.size, 'distinct ratified event types').toBe(40);
+		expect(expected.every((e) => typeof e.seq === 'number'), 'every step carries a seq').toBe(true);
+	});
+
+	// CONTROL — IT DETECTS AN INVERSION. Without this, a comparison that never fires would pass the pin above by
+	// returning nothing. The fixture is synthetic so the control cannot be made green by changing the engine.
+	it('CONTROL — a planted inversion is detected', () => {
+		const order = ['B', 'A'];
+		const firstAt = new Map<string, number>();
+		order.forEach((t, i) => {
+			if (!firstAt.has(t)) firstAt.set(t, i + 1);
+		});
+		// ratified: A (seq 1) strictly precedes B (seq 2); live emits B first.
+		expect(firstAt.get('A')! > firstAt.get('B')!, 'the inversion must be visible').toBe(true);
+	});
+
 	it('DEFICIENCY: the engine emits none of these 12 §26 event types (28 -> 23 -> 16 -> 14 -> 13 -> 12 as the loops were wired)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];

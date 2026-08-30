@@ -95,8 +95,8 @@ It now also answers a live but more tightly bound question: what exact repositor
 | Subject schema | `jan-csaa-subject/2.0.0` | DWP-002 subject contract |
 | Generator | `jan-csaa-inventory@0.3.0` | Selected generator source is included in the file-manifest digest |
 | Subject kind | `WORKTREE` | Working-tree file bytes; Git cleanliness is not a prerequisite |
-| Subject ID | `7a09f7f8bfa7dfdf447fdedb02eb6b7ae16539e7d4425ab5752f3a70cbaae486` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
-| File-manifest digest | `76e391e76101fb8d5aec370ff9ba50005d72910ca21e3f3b60dacf21db593dd2` | `1258 selected files` |
+| Subject ID | `082ef402493d2b726f90a16619779e67902a534d8e48f92f7b166bd37963dccb` | Domain-separated file-manifest, configuration, schema, perimeter, and exclusion-policy identity |
+| File-manifest digest | `43832fe7f160fc72543701e08f478e0c4df21989eb144ff3436d517114c04daa` | `1258 selected files` |
 | Configuration digest | `36cfa9bd51876b6967ac0fdc03d0799965a13648ae0d2e24fb202d1594f59da1` | Selected files classified as configuration |
 | Repository root | `.` | Machine-independent repository-relative identity |
 | Perimeter | `.dependency-cruiser.cjs`, `.github`, `.gitignore`, `.prettierignore`, `.prettierrc.json`, `apps`, `bun.lock`, `bunfig.toml`, `eslint.config.mjs`, `package.json`, `packages`, `scripts`, `sonar-project.properties`, `tsconfig.json`, `turbo.json`, `verif`, `vitest.config.ts`, `vitest.dist.config.ts`, `vitest.projects.ts` | Root workspace declaration and configured inventory roots |
