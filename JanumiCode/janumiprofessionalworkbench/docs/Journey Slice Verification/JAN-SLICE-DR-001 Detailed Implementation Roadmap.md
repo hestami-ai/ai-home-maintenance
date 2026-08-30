@@ -129,8 +129,18 @@ object plane; then build the evidence surface and the first `SURFACE` Slices.
 | `packages/rph-domain/src/conformance.test.ts` | records the red; later asserts on assertions, not citations |
 | `verif/slice-ledger.ts` + `verif/slice-ledger.test.ts` | **new** — the generator, its predicate, and its control |
 | `docs/tracking/slices/` | **new** — the generated ledger. Generated only; never hand-edited |
-| `packages/rph-engine/src/slices/` | **new** — `ENGINE` Slice sources |
-| `apps/rph-demo/e2e/slices/` | **new** — `SURFACE` Slice sources (`SWP-06`) |
+| `packages/rph-engine/src/slices/**/*.slice.test.ts` | **new** — `ENGINE` Slice sources. ⚠ The suffix is `.slice.test.ts`, NOT `.slice.ts` — see below |
+| `apps/rph-demo/e2e/slices/**/*.slice.e2e.ts` | **new** — `SURFACE` Slice sources (`SWP-06`). ⚠ `.slice.e2e.ts`, NOT `.slice.ts` |
+
+⚠⚠ **THE SUFFIX IS LOAD-BEARING, AND v0.1.0 OF THIS ROADMAP GOT IT WRONG — CORRECTED 2026-08-30 (`REG-F-293`).**
+It named `*.slice.ts`. **No runner in this repository collects that.** Measured: the vitest package projects
+`include: ['src/**/*.test.ts']` (`vitest.projects.ts:90,127`) and Playwright uses `testMatch: '**/*.e2e.ts'`
+(`apps/rph-demo/playwright.config.ts:25`). A `*.slice.ts` file would additionally be **emitted into `dist`** —
+`packages/rph-engine/tsconfig.build.json` excludes only `src/**/*.test.ts`, `src/**/__tests__/**` and `src/gen/**`
+— and would land in the **coverage denominator**, since `vitest.config.ts` excludes `**/*.test.ts` and nothing
+`.slice.ts`. **A Slice that no runner collects asserts nothing while still appearing in the ledger**, which is the
+worst available failure: this programme's own artifact, placed where the reader's predicate cannot see it. The
+double suffix fixes runner collection, dist emission and coverage in one move using rules that already exist.
 | `packages/rph-contracts`, `rph-domain`, `rph-application` | the five promoted object types (`SWP-05`) |
 | `apps/rph-demo/src/routes` | the evidence surface (`SWP-06`) |
 | `docs/_working/ROADMAP-*.md`, `docs/**/RESIDUALS*.md` | struck in place, never deleted (`SWP-04`) |
@@ -181,7 +191,50 @@ design_obligations: [SL-9, SL-L1, SL-L2, SL-L3]
 outcome: "A machine-readable Slice declaration co-located with each Slice source; a generator that derives the
   ledger from those declarations alone; the generator wired into gate:fast so a stale ledger fails the build; and a
   CONTROL that reddens when a Slice is placed where the generator's predicate cannot see it."
-knowledge_status: PARTIAL — the format is proposed here and MUST be settled in this work package before SWP-02
+knowledge_status: SETTLED 2026-08-30 (REG-F-293) — format, predicate and gate decided and measured; NOT yet built
+settled_design:
+  format: >
+    An exported `const SLICE` in each Slice source, read by the TypeScript compiler API and NEVER IMPORTED.
+    ⚠ IMPORTING WAS DRIVEN AND REJECTED: outside its runner the module does not load at all, and inside vitest
+    importing a Slice RE-REGISTERS its suites into the importing file — so the ledger would go red whenever a
+    Slice went red, unable to tell "ledger stale" from "slice failing". The suite is red for the whole
+    SWP-00 -> SWP-03 window, which makes that fatal rather than untidy. A sidecar `.json` was also rejected:
+    it survives a red suite but is type-checked by nothing, so the pair can drift.
+  type_home: >
+    `packages/rph-contracts/src/slice.ts`, exported on the SUBPATH `@janumipwb/rph-contracts/slice`, never from
+    the barrel — the convention `index.ts` already states for `hash.ts`. rph-contracts is the only package BOTH
+    planes already depend on; `verif/` was refuted as a home because `apps/rph-demo/e2e` cannot reach it.
+  recognition: >
+    `packages/*/src/**/*.slice.test.ts`, `apps/*/src/**/*.slice.test.ts`, `verif/**/*.slice.test.ts`,
+    `apps/*/e2e/**/*.slice.e2e.ts` — matched against `git ls-files -co --exclude-standard`. Union matches 0 today.
+  discovery: >
+    Three limbs, deliberately wider: filename `**/*.slice.*`; directory `**/slices/**`; marker — the byte
+    sequence `export const SLICE` in any tracked `.ts`/`.svelte`. Union matches 0 today. ⚠ Keying discovery on
+    the WORD "slice" was rejected with a number: 52 tracked `.ts` files contain it, so that predicate starts at
+    day-one false positives and gets weakened within a week.
+  the_canary: >
+    `delta = discovery \ recognition == {}` is an ABSENCE assertion, and a sweep that silently returned nothing
+    would satisfy it. So exactly ONE permanently unreachable Slice is committed on purpose at
+    `packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts`, and the gate asserts
+    `delta == { CANARY }`. Empty FAILS (the sweep stopped seeing it), `{CANARY}` passes, a superset FAILS naming
+    the extras. ⚠ The canary IS LINTED — eslint ignores do not cover `test-fixtures` — so it MUST carry ZERO
+    imports.
+  gate: >
+    Modelled on `csaa:inventory:check`, NOT on `tracker:build`: the ledger is COMMITTED, the tracker DB is
+    gitignored, and `tracker:build` cannot detect staleness because it rebuilds unconditionally. Regenerate both
+    products in memory, byte-compare, report per-path {actualBytes, actualSha256, expectedBytes, expectedSha256,
+    path}. New `slices:ledger:check` inserted into gate:fast as step 4 — after the CSAA checks, BEFORE
+    `tracker:build` — because `&&` short-circuits and the suite at step 9 is red by design.
+  products: >
+    `docs/tracking/slices/LEDGER.md` (generated region between markers, reusing `replaceGeneratedRegion`
+    semantics verbatim including its `\r\n` detection — that clause is what stops a small edit becoming a
+    CRLF-wide diff on this host) and `verif/slices/slice-ledger.baseline.json` (canonical, key-sorted,
+    code-unit ordering, NOT localeCompare).
+  residual: >
+    ⚠ Every discovery limb keys on the word "slice". They catch a Slice that was MOVED; they do NOT catch a
+    Slice-shaped substrate INVENTED under another vocabulary — which is exactly what docs/tracking/w3b/ was:
+    614 records typed "limb", a type the tracker's loader throws on. This MUST be stated in the ledger header.
+    `docs/tracking/README.md:14` already stated its predicate in prose and w3b appeared anyway.
 repository_scope:
   files_or_symbols:
     - "verif/slice-ledger.ts — the generator and its stated predicate"
@@ -221,7 +274,7 @@ outcome: "The ratified normal intent-to-architecture journey is driven end to en
 knowledge_status: CONFIRMED — the rule statement was read verbatim from m12-conformance.json this session
 repository_scope:
   files_or_symbols:
-    - "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.ts"
+    - "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts" (⚠ .slice.test.ts — REG-F-293)
     - "packages/rph-engine/fixtures/expected-events.jsonl — the 72-step, 11-phase trace MUST be reused, not re-derived"
 required_changes:
   - "Drive the journey through the real bus and store (SL-7). No stubs for any asserted act."
@@ -305,7 +358,7 @@ outcome: "All seven ratified end-to-end rules assert. DEFERRABLE_PREFIXES stays 
 knowledge_status: CONFIRMED for the seven statements; PROPOSED for the class assignments in §9
 repository_scope:
   files_or_symbols:
-    - "packages/rph-engine/src/slices/e2e-002..007.slice.ts"
+    - "packages/rph-engine/src/slices/e2e-002..007.slice.test.ts" (⚠ .slice.test.ts — REG-F-293)
 required_changes:
   - "RPH-E2E-002 MUST assert STA-2 directly: execution SUCCEEDED while assurance REJECTED and the PWU NOT satisfied."
   - "RPH-E2E-005 MUST preserve BOTH assessments and MUST assert the baseline is not promoted automatically."
@@ -379,7 +432,7 @@ knowledge_status: CONFIRMED — F-4, with its positive control
 repository_scope:
   files_or_symbols:
     - "apps/rph-demo/src/routes — the evidence surface"
-    - "apps/rph-demo/e2e/slices/ — SURFACE Slices"
+    - "apps/rph-demo/e2e/slices/*.slice.e2e.ts — SURFACE Slices (⚠ .slice.e2e.ts — REG-F-293)"
 required_changes:
   - "Surface ProposeEvidence, AdmitEvidence, SubmitEvidenceForAssessment through real server actions."
   - "Each SURFACE Slice MUST cite the ENGINE Slice it presupposes (SL-6)."

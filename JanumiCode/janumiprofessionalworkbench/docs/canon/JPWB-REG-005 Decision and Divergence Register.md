@@ -27209,3 +27209,70 @@ and the red is recorded here verbatim because a red nobody wrote down is just a 
 - **Merge target:** **Repository** — `packages/rph-domain/src/conformance-manifest.ts` (one line, plus the struck
   paragraph and the prohibition list) · **This register** (the red). **Owed, not done:** the `is silent` word
   boundary in `verif/absence-claims.test.ts`, with a mutant proving the boundary is load-bearing. Status: CLOSED.
+
+---
+
+### REG-F-293 — the roadmap written to stop artifacts being placed where the reader cannot see them named Slice
+filenames NO RUNNER COLLECTS; and the control that fixes it needs a canary, because an empty delta proves nothing
+
+- **Date:** 2026-08-30 · **Type:** DIVERGENCE FINDING (RECORD) · **Class:** RECORD — corrects
+  `JAN-SLICE-DR-001` v0.2.0 §7 and the `repository_scope` of `SWP-02`, `SWP-03` and `SWP-06` ·
+  **Status:** ✅ CLOSED — the roadmap is corrected in place; `SWP-01`'s design is settled and not yet built.
+
+- **⚠⚠ THE DEFECT, AND IT IS THIS PROGRAMME'S OWN CLASS COMMITTED BY ITS OWN ROADMAP.** `JAN-SLICE-DR-001` named
+  Slice sources as `*.slice.ts` — e.g. `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.ts`.
+  **No runner in this repository collects that.** Measured at HEAD:
+  - vitest package projects use `include: ['src/**/*.test.ts']` (`vitest.projects.ts:90` and `:127`);
+  - Playwright uses `testMatch: '**/*.e2e.ts'` (`apps/rph-demo/playwright.config.ts:25`);
+  - `packages/rph-engine/tsconfig.build.json` excludes only `src/**/*.test.ts`, `src/**/__tests__/**` and
+    `src/gen/**`, so a `.slice.ts` would be **EMITTED INTO `dist`** — verification code shipped in the package;
+  - `vitest.config.ts:106-108` sets coverage `include: ['packages/*/src/**/*.ts']` excluding `**/*.test.ts` and
+    nothing `.slice.ts`, so it would enter the **coverage denominator**.
+  **A Slice no runner collects asserts nothing while still appearing in the ledger.** That is the worst available
+  outcome for this programme: a green row over an artifact that never ran. **CORRECTED to `*.slice.test.ts`
+  (ENGINE) and `*.slice.e2e.ts` (SURFACE)** — one suffix change repairs collection, dist emission and coverage at
+  once, using rules that already exist.
+  > ⚠ **THE ROADMAP CONTAINED THE `w3b` DEFECT IN THE SECTION THAT DIAGNOSES THE `w3b` DEFECT.** `F-7` of that
+  > same document records a substrate born one day after the machinery meant to prevent it and invisible to it.
+  > Writing the diagnosis down did not stop the author committing it four sections later. **Prose does not
+  > protect; only a predicate that is DRIVEN does** — which is the entire argument for `SWP-01` and is now
+  > evidenced by the roadmap itself rather than by the tracker's history.
+
+- **⚠ AND `SL-L3` AS WRITTEN WAS SELF-CONTRADICTORY — RESOLVED BY A CANARY, NOT BY CLEVERNESS.** The obligation
+  asks for *"a CONTROL that reddens when a Slice is placed where the generator's predicate cannot see it."* A
+  generator cannot report what its predicate excludes. The resolution is **two layers**: a narrow RECOGNITION set
+  the ledger is built from, and a deliberately wider DISCOVERY sweep; the gate fails when `discovery \ recognition`
+  is non-empty. **Both are 0 today, measured** over the gitignore-aware working set (1860 files).
+  ⚠ **BUT `delta == ∅` IS AN ABSENCE ASSERTION, AND THIS REPOSITORY'S STANDING RULE IS THAT AN ABSENCE CLAIM NEEDS
+  A POSITIVE CONTROL.** A sweep that silently returned nothing would satisfy it. So exactly one **permanently
+  unreachable Slice is committed on purpose** —
+  `packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts` — and the gate asserts
+  `delta == { CANARY }`. Three distinguishable outcomes: `∅` FAILS (the sweep stopped seeing the canary),
+  `{CANARY}` passes, a superset FAILS naming the extras. **Verified unreachable at HEAD:**
+  `packages/rph-engine/tsconfig.json` has `"include": ["src"]`, vitest collects only `src/**/*.test.ts`, coverage
+  includes only `packages/*/src/**/*.ts`, and `packages/csaa/test-fixtures/` is the existing precedent (12 tracked
+  files). ⚠ **It IS linted** — `eslint.config.mjs` ignores `dist`, `node_modules`, `coverage`, `.turbo`,
+  `.svelte-kit`, `build` and `docs`, but **not** `test-fixtures` — **so the canary must carry zero imports.**
+
+- **⚠ THE RESIDUAL, NAMED RATHER THAN LEFT IMPLICIT, AND IT MUST APPEAR IN THE LEDGER'S OWN HEADER.** All discovery
+  limbs key on the word *"slice"*. They catch a Slice that was **MOVED**. They do **not** catch a Slice-shaped
+  substrate **INVENTED** under a different vocabulary — which is exactly what `docs/tracking/w3b/` was to the
+  tracker index: **614 records** typed `"limb"`, a type that loader's `default:` branch throws on. **Nothing in
+  `SWP-01` closes that**, and `docs/tracking/README.md:14` already stated its own predicate in prose and w3b
+  appeared anyway. **Stating the predicate is necessary and demonstrably insufficient; the driven control is the
+  load-bearing half.**
+
+- **A SECOND DEFECT FOUND IN THE SAME PASS, ATTRIBUTED AND REPAIRED.** `csaa:inventory:check` was exit 1.
+  Attribution was measured before anything was touched: the baseline was last written in `460d134b` (ours), and
+  `git diff --name-only 460d134b..HEAD -- '*.ts'` returns exactly four files, **all ours** — `conformance-manifest.ts`
+  plus the three register gates. ⚠ **A CONTROLLED TEST SEPARATED IT FROM `SWP-00`:** reverting
+  `conformance-manifest.ts` to its pre-`SWP-00` state left the check RED, with the on-disk hash unchanged and the
+  RECOMPUTED hash different — so `SWP-00` moved WHICH hash mismatches, not WHETHER one does. Regenerated
+  (`2028fea9`); the diff is 13 baseline lines and 5 doc lines, all hashes and byte counts over those four files
+  plus two aggregate digests, with `1251 selected files` unchanged — **no semantic row, disposition or mapping
+  touched.** Both CSAA gates exit 0 after it. This is the standing instruction applied: attend to CSAA work only
+  where we broke it.
+
+- **Merge target:** **Repository** — `JAN-SLICE-DR-001` §7 and three `repository_scope` paths corrected in place
+  (line count unchanged, content-guarded); `SWP-01`'s block carries the settled design.
+  **Owed, not done:** `SWP-01` itself is unbuilt. Status: CLOSED.
