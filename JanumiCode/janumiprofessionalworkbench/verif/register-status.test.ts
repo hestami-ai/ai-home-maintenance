@@ -98,7 +98,12 @@ const GRANDFATHERED: ReadonlySet<string> = new Set([
 	'REG-Q-018', 'REG-Q-019', 'REG-Q-020', 'REG-Q-021', 'REG-Q-022', 'REG-Q-023',
 	'REG-Q-024', 'REG-Q-026', 'REG-Q-027', 'REG-Q-028', 'REG-Q-029', 'REG-Q-030',
 	'REG-Q-031', 'REG-Q-032', 'REG-Q-033', 'REG-Q-034', 'REG-Q-035', 'REG-Q-036',
-	'REG-Q-037', 'REG-Q-038', 'REG-Q-039', 'REG-Q-040', 'REG-Q-041', 'REG-Q-042',
+	// ⚠ 'REG-Q-038' REMOVED 2026-08-30: genuinely repaired, and by a DISPOSITION rather than by editing prose.
+	// The sponsor ruled it (REG-D-046) and the ruling was written onto the entry's existing `Merge target:` line,
+	// so the entry gained its first live status WITHOUT gaining a line — the zero-shift form, applied to an entry
+	// that had no status of its own and sat under Section B's blanket `**Status:** OPEN, unless stated otherwise`.
+	// This gate caught the repair, which is what grandfathering BY ID is for.
+	'REG-Q-037', 'REG-Q-039', 'REG-Q-040', 'REG-Q-041', 'REG-Q-042',
 	'REG-Q-043', 'REG-Q-044', 'REG-Q-045', 'REG-Q-046', 'REG-Q-047', 'REG-Q-048',
 	'REG-Q-049', 'REG-Q-050', 'REG-F-043', 'REG-F-054', 'REG-F-067',
 	// ⚠ 'REG-F-085' REMOVED 2026-08-21: REG-D-044 answered it and its status was repaired to a single live line.

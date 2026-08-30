@@ -370,7 +370,7 @@ All Section C entries: **Date:** 2026-07-16 · **Type:** OPEN QUESTION · **Disp
 ### REG-Q-038 — Survivorship of Executive-Overview-only platform claims
 - **Statement:** The Executive Overview was demoted to an orientation aid, yet it was the sole in-corpus source for several platform claims (README.md L50 vs Executive Overview L13-25). Part of that content is now carried: JPWB-DOC-001 §8 carries the two-plane control/execution separation, surfaces-as-clients-never-editions, and edition-tiering doctrine as canon HYPOTHESIS, and JPWB-CON-000 V5 carries "the de minimis assurance floor is never a paid tier." The open question is the uncarried remainder only: the three-edition ladder specifics, the REL-1..4 roadmap, the SOC2/RMF/GDPR compliance posture and hash-chained audit claim, and the READ/PROPOSE/GOVERN tier naming.
 - **Safe default:** DOC-001 §8 and CON-000 V5 govern what they carry. For the remainder: treat plane/trust topology detail as repository/ADR territory (REG-Q-016) and edition specifics, roadmap, and compliance posture as non-canonical product planning; carry nothing further into the canon absent a sponsor decision.
-- **Merge target:** JPWB-DOC-001 (if further adopted as doctrine) or repository ADRs; decision recorded here.
+- **Merge target:** JPWB-DOC-001 (if further adopted as doctrine) or repository ADRs; decision recorded here. **Status:** ✅ DISPOSITIONED 2026-08-30 by sponsor ruling (`REG-D-046`) — **the uncarried remainder stays INFORMAL PLANNING and is NOT carried into canon.** The safe default is confirmed rather than overridden: the three-edition ladder specifics, the REL-1..4 roadmap, the SOC2/RMF/GDPR compliance posture and hash-chained audit claim, and the READ/PROPOSE/GOVERN tier naming remain non-canonical product planning. What `JPWB-DOC-001 §8` and `JPWB-CON-000 V5` already carry is unaffected.
 
 ### REG-Q-039 — Altitude of the vision's top-level object
 - **Statement:** Vision material revises its own top-level concept repeatedly — PWA, then Professional Scenario, then Professional Capability, then Civilizational Knowledge (Additional Concepts, Complex Systems discussion L682-L1240) — none marked final, though the sponsor endorsed the discussion wholesale. Narrative Memories likewise carry two distinct definitions.
@@ -21265,7 +21265,7 @@ proposed for it was withdrawn as the chain-of-thought hazard PER-12 has since ra
 ### REG-Q-067 — RATIFICATION: nothing in this engine can say that scope was DEFERRED, and the one
 scope-shaped field conflates "never ours" with "ours, postponed" — adjudicate before a guard freezes it
 
-**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** ✅ ADJUDICATED 2026-08-30 by sponsor ruling (`REG-D-046`) — **READING A: the engine MUST represent deferral as a first-class fact.** Superseding ~~OPEN~~
 
 **In one line:** canon names five carriers a deferral must stay represented in; four of them exist as
 first-class mintable objects, and there is no such thing as a deferral for any of them to carry.
@@ -27043,3 +27043,88 @@ roadmap also departs from house convention by refusing to record its own progres
   zero-shift form. Its two sponsor rulings and every measurement it carries stand unaltered.
 
 - **Merge target:** **Repository** — the roadmap document. Status: CLOSED.
+
+---
+
+### REG-D-046 — Three sponsor rulings: the orphaned platform claims stay informal, deferral becomes a FIRST-CLASS
+FACT (Reading A), and v1 is NOT production-facing because the platform JPWB depends on is still in progress
+
+- **Date:** 2026-08-30 · **Type:** DECISION (sponsor, three rulings given in session) · **Class:** DECISION —
+  dispositions **REG-Q-038**, adjudicates **REG-Q-067**, and settles the production-facing question that
+  `REG-Q-049` / `REG-Q-050` hang on · **Status:** EFFECTIVE — rulings recorded; `JAN-SLICE-DR-001` amended.
+
+- **RULING 1 — `REG-Q-038`: THE UNCARRIED REMAINDER STAYS INFORMAL PLANNING.** The three-edition ladder specifics,
+  the REL-1..4 roadmap, the SOC2/RMF/GDPR compliance posture with its hash-chained audit claim, and the
+  READ/PROPOSE/GOVERN tier naming are **not** carried into canon. The safe default is **confirmed, not overridden**.
+  What `JPWB-DOC-001 §8` (two-plane separation, surfaces-as-clients, edition-tiering doctrine, as canon HYPOTHESIS)
+  and `JPWB-CON-000 V5` (*"the de minimis assurance floor is never a paid tier"*) already carry is unaffected.
+  ⚠ **AND AN EARLIER SUMMARY OF THIS ENTRY WAS WRONG, CORRECTED HERE.** It was relayed to the sponsor as the
+  missing "define v1" decision. It is not: it is a SURVIVORSHIP question about claims orphaned when the Executive
+  Overview was demoted to an orientation aid. Nothing was ever blocked on it.
+
+- **RULING 2 — `REG-Q-067`: READING A. THE ENGINE MUST REPRESENT DEFERRAL AS A FIRST-CLASS FACT.** Not Reading B
+  (the engine offers carriers and the limb governs professional practice). `ASR-9` limb 10 binds the **engine**.
+  The model therefore owes **a shape** that records that named scope was moved out of this unit's work and must be
+  carried, **an act** that creates it, and **a gate** that the link from the deferral to its carrier survives.
+  This is the expensive reading and it was chosen with its cost stated.
+
+- **⚠⚠ THE TRAP INSIDE RULING 2, RECORDED BEFORE ANYONE FALLS INTO IT.** A ratified event type exists whose
+  declared purpose is a deferral staying represented: `IntentConstraintRefined`
+  (`packages/rph-contracts/src/messages.ts:1362`, registered `:2692`). The corpus's own worked example carries it
+  as event 53 labelled *"Offline scope"*, and `packages/rph-engine/src/replay.ts:139-143` asserts it by name under
+  the comment *"the deferred offline capability stays explicitly represented (a refined intent constraint)"*.
+  **NOTHING EMITS IT** — re-verified at HEAD 2026-08-30: `grep -rn 'IntentConstraintRefined'
+  packages/rph-application/src` → **0**; positive control `eventType: 'IntentRevised'` → **1**. It sits at `:141`
+  of the shrink-only pin at `replay-conformance.test.ts:114`, titled *"DEFICIENCY: the engine emits none of these
+  12 §26 event types"*.
+  > ⚠ **WIRING THAT EVENT DOES NOT SATISFY READING A, AND THE PIN SHRINKING IS NOT EVIDENCE THAT IT DOES.** Its
+  > payload is exactly `{ intentId, constraintId, refinement }` — **read at HEAD**. There is no field marking
+  > postponement, no link to a carrier, and no name for the deferred scope. The fixture reads as a deferral only
+  > because a HAND-AUTHORED LABEL says *"Offline scope"*. Emitting it would move the deficiency pin 12 → 11 and
+  > produce the event the fixture wants **without producing the fact this ruling demands.** A pin that shrinks is
+  > the single most likely way this ruling gets recorded as discharged while nothing was built.
+
+- **⚠ A CONSEQUENCE THAT FOLLOWS FROM READING A, FLAGGED AS MY READING AND OVERTURNABLE.** `REG-Q-067` asked a
+  third question the sponsor did not address in terms: whether `outOfScope` may ever serve as the deferral record.
+  Under Reading A a first-class deferral exists, so allowing `outOfScope` to serve as one **in parallel** would
+  preserve the very conflation the ruling removes. **I therefore read Reading A as DISQUALIFYING `outOfScope`**,
+  and the roadmap is written that way. `WorkBoundarySchema` is exactly `inScope`, `outOfScope`,
+  `permittedChanges`, `prohibitedChanges` — four string arrays, **re-read at HEAD** — with no deferral flag and no
+  status member, so it cannot distinguish *"never ours"* from *"ours, postponed"*. If the sponsor intends
+  otherwise, this is the clause to overturn.
+
+- **THE FIFTH CARRIER IS STILL A FABRICATED CONSTANT, AND READING A MAKES IT LOAD-BEARING.** `governance.ts:747`
+  writes `scope: 'undertaking',` on **every baseline ever created** — re-read at HEAD — because
+  `CreateBaselinePayloadSchema` carries no scope while `BaselineObjectSchema` requires one. Under Reading B this
+  was a blemish; under Reading A *baseline scope statement* is one of the five carriers a deferral must be able to
+  live in, so the repair becomes required. It is `REG-F-228`'s to land and this entry does not re-file it.
+  ⚠ **AND THE CONCEPT IS ABSENT FROM THE CONTRACTS ENTIRELY:** `grep -c -i 'defer'` over `objects.ts`,
+  `messages.ts`, `enums.ts` → **0 / 0 / 0**, re-verified at HEAD.
+
+- **RULING 3 — v1 IS NOT PRODUCTION-FACING, AND THE REASON IS EXTERNAL.** *"The Janumi Platform that it depends on
+  is still a work-in-progress."* Consequences, stated so they are not re-litigated: `REG-Q-049` (security /
+  supply-chain) and `REG-Q-050` (operational / NFR) carry the rider *"becomes mandatory at the first
+  production-facing slice"* and therefore **remain deferred**; **C2 (authentication) is NOT the critical path**,
+  though `DIV-W0-003` stays OPEN; W9 (tenancy) and W10 (platform/commerce) stay out of the first increment; and
+  **`JAN-SLICE` is the main line rather than a secondary track.** ⚠ This ruling is contingent on an EXTERNAL
+  dependency and **MUST be revisited when the platform ships**, not treated as settled forever.
+
+- **⚠ AN INSTRUMENT NOTE, BECAUSE IT NEARLY BIT.** `REG-Q-067`'s status line is the ordinary
+  `Date / Type / Status: OPEN` header form — and **seven lines in this register are byte-identical to it.** The
+  repair was applied by locating the entry's heading structurally and taking the first status line within it, with
+  a guard asserting the line's exact content before writing. A string-match edit would have been a one-in-seven
+  chance of repairing the wrong entry, silently. **This register has now produced anchor ambiguity twice; a
+  structural anchor is not a nicety here.**
+
+- **AND `REG-Q-038`'s DISPOSITION REPAIRED ITS STATUS AS A SIDE EFFECT, WHICH THE GATE CAUGHT.** The entry had no
+  status of its own and sat under Section B's blanket *"`**Status:** OPEN, unless stated otherwise`"*. Writing the
+  disposition onto its existing `Merge target:` line gave it its first live status **without adding a line** —
+  the zero-shift form. It therefore began conforming, `register-status.test.ts` fired its SHRINK-ONLY leg naming
+  `REG-Q-038` exactly, and the id was removed deliberately. **62 → 60 → 59.**
+
+- **Merge target:** **This register** (the three rulings) · **Repository** —
+  `docs/Journey Slice Verification/JAN-SLICE-DR-001 Detailed Implementation Roadmap.md` gains the deferral-plane
+  work package and drops production-facing scope from its open questions; `verif/register-status.test.ts`
+  (one id removed). ⚠ **OWED AND NOT DONE HERE:** the corpus edit `JPWB-DOC-003 §8.4 ASR-9` needs to record which
+  reading was ruled, since a ruling that lives only in the register leaves the invariant catalog silent on its own
+  meaning. Status: EFFECTIVE.

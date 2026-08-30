@@ -1,10 +1,12 @@
 # JAN-SLICE-DR-001 — Detailed Implementation Roadmap
 
-*`PROPOSED` / **v0.1.0**. Design authority: `docs/_working/DESIGN-journey-slice-verification.md` (filed 2026-08-29
-with `REG-D-045`). Scope: journey-traced vertical slices as the verification and progress substrate. **No work
-package is LANDED.** Sponsor rulings carried: engine plane before surface plane; the W7 product-behavior plane is
-promoted. Deontic keywords per the design's §0 — MUST / MUST NOT / SHALL bind this programme; SHOULD MAY be departed
-from only with the departure recorded in the register.*
+*`PROPOSED` / ~~**v0.1.0**~~ **v0.2.0** — amended 2026-08-30 for `REG-D-046`'s three sponsor rulings (`SWP-02a`
+added; production-facing settled; `REG-Q-038` closed as a non-question). Design authority:
+`docs/_working/DESIGN-journey-slice-verification.md` (filed 2026-08-29 with `REG-D-045`). Scope: journey-traced
+vertical slices as the verification and progress substrate. **No work package is LANDED.** Sponsor rulings carried:
+engine plane before surface plane; the W7 product-behavior plane is promoted; **deferral is a first-class fact
+(`REG-Q-067` Reading A)**; **v1 is NOT production-facing**. Deontic keywords per the design's §0 — MUST / MUST NOT /
+SHALL bind this programme; SHOULD MAY be departed from only with the departure recorded in the register.*
 
 ---
 
@@ -25,9 +27,19 @@ The seven ratified end-to-end conformance rules `RPH-E2E-001..007`, the conforma
 a derived Slice Ledger and its generator, the subsumption of superseded progress claims, the W7 product-behavior
 object plane, and the demo's missing evidence surface.
 
+**Added 2026-08-30 by `REG-D-046`:** the **deferral plane** — a first-class deferral shape, the act that creates
+it, and the gate that its link to a carrier survives (`SWP-02a`).
+
 **Out of scope, disclosed:** the assertion-resolution predicate for all 125 conformance rules (`SL-S3`, a SHOULD
 whose blast radius is unmeasured — §11 R-4); authentication (C2); tenancy (W9); platform and commerce (W10);
 `reconcile` as a command (§11 D-2).
+
+⚠ **THOSE EXCLUSIONS ARE NOW RULED RATHER THAN ASSUMED.** `REG-D-046` settled that **v1 is NOT production-facing**,
+because the Janumi Platform this depends on is itself still in progress. `REG-Q-049` (security / supply-chain) and
+`REG-Q-050` (operational / NFR) carry the rider *"becomes mandatory at the first production-facing slice"* and so
+remain deferred; C2 is not the critical path, though `DIV-W0-003` stays OPEN. ⚠ **This ruling is contingent on an
+EXTERNAL dependency and MUST be revisited when the platform ships.** A roadmap that inherits it silently after that
+point would be carrying a lapsed premise.
 
 ## 3. Normative-source digest
 
@@ -89,6 +101,7 @@ Each figure below was derived by a quoted command and re-driven by this roadmap'
 | G-5 | Capabilities and journeys cannot be traced to objects that do not exist | `SWP-05` |
 | G-6 | No browser journey crosses the evidence stage | `SWP-06` |
 | G-7 | At least four mandated scenario classes have no seed scenario | `SWP-03` (§9) |
+| G-8 | Nothing in the engine can say that scope was DEFERRED, and the one scope-shaped field conflates "never ours" with "ours, postponed" | `SWP-02a` (`REG-D-046` Ruling 2) |
 
 ## 6. Alternatives considered and selected strategy
 
@@ -229,6 +242,61 @@ tests:
 ```
 
 ```yaml
+id: JAN-SLICE-SWP-02a
+title: "The deferral plane — REG-Q-067 Reading A: a deferral becomes a first-class fact"
+design_obligations: [SL-4, SL-7, SL-8]
+authority: "REG-D-046 (2026-08-30), Ruling 2. NOT in v0.1.0 of this roadmap; added by the ruling."
+outcome: "The engine can record that named scope was moved out of a unit's work and must be carried: a deferral
+  shape, an act that creates it, a link to whichever of ASR-9's five carriers holds it, and a gate that the link
+  survives. `outOfScope` is disqualified as a deferral record."
+knowledge_status: CONFIRMED absent — re-verified at HEAD 2026-08-30
+repository_scope:
+  files_or_symbols:
+    - "packages/rph-contracts/src/objects.ts — the deferral shape; `WorkBoundarySchema` (:389-394) is NOT it"
+    - "packages/rph-contracts/src/messages.ts — the command payload and the event"
+    - "packages/rph-application/src/handlers/ — the act, and its registration in registry.ts"
+    - "packages/rph-application/src/handlers/governance.ts:747 — the baseline `scope` carrier (REG-F-228 lands it)"
+measured_ground:
+  - "`grep -c -i defer` over objects.ts / messages.ts / enums.ts → 0 / 0 / 0. The concept is absent from the contracts."
+  - "Of 105 registered commands, none defers anything."
+  - "`WorkBoundarySchema` is exactly inScope, outOfScope, permittedChanges, prohibitedChanges — four string arrays,
+     no deferral flag, no status member — so it cannot distinguish 'never ours' from 'ours, postponed'."
+  - "`governance.ts:747` writes `scope: 'undertaking',` on EVERY baseline, so the fifth carrier records nothing
+     about any particular baseline. Under Reading B that was a blemish; under Reading A the carrier is load-bearing."
+required_changes:
+  - "A deferral records AT MINIMUM: the scope deferred (named, not implied), that it is POSTPONED rather than
+    abandoned, and the carrier object it is represented in."
+  - "The act MUST be a registered command. A field written at mint by some other command does not satisfy Reading A."
+  - "The gate MUST fail when a deferral exists whose carrier link does not resolve."
+  - "`outOfScope` MUST NOT be read as a deferral record anywhere. ⚠ This clause is the ONE part of this work package
+    that the sponsor did not rule in terms — REG-D-046 records it as a consequence FOLLOWING FROM Reading A and
+    explicitly overturnable. If it is overturned, this bullet is the one to strike."
+invariants:
+  - "A deferral names its scope and its carrier, or it cannot be created."
+  - "Nothing infers deferral from `outOfScope`."
+prohibited_shortcuts:
+  - "⚠⚠ MUST NOT treat wiring `IntentConstraintRefined` as satisfying this work package. A ratified event of that
+     name exists (messages.ts:1362, registered :2692) whose declared purpose IS a deferral staying represented; the
+     corpus's worked example carries it as event 53 labelled 'Offline scope' and replay.ts:139-143 asserts it. But
+     NOTHING EMITS IT (0 producers in rph-application/src; control `eventType: 'IntentRevised'` → 1), and its
+     payload is exactly { intentId, constraintId, refinement } — NO postponement marker, NO carrier link, NO scope
+     name. It reads as a deferral only because a HAND-AUTHORED LABEL says so."
+  - "⚠⚠ MUST NOT report the shrink-only deficiency pin moving 12 → 11 as evidence this ruling is discharged.
+     `replay-conformance.test.ts:114` pins the 12 unemitted §26 event types and `IntentConstraintRefined` is :141
+     of it. Emitting it produces the event the fixture wants WITHOUT producing the fact Reading A demands. This is
+     the single most likely way this work package gets recorded as done while nothing was built."
+  - "MUST NOT infer a professional meaning from a field that does not carry one — CON-000 AX-6 forbids it by name,
+     and it is why REG-Q-067 was a QUESTION rather than a FINDING."
+tests:
+  - "handler: creating a deferral without a resolvable carrier link is REFUSED."
+  - "gate: a deferral whose carrier is later unreachable REDDENS. CONTROL: a resolvable one stays green."
+  - "CONTROL, and this one is the point: a test asserting that `outOfScope` is NOT read as a deferral anywhere —
+     with a mutant that makes something read it, which MUST redden."
+  - "⚠ A test that FAILS if the deficiency pin shrank without a deferral shape existing. The trap above must be
+     mechanically closed, not merely written down."
+```
+
+```yaml
 id: JAN-SLICE-SWP-03
 title: "RPH-E2E-002..007 admitted as ENGINE Slices; the scenario-class gap closed or explicitly recorded"
 design_obligations: [SL-1, SL-2, SL-3, SL-3a, SL-4, SL-5, SL-6, SL-7, SL-8]
@@ -346,6 +414,18 @@ and `SWP-03`, not inherited from this table:
 or record explicit, reasoned inapplicability. **The absence of a ratified scenario is NOT a reason to call a class
 inapplicable** — the ratified rule requires inapplicability to be explicit, and "no one wrote one" is not a reason.
 
+⚠⚠ **AND AFTER `REG-D-046`, AN INAPPLICABILITY RECORD IS A DEFERRAL AND MUST USE THE DEFERRAL PLANE.** Under
+Reading A a deferral is a first-class fact, so "this class is not covered, and here is why" MUST be recorded through
+`SWP-02a`'s shape and act — **not as prose in a document, and never in `outOfScope`.** This is why `SWP-02a` is
+sequenced before `SWP-03` (§13): writing those records first would settle `REG-Q-067` by accident, which is the
+exact hazard the question was filed to prevent.
+
+**MATERIAL ALREADY WRITTEN, AND IT COVERS THE GAP.** The Field Service reference undertaking's own exceptional
+paths name the missing classes directly: *"Customer cancels"* (cancellation) and *"Network unavailable during field
+update"* (data-unavailable / system-failure), alongside *"Estimate rejected"*, *"Customer requests revision"*,
+*"Technician unavailable"*, *"Job rescheduled"*, *"Work requires follow-up visit"* and *"Technician cannot complete
+work"*. Per `SL-S4`, `SWP-03` MUST draw on these rather than invent scenarios.
+
 ## 10. Assurance, tests, and evidence plan
 
 - Every work package's evidence is **a driven red followed by a driven green**, in that order. A green with no
@@ -365,7 +445,14 @@ inapplicable** — the ratified rule requires inapplicability to be explicit, an
   recorded and the act NOT claimed as verified.
 - **R-4. `SL-S3` (assertion resolution over all 125 rules) is deferred with its blast radius unmeasured.**
   `SWP-01` MUST produce the figure. Deferring it is a decision; deferring it *silently* would be the defect.
-- **D-1. Authentication (C2)** is out of scope and remains `DIV-W0-003`, OPEN.
+- **R-5. `SWP-02a` will be reported as done when a pin shrinks.** The deferral plane has one artifact already
+  authored for it and no producer, so the cheapest-looking route is to emit `IntentConstraintRefined`, watch the
+  deficiency pin fall 12 → 11, and call `REG-Q-067` discharged. The event's payload cannot carry a deferral, so
+  that would produce the fixture's event **and none of the ruling's fact**. `SWP-02a` therefore carries a test that
+  fails if the pin shrank without a deferral shape existing — the trap is closed mechanically, not by warning.
+- **D-1. Authentication (C2)** is out of scope and remains `DIV-W0-003`, OPEN. ⚠ **RULED, not assumed:**
+  `REG-D-046` settled that v1 is not production-facing because the platform JPWB depends on is still in progress.
+  **The ruling is contingent on that external dependency and MUST be revisited when the platform ships.**
 - **D-2. `reconcile`** — one of nine ratified primary verbs and the only WRITE verb with no command anywhere (0 of
   105 registry keys match `/reconcil/i`) — is NOT scoped here and MUST be escalated, not absorbed.
 - **A-1. Assumption, stated so it can be falsified:** the seven ratified statements are assertable against today's
@@ -380,7 +467,8 @@ inapplicable** — the ratified rule requires inapplicability to be explicit, an
 | `SL-2` assertion obligation | SWP-02, SWP-03, SWP-06 |
 | `SL-3` / `SL-3a` predicted red, discriminating mutants | SWP-02, SWP-03, SWP-06 |
 | `SL-4` register binding | every work package |
-| `SL-5` scenario class | SWP-03 (§9) |
+| `SL-5` scenario class | SWP-03 (§9), and its inapplicability records ride `SWP-02a` |
+| `REG-D-046` Ruling 2 — deferral is a first-class fact | SWP-02a |
 | `SL-6` plane and presupposition | SWP-06 |
 | `SL-7` no fabrication | SWP-02, SWP-03, SWP-06 |
 | `SL-8` honest failure | every work package |
@@ -394,8 +482,13 @@ inapplicable** — the ratified rule requires inapplicability to be explicit, an
 
 ## 13. Implementation ordering and concurrency
 
-**Strictly sequential:** `SWP-00` → `SWP-01` → `SWP-02` → `SWP-03` → `SWP-04`. Each MUST observe its predecessor's
-exit condition rather than assert it.
+**Strictly sequential:** `SWP-00` → `SWP-01` → `SWP-02` → **`SWP-02a`** → `SWP-03` → `SWP-04`. Each MUST observe
+its predecessor's exit condition rather than assert it.
+
+⚠ **`SWP-02a` IS SEQUENCED BEFORE `SWP-03` FOR A REASON, NOT FOR TIDINESS.** `SWP-03` must record explicit
+inapplicability for the uncovered scenario classes, and after `REG-D-046` those records are deferrals. Running
+`SWP-03` first would write them in whatever shape was to hand — most likely prose or `outOfScope` — and thereby
+settle `REG-Q-067` by accident in the direction the ruling rejected. **The ordering is the enforcement.**
 
 `SWP-05` MAY run concurrently with `SWP-04` **only** if `SWP-04` is already gated, because concurrency is how
 `SWP-04` gets deferred in practice. `SWP-06` MUST follow `SWP-03` (sponsor ruling: engine plane first).
@@ -408,8 +501,13 @@ The programme's first increment is complete when **all** hold:
 2. All seven `RPH-E2E` rules assert, each with per-clause discriminating mutants driven red.
 3. The Slice Ledger is generated, gated in `gate:fast`, and its `SL-L3` predicate control has been driven red.
 4. No artifact in the tracker census claims an item the ledger derives, and the subsumption gate proves it.
-5. Every one of the eight scenario classes is covered or explicitly recorded inapplicable with a reason.
-6. A register entry exists for each work package recording what it discharged — or `Discharges: none`.
+5. Every one of the eight scenario classes is covered or explicitly recorded inapplicable with a reason, **and
+   every inapplicability record is a first-class deferral**, not prose and not an `outOfScope` entry.
+6. A deferral cannot be created without a resolvable carrier link, and a test proves `outOfScope` is read as a
+   deferral nowhere.
+7. A register entry exists for each work package recording what it discharged — or `Discharges: none`.
+8. ⚠ **`REG-Q-067` is discharged by a deferral SHAPE existing, never by the deficiency pin shrinking.** If the pin
+   moved and no shape exists, the exit criterion is NOT met however green the suite is.
 
 ## 15. ⚠ Why this roadmap carries no `delivery_state`
 
