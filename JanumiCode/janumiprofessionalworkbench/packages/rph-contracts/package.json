@@ -17,6 +17,12 @@
       "types": "./dist/hash.d.ts",
       "import": "./dist/hash.js",
       "default": "./dist/hash.js"
+    },
+    "./slice": {
+      "source": "./src/slice.ts",
+      "types": "./dist/slice.d.ts",
+      "import": "./dist/slice.js",
+      "default": "./dist/slice.js"
     }
   },
   "main": "./dist/index.js",

@@ -29,60 +29,60 @@
       "discovered": "UNKNOWN",
       "excluded": "UNKNOWN",
       "failed": 0,
-      "included": 133,
+      "included": 134,
       "provenance": [
         "subject.selectedFiles#artifactClass=OTHER",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 133
+      "successfullyInventoried": 134
     },
     {
       "artifactClass": "SCRIPT",
-      "discovered": 49,
+      "discovered": 50,
       "excluded": 0,
       "failed": 0,
-      "included": 49,
+      "included": 50,
       "provenance": [
         "subject.selectedFiles#artifactClass=SCRIPT",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 49
+      "successfullyInventoried": 50
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 446,
+      "discovered": 447,
       "excluded": 0,
       "failed": 0,
-      "included": 446,
+      "included": 447,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 446
+      "successfullyInventoried": 447
     },
     {
       "artifactClass": "TEST",
-      "discovered": 478,
+      "discovered": 479,
       "excluded": 0,
       "failed": 0,
-      "included": 478,
+      "included": 479,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 478
+      "successfullyInventoried": 479
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 59,
+      "discovered": 62,
       "excluded": 0,
       "failed": 0,
-      "included": 59,
+      "included": 62,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 59
+      "successfullyInventoried": 62
     }
   ],
   "assuranceSurfaces": {
@@ -377,10 +377,10 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 524,
+        "discovered": 527,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 46,
+        "excluded": 47,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -427,16 +427,17 @@
           "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
           "packages/rph-application/src/handlers/__tests__/floor-fixtures.ts",
           "packages/rph-application/src/handlers/__tests__/plan-fixtures.ts",
-          "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
+          "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts",
+          "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "bf7c1f3c1bd6e09e7eada3b0b7db40baf6a0adeddfb595aaf8689407cb1404b3",
+        "id": "d6c6e62e859e8978f335f133c1bc9072c06866c1149815d8bb2cc5c39d9821bd",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 478,
+        "included": 480,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -905,6 +906,8 @@
           "verif/register-status-truth.test.ts",
           "verif/register-status.test.ts",
           "verif/route-action-census.test.ts",
+          "verif/slice-ledger.test.ts",
+          "verif/slice-scenario-classes.test.ts",
           "verif/source-is-reviewable.test.ts",
           "verif/source-resolution.test.ts",
           "verif/test-modes.test.ts",
@@ -927,7 +930,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "f3776f024feeb8e766eb56bf1e41c502e4f78e50e49a02138469c7bf0a203c47",
+        "selectionDigest": "c3d8573102ae54fabc3e82158e9d842daaedd646d6e533b8aa59bf7af2f41ac1",
         "status": "COMPLETE"
       },
       {
@@ -935,10 +938,10 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 524,
+        "discovered": 527,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 46,
+        "excluded": 47,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -985,16 +988,17 @@
           "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
           "packages/rph-application/src/handlers/__tests__/floor-fixtures.ts",
           "packages/rph-application/src/handlers/__tests__/plan-fixtures.ts",
-          "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
+          "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts",
+          "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "a41cc79303b8fbd122006a256e203ec3f9f494c9fe2094bad9f33fe4c786d796",
+        "id": "5a0a163c29a4bacb2329f2a26b2a8928d8ec35402a2e28a5bf71987ac1ae2474",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 478,
+        "included": 480,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1463,6 +1467,8 @@
           "verif/register-status-truth.test.ts",
           "verif/register-status.test.ts",
           "verif/route-action-census.test.ts",
+          "verif/slice-ledger.test.ts",
+          "verif/slice-scenario-classes.test.ts",
           "verif/source-is-reviewable.test.ts",
           "verif/source-resolution.test.ts",
           "verif/test-modes.test.ts",
@@ -1485,7 +1491,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "b9ba3f49cfe3ba0018910e345db1408e343f3f1f5931af168be738b4183e2ced",
+        "selectionDigest": "63d3cf2a51d4cbbf9ddfa40174ea110c62288c070b281a94a6e31f1d20e73c92",
         "status": "COMPLETE"
       }
     ],
@@ -1958,6 +1964,8 @@
         "verif/register-status-truth.test.ts",
         "verif/register-status.test.ts",
         "verif/route-action-census.test.ts",
+        "verif/slice-ledger.test.ts",
+        "verif/slice-scenario-classes.test.ts",
         "verif/source-is-reviewable.test.ts",
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
@@ -3907,7 +3915,7 @@
       "categories": [
         "TEST"
       ],
-      "command": "bun run csaa:generated-context:check && bun run csaa:inventory:check && bun run csaa:content-store-performance:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
+      "command": "bun run csaa:generated-context:check && bun run csaa:inventory:check && bun run csaa:content-store-performance:check && bun run slices:ledger:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
       "name": "gate:fast",
       "owner": ".",
       "provenance": [
@@ -3972,6 +3980,30 @@
       "owner": ".",
       "provenance": [
         "package.json#/scripts/mutants:preflight"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "OTHER"
+      ],
+      "command": "bun run scripts/slice-ledger.ts --write",
+      "name": "slices:ledger",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/slices:ledger"
+      ],
+      "state": "CONFIGURED_NOT_RUN"
+    },
+    {
+      "categories": [
+        "FRAMEWORK_CHECK"
+      ],
+      "command": "bun run scripts/slice-ledger.ts --check",
+      "name": "slices:ledger:check",
+      "owner": ".",
+      "provenance": [
+        "package.json#/scripts/slices:ledger:check"
       ],
       "state": "CONFIGURED_NOT_RUN"
     },
@@ -5212,7 +5244,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "ed5941069f900bda5a9a72f51ad61ce27ee5564b6964bfa297da16bb28fcc50d",
+    "configurationDigest": "36cfa9bd51876b6967ac0fdc03d0799965a13648ae0d2e24fb202d1594f59da1",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -5313,9 +5345,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 9271,
+          "bytes": 9432,
           "path": "package.json",
-          "sha256": "ea2f9b551d2ae09aca3ab1bfd1dfabc6ecf5dbcde15ab168ca76fbe9e1e8b6e7"
+          "sha256": "858de9ceb69c691c3f820477b80293ba67b21e94a62ef6e56f711bf6fd94ecde"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -5433,9 +5465,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 1467,
+          "bytes": 1631,
           "path": "packages/rph-contracts/package.json",
-          "sha256": "2e751402faeb3e5cd6d72c1335241f283d552f4733e51287a4aa3ff7fdc11ea1"
+          "sha256": "23ef13b73e80ed181159b57b3bed8bf364bd5580610fed3fb2cb80a7abf78eff"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -7355,11 +7387,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "d1fa967248aee6d929177fdeeee7f743b3887a81e6af5085845683a63f05d779",
+          "configClosureDigest": "d9203442a6c02e1c71f21761745890628331cd540f25398a8e97f7ea44ae8947",
           "configPath": "packages/rph-contracts/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "33c7a29f1f303b4b4cb5cce51e2fe0d31b559f174574b14290c8c008ed8fd9a1",
+          "projectResolutionDigest": "9ff840ecaf62298d9231fd6a08acab29c19870095f5d0bbe05636c59d8bcced2",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7374,6 +7406,7 @@
             "packages/rph-contracts/src/index.ts",
             "packages/rph-contracts/src/messages.ts",
             "packages/rph-contracts/src/objects.ts",
+            "packages/rph-contracts/src/slice.ts",
             "packages/rph-contracts/src/validate.ts"
           ]
         },
@@ -7405,11 +7438,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "fdd01f1037888e696f11b64d7b68a73701040af1272bd30a46c6b22e18b4b67a",
+          "configClosureDigest": "a83bf7923e2c917d090cf9f350835e313b69b3a9bc0d91bbeb8fe7a43e40d9d9",
           "configPath": "packages/rph-contracts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "cc56e0d99af9548be03a14f0224f440b0d055fa68376f423ac6ac595b3d58bcb",
+          "projectResolutionDigest": "cb0b3e4c271a9df7914333a41d9719bb364194a745fc2ecd912c390065875367",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7441,6 +7474,7 @@
             "packages/rph-contracts/src/number-integrity.test.ts",
             "packages/rph-contracts/src/objects.test.ts",
             "packages/rph-contracts/src/objects.ts",
+            "packages/rph-contracts/src/slice.ts",
             "packages/rph-contracts/src/validate.test.ts",
             "packages/rph-contracts/src/validate.ts"
           ]
@@ -8175,11 +8209,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "f24af06d07226689723b07be581fc6f80844aca99f2447c4d628fa931375e0c2",
+          "configClosureDigest": "368afc20a236700590d33fff380f05e997ccf7b23bf317c6fd383d2ffcc7d2f6",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "e91020e675ce4086f07e2c7aa9f449d633c33d3f5c801d56bb797397d9675f52",
+          "projectResolutionDigest": "2368b7832f9dca8df4148c76a4329a214e51a488d20c796659da96fd8240a22e",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8218,6 +8252,7 @@
             "scripts/mutants/show.ts",
             "scripts/mutants/tree-baseline.ts",
             "scripts/mutants/verdict.ts",
+            "scripts/slice-ledger.ts",
             "scripts/spec-obligations.ts",
             "scripts/tracker/build.ts",
             "scripts/tracker/bun-sqlite.d.ts",
@@ -8256,11 +8291,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "273ca52526219a2ac8940abab22a615e555083c1f8f87fd17d832c64feb8d39c",
+          "configClosureDigest": "67af6702e5827e236d9bd65320ce4aa6db0cbd498fd6894edf63440acfac6509",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "1fa04b21de83fff28fffe991cded0df638146d6835bb4233ccca66f4fb314fce",
+          "projectResolutionDigest": "599cc85aad9e5888c5b0e1ff13dd71a22516fd17c88f00d0f757db3065e80bec",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8294,11 +8329,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "76d8c51b7bfee6bb63aef19852cb3b153a287543c4858518844435282262a838",
+          "configClosureDigest": "1d7a41a07610843ecb3389f67c54e1e38829de1f1d90c437b72739e4a9d4d242",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d22ad3f6185bf1f33f9158b5743b66d9d29c268b9a687a535bc70678605652e6",
+          "projectResolutionDigest": "e007d08e965c48ad0d54c973eec9590ce9aef3be04a949b04577b29f5d7dafd5",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8345,6 +8380,9 @@
             "verif/register-status-truth.test.ts",
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
+            "verif/slice-ledger.test.ts",
+            "verif/slice-ledger.ts",
+            "verif/slice-scenario-classes.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -8571,10 +8609,10 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 524,
+          "discovered": 527,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 46,
+          "excluded": 47,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -8621,16 +8659,17 @@
             "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
             "packages/rph-application/src/handlers/__tests__/floor-fixtures.ts",
             "packages/rph-application/src/handlers/__tests__/plan-fixtures.ts",
-            "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
+            "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts",
+            "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "bf7c1f3c1bd6e09e7eada3b0b7db40baf6a0adeddfb595aaf8689407cb1404b3",
+          "id": "d6c6e62e859e8978f335f133c1bc9072c06866c1149815d8bb2cc5c39d9821bd",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 478,
+          "included": 480,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9099,6 +9138,8 @@
             "verif/register-status-truth.test.ts",
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
+            "verif/slice-ledger.test.ts",
+            "verif/slice-scenario-classes.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -9121,7 +9162,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "f3776f024feeb8e766eb56bf1e41c502e4f78e50e49a02138469c7bf0a203c47",
+          "selectionDigest": "c3d8573102ae54fabc3e82158e9d842daaedd646d6e533b8aa59bf7af2f41ac1",
           "status": "COMPLETE"
         },
         {
@@ -9129,10 +9170,10 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 524,
+          "discovered": 527,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 46,
+          "excluded": 47,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9179,16 +9220,17 @@
             "apps/rph-demo/e2e/undertaking-scroll.e2e.ts",
             "packages/rph-application/src/handlers/__tests__/floor-fixtures.ts",
             "packages/rph-application/src/handlers/__tests__/plan-fixtures.ts",
-            "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts"
+            "packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts",
+            "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "a41cc79303b8fbd122006a256e203ec3f9f494c9fe2094bad9f33fe4c786d796",
+          "id": "5a0a163c29a4bacb2329f2a26b2a8928d8ec35402a2e28a5bf71987ac1ae2474",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 478,
+          "included": 480,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9657,6 +9699,8 @@
             "verif/register-status-truth.test.ts",
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
+            "verif/slice-ledger.test.ts",
+            "verif/slice-scenario-classes.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -9679,7 +9723,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "b9ba3f49cfe3ba0018910e345db1408e343f3f1f5931af168be738b4183e2ced",
+          "selectionDigest": "63d3cf2a51d4cbbf9ddfa40174ea110c62288c070b281a94a6e31f1d20e73c92",
           "status": "COMPLETE"
         }
       ],
@@ -9932,6 +9976,34 @@
               ],
               "exportName": "./hash",
               "target": "./dist/hash.d.ts"
+            },
+            {
+              "conditions": [
+                "default"
+              ],
+              "exportName": "./slice",
+              "target": "./dist/slice.js"
+            },
+            {
+              "conditions": [
+                "import"
+              ],
+              "exportName": "./slice",
+              "target": "./dist/slice.js"
+            },
+            {
+              "conditions": [
+                "source"
+              ],
+              "exportName": "./slice",
+              "target": "./src/slice.ts"
+            },
+            {
+              "conditions": [
+                "types"
+              ],
+              "exportName": "./slice",
+              "target": "./dist/slice.d.ts"
             },
             {
               "conditions": [
@@ -10370,7 +10442,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "35d949206a2147c0f38eecd2dbc4516eb68315339306bc4f83f26a8877e36294",
+    "fileManifestDigest": "76e391e76101fb8d5aec370ff9ba50005d72910ca21e3f3b60dacf21db593dd2",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10381,7 +10453,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
+          "866f0636b679d70451767ca8e34708cb99db4a2861a061f90926e4f680a8d2c9",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10419,7 +10491,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
+          "866f0636b679d70451767ca8e34708cb99db4a2861a061f90926e4f680a8d2c9",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10476,7 +10548,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1251,
+    "selectedFileCount": 1258,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11600,9 +11672,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 9271,
+        "bytes": 9432,
         "path": "package.json",
-        "sha256": "ea2f9b551d2ae09aca3ab1bfd1dfabc6ecf5dbcde15ab168ca76fbe9e1e8b6e7",
+        "sha256": "858de9ceb69c691c3f820477b80293ba67b21e94a62ef6e56f711bf6fd94ecde",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -16136,9 +16208,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 1467,
+        "bytes": 1631,
         "path": "packages/rph-contracts/package.json",
-        "sha256": "2e751402faeb3e5cd6d72c1335241f283d552f4733e51287a4aa3ff7fdc11ea1",
+        "sha256": "23ef13b73e80ed181159b57b3bed8bf364bd5580610fed3fb2cb80a7abf78eff",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -17087,6 +17159,13 @@
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
+        "artifactClass": "SOURCE",
+        "bytes": 5961,
+        "path": "packages/rph-contracts/src/slice.ts",
+        "sha256": "8b7e438d939d2fd72962e0b21c30913207aca93edd49a481635c922521049a6f",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
         "artifactClass": "TEST",
         "bytes": 12234,
         "path": "packages/rph-contracts/src/validate.test.ts",
@@ -17899,6 +17978,13 @@
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
+        "artifactClass": "TEST",
+        "bytes": 2709,
+        "path": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
+        "sha256": "7cf1f5f5aba0004a1f02fcc3e16944d674c45f27f01497b33c2215209f4082c8",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
         "artifactClass": "CONFIGURATION",
         "bytes": 107,
         "path": "packages/rph-engine/tsconfig.build.json",
@@ -18684,6 +18770,13 @@
       },
       {
         "artifactClass": "SCRIPT",
+        "bytes": 4940,
+        "path": "scripts/slice-ledger.ts",
+        "sha256": "729f255a7d6bc62a3e9e1780d50481046ecea59107a1e972f146a07a60ed6497",
+        "subjectArtifactClass": "SCRIPT"
+      },
+      {
+        "artifactClass": "SCRIPT",
         "bytes": 20000,
         "path": "scripts/spec-obligations.ts",
         "sha256": "b06d00b043acabdd85701eb6c977b372f834cb8f3a4955b612ec9fb3321c9b77",
@@ -18945,7 +19038,7 @@
         "artifactClass": "VERIFICATION",
         "bytes": 78070,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "facb80996bc3162681e5e4dade8fabe624e0485274215b769943f66a5bfc92a0",
+        "sha256": "2f47e0ae3202661765aecd733e5f3d54129ea2c71ae7ff1f4ed22fa7223771b2",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19118,6 +19211,34 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 11498,
+        "path": "verif/slice-ledger.test.ts",
+        "sha256": "e7240afdf6eedbd87da96a464facaf79c7dc0a2497e5d186d69d031f68f7359e",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 23483,
+        "path": "verif/slice-ledger.ts",
+        "sha256": "824032f006c8f046448929916f80cd351e80fccd09df48a822ed1bb49362dfc5",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 3303,
+        "path": "verif/slice-scenario-classes.test.ts",
+        "sha256": "e20958c83494572a801fbe58307953ac6630e6372b8f3c6897bb35555ce64b03",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 134,
+        "path": "verif/slices/slice-ledger.baseline.json",
+        "sha256": "70377e39a9aa3fbd1ea275125450b0b4f55b7a71ce3dcaa8fb9825a1d6f44463",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 6205,
         "path": "verif/source-is-reviewable.test.ts",
         "sha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
@@ -19236,7 +19357,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "3bcae6e968d694993522f1f6a43ff16810ee698b146450e756b97f68ca5ff922",
+    "subjectId": "7a09f7f8bfa7dfdf447fdedb02eb6b7ae16539e7d4425ab5752f3a70cbaae486",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -19264,7 +19385,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
+            "866f0636b679d70451767ca8e34708cb99db4a2861a061f90926e4f680a8d2c9",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -19398,7 +19519,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
+            "866f0636b679d70451767ca8e34708cb99db4a2861a061f90926e4f680a8d2c9",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -21015,7 +21136,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 10,
+      "candidateArtifactCount": 11,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -21051,6 +21172,7 @@
         "packages/rph-contracts/src/index.ts",
         "packages/rph-contracts/src/messages.ts",
         "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/slice.ts",
         "packages/rph-contracts/src/validate.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",
@@ -21059,7 +21181,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 28,
+      "candidateArtifactCount": 29,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -21112,6 +21234,7 @@
         "packages/rph-contracts/src/number-integrity.test.ts",
         "packages/rph-contracts/src/objects.test.ts",
         "packages/rph-contracts/src/objects.ts",
+        "packages/rph-contracts/src/slice.ts",
         "packages/rph-contracts/src/validate.test.ts",
         "packages/rph-contracts/src/validate.ts"
       ],
@@ -21749,7 +21872,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 42,
+      "candidateArtifactCount": 43,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -21811,6 +21934,7 @@
         "scripts/mutants/show.ts",
         "scripts/mutants/tree-baseline.ts",
         "scripts/mutants/verdict.ts",
+        "scripts/slice-ledger.ts",
         "scripts/spec-obligations.ts",
         "scripts/tracker/build.ts",
         "scripts/tracker/bun-sqlite.d.ts",
@@ -21857,7 +21981,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 54,
+      "candidateArtifactCount": 57,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -21927,6 +22051,9 @@
         "verif/register-status-truth.test.ts",
         "verif/register-status.test.ts",
         "verif/route-action-census.test.ts",
+        "verif/slice-ledger.test.ts",
+        "verif/slice-ledger.ts",
+        "verif/slice-scenario-classes.test.ts",
         "verif/source-is-reviewable.test.ts",
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
@@ -23259,6 +23386,23 @@
       "role": "SCRIPT"
     },
     {
+      "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/slice-ledger.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "729f255a7d6bc62a3e9e1780d50481046ecea59107a1e972f146a07a60ed6497",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "FILESYSTEM_OR_TEXT",
+      "gateCarriers": [
+        "package.json#/scripts/slices:ledger",
+        "package.json#/scripts/slices:ledger:check",
+        "verif/slice-ledger.test.ts"
+      ],
+      "path": "scripts/slice-ledger.ts",
+      "provenance": [
+        "scripts/slice-ledger.ts"
+      ],
+      "role": "SCRIPT"
+    },
+    {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/spec-obligations.ts at execution time.",
       "associatedBaselines": [],
       "contentSha256": "b06d00b043acabdd85701eb6c977b372f834cb8f3a4955b612ec9fb3321c9b77",
@@ -23746,7 +23890,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "facb80996bc3162681e5e4dade8fabe624e0485274215b769943f66a5bfc92a0",
+      "contentSha256": "2f47e0ae3202661765aecd733e5f3d54129ea2c71ae7ff1f4ed22fa7223771b2",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -24145,6 +24289,53 @@
       "path": "verif/route-action-census.test.ts",
       "provenance": [
         "verif/route-action-census.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-ledger.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "e7240afdf6eedbd87da96a464facaf79c7dc0a2497e5d186d69d031f68f7359e",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/slice-ledger.test.ts"
+      ],
+      "path": "verif/slice-ledger.test.ts",
+      "provenance": [
+        "verif/slice-ledger.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Repository syntax and declarations selected by verif/slice-ledger.ts at execution time.",
+      "associatedBaselines": [],
+      "contentSha256": "824032f006c8f046448929916f80cd351e80fccd09df48a822ed1bb49362dfc5",
+      "disposition": "WRAP",
+      "extractionMethod": "TYPESCRIPT_AST",
+      "gateCarriers": [
+        "verif/slice-ledger.test.ts"
+      ],
+      "path": "verif/slice-ledger.ts",
+      "provenance": [
+        "verif/slice-ledger.ts"
+      ],
+      "role": "ANALYZER"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-scenario-classes.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "e20958c83494572a801fbe58307953ac6630e6372b8f3c6897bb35555ce64b03",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/slice-scenario-classes.test.ts"
+      ],
+      "path": "verif/slice-scenario-classes.test.ts",
+      "provenance": [
+        "verif/slice-scenario-classes.test.ts"
       ],
       "role": "TEST"
     },

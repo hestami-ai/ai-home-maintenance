@@ -2114,9 +2114,9 @@
     },
     {
       "artifactClass": "MANIFEST",
-      "bytes": 9271,
+      "bytes": 9432,
       "path": "package.json",
-      "sha256": "ea2f9b551d2ae09aca3ab1bfd1dfabc6ecf5dbcde15ab168ca76fbe9e1e8b6e7"
+      "sha256": "858de9ceb69c691c3f820477b80293ba67b21e94a62ef6e56f711bf6fd94ecde"
     },
     {
       "artifactClass": "TOOL_CONFIGURATION",
@@ -2155,7 +2155,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "b71be7f1ad3becb03740edfd76ee7ef92352356d538ba27f9297c3b0318043cc",
+  "inputManifestDigest": "866f0636b679d70451767ca8e34708cb99db4a2861a061f90926e4f680a8d2c9",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"
