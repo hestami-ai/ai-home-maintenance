@@ -496,8 +496,22 @@ work"*. Per `SL-S4`, `SWP-03` MUST draw on these rather than invent scenarios.
   changing it afterwards rewrites every Slice.
 - **R-3. `RPH-E2E-006` needs a real restart.** If the harness cannot drive one, `SL-7` requires the substitution be
   recorded and the act NOT claimed as verified.
-- **R-4. `SL-S3` (assertion resolution over all 125 rules) is deferred with its blast radius unmeasured.**
-  `SWP-01` MUST produce the figure. Deferring it is a decision; deferring it *silently* would be the defect.
+- ~~**R-4. `SL-S3` (assertion resolution over all 125 rules) is deferred with its blast radius unmeasured.**
+  `SWP-01` MUST produce the figure. Deferring it is a decision; deferring it *silently* would be the defect.~~
+  **R-4 — MEASURED 2026-08-30: 40 of 99.** Of the 125 rules, only **99** cite a real path at all (8 cite a glob,
+  11 cite prose, 7 cite nothing — and those 26 have never had their citation checked by anything). Applying the
+  naive predicate *"the cited file must contain the literal rule id"* to the 99: **40 fail — 34 PARTIAL, 6 COVERED.**
+  ⚠ **THIS IS NOT A COUNT OF COVERAGE GAPS, AND READING IT AS ONE WOULD BE THE PROGRAMME'S SIGNATURE DEFECT.**
+  Every one of the 6 COVERED failures traces to a green assertion: 5 are mis-cites (the rule IS asserted, in a
+  different file) and 2 are asserted over a DERIVED set whose ids live in the producing module and therefore can
+  never appear in the test. The 34 PARTIAL failures are the predicate applied to FAMILY rows whose notes already
+  say what is pending — 14 from one file that labels by `Inv-N` and § rather than by rule id.
+  ⚠⚠ **AND THE OBVIOUS REPAIR IS A TRAP.** 38 of the strict failures DO have their id somewhere in a test file,
+  so "re-cite it to the file that mentions it" looks mechanical. In 28 and 36 cases respectively the sole
+  occurrence is a `': null,'` probe-map entry meaning **explicitly NOT probed here**, and one of those files'
+  own header says it *"asserts the engine ACCEPTS"* what the rule forbids. **A mechanical re-cite would certify
+  up to 38 rules on proof of the opposite.** `SL-S3` therefore stays a SHOULD, and any future scheduling of it
+  MUST treat id-presence as a starting question rather than an answer.
 - **R-5. `SWP-02a` will be reported as done when a pin shrinks.** The deferral plane has one artifact already
   authored for it and no producer, so the cheapest-looking route is to emit `IntentConstraintRefined`, watch the
   deficiency pin fall 12 → 11, and call `REG-Q-067` discharged. The event's payload cannot carry a deferral, so
