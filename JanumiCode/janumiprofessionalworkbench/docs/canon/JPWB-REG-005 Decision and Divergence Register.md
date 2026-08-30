@@ -27423,3 +27423,65 @@ so in a numbered list; the parenthetical that made it look ambiguous is a lossy 
   `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` carries the ruling in its
   docblock and cites this entry. **Owed and named, not done here:** the `m12-conformance.json` statement repair;
   the engine remedy for the two precedence violations. Status: EFFECTIVE.
+
+---
+
+### REG-F-295 — the generated contracts are CORRECT today and nothing would notice if they were not: `gen` is in
+no gate, and the shape authority the constitution names is the one artifact with no staleness check
+
+- **Date:** 2026-08-30 · **Type:** STRUCTURAL INSTRUMENT GAP · **Class:** FINDING — latent, not live ·
+  **Status:** OPEN — the gap is measured and the remedy is one already-built pattern away; not taken here.
+
+- **FOUND WHILE GROUNDING `JAN-SLICE-SWP-02a`**, which must add a first-class object type and therefore edits
+  `vocab/` and regenerates. Before editing a generated surface it is worth knowing what protects it. Nothing does.
+
+- **MEASURED.** `packages/rph-contracts/src/objects.ts` opens *"GENERATED FILE — do not edit by hand. Regenerate
+  with `bun run gen:objects`. Source: vocab/m1-object-fields.json"*. The package's `gen` script chains
+  `gen-enums → gen-objects → gen-messages → emit → prettier`. **`gen` appears in no gate:** `gate:fast`'s
+  fourteen steps are `csaa:generated-context:check`, `csaa:inventory:check`,
+  `csaa:content-store-performance:check`, `slices:ledger:check`, `tracker:build`, `check-types`, `lint`,
+  `boundary`, `build`, `test`, `test:coverage`, then the demo's `check` and `e2e`. No `gen`, no `gen:check`.
+
+- **SEARCHED FOR A COMPARER, WITH A POSITIVE CONTROL.** `grep -rln 'gen-objects|genObjects|m1-object-fields'`
+  over `verif` and `packages` returns ten files; each was read and **none regenerates and compares**. The nearest,
+  `verif/contract-number-census.test.ts`, asserts a PROPERTY OF the generated contracts (no schema admits a
+  non-integer number) — not that they match their source. **POSITIVE CONTROL, same search shape:**
+  `jan-csaa-005.inventory.baseline` returns `run-inventory.ts` and `inventory.test.ts`, a thing that IS gated —
+  so the search finds comparers where comparers exist.
+
+- **⚠ AND THE ARTIFACT IS CURRENT, WHICH IS WHY THIS IS LATENT AND NOT A DEFECT.** `bun run gen` was DRIVEN in a
+  clean tree: exit 0, and `git status --porcelain -- packages/rph-contracts/src` returned **empty**. The
+  committed contracts match their vocab today. **The finding is that nothing would say so if they stopped.**
+  A vocab edit without regeneration, or a hand-edit of a file whose first line forbids hand-edits, passes every
+  gate this repository runs.
+
+- **⚠⚠ WHY THIS ONE MATTERS MORE THAN AN ORDINARY UNGATED SCRIPT.** `JPWB-CON-000 B1` names *"the repository's
+  generated contracts, schemas, migrations, and conformance tests as **shape authority**"*, and closes with:
+  *"A shape reference that no type check or conformance test enforces asserts a status nothing performs (B7)."*
+  The generated contracts ARE the named shape authority, and the property that makes them authoritative — being
+  the faithful emission of the ratified vocab — is the one property nothing checks. The constitution's own
+  sentence describes the gap in the artifact the sentence is about.
+
+- **THE REMEDY IS ALREADY BUILT, ONE LAYER OVER.** `scripts/slice-ledger.ts` (`JAN-SLICE-SWP-01`) is the
+  `--write` / `--check` pattern applied to a derived artifact, itself modelled on `csaa:inventory:check`:
+  regenerate in memory, byte-compare against the committed bytes, report per-path
+  `{actualBytes, actualSha256, expectedBytes, expectedSha256, path}`, exit 1 on difference, and wire the `:check`
+  half into `gate:fast`. A `contracts:gen:check` is the same shape over `enums.ts`, `objects.ts` and
+  `messages.ts`. ⚠ **NOT TAKEN IN THIS ENTRY, DELIBERATELY:** it is not `SWP-02a`'s scope, and smuggling an
+  adjacent gate into a work package is the quiet scope drift this programme has recorded against itself. It is
+  recorded as owed so the decision is the sponsor's rather than mine.
+
+- **⚠ THE GENERAL FORM, ASKED RATHER THAN LEFT AS A RESIDUAL — AND IT IS THREE PACKAGES, NOT ONE.** The first
+  draft of this entry scoped the search to `rph-contracts` and left the general form as a next step. Deriving it
+  cost one command. Files declaring themselves generated, excluding CSAA and `dist`: **six**, across **three**
+  packages — `rph-contracts/src/{enums,objects,messages}.ts` (source `vocab/`),
+  `rph-domain/src/transitions.data.ts`, and `rph-product-realization-pwa/src/ontology.data.ts`. Each package
+  carries its own `gen` script (`gen`, `gen:format`, plus per-artifact entries). **None of the three is in any
+  gate.**
+  > **DRIVEN, all three, in a clean tree:** each `bun run gen` exited 0 and
+  > `git status --porcelain` over the three `src` trees returned **empty**. Every generated surface in this
+  > repository is current, and not one of them is checked. The gap is uniform, which makes a single
+  > `--write`/`--check` shape applicable to all three rather than three bespoke gates.
+
+- **Merge target:** **Repository** — a `contracts:gen:check` modelled on `slice-ledger.ts`, wired into
+  `gate:fast`; and the general-form sweep over every other generated surface. Status: OPEN.
