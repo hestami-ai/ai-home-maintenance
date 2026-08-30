@@ -32,7 +32,8 @@ Both layers key on the word "slice". They catch a Slice that was **MOVED**. They
 
 ### Slices
 
-**None.** No file matches the recognition predicate. This is the true state, not an error —
-`SWP-02` admits the first Slice.
+| id | plane | scenario class | cited rules | mutants | discharges | source |
+|---|---|---|---|---|---|---|
+| `E2E-001` | ENGINE | normal path | `RPH-E2E-001` | 3 | — | `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` |
 
 <!-- JAN-SLICE:GENERATED-LEDGER:END -->

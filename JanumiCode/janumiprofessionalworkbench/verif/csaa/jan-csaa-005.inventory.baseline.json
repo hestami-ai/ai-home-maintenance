@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 479,
+      "discovered": 480,
       "excluded": 0,
       "failed": 0,
-      "included": 479,
+      "included": 480,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 479
+      "successfullyInventoried": 480
     },
     {
       "artifactClass": "VERIFICATION",
@@ -377,7 +377,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 527,
+        "discovered": 528,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 47,
@@ -431,13 +431,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "d6c6e62e859e8978f335f133c1bc9072c06866c1149815d8bb2cc5c39d9821bd",
+        "id": "4d1df075598dbbc55b6faff99880cd9517b609f8fabea53245850e08bd80c6a7",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 480,
+        "included": 481,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -842,6 +842,7 @@
           "packages/rph-engine/src/seed-finding-definitions.test.ts",
           "packages/rph-engine/src/seed-policy-arrays.test.ts",
           "packages/rph-engine/src/seed-workbench.test.ts",
+          "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
           "packages/rph-engine/src/waiver-attachment-live.test.ts",
           "packages/rph-persistence/src/durability.test.ts",
           "packages/rph-persistence/src/schema-migration.test.ts",
@@ -930,7 +931,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "c3d8573102ae54fabc3e82158e9d842daaedd646d6e533b8aa59bf7af2f41ac1",
+        "selectionDigest": "8404fa31493330ac21b978299826c8c85695521f902952bbe46c57a563421251",
         "status": "COMPLETE"
       },
       {
@@ -938,7 +939,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 527,
+        "discovered": 528,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 47,
@@ -992,13 +993,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "5a0a163c29a4bacb2329f2a26b2a8928d8ec35402a2e28a5bf71987ac1ae2474",
+        "id": "a4f6456015d5d72f56fb2c83f30af01f52775f4796c7c6329a1eff9ffb0f3ded",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 480,
+        "included": 481,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1403,6 +1404,7 @@
           "packages/rph-engine/src/seed-finding-definitions.test.ts",
           "packages/rph-engine/src/seed-policy-arrays.test.ts",
           "packages/rph-engine/src/seed-workbench.test.ts",
+          "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
           "packages/rph-engine/src/waiver-attachment-live.test.ts",
           "packages/rph-persistence/src/durability.test.ts",
           "packages/rph-persistence/src/schema-migration.test.ts",
@@ -1491,7 +1493,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "63d3cf2a51d4cbbf9ddfa40174ea110c62288c070b281a94a6e31f1d20e73c92",
+        "selectionDigest": "505707bdb5fc2893810708a743a2a17c1c51045640b8b20beb032f10ba3d57d2",
         "status": "COMPLETE"
       }
     ],
@@ -1900,6 +1902,7 @@
         "packages/rph-engine/src/seed-finding-definitions.test.ts",
         "packages/rph-engine/src/seed-policy-arrays.test.ts",
         "packages/rph-engine/src/seed-workbench.test.ts",
+        "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
         "packages/rph-engine/src/waiver-attachment-live.test.ts",
         "packages/rph-persistence/src/durability.test.ts",
         "packages/rph-persistence/src/schema-migration.test.ts",
@@ -5244,7 +5247,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "36cfa9bd51876b6967ac0fdc03d0799965a13648ae0d2e24fb202d1594f59da1",
+    "configurationDigest": "53c04683849c139007cc0b6a920dead5261b0453f77b415892cdc9a724c9d1d7",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -7714,7 +7717,7 @@
           "configPath": "packages/rph-engine/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "9dcbc839dd0554919c1cc8070961256ae0ab6f849a6254cee9b4c82854eb970e",
+          "projectResolutionDigest": "f9400804f9a570776cb5747c9f8628dcc9e76d69540983b20d5ef31ff239e081",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7764,6 +7767,7 @@
             "packages/rph-engine/src/seed-policy-arrays.test.ts",
             "packages/rph-engine/src/seed-workbench.test.ts",
             "packages/rph-engine/src/seed-workbench.ts",
+            "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
             "packages/rph-engine/src/waiver-attachment-live.test.ts"
           ]
         },
@@ -8609,7 +8613,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 527,
+          "discovered": 528,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 47,
@@ -8663,13 +8667,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "d6c6e62e859e8978f335f133c1bc9072c06866c1149815d8bb2cc5c39d9821bd",
+          "id": "4d1df075598dbbc55b6faff99880cd9517b609f8fabea53245850e08bd80c6a7",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 480,
+          "included": 481,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9074,6 +9078,7 @@
             "packages/rph-engine/src/seed-finding-definitions.test.ts",
             "packages/rph-engine/src/seed-policy-arrays.test.ts",
             "packages/rph-engine/src/seed-workbench.test.ts",
+            "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
             "packages/rph-engine/src/waiver-attachment-live.test.ts",
             "packages/rph-persistence/src/durability.test.ts",
             "packages/rph-persistence/src/schema-migration.test.ts",
@@ -9162,7 +9167,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "c3d8573102ae54fabc3e82158e9d842daaedd646d6e533b8aa59bf7af2f41ac1",
+          "selectionDigest": "8404fa31493330ac21b978299826c8c85695521f902952bbe46c57a563421251",
           "status": "COMPLETE"
         },
         {
@@ -9170,7 +9175,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 527,
+          "discovered": 528,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 47,
@@ -9224,13 +9229,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "5a0a163c29a4bacb2329f2a26b2a8928d8ec35402a2e28a5bf71987ac1ae2474",
+          "id": "a4f6456015d5d72f56fb2c83f30af01f52775f4796c7c6329a1eff9ffb0f3ded",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 480,
+          "included": 481,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9635,6 +9640,7 @@
             "packages/rph-engine/src/seed-finding-definitions.test.ts",
             "packages/rph-engine/src/seed-policy-arrays.test.ts",
             "packages/rph-engine/src/seed-workbench.test.ts",
+            "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
             "packages/rph-engine/src/waiver-attachment-live.test.ts",
             "packages/rph-persistence/src/durability.test.ts",
             "packages/rph-persistence/src/schema-migration.test.ts",
@@ -9723,7 +9729,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "63d3cf2a51d4cbbf9ddfa40174ea110c62288c070b281a94a6e31f1d20e73c92",
+          "selectionDigest": "505707bdb5fc2893810708a743a2a17c1c51045640b8b20beb032f10ba3d57d2",
           "status": "COMPLETE"
         }
       ],
@@ -10442,7 +10448,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "43832fe7f160fc72543701e08f478e0c4df21989eb144ff3436d517114c04daa",
+    "fileManifestDigest": "622d9dd2659d3f5e397e23854ac8fb480f8adc034cea2e1a53c35f3b706dfffc",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10548,7 +10554,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1258,
+    "selectedFileCount": 1259,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -17916,9 +17922,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 21948,
+        "bytes": 23542,
         "path": "packages/rph-engine/src/replay-conformance.test.ts",
-        "sha256": "40557912dce1e193dc15db226f1d443e1326229fe03a7d465eae3d6e64c01497",
+        "sha256": "68270db563e0b7d5777b68cd7e045aed5c0f8ff1d05dda7714916541cdafbd42",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -17969,6 +17975,13 @@
         "path": "packages/rph-engine/src/seed-workbench.ts",
         "sha256": "ea60a7a72723ce5c3bb42217a298163e910aee726882358831f901f93c9285d9",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 14200,
+        "path": "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
+        "sha256": "ff1bb03f779c4e631cc76b8c2968b07b9cf1b2948831391ab2e84a47318c85ec",
+        "subjectArtifactClass": "TEST_SOURCE"
       },
       {
         "artifactClass": "TEST",
@@ -19232,9 +19245,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 134,
+        "bytes": 538,
         "path": "verif/slices/slice-ledger.baseline.json",
-        "sha256": "70377e39a9aa3fbd1ea275125450b0b4f55b7a71ce3dcaa8fb9825a1d6f44463",
+        "sha256": "1e41ee539978c840cfea69d2be50fa56d83a08c7baa7034f8c6e2d8ef8260aef",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -19357,7 +19370,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "082ef402493d2b726f90a16619779e67902a534d8e48f92f7b166bd37963dccb",
+    "subjectId": "e4b8d5bd375884a3afa4127153910dcfa96f54862b62be31bc52c6e5e2ca90a6",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -21429,7 +21442,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 45,
+      "candidateArtifactCount": 46,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -21500,6 +21513,7 @@
         "packages/rph-engine/src/seed-policy-arrays.test.ts",
         "packages/rph-engine/src/seed-workbench.test.ts",
         "packages/rph-engine/src/seed-workbench.ts",
+        "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
         "packages/rph-engine/src/waiver-attachment-live.test.ts"
       ],
       "resolvedRootState": "RESOLVED_DWP002",

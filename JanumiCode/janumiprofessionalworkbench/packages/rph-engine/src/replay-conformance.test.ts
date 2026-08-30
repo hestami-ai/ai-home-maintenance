@@ -142,6 +142,26 @@ describe('the §26 oracle pointed at the live engine', () => {
 	// being representative: it claims only that where the corpus puts A wholly before B, the engine does not put
 	// B first. A representative trace can omit acts; it cannot invert the ones it names.
 	//
+	// ⚠⚠ TWENTY-THREE PAIRS ARE NOT TWENTY-THREE DEFECTS, AND READING THEM THAT WAY WOULD MISDESCRIBE THE ENGINE.
+	// Grouped by which act is emitted too late, the 23 collapse to SEVEN acts — and every one is an act the
+	// ratified trace places EARLY that the engine emits LATE:
+	//
+	//     AssuranceAssessmentStarted    11 pairs   ratified seq  9   live first @49
+	//     AssuranceObservationRecorded   3 pairs   ratified seq 10   live first @330
+	//     ClaimAsserted                  3 pairs   ratified seq 19   live first @37
+	//     AssumptionDetected             2 pairs   ratified seq  5   live first @112
+	//     PwuShapingStarted              2 pairs   ratified seq 18   live first @32
+	//     DecisionProposed               1 pair    ratified seq 12   live first @73
+	//     DecisionEffective              1 pair    ratified seq 13   live first @74
+	//
+	// And the seven are ONE STRUCTURAL FACT. §26's first sixteen steps are a complete assure -> decide -> approve
+	// -> baseline cycle on the INTENT, before any downstream work begins. This drive defers all of it: it proposes
+	// the PWUs and decomposes them first, then assures, decides and baselines at the end. **The ratified journey
+	// governs each stage before starting the next; this one builds everything and governs afterwards.** For a
+	// product whose thesis is that intent, evidence and authority are preserved AS THE WORK PROCEEDS, that is a
+	// difference in kind and not a scheduling detail. The pin is a list of pairs because pairs are what can be
+	// mechanically derived; the defect is the interleaving.
+	//
 	// ⚠ CONTROL AGAINST THE OTHER CONFOUND: the same derivation run against `seedWorkbench` — a DIFFERENT drive,
 	// 446 events across several undertakings rather than 332 across one — yields the SAME 23 of 198. The count
 	// is structural to the drive logic, not an artifact of what else the seed happens to build.

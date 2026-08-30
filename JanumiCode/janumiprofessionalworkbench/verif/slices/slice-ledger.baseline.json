@@ -1,5 +1,18 @@
 {
   "canary": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
-  "recognisedCount": 0,
-  "rows": []
+  "recognisedCount": 1,
+  "rows": [
+    {
+      "citedRules": [
+        "RPH-E2E-001"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-001",
+      "mutantCount": 3,
+      "path": "packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "normal path",
+      "title": "The normal intent-to-architecture journey reaches its five ratified outcomes"
+    }
+  ]
 }
