@@ -1580,6 +1580,44 @@
 					"note": "The machine axis — ValidatorRegistryEntry.status."
 				}
 			]
+		},
+		{
+			"objectType": "DEFERRAL",
+			"tsName": "DeferralObject",
+			"idPrefixEntity": "DEFERRAL",
+			"note": "REG-D-046 Ruling 2 (REG-Q-067 Reading A, 2026-08-30): ASR-9 limb 10 binds the ENGINE, so a deferral is a governed object rather than a professional habit. Extends ObjectEnvelope. FIELDS ARE TRACED, NOT INVENTED: statement from ASR-9 limb 10 and RPH-FIX-006; subjectObjectIds from the ruling’s own words (\"named scope was moved out of this unit’s work\"); carrierObjectIds is PLURAL because RPH-FIX-006 is conjunctive (\"an assumption or constraint, a residual condition, a baseline scope statement, AND a future implementation obligation where applicable\") — the SWP-02a roadmap said \"the carrier object\", singular, which is narrower than the corpus it serves; rationale from ASR-5 (\"gaps are never silent\"). revisitCondition IS REQUIRED AND ITS GROUND IS DISCLOSED (REG-F-296): it encodes \"postponed rather than abandoned\" without a tautological status field, resting on DOC-003 §3 — \"deferred with an explicit review condition\", the only one of five dispositions carrying a mandatory qualifier. That meaning was AUTHORED BY THE FINALIZER, flagged NEW, referred to the sponsor as REG-E-021, then DEFERRED to its safe default by REG-D-010. It stands as drafted, not confirmed; if REG-E-021 is ever confirmed otherwise, the requiredness of this field is what moves. NO status FIELD AND NO LIFECYCLE: neither is traced to the professional corpus, and both remain sponsor proposals rather than built.",
+			"fields": [
+				{
+					"field": "statement",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "subjectObjectIds",
+					"type": "string[]",
+					"required": true
+				},
+				{
+					"field": "carrierObjectIds",
+					"type": "string[]",
+					"required": true
+				},
+				{
+					"field": "revisitCondition",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "rationale",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "authority",
+					"type": "AuthorityReference",
+					"required": true
+				}
+			]
 		}
 	],
 	"helperSubTypes": [

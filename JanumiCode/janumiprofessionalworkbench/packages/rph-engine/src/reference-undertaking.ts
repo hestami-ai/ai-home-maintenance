@@ -1318,6 +1318,43 @@ export function driveReferenceUndertaking(
 		materiality: 'MATERIAL'
 	});
 
+	// ── THE DEFERRAL ITSELF (JAN-SLICE-SWP-02a, REG-D-046 Ruling 2) ──────────────────────────────────────────
+	//
+	// ⚠ THE ASSUMPTION ABOVE IS A CARRIER, NOT THE DEFERRAL. `ASR-9` limb 10 requires deferred scope to stay
+	// REPRESENTED "as assumption, constraint, residual condition, baseline scope statement, or future
+	// obligation" — those are the things that CARRY it. Until now the engine had the carriers and no deferral
+	// for any of them to carry: `grep -c -i defer` over the contracts returned 0/0/0. The sponsor ruled the limb
+	// binds the ENGINE, so the fact is minted here rather than left implied by the objects around it.
+	//
+	// ⚠ AND THIS DRIVE IS WHY THE GATE IS NOT VACUOUS. A carrier-link gate over a population that never defers
+	// anything is green because it looked at nothing — the defect class this repository has recorded against
+	// itself more than any other. The corpus's own worked example defers exactly one thing; recording it here is
+	// what gives the gate a real subject. The repository's censuses enforced this: a ratified command nothing
+	// dispatches and an event nothing emits both redden, and they did.
+	// ⚠ MINT ONCE. A first draft called mintId('dfr') twice — once for the aggregate and once for the payload —
+	// which would have given the object and the fact it records two different identities, silently.
+	const deferralId = mintId('dfr');
+	send('DeferScope', 'DEFERRAL', deferralId, {
+		deferralId,
+		statement: REFERENCE_OPEN_RESIDUALS[0],
+		subjectObjectIds: [R.mobileOffline],
+		// PLURAL because RPH-FIX-006 is conjunctive: "an assumption or constraint, a residual condition, a
+		// baseline scope statement, AND a future implementation obligation where applicable".
+		carrierObjectIds: [assumptionId],
+		// DOC-003 §3 — "deferred with an explicit review condition". The condition is what makes this POSTPONED
+		// rather than abandoned; see REG-F-296 for the disclosed ground of its requiredness.
+		revisitCondition:
+			'Reconsidered when field connectivity telemetry shows sustained offline periods at job start, or at the next Architecture Baseline, whichever is first.',
+		rationale:
+			'First-increment scope decision: connectivity is assumed at job start and sync is deferred, so offline behavior is carried rather than built.',
+		authority: {
+			authorityId: 'auth_architecture_lead',
+			authorityType: 'ORGANIZATIONAL_ROLE',
+			scope: ['ARCHITECTURE'],
+			validFrom: '2026-07-12T00:00:00Z'
+		}
+	});
+
 	// Architecture: satisfied, then BASELINED through the ratified chain — create, submit for review, an
 	// authorizing PROMOTE_BASELINE decision made effective, approve, promote — and only then the controller's
 	// hop, citing the baseline and the decision that authorized it. DOC-002 §8.1's Given for this arrow is

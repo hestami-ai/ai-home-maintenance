@@ -618,7 +618,8 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'UNDERTAKING',
 	'AUTHORING_CONVERSATION',
 	'RECURSIVE_PROFESSIONAL_HARNESS',
-	'VALIDATOR_REGISTRY_ENTRY'
+	'VALIDATOR_REGISTRY_ENTRY',
+	'DEFERRAL'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 

@@ -147,6 +147,9 @@ describe('validate', () => {
 		// `CompletePwuRecompositionPayload`, `PwuRecompositionBegunPayload`, `PwuRecomposedPayload`. +4
 		// rather than +2 because BOTH commands mint a new event shape; a command reusing an existing
 		// payload moves this by less (REG-F-131's `IntentSupersededPayload` moved it by 1).
-		expect(buildContractRegistry().ids()).toHaveLength(360);
+		// 360 -> 363 (2026-08-30, JAN-SLICE-SWP-02a / REG-D-046 Ruling 2): `DeferralObject`,
+		// `DeferScopePayload`, `ScopeDeferredPayload`. +3 and not +4 — one object schema plus a command/event
+		// pair that mint one payload shape each, which is the same arithmetic the S-1b note above records.
+		expect(buildContractRegistry().ids()).toHaveLength(363);
 	});
 });

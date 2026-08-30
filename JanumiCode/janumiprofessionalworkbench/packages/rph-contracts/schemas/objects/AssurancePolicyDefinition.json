@@ -30,7 +30,8 @@
         "UNDERTAKING",
         "AUTHORING_CONVERSATION",
         "RECURSIVE_PROFESSIONAL_HARNESS",
-        "VALIDATOR_REGISTRY_ENTRY"
+        "VALIDATOR_REGISTRY_ENTRY",
+        "DEFERRAL"
       ]
     },
     "schemaVersion": {
@@ -270,7 +271,8 @@
           "UNDERTAKING",
           "AUTHORING_CONVERSATION",
           "RECURSIVE_PROFESSIONAL_HARNESS",
-          "VALIDATOR_REGISTRY_ENTRY"
+          "VALIDATOR_REGISTRY_ENTRY",
+          "DEFERRAL"
         ]
       }
     },

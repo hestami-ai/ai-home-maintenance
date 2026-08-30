@@ -3383,6 +3383,57 @@
 					"note": "Why. A status change nobody explained is a governance fact with no provenance."
 				}
 			]
+		},
+		{
+			"commandType": "DeferScope",
+			"targetAggregateType": "DEFERRAL",
+			"emitsEvent": "ScopeDeferred",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-30, under REG-D-046 Ruling 2 — the sponsor ruling on REG-Q-067 that ASR-9 limb 10 binds the ENGINE). DOC-007 schematizes NO interface for deferral: `grep -c -i defer` over objects.ts, messages.ts and enums.ts returned 0 / 0 / 0, and none of the 105 registered commands defers anything. So these fields were AUTHORED, not derived, and this sourceSection is NOT proof the shape is ratified. Ratification pending. The field set is traced in m1-object-fields.json’s DEFERRAL note; revisitCondition’s ground is disclosed in REG-F-296. ⚠ THIS IS NOT IntentConstraintRefined. That ratified event exists, has no producer, and carries only {intentId, constraintId, refinement} — no postponement marker, no carrier link, no scope name. Emitting it would move a shrink-only deficiency pin 12 -> 11 and produce the fixture’s event WITHOUT producing the fact this ruling demands. Wiring it MUST NOT be reported as discharging REG-Q-067.",
+			"payloadFields": [
+				{
+					"field": "deferralId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the minted DEFERRAL object"
+				},
+				{
+					"field": "statement",
+					"required": true,
+					"type": "string",
+					"note": "the named scope being deferred"
+				},
+				{
+					"field": "subjectObjectIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]; the unit whose work it left"
+				},
+				{
+					"field": "carrierObjectIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]; ASR-9 limb 10 carriers, PLURAL per RPH-FIX-006"
+				},
+				{
+					"field": "revisitCondition",
+					"required": true,
+					"type": "string",
+					"note": "DOC-003 §3 — postponed, not abandoned (REG-F-296)"
+				},
+				{
+					"field": "rationale",
+					"required": true,
+					"type": "string",
+					"note": "ASR-5 — gaps are never silent"
+				},
+				{
+					"field": "authority",
+					"required": true,
+					"type": "AuthorityReference",
+					"note": "complex type"
+				}
+			]
 		}
 	],
 	"events": [
@@ -7799,6 +7850,55 @@
 					"type": "ValidatorRegistryStatus",
 					"enumRef": "ValidatorRegistryStatusSchema",
 					"required": true
+				}
+			]
+		},
+		{
+			"eventType": "ScopeDeferred",
+			"aggregateType": "Deferral",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-08-30, under REG-D-046 Ruling 2 — the sponsor ruling on REG-Q-067 that ASR-9 limb 10 binds the ENGINE). DOC-007 schematizes NO interface for deferral: `grep -c -i defer` over objects.ts, messages.ts and enums.ts returned 0 / 0 / 0, and none of the 105 registered commands defers anything. So these fields were AUTHORED, not derived, and this sourceSection is NOT proof the shape is ratified. Ratification pending. The field set is traced in m1-object-fields.json’s DEFERRAL note; revisitCondition’s ground is disclosed in REG-F-296. ⚠ THIS IS NOT IntentConstraintRefined. That ratified event exists, has no producer, and carries only {intentId, constraintId, refinement} — no postponement marker, no carrier link, no scope name. Emitting it would move a shrink-only deficiency pin 12 -> 11 and produce the fixture’s event WITHOUT producing the fact this ruling demands. Wiring it MUST NOT be reported as discharging REG-Q-067.",
+			"payloadFields": [
+				{
+					"field": "deferralId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref; the minted DEFERRAL object"
+				},
+				{
+					"field": "statement",
+					"required": true,
+					"type": "string",
+					"note": "the named scope being deferred"
+				},
+				{
+					"field": "subjectObjectIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]; the unit whose work it left"
+				},
+				{
+					"field": "carrierObjectIds",
+					"required": true,
+					"type": "string[]",
+					"note": "id-ref[]; ASR-9 limb 10 carriers, PLURAL per RPH-FIX-006"
+				},
+				{
+					"field": "revisitCondition",
+					"required": true,
+					"type": "string",
+					"note": "DOC-003 §3 — postponed, not abandoned (REG-F-296)"
+				},
+				{
+					"field": "rationale",
+					"required": true,
+					"type": "string",
+					"note": "ASR-5 — gaps are never silent"
+				},
+				{
+					"field": "authority",
+					"required": true,
+					"type": "AuthorityReference",
+					"note": "complex type"
 				}
 			]
 		}

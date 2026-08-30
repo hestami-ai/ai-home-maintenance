@@ -55,6 +55,7 @@ import {
 	revokeRuntimeCapability
 } from './runtime-binding.js';
 import { recordArtifact } from './artifact.js';
+import { deferScope } from './deferral.js';
 import {
 	admitEvidence,
 	activateAssurancePolicy,
@@ -182,6 +183,10 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// Artifacts — the recorded OUTPUT of work (DOC-009 §18.1; no ratified command/event, authored under the
 	// 2026-07-16 grant to close `outputArtifactIds`' dangling reference)
 	RecordArtifact: recordArtifact,
+	// JAN-SLICE-SWP-02a (REG-D-046 Ruling 2). Registration is what makes the act REAL: the
+	// command-dispatch census refuses a ratified command nothing dispatches, which is how a declared-but-
+	// unproduced deferral plane would have been caught — and was.
+	DeferScope: deferScope,
 	// Assurance: evidence / claim / assumption / assessment / observation (DOC-002 §12, §15–19)
 	ProposeEvidence: proposeEvidence,
 	AdmitEvidence: admitEvidence,

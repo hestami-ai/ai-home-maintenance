@@ -30,7 +30,11 @@ export const ID_PREFIXES = {
 	TRACE_LINK: 'trace',
 	COMMAND: 'cmd',
 	EVENT: 'evt',
-	EXECUTION_ATTEMPT: 'attempt'
+	EXECUTION_ATTEMPT: 'attempt',
+	// JAN-SLICE-SWP-02a (REG-D-046 Ruling 2). `ids.test.ts` compares this map against the vocab's own
+	// idPrefixRegistry, so this entry is not optional decoration — omitting it reddens that gate, which is what
+	// caught the addition here rather than letting a half-registered object type through.
+	DEFERRAL: 'dfr'
 } as const;
 
 export type IdEntity = keyof typeof ID_PREFIXES;

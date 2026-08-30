@@ -233,16 +233,8 @@
         "additionalProperties": false
       }
     },
-    "assurancePolicyId": {
+    "statement": {
       "type": "string"
-    },
-    "policyVersion": {
-      "type": "string"
-    },
-    "policySemanticVersion": {
-      "type": "integer",
-      "minimum": -9007199254740991,
-      "maximum": 9007199254740991
     },
     "subjectObjectIds": {
       "type": "array",
@@ -250,177 +242,58 @@
         "type": "string"
       }
     },
-    "subjectSemanticVersions": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {
-        "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991
-      }
-    },
-    "claimIds": {
+    "carrierObjectIds": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "evaluator": {
+    "revisitCondition": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "authority": {
       "type": "object",
       "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
+        "authorityId": {
+          "type": "string"
         },
-        "actorType": {
+        "authorityType": {
           "type": "string",
           "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
+            "USER",
+            "ORGANIZATIONAL_ROLE",
+            "POLICY",
+            "LEGAL_REQUIREMENT",
+            "SYSTEM_OWNER",
+            "DELEGATED_AGENT"
           ]
         },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
+        "grantedBy": {
           "type": "string"
         },
-        "modelId": {
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validFrom": {
           "type": "string"
         },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
+        "validUntil": {
           "type": "string"
         }
       },
       "required": [
-        "actorId",
-        "actorType",
-        "displayName"
+        "authorityId",
+        "authorityType",
+        "scope",
+        "validFrom"
       ],
       "additionalProperties": false
-    },
-    "producer": {
-      "type": "object",
-      "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorType": {
-          "type": "string",
-          "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
-          ]
-        },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
-          "type": "string"
-        },
-        "modelId": {
-          "type": "string"
-        },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "actorId",
-        "actorType",
-        "displayName"
-      ],
-      "additionalProperties": false
-    },
-    "evidenceConsideredIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "rejectedEvidence": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
-          "type": "string"
-        },
-        "additionalProperties": {}
-      }
-    },
-    "observationIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "startedAt": {
-      "type": "string"
-    },
-    "completedAt": {
-      "type": "string"
-    },
-    "assessmentState": {
-      "type": "string",
-      "enum": [
-        "REQUESTED",
-        "EVIDENCE_PENDING",
-        "READY",
-        "ASSESSING",
-        "SATISFIED",
-        "CONDITIONALLY_SATISFIED",
-        "REJECTED",
-        "INCONCLUSIVE",
-        "ESCALATED",
-        "WAIVED",
-        "VALIDATOR_FAILED",
-        "INDEPENDENCE_VIOLATION",
-        "INVALIDATED",
-        "WAIVER_EXPIRED",
-        "CANCELLED"
-      ]
-    },
-    "confidence": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {}
-    },
-    "residualUncertainty": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "recommendedControlActions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
-          "type": "string"
-        },
-        "additionalProperties": {}
-      }
     }
   },
   "required": [
@@ -437,19 +310,13 @@
     "provenance",
     "tags",
     "extensions",
-    "assurancePolicyId",
-    "policyVersion",
-    "policySemanticVersion",
+    "statement",
     "subjectObjectIds",
-    "subjectSemanticVersions",
-    "claimIds",
-    "evidenceConsideredIds",
-    "rejectedEvidence",
-    "observationIds",
-    "assessmentState",
-    "residualUncertainty",
-    "recommendedControlActions"
+    "carrierObjectIds",
+    "revisitCondition",
+    "rationale",
+    "authority"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:AssuranceAssessment:1"
+  "$id": "urn:janumi:rph:schema:object:DeferralObject:1"
 }

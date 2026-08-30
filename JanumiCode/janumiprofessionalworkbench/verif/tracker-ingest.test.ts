@@ -256,7 +256,11 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// 267 -> 269: BeginPwuRecomposition and CompletePwuRecomposition (REG-D-044 S-1b). +2 for two
 		// COMMANDS; their two events do not move this number, because EVENTS is not one of the four w2
 		// populations — which is why S-1a's one command plus one event moved it by exactly 1.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 269 }]);
+		// 269 -> 270: DeferScope (JAN-SLICE-SWP-02a / REG-D-046 Ruling 2). +1 for ONE command, and its event
+		// `ScopeDeferred` does not move this number for the same reason the S-1b note above gives — EVENTS is not
+		// one of the four w2 populations. The arithmetic here is the one place that distinction is visible, so a
+		// move of +2 would have meant something else had changed.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 270 }]);
 	});
 });
 

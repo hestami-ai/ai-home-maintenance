@@ -797,6 +797,16 @@ export const EnableValidatorPayloadSchema = z.strictObject({
 	reason: z.string()
 });
 export type EnableValidatorPayload = z.infer<typeof EnableValidatorPayloadSchema>;
+export const DeferScopePayloadSchema = z.strictObject({
+	deferralId: z.string(),
+	statement: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	carrierObjectIds: z.array(z.string()),
+	revisitCondition: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema
+});
+export type DeferScopePayload = z.infer<typeof DeferScopePayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1853,6 +1863,16 @@ export const ValidatorEnabledPayloadSchema = z.strictObject({
 	status: ValidatorRegistryStatusSchema
 });
 export type ValidatorEnabledPayload = z.infer<typeof ValidatorEnabledPayloadSchema>;
+export const ScopeDeferredPayloadSchema = z.strictObject({
+	deferralId: z.string(),
+	statement: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	carrierObjectIds: z.array(z.string()),
+	revisitCondition: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema
+});
+export type ScopeDeferredPayload = z.infer<typeof ScopeDeferredPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2506,6 +2526,12 @@ export const COMMANDS = {
 		targetAggregateType: 'VALIDATOR_REGISTRY_ENTRY',
 		emitsEvent: 'ValidatorEnabled',
 		firstSlice: false
+	},
+	DeferScope: {
+		payload: DeferScopePayloadSchema,
+		targetAggregateType: 'DEFERRAL',
+		emitsEvent: 'ScopeDeferred',
+		firstSlice: false
 	}
 } as const;
 
@@ -2872,7 +2898,8 @@ export const EVENTS = {
 	ValidatorEnabled: {
 		payload: ValidatorEnabledPayloadSchema,
 		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
-	}
+	},
+	ScopeDeferred: { payload: ScopeDeferredPayloadSchema, aggregateType: 'Deferral' }
 } as const;
 
 /** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not

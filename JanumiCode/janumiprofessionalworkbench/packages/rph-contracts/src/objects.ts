@@ -799,6 +799,18 @@ export const ValidatorRegistryEntrySchema = z.strictObject({
 });
 export type ValidatorRegistryEntry = z.infer<typeof ValidatorRegistryEntrySchema>;
 
+/** DEFERRAL — id prefix: DEFERRAL */
+export const DeferralObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	statement: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	carrierObjectIds: z.array(z.string()),
+	revisitCondition: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema
+});
+export type DeferralObject = z.infer<typeof DeferralObjectSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -883,5 +895,6 @@ export const OBJECT_SCHEMAS = {
 		schema: ValidatorRegistryEntrySchema,
 		idPrefixEntity: 'VALIDATOR_REGISTRY_ENTRY',
 		tsName: 'ValidatorRegistryEntry'
-	}
+	},
+	DEFERRAL: { schema: DeferralObjectSchema, idPrefixEntity: 'DEFERRAL', tsName: 'DeferralObject' }
 } as const;

@@ -61,6 +61,17 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-08-30, JAN-SLICE-SWP-02a (REG-D-046 Ruling 2): `ScopeDeferred` acquires its first and only emitter,
+	// `DeferScope`. Recorded by hand for the reason this set exists — no single vitest worker sees the whole
+	// suite's emissions — but the emission is DRIVEN in two places rather than asserted: the reference
+	// undertaking now mints the corpus's one real deferral (the offline residual), taking the drive from 332 to
+	// 333 events, and `deferral.test.ts` dispatches it directly.
+	//
+	// ⚠ IT IS NOT `IntentConstraintRefined`, WHICH REMAINS UNEMITTED AND MUST STAY THAT WAY UNTIL SOMETHING REAL
+	// PRODUCES IT. That ratified event's declared purpose is also a deferral staying represented, and wiring it
+	// would move a shrink-only deficiency pin 12 -> 11 while producing none of the fact ASR-9 limb 10 requires:
+	// its payload carries no postponement marker, no carrier link and no scope name.
+	'ScopeDeferred',
 	// + 2026-08-13, REG-F-131: `IntentSuperseded` acquires its FIRST emitter, `SupersedeIntent`. It had been a
 	// RATIFIED event (it is in the Canonical Domain Model's own event list) that was neither bound nor emitted —
 	// the corpus named the event and the six arrows into SUPERSEDED, and no command reached them, so an Intent
