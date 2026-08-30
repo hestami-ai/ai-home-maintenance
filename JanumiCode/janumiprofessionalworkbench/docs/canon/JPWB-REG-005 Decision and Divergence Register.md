@@ -27276,3 +27276,73 @@ filenames NO RUNNER COLLECTS; and the control that fixes it needs a canary, beca
 - **Merge target:** **Repository** — `JAN-SLICE-DR-001` §7 and three `repository_scope` paths corrected in place
   (line count unchanged, content-guarded); `SWP-01`'s block carries the settled design.
   **Owed, not done:** `SWP-01` itself is unbuilt. Status: CLOSED.
+
+---
+
+### REG-F-294 — the ratified normal flow does not flow: intent is APPROVED 91 events before the assurance that
+justifies it, and the architecture is decomposed 80 events before the Intent Baseline exists
+
+- **Date:** 2026-08-30 · **Type:** DIVERGENCE FINDING · **Class:** FINDING — blocks the honest completion of
+  `JAN-SLICE-SWP-02` and puts an interpretive question to the sponsor ·
+  **Status:** OPEN — the measurement is settled; the READING is not, and the reading decides the remedy.
+
+- **WHAT WAS BEING DONE.** `SWP-02` admits `RPH-E2E-001` as the first Slice. Its ratified statement names a
+  thirteen-act **flow** — *"(capture, discovery, formalize, Intent Fidelity/Completeness, human approval, Intent
+  Baseline, Architecture PWU + decomposition, decomposition validation, architecture generation, assumption/
+  evidence capture, Architecture Coverage + Intent Preservation, human approval, Architecture Baseline
+  promotion)"* — and five outcome clauses. The outcomes hold. **The order does not.**
+
+- **MEASURED, AND RE-DRIVEN BY THIS ENTRY'S AUTHOR RATHER THAN TAKEN ON REPORT.** Driving `seedWorkbench`
+  through the real engine under node (446 events; the figure independently reproduces the pin already committed
+  at `replay-conformance.test.ts:249`), positions are 1-based indices into `engine.readAllEvents()`:
+  | the rule's stated precedence | measured | verdict |
+  |---|---|---|
+  | Intent Fidelity/Completeness **then** human approval | assessments complete **@156 / @157**; `IntentApproved` **@65** | **VIOLATED by 91 events** |
+  | Intent Baseline **then** Architecture PWU + decomposition | INTENT `BaselinePromoted` **@165**; arch `DecompositionProposed` **@83 / @85**, `DecompositionValidated` **@84 / @86** | **VIOLATED by ~80 events** |
+  **CONTROL, so this is not an instrument that reports inversions everywhere:** twelve of the fourteen stated
+  pairs HOLD in the measured order. The instrument reports correct order where the order is correct.
+
+- **⚠ AN INSTRUMENT FAULT FOUND AND CORRECTED MID-MEASUREMENT, RECORDED BECAUSE IT WOULD HAVE READ AS AN
+  ABSENCE.** A first probe searched each event's PAYLOAD for the architecture PWU id and returned **null** for
+  `DecompositionValidated` — which, taken at face value, says the act never happens. It happens twice. The
+  `aggregateId` of a decomposition event is the **decomposition contract** (`dcp_…`), not the PWU it decomposes.
+  A null from the wrong predicate is indistinguishable from a real absence, and this one would have been the
+  more alarming finding.
+
+- **⚠⚠ WHAT THIS MEANS, STATED PLAINLY, BECAUSE IT IS WORSE THAN AN ORDERING NICETY.** The Intent is approved by
+  a human **before** the Intent Fidelity and Intent Completeness assessments that the ratified flow places ahead
+  of that approval have been performed. Clause (a) of `RPH-E2E-001` — *"ends with intent approved"* — is
+  therefore TRUE at the end of the run while **the approval was not backed by those assessments at the moment it
+  was made**. That is the shape `STA-2` forbids one level up (*"execution success moves work toward evidence and
+  assurance, never directly to satisfaction"*): here it is an APPROVAL preceding its own justification. A Slice
+  asserting only the outcome clauses would go green over exactly this.
+
+- **⚠ THE FORK, AND IT IS THE SPONSOR'S TO RULE, NOT MINE AND NOT A SUB-AGENT'S.** Everything above is a
+  measurement. What it *means* depends on one unruled question:
+  - **READING A — the parenthetical is an ORDER.** The rule's own word is *flow*, and the acts are given as a
+    causal sequence (assure → approve → baseline). Then `RPH-E2E-001` **cannot pass today**, `SL-8` requires the
+    Slice be admitted FAILING on those two clauses, and the engine owes a real fix.
+  - **READING B — the parenthetical is a SET.** The rule asserts the acts all occur and the outcomes hold, with
+    order unspecified. Then the Slice passes today and this entry closes as a non-finding.
+  **The readings differ in what they cost and in what they forbid**, which is why the adjudication cannot be
+  skipped: Reading A makes this a product defect on the flagship journey; Reading B makes it a documentation
+  question. ⚠ **AND A GUARD WRITTEN UNDER EITHER READING WOULD SETTLE IT BY ACCIDENT** — the same hazard
+  `REG-Q-067` was filed to prevent, which `CON-000 AX-6` forbids by name.
+
+- **WHAT `SWP-02` DOES IN THE MEANTIME, AND WHAT IT MUST NOT DO.** The Slice MAY be built now asserting the five
+  outcome clauses, each with its own discriminating mutant. It **MUST NOT** silently adopt either reading, and
+  its docblock **MUST** state which reading it took and cite this entry — otherwise a later reader will assume
+  order was checked when it was not. **`it.fails` MUST NOT be used to absorb this:** it turns a false clause into
+  a green suite, which is `SL-8`'s prohibited "weakened to green" wearing a different hat.
+
+- **AND THE EXISTING TEST DOES NOT COVER IT.** `reference-undertaking.test.ts` asserts the outcome facts —
+  `arch.axes.workLifecycleState === 'BASELINED'`, `root.axes.workLifecycleState === 'EXECUTING'`,
+  `root.qualifiedSuccess === false`. **Nothing anywhere asserts the ORDER of the flow**, which is why six weeks
+  of green suites never surfaced this. That file also carries a rename from 2026-07-17 recording the same class
+  of error one level down: a test whose *"old title claimed the ratified property RPH-PER-006 was covered when
+  nothing did."*
+
+- **Merge target:** **Corpus first** — the sponsor rules ORDER or SET, and `JPWB-DOC-003` / the conformance
+  manifest records which. **Repository, once ruled** — under Reading A, the two precedence violations are product
+  defects on the flagship journey and need their own remediation; `packages/rph-engine/src/slices/` carries the
+  Slice either way. Status: OPEN.
