@@ -1,6 +1,6 @@
 {
   "canary": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
-  "recognisedCount": 1,
+  "recognisedCount": 2,
   "rows": [
     {
       "citedRules": [
@@ -13,6 +13,18 @@
       "plane": "ENGINE",
       "scenarioClass": "normal path",
       "title": "The normal intent-to-architecture journey reaches its five ratified outcomes"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-002"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-002",
+      "mutantCount": 3,
+      "path": "packages/rph-engine/src/slices/e2e-002-rejected-assurance.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "alternate valid path",
+      "title": "Execution succeeds, assurance rejects, and nothing downstream is permitted to proceed"
     }
   ]
 }

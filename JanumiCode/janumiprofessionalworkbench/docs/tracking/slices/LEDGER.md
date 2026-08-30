@@ -35,5 +35,6 @@ Both layers key on the word "slice". They catch a Slice that was **MOVED**. They
 | id | plane | scenario class | cited rules | mutants | discharges | source |
 |---|---|---|---|---|---|---|
 | `E2E-001` | ENGINE | normal path | `RPH-E2E-001` | 3 | — | `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` |
+| `E2E-002` | ENGINE | alternate valid path | `RPH-E2E-002` | 3 | — | `packages/rph-engine/src/slices/e2e-002-rejected-assurance.slice.test.ts` |
 
 <!-- JAN-SLICE:GENERATED-LEDGER:END -->
