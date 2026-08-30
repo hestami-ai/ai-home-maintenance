@@ -10370,7 +10370,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "6dfa785f6b809d5671a3b1cebc167686ea84f9857d4473f7a6037d5bfff51eb7",
+    "fileManifestDigest": "35d949206a2147c0f38eecd2dbc4516eb68315339306bc4f83f26a8877e36294",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -17200,9 +17200,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 47126,
+        "bytes": 48526,
         "path": "packages/rph-domain/src/conformance-manifest.ts",
-        "sha256": "df9ead52603901750772a62c3a87e8cbaeb644a40e499acd83e1332a7d3c2595",
+        "sha256": "16fd37ed3964bc4b1e7e3fd3b9b6a66f7d41e881f38006c6091c1d776cbac976",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -19090,23 +19090,23 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 9579,
+        "bytes": 9592,
         "path": "verif/register-citations.test.ts",
-        "sha256": "2f2bb709c8a5e0e641b4a239aaa7f9be6bc2fd7856f3f88536072562f10ab93d",
+        "sha256": "d0533ead3f6323239a6068359f6967d4b3d1039d2ce03b5677bec9d539c05bb5",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 45646,
+        "bytes": 47335,
         "path": "verif/register-status-truth.test.ts",
-        "sha256": "0e262b2ebdd9d66b96050578f1db3875a78782fd5db185d345272102793b4a68",
+        "sha256": "2c575553783b76bc69325824f4fc5fa6e81c356535c51f594caec1f9223e4fc1",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 8618,
+        "bytes": 12791,
         "path": "verif/register-status.test.ts",
-        "sha256": "cacb7ff3561d02e606b46bd1e0f172b14b4c9fae9940aa0d56fa4370e59b1610",
+        "sha256": "7a1d9f9e6cb47e31b887eac3d1ec36e64310ac5598acee40dbd413f745df6598",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19236,7 +19236,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "0439da8adb0f6e990e657235d6db9930eb331a610416383f489ebd370b933dc3",
+    "subjectId": "3bcae6e968d694993522f1f6a43ff16810ee698b146450e756b97f68ca5ff922",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -24087,7 +24087,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-citations.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "2f2bb709c8a5e0e641b4a239aaa7f9be6bc2fd7856f3f88536072562f10ab93d",
+      "contentSha256": "d0533ead3f6323239a6068359f6967d4b3d1039d2ce03b5677bec9d539c05bb5",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24103,7 +24103,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-status-truth.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "0e262b2ebdd9d66b96050578f1db3875a78782fd5db185d345272102793b4a68",
+      "contentSha256": "2c575553783b76bc69325824f4fc5fa6e81c356535c51f594caec1f9223e4fc1",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24119,7 +24119,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/register-status.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "cacb7ff3561d02e606b46bd1e0f172b14b4c9fae9940aa0d56fa4370e59b1610",
+      "contentSha256": "7a1d9f9e6cb47e31b887eac3d1ec36e64310ac5598acee40dbd413f745df6598",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
