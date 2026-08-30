@@ -27128,3 +27128,84 @@ FACT (Reading A), and v1 is NOT production-facing because the platform JPWB depe
   (one id removed). ⚠ **OWED AND NOT DONE HERE:** the corpus edit `JPWB-DOC-003 §8.4 ASR-9` needs to record which
   reading was ruled, since a ruling that lives only in the register leaves the invariant catalog silent on its own
   meaning. Status: EFFECTIVE.
+
+---
+
+### REG-F-292 — JAN-SLICE-SWP-00 LANDED: the last conformance exemption is removed, the gate is RED on purpose,
+and the red is recorded here verbatim because a red nobody wrote down is just a broken build
+
+- **Date:** 2026-08-30 · **Type:** RECORD (work package landed) · **Class:** RECORD — discharges
+  `JAN-SLICE-SWP-00`; the roadmap was approved by the sponsor this session · **Status:** ✅ CLOSED — the change
+  landed, the red is observed and recorded, and it stands until `SWP-02`/`SWP-03`.
+
+- **WHAT CHANGED.** `packages/rph-domain/src/conformance-manifest.ts:468` —
+  ~~`new Set(['RPH-E2E'])`~~ → **`new Set([])`**. `DEFERRABLE_PREFIXES` is now empty. Nothing else was touched;
+  the work package forbade it.
+
+- **THE RED, VERBATIM AND UNEDITED — this is the deliverable.**
+  > `FAIL |rph-domain| src/conformance.test.ts > M12 conformance coverage GATE — no rule is silently unaccounted >`
+  > `the covered/partial/deferred split is explicit and every non-COVERED rule carries a reason`
+  > `AssertionError: RPH-E2E-001 deferred but not a deferrable family: expected false to be true // Object.is equality`
+  > `Tests  1 failed | 8 passed (9)`
+  **It matched the prediction recorded in `REG-F-291` byte-for-byte**, which is why the work package proceeded
+  rather than stopping — the roadmap required a stop-and-re-derive on any different failure.
+
+- **⚠ ONLY ONE RULE IS NAMED, AND SIX FOLLOW IT.** The assertion sits inside the per-rule loop and fails on the
+  first `DEFERRED` rule it reaches. **`SWP-00` must not be recorded as having exposed one rule** — it exposed
+  `RPH-E2E-001..007`, and the message shows one because that is where the loop stopped. This is the wrong
+  denominator taken from a true message, and the roadmap named it in advance.
+
+- **BLAST RADIUS, MEASURED RATHER THAN ASSUMED.** `vitest run verif/ packages/rph-domain` → **1 failed, 920
+  passed, 2 skipped, across 78 files.** Exactly one test in one file. `verif/deferral-honesty.test.ts` — which
+  closes the opposite direction, refusing to let a rule with a passing check be certified `DEFERRED` — is
+  **unaffected and green**, which is the right result: the seven have no passing check to be caught under-claiming.
+
+- **⚠⚠ THE STRUCK PARAGRAPH WAS RIGHT IN SUBSTANCE AND FALSE AS WRITTEN, AND ITS OWN FINDING IS WHAT RETIRED IT.**
+  It argued that this last entry's *"deferral is real"* because *"No `RPH-E2E` rule id appears in any check, any
+  test, or any source file in this repository."*
+  > ⚠ **SEARCHED AT HEAD 2026-08-30 AND THE LITERAL CLAIM IS FALSE.**
+  > `grep -rln 'RPH-E2E' --include=*.ts packages verif apps` → **4 files**: `conformance-manifest.ts` (which
+  > declares them), its `dist` build, `enforcement-register.ts`, and `verif/deferral-honesty.test.ts` — the last
+  > two being a source file and a test file respectively, which the claim says do not exist.
+  > **POSITIVE CONTROL, same form and population:** `RPH-FIX-00` → **13 files**, so the search discriminates and
+  > the four hits are real.
+  > **What IS true is the narrower claim the comment meant:** no file ASSERTS an `RPH-E2E` scenario. The two
+  > non-declaring hits reference the family to record its *deferral*, never to check it.
+  **The substance stands and it was the wrong test.** The same comment records, one paragraph up, that
+  *"an exempt family makes no claim to check"* — and that applies to the last member exactly as it applied to the
+  two removed before it. **The deferral being REAL is what made it invisible:** a genuinely unbuilt family raises
+  no overclaim, so the enforcement register never caught it and nothing ever asked when it would be built. An
+  honest exemption is harder to notice than a dishonest one.
+
+- **THREE WAYS OF MAKING THIS GREEN ARE PROHIBITED, EACH WITH A PRECEDENT IN THE SAME FILE.** (1) Re-adding
+  `RPH-E2E`, or any prefix, to the set. (2) Restating the seven as `PARTIAL` or `COVERED` — `REG-F-013` exactly,
+  where `RPH-CMP` sat here under a reason both halves of which were false. (3) Citing a test file that does not
+  assert the rule — the gate checks only that the cited file EXISTS (`conformance.test.ts:203-208`), so it would
+  accept the citation and prove nothing. **The gate goes green when the seven ASSERT, and by no other route.**
+
+- **⚠ A RESIDUAL I OWE THE SPONSOR RATHER THAN BURY: `gate:fast` IS NOW RED AND STAYS RED THROUGH `SWP-03`.** The
+  roadmap says so in terms and the sponsor approved it, so this is disclosure and not dissent. But the cost is
+  real and worth naming: a gate that is red for the length of three work packages stops functioning as a signal
+  for everything else that lands beside it, and *"the gate is red, that's the known one"* is the same habit that
+  lets an exemption list rot into an allowlist — a defect class this programme has recorded against itself twice.
+  **The alternative, offered and NOT taken unilaterally:** convert the seven to an honest `UNASSERTED` status
+  behind a shrink-only pin, which is this repository's own established idiom
+  (`replay-conformance.test.ts:114` — *"This list is a defect register, not a specification. It must only ever
+  SHRINK"*). That keeps the debt undeniable and countable while leaving the gate usable. **It is a change to an
+  approved plan and therefore the sponsor's to make, not mine.** Recorded here so the choice is visible while the
+  red is young rather than after it has been ignored for a week.
+
+- **⚠ A DEFECT IN A SIBLING GATE, FOUND BY BEING CAUGHT BY IT, AND DELIBERATELY NOT FIXED HERE.**
+  `verif/absence-claims.test.ts` flagged the first draft of this entry. Its `ABSENCE` pattern contains
+  `is silent`, which **substring-matches `is silently`** — and the only occurrence in this entry was inside the
+  verbatim test name *"no rule is silently unaccounted"*, quoted in the red above. So the gate fired on a
+  quotation of a test title, not on a claim. ⚠ **The gate was nonetheless RIGHT to fire**: this entry did repeat
+  an absence claim without stating its search, and stating it is what exposed that the claim was false as written.
+  A false positive and a true catch in the same assertion. **The pattern needs a word boundary and this work
+  package MUST NOT make it** — `SWP-00` forbids touching any other file, and a gate repair smuggled into a
+  work package whose deliverable is a red is exactly the kind of quiet scope drift this programme exists to stop.
+  Recorded as owed.
+
+- **Merge target:** **Repository** — `packages/rph-domain/src/conformance-manifest.ts` (one line, plus the struck
+  paragraph and the prohibition list) · **This register** (the red). **Owed, not done:** the `is silent` word
+  boundary in `verif/absence-claims.test.ts`, with a mutant proving the boundary is load-bearing. Status: CLOSED.

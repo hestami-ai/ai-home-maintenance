@@ -460,12 +460,29 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
  * family makes no claim to check. `verif/deferral-honesty.test.ts` now closes that direction by RUNNING the
  * replay harness and refusing to let a rule with a passing check be certified DEFERRED.
  *
- * ONE ENTRY REMAINS, AND ITS DEFERRAL IS REAL — checked in both directions rather than assumed by association.
+ * ~~ONE ENTRY REMAINS, AND ITS DEFERRAL IS REAL — checked in both directions rather than assumed by association.
  * No `RPH-E2E` rule id appears in any check, any test, or any source file in this repository; the seven scenarios
  * are genuinely unbuilt. The asymmetry is the point: two families sat here under one sentence, and only one of
- * them belonged.
+ * them belonged.~~
+ *
+ * ⚠⚠ `RPH-E2E` REMOVED 2026-08-30 — THE SET IS NOW EMPTY, AND THE GATE IS RED ON PURPOSE (JAN-SLICE-SWP-00,
+ * authorized by the sponsor's roadmap approval; see `REG-D-045`, `REG-D-046` and the record entry this landed with).
+ *
+ * The struck paragraph was TRUE and is retired for a reason it did not consider. Its own finding — *"an exempt
+ * family makes no claim to check"* — applies to the last member as much as to the two it removed. `RPH-E2E` is the
+ * one family whose remit is END-TO-END JOURNEYS, so exempting it exempted precisely the thing a conformance gate
+ * exists to establish. The deferral being *real* is what made it invisible: a genuinely unbuilt family raises no
+ * overclaim, so nothing ever asked when it would be built.
+ *
+ * ⚠ THE RED IS THE DELIVERABLE, NOT A REGRESSION. It stands until the seven rules ASSERT (JAN-SLICE-SWP-02 and
+ * SWP-03). Three ways of making it green are PROHIBITED and each has a precedent in this file:
+ *   1. Re-adding `RPH-E2E`, or any prefix, to this set.
+ *   2. Restating the seven as `PARTIAL` or `COVERED` — REG-F-013 exactly, where `RPH-CMP` sat here under a reason
+ *      both halves of which were false.
+ *   3. Citing a test file that does not assert the rule — the gate checks only that the cited file EXISTS
+ *      (`conformance.test.ts:203-208`), so it would accept the citation and prove nothing.
  */
-export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set(['RPH-E2E']);
+export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set([]);
 
 /** Properties P1–P8 are all asserted generatively in properties.test.ts. */
 export const PROPERTY_COVERAGE: Readonly<Record<string, string>> = {
