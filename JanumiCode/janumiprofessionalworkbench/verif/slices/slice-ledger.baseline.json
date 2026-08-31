@@ -1,7 +1,20 @@
 {
   "canary": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
-  "recognisedCount": 12,
+  "recognisedCount": 13,
   "rows": [
+    {
+      "citedRules": [
+        "RPH-EVD-003"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "S-01",
+      "mutantCount": 3,
+      "path": "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
+      "plane": "SURFACE",
+      "presupposes": "E2E-001",
+      "scenarioClass": "normal path",
+      "title": "A human evidences a sign-off through the browser, and admission can refuse them"
+    },
     {
       "citedRules": [
         "RPH-PWU-009"

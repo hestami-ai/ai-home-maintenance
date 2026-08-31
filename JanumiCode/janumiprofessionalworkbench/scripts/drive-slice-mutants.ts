@@ -51,6 +51,46 @@ function sliceFiles(dir: string, acc: string[] = []): string[] {
 }
 
 /**
+ * ⚠ THIS DRIVER COVERS THE **ENGINE** PLANE ONLY, AND IT NOW SAYS SO OUT LOUD INSTEAD OF SKIPPING IN SILENCE.
+ *
+ * Two independent narrowings put SURFACE Slices outside it: the walk starts at `packages/` (SURFACE Slices live
+ * under `apps/<app>/e2e/`), and the filename test is `.slice.test.ts` (theirs is `.slice.e2e.ts`, a distinction
+ * `REG-F-293` made load-bearing on purpose). Underneath both, `runSlice` shells **vitest**, which cannot run a
+ * Playwright spec at all.
+ *
+ * Before `JAN-SLICE-SWP-06` that was harmless because no SURFACE Slice existed. The moment one did, this driver
+ * would have walked its population, found every ENGINE mutant SOUND, and reported success — having driven ZERO
+ * of the SURFACE mutants while looking exactly like a full sweep. **That is the shape this repository has
+ * recorded most often: a predicate narrowed by a vocabulary split, still green on the half it can still see.**
+ *
+ * So the omission is made LOUD rather than repaired here: repairing it means teaching this script to shell
+ * Playwright, which is a second runner with its own report shape and its own server lifecycle — a real change
+ * that belongs to whoever needs SURFACE mutants in `gate:fast`, not to a silent `else if`. Until then, this
+ * refuses to finish while a recognised SURFACE Slice declares mutants it did not drive.
+ */
+function undrivenSurfaceSlices(): { file: string; sliceId: string; mutants: number }[] {
+	const surfaceDir = join(ROOT, 'apps', 'rph-demo', 'e2e', 'slices');
+	let names: string[];
+	try {
+		names = readdirSync(surfaceDir);
+	} catch {
+		return; // no SURFACE Slices yet — nothing this driver is failing to cover
+	}
+	return names
+		.filter((n) => n.endsWith('.slice.e2e.ts'))
+		.map((n) => {
+			const parsed = parseSliceSource(readFileSync(join(surfaceDir, n), 'utf8'), n);
+			return {
+				file: `apps/rph-demo/e2e/slices/${n}`,
+				sliceId: String(parsed.declaration['id']),
+				mutants: ((parsed.declaration['mutants'] ?? []) as Mutant[]).length
+			};
+		})
+		.filter((s) => s.mutants > 0);
+}
+
+
+/**
  * Run one Slice and return the test names that FAILED.
  *
  * ⚠⚠ THE STALE-REPORT CONTROL IS THE MOST IMPORTANT THING IN THIS FUNCTION, AND IT IS HERE BECAUSE THIS
@@ -96,6 +136,12 @@ function runSlice(rel: string): { failed: string[]; total: number } {
 }
 
 const results: Record<string, unknown>[] = [];
+
+// ⚠ THE ENGINE SWEEP STILL RUNS; THE GAP IS A ROW, NOT A WALL. A first version threw before the loop, which made
+// one SURFACE Slice block every ENGINE verdict — an instrument that reports nothing is not more honest than one
+// that reports what it covered, only less useful. These rows carry `NOT_DRIVEN_HERE` and count as not-SOUND, so
+// the omission is loud and itemised and the sweep still does its job.
+const notDrivenHere = undrivenSurfaceSlices();
 
 for (const abs of sliceFiles(join(ROOT, 'packages'))) {
 	const rel = abs.slice(ROOT.length).replace(/\\/g, '/');
@@ -148,6 +194,15 @@ for (const abs of sliceFiles(join(ROOT, 'packages'))) {
 		});
 	}
 }
+
+for (const s of notDrivenHere)
+	results.push({
+		sliceId: s.sliceId,
+		mutant: `(${String(s.mutants)} declared)`,
+		file: s.file,
+		verdict: 'NOT_DRIVEN_HERE',
+		note: 'a .slice.e2e.ts is a Playwright spec and this driver shells vitest — drive it with the SURFACE driver and record the verdicts'
+	});
 
 process.stdout.write(`${JSON.stringify(results, null, 1)}\n`);
 const bad = results.filter((r) => r['verdict'] !== 'SOUND');

@@ -51,6 +51,7 @@ import {
 	dispatchBatch,
 	getEngine,
 	getRegisteredIntent,
+	hostNow,
 	mintUiId,
 	uiSession
 } from '$lib/server/workbench';
@@ -364,6 +365,71 @@ export const load: PageServerLoad = ({ params }) => {
 			? (o.state.subjectObjectIds as unknown[]).map(String)
 			: []
 	}));
+	// ── THE EVIDENCE WORKING SET (JAN-SLICE-SWP-06) ─────────────────────────────────────────────────────────
+	//
+	// ⚠ THE SURFACE COULD ASSURE AND COULD NOT EVIDENCE, AND THAT IS THE GAP F-4 NAMED. `ProposeEvidence`,
+	// `AdmitEvidence` and `SubmitEvidenceForAssessment` appeared ZERO times anywhere under `apps/rph-demo`
+	// (positive control at the time of writing: `CreatePwa` 5 files, `PromoteBaseline` 2, `AbandonPwu` 2), so a
+	// human could sign work off through this workbench having produced no evidence at all — while the ENGINE
+	// Slice `E2E-001` asserts on the other plane that an assessment must name "BOTH what it assessed AND the
+	// evidence it considered".
+	//
+	// `status` is the ratified `Evidence.status` (PROPOSED -> ADMISSIBLE), so the surface can offer admission
+	// exactly where it is legal and nowhere else — the affordance and the engine's own precondition
+	// (`fromStates('PROPOSED')`) ask the same question of the same field.
+	// ⚠⚠ THIS LIST IS WORKSPACE-WIDE, WHICH IS A DEPARTURE FROM THIS PAGE'S SCOPING DISCIPLINE, AND IT IS STATED
+	// RATHER THAN QUIETLY SHIPPED. `listAssessments` / `listObservations` / `listDecisions` / `listBaselines` all
+	// take a REQUIRED `QueryScope` because they are subject-bindable. EVIDENCE IS NOT ONE OF THEM: an Evidence
+	// object names no subject — it carries `supportsClaimIds`, and a claim names the subject — so binding it to an
+	// Undertaking is a TWO-HOP resolve, and evidence supporting no claim yet has no hop at all. The engine
+	// therefore ships no `listEvidence(h, scope)`, and inventing one here would put a second, weaker answer beside
+	// the four that already exist.
+	//
+	// The visible consequence is disclosed in the panel's own heading rather than hidden: an operator sees every
+	// Evidence object in the workspace, including the reference drive's sixteen. What is NOT workspace-wide is the
+	// ACT — `evidenceSubjectPwuId` above is scoped, and the admit/submit affordances render only when this
+	// Undertaking has an assessment open to evidence.
+	const evidence = listByType(engine, 'EVIDENCE').map((e) => ({
+		id: e.id,
+		status: String((e.state.status ?? '') as string),
+		evidenceType: String((e.state.evidenceType ?? '') as string),
+		scope: String((e.state.scope ?? '') as string),
+		supportsClaimIds: Array.isArray(e.state.supportsClaimIds)
+			? (e.state.supportsClaimIds as unknown[]).map(String)
+			: []
+	}));
+	// The PWU whose assessment is currently open to evidence, if one is — the subject the admit/submit
+	// affordances act on.
+	//
+	// ⚠ DERIVED FROM THE ENGINE'S OWN OPEN SET, AND ITS REMAINING LIMITATION IS DISCLOSED RATHER THAN HIDDEN.
+	// Evidence in RPH attaches to CLAIMS, not to PWUs (`ProposeEvidence` carries `supportsClaimIds` and names no
+	// subject), and the evidence THIS SURFACE mints supports no claim — `recordAssurance` drives with
+	// `claimIds: []` — so a freshly proposed object cannot say which work it is about.
+	//
+	// ⚠ AN EARLIER VERSION OF THIS COMMENT SAID "this demo asserts no claims". THAT WAS FALSE: the reference
+	// drive asserts nine, and every one of the sixteen seeded Evidence objects carries a non-empty
+	// `supportsClaimIds`. The true statement is narrower and is the one that matters here — the OPERATOR's own
+	// evidence is unclaimed, so within this Undertaking the binding is the open assessment and nothing else.
+	// With one open assessment that is exact. With several, this takes the first, and the operator could admit to
+	// a different PWU than they meant — bounded to this Undertaking since the read is scoped, and a real
+	// limitation of a surface that mints no claims rather than a defect papered over with a plausible guess.
+	const evidenceSubjectPwuId = (() => {
+		// ⚠ SCOPED, AND AN ADVERSARIAL PASS IS WHY. This read was `listByType(engine, 'ASSURANCE_ASSESSMENT')`
+		// — the whole WORKSPACE — so the first open assessment ANYWHERE became the hidden `pwuId` of the admit
+		// and submit forms. An operator on Undertaking A could admit evidence to Undertaking B's assessment, and
+		// the SATISFIED sign-off on B would then cite evidence about A while A's own assessment recorded
+		// considering nothing. The four sibling reads on this page all pass `undertakingScope`; this one did not,
+		// which is the exact defect `QueryScope`'s header records being repaired four times.
+		for (const a of listAssessments(engine, undertakingScope)) {
+			if (!['EVIDENCE_PENDING', 'READY', 'ASSESSING'].includes(String((a.state.assessmentState ?? '') as string)))
+				continue;
+			const subjects = Array.isArray(a.state.subjectObjectIds)
+				? (a.state.subjectObjectIds as unknown[]).map(String)
+				: [];
+			if (subjects[0]) return subjects[0];
+		}
+		return '';
+	})();
 	const decisions = listDecisions(engine, undertakingScope).map((dc) => ({
 		id: dc.id,
 		type: String((dc.state.decisionType ?? '') as string),
@@ -486,6 +552,8 @@ export const load: PageServerLoad = ({ params }) => {
 		disclosures,
 		applicablePolicies,
 		observations,
+		evidence,
+		evidenceSubjectPwuId,
 		decisions,
 		baselines,
 		pwuTypeOptions,
@@ -515,6 +583,7 @@ type Step = [command: string, aggType: string, aggId: string, payload: unknown];
 // The demo sign-off policy lives in ONE module now (S-1b): a second assurance act needs the same policy, and
 // copying a governed object's definition is how four restatements of AssessmentCriterion came to disagree.
 import {
+	DEMO_EVIDENCE_REQUIREMENT_ID,
 	DEMO_FINDING_CODE,
 	DEMO_POLICY_ID,
 	DEMO_POLICY_PAYLOAD,
@@ -568,7 +637,12 @@ function demoValidatorResult(
 	assessmentId: string,
 	pwuId: string,
 	dispositionRecommendation: string,
-	evaluator: ActorReference
+	evaluator: ActorReference,
+	// ⚠ DEFAULTED EMPTY SO EVERY EXISTING CALLER IS UNCHANGED. The adverse arm (`recordBlockingFinding`) passes
+	// nothing and its result is byte-identical to before. Only `recordAssurance` supplies a set, and only when
+	// the operator actually submitted evidence — so this parameter cannot silently make a sign-off look
+	// evidenced (JAN-SLICE-SWP-06).
+	evidenceConsideredIds: readonly string[] = []
 ) {
 	return {
 		validatorId: 'workbench.demo-signoff',
@@ -579,7 +653,12 @@ function demoValidatorResult(
 		subjectObjectIds: [pwuId],
 		subjectSemanticVersions: { [pwuId]: 1 },
 		claimResults: [],
-		evidenceConsideredIds: [],
+		// ⚠ THIS WAS UNCONDITIONALLY `[]`, AND THAT IS WHAT THE EVIDENCE SURFACE EXISTS TO END. The workbench
+		// could reach a SATISFIED disposition whose own §20 ValidatorResult recorded that it had considered
+		// nothing — while the ENGINE Slice `E2E-001` asserts on the other plane that an assessment must name
+		// "BOTH what it assessed AND the evidence it considered". The two planes disagreed, and only one of them
+		// was checked.
+		evidenceConsideredIds: [...evidenceConsideredIds],
 		evidenceRejected: [],
 		observations: [],
 		dispositionRecommendation,
@@ -588,6 +667,70 @@ function demoValidatorResult(
 		limitations: [],
 		executionProvenance: { evaluator }
 	};
+}
+
+/**
+ * The pending assessment covering this PWU, if the operator has already opened one (JAN-SLICE-SWP-06).
+ *
+ * ⚠ THE OPEN SET IS THE ENGINE'S, COPIED FROM THE GUARD THAT ENFORCES IT rather than chosen here.
+ * `submitEvidenceForAssessment` admits evidence only while the assessment is in
+ * `['EVIDENCE_PENDING', 'READY', 'ASSESSING']` and refuses `REQUESTED` explicitly, because at REQUESTED the
+ * required set has not been evaluated and `satisfiesRequirementId` could not be checked. Offering the affordance
+ * on a wider set than the engine accepts would produce a button whose only outcome is a refusal.
+ *
+ * With this policy's only requirement carrying `cardinality: 'ZERO_OR_MORE'`, `requestAssuranceAssessment`'s
+ * required set is empty and the assessment lands directly in READY — so the window is open from the first act.
+ */
+function pendingAssessmentFor(pwuId: string): string | null {
+	const OPEN_FOR_EVIDENCE = ['EVIDENCE_PENDING', 'READY', 'ASSESSING'];
+	for (const a of listByType(getEngine(), 'ASSURANCE_ASSESSMENT')) {
+		const subjects = Array.isArray(a.state.subjectObjectIds)
+			? (a.state.subjectObjectIds as unknown[]).map(String)
+			: [];
+		if (!subjects.includes(pwuId)) continue;
+		if (OPEN_FOR_EVIDENCE.includes(String((a.state.assessmentState ?? '') as string))) return a.id;
+	}
+	return null;
+}
+
+/**
+ * Open an assessment for this PWU WITHOUT beginning it — the policy setup plus `RequestAssuranceAssessment`.
+ *
+ * ⚠ THIS IS `assurancePrelude` STOPPED ONE ACT EARLIER, AND THE STOP IS THE POINT. That helper drives all the way
+ * to ASSESSING through `driveAssessmentToAssessing`, which selects an evaluator and BEGINS. Evidence must be
+ * submitted before the verdict is reached, so the evidence journey needs the assessment OPEN and not yet begun.
+ */
+function openAssessmentFor(pwuId: string, assessmentId: string): Step[] {
+	const steps: Step[] = getObject(getEngine(), DEMO_POLICY_ID)
+		? []
+		: [
+				['CreateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD],
+				['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+			];
+	steps.push([
+		'RequestAssuranceAssessment',
+		'ASSURANCE_ASSESSMENT',
+		assessmentId,
+		{
+			assessmentId,
+			assurancePolicyId: DEMO_POLICY_ID,
+			policyVersion: DEMO_POLICY_VERSION,
+			subjectObjectIds: [pwuId],
+			subjectSemanticVersions: { [pwuId]: 1 },
+			claimIds: []
+		}
+	]);
+	return steps;
+}
+
+/** The evidence ALREADY SUBMITTED to an assessment, folded from its own event log. */
+function evidenceSubmittedTo(assessmentId: string): string[] {
+	// `EngineHandle` exposes `readAllEvents` and no per-aggregate reader, so the aggregate filter is explicit.
+	return getEngine()
+		.readAllEvents()
+		.filter((e) => e.eventType === 'AssuranceEvidenceReceived' && e.aggregateId === assessmentId)
+		.map((e) => String(((e.payload as { evidenceId?: unknown }).evidenceId ?? '') as string))
+		.filter((id) => id.length > 0);
 }
 
 function chg(
@@ -950,23 +1093,170 @@ export const actions: Actions = {
 	// complete an assessment under a lightweight NONE-independence demo policy (created + activated once), then cite
 	// it. The PWU is NOT yet green: workLifecycle stays UNDER_ASSURANCE until Mark Satisfied — exec != assurance
 	// (INV-5). This mirrors the reference seed's earnAssurance, minus the evidence/claim/independence apparatus.
+	// ── THE EVIDENCE STAGE, THROUGH THE BROWSER (JAN-SLICE-SWP-06) ────────────────────────────────────────────
+	//
+	// ⚠ WHAT WAS ACTUALLY MISSING, MEASURED RATHER THAN ASSUMED. F-4 recorded that the three evidence commands
+	// appear ZERO times under `apps/rph-demo` — true, and re-driven before this was written (positive control:
+	// `CreatePwa` 5 files, `PromoteBaseline` 2, `AbandonPwu` 2). But the MECHANISM is narrower and worth naming:
+	// `driveAssessmentToAssessing`, which this workbench already calls, ALREADY dispatches
+	// `SubmitEvidenceForAssessment` — for every member of an OPTIONAL `evidence` argument that
+	// `assurancePrelude` never passed. So the loop ran zero times, and the surface signed work off with
+	// `claimIds: []` and `evidenceConsideredIds: []`. **The absent thing was one defaulted argument, not a
+	// missing pathway** — which is why this change is three actions and a reuse, not a new subsystem.
+	//
+	// ⚠ AND THE ORDER IS THE ENGINE'S, NOT A PREFERENCE. `AdmitEvidence` carries an `admissibilityAssessmentId`
+	// — the reference undertaking passes the assessment that will consider the evidence — so the assessment
+	// must EXIST before evidence can be admitted to it. The ratified sequence is therefore
+	// Request -> Propose -> Admit -> Submit -> Begin, and `proposeEvidence` opens the assessment for exactly
+	// that reason rather than because opening it there is tidy.
+	proposeEvidence: async ({ request }) => {
+		const form = await request.formData();
+		const pwuId = String((form.get('pwuId') ?? '') as string).trim();
+		const evidenceType = String((form.get('evidenceType') ?? '') as string).trim();
+		const scope = String((form.get('scope') ?? '') as string).trim();
+		const contentUri = String((form.get('contentUri') ?? '') as string).trim();
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		if (!evidenceType) return fail(400, { error: 'Choose the kind of evidence.' });
+
+		// ⚠ NOT VALIDATED HERE: an empty `scope` or a blank content reference is passed STRAIGHT TO THE ENGINE,
+		// deliberately. `evidenceAdmissibility` refuses admission on `SCOPE_STATED`, `CONTENT_AVAILABLE` and
+		// `PROVENANCE_PRESENT`, and duplicating those checks in the surface would make the operator's experience
+		// depend on a second copy of the rule that could drift from the first. The surface's job is to let the
+		// professional act; the ratified predicate's job is to refuse. `S-01`'s clause S-b drives that refusal
+		// through the browser and asserts the ENGINE's own message.
+		// (An earlier draft of this line cited a "U-4 clause" that has never existed in any Slice.)
+		const steps: Step[] = [];
+		let assessmentId = pendingAssessmentFor(pwuId);
+		if (!assessmentId) {
+			assessmentId = mintUiId('asm');
+			steps.push(...openAssessmentFor(pwuId, assessmentId));
+		}
+		const evidenceId = mintUiId('evd');
+		steps.push([
+			'ProposeEvidence',
+			'EVIDENCE',
+			evidenceId,
+			{
+				evidenceId,
+				evidenceType,
+				contentReference: contentUri ? { uri: contentUri } : {},
+				// The REAL session actor, not a literal. `evidenceAdmissibility`'s PROVENANCE_PRESENT limb reads
+				// this field through `namesAnActor` (REG-F-008), so a placeholder here would be refused at
+				// admission — correctly, and confusingly.
+				producedBy: actingActor(uiSession()),
+				supportsClaimIds: [],
+				contradictsClaimIds: [],
+				scope,
+				limitations: [],
+				capturedAt: hostNow()
+			}
+		]);
+		const err = runSteps(steps);
+		if (err) return fail(400, { error: `Proposing evidence failed: ${err}` });
+		return { advanced: 'evidence-proposed' };
+	},
+
+	admitEvidence: async ({ request }) => {
+		const form = await request.formData();
+		const evidenceId = String((form.get('evidenceId') ?? '') as string).trim();
+		const pwuId = String((form.get('pwuId') ?? '') as string).trim();
+		if (!evidenceId || !pwuId) return fail(400, { error: 'Missing evidence or PWU.' });
+		const assessmentId = pendingAssessmentFor(pwuId);
+		if (!assessmentId)
+			return fail(400, { error: 'No open assessment to admit this evidence to. Propose evidence first.' });
+		const ev = getObject(getEngine(), evidenceId);
+		const err = runSteps([
+			[
+				'AdmitEvidence',
+				'EVIDENCE',
+				evidenceId,
+				{
+					// The assessment that judged admissibility — the same shape the reference undertaking uses.
+					admissibilityAssessmentId: assessmentId,
+					// The scope ADMITTED is the scope CLAIMED, and they are the same field on purpose: RPH-EVD-004
+					// is about evidence used beyond its scope, so narrowing it here without the operator saying so
+					// would silently rewrite what they attested to.
+					admittedScope: String((ev?.scope ?? '') as string),
+					admittedClaimIds: []
+				}
+			]
+		]);
+		if (err) return fail(400, { error: `Admission refused: ${err}` });
+		return { advanced: 'evidence-admitted' };
+	},
+
+	submitEvidence: async ({ request }) => {
+		const form = await request.formData();
+		const evidenceId = String((form.get('evidenceId') ?? '') as string).trim();
+		const pwuId = String((form.get('pwuId') ?? '') as string).trim();
+		if (!evidenceId || !pwuId) return fail(400, { error: 'Missing evidence or PWU.' });
+		const assessmentId = pendingAssessmentFor(pwuId);
+		if (!assessmentId) return fail(400, { error: 'No open assessment to submit this evidence to.' });
+		const err = runSteps([
+			[
+				'SubmitEvidenceForAssessment',
+				'ASSURANCE_ASSESSMENT',
+				assessmentId,
+				{
+					evidenceId,
+					// ⚠ THE REQUIREMENT ID, NOT THE CRITERION ID — DIFFERENT NAMESPACES, AND THE HANDLER SAYS SO:
+					// *"The required set is EvidenceRequirement ids while evidenceId is an Evidence OBJECT id —
+					// different namespaces, so the binding is explicit, never inferred from proximity."* A first
+					// draft of this action passed `criteria[0].id` (`DEMO-01`), which would have been refused by
+					// the fail-closed declared-requirement check on every submission.
+					satisfiesRequirementId: DEMO_EVIDENCE_REQUIREMENT_ID
+				}
+			]
+		]);
+		if (err) return fail(400, { error: `Submission failed: ${err}` });
+		return { advanced: 'evidence-submitted' };
+	},
+
 	recordAssurance: async ({ request }) => {
 		// The engine handle is no longer read here: `assurancePrelude` owns the policy/§30 setup both assurance
 		// arms share, and reaches for it itself.
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
-		const assessmentId = mintUiId('asm');
+		// ── REUSE THE ASSESSMENT THE EVIDENCE WAS SUBMITTED TO (JAN-SLICE-SWP-06) ─────────────────────────────
+		//
+		// ⚠ WITHOUT THIS THE EVIDENCE SURFACE WOULD BE DECORATIVE, AND THAT IS THE FAILURE MODE WORTH NAMING.
+		// The operator submits evidence to an open assessment; this action used to mint a SECOND, FRESH
+		// assessment and complete THAT — so the sign-off would have been reached by an assessment that never saw
+		// the evidence, while the evidence sat against one that was never completed. Both objects would exist,
+		// both acts would have happened, and the surface would look evidenced while being exactly as unevidenced
+		// as before.
+		//
+		// ⚠ AND THE ELSE-BRANCH IS BYTE-IDENTICAL TO THE OLD BEHAVIOUR. With no open assessment — which is every
+		// existing path, since nothing else opens one — this mints an id and calls `assurancePrelude` exactly as
+		// it always did, with an empty considered-set. So no existing spec changes meaning.
+		const pending = pendingAssessmentFor(pwuId);
+		const assessmentId = pending ?? mintUiId('asm');
+		const considered = pending ? evidenceSubmittedTo(pending) : [];
 		// Independence NONE, and the operator IS the reviewer — so the evaluator must be the real session, or the
 		// assessment records a sign-off by nobody.
 		const evaluator = actingActor(uiSession());
 		const err = runSteps([
-			...assurancePrelude(pwuId, assessmentId),
+			// A pending assessment has already been REQUESTED, so re-running the prelude would attempt a second
+			// `RequestAssuranceAssessment` on a live aggregate and CONFLICT. It needs only the two acts that
+			// remain before a verdict: who is assessing, and the start of the assessment itself.
+			...(pending
+				? ([
+						['SelectAssuranceEvaluator', 'ASSURANCE_ASSESSMENT', pending, { evaluator }],
+						['BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', pending, {}]
+					] as Step[])
+				: assurancePrelude(pwuId, assessmentId)),
 			[
 				'CompleteAssuranceAssessment',
 				'ASSURANCE_ASSESSMENT',
 				assessmentId,
 				{
-					validatorResult: demoValidatorResult(assessmentId, pwuId, 'SATISFIED', evaluator),
+					validatorResult: demoValidatorResult(
+						assessmentId,
+						pwuId,
+						'SATISFIED',
+						evaluator,
+						considered
+					),
 					producer: evaluator
 				}
 			],

@@ -23,6 +23,8 @@ export interface EngineSnapshot {
 	// consumer side: hand-annotation where the type should have spoken.
 	readonly assurancePolicies: ObjectRow[];
 	readonly observations: ObjectRow[];
+	/** JAN-SLICE-SWP-06 — the evidence stage's ground truth, so a SURFACE Slice asserts the ENGINE and not the page. */
+	readonly evidence: ObjectRow[];
 	readonly decisions: ObjectRow[];
 	readonly baselines: ObjectRow[];
 	readonly conversations: ObjectRow[];

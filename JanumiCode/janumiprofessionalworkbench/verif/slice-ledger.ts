@@ -445,12 +445,20 @@ export function renderRegion(ledger: Ledger): string {
 		lines.push('**None.** No file matches the recognition predicate. This is the true state, not an error —');
 		lines.push('`SWP-02` admits the first Slice.');
 	} else {
-		lines.push('| id | plane | scenario class | cited rules | mutants | discharges | source |');
-		lines.push('|---|---|---|---|---|---|---|');
+		// ⚠ `presupposes` IS RENDERED, AND IT WAS NOT UNTIL THE FIRST SURFACE SLICE EXISTED (JAN-SLICE-SWP-06).
+		// The field was parsed into every SURFACE row and written to the JSON baseline, and the human-readable
+		// ledger — the artifact anyone actually reads — did not show it. `SL-6`'s whole point is that a reader can
+		// tell a browser failure from a domain failure, which requires seeing WHICH ENGINE Slice a SURFACE Slice
+		// stands on. A column that exists only in the machine projection is a citation nobody is told about.
+		lines.push(
+			'| id | plane | scenario class | cited rules | mutants | presupposes | discharges | source |'
+		);
+		lines.push('|---|---|---|---|---|---|---|---|');
 		for (const r of ledger.rows)
 			lines.push(
 				`| \`${r.id}\` | ${r.plane} | ${r.scenarioClass} | ${r.citedRules.map((x) => `\`${x}\``).join(', ')} ` +
-					`| ${String(r.mutantCount)} | ${r.dischargesRegisterEntries.map((x) => `\`${x}\``).join(', ') || '—'} ` +
+					`| ${String(r.mutantCount)} | ${r.presupposes ? `\`${r.presupposes}\`` : '—'} ` +
+					`| ${r.dischargesRegisterEntries.map((x) => `\`${x}\``).join(', ') || '—'} ` +
 					`| \`${r.path}\` |`
 			);
 	}

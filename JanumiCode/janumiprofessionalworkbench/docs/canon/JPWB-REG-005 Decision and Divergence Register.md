@@ -28099,3 +28099,235 @@ thing from the other side — *"The promotion is an enabler, not a prerequisite"
   COMMANDS with their events correctly not counted, contract ids 363 → 380, drive 333 → 367).
   **Owed:** `SWP-06` (the evidence surface and the first SURFACE Slices); `REG-F-304` stays OPEN — no ratified
   conformance rule governs this plane, so no Slice may yet claim to assert one.
+
+### REG-F-306 — the evidence stage had no browser path, and the mechanism was a defaulted argument and an undeclared requirement
+
+- **Date:** 2026-08-31 · **Type:** CORRECTION (a finding's mechanism, narrower than recorded) · **Class:**
+  RECORD — arises from `JAN-SLICE-SWP-06` · **Status:** ✅ CLOSED.
+
+`DR-001`'s finding **F-4** recorded that `ProposeEvidence`, `AdmitEvidence` and `SubmitEvidenceForAssessment`
+appear in **0** files under `apps/rph-demo/src` and **0** under `apps/rph-demo/e2e`. **Re-driven before building:
+still 0 / 0 / 0, positive control `CreatePwa` 5 files, `PromoteBaseline` 2, `AbandonPwu` 2** — grown from the
+3 / 1 / 1 the roadmap recorded, so the control is live and the absence is real.
+
+- **⚠ BUT "NO BROWSER PATH" WAS THE SYMPTOM, NOT THE MECHANISM, AND THE DIFFERENCE DECIDED THE SIZE OF THE WORK.**
+  Two things were missing and neither was a route:
+  1. **A DEFAULTED ARGUMENT.** `driveAssessmentToAssessing` — the helper the workbench ALREADY called — already
+     dispatches `SubmitEvidenceForAssessment`, once per member of an OPTIONAL `evidence` argument.
+     `assurancePrelude` never passed one, so the loop ran zero times.
+  2. **AN UNDECLARED REQUIREMENT.** `submitEvidenceForAssessment` fails closed on any submission whose
+     `satisfiesRequirementId` the assessment's policy does not declare (DOC-004 §6.1), and the demo policy
+     declared no `requiredEvidence` at all. So the command could have been wired to a route and would still
+     never have been ACCEPTED.
+  Had the mechanism not been checked, `SWP-06` would have been scoped as building an evidence subsystem. It is
+  three form actions, one policy field, and a reuse.
+
+- **⚠ AND THE CONSEQUENCE WAS SHARPER THAN THE FINDING SAID.** `demoValidatorResult` set
+  `evidenceConsideredIds: []` **unconditionally**, and the §38 view has been rendering *"Evidence considered:
+  none"* for every sign-off this workbench ever made — truthfully, and with no way for an operator to change it.
+  Meanwhile the ENGINE Slice `E2E-001` asserts on the other plane that an assessment must name *"BOTH what it
+  assessed AND the evidence it considered"*. **Two planes disagreeing about the same rule, and only one of them
+  was checked.** That is what a SURFACE Slice is for.
+
+- **THE POLICY CHANGE, AND THE SITES IT ACTUALLY TURNS ON.** The demo policy now declares ONE
+  `EvidenceRequirement` with `cardinality: 'ZERO_OR_MORE'`, which the engine reads through one predicate —
+  `demandsAnInstance = cardinality !== 'ZERO_OR_MORE'`. The two sites that keep this behaviour-preserving are
+  `requiredEvidenceIds` in `requestAssuranceAssessment` (the assessment's BIRTH state, and §38's missing set) and
+  `unmet` in Gate A. ⚠ **The §30 `EVIDENCE_PENDING -> READY` arrow is NOT one of them, and a first draft of the
+  code comment said it was**: that site filters `requiredForDispositions === 'ALL'` FIRST, discarding a
+  `SATISFIED_ONLY` requirement before cardinality is consulted — and the assessment never reaches the arrow
+  anyway, being born READY. A plausible explanation for a true conclusion is the hardest kind of wrong to notice.
+  **"Behaviour-preserving" is precise, not absolute**: no consumer's output changes except one, and that one IS
+  the change — the declared-requirement reader is deliberately unfiltered by cardinality, so it stops refusing.
+
+- **⚠⚠ AND IT IS NOT "THE FIRST REQUIREMENT IN THE PRODUCT" — A DRAFT OF THIS ENTRY AND OF THE CODE COMMENT BOTH
+  SAID SO, AND BOTH WERE FALSE.** MEASURED: `m8-ontology.json` seeds `pol_intent_fidelity` (7 requirements) and
+  `pol_intent_completeness` (6) — **thirteen**, several `AT_LEAST_ONE` and therefore genuinely demanding. The
+  claim was inherited from engine comments that still assert the opposite; see `REG-F-308`. What is true of this
+  policy is only that it is the first to declare a requirement that **demands nothing**.
+
+- **Merge target:** **Repository** — three route actions, the policy's declared requirement, the
+  `evidenceConsideredIds` join, `evidence` on the introspection endpoint, and the `S-01` SURFACE Slice.
+  **Owed:** nothing from this entry.
+
+### REG-F-307 — `SL-6`'s presupposition was declared, parsed, written to the ledger, and read by nothing
+
+- **Date:** 2026-08-31 · **Type:** FINDING (an unenforced invariant) · **Class:**
+  FINDING — arises from `JAN-SLICE-SWP-06` / `SL-6` · **Status:** ✅ CLOSED (gated).
+
+`SL-6`: *"Every Slice MUST declare `ENGINE` or `SURFACE`. A `SURFACE` Slice MUST cite its presupposed `ENGINE`
+Slice."* The roadmap's `SWP-06` block states the consequence as an invariant: *"A SURFACE Slice MUST NOT be
+admitted while its presupposed ENGINE Slice is failing or absent."*
+
+- **THE FIELD EXISTED AT THREE LAYERS AND HAD NO READER.** `presupposes` is declared in the Slice contract
+  (`rph-contracts/src/slice.ts:113`), parsed by the ledger generator (`verif/slice-ledger.ts:308`), and written
+  into every SURFACE row of the committed baseline — and **nothing resolved it**. A SURFACE Slice could have
+  cited `E2E-999`, or an id belonging to another SURFACE Slice, and the ledger would have recorded the citation
+  faithfully while it referred to nothing.
+
+- **IT HAD NEVER MATTERED, WHICH IS EXACTLY WHEN IT STARTS TO.** There were no SURFACE Slices before `S-01`, so
+  the invariant had no instance and its unenforcement was invisible. An invariant that has never had an instance
+  has never been tested by anything.
+
+- **AND THE HUMAN-READABLE LEDGER DID NOT SHOW IT EITHER.** `LEDGER.md` rendered id, plane, scenario class, cited
+  rules, mutants, discharges and source — and not `presupposes`. `SL-6` exists so a reader can tell a browser
+  failure from a domain failure, which requires seeing WHICH ENGINE Slice a SURFACE Slice stands on. A column
+  present only in the machine projection is a citation nobody is told about. The column is added and the ledger
+  regenerated, not hand-edited.
+
+- **WHAT THE GATE ESTABLISHES AND WHAT IT DOES NOT.** `verif/slice-presupposition.test.ts` resolves ABSENCE, not
+  FAILURE: that the citation resolves to a real row, that the row is on the ENGINE plane, and that its source file
+  exists. *"Is the presupposed Slice failing?"* is answered by the gate as a whole — `E2E-001` runs in the same
+  suite — and a test that tried to observe another test's result would be reading a fact it cannot see. Five
+  limbs, two of them controls.
+
+- **Merge target:** **Repository** — `verif/slice-presupposition.test.ts` and the ledger's new column.
+  **Owed:** nothing.
+
+### REG-F-308 — four recorded statements say no policy declares required evidence, and thirteen requirements say otherwise
+
+- **Date:** 2026-08-31 · **Type:** FINDING (stale recorded statements) · **Class:**
+  FINDING — surfaced by `JAN-SLICE-SWP-06` · **Status:** OPEN.
+
+- **THE CLAIM, AND WHERE IT STANDS.** `verif/guard-enforcement-ledger.data.ts` and three sites in
+  `packages/rph-application/src/handlers/assurance.ts` assert, in substance, *"no production path declares
+  `requiredEvidence` on any policy"* — the engine's own explanation for why its evidence gating *"takes the
+  vacuous route"* everywhere.
+
+- **MEASURED, AND FALSE.** `packages/rph-product-realization-pwa/vocab/m8-ontology.json` seeds
+  `pol_intent_fidelity` with **7** evidence requirements and `pol_intent_completeness` with **6** — thirteen in
+  total, of which several carry `cardinality: 'AT_LEAST_ONE'` and therefore DEMAND an instance.
+
+- **⚠ WHY THIS IS WORSE THAN A STALE COMMENT.** Two of the four assert that **Gate A is vacuous** — a
+  control-that-cannot-fail claim — and the code now contradicts them: a SATISFIED disposition under either seeded
+  policy produces a non-empty `unmet` set and is refused. A recorded statement that a guard cannot fire, standing
+  beside a guard that can, is the shape this repository has recorded against itself more than any other, and here
+  it points in the direction that makes real enforcement look absent.
+
+- **NOT AMENDED HERE, AND THAT IS DELIBERATE.** Those four sites belong to another programme's records and their
+  correct wording depends on a population this work package has not measured (which policies, which dispositions,
+  which of the thirteen actually gate). `SWP-06` corrected only its OWN repetition of the claim, in
+  `demo-policy.ts`, and files this so the other four are found by someone who can measure them rather than
+  silently rewritten by someone who cannot.
+
+- **Merge target:** **Register.** **Owed:** re-derive the population and amend the four statements, or record why
+  each stands. Status: OPEN.
+
+### REG-F-309 — an adversarial pass over `SWP-06` refuted three of four declared mutants and one clause that could not fail
+
+- **Date:** 2026-08-31 · **Type:** RECORD (verification of this work package) · **Class:**
+  RECORD — arises from `JAN-SLICE-SWP-06` / `SL-3a` · **Status:** ✅ CLOSED.
+
+Before commit, `SWP-06`'s own claims were put to an adversarial pass — four independent lenses, every surviving
+claim then handed to a skeptic instructed to refute it and to default to refuted where it could not reproduce the
+evidence. **47 claims examined, 24 survived.** What it found in my own work is recorded here because the useful
+part of a verification pass is the part that says the author was wrong.
+
+- **⚠⚠ THREE OF THE FOUR DECLARED MUTANTS WERE WRONG, AND ALL FOUR WERE UNDRIVEN WHEN DECLARED.** They were
+  authorial hypotheses written beside the clauses they claimed to prove:
+  - one reddened **S-d AND S-e** — prefix subsumption in a linear journey, which `SL-3a` says proves NEITHER;
+  - one was **INERT**: it changed `cardinality`, but `blockingEvidenceIds` filters
+    `requiredForDispositions === 'ALL'` BEFORE cardinality is consulted, so nothing could move;
+  - one was **schema-foreclosed** at the command bus by `ActorReferenceSchema`'s `.min(1)`, minting no object and
+    reddening every clause with a message none of them predicted.
+  **A predicted red that has not been observed is a hypothesis, and three of four were false.** Re-authored as
+  three single-victim mutants and DRIVEN: **3/3 SOUND**, each reddening exactly its own clause and no other.
+
+- **AND THE SHORTFALL FROM FIVE CLAUSES TO THREE MUTANTS IS STRUCTURAL, NOT LAZINESS.** This Slice is a linear
+  journey: S-c admits what S-a proposed, S-d submits what S-c admitted, S-e signs off what S-d submitted. Every
+  clause is a strict PREFIX of the ones after it, so any mutation breaking S-c or S-d necessarily breaks S-e.
+  Declared in-file rather than left to be noticed.
+
+- **⚠ A CLAUSE THAT COULD NOT FAIL.** S-b asserted only that refused evidence stayed `PROPOSED` — **the state it
+  was already in**, asserted identically by S-a — so it could not distinguish "the engine refused" from "the
+  click did nothing", and `expect.poll` discharges on its first sample. It now asserts the ENGINE's own message,
+  `failed CONTENT_AVAILABLE`, which for that arrangement is the only limb that can fail; the panel had no error
+  display at all, so the refusal was invisible to the operator too, and now is not.
+
+- **A REAL CORRECTNESS DEFECT: THE SURFACE ROUTED EVIDENCE BY A WORKSPACE-WIDE GUESS.** `evidenceSubjectPwuId`
+  read `listByType(engine, 'ASSURANCE_ASSESSMENT')` — the whole workspace — and became the hidden `pwuId` of the
+  admit and submit forms. An operator on Undertaking A could admit evidence to Undertaking B's assessment, and
+  B's sign-off would then cite evidence about A. Scoped. This is precisely the defect `QueryScope`'s own header
+  records being repaired four times, committed a fifth.
+
+- **TWO FALSE COMMENTS, BOTH IN MY OWN NEW CODE.** One cited an *"`s01` U-4 clause"* that has never existed in
+  any Slice. The other said *"this demo asserts no claims"* — the reference drive asserts nine, and all sixteen
+  seeded Evidence objects carry a non-empty `supportsClaimIds`; the true statement is only that the OPERATOR's
+  evidence is unclaimed. Both corrected in place with the correction stated.
+
+- **AND ONE AFFORDANCE THAT COULD ONLY ERROR.** On a fresh workbench the seed leaves zero open assessments while
+  sixteen ADMISSIBLE evidence rows render, so every `Submit for assessment` button could only produce
+  *"Missing evidence or PWU."* Both acts are now gated on a scoped open assessment.
+
+- **Merge target:** **Repository** — every item above is fixed or gated. **Owed:** `REG-F-308` (OPEN) and the
+  `NOT_DRIVEN_HERE` gap in `scripts/drive-slice-mutants.ts` — see `REG-F-310`. Status: CLOSED.
+
+### REG-F-310 — the ENGINE mutant driver would have reported a full sweep having driven zero SURFACE mutants
+
+- **Date:** 2026-08-31 · **Type:** FINDING (a silently narrowed predicate) · **Class:**
+  FINDING — arises from `JAN-SLICE-SWP-06` · **Status:** ✅ CLOSED (made loud, not repaired).
+
+`scripts/drive-slice-mutants.ts` is the instrument that turns a declared mutant into an observed one. **Two
+independent narrowings put every SURFACE Slice outside it**: its walk starts at `packages/` (SURFACE Slices live
+under `apps/<app>/e2e/`), and its filename test is `.slice.test.ts` (theirs is `.slice.e2e.ts` — a distinction
+`REG-F-293` made load-bearing on purpose). Underneath both, it shells **vitest**, which cannot run a Playwright
+spec at all.
+
+- **⚠ IT WOULD HAVE REPORTED SUCCESS.** With `S-01` present, the driver walks its population, finds every ENGINE
+  mutant SOUND, prints `78/78 SOUND`, and exits zero — having driven **none** of the SURFACE mutants, and looking
+  exactly like a full sweep. This is the vocabulary-split narrowing this repository has recorded before: a
+  predicate keyed on the old word, still green on the half it can still see.
+
+- **MADE LOUD RATHER THAN REPAIRED, AND THE CHOICE IS STATED.** Repairing it means teaching the script a second
+  runner with its own report shape and server lifecycle — a real change that belongs to whoever needs SURFACE
+  mutants inside `gate:fast`. Until then it emits a `NOT_DRIVEN_HERE` row per SURFACE Slice, counted as
+  not-SOUND, naming the file and its declared mutant count.
+
+- **⚠ A FIRST VERSION THREW BEFORE THE LOOP** and thereby let one SURFACE Slice block every ENGINE verdict. An
+  instrument that reports nothing is not more honest than one that reports what it covered — only less useful.
+
+- **Merge target:** **Repository.** **Owed:** teach the driver to shell Playwright, or move the SURFACE driver
+  into `gate:fast`. Status: CLOSED as a disclosure; the coverage gap itself is OPEN and named.
+
+### REG-F-311 — `csaa:generated-context` cannot be regenerated in this environment, and the gate is RED on commit
+
+- **Date:** 2026-08-31 · **Type:** FINDING (a blocked gate, disclosed) · **Class:**
+  FINDING — arises from `JAN-SLICE-SWP-06` · **Status:** OPEN.
+
+`JAN-SLICE-SWP-06` is committed with `gate:fast`'s FIRST step failing, and that is stated here rather than
+discovered by whoever runs it next. **No pass is claimed for it.**
+
+- **WHAT IS STALE, AND WHY IT LEGITIMATELY IS.** `verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json`
+  records a manifest of the SvelteKit project's input artifacts. `SWP-06` adds three server actions, a Slice
+  source and route changes, so the manifest genuinely moved. It was regenerated successfully TWICE during this
+  work package; the third regeneration is blocked. `csaa:inventory:check` is gated on it
+  (*"Required JPWB SvelteKit generated context is not current and closed"*), so both CSAA gates are red from one
+  root cause.
+
+- **THE MECHANISM, MEASURED IN BOTH DIRECTIONS.** `run-generated-context-evidence.ts` renames
+  `apps/rph-demo/.svelte-kit` aside before regenerating it. `renameSync` on that directory returns **EPERM**
+  under both node and bun. **CONTROL: a directory created seconds earlier in the SAME parent, renamed to the
+  SAME destination, succeeds** — so it is neither the source parent nor the destination, but a handle held
+  inside `.svelte-kit` itself. PowerShell's `Move-Item` succeeds because it falls back to copy-and-delete; a
+  POSIX `rename(2)` cannot. Deleting and re-syncing the directory, cycling its directory entry, killing every
+  `node`/`bun` process, and pausing for inactivity were each tried and each failed. **No `tsserver`,
+  `vite` or `playwright` process was alive for the final attempts**, so the holder is outside this session —
+  most likely the editor's file watcher on a well-known generated path.
+
+- **⚠ AND THE OTHER ROUTE IS BLOCKED BY SOMETHING THAT PREDATES THIS WORK PACKAGE.** With `.svelte-kit` ABSENT
+  the script skips the rename and fails differently:
+  *"SUBJECT_CHANGED_DURING_RESOLUTION: TypeScript discovered an uncaptured repository artifact:
+  apps/rph-demo/harness/pwa-judge-panel.workflow.js."* That file is TRACKED, unmodified, added by commit
+  `f517115d` (*"Layer B — Claude multi-lens judge panel"*), and appears in **neither** CSAA manifest — zero hits
+  in the generated-context evidence and zero in `jan-csaa-005.inventory.baseline.json`. So the second path was
+  already broken before `SWP-06` touched anything.
+
+- **WHY THIS IS DISCLOSED RATHER THAN WORKED AROUND.** The two available workarounds are both dishonest: editing
+  the evidence file by hand would forge a measurement, and reverting it to `HEAD` would make it MORE stale than
+  the partially-regenerated version being committed while looking untouched. The committed version is the closer
+  of the two to the truth and is still not current.
+
+- **Merge target:** **Register.** **Owed:** regenerate `csaa:generated-context` (and then `csaa:inventory`) in an
+  environment where `.svelte-kit` is not held open — and separately, capture or exclude
+  `apps/rph-demo/harness/pwa-judge-panel.workflow.js` in the CSAA subject, which is a defect of its own and not
+  this programme's to decide. Status: OPEN.

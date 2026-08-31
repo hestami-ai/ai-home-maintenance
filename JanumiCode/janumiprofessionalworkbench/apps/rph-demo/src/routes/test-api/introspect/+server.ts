@@ -14,6 +14,7 @@ import {
 	listObservations,
 	listDecisions,
 	listBaselines,
+	listByType,
 	listConversations
 } from '@janumipwb/rph-engine';
 import { getEngine, isTestMode } from '$lib/server/workbench';
@@ -38,6 +39,11 @@ export const GET: RequestHandler = () => {
 		assessments: listAssessments(e, { kind: 'WORKSPACE' }),
 		assurancePolicies: listAssurancePolicies(e),
 		observations: listObservations(e, { kind: 'WORKSPACE' }),
+		// JAN-SLICE-SWP-06 — the evidence stage's ground truth. A SURFACE Slice that asserted the browser's own
+		// rendering would prove only that the page says what the page says; the roadmap forbids exactly that
+		// ("MUST NOT assert a SURFACE journey by inspecting server-rendered HTML alone"). The Slice drives the
+		// real UI and then reads the ENGINE here, so what it proves is that the operator's acts reached the store.
+		evidence: listByType(e, 'EVIDENCE'),
 		decisions: listDecisions(e, { kind: 'WORKSPACE' }),
 		baselines: listBaselines(e, { kind: 'WORKSPACE' }),
 		conversations: listConversations(e),

@@ -171,6 +171,16 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		'completePlan',
 		'failPlan',
 		'completeStep',
+		// JAN-SLICE-SWP-06 — the evidence stage, which this surface had no act for at all. `ProposeEvidence`,
+		// `AdmitEvidence` and `SubmitEvidenceForAssessment` appeared in ZERO files under `apps/rph-demo`
+		// (positive control when re-driven: `CreatePwa` 5, `PromoteBaseline` 2, `AbandonPwu` 2), so the workbench
+		// could sign work off and could not evidence it. THREE acts and not one, because they are three
+		// professional acts: proposing asserts something exists, ADMITTING is a judgement the engine can refuse,
+		// and submitting offers it against a declared requirement. This census reddened on their arrival, which
+		// is its job.
+		'proposeEvidence',
+		'admitEvidence',
+		'submitEvidence',
 		'recordAssurance',
 		// S-1b (REG-F-112): the ADVERSE assurance act. Until it landed the workbench could sign work off and
 		// could not fault it — `RecordAssuranceObservation` was dispatched nowhere in the app — which is why

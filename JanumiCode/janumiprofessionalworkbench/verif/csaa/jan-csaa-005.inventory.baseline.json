@@ -62,27 +62,27 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 494,
+      "discovered": 495,
       "excluded": 0,
       "failed": 0,
-      "included": 494,
+      "included": 495,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 494
+      "successfullyInventoried": 495
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 66,
+      "discovered": 67,
       "excluded": 0,
       "failed": 0,
-      "included": 66,
+      "included": 67,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 66
+      "successfullyInventoried": 67
     }
   ],
   "assuranceSurfaces": {
@@ -141,6 +141,7 @@
         "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
         "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
         "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+        "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
         "apps/rph-demo/e2e/smoke.e2e.ts",
         "apps/rph-demo/e2e/theme.e2e.ts",
         "apps/rph-demo/e2e/traceability.e2e.ts",
@@ -172,7 +173,7 @@
         "configurationPaths": [
           "apps/rph-demo/playwright.config.ts"
         ],
-        "discovered": 71,
+        "discovered": 72,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 34,
@@ -213,11 +214,11 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "7c56ef1637cea89663d46f87668d3e5ec64d94fa11ba562b1b7a1be1340ce19d",
+        "id": "84c4abd8b9bc666fd9b95440881bd998815bb6ce2d0d41ba8040d2207e157646",
         "includePatterns": [
           "apps/rph-demo/e2e/**/*.e2e.ts"
         ],
-        "included": 37,
+        "included": 38,
         "includedPaths": [
           "apps/rph-demo/e2e/agent-retention.e2e.ts",
           "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -247,6 +248,7 @@
           "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
           "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
           "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+          "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
           "apps/rph-demo/e2e/smoke.e2e.ts",
           "apps/rph-demo/e2e/theme.e2e.ts",
           "apps/rph-demo/e2e/traceability.e2e.ts",
@@ -267,17 +269,17 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "48b9fa6689b9a711099d16d8f74b9d07728f59579f3c89914440506457b7792b",
+        "selectionDigest": "6cf60dc24809850da35fcb7bfbf033bef8d6337d00c700be0bcfd47c47fedfa1",
         "status": "COMPLETE"
       },
       {
         "configurationPaths": [
           "apps/rph-demo/playwright.live.config.ts"
         ],
-        "discovered": 71,
+        "discovered": 72,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 69,
+        "excluded": 70,
         "excludedPaths": [
           "apps/rph-demo/e2e/agent-retention.e2e.ts",
           "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -309,6 +311,7 @@
           "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
           "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
           "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+          "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
           "apps/rph-demo/e2e/smoke.e2e.ts",
           "apps/rph-demo/e2e/support/gallery.ts",
           "apps/rph-demo/e2e/support/harness.ts",
@@ -350,7 +353,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "f390a52220e685c47c1a05ead25e049615508ef887dd780625040f7ff0e4da03",
+        "id": "04d6763ea007b6ae04ba4d73c8a4f04caa7d7493026dbfe8914f39c0c51af3dc",
         "includePatterns": [
           "apps/rph-demo/e2e-live/**/*.live.ts"
         ],
@@ -369,7 +372,7 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "7f0a72351923fe3e4c366d847241b312a0b7e2fd81e3329375ee030def672020",
+        "selectionDigest": "17e2baa80298519e549cb32ec2aa943f8817c642e7e3d6ba272ff0fbaade94f9",
         "status": "COMPLETE"
       },
       {
@@ -377,10 +380,10 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 546,
+        "discovered": 548,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 48,
+        "excluded": 49,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -414,6 +417,7 @@
           "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
           "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
           "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+          "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
           "apps/rph-demo/e2e/smoke.e2e.ts",
           "apps/rph-demo/e2e/support/gallery.ts",
           "apps/rph-demo/e2e/support/harness.ts",
@@ -432,13 +436,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "6a79a18022e2278a33e629bc3fb925955d8cd0cd21b465ca9d06434a166104d0",
+        "id": "468c217406ea6639052fc77fd0469b8c611228aa2af03dafcd431a8fc3e6fa6d",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 498,
+        "included": 499,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -924,6 +928,7 @@
           "verif/register-status.test.ts",
           "verif/route-action-census.test.ts",
           "verif/slice-ledger.test.ts",
+          "verif/slice-presupposition.test.ts",
           "verif/slice-scenario-classes.test.ts",
           "verif/slice-scenario-coverage.test.ts",
           "verif/slice-subsumption.test.ts",
@@ -949,7 +954,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "cbbb278e097cdb94af4df1f4bc17f3b560aae51be8ddd53e981e46af883b0afc",
+        "selectionDigest": "b1574a5c55315b445f5c6ee416bfb2408b074948f130f2d1fc77056e3a49e146",
         "status": "COMPLETE"
       },
       {
@@ -957,10 +962,10 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 546,
+        "discovered": 548,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 48,
+        "excluded": 49,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -994,6 +999,7 @@
           "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
           "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
           "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+          "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
           "apps/rph-demo/e2e/smoke.e2e.ts",
           "apps/rph-demo/e2e/support/gallery.ts",
           "apps/rph-demo/e2e/support/harness.ts",
@@ -1012,13 +1018,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "e39e4841e763049c2fe7bedce3643161a57faa82aaec823c18c3fb85c3ac6799",
+        "id": "5c181101f7d60be66d489a6eced5feaa9c5481eed37d03f8ac7212568230e31c",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 498,
+        "included": 499,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1504,6 +1510,7 @@
           "verif/register-status.test.ts",
           "verif/route-action-census.test.ts",
           "verif/slice-ledger.test.ts",
+          "verif/slice-presupposition.test.ts",
           "verif/slice-scenario-classes.test.ts",
           "verif/slice-scenario-coverage.test.ts",
           "verif/slice-subsumption.test.ts",
@@ -1529,7 +1536,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "0f2146c2f67bd367a006a8adbc58172a8e7c0f5b61ac914160516a8baa05502a",
+        "selectionDigest": "36e43ab2de0924f274760860125c36a9a3d257c46c6a4eff0910bd2b4747f042",
         "status": "COMPLETE"
       }
     ],
@@ -2019,6 +2026,7 @@
         "verif/register-status.test.ts",
         "verif/route-action-census.test.ts",
         "verif/slice-ledger.test.ts",
+        "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-classes.test.ts",
         "verif/slice-scenario-coverage.test.ts",
         "verif/slice-subsumption.test.ts",
@@ -5300,7 +5308,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "446250f6c77df4895e54a5926a9b1c91d2f5279aa6e212d1addde876ca06ad75",
+    "configurationDigest": "4f50273d4c7cc5dd8aa087e9f2620b304be9d8024a47ce4412fe0d88d612f694",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -5811,7 +5819,7 @@
           "configPath": "apps/rph-demo/e2e/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "48ce2083a6987d6e637f1013f28051d9c29067f21b14b16ec2c0deabcc0153c2",
+          "projectResolutionDigest": "10efc9dbadb804d8a91a7f9f0a2e7e53629c2b48bd6c33bdb462a3a7738b1fcc",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -5847,6 +5855,7 @@
             "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
             "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
             "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
             "apps/rph-demo/e2e/smoke.e2e.ts",
             "apps/rph-demo/e2e/support/gallery.ts",
             "apps/rph-demo/e2e/support/harness.ts",
@@ -8409,7 +8418,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "f3ae60fc617b1cd7e6d432fac879c0065ea65678fb5372e0437e8b010c1bdaee",
+          "projectResolutionDigest": "842cd4379e20cfda686f248263c60d853d29a6af83faee0a22afe8f01b0d9f97",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8460,6 +8469,7 @@
             "verif/route-action-census.test.ts",
             "verif/slice-ledger.test.ts",
             "verif/slice-ledger.ts",
+            "verif/slice-presupposition.test.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
             "verif/slice-subsumption.test.ts",
@@ -8484,7 +8494,7 @@
           "configurationPaths": [
             "apps/rph-demo/playwright.config.ts"
           ],
-          "discovered": 71,
+          "discovered": 72,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 34,
@@ -8525,11 +8535,11 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "7c56ef1637cea89663d46f87668d3e5ec64d94fa11ba562b1b7a1be1340ce19d",
+          "id": "84c4abd8b9bc666fd9b95440881bd998815bb6ce2d0d41ba8040d2207e157646",
           "includePatterns": [
             "apps/rph-demo/e2e/**/*.e2e.ts"
           ],
-          "included": 37,
+          "included": 38,
           "includedPaths": [
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -8559,6 +8569,7 @@
             "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
             "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
             "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
             "apps/rph-demo/e2e/smoke.e2e.ts",
             "apps/rph-demo/e2e/theme.e2e.ts",
             "apps/rph-demo/e2e/traceability.e2e.ts",
@@ -8579,17 +8590,17 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "48b9fa6689b9a711099d16d8f74b9d07728f59579f3c89914440506457b7792b",
+          "selectionDigest": "6cf60dc24809850da35fcb7bfbf033bef8d6337d00c700be0bcfd47c47fedfa1",
           "status": "COMPLETE"
         },
         {
           "configurationPaths": [
             "apps/rph-demo/playwright.live.config.ts"
           ],
-          "discovered": 71,
+          "discovered": 72,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 69,
+          "excluded": 70,
           "excludedPaths": [
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -8621,6 +8632,7 @@
             "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
             "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
             "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
             "apps/rph-demo/e2e/smoke.e2e.ts",
             "apps/rph-demo/e2e/support/gallery.ts",
             "apps/rph-demo/e2e/support/harness.ts",
@@ -8662,7 +8674,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "f390a52220e685c47c1a05ead25e049615508ef887dd780625040f7ff0e4da03",
+          "id": "04d6763ea007b6ae04ba4d73c8a4f04caa7d7493026dbfe8914f39c0c51af3dc",
           "includePatterns": [
             "apps/rph-demo/e2e-live/**/*.live.ts"
           ],
@@ -8681,7 +8693,7 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "7f0a72351923fe3e4c366d847241b312a0b7e2fd81e3329375ee030def672020",
+          "selectionDigest": "17e2baa80298519e549cb32ec2aa943f8817c642e7e3d6ba272ff0fbaade94f9",
           "status": "COMPLETE"
         },
         {
@@ -8689,10 +8701,10 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 546,
+          "discovered": 548,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 48,
+          "excluded": 49,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -8726,6 +8738,7 @@
             "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
             "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
             "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
             "apps/rph-demo/e2e/smoke.e2e.ts",
             "apps/rph-demo/e2e/support/gallery.ts",
             "apps/rph-demo/e2e/support/harness.ts",
@@ -8744,13 +8757,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "6a79a18022e2278a33e629bc3fb925955d8cd0cd21b465ca9d06434a166104d0",
+          "id": "468c217406ea6639052fc77fd0469b8c611228aa2af03dafcd431a8fc3e6fa6d",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 498,
+          "included": 499,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9236,6 +9249,7 @@
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
             "verif/slice-ledger.test.ts",
+            "verif/slice-presupposition.test.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
             "verif/slice-subsumption.test.ts",
@@ -9261,7 +9275,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "cbbb278e097cdb94af4df1f4bc17f3b560aae51be8ddd53e981e46af883b0afc",
+          "selectionDigest": "b1574a5c55315b445f5c6ee416bfb2408b074948f130f2d1fc77056e3a49e146",
           "status": "COMPLETE"
         },
         {
@@ -9269,10 +9283,10 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 546,
+          "discovered": 548,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 48,
+          "excluded": 49,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9306,6 +9320,7 @@
             "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
             "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
             "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+            "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
             "apps/rph-demo/e2e/smoke.e2e.ts",
             "apps/rph-demo/e2e/support/gallery.ts",
             "apps/rph-demo/e2e/support/harness.ts",
@@ -9324,13 +9339,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "e39e4841e763049c2fe7bedce3643161a57faa82aaec823c18c3fb85c3ac6799",
+          "id": "5c181101f7d60be66d489a6eced5feaa9c5481eed37d03f8ac7212568230e31c",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 498,
+          "included": 499,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9816,6 +9831,7 @@
             "verif/register-status.test.ts",
             "verif/route-action-census.test.ts",
             "verif/slice-ledger.test.ts",
+            "verif/slice-presupposition.test.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
             "verif/slice-subsumption.test.ts",
@@ -9841,7 +9857,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "0f2146c2f67bd367a006a8adbc58172a8e7c0f5b61ac914160516a8baa05502a",
+          "selectionDigest": "36e43ab2de0924f274760860125c36a9a3d257c46c6a4eff0910bd2b4747f042",
           "status": "COMPLETE"
         }
       ],
@@ -10560,7 +10576,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "b04964c5964d6c0572b518b3a142694f49c8633f314717aa40636f9e4015bd77",
+    "fileManifestDigest": "ed95f87ae14a613b2c2a29e19333701ecaa782cf4346c30199bf9f57f86a36ce",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10571,7 +10587,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "7d25752813dc68c84436d3ac4db0819ee41f9dcb4f31a8007f5b25970c9ecfc0",
+          "824481f3be3f0901add1be58497367c9a60edc9964c7036c12ed8bb25d301198",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10609,7 +10625,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
           "2.69.2",
-          "7d25752813dc68c84436d3ac4db0819ee41f9dcb4f31a8007f5b25970c9ecfc0",
+          "824481f3be3f0901add1be58497367c9a60edc9964c7036c12ed8bb25d301198",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -10666,7 +10682,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1288,
+    "selectedFileCount": 1290,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11048,6 +11064,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 20233,
+        "path": "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
+        "sha256": "55b7bd66c9cf8e239720a82f92de02aebf867ea862b1fe36ad776b929b26b21c",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 687,
         "path": "apps/rph-demo/e2e/smoke.e2e.ts",
         "sha256": "52fe631f89bd670c9f2f2f867b5ec6f25a837f3c5a08932b0511604e15f81d0e",
@@ -11062,9 +11085,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 5213,
+        "bytes": 5366,
         "path": "apps/rph-demo/e2e/support/harness.ts",
-        "sha256": "32dcde3c3389662ce35f08a20dcb5b21ade75518591209d0b7437a5caa78c7ae",
+        "sha256": "7da55a77084483a33f57afa1cde10e4733970f25d0a3b1c018348c1174ec76a4",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -11377,9 +11400,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 4812,
+        "bytes": 8873,
         "path": "apps/rph-demo/src/lib/server/assurance/demo-policy.ts",
-        "sha256": "718540fea0d053efe1f158156f5ab5f2eb61e6bf7d245dfbce6f88dcb8bd5d99",
+        "sha256": "a4cac959dc7f2d4ba5d6a82ae7a5b3f7ffdb8cec975fcc21d009860be98e3993",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11692,9 +11715,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 2645,
+        "bytes": 3126,
         "path": "apps/rph-demo/src/routes/test-api/introspect/+server.ts",
-        "sha256": "0c4117e1eabca66dcd34474abafa69a59fafb9bfa78ceaa811ede48bf580c03e",
+        "sha256": "e5e63d387a7f87a0c1745603e93606ba2239a6410ff23dd5d08de6ed4fdf6cc1",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -11720,16 +11743,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 61437,
+        "bytes": 75851,
         "path": "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-        "sha256": "1d48030aed1a6c6ad6ce53d0b1be6c78dff03232d85099b47ea8189b979d87dc",
+        "sha256": "a345af1285fa9902b44a30d3e55c9af484e09be7dcd7e49a940ed93fa73b4e78",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 45678,
+        "bytes": 49737,
         "path": "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte",
-        "sha256": "8271974663b07a5d0099157c1bfa90410c5469126e7e38c918ee69546a7314a9",
+        "sha256": "acdaed428102dfbb11b5930565e90678f920fe1a12649bb4ff84c7ddeb56ddf2",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -15094,9 +15117,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 105469,
+        "bytes": 105787,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "082d5fd8784c549c5fcaf7e4c46dd9e601eb7d0ed9eacb1d6aa4f6bf6360161e",
+        "sha256": "ded81e2cbe8bf121d04ede012451b93ef89e233b561b2cf2f9727c4b80c3a79f",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -19336,9 +19359,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 78070,
+        "bytes": 78314,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "c89243422726f04110201155cbb2f1b17f008786d5c469879f2fe45243206e14",
+        "sha256": "c1d9da33ca60df1690ded1676df02c083d1f73fca5f39e2594d9e62448a9b0be",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19518,9 +19541,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11902,
+        "bytes": 12609,
         "path": "verif/route-action-census.test.ts",
-        "sha256": "156e01ad200c8e295c2455fd4f1870bdf1dc1e18085deaa159f9b58d56d8a098",
+        "sha256": "1f7562f79822902862a14cef68c88a0a704bb22f5c48039910410c5049dfbb8d",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19535,6 +19558,13 @@
         "bytes": 23483,
         "path": "verif/slice-ledger.ts",
         "sha256": "824032f006c8f046448929916f80cd351e80fccd09df48a822ed1bb49362dfc5",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
+        "bytes": 7129,
+        "path": "verif/slice-presupposition.test.ts",
+        "sha256": "fbe832eeeccdcc3eb609c78aebe5975ae9807699394ef384235542cbe2787712",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19560,9 +19590,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 5471,
+        "bytes": 5901,
         "path": "verif/slices/slice-ledger.baseline.json",
-        "sha256": "1b186aa381d8830a4ab816a21933e09ce0318f5623c8a4e924e241ec2d73139c",
+        "sha256": "68e7430e7b17b08799be7411365bf9a5f7f0e250abf501db2b26367bfbbd5131",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -19685,12 +19715,12 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "3573d08f530eb84e6980d1c04d8e0be89fd58cd4ce6419b7de9b60f6b84f401d",
+    "subjectId": "c6a87c761a125e61006ea964126f802ccd5269da709614d8c09d8cb73d31e6ed",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
     {
-      "candidateArtifactCount": 42,
+      "candidateArtifactCount": 43,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -19713,7 +19743,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "7d25752813dc68c84436d3ac4db0819ee41f9dcb4f31a8007f5b25970c9ecfc0",
+            "824481f3be3f0901add1be58497367c9a60edc9964c7036c12ed8bb25d301198",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -19788,6 +19818,7 @@
         "apps/rph-demo/e2e/pwu-lifecycle.e2e.ts",
         "apps/rph-demo/e2e/pwu-rejection.e2e.ts",
         "apps/rph-demo/e2e/risk-profile-authored.e2e.ts",
+        "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
         "apps/rph-demo/e2e/smoke.e2e.ts",
         "apps/rph-demo/e2e/support/gallery.ts",
         "apps/rph-demo/e2e/support/harness.ts",
@@ -19847,7 +19878,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "cf488d968f46109fdbe9df1694e44f30a28f6577d84f4c97808e30856a2c46f8",
             "2.69.2",
-            "7d25752813dc68c84436d3ac4db0819ee41f9dcb4f31a8007f5b25970c9ecfc0",
+            "824481f3be3f0901add1be58497367c9a60edc9964c7036c12ed8bb25d301198",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -22329,7 +22360,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 61,
+      "candidateArtifactCount": 62,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -22403,6 +22434,7 @@
         "verif/route-action-census.test.ts",
         "verif/slice-ledger.test.ts",
         "verif/slice-ledger.ts",
+        "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-classes.test.ts",
         "verif/slice-scenario-coverage.test.ts",
         "verif/slice-subsumption.test.ts",
@@ -23661,6 +23693,7 @@
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
         "verif/mutant-ledger.test.ts",
+        "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-coverage.test.ts",
         "verif/tracker-name-match.test.ts"
       ],
@@ -23763,6 +23796,7 @@
         "package.json#/scripts/slices:ledger",
         "package.json#/scripts/slices:ledger:check",
         "verif/slice-ledger.test.ts",
+        "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-coverage.test.ts"
       ],
       "path": "scripts/slice-ledger.ts",
@@ -24259,7 +24293,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "c89243422726f04110201155cbb2f1b17f008786d5c469879f2fe45243206e14",
+      "contentSha256": "c1d9da33ca60df1690ded1676df02c083d1f73fca5f39e2594d9e62448a9b0be",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
@@ -24680,7 +24714,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/route-action-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "156e01ad200c8e295c2455fd4f1870bdf1dc1e18085deaa159f9b58d56d8a098",
+      "contentSha256": "1f7562f79822902862a14cef68c88a0a704bb22f5c48039910410c5049dfbb8d",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24717,6 +24751,7 @@
       "extractionMethod": "TYPESCRIPT_AST",
       "gateCarriers": [
         "verif/slice-ledger.test.ts",
+        "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-coverage.test.ts"
       ],
       "path": "verif/slice-ledger.ts",
@@ -24724,6 +24759,22 @@
         "verif/slice-ledger.ts"
       ],
       "role": "ANALYZER"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-presupposition.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "fbe832eeeccdcc3eb609c78aebe5975ae9807699394ef384235542cbe2787712",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/slice-presupposition.test.ts"
+      ],
+      "path": "verif/slice-presupposition.test.ts",
+      "provenance": [
+        "verif/slice-presupposition.test.ts"
+      ],
+      "role": "TEST"
     },
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-scenario-classes.test.ts.",

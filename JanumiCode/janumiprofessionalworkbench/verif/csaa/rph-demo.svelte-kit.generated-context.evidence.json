@@ -1478,6 +1478,12 @@
     },
     {
       "artifactClass": "TEST_SOURCE",
+      "bytes": 20233,
+      "path": "apps/rph-demo/e2e/slices/s01-evidence-through-the-browser.slice.e2e.ts",
+      "sha256": "55b7bd66c9cf8e239720a82f92de02aebf867ea862b1fe36ad776b929b26b21c"
+    },
+    {
+      "artifactClass": "TEST_SOURCE",
       "bytes": 687,
       "path": "apps/rph-demo/e2e/smoke.e2e.ts",
       "sha256": "52fe631f89bd670c9f2f2f867b5ec6f25a837f3c5a08932b0511604e15f81d0e"
@@ -1490,9 +1496,9 @@
     },
     {
       "artifactClass": "TEST_SOURCE",
-      "bytes": 5213,
+      "bytes": 5366,
       "path": "apps/rph-demo/e2e/support/harness.ts",
-      "sha256": "32dcde3c3389662ce35f08a20dcb5b21ade75518591209d0b7437a5caa78c7ae"
+      "sha256": "7da55a77084483a33f57afa1cde10e4733970f25d0a3b1c018348c1174ec76a4"
     },
     {
       "artifactClass": "TEST_SOURCE",
@@ -1760,9 +1766,9 @@
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 4812,
+      "bytes": 8873,
       "path": "apps/rph-demo/src/lib/server/assurance/demo-policy.ts",
-      "sha256": "718540fea0d053efe1f158156f5ab5f2eb61e6bf7d245dfbce6f88dcb8bd5d99"
+      "sha256": "a4cac959dc7f2d4ba5d6a82ae7a5b3f7ffdb8cec975fcc21d009860be98e3993"
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
@@ -2030,9 +2036,9 @@
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 2645,
+      "bytes": 3126,
       "path": "apps/rph-demo/src/routes/test-api/introspect/+server.ts",
-      "sha256": "0c4117e1eabca66dcd34474abafa69a59fafb9bfa78ceaa811ede48bf580c03e"
+      "sha256": "e5e63d387a7f87a0c1745603e93606ba2239a6410ff23dd5d08de6ed4fdf6cc1"
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
@@ -2054,15 +2060,15 @@
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 61437,
+      "bytes": 75851,
       "path": "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-      "sha256": "1d48030aed1a6c6ad6ce53d0b1be6c78dff03232d85099b47ea8189b979d87dc"
+      "sha256": "a345af1285fa9902b44a30d3e55c9af484e09be7dcd7e49a940ed93fa73b4e78"
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 45678,
+      "bytes": 49737,
       "path": "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte",
-      "sha256": "8271974663b07a5d0099157c1bfa90410c5469126e7e38c918ee69546a7314a9"
+      "sha256": "acdaed428102dfbb11b5930565e90678f920fe1a12649bb4ff84c7ddeb56ddf2"
     },
     {
       "artifactClass": "OTHER",
@@ -2155,7 +2161,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "7d25752813dc68c84436d3ac4db0819ee41f9dcb4f31a8007f5b25970c9ecfc0",
+  "inputManifestDigest": "824481f3be3f0901add1be58497367c9a60edc9964c7036c12ed8bb25d301198",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"

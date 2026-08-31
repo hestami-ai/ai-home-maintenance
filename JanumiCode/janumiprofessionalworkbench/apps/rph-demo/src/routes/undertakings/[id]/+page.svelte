@@ -599,6 +599,100 @@
 				{/if}
 			</div>
 		</div>
+		<!-- ── THE EVIDENCE STAGE (JAN-SLICE-SWP-06) ────────────────────────────────────────────────────────────
+		     ⚠ IT SITS IN THE ASSURANCE TAB, BESIDE THE SIGN-OFF IT SUPPORTS, and that placement is the argument.
+		     `ProposeEvidence`, `AdmitEvidence` and `SubmitEvidenceForAssessment` appeared ZERO times anywhere in
+		     this app, so an operator could sign work off through this workbench having produced nothing — while
+		     the ENGINE Slice E2E-001 asserts on the other plane that an assessment must name BOTH what it
+		     assessed AND the evidence it considered. Put on its own page, the evidence stage would be a thing you
+		     could skip; here it is a thing you can see you skipped.
+
+		     ⚠ THE THREE ACTS ARE THREE BUTTONS BECAUSE THEY ARE THREE PROFESSIONAL ACTS. Proposing is a claim
+		     that something exists; ADMITTING is a judgement that it is admissible (the engine's own
+		     `evidenceAdmissibility` decides, on provenance, content, scope and limitations); SUBMITTING offers it
+		     against a declared requirement. Collapsing them into one "add evidence" button would hide the
+		     admission judgement, which is the only one of the three that can refuse. -->
+		<div class="panel">
+			<h2>Evidence</h2>
+			<p class="hint">
+				Evidence is <b>proposed</b>, then <b>admitted</b> — admission is a judgement the engine makes on
+				provenance, content and stated scope, and it can refuse — then <b>submitted</b> to the open
+				assessment. An assessment that considered nothing records exactly that.
+			</p>
+			<!-- ⚠ THE REFUSAL MUST BE VISIBLE, OR ADMISSION IS A BUTTON THAT SILENTLY DOES NOTHING. Admission is the
+			     one act here the ENGINE can refuse — `evidenceAdmissibility` judges provenance, content, scope and
+			     limitations — and this panel rendered no error at all, so a refused admission looked identical to
+			     an unclicked button. The other two `form?.error` sites on this page are on the overview and
+			     execution tabs; neither is reachable from here. -->
+			{#if form?.error}<p class="err" role="alert" data-testid="evidence-error">{form.error}</p>{/if}
+			<form method="POST" action="?/proposeEvidence" use:enhance class="evidence-form">
+				<select name="pwuId" aria-label="Work unit this evidence is about" required>
+					{#each data.pwuList as p (p.id)}
+						<option value={p.id}>{p.title}</option>
+					{/each}
+				</select>
+				<select name="evidenceType" aria-label="Kind of evidence">
+					<option value="ARTIFACT">ARTIFACT</option>
+					<option value="TEST_RESULT">TEST_RESULT</option>
+					<option value="REVIEW">REVIEW</option>
+					<option value="MEASUREMENT">MEASUREMENT</option>
+				</select>
+				<input name="scope" placeholder="What this evidence covers (its scope)" />
+				<input name="contentUri" placeholder="Where it lives (a reference)" />
+				<button class="mini" type="submit">Propose evidence</button>
+			</form>
+			<p class="hint">
+				⚠ This table lists every Evidence object in the <b>workspace</b>, not only this Undertaking's. An
+				Evidence object names no subject — it supports a <em>claim</em>, and the claim names the subject — so
+				there is no one-hop binding to scope it by, and evidence supporting no claim yet has none at all. The
+				<em>acts</em> below are scoped: they are offered only while this Undertaking has an assessment open to
+				evidence.
+			</p>
+			<table data-evidence-count={data.evidence.length}>
+				<thead>
+					<tr><th>Evidence</th><th>Type</th><th>Scope</th><th>Status</th><th>Acts</th></tr>
+				</thead>
+				<tbody>
+					{#each data.evidence as e (e.id)}
+						<tr data-evidence-id={e.id}>
+							<td>{e.id}</td>
+							<td>{e.evidenceType || '—'}</td>
+							<td>{e.scope || '—'}</td>
+							<td><span class="tag" data-evidence-status={e.status}>{e.status}</span></td>
+							<td>
+								<div class="acts">
+									<!-- ⚠ NO ASSESSMENT OPEN, NO ACT. Both acts need a scoped open assessment to admit to
+									     or submit against; without one the server refuses with "Missing evidence or PWU."
+									     On a fresh workbench the seed leaves ZERO open assessments while sixteen ADMISSIBLE
+									     evidence rows render, so every Submit button offered here could only produce that
+									     error. An affordance whose sole outcome is a refusal is worse than none. -->
+									{#if data.evidenceSubjectPwuId}
+									<!-- The affordance follows the ENGINE's precondition, not a guess: `admitEvidence`
+									     declares `fromStates('PROPOSED')`, so admission is offered exactly there. -->
+									{#if e.status === 'PROPOSED'}
+										<form method="POST" action="?/admitEvidence" use:enhance>
+											<input type="hidden" name="evidenceId" value={e.id} />
+											<input type="hidden" name="pwuId" value={data.evidenceSubjectPwuId} />
+											<button class="mini" type="submit">Admit</button>
+										</form>
+									{:else if e.status === 'ADMISSIBLE'}
+										<form method="POST" action="?/submitEvidence" use:enhance>
+											<input type="hidden" name="evidenceId" value={e.id} />
+											<input type="hidden" name="pwuId" value={data.evidenceSubjectPwuId} />
+											<button class="mini" type="submit">Submit for assessment</button>
+										</form>
+									{/if}
+									{/if}
+								</div>
+							</td>
+						</tr>
+					{/each}
+					{#if !data.evidence.length}
+						<tr><td colspan="5" class="dim">No Evidence objects exist in this workspace.</td></tr>
+					{/if}
+				</tbody>
+			</table>
+		</div>
 		<div class="panel">
 			<h2>Assurance — §38 Assurance Workbench</h2>
 			<p class="hint">

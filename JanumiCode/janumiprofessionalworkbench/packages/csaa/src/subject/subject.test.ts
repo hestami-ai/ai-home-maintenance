@@ -2718,7 +2718,10 @@ describe('live JPWB and inventory projection', () => {
 		// fix only what we break, and say that we broke it.
 		// +1 `verif/product-behavior-plane.test.ts` (JAN-SLICE-SWP-05), which gates the promoted W7 plane —
 		// the routine half.
-		expect(counts.get('verif/tsconfig.json')).toBe(61);
+		// +1 `verif/slice-presupposition.test.ts` (JAN-SLICE-SWP-05 -> SWP-06): SL-6's gate. `presupposes` had
+		// been declared in the Slice contract, parsed by the ledger and written into every SURFACE row, and read
+		// by NOTHING — which had never mattered because there were no SURFACE Slices. `S-01` is the first.
+		expect(counts.get('verif/tsconfig.json')).toBe(62);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',
