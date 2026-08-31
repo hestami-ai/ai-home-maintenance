@@ -27615,3 +27615,68 @@ repository refused every attempt to land less than all three
   its test + registration, `reference-undertaking.ts` (the producer), and the census pins that legitimately moved.
   **Owed and named:** the `contracts:gen:check` gate (`REG-F-295`) still does not exist, so this regeneration was
   itself ungated. Status: CLOSED.
+
+---
+
+### REG-F-298 — RPH-E2E-002 lands as the second Slice, and TWO OF ITS THREE MUTANTS REFUTED THE REASON THE SLICE
+GAVE FOR ITS OWN ASSERTION
+
+- **Date:** 2026-08-31 · **Type:** RECORD (work package increment) · **Class:** RECORD — advances
+  `JAN-SLICE-SWP-03`; builds on `REG-D-045` / `REG-F-293` · **Status:** ✅ CLOSED — driven, gated, committed
+  (`3ef7d0ef`).
+
+- **WHAT LANDED.** `RPH-E2E-002` — *"execution is SUCCEEDED, assurance is REJECTED"* — as an ENGINE Slice, six
+  clauses asserted separately, plus `packages/rph-engine/src/__tests__/slice-journey.ts`, the shared real-bus
+  arrangement the remaining five Slices branch from. Engine package **35 files / 175 tests green**; slices +
+  ledger **29 green**; ledger regenerated to 2 recognised Slices.
+
+- **WHY A NEW FIXTURE RATHER THAN THE REFERENCE DRIVE, MEASURED NOT PREFERRED.** `driveReferenceUndertaking`
+  cannot produce ANY of `RPH-E2E-002..007`, for three structural reasons: `earnAssurance` types its disposition
+  `'SATISFIED' | 'CONDITIONALLY_SATISFIED'`, so REJECTED is inexpressible; its `send` is fail-loud, so a scenario
+  whose point is an expected REFUSAL cannot run through it; and it is monolithic with no stop-at-step-N option, so
+  it cannot be INTERRUPTED — which is the whole antecedent of `RPH-E2E-006`.
+
+- **⚠⚠ THE FINDING WORTH KEEPING: A MUTANT THAT STAYS GREEN IS TELLING YOU THE CLAUSE'S STATED REASON IS A GUESS.**
+  `E2E-002-M3` disabled `rejectUnbackedDisposition`, which the Slice named as the guard refusing clause (c). The
+  Slice stayed **GREEN**. The real mechanism is the cross-axis guard
+  `WORK_LIFECYCLE_CROSS_AXIS_GUARDS['UNDER_ASSURANCE->SATISFIED']` in `pwuGuards.ts` — property **P1 itself**.
+  `UNDER_ASSURANCE -> SATISFIED` is a **LEGAL** arrow, so the matrix never refuses it; only the guard does. The
+  narrative was wrong and only the mutant said so. **A clause whose stated reason has never been mutated is a
+  clause whose reason is unverified prose.**
+
+- **⚠ AND A MUTANT CAN BE INERT BECAUSE OF ITS OWN SHAPE.** `E2E-002-M1` replaced `OPEN_BLOCKING_FINDING` with
+  `OPEN_BLOCKING_FINDING_MUTANT` and stayed green: the replacement **CONTAINS** the anchor, and the assertion is a
+  `toContain`. This is `ENFORCED`-inside-`UNENFORCED` (`REG-005`'s own recorded trap) arriving from the
+  other direction. **GENERAL FORM, and it belongs in the mutation discipline: a mutant whose replacement is a
+  SUPERSTRING of its anchor cannot redden a substring assertion.** The replacement must share no substring with
+  what the assertion looks for.
+
+- **A DEFECT FOUND BY DRIVING THAT NO AMOUNT OF READING PRODUCED.** `completeAssuranceAssessment` writes
+  `recommendedControlActions` into the **EVENT** payload, while the sibling `mutate` builds the object from
+  `base` — where the field was initialised `[]` at request time and is **never updated**. Observed: the completion
+  is ACCEPTED, the event carries `[{action:'RESHAPE_PWU',…}]`, and the object's field is still `[]`. So every read
+  model that reads the object sees an empty list forever, whatever any validator recommends. Clause (f) asserts
+  the two levels where it is true and **PINS** the third, written to fail the day the object starts carrying it.
+
+- **⚠ THE LEDGER'S BLIND-SPOT SWEEP CAUGHT MY OWN PLACEMENT, AND THE ANSWER WAS TO MOVE THE FILE.** The shared
+  fixture first sat at `src/slices/__tests__/journey.ts`; `verif/slice-ledger.ts` limb **D-2** flags every source
+  file under a `slices/` segment, exactly so a Slice-shaped file cannot hide where the narrower recognition
+  predicate does not look. It fired on the first run. **Widening the predicate to excuse the file would have been
+  the defect that gate exists to prevent**; the file moved to `src/__tests__/slice-journey.ts` instead.
+
+- **WHAT IS NARROWED AND NAMED, NOT WEAKENED.** (c) cannot claim `RPH-PWU-007` — UNENFORCED_DISCLOSED, because the
+  engine checks the assessment it was HANDED and never the SET; a second satisfied assessment would let the same
+  PWU through. (f) is partial per the defect above. `it.fails` is used nowhere, on purpose.
+
+- **THE ULTRACODE RECON THAT PRECEDED IT, AND WHY THE VERIFY STAGE PAID FOR ITSELF.** Six reconnaissance agents
+  reported **five ABSENT clauses** across `RPH-E2E-002..007`; adversarial verifiers **overturned four of them**,
+  each re-checked by hand before use: `DecisionType` does carry `RESHAPE`/`REPLAN`; `CreateBaselinePayload.
+  itemObjectIds` is unrestricted; the PWA *is* `PROFESSIONAL_WORK_ARCHITECTURE`; `canPromoteBaseline` has a second
+  version-aware arm (`findVersionMismatches` / `BASELINE_VERSION_MISMATCH`). **Had the first pass been trusted,
+  this Slice would have recorded a governed carrier as missing when it exists.** The verifiers also measured
+  systematic line-number drift of 1–10 lines in production citations while every TEST citation was exact.
+
+- **Merge target:** **Repository** — `packages/rph-engine/src/slices/e2e-002-rejected-assurance.slice.test.ts`,
+  `packages/rph-engine/src/__tests__/slice-journey.ts`, and the regenerated ledger products. **Owed:**
+  `RPH-E2E-003..007` and the scenario-class gap remain open in `SWP-03`; the `RPH-E2E` manifest entry stays
+  `DEFERRED` until all seven assert, and `DEFERRABLE_PREFIXES` stays empty. Status: CLOSED.
