@@ -27807,3 +27807,73 @@ the whole suite
   row, the four CSAA population pins, and the regenerated CSAA evidence. **Owed:** `SWP-04` (the subsumption
   sweep, which the roadmap's own R-1 names as the package most likely to be skipped and by which it says the
   programme SHALL be judged), then `SWP-05`/`SWP-06`. Status: CLOSED.
+
+---
+
+### REG-F-301 — `JAN-SLICE-SWP-04`: the nineteen roadmaps were NOT full of superseded claims, and the package's own
+premise was the thing that needed checking
+
+- **Date:** 2026-08-31 · **Type:** RECORD (work package landed) + CORRECTION (a roadmap premise) · **Class:**
+  RECORD — discharges `JAN-SLICE-SWP-04` / `SL-L4` · **Status:** ✅ CLOSED.
+
+- **WHAT `SWP-04` EXPECTED TO FIND, AND WHAT IS ACTUALLY THERE.** `DR-001` scoped this package at *"~19 files, 15
+  write-once"* plus two residuals, on the strength of finding F-7 (*"the progress substrate is stale and
+  multiplying"*). **A claim-by-claim sweep of all 21 documents — 100 claims examined — found exactly ONE that a
+  Slice supersedes.** F-7 was TRUE, and its evidence was about the master TRACKER, not about the roadmaps; the
+  inference from "nineteen roadmaps grew around a stale tracker" to "nineteen roadmaps hold superseded claims"
+  was never tested when `DR-001` was written. It is tested now, and it does not hold.
+
+- **⚠⚠ THE MOST VALUABLE OUTPUT OF THIS PACKAGE IS THE CLAIMS THAT WERE *NOT* STRUCK, AND WHY.** Several roadmap
+  claims ARE false today — and were displaced by their OWN programmes, weeks before the first Slice existed.
+  `C-0b`'s arrow-guard control landed at `174047b8` (2026-08-08); `C-3`'s outbox correction is recorded in the
+  enforcement register at the same date; `REG-F-069` joined `FalsifyAssumption` to its kernel. The first Slice
+  commit is `aba61f03` (2026-08-30). **Striking those on a Slice's authority would have credited `JAN-SLICE` with
+  three other programmes' work** — a falsification of the record in the direction nobody audits, and precisely
+  what `SL-L4` exists to prevent. Restraint was the correct output, and it is the output a package measured by
+  "how much did you strike" would have punished.
+
+- **THE ONE GENUINE SUPERSESSION, and it was found by the VERIFIER rather than the sweep.**
+  `ROADMAP-self-declaring-lifecycle-arrows.md` A-5 declared mutant
+  `F114-the-declared-source-set-stops-being-checked` with *"Predicted red: the synthetic-spec test alone."* No
+  longer alone: `e2e-003-falsified-assumption.slice.test.ts:853` asserts the same refusal's MESSAGE
+  (*"does not declare BASELINED as a source state"*), so deleting that guard now reddens a real JOURNEY too.
+  ⚠ THE MUTATION LEDGER ENTRY IS UNCHANGED AND CORRECT — `verif/mutant-ledger.test.ts` requires *"exactly ONE
+  victim per mutant, because a longer list is a LOWER bar"*, so `expectRed` names the file that MUST redden, not
+  every file that does. Checking that before editing another programme's instrument is the whole difference
+  between a repair and a churn.
+
+- **WHAT I STRUCK IN THE MASTER TRACKER, AND IT IS WHERE F-7 ACTUALLY LIVED.** Two milestone rows carrying a ✅ for
+  rules the Slices now derive: **M11** claimed `RPH-E2E-006` including *"reconcile uncertain side-effects on
+  restart"* — the Slice drives a REAL restart and finds no reconciliation act exists at all, with
+  `externalOperationId` / `reconciliationState` ratified as `executionAttempt` FIELDS the contracts never
+  generated. **M13** claimed `RPH-E2E-001` where the Slice asserts the five OUTCOME clauses and explicitly not the
+  flow ORDER, violated at seven acts. And the progress summary frozen since 2026-07-12 at *"13 packages, 338
+  tests"* against a measured **495 files, 5,909 tests** — wrong by a factor of 17 for seven weeks with nothing
+  able to notice. The strike says plainly that **nothing derives the other fourteen milestones' status**, so the
+  rest of that table carries the same risk it just demonstrated.
+
+- **TWO CLAIMS STRUCK THAT ARE STALE BUT NOT MINE TO CLAIM.** `ROADMAP-decision-subject-scope.md` measured
+  *"`PromoteBaseline` — zero dispatches anywhere in `apps/rph-demo`"* and *"`RecordAssuranceObservation` is
+  dispatched ZERO times"*. Both false: the demo dispatches both, and one source file states the measurement in the
+  PAST tense in its own comment. Struck **with the attribution written into the strike** — superseded by `S-0` /
+  `S-1b`'s own increments (`REG-F-077`, `REG-F-104`), NOT by `JAN-SLICE`. A measurement made in passing is worth
+  recording; a measurement made in passing is not worth claiming.
+
+- **⚠ THE GATE'S STRONGEST LIMB IS NOT ABOUT STRIKING AT ALL.** `SL-L4`'s sharpest sentence is *"A JAN-SLICE that
+  leaves the nineteen working roadmaps standing has become the twentieth"* — which is about ACCUMULATION, and
+  unlike the striking it is mechanically checkable. `verif/slice-subsumption.test.ts` pins the working-roadmap
+  population at 19 as a RATCHET, not a prohibition: a twentieth may be warranted, but it must be a deliberate act
+  that edits the number and says why. Driven: a transient twentieth file reddens it. `JAN-SLICE`'s own roadmap
+  lives at `docs/Journey Slice Verification/` and not in `docs/_working/` precisely so that admitting it did not
+  grow this population — a decision that is now enforced rather than merely intended.
+
+- **⚠ AND MY OWN DELETION-CHECK WAS WRONG TWICE BEFORE IT WAS RIGHT.** Verifying that nothing was deleted, I first
+  grepped for `~~` PRECEDING each removed line's text — which fails whenever a strike opens on an earlier line, and
+  reported all four survivors LOST. The second attempt compared whole lines and reported three LOST, because
+  inserting `~~` INSIDE a line changes the line. Only a phrase-level check answered the question. **Three
+  instruments, two wrong, and both wrong in the alarming direction** — which is the safe direction to be wrong in,
+  and the reason to keep going rather than accept the first answer.
+
+- **Merge target:** **Repository** — `verif/slice-subsumption.test.ts` (5 limbs, every control driven), three
+  struck claims across two working roadmaps, and three strikes in the master tracker. **Owed:** `SWP-05` (the W7
+  product-behavior plane) and `SWP-06` (the evidence surface + SURFACE Slices). Status: CLOSED.

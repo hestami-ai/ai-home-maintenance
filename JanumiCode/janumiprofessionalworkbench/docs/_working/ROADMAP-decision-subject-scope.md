@@ -14,7 +14,11 @@ written down *before* it runs. A green with no predicted red is not evidence.
 **Why first.** §4: promotion is the **only** path whose version limb can fire, and §6: its sibling floor path is
 already demo-reachable. So it is the one increment that can prove scope *and* staleness against the real engine.
 
-- Drive `PromoteBaseline` from the demo — measured today: **zero** dispatches anywhere in `apps/rph-demo`.
+- ~~Drive `PromoteBaseline` from the demo — measured today: **zero** dispatches anywhere in `apps/rph-demo`.~~
+  **STALE — MEASURED AGAIN 2026-08-31: `apps/rph-demo/src/routes/baselines/+page.server.ts` dispatches
+  `PromoteBaseline`, and its own header records the change. ⚠ NOT SUPERSEDED BY `JAN-SLICE` — S-0's own
+  increment landed it (`REG-F-077`), and crediting the Slice programme would be exactly the misattribution
+  `SL-L4` exists to prevent. Struck here only because `JAN-SLICE-SWP-04`'s sweep measured it false in passing.**
 - Red-first: an e2e that promotes and is **refused** for want of an authorizing Decision.
 - **The staleness arrangement, and it belongs here or nowhere:** approve at v1, revise the subject (an INTENT or
   DECOMPOSITION_CONTRACT — the two that can `bumpSemanticVersion`), promote, observe refusal.
@@ -39,9 +43,14 @@ rest must be re-thought rather than pushed.
 ## S-1b · Rejection — DEFERRED, and on a reason of substance rather than effort
 
 `RejectPwu` requires **both** an EFFECTIVE `REJECTION` Decision **and** a real `ASSURANCE_OBSERVATION` of BLOCKING
-or CRITICAL severity naming the PWU (`hasBlockingObservationFor`). **Measured: `RecordAssuranceObservation` is
+or CRITICAL severity naming the PWU (`hasBlockingObservationFor`). ~~**Measured: `RecordAssuranceObservation` is
 dispatched ZERO times anywhere in `apps/rph-demo`** — the workbench cannot record a blocking finding at all, and
-`recordAssurance` drives only a SATISFIED disposition with `observations: []`.
+`recordAssurance` drives only a SATISFIED disposition with `observations: []`.~~
+**STALE — MEASURED AGAIN 2026-08-31: `undertakings/[id]/+page.server.ts:1035` dispatches
+`RecordAssuranceObservation` with `severity: 'BLOCKING'`, and that file's own comment at :997 states the
+measurement in the PAST tense. ⚠ NOT SUPERSEDED BY `JAN-SLICE` — S-1b's own increment landed it (`REG-F-104`,
+with `apps/rph-demo/e2e/pwu-rejection.e2e.ts`). Struck by `JAN-SLICE-SWP-04`'s sweep as a measurement, not as a
+claim to its work.**
 
 **⚠ AND THE OBVIOUS SHORTCUT IS THE DEFECT.** A `rejectPwu` action could mint its own assessment and its own
 BLOCKING observation inside the same batch, satisfying the gate. **That is manufacturing the guard's own input** —

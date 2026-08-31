@@ -50,7 +50,13 @@ true is the inverse of measuring.
 ## A-5 — mutants, register, gate
 
 - **Mutant** `F114-the-declared-source-set-stops-being-checked`: delete the source-set refusal in
-  `advancePwuLifecycle`. Predicted red: the synthetic-spec test alone. Without this the declaration is a comment.
+  `advancePwuLifecycle`. ~~Predicted red: the synthetic-spec test alone.~~ **NARROWED BY
+  `JAN-SLICE-SWP-03`: no longer alone. `e2e-003-falsified-assumption.slice.test.ts:853` asserts the same
+  refusal's MESSAGE — `does not declare BASELINED as a source state` — where `SupersedePwu` meets a BASELINED
+  predecessor, so deleting that reject now reddens a real JOURNEY as well as the synthetic spec. ⚠ THE LEDGER
+  ENTRY IS UNCHANGED AND CORRECT: `verif/mutant-ledger.test.ts` requires "exactly ONE victim per mutant, because
+  a longer list is a LOWER bar", so `expectRed` names the file that MUST redden, not every file that does.**
+  Without this the declaration is a comment.
 - **Mutant** `F114-a-machine-arrow-goes-unclaimed-quietly`: drop the unclaimed-in-edge limb of the gate.
   Predicted red: the agreement test alone.
 - **Register:** amend REG-F-087 (its residue is discharged, coverage restated) and REG-F-114 (built), both by
