@@ -28331,3 +28331,89 @@ discovered by whoever runs it next. **No pass is claimed for it.**
   environment where `.svelte-kit` is not held open — and separately, capture or exclude
   `apps/rph-demo/harness/pwa-judge-panel.workflow.js` in the CSAA subject, which is a defect of its own and not
   this programme's to decide. Status: OPEN.
+
+### REG-F-312 — `JAN-SLICE-SWP-01` and `SWP-02` landed without the completion entry §14 requires, and the omission was found by checking the criterion rather than assuming it
+
+- **Date:** 2026-08-31 · **Type:** RECORD (two owed entries, filed late) · **Class:**
+  RECORD — discharges `JAN-SLICE-SWP-01` and `JAN-SLICE-SWP-02` · **Status:** ✅ CLOSED.
+
+`DR-001 §14`'s seventh exit criterion, verbatim: *"A register entry exists for each work package recording what
+it discharged — or `Discharges: none`."* On closing the programme this was CHECKED rather than assumed, by
+parsing the register for an entry naming each of the eight work packages. **Six had one. `SWP-01` and `SWP-02`
+did not.**
+
+- **⚠ AND A NAÏVE CHECK WOULD HAVE PASSED THEM.** Both work packages ARE named in the register — `SWP-01` in
+  `REG-F-295`, `SWP-02` in `REG-F-294` and `REG-D-047`. But those entries record findings that AROSE FROM the
+  work, not what the work DISCHARGED, and a `grep` for the work-package id returns them happily. The criterion
+  asks a different question from the one a mention answers, which is why the check was written to look for the
+  discharge relation and not the string.
+
+- **`SWP-01` DISCHARGED** (`5ca30aaf`): the Slice declaration format, the ledger generator, its CLI, the
+  permanent canary and the controls. **Declarations are PARSED, NEVER IMPORTED** — importing was driven and
+  rejected because inside vitest it re-registers a Slice's suites into the importing file, so the ledger would
+  have gone red whenever a Slice went red, unable to tell *"ledger stale"* from *"slice failing"*; fatal in a
+  window the programme deliberately kept red. **The canary is the SL-L3 control**: `delta = discovery \
+  recognition == {}` is an absence assertion a silently-empty sweep satisfies perfectly, so one permanently
+  unreachable Slice is committed on purpose and the gate asserts `delta == {CANARY}` — empty FAILS. The ledger
+  recorded ZERO Slices on landing, which was the true state.
+  ⚠ Three defects were found by DRIVING it, the sharpest being that **the generator's output changed the input it
+  measured**: its header printed a working-set file count, and writing the two products added two files to that
+  set, so `--write` then `--check` reported stale immediately.
+
+- **`SWP-02` DISCHARGED** (`aba61f03`): `RPH-E2E-001` admitted as the first ENGINE Slice, five outcome clauses
+  asserted separately, the ledger deriving its first row.
+  ⚠ **THE MUTANT DISCIPLINE CAUGHT THAT WORK PACKAGE'S OWN AUTHOR THREE TIMES**, and every failure looked fine:
+  one mutant was **UNANCHORED** — its anchor `pwuKind: 'ARCHITECTURE_DEFINITION'` occurred ZERO times because
+  the literal is `kind:`, so it applied nothing and proved nothing with no signal; one **targeted the wrong
+  module and passed silently**, mutating `work-projection.ts` when the graph is built by `pwuGraphNode` in
+  `graph-view.ts`. That is the same class of error an adversarial pass found again in `SWP-06`
+  (`REG-F-309`, three of four mutants wrong) — **twice in one programme, at both ends of it, which is the
+  argument for driving every predicted red rather than declaring it.**
+
+- **WHY FILED LATE RATHER THAN BACKDATED.** These entries are written on 2026-08-31 from the commits' own
+  records, not presented as having existed at the time. A register whose completeness is achieved by writing
+  the past is worth less than one that records when it noticed.
+
+- **Merge target:** **Register.** **Owed:** nothing. §14 criterion 7 now holds for all eight work packages.
+
+### REG-F-313 — `JAN-SLICE` COMPLETE: the eight work packages landed, and the exit criteria are checked rather than declared
+
+- **Date:** 2026-08-31 · **Type:** RECORD (programme complete) · **Class:**
+  RECORD — closes `JAN-SLICE-DR-001` · **Status:** ✅ CLOSED.
+
+`SWP-00` → `SWP-01` → `SWP-02` → `SWP-02a` → `SWP-03` → `SWP-04` → `SWP-05` → `SWP-06`, in the order `§13`
+requires. **`§14`'s exit criteria, each verified rather than asserted:**
+
+1. **`DEFERRABLE_PREFIXES` is empty and has stayed empty** — `conformance-manifest.ts:521`,
+   `new Set([])`, and `SWP-00`'s recorded red was discharged by work rather than by re-adding the prefix.
+2. **All seven `RPH-E2E` rules assert, with driven mutants** — `verif/e2e-rule-assertion.test.ts` makes the
+   family answerable to the GENERATED ledger rather than to a cited filename, closing F-3's hole; the full
+   ENGINE sweep re-driven at close is **78/79 SOUND**.
+3. **The ledger is generated, gated in `gate:fast`, and its `SL-L3` control cannot pass vacuously** —
+   `slices:ledger:check` is in the gate, and the permanent canary makes an empty sweep FAIL.
+4. **No census artifact claims an item the ledger derives** — `verif/slice-subsumption.test.ts`, whose sharpest
+   limb is the anti-accumulation ratchet rather than the striking.
+5. **All eight scenario classes are covered** — `EXEMPT` is `{}`, measured, so no class rests on an exemption.
+6. **A deferral cannot be created without a carrier** — `SWP-02a`'s guards, and the plane now has a SECOND real
+   subject (`REG-F-303`) rather than a population of one.
+7. **A completion entry exists for every work package** — TWO were missing and are filed as `REG-F-312`.
+8. **`REG-Q-067` is discharged by a deferral SHAPE existing**, not by a deficiency pin shrinking — the
+   `DEFERRAL` object type, its command, and two real subjects.
+
+- **⚠ WHAT THE PROGRAMME IS NOT CLAIMING.** `gate:fast`'s FIRST step is RED at close and no pass is claimed for
+  it (`REG-F-311`): `csaa:generated-context` cannot regenerate in this environment, for one reason that is an OS
+  handle and one that predates this programme entirely. Three findings remain OPEN and are named rather than
+  closed by assertion: `REG-F-304` (no ratified conformance rule governs the promoted product-behavior plane, so
+  no Slice may claim to assert one), `REG-F-308` (four recorded statements say no policy declares required
+  evidence; thirteen do), and `REG-F-310`'s coverage gap (the ENGINE mutant driver cannot run SURFACE mutants,
+  now loud rather than silent).
+
+- **⚠⚠ AND THE PROGRAMME'S OWN PREMISES WERE WRONG TWICE, IN OPPOSITE DIRECTIONS.** `SWP-04` was scoped on the
+  belief that nineteen roadmaps held superseded claims; a 100-claim sweep found exactly ONE, and striking the
+  rest would have credited `JAN-SLICE` with three other programmes' work (`REG-F-301`). `SWP-05` was recorded as
+  discharging FSM §30.2's deferral; §30.2 defers SEVEN kinds and the promotion covers FOUR, with `SCENARIO` not
+  on that list at all (`REG-F-302`). **Both errors were over-attribution, and neither would have been caught by
+  asking whether the work was done.**
+
+- **Merge target:** **Register.** **Owed:** the three OPEN findings above, and `SWP-06`'s blocked gate.
+  Status: CLOSED.
