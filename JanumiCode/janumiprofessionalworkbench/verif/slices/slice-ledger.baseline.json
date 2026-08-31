@@ -1,7 +1,73 @@
 {
   "canary": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
-  "recognisedCount": 7,
+  "recognisedCount": 12,
   "rows": [
+    {
+      "citedRules": [
+        "RPH-PWU-009"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "CLS-CANCELLATION",
+      "mutantCount": 9,
+      "path": "packages/rph-engine/src/slices/class-cancellation.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "cancellation path",
+      "title": "The customer calls the job off mid-flight: the unit closes, the exit stays open, and nothing may claim success"
+    },
+    {
+      "citedRules": [
+        "RPH-EXE-005",
+        "RPH-PWU-004"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "CLS-DATA-UNAVAILABLE",
+      "mutantCount": 8,
+      "path": "packages/rph-engine/src/slices/class-data-unavailable.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "data-unavailable path",
+      "title": "The required field data was never captured: the step is not ready, the follow-up cannot be shaped, and the absence is recorded as a governed block"
+    },
+    {
+      "citedRules": [
+        "RPH-GOV-001",
+        "RPH-BAS-006",
+        "RPH-ASR-003"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "CLS-PERMISSION-DENIED",
+      "mutantCount": 6,
+      "path": "packages/rph-engine/src/slices/class-permission-denied.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "permission-denied path",
+      "title": "An agent may recommend and may not approve: three permission denials in one journey, told apart by their messages"
+    },
+    {
+      "citedRules": [
+        "RPH-EXE-008"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "CLS-SYSTEM-FAILURE",
+      "mutantCount": 5,
+      "path": "packages/rph-engine/src/slices/class-system-failure.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "system-failure path",
+      "title": "Execution runs, the sandbox fails it three times, and the retry budget ends the work without a verdict"
+    },
+    {
+      "citedRules": [
+        "RPH-CON-002",
+        "RPH-INT-003",
+        "RPH-PWU-002",
+        "RPH-PWU-004"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "CLS-USER-ERROR",
+      "mutantCount": 9,
+      "path": "packages/rph-engine/src/slices/class-user-error.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "user-error path",
+      "title": "A professional makes four mistakes in sequence and the engine refuses each one intelligibly"
+    },
     {
       "citedRules": [
         "RPH-E2E-001"

@@ -34,6 +34,11 @@ Both layers key on the word "slice". They catch a Slice that was **MOVED**. They
 
 | id | plane | scenario class | cited rules | mutants | discharges | source |
 |---|---|---|---|---|---|---|
+| `CLS-CANCELLATION` | ENGINE | cancellation path | `RPH-PWU-009` | 9 | — | `packages/rph-engine/src/slices/class-cancellation.slice.test.ts` |
+| `CLS-DATA-UNAVAILABLE` | ENGINE | data-unavailable path | `RPH-EXE-005`, `RPH-PWU-004` | 8 | — | `packages/rph-engine/src/slices/class-data-unavailable.slice.test.ts` |
+| `CLS-PERMISSION-DENIED` | ENGINE | permission-denied path | `RPH-GOV-001`, `RPH-BAS-006`, `RPH-ASR-003` | 6 | — | `packages/rph-engine/src/slices/class-permission-denied.slice.test.ts` |
+| `CLS-SYSTEM-FAILURE` | ENGINE | system-failure path | `RPH-EXE-008` | 5 | — | `packages/rph-engine/src/slices/class-system-failure.slice.test.ts` |
+| `CLS-USER-ERROR` | ENGINE | user-error path | `RPH-CON-002`, `RPH-INT-003`, `RPH-PWU-002`, `RPH-PWU-004` | 9 | — | `packages/rph-engine/src/slices/class-user-error.slice.test.ts` |
 | `E2E-001` | ENGINE | normal path | `RPH-E2E-001` | 3 | — | `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` |
 | `E2E-002` | ENGINE | alternate valid path | `RPH-E2E-002` | 3 | — | `packages/rph-engine/src/slices/e2e-002-rejected-assurance.slice.test.ts` |
 | `E2E-003` | ENGINE | alternate valid path | `RPH-E2E-003` | 9 | — | `packages/rph-engine/src/slices/e2e-003-falsified-assumption.slice.test.ts` |

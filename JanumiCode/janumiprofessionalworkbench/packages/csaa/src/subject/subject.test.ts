@@ -2683,17 +2683,32 @@ describe('live JPWB and inventory projection', () => {
 			subject.projects.map((project) => [project.configPath, project.fileNames.length])
 		);
 		expect(counts.get('tsconfig.json')).toBe(0);
-		expect(counts.get('packages/rph-contracts/tsconfig.json')).toBe(28);
-		expect(counts.get('packages/rph-contracts/tsconfig.build.json')).toBe(10);
+		// 28 -> 29: `packages/rph-contracts/src/slice.ts`, the SliceDeclaration shape (JAN-SLICE-SWP-01). It lives
+		// in rph-contracts rather than verif/ because BOTH verification planes must reach it and this is the only
+		// package `apps/rph-demo/e2e` already depends on.
+		expect(counts.get('packages/rph-contracts/tsconfig.json')).toBe(29);
+		// 10 -> 11: the same `slice.ts`. It is in the BUILD project too, because it ships as the `./slice`
+		// subpath export — mirroring how `./hash` is exported, per that file's own header.
+		expect(counts.get('packages/rph-contracts/tsconfig.build.json')).toBe(11);
 		// Re-derived from the same live compiler-root projection used by JAN-CSAA-005. The report commands
 		// import their bounded implementation closures into the scripts program; the mutation baseline helper is
 		// also a scripts-project root. The verification program grows with public contract assertions.
-		expect(counts.get('scripts/tsconfig.json')).toBe(42);
+		// 42 -> 44: `scripts/slice-ledger.ts` (the Slice ledger generator, JAN-SLICE-SWP-01) and
+		// `scripts/drive-slice-mutants.ts` (JAN-SLICE-SWP-03), which applies each declared Slice mutant, runs only
+		// that Slice, and classifies the result. The latter is a SCRIPT and not a gate precisely because it mutates
+		// production source and cannot run alongside the suite.
+		expect(counts.get('scripts/tsconfig.json')).toBe(44);
 		// 52 -> 53: `verif/register-append-only.test.ts`, the instrument for JPWB-REG-005's append-only rule.
 		// 53 -> 54: `verif/register-status-truth.test.ts`, which checks a register status is TRUE and not
 		// merely readable (REG-F-285). Both are what the comment above means by "the verification program
 		// grows with public contract assertions".
-		expect(counts.get('verif/tsconfig.json')).toBe(54);
+		// 54 -> 59, all five from the Journey Slice Verification programme: `verif/slice-ledger.ts` and
+		// `verif/slice-ledger.test.ts` (the ledger reader and its blind-spot control), `slice-scenario-classes.test.ts`
+		// (re-derives the eight ratified classes from the ontology so a hand-written union cannot drift),
+		// `slice-scenario-coverage.test.ts` (the SL-5 gate: every class covered or explicitly exempt) and
+		// `e2e-rule-assertion.test.ts` (which makes the RPH-E2E manifest status answerable to the generated ledger
+		// rather than to a cited filename).
+		expect(counts.get('verif/tsconfig.json')).toBe(59);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',

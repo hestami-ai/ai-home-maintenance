@@ -27729,3 +27729,81 @@ described it from the shape of `.at(-1)` and nobody drove it
 
 - **Merge target:** **Repository** — `REG-F-215` limb (1) struck and corrected in place (the retire-by-striking
   idiom, `REG-005:57`); the `RPH-E2E-005` Slice corrected in the same increment. Status: CLOSED.
+
+---
+
+### REG-F-300 — JAN-SLICE-SWP-03 COMPLETE: all eight ratified scenario classes covered, all seven RPH-E2E rules
+asserted, `SWP-00`'s deliberate red discharged BY WORK — and my own CSAA breakage found only because I finally ran
+the whole suite
+
+- **Date:** 2026-08-31 · **Type:** RECORD (work package landed) · **Class:** RECORD — discharges
+  `JAN-SLICE-SWP-03`; closes the red opened by `JAN-SLICE-SWP-00` · **Status:** ✅ CLOSED.
+
+- **WHAT LANDED.** Twelve ENGINE Slices: seven for `RPH-E2E-001..007` and five authored for the scenario classes
+  no ratified `RPH-E2E` rule reaches. **78 of 78 declared mutants drive SOUND** — each reddening exactly the one
+  clause it names (`SL-3a`). `verif/slice-scenario-coverage.test.ts` (the `SL-5` gate) is GREEN: all eight
+  ratified classes covered, exemption list EMPTY. `RPH-E2E` moved `DEFERRED` → `PARTIAL`, which greens
+  `conformance.test.ts` — red on purpose since `SWP-00`.
+
+- **⚠⚠ THE RED WAS DISCHARGED BY WORK, NOT BY RELABELLING, AND THE MANIFEST'S OWN PROHIBITION IS WHY THAT HAD TO
+  BE PROVED.** `DEFERRABLE_PREFIXES`' comment names three forbidden ways to green this family, and the second is
+  *"restating the seven as PARTIAL or COVERED"* — `REG-F-013` exactly. The restatement is legitimate here only
+  because of the third prohibition's remedy: **the row cites NO FILE.** Prohibition 3 records that a citation
+  proves nothing because the gate checks only that the file EXISTS — the mechanism by which 125 of 125 rules once
+  passed, 38 on files whose sole occurrence of the id was a *"not probed here"* marker. So
+  `verif/e2e-rule-assertion.test.ts` DERIVES the claim instead: every ratified id must be cited by a Slice **in
+  the generated ledger**, and that Slice must carry a mutant. Both inputs are themselves gated. Two controls were
+  driven before its green was trusted: removing a citation reddens it, zeroing a mutant count reddens it.
+
+- **PARTIAL AND NOT COVERED, WITH THE GAPS NAMED.** Four Slices assert clauses narrower than their ratified
+  statements and say so in their test NAMES: `-001`'s flow ORDER is violated at seven acts; `-002`'s controller
+  recommendation reaches the event and never the object; `-003` has no impact-analysis and no baseline
+  review-required plane; `-005` has no human review package; `-006` has no attempt-reconciliation act. A COVERED
+  claim would have been false.
+
+- **⚠ THE F-3 DEFECT APPEARED INSIDE THE PROGRAMME'S OWN ARTIFACT.** The cancellation Slice was authored citing
+  three rules while a comment in the same file conceded it did not assert them all. That is precisely the defect
+  this programme exists to close, one level up. Repaired by REMOVING the two it does not assert:
+  `citedRules` went from three to **one** (`RPH-PWU-009`). A Slice that cites what it does not assert is worth
+  less than one that cites less.
+
+- **A CORPUS ASYMMETRY, DERIVED AND THEN CORRECTED IN MY OWN BRIEF.** The ratified ontology MANDATES a
+  cancellation path as one of eight minimum classes; the 125-rule M12 catalog governs it only obliquely. I briefed
+  the authoring agent that a concept sweep returns *"exactly ONE hit"*. **It returns TWO of 125** — `RPH-EXE-008`
+  (via its *"escalate, reject, or abandon"* arm) and `RPH-GOV-007` (revocation) — because my sweep omitted
+  `revoke`. Positive control: 27 hits for "assurance", so the sweep was reading statements. **The finding survives
+  and the number did not**, which is the same "search reported shorter than it ran" fault I had been flagging in
+  the agents' work all session.
+
+- **⚠⚠ I BROKE CSAA IN SWP-01 AND DID NOT FIND OUT FOR TWO WORK PACKAGES, BECAUSE I HAD ONLY EVER RUN SCOPED
+  SUITES.** `packages/rph-contracts/src/slice.ts` (SWP-01, 2026-08-30) moved a population CSAA pins; the pin was
+  written 2026-08-28 and never updated. Four pins had moved by the time I looked, every delta attributable:
+  contracts 28→29 and its build project 10→11 (`slice.ts`), scripts 42→44 (`slice-ledger.ts`,
+  `drive-slice-mutants.ts`), verif 54→59 (five Slice-programme gates). Each is updated **with a comment naming the
+  file that moved it**, which is that file's own documented idiom. Everything I reported green all session WAS
+  green — I ran `rph-engine` and `verif` and said so — but a scoped green is a claim about a scope, and I let two
+  work packages pass without once asking the whole repository.
+
+- **⚠ AND MY FIRST ATTRIBUTION OF THE SECOND CSAA FAILURE WAS WRONG, IN THE DIRECTION OF EXONERATING MYSELF.** The
+  generated-context evidence mismatched. I compared `.svelte-kit/generated`'s mtime against my first commit,
+  found it older, and concluded PRE-EXISTING. **The evidence does not only cover SvelteKit output — it hashes repo
+  TOOL CONFIGURATION.** Regenerating showed the sole content change was `.gitignore`, 1550→1695 bytes: *my* edit,
+  adding the mutant driver's report to the ignore list. The mtime was the wrong instrument, and it answered a
+  question I had not actually asked. The inventory baseline likewise: 430 insertions, **no path removed**, every
+  added path mine — including the `SWP-02a` deferral plane, committed but never inventoried.
+
+- **⚠⚠ AND 33 "FAILURES" WERE MY MEASUREMENT, NOT THE REPOSITORY'S STATE.** A full source-mode run reported 22
+  then 19 failing CSAA files. Every one was a **TIMEOUT** — 31 at 5000ms, 2 hook timeouts — not one assertion.
+  The repository already knows this: `test:coverage` runs `--testTimeout=30000 --maxWorkers=4`, and `gate:fast`
+  runs `turbo run test` per package, not the root runner I used. Re-run with the repo's own settings: **csaa 186
+  files / 2811 tests, zero failures.** The tell was there before the diagnosis — a file that FAILED in the suite
+  and PASSED alone, and a failing set that changed between runs beyond the files I had fixed.
+
+- **VERIFIED FINAL STATE.** rph-* five packages **213 files / 2297 tests**; csaa **186 / 2811**; verif **50 / 375**;
+  `check-types` and `lint` clean; `csaa:generated-context:check`, `csaa:inventory:check` and
+  `slices:ledger:check` all OK.
+
+- **Merge target:** **Repository** — five class Slices, `verif/e2e-rule-assertion.test.ts`, the `RPH-E2E` manifest
+  row, the four CSAA population pins, and the regenerated CSAA evidence. **Owed:** `SWP-04` (the subsumption
+  sweep, which the roadmap's own R-1 names as the package most likely to be skipped and by which it says the
+  programme SHALL be judged), then `SWP-05`/`SWP-06`. Status: CLOSED.

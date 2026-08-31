@@ -436,9 +436,45 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-engine/src/replay.test.ts',
 		note: 'ALL SIX ARE ASSERTED BY NAME, across TWO oracles because the rules are of two kinds. FOUR are properties of the §26 event SEQUENCE, in `runConformance` (packages/rph-engine/src/replay.ts), green in replay.test.ts: FIX-001 (contiguous seq — reference integrity), FIX-002 (every one of the 72 trace events resolves to a registered EVENTS contract), FIX-003a/b/c (both baselines promoted; the trace ends AUTHORITATIVE + PwuBaselined; a Behavior PWU SATISFIED but not baselined), FIX-006 (the deferred offline capability stays represented as a refined intent constraint). TWO are properties of the OBJECT GRAPH and are asserted in `runGraphConformance` (graph-conformance.ts) over the store `driveReferenceUndertaking` builds. FIX-004: every MANDATORY obligation sourced from the Architecture PWU is allocated to a child of its decomposition, or explicitly retained (DOC-003 §6 DEC-3 permits retention, and a bare "all allocated" reading would wrongly refuse it) — IT WOULD HAVE PASSED VACUOUSLY, since every PWU was proposed with `obligationIds: []`, so the drive now AUTHORS the three obligations corpus §25 Test 3 names as traceability targets and the check treats an empty population as a FAILURE. FIX-005: the corpus §25 chain, WALKED hop by hop — Constraint, Constraint->PWU (`constraintIds`), PWU->Artifact (`producingPwuId`), Artifact->Claim (`subjectObjectIds`), Claim->Assessment (`claimIds`) — because the rule says the fixture EXPOSES the trace, and five objects each existing separately would satisfy an existence check while exposing nothing. Each hop has its own mutant. Both were CLOSED 2026-08-04 (REG-F-019); recording the drive\'s first ever artifact exposed REG-F-020.'
 	},
+	// ~~status: 'DEFERRED', note: 'full end-to-end scenarios — the M13 Reference Undertaking replay + M14
+	// surface'~~ — MOVED TO PARTIAL 2026-08-31 (JAN-SLICE-SWP-03). The deferral was TRUE when written and is
+	// retired because the work it deferred was DONE, not because the label became inconvenient.
+	//
+	// ⚠ READ THE THREE PROHIBITIONS ABOVE BEFORE TRUSTING THIS ROW. The comment on `DEFERRABLE_PREFIXES` names
+	// three forbidden ways to green this family, and the second is "restating the seven as PARTIAL or COVERED".
+	// This IS that restatement — so what makes it legitimate rather than REG-F-013 repeating itself has to be
+	// stated, and has to be checkable by something other than this comment:
+	//
+	//   1. Seven Slices exist, one per rule, each driving a real journey through the real bus and store:
+	//      `packages/rph-engine/src/slices/e2e-00{1..7}-*.slice.test.ts`.
+	//   2. ⚠ THE CITATION HOLE IS CLOSED BY A GATE, NOT BY THIS NOTE. Prohibition 3 says a cited file proves
+	//      nothing because `conformance.test.ts` checks only that it EXISTS — which is how 125 of 125 rules once
+	//      passed, 38 of them on files whose only occurrence of the id was a "not probed here" marker. So this row
+	//      cites NO file. `verif/e2e-rule-assertion.test.ts` derives the claim instead: every ratified RPH-E2E id
+	//      must be cited by a Slice IN THE GENERATED LEDGER, and that Slice must carry a mutant. Both inputs are
+	//      themselves gated (`slice-ledger.test.ts` proves the ledger is neither stale nor hand-edited).
+	//   3. Every mutant is DRIVEN by `scripts/drive-slice-mutants.ts`, which applies it, runs only its own Slice
+	//      and classifies the result. At the time of writing: 78 of 78 SOUND — each reddening exactly the one
+	//      clause it named. That instrument once reported ALL mutants inert because it re-read a stale report, so
+	//      it now ABORTS rather than return a zero it cannot justify.
+	//
+	// ⚠⚠ PARTIAL AND NOT COVERED, AND THE REASON IS IN THE SLICES THEMSELVES. Four of the seven assert clauses
+	// NARROWER than their ratified statements and say so in their test NAMES. RPH-E2E-001's flow ORDER is violated
+	// at seven acts (pinned in `replay-conformance.test.ts`); -002's controller recommendation reaches the event
+	// and never the object; -003 has no impact-analysis and no baseline review-required plane; -005 has no human
+	// review package; -006 has no attempt-reconciliation act. A COVERED claim here would be false, and the honest
+	// label is the one that leaves those gaps visible.
 	'RPH-E2E': {
-		status: 'DEFERRED',
-		note: 'full end-to-end scenarios — the M13 Reference Undertaking replay + M14 surface'
+		status: 'PARTIAL',
+		note:
+			'end-to-end journeys: all seven rules are asserted by ENGINE Slices with driven per-clause mutants — '
+			+ 'RPH-E2E-001..007 map one-to-one onto e2e-001..007.slice.test.ts. PARTIAL rather than COVERED because '
+			+ 'four Slices assert narrower clauses than their ratified statements and name the narrowing: 001 omits '
+			+ 'the flow ORDER (pinned separately in replay-conformance.test.ts, currently violated at seven acts), '
+			+ '002 clause (f) survives only in the emitted event, 003 has no impact-analysis or baseline '
+			+ 'review-required plane, 005 has no human review package, 006 has no attempt-reconciliation act. That '
+			+ 'each rule is really asserted is derived by verif/e2e-rule-assertion.test.ts from the generated Slice '
+			+ 'ledger, not from a cited filename.'
 	}
 };
 
