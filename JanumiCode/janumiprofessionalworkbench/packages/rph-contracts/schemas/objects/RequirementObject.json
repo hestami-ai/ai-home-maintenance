@@ -241,82 +241,100 @@
     "statement": {
       "type": "string"
     },
-    "basis": {
+    "rationale": {
       "type": "string"
     },
-    "introducedBy": {
+    "authority": {
       "type": "object",
       "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
+        "authorityId": {
+          "type": "string"
         },
-        "actorType": {
+        "authorityType": {
           "type": "string",
           "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
+            "USER",
+            "ORGANIZATIONAL_ROLE",
+            "POLICY",
+            "LEGAL_REQUIREMENT",
+            "SYSTEM_OWNER",
+            "DELEGATED_AGENT"
           ]
         },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
+        "grantedBy": {
           "type": "string"
         },
-        "modelId": {
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validFrom": {
           "type": "string"
         },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
+        "validUntil": {
           "type": "string"
         }
       },
       "required": [
-        "actorId",
-        "actorType",
-        "displayName"
+        "authorityId",
+        "authorityType",
+        "scope",
+        "validFrom"
       ],
       "additionalProperties": false
     },
-    "affectedObjectIds": {
+    "sourceObjectIds": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "materiality": {
-      "type": "string",
-      "enum": [
-        "IMMATERIAL",
-        "MATERIAL",
-        "CRITICAL"
-      ]
+    "priority": {
+      "type": "string"
+    },
+    "applicability": {
+      "type": "string"
     },
     "verificationMethod": {
       "type": "string"
     },
-    "expirationCondition": {
+    "affectedArtifactIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencyIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "conflictStatus": {
       "type": "string"
     },
-    "status": {
+    "lifecycle": {
+      "type": "string"
+    },
+    "requirementType": {
       "type": "string",
       "enum": [
-        "PROPOSED",
-        "DISCLOSED",
-        "UNDER_VERIFICATION",
-        "ACCEPTED",
-        "VERIFIED",
-        "FALSIFIED",
-        "EXPIRED",
-        "SUPERSEDED"
+        "FUNCTIONAL",
+        "QUALITY",
+        "SECURITY",
+        "PRIVACY",
+        "DATA",
+        "INTERFACE",
+        "PERFORMANCE",
+        "OPERATIONAL",
+        "DEPLOYMENT",
+        "MIGRATION",
+        "OBSERVABILITY",
+        "COMPLIANCE",
+        "MAINTAINABILITY",
+        "USABILITY"
       ]
     }
   },
@@ -335,11 +353,18 @@
     "tags",
     "extensions",
     "statement",
-    "introducedBy",
-    "affectedObjectIds",
-    "materiality",
-    "status"
+    "rationale",
+    "authority",
+    "sourceObjectIds",
+    "priority",
+    "applicability",
+    "verificationMethod",
+    "affectedArtifactIds",
+    "dependencyIds",
+    "conflictStatus",
+    "lifecycle",
+    "requirementType"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:AssumptionObject:1"
+  "$id": "urn:janumi:rph:schema:object:RequirementObject:1"
 }

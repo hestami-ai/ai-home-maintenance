@@ -150,6 +150,13 @@ describe('validate', () => {
 		// 360 -> 363 (2026-08-30, JAN-SLICE-SWP-02a / REG-D-046 Ruling 2): `DeferralObject`,
 		// `DeferScopePayload`, `ScopeDeferredPayload`. +3 and not +4 — one object schema plus a command/event
 		// pair that mint one payload shape each, which is the same arithmetic the S-1b note above records.
-		expect(buildContractRegistry().ids()).toHaveLength(363);
+		// 363 -> 380 (2026-08-31, JAN-SLICE-SWP-05 / REG-D-046 Ruling 2): the W7 product-behavior plane.
+		// +17, and the arithmetic is DERIVED rather than read off the failure: FIVE object schemas
+		// (`ActorObject`, `CapabilityObject`, `UserJourneyObject`, `ScenarioObject`, `RequirementObject`),
+		// TWO enum schemas (`RequirementType`, `ScenarioClass`), and FIVE command/event pairs minting one
+		// payload shape each = 10. 5 + 2 + 10 = 17, the same per-pair arithmetic the S-1b and SWP-02a notes
+		// above record. A different number would mean something else moved — an enum I did not intend to add,
+		// or a payload shape silently reused — and is a finding, not a pin to bump.
+		expect(buildContractRegistry().ids()).toHaveLength(380);
 	});
 });

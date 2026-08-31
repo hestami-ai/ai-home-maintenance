@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "FUNCTIONAL",
+    "QUALITY",
+    "SECURITY",
+    "PRIVACY",
+    "DATA",
+    "INTERFACE",
+    "PERFORMANCE",
+    "OPERATIONAL",
+    "DEPLOYMENT",
+    "MIGRATION",
+    "OBSERVABILITY",
+    "COMPLIANCE",
+    "MAINTAINABILITY",
+    "USABILITY"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:RequirementType:1"
+}

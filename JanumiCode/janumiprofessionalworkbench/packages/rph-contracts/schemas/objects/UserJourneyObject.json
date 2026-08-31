@@ -238,86 +238,74 @@
         "additionalProperties": false
       }
     },
-    "statement": {
+    "journeyIdentity": {
       "type": "string"
     },
-    "basis": {
+    "originatingOutcome": {
       "type": "string"
     },
-    "introducedBy": {
-      "type": "object",
-      "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorType": {
-          "type": "string",
-          "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
-          ]
-        },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
-          "type": "string"
-        },
-        "modelId": {
-          "type": "string"
-        },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "actorId",
-        "actorType",
-        "displayName"
-      ],
-      "additionalProperties": false
+    "primaryActorId": {
+      "type": "string"
     },
-    "affectedObjectIds": {
+    "supportingActorIds": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "materiality": {
-      "type": "string",
-      "enum": [
-        "IMMATERIAL",
-        "MATERIAL",
-        "CRITICAL"
-      ]
-    },
-    "verificationMethod": {
+    "trigger": {
       "type": "string"
     },
-    "expirationCondition": {
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "alternatePaths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exceptionalPaths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "completionCondition": {
       "type": "string"
     },
-    "status": {
-      "type": "string",
-      "enum": [
-        "PROPOSED",
-        "DISCLOSED",
-        "UNDER_VERIFICATION",
-        "ACCEPTED",
-        "VERIFIED",
-        "FALSIFIED",
-        "EXPIRED",
-        "SUPERSEDED"
-      ]
+    "failureCondition": {
+      "type": "string"
+    },
+    "affectedEntityIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requiredCapabilityIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidenceOfSuccess": {
+      "type": "string"
     }
   },
   "required": [
@@ -334,12 +322,22 @@
     "provenance",
     "tags",
     "extensions",
-    "statement",
-    "introducedBy",
-    "affectedObjectIds",
-    "materiality",
-    "status"
+    "journeyIdentity",
+    "originatingOutcome",
+    "primaryActorId",
+    "supportingActorIds",
+    "trigger",
+    "preconditions",
+    "steps",
+    "decisions",
+    "alternatePaths",
+    "exceptionalPaths",
+    "completionCondition",
+    "failureCondition",
+    "affectedEntityIds",
+    "requiredCapabilityIds",
+    "evidenceOfSuccess"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:AssumptionObject:1"
+  "$id": "urn:janumi:rph:schema:object:UserJourneyObject:1"
 }

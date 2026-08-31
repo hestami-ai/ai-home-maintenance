@@ -371,6 +371,18 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// statement/future-obligation as the things that CARRY deferred scope. The engine had every carrier and no
 		// deferral for any of them to carry — `grep -c -i defer` over the contracts returned 0/0/0. So this +1 is
 		// the CARRIED FACT arriving, not the carrier being duplicated.
-		expect(actual).toHaveLength(333);
+		// +34 to 367 (2026-08-31, JAN-SLICE-SWP-05 / REG-D-046 Ruling 2): the Behavior PWU now PRODUCES its
+		// ratified `outputArtifactTypes` instead of being satisfied over an empty plane. The arithmetic is
+		// derived from the fixture, not read off the failure: EIGHT actors (Reference §11.2) + FIFTEEN
+		// capabilities (§11.3) + ONE journey (§11.4) + TWO scenarios + SEVEN requirements (§11.5) + ONE
+		// deferral = 34.
+		//
+		// ⚠ TWO OF THOSE NUMBERS ARE SHORTFALLS AND BOTH ARE DELIBERATE, so a later reader does not "fix" them.
+		// TWO scenarios and not nine: the fixture lists nine exceptional paths and assigning each to one of
+		// §12's ratified eight classes is a modelling judgement it never made. SEVEN requirements and not
+		// eight: `FSM-AUD-001` carries the prefix `AUD` and AUDIT is not one of §13's fourteen types, so it is
+		// DEFERRED through `DeferScope` rather than typed by guesswork — which is the +1 deferral above, and
+		// the second real subject of the plane SWP-02a built.
+		expect(actual).toHaveLength(367);
 	});
 });

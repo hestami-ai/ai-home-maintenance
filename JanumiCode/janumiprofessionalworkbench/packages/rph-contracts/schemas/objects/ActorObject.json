@@ -238,85 +238,18 @@
         "additionalProperties": false
       }
     },
-    "statement": {
+    "name": {
       "type": "string"
     },
-    "basis": {
-      "type": "string"
-    },
-    "introducedBy": {
-      "type": "object",
-      "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorType": {
-          "type": "string",
-          "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
-          ]
-        },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
-          "type": "string"
-        },
-        "modelId": {
-          "type": "string"
-        },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "actorId",
-        "actorType",
-        "displayName"
-      ],
-      "additionalProperties": false
-    },
-    "affectedObjectIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "materiality": {
+    "actorType": {
       "type": "string",
       "enum": [
-        "IMMATERIAL",
-        "MATERIAL",
-        "CRITICAL"
-      ]
-    },
-    "verificationMethod": {
-      "type": "string"
-    },
-    "expirationCondition": {
-      "type": "string"
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "PROPOSED",
-        "DISCLOSED",
-        "UNDER_VERIFICATION",
-        "ACCEPTED",
-        "VERIFIED",
-        "FALSIFIED",
-        "EXPIRED",
-        "SUPERSEDED"
+        "HUMAN",
+        "AGENT",
+        "MODEL",
+        "SERVICE",
+        "POLICY_ENGINE",
+        "EXTERNAL_SYSTEM"
       ]
     }
   },
@@ -334,12 +267,9 @@
     "provenance",
     "tags",
     "extensions",
-    "statement",
-    "introducedBy",
-    "affectedObjectIds",
-    "materiality",
-    "status"
+    "name",
+    "actorType"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:AssumptionObject:1"
+  "$id": "urn:janumi:rph:schema:object:ActorObject:1"
 }

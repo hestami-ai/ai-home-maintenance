@@ -57,6 +57,13 @@ import {
 import { recordArtifact } from './artifact.js';
 import { deferScope } from './deferral.js';
 import {
+	defineActor,
+	defineCapability,
+	defineRequirement,
+	defineScenario,
+	defineUserJourney
+} from './product-behavior.js';
+import {
 	admitEvidence,
 	activateAssurancePolicy,
 	assertClaim,
@@ -187,6 +194,16 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// command-dispatch census refuses a ratified command nothing dispatches, which is how a declared-but-
 	// unproduced deferral plane would have been caught — and was.
 	DeferScope: deferScope,
+	// JAN-SLICE-SWP-05 — the W7 product-behavior plane (REG-D-046 Ruling 2; FSM §30.2's deferral condition
+	// met for four of its seven, plus SCENARIO on its own warrant — REG-F-302). Registered here for the same
+	// reason DeferScope is: 24 of 24 object types were reachable by a command before this, so five shape-only
+	// types would have been the repository's first five exceptions and exactly the hollow governed layer this
+	// repository has already recorded.
+	DefineActor: defineActor,
+	DefineCapability: defineCapability,
+	DefineUserJourney: defineUserJourney,
+	DefineScenario: defineScenario,
+	DefineRequirement: defineRequirement,
 	// Assurance: evidence / claim / assumption / assessment / observation (DOC-002 §12, §15–19)
 	ProposeEvidence: proposeEvidence,
 	AdmitEvidence: admitEvidence,

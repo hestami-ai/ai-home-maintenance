@@ -72,6 +72,20 @@ const EMITTED_2026_08_04 = new Set([
 	// would move a shrink-only deficiency pin 12 -> 11 while producing none of the fact ASR-9 limb 10 requires:
 	// its payload carries no postponement marker, no carrier link and no scope name.
 	'ScopeDeferred',
+	// + 2026-08-31, JAN-SLICE-SWP-05 (REG-D-046 Ruling 2): the five W7 product-behavior events acquire their
+	// first and only emitters. Recorded by hand for the reason this set exists, but each emission is DRIVEN in
+	// two places rather than asserted: the reference undertaking's Behavior PWU now PRODUCES its ratified
+	// `outputArtifactTypes` (8 actors, 15 capabilities, 1 journey, 2 scenarios, 7 requirements — the drive goes
+	// 333 -> 367), and `product-behavior.test.ts` dispatches all five commands directly.
+	//
+	// ⚠ THIS CENSUS IS WHY THE PROMOTION IS SHAPE *AND* PRODUCER. With the five commands registered and no
+	// drive behind them, this limb reddened naming all five as bound-but-unemitted — the repository refusing a
+	// declared-but-unproduced plane, which is the hollow governed layer it has recorded against itself before.
+	'ActorDefined',
+	'CapabilityDefined',
+	'UserJourneyDefined',
+	'ScenarioDefined',
+	'RequirementDefined',
 	// + 2026-08-13, REG-F-131: `IntentSuperseded` acquires its FIRST emitter, `SupersedeIntent`. It had been a
 	// RATIFIED event (it is in the Canonical Domain Model's own event list) that was neither bound nor emitted —
 	// the corpus named the event and the six arrows into SUPERSEDED, and no command reached them, so an Intent

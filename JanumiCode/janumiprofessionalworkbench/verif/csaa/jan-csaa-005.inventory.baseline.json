@@ -29,12 +29,12 @@
       "discovered": "UNKNOWN",
       "excluded": "UNKNOWN",
       "failed": 0,
-      "included": 135,
+      "included": 142,
       "provenance": [
         "subject.selectedFiles#artifactClass=OTHER",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 135
+      "successfullyInventoried": 142
     },
     {
       "artifactClass": "SCRIPT",
@@ -50,39 +50,39 @@
     },
     {
       "artifactClass": "SOURCE",
-      "discovered": 448,
+      "discovered": 449,
       "excluded": 0,
       "failed": 0,
-      "included": 448,
+      "included": 449,
       "provenance": [
         "subject.selectedFiles#artifactClass=SOURCE",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 448
+      "successfullyInventoried": 449
     },
     {
       "artifactClass": "TEST",
-      "discovered": 493,
+      "discovered": 494,
       "excluded": 0,
       "failed": 0,
-      "included": 493,
+      "included": 494,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 493
+      "successfullyInventoried": 494
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 64,
+      "discovered": 66,
       "excluded": 0,
       "failed": 0,
-      "included": 64,
+      "included": 66,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 64
+      "successfullyInventoried": 66
     }
   ],
   "assuranceSurfaces": {
@@ -377,7 +377,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 543,
+        "discovered": 546,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 48,
@@ -432,13 +432,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "fc307d06da31d5c8f5ec6a6f01825cc7cf014384e7db4d6e88de7d205c947d6b",
+        "id": "6a79a18022e2278a33e629bc3fb925955d8cd0cd21b465ca9d06434a166104d0",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 495,
+        "included": 498,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -737,6 +737,7 @@
           "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
           "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
           "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+          "packages/rph-application/src/handlers/product-behavior.test.ts",
           "packages/rph-application/src/handlers/pwa-authoring.test.ts",
           "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
           "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
@@ -915,6 +916,7 @@
           "verif/observation-command-surface.test.ts",
           "verif/optimistic-concurrency-surface.test.ts",
           "verif/policy-evidence-requirement-census.test.ts",
+          "verif/product-behavior-plane.test.ts",
           "verif/recomposition-ungoverned.test.ts",
           "verif/register-append-only.test.ts",
           "verif/register-citations.test.ts",
@@ -924,6 +926,7 @@
           "verif/slice-ledger.test.ts",
           "verif/slice-scenario-classes.test.ts",
           "verif/slice-scenario-coverage.test.ts",
+          "verif/slice-subsumption.test.ts",
           "verif/source-is-reviewable.test.ts",
           "verif/source-resolution.test.ts",
           "verif/test-modes.test.ts",
@@ -946,7 +949,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "1211ac9850c96e22e2fdf8f47792487ab4607dbe96fbf715a56174f863f3d84e",
+        "selectionDigest": "cbbb278e097cdb94af4df1f4bc17f3b560aae51be8ddd53e981e46af883b0afc",
         "status": "COMPLETE"
       },
       {
@@ -954,7 +957,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 543,
+        "discovered": 546,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 48,
@@ -1009,13 +1012,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "8e11eb776988e25dadc4dadc0759c68c1ffc2f13a1b87aaddfb620132bb10df7",
+        "id": "e39e4841e763049c2fe7bedce3643161a57faa82aaec823c18c3fb85c3ac6799",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 495,
+        "included": 498,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1314,6 +1317,7 @@
           "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
           "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
           "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+          "packages/rph-application/src/handlers/product-behavior.test.ts",
           "packages/rph-application/src/handlers/pwa-authoring.test.ts",
           "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
           "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
@@ -1492,6 +1496,7 @@
           "verif/observation-command-surface.test.ts",
           "verif/optimistic-concurrency-surface.test.ts",
           "verif/policy-evidence-requirement-census.test.ts",
+          "verif/product-behavior-plane.test.ts",
           "verif/recomposition-ungoverned.test.ts",
           "verif/register-append-only.test.ts",
           "verif/register-citations.test.ts",
@@ -1501,6 +1506,7 @@
           "verif/slice-ledger.test.ts",
           "verif/slice-scenario-classes.test.ts",
           "verif/slice-scenario-coverage.test.ts",
+          "verif/slice-subsumption.test.ts",
           "verif/source-is-reviewable.test.ts",
           "verif/source-resolution.test.ts",
           "verif/test-modes.test.ts",
@@ -1523,7 +1529,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "65d9704574b9abaa1dfb9844baeaaf30c2d62f34b98628c14bbdaf1a0f91c3cb",
+        "selectionDigest": "0f2146c2f67bd367a006a8adbc58172a8e7c0f5b61ac914160516a8baa05502a",
         "status": "COMPLETE"
       }
     ],
@@ -1826,6 +1832,7 @@
         "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
         "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
         "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+        "packages/rph-application/src/handlers/product-behavior.test.ts",
         "packages/rph-application/src/handlers/pwa-authoring.test.ts",
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
         "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
@@ -2004,6 +2011,7 @@
         "verif/observation-command-surface.test.ts",
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
+        "verif/product-behavior-plane.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/register-append-only.test.ts",
         "verif/register-citations.test.ts",
@@ -2013,6 +2021,7 @@
         "verif/slice-ledger.test.ts",
         "verif/slice-scenario-classes.test.ts",
         "verif/slice-scenario-coverage.test.ts",
+        "verif/slice-subsumption.test.ts",
         "verif/source-is-reviewable.test.ts",
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
@@ -5291,7 +5300,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "4571745e981e09a8f28d8a0d0e7971ca187441ec9e4dc08caac700467e8810e8",
+    "configurationDigest": "446250f6c77df4895e54a5926a9b1c91d2f5279aa6e212d1addde876ca06ad75",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -7019,7 +7028,7 @@
           "configPath": "packages/rph-application/tsconfig.build.json",
           "kind": "BUILD",
           "projectReferences": [],
-          "projectResolutionDigest": "d798683b6cde2ca5680bd58adf6e2f5240a224853c142d404fdd909e413a27a4",
+          "projectResolutionDigest": "efe3b20cf5b6ed6c11359ede5fbfc0b4c9394f20e694f5bf3b725a04de7e092d",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7039,6 +7048,7 @@
             "packages/rph-application/src/handlers/intent.ts",
             "packages/rph-application/src/handlers/kit.ts",
             "packages/rph-application/src/handlers/obligation-constraint.ts",
+            "packages/rph-application/src/handlers/product-behavior.ts",
             "packages/rph-application/src/handlers/pwa-authoring.ts",
             "packages/rph-application/src/handlers/pwu.ts",
             "packages/rph-application/src/handlers/registry.ts",
@@ -7082,7 +7092,7 @@
           "configPath": "packages/rph-application/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "9d43cf0fd674193998d0d056541ad397a93f880de53dffc116bd6dafe11e7e26",
+          "projectResolutionDigest": "0f00bb6dcfa589318aad0064e6ca43c7e59ecca6ecb207589d7dc91f8b122614",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -7186,6 +7196,8 @@
             "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
             "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
             "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+            "packages/rph-application/src/handlers/product-behavior.test.ts",
+            "packages/rph-application/src/handlers/product-behavior.ts",
             "packages/rph-application/src/handlers/pwa-authoring.test.ts",
             "packages/rph-application/src/handlers/pwa-authoring.ts",
             "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
@@ -8397,7 +8409,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "5fe2d3d675858b5642c05316b3c9c8914eb3c66b7d4dc7b9596bfee60d062de8",
+          "projectResolutionDigest": "f3ae60fc617b1cd7e6d432fac879c0065ea65678fb5372e0437e8b010c1bdaee",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8439,6 +8451,7 @@
             "verif/observation-command-surface.test.ts",
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
+            "verif/product-behavior-plane.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -8449,6 +8462,7 @@
             "verif/slice-ledger.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
+            "verif/slice-subsumption.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -8675,7 +8689,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 543,
+          "discovered": 546,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 48,
@@ -8730,13 +8744,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "fc307d06da31d5c8f5ec6a6f01825cc7cf014384e7db4d6e88de7d205c947d6b",
+          "id": "6a79a18022e2278a33e629bc3fb925955d8cd0cd21b465ca9d06434a166104d0",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 495,
+          "included": 498,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9035,6 +9049,7 @@
             "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
             "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
             "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+            "packages/rph-application/src/handlers/product-behavior.test.ts",
             "packages/rph-application/src/handlers/pwa-authoring.test.ts",
             "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
@@ -9213,6 +9228,7 @@
             "verif/observation-command-surface.test.ts",
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
+            "verif/product-behavior-plane.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -9222,6 +9238,7 @@
             "verif/slice-ledger.test.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
+            "verif/slice-subsumption.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -9244,7 +9261,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "1211ac9850c96e22e2fdf8f47792487ab4607dbe96fbf715a56174f863f3d84e",
+          "selectionDigest": "cbbb278e097cdb94af4df1f4bc17f3b560aae51be8ddd53e981e46af883b0afc",
           "status": "COMPLETE"
         },
         {
@@ -9252,7 +9269,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 543,
+          "discovered": 546,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 48,
@@ -9307,13 +9324,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "8e11eb776988e25dadc4dadc0759c68c1ffc2f13a1b87aaddfb620132bb10df7",
+          "id": "e39e4841e763049c2fe7bedce3643161a57faa82aaec823c18c3fb85c3ac6799",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 495,
+          "included": 498,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9612,6 +9629,7 @@
             "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
             "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
             "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+            "packages/rph-application/src/handlers/product-behavior.test.ts",
             "packages/rph-application/src/handlers/pwa-authoring.test.ts",
             "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
             "packages/rph-application/src/handlers/pwa-validation-gate.test.ts",
@@ -9790,6 +9808,7 @@
             "verif/observation-command-surface.test.ts",
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
+            "verif/product-behavior-plane.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -9799,6 +9818,7 @@
             "verif/slice-ledger.test.ts",
             "verif/slice-scenario-classes.test.ts",
             "verif/slice-scenario-coverage.test.ts",
+            "verif/slice-subsumption.test.ts",
             "verif/source-is-reviewable.test.ts",
             "verif/source-resolution.test.ts",
             "verif/test-modes.test.ts",
@@ -9821,7 +9841,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "65d9704574b9abaa1dfb9844baeaaf30c2d62f34b98628c14bbdaf1a0f91c3cb",
+          "selectionDigest": "0f2146c2f67bd367a006a8adbc58172a8e7c0f5b61ac914160516a8baa05502a",
           "status": "COMPLETE"
         }
       ],
@@ -10540,7 +10560,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "54aa1d845a5f1eb9e6f7f0b6c1b490e81c55e58ad6e1443e93a641c903721203",
+    "fileManifestDigest": "b04964c5964d6c0572b518b3a142694f49c8633f314717aa40636f9e4015bd77",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -10646,7 +10666,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1277,
+    "selectedFileCount": 1288,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -15074,9 +15094,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 104553,
+        "bytes": 105469,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "0630250a780f396ecaea4a67c94e3686a813118fdcb634d860b03a52606a6a8e",
+        "sha256": "082d5fd8784c549c5fcaf7e4c46dd9e601eb7d0ed9eacb1d6aa4f6bf6360161e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -15914,6 +15934,20 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 12439,
+        "path": "packages/rph-application/src/handlers/product-behavior.test.ts",
+        "sha256": "fe0a82d421304dfef20cf162077aebda423b8d77d07b555f93a2165024db56d5",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "SOURCE",
+        "bytes": 16070,
+        "path": "packages/rph-application/src/handlers/product-behavior.ts",
+        "sha256": "c676869a1b03fb7df14431d3ed5121a28b71ce09891e4c88cb8ee8b6717f7a48",
+        "subjectArtifactClass": "PRODUCTION_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 45040,
         "path": "packages/rph-application/src/handlers/pwa-authoring.test.ts",
         "sha256": "32c0d40974b93b5eb953a49c8e06060fee9c4ad0d10b1cfb67ba539089c1bce8",
@@ -15991,9 +16025,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 9156,
+        "bytes": 9931,
         "path": "packages/rph-application/src/handlers/registry.ts",
-        "sha256": "242651234034d780f46a98b62f19ee69d439fd01047cedc15ee139e079463fe3",
+        "sha256": "53cbdbcf9e5f95d6cd17ae8fb482e094bd583ac3701f371c3157bc3b4babfbbd",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -16705,9 +16739,9 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 718,
+        "bytes": 804,
         "path": "packages/rph-contracts/schemas/enums/ProfessionalWorkObjectType.json",
-        "sha256": "80943c087ea17e2f07ad32bea20d08dca33a1c6fe24f1815dd6db195c071fbff",
+        "sha256": "15929cd035622b5c49c457f9eaf7acfc860022639700c1d19e9eaf5f82f566d0",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -16733,6 +16767,13 @@
       },
       {
         "artifactClass": "OTHER",
+        "bytes": 402,
+        "path": "packages/rph-contracts/schemas/enums/RequirementType.json",
+        "sha256": "3e48e5e6a690e4fc47df85c41b5e76579765bca36641e8ca1374e911f42fa7a0",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
         "bytes": 271,
         "path": "packages/rph-contracts/schemas/enums/RiskDimension.json",
         "sha256": "7071e3695fb8723a3fa9009f62c24d393ab841ad57f66fff4857b0b3eb3bd478",
@@ -16750,6 +16791,13 @@
         "bytes": 358,
         "path": "packages/rph-contracts/schemas/enums/RphErrorCategory.json",
         "sha256": "4585047b82b938b9138f5ee913beb639e99cfbb988da17c241dc75e6f2b88fed",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 371,
+        "path": "packages/rph-contracts/schemas/enums/ScenarioClass.json",
+        "sha256": "570b932c1d40da5bee039a748960b27d57975cf7c71d61c9e302ed2f624c25af",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -16873,6 +16921,13 @@
       },
       {
         "artifactClass": "OTHER",
+        "bytes": 6359,
+        "path": "packages/rph-contracts/schemas/objects/ActorObject.json",
+        "sha256": "84770d0978b40ea582ac750208e8c9ce3b121370c44bdbce29a159a3b0751c83",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
         "bytes": 807,
         "path": "packages/rph-contracts/schemas/objects/ActorReference.json",
         "sha256": "e4d620b7e9ce476bee22071f9b8ca898fca048f858a0702a96494fb372061eba",
@@ -16880,58 +16935,65 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 6811,
+        "bytes": 6917,
         "path": "packages/rph-contracts/schemas/objects/ArtifactObject.json",
-        "sha256": "3b3e3813a59d2668cf1c0119170c57e978783ba1bfbe50d8f22047a7ca6f8368",
+        "sha256": "cb2491c0e52f8cd3551d249fe84b15a066552e0a44149335feb4aefabbe08374",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7656,
+        "bytes": 7762,
         "path": "packages/rph-contracts/schemas/objects/AssumptionObject.json",
-        "sha256": "9c8aa4fff741ee4348f74e24de642cd52eba4913b12521ea812a6d1b057f8903",
+        "sha256": "52f8fe958019fe505f4021404af8162345f340c59ff176f3d23923bef834bdf2",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 10174,
+        "bytes": 10280,
         "path": "packages/rph-contracts/schemas/objects/AssuranceAssessment.json",
-        "sha256": "d57739744411b1ff0b4db1f9de266c7f53cb7d153a574a12c25c2146ee845b67",
+        "sha256": "820fdc745c102873cd17c1fed81c688eed2d65e2362debf822eab2a1e3bf9230",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7310,
+        "bytes": 7416,
         "path": "packages/rph-contracts/schemas/objects/AssuranceObservation.json",
-        "sha256": "cc85795b0393f177723c3750bc1b7910db55cab84ba4070dee5307a4b99dc705",
+        "sha256": "26cec3dc0a79bf0e706a0bd321cfd6c0847f1839cd33405d78fbb675c8848a46",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 22126,
+        "bytes": 22348,
         "path": "packages/rph-contracts/schemas/objects/AssurancePolicyDefinition.json",
-        "sha256": "a10afd5e0b4d6b6aaef8e91aafeeaabb7027c3f5fc7376297bff717c8731ed66",
+        "sha256": "d2bca0b18f872fef8f5068ec983b873f47c6ab9eda406eaec1b650aec1081223",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 6576,
+        "bytes": 6682,
         "path": "packages/rph-contracts/schemas/objects/AuthoringConversation.json",
-        "sha256": "897f1252c0c1c4e09bafa56844e6e3ed53b829afccc5b025a288b4491572a4fd",
+        "sha256": "93dad330d2ca5a146a49b3d6058bb9889c2404d45537ec330dcbc874f5115267",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7443,
+        "bytes": 7549,
         "path": "packages/rph-contracts/schemas/objects/BaselineObject.json",
-        "sha256": "ac9f9ecad6266f642d70dff804f83f4c35713fcf568e9feebfea90db811fc649",
+        "sha256": "28c18b91092663ab0d62b4173d9ba69170c41e90634d6a71304b297330f7b646",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7932,
+        "bytes": 6306,
+        "path": "packages/rph-contracts/schemas/objects/CapabilityObject.json",
+        "sha256": "e285f08732dad8b5ed70e0edf0fd936f5d406be3d64cd0a54834fa505225f59c",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 8038,
         "path": "packages/rph-contracts/schemas/objects/ClaimObject.json",
-        "sha256": "6269f2f7b74a139a56683751767cd364393a66c3ba91777187dceedfdb505866",
+        "sha256": "ea6e463874cbb36f675ed8c52b3f733dc0d27cc95e9c4c87e9c55078e9277ec6",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -16943,30 +17005,30 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 8750,
+        "bytes": 8856,
         "path": "packages/rph-contracts/schemas/objects/ConstraintObject.json",
-        "sha256": "036e99133a99db225f1d48814c801e822e1d250c0f0bb3bd2c4cad480eff97e5",
+        "sha256": "3a957f6a095583cf279baab8e775f6390acfc965fe7c21b6d95d3011407e01e6",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 9830,
+        "bytes": 9936,
         "path": "packages/rph-contracts/schemas/objects/DecisionObject.json",
-        "sha256": "c8e2cbeb22be22f00610a8b1a3a52e62408cb99bba0d785820745253fcb7c979",
+        "sha256": "7a1e1997942f082867f6f47a4174d1d9879b164f8ed93f6e51fe26b34ac5a22d",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 10470,
+        "bytes": 10576,
         "path": "packages/rph-contracts/schemas/objects/DecompositionContract.json",
-        "sha256": "4f925e0c64a2af6a8d1d8203f241b9d103196d52c9642f27cde0bd4e73d74f0b",
+        "sha256": "33ae5d8afd1de46e16598b6e004fde85d1a438a792f9aa1c7be5023acc3ee087",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7339,
+        "bytes": 7445,
         "path": "packages/rph-contracts/schemas/objects/DeferralObject.json",
-        "sha256": "a7b708786555db1a25c43171e9a82a66d68ebdf797c1bc76dea4b18317048b22",
+        "sha256": "980b039ee88c089e4f3b634a0f44871178312b3f7c8a2e8f2566803f2ff1e14c",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -16985,16 +17047,16 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 8130,
+        "bytes": 8236,
         "path": "packages/rph-contracts/schemas/objects/EvidenceObject.json",
-        "sha256": "70380775126efb4a475d78c63f2a19d4a4a751010ac2eeacf97ccee983a0634f",
+        "sha256": "064571911bb27ab27b0062d0e1fbdee709139bc7af8bf4d724b561454fe0e799",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 10927,
+        "bytes": 11033,
         "path": "packages/rph-contracts/schemas/objects/ExecutionPlan.json",
-        "sha256": "080fa814cce18c981df227896cf157f838b5457c90bb0595377e6b8f45e73253",
+        "sha256": "e6865eb289c1cbb0bfd2f780339d0174e85de5cdc83befb9b553af5b6b6be88c",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -17006,37 +17068,37 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7460,
+        "bytes": 7566,
         "path": "packages/rph-contracts/schemas/objects/IntentObject.json",
-        "sha256": "ae056baaef373768af456068cdff56cf8b472e26d64e790c5c9e80bb7ed15dab",
+        "sha256": "c17d72d8b2bd0deec8846c8ee273a2c2070cf0df88fb20ddc136cae8052f1cec",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 5988,
+        "bytes": 6094,
         "path": "packages/rph-contracts/schemas/objects/ObjectEnvelope.json",
-        "sha256": "e19408db33ae35e5adbb3fa258d2d3b8f2a68ec3f9e51ed10d5c01561746e631",
+        "sha256": "735a4bd8f7bd05ac4935ede46e8ca2afc829c85554302e2e7df379e14dffda3a",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7649,
+        "bytes": 7755,
         "path": "packages/rph-contracts/schemas/objects/ObligationObject.json",
-        "sha256": "95dfa77d809dd561d01c2564f52b50e57a566ada7cc7c8ef6e3e190fbc47c04c",
+        "sha256": "fcd3d7656731618a4af561148b72a08e0943331079d44146868a37ebaf70cf89",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7324,
+        "bytes": 7430,
         "path": "packages/rph-contracts/schemas/objects/ProfessionalWorkArchitecture.json",
-        "sha256": "8d2741850293da58849f3202a4364051098feb27f1e6d42d7ebc5c253ec57bac",
+        "sha256": "1b94e20dec138d74782386c2fcd625bb199c8a1df96e821e6025269f6c2e8250",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 11552,
+        "bytes": 11658,
         "path": "packages/rph-contracts/schemas/objects/ProfessionalWorkUnit.json",
-        "sha256": "b0843c8fe779cea20fc99a995c8946079077a3a5bd7abe1fdf23e01fda6d1c0e",
+        "sha256": "1c8cbc38b0adeffddd93d7001e97a18ca5f3332b7b59e1896c194f18c08014f9",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -17048,23 +17110,30 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 8481,
+        "bytes": 8587,
         "path": "packages/rph-contracts/schemas/objects/PwuType.json",
-        "sha256": "d788cb07924be418f183e8b3290e3eaa52b83d7f2bec69ec8482bb57042ea036",
+        "sha256": "88bb46054f786829dd301c2fadc1d6fe1cd375fec10eef42a9bd96631bb4b8e4",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7310,
+        "bytes": 7416,
         "path": "packages/rph-contracts/schemas/objects/RecompositionContract.json",
-        "sha256": "f4f75c5b3e50a30dac5d6fac3449463c2f888eaa65fdae78b83ddcd74e058a4c",
+        "sha256": "2b0f655c0f31e17ec5be7d0c08b3aa96df3b0d96fc7099d4045cf23df84444a9",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7558,
+        "bytes": 7664,
         "path": "packages/rph-contracts/schemas/objects/RecursiveProfessionalHarness.json",
-        "sha256": "6095cad1f360adb5f530e8645152c20d579299df40906182428a4df031f6aacf",
+        "sha256": "a2c30f5af256833c8b95f3d7acb9ed28f6bb30165d7a64451d2cf567cfdede99",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 8263,
+        "path": "packages/rph-contracts/schemas/objects/RequirementObject.json",
+        "sha256": "9db714a4f452f7134408e97a9ee7a920d725874805fe387226d31d78906c9597",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -17076,23 +17145,37 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7604,
+        "bytes": 7710,
         "path": "packages/rph-contracts/schemas/objects/RuntimeBinding.json",
-        "sha256": "4220ef2d3da4e0fd1dabda0f39a191de5df2e1e5ea6642db7178152c8d2edcc8",
+        "sha256": "01faefd52f37d23f95693d299a2556a43baa76afd4a6335e840557aad1b3fd28",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 6678,
+        "bytes": 6572,
+        "path": "packages/rph-contracts/schemas/objects/ScenarioObject.json",
+        "sha256": "72353bdd1d0d21fe29fc9764471af1214c1a5b1f3c4cf20b58decc46b7c80efa",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 6784,
         "path": "packages/rph-contracts/schemas/objects/Undertaking.json",
-        "sha256": "04caec305e9152bf596a8713a08b52aa4b12beb57e02c553a5fca9b661b8a03b",
+        "sha256": "64c5fcd1a8453f9aa8bea7f3523ed9fd1831ed4615a7630905dcb182d20faba3",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 7674,
+        "bytes": 7655,
+        "path": "packages/rph-contracts/schemas/objects/UserJourneyObject.json",
+        "sha256": "09588ee19d8a362b9723793bfceb7fce8efd6fd302a1d3bd693b95479bc2b801",
+        "subjectArtifactClass": "OTHER"
+      },
+      {
+        "artifactClass": "OTHER",
+        "bytes": 7780,
         "path": "packages/rph-contracts/schemas/objects/ValidatorRegistryEntry.json",
-        "sha256": "2fc145063a4b7ffa9c639ddbd3b91c4ba216186bca1d613d89c1a9f010a0f562",
+        "sha256": "fb261854e49275c95d62b9987a1fb9689eab10a127ff24705e32e25beebf9fc0",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -17125,9 +17208,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 31042,
+        "bytes": 32192,
         "path": "packages/rph-contracts/src/enums.ts",
-        "sha256": "7e83c25ff67f1527827d610cf5f7400300c8dfabc24945b6d8382cf2627bad6b",
+        "sha256": "ea1f2ea2b47e612cf973c47f5310ac58686b800ebf7a92d8a5d29c75f306c150",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -17223,9 +17306,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 2726,
+        "bytes": 3083,
         "path": "packages/rph-contracts/src/ids.ts",
-        "sha256": "69bcc09189f79f16c4e9d010c375c31b551482e8e1d9d35a34adca0dc6cca0a6",
+        "sha256": "26dc5cb3875556000fa675e4937ab19118c4182b6563fd33d0864a33c02795cc",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -17251,9 +17334,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 128106,
+        "bytes": 133344,
         "path": "packages/rph-contracts/src/messages.ts",
-        "sha256": "42917bc5979f6d1d2fdd2224f33dafa4506a1f607d2c35dfd4f50ed2a899e1cf",
+        "sha256": "789f49ad032c254bac2be5f8ded2c4a8f75274311e57e89980d9726c5942a9a5",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -17272,9 +17355,9 @@
       },
       {
         "artifactClass": "GENERATED_SOURCE",
-        "bytes": 34756,
+        "bytes": 37433,
         "path": "packages/rph-contracts/src/objects.ts",
-        "sha256": "58c0a978ef8d564f9715ad0c9ab39e25dbd584b6904765c6021db174d5eec591",
+        "sha256": "82c1144c7b114e05ecd813686424b634fdedd55fdccdab647b995954a1875ae7",
         "subjectArtifactClass": "GENERATED_SOURCE"
       },
       {
@@ -17286,9 +17369,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 12531,
+        "bytes": 13219,
         "path": "packages/rph-contracts/src/validate.test.ts",
-        "sha256": "441bab5fc728d89ac23335a78d7c95afc8de4c6b12f37fd115f4204b0e8ad917",
+        "sha256": "ce05db160cbe29e60f6d40488da28e7a82f8cedc31559cec5e99c5f05f04c56e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -17314,23 +17397,23 @@
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 93279,
+        "bytes": 95963,
         "path": "packages/rph-contracts/vocab/canonical-vocabulary.json",
-        "sha256": "6db1ac8999e78d07dc0714ec91debc3e3cc7b53f06666247aafbcfff33804b0e",
+        "sha256": "961395fa7c7506b01635a7c023e0fb4768fab8815d291b281706e1cd862ff203",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 136971,
+        "bytes": 152980,
         "path": "packages/rph-contracts/vocab/m1-object-fields.json",
-        "sha256": "c8d323df38d101cec05ca4570d330516a6179535dedc04fa3ca7d3ca0499e0ef",
+        "sha256": "db710a4571349614eac5409500e5a9bf8b855f0e811ce5255c76b6a15380504a",
         "subjectArtifactClass": "OTHER"
       },
       {
         "artifactClass": "OTHER",
-        "bytes": 384900,
+        "bytes": 408186,
         "path": "packages/rph-contracts/vocab/m3-commands-events.json",
-        "sha256": "02b44a1701bc92064f330db42df814ec0cce3acdec098bdf824ab4cba766a179",
+        "sha256": "eb68ae4ad5fb3e4a0a3475e474e2768e9483822a0665044b0b95f6ebd6acc846",
         "subjectArtifactClass": "OTHER"
       },
       {
@@ -18035,16 +18118,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 73752,
+        "bytes": 86700,
         "path": "packages/rph-engine/src/reference-undertaking.ts",
-        "sha256": "0476980efe65f616a9fde329582cdf01ad3c6edea5a215f75d2199c55a8fbf6e",
+        "sha256": "efff97b2dd65c303401507cbe07f88ab8eeca75af1427d1287029f203ab5ab72",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 24264,
+        "bytes": 25279,
         "path": "packages/rph-engine/src/replay-conformance.test.ts",
-        "sha256": "441c2055527ec96577d56da1719d02e06fcdd963c2e2939d3889e637f0d0a2bd",
+        "sha256": "303979966061179a0e876bf7c75967e14065efc2b028c6010b767cc5ce10473c",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -19295,9 +19378,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 22461,
+        "bytes": 23416,
         "path": "verif/event-surface-census.test.ts",
-        "sha256": "3e3b043b76f279eaa96e3b2b7026bdc699b8ce958aaa3c0dea5a3625099dcae0",
+        "sha256": "a774ad3c7eead3fa6f059955d69f03ffc9047387bcd9abc1bf5a4f1f81e18c5c",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19393,6 +19476,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 12280,
+        "path": "verif/product-behavior-plane.test.ts",
+        "sha256": "01b1a8928de3b5440b1e5c366b46c930863039b8118f37f78b0438f553f222f5",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 8439,
         "path": "verif/recomposition-ungoverned.test.ts",
         "sha256": "f5acb0437fea658df37552318441853be034c9bd4050efe53ae2c47f2b74014a",
@@ -19462,6 +19552,13 @@
         "subjectArtifactClass": "VERIFICATION"
       },
       {
+        "artifactClass": "VERIFICATION",
+        "bytes": 10709,
+        "path": "verif/slice-subsumption.test.ts",
+        "sha256": "9f8b274da71d853dac8520c4970c7cf36a9add25764a6fdf2b2b22b98e6e62b2",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
         "artifactClass": "OTHER",
         "bytes": 5471,
         "path": "verif/slices/slice-ledger.baseline.json",
@@ -19498,9 +19595,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 25037,
+        "bytes": 25533,
         "path": "verif/tracker-ingest.test.ts",
-        "sha256": "c221dd938dd52c9ab393ad9f5b28095935d1cf978a6f3698bb04a3f1a8b54b6a",
+        "sha256": "01a3cc1528be8a80f5fa729d69c05ce30b01cde4a7257c12bcc69f09edbbce41",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -19588,7 +19685,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "42eb65da6a458689a2b0c250ca05205bd21222a9eb0b530c504b7c2d48a4f4c9",
+    "subjectId": "3573d08f530eb84e6980d1c04d8e0be89fd58cd4ce6419b7de9b60f6b84f401d",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -20987,7 +21084,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 23,
+      "candidateArtifactCount": 24,
       "compilerOptions": {},
       "diagnostics": [],
       "diagnosticsState": "RUN",
@@ -21027,6 +21124,7 @@
         "packages/rph-application/src/handlers/intent.ts",
         "packages/rph-application/src/handlers/kit.ts",
         "packages/rph-application/src/handlers/obligation-constraint.ts",
+        "packages/rph-application/src/handlers/product-behavior.ts",
         "packages/rph-application/src/handlers/pwa-authoring.ts",
         "packages/rph-application/src/handlers/pwu.ts",
         "packages/rph-application/src/handlers/registry.ts",
@@ -21043,7 +21141,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 129,
+      "candidateArtifactCount": 131,
       "compilerOptions": {
         "outDir": "dist",
         "rootDir": "src"
@@ -21168,6 +21266,8 @@
         "packages/rph-application/src/handlers/partauth-derived-outcome.test.ts",
         "packages/rph-application/src/handlers/peer-assessment-gates.test.ts",
         "packages/rph-application/src/handlers/policy-scope-edit.test.ts",
+        "packages/rph-application/src/handlers/product-behavior.test.ts",
+        "packages/rph-application/src/handlers/product-behavior.ts",
         "packages/rph-application/src/handlers/pwa-authoring.test.ts",
         "packages/rph-application/src/handlers/pwa-authoring.ts",
         "packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts",
@@ -22229,7 +22329,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 59,
+      "candidateArtifactCount": 61,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -22294,6 +22394,7 @@
         "verif/observation-command-surface.test.ts",
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
+        "verif/product-behavior-plane.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/register-append-only.test.ts",
         "verif/register-citations.test.ts",
@@ -22304,6 +22405,7 @@
         "verif/slice-ledger.ts",
         "verif/slice-scenario-classes.test.ts",
         "verif/slice-scenario-coverage.test.ts",
+        "verif/slice-subsumption.test.ts",
         "verif/source-is-reviewable.test.ts",
         "verif/source-resolution.test.ts",
         "verif/test-modes.test.ts",
@@ -24253,7 +24355,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/event-surface-census.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "3e3b043b76f279eaa96e3b2b7026bdc699b8ce958aaa3c0dea5a3625099dcae0",
+      "contentSha256": "a774ad3c7eead3fa6f059955d69f03ffc9047387bcd9abc1bf5a4f1f81e18c5c",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -24480,6 +24582,22 @@
       "role": "TEST"
     },
     {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/product-behavior-plane.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "01b1a8928de3b5440b1e5c366b46c930863039b8118f37f78b0438f553f222f5",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/product-behavior-plane.test.ts"
+      ],
+      "path": "verif/product-behavior-plane.test.ts",
+      "provenance": [
+        "verif/product-behavior-plane.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/recomposition-ungoverned.test.ts.",
       "associatedBaselines": [],
       "contentSha256": "f5acb0437fea658df37552318441853be034c9bd4050efe53ae2c47f2b74014a",
@@ -24640,6 +24758,22 @@
       "role": "TEST"
     },
     {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-subsumption.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "9f8b274da71d853dac8520c4970c7cf36a9add25764a6fdf2b2b22b98e6e62b2",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/slice-subsumption.test.ts"
+      ],
+      "path": "verif/slice-subsumption.test.ts",
+      "provenance": [
+        "verif/slice-subsumption.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/source-is-reviewable.test.ts.",
       "associatedBaselines": [],
       "contentSha256": "0bb6c83da949073c31b8cbd882b11d1b01f8f4417ae764f937a5fc0dfbcee972",
@@ -24706,7 +24840,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-ingest.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "c221dd938dd52c9ab393ad9f5b28095935d1cf978a6f3698bb04a3f1a8b54b6a",
+      "contentSha256": "01a3cc1528be8a80f5fa729d69c05ce30b01cde4a7257c12bcc69f09edbbce41",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

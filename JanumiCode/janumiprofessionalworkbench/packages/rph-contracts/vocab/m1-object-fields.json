@@ -1618,6 +1618,253 @@
 					"required": true
 				}
 			]
+		},
+		{
+			"objectType": "ACTOR",
+			"tsName": "ActorObject",
+			"idPrefixEntity": "ACTOR",
+			"note": "JAN-SLICE-SWP-05 (REG-D-046 Ruling 2, sponsor 2026-08-29). FSM §30.2 defers this plane — \"Promote them to universal first-class tables only after the Product Realization PWA implementation proves the need\" — and the condition is PROOF OF NEED, now met. THIS IS THE DISCHARGE OF A RATIFIED DEFERRAL, NOT THE CLOSING OF A DEFECT. ⚠ AND THE DISCHARGE IS PARTIAL, WHICH THE ROADMAP DID NOT STATE: FSM §30.2 defers SEVEN — \"stakeholder; actor; capability; journey; requirement; risk; architecture element\" — and this work package promotes FOUR of them. stakeholder, risk and architecture element REMAIN DEFERRED under the same unchanged condition. See REG-F-302. Extends ObjectEnvelope. FIELDS ARE TRACED, NOT INVENTED. Product Realization PWA Professional Ontology and Assurance Policy Specification §5.4 defines an Actor in one sentence — \"A human or system participant that performs actions within a user journey or operational process\" — and that sentence grounds exactly TWO fields: name (the participant's identity, catalogued in Reference §11.2 \"Initial actors\") and actorType (\"human or system\"). ⚠ actorType REUSES THE RATIFIED ActorType ENUM (RPH-DOC-007 §6, identical to DOC-002 §5) RATHER THAN MINTING A SECOND ONE. A parallel actor-type enum is precisely the parallel representation SL-W7-1 forbids, and the ratified members already fit the fixture exactly: Reference §11.2's eight actors are five HUMAN (Business Owner, Office Administrator, Dispatcher, Field Technician, Customer) and three EXTERNAL_SYSTEM (External Payment Provider, External Accounting System, Notification Provider). ⚠ THIS OBJECT IS NOT ActorReference, AND THE TWO MUST NOT BE CONFLATED. ActorReference (envelopes.ts, DOC-007 §6) is the ACTING PARTY that operates the harness — who created an object. ACTOR is a PRODUCT-DOMAIN participant inside a modelled journey. They share the word and the type enum and nothing else; verif/product-behavior-plane.test.ts holds that distinction. NO responsibilities, goals, permissions OR lifecycle FIELD: none is traced to the professional corpus, and §5.4 is the whole of what it says. The journey-participation edge is NOT duplicated here — §12 puts \"primary actor\" and \"supporting actors\" ON THE JOURNEY, and §6's typed relationship is Stakeholder PARTICIPATES_IN User Journey.",
+			"fields": [
+				{
+					"field": "name",
+					"type": "string",
+					"required": true,
+					"note": "Spec §5.4 (the participant's identity); catalogued in Reference §11.2."
+				},
+				{
+					"field": "actorType",
+					"type": "ActorType",
+					"required": true,
+					"enumRef": "ActorTypeSchema",
+					"note": "Spec §5.4 \"A human or system participant\". REUSES the ratified ActorType enum (RPH-DOC-007 §6)."
+				}
+			]
+		},
+		{
+			"objectType": "CAPABILITY",
+			"tsName": "CapabilityObject",
+			"idPrefixEntity": "CAPABILITY",
+			"note": "JAN-SLICE-SWP-05 (REG-D-046 Ruling 2, sponsor 2026-08-29). FSM §30.2 defers this plane — \"Promote them to universal first-class tables only after the Product Realization PWA implementation proves the need\" — and the condition is PROOF OF NEED, now met. THIS IS THE DISCHARGE OF A RATIFIED DEFERRAL, NOT THE CLOSING OF A DEFECT. Extends ObjectEnvelope. FIELDS ARE TRACED, NOT INVENTED. Product Realization PWA Professional Ontology and Assurance Policy Specification §5.6 defines a Capability in six words — \"An ability the product must provide\" — which grounds statement and nothing else. refinedByRequirementIds is NOT an inference: Spec §6 states the typed relationship Capability REFINED_BY Requirement in its own relationship graph, and §6 closes with \"Relationships must remain typed and traceable. Generic untyped links are insufficient for authoritative reasoning.\" ⚠ THE INVERSE EDGE IS NOT STORED TWICE. Spec §13's Requirement carries \"source intent or journey\" — intent or journey, NOT capability — so Requirement.sourceObjectIds and Capability.refinedByRequirementIds are different edges, not two copies of one. The other two capability edges in §6 (User Journey REALIZES Capability; Architecture Element IMPLEMENTS Capability) are held by their own subjects: USER_JOURNEY.requiredCapabilityIds carries the first, and the second is not stored at all because ARCHITECTURE ELEMENT REMAINS DEFERRED under FSM §30.2 (REG-F-302). NO priority, owner, maturity OR status FIELD: none is traced.",
+			"fields": [
+				{
+					"field": "statement",
+					"type": "string",
+					"required": true,
+					"note": "Spec §5.6 \"An ability the product must provide\"; catalogued in Reference §11.3."
+				},
+				{
+					"field": "refinedByRequirementIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §6 typed relationship: Capability REFINED_BY Requirement. Empty is legitimate — a capability not yet refined."
+				}
+			]
+		},
+		{
+			"objectType": "USER_JOURNEY",
+			"tsName": "UserJourneyObject",
+			"idPrefixEntity": "USER_JOURNEY",
+			"note": "JAN-SLICE-SWP-05 (REG-D-046 Ruling 2, sponsor 2026-08-29). FSM §30.2 defers this plane — \"Promote them to universal first-class tables only after the Product Realization PWA implementation proves the need\" — and the condition is PROOF OF NEED, now met. THIS IS THE DISCHARGE OF A RATIFIED DEFERRAL, NOT THE CLOSING OF A DEFECT. Extends ObjectEnvelope. ⚠ THE FIFTEEN FIELDS ARE THE CORPUS'S OWN \"Required fields\" LIST AT Product Realization PWA Professional Ontology and Assurance Policy Specification §12, IN ITS ORDER AND WITHOUT ADDITION OR OMISSION: journey identity; originating outcome; primary actor; supporting actors; trigger; preconditions; steps; decisions; alternate paths; exceptional paths; completion condition; failure condition; affected entities; required capabilities; evidence of success. Every one is REQUIRED because §12 calls them required; the plural ones are arrays and an EMPTY array is a legitimate value meaning the definition records none, which is how a producer states absence without fabricating content. ⚠ THE OBJECT IS NOT THE PWU. USER_JOURNEY_DEFINITION is a pwuKind — the WORK of defining a journey; USER_JOURNEY is the journey that work PRODUCES, and Reference §11 lists USER_JOURNEY among PRODUCT_BEHAVIOR_DEFINITION's outputArtifactTypes. Spec §6's PWU Instance PRODUCES Artifact is the edge between them, and Reference §29.2 puts the object-versus-PWU decision to the implementation explicitly. This is why the promotion introduces no parallel representation alongside pwuKind (SL-W7-1), and verif/product-behavior-plane.test.ts gates it. primaryActorId and supportingActorIds reference ACTOR; requiredCapabilityIds carries Spec §6's User Journey REALIZES Capability. NO scenarioIds FIELD: §5.9 makes a Scenario an instance OF a journey, so SCENARIO.journeyId holds that edge once rather than twice.",
+			"fields": [
+				{
+					"field": "journeyIdentity",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 1 — \"journey identity\". The envelope's objectId is the machine identity; this is the named one, e.g. Reference §11.4 \"Request to Completed Job\"."
+				},
+				{
+					"field": "originatingOutcome",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 2 — \"originating outcome\"."
+				},
+				{
+					"field": "primaryActorId",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 3 — \"primary actor\". References ACTOR."
+				},
+				{
+					"field": "supportingActorIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 4 — \"supporting actors\". References ACTOR."
+				},
+				{
+					"field": "trigger",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 5 — \"trigger\"."
+				},
+				{
+					"field": "preconditions",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 6 — \"preconditions\"."
+				},
+				{
+					"field": "steps",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 7 — \"steps\"."
+				},
+				{
+					"field": "decisions",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 8 — \"decisions\"."
+				},
+				{
+					"field": "alternatePaths",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 9 — \"alternate paths\"."
+				},
+				{
+					"field": "exceptionalPaths",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 10 — \"exceptional paths\"."
+				},
+				{
+					"field": "completionCondition",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 11 — \"completion condition\"."
+				},
+				{
+					"field": "failureCondition",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 12 — \"failure condition\"."
+				},
+				{
+					"field": "affectedEntityIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 13 — \"affected entities\". DOMAIN ENTITY is not itself promoted here, so these are free ids, not references into a promoted plane."
+				},
+				{
+					"field": "requiredCapabilityIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §12 required field 14 — \"required capabilities\". Carries Spec §6's User Journey REALIZES Capability. References CAPABILITY."
+				},
+				{
+					"field": "evidenceOfSuccess",
+					"type": "string",
+					"required": true,
+					"note": "Spec §12 required field 15 — \"evidence of success\"."
+				}
+			]
+		},
+		{
+			"objectType": "SCENARIO",
+			"tsName": "ScenarioObject",
+			"idPrefixEntity": "SCENARIO",
+			"note": "JAN-SLICE-SWP-05 (REG-D-046 Ruling 2, sponsor 2026-08-29). ⚠⚠ SCENARIO'S WARRANT IS NOT FSM §30.2, AND SAYING SO WOULD BE AN OVERCLAIM. §30.2's deferral list is \"stakeholder; actor; capability; journey; requirement; risk; architecture element\" — SCENARIO IS NOT ON IT. Its warrant is independent and also ratified: Product Realization PWA Professional Ontology and Assurance Policy Specification §5.9 defines it, §12 mandates its classes, and Reference §11 lists SCENARIO among PRODUCT_BEHAVIOR_DEFINITION's outputArtifactTypes. Recorded in REG-F-302 so the register does not read as though one deferral carried all five promotions. Extends ObjectEnvelope. FIELDS ARE TRACED: §5.9 — \"A concrete instance or variation of a journey, including normal, alternate, exceptional, and failure paths\" — grounds journeyId (\"of a journey\"), statement (\"a concrete instance or variation\") and scenarioClass (the paths). ⚠ scenarioClass IS THE SAME RATIFIED EIGHT THE SLICE PROGRAMME ALREADY DERIVES, and that is the point: SCENARIO_CLASSES in @janumipwb/rph-contracts/slice is re-derived from the ontology sentence by verif/slice-scenario-classes.test.ts, and verif/product-behavior-plane.test.ts asserts this enum is that same set under the repository's UPPER_SNAKE convention. A ninth ratified class reddens BOTH rather than diverging in silence. The enum is UPPER_SNAKE because ZERO of the 90 canonical enums carry non-UPPER values; lowercase phrases here would be the first exception and a second convention. NO status, priority OR outcome FIELD: none is traced.",
+			"fields": [
+				{
+					"field": "statement",
+					"type": "string",
+					"required": true,
+					"note": "Spec §5.9 \"A concrete instance or variation of a journey\"."
+				},
+				{
+					"field": "journeyId",
+					"type": "string",
+					"required": true,
+					"note": "Spec §5.9 \"of a journey\". References USER_JOURNEY. Holds the journey-scenario edge ONCE — USER_JOURNEY carries no scenarioIds."
+				},
+				{
+					"field": "scenarioClass",
+					"type": "ScenarioClass",
+					"required": true,
+					"enumRef": "ScenarioClassSchema",
+					"note": "Spec §12 \"Minimum scenario classes\", the ratified eight. Same set as SCENARIO_CLASSES in the Slice contract."
+				}
+			]
+		},
+		{
+			"objectType": "REQUIREMENT",
+			"tsName": "RequirementObject",
+			"idPrefixEntity": "REQUIREMENT",
+			"note": "JAN-SLICE-SWP-05 (REG-D-046 Ruling 2, sponsor 2026-08-29). FSM §30.2 defers this plane — \"Promote them to universal first-class tables only after the Product Realization PWA implementation proves the need\" — and the condition is PROOF OF NEED, now met. THIS IS THE DISCHARGE OF A RATIFIED DEFERRAL, NOT THE CLOSING OF A DEFECT. Extends ObjectEnvelope. ⚠ THE ELEVEN FIELDS ARE THE CORPUS'S OWN \"Required properties\" LIST AT Product Realization PWA Professional Ontology and Assurance Policy Specification §13, IN ITS ORDER: statement; rationale; authority; source intent or journey; priority; applicability; verification method; affected artifacts; dependencies; conflict status; lifecycle. requirementType is the twelfth and is equally traced — §13's own \"Requirement types\" list of fourteen. ⚠ applicability IS A STRING AND THE CHOICE IS DISCLOSED. This repository has a ratified ApplicabilityExpression grammar (DOC-007 §18) used by assurance policies, and reusing it here would be an INFERENCE: §13 names the property and specifies no grammar for it. Typing it as the policy expression would import a semantics the corpus does not assign, so it stays a string until the corpus says otherwise. authority REUSES the ratified AuthorityReference helper rather than restating an actor inline. lifecycle and conflictStatus are STRINGS, NOT ENUMS: §13 lists both as required properties and enumerates the members of NEITHER, and inventing the members is what SL-7 forbids — the same reasoning that kept a status field off DEFERRAL in SWP-02a.",
+			"fields": [
+				{
+					"field": "statement",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 1."
+				},
+				{
+					"field": "rationale",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 2."
+				},
+				{
+					"field": "authority",
+					"type": "AuthorityReference",
+					"required": true,
+					"note": "Spec §13 required property 3 — \"authority\". Reuses the ratified AuthorityReference helper."
+				},
+				{
+					"field": "sourceObjectIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §13 required property 4 — \"source intent or journey\". References INTENT or USER_JOURNEY; NOT capability (Spec §6 puts that edge on CAPABILITY.refinedByRequirementIds)."
+				},
+				{
+					"field": "priority",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 5. A string: §13 enumerates no priority scale."
+				},
+				{
+					"field": "applicability",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 6. A string by disclosed choice — §13 specifies no grammar; see the object note."
+				},
+				{
+					"field": "verificationMethod",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 7."
+				},
+				{
+					"field": "affectedArtifactIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §13 required property 8 — \"affected artifacts\". References ARTIFACT."
+				},
+				{
+					"field": "dependencyIds",
+					"type": "string[]",
+					"required": true,
+					"note": "Spec §13 required property 9 — \"dependencies\"."
+				},
+				{
+					"field": "conflictStatus",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 10. A string: §13 enumerates no members."
+				},
+				{
+					"field": "lifecycle",
+					"type": "string",
+					"required": true,
+					"note": "Spec §13 required property 11. A string: §13 enumerates no members."
+				},
+				{
+					"field": "requirementType",
+					"type": "RequirementType",
+					"required": true,
+					"enumRef": "RequirementTypeSchema",
+					"note": "Spec §13 \"Requirement types\" — the ratified fourteen."
+				}
+			]
 		}
 	],
 	"helperSubTypes": [

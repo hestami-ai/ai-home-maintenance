@@ -32,7 +32,12 @@
         "AUTHORING_CONVERSATION",
         "RECURSIVE_PROFESSIONAL_HARNESS",
         "VALIDATOR_REGISTRY_ENTRY",
-        "DEFERRAL"
+        "DEFERRAL",
+        "ACTOR",
+        "CAPABILITY",
+        "USER_JOURNEY",
+        "SCENARIO",
+        "REQUIREMENT"
       ]
     },
     "schemaVersion": {

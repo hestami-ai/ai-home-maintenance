@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "NORMAL_PATH",
+    "ALTERNATE_VALID_PATH",
+    "USER_ERROR_PATH",
+    "SYSTEM_FAILURE_PATH",
+    "PERMISSION_DENIED_PATH",
+    "INTERRUPTED_OR_RESUMED_PATH",
+    "DATA_UNAVAILABLE_PATH",
+    "CANCELLATION_PATH"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ScenarioClass:1"
+}

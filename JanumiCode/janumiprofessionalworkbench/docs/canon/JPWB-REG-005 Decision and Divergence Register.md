@@ -27877,3 +27877,225 @@ premise was the thing that needed checking
 - **Merge target:** **Repository** — `verif/slice-subsumption.test.ts` (5 limbs, every control driven), three
   struck claims across two working roadmaps, and three strikes in the master tracker. **Owed:** `SWP-05` (the W7
   product-behavior plane) and `SWP-06` (the evidence surface + SURFACE Slices). Status: CLOSED.
+
+### REG-F-302 — `JAN-SLICE-SWP-05`: FSM §30.2 defers SEVEN, the promotion covers FOUR, and SCENARIO is not on that list at all
+
+- **Date:** 2026-08-31 · **Type:** CORRECTION (a discharge claim narrower than it reads) · **Class:**
+  RECORD — qualifies `JAN-SLICE-SWP-05` / `SL-W7-1` · **Status:** ✅ CLOSED.
+
+**Filed 2026-08-31.** `SWP-05` promotes the W7 product-behavior plane. The roadmap, the design record and
+`REG-D-046` Ruling 2 all describe this in one voice as *"the discharge of a ratified deferral, not the closing of
+a defect"*, citing **FSM §30.2**. That framing is correct and is preserved. **What none of the three states is
+how much of §30.2 the promotion actually discharges, and the answer is four sevenths.**
+
+- **THE DEFERRAL LIST IS SEVEN, READ BYTE-EXACT FROM THE SECTION.** `FSM §30.2 "Defer as separate first-class
+  objects"`, verbatim: *"stakeholder; actor; capability; journey; requirement; risk; architecture element."*
+  `SWP-05` promotes **ACTOR, CAPABILITY, USER_JOURNEY, REQUIREMENT** — four of them. **`stakeholder`, `risk` and
+  `architecture element` REMAIN DEFERRED** under the same unchanged condition, and nothing in the programme had
+  said so. **THAT LAST CLAUSE IS A CLAIM ABOUT A SEARCH, SO THE SEARCH IS STATED.** Case-insensitive `grep` for
+  `stakeholder|architecture element|risk` over the two documents that frame this work package — the design
+  record and `JAN-SLICE-DR-001` — returns **0 and 1**, and the single hit is *"`SWP-01` carries that risk"*, the
+  roadmap's own risk register, not §30.2's `risk` object kind. **Positive control: the same probe for
+  `capabilit|journey` over the same two files returns 21 and 16.** So the three are absent from the framing
+  documents rather than merely unnoticed by me — which is the distinction `REG-F-215` was struck for missing. A register that recorded "§30.2's condition has been met" without that qualifier would read as full
+  discharge, and the next reader to check would find three kinds still absent with no record of why.
+
+- **⚠ AND SCENARIO IS NOT ON §30.2's LIST — SO ITS PROMOTION DISCHARGES NO DEFERRAL.** This is the sharper half.
+  Four of the five promoted types are §30.2's; the fifth is not, and its warrant is separate and also ratified:
+  ontology `§5.9` defines a Scenario, `§12` mandates its eight classes, and the Reference lists `SCENARIO` among
+  `PRODUCT_BEHAVIOR_DEFINITION`'s `outputArtifactTypes`. **Attributing all five promotions to one deferral would
+  credit §30.2 with something it never deferred** — the same falsification shape `REG-F-301` recorded from the
+  other direction, where striking three other programmes' claims on a Slice's authority would have credited
+  `JAN-SLICE` with work it did not do. Over-attribution reads as thoroughness in both directions, which is why
+  neither is caught by asking whether the work was done.
+
+- **THE RESIDUE IS A RATCHET, NOT A SENTENCE.** `verif/product-behavior-plane.test.ts` PARSES §30.2's list from
+  the corpus, subtracts the four promoted by matching the section's own wording, and asserts the remainder is
+  exactly `stakeholder / risk / architecture element`. Promoting one later is legitimate — but it becomes a
+  deliberate act that edits the list and says why, rather than a silent change that leaves "the condition is met"
+  meaning something different from what it meant when it was written. A prose caveat is precisely what goes stale;
+  `REG-F-301` found nineteen documents' worth of evidence for that.
+
+- **DRIVEN, INCLUDING THE CONTROLS.** Four mutants, 4/4 SOUND: shrinking the recorded residue reddens; adding an
+  unpromoted type to the promoted list reddens; breaking the scenario-class mapping reddens; and **blinding the
+  corpus parser reddens the CONTROL** — so the file cannot pass over a corpus it never read, which is the vacuity
+  this repository has shipped before. The §30.2 parser itself was wrong on first run and the control caught it:
+  the list is semicolon-separated **except its last item, which ends in a full stop**, so a parser stripping only
+  `;` yielded `"architecture element."` and matched nothing. That is the argument for parsing the sentence rather
+  than restating it, made by the parser failing.
+
+- **Merge target:** **Repository** — the residue is gated. **Owed:** nothing; the three deferred kinds stay
+  deferred under §30.2's own unchanged condition. Status: CLOSED.
+
+### REG-F-303 — the corpus's own fixture supplies ONE of the eleven required properties its ontology demands
+
+- **Date:** 2026-08-31 · **Type:** RECORD (an observation about the corpus) · **Class:**
+  RECORD — arises from `JAN-SLICE-SWP-05` / `SL-7` · **Status:** ✅ CLOSED.
+
+**Filed 2026-08-31, from `JAN-SLICE-SWP-05`'s producer stage.** Wiring the reference undertaking to mint
+Reference `§11.5`'s "Representative requirements" as `REQUIREMENT` objects surfaced a fact about the corpus rather
+than about the code.
+
+- **ONE OF ELEVEN.** Ontology `§13` lists eleven "Required properties" for a requirement — *statement; rationale;
+  authority; source intent or journey; priority; applicability; verification method; affected artifacts;
+  dependencies; conflict status; lifecycle*. Each of the fixture's eight representative requirements supplies
+  **the statement and nothing else**. The producer therefore mints them with seven empty properties, and those
+  empties are ASSERTIONS ABOUT THE FIXTURE: they state that it says nothing there, which is true and checkable.
+  Filling them with plausible values would have made the corpus's own worked example look complete and would be
+  the fabrication `SL-7` forbids — the expensive kind, because invented values read as evidence.
+
+- **⚠ AND THE EIGHTH REQUIREMENT IS DEFERRED RATHER THAN DROPPED.** `FSM-AUD-001` — *"The system shall retain an
+  auditable record of material job-state changes."* — carries the prefix `AUD`, and **AUDIT is not one of §13's
+  fourteen requirement types.** It sits between `COMPLIANCE` and `OBSERVABILITY`; the corpus types it nowhere
+  (`grep FSM-AUD` across the whole RPH corpus returns exactly one hit, its own heading). Choosing one would be
+  inventing a classification and then citing the fixture for it. So the scope leaves the unit's work as a
+  **governed fact**: the drive mints a `DEFERRAL` through `DeferScope` naming the requirement, its carrier and its
+  revisit condition. `ASR-9` limb 10 requires deferred scope to stay REPRESENTED and *"never silently deleted"*,
+  and `SWP-02a` built exactly the object for it — **this is that plane's second real subject, which is also what
+  stops it being a population of one.**
+
+- **WHAT THIS IS NOT.** It is not a defect in the fixture. `Reference §11.1` states its own scope — *"Define the
+  first product behavior model sufficient to inform architecture"* — and a first-increment sketch is not obliged
+  to be a complete §13 requirement set. It is recorded because the ENGINE now carries the fixture's content, so
+  the gap is visible in data where it used to be invisible in prose, and a later reader finding seven empty
+  properties should find this entry rather than assume the producer was careless.
+
+- **Merge target:** **Repository** — the empties and the deferral are both driven by the reference undertaking
+  (`333 -> 367` events). **Owed:** nothing. A future ratification assigning a type to audit obligations, or a
+  sponsor ruling between `COMPLIANCE` and `OBSERVABILITY`, discharges the deferral. Status: CLOSED.
+
+### REG-F-304 — no ratified conformance rule governs the plane that was just promoted
+
+- **Date:** 2026-08-31 · **Type:** FINDING (a gap in the conformance catalog) · **Class:**
+  FINDING — arises from `JAN-SLICE-SWP-05` · **Status:** OPEN.
+
+**Filed 2026-08-31.** `SWP-05`'s outcome required the promoted types to be *"traceable from Slices"*. The obvious
+construction — a Slice that drives the plane and cites the rules it asserts — **could not be built honestly, and
+the reason is worth recording.**
+
+- **MEASURED, IN BOTH DIRECTIONS.** Of the 125 ratified rules in the M12 catalog, the statements naming *journey,
+  capability, scenario, requirement* or *actor* number **five**, and four of them use those words in a different
+  sense: `RPH-EXE-004`'s "capability" is a runtime binding grant (file-system / network), `RPH-EVD-003`'s and
+  `RPH-GOV-002`'s "actor" is the acting party, and `RPH-FIX-006`'s "capability" is the FSM offline residual. The
+  fifth, `RPH-ASR-002`, names a *"requirement trace matrix"* but governs an **assessment**, not the minting of a
+  requirement. **Positive control: 17 rules name evidence**, a plane that IS governed — so the near-absence is
+  absence, not a broken probe.
+
+- **THEREFORE THE CITATION WAS NOT MADE.** Citing `RPH-TRC-001..005` would have looked right — the family is
+  literally called traceability — and every one of them is about **Architecture Baselines and trace links**, not
+  about this plane. **That citation is the roadmap's own finding F-3 committed deliberately**: the conformance gate
+  checks only that a cited file exists, so it would have accepted the claim and proved nothing, and 38 rules
+  already have their id present in a file whose sole occurrence is a "not probed here" marker. `SWP-05` therefore
+  ships handler tests and a derived gate instead of a Slice with citations it could not honestly make.
+
+- **HOW TRACEABILITY IS ACTUALLY ESTABLISHED, AND WHY IT IS BETTER THAN A NEW FIELD.** A Slice declares a
+  `scenarioClass`; a promoted `SCENARIO` object now carries **the same ratified eight**. Both answer to one
+  sentence — ontology `§12`'s "Minimum scenario classes" — so a ninth ratified class reddens in
+  `verif/slice-scenario-classes.test.ts` AND in `verif/product-behavior-plane.test.ts` instead of one drifting
+  past the other. **Adding a `tracesObjectTypes` field to the Slice declaration was considered and rejected**: it
+  would have been a second representation with no consumer, which is the hollow governed layer one level up from
+  the one `SWP-05` was built to avoid.
+
+- **Merge target:** **Register** — this is a gap in the CONFORMANCE catalog, not in the repository. **Owed:** a
+  ratified rule family governing the product-behavior plane would let a Slice cite it; until one exists, no Slice
+  may claim to assert one. Status: OPEN, and deliberately not closed by writing rules this programme has no
+  authority to ratify.
+
+### REG-F-305 — `JAN-SLICE-SWP-05` LANDED: FSM §30.2's deferral condition is MET, and the W7 product-behavior plane is promoted
+
+- **Date:** 2026-08-31 · **Type:** RECORD (work package landed) · **Class:**
+  RECORD — discharges `JAN-SLICE-SWP-05` / `SL-W7-1` / `SL-W7-2` · **Status:** ✅ CLOSED.
+
+**⚠ THIS ENTRY RECORDS A DEFERRAL'S CONDITION HAVING BEEN MET. IT IS NOT THE REMEDIATION OF A GAP, AND THE
+ROADMAP REQUIRED IT TO SAY SO IN TERMS.** `FSM §30.2` defers the plane in its own words — *"Initially represent
+these through typed fields or extensions… Promote them to universal first-class tables only after the Product
+Realization PWA implementation proves the need."* **The condition is PROOF OF NEED**, and a verification
+substrate keyed to capabilities and journeys is that proof: it cannot trace to objects that do not exist.
+Recording this as remediation would misdescribe a design maturing exactly as designed. `SL-W7-2` states the same
+thing from the other side — *"The promotion is an enabler, not a prerequisite"* — and it held: `SWP-00` through
+`SWP-04` all landed before this, and none waited on it.
+
+- **WHAT LANDED, IN THE THREE STAGES `SWP-02a` ARGUED FOR.** **SHAPE:** `ACTOR`, `CAPABILITY`, `USER_JOURNEY`,
+  `SCENARIO`, `REQUIREMENT` added to the vocab and REGENERATED, never hand-edited — 29 object types (was 24),
+  111 commands (was 106), 152 events (was 147), 380 contract ids (was 363). **ACT:** five handlers registered,
+  each with a refusal traced to a corpus sentence. **PRODUCER:** the Behavior PWU now mints its own ratified
+  `outputArtifactTypes`, taking the reference drive **333 → 367 events**.
+
+- **⚠ THE SCOPE WAS DECIDED BY MEASUREMENT, NOT BY PREFERENCE, AND THE MEASUREMENT OVERRULED THE CHEAPER
+  READING.** The roadmap's `outcome` says only that the five *"exist, are registered, and are traceable"*, which
+  a shape-only promotion satisfies on its face. Before building: **24 of 24 existing object types are the
+  aggregate of some command** — so five shape-only types would have been the repository's first five exceptions,
+  and `SL-W7-1`'s *"follow the corpus's existing object-plane pattern exactly"* therefore REQUIRES the act. And
+  **16 of 24 are driven by the reference undertaking**, and none of the eight exceptions is an undertaking's
+  professional content — six are harness-meta (`PWA`, `PWU_TYPE`, `UNDERTAKING`, `AUTHORING_CONVERSATION`,
+  `RPH`, `VALIDATOR_REGISTRY_ENTRY`) and two are execution-side (`RECOMPOSITION_CONTRACT`, `RUNTIME_BINDING`).
+  ⚠ A first draft of this sentence said the eight were "all harness-meta", which is false for those two;
+  the claim that survives is the narrower one, and it is the one the argument actually needs. The
+  repository then ENFORCED what the measurement implied: with the commands registered and nothing dispatching
+  them, `command-dispatch-census` and `event-surface-census` both reddened naming all five. **Shape alone is the
+  hollow governed layer, and it was the censuses that said so, not me.**
+
+- **THE INVARIANT — "no parallel representation alongside the existing pwuKind" — IS SETTLED BY THE CORPUS AND
+  GATED, NOT ASSERTED.** `USER_JOURNEY_DEFINITION` is a **pwuKind**, the WORK of defining a journey;
+  `USER_JOURNEY` is the journey that work PRODUCES, and the Reference already lists it among that PWU's
+  `outputArtifactTypes`. Ontology `§6`'s `PWU Instance PRODUCES Artifact` is the edge between them, and Reference
+  `§29.2` hands the object-versus-PWU decision to the implementation explicitly with a five-part rule. Work and
+  product are different things. `verif/product-behavior-plane.test.ts` refuses any object type whose NAME is a
+  pwuKind, with a control asserting the near-miss (`USER_JOURNEY_DEFINITION`) is really in the compared set.
+
+- **⚠ NO FIELD WAS INVENTED, AND TWO PLACES THE TEMPTATION WAS REAL.** `USER_JOURNEY` carries `§12`'s fifteen
+  "Required fields" in its order without addition or omission; `REQUIREMENT` carries `§13`'s eleven "Required
+  properties" plus its ratified fourteen-member type enum. Where the corpus names a property and enumerates no
+  members — `lifecycle`, `conflictStatus` — the field is a STRING, for the same reason `DEFERRAL` has no status
+  field. And `applicability` is a string **by disclosed choice**: this repository has a ratified
+  `ApplicabilityExpression` grammar that assurance policies use, and reaching for it here would have imported a
+  semantics `§13` does not assign to requirements — a reuse that would have looked like rigour.
+
+- **REUSED RATHER THAN MINTED: `ActorType`.** The ratified enum (`RPH-DOC-007 §6`) already covers the fixture
+  exactly — Reference `§11.2`'s eight actors are five `HUMAN` and three `EXTERNAL_SYSTEM` — so a second
+  actor-type enum would have been the parallel representation `SL-W7-1` forbids. ⚠ **The `ACTOR` OBJECT IS NOT
+  `ActorReference`**, and the collision is in the word only: `ActorReference` is the acting party that operates
+  the harness, `ACTOR` is a participant inside the modelled product. A dispatcher is not a user of this
+  workbench. They share the enum and nothing else.
+
+- **DRIVEN, GUARD BY GUARD.** Six handler mutants, **6/6 SOUND** — each disabled guard reddened EXACTLY its own
+  test and no other, which is what makes the refusals load-bearing rather than present. Four gate mutants,
+  **4/4 SOUND**, including one that blinds the corpus parser and reddens the CONTROL, so the gate cannot pass
+  over a corpus it never read. The accept-control was driven too and reddens as a control must; it necessarily
+  reddens more than one test, so it is recorded as proving non-vacuity and NOT as a per-clause mutant.
+
+- **⚠ AND THIS WORK PACKAGE FOUND THAT `SWP-04` HAD SHIPPED A CSAA RED.** `verif/slice-subsumption.test.ts`
+  moved the verif population 59 → 60 and the CSAA pin was not updated, because `SWP-04` ran verif, `check-types`
+  and `lint` and not the CSAA subject test. **It is the second time this programme has broken CSAA by running
+  only scoped suites**, the first having cost two work packages before anyone noticed. Fixed here (59 → 61,
+  both steps attributed separately in the pin's own comment) under the standing rule that CSAA is the CSAA
+  agent's except for what we break — and reported rather than folded silently into the new number.
+
+- **⚠ AND A SECOND, INDEPENDENT INSTRUMENT CONFIRMED THE SAME MISS — WHICH IS WHY IT IS WORTH MORE THAN THE
+  FIX.** `csaa:inventory:check` also reddened, and its arithmetic is fully attributable: `1277 -> 1288` selected
+  files, being `OTHER` +7 (the seven emitted JSON schemas), `SOURCE` +1, `TEST` +1 — and **`VERIFICATION` +2
+  when `SWP-05` added exactly ONE verif file.** The extra one is `SWP-04`'s `slice-subsumption.test.ts`. So the
+  CSAA subject pin and the CSAA inventory baseline, two instruments that do not read each other, agree that
+  `SWP-04` shipped stale — and `SWP-04` would have failed `gate:fast` at BOTH. The baseline is regenerated here
+  (the precedent is `2028fea9`, *"mechanical, and it is ours to fix"*). **The lesson that did not stick is not
+  "update the pin": it is that `verif` + `check-types` + `lint` IS NOT THE GATE**, and a work package that
+  reports green on a scoped subset has reported on its own choice of evidence.
+
+- **⚠ WHAT THIS DOES *NOT* ESTABLISH, MEASURED RATHER THAN LEFT TO BE DISCOVERED.** The promoted objects enter
+  the traceability projection as NODES — `traceabilityProjector` registers `event.aggregateType` generically, so
+  they arrive without anyone listing them — but they contribute **no typed EDGES**, because `linksFor` is a
+  hand-written switch and the five fall to its `default`. Ontology `§6` does demand typed relationships in terms
+  (*"Generic untyped links are insufficient for authoritative reasoning"*), so this is a real gap and it is named
+  here rather than implied to be covered. **It is not, however, an exception made for this plane: `linksFor`
+  handles 8 of 152 ratified event types**, so 144 others are in exactly the same position. The edges the corpus
+  would license are already recorded field-by-field in the vocab notes (`User Journey REALIZES Capability`;
+  `Capability REFINED_BY Requirement`; a requirement's `§13` source), and the envelope's `sourceObjectIds` carries
+  each of them today, so closing the gap is a projection change and not a re-modelling. Deliberately not done
+  here: widening `TraceLinkType` for five events while 144 wait is a change to a shared contract that belongs to
+  whoever fixes the 144.
+
+- **Merge target:** **Repository** — vocab, five handlers, the producer, `verif/product-behavior-plane.test.ts`,
+  and the census pins that legitimately moved (`w4-driven.ndjson` +5, capability census 270 → 275 for five
+  COMMANDS with their events correctly not counted, contract ids 363 → 380, drive 333 → 367).
+  **Owed:** `SWP-06` (the evidence surface and the first SURFACE Slices); `REG-F-304` stays OPEN — no ratified
+  conformance rule governs this plane, so no Slice may yet claim to assert one.

@@ -2708,7 +2708,17 @@ describe('live JPWB and inventory projection', () => {
 		// `slice-scenario-coverage.test.ts` (the SL-5 gate: every class covered or explicitly exempt) and
 		// `e2e-rule-assertion.test.ts` (which makes the RPH-E2E manifest status answerable to the generated ledger
 		// rather than to a cited filename).
-		expect(counts.get('verif/tsconfig.json')).toBe(59);
+		// ⚠ 59 -> 61, AND THE TWO STEPS HAVE DIFFERENT STORIES — recording both because only one is routine.
+		// +1 `verif/slice-subsumption.test.ts` (JAN-SLICE-SWP-04, the SL-L4 gate). **THIS PIN WAS STALE FROM
+		// THAT COMMIT AND SHIPPED RED.** SWP-04 ran verif, check-types and lint and did NOT run this file, so
+		// the population moved 59 -> 60 with the pin left at 59. It is the SECOND time this programme has
+		// broken CSAA by running only scoped suites — the first cost two work packages before it was noticed —
+		// and it is recorded here rather than quietly folded into the new number, because a pin that is
+		// corrected silently teaches nothing and this is the repository's own standing instruction about CSAA:
+		// fix only what we break, and say that we broke it.
+		// +1 `verif/product-behavior-plane.test.ts` (JAN-SLICE-SWP-05), which gates the promoted W7 plane —
+		// the routine half.
+		expect(counts.get('verif/tsconfig.json')).toBe(61);
 		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
 		for (const path of [
 			'package.json',

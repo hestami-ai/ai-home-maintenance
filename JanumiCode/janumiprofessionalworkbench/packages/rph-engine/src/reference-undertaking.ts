@@ -1303,6 +1303,262 @@ export function driveReferenceUndertaking(
 	const intentDefAssessments = driveToSatisfied(R.intentDef);
 	baseline(R.intentDef, 'INTENT', 'Intent Baseline', [...intentDefAssessments]);
 
+	// ── THE W7 PRODUCT-BEHAVIOR PLANE, PRODUCED (JAN-SLICE-SWP-05, REG-D-046 Ruling 2) ──────────────────────
+	//
+	// The Behavior PWU's ratified `outputArtifactTypes` are `ACTOR_CATALOG, CAPABILITY_MAP, USER_JOURNEY,
+	// SCENARIO, REQUIREMENT, …` — so these objects are what this unit PRODUCES, and they are minted here
+	// before it is satisfied rather than after.
+	//
+	// ⚠ WHY A PRODUCER AT ALL, AND NOT JUST THE SHAPE. `SWP-02a` recorded the reason in one line: shape alone
+	// is the hollow governed layer. The repository ENFORCED it here rather than leaving it to judgement — with
+	// the five commands registered and nothing dispatching them, `command-dispatch-census` and
+	// `event-surface-census` both reddened, naming all five. A plane no drive populates is a gate that looked
+	// at nothing.
+	//
+	// ⚠⚠ THE RULE FOR EVERY VALUE BELOW, STATED ONCE AND APPLIED WITHOUT EXCEPTION: **QUOTE THE FIXTURE WHERE
+	// IT SPEAKS, LEAVE EMPTY WHERE IT IS SILENT, AND NEVER INVENT.** `SL-7` forbids fabrication, and a
+	// plausible-looking value the corpus never stated is the most expensive kind — it reads as evidence.
+	// Where a value is DERIVED rather than quoted (by matching the fixture's own step wording), it is marked
+	// DERIVED at its site. Empty strings and empty arrays below are therefore ASSERTIONS ABOUT THE FIXTURE:
+	// they say it states nothing there, which is true and checkable.
+	//
+	// ⚠ AND THAT EMPTINESS IS ITSELF A FINDING (REG-F-303). The fixture's eight "Representative requirements"
+	// at §11.5 supply ONE of §13's ELEVEN required properties — the statement — and nothing else: no
+	// rationale, priority, applicability, verification method, conflict status or lifecycle. That is a true
+	// fact about the corpus's own worked example, recorded rather than papered over by inventing the other ten.
+	const actorIds: Record<string, string> = {};
+	for (const [name, actorType] of [
+		// Reference §11.2 "Initial actors", verbatim and in its order. The split across the ratified
+		// `ActorType` enum is the only judgement here and it is forced: §5.4 says "a human or system
+		// participant", and the last three are named as external systems by the fixture itself.
+		['Business Owner', 'HUMAN'],
+		['Office Administrator', 'HUMAN'],
+		['Dispatcher', 'HUMAN'],
+		['Field Technician', 'HUMAN'],
+		['Customer', 'HUMAN'],
+		['External Payment Provider', 'EXTERNAL_SYSTEM'],
+		['External Accounting System', 'EXTERNAL_SYSTEM'],
+		['Notification Provider', 'EXTERNAL_SYSTEM']
+	] as const) {
+		const actorId = mintId('actor');
+		actorIds[name] = actorId;
+		send('DefineActor', 'ACTOR', actorId, { actorId, name, actorType });
+	}
+
+	const capabilityIds: Record<string, string> = {};
+	for (const statement of [
+		// Reference §11.3 "Initial capabilities", verbatim and in its order.
+		'Tenant administration',
+		'User and role management',
+		'Customer management',
+		'Service-location management',
+		'Work-request intake',
+		'Estimate creation',
+		'Scheduling and dispatch',
+		'Technician assignment',
+		'Job-state management',
+		'Field notes and evidence',
+		'Invoice generation',
+		'Payment-status recording',
+		'Customer communication',
+		'Operational reporting',
+		'Audit history'
+	]) {
+		const capabilityId = mintId('cap');
+		capabilityIds[statement] = capabilityId;
+		send('DefineCapability', 'CAPABILITY', capabilityId, {
+			capabilityId,
+			statement,
+			// EMPTY, AND THE EMPTINESS IS THE POINT: §6's edge is `Capability REFINED_BY Requirement`, and at
+			// the moment a capability is catalogued no requirement has refined it yet. The requirements minted
+			// below carry their own `sourceObjectIds` edge, which is a DIFFERENT edge, not this one inverted.
+			refinedByRequirementIds: []
+		});
+	}
+
+	const journeyId = mintId('jrny');
+	send('DefineUserJourney', 'USER_JOURNEY', journeyId, {
+		journeyId,
+		journeyIdentity: 'Request to Completed Job', // QUOTED — Reference §11.4 heading
+		// DERIVED from the heading and the final step; the fixture states no outcome sentence of its own.
+		originatingOutcome: 'A work request becomes a completed job with recorded payment status.',
+		// DERIVED — §11.4 step 1 reads "Customer or office staff creates work request"; the fixture does not
+		// mark either as primary, and Customer is the one it names first.
+		primaryActorId: actorIds['Customer']!,
+		// DERIVED from the steps that name them: "Office reviews request", "Technician is assigned",
+		// "Technician performs work".
+		supportingActorIds: [
+			actorIds['Office Administrator']!,
+			actorIds['Dispatcher']!,
+			actorIds['Field Technician']!
+		],
+		trigger: 'Customer or office staff creates work request', // QUOTED — step 1
+		preconditions: [], // The fixture states none.
+		steps: [
+			// QUOTED — Reference §11.4, all eleven, in order.
+			'Customer or office staff creates work request',
+			'Office reviews request',
+			'Estimate is prepared',
+			'Customer approves estimate',
+			'Job is scheduled',
+			'Technician is assigned',
+			'Technician performs work',
+			'Technician records completion',
+			'Office reviews completion',
+			'Invoice is issued',
+			'Payment status is recorded'
+		],
+		// The fixture labels no step a decision. Calling the two approval steps "decisions" would be a
+		// modelling judgement it did not make.
+		decisions: [],
+		// The fixture lists "Exceptional paths" and nothing under an alternate heading.
+		alternatePaths: [],
+		exceptionalPaths: [
+			// QUOTED — Reference §11.4 "Exceptional paths", all nine, in order.
+			'Estimate rejected.',
+			'Customer requests revision.',
+			'Technician unavailable.',
+			'Job rescheduled.',
+			'Work requires follow-up visit.',
+			'Technician cannot complete work.',
+			'Customer cancels.',
+			'Network unavailable during field update.',
+			'Invoice disputed.'
+		],
+		completionCondition: 'Payment status is recorded', // QUOTED — the final step
+		// The fixture states no failure condition. "Technician cannot complete work" is one of nine
+		// exceptional paths, and promoting one of them to THE failure condition is a judgement it did not make.
+		failureCondition: '',
+		// DOMAIN ENTITY is not promoted by this work package, so there is no plane for these to reference.
+		affectedEntityIds: [],
+		// DERIVED, and each by a direct name match between a step and a §11.3 capability — this is the edge
+		// §6 calls `User Journey REALIZES Capability`. The other seven capabilities are catalogued but not
+		// exercised by THIS journey, which is why the list is 8 and not 15.
+		requiredCapabilityIds: [
+			capabilityIds['Work-request intake']!, // "creates work request"
+			capabilityIds['Estimate creation']!, // "Estimate is prepared"
+			capabilityIds['Scheduling and dispatch']!, // "Job is scheduled"
+			capabilityIds['Technician assignment']!, // "Technician is assigned"
+			capabilityIds['Field notes and evidence']!, // "Technician performs work"
+			capabilityIds['Job-state management']!, // "Technician records completion"
+			capabilityIds['Invoice generation']!, // "Invoice is issued"
+			capabilityIds['Payment-status recording']! // "Payment status is recorded"
+		],
+		evidenceOfSuccess: '' // The fixture states none.
+	});
+
+	// ⚠ TWO SCENARIOS, NOT NINE, AND THE SHORTFALL IS DELIBERATE. The fixture lists nine exceptional paths;
+	// assigning each to one of §12's ratified eight classes is a MODELLING JUDGEMENT THE FIXTURE DID NOT MAKE
+	// — "Network unavailable during field update" sits equally well under `SYSTEM_FAILURE_PATH` and
+	// `DATA_UNAVAILABLE_PATH`, and picking one would be my inference presented as the corpus's. Only two map
+	// on the fixture's own words: the step sequence IS the normal path, and "Customer cancels." IS the
+	// cancellation path. The remaining seven stay on the journey's `exceptionalPaths` field, which is exactly
+	// where §12 puts them — represented, not promoted, and not silently dropped.
+	const normalScenarioId = mintId('scen');
+	send('DefineScenario', 'SCENARIO', normalScenarioId, {
+		scenarioId: normalScenarioId,
+		statement: 'Request to Completed Job proceeds through its eleven steps to recorded payment.',
+		journeyId,
+		scenarioClass: 'NORMAL_PATH'
+	});
+	const cancelScenarioId = mintId('scen');
+	send('DefineScenario', 'SCENARIO', cancelScenarioId, {
+		scenarioId: cancelScenarioId,
+		statement: 'Customer cancels.', // QUOTED — Reference §11.4 exceptional paths
+		journeyId,
+		scenarioClass: 'CANCELLATION_PATH'
+	});
+
+	// Reference §11.5 "Representative requirements". Statements are QUOTED verbatim; the type of each is read
+	// from the fixture's own id prefix (FUNC / SEC / QUAL), which is the only classification it supplies.
+	const requirementIds: string[] = [];
+	for (const [statement, requirementType] of [
+		[
+			'The system shall allow an authorized tenant user to create and maintain customers and service locations.',
+			'FUNCTIONAL'
+		],
+		[
+			'The system shall allow an authorized user to create a work request associated with a customer and service location.',
+			'FUNCTIONAL'
+		],
+		['The system shall support conversion of an approved estimate into a schedulable job.', 'FUNCTIONAL'],
+		[
+			'The system shall allow an authorized dispatcher to assign a technician and scheduled time window to a job.',
+			'FUNCTIONAL'
+		],
+		[
+			'The system shall allow a technician to view assigned jobs and record permitted job-state transitions.',
+			'FUNCTIONAL'
+		],
+		[
+			'A tenant user shall not access another tenant’s customers, locations, jobs, estimates, invoices, or communications.',
+			'SECURITY'
+		],
+		[
+			'The core product model shall support trade-specific extensions without requiring modification of universal customer, location, job, and assignment identities.',
+			'QUALITY'
+		]
+	] as const) {
+		const requirementId = mintId('req');
+		requirementIds.push(requirementId);
+		send('DefineRequirement', 'REQUIREMENT', requirementId, {
+			requirementId,
+			statement,
+			requirementType,
+			// §13 required property 4 — "source intent or journey". The journey is what these requirements
+			// were converted from, per the REQUIREMENT_DEFINITION PWU's declared inputs ("user journeys").
+			sourceObjectIds: [journeyId],
+			authority: {
+				authorityId: 'auth_product_modeler',
+				authorityType: 'ORGANIZATIONAL_ROLE',
+				scope: ['REQUIREMENTS'],
+				validFrom: '2026-07-12T00:00:00Z'
+			},
+			// The remaining seven §13 properties are EMPTY BECAUSE THE FIXTURE SUPPLIES THEM FOR NO
+			// REQUIREMENT. See REG-F-303: §11.5 gives one of eleven required properties. Filling these with
+			// plausible values is the fabrication SL-7 forbids, and it would make the fixture look complete.
+			rationale: '',
+			priority: '',
+			applicability: '',
+			verificationMethod: '',
+			affectedArtifactIds: [],
+			dependencyIds: [],
+			conflictStatus: '',
+			lifecycle: ''
+		});
+	}
+
+	// ⚠ THE EIGHTH REQUIREMENT IS NOT MINTED, AND IT IS DEFERRED RATHER THAN DROPPED. `FSM-AUD-001` — "The
+	// system shall retain an auditable record of material job-state changes." — carries the prefix `AUD`, and
+	// AUDIT IS NOT ONE OF §13's RATIFIED FOURTEEN TYPES. It sits between `COMPLIANCE` and `OBSERVABILITY`,
+	// the corpus types it nowhere (`grep FSM-AUD` over the whole RPH corpus returns exactly one hit, its own
+	// heading), and choosing one would be inventing a classification and then citing the fixture for it.
+	//
+	// So the scope leaves this unit's work as a GOVERNED FACT rather than a comment: `ASR-9` limb 10 requires
+	// deferred scope to stay REPRESENTED, "never silently deleted", and `SWP-02a` built exactly the object for
+	// it. This is the deferral plane's second real subject, which is also what stops that plane being a
+	// population of one.
+	const auditDeferralId = mintId('dfr');
+	send('DeferScope', 'DEFERRAL', auditDeferralId, {
+		deferralId: auditDeferralId,
+		statement:
+			'Reference §11.5 requirement FSM-AUD-001 ("The system shall retain an auditable record of material job-state changes.") is not promoted to a REQUIREMENT object: the ontology §13 requirement-type list has no AUDIT member and the corpus assigns it none.',
+		subjectObjectIds: [R.behavior],
+		// The journey carries it: FSM-AUD-001 is a requirement OF the modelled behavior, and the journey is
+		// the object that represents that behavior until the requirement itself can be typed.
+		carrierObjectIds: [journeyId],
+		revisitCondition:
+			'Reconsidered when the ontology assigns a requirement type covering audit obligations, or the sponsor rules which of COMPLIANCE and OBSERVABILITY governs an auditable-record requirement.',
+		rationale:
+			'Typing it would require choosing between two ratified members on no stated authority, and SL-7 forbids presenting that choice as the corpus’s.',
+		authority: {
+			authorityId: 'auth_product_modeler',
+			authorityType: 'ORGANIZATIONAL_ROLE',
+			scope: ['REQUIREMENTS'],
+			validFrom: '2026-07-12T00:00:00Z'
+		}
+	});
+
 	driveToSatisfied(R.behavior);
 
 	// The material assumption that produced the offline residual. Ratified Reference Undertaking §28 Test 2

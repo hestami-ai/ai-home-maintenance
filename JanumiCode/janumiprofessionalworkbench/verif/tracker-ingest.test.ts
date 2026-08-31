@@ -260,7 +260,12 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// `ScopeDeferred` does not move this number for the same reason the S-1b note above gives — EVENTS is not
 		// one of the four w2 populations. The arithmetic here is the one place that distinction is visible, so a
 		// move of +2 would have meant something else had changed.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 270 }]);
+		// 270 -> 275: the five W7 product-behavior commands (JAN-SLICE-SWP-05 / REG-D-046 Ruling 2).
+		// +5 for FIVE COMMANDS, and their five events do not move this number for exactly the reason the two
+		// notes above give — EVENTS is not one of the four w2 populations. This is the third time that
+		// distinction has been load-bearing here: a move of +10 would have meant the events had started
+		// counting, and a move of +6 would have meant something else changed that nobody had noticed.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 275 }]);
 	});
 });
 

@@ -2,6 +2,7 @@
 // Source: vocab/m3-commands-events.json (grounded from DOC-007 + DOC-002, reconciled). See gen/gen-messages.ts.
 import { z } from 'zod';
 import {
+	ActorTypeSchema,
 	AssumptionStatusSchema,
 	AssuranceDispositionRecommendationSchema,
 	AssuranceDispositionSchema,
@@ -37,6 +38,8 @@ import {
 	ProfessionalWorkObjectTypeSchema,
 	PruneCauseSchema,
 	RecompositionContractStatusSchema,
+	RequirementTypeSchema,
+	ScenarioClassSchema,
 	ShapeIntegrityStateSchema,
 	StepStateSchema,
 	ValidatorCostClassSchema,
@@ -807,6 +810,60 @@ export const DeferScopePayloadSchema = z.strictObject({
 	authority: AuthorityReferenceSchema
 });
 export type DeferScopePayload = z.infer<typeof DeferScopePayloadSchema>;
+export const DefineActorPayloadSchema = z.strictObject({
+	actorId: z.string(),
+	name: z.string(),
+	actorType: ActorTypeSchema
+});
+export type DefineActorPayload = z.infer<typeof DefineActorPayloadSchema>;
+export const DefineCapabilityPayloadSchema = z.strictObject({
+	capabilityId: z.string(),
+	statement: z.string(),
+	refinedByRequirementIds: z.array(z.string())
+});
+export type DefineCapabilityPayload = z.infer<typeof DefineCapabilityPayloadSchema>;
+export const DefineUserJourneyPayloadSchema = z.strictObject({
+	journeyId: z.string(),
+	journeyIdentity: z.string(),
+	originatingOutcome: z.string(),
+	primaryActorId: z.string(),
+	supportingActorIds: z.array(z.string()),
+	trigger: z.string(),
+	preconditions: z.array(z.string()),
+	steps: z.array(z.string()),
+	decisions: z.array(z.string()),
+	alternatePaths: z.array(z.string()),
+	exceptionalPaths: z.array(z.string()),
+	completionCondition: z.string(),
+	failureCondition: z.string(),
+	affectedEntityIds: z.array(z.string()),
+	requiredCapabilityIds: z.array(z.string()),
+	evidenceOfSuccess: z.string()
+});
+export type DefineUserJourneyPayload = z.infer<typeof DefineUserJourneyPayloadSchema>;
+export const DefineScenarioPayloadSchema = z.strictObject({
+	scenarioId: z.string(),
+	statement: z.string(),
+	journeyId: z.string(),
+	scenarioClass: ScenarioClassSchema
+});
+export type DefineScenarioPayload = z.infer<typeof DefineScenarioPayloadSchema>;
+export const DefineRequirementPayloadSchema = z.strictObject({
+	requirementId: z.string(),
+	statement: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema,
+	sourceObjectIds: z.array(z.string()),
+	priority: z.string(),
+	applicability: z.string(),
+	verificationMethod: z.string(),
+	affectedArtifactIds: z.array(z.string()),
+	dependencyIds: z.array(z.string()),
+	conflictStatus: z.string(),
+	lifecycle: z.string(),
+	requirementType: RequirementTypeSchema
+});
+export type DefineRequirementPayload = z.infer<typeof DefineRequirementPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1873,6 +1930,60 @@ export const ScopeDeferredPayloadSchema = z.strictObject({
 	authority: AuthorityReferenceSchema
 });
 export type ScopeDeferredPayload = z.infer<typeof ScopeDeferredPayloadSchema>;
+export const ActorDefinedPayloadSchema = z.strictObject({
+	actorId: z.string(),
+	name: z.string(),
+	actorType: ActorTypeSchema
+});
+export type ActorDefinedPayload = z.infer<typeof ActorDefinedPayloadSchema>;
+export const CapabilityDefinedPayloadSchema = z.strictObject({
+	capabilityId: z.string(),
+	statement: z.string(),
+	refinedByRequirementIds: z.array(z.string())
+});
+export type CapabilityDefinedPayload = z.infer<typeof CapabilityDefinedPayloadSchema>;
+export const UserJourneyDefinedPayloadSchema = z.strictObject({
+	journeyId: z.string(),
+	journeyIdentity: z.string(),
+	originatingOutcome: z.string(),
+	primaryActorId: z.string(),
+	supportingActorIds: z.array(z.string()),
+	trigger: z.string(),
+	preconditions: z.array(z.string()),
+	steps: z.array(z.string()),
+	decisions: z.array(z.string()),
+	alternatePaths: z.array(z.string()),
+	exceptionalPaths: z.array(z.string()),
+	completionCondition: z.string(),
+	failureCondition: z.string(),
+	affectedEntityIds: z.array(z.string()),
+	requiredCapabilityIds: z.array(z.string()),
+	evidenceOfSuccess: z.string()
+});
+export type UserJourneyDefinedPayload = z.infer<typeof UserJourneyDefinedPayloadSchema>;
+export const ScenarioDefinedPayloadSchema = z.strictObject({
+	scenarioId: z.string(),
+	statement: z.string(),
+	journeyId: z.string(),
+	scenarioClass: ScenarioClassSchema
+});
+export type ScenarioDefinedPayload = z.infer<typeof ScenarioDefinedPayloadSchema>;
+export const RequirementDefinedPayloadSchema = z.strictObject({
+	requirementId: z.string(),
+	statement: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema,
+	sourceObjectIds: z.array(z.string()),
+	priority: z.string(),
+	applicability: z.string(),
+	verificationMethod: z.string(),
+	affectedArtifactIds: z.array(z.string()),
+	dependencyIds: z.array(z.string()),
+	conflictStatus: z.string(),
+	lifecycle: z.string(),
+	requirementType: RequirementTypeSchema
+});
+export type RequirementDefinedPayload = z.infer<typeof RequirementDefinedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2532,6 +2643,36 @@ export const COMMANDS = {
 		targetAggregateType: 'DEFERRAL',
 		emitsEvent: 'ScopeDeferred',
 		firstSlice: false
+	},
+	DefineActor: {
+		payload: DefineActorPayloadSchema,
+		targetAggregateType: 'ACTOR',
+		emitsEvent: 'ActorDefined',
+		firstSlice: false
+	},
+	DefineCapability: {
+		payload: DefineCapabilityPayloadSchema,
+		targetAggregateType: 'CAPABILITY',
+		emitsEvent: 'CapabilityDefined',
+		firstSlice: false
+	},
+	DefineUserJourney: {
+		payload: DefineUserJourneyPayloadSchema,
+		targetAggregateType: 'USER_JOURNEY',
+		emitsEvent: 'UserJourneyDefined',
+		firstSlice: false
+	},
+	DefineScenario: {
+		payload: DefineScenarioPayloadSchema,
+		targetAggregateType: 'SCENARIO',
+		emitsEvent: 'ScenarioDefined',
+		firstSlice: false
+	},
+	DefineRequirement: {
+		payload: DefineRequirementPayloadSchema,
+		targetAggregateType: 'REQUIREMENT',
+		emitsEvent: 'RequirementDefined',
+		firstSlice: false
 	}
 } as const;
 
@@ -2899,7 +3040,12 @@ export const EVENTS = {
 		payload: ValidatorEnabledPayloadSchema,
 		aggregateType: 'VALIDATOR_REGISTRY_ENTRY'
 	},
-	ScopeDeferred: { payload: ScopeDeferredPayloadSchema, aggregateType: 'Deferral' }
+	ScopeDeferred: { payload: ScopeDeferredPayloadSchema, aggregateType: 'Deferral' },
+	ActorDefined: { payload: ActorDefinedPayloadSchema, aggregateType: 'Actor' },
+	CapabilityDefined: { payload: CapabilityDefinedPayloadSchema, aggregateType: 'Capability' },
+	UserJourneyDefined: { payload: UserJourneyDefinedPayloadSchema, aggregateType: 'UserJourney' },
+	ScenarioDefined: { payload: ScenarioDefinedPayloadSchema, aggregateType: 'Scenario' },
+	RequirementDefined: { payload: RequirementDefinedPayloadSchema, aggregateType: 'Requirement' }
 } as const;
 
 /** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not

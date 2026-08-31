@@ -619,7 +619,12 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'AUTHORING_CONVERSATION',
 	'RECURSIVE_PROFESSIONAL_HARNESS',
 	'VALIDATOR_REGISTRY_ENTRY',
-	'DEFERRAL'
+	'DEFERRAL',
+	'ACTOR',
+	'CAPABILITY',
+	'USER_JOURNEY',
+	'SCENARIO',
+	'REQUIREMENT'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 
@@ -647,6 +652,25 @@ export const RequiredForDispositionsSchema = z.enum([
 	'CONDITIONAL_OR_SATISFIED'
 ]);
 export type RequiredForDispositions = z.infer<typeof RequiredForDispositionsSchema>;
+
+/** RequirementObject.requirementType — Product Realization PWA Professional Ontology and Assurance Policy Specification §13 "Requirement types" (14 values, in the order the section lists them) */
+export const RequirementTypeSchema = z.enum([
+	'FUNCTIONAL',
+	'QUALITY',
+	'SECURITY',
+	'PRIVACY',
+	'DATA',
+	'INTERFACE',
+	'PERFORMANCE',
+	'OPERATIONAL',
+	'DEPLOYMENT',
+	'MIGRATION',
+	'OBSERVABILITY',
+	'COMPLIANCE',
+	'MAINTAINABILITY',
+	'USABILITY'
+]);
+export type RequirementType = z.infer<typeof RequirementTypeSchema>;
 
 /** WorkRiskProfile.consequence — RPH-DOC-002 §9.2 */
 export const RiskConsequenceSchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
@@ -696,6 +720,19 @@ export const RphErrorCategorySchema = z.enum([
 	'SCHEMA_COMPATIBILITY'
 ]);
 export type RphErrorCategory = z.infer<typeof RphErrorCategorySchema>;
+
+/** ScenarioObject.scenarioClass — Product Realization PWA Professional Ontology and Assurance Policy Specification §12 "Minimum scenario classes" (the ratified eight) */
+export const ScenarioClassSchema = z.enum([
+	'NORMAL_PATH',
+	'ALTERNATE_VALID_PATH',
+	'USER_ERROR_PATH',
+	'SYSTEM_FAILURE_PATH',
+	'PERMISSION_DENIED_PATH',
+	'INTERRUPTED_OR_RESUMED_PATH',
+	'DATA_UNAVAILABLE_PATH',
+	'CANCELLATION_PATH'
+]);
+export type ScenarioClass = z.infer<typeof ScenarioClassSchema>;
 
 /** SemanticViolation.severity — RPH-DOC-007 §37 */
 export const SemanticViolationSeveritySchema = z.enum(['ERROR', 'WARNING']);
@@ -883,6 +920,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	PruneCause: PruneCauseSchema,
 	RecompositionContractStatus: RecompositionContractStatusSchema,
 	RequiredForDispositions: RequiredForDispositionsSchema,
+	RequirementType: RequirementTypeSchema,
 	'WorkRiskProfile.consequence': RiskConsequenceSchema,
 	RiskDimension: RiskDimensionSchema,
 	'WorkRiskProfile.irreversibility': RiskIrreversibilitySchema,
@@ -891,6 +929,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	'WorkRiskProfile.securitySensitivity': RiskSecuritySensitivitySchema,
 	'WorkRiskProfile.uncertainty': RiskUncertaintySchema,
 	RphErrorCategory: RphErrorCategorySchema,
+	ScenarioClass: ScenarioClassSchema,
 	SemanticViolationSeverity: SemanticViolationSeveritySchema,
 	ShapeIntegrityState: ShapeIntegrityStateSchema,
 	StepState: StepStateSchema,

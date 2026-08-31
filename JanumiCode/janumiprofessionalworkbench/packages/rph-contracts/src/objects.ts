@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { objectEnvelopeShape, ActorReferenceSchema } from './envelopes.js';
 import {
+	ActorTypeSchema,
 	AssumptionStatusSchema,
 	AssuranceAssessmentStateSchema,
 	AssuranceDispositionRecommendationSchema,
@@ -47,11 +48,13 @@ import {
 	ProfessionalWorkObjectTypeSchema,
 	RecompositionContractStatusSchema,
 	RequiredForDispositionsSchema,
+	RequirementTypeSchema,
 	RiskConsequenceSchema,
 	RiskIrreversibilitySchema,
 	RiskRegulatoryExposureSchema,
 	RiskSecuritySensitivitySchema,
 	RiskUncertaintySchema,
+	ScenarioClassSchema,
 	ShapeIntegrityStateSchema,
 	StepStateSchema,
 	StepTypeSchema,
@@ -811,6 +814,70 @@ export const DeferralObjectSchema = z.strictObject({
 });
 export type DeferralObject = z.infer<typeof DeferralObjectSchema>;
 
+/** ACTOR — id prefix: ACTOR */
+export const ActorObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	name: z.string(),
+	actorType: ActorTypeSchema
+});
+export type ActorObject = z.infer<typeof ActorObjectSchema>;
+
+/** CAPABILITY — id prefix: CAPABILITY */
+export const CapabilityObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	statement: z.string(),
+	refinedByRequirementIds: z.array(z.string())
+});
+export type CapabilityObject = z.infer<typeof CapabilityObjectSchema>;
+
+/** USER_JOURNEY — id prefix: USER_JOURNEY */
+export const UserJourneyObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	journeyIdentity: z.string(),
+	originatingOutcome: z.string(),
+	primaryActorId: z.string(),
+	supportingActorIds: z.array(z.string()),
+	trigger: z.string(),
+	preconditions: z.array(z.string()),
+	steps: z.array(z.string()),
+	decisions: z.array(z.string()),
+	alternatePaths: z.array(z.string()),
+	exceptionalPaths: z.array(z.string()),
+	completionCondition: z.string(),
+	failureCondition: z.string(),
+	affectedEntityIds: z.array(z.string()),
+	requiredCapabilityIds: z.array(z.string()),
+	evidenceOfSuccess: z.string()
+});
+export type UserJourneyObject = z.infer<typeof UserJourneyObjectSchema>;
+
+/** SCENARIO — id prefix: SCENARIO */
+export const ScenarioObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	statement: z.string(),
+	journeyId: z.string(),
+	scenarioClass: ScenarioClassSchema
+});
+export type ScenarioObject = z.infer<typeof ScenarioObjectSchema>;
+
+/** REQUIREMENT — id prefix: REQUIREMENT */
+export const RequirementObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	statement: z.string(),
+	rationale: z.string(),
+	authority: AuthorityReferenceSchema,
+	sourceObjectIds: z.array(z.string()),
+	priority: z.string(),
+	applicability: z.string(),
+	verificationMethod: z.string(),
+	affectedArtifactIds: z.array(z.string()),
+	dependencyIds: z.array(z.string()),
+	conflictStatus: z.string(),
+	lifecycle: z.string(),
+	requirementType: RequirementTypeSchema
+});
+export type RequirementObject = z.infer<typeof RequirementObjectSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -896,5 +963,22 @@ export const OBJECT_SCHEMAS = {
 		idPrefixEntity: 'VALIDATOR_REGISTRY_ENTRY',
 		tsName: 'ValidatorRegistryEntry'
 	},
-	DEFERRAL: { schema: DeferralObjectSchema, idPrefixEntity: 'DEFERRAL', tsName: 'DeferralObject' }
+	DEFERRAL: { schema: DeferralObjectSchema, idPrefixEntity: 'DEFERRAL', tsName: 'DeferralObject' },
+	ACTOR: { schema: ActorObjectSchema, idPrefixEntity: 'ACTOR', tsName: 'ActorObject' },
+	CAPABILITY: {
+		schema: CapabilityObjectSchema,
+		idPrefixEntity: 'CAPABILITY',
+		tsName: 'CapabilityObject'
+	},
+	USER_JOURNEY: {
+		schema: UserJourneyObjectSchema,
+		idPrefixEntity: 'USER_JOURNEY',
+		tsName: 'UserJourneyObject'
+	},
+	SCENARIO: { schema: ScenarioObjectSchema, idPrefixEntity: 'SCENARIO', tsName: 'ScenarioObject' },
+	REQUIREMENT: {
+		schema: RequirementObjectSchema,
+		idPrefixEntity: 'REQUIREMENT',
+		tsName: 'RequirementObject'
+	}
 } as const;

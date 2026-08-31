@@ -241,82 +241,20 @@
     "statement": {
       "type": "string"
     },
-    "basis": {
+    "journeyId": {
       "type": "string"
     },
-    "introducedBy": {
-      "type": "object",
-      "properties": {
-        "actorId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorType": {
-          "type": "string",
-          "enum": [
-            "HUMAN",
-            "AGENT",
-            "MODEL",
-            "SERVICE",
-            "POLICY_ENGINE",
-            "EXTERNAL_SYSTEM"
-          ]
-        },
-        "displayName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "roleId": {
-          "type": "string"
-        },
-        "modelId": {
-          "type": "string"
-        },
-        "providerId": {
-          "type": "string"
-        },
-        "executionInstanceId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "actorId",
-        "actorType",
-        "displayName"
-      ],
-      "additionalProperties": false
-    },
-    "affectedObjectIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "materiality": {
+    "scenarioClass": {
       "type": "string",
       "enum": [
-        "IMMATERIAL",
-        "MATERIAL",
-        "CRITICAL"
-      ]
-    },
-    "verificationMethod": {
-      "type": "string"
-    },
-    "expirationCondition": {
-      "type": "string"
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "PROPOSED",
-        "DISCLOSED",
-        "UNDER_VERIFICATION",
-        "ACCEPTED",
-        "VERIFIED",
-        "FALSIFIED",
-        "EXPIRED",
-        "SUPERSEDED"
+        "NORMAL_PATH",
+        "ALTERNATE_VALID_PATH",
+        "USER_ERROR_PATH",
+        "SYSTEM_FAILURE_PATH",
+        "PERMISSION_DENIED_PATH",
+        "INTERRUPTED_OR_RESUMED_PATH",
+        "DATA_UNAVAILABLE_PATH",
+        "CANCELLATION_PATH"
       ]
     }
   },
@@ -335,11 +273,9 @@
     "tags",
     "extensions",
     "statement",
-    "introducedBy",
-    "affectedObjectIds",
-    "materiality",
-    "status"
+    "journeyId",
+    "scenarioClass"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:AssumptionObject:1"
+  "$id": "urn:janumi:rph:schema:object:ScenarioObject:1"
 }

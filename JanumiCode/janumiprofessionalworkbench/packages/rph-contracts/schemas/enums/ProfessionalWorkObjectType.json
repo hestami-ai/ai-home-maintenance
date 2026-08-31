@@ -25,7 +25,12 @@
     "AUTHORING_CONVERSATION",
     "RECURSIVE_PROFESSIONAL_HARNESS",
     "VALIDATOR_REGISTRY_ENTRY",
-    "DEFERRAL"
+    "DEFERRAL",
+    "ACTOR",
+    "CAPABILITY",
+    "USER_JOURNEY",
+    "SCENARIO",
+    "REQUIREMENT"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }
