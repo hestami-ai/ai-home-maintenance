@@ -7416,9 +7416,9 @@ and a reader that deliberately skips the result.
   baseline's record must not be read as carrying an acceptance of residual risk — the engine cannot
   record one, and the promotion gate skips the only state that expresses it.
 
-### REG-F-215 — assessment disagreement is arbitrated by recency at a read model AND at an engine gate
+### REG-F-215 — assessment disagreement is arbitrated by ~~recency~~ **REQUEST ORDER** at a read model AND at an engine gate
 
-**Date:** 2026-08-22 · **Type:** DIVERGENCE FINDING · **Class:** CODE_DIVERGES · **Status:** OPEN
+**Date:** 2026-08-22 · **Type:** DIVERGENCE FINDING · **Class:** CODE_DIVERGES · **Status:** **OPEN — PARTIALLY DISCHARGED by `REG-F-299` (2026-08-31), which corrects limb (1)'s CHARACTERIZATION only: the §38 arbitration is last-REQUESTED-wins, not last-completed-wins, driven twice. The FINDING itself stands OPEN and untouched — N assessments are still silently reduced to one with no marker that a choice was made, and the survivor is now known to be chosen by an ordering no professional can observe, which is worse than what this entry originally reported.** ~~OPEN~~
 
 - **THE LIMB IS A CONJUNCTION OF THREE AND THE SYSTEM HOLDS EXACTLY ONE.** Canon requires that
   disagreement be *visible*, *unarbitrated*, and *resolved into one of three named aggregate outcomes*.
@@ -7439,7 +7439,14 @@ and a reader that deliberately skips the result.
   not confined to a projection.** `buildApplicablePolicies`
   (`packages/rph-projections/src/assurance-view.ts:467`) collects every assessment covering a policy at
   `:480-482`, filters the concluded ones at `:484`, and then reduces N to one at **`:485`**:
-  `const chosen = completed.at(-1) ?? covering.at(-1);`. Last-completed-wins; the losing assessment is
+  `const chosen = completed.at(-1) ?? covering.at(-1);`. ~~Last-completed-wins~~ **CORRECTED 2026-08-31
+  (REG-F-299): LAST-*REQUESTED*-WINS.** `withAssessment` upserts as `{...view.assessments, [id]: a}`, and
+  re-assigning an EXISTING string key keeps its FIRST-insertion position — set by
+  `AssuranceAssessmentRequested`, never by the completion. So `.at(-1)` over `Object.values` selects the
+  last-REQUESTED concluded assessment. DRIVEN: request A then B, complete B=REJECTED then A=SATISFIED —
+  completion order came back [B, A] and the chosen row came back B/REJECTED. Under last-completed-wins it
+  would have read A/SATISFIED. The original wording was inferred from `.at(-1)` and never driven; the
+  losing assessment is
   dropped from the fold with **no marker that a choice was made** — the returned row carries
   `disposition` and `assessmentId` for the winner and nothing at all for the loser (`:487-496`). The
   same reduction runs on the **engine** path: `latestFloorDispositions`
@@ -27680,3 +27687,45 @@ GAVE FOR ITS OWN ASSERTION
   `packages/rph-engine/src/__tests__/slice-journey.ts`, and the regenerated ledger products. **Owed:**
   `RPH-E2E-003..007` and the scenario-class gap remain open in `SWP-03`; the `RPH-E2E` manifest entry stays
   `DEFERRED` until all seven assert, and `DEFERRABLE_PREFIXES` stays empty. Status: CLOSED.
+
+---
+
+### REG-F-299 — the §38 assurance arbitration is LAST-*REQUESTED*-WINS, not last-completed-wins: `REG-F-215`
+described it from the shape of `.at(-1)` and nobody drove it
+
+- **Date:** 2026-08-31 · **Type:** CORRECTION (a prior entry's characterization was wrong) · **Class:** FINDING —
+  corrects `REG-F-215` limb (1) · **Status:** ✅ CLOSED — driven twice, independently, and struck in place.
+
+- **WHAT `REG-F-215` SAID, AND WHAT IS ACTUALLY TRUE.** That entry described
+  `buildApplicablePolicies`'s reduction of N covering assessments to one — `const chosen = completed.at(-1) ??
+  covering.at(-1);` — as ***"Last-completed-wins"***. It is not. `withAssessment` upserts as
+  `{ ...view.assessments, [id]: assessment }`, and **re-assigning an EXISTING string key preserves its
+  FIRST-insertion position**. That position is set by `AssuranceAssessmentRequested` and never by the completion,
+  so `.at(-1)` over `Object.values` selects the **last-REQUESTED** concluded assessment.
+
+- **DRIVEN, TWICE, BY TWO PARTIES WHO DID NOT SHARE A PROBE.** Request A, then B; complete **B = REJECTED first**,
+  then **A = SATISFIED**. Completion-event order came back `[B, A]`; the §38 row came back **`B` / `REJECTED`**.
+  Under last-completed-wins the row would have read `A` / `SATISFIED`. An adversarial reviewer found it while
+  checking a Slice; the coordinator reproduced it from a clean probe before accepting it.
+
+- **⚠⚠ THE GENERAL FORM, AND IT IS THE REASON THIS IS WORTH AN ENTRY.** `REG-F-215`'s wording was **inferred from
+  the shape of the expression** — `.at(-1)` *looks* like "the most recent thing that happened" — and the entry
+  quoted the line correctly while describing its behaviour wrongly. **Quoting the code is not driving the code.**
+  The ordering that `.at(-1)` walks is a property of how the CONTAINER was built, which is nowhere near the line
+  being quoted. Every register claim of the form "this reduction keeps the latest X" is suspect on the same
+  grounds unless a drive varied the two candidate orderings against each other.
+
+- **AND THE ERROR PROPAGATED EXACTLY AS THAT FORM PREDICTS.** The `RPH-E2E-005` Slice authored this session
+  reproduced *"the LAST-completed verdict"* in a test name, an assertion message and a mutant's
+  `predictedMessage` — three places — **under the authority of a drive that never varied the order**. Its two
+  runs swapped which disposition was attached to which id while holding the act sequence identical, so the
+  arrangement could not distinguish request-order from completion-order from "the second rival always wins". A
+  live drive that cannot discriminate is not evidence, and it inherits whatever the register told it to expect.
+
+- **WHAT IS UNCHANGED.** `REG-F-215`'s actual FINDING — that N assessments are silently reduced to one and the
+  loser is dropped with **no marker that a choice was made** — stands untouched and is if anything worse: the
+  survivor is chosen by an ordering no professional could predict or observe, since request order is not
+  something the §38 view displays.
+
+- **Merge target:** **Repository** — `REG-F-215` limb (1) struck and corrected in place (the retire-by-striking
+  idiom, `REG-005:57`); the `RPH-E2E-005` Slice corrected in the same increment. Status: CLOSED.

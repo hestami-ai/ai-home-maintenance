@@ -1,6 +1,6 @@
 {
   "canary": "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts",
-  "recognisedCount": 2,
+  "recognisedCount": 7,
   "rows": [
     {
       "citedRules": [
@@ -25,6 +25,66 @@
       "plane": "ENGINE",
       "scenarioClass": "alternate valid path",
       "title": "Execution succeeds, assurance rejects, and nothing downstream is permitted to proceed"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-003"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-003",
+      "mutantCount": 9,
+      "path": "packages/rph-engine/src/slices/e2e-003-falsified-assumption.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "alternate valid path",
+      "title": "A material assumption is falsified after the architecture was baselined, and the record survives it"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-004"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-004",
+      "mutantCount": 7,
+      "path": "packages/rph-engine/src/slices/e2e-004-scoped-waiver.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "alternate valid path",
+      "title": "An authorized human waives a material finding, and the finding survives the waiver"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-005"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-005",
+      "mutantCount": 6,
+      "path": "packages/rph-engine/src/slices/e2e-005-contested-assurance.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "alternate valid path",
+      "title": "Two independent validators disagree about tenant isolation, and neither verdict silently wins"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-006"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-006",
+      "mutantCount": 7,
+      "path": "packages/rph-engine/src/slices/e2e-006-restart-mid-execution.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "interrupted or resumed path",
+      "title": "The runtime dies mid-generation, comes back, and neither repeats the work nor forgets it"
+    },
+    {
+      "citedRules": [
+        "RPH-E2E-007"
+      ],
+      "dischargesRegisterEntries": [],
+      "id": "E2E-007",
+      "mutantCount": 6,
+      "path": "packages/rph-engine/src/slices/e2e-007-stale-version-promotion.slice.test.ts",
+      "plane": "ENGINE",
+      "scenarioClass": "alternate valid path",
+      "title": "The Architecture moves from approved version 2 to version 3, and the version-2 authorization does not move with it"
     }
   ]
 }

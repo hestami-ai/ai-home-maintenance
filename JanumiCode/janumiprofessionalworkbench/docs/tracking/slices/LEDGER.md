@@ -36,5 +36,10 @@ Both layers key on the word "slice". They catch a Slice that was **MOVED**. They
 |---|---|---|---|---|---|---|
 | `E2E-001` | ENGINE | normal path | `RPH-E2E-001` | 3 | — | `packages/rph-engine/src/slices/e2e-001-intent-to-architecture.slice.test.ts` |
 | `E2E-002` | ENGINE | alternate valid path | `RPH-E2E-002` | 3 | — | `packages/rph-engine/src/slices/e2e-002-rejected-assurance.slice.test.ts` |
+| `E2E-003` | ENGINE | alternate valid path | `RPH-E2E-003` | 9 | — | `packages/rph-engine/src/slices/e2e-003-falsified-assumption.slice.test.ts` |
+| `E2E-004` | ENGINE | alternate valid path | `RPH-E2E-004` | 7 | — | `packages/rph-engine/src/slices/e2e-004-scoped-waiver.slice.test.ts` |
+| `E2E-005` | ENGINE | alternate valid path | `RPH-E2E-005` | 6 | — | `packages/rph-engine/src/slices/e2e-005-contested-assurance.slice.test.ts` |
+| `E2E-006` | ENGINE | interrupted or resumed path | `RPH-E2E-006` | 7 | — | `packages/rph-engine/src/slices/e2e-006-restart-mid-execution.slice.test.ts` |
+| `E2E-007` | ENGINE | alternate valid path | `RPH-E2E-007` | 6 | — | `packages/rph-engine/src/slices/e2e-007-stale-version-promotion.slice.test.ts` |
 
 <!-- JAN-SLICE:GENERATED-LEDGER:END -->
