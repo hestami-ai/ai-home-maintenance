@@ -141,6 +141,18 @@ on a plane without an Execution Plan — not just this limb.
 - **No write of E-2** through `exchange-capture.ts`; it stays blocked with `PENDING_CONTENT_PLANE`.
 - **No second purgeability class** invented to paper over §3's cardinality.
 
-**What I will do without a ruling, because it is unblocked and already owed:** wire `ArtifactStore` to a real call
-site so §2a stops being true, and give `verif/agy-stderr-unbound.test.ts` the shape-probing companion `REG-F-333`
+~~**What I will do without a ruling, because it is unblocked and already owed:** wire `ArtifactStore` to a real call
+site so §2a stops being true~~, and give `verif/agy-stderr-unbound.test.ts` the shape-probing companion `REG-F-333`
 records as owed.
+
+> ⚠ **CORRECTED 2026-09-02, same day, by `REG-F-336` — the struck clause was wrong and the correction matters.**
+> Wiring `ArtifactStore` alone is **not** unblocked work. `captureTry` is already called from
+> `reasoning-review-validator.ts:203`; what has no caller is the composition root
+> (`apps/rph-demo/src/lib/server/assurance/index.ts:24`, which constructs the validator with no options). Supplying
+> the **store** without the **sink** would `put()` the E-1 bytes and then discard the `ExchangeRecord` that
+> references them — **content retained on the content plane with no record on the record plane**, which is
+> `PER-9`'s prohibition read from the other side. **A half-wire is worse than the disclosed absence it replaces.**
+> Store, sink and record consumer must land together; and the consumer is blocked on **`REG-Q-056`** (OPEN —
+> `RecordArtifact` requires `artifactType`, `securityClassification`, `retentionClass` and `status` with no
+> ratified value domain), **not** on `AUTHORING_CONVERSATION`, which is ratified. The `REG-F-333` companion gate
+> stands as the one genuinely unblocked item.

@@ -29674,3 +29674,62 @@ taken up.
   auditable. **"CSAA at baseline" was the one that did not, and it is the one that was wrong.**
 - **Merge target:** **Register.** **Owed:** nothing for this defect. Read *"CSAA at baseline"* in every
   2026-09-02 commit message as **"unchanged by this work"**, never as **"green"**.
+
+### REG-F-336 — three corrections to `REG-F-334` and its decision package, found by trying to do the work they called unblocked
+
+- **Date:** 2026-09-02 · **Type:** FINDING (corrections to entries filed the same day) · **Class:**
+  FINDING — amends `REG-F-334` and `docs/_working/DECISION-REG-Q-066-raw-validator-output.md` §7 ·
+  **Status:** ✅ CLOSED as a correction. **`REG-Q-066` remains OPEN and sponsor-reserved.**
+
+**C-1 — THE `Purgeability` BLOCKER WAS NOT NEW, AND I HAD RECORDED IT MYSELF HOURS EARLIER.** `REG-F-334`
+presents it as *"a third blocker, which neither the question nor I anticipated."* ⚠ **The second half is
+false.** `apps/rph-demo/src/lib/server/assurance/exchange-capture.ts` states it verbatim in the comment that
+blocks `E-2`: *"`Purgeability` is ONE value per `put()`, so the contract cannot express a blob that is partly
+PURGEABLE_AT_EXPIRY (reasoning, PER-12) and partly RETAINED_BY_PARTICIPATION (the answer, PER-8)."* **The
+blocker is real and the novelty claim is not.** ⭑ **I re-derived my own finding from a fresh reading and
+reported it as new, in an entry whose whole subject is a reading that claimed more than it had checked** —
+the same shape one level down. The cure is the standing one and I did not apply it: **grep the obligation
+before claiming novelty**, including against code I wrote this session.
+
+**C-2 — "WIRE `ArtifactStore` TO A REAL CALL SITE" IS NOT UNBLOCKED WORK, AND DOING IT ALONE WOULD BE A
+DEFECT.** Both `REG-F-334` and the package's §7 list it as the thing to do without a ruling. **Re-read at
+HEAD, the capture path is wired further than either says:** `captureTry` IS called from
+`reasoning-review-validator.ts:203`, and the validator accepts `opts.artifacts` (the store) and
+`opts.exchanges` (the sink). What has no production caller is the **composition root** —
+`apps/rph-demo/src/lib/server/assurance/index.ts:24` constructs
+`createAgyReasoningReviewValidator()` **with no options at all**, so neither reaches the running app.
+
+- ⭑⭑ **AND SUPPLYING THE STORE ALONE WOULD RETAIN BYTES THAT NO RECORD REFERENCES.** With `opts.artifacts`
+  set and `opts.exchanges` unset, `captureTry` calls `put()` — the `E-1` prompt bytes are retained — and then
+  returns an `ExchangeRecord` that **nothing collects and nothing persists**. That is content on the content
+  plane with **no record on the record plane pointing at it**, which is `PER-9`'s prohibition read from the
+  other side: *"a fingerprint identifies that record; it never substitutes for it"*, and *"record-plane
+  omission is not [legal]"*. **A half-wire is worse than the disclosed absence it replaces**, because the
+  absence is currently declared and the orphan would not be. **Store, sink, and record consumer must land
+  together or not at all.**
+
+**C-3 — AND THE CONSUMER'S BLOCKER IS NOT THE ONE ON RECORD.** This session has been carrying
+*"`AUTHORING_CONVERSATION` shape unratified"* as the reason `ICP-02` deliverable 3 could not land. **That is
+false, measured both directions:** `AUTHORING_CONVERSATION` is a member of the ratified
+`packages/rph-contracts/schemas/enums/ProfessionalWorkObjectType.json` (**29 members**, membership confirmed
+by parse rather than by grep), and `packages/rph-application/src/handlers/pwa-authoring.ts:43` already binds
+it as `CONVERSATION`. `RecordArtifact` likewise exists (`messages.ts:161`,
+`RecordArtifactPayloadSchema`) and its byte-addressing fields are **field-for-field what `StoredArtifactRef`
+already returns** — `storageProvider`, `storageKey`, `contentHash`, `byteSize`.
+
+- ⚠ **THE REAL BLOCKER IS `REG-Q-056`, WHICH IS OPEN.** `RecordArtifactPayloadSchema` requires
+  `artifactType`, `securityClassification`, `retentionClass` and `status` as **required `z.string()`s with no
+  ratified value domain.** `REG-Q-056` (R:11685, **Status: OPEN**) asks exactly whether canon ratifies that
+  vocabulary. So dispatching `RecordArtifact` today means **minting four vocabulary values** — which is the
+  fabrication `artifact-store.ts` refused by name when it declined to reuse `retentionClass` for
+  `Purgeability`. ⭑ **The port already made this call correctly; the consumer inherits the same constraint,
+  and nothing in the register had connected the two.**
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a blocker carried in prose decays independently of the thing
+  it blocks.** All three corrections here are the same failure: `C-1` a novelty claim never grepped, `C-2` a
+  wiring claim never traced to its composition root, `C-3` a blocker never re-measured after the corpus moved.
+  **Each was cheap to check and none had been checked** — and `C-3`'s stale blocker was hiding a real one that
+  is still open.
+- **Merge target:** **Register.** **Owed:** `ICP-02` deliverable 3 is blocked on `REG-Q-056`, not on
+  `AUTHORING_CONVERSATION`; record it that way wherever the old reason is carried. Nothing here is owed to
+  `REG-Q-066`, which is untouched by these corrections.
