@@ -2721,7 +2721,13 @@ describe('live JPWB and inventory projection', () => {
 		// +1 `verif/slice-presupposition.test.ts` (JAN-SLICE-SWP-05 -> SWP-06): SL-6's gate. `presupposes` had
 		// been declared in the Slice contract, parsed by the ledger and written into every SURFACE row, and read
 		// by NOTHING — which had never mattered because there were no SURFACE Slices. `S-01` is the first.
-		expect(counts.get('verif/tsconfig.json')).toBe(62);
+		// 62 -> 63: `verif/agy-stderr-unbound.test.ts`, which GATES the answer to REG-Q-066’s one stated bound.
+		// The answer is "the stderr escape hatch does not count, because it is CLOSED BY NON-USE" — and an answer
+		// contingent on an absence rots the moment someone ends the absence. Binding stderr would CREATE the
+		// retention surface the question asks about (a model CLI’s stderr can echo prompt content), so the gate
+		// reddens on that day and sends the author back to the question. It carries its own positive control,
+		// driven: pointing the source walk at a missing directory reddens the CONTROL, not just the assertion.
+		expect(counts.get('verif/tsconfig.json')).toBe(63);
 		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
 		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
 		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands

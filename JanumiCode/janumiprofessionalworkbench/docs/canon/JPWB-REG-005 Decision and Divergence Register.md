@@ -29052,3 +29052,47 @@ for it and **it blocks**: `floor.ts` records that INCONCLUSIVE *"leaves assuranc
 - **Merge target:** the validator and its new test. **Owed:** nothing. The equivalent arm in the PRODUCTION
   (`agy`) validator is a separate subject — `reasoning-review-validator.ts`'s bare `catch` is finding `#62`,
   still TRUE AT HEAD per `ICP-00`.
+
+### REG-F-326 — `REG-Q-066`'s STATED BOUND is answered: the `agy` stderr hatch does not count, because it is CLOSED BY NON-USE — and the answer is now gated, because it is contingent on an absence
+
+- **Date:** 2026-09-02 · **Type:** FINDING (answers a bound; the question itself stays OPEN) · **Class:**
+  FINDING — addresses one stated bound of `REG-Q-066` · **Status:** ✅ CLOSED (the bound only).
+
+⚠ **SCOPE FIRST, SO THIS IS NOT READ AS CLOSING THE QUESTION.** `REG-Q-066` asks whether raw validator output
+can be retained at all given `PER-12`'s chain-of-thought hazard, and it lists **three readings the register says
+are "not resolvable from code"**. **That remains OPEN and remains the sponsor's.** This entry answers only the
+paragraph headed *"ONE BOUND"*, verbatim: *"out-of-band logging (console/stderr from `agy-cli`) was not tested.
+It is outside canonical state and outside this census's definition of retention, but it is an unexamined escape
+hatch and an answer should say whether it counts."*
+
+**THE ANSWER: IT DOES NOT COUNT — and for a stronger reason than "outside canonical state."** The hatch is not
+merely unexamined; **it is closed by NON-USE.** `agy-cli.ts` destructures `const { stdout } = await
+execFileAsync(AGY_BIN, args, {…})` and **`stderr` is bound nowhere in the demo application.** There is no
+surface on which retention could occur, so `PER-9` and `PER-12` have nothing to govern here.
+
+- **MEASURED WITH A POSITIVE CONTROL, because a zero is a claim about the instrument:** `stderr` in
+  `apps/rph-demo/src` → **0**; `stdout` in the same population → **3**; `stderr` in `packages/*/src` → **493**.
+  The instrument finds `stderr` where it exists and finds `stdout` in the very files searched.
+
+- ⭑ **AND THE ANSWER IS CONTINGENT ON AN ABSENCE, WHICH IS WHY IT IS GATED RATHER THAN NOTED.** An answer that
+  rests on the code NOT doing something rots the moment someone does it — and **binding `stderr` would CREATE
+  the retention surface the question asks about**, because a model CLI's stderr can echo prompt content, which
+  `PER-9` governs and which no redaction in this codebase covers (finding `#60`).
+  `verif/agy-stderr-unbound.test.ts` reddens on that day and sends the author back to `REG-Q-066` with a message
+  saying so. **A recorded answer without a gate is a claim about the day it was written.**
+
+- **THE GATE CARRIES ITS OWN POSITIVE CONTROL, AND BOTH WERE DRIVEN.** A source-absence gate whose file walk
+  silently matched nothing would pass forever while asserting nothing — this repository's most-recorded failure.
+  Driven on a clean baseline: **binding `stderr` in `agy-cli` reddens the absence assertion alone**; **pointing
+  the walk at a directory that does not exist reddens the CONTROL**, proving the control is not decorative.
+
+- ⚠ **A SECOND FACT, RECORDED BUT NOT FIXED HERE — AND THE TWO ARE IN TENSION.** The same non-binding is a
+  DIAGNOSTIC loss: `execFile` rejects on a non-zero exit with an error that CARRIES `stderr`, and nothing reads
+  it, so the diagnostic is discarded at exactly the moment it is needed. **But the fix and the answer point in
+  opposite directions** — binding it for diagnosis is precisely what would open the retention surface. So the
+  remedy is not "bind stderr"; it is to give the failure a home in the exchange record's **E-5** disposition,
+  which is `ICP-02`'s owed wiring. **Recorded here so a later reader does not treat the gate as hostility toward
+  observability** — it is a requirement that observability arrive with a retention disposition attached.
+
+- **Merge target:** `verif/agy-stderr-unbound.test.ts`. **Owed:** nothing for the bound. `REG-Q-066`'s three
+  readings stay OPEN.
