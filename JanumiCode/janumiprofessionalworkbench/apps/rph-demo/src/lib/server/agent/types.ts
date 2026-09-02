@@ -29,6 +29,36 @@ export type AuthoringAgentEvent =
 	| { readonly kind: 'error'; readonly message: string }
 	| { readonly kind: 'done' };
 
+/**
+ * Every streamed event kind, as a VALUE so it can be iterated at runtime.
+ *
+ * ⭑ THIS EXISTS BECAUSE A HAND-LISTED SET SHIPPED A DEFECT. The write-boundary omission map was authored by
+ * hand as {thinking: …} and never checked against this union; `status`, `producer` and `done` fell through
+ * and were dropped with nothing declared — and `producer` carries PER-9's E-3. The two checks below make that
+ * drift a COMPILE error in BOTH directions: a new event kind not listed here fails, and a stale entry here that
+ * no longer exists in the union fails too. One-directional exhaustiveness is how a list rots while still
+ * type-checking.
+ */
+export const AUTHORING_EVENT_KINDS = [
+	'status',
+	'producer',
+	'text',
+	'thinking',
+	'tool_start',
+	'tool_end',
+	'error',
+	'done'
+] as const;
+
+export type AuthoringEventKind = (typeof AUTHORING_EVENT_KINDS)[number];
+
+/** Compile-time proof that the list and the union are the SAME set. Neither assignment may be removed: each
+ *  catches drift the other cannot see. */
+const _everyUnionMemberIsListed: AuthoringAgentEvent['kind'] extends AuthoringEventKind ? true : never = true;
+const _everyListedMemberIsInUnion: AuthoringEventKind extends AuthoringAgentEvent['kind'] ? true : never = true;
+void _everyUnionMemberIsListed;
+void _everyListedMemberIsInUnion;
+
 export type EmitFn = (event: AuthoringAgentEvent) => void;
 
 /** An authoring agent: given a natural-language instruction, drive the tools and stream normalized events. */

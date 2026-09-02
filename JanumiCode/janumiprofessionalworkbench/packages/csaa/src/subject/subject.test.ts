@@ -2746,7 +2746,15 @@ describe('live JPWB and inventory projection', () => {
 		// METADATA — so the declared half is buildable today while the retained half waits on REG-Q-B.
 		// ⚠ THIRD CSAA PIN THIS PROGRAMME HAS MOVED. Same detection route each time: the FULL suite, not the
 		// scoped one. Recorded rather than folded in, per this file’s own standing instruction.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(100);
+		// 100 -> 101 (JAN-ICP-03b): `disposition.test.ts` — the totality gate over the streamed-event union.
+		// ⚠ IT EXISTS BECAUSE IT CAUGHT A DEFECT ITS OWN AUTHOR SHIPPED ONE COMMIT EARLIER. The omission map
+		// was hand-written as a single entry {thinking: …} and never checked against the union, which has
+		// EIGHT members; `status`, `producer` and `done` fell through and were dropped with nothing declared.
+		// `producer` carries the resolved model/provider — PER-9 E-3, and the surviving half of finding #10 —
+		// so the omission the disclosure existed to prevent was being performed by the disclosure’s own gap.
+		// The remedy is not a longer hand-list but TOTALITY: Record<AuthoringEventKind, …> plus bidirectional
+		// compile-time exhaustiveness, all three drift directions driven and observed to fail.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(101);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

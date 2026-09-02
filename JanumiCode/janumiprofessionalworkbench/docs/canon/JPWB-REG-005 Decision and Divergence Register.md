@@ -28854,3 +28854,98 @@ that it left no trace.
   back to its HEAD baseline of 1 failed (the pre-existing JAN-CSAA-005 projection) / 63 passed.
 
 - **Merge target:** roadmap `ICP-03`. **Owed:** `REG-Q-B`, and the record-plane carrier via `ICP-02` d3.
+
+### REG-F-323 — the disclosure shipped one commit ago performed the very omission it existed to prevent, because its map was hand-written
+
+- **Date:** 2026-09-02 · **Type:** FINDING (self-inflicted, found by an adversarial sweep, fixed) · **Class:**
+  FINDING — corrects `d33da325` · **Status:** ✅ CLOSED by `ICP-03b`.
+
+`REG-F-322` landed `omissionFor()` so that dropping volunteered reasoning would be DECLARED rather than
+silent. **Its `OMISSION_ROLE` was a hand-written one-entry map, `{ thinking: … }`, never checked against the
+event union.**
+
+- **THE UNION HAS EIGHT MEMBERS AND `TRANSCRIPT_KIND` MAPS FIVE.** `status`, `producer` and `done` had no
+  mapping, so `TRANSCRIPT_KIND[ev.kind] ?? ''` yielded `''`, `omissionFor('')` yielded `undefined`, and all
+  three were dropped with nothing declared.
+- ⭑ **AND ONE OF THEM WAS THE ONE `PER-9` NAMES.** `producer` carries the resolved model/provider — **E-3**,
+  and precisely the half of finding `#10` that `ICP-00` had just re-dispositioned as still open. **So the
+  disclosure built to end a silent omission was itself silently omitting the element the invariant names**,
+  and its own comment justified excluding `status` as *"display chrome"* while never considering `producer` at
+  all. Reasoning about one exclusion is not reasoning about the set.
+- ⚠ **THE DEFECT IS THE ONE THIS REGISTER RECORDS MOST OFTEN, COMMITTED ONE COMMIT AFTER RE-RECORDING IT.**
+  `REG-F-321` closed on *"never hand-enumerate when you can DERIVE"*; `ICP-00`'s own `ICP-02` note repeats it.
+  A hand-listed set standing in for a derived one, again.
+
+**THE REMEDY IS NOT A LONGER HAND-LIST.** `DISPOSITION` is now
+`Readonly<Record<AuthoringEventKind, WriteDisposition>>` — **total by type** — over an
+`AUTHORING_EVENT_KINDS` value with **bidirectional compile-time exhaustiveness** against the union. Every kind
+is now explicitly `RECORDED`, `DROPPED_GOVERNED` or `DROPPED_CHROME`.
+
+- **ALL THREE DRIFT DIRECTIONS DRIVEN AND OBSERVED TO FAIL, on a baseline that passes:** a new union member
+  missing from the list (**FAILED**); a stale list entry no longer in the union (**FAILED**); a kind missing
+  from the disposition map (**FAILED**). ⚠ **One-directional exhaustiveness is how a list rots while still
+  type-checking**, which is why both assignments exist and neither may be removed.
+- **`producer` is now `DROPPED_GOVERNED`** with role `RESOLVED_MODEL_IDENTITY`, and its reason states the real
+  blocker: E-3 is **metadata, not content**, so nothing about the content plane stops it — what stops it is
+  that `ConversationEntry` is `UNRATIFIED-AUTHORED` and carries no field for a structured actor. **Flattening
+  it into the text field would reproduce finding `#63`.** Owed to `ICP-02` deliverable 3.
+
+- **Merge target:** `transcript.ts`, `types.ts`, `disposition.test.ts`. **Owed:** nothing here.
+
+### REG-D-049 — AUTHORED RULING (under the standing grant): `REG-Q-B` is answered — BUILD the artifact-store seam, because deferral has nowhere left to go
+
+- **Date:** 2026-09-02 · **Type:** RULING (**AUTHORED UNDER GRANT, NOT A CONFERRAL**) · **Class:**
+  DECISION — settles `REG-Q-B` raised in `JAN-ICP-DR-001` `ICP-03` · **Status:** 🔶 OPERATIVE PENDING SPONSOR CONFIRMATION.
+
+⚠ **STATUS FIRST, SO THIS IS NOT MISREAD.** `CON-000 B2`: *"an agent's best-judgment resolution is a proposal
+logged for confirmation, not a conferral."* The sponsor authorized authoring solutions; that authorizes the
+WORK and the RECORD, not the ratification. This entry is operative as a working decision and is **not** a
+sponsor act. It follows the precedent of the `UNRATIFIED-AUTHORED` annotations already in the vocab.
+
+**THE QUESTION.** `ICP-03` asked whether the ICP programme pulls `DEF-W2-001` (the artifact content/retention
+seam) forward, or records the dependency and stops at the elements that do not need it.
+
+**THE FACT THAT DECIDES IT — DEFERRAL HAS NO DESTINATION LEFT.** `DEF-W2-001` routes to *"W3 execution / W10
+security"*. Measured:
+- **W3 gated with ZERO mention of it** — 0 hits in its gate package, against a positive control of 4 for
+  `DEF-W3-001` in the same directory. Its `G3` yaml carries `deferrals: [DEF-W3-001, DEF-W3-002]`.
+  **`DEF-W2-001` simply vanished at the gate.**
+- **W10 gated `DEFER`**, recorded as *"genuinely not completable within this repository"*.
+- **No successor master roadmap exists** (`JAN-ROADMAP-001-v2` is the only one; `DIV-W1-003`'s re-baseline is
+  still owed).
+
+⭑ **A DEFERRAL WHOSE DESTINATIONS ARE BOTH DEAD IS NOT A DEFERRAL. IT IS AN ABANDONMENT WEARING A LABEL** —
+and `ASR-5`'s *"gaps are never silent"* plus `DOC-003 §3`'s *"deferred with an explicit review condition"* are
+exactly what such a label defeats. **So "record the dependency and stop" is not the conservative option; it is
+the option that quietly ends the obligation.** That is what turns this from a scheduling preference into a
+decision with only one defensible side.
+
+**RULED — BUILD IT, WITHIN THREE CONSTRAINTS THE CORPUS ALREADY FIXES.**
+
+1. **NO NEW STORE, OBJECT TYPE, TABLE OR EVENT.** Guide §9.7: *"It adds no dedicated reasoning store; Section
+   10's typed persistence remains authoritative."* §10.1: *"These are information requirements, not permission
+   to add tables, fields, objects, or Events."* The prohibition on a second reasoning-keyed store is stated
+   **four times** in the Guide and once more as a **binding safe default** (`REG-Q-021`).
+2. **THE HOME IS ALREADY BUILT AND ALREADY NAMED.** `ARTIFACT` carries DOC-009 §18.1 column-for-column —
+   `storageProvider`, `storageKey`, `contentHash`, `byteSize`, `securityClassification`, `retentionClass`,
+   `producingExecutionAttemptId`. `PER-12`'s *"typed Artifact bound to its producing Attempt"* is that object.
+   **Nothing about the home needs designing; only the bytes have nowhere to live.**
+3. **WHAT IS PERMITTED IS A PORT.** A hexagonal port is not a table, an object type or an Event — it is a seam,
+   and `DEF-W2-001` **names this one itself**: *"→ ArtifactStore/CapabilityAuthorizer ports"*. Finding `#8`
+   establishes the shape from the other side: *"The authorizer port that rph-domain's authority model documents
+   as its seam does not exist"* is filed as **CRITICAL**, so a documented seam without its port is a defect
+   here, not a liberty.
+
+⭑ **AND THE KEYSTONE IS `purge`, NOT `put`.** Retention is currently ILLEGAL rather than merely unbuilt:
+anything admitted to `domain_events` is permanent (§9.4), and `PER-12` requires retained reasoning
+*"purgeable at retention expiry"*. **A store without purge would not make retention lawful — it would only
+move the unlawfulness.** So `purge` is not a feature of the port; it is the clause that makes every other
+clause permissible, and it must be built first and proven by a driven red.
+
+**SCOPE OF THIS RULING, AND WHAT IT DOES NOT DECIDE.** It does not choose an adapter (filesystem, S3, or
+in-memory for the demo); it does not settle `REG-Q-056` (the retention-class value domain), which stays OPEN
+with three candidate domains already recorded; and it does not authorize touching CSAA. It does not amend
+`DEF-W2-001` — **the deferral stands and this records that its route is dead**, which is itself owed to
+whoever re-baselines `DIV-W1-003`.
+
+- **Merge target:** roadmap `ICP-03`. **Owed:** the port, its purge proof, and sponsor confirmation.
