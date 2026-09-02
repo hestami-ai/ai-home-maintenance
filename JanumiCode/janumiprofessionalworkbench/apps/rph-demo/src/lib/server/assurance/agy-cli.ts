@@ -61,7 +61,18 @@ export const MAX_AGY_PROMPT_CHARS = 28_000;
 
 /** One non-interactive `agy --print "<prompt>"` call, returning stdout. Always pins the model, so the model that
  *  actually judged is the model recorded. Fails closed if the prompt exceeds the command-line budget. */
-export async function agyPrint(prompt: string): Promise<string> {
+/** The exec seam. Injectable ONLY so the sanitisation boundary is reachable in the gate — as an inline call it
+ *  could be exercised only by driving a real agy, so the regression that reintroduces the leak would be silent. */
+export type AgyExec = (
+	file: string,
+	args: readonly string[],
+	options: { timeout: number; maxBuffer: number; windowsHide: boolean }
+) => Promise<{ stdout: string }>;
+
+export async function agyPrint(
+	prompt: string,
+	exec: AgyExec = execFileAsync as unknown as AgyExec
+): Promise<string> {
 	if (prompt.length > MAX_AGY_PROMPT_CHARS)
 		throw new Error(
 			`agy prompt is ${prompt.length} chars, over the ${MAX_AGY_PROMPT_CHARS}-char command-line budget ` +
@@ -69,12 +80,40 @@ export async function agyPrint(prompt: string): Promise<string> {
 				`The caller must shorten it.`
 		);
 	const args = ['--print', prompt, '--print-timeout', '3m', '--model', judgeModel()];
-	const { stdout } = await execFileAsync(AGY_BIN, args, {
-		timeout: 240_000,
-		maxBuffer: 16 * 1024 * 1024,
-		windowsHide: true
-	});
-	return stdout;
+	try {
+		const { stdout } = await exec(AGY_BIN, args, {
+			timeout: 240_000,
+			maxBuffer: 16 * 1024 * 1024,
+			windowsHide: true
+		});
+		return stdout;
+	} catch (e) {
+		// ⛔ SANITISE THE FAILURE. DO NOT RETHROW.
+		//
+		// Node's execFile rejection message is `Command failed: <full argv>\n<full stderr>` — and argv carries
+		// THE ENTIRE PROMPT. That error is caught in rph-assurance's floor runner and written VERBATIM into a
+		// `VALIDATOR_EXECUTION_FAILED` observation `statement`, which is dispatched through
+		// `RecordAssuranceObservation` and PROJECTED onto the assurance view.
+		//
+		// So rethrowing puts the whole materialized judge prompt — graph export, rubric, the producer's declared
+		// rationale and narration — into a permanent, projected record with no redaction (finding #60).
+		// `PER-12`: never logged, never projected. `PER-9`: retention is "subject to recorded redaction".
+		//
+		// ⚠ AND THE DIAGNOSTIC IS DELIBERATELY LOST RATHER THAN RELOCATED. Its lawful home is the exchange
+		// record's E-5 (`REG-F-326`), which is not wired yet, or the LOG plane, where `PER-9` says redaction is
+		// legal — and this codebase has no redaction at all. Until one exists, a DISCLOSED loss beats an
+		// unlawful retention. The classification below is what a caller needs to act; the content is what it
+		// may not carry.
+		const code = (e as { code?: unknown })?.code;
+		throw new Error(
+			`agy invocation failed${typeof code === 'number' ? ` (exit ${code})` : ''}. ` +
+				'Its diagnostic is WITHHELD from the record plane: execFile embeds the full argv — which carries the ' +
+				'entire judge prompt — and the full stderr into its error message, and that message is written ' +
+				'verbatim into a projected VALIDATOR_EXECUTION_FAILED observation. PER-12 forbids that content ' +
+				'being logged or projected and no redaction exists here (finding #60). Diagnose from the agy ' +
+				'process directly; the durable home for this outcome is the exchange record E-5 (REG-F-326).'
+		);
+	}
 }
 
 /** Strip markdown fences and extract the outermost JSON object from a model reply. */

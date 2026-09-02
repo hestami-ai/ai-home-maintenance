@@ -29464,3 +29464,75 @@ performance parameters that have yet to be determined. Meaning that it will need
 
 - **Merge target:** `agy-cli.ts`, `preflight.ts`, the SSE route. **Owed:** nothing. `REG-F-331` is discharged by
   this ruling; the operator must set `JPWB_JUDGE_MODEL`.
+
+### REG-F-333 — the `agy` failure path writes the ENTIRE judge prompt into a permanent, PROJECTED record — and it refutes `REG-F-326`, which I filed this morning
+
+- **Date:** 2026-09-02 · **Type:** FINDING (live leak, measured first-hand; corrects an earlier entry of my own) ·
+  **Class:** FINDING — amends `REG-F-326` and a premise of `REG-Q-066` · **Status:** ✅ CLOSED by sanitisation at the boundary.
+
+**MEASURED FIRST-HAND, not relayed.** `agyPrint` called `promisify(execFile)` and did not catch. Node's
+rejection message is:
+
+```
+Command failed: agy --print <THE ENTIRE PROMPT> --model <model>
+<THE ENTIRE STDERR>
+```
+
+Driven with a sentinel prompt: **the message contains the prompt verbatim (`true`)**, and the error carries
+**559 bytes of stderr** besides.
+
+**THE PATH TO THE RECORD, TRACED:** `validators.ts:307` catches it and passes
+`e instanceof Error ? e.message : String(e)` as `reason` into `failedResult`, which places it **verbatim** into
+`observations[0].statement` with code `VALIDATOR_EXECUTION_FAILED` (`:277`). Those observations are dispatched
+through `RecordAssuranceObservation` and **projected** onto the assurance view.
+
+- ⭑ **SO THE FULL MATERIALIZED JUDGE PROMPT — graph export, rubric, the producer's declared rationale, its
+  narration — LANDS IN A PERMANENT, PROJECTED RECORD ON EVERY agy FAILURE.** `PER-12`: reasoning is *"never
+  logged, never projected"*. `PER-9`: retention is *"subject to recorded redaction"*, and **no redaction exists
+  anywhere in this codebase** (finding `#60`).
+- ⚠⚠ **AND IT IS NOT THEORETICAL: PER `REG-F-331`, EVERY agy CALL CURRENTLY FAILS** (the pinned model label was
+  rejected outright). So the leak fires on every attempted Reasoning Review, which is the mandatory,
+  non-suppressible floor policy.
+
+> ### ⚠⚠ IT REFUTES `REG-F-326`, WHICH I FILED THIS MORNING, AND THE MANNER IS THE FINDING
+> `REG-F-326` answered `REG-Q-066`'s stated bound: *"the agy stderr hatch does not count, because it is CLOSED
+> BY NON-USE"* — `agy-cli` destructures only `{ stdout }`, and `stderr` appears zero times in the demo. **Both
+> halves of that measurement were true. The conclusion was wrong.**
+>
+> **stderr — and the whole prompt — reach a durable record through `err.message`, and the demo never names
+> `stderr` to do it.** So `verif/agy-stderr-unbound.test.ts`, the gate I wrote to protect that answer, is
+> **structurally blind to the leak it exists to prevent**: it probes for the NAME while the leak travels by
+> SHAPE.
+>
+> ⭑ **THAT IS THE DEFECT CLASS THIS REGISTER RECORDS MOST OFTEN, COMMITTED INSIDE AN ENTRY ABOUT IT.**
+> `REG-F-326`'s own text warns that *"an answer contingent on an absence rots the moment someone ends the
+> absence"* and gates against a future author binding `stderr`. It never considered that the absence was
+> already irrelevant because the content escaped by another route. **The gate guards the front door of a room
+> with no back wall.**
+
+**AND IT AMENDS A PREMISE OF `REG-Q-066` IN THE DIRECTION THAT MATTERS.** The question states that the floor
+path *"contains raw output only by accident of V8 splicing a twelve-character snippet into `SyntaxError`, and
+contains none at all for an infrastructure failure."* **The second clause is false, and false at filing** —
+`agy-cli.ts` was last changed 2026-07-20, so this was already true on 2026-08-23. For an infrastructure failure
+the observation statement contains **the entire prompt and the entire stderr**, not none. The question asks
+whether raw output *can* be retained; an unexamined channel was retaining far more than raw output all along.
+
+**THE FIX: SANITISE AT THE BOUNDARY, AND DISCLOSE THE WITHHOLDING.** `agyPrint` now catches and throws a
+classifiable error carrying the exit code and an explanation, and **no argv and no stderr**. ⚠ **The diagnostic
+is deliberately LOST rather than relocated**: its lawful homes are the exchange record's `E-5` (`REG-F-326`),
+which is unwired, or the LOG plane where `PER-9` says redaction is legal — and there is no redaction. **A
+disclosed loss beats an unlawful retention**, which is the same posture as `REG-F-330`'s `E-2` block.
+
+- **FOUR MUTANTS, ALL SOUND ON A CLEAN BASELINE:** rethrow the original (the shipped leak) reddens {1,2,3};
+  sanitise to a bare message reddens {3}; include raw stderr reddens {2}; always-throw reddens the CONTROL {4}.
+- ⚠ **ONE MUTANT WAS INERT BY ITS OWN SHAPE, AGAIN.** It replaced only the FIRST LINE of a multi-line message,
+  and the remaining lines still carried both matched tokens. **A partial mutation of a multi-line string proves
+  nothing**; it was rewritten to replace the whole throw.
+- ⚠⚠ **AND TWO OF MY OWN TESTS WERE PASSING FOR THE WRONG REASON — CAUGHT BY THE CONTROL.** With
+  `JPWB_JUDGE_MODEL` unset, `judgeModel()` refuses BEFORE the exec is reached (`REG-D-052`), and that unrelated
+  refusal satisfies "the message does not contain the prompt". **The two leak assertions were green against a
+  code path they never entered.** The CONTROL — a successful call returning stdout — is what failed and exposed
+  it. Third instance today of a test passing for a reason unrelated to its subject.
+
+- **Merge target:** `agy-cli.ts`. **Owed:** a lawful home for the diagnostic (`E-5` wiring), and
+  `verif/agy-stderr-unbound.test.ts` now needs a companion that probes the SHAPE, not the name.

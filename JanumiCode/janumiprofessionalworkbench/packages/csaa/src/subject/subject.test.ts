@@ -2772,7 +2772,13 @@ describe('live JPWB and inventory projection', () => {
 		// REG-D-050 (sponsor) settles the classification: a materialized assurance input PARTICIPATES, so it is
 		// RETAINED_BY_PARTICIPATION and purge REFUSES it — purging the basis of a recorded judgement is what
 		// "fully auditable and reconstructable" forecloses.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(104);
+		// 104 -> 105: agy-failure-sanitisation.test.ts — the agy failure path leaked the ENTIRE judge prompt
+		// into a permanent, PROJECTED record. Node rejects execFile with a message that embeds the full argv
+		// followed by the full stderr, and argv carries the prompt; validators.ts then writes that message
+		// verbatim into a VALIDATOR_EXECUTION_FAILED observation statement, which is persisted and projected.
+		// PER-12: never logged, never projected. The failure is now sanitised at the boundary and the
+		// diagnostic is disclosed-as-withheld rather than leaked (REG-F-333).
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(105);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',
