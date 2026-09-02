@@ -28469,3 +28469,128 @@ system needs."*
 
 - **Merge target:** `docs/_working/DESIGN-instruction-and-context-plane.md` §2 (the open question struck in
   place and the ruling recorded), then a roadmap. **Owed:** the roadmap, and the design questions listed above.
+
+### REG-F-314 — the instruction-and-context design INVENTED what `PER-9` ratifies, and its own falsifier could not catch it because the falsifier was written in the invention's vocabulary
+
+- **Date:** 2026-09-02 · **Type:** FINDING (self-audit, design record rewritten) · **Class:**
+  FINDING — corrects `docs/_working/DESIGN-instruction-and-context-plane.md` · **Status:** ✅ CLOSED by rewrite.
+
+The design proposed a **context manifest** to make composed prompts perceivable, and specified its content as
+byte counts: *"composed instruction bytes; assembled context bytes, itemised by source; tool-schema bytes;
+cumulative tool-result bytes."* **`DOC-003 PER-9` already ratifies that record**, and requires something else:
+*"the exact materialized input presented to the model, the returned output before schema coercion or repair,
+the resolved provider, model, and version actually invoked, declared truncation or omission, and the
+parse/validation/repair outcome."* **The design proposed MEASURING the prompt where the invariant requires
+RETAINING it.**
+
+- ⚠ **AND `PER-9` FORECLOSES THE SUBSTITUTION BY NAME:** *"A prompt or template fingerprint identifies that
+  record; it never substitutes for it."* A byte-count manifest is a fingerprint. The design did not merely miss
+  a rule — it proposed the one thing the rule prohibits.
+
+- ⚠⚠ **THE FALSIFIER WAS RUN AND REPORTED CLEAN, AND THIS IS THE FINDING.** `FAL-5` asked whether a durable
+  record already existed and was recorded **NOT TRIGGERED**, driven with the probe
+  `promptBytes|contextBytes|tokenCount|promptSize` — **the field names of the manifest the design invented.**
+  A probe phrased in the vocabulary of one's own proposal **cannot fail**: it confirms only that the proposal
+  is absent, and is structurally incapable of detecting that a ratified, differently-shaped obligation already
+  covers the ground. Correct probe: the OBLIGATION. Correct disposition: **TRIGGERED IN PART** — no durable
+  record exists (the narrow claim survives), but the premise that one needed inventing is false.
+
+- **THE GENERAL FORM, which is why this is filed rather than quietly fixed:** *an absence claim phrased in the
+  vocabulary of the thing it is meant to falsify is not a test.* It is a restatement. This is the same family
+  as `REG-F`'s standing *absence-of-evidence* lesson — grep the CONTENT, not the field name — one level up:
+  here the field name being grepped was **one I had just made up**, so the search space and the hypothesis were
+  the same object.
+
+- ⚠ **THE ERROR WAS NOT RANDOM — A RATIFIED SENTENCE SUPPORTS IT.** `DOC-009 §33.2` says, verbatim: *"Prefer
+  retaining: content hash; parsed result; provenance; bounded diagnostic excerpt; rather than all raw context
+  indefinitely."* That is the manifest's design, arrived at independently without having read §33.2. It
+  reconciles with `PER-9` on the word *"indefinitely"* — §33.2 governs DURATION, `PER-9` governs CAPTURE — but
+  a future author who finds §33.2 first will re-derive the same error **with a corpus quotation supporting it**.
+  The counter-quotation they need is `PER-9`'s *"it never substitutes for it"*.
+
+- **Merge target:** design record §0 (rewrite banner), §8 (the tension), §11 (`FAL-5` re-dispositioned).
+  **Owed:** nothing. Status: CLOSED.
+
+### REG-F-315 — three absence claims about content storage and redaction were FALSE corpus-wide, and each failed the same way: the search used my architecture's vocabulary, not the corpus's
+
+- **Date:** 2026-09-02 · **Type:** FINDING (absence claims refuted by adversarial pass) · **Class:**
+  FINDING — corrects the design record §7 · **Status:** ✅ CLOSED by rewrite.
+
+Three claims were asserted, twice narrowed, and flagged in the design record as *"the claim most likely to be
+wrong in the direction of my own prior errors."* **An adversarial pass re-drove them within the hour and all
+three fell on their corpus-wide limb.**
+
+1. **"There is no content port / no content store."** TRUE IN CODE (`rph-ports/src/ports/` = authentication,
+   logger, storage; none with a content operation). **FALSE OF THE CORPUS.**
+   `docs/Constitution Discussion/Janumi Single-Node Runtime Profile.md §31`, verbatim: *"Large binary and
+   document Artifacts SHOULD use S3-compatible storage"*; §31.1 *"PostgreSQL SHALL retain authoritative
+   metadata"* — `artifact_id, tenant_id, object_key, content_hash, content_type, size, created_by, created_at,
+   source_context, malware_scan_status, retention_policy, encryption_status`; §31.3 *"Artifacts SHALL use
+   cryptographic content hashes."* `CON-000 B1` admits that directory as SOURCE CORPORA **for DETAIL**.
+   ⚠ **That field list IS `ARTIFACT`'s** — `object_key`↔`storageKey`, `content_hash`↔`contentHash`,
+   `content_type`↔`mediaType`, `size`↔`byteSize`, `retention_policy`↔`retentionClass`. **The pointer and the
+   store were designed together and only the pointer was built.**
+2. **"No redaction or purge mechanism anywhere."** TRUE of the six RPH packages (measured: zero). **FALSE of
+   the corpus.** `JAN-CSAA-009 §20` specifies a nine-member action vocabulary including `redact-derivative`,
+   `tombstone-or-unavailable-record`, `physical-delete`, `cryptographic-erasure`, plus a `retentionActionId`
+   and a Redaction Manifest; `JAN-CSAA-007:2358` carries `InformationControlBinding` with separate
+   confidentiality/access/retention classifications and effective/expiry times.
+3. **"`DOC-009` ratifies only a POINTER"** and **"55 tables"**. It ratifies inline `jsonb` carriers too — §3.1
+   permits JSON for *"structured model output"*, and `execution_attempts.result jsonb` is one. And the count is
+   **56**, not 55.
+
+- ⚠⚠ **THE COMMON CAUSE, AND IT IS NOT CARELESSNESS.** The probes were
+  `content store|blob store|content_store|payload store`. **The corpus's term is "object storage."** Absence of
+  the PHRASE was reported as absence of the SHAPE — the identical defect as `REG-F-314`, one level up:
+  `FAL-5` searched the vocabulary of my *invention*; this searched the vocabulary of my *architecture*.
+  **Neither searched the corpus's own.** A near-miss makes it worse in both cases: the redaction probe DOES
+  return hits, all belonging to `packages/csaa`'s `redactRoot`, a repository-path scrubber — a different sense
+  of the word, which reads as a completed search.
+
+- ⚠ **AND THE SEAM WAS ALREADY REGISTERED, WHICH THE STANDING RULE SAYS TO CHECK FIRST.** `DEF-W2-001` —
+  *"WP-2-005 blob content-hashing + §18.3 artifact supersession + access control → W3 execution / W10
+  security"* — audited **`STILL_TRUE`** by the `REG-F-200` deferral census on 2026-08-20. **This was never an
+  unraised gap. It was a scheduled one**, and the design had raised it as a fresh sponsor question.
+
+- **NET EFFECT: THE PROGRAMME GETS SMALLER.** A specified-and-deferred store is a scheduling decision; an
+  unspecified one would have been a design programme.
+
+- **Merge target:** design record §7 (B-1, B-3), §11 (`FAL-7` re-dispositioned TRIGGERED), roadmap `ICP-03`.
+  **Owed:** nothing. Status: CLOSED.
+
+### REG-F-316 — `PER-9`'s exchange record has already been specified field-by-field in this repository, and the 75 confirmed harmonization findings have never been re-dispositioned
+
+- **Date:** 2026-09-02 · **Type:** FINDING (two, filed together because the second explains the first's cost) ·
+  **Class:** FINDING — grounds `JAN-ICP-DR-001` · **Status:** 🔶 OPEN (`ICP-00` owes the re-disposition).
+
+**(a) THE RECORD EXISTS AS A DESIGN.** `JAN-CSAA-007:1288-1308` specifies `ModelExchangeRecord`, which carries
+every one of `PER-9`'s elements: `materializedInputArtifactRef` (*"1 exact bytes actually presented after
+redaction"*), `rawOutputBeforeCoercionRef` (*"1 exact raw output"*), `resolvedModelIdentity` (*"closed union of
+exact provider/model/version/evidence or `unreported`/`unresolvable` with rationale"*), `truncationState` +
+`omittedRegions`, the parse/validation/disposition triple, `inputRedactionManifestRef`, and — for `PER-9`'s
+*"each retry, reformat, and repair"* — `exchangeRole` (*"1 of `initial`, `retry`, `reformat`, `repair`"*) with
+`predecessorExchangeRef`. It states `PER-9-b` in its own words: *"A fingerprint never substitutes for retained
+materialized input or raw output."* It also defines the fingerprint — `DigestDescriptor`, a JCS-aligned sha256
+descriptor — for which **JPWB already has the canonicalization** (`rph-contracts/src/hash.ts`).
+⚠ **It forbids, by name, a bug live at HEAD:** *"Repair never rewrites predecessor raw output"* is exactly
+`reasoning-review-validator.ts:180`'s `raw = await print(...)`, findings #25/#62.
+⚠ **SCOPE:** CSAA is another agent's subsystem, its types are CSAA-namespaced, and this programme imports
+nothing from it. Cited as a worked solution to the same ratified obligation.
+
+**(b) AND THE MEASUREMENT THIS RESTS ON IS FOURTEEN MONTHS OLD.** `HARMONIZATION-FINDINGS.md` carries 75
+adversarially-confirmed findings, of which **fifteen are `governed-stream`: 1 CRITICAL, 6 BLOCKING, 8
+MATERIAL** — the whole subject matter of the ICP design. **The 32 REFUTED findings were re-checked at HEAD on
+2026-08-23; the 75 CONFIRMED ones never have been.** Spot-checks show movement in **both directions**:
+
+- **#24/#25/#62 TRUE AT HEAD**, same file, drifted lines — `reasoning-review-validator.ts:176-182` runs two
+  bounded tries in one function, retains neither, overwrites the first's output, and swallows the parse outcome.
+- **#26 PARTLY STALE** — an Execution Attempt read-model now EXISTS (`rph-projections/src/execution-attempts.ts`,
+  Fork A, ruled 2026-07-21) and carries **ZERO of `PER-9`'s six elements**. ⚠ **The §10.4 SHAPE landed and the
+  `PER-9` SUBSTANCE did not**, and it cannot arrive by projection, because the events it folds never carried
+  the exchange.
+- **#65 STALE** — `ArtifactObjectSchema` now carries the full storage field set.
+
+⚠ **THIS IS WHY `ICP-00` IS A RE-DISPOSITION AND NOT A SURVEY**, and why its control is that **#65 and #26 must
+be reported as moved** — a sweep returning "all still true" is indistinguishable from one that never ran.
+
+- **Merge target:** design record §5, §7a; roadmap `ICP-00`, `ICP-02`. **Owed:** `ICP-00`'s twenty rows.
