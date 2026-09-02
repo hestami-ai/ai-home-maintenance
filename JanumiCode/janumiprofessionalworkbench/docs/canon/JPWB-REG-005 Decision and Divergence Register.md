@@ -28417,3 +28417,55 @@ requires. **`§14`'s exit criteria, each verified rather than asserted:**
 
 - **Merge target:** **Register.** **Owed:** the three OPEN findings above, and `SWP-06`'s blocked gate.
   Status: CLOSED.
+
+### REG-D-048 — SPONSOR RULING: an instruction template is a GOVERNED OBJECT, declared by a PWU Type, not a string field on one
+
+- **Date:** 2026-08-31 · **Type:** RULING (sponsor) · **Class:**
+  DECISION — settles `REG-Q-A` raised in `DESIGN-instruction-and-context-plane.md` §2 · **Status:** ✅ CLOSED.
+
+**THE QUESTION PUT TO THE SPONSOR.** The corpus carries two ratified answers about where an authored instruction
+to an agent lives, and they do not agree. *Legacy JanumiCode — Semantic Inventory and RPH Conformance Mapping*
+§7 maps, verbatim: `| Prompt | Prompt template within an Execution Step |`. The *Canonical Domain Model* §21
+then gives the `ExecutionStep` interface in full — `id, executionPlanId, stepType, purpose, inputBindings,
+outputBindings, runtimeBindingId?, preconditions, postconditions, stepState` — with **no prompt template
+field**, while `stepType` includes `MODEL_INVOCATION`. The engine implements §21 faithfully, so the absence is
+not an implementation defect.
+
+Four options were put, with their costs: (a) on the Execution Step, per the mapping row; (b) on the PWU Type,
+per the sponsor's own model; (c) derived and never authored; (d) **a governed object in its own right, declared
+by the PWU Type the way an assurance policy already is.**
+
+**RULED (d), 2026-08-31.** In the sponsor's words: *"Option (d) sounds most like the balance and tradeoffs the
+system needs."*
+
+- **WHAT (d) IS, AND WHY IT IS NOT AN INVENTION.** The corpus already solved this problem once. An
+  `ASSURANCE_POLICY` is not a string on a PWU Type — it is a governed object, authored and versioned
+  independently, which a PWU Type merely DECLARES by id (`PwuType.requiredAssurancePolicyIds`) and an instance
+  carries resolved (`Pwu.assurancePolicyIds`). The ruling adopts that same shape for the instruction: authored
+  once, versioned on its own, referenced by the kind of work it governs, composed at execution time with the
+  context-assembly policy, and recorded in the per-turn manifest.
+  ⚠ **THE PATTERN IS RATIFIED; THIS APPLICATION OF IT IS NOT.** No corpus text places an instruction template
+  in an object of its own. Option (a) has a corpus row behind it; (d) has an architectural precedent behind it,
+  and that difference was stated to the sponsor before they ruled.
+
+- **WHAT THIS BUYS, IN THE TERMS THE QUESTION WAS ASKED IN.** The sponsor's originating complaint about the
+  predecessor system was that *the coding agent could not fix an oversized prompt because it could not perceive
+  it* — the authored instruction and the accumulated context were one artifact. Under (d) they are three
+  separable things: a versioned template a human authors and reviews; a context-assembly policy that governs
+  what is added; and a composed result recorded in a durable manifest. **Something to reach for, and something
+  to look at.**
+
+- **WHAT THE RULING DOES NOT SETTLE, AND MUST NOT BE READ AS SETTLING.** The object's field shape; whether a
+  PWU Type declares one template or several; whether parameter substitution exists and in what syntax; whether
+  editing a template migrates dependent PWAs the way `EditAssurancePolicy` versioning does; and the shape of
+  `ModelSelectionPolicy`, which the ontology still records as *"NOT field-defined. Source TBD."* Each is a
+  design question the roadmap must answer or defer explicitly.
+
+- **⚠ AND THE TWO CORPUS READINGS ARE NOT THEREBY RECONCILED.** (d) is neither (a) nor (b): the mapping row
+  still names a placement — *within an Execution Step* — that no ratified interface provides, and §21 still
+  defines an interface with no instruction. The ruling decides what THIS SYSTEM will build; it does not amend
+  either document, and a later reader must not cite `REG-D-048` as having resolved the corpus tension. The
+  tension stands and is recorded in the design record's §2.
+
+- **Merge target:** `docs/_working/DESIGN-instruction-and-context-plane.md` §2 (the open question struck in
+  place and the ruling recorded), then a roadmap. **Owed:** the roadmap, and the design questions listed above.

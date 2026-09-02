@@ -77,15 +77,31 @@ it for Reading B and leave the mapping row as an aspiration. **But that reading 
 for an authored instruction at all**, which is a substantive claim about the product, not a documentation
 cleanup. It needs a ruling.
 
-> **SPONSOR RULING REQUIRED — `REG-Q-A`: where does an authored instruction live?**
-> (a) On the **Execution Step**, per the mapping row — one template per step, versioned with the plan.
-> (b) On the **PWU Type**, per the sponsor's stated model — one template per kind of work, inherited by every
->     instance and every plan that realizes it.
-> (c) **Nowhere as authored text**: the instruction is *derived* at execution time from purpose, required
->     inputs/outputs, obligations, constraints and completion rule, and the design work is entirely in the
->     context-assembly policy.
-> Each is coherent. (a) matches the corpus mapping; (b) matches the sponsor's mental model and the predecessor
-> system; (c) is the most governed and the least controllable. **This document does not choose.**
+- ~~**SPONSOR RULING REQUIRED — `REG-Q-A`: where does an authored instruction live?** (a) On the Execution Step,
+  per the mapping row. (b) On the PWU Type, per the sponsor's stated model. (c) Nowhere as authored text —
+  derived at execution time. **This document does not choose.**~~
+  **✅ RULED 2026-08-31 — `REG-D-048`, OPTION (d).**
+
+> **`REG-D-048` — AN INSTRUCTION TEMPLATE IS A GOVERNED OBJECT, DECLARED BY A PWU TYPE.**
+> Sponsor's words: *"Option (d) sounds most like the balance and tradeoffs the system needs."*
+>
+> ⚠ **OPTION (d) WAS NOT IN THIS DOCUMENT WHEN IT WAS FILED.** It was proposed after the sponsor asked for
+> clarity on what they were ruling on, and it is recorded here as the fourth option rather than back-written
+> into the original three, because the reason it exists is that the first three did not fit.
+>
+> **The shape, and why it is not an invention:** the corpus already solved this once. An `ASSURANCE_POLICY` is
+> not a string on a PWU Type — it is a governed object, authored and versioned independently, which a PWU Type
+> DECLARES by id (`requiredAssurancePolicyIds`) and an instance carries resolved (`assurancePolicyIds`). The
+> ruling adopts that same shape for the instruction.
+>
+> ⚠ **THE PATTERN IS RATIFIED; THIS APPLICATION OF IT IS NOT**, and that was said before the ruling was made.
+> Option (a) has a corpus row behind it; (d) has an architectural precedent behind it. They are different kinds
+> of warrant and a later reader must not conflate them.
+>
+> ⚠⚠ **AND THE §2 TENSION IS NOT RESOLVED BY THIS RULING.** (d) is neither (a) nor (b). The mapping row still
+> names a placement — *within an Execution Step* — that no ratified interface provides, and §21 still defines
+> an interface with no instruction. `REG-D-048` decides what THIS SYSTEM WILL BUILD. It amends no document, and
+> it MUST NOT be cited as having reconciled the corpus with itself. **The tension stands.**
 
 ---
 
@@ -197,7 +213,10 @@ only then build surfaces, each reading a fact that exists.
 
 ## 7. Sequence
 
-1. **`REG-Q-A` ruling.** Everything downstream depends on where the instruction lives. Nothing is built first.
+1. ~~**`REG-Q-A` ruling.** Everything downstream depends on where the instruction lives. Nothing is built
+   first.~~ **✅ DISCHARGED 2026-08-31 by `REG-D-048` — option (d).** The instruction is a governed object
+   declared by the PWU Type; steps 2-6 stand as written and step 4 now reads "the instruction template object
+   and its declaration on PWU Type", not "a field".
 2. **Context assembly as a governed object.** Independent of the ruling: whichever artifact carries the
    instruction, the assembled context needs an identity. This is the item that makes the rest possible.
 3. **The durable context manifest**, with the reload test of §5 driven RED before it is made green.
@@ -213,7 +232,10 @@ the answer is that four fifths of it is not.
 
 ## 8. What this design does not decide
 
-- **Where the instruction lives** — `REG-Q-A`, above.
+- ~~**Where the instruction lives** — `REG-Q-A`, above.~~ **RULED: `REG-D-048`, option (d).** What the ruling
+  left open, and what the roadmap must answer or defer explicitly: the object's field shape; whether a PWU Type
+  declares ONE template or several; whether parameter substitution exists and in what syntax; and whether
+  editing a template migrates dependent PWAs the way `EditAssurancePolicy` versioning already does.
 - **The shape of `ModelSelectionPolicy`** — the ontology records it as *"Source TBD"*, and inventing a shape
   here would create a fifth restatement of the kind `assessment-criterion-contract.test.ts` exists to prevent.
 - **Whether the decomposition budget is a MUST** — no corpus text imposes one.
