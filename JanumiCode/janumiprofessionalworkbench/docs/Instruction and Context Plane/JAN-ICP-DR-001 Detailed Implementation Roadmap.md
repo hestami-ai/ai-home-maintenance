@@ -132,7 +132,21 @@ re-checked **at the site** with a positive control, in the manner of the 2026-08
 not run. **#65 and #26 are the known-moved pair** — any sweep that reports them unchanged has failed, and that
 is the check on the instrument.
 
-**Exit.** Twenty rows, each with a command a reader can re-drive. **No code changes.**
+⚠ **AND TWO CENSUS LIMBS ARE OWED FILINGS, NOT RE-DISPOSITIONS** (`REG-F-317`). The W-3b invariant census
+(`docs/tracking/w3b/invariant-verdicts.ndjson`) drove `PER-9` as **eleven limbs** and named what each owes.
+`limb:PER-9:6` and `:9` are discharged by `REG-F-316`. **Two remain:**
+- **`limb:PER-9:7`** — *"PER-9's fingerprint clause has no implementation surface: no prompt or template
+  identity of any kind is minted, versioned or recorded, on either plane."*
+- **`limb:PER-9:10`** — *"the log/record plane distinction is asserted only in prose … the Logger port's 'MUST
+  NOT carry secrets / PII / raw payloads' is unenforceable."* ⚠ The design record quotes that very line as
+  corroboration for the log/record split **without noticing the line itself is unenforced.**
+
+⚠⚠ **AND `docs/tracking/` IS A THIRD PLACE TO SEARCH BEFORE FILING ANYTHING.** It is neither the register nor
+the per-programme design corpus, it holds **driven verdicts with positive controls**, and this programme
+re-derived from the corpus what it already contained. Add it to the standing pre-filing sweep.
+
+**Exit.** Twenty-two rows — the twenty findings plus `limb:PER-9:7` and `:10` — each with a command a reader
+can re-drive. **No code changes.**
 
 ---
 

@@ -28594,3 +28594,40 @@ MATERIAL** — the whole subject matter of the ICP design. **The 32 REFUTED find
 be reported as moved** — a sweep returning "all still true" is indistinguishable from one that never ran.
 
 - **Merge target:** design record §5, §7a; roadmap `ICP-00`, `ICP-02`. **Owed:** `ICP-00`'s twenty rows.
+
+### REG-F-317 — the W-3b census had already driven `PER-9` limb by limb and named the owed filing; `REG-F-316` is that filing, and two of its siblings remain owed
+
+- **Date:** 2026-09-02 · **Type:** RECORD (linkage; discharges two census limbs) · **Class:**
+  RECORD — connects `REG-F-316` to `docs/tracking/w3b/invariant-verdicts.ndjson` · **Status:** 🔶 PARTIAL.
+
+Found only because an adversarial verifier cited a census row I had not opened. **The W-3b invariant census
+drove `PER-9` as ELEVEN LIMBS and reached this design's conclusions independently, before it did** — which
+means the re-grounding in `REG-F-314`/`REG-F-316` was, in part, a re-derivation of driven work.
+
+- **`limb:PER-9:6` — `UNENFORCED_NO_SHAPE`.** Owed, verbatim: *"A REG-F finding naming PER-9's exchange-record
+  obligation directly: no bounded model or agent try in this system — neither an execution-plane attempt nor
+  either of the reasoning-review validator's two…"* **`REG-F-316` is that filing.** ✅
+- **`limb:PER-9:9` — `UNENFORCED_NO_SHAPE`.** Owed, verbatim: *"PER-9 binds the exchange-record obligation to
+  the authoring plane BY NAME ('PWA authoring among them'), and the plane's only governed-stream record shape
+  is a four-field ConversationE[ntry]…"* **`REG-F-316` is that filing too**, and the design record's §6 is its
+  worked form. ✅
+- **`limb:PER-9:7` — `UNENFORCED_NO_SUBJECT`, STILL OWED.** *"PER-9's fingerprint clause has no implementation
+  surface: no prompt or template identity of any kind is minted, versioned or recorded, on either plane."*
+  ⚠ The design record's `H-5` addresses the SHAPE (`DigestDescriptor`) but files nothing. **Owed.**
+- **`limb:PER-9:10` — `UNENFORCED_NO_SUBJECT`, STILL OWED.** *"the log/record plane distinction is asserted
+  only in prose … the Logger port's 'MUST NOT carry secrets / PII / raw payloads' is unenforceable."*
+  ⚠ The design record quotes that port line as CORROBORATION and never noticed it is itself unenforced. **Owed.**
+
+- ⚠⚠ **AND `filing: FILED` ON THESE ROWS DOES NOT MEAN THE FINDING EXISTS** — a verifier read it that way and
+  was wrong. `filed_as` shows the field records that the **filing-status SEARCH was performed**, and that the
+  facts sit under **other anchors** (`RPH-PER-012` under PER-6, docblocks at `handlers/assurance.ts:2289`),
+  while `owed` states that a REG-F naming `PER-9` directly is still outstanding. **A status field can describe
+  the search rather than the world**, which is this register's standing lesson wearing a schema.
+
+- **THE PROCESS FINDING, which is the reusable part.** `REG-F-314`/`315`/`316` were reached by reading the
+  corpus, not by grepping the census — and the census had the answer, driven, with positive controls. The
+  standing rule *"grep the register AND the per-programme design corpus first"* extends to
+  **`docs/tracking/`**, which is neither, and which holds driven verdicts nobody re-reads.
+
+- **Merge target:** roadmap `ICP-00` (add `limb:PER-9:7` and `:10` to the twenty rows). **Owed:** those two
+  filings. Status: PARTIAL.
