@@ -194,6 +194,25 @@ and is **not** E-2. The pre-coercion output still needs its own capture in `ICP-
 3. `AUTHORING_CONVERSATION`'s shape **ratified**: it is currently `UNRATIFIED-AUTHORED` by its own m3 note
    (*"Ratification pending"*), so extending it is a ratification act, not only a build.
 
+> ### ⚠ PARTIALLY LANDED 2026-09-02 — deliverables 1 and 2a done; 2b and 3 remain
+> ✅ **Deliverable 1 — the adoption decision** is filed: `ICP-02 adoption decision.md`. **Adopted 9 · Deferred 5
+> (each with a named carrier) · Partial 1 · Rejected 1 · Renamed member 1.**
+> ✅ **Deliverable 2a — the record and its assembly**: `exchange-record.ts`, 7 tests, **6 mutants all SOUND,
+> single-victim, baseline clean.**
+> 🔶 **Deliverable 2b — carrying it on both planes** and 🔶 **deliverable 3 — ratifying
+> `AUTHORING_CONVERSATION`** remain. They need persistence, which is `ICP-03`.
+>
+> ⭑ **AND THE ADOPTION CORRECTED THIS ROADMAP'S OWN GROUPING.** `ICP-03` below says *"E-1/E-3/E-4/E-5 need no
+> content store; E-2/E-6 do."* **That is wrong: E-1 IS content** — the largest and most sensitive field in the
+> record. `ModelExchangeRecord` settles it by storing input and output BY REFERENCE, which is exactly the
+> two-plane split `PER-12` + `PER-8` require. **The honest split is by KIND, not element number:** metadata
+> (E-3, E-4, E-5, role, predecessor, disposition) is buildable now; content (E-1, E-2, E-6) waits on `ICP-03`.
+>
+> ⚠ **ONE TEST WAS A CONTROL THAT COULD NOT FAIL, AND WAS FIXED RATHER THAN KEPT.** *"A repair does not mutate
+> its predecessor"* was vacuous while `beginExchange` took only a predecessor **id** — nothing was reachable to
+> mutate. The API now takes the predecessor RECORD, which makes CSAA-007's rule *"Repair never rewrites
+> predecessor raw output"* breakable and therefore assertable. Its mutant (X2) is SOUND.
+
 **Exit + THE TESTS THAT MUST REDDEN.**
 - **A repair produces TWO records.** Mutant: emit one record per turn. MUST fail — `PER-9-a` counts tries, and
   `reasoning-review-validator.ts` produces two on every repair path (F-9).

@@ -28761,3 +28761,54 @@ unrecorded** — which is why this preceded the record rather than being part of
   the recorder and **asserts, without proving, that it is installed on the live path.**
 
 - **Merge target:** roadmap `ICP-01` (risk retired). **Owed:** `ICP-02`. Status: CLOSED.
+
+### REG-F-321 — `ICP-02` PARTIAL: the exchange record is adopted rather than derived, and the adoption corrected the roadmap's own element grouping
+
+- **Date:** 2026-09-02 · **Type:** RECORD (work package partial) · **Class:**
+  RECORD — advances `JAN-ICP-DR-001` `ICP-02` · **Status:** 🔶 PARTIAL (deliverables 2b and 3 owed).
+
+**Deliverable 1 — the field-by-field adoption decision against `ModelExchangeRecord`** is filed at
+`docs/Instruction and Context Plane/ICP-02 adoption decision.md`: **adopted 9, deferred 5 (each with a named
+carrier), partial 1, rejected 1, renamed member 1.** **Deliverable 2a — the record and its assembly** landed as
+`exchange-record.ts` with 7 tests and **6 mutants, all SOUND, single-victim, on a clean baseline.**
+
+- ⭑ **THE ADOPTION OVERTURNED THIS PROGRAMME'S OWN GROUPING OF `PER-9`'s ELEMENTS.** The roadmap's `ICP-03`
+  entry said *"E-1/E-3/E-4/E-5 need no content store; E-2/E-6 do."* **E-1 IS content** — the exact materialized
+  input is the largest and most sensitive field in the record, and grouping it with metadata would have
+  scheduled it as buildable now. `ModelExchangeRecord` settles it by storing input and output **BY REFERENCE**
+  (`materializedInputArtifactRef`, `rawOutputBeforeCoercionRef`, `inputRedactionManifestRef`), which is
+  precisely the two-plane architecture `PER-12` + `PER-8` require — **arrived at independently by whoever wrote
+  CSAA-007, and by this design from the invariants, which is the strongest corroboration either has.** The
+  honest split is by KIND: metadata buildable now, content behind `ICP-03`.
+
+- **THE REFERENTS ARE ABSENT AND THE RECORD SAYS SO.** Content refs are born `PENDING_CONTENT_PLANE` carrying
+  the reason: no content store (`REG-F-315` / `DEF-W2-001`) and no redaction (finding `#60`). **A record that
+  states its bytes are unretained is the DISCLOSED omission `PER-9` permits; the code today performs the SILENT
+  one it forbids** (*"record-plane omission is not"*).
+
+- ⚠⚠ **ONE TEST WAS A CONTROL THAT COULD NOT FAIL, AND IT WAS CAUGHT BEFORE THE MUTANTS RAN.** *"A repair does
+  not mutate its predecessor"* — the roadmap's second required red — was **vacuous as first written**, because
+  `beginExchange` took only a predecessor **id**: no plausible mutation of the module could have reddened it.
+  The API now takes the predecessor **RECORD**, which makes CSAA-007's *"Repair never rewrites predecessor raw
+  output"* breakable and therefore assertable; mutant `X2` (a repair that overwrites its predecessor's
+  raw-output ref) is SOUND. **Passing a value the rule cannot reach is how a guard ends up proving nothing**,
+  and this one was written that way by its own author on the first attempt.
+
+- **THE THREE ROADMAP-OWED REDS, EACH DRIVEN:** a repair produces a SECOND record naming its predecessor (`X1`);
+  a repair does not rewrite its predecessor (`X2`); a fingerprint does NOT satisfy the record (`X3` — letting a
+  present `promptTemplateFingerprint` clear `E-1` reddens, which is `REG-F-314`'s manifest as an executable
+  refusal). Three further mutants guard adoption limbs that would otherwise vanish silently: the identity
+  union's `unreported`/`unresolvable` arms (`X5`), `truncationState` defaulting to `unknown` rather than
+  `none-declared` (`X6`), and the role/predecessor guards (`X4`).
+
+- ⚠ **AND WE MOVED A CSAA PIN A SECOND TIME.** `apps/rph-demo` population 97 → 99. Caught the same way as the
+  first — by running the FULL suite rather than the scoped one — and corrected in place with its reason. After
+  the fix `subject.test.ts` is back to its HEAD baseline of 1 failed (the pre-existing JAN-CSAA-005 projection)
+  / 63 passed.
+
+- **OWED:** deliverable 2b (carry the record on both planes) and deliverable 3 (ratify
+  `AUTHORING_CONVERSATION`'s shape, currently `UNRATIFIED-AUTHORED`). Both need persistence — `ICP-03`. Also
+  still open: **E-2 has no capture point.** `ICP-01` established `onResponse` fires *"before its body stream is
+  consumed"*, so it is HTTP-level, not the decoded answer.
+
+- **Merge target:** roadmap `ICP-02` (the partial-landing banner) and the adoption decision document.

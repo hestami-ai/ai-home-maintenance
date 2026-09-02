@@ -2732,7 +2732,15 @@ describe('live JPWB and inventory projection', () => {
 		// recorded that scoped runs hide CSAA population moves. It was also verified pre-existing-vs-ours by
 		// stashing: at HEAD this file fails ONE test (the JAN-CSAA-005 projection) and inventory.test.ts fails
 		// on REG-F-311's generated-context blocker; only THIS assertion is ours.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(97);
+		// 97 -> 99 (JAN-ICP-02): `exchange-record.ts` and its test — the PER-9 exchange record, adopted
+		// field-by-field from JAN-CSAA-007's `ModelExchangeRecord` rather than derived (REG-F-316). It holds
+		// E-1/E-2/E-6 BY REFERENCE, which is the two-plane split PER-12 + PER-8 require: the record is
+		// permanent, the content it points at is purgeable, so they cannot share a store. The referents are
+		// born PENDING_CONTENT_PLANE because no content store exists (DEF-W2-001) and no redaction exists
+		// (finding #60) — a DISCLOSED omission, which PER-9 permits, in place of the silent one it forbids.
+		// ⚠ SECOND CSAA PIN WE HAVE MOVED IN THIS PROGRAMME, AND WE ARE SAYING SO AGAIN. Caught the same way:
+		// by running the full suite, not the scoped one.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(99);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',
