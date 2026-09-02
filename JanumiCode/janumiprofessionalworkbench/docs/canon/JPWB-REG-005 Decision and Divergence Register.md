@@ -29279,3 +29279,48 @@ corrected statement: **build the port (JPWB); leave access control deferred (Pla
 
 - **Merge target:** `REG-D-049`'s warrant. **Owed:** nothing; `REG-D-049` still awaits sponsor confirmation on
   its conclusion, now with this correction attached.
+
+### REG-D-051 — `REG-D-049` is CONFIRMED **PROVISIONALLY**, with the sponsor's reservation recorded rather than smoothed away
+
+- **Date:** 2026-09-02 · **Type:** RULING (sponsor confirmation, qualified) · **Class:**
+  DECISION — confirms `REG-D-049` · **Status:** ✅ CONFIRMED — **PROVISIONALLY. THE RESERVATION IS UNSTATED AND UNRESOLVED.**
+
+**THE SPONSOR'S WORDS, VERBATIM (2026-09-02):** *"I'm not sure I'm 100% in agreement with REG-D-049, but in the
+interest of moving forward, I will confirm for now."*
+
+⚠ **THIS IS RECORDED AS QUALIFIED BECAUSE IT WAS GIVEN AS QUALIFIED.** `REG-D-049` moves from *operative pending
+confirmation* to **confirmed**, and the work resting on it is authorized. But a confirmation offered *"for
+now"*, by a sponsor who says they are not fully in agreement, is **weaker than a ratification**, and filing it
+as a flat CONFIRMED would misrepresent the act. `CON-000 B2` makes status a conferred thing; it does not make
+every conferral equal.
+
+- ⭑ **WHAT WAS CONFIRMED IS THE RULING AS CORRECTED, NOT AS ORIGINALLY WRITTEN.** `REG-F-329` — which found that
+  `REG-D-049` *"convicted W10 of abandoning work it had correctly DEFERRED"* — was filed BEFORE this
+  confirmation and was visible to the sponsor when they gave it. **The confirmed object therefore includes that
+  correction**, and a later reader must not resurrect the original warrant (*"both destinations are dead"*),
+  which is false of the Platform limb.
+
+- ⚠ **THE RESERVATION IS UNSTATED, SO IT CANNOT BE ADDRESSED — AND THAT IS ITSELF THE RECORD.** Nothing here
+  should pretend to know what the sponsor doubts. Recording the doubt WITHOUT inventing its content is the only
+  honest option, and it leaves the question re-openable on its own terms rather than closed by silence.
+  ⚠ **DO NOT LATER CITE THIS ENTRY AS EVIDENCE THAT THE OBJECTION WAS ANSWERED.** It was not raised in
+  specifics and it was not answered.
+
+- **WHAT UNWINDS IF IT IS WITHDRAWN, STATED NOW SO THE EXPOSURE IS KNOWN RATHER THAN DISCOVERED.**
+  - **The `ArtifactStore` port SURVIVES on independent warrant.** Three sources name the seam without reference
+    to `REG-D-049`: `rph-ports/src/index.ts`'s own header; `DEF-W2-001`'s route text (*"→ ArtifactStore /
+    CapabilityAuthorizer ports"*); and finding `#8`, which files a documented seam WITHOUT its port as
+    **CRITICAL**. Withdrawal does not make the port wrong.
+  - **What is genuinely contingent is the SCHEDULING claim** — that the ICP programme should pull this forward
+    NOW rather than leave it deferred. That is the part `REG-D-049` actually decided and the part a withdrawal
+    would reverse.
+  - **`REG-D-050` does NOT rest on it.** The purgeability ruling has its own sponsor statement and its own
+    warrant in `PER-8`'s SCOPE line; it survives independently.
+
+- **THE OPERATING CONSEQUENCE, ADOPTED DELIBERATELY:** while the reservation stands, **do not build anything
+  whose ONLY justification is `REG-D-049`.** Work that also stands on `PER-9`, `PER-12`, `PER-8`, `REG-D-050`,
+  or an existing filed finding proceeds normally. This keeps the exposure bounded to the scheduling claim rather
+  than letting it spread into the substance.
+
+- **Merge target:** `REG-D-049`'s status. **Owed:** the reservation's content, if and when the sponsor wishes to
+  state it.
