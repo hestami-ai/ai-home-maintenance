@@ -29536,3 +29536,80 @@ disclosed loss beats an unlawful retention**, which is the same posture as `REG-
 
 - **Merge target:** `agy-cli.ts`. **Owed:** a lawful home for the diagnostic (`E-5` wiring), and
   `verif/agy-stderr-unbound.test.ts` now needs a companion that probes the SHAPE, not the name.
+
+### REG-F-334 — the reading that would have dissolved `REG-Q-066` answers a blocker the question never named — and the carrier it cites is one I authored hours earlier, and never wired
+
+- **Date:** 2026-09-02 · **Type:** FINDING (a correction to my own reading, plus two blockers neither the
+  question nor I anticipated) · **Class:** FINDING — bounds `REG-Q-066`, discloses a gap in `ICP-02` as
+  delivered · **Status:** ✅ CLOSED as a correction. **`REG-Q-066` REMAINS OPEN and sponsor-reserved.**
+
+**THE READING, AND WHY IT DOES NOT HOLD.** A decision package over `REG-Q-066` returned the headline that
+*"'no shape in the RPH engine can hold it' is NO LONGER TRUE — a lawful carrier landed ten days after the
+question was filed."* ⚠ **A re-reading that makes a blocker VANISH needs more verification than the blocker
+did, and this one does not survive it.**
+
+- ⭑⭑ **THE CARRIER ANSWERS A BLOCKER THE QUESTION NEVER NAMED.** `REG-Q-066`'s option 1 reads verbatim:
+  *"the carrier is 'a typed Artifact bound to its producing Attempt' — and **no `EXECUTION_ATTEMPT` object
+  type, store row, or table exists**."* **Its blocker is that there is nothing to BIND TO, not that there is
+  nowhere to PUT.** The `ArtifactStore` port supplies a home for BYTES. **It is not responsive to the
+  question's own stated obstacle.**
+- **AND THE BLOCKER THE QUESTION DID NAME STILL STANDS, MEASURED AT HEAD.** `grep -rn EXECUTION_ATTEMPT` over
+  `packages/ apps/` minus `node_modules` and `dist` → **1 hit**: `packages/rph-contracts/src/ids.ts:33`,
+  `EXECUTION_ATTEMPT: 'attempt'` — an id **prefix**. The object registry enumerated from
+  `packages/rph-contracts/src/objects.ts` → **thirteen types, none an Attempt.** No `execution_attempts`
+  table. The two decisions that keep it staged (`docs/_working/HARMONIZATION-LOG.md:4142`) remain unratified.
+- ⚠⚠ **AND THE CARRIER IS MINE, FROM THIS SESSION.** `packages/rph-ports/src/ports/artifact-store.ts` landed
+  at **`c8fcb368`, 2026-09-02**, authored by me under `REG-D-049` — which the sponsor confirmed **with a
+  stated reservation**. *"Ten days after the question was filed"* is arithmetically true (2026-08-23 →
+  2026-09-02) **and reads as independent corroboration when it is the same hand, the same day.** Citing it to
+  dissolve the question is circular in the same shape as `FAL-5`: a test driven with the vocabulary of the
+  thing it is meant to test.
+- **WHAT THE PORT GENUINELY CHANGES, STATED NARROWLY SO IT IS NOT READ WIDER:** it makes **option 2**
+  buildable — ordinary content needs no Attempt binding. It does nothing for option 1.
+
+> ### ⚠⚠ THE CARRIER IS UNWIRED, AND THAT BOUNDS `ICP-02` AS I DELIVERED IT
+> `createInMemoryArtifactStore` has **zero non-test call sites repo-wide** — 11 hits total: 1 definition
+> (`packages/rph-ports/src/defaults/artifact-store.ts:40`), 1 `.d.ts`, and 9 across two test files.
+> **So in the running app nothing is retained and no exchange record is collected: the `ICP-02` capture path
+> is INERT IN PRODUCTION.** ⭑ **This is the `project_jpwb_hollow_governed_layer` shape and the
+> `feedback_delivery_is_not_the_end` shape at once** — I wired a seam, gated it, and did not give it a
+> caller, then reported the stage delivered. **Disclosed here rather than left for the next reader.**
+
+**A THIRD BLOCKER, WHICH NEITHER THE QUESTION NOR I ANTICIPATED.** `ArtifactContentInput.purgeability` admits
+**one value per stored object** (`Purgeability = 'PURGEABLE_AT_EXPIRY' | 'RETAINED_BY_PARTICIPATION'`). Raw
+model output is **MIXED**: the prose span is volunteered reasoning, `PURGEABLE_AT_EXPIRY` under `PER-12`
+(*"participates in no execution, assurance, governance, Baseline, or traceability"*); the JSON span is the
+judge's answer, which **did** participate in assurance, `RETAINED_BY_PARTICIPATION` under `PER-8`. **One object
+cannot carry both classes, so even option 2 fails as a whole-blob write.** ⚠ **This is a consequence of the
+port's design, not a defect in it** — the binary is `PER-8`'s participation predicate, and a mixed blob has no
+single answer to it.
+
+**AND A CORPUS TENSION THE QUESTION DID NOT SURFACE, WHICH IS THE REAL RESIDUE.** Guide **§9.7 L1340**
+provides for planes with no Execution Plan: *"Where no Execution Plan exists—PWA authoring is the current
+example—the identical recording obligation binds to the plane's own governed-stream record, **not to an
+Execution Attempt**."* ⭑ **But that carve-out redirects the EXCHANGE RECORD only.** The same sentence sends
+reasoning elsewhere — *"governed by the rule above, not by this record"* — and **L1338 binds it to *"a typed
+Artifact of its producing Attempt"*.** So on the assurance and authoring planes the reasoning Artifact has a
+**mandatory anchor with no referent**: the field exists
+(`ArtifactObjectSchema.producingExecutionAttemptId`, `packages/rph-contracts/src/objects.ts:623`,
+`z.string().optional()`) and no Attempt exists for it to name. **Unsatisfiable by construction on these planes,
+not by omission** — which is why no amount of building discharges it, and why `REG-Q-066`'s own merge target
+(**corpus**, not repository) is the right one.
+
+**THE ONE THING THE CORPUS ALREADY DECIDES, SO THE RULING NEEDED IS SMALLER THAN THE QUESTION ASKS.** §9.7
+L1340 closes: *"where it arrives inline with the answer, separate it at retention so that only the answer span
+binds under Section 8.4. **Where the spans cannot be separated losslessly** … **block the capability and
+resolve Section 16 item 23**."* `extractJson` (`apps/rph-demo/src/lib/server/assurance/agy-cli.ts:120-128`) is
+the de-facto separator and **returns the answer span while discarding the prose entirely** — it never returns
+the complement. The complement IS computable from the same offsets for a WELL-FORMED blob; it is **not** for a
+malformed one, where interleaved prose is swallowed by `slice(first, last + 1)`. ⭑ **The malformed case is
+`REG-Q-066`'s entire subject, and §9.7 already answers it: block.**
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a re-reading that dissolves a question must be checked against
+  the question's OWN stated obstacle, not against the obstacle I would have written.** Both times this failed
+  today the substitute obstacle was one I had recently been working on — `REG-F-326` substituted "is `stderr`
+  bound?" for "does the content reach a record?", and this reading substituted "is there a byte store?" for
+  "is there an Attempt?" **The tell in both: the dissolving evidence was authored by me, within hours.**
+- **Merge target:** `docs/_working/DECISION-REG-Q-066-raw-validator-output.md` (the package and its narrowed
+  recommendation). **Owed:** wire `ArtifactStore` to a real call site so the `ICP-02` limb above stops being
+  true; `REG-Q-066`'s ruling, still sponsor-reserved and unanswered by this entry.
