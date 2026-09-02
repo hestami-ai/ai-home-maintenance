@@ -2754,7 +2754,13 @@ describe('live JPWB and inventory projection', () => {
 		// so the omission the disclosure existed to prevent was being performed by the disclosure’s own gap.
 		// The remedy is not a longer hand-list but TOTALITY: Record<AuthoringEventKind, …> plus bidirectional
 		// compile-time exhaustiveness, all three drift directions driven and observed to fail.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(101);
+		// 101 -> 102: `mock-reasoning-review-validator.test.ts` — closing a FAIL-OPEN in the assurance floor.
+		// `judge()` returned SATISFIED with zero findings from BOTH arms that could not read the subject (a JSON
+		// parse failure, and an export with no `nodes`), so the floor’s mandatory Reasoning Review passed on
+		// content it had never read — a control that cannot fail, on the one Validator path the gate can run.
+		// INCONCLUSIVE is the correct disposition and it BLOCKS (floor.ts: "leaves assurance incomplete →
+		// blocks"). The reason rides in `limitations` rather than as a fabricated criterion id.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(102);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

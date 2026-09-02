@@ -29002,3 +29002,53 @@ SOUND and single-victim on a clean baseline.**
 - **OWED:** a durable (§31 S3-compatible) adapter; wiring `ExchangeRecord`'s `ContentRef`s to it so
   `PENDING_CONTENT_PLANE` becomes `STORED`; and **sponsor confirmation of `REG-D-049`**, which remains a
   proposal under `CON-000 B2`.
+
+### REG-F-325 — the assurance floor's one gate-runnable Validator passed on content it could not read, and the same file already fail-closed one function lower
+
+- **Date:** 2026-09-02 · **Type:** FINDING (fail-open in the assurance floor, fixed) · **Class:**
+  FINDING — found by the `ICP-03` disclosure sweep · **Status:** ✅ CLOSED.
+
+`apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts` — the TEST_MODE Reasoning-Review
+Validator, and **the only Validator the gate can actually run** — returned
+`{ findings: [], recommendation: 'SATISFIED' }` from **both** arms that could not read the subject: a JSON parse
+failure, and a parsed payload with no `nodes`.
+
+- ⭑ **THIS IS A CONTROL THAT CANNOT FAIL, INSIDE THE ASSURANCE FLOOR, ON THE PATH THE GATE USES.** The floor's
+  Reasoning Review is MANDATORY and non-suppressible. An arm that returns a pass for anything it cannot parse
+  means **every e2e that "proved" the floor blocks was proving less than it appeared** — 82 of them.
+- ⚠⚠ **AND THE SAME FILE ALREADY FAILS CLOSED ONE FUNCTION LOWER, WITH A COMMENT EXPLAINING WHY.** `evaluate`
+  throws on a missing `reasoningReview` context and cites *"§13.3: fail closed on missing policy"*. **So the
+  module held both postures at once — a reasoned fail-closed on missing INPUT, a silent fail-open on unreadable
+  CONTENT** — and the fail-open had no comment at all. The reasoning was done once and not carried across the
+  same file.
+- ⚠ **THE HEADER DESCRIBED A BEHAVIOUR THE CODE DID NOT HAVE**: *"a well-formed graph passes; an invalid one is
+  REJECTED"*. Unreadable content was neither, and passed. Corrected to state the third case explicitly.
+
+**THE FIX, AND WHY `INCONCLUSIVE` RATHER THAN `REJECTED`.** A Validator that could not read its subject has not
+reviewed it — that is neither a pass nor a rejection OF THE SUBJECT. `INCONCLUSIVE` is the ratified disposition
+for it and **it blocks**: `floor.ts` records that INCONCLUSIVE *"leaves assurance incomplete → blocks"*, and
+`assurance-rules.ts` that an undeterminable mandatory criterion is *"INCONCLUSIVE (never a pass)"*.
+
+- **THE REASON RIDES IN `limitations`, NOT AS A FINDING.** Inventing a criterion id for *"unparseable"* would
+  attribute the failure to a policy criterion that says nothing about parsing — the fabrication this programme
+  keeps recording. §8.9 requires a valid result to identify its *"residual uncertainty, limitations"*, and this
+  is how `PER-9`'s **E-5 (the parse outcome)** reaches the record through a ratified field.
+- **`{ nodes: [] }` STAYS REVIEWABLE.** An empty array is truthy, so the guard fires only when `nodes` is absent
+  altogether. **Malformed is not the same as empty**, and collapsing them would have blocked a legitimate empty
+  graph.
+
+- **FIVE MUTANTS, ALL SOUND ON A CLEAN BASELINE:** each shipped arm restored to `SATISFIED` (`V1`, `V2`);
+  INCONCLUSIVE with the reason unrecorded (`V3`); `REJECTED` instead of `INCONCLUSIVE` (`V4`); and **`V5`, which
+  blocks everything — the control proving the fix is not merely "refuse more".** Without `V5` the other four
+  would pass while the gate was destroyed.
+- ⚠ **ONE PREDICTION WAS WRONG AND IS RECORDED AS SUCH.** `V1` was predicted to redden test 1 and reddened
+  {1, 3}: two tests exercise the same unparseable input, asserting DIFFERENT properties of it (the disposition,
+  and that the reason was recorded). **The mutant was right and the prediction was wrong** — corrected rather
+  than quietly re-fitted, because a prediction adjusted after seeing the result is not a prediction.
+
+- **REGRESSION SURFACE MEASURED, NOT ASSUMED:** the full Playwright suite — **82 passed** — so valid content
+  still passes and only unreadable content newly blocks.
+
+- **Merge target:** the validator and its new test. **Owed:** nothing. The equivalent arm in the PRODUCTION
+  (`agy`) validator is a separate subject — `reasoning-review-validator.ts`'s bare `catch` is finding `#62`,
+  still TRUE AT HEAD per `ICP-00`.
