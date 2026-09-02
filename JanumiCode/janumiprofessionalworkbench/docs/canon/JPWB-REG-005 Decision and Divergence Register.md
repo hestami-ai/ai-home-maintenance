@@ -29096,3 +29096,81 @@ surface on which retention could occur, so `PER-9` and `PER-12` have nothing to 
 
 - **Merge target:** `verif/agy-stderr-unbound.test.ts`. **Owed:** nothing for the bound. `REG-Q-066`'s three
   readings stay OPEN.
+
+### REG-D-050 — SPONSOR INTENT: the governed stream is fully auditable and reconstructable — which settles the purgeability of a participating assurance input
+
+- **Date:** 2026-09-02 · **Type:** RULING (sponsor statement of intent) · **Class:**
+  DECISION — settles the question raised by `ICP-02`/`REG-D-049`'s wiring · **Status:** ✅ CLOSED.
+
+**THE QUESTION PUT TO THE SPONSOR.** The `ArtifactStore`'s `purge()` refuses content marked
+`RETAINED_BY_PARTICIPATION`. So every retained exchange element must be classified, and the judge's
+**materialized input** was genuinely ambiguous: it is not a reasoning trace (which `PER-12` exempts), but it is
+also the most sensitive content the system handles. Marking it wrongly does opposite harms — permanently
+unpurgeable sensitive prompt content, or a purgeable basis for a recorded professional judgement.
+
+**THE SPONSOR'S WORDS, VERBATIM (2026-09-02):** *"The intention is for the governed stream to be fully auditable
+and reconstructable."*
+
+**RULED: a materialized assurance input PARTICIPATES, and is `RETAINED_BY_PARTICIPATION`.**
+
+- ⭑ **AND THE CORPUS SAYS IT IN NEARLY THE SAME WORDS, WHICH IS THE STRONGEST FORM OF CORROBORATION.** `PER-8`'s
+  **WHY**, verbatim (`DOC-003:366`): *"deletion severs the trace spine retroactively; **a record with holes
+  cannot answer who decided what on what basis**."* The sponsor's intent and the invariant's stated rationale
+  are the same sentence twice.
+
+- **PARTICIPATION IS A PROPERTY OF USE, NOT OF KIND — and `PER-8`'s SCOPE line draws the boundary explicitly.**
+  Verbatim (`DOC-003:367`): *"**SCOPE:** governs participated canonical objects. **NON-EXAMPLE:**
+  never-participated drafts, expired retention-bounded material **that by rule participates in nothing** (e.g.,
+  retained volunteered model reasoning — PER-12), and rebuildable projections are all purgeable; **this rule
+  does not embalm scratch space**."* The predicate is a past-tense act (*"has participated"*), and the exemption
+  is stated as a rule about what material may DO. **So the two-member `Purgeability` binary built under
+  `REG-D-049` maps onto the corpus exactly**, and the assignment follows:
+
+| Exchange element | Purgeability | Warrant |
+|---|---|---|
+| **E-1** materialized input | `RETAINED_BY_PARTICIPATION` | it is the basis of a recorded Assessment; purging it makes the conclusion unreproducible |
+| **E-2** pre-coercion output | `RETAINED_BY_PARTICIPATION` | the parse/disposition rests on it |
+| **E-3/E-4/E-5** metadata | retained (not content) | — |
+| **volunteered reasoning** | `PURGEABLE_AT_EXPIRY` | `PER-8`'s NON-EXAMPLE names it: *"by rule participates in nothing (e.g., retained volunteered model reasoning — PER-12)"* |
+
+- ⚠ **AND THE SENSITIVITY CONCERN IS ANSWERED BY REDACTION, NOT BY PURGE.** `PER-9`: retention is *"subject to
+  recorded redaction"*, and *"Log-plane redaction of sensitive prompt content is legal; **record-plane omission
+  is not**."* Redaction is not omission **when the redaction is itself recorded** — which is exactly what
+  `E-6`/`inputRedactionManifestRef` is for. **Reconstructability survives redaction** because the manifest says
+  what was removed and why; it would not survive purge, which is why the two are not interchangeable.
+
+- ⭑⭑ **THE UNBLOCK THIS CREATES, AND IT IS THE LARGER HALF.** `transcript.ts` drops volunteered reasoning
+  because *"anything admitted to the transcript could never be purged"* (finding `#59`, verdict `BOTH`). **That
+  premise is now false**: `PER-8` names reasoning as purgeable BY RULE, and the `ArtifactStore` can purge it.
+  **So reasoning may now be RETAINED lawfully — `PER-12`'s "retained where available" becomes performable for
+  the first time**, and `#59` becomes fixable rather than blocked.
+
+- **Merge target:** `exchange-record.ts` (the purgeability assignment), the roadmap, and `#59`'s disposition.
+  **Owed:** the wiring. Status: CLOSED.
+
+### REG-F-327 — the wiring is buildable today for the CONTENT and blocked for the REFERENCE, and three strict schemas were driven to prove it
+
+- **Date:** 2026-09-02 · **Type:** FINDING (pre-build ground truth, adversarially swept) · **Class:**
+  FINDING — scopes `ICP-02` deliverable 2b · **Status:** 🔶 OPEN.
+
+- ⭑ **THE CONTENT NEEDS NO RATIFICATION.** An exchange's materialized input can be persisted **today** as an
+  `ARTIFACT` through the existing `RecordArtifact` command, with **ZERO contract change** — driven, with a
+  refusal control. `ARTIFACT`'s fields are ratified (DOC-009 §18.1, transcribed column-for-column).
+- ⚠ **WHAT HAS NO CARRIER IS THE REFERENCE FROM THE ASSURANCE VERDICT.** Driven, all three rejected with
+  `unrecognized_keys`: a 17th field on `ValidatorResult` (`objects.ts:352-370`, `z.strictObject`); an added key
+  on `CompleteAssuranceAssessmentPayloadSchema` (`messages.ts:225-228`); an added key on `ExecutionProvenance`.
+  **The boundary fails CLOSED — so this is a contract change, not plumbing.**
+  ⭑ **BUT THE LINK CAN RUN THE OTHER WAY WITHOUT ONE:** `ARTIFACT` already carries `producingPwuId` and
+  `producingExecutionAttemptId`. **The artifact can name what produced it**, which makes the stream
+  reconstructable by join rather than by a forward pointer the verdict cannot hold.
+- **AND THE PER-9-a ARITHMETIC IS WORSE THAN FILED.** One authoring turn runs the floor **twice**
+  (`+server.ts:127` and `:153`, the auto-refine pass), and each floor run can call the model **twice**
+  (`reasoning-review-validator.ts:176`, `:181`). **Up to FOUR bounded tries per turn, and zero records today.**
+- ⚠ **A CONSTRAINT THAT SHAPES THE BUILD:** `ArtifactStore` is **async**, while `StorageAdapter`,
+  `Engine.dispatch`, `CommandHandler` and `HandlerContext` are **entirely synchronous** — so it cannot be
+  consumed from a command handler without changing that contract. The validator also holds no engine and is
+  constructed fresh per floor run (`assurance/index.ts:24`). The demo has **one composition root**
+  (`workbench.ts`, a per-process module singleton) and **no `hooks.server.ts`**, so a `getArtifactStore()`
+  singleton beside `handle` is the path that exists.
+
+- **Merge target:** `ICP-02` deliverable 2b. **Owed:** the wiring, within these constraints.
