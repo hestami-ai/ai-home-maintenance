@@ -29613,3 +29613,64 @@ malformed one, where interleaved prose is swallowed by `slice(first, last + 1)`.
 - **Merge target:** `docs/_working/DECISION-REG-Q-066-raw-validator-output.md` (the package and its narrowed
   recommendation). **Owed:** wire `ArtifactStore` to a real call site so the `ICP-02` limb above stops being
   true; `REG-Q-066`'s ruling, still sponsor-reserved and unanswered by this entry.
+
+### REG-F-335 — "CSAA at baseline" was certified all day against a ONE-FILE measurement, and the project carries thirty reds
+
+- **Date:** 2026-09-02 · **Type:** FINDING (a reporting defect of my own; no code defect) · **Class:**
+  FINDING — qualifies every gate claim in this session's commit messages · **Status:** ✅ CLOSED by
+  measurement. **None of the thirty is attributable to this session.**
+
+**THE PHRASE, AND WHAT IT ACTUALLY MEASURED.** Today's commit messages certify *"CSAA at baseline"* or
+*"CSAA at baseline (1 pre-existing failure)"*. That number came from
+`packages/csaa/src/subject/subject.test.ts` **alone** — the file holding the population pins, which is the
+file this work keeps having to bump. **Measured at HEAD `43651431`, the whole `csaa` project is:**
+
+```
+Test Files  22 failed | 164 passed | 2 skipped (188)
+     Tests  30 failed | 2764 passed | 36 skipped (2829)
+```
+
+⭑ **So "at baseline" was true of the file I was watching and said nothing about the project.** A reader of
+those commit messages would take it for "CSAA is green but for one known red." **It is not, and never was
+during this session.** This is `feedback_audit_what_the_number_measures` again: the number was correct and
+the POPULATION it ranged over was narrower than the phrase implied.
+
+**AND THE INSTRUMENT TRUNCATED ITS OWN EVIDENCE.** The first full run was invoked as
+`… --project csaa 2>&1 | tail -15`. When it was moved to the background, **the captured output file held
+588 bytes — the tail only — so the failure list did not exist to be read.** ⚠ **A pipe that trims output
+for display also trims the record**; the re-run used `--reporter=json --outputFile` and kept all of it.
+
+**NONE OF THE THIRTY IS MINE, ESTABLISHED THREE WAYS RATHER THAN ASSERTED.**
+
+1. **The commit under test changed only `.md` files** — `git status --porcelain` filtered for `.ts`/`.svelte`
+   returned empty. Docs cannot redden a TypeScript suite.
+2. **The two failures that reach my own pin file do not reach a pin.** Both
+   `src/subject/subject.test.ts :: projects the same subject paths …` and
+   `src/inventory/inventory.test.ts :: discovers every current workspace manifest …` throw
+   *"Required JPWB SvelteKit generated context is not current and closed"* from
+   `assertJpwbGeneratedContext` (`collect-inventory.ts:2797`) — **that is `REG-F-311`, filed 2026-08-31,
+   before this session.** ⚠ **I had been reading these as population-pin reds. They are not: they fail
+   BEFORE any population assertion is evaluated.**
+3. **No failure message names anything I authored.** Across **42,761 bytes** of collected `failureMessages`,
+   the ten files this session created or changed — `artifact-store`, `exchange-record`,
+   `materialized-input`, `exchange-capture`, `agy-failure-sanitisation`, `agy-stderr-unbound`, `agy-cli`,
+   `preflight`, `transcript.ts`, `mock-reasoning-review` — return **zero hits each**. **OBSERVED POSITIVE
+   CONTROL:** the same 42,761-byte corpus is non-empty and does name `collect-inventory.ts`,
+   `assess-dwp-007-persistence-selection.ts`, and `project-hybrid-static-prerequisites.test.ts`.
+
+**`REG-F-311` RE-TESTED THIS PASS AND IT CORRECTLY STAYS OPEN.** `svelte-kit sync` was re-run
+(`npm --prefix apps/rph-demo run prepare`) and **the guard did not clear** — the entry's first route is an
+`EPERM` on renaming `.svelte-kit`, not a missing sync. Its second route remains blocked by the same
+pre-existing defect it names: `apps/rph-demo/harness/pwa-judge-panel.workflow.js` is present and tracked and
+scores **0 hits in `rph-demo.svelte-kit.generated-context.evidence.json` and 0 in
+`jan-csaa-005.inventory.baseline.json`** — unchanged since 2026-08-31. `REG-F-311` says that one is *"a
+defect of its own and not this programme's to decide"*, and the standing instruction is that **CSAA belongs
+to the CSAA agent; we attend only to what we break.** Nothing here was broken by us, so nothing here is
+taken up.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a green certification must name the POPULATION it ranged
+  over, not just the count.** Every gate phrase in this session's messages — *"register ×4"*,
+  *"`app:rph-demo` 35 files / 175 tests"*, *"check-types 22/22"* — carries its population and is therefore
+  auditable. **"CSAA at baseline" was the one that did not, and it is the one that was wrong.**
+- **Merge target:** **Register.** **Owed:** nothing for this defect. Read *"CSAA at baseline"* in every
+  2026-09-02 commit message as **"unchanged by this work"**, never as **"green"**.
