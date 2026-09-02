@@ -2740,7 +2740,13 @@ describe('live JPWB and inventory projection', () => {
 		// (finding #60) — a DISCLOSED omission, which PER-9 permits, in place of the silent one it forbids.
 		// ⚠ SECOND CSAA PIN WE HAVE MOVED IN THIS PROGRAMME, AND WE ARE SAYING SO AGAIN. Caught the same way:
 		// by running the full suite, not the scoped one.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(99);
+		// 99 -> 100 (JAN-ICP-03): `omission.test.ts` — the disclosure half of ICP-03, which needs no sponsor
+		// ruling and no content store. PER-9: "record-plane omission is not [legal]". The bytes still cannot be
+		// retained (no purgeable plane, DEF-W2-001), but recording THAT reasoning was dropped and WHY is
+		// METADATA — so the declared half is buildable today while the retained half waits on REG-Q-B.
+		// ⚠ THIRD CSAA PIN THIS PROGRAMME HAS MOVED. Same detection route each time: the FULL suite, not the
+		// scoped one. Recorded rather than folded in, per this file’s own standing instruction.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(100);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

@@ -14,7 +14,9 @@ import { createAuthoringAgent, type AuthoringAgentEvent } from '$lib/server/agen
 import {
 	isRecordable,
 	narrationOf,
+	omissionFor,
 	TRANSCRIPT_KIND,
+	type OmittedRegion,
 	type TranscriptEntry
 } from '$lib/server/agent/transcript';
 import {
@@ -187,8 +189,20 @@ async function runFloorAfterTurn(ctx: {
 /** Append a recordable agent event to the candidate transcript. §9.7 write boundary: volunteered reasoning material
  * is never admitted to the durable transcript. Events are immutable and permanent (§9.4), so anything recorded here
  * could never be purged — the drop has to happen before the write, not after. See $lib/server/agent/transcript. */
-function recordEvent(transcript: TurnEntry[], ev: AuthoringAgentEvent): void {
-	if (!isRecordable(TRANSCRIPT_KIND[ev.kind] ?? '')) return;
+function recordEvent(
+	transcript: TurnEntry[],
+	ev: AuthoringAgentEvent,
+	omitted?: OmittedRegion[]
+): void {
+	const kind = TRANSCRIPT_KIND[ev.kind] ?? '';
+	if (!isRecordable(kind)) {
+		// ICP-03 — DECLARE the omission instead of performing it silently. PER-9: "record-plane omission is
+		// not [legal]". The bytes still cannot be retained (no purgeable plane — DEF-W2-001), but recording
+		// THAT they were dropped is metadata and needs no content store.
+		const region = omissionFor(kind);
+		if (region && omitted) omitted.push(region);
+		return;
+	}
 	if (ev.kind === 'text') {
 		const last = transcript.at(-1);
 		if (last?.role === 'AGENT' && last.kind === 'message') last.text += ev.text;
@@ -305,7 +319,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			// §9.7 write boundary: volunteered reasoning material is never admitted to the durable transcript.
 			// Events are immutable and permanent (§9.4), so anything recorded here could never be purged — the
 			// drop has to happen before the write, not after. See $lib/server/agent/transcript.
-			const record = (ev: AuthoringAgentEvent) => recordEvent(transcript, ev);
+			// ICP-03: omissions accumulate for the turn. They are METADATA (what was dropped and why), never
+			// the dropped content — so they are available today while retention waits on ICP-03's ruling.
+			const omitted: OmittedRegion[] = [];
+			const record = (ev: AuthoringAgentEvent) => recordEvent(transcript, ev, omitted);
 			try {
 				if (pwa.publicationStatus !== 'DRAFT') {
 					send({
@@ -343,6 +360,20 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					record(ev);
 				};
 				await agent.run(instruction, onEvent, request.signal);
+
+				// ICP-03 — the omission is DECLARED to the human who is watching. ⚠ THIS IS A SURFACE
+				// DISCLOSURE, NOT A RECORD-PLANE ONE, and the distinction is the point: PER-9 requires the
+				// declaration to live in the RECORD, and the authoring plane's record (ConversationEntry) is
+				// UNRATIFIED-AUTHORED and carries no field for it. Ratifying it is ICP-02 deliverable 3. Until
+				// then this makes the drop perceivable rather than invisible, and does not pretend to discharge
+				// PER-9.
+				if (omitted.length)
+					send({
+						kind: 'status',
+						text:
+							`${omitted.length} reasoning segment(s) were produced and dropped unretained. ` +
+							omitted[0].reason
+					});
 
 				// A fresh or REVISE-resumed candidate is COLLECTING and advances to ASSURING here; a candidate resumed
 				// from BLOCKED_EXTERNAL is already ASSURING (a mutable state), so the agent refined it in place.

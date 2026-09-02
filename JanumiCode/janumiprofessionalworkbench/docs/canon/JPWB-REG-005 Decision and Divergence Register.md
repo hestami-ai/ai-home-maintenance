@@ -28812,3 +28812,45 @@ carrier), partial 1, rejected 1, renamed member 1.** **Deliverable 2a — the re
   consumed"*, so it is HTTP-level, not the decoded answer.
 
 - **Merge target:** roadmap `ICP-02` (the partial-landing banner) and the adoption decision document.
+
+### REG-F-322 — `ICP-03` PARTIAL: the omission is now DECLARED, and the work package's own framing was wrong about why it could be
+
+- **Date:** 2026-09-02 · **Type:** RECORD (work package partial) · **Class:**
+  RECORD — advances `JAN-ICP-DR-001` `ICP-03` · **Status:** 🔶 PARTIAL (`REG-Q-B` remains the sponsor's).
+
+`PER-9`: *"Log-plane redaction of sensitive prompt content is legal; **record-plane omission is not**."*
+`transcript.ts` drops volunteered reasoning at the write boundary and, until now, **nothing recorded that it
+had.** The drop itself is defensible — events are immutable and permanent (§9.4) and `PER-12` requires retained
+reasoning purgeable at expiry, so admitting it would create an unpurgeable artifact. What was indefensible is
+that it left no trace.
+
+- ⭑ **THE DISCLOSURE NEEDED NO RULING BECAUSE IT IS METADATA.** Recording THAT content was dropped, and why, is
+  not content; only the dropped bytes are. So the DECLARED half of `PER-9` was available all along while the
+  RETAINED half waits on the content plane. `omissionFor()` + wiring, **5 mutants all SOUND on a clean
+  baseline**: always-undefined (today's silent drop) `{1,2}`; a bare reason naming no invariant `{2}`;
+  every-non-recordable-is-an-omission `{3}`; a role name that does not identify what was lost `{1}`; a
+  RECORDABLE kind mapped as omitted `{3,4}`.
+
+- **THE DISCLOSED SET IS NARROW ON PURPOSE.** Only `thinking` maps to an omission role. `status` lines are
+  display chrome the corpus never asks anyone to retain, and disclosing them as governed-content omissions
+  would bury the one real disclosure in noise. ⚠ **An over-broad disclosure is its own defect** — it makes the
+  finding unfindable, which is the failure it was meant to prevent — and mutant `O5` is what holds that line.
+
+- ⚠⚠ **AND THE WORK PACKAGE'S OWN FRAMING WAS WRONG, CORRECTED MID-BUILD.** This was scoped as a RECORD-PLANE
+  disclosure. **It could not be, and not for the reason assumed.** `PER-9` requires the declaration to live in
+  the record; the authoring plane's record is `ConversationEntry`, which is `UNRATIFIED-AUTHORED` and carries
+  no field for it. **So the record-plane disclosure is blocked on ratifying `ConversationEntry` (`ICP-02`
+  deliverable 3) — NOT on the content store, which is what `ICP-03` exists for.** Two different blockers were
+  being treated as one. What landed is the proven predicate plus a SURFACE disclosure that makes the drop
+  perceivable to a watching human; **the code says at the site that this does not discharge `PER-9`.**
+
+- **WHAT REMAINS `REG-Q-B`, UNCHANGED:** pull `DEF-W2-001` forward and build the purgeable content plane, or
+  record the dependency. Guide §9.7 already supplies the default — *"block the capability and resolve Section
+  16 item 23"* — and constrains any solution: *"It adds no dedicated reasoning store; Section 10's typed
+  persistence remains authoritative."*
+
+- ⚠ **THIRD CSAA PIN THIS PROGRAMME HAS MOVED** (`apps/rph-demo` 99 → 100), caught the same way each time: by
+  running the FULL suite rather than the scoped one. Corrected in place with its reason; `subject.test.ts` is
+  back to its HEAD baseline of 1 failed (the pre-existing JAN-CSAA-005 projection) / 63 passed.
+
+- **Merge target:** roadmap `ICP-03`. **Owed:** `REG-Q-B`, and the record-plane carrier via `ICP-02` d3.

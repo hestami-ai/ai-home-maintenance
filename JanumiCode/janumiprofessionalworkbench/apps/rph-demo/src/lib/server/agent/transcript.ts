@@ -29,6 +29,39 @@ export function isRecordable(kind: string): boolean {
 	return RECORDABLE.has(kind);
 }
 
+/** One declared omission — PER-9's "declared truncation or omission" (E-4), in the shape `ExchangeRecord`
+ *  carries as `omittedRegions`. */
+export interface OmittedRegion {
+	readonly role: string;
+	readonly reason: string;
+}
+
+/** The kinds whose DROP is a governed-content omission, mapped to the role the record names them by.
+ *  ⚠ DELIBERATELY NOT "everything non-recordable". `status` lines are display chrome the corpus never asks
+ *  anyone to retain; recording them here would bury the one real disclosure in noise. An over-broad disclosure
+ *  is its own defect — it makes the finding unfindable, which is the failure it was meant to prevent. */
+const OMISSION_ROLE: Readonly<Record<string, string>> = { thinking: 'VOLUNTEERED_REASONING' };
+
+const OMISSION_REASON =
+	'Volunteered reasoning was produced and DROPPED at the write boundary. PER-12 requires it retained where ' +
+	'available as a typed Artifact and purgeable at retention expiry (PER-8); domain_events is immutable and ' +
+	'permanent (§9.4) and no purgeable content plane exists (DEF-W2-001), so admitting it here would create an ' +
+	'unpurgeable artifact. Retention is blocked on ICP-03; this record discharges PER-9’s "record-plane omission ' +
+	'is not [legal]" by DECLARING the omission rather than performing it silently.';
+
+/**
+ * The declared omission for a dropped entry kind, or `undefined` when nothing governed was lost.
+ *
+ * ⭑ WHY THIS EXISTS AND WHY IT IS NOT BLOCKED BY THE MISSING CONTENT STORE. Recording THAT content was
+ * omitted, and why, is METADATA; only the omitted bytes are content. So the disclosed half of PER-9 is
+ * available today even though the retained half is not — and the difference between a silent drop and a
+ * declared one is exactly the difference PER-9 draws between an illegal omission and a legal one.
+ */
+export function omissionFor(kind: string): OmittedRegion | undefined {
+	const role = OMISSION_ROLE[kind];
+	return role ? { role, reason: OMISSION_REASON } : undefined;
+}
+
 /** The producer's OBSERVABLE narration — the only thing the independent reviewer may be shown about how the
  *  subject was produced. Never the producer's interior (§9.7). */
 export function narrationOf(transcript: readonly TranscriptEntry[]): string {

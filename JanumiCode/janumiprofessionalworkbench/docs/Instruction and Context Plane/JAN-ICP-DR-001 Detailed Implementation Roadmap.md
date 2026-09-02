@@ -234,6 +234,24 @@ ratified default — Guide §9.7: *"block the capability and resolve Section 16 
 **The question for the sponsor:** does ICP pull `DEF-W2-001` forward, or record the dependency and stop at the
 four elements that do not need it?
 
+> ### ✅ THE HALF THAT NEEDS NO RULING LANDED 2026-09-02
+> **The omission is now DECLARED rather than performed silently.** `omissionFor()` in `transcript.ts`, wired
+> into the drop site in the SSE route, with 5 mutants all SOUND on a clean baseline.
+> ⭑ **WHY IT IS NOT BLOCKED ON `REG-Q-B`:** recording THAT content was dropped, and why, is **metadata**; only
+> the dropped bytes are content. The declared half of `PER-9` is therefore available today while the retained
+> half waits.
+> ⚠ **AND IT DECLARES A NARROW SET ON PURPOSE.** Only `thinking` maps to an omission role. `status` lines are
+> display chrome the corpus never asks anyone to retain, and disclosing them as governed-content omissions
+> would bury the one real disclosure in noise — **an over-broad disclosure is its own defect**, and mutant `O5`
+> holds that line.
+>
+> ⚠⚠ **CORRECTION TO THIS WORK PACKAGE'S OWN FRAMING, MADE MID-BUILD.** The disclosure was scoped as
+> record-plane. **It is not, and could not be:** `PER-9` requires the declaration to live in the RECORD, and
+> the authoring plane's record — `ConversationEntry` — is `UNRATIFIED-AUTHORED` and has no field to carry it.
+> **So the record-plane disclosure is blocked on ratifying `ConversationEntry` (`ICP-02` deliverable 3), NOT on
+> the content store.** What landed is the proven predicate plus a SURFACE disclosure that makes the drop
+> perceivable. It does not pretend to discharge `PER-9`, and the code says so at the site.
+
 ⚠ **AND ONE THING IS A DEFECT EITHER WAY.** The code currently omits at the write boundary (`transcript.ts`
 drops `thinking`) **without disclosing that it is doing so.** `PER-9`: *"record-plane omission is not [legal]."*
 Whatever is decided about building, **the undisclosed omission must become a disclosed one.**
