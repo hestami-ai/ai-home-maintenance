@@ -28949,3 +28949,56 @@ with three candidate domains already recorded; and it does not authorize touchin
 whoever re-baselines `DIV-W1-003`.
 
 - **Merge target:** roadmap `ICP-03`. **Owed:** the port, its purge proof, and sponsor confirmation.
+
+### REG-F-324 — the `ArtifactStore` port landed, `purge` first, and the guard that makes it lawful is proven before the happy path
+
+- **Date:** 2026-09-02 · **Type:** RECORD (delivery under `REG-D-049`) · **Class:**
+  RECORD — delivers the seam ruled for in `REG-D-049` · **Status:** 🔶 PARTIAL (adapter + wiring owed; ruling still owed sponsor confirmation).
+
+`packages/rph-ports/src/ports/artifact-store.ts` + `defaults/artifact-store.ts`, **6 tests, 6 mutants all
+SOUND and single-victim on a clean baseline.**
+
+- **THE SEAM WAS NAMED IN THREE INDEPENDENT PLACES BEFORE IT WAS BUILT**, which is why this is delivery and not
+  invention: `rph-ports/src/index.ts`'s own header listed `ArtifactStore` among ports that *"land alongside the
+  milestones that first need them"*; `DEF-W2-001` routes to *"ArtifactStore/CapabilityAuthorizer ports"*; and
+  finding `#8` files a documented seam WITHOUT its port as **CRITICAL**. The header has been updated to record
+  that this one has landed rather than leaving a stale "yet to come" list — the small rot that makes such lists
+  worthless.
+
+- ⭑ **`purge` IS THE PORT'S REASON FOR EXISTING AND WAS PROVEN FIRST.** Retention of model content is currently
+  ILLEGAL rather than merely unbuilt — `domain_events` is permanent (§9.4) and `PER-12` requires retained
+  reasoning *"purgeable at retention expiry (PER-8)"*. **A store with `put` and no `purge` would not make
+  retention lawful; it would move the unlawfulness behind an interface.**
+
+- ⭑⭑ **AND THE GUARD THAT REFUSES A PURGE IS WHAT KEEPS THE PORT FROM BECOMING THE VIOLATION.** `PER-8`: a
+  canonical object that *"has participated in execution, assurance, governance, a baseline, or traceability is
+  never hard-deleted."* Reasoning traces are purgeable PRECISELY BECAUSE they never participate. So
+  purgeability is a property of **participation**, not of a schedule, and **a store that purges on demand is a
+  hard-delete vector wearing a retention label.** Mutant `P1` (disable the guard) reddens the participation
+  test alone.
+
+- **⚠ THE PURGEABILITY FLAG IS DELIBERATELY NOT A RETENTION CLASS.** `retentionClass`'s value domain is
+  `REG-Q-056`, **OPEN**, with three candidate domains recorded and none ratified. Inventing one here would be
+  the fabrication this programme keeps recording. `Purgeability` is a binary restatement of `PER-8`'s
+  participation predicate — which the corpus states outright — and is the only distinction `purge` needs.
+
+- **TOMBSTONES ARE A CONTRACT CLAUSE, NOT AN IMPLEMENTATION CHOICE.** A purge removes the BYTES and keeps the
+  ENTRY. Deleting outright would leave an `ARTIFACT` record pointing at nothing, and a reader could not tell
+  *purged on schedule* from *never stored* from *lost* — **the silent-omission defect one layer down.**
+  `JAN-CSAA-009 §20` names this action `tombstone-or-unavailable-record`. Mutant `P3` holds it.
+
+- **THE HASH IS OVER THE BYTES, AND THAT IS A REAL DISTINCTION.** `contentHash()` in rph-contracts canonicalizes
+  JSON first, which is right for OBJECT identity and wrong here: `{"a":1}` and `{ "a" : 1 }` are the same object
+  and different bytes, so an object hash would **deduplicate two distinct artifacts into one**. §31.3 requires a
+  cryptographic hash of the ARTIFACT, and the artifact is the bytes. Mutant `P5` holds it.
+
+- **§31.2 IS HONOURED IN THE KEY** — *"Object keys SHALL include opaque tenant-scoped prefixes"* — with the
+  suffix a content address rather than anything caller-controlled. Mutant `P4` holds it.
+
+- **AND THERE IS NO SILENT ARM ON `PurgeOutcome`.** A refusal always says why, and purging an unknown key
+  reports that rather than success: **a purge log that cannot distinguish "removed" from "was not there" cannot
+  evidence that a retention policy ran**, which is the only reason to keep one. Mutant `P6` holds it.
+
+- **OWED:** a durable (§31 S3-compatible) adapter; wiring `ExchangeRecord`'s `ContentRef`s to it so
+  `PENDING_CONTENT_PLANE` becomes `STORED`; and **sponsor confirmation of `REG-D-049`**, which remains a
+  proposal under `CON-000 B2`.
