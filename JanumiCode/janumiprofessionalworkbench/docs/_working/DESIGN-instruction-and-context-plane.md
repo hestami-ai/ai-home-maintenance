@@ -74,10 +74,17 @@ separately, so the failure was invisible to the only party positioned to fix it.
 
 ⚠ **AND THE STRUCTURAL FORM OF THAT FAILURE IS PRESENT HERE, NOT MERELY INHERITED.** `pi-agent.ts:119` supplies
 a `systemPromptOverride` and `:166` calls `session.prompt(instruction)`; Pi's `DefaultResourceLoader` composes
-the rest. **JPWB never holds the prompt it sends.** The predecessor's defect was that nobody could perceive the
-aggregate. This system's version is that the aggregate is never materialized on this side of the boundary at
-all — which is why PER-9's *"exact materialized input"* is not merely unrecorded here, it is **unavailable**.
-That distinction sets the whole of `ICP-01` (§6).
+the rest. **JPWB never holds the COMPOSITE it sends.** The predecessor's defect was that nobody could perceive
+the aggregate. This system's version is that the aggregate is never materialized on this side of the boundary
+at all — which is why PER-9's *"exact materialized input"* is not merely unrecorded here, it is
+**unavailable**. That distinction sets the whole of `ICP-01` (§10).
+
+⚠ **AND THE PRECISE FORM MATTERS, BECAUSE A LOOSER STATEMENT IS FALSE.** The user's `instruction` **IS**
+durably recorded — it is the first transcript entry persisted through `recordConversation`. What is absent is
+the **composed** input: system prompt + loaded resources + assembled context + tool schemas + accumulated
+history, as actually presented. So E-1's gap is not *"nothing about the input is kept"*; it is that **what is
+kept is an input to the composition, not the composition** — which is exactly `PER-9-b`'s distinction between
+a thing that identifies the record and the record itself.
 
 ---
 
@@ -228,6 +235,16 @@ requirements), **#65** (ArtifactObjectSchema envelope-only), **#68** (`AUTHORING
 >   carried the exchange.
 > - **#65 — STALE.** `ArtifactObjectSchema` now carries the full storage field set (§7).
 > - **#58 — line reference stale**; the route file has been substantially rewritten.
+> - ⚠ **AND A THIRD REALIZATION EXISTS THAT AN EARLIER DRAFT OF THIS SECTION MISSED.**
+>   `packages/rph-domain/src/execution.ts` carries an attempt KERNEL: `InterruptedAttemptView` (`:853`) and
+>   `classifyInterruptedAttempt` → `ReconciliationClass` (`:872`) — §10.4's `reconciliation_state` realized as
+>   a typed enum — plus `AttemptCountableEvent` (`:733`), attempt counting keyed on `ExecutionStepStarted`, and
+>   attempt-level idempotency for external side effects (`:918-929`, RPH-EXE-007/§28.2). **So the Attempt is
+>   realized in THREE places** — an id prefix, a read-model, and a domain kernel — **and none of the three
+>   carries E-1..E-6.** ⚠ `classifyInterruptedAttempt` sits on the harmonization thesis's DEAD list (*"tested,
+>   green, never called"*), so its existence is not evidence of a live path. **The point stands and sharpens:
+>   the exchange gap is not "the Attempt is missing." It is that every carrier the Attempt has was built for
+>   lifecycle and reconciliation, and none was built for the exchange.**
 >
 > **`ICP-00` is therefore a re-disposition, not a survey.** Any roadmap that schedules these fifteen as work
 > without re-checking them first will build against a fourteen-month-old measurement — and #26 shows the
