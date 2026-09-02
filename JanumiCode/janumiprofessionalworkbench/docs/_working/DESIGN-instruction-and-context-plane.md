@@ -168,15 +168,33 @@ build the day the constant moves.
 
 **P-2 — the variable half is a DURABLE MANIFEST.** Every completed model invocation records: composed
 instruction bytes; assembled context bytes, itemised by source; tool-schema bytes; cumulative tool-result
-bytes; compaction and retry counts; and the identity of the context-assembly policy that governed it.
+bytes; ~~compaction and retry counts;~~ and the identity of the context-assembly policy that governed it
+(once one exists).
+
+⚠ **`compaction and retry counts` STRUCK 2026-08-31, AND THE REASON IS THE POINT OF THIS WHOLE DOCUMENT.**
+**JPWB HAS NEITHER MECHANISM.** `grep -rn "compact"` over `packages/rph-authoring/src` and the demo's server
+lib returns ZERO; the only `retry` hits in the authoring path are an outbox drain and prose inside error
+messages. Both fields were imported — one from how other agent runtimes behave, one from `ExecutionPlan`'s
+`retryPolicy`, which governs execution steps and not authoring turns.
+
+**This is the exact error §1 warns against, committed inside the document that warns against it:** the
+predecessor's phenomena treated as evidence about this system. It was caught when the sponsor asked what
+"a compacting turn" meant and the answer turned out to be "nothing here". The remaining fields are ones this
+system can actually produce; anything further MUST come from `ICP-00`'s measurement rather than from what a
+manifest usually contains.
 
 **THE TEST THAT MUST REDDEN** — without which `P-2` is decoration:
 
-> Drive a turn that compacts. **Reload.** The manifest is still there, itemised.
+> ~~Drive a turn that compacts.~~ **Drive any completed turn. Reload.** The manifest is still there, itemised.
 >
 > **The mutant:** emit the identical facts as a live status stream only. This **MUST** fail — status lines are
 > dropped at the transcript boundary and vanish on reload. A manifest that only exists while you are watching
 > is exactly the artifact the predecessor's agent could not consult.
+>
+> ⚠ **THE PROVOCATION IS THE RELOAD, NOT COMPACTION.** The property under test is DURABILITY, and a turn does
+> not need to be large to test whether its record survives. Requiring compaction made the test depend on a
+> mechanism JPWB does not have — and would have made it unrunnable for a reason that had nothing to do with
+> what it asserts.
 
 **P-3.** The manifest **MUST** record what was *injected*, not merely what was *authored* — context files,
 skills, prior-turn carryover. An instruction inventory that omits the injected half reproduces the original

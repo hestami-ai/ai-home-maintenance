@@ -111,8 +111,17 @@ prohibited_shortcuts:
   - "MUST NOT measure against `pi` if `pi` is absent and silently report zero. State which harness was driven
      (`JPWB_AGENT=mock` is legitimate; pretending it was `pi` is not) and give a positive control."
 open_questions:
-  - "Can a compacting turn be driven under the mock harness at all? If not, the reload test needs a different
-     provocation and this package MUST say so rather than weaken the test."
+  - "~~Can a compacting turn be driven under the mock harness at all?~~ WITHDRAWN 2026-08-31 — MALFORMED.
+     JPWB HAS NO COMPACTION MECHANISM: `grep -rn compact` over packages/rph-authoring/src and the demo server
+     lib returns ZERO, and the authoring path has no turn retry either. The question asked whether a phenomenon
+     this system does not have could be provoked, and it was imported from how other agent runtimes behave.
+     ⚠ THAT IS THE OVER-ATTRIBUTION §4 OF THIS ROADMAP WARNS AGAINST, COMMITTED IN THE SAME DOCUMENT. The
+     provocation is the RELOAD, not compaction: the property is durability, and a turn need not be large for
+     its record to be tested for survival."
+  - "OPEN, and this one is real: what does a turn record TODAY? `AUTHORING_CONVERSATION` is durable and its
+     `ConversationEntry` carries `role, kind, text, success?` — so SOME text survives, and whether the composed
+     instruction is among it is not established (`authoring-turn.ts` never mentions `instruction`). ICP-00 MUST
+     establish this before ICP-02 designs a manifest, because part of it may already exist."
 ```
 
 ```yaml
@@ -252,9 +261,11 @@ prohibited_shortcuts:
 
 ## 8. Risk register
 
-- **R-1. `ICP-00` cannot drive a compacting turn** because the mock harness does not compact and `pi` is absent.
-  Then the reload test needs a different provocation. **The risk is that the test gets weakened to fit the
-  harness** rather than the provocation being found. `SL-8` applies: admitted failing, never weakened to green.
+- ~~**R-1. `ICP-00` cannot drive a compacting turn**~~ **WITHDRAWN — the risk rested on a mechanism JPWB does
+  not have (see `ICP-00`'s open questions). REPLACED BY THE RISK IT REVEALED: this roadmap imported a
+  phenomenon from the predecessor system into a test provocation, inside a document whose §4 warns against
+  exactly that.** The standing risk is therefore that OTHER imported assumptions remain: every field
+  `ICP-02`'s manifest records MUST be traced to something this system produces, or dropped. Two already were.
 - **R-2. The measurement shows JPWB composes small prompts.** Then `ICP-03` and `ICP-05` are precautionary, and
   saying so is the correct outcome — not a reason to build them anyway.
 - **R-3. `ICP-01` drifts into inventing template syntax.** `REG-D-048` left substitution open; a roadmap is not
