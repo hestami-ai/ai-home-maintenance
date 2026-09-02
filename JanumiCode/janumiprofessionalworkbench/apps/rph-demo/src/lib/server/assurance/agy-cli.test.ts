@@ -2,7 +2,7 @@
 // "allowed and resolved provider/model/version". Both the application default and an environment override are
 // concrete selections passed to agy --model; neither permits agy's unnamed dynamic default.
 import { afterEach, describe, expect, it } from 'vitest';
-import { agyPrint, DEFAULT_JUDGE_MODEL, judgeModel, MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
+import { agyPrint, judgeModel, MAX_AGY_PROMPT_CHARS, resolveJudgeModel } from './agy-cli.js';
 
 const KEY = 'JPWB_JUDGE_MODEL';
 const original = process.env[KEY];
@@ -12,11 +12,16 @@ afterEach(() => {
 });
 
 describe('judgeModel — the evaluator identity may not be a fiction (§8.4 / §14.6 / §13.3)', () => {
-	it('uses the application-owned Gemini 3.5 Flash (High) default when no override is set', () => {
+	it('REFUSES when no model is configured — there is no application default', () => {
 		delete process.env[KEY];
-		expect(DEFAULT_JUDGE_MODEL).toBe('Gemini 3.5 Flash (High)');
-		expect(judgeModel()).toBe(DEFAULT_JUDGE_MODEL);
-		expect(judgeModel()).not.toBe('agy:default');
+
+		// SPONSOR DIRECTION 2026-09-02: the judge model "will be selected based on performance parameters that
+		// have yet to be determined … it will need to be configurable." So there is no pin to fall back to.
+		// THE MUTANT: reintroduce a default. The previous one — 'Gemini 3.5 Flash (High)' — had ROTTED: the
+		// installed agy rejects it outright (REG-F-331), so every Reasoning Review failed while the code looked
+		// configured. A default that no longer resolves is the fictional identity 'agy:default' in disguise.
+		expect(() => judgeModel()).toThrow(/JPWB_JUDGE_MODEL/);
+		expect(resolveJudgeModel(undefined)).toBeUndefined();
 	});
 
 	it('returns the pinned model, which is also the model passed to agy', () => {
@@ -26,7 +31,8 @@ describe('judgeModel — the evaluator identity may not be a fiction (§8.4 / §
 
 	it('treats an empty override as absent instead of recording an empty identity', () => {
 		process.env[KEY] = '';
-		expect(judgeModel()).toBe(DEFAULT_JUDGE_MODEL);
+		// Whitespace-only configuration must not become an empty evaluator identity; with no default it refuses.
+		expect(() => judgeModel()).toThrow(/JPWB_JUDGE_MODEL/);
 	});
 });
 

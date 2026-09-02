@@ -6,23 +6,46 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';
-export const DEFAULT_JUDGE_MODEL = 'Gemini 3.5 Flash (High)';
 
 /**
- * Resolve the judge to a concrete, application-owned model selection. §8.4 requires the evaluator's "actual
- * identities and lineage are recorded", and §14.6 requires recording "allowed and resolved
- * provider/model/version". An explicit environment override wins; otherwise the application pins the known agy
- * model label above. This is materially different from allowing agy to choose an unnamed dynamic default and then
- * recording the fictional identity `'agy:default'`.
+ * Resolve the judge to a concrete model selection, or to NOTHING.
+ *
+ * ── ⭑ THERE IS NO APPLICATION DEFAULT, BY SPONSOR DIRECTION (2026-09-02) ────────────────────────────────────
+ * "We won't be pinning judge model because that will be selected based on performance parameters that have yet
+ * to be determined. Meaning that it will need to be configurable."
+ *
+ * The previous version pinned `'Gemini 3.5 Flash (High)'`. That label had ROTTED — the installed agy rejects it
+ * outright (`REG-F-331`, measured: exit 1, stdout 0 bytes, stderr naming the valid labels), so every Reasoning
+ * Review failed unless the override happened to be set. A pin expressed as a human-readable provider label rots
+ * silently whenever the provider's catalogue moves, and nothing detects it.
+ *
+ * §8.4 requires the evaluator's "actual identities and lineage are recorded" and §14.6 the "allowed and
+ * resolved provider/model/version". An application default that no longer exists satisfies neither — it is the
+ * fictional identity `'agy:default'` in a better disguise. So the selection is now configuration-only and its
+ * ABSENCE is a refusal rather than a fallback.
  *
  * Whitespace-only configuration is treated as absent so it cannot become an empty evaluator identity.
  */
-export function resolveJudgeModel(configured = process.env.JPWB_JUDGE_MODEL): string {
-	return configured?.trim() || DEFAULT_JUDGE_MODEL;
+export function resolveJudgeModel(configured = process.env.JPWB_JUDGE_MODEL): string | undefined {
+	return configured?.trim() || undefined;
 }
 
+/**
+ * The configured judge model, or a REFUSAL.
+ *
+ * Fails closed (§13.3) rather than substituting anything: an unconfigured judge has no identity to record, and
+ * recording a placeholder is precisely what this module was written to stop.
+ */
 export function judgeModel(): string {
-	return resolveJudgeModel();
+	const model = resolveJudgeModel();
+	if (!model)
+		throw new Error(
+			'JPWB_JUDGE_MODEL is not set, and there is no application default: the judge model is selected on ' +
+				'performance parameters and must be configured explicitly (sponsor direction, 2026-09-02). Set it to a ' +
+				'label the installed agy recognises; its error output lists the available ones. ' +
+				'Refusing rather than substituting, because an evaluator identity may not be a fiction (§8.4, §14.6).'
+		);
+	return model;
 }
 
 /**

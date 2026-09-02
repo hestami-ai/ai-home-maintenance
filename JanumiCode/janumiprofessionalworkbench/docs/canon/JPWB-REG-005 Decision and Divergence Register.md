@@ -29385,7 +29385,8 @@ defect) and one that blocks without saying why.
 ### REG-F-331 — the default judge model is REJECTED by the installed `agy`, so every Reasoning Review fails, and the diagnostic that says so is discarded
 
 - **Date:** 2026-09-02 · **Type:** FINDING (live breakage, verified first-hand) · **Class:**
-  FINDING — surfaced by the span-separation sweep · **Status:** 🔶 OPEN.
+  FINDING — surfaced by the span-separation sweep · ~~**Status:** 🔶 OPEN.~~
+- **Status:** ✅ CLOSED by `REG-D-052` (sponsor direction: the judge model is not pinned but configured, and its absence is a refusal). The original status is struck in place rather than rewritten, per the soft-retire rule; the finding itself stands as the measurement that prompted the direction.
 
 `agy-cli.ts:9` — `export const DEFAULT_JUDGE_MODEL = 'Gemini 3.5 Flash (High)';` — and `judgeModel()` returns
 `JPWB_JUDGE_MODEL ?? DEFAULT_JUDGE_MODEL`. **The installed `agy` rejects that label.**
@@ -29417,3 +29418,49 @@ the mandatory, non-suppressible floor policy.
 
 - **Merge target:** `agy-cli.ts`'s default, once a label is chosen. **Owed:** the choice; and the diagnostic
   home for the failure, which `REG-F-326` places in the exchange record's `E-5` rather than in a bound `stderr`.
+
+### REG-D-052 — SPONSOR DIRECTION: the judge model is NOT pinned, it is configured — and unpinning it closed two latent vacuities
+
+- **Date:** 2026-09-02 · **Type:** RULING (sponsor direction) · **Class:**
+  DECISION — settles `REG-F-331` · **Status:** ✅ CLOSED.
+
+**THE SPONSOR'S WORDS, VERBATIM:** *"We won't be pinning judge model because that will be selected based on
+performance parameters that have yet to be determined. Meaning that it will need to be configurable."*
+
+**RULED: no application default. The judge model is configuration-only, and its ABSENCE IS A REFUSAL.**
+
+- **WHY A REFUSAL AND NOT A FALLBACK.** §8.4 requires the evaluator's *"actual identities and lineage are
+  recorded"* and §14.6 the *"allowed and resolved provider/model/version"*. An unconfigured judge has **no
+  identity to record**, and this module was written in the first place to stop the fictional identity
+  `'agy:default'`. **A default that no longer resolves is that same fiction in a better disguise** — which is
+  exactly what `REG-F-331` measured: the pinned `'Gemini 3.5 Flash (High)'` is rejected by the installed agy
+  (exit 1, stderr naming the valid labels), so every Reasoning Review failed while the code looked configured.
+- ⚠ **THE STRUCTURAL LESSON OUTLIVES THE VALUE.** The pin was a **human-readable provider label**, and provider
+  catalogues move. Such a pin **rots silently**: nothing detected that the configured label had ceased to exist,
+  and the failure surfaced as an opaque non-zero exit whose diagnostic is discarded (`REG-F-326`). Configuration
+  does not remove that risk — it relocates it to the operator, who at least gets a refusal that names the
+  variable.
+
+> ### ⭑ UNPINNING IT EXPOSED TWO LATENT VACUITIES, AND THE SECOND WAS CAUGHT ONLY BY LOOKING FOR IT
+>
+> 1. **THE PREFLIGHT COULD NOT FAIL.** `AssurancePreflightCode` had exactly **ONE** member (`'READY'`) and
+>    `ready` was the **literal `true` on every path**. So a preflight guarding the mandatory, non-suppressible
+>    Reasoning Review **could not report that the review was unable to run** — it reported READY while the
+>    pinned default was one the installed agy rejects. It gained a second member the day the default died.
+> 2. ⚠⚠ **AND THE ROUTE READ `guidance` BUT NEVER READ `ready`.** That was harmless only while `ready` was
+>    always `true`. The moment the preflight could refuse, **ignoring the verdict would have made the refusal
+>    decorative — a fail-closed that does not close.** Found by checking whether anything consumed the new
+>    verdict, before shipping it, rather than after. The route now aborts the turn and surfaces the guidance.
+>
+> **Both are the same shape:** a control whose output nothing acts on, and a type whose only value is the
+> passing one. Neither would have been visible while the default existed, because the failing branch was
+> unreachable — **which is why removing a fallback is a good way to discover what was resting on it.**
+
+- **BLAST RADIUS MEASURED:** check-types 22/22, lint, `app:rph-demo` 34 files / 171 tests, **Playwright 82
+  passed**. E2E is unaffected because TEST_MODE selects the deterministic reviewer, so `requiresAgyReviewer` is
+  false and no model is needed — which is also the control proving the change did not simply block everything.
+- **FOUR TESTS ENCODING THE OLD CONTRACT WERE REWRITTEN, NOT DELETED**, each now asserting the refusal and its
+  reason rather than the vanished default.
+
+- **Merge target:** `agy-cli.ts`, `preflight.ts`, the SSE route. **Owed:** nothing. `REG-F-331` is discharged by
+  this ruling; the operator must set `JPWB_JUDGE_MODEL`.

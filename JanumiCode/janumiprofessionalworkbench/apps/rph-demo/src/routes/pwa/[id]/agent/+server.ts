@@ -333,13 +333,23 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					return;
 				}
 				const mode = agentMode();
-				// Resolve the explicit judge-model override or the application-owned default before the isolated
-				// candidate begins. This configuration-only preflight never invokes agy or claims it is healthy.
+				// Resolve the configured judge model before the isolated candidate begins. This configuration-only
+				// preflight never invokes agy or claims it is healthy.
 				const preflight = assurancePreflight({
 					testMode: isTestMode(),
 					assessor: process.env.JPWB_ASSESSOR,
 					judgeModel: process.env.JPWB_JUDGE_MODEL
 				});
+				// ⚠ ACT ON THE VERDICT, NOT ONLY ON THE GUIDANCE. This route previously read `preflight.guidance`
+				// and NEVER read `preflight.ready` — which was harmless only while `ready` was the literal `true`
+				// on every path. The moment the preflight could refuse, ignoring the verdict would have made the
+				// refusal decorative: a fail-closed that does not close. §13.3 fails closed on missing identity,
+				// and an unconfigured judge has no evaluator identity to record (§8.4, §14.6).
+				if (!preflight.ready) {
+					send({ kind: 'error', message: preflight.guidance });
+					send({ kind: 'done' });
+					return;
+				}
 				if (preflight.guidance) {
 					const text = `⚖ ${preflight.guidance}`;
 					send({ kind: 'status', text });
