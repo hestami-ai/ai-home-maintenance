@@ -29226,3 +29226,56 @@ clean baseline**), wired into `reasoning-review-validator.ts`.
   **this retains within a run and not across restarts** — a durability limit, not a compliance one.
 
 - **Merge target:** `ICP-02` d2b. **Owed:** the `RecordArtifact` dispatch and a durable §31 adapter.
+
+### REG-F-329 — `REG-D-049` convicted W10 of abandoning work it had correctly DEFERRED: the deferral splits across the JPWB / Janumi Platform boundary, and only the JPWB limbs were lost
+
+- **Date:** 2026-09-02 · **Type:** FINDING (corrects a ruling's warrant; the ruling's conclusion stands) ·
+  **Class:** FINDING — amends `REG-D-049`'s reasoning · **Status:** ✅ CLOSED.
+
+Raised by the sponsor, who asked whether the W10 disposition reflected **a delineation between JPWB and the
+Janumi Platform**. It does, and checking it found `REG-D-049` overstated.
+
+**WHAT `REG-D-049` SAID:** *"both destinations are dead … a deferral whose destinations are both dead is not a
+deferral. It is an abandonment wearing a label."* **That is true of one destination and FALSE of the other.**
+
+- ⭑ **`DEF-W2-001` IS A THREE-LIMB DEFERRAL SPLIT ACROSS TWO OWNERS, AND ITS OWN TEXT SAYS SO** — verbatim:
+  *"WP-2-005 blob content-hashing + §18.3 artifact supersession + access control → W3 execution / W10 security
+  **(access control auth-gated, carried C2)**."* The routing was never one deferral sent to two places; it was a
+  correctly-split deferral whose limbs have different owners.
+- **THE JPWB LIMBS WERE LOST.** Blob content-hashing and §18.3 supersession routed to **W3**, which gated with
+  **zero mention** of `DEF-W2-001` (0 hits against a positive control of 4 for `DEF-W3-001` in the same
+  directory). No disposition, no carry-forward. **That is the real loss, and it is what the ruling correctly
+  caught.**
+- ⚠ **THE PLATFORM LIMB WAS NOT LOST — IT WAS PROPERLY DEFERRED, AND I MISCHARACTERISED IT.** W10 is titled
+  *"JanumiCode Productization and Janumi Platform Integration"*, and its gate record states the condition and
+  the blocker explicitly: *"W10 is genuinely not completable within this repository: it depends on (a) closing
+  the authentication gap C2 … and (b) external commercial/platform infrastructure … whose commitment master §10
+  reserves to the sponsor as a material-decision trigger."* Its `10-001` row reads **BLOCKED (C2)** with the
+  reason *"no endpoint authenticates; the server fabricates a HUMAN principal"* — harmonization finding `#9`,
+  CRITICAL. **A deferral with a named condition, a named blocker and a reserved authority is the OPPOSITE of an
+  abandonment wearing a label**; it is `DOC-003 §3`'s *"deferred with an explicit review condition"* performed
+  correctly.
+
+**THE RULING'S CONCLUSION SURVIVES ON A BETTER WARRANT, AND ITS SCOPE SHARPENS.** The port is the JPWB half,
+and the lost limbs are the JPWB limbs — so *"build it"* holds for the reason that actually applies. The
+corrected statement: **build the port (JPWB); leave access control deferred (Platform, C2-gated).**
+
+- ⭑ **AND A PORT IS THE RIGHT SHAPE FOR PRECISELY THIS SEAM**, which is the part worth keeping. JPWB defines the
+  interface and owns what is JPWB's — content-addressing, `purge` semantics, the `PER-8`/`PER-12` participation
+  guard. The Platform supplies the adapter that carries real tenant isolation and access control once `C2`
+  closes. **The hexagonal boundary and the ownership boundary are the same line here**, which is why the seam
+  was nameable in three places before anyone built it.
+- **THIS RETROACTIVELY EXPLAINS A PARAMETER BUILT FOR A WEAKER REASON.** `ArtifactStore.put` takes a
+  `tenantPrefix` because `§31.2` says *"Object keys SHALL include opaque tenant-scoped prefixes."* Under the
+  ownership reading it is load-bearing for a second reason: **it is the platform-facing part of the interface**,
+  and `createInMemoryArtifactStore` is explicitly the JPWB-side stand-in until a Platform adapter exists.
+  ⚠ Which also means the in-memory default **must not be mistaken for a deployment story** — it has no tenant
+  isolation beyond the key prefix, and enforcing that prefix is `C2`/Platform work, not JPWB's.
+
+- ⚠ **THE GENERAL FORM, because this is the second time in this programme.** A deferral is not one object with
+  one destination; **its limbs can have different owners, and "the deferral is dead" is a claim about ALL of
+  them.** `REG-F-317` recorded the sibling shape — a census `filing: FILED` field that described the SEARCH
+  rather than the world. Both are cases of reading a composite record as a scalar.
+
+- **Merge target:** `REG-D-049`'s warrant. **Owed:** nothing; `REG-D-049` still awaits sponsor confirmation on
+  its conclusion, now with this correction attached.
