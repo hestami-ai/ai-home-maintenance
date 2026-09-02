@@ -28631,3 +28631,75 @@ means the re-grounding in `REG-F-314`/`REG-F-316` was, in part, a re-derivation 
 
 - **Merge target:** roadmap `ICP-00` (add `limb:PER-9:7` and `:10` to the twenty rows). **Owed:** those two
   filings. Status: PARTIAL.
+
+### REG-F-318 — `ICP-00` COMPLETE: nine of twenty-two rows had moved, the cluster's only CRITICAL is half-fixed, and one finding's remedy would have been a defect
+
+- **Date:** 2026-09-02 · **Type:** RECORD (work package complete) · **Class:**
+  RECORD — discharges `JAN-ICP-DR-001` `ICP-00` · **Status:** ✅ CLOSED.
+
+The 15 `governed-stream` findings, 5 adjacent, and 2 `PER-9` census limbs, each re-checked **at the site** at
+HEAD `3c57ba71`. Full rows: `docs/Instruction and Context Plane/ICP-00 re-disposition at HEAD.md`.
+
+**THE CONTROL WAS DECLARED BEFORE THE RESULT** — `#65` and `#26` were named as known-moved, because a sweep
+returning *"all still true"* is indistinguishable from one that never ran. **Both came back moved, and seven
+more with them: 9 of 22.** The instrument discriminates.
+
+- **12 TRUE AT HEAD** — `#24 #25 #29 #55 #58 #59 #60 #61 #62 #63 #68`, `limb:PER-9:7`. The sharpest is `#61`:
+  `excerpt()` writes `…(truncated)` **into the prompt string**, and the prompt is never persisted — so
+  `PER-9`'s declared-truncation element is recorded **only in the artifact that is thrown away.**
+- **5 PARTLY STALE** — `#10 #26 #27 #28 #52`.
+- **3 FALSE AT HEAD** — `#56` (independence now DERIVED from a persisted observation, and the emission path was
+  checked for reachability rather than assumed), `#57` (`correlationId` is the candidate subject hash),
+  `#65` (`ArtifactObjectSchema` carries the full 11-field storage shape — **which is what makes `PER-12`'s
+  "typed Artifact" home constructible at all**).
+- **1 TRUE AS FACT, REFUTED AS DEFECT** — `#46`.
+
+- ⭑ **THE CLUSTER'S ONLY CRITICAL IS HALF-FIXED, AND THE HALF THAT SURVIVED IS THE INTERESTING ONE.** `#10`
+  said the resolved model/provider is *"computed, used to decide independence, and then never written to any
+  durable record."* At HEAD the **EVALUATOR's IS** written — `record-assurance.ts:41-50` populates an
+  `ActorReference` with `modelId`/`providerId`/`executionInstanceId`, carried through `executionProvenance`.
+  **The PRODUCER's is not:** `floor.ts:248-250` computes `hasProducer` as a BOOLEAN from exactly those fields
+  and discards the values. **So `PER-9` E-3 is satisfied for the judge and fails for the authoring agent** —
+  and `ICP-02` should carry the existing pattern across rather than invent one, the same *adopt-don't-derive*
+  move as `REG-F-316`'s `ModelExchangeRecord`.
+
+- ⚠⚠ **AND `#46` WOULD HAVE BEEN A DEFECT TO ACT ON.** It reads: *"The authoring agent's runs are recorded as
+  conversation entries, not as Attempts rooted in an Execution Plan."* **The observation is TRUE at HEAD. The
+  implied remedy is refuted by ratified text.** Guide §9.7 L1340: *"Where no Execution Plan exists—PWA authoring
+  is the current example—the identical recording obligation binds to the plane's own governed-stream record,
+  **not to an Execution Attempt**."* Giving authoring an Execution Plan to satisfy `#46` is precisely the
+  over-reach `HARMONIZATION-LOG` C5 identified and the staged design §3.4 settled as a category error. **A
+  finding's recorded remedy is a hypothesis, and this one was false.**
+
+- **THE HEADLINE NUMBER DROPS, AND ANY DOCUMENT QUOTING THE 2026-07-15 PROFILE NOW OVERSTATES THE GAP.** At
+  filing: **1 CRITICAL + 6 BLOCKING**. At HEAD: **0 CRITICAL + 4 BLOCKING**. The retention gap is real and
+  mostly unfixed — E-1, E-2, E-4, E-5 absent on every carrier and E-6 unimplemented — but it is smaller and
+  differently shaped than the cluster's own severity summary implies.
+
+- **Merge target:** `ICP-00` deliverable filed; design record §4 (E-3) and §5 (row 10) corrected.
+  **Owed:** nothing for `ICP-00`. Status: CLOSED.
+
+### REG-F-319 — the two `PER-9` census limbs `REG-F-317` recorded as owed, now filed: no fingerprint surface exists, and the Logger port's prohibition is unenforced
+
+- **Date:** 2026-09-02 · **Type:** FINDING (discharges two owed census limbs) · **Class:**
+  FINDING — discharges `limb:PER-9:7` and `limb:PER-9:10` · **Status:** 🔶 OPEN (defects stand; filings owed no longer).
+
+- **`limb:PER-9:7` — `PER-9`'s fingerprint clause has NO implementation surface.** `PER-9` makes the fingerprint
+  the record's INDEX (*"A prompt or template fingerprint identifies that record"*), and
+  `grep -rn "promptTemplate|templateFingerprint|promptFingerprint"` over `packages/*/src` and `apps/rph-demo/src`
+  (non-test) returns **0**. **POSITIVE CONTROL:** the same instrument over `contentHash` returns **37**, so it
+  finds identity fields where they exist. No prompt or template identity is minted, versioned, or recorded on
+  either plane. ⚠ Three canon artifacts (`PER-9`, `DOC-004 §7.2`, `SPEC-001 INV-12`) use *fingerprint*
+  normatively and **none defines it**; `JAN-CSAA-007:378`'s `DigestDescriptor` is the only worked definition in
+  the repository, and `rph-contracts/src/hash.ts` already implements the JCS canonicalization it names.
+
+- **`limb:PER-9:10` — the log/record plane distinction is prose, and its one code-side statement is
+  unenforced.** `PER-9`: *"Log-plane redaction of sensitive prompt content is legal; record-plane omission is
+  not."* `packages/rph-ports/src/ports/logger.ts:7` states the log-plane half — *"MUST NOT carry secrets / PII
+  / raw payloads"* — and **nothing enforces it**: `grep -l "Logger" verif/*.ts` returns **0 gates**.
+  ⚠ **AND I OFFERED THAT LINE AS CORROBORATION** for the two-plane architecture in this session's reporting,
+  **without noticing it is itself unenforced** — a prose constraint presented as if it were a control. That is
+  the same error class as citing a `sourceSection` as proof the section was read: **the existence of a sentence
+  is not the existence of a check.**
+
+- **Merge target:** `ICP-00` rows. **Owed:** enforcement for both, scheduled behind `ICP-02`/`ICP-03`.

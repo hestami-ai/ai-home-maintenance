@@ -155,7 +155,7 @@ document appears to add something, that is a defect in this document.
 |---|---|
 | **E-1** | the exact materialized input presented to the model |
 | **E-2** | the returned output before schema coercion or repair |
-| **E-3** | the resolved provider, model, and version actually invoked |
+| **E-3** | the resolved provider, model, and version actually invoked · ⚠ **PARTLY CARRIED — see `ICP-00`.** The EVALUATOR's is persisted as an `ActorReference` (`modelId`/`providerId`/`executionInstanceId`) through `executionProvenance`; the PRODUCER's is reduced to a boolean at `floor.ts:248-250` and discarded. **`ICP-02` should carry the existing pattern across, not invent one.** |
 | **E-4** | declared truncation or omission |
 | **E-5** | the parse/validation/repair outcome |
 | **E-6** | recorded redaction (the *record* of what was redacted, not the redaction itself) |
@@ -196,7 +196,7 @@ confirmed, 32 refuted** — a 30% fabrication rate the filter caught). Of the 75
 
 | # | Sev | Finding (abridged; the file carries them verbatim) |
 |---|---|---|
-| 10 | CRITICAL | resolved model/provider computed, used to decide independence, **never written to a durable record** |
+| 10 | ~~CRITICAL~~ | ⚠ **PARTLY STALE at HEAD (`ICP-00`)** — resolved model/provider computed, used to decide independence, never written… **for the PRODUCER.** For the EVALUATOR it now IS written (`record-assurance.ts:41-50`) |
 | 24 | BLOCKING | **the materialized input is never recorded** — authoring agent or judge (**E-1**) |
 | 25 | BLOCKING | **the raw answer before coercion is never recorded**, and the first try's is destroyed (**E-2**) |
 | 26 | BLOCKING | no Execution Attempt record exists; retries/repair are not separate records (**PER-9-a**) |
