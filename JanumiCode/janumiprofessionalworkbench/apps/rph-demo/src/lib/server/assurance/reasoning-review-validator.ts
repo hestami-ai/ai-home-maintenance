@@ -18,6 +18,9 @@ import {
 } from '@janumipwb/rph-assurance';
 import { renderRationale } from '../agent/rationale.js';
 import { agyPrint, extractJson, judgeModel, MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
+import type { ArtifactStore } from '@janumipwb/rph-ports';
+import type { ExchangeRecord } from '../agent/exchange-record.js';
+import { captureTry, type ExchangeSink } from './exchange-capture.js';
 
 const DISPOSITIONS = new Set<Disposition>([
 	'SATISFIED',
@@ -154,10 +157,22 @@ function coerceJudgement(parsed: unknown, input: ReasoningReviewInput): Reasonin
  *  trivially", so the fake captures the materialized prompt and the test asserts over it. */
 export type AgyPrint = (prompt: string) => Promise<string>;
 
-export function createAgyReasoningReviewValidator(
-	opts: { print?: AgyPrint; modelId?: string } = {}
-): Validator {
+export interface AgyValidatorOptions {
+	print?: AgyPrint;
+	modelId?: string;
+	/** ICP-02 d2b — where the per-try exchange records go. Optional: the Validator is constructed fresh on every
+	 *  floor run with an empty options object, so a hard dependency would break the assurance path rather than
+	 *  degrade to today's behaviour. */
+	exchanges?: ExchangeSink;
+	/** Where the retained bytes go. Absent -> the refs stay PENDING_CONTENT_PLANE, a DISCLOSED absence. */
+	artifacts?: ArtifactStore;
+	tenantPrefix?: string;
+}
+
+export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}): Validator {
 	const print = opts.print ?? agyPrint;
+	// Per-instance, so ids restart with each floor run and are stable within it.
+	let tryCounter = 0;
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 		validatorId: 'agy.reasoning-review',
@@ -173,13 +188,52 @@ export function createAgyReasoningReviewValidator(
 				providerId: 'google'
 			};
 			const prompt = judgePrompt(input);
-			let raw = await print(prompt);
+			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
+			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
+			// answer on the repair path, which is finding #25. CSAA-007 states the rule this now enforces
+			// structurally rather than by discipline: "Repair never rewrites predecessor raw output."
+			const capture = (
+				role: 'initial' | 'repair',
+				text: string,
+				rawOutput: string,
+				disposition: 'accepted' | 'rejected' | 'repair-requested',
+				predecessor?: ExchangeRecord
+			) => {
+				tryCounter += 1;
+				return captureTry({
+					...(opts.artifacts ? { store: opts.artifacts } : {}),
+					...(opts.exchanges ? { sink: opts.exchanges } : {}),
+					tenantPrefix: opts.tenantPrefix ?? 'tnt-local',
+					exchangeId: `exch-${tryCounter}`,
+					role,
+					...(predecessor ? { predecessor } : {}),
+					model: { modelId: evaluator.modelId ?? '', providerId: evaluator.providerId ?? '' },
+					prompt: text,
+					rawOutput,
+					disposition
+				});
+			};
+
+			const firstRaw = await print(prompt);
 			let judgement: ReasoningReviewJudgement;
 			try {
-				judgement = coerceJudgement(JSON.parse(extractJson(raw)), input);
+				judgement = coerceJudgement(JSON.parse(extractJson(firstRaw)), input);
+				await capture('initial', prompt, firstRaw, 'accepted');
 			} catch {
-				raw = await print(`${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
-				judgement = coerceJudgement(JSON.parse(extractJson(raw)), input);
+				// E-5 recorded for the FAILING try before the repair is attempted — finding #62 is precisely that
+				// this outcome was swallowed by a bare catch and recorded nowhere.
+				const first = await capture('initial', prompt, firstRaw, 'repair-requested');
+				const repairPrompt = `${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`;
+				const repairRaw = await print(repairPrompt);
+				try {
+					judgement = coerceJudgement(JSON.parse(extractJson(repairRaw)), input);
+				} catch (e) {
+					// The repair failed too. Record it as REJECTED before rethrowing — otherwise the try that
+					// finally broke the run would be the one try with no record, which is the defect inverted.
+					await capture('repair', repairPrompt, repairRaw, 'rejected', first);
+					throw e;
+				}
+				await capture('repair', repairPrompt, repairRaw, 'accepted', first);
 			}
 			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same
 			// `input.criteria` to both is what makes the two unable to diverge — the rubric asking about one set

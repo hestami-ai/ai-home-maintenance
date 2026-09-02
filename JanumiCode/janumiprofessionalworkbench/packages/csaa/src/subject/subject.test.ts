@@ -2766,7 +2766,13 @@ describe('live JPWB and inventory projection', () => {
 		// content it had never read — a control that cannot fail, on the one Validator path the gate can run.
 		// INCONCLUSIVE is the correct disposition and it BLOCKS (floor.ts: "leaves assurance incomplete →
 		// blocks"). The reason rides in `limitations` rather than as a fabricated criterion id.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(102);
+		// 102 -> 104 (JAN-ICP-02 d2b): exchange-capture.ts and its test — one PER-9 exchange record per bounded
+		// try, with the content RETAINED. The Reasoning Review runs up to FOUR tries per authoring turn (the floor
+		// runs twice, each run can call the model twice) and produced ZERO records: findings #24, #25, #62.
+		// REG-D-050 (sponsor) settles the classification: a materialized assurance input PARTICIPATES, so it is
+		// RETAINED_BY_PARTICIPATION and purge REFUSES it — purging the basis of a recorded judgement is what
+		// "fully auditable and reconstructable" forecloses.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(104);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

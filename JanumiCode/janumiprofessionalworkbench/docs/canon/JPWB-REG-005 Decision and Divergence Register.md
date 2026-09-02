@@ -29174,3 +29174,55 @@ and reconstructable."*
   singleton beside `handle` is the path that exists.
 
 - **Merge target:** `ICP-02` deliverable 2b. **Owed:** the wiring, within these constraints.
+
+### REG-F-328 — every bounded try in the Reasoning Review is now its own record, and the mutant pass caught TWO of its own tests passing for the wrong reason
+
+- **Date:** 2026-09-02 · **Type:** RECORD (delivery under `REG-D-050`) · **Class:**
+  RECORD — advances `JAN-ICP-DR-001` `ICP-02` deliverable 2b · **Status:** 🔶 PARTIAL.
+
+`apps/rph-demo/src/lib/server/assurance/exchange-capture.ts` + its test (6 tests, **6 mutants all SOUND on a
+clean baseline**), wired into `reasoning-review-validator.ts`.
+
+- **THE ARITHMETIC IT ADDRESSES.** The floor runs **twice** per authoring turn (`+server.ts:127` and the
+  auto-refine pass at `:153`), and each run can call the model **twice** — **up to four bounded tries, and zero
+  records.** `PER-9-a` counts tries: *"each retry, reformat, and repair request included"*.
+- ⭑ **FINDING `#25` IS NOW STRUCTURALLY IMPOSSIBLE RATHER THAN DISCOURAGED.** The old `let raw = await
+  print(...)` was reassigned on the repair path, destroying the first try's answer. It is now a `const`
+  (`firstRaw`), and each try stores its own bytes in a content-addressed store, so a repair **cannot** overwrite
+  its predecessor. `JAN-CSAA-007` states the rule this enforces: *"Repair never rewrites predecessor raw
+  output."*
+- **FINDING `#62`'s SWALLOW IS CLOSED, INCLUDING ON THE PATH THAT STILL FAILS.** The failing first try is
+  recorded `repair-requested` BEFORE the repair is attempted, and **a repair that ALSO fails to parse is
+  recorded `rejected` before the error is rethrown** — otherwise the try that finally broke the run would be the
+  one try with no record, which is the defect inverted.
+- **RETENTION PER `REG-D-050`:** both the materialized input and the pre-coercion output are stored
+  `RETAINED_BY_PARTICIPATION`, and `purge` refuses them.
+
+> ### ⚠⚠ THE MUTANT PASS CAUGHT TWO OF MY OWN TESTS PASSING FOR THE WRONG REASON
+> Neither would have been found by reading them, and both had been written specifically to guard a named defect.
+>
+> 1. **`C4` came back INERT.** The repair-clobbering test asserted only that the FIRST record's bytes survived —
+>    which a mutant repointing the SECOND record's ref never touches. **It passed for a reason unrelated to what
+>    it claimed.** Catching the defect requires asserting the two records hold DIFFERENT, independently readable
+>    content; it now does.
+> 2. **`C1` came back narrower than predicted**, which exposed that the purge-refusal test asserted only
+>    `purged === false` — and `purge()` returns exactly that for an **unknown key** too. So it could not tell
+>    *"refused because it participated"* from *"refused because nothing was stored"*, and a mutant that left the
+>    ref `PENDING` passed it for the second reason while breaking the first. **It now asserts the refusal
+>    REASON**, which is this register's standing lesson: an arrangement that trips two guards proves neither, so
+>    assert the message.
+
+- **BLAST RADIUS MEASURED, NOT ASSUMED:** demo suite **171 passed**, Playwright **82 passed**, check-types 22/22,
+  lint, boundary (495 files, 0 violations).
+- `@janumipwb/rph-ports` is now a DECLARED dependency of the demo rather than resolved by hoisting — the app is
+  the composition root, which is where an adapter is chosen. Added by surgical text insert, not a JSON
+  round-trip, because the file is 2-space indented and re-serializing would have reformatted every line.
+
+- ⚠ **OWED, AND NAMED SO IT IS NOT MISTAKEN FOR DONE.** The sink has **no consumer yet**: the records are
+  created and the bytes retained, but nothing dispatches `RecordArtifact` to mint the governed `ARTIFACT`. The
+  reason is structural and recorded in `REG-F-327` — **the Validator holds no engine**, is constructed fresh per
+  floor run, and `ArtifactStore` is async while `Engine.dispatch`/`CommandHandler` are entirely synchronous. The
+  consumer belongs one layer out, where the engine is. Until then the store is per-process and in-memory, so
+  **this retains within a run and not across restarts** — a durability limit, not a compliance one.
+
+- **Merge target:** `ICP-02` d2b. **Owed:** the `RecordArtifact` dispatch and a durable §31 adapter.

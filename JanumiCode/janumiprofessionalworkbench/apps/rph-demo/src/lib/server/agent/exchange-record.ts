@@ -19,6 +19,8 @@
 // SAYS its bytes are unretained is the disclosed omission PER-9 permits; today's code performs the silent one
 // PER-9 forbids ("record-plane omission is not").
 
+import type { Purgeability } from '@janumipwb/rph-ports';
+
 /** PER-9-a's unit. Taken VERBATIM from `ModelExchangeRecord` — a narrower set would silently re-merge cases
  *  the corpus separates, which is the defect at `reasoning-review-validator.ts:180`. */
 export type ExchangeRole = 'initial' | 'retry' | 'reformat' | 'repair';
@@ -45,6 +47,9 @@ export type ResolvedModelIdentity =
 /** A pointer to content that lives outside the record. `PENDING_CONTENT_PLANE` is not a placeholder for a
  *  missing value — it is a positive statement that the bytes were obtainable and are not yet retainable. */
 export interface ContentRef {
+	/** REG-D-050: which side of PER-8 this content falls on. Absent while PENDING — nothing is classified
+	 *  until it is actually retained, because a classification on absent bytes asserts a fact about nothing. */
+	readonly purgeability?: Purgeability;
 	readonly status: 'PENDING_CONTENT_PLANE' | 'STORED';
 	/** Set only when STORED — the `ARTIFACT.storageKey` the bytes live under. */
 	readonly storageKey?: string;
