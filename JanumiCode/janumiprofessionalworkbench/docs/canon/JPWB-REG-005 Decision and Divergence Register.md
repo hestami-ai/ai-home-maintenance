@@ -29324,3 +29324,96 @@ every conferral equal.
 
 - **Merge target:** `REG-D-049`'s status. **Owed:** the reservation's content, if and when the sponsor wishes to
   state it.
+
+### REG-F-330 — I wrote the `rawOutput` field the register forbids writing before its ruling, and blocked it four hours later
+
+- **Date:** 2026-09-02 · **Type:** FINDING (self-inflicted compliance defect, found by an adversarial sweep, fixed) ·
+  **Class:** FINDING — corrects `76ce7356` · **Status:** ✅ CLOSED by the block.
+
+`exchange-capture.ts` stored the **pre-coercion raw output** for every bounded try under
+`RETAINED_BY_PARTICIPATION` — permanently non-purgeable. **That is non-compliant, and the register said so
+before it was written.**
+
+- ⭑⭑ **THE PROCEDURAL GROUND IS THE STRONGEST AND THE MOST EMBARRASSING.** `REG-Q-066` is **OPEN and reserved to
+  the sponsor**, and closes, verbatim: *"item 23's `rawOutput` field was drafted, defended as 'retained whole',
+  and withdrawn. **Do not write the field before the ruling.**"* **I re-confirmed that question was still OPEN
+  in `REG-F-326`, hours earlier the same day, and then wrote the field.**
+- **THE SUBSTANTIVE GROUND HAS TWO TRIGGERS AND THEY FAIL INDEPENDENTLY.** Guide §9.7 (`:1340`): *"where it
+  arrives inline with the answer, separate it at retention so that only the answer span binds under Section 8.4.
+  Where the spans cannot be separated losslessly, **or accepted contracts cannot represent these records
+  losslessly**, block the capability and resolve Section 16 item 23."*
+  1. **CONDITIONAL — and measured, not assumed.** A live `agy --print` run returned a step-by-step derivation
+     followed by `{"prime":false}` in ONE stdout blob. A control run under the judge prompt's own *"Return ONLY
+     a single-line minified JSON object (no markdown, no prose)"* came back clean. **So inline arrival is real
+     but contingent, and the committed code could not tell the two cases apart** — no detection, no separation,
+     no disclosure either way. The judge prompt does not solicit reasoning, so anything arriving is
+     **volunteered** in §9.7's exact sense.
+  2. **UNCONDITIONAL, and this is what settles it.** `Purgeability` is one value per `put()`, so **the contract
+     cannot express a blob that is partly `PURGEABLE_AT_EXPIRY` (reasoning, PER-12) and partly
+     `RETAINED_BY_PARTICIPATION` (the answer, PER-8).** This trigger fires whether or not reasoning ever
+     arrives.
+- **THE PURGEABILITY LIMB IS BREACHED; THE ASSURANCE-INPUT LIMB IS NOT — YET.** `PER-12` ends *"It is purgeable
+  at retention expiry (PER-8)"*, and the store **refuses** to purge this blob — asserted by the module's own
+  test. Purgeability is a property of the stored bytes, not of who reads them. The second limb (*"never an input
+  to any tier of assurance policy"*) is not breached today only because nothing reads the reasoning back out.
+
+- ⚠⚠ **MY OWN EARLIER MODULES SAID THE OPPOSITE, IN WRITING, AND I WIRED PAST THEM.** `exchange-record.ts:12-14`:
+  *"the RECORD is permanent and the CONTENT is purgeable at retention expiry (PER-12), so they cannot share a
+  store."* `materialized-input.ts:27-29`: *"**Do not wire this to durable storage until the purgeable plane
+  exists.**"* `exchange-capture.ts` wired it. **The warning was authored by the same hand that ignored it, three
+  commits apart.**
+- ⚠ **AND `REG-D-050` DID NOT AUTHORIZE IT.** Its warrant for `E-1` is stated as *"it is not a reasoning trace
+  (which PER-12 exempts)"* — true of the prompt, **never established for the raw output**. The `E-2` row's
+  warrant, *"the parse/disposition rests on it"*, **was authored by me, not ruled.** And the ruling's own table
+  carries volunteered reasoning as a SEPARATE row at `PURGEABLE_AT_EXPIRY` — **so it presupposes span
+  separation; it does not license merging.**
+
+**THE FIX IS THE CORPUS'S OWN INSTRUCTION: BLOCK AND DISCLOSE.** `E-1` (the prompt) is still retained — it is
+composed by JPWB from its own scaffolding and the graph export, so it is not a reasoning trace. `E-2`'s ref is
+now born `PENDING_CONTENT_PLANE` carrying the reason, which is exactly what that state was built to perform.
+**Five mutants, all SOUND on a clean baseline**, including one that stores the raw output anyway (the shipped
+defect) and one that blocks without saying why.
+
+- ⚠ **ONE MUTANT WAS INERT BY ITS OWN SHAPE AND IS RECORDED AS SUCH.** The first "block without a reason" mutant
+  replaced the reason with `'' + ('unavailable' && '<original>')`, **which evaluates to the original string** —
+  it changed nothing and proved nothing. `drive-slice-mutants.ts`'s own header warns of exactly this class. It
+  was rewritten to actually remove the reason, and then reddened.
+
+- **Merge target:** `exchange-capture.ts`. **Owed:** `REG-Q-066`'s ruling, which alone can unblock `E-2`; or a
+  lossless span separation into two artifacts.
+
+### REG-F-331 — the default judge model is REJECTED by the installed `agy`, so every Reasoning Review fails, and the diagnostic that says so is discarded
+
+- **Date:** 2026-09-02 · **Type:** FINDING (live breakage, verified first-hand) · **Class:**
+  FINDING — surfaced by the span-separation sweep · **Status:** 🔶 OPEN.
+
+`agy-cli.ts:9` — `export const DEFAULT_JUDGE_MODEL = 'Gemini 3.5 Flash (High)';` — and `judgeModel()` returns
+`JPWB_JUDGE_MODEL ?? DEFAULT_JUDGE_MODEL`. **The installed `agy` rejects that label.**
+
+**MEASURED FIRST-HAND rather than relayed** (`agy --print "hi" --model "Gemini 3.5 Flash (High)"`, streams
+separated):
+- **exit code `1`**
+- **stdout: 0 bytes**
+- **stderr: 559 bytes**, beginning: *"Error: invalid model selection (--model "Gemini 3.5 Flash (High)"
+  --effort ""): model Gemini 3.5 Flash (High) is not recognized as a known model or custom model in settings.
+  Available models: Gemini 3.8 Flash (High) / (Medium) / (Low) …"*
+
+**So unless `JPWB_JUDGE_MODEL` is set to a valid label, EVERY Reasoning Review invocation in dev/prod fails** —
+the mandatory, non-suppressible floor policy.
+
+- ⭑ **AND IT IS THE LIVE CASE `REG-F-326` PREDICTED, HOURS OLD.** `execFileAsync` rejects on the non-zero exit
+  with an error object that CARRIES `stderr`; `agy-cli.ts` destructures only `{ stdout }` and **`stderr` is
+  bound nowhere in the demo.** So the 559 bytes that name the exact problem AND list the valid alternatives are
+  **discarded at precisely the moment they are needed.** `REG-F-326` recorded that tension as a prediction; this
+  is it happening.
+- ⚠ **THE STRUCTURAL POINT, WHICH OUTLIVES THE VALUE.** The model is pinned by a **human-readable provider
+  label**, and provider catalogs move. A pin of that kind **rots silently** — nothing in the repository detects
+  that the configured label has stopped existing, and the failure surfaces as an opaque non-zero exit rather
+  than as "your configured model is gone".
+- ⚠ **NOT FIXED HERE, DELIBERATELY.** Choosing a replacement label is a **model-selection decision** bearing on
+  assurance quality (§14.6's *"allowed and resolved"*), not a typo correction, and `ModelSelectionPolicy`
+  remains *"NOT field-defined. Source TBD."* Changing it silently would be exactly the unilateral shape this
+  register keeps recording.
+
+- **Merge target:** `agy-cli.ts`'s default, once a label is chosen. **Owed:** the choice; and the diagnostic
+  home for the failure, which `REG-F-326` places in the exchange record's `E-5` rather than in a bound `stderr`.

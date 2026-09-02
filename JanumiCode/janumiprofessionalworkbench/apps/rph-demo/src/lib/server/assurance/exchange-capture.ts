@@ -115,12 +115,40 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 			purgeability: 'RETAINED_BY_PARTICIPATION'
 		});
 
-	const [inputRef, outputRef] = await Promise.all([put(input.prompt), put(input.rawOutput)]);
+	// ⛔ E-2 IS BLOCKED, DELIBERATELY, AND ONLY E-1 IS STORED.
+	//
+	// The raw pre-coercion output is a MIXED object: a reason-then-answer model returns its derivation and its
+	// answer in one blob, and a measured `agy --print` run did exactly that. Guide §9.7 (:1340): "where it
+	// arrives inline with the answer, separate it at retention so that only the answer span binds under Section
+	// 8.4. Where the spans cannot be separated losslessly, OR ACCEPTED CONTRACTS CANNOT REPRESENT THESE RECORDS
+	// LOSSLESSLY, block the capability and resolve Section 16 item 23."
+	//
+	// That second trigger is UNCONDITIONAL and fires here whether or not reasoning ever arrives: `Purgeability`
+	// is ONE value per `put()`, so the contract cannot express a blob that is partly PURGEABLE_AT_EXPIRY
+	// (reasoning, PER-12) and partly RETAINED_BY_PARTICIPATION (the answer, PER-8). Storing it whole under
+	// either class is wrong in one direction or the other.
+	//
+	// ⚠ AND THE REGISTER FORBADE THIS BY NAME BEFORE IT WAS WRITTEN. REG-Q-066 is OPEN and reserved to the
+	// sponsor — "item 23's `rawOutput` field was drafted, defended as 'retained whole', and withdrawn. Do not
+	// write the field before the ruling." A first version of this module wrote it anyway (REG-F-330).
+	//
+	// E-1 is NOT affected: the judge prompt is composed by JPWB from its own scaffolding and the graph export,
+	// so it is not a reasoning trace — which is exactly the warrant REG-D-050 states for it, and exactly the
+	// property never established for E-2.
+	const inputRef = await put(input.prompt);
 
 	const recorded: ExchangeRecord = {
 		...base,
 		materializedInputRef: storedRef(inputRef),
-		rawOutputBeforeCoercionRef: storedRef(outputRef),
+		rawOutputBeforeCoercionRef: {
+			status: 'PENDING_CONTENT_PLANE',
+			reason:
+				'E-2 BLOCKED-AND-DISCLOSED per Guide §9.7: the pre-coercion output may carry volunteered reasoning ' +
+				'inline with the answer, and Purgeability admits ONE class per stored object — so the contract ' +
+				'cannot represent a partly-purgeable blob losslessly. REG-Q-066 (OPEN, sponsor-reserved) forbids ' +
+				'writing this field before its ruling. Unblocking requires lossless span separation into two ' +
+				'artifacts (answer RETAINED_BY_PARTICIPATION, reasoning PURGEABLE_AT_EXPIRY) or that ruling.'
+		},
 		disposition: input.disposition
 	};
 	input.sink?.record(recorded);

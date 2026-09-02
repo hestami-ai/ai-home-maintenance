@@ -38,8 +38,15 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 		// THE MUTANT: leave the ref PENDING_CONTENT_PLANE. That was correct while no store existed; with one, it
 		// would be a record claiming its bytes are unretainable when they are sitting in the store.
 		expect(rec.materializedInputRef.status).toBe('STORED');
-		expect(rec.rawOutputBeforeCoercionRef.status).toBe('STORED');
 		expect(sink.drain()).toHaveLength(1);
+
+		// ⛔ E-2 IS BLOCKED ON PURPOSE, AND THE BLOCK IS ASSERTED RATHER THAN ASSUMED. Guide §9.7 requires the
+		// spans separated at retention, and Purgeability admits ONE class per stored object — so a mixed blob
+		// cannot be represented losslessly and the corpus's instruction is to block. REG-Q-066 (OPEN) forbids
+		// writing this field before its ruling. THE MUTANT: store it anyway, which is what REG-F-330 records
+		// having shipped.
+		expect(rec.rawOutputBeforeCoercionRef.status).toBe('PENDING_CONTENT_PLANE');
+		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/REG-Q-066|separat/i);
 	});
 
 	it('the stored bytes are the EXACT prompt — retrievable, not merely referenced', async () => {
@@ -121,14 +128,16 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 		// passed for a reason unrelated to what it claimed. The defect being guarded is that a repair CLOBBERS
 		// its predecessor (`raw = await print(...)` at reasoning-review-validator.ts:180, finding #25), and
 		// catching that requires asserting the two records hold DIFFERENT, independently readable content.
-		expect(second.rawOutputBeforeCoercionRef.storageKey).not.toBe(
-			first.rawOutputBeforeCoercionRef.storageKey
-		);
-		expect(await store.get(first.rawOutputBeforeCoercionRef.storageKey ?? '')).toBe(
-			'MALFORMED-FIRST-ANSWER'
-		);
-		// CSAA-007 states the rule: "Repair never rewrites predecessor raw output."
-		expect(await store.get(second.rawOutputBeforeCoercionRef.storageKey ?? '')).toBe('{"ok":true}');
+		// ⚠ THE GUARANTEE NOW RIDES ON E-1, BECAUSE E-2 IS BLOCKED. A repair sends a DIFFERENT prompt (the
+		// original plus a repair suffix), so the two tries have distinct, independently readable inputs — which
+		// is the same non-clobbering property, asserted on the content that is lawfully retained.
+		expect(second.materializedInputRef.storageKey).not.toBe(first.materializedInputRef.storageKey);
+		expect(await store.get(first.materializedInputRef.storageKey ?? '')).toBe('P1');
+		expect(await store.get(second.materializedInputRef.storageKey ?? '')).toBe('P1 + repair suffix');
+		// CSAA-007's rule — "Repair never rewrites predecessor raw output" — is honoured VACUOUSLY for E-2
+		// while it is blocked: there is no retained raw output to rewrite. Recorded so a later reader does not
+		// mistake the blocked state for a satisfied one.
+		expect(first.rawOutputBeforeCoercionRef.status).toBe('PENDING_CONTENT_PLANE');
 	});
 
 	it('the parse outcome is recorded on each try — E-5', async () => {
