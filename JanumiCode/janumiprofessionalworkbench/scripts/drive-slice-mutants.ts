@@ -74,7 +74,7 @@ function undrivenSurfaceSlices(): { file: string; sliceId: string; mutants: numb
 	try {
 		names = readdirSync(surfaceDir);
 	} catch {
-		return; // no SURFACE Slices yet — nothing this driver is failing to cover
+		return []; // no SURFACE Slices yet — nothing this driver is failing to cover
 	}
 	return names
 		.filter((n) => n.endsWith('.slice.e2e.ts'))

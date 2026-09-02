@@ -11,6 +11,7 @@
 //    something sensible against the mock.
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { RationaleSink } from './rationale.js';
+import type { MaterializedInput } from './materialized-input.js';
 import type { AuthoringToolDescriptor, AuthoringAgent, EmitFn, ToolRunResult } from './types.js';
 
 interface PlanStep {
@@ -44,6 +45,14 @@ export class MockAuthoringAgent implements AuthoringAgent {
 	 *  that omits declare_rationale returns undefined — and that shortfall is recorded, never papered over. */
 	rationale(): ProfessionalRationaleSummary | undefined {
 		return this.sink.get();
+	}
+
+	/** ICP-01 — ALWAYS EMPTY, and that is a positive statement rather than a gap. The mock is a deterministic
+	 *  structural agent: it issues NO provider request, so there is no materialized input to present and
+	 *  nothing for PER-9 to require. ⚠ Do not "fix" this by synthesizing a payload — a fabricated input recorded
+	 *  as an exchange is precisely the thing PER-9's record exists to make impossible. */
+	materializedInputs(): readonly MaterializedInput[] {
+		return [];
 	}
 
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {

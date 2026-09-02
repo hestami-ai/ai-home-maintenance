@@ -2722,7 +2722,17 @@ describe('live JPWB and inventory projection', () => {
 		// been declared in the Slice contract, parsed by the ledger and written into every SURFACE row, and read
 		// by NOTHING — which had never mattered because there were no SURFACE Slices. `S-01` is the first.
 		expect(counts.get('verif/tsconfig.json')).toBe(62);
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(95);
+		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
+		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
+		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands
+		// Pi is an input TO the composition, and capturing earlier would record a template, which PER-9 says
+		// "identifies that record" but "never substitutes for it".
+		// ⚠ WE BROKE THIS PIN AND ARE SAYING SO, per this file's own standing instruction. It was found by
+		// running the FULL suite rather than the scoped one — which is the third time this repository has
+		// recorded that scoped runs hide CSAA population moves. It was also verified pre-existing-vs-ours by
+		// stashing: at HEAD this file fails ONE test (the JAN-CSAA-005 projection) and inventory.test.ts fails
+		// on REG-F-311's generated-context blocker; only THIS assertion is ours.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(97);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

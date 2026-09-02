@@ -165,9 +165,17 @@ what was sent. **The mutant:** capture the template *before* substitution/assemb
 fail — a pre-assembly capture is exactly the fingerprint `PER-9` forbids substituting for the record, and a
 test that passes on it is asserting nothing.
 
-⚠ **RISK, NAMED:** this may not be fully achievable through Pi's public surface. If it is not, the honest
-outcome is a **disclosed partial** — record what is obtainable, declare the rest as `truncationState: unknown`
-per `ModelExchangeRecord`'s own vocabulary — **not a silent capture of the wrong artifact.**
+⚠ ~~**RISK, NAMED:** this may not be fully achievable through Pi's public surface.~~
+✅ **LANDED 2026-09-02. THE RISK IS RETIRED, AND MORE CHEAPLY THAN PRICED.** Pi exposes a documented hook —
+`onPayload`: *"Optional callback for inspecting or replacing provider payloads before sending. Return undefined
+to keep the payload unchanged"* — which fires **once per provider request**, i.e. exactly PER-9's unit.
+`Agent.onPayload` is a public writable property and `AgentSession.agent` is public, so no internal is touched.
+**No disclosed partial was needed.** `materialized-input.ts` + 6 mutants, all SOUND against declared predictions,
+with a BASELINE control that caught a broken instrument before any verdict was believed.
+⚠ **AND IT YIELDS E-3 FOR FREE:** `onPayload(payload, model)` carries the resolved model, so the producer's
+identity — the surviving half of finding `#10` — arrives on the same seam.
+⚠ **WHAT IT DOES NOT YIELD:** `onResponse` fires *"before its body stream is consumed"*, so it is HTTP-level
+and is **not** E-2. The pre-coercion output still needs its own capture in `ICP-02`.
 
 ---
 

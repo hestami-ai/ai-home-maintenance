@@ -3,6 +3,7 @@
 // implementation just maps its richer event stream onto these same events. Swapping mock <-> Pi changes nothing
 // downstream.
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { MaterializedInput } from './materialized-input.js';
 
 /** The ACTUAL producer of this run — the resolved model/provider, not a role label. §8.12 checks independence
  *  against actual model/provider identity, so the floor cannot use a compile-time placeholder here. */
@@ -37,6 +38,13 @@ export interface AuthoringAgent {
 	 *  the execution contract requires alongside its proposals. Undefined when the producer never declared one;
 	 *  that is a contract shortfall to record, never an absence to infer from (§9.7). */
 	rationale(): ProfessionalRationaleSummary | undefined;
+	/** ICP-01 — the exact materialized inputs presented to the model this run, one per bounded try (PER-9 E-1 +
+	 *  E-3). REQUIRED rather than optional so every agent must STATE its position: an implementation that makes
+	 *  no provider request returns `[]` because there was nothing to present, which is a different fact from
+	 *  "not captured" and should be readable as such.
+	 *  ⚠ IN-MEMORY FOR THE TURN. Persisting these is ICP-02 and is blocked behind ICP-03 — see
+	 *  `materialized-input.ts`. */
+	materializedInputs(): readonly MaterializedInput[];
 }
 
 // ---- Pi-agnostic tool parameter DSL ----------------------------------------------------------------

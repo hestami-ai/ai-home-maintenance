@@ -28703,3 +28703,61 @@ more with them: 9 of 22.** The instrument discriminates.
   is not the existence of a check.**
 
 - **Merge target:** `ICP-00` rows. **Owed:** enforcement for both, scheduled behind `ICP-02`/`ICP-03`.
+
+### REG-F-320 — `ICP-01` COMPLETE: PER-9's E-1 is obtainable through a documented Pi hook, and the risk that priced this work package was wrong
+
+- **Date:** 2026-09-02 · **Type:** RECORD (work package complete) · **Class:**
+  RECORD — discharges `JAN-ICP-DR-001` `ICP-01` · **Status:** ✅ CLOSED.
+
+`PER-9` requires *"the exact materialized input presented to the model"*. Before this, JPWB could not produce
+it: `pi-agent.ts` hands Pi a `systemPromptOverride` and an `instruction`, and Pi's `DefaultResourceLoader`
+composes system prompt, resources, tool schemas and history INSIDE the SDK. **E-1 was UNAVAILABLE rather than
+unrecorded** — which is why this preceded the record rather than being part of it.
+
+- **THE SEAM IS DOCUMENTED, NOT AN INTERNAL.** pi-ai `types.d.ts`, verbatim: *"Optional callback for inspecting
+  or replacing provider payloads before sending. Return undefined to keep the payload unchanged."* It fires
+  **once per provider request**, which is `PER-9-a`'s unit — *"each retry, reformat, and repair request
+  included"*. `Agent.onPayload` is a public writable property and `AgentSession.agent` is public.
+  **`ICP-01`'s named risk — *"may not be fully achievable through Pi's public surface"* — is RETIRED**, and no
+  disclosed partial was needed.
+
+- **AND IT PAYS FOR PART OF `#10`.** `onPayload(payload, model)` carries the resolved model, so the PRODUCER's
+  identity — the half of finding `#10` that `ICP-00` found still open — arrives on the same seam that yields
+  E-1. ⚠ **`onResponse` does NOT yield E-2**: it fires *"before its body stream is consumed"*, so it is
+  HTTP-level, not the decoded answer. The pre-coercion output still needs its own capture in `ICP-02`, and
+  saying so now prevents `ICP-02` from being scoped as already-solved.
+
+- **SIX MUTANTS, ALL SOUND AGAINST PREDICTIONS DECLARED FIRST** — pre-assembly capture (the roadmap's named
+  mutant) `{1,3}`; replace-instead-of-observe `{2}`; collapse-tries `{3}`; drop-model-identity `{4}`;
+  don't-chain `{5,6}`; record-our-argument-not-the-replacement `{6}`.
+  ⭑ **THE BASELINE CONTROL EARNED ITS PLACE ON THE FIRST RUN.** The driver reported all six MISMATCH — because
+  `execSync` uses `cmd.exe` on Windows, where `./node_modules/.bin/vitest` does not resolve, so **no run
+  happened and no report was written**. Without a baseline row the six uniform verdicts would have read as a
+  finding about the tests. ⚠ **`drive-slice-mutants.ts:96-107` documents this EXACT failure** — a Windows
+  vitest shim that *"ran NOTHING and wrote NO report"* — and its stale-report abort is the same guard. **The
+  instrument failed the way its sibling's header says instruments fail here.**
+
+- ⚠ **IN-MEMORY ONLY, AND THAT IS A CONTRACT.** Captured bytes are held for the turn and written nowhere.
+  Persisting them is `ICP-02`, blocked behind `ICP-03`: no redaction exists anywhere (finding `#60`) and
+  `domain_events` is immutable and permanent (§9.4), so writing an unredacted provider payload there would
+  create precisely the unpurgeable artifact `transcript.ts` drops `thinking` to avoid, against `PER-12`'s
+  purge-at-expiry requirement. The module header says so at the site.
+
+- **TWO DEFECTS FOUND AND FIXED ON THE WAY, BOTH DISCLOSED RATHER THAN FOLDED IN.**
+  1. `scripts/drive-slice-mutants.ts:77` returned `undefined` from a function typed to return an array
+     (`return;` where the empty case needs `return []`), and its result is iterated. **Pre-existing at HEAD and
+     mine from `JAN-SLICE-SWP-06`** — it survived because `gate:fast` dies at its FIRST step (`REG-F-311`) and
+     never reaches `check-types`. ⚠ **A red gate was masking a second red.**
+  2. **WE BROKE A CSAA PIN AND ARE SAYING SO.** `apps/rph-demo/tsconfig.json` population 95 → 97, the two new
+     files. Found by running the FULL suite rather than the scoped one — **the third time this repository has
+     recorded that scoped runs hide CSAA population moves.** Attribution was verified by STASHING rather than
+     assumed: at HEAD `subject.test.ts` fails ONE test (the JAN-CSAA-005 projection) and `inventory.test.ts`
+     fails on `REG-F-311`'s generated-context blocker. **Only the population assertion was ours**, and after the
+     fix the file is back to its HEAD baseline of 1 failed / 63 passed.
+
+- ⚠ **WHAT IS NOT COVERED, STATED PLAINLY.** The module is mutation-tested; **the one wiring line in
+  `pi-agent.ts` is not.** That file needs the real Pi SDK and credentials, has no test today, and is excluded
+  from the gate by design (the factory dynamic-imports Pi so the mock path never loads it). So `ICP-01` proves
+  the recorder and **asserts, without proving, that it is installed on the live path.**
+
+- **Merge target:** roadmap `ICP-01` (risk retired). **Owed:** `ICP-02`. Status: CLOSED.

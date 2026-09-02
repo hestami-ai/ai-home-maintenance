@@ -17,6 +17,11 @@ import {
 import { Type, type TSchema } from 'typebox';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { RationaleSink } from './rationale.js';
+import {
+	createMaterializedInputRecorder,
+	type MaterializedInput,
+	type PayloadHookHost
+} from './materialized-input.js';
 import type { AuthoringAgent, AuthoringToolDescriptor, EmitFn, ParamSpec } from './types.js';
 import { piToolExecutionSucceeded, toPiToolResult } from './pi-tool-result.js';
 
@@ -95,6 +100,15 @@ export class PiAuthoringAgent implements AuthoringAgent {
 		return this.sink.get();
 	}
 
+	/** ICP-01 — one entry per PROVIDER REQUEST, which is PER-9's unit ("each retry, reformat, and repair request
+	 *  included"). Accumulates across `run()` calls on this instance, so a turn's refinement pass appears as its
+	 *  own try rather than overwriting the first. */
+	private readonly inputs = createMaterializedInputRecorder();
+
+	materializedInputs(): readonly MaterializedInput[] {
+		return this.inputs.captured();
+	}
+
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {
 		let session: Awaited<ReturnType<typeof createAgentSession>>['session'] | undefined;
 		let unsubscribe: (() => void) | undefined;
@@ -134,6 +148,17 @@ export class PiAuthoringAgent implements AuthoringAgent {
 				modelRegistry
 			});
 			session = created.session;
+
+			// ICP-01 — capture the EXACT materialized input (PER-9 E-1) at Pi's documented `onPayload` seam:
+			// "inspecting or replacing provider payloads before sending. Return undefined to keep the payload
+			// unchanged." Installed AFTER session creation because `CreateAgentSessionOptions` does not expose
+			// the hook, while `AgentSession.agent` is public and `Agent.onPayload` is a writable property.
+			//
+			// ⚠ THIS IS THE ONLY POINT WHERE THE COMPOSITE EXISTS. Everything JPWB hands Pi (the system-prompt
+			// override, the instruction) is an INPUT TO the composition; Pi assembles resources, tool schemas
+			// and history on top. Capturing earlier would record a template, and PER-9 is explicit that a
+			// template identifies the record and "never substitutes for it".
+			this.inputs.install(session.agent as unknown as PayloadHookHost);
 
 			unsubscribe = session.subscribe((event) => {
 				switch (event.type) {
