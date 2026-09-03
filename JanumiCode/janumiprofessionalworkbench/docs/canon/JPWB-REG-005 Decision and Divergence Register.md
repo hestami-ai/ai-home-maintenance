@@ -29733,3 +29733,64 @@ already returns** — `storageProvider`, `storageKey`, `contentHash`, `byteSize`
 - **Merge target:** **Register.** **Owed:** `ICP-02` deliverable 3 is blocked on `REG-Q-056`, not on
   `AUTHORING_CONVERSATION`; record it that way wherever the old reason is carried. Nothing here is owed to
   `REG-Q-066`, which is untouched by these corrections.
+
+### REG-D-053 — SPONSOR INTENT: reasoning capture spans all five aggregates — which discharges PER-12's producing-Attempt anchor on the four that can never have one
+
+- **Date:** 2026-09-03 · **Type:** RULING (sponsor statement of intent) · **Class:**
+  DECISION — answers the residual `Q1` that survived the `REG-F-334` audit; closes the operative half of
+  `REG-Q-066` · **Status:** ✅ CLOSED.
+
+**THE QUESTION PUT TO THE SPONSOR.** `PER-12` retains volunteered reasoning as *"a typed Artifact bound to
+its producing Attempt."* An Execution Attempt is an **Execution-aggregate** concept. **Four of the five
+principal aggregates are not rooted at an Execution Plan** (`JPWB-DOC-003:135-141`, read verbatim): Work is
+rooted at a PWU Instance, Assurance at an Assurance Assessment, Governance at a Decision, Baseline at a
+Baseline. **Only Execution is rooted at an Execution Plan.** So the anchor `PER-12` makes mandatory has no
+referent on four fifths of the system — including the **assurance** plane, where JPWB's only live model call
+(the Reasoning Review Validator) actually runs. The question: may that anchor be satisfied by the plane's own
+governed-stream record instead?
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"Well the intention would be to capture all five fifths."*
+
+- ⚠ **THE READING IS AN INFERENCE AND IS MARKED AS ONE.** The sponsor stated **scope**, not a direct yes to
+  `Q1`. The inference: **capture on all five aggregates is unachievable under an execution-only anchor**,
+  because four of them can never produce an Execution Attempt. Therefore the anchor must be discharged by the
+  plane's own governed-stream record. **If the sponsor intended the narrower reading — capture everywhere,
+  but blocked pending an Attempt type — this entry is wrong and supersession is owed.**
+
+**WHAT IT SETTLES.** Where no Execution Plan exists, `PER-12`'s producing-Attempt anchor is satisfied by the
+plane's own governed-stream record, per `PER-9`'s existing carve-out (`DOC-003:369`, verbatim: *"Where no
+Execution Plan exists — PWA authoring among them — the identical obligation binds to the plane's
+governed-stream record"*). The retained trace lives on the **content plane**, referenced from that record.
+
+- ⭑ **AND IT SATISFIES "NEVER PROJECTED" STRUCTURALLY RATHER THAN BY A FILTER.** The audit measured a live
+  hazard: an `ARTIFACT` Professional Work Object is projected **by construction** —
+  `packages/rph-engine/src/queries.ts:322` seeds `governedTypes` from
+  `new Set(ProfessionalWorkObjectTypeSchema.options)`, `listGovernedObjects` (`:304-317`) applies **no
+  content, retention, or type filter**, and `apps/rph-demo/src/routes/decisions/+page.server.ts:43` feeds
+  that straight into the Decision Center subject picker. `PER-12`: *"never projected."* Guide `:1338`:
+  *"never enters a default or shared projection."* ⚠ **A green committed control locks the exposure open** —
+  `packages/rph-engine/src/governed-object-catalog.test.ts:106-119` asserts every registry type the store
+  holds must be offered, precisely to catch hand-written exemptions. **Under this ruling no reasoning PWO is
+  ever recorded, so the filter is never needed and the control is never fought.**
+- **AND IT REMOVES `REG-Q-056` FROM THE REASONING HALF'S CRITICAL PATH.** No `RecordArtifact` is dispatched
+  for reasoning, so the four unratified vocabulary values (`artifactType`, `securityClassification`,
+  `retentionClass`, `status`) are not required for it. `REG-Q-056` still governs the **answer** half's
+  governed-record write and stays OPEN for that.
+
+**WHAT IT DOES NOT SETTLE, STATED SO THIS IS NOT READ WIDER THAN IT IS.**
+
+1. **It is a ruling about the ANCHOR, not a build order.** Only the assurance plane has a wired model call
+   today (`reasoning-review-validator.ts:203` is `captureTry`'s one production caller). Capture on the other
+   four aggregates is **new work**, not a wiring flip.
+2. **It does not create an Attempt type.** The two staged Attempt decisions
+   (`docs/_working/HARMONIZATION-LOG.md:4142`) remain unratified and are untouched.
+3. **It does not rule on `ASR-11` limb 3's per-validator-kind question** (`REG-Q-066` option 3), which
+   remains available and would unblock the deterministic and infrastructure rows independently.
+
+- **Merge target:** **Corpus** — `JPWB-DOC-003`, `PER-12`'s SCOPE line at `:383`, cross-referenced from
+  `ASR-11`. Proposed addendum: *"where no Execution Plan exists — PWA authoring and the assurance plane among
+  them — the reasoning Artifact's producing-Attempt anchor is satisfied by the plane's own governed-stream
+  record, per PER-9. The retained trace is held on the content plane referenced from that record; it is never
+  recorded as a governed Professional Work Object and therefore never enters the governed-object catalog."*
+  **Repository** — the exchange record must become durable before it can discharge an anchor; today the sink
+  is in-memory with no consumer (`REG-F-334`). Status: CLOSED.
