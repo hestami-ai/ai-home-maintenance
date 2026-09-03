@@ -25,8 +25,16 @@ const REGISTER = new URL(
 );
 
 /** Phrasings that assert something is absent from the corpus. */
+// ⚠ TWO ALTERNATIVES CARRY WORD BOUNDARIES, AND THAT IS A PRECISION FIX RATHER THAN A LOOSENING.
+// `is silent` matched inside `is silentLY`, so an entry writing "is silently last-write-wins" — a statement
+// about BEHAVIOUR, asserting no absence at all — was flagged as an unevidenced absence claim (REG-F-337).
+// `nothing in` is bounded for the same reason. DRIVEN before and after: the boundaries remove EXACTLY ONE
+// entry from the flagged set and leave the other fifteen, so this narrows a false positive and forgives
+// nothing. ⭑ The gate still cannot tell an assertion from a QUOTATION — REG-F-342 is flagged for the string
+// `no such` inside a regex it was describing — which is the same name-versus-shape limit REG-F-333 records;
+// that one is answered in the entry rather than by widening this instrument.
 const ABSENCE =
-	/NONE FOUND|not defined|canon does not|no such|unspecified|is silent|nothing in|does not define|no canon|zero hits/i;
+	/NONE FOUND|not defined|canon does not|no such|unspecified|is silent\b|nothing in\b|does not define|no canon|zero hits/i;
 
 /** Evidence that the absence was SEARCHED FOR rather than assumed. */
 const SEARCH_STATED = /positive control|control:|searched|grep|hit count|=\s*0 hits|control of|instrumented/i;

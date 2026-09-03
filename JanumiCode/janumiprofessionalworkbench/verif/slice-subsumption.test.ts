@@ -149,7 +149,16 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 		expect(
 			working.length,
 			`the working-roadmap population changed. SL-L4 makes ADDING one the failure mode this programme exists to end — if a twentieth is genuinely warranted, edit this number and record why. Present: ${working.sort().join(', ')}`
-		).toBe(19);
+			// 19 -> 20 (2026-09-03): `ROADMAP-JAN-MXR-model-exchange-record.md`. ⚠ SL-L4 makes adding one the
+			// failure mode this programme exists to end, so the warrant is stated rather than assumed: it
+			// sequences work a SPONSOR RULING licensed on the day it was written (`REG-D-055`, resolving Guide
+			// §16 item 23 for the exchange-record limb), and item 23's own instruction is a CONJUNCTION —
+			// "registry, schemas, persistence, projections, fixtures, and conformance tests together" — which
+			// is precisely the thing a roadmap exists to hold and a register entry cannot.
+			// ⭑ IT SUBSUMES RATHER THAN ACCUMULATES, which is what SL-L4 actually asks: it absorbs the open
+			// limbs of `JAN-ICP`'s `ICP-02`/`ICP-03` (the durable exchange record and the content/retention
+			// seam), and it is bounded by an exit criterion that retires it rather than leaving it standing.
+		).toBe(20);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

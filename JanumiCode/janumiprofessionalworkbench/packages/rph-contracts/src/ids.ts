@@ -42,7 +42,13 @@ export const ID_PREFIXES = {
 	CAPABILITY: 'cap',
 	USER_JOURNEY: 'jrny',
 	SCENARIO: 'scen',
-	REQUIREMENT: 'req'
+	REQUIREMENT: 'req',
+	// MODEL_EXCHANGE — PER-9's durable exchange record, one per bounded model or agent try (REG-D-055).
+	// ⚠ REGISTERED IN BOTH PLACES DELIBERATELY. §16 item 8's safe default is "extend the registry/schema/tests
+	// before adding an object prefix", and `ids.test.ts` holds this map equal to `canonical-vocabulary.json`'s
+	// `idPrefixRegistry`. `AUTHORING_CONVERSATION` is the counter-example to NOT copy: it carries
+	// `idPrefixEntity: 'conv'` in the object vocab while appearing in neither registry.
+	MODEL_EXCHANGE: 'mex'
 } as const;
 
 export type IdEntity = keyof typeof ID_PREFIXES;

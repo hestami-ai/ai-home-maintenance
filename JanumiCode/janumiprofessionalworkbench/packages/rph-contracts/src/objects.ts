@@ -238,6 +238,36 @@ export const EvidenceRequirementSchema = z.strictObject({
 	mayBeWaived: z.boolean()
 });
 export type EvidenceRequirement = z.infer<typeof EvidenceRequirementSchema>;
+export const ExchangeContentRefSchema = z.strictObject({
+	status: z.enum(['PENDING_CONTENT_PLANE', 'STORED']),
+	reason: z.string().optional(),
+	storageProvider: z.string().optional(),
+	storageKey: z.string().optional(),
+	contentHash: z.string().optional(),
+	byteSize: z.number().int().optional(),
+	purgeability: z.enum(['PURGEABLE_AT_EXPIRY', 'RETAINED_BY_PARTICIPATION']).optional(),
+	contentDurability: z.enum(['DURABLE', 'PROCESS_LOCAL']).optional()
+});
+export type ExchangeContentRef = z.infer<typeof ExchangeContentRefSchema>;
+export const ExchangeIdentityFactSchema = z.strictObject({
+	availability: z.enum(['REPORTED', 'UNREPORTED', 'UNRESOLVABLE', 'NOT_PROBED']),
+	evidence: z.enum(['PROVIDER_REPORTED', 'HOST_CONFIGURED', 'REQUEST_ASSUMED', 'NONE']),
+	value: z.string().optional(),
+	rationale: z.string().optional()
+});
+export type ExchangeIdentityFact = z.infer<typeof ExchangeIdentityFactSchema>;
+export const ExchangeParseOutcomeSchema = z.strictObject({
+	outcome: z.enum([
+		'PARSED',
+		'EMPTY_RESPONSE',
+		'JSON_EXTRACTION_FAILED',
+		'JSON_PARSE_FAILED',
+		'SCHEMA_COERCION_FAILED',
+		'NOT_ATTEMPTED'
+	]),
+	detail: z.string()
+});
+export type ExchangeParseOutcome = z.infer<typeof ExchangeParseOutcomeSchema>;
 export const ExecutionProvenanceSchema = z.strictObject({
 	originType: OriginTypeSchema.optional(),
 	producingExecutionAttemptId: z.string().optional(),
@@ -311,6 +341,21 @@ export const ObligationAllocationSchema = z.strictObject({
 	allocatedTo: z.array(z.string())
 });
 export type ObligationAllocation = z.infer<typeof ObligationAllocationSchema>;
+export const OmittedRegionSchema = z.strictObject({
+	role: z.enum([
+		'SYSTEM_PREAMBLE',
+		'SUBJECT_GRAPH',
+		'PRIOR_FINDINGS',
+		'CRITERIA',
+		'NARRATION',
+		'RATIONALE',
+		'MODEL_ANSWER',
+		'OTHER'
+	]),
+	reason: z.string(),
+	byteSize: z.number().int()
+});
+export type OmittedRegion = z.infer<typeof OmittedRegionSchema>;
 export const PermittedChildRuleSchema = z.strictObject({
 	typeId: z.string(),
 	cardinality: CardinalityCodeSchema,
@@ -878,6 +923,39 @@ export const RequirementObjectSchema = z.strictObject({
 });
 export type RequirementObject = z.infer<typeof RequirementObjectSchema>;
 
+/** MODEL_EXCHANGE — id prefix: mex */
+export const ModelExchangeSchema = z.strictObject({
+	...objectEnvelopeShape,
+	exchangeRole: z.enum(['INITIAL', 'RETRY', 'REFORMAT', 'REPAIR']),
+	predecessorExchangeId: z.string().optional(),
+	attemptOrdinal: z.number().int(),
+	runToken: z.string(),
+	plane: z.enum(['WORK', 'ASSURANCE', 'GOVERNANCE', 'BASELINE', 'EXECUTION', 'AUTHORING']),
+	invokerId: z.string(),
+	assurancePolicyId: z.string().optional(),
+	subjectObjectId: z.string(),
+	subjectObjectType: ProfessionalWorkObjectTypeSchema,
+	subjectSemanticVersion: z.number().int(),
+	resolvedProvider: ExchangeIdentityFactSchema,
+	resolvedModel: ExchangeIdentityFactSchema,
+	resolvedModelVersion: ExchangeIdentityFactSchema,
+	materializedInputRef: ExchangeContentRefSchema,
+	rawOutputBeforeCoercionRef: ExchangeContentRefSchema,
+	answerSpanRef: ExchangeContentRefSchema,
+	volunteeredReasoningRef: ExchangeContentRefSchema,
+	inputRedactionManifestRef: ExchangeContentRefSchema,
+	redactionState: z.enum(['NONE_APPLIED', 'APPLIED', 'NOT_IMPLEMENTED', 'UNKNOWN']),
+	inputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	outputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	omittedRegions: z.array(OmittedRegionSchema),
+	disposition: z.enum(['ACCEPTED', 'REJECTED', 'QUARANTINED', 'REPAIR_REQUESTED', 'NO_RESPONSE']),
+	parseOutcome: ExchangeParseOutcomeSchema,
+	promptTemplateFingerprint: z.string().optional(),
+	requestedAt: z.string(),
+	respondedAt: z.string()
+});
+export type ModelExchange = z.infer<typeof ModelExchangeSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -980,5 +1058,6 @@ export const OBJECT_SCHEMAS = {
 		schema: RequirementObjectSchema,
 		idPrefixEntity: 'REQUIREMENT',
 		tsName: 'RequirementObject'
-	}
+	},
+	MODEL_EXCHANGE: { schema: ModelExchangeSchema, idPrefixEntity: 'mex', tsName: 'ModelExchange' }
 } as const;

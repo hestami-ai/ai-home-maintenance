@@ -32,10 +32,11 @@
         "CAPABILITY",
         "USER_JOURNEY",
         "SCENARIO",
-        "REQUIREMENT"
+        "REQUIREMENT",
+        "MODEL_EXCHANGE"
       ],
       "canonicalSource": "RPH-DOC-002 §4 (17 runtime) + 4 authoring objects (RPH-DOC-010)",
-      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor.) RECURSIVE_PROFESSIONAL_HARNESS added for JAN-IRP capability C7 (durable RPH coordination object). VALIDATOR_REGISTRY_ENTRY added 2026-08-05 (REG-E-024(c)): DOC-004 §35's registry entry becomes a governed object so its ratified status can change through commands. NOTE THE FLOOR: seedFloorPolicies derives applicableObjectTypes from this enum precisely so a new type cannot be silently exempted (REG-F-024) — the declaration widens, enforcement is unchanged (floor-gate requires the FLOOR_POLICY_IDS triple outright, never this list). DEFERRAL added 2026-08-30 (REG-D-046 Ruling 2 / REG-Q-067 Reading A): ASR-9 limb 10 requires deferred scope to stay REPRESENTED, and the sponsor ruled that limb binds the ENGINE — so a deferral is a governed object rather than a professional habit. Widening this enum widens seedFloorPolicies’ declared applicableObjectTypes per the FLOOR note above; that is REG-F-024’s designed consequence, not an oversight. JAN-SLICE-SWP-05: +ACTOR, CAPABILITY, USER_JOURNEY, SCENARIO, REQUIREMENT (24 -> 29). FSM §30.2 deferred actor/capability/journey/requirement and its condition (\"after the Product Realization PWA implementation proves the need\") is met; SCENARIO is promoted on the independent warrant of Spec §5.9/§12. stakeholder, risk and architecture element REMAIN DEFERRED (REG-F-302)."
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor.) RECURSIVE_PROFESSIONAL_HARNESS added for JAN-IRP capability C7 (durable RPH coordination object). VALIDATOR_REGISTRY_ENTRY added 2026-08-05 (REG-E-024(c)): DOC-004 §35's registry entry becomes a governed object so its ratified status can change through commands. NOTE THE FLOOR: seedFloorPolicies derives applicableObjectTypes from this enum precisely so a new type cannot be silently exempted (REG-F-024) — the declaration widens, enforcement is unchanged (floor-gate requires the FLOOR_POLICY_IDS triple outright, never this list). DEFERRAL added 2026-08-30 (REG-D-046 Ruling 2 / REG-Q-067 Reading A): ASR-9 limb 10 requires deferred scope to stay REPRESENTED, and the sponsor ruled that limb binds the ENGINE — so a deferral is a governed object rather than a professional habit. Widening this enum widens seedFloorPolicies’ declared applicableObjectTypes per the FLOOR note above; that is REG-F-024’s designed consequence, not an oversight. JAN-SLICE-SWP-05: +ACTOR, CAPABILITY, USER_JOURNEY, SCENARIO, REQUIREMENT (24 -> 29). FSM §30.2 deferred actor/capability/journey/requirement and its condition (\"after the Product Realization PWA implementation proves the need\") is met; SCENARIO is promoted on the independent warrant of Spec §5.9/§12. stakeholder, risk and architecture element REMAIN DEFERRED (REG-F-302). MODEL_EXCHANGE added 2026-09-03 (REG-D-055): the sponsor ruled the model-call container is a STORED OBJECT rather than a projection, superseding REG-D-054's no-new-object bound. It records ONE bounded model or agent try (PER-9) and is BORN TERMINAL at revision 0 — no state machine, no arrows. It IS catalogued and that is correct: PER-12's \"never projected\" names the BYTES, and this object holds only references — governedRow reads only title/name/displayName/selectedOption, none of which this type declares, so its projected label falls back to its own minted id. Widening this enum widens seedFloorPolicies' declared applicableObjectTypes per the FLOOR note above; enforcement is unchanged."
     },
     {
       "name": "HarnessStatus",
@@ -1442,6 +1443,10 @@
     {
       "objectType": "REQUIREMENT",
       "prefix": "req"
+    },
+    {
+      "objectType": "MODEL_EXCHANGE",
+      "prefix": "mex"
     }
   ],
   "errorCodes": [

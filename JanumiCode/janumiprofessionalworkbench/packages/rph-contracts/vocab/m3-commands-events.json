@@ -3716,6 +3716,180 @@
 					"note": "Spec §13 \"Requirement types\" — the ratified fourteen"
 				}
 			]
+		},
+		{
+			"commandType": "RecordModelExchange",
+			"targetAggregateType": "MODEL_EXCHANGE",
+			"emitsEvent": "ModelExchangeRecorded",
+			"schematized": false,
+			"sourceSection": "PAYLOAD FIELDS: JPWB-DOC-003 PER-9 — RATIFIED. PER-9 enumerates the exchange record's contents in terms ('the exact materialized input presented to the model, the returned output before schema coercion or repair, the resolved provider, model, and version actually invoked, declared truncation or omission, and the parse/validation/repair outcome, subject to recorded redaction'), and every field here carries one of those elements or the per-try chain PER-9 also requires ('each retry, reformat, and repair request included — is its own durable exchange record'). THE OBJECT AND COMMAND: ratified by the sponsor 2026-09-03 as REG-D-055, which resolves Guide section 16 item 23 for the exchange-record limb and supersedes REG-D-054's no-new-object bound. THIS PROVENANCE IS DELIBERATELY CLEAN OF THE UNRATIFIED PROVENANCE MARKER, AND THE REASON MATTERS: gen-messages admits an event to RATIFIED_EVENT_PAYLOADS only when its sourceSection is present and free of that marker, and kit's commit gate skips payload validation for every event absent from that map. Applying the marker to a sponsor-ratified shape would therefore ship the one PERMANENT artefact PER-2 governs with its payload gate DISABLED — the opposite of what the caution exists for. NOTE FOR ANYONE EDITING THIS TEXT: the gate is a substring test over this very field, so merely DISCUSSING the marker by name here re-disables the gate. That is not hypothetical: the first draft of this sentence did exactly that, and generation reported success while the gate was off.",
+			"payloadFields": [
+				{
+					"field": "exchangeId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref, the target aggregate id echoed into the payload — the AppendConversationEntries idiom. Prefix 'mex', registered in canonical-vocabulary idPrefixRegistry."
+				},
+				{
+					"field": "exchangeRole",
+					"required": true,
+					"type": "'INITIAL' | 'RETRY' | 'REFORMAT' | 'REPAIR'",
+					"note": "PER-9 names retry, reformat and repair as distinct tries."
+				},
+				{
+					"field": "predecessorExchangeId",
+					"required": false,
+					"type": "string",
+					"note": "Determined by exchangeRole: required for RETRY/REFORMAT/REPAIR, refused for INITIAL."
+				},
+				{
+					"field": "attemptOrdinal",
+					"required": true,
+					"type": "number",
+					"note": "1-based position within runToken."
+				},
+				{
+					"field": "runToken",
+					"required": true,
+					"type": "string",
+					"note": "The floor-run or agent-run key. Without it a HOLE in the chain is undetectable, because revision cannot order across aggregates."
+				},
+				{
+					"field": "plane",
+					"required": true,
+					"type": "'WORK' | 'ASSURANCE' | 'GOVERNANCE' | 'BASELINE' | 'EXECUTION' | 'AUTHORING'",
+					"note": "DOC-003 135-141 five aggregate roots plus PER-9 authoring carve-out. ICP-02 deferred this as 'carried by the PWU/policy the try serves' — a warrant that held only while the record hung off an assessment. On a standalone aggregate nothing supplies it."
+				},
+				{
+					"field": "invokerId",
+					"required": true,
+					"type": "string",
+					"note": "The validatorId or agentId that made the call."
+				},
+				{
+					"field": "assurancePolicyId",
+					"required": false,
+					"type": "string",
+					"note": "Required iff plane is ASSURANCE."
+				},
+				{
+					"field": "subjectObjectId",
+					"required": true,
+					"type": "string"
+				},
+				{
+					"field": "subjectObjectType",
+					"required": true,
+					"type": "ProfessionalWorkObjectType"
+				},
+				{
+					"field": "subjectSemanticVersion",
+					"required": true,
+					"type": "number"
+				},
+				{
+					"field": "resolvedProvider",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModel",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModelVersion",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3 — PER-9 requires the VERSION actually invoked, and ActorReference has no version field."
+				},
+				{
+					"field": "materializedInputRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-1."
+				},
+				{
+					"field": "rawOutputBeforeCoercionRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, whole. ALWAYS PENDING_CONTENT_PLANE while REG-Q-066 is OPEN: the FIELD lands now because the schema is permanent (PER-2), and the block stays at the WRITE, enforced by the handler."
+				},
+				{
+					"field": "answerSpanRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, answer half — RETAINED_BY_PARTICIPATION once writable."
+				},
+				{
+					"field": "volunteeredReasoningRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, reasoning half — PURGEABLE_AT_EXPIRY (PER-12). Never a governed object of its own; no RecordArtifact is dispatched for it."
+				},
+				{
+					"field": "inputRedactionManifestRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-6."
+				},
+				{
+					"field": "redactionState",
+					"required": true,
+					"type": "'NONE_APPLIED' | 'APPLIED' | 'NOT_IMPLEMENTED' | 'UNKNOWN'",
+					"note": "A ref alone cannot distinguish 'none was applied' from 'redaction is not implemented'. A record unable to say whether redaction occurred performs record-plane omission about redaction itself, which PER-9 forbids by name."
+				},
+				{
+					"field": "inputTruncation",
+					"required": true,
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"note": "E-4. Split from output because input truncation bears on what the model was permitted to see."
+				},
+				{
+					"field": "outputTruncation",
+					"required": true,
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"note": "E-4. Decides whether a parse failure was the model's or the cutoff's."
+				},
+				{
+					"field": "omittedRegions",
+					"required": true,
+					"type": "OmittedRegion[]",
+					"note": "E-4."
+				},
+				{
+					"field": "disposition",
+					"required": true,
+					"type": "'ACCEPTED' | 'REJECTED' | 'QUARANTINED' | 'REPAIR_REQUESTED' | 'NO_RESPONSE'",
+					"note": "NO_RESPONSE ships now: a timeout or abort is a try that happened and cost money, and produces no record today. A persisted enum gains a member only via an upcaster."
+				},
+				{
+					"field": "parseOutcome",
+					"required": true,
+					"type": "ExchangeParseOutcome",
+					"note": "E-5."
+				},
+				{
+					"field": "promptTemplateFingerprint",
+					"required": false,
+					"type": "string",
+					"note": "INDEX, NEVER SUBSTITUTE — PER-9: a prompt or template fingerprint identifies that record; it never substitutes for it."
+				},
+				{
+					"field": "requestedAt",
+					"required": true,
+					"type": "string",
+					"note": "PER-11 occurrence time. makeEvent stamps occurredAt/recordedAt at DRAIN time, up to two round-trips later, so without these latency is unrecoverable and a timeout is indistinguishable from a bad answer."
+				},
+				{
+					"field": "respondedAt",
+					"required": true,
+					"type": "string",
+					"note": "PER-11 occurrence time."
+				}
+			]
 		}
 	],
 	"events": [
@@ -8453,6 +8627,178 @@
 					"type": "enum",
 					"enumRef": "RequirementTypeSchema",
 					"note": "Spec §13 \"Requirement types\" — the ratified fourteen"
+				}
+			]
+		},
+		{
+			"eventType": "ModelExchangeRecorded",
+			"aggregateType": "MODEL_EXCHANGE",
+			"sourceSection": "PAYLOAD FIELDS: JPWB-DOC-003 PER-9 — RATIFIED. PER-9 enumerates the exchange record's contents in terms ('the exact materialized input presented to the model, the returned output before schema coercion or repair, the resolved provider, model, and version actually invoked, declared truncation or omission, and the parse/validation/repair outcome, subject to recorded redaction'), and every field here carries one of those elements or the per-try chain PER-9 also requires ('each retry, reformat, and repair request included — is its own durable exchange record'). THE OBJECT AND COMMAND: ratified by the sponsor 2026-09-03 as REG-D-055, which resolves Guide section 16 item 23 for the exchange-record limb and supersedes REG-D-054's no-new-object bound. THIS PROVENANCE IS DELIBERATELY CLEAN OF THE UNRATIFIED PROVENANCE MARKER, AND THE REASON MATTERS: gen-messages admits an event to RATIFIED_EVENT_PAYLOADS only when its sourceSection is present and free of that marker, and kit's commit gate skips payload validation for every event absent from that map. Applying the marker to a sponsor-ratified shape would therefore ship the one PERMANENT artefact PER-2 governs with its payload gate DISABLED — the opposite of what the caution exists for. NOTE FOR ANYONE EDITING THIS TEXT: the gate is a substring test over this very field, so merely DISCUSSING the marker by name here re-disables the gate. That is not hypothetical: the first draft of this sentence did exactly that, and generation reported success while the gate was off. THE EVENT PAYLOAD IS THE FULL FIELD SET, deliberately: PER-2 requires that 'authoritative history remains reconstructable' and that materialized current state is 'a cache of this history, not a second authority'. A partial event payload would make the state row the authority.",
+			"payloadFields": [
+				{
+					"field": "exchangeId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref, the target aggregate id echoed into the payload — the AppendConversationEntries idiom. Prefix 'mex', registered in canonical-vocabulary idPrefixRegistry."
+				},
+				{
+					"field": "exchangeRole",
+					"required": true,
+					"type": "'INITIAL' | 'RETRY' | 'REFORMAT' | 'REPAIR'",
+					"note": "PER-9 names retry, reformat and repair as distinct tries."
+				},
+				{
+					"field": "predecessorExchangeId",
+					"required": false,
+					"type": "string",
+					"note": "Determined by exchangeRole: required for RETRY/REFORMAT/REPAIR, refused for INITIAL."
+				},
+				{
+					"field": "attemptOrdinal",
+					"required": true,
+					"type": "number",
+					"note": "1-based position within runToken."
+				},
+				{
+					"field": "runToken",
+					"required": true,
+					"type": "string",
+					"note": "The floor-run or agent-run key. Without it a HOLE in the chain is undetectable, because revision cannot order across aggregates."
+				},
+				{
+					"field": "plane",
+					"required": true,
+					"type": "'WORK' | 'ASSURANCE' | 'GOVERNANCE' | 'BASELINE' | 'EXECUTION' | 'AUTHORING'",
+					"note": "DOC-003 135-141 five aggregate roots plus PER-9 authoring carve-out. ICP-02 deferred this as 'carried by the PWU/policy the try serves' — a warrant that held only while the record hung off an assessment. On a standalone aggregate nothing supplies it."
+				},
+				{
+					"field": "invokerId",
+					"required": true,
+					"type": "string",
+					"note": "The validatorId or agentId that made the call."
+				},
+				{
+					"field": "assurancePolicyId",
+					"required": false,
+					"type": "string",
+					"note": "Required iff plane is ASSURANCE."
+				},
+				{
+					"field": "subjectObjectId",
+					"required": true,
+					"type": "string"
+				},
+				{
+					"field": "subjectObjectType",
+					"required": true,
+					"type": "ProfessionalWorkObjectType"
+				},
+				{
+					"field": "subjectSemanticVersion",
+					"required": true,
+					"type": "number"
+				},
+				{
+					"field": "resolvedProvider",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModel",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModelVersion",
+					"required": true,
+					"type": "ExchangeIdentityFact",
+					"note": "E-3 — PER-9 requires the VERSION actually invoked, and ActorReference has no version field."
+				},
+				{
+					"field": "materializedInputRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-1."
+				},
+				{
+					"field": "rawOutputBeforeCoercionRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, whole. ALWAYS PENDING_CONTENT_PLANE while REG-Q-066 is OPEN: the FIELD lands now because the schema is permanent (PER-2), and the block stays at the WRITE, enforced by the handler."
+				},
+				{
+					"field": "answerSpanRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, answer half — RETAINED_BY_PARTICIPATION once writable."
+				},
+				{
+					"field": "volunteeredReasoningRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-2, reasoning half — PURGEABLE_AT_EXPIRY (PER-12). Never a governed object of its own; no RecordArtifact is dispatched for it."
+				},
+				{
+					"field": "inputRedactionManifestRef",
+					"required": true,
+					"type": "ExchangeContentRef",
+					"note": "E-6."
+				},
+				{
+					"field": "redactionState",
+					"required": true,
+					"type": "'NONE_APPLIED' | 'APPLIED' | 'NOT_IMPLEMENTED' | 'UNKNOWN'",
+					"note": "A ref alone cannot distinguish 'none was applied' from 'redaction is not implemented'. A record unable to say whether redaction occurred performs record-plane omission about redaction itself, which PER-9 forbids by name."
+				},
+				{
+					"field": "inputTruncation",
+					"required": true,
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"note": "E-4. Split from output because input truncation bears on what the model was permitted to see."
+				},
+				{
+					"field": "outputTruncation",
+					"required": true,
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"note": "E-4. Decides whether a parse failure was the model's or the cutoff's."
+				},
+				{
+					"field": "omittedRegions",
+					"required": true,
+					"type": "OmittedRegion[]",
+					"note": "E-4."
+				},
+				{
+					"field": "disposition",
+					"required": true,
+					"type": "'ACCEPTED' | 'REJECTED' | 'QUARANTINED' | 'REPAIR_REQUESTED' | 'NO_RESPONSE'",
+					"note": "NO_RESPONSE ships now: a timeout or abort is a try that happened and cost money, and produces no record today. A persisted enum gains a member only via an upcaster."
+				},
+				{
+					"field": "parseOutcome",
+					"required": true,
+					"type": "ExchangeParseOutcome",
+					"note": "E-5."
+				},
+				{
+					"field": "promptTemplateFingerprint",
+					"required": false,
+					"type": "string",
+					"note": "INDEX, NEVER SUBSTITUTE — PER-9: a prompt or template fingerprint identifies that record; it never substitutes for it."
+				},
+				{
+					"field": "requestedAt",
+					"required": true,
+					"type": "string",
+					"note": "PER-11 occurrence time. makeEvent stamps occurredAt/recordedAt at DRAIN time, up to two round-trips later, so without these latency is unrecoverable and a timeout is indistinguishable from a bad answer."
+				},
+				{
+					"field": "respondedAt",
+					"required": true,
+					"type": "string",
+					"note": "PER-11 occurrence time."
 				}
 			]
 		}

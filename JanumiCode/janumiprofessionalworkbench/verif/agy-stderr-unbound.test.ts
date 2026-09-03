@@ -54,9 +54,26 @@ describe('REG-Q-066 — the agy stderr escape hatch stays CLOSED BY NON-USE', ()
 	});
 
 	it('`stderr` is bound NOWHERE in the demo application', () => {
-		const stderr = occurrences('stderr');
+		// ⚠ THIS PROBED A MENTION AND CALLED IT A BINDING, AND IT HAD BEEN RED FOR TWO DAYS UNNOTICED.
+		//
+		// `occurrences('stderr')` matches the token anywhere, INCLUDING COMMENTS AND STRINGS. So the moment
+		// `agy-cli.ts` gained a comment EXPLAINING why stderr must not be bound — REG-D-052 took it from 0 to 1,
+		// REG-F-333's sanitisation note to 3 — this gate reddened on its own documentation. Measured across the
+		// commits: dbe1a955 = 0 (green when written), df6019e8 = 1, 95c71798 = 3.
+		//
+		// ⭑ IT IS THE SAME DEFECT REG-F-333 RECORDED ABOUT THIS VERY FILE, ONE LAYER OVER: it probed the NAME.
+		// Now it probes the SHAPE — a destructured binding or a property read — which is what "bound" means.
+		// Prose about stderr is not a retention surface; `const { stderr } = ...` and `e.stderr` are.
+		//
+		// ⚠ AND THIS GATE IS NO LONGER THE PROTECTION, ONLY THE CHEAP EARLY SIGNAL. The real one is
+		// `agy-failure-sanitisation.test.ts`, which plants a sentinel and asserts it reaches no part of the
+		// assurance outcome by ANY route (REG-F-333's companion). Keep both: this one names the hazard at the
+		// site, that one proves the property at its destination.
+		const bindings = occurrences('stderr').filter(
+			(h) => /\.stderr\b/.test(h.text) || /\{[^}]*\bstderr\b[^}]*\}\s*=/.test(h.text)
+		);
 		expect(
-			stderr,
+			bindings,
 			'Binding `stderr` CREATES the retention surface REG-Q-066 asks about — a model CLI\'s stderr can echo ' +
 				'prompt content, which PER-9 governs and no redaction in this codebase covers (finding #60). If this ' +
 				'is deliberate, it needs a retention disposition and REG-Q-066 needs re-answering; it must not arrive ' +

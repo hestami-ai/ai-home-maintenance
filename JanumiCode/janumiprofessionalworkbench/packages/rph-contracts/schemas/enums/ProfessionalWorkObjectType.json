@@ -30,7 +30,8 @@
     "CAPABILITY",
     "USER_JOURNEY",
     "SCENARIO",
-    "REQUIREMENT"
+    "REQUIREMENT",
+    "MODEL_EXCHANGE"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }

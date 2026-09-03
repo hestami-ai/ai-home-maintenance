@@ -624,7 +624,8 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'CAPABILITY',
 	'USER_JOURNEY',
 	'SCENARIO',
-	'REQUIREMENT'
+	'REQUIREMENT',
+	'MODEL_EXCHANGE'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 

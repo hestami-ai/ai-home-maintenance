@@ -157,6 +157,17 @@ describe('validate', () => {
 		// payload shape each = 10. 5 + 2 + 10 = 17, the same per-pair arithmetic the S-1b and SWP-02a notes
 		// above record. A different number would mean something else moved — an enum I did not intend to add,
 		// or a payload shape silently reused — and is a finding, not a pin to bump.
-		expect(buildContractRegistry().ids()).toHaveLength(380);
+		// 380 -> 383 (2026-09-03, JAN-MXR / REG-D-055): `ModelExchangeSchema`,
+		// `RecordModelExchangePayloadSchema`, `ModelExchangeRecordedPayloadSchema`. +3 — one object schema plus a
+		// command/event pair minting one payload shape each, the SAME arithmetic as SWP-02a above.
+		// ⚠ DERIVED, NOT READ OFF THE FAILURE, because the note above says a different number is a finding: the
+		// registry was built and filtered, and it returns EXACTLY three `ModelExchange`-matching ids — the object,
+		// the command and the event — so the delta is fully accounted for.
+		// ⭑ AND +3 RATHER THAN +4 IS THE LOAD-BEARING PART. `MODEL_EXCHANGE` is a new member of the EXISTING
+		// `ProfessionalWorkObjectType` enum, not a new enum schema, so it adds no id (contrast SWP-05's +2 for
+		// two genuinely new enums). The four new helper sub-types add none either — helpers are inlined into the
+		// schemas that use them and were never registry entries, which is why SWP-05's derivation counts objects,
+		// enums and payload shapes and nothing else.
+		expect(buildContractRegistry().ids()).toHaveLength(383);
 	});
 });

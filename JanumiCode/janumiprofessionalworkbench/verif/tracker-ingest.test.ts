@@ -265,7 +265,13 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// notes above give — EVENTS is not one of the four w2 populations. This is the third time that
 		// distinction has been load-bearing here: a move of +10 would have meant the events had started
 		// counting, and a move of +6 would have meant something else changed that nobody had noticed.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 275 }]);
+		// 275 -> 276: `RecordModelExchange` (JAN-MXR / REG-D-055). +1 for ONE COMMAND, and its event
+		// `ModelExchangeRecorded` does not move this number for the same reason the three notes above give —
+		// EVENTS is not one of the four w2 populations. ⭑ FOURTH time that distinction has been load-bearing,
+		// and here it is the CHECK rather than a footnote: a move of +2 would have meant events had started
+		// counting, and +1 is therefore evidence the new event is bound where it belongs rather than leaking
+		// into a population it does not belong to. The new OBJECT TYPE moves nothing here either.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 276 }]);
 	});
 });
 

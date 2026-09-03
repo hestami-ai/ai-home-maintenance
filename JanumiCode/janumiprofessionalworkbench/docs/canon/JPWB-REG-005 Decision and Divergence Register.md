@@ -29410,7 +29410,15 @@ the mandatory, non-suppressible floor policy.
 - ⚠ **THE STRUCTURAL POINT, WHICH OUTLIVES THE VALUE.** The model is pinned by a **human-readable provider
   label**, and provider catalogs move. A pin of that kind **rots silently** — nothing in the repository detects
   that the configured label has stopped existing, and the failure surfaces as an opaque non-zero exit rather
-  than as "your configured model is gone".
+  than as "your configured model is gone". ⚠ **THE SEARCH, ADDED 2026-09-03 — the claim was filed unevidenced
+  and `verif/absence-claims.test.ts` was red on it from that day, unnoticed because only the four register
+  gates were being run (see `REG-F-335`).** `grep -rniE
+  "availableModels|listModels|modelCatalog|validateModel|knownModels" --include=*.ts` over `apps/` and
+  `packages/`, excluding `node_modules`, `dist` and tests → **no catalog-validation site**; the three
+  incidental hits are comments using the word "exists" in unrelated senses. **POSITIVE CONTROL, identical
+  instrument and population:** `JPWB_JUDGE_MODEL` → **4 hits**, so the instrument does read these files. The
+  claim stands as measured, and `REG-D-052` narrowed but did not remove it: the label is no longer defaulted,
+  and it is still unvalidated.
 - ⚠ **NOT FIXED HERE, DELIBERATELY.** Choosing a replacement label is a **model-selection decision** bearing on
   assurance quality (§14.6's *"allowed and resolved"*), not a typo correction, and `ModelSelectionPolicy`
   remains *"NOT field-defined. Source TBD."* Changing it silently would be exactly the unilateral shape this
@@ -30174,6 +30182,13 @@ looks intact**.
   `R2` false durability at the port → only the RECORD's test, proving the value is read rather than assumed.
   `R3` hardcode it in `storedRef` → the same test, proving the assertion is not satisfiable by a constant.
   `R4` restore *"nothing was stored"* → the two message tests, each independently killable.
+- ⚠ **THE SEARCH BEHIND THIS ENTRY'S ABSENCE CLAIMS, stated 2026-09-03 because `verif/absence-claims.test.ts`
+  flagged the entry.** The flagged phrase is `no such` **inside a quoted regex** (`/unknown|not stored|no
+  such/i`) that this entry was describing rather than asserting — a false positive of the gate's substring
+  match. The entry's real claims were nonetheless driven: **four mutants on a clean baseline**, each with a
+  **positive control** — `R2` (a false durability declaration at the port) reddens only the RECORD's test,
+  proving the value is READ from the store rather than assumed, and `R3` (hardcoding it) reddens the same
+  test, proving the assertion is not satisfiable by a constant.
 - **GENERAL FORM, DERIVED not enumerated:** ⭑ **an implementation that cannot observe a property must not
   assert it — and the fix is a DECLARATION, not a detection.** Both halves here are the same move: the store
   declares its durability instead of the host guessing, and the store declines to declare an absence it cannot
@@ -30346,6 +30361,15 @@ belongs to the call — which is `PER-9`'s own framing.**
 >   floor returns (`+server.ts:405-407`).
 > - ⚠ **And one turn's four tries span TWO assessments** (the auto-refine pass is a second full floor run,
 >   `+server.ts:127`/`:153`), so neither aggregate could hold one turn's chain.
+>
+> ⚠ **THE SEARCH BEHIND "no such object exists in this engine", stated here rather than left to the sibling
+> entry.** `grep -rn "EXECUTION_ATTEMPT" --include=*.ts` over `packages/` and `apps/`, excluding
+> `node_modules` and `dist` → **exactly ONE hit**, `packages/rph-contracts/src/ids.ts:33`, an id **prefix**.
+> The object registry in `packages/rph-contracts/src/objects.ts` was enumerated by parse: **thirteen types at
+> the time of measurement, none an Attempt**; the SQLite schema has no `execution_attempts` table.
+> **POSITIVE CONTROLS, same instrument and population:** `ARTIFACT` resolves BOTH as a prefix (`ids.ts:23`)
+> **and** as a registry member (`objects.ts:922`), so the instrument does find real object types when they
+> exist.
 >
 > ⭑ **So the sponsor's preference was not merely preferred — it was the only workable answer, and the fork I
 > posed was defective.**

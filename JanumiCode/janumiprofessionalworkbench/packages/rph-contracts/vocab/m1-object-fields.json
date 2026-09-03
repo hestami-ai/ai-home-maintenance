@@ -1865,6 +1865,173 @@
 					"note": "Spec §13 \"Requirement types\" — the ratified fourteen."
 				}
 			]
+		},
+		{
+			"objectType": "MODEL_EXCHANGE",
+			"tsName": "ModelExchange",
+			"idPrefixEntity": "mex",
+			"note": "PER-9 durable exchange record: ONE bounded model or agent try — each retry, reformat and repair included. BORN TERMINAL at revision 0 (lifecycleStatus RECORDED): no second command, no state machine, no arrows, so PER-8 immutability is structural rather than disciplinary. Licensed by REG-D-055 resolving Guide section 16 item 23 for this limb. Content is carried BY REFERENCE only.",
+			"fields": [
+				{
+					"field": "exchangeRole",
+					"type": "'INITIAL' | 'RETRY' | 'REFORMAT' | 'REPAIR'",
+					"required": true,
+					"note": "PER-9 names retry, reformat and repair as distinct tries."
+				},
+				{
+					"field": "predecessorExchangeId",
+					"type": "string",
+					"required": false,
+					"note": "Determined by exchangeRole: required for RETRY/REFORMAT/REPAIR, refused for INITIAL."
+				},
+				{
+					"field": "attemptOrdinal",
+					"type": "number",
+					"required": true,
+					"note": "1-based position within runToken."
+				},
+				{
+					"field": "runToken",
+					"type": "string",
+					"required": true,
+					"note": "The floor-run or agent-run key. Without it a HOLE in the chain is undetectable, because revision cannot order across aggregates."
+				},
+				{
+					"field": "plane",
+					"type": "'WORK' | 'ASSURANCE' | 'GOVERNANCE' | 'BASELINE' | 'EXECUTION' | 'AUTHORING'",
+					"required": true,
+					"note": "DOC-003 135-141 five aggregate roots plus PER-9 authoring carve-out. ICP-02 deferred this as 'carried by the PWU/policy the try serves' — a warrant that held only while the record hung off an assessment. On a standalone aggregate nothing supplies it."
+				},
+				{
+					"field": "invokerId",
+					"type": "string",
+					"required": true,
+					"note": "The validatorId or agentId that made the call."
+				},
+				{
+					"field": "assurancePolicyId",
+					"type": "string",
+					"required": false,
+					"note": "Required iff plane is ASSURANCE."
+				},
+				{
+					"field": "subjectObjectId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "subjectObjectType",
+					"type": "ProfessionalWorkObjectType",
+					"required": true
+				},
+				{
+					"field": "subjectSemanticVersion",
+					"type": "number",
+					"required": true
+				},
+				{
+					"field": "resolvedProvider",
+					"type": "ExchangeIdentityFact",
+					"required": true,
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModel",
+					"type": "ExchangeIdentityFact",
+					"required": true,
+					"note": "E-3."
+				},
+				{
+					"field": "resolvedModelVersion",
+					"type": "ExchangeIdentityFact",
+					"required": true,
+					"note": "E-3 — PER-9 requires the VERSION actually invoked, and ActorReference has no version field."
+				},
+				{
+					"field": "materializedInputRef",
+					"type": "ExchangeContentRef",
+					"required": true,
+					"note": "E-1."
+				},
+				{
+					"field": "rawOutputBeforeCoercionRef",
+					"type": "ExchangeContentRef",
+					"required": true,
+					"note": "E-2, whole. ALWAYS PENDING_CONTENT_PLANE while REG-Q-066 is OPEN: the FIELD lands now because the schema is permanent (PER-2), and the block stays at the WRITE, enforced by the handler."
+				},
+				{
+					"field": "answerSpanRef",
+					"type": "ExchangeContentRef",
+					"required": true,
+					"note": "E-2, answer half — RETAINED_BY_PARTICIPATION once writable."
+				},
+				{
+					"field": "volunteeredReasoningRef",
+					"type": "ExchangeContentRef",
+					"required": true,
+					"note": "E-2, reasoning half — PURGEABLE_AT_EXPIRY (PER-12). Never a governed object of its own; no RecordArtifact is dispatched for it."
+				},
+				{
+					"field": "inputRedactionManifestRef",
+					"type": "ExchangeContentRef",
+					"required": true,
+					"note": "E-6."
+				},
+				{
+					"field": "redactionState",
+					"type": "'NONE_APPLIED' | 'APPLIED' | 'NOT_IMPLEMENTED' | 'UNKNOWN'",
+					"required": true,
+					"note": "A ref alone cannot distinguish 'none was applied' from 'redaction is not implemented'. A record unable to say whether redaction occurred performs record-plane omission about redaction itself, which PER-9 forbids by name."
+				},
+				{
+					"field": "inputTruncation",
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"required": true,
+					"note": "E-4. Split from output because input truncation bears on what the model was permitted to see."
+				},
+				{
+					"field": "outputTruncation",
+					"type": "'NONE_DECLARED' | 'DECLARED' | 'DETECTED' | 'UNKNOWN'",
+					"required": true,
+					"note": "E-4. Decides whether a parse failure was the model's or the cutoff's."
+				},
+				{
+					"field": "omittedRegions",
+					"type": "OmittedRegion[]",
+					"required": true,
+					"note": "E-4."
+				},
+				{
+					"field": "disposition",
+					"type": "'ACCEPTED' | 'REJECTED' | 'QUARANTINED' | 'REPAIR_REQUESTED' | 'NO_RESPONSE'",
+					"required": true,
+					"note": "NO_RESPONSE ships now: a timeout or abort is a try that happened and cost money, and produces no record today. A persisted enum gains a member only via an upcaster."
+				},
+				{
+					"field": "parseOutcome",
+					"type": "ExchangeParseOutcome",
+					"required": true,
+					"note": "E-5."
+				},
+				{
+					"field": "promptTemplateFingerprint",
+					"type": "string",
+					"required": false,
+					"note": "INDEX, NEVER SUBSTITUTE — PER-9: a prompt or template fingerprint identifies that record; it never substitutes for it."
+				},
+				{
+					"field": "requestedAt",
+					"type": "string",
+					"required": true,
+					"note": "PER-11 occurrence time. makeEvent stamps occurredAt/recordedAt at DRAIN time, up to two round-trips later, so without these latency is unrecoverable and a timeout is indistinguishable from a bad answer."
+				},
+				{
+					"field": "respondedAt",
+					"type": "string",
+					"required": true,
+					"note": "PER-11 occurrence time."
+				}
+			]
 		}
 	],
 	"helperSubTypes": [
@@ -3488,6 +3655,127 @@
 					"field": "organization",
 					"type": "string",
 					"required": false
+				}
+			]
+		},
+		{
+			"name": "ExchangeContentRef",
+			"note": "PER-9 content carried BY REFERENCE. There is deliberately NO bytes field: a MODEL_EXCHANGE is catalogued (REG-D-055), and PER-12 'never projected' is kept structural by the record being incapable of holding model text at all, rather than by a projection filter.",
+			"fields": [
+				{
+					"field": "status",
+					"type": "'PENDING_CONTENT_PLANE' | 'STORED'",
+					"required": true,
+					"note": "The required discriminator. Every optional below is determined by it and the handler refuses the disagreeing combinations; an optional carrying 'absent or unknown?' is this repository's most-recorded defect."
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": false,
+					"note": "PENDING only. Why the bytes are not retained, in terms a reader can act on."
+				},
+				{
+					"field": "storageProvider",
+					"type": "string",
+					"required": false,
+					"note": "STORED only."
+				},
+				{
+					"field": "storageKey",
+					"type": "string",
+					"required": false,
+					"note": "STORED only."
+				},
+				{
+					"field": "contentHash",
+					"type": "string",
+					"required": false,
+					"note": "STORED only. Over the BYTES (section 31.3), never a canonicalized object."
+				},
+				{
+					"field": "byteSize",
+					"type": "number",
+					"required": false,
+					"note": "STORED only."
+				},
+				{
+					"field": "purgeability",
+					"type": "'PURGEABLE_AT_EXPIRY' | 'RETAINED_BY_PARTICIPATION'",
+					"required": false,
+					"note": "STORED only. PER-8 participation predicate (REG-D-050). Inline union rather than a canonical enum: rph-ports already owns these words and a second enum would be a parallel representation."
+				},
+				{
+					"field": "contentDurability",
+					"type": "'DURABLE' | 'PROCESS_LOCAL'",
+					"required": false,
+					"note": "STORED only. REG-F-342: a durable record naming process-local bytes is lawful only if it says so."
+				}
+			]
+		},
+		{
+			"name": "ExchangeIdentityFact",
+			"note": "E-3, PER-FACT rather than one discriminator gating provider, model and version together. judgeModel yields no version, so a shared discriminator would force either a fabricated version or the collapse of two facts that WERE reported.",
+			"fields": [
+				{
+					"field": "availability",
+					"type": "'REPORTED' | 'UNREPORTED' | 'UNRESOLVABLE' | 'NOT_PROBED'",
+					"required": true,
+					"note": "Distinguishes 'the provider said nothing' from 'nobody asked' — the distinction an optional string cannot carry."
+				},
+				{
+					"field": "evidence",
+					"type": "'PROVIDER_REPORTED' | 'HOST_CONFIGURED' | 'REQUEST_ASSUMED' | 'NONE'",
+					"required": true,
+					"note": "How the value was obtained. PER-9 requires the provider, model and version ACTUALLY INVOKED; a host-configured label is not the same claim as a provider-reported one."
+				},
+				{
+					"field": "value",
+					"type": "string",
+					"required": false,
+					"note": "REPORTED only; refused empty."
+				},
+				{
+					"field": "rationale",
+					"type": "string",
+					"required": false,
+					"note": "Non-REPORTED only; refused empty."
+				}
+			]
+		},
+		{
+			"name": "OmittedRegion",
+			"note": "E-4 detail. role is a CLOSED union: a free string is an untyped discriminator inside a record whose whole warrant is typed relationships.",
+			"fields": [
+				{
+					"field": "role",
+					"type": "'SYSTEM_PREAMBLE' | 'SUBJECT_GRAPH' | 'PRIOR_FINDINGS' | 'CRITERIA' | 'NARRATION' | 'RATIONALE' | 'MODEL_ANSWER' | 'OTHER'",
+					"required": true
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "byteSize",
+					"type": "number",
+					"required": true
+				}
+			]
+		},
+		{
+			"name": "ExchangeParseOutcome",
+			"note": "E-5. PER-9 names the parse/validation/repair outcome as a fact to retain; today a bare catch keeps none of it.",
+			"fields": [
+				{
+					"field": "outcome",
+					"type": "'PARSED' | 'EMPTY_RESPONSE' | 'JSON_EXTRACTION_FAILED' | 'JSON_PARSE_FAILED' | 'SCHEMA_COERCION_FAILED' | 'NOT_ATTEMPTED'",
+					"required": true
+				},
+				{
+					"field": "detail",
+					"type": "string",
+					"required": true
 				}
 			]
 		}

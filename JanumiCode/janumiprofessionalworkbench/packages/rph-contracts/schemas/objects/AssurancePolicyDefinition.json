@@ -36,7 +36,8 @@
         "CAPABILITY",
         "USER_JOURNEY",
         "SCENARIO",
-        "REQUIREMENT"
+        "REQUIREMENT",
+        "MODEL_EXCHANGE"
       ]
     },
     "schemaVersion": {
@@ -282,7 +283,8 @@
           "CAPABILITY",
           "USER_JOURNEY",
           "SCENARIO",
-          "REQUIREMENT"
+          "REQUIREMENT",
+          "MODEL_EXCHANGE"
         ]
       }
     },

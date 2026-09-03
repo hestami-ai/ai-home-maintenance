@@ -1,0 +1,806 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^([a-z]+)_([0-9A-HJKMNP-TV-Z]{26})$"
+    },
+    "objectType": {
+      "type": "string",
+      "enum": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT",
+        "OBLIGATION",
+        "CONSTRAINT",
+        "ASSUMPTION",
+        "CLAIM",
+        "EVIDENCE",
+        "ASSURANCE_POLICY",
+        "ASSURANCE_ASSESSMENT",
+        "ASSURANCE_OBSERVATION",
+        "DECISION",
+        "ARTIFACT",
+        "DECOMPOSITION_CONTRACT",
+        "RECOMPOSITION_CONTRACT",
+        "EXECUTION_PLAN",
+        "RUNTIME_BINDING",
+        "BASELINE",
+        "PROFESSIONAL_WORK_ARCHITECTURE",
+        "PWU_TYPE",
+        "UNDERTAKING",
+        "AUTHORING_CONVERSATION",
+        "RECURSIVE_PROFESSIONAL_HARNESS",
+        "VALIDATOR_REGISTRY_ENTRY",
+        "DEFERRAL",
+        "ACTOR",
+        "CAPABILITY",
+        "USER_JOURNEY",
+        "SCENARIO",
+        "REQUIREMENT",
+        "MODEL_EXCHANGE"
+      ]
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "semanticVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "lifecycleStatus": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "createdBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "updatedBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "originType": {
+          "type": "string",
+          "enum": [
+            "USER_INPUT",
+            "MODEL_GENERATION",
+            "TOOL_OUTPUT",
+            "HUMAN_DECISION",
+            "MIGRATION",
+            "DERIVED",
+            "IMPORTED"
+          ]
+        },
+        "sourceObjectIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sourceEventIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "producingExecutionAttemptId": {
+          "type": "string"
+        },
+        "producingValidatorId": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "originType",
+        "sourceObjectIds",
+        "sourceEventIds"
+      ],
+      "additionalProperties": false
+    },
+    "ontologyId": {
+      "type": "string"
+    },
+    "ontologyVersion": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "data": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "namespace",
+          "schemaVersion",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exchangeRole": {
+      "type": "string",
+      "enum": [
+        "INITIAL",
+        "RETRY",
+        "REFORMAT",
+        "REPAIR"
+      ]
+    },
+    "predecessorExchangeId": {
+      "type": "string"
+    },
+    "attemptOrdinal": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "runToken": {
+      "type": "string"
+    },
+    "plane": {
+      "type": "string",
+      "enum": [
+        "WORK",
+        "ASSURANCE",
+        "GOVERNANCE",
+        "BASELINE",
+        "EXECUTION",
+        "AUTHORING"
+      ]
+    },
+    "invokerId": {
+      "type": "string"
+    },
+    "assurancePolicyId": {
+      "type": "string"
+    },
+    "subjectObjectId": {
+      "type": "string"
+    },
+    "subjectObjectType": {
+      "type": "string",
+      "enum": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT",
+        "OBLIGATION",
+        "CONSTRAINT",
+        "ASSUMPTION",
+        "CLAIM",
+        "EVIDENCE",
+        "ASSURANCE_POLICY",
+        "ASSURANCE_ASSESSMENT",
+        "ASSURANCE_OBSERVATION",
+        "DECISION",
+        "ARTIFACT",
+        "DECOMPOSITION_CONTRACT",
+        "RECOMPOSITION_CONTRACT",
+        "EXECUTION_PLAN",
+        "RUNTIME_BINDING",
+        "BASELINE",
+        "PROFESSIONAL_WORK_ARCHITECTURE",
+        "PWU_TYPE",
+        "UNDERTAKING",
+        "AUTHORING_CONVERSATION",
+        "RECURSIVE_PROFESSIONAL_HARNESS",
+        "VALIDATOR_REGISTRY_ENTRY",
+        "DEFERRAL",
+        "ACTOR",
+        "CAPABILITY",
+        "USER_JOURNEY",
+        "SCENARIO",
+        "REQUIREMENT",
+        "MODEL_EXCHANGE"
+      ]
+    },
+    "subjectSemanticVersion": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "resolvedProvider": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "type": "string",
+          "enum": [
+            "REPORTED",
+            "UNREPORTED",
+            "UNRESOLVABLE",
+            "NOT_PROBED"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "PROVIDER_REPORTED",
+            "HOST_CONFIGURED",
+            "REQUEST_ASSUMED",
+            "NONE"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "availability",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "resolvedModel": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "type": "string",
+          "enum": [
+            "REPORTED",
+            "UNREPORTED",
+            "UNRESOLVABLE",
+            "NOT_PROBED"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "PROVIDER_REPORTED",
+            "HOST_CONFIGURED",
+            "REQUEST_ASSUMED",
+            "NONE"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "availability",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "resolvedModelVersion": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "type": "string",
+          "enum": [
+            "REPORTED",
+            "UNREPORTED",
+            "UNRESOLVABLE",
+            "NOT_PROBED"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "PROVIDER_REPORTED",
+            "HOST_CONFIGURED",
+            "REQUEST_ASSUMED",
+            "NONE"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "availability",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "materializedInputRef": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONTENT_PLANE",
+            "STORED"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "purgeability": {
+          "type": "string",
+          "enum": [
+            "PURGEABLE_AT_EXPIRY",
+            "RETAINED_BY_PARTICIPATION"
+          ]
+        },
+        "contentDurability": {
+          "type": "string",
+          "enum": [
+            "DURABLE",
+            "PROCESS_LOCAL"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "rawOutputBeforeCoercionRef": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONTENT_PLANE",
+            "STORED"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "purgeability": {
+          "type": "string",
+          "enum": [
+            "PURGEABLE_AT_EXPIRY",
+            "RETAINED_BY_PARTICIPATION"
+          ]
+        },
+        "contentDurability": {
+          "type": "string",
+          "enum": [
+            "DURABLE",
+            "PROCESS_LOCAL"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "answerSpanRef": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONTENT_PLANE",
+            "STORED"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "purgeability": {
+          "type": "string",
+          "enum": [
+            "PURGEABLE_AT_EXPIRY",
+            "RETAINED_BY_PARTICIPATION"
+          ]
+        },
+        "contentDurability": {
+          "type": "string",
+          "enum": [
+            "DURABLE",
+            "PROCESS_LOCAL"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "volunteeredReasoningRef": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONTENT_PLANE",
+            "STORED"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "purgeability": {
+          "type": "string",
+          "enum": [
+            "PURGEABLE_AT_EXPIRY",
+            "RETAINED_BY_PARTICIPATION"
+          ]
+        },
+        "contentDurability": {
+          "type": "string",
+          "enum": [
+            "DURABLE",
+            "PROCESS_LOCAL"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "inputRedactionManifestRef": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_CONTENT_PLANE",
+            "STORED"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "purgeability": {
+          "type": "string",
+          "enum": [
+            "PURGEABLE_AT_EXPIRY",
+            "RETAINED_BY_PARTICIPATION"
+          ]
+        },
+        "contentDurability": {
+          "type": "string",
+          "enum": [
+            "DURABLE",
+            "PROCESS_LOCAL"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "redactionState": {
+      "type": "string",
+      "enum": [
+        "NONE_APPLIED",
+        "APPLIED",
+        "NOT_IMPLEMENTED",
+        "UNKNOWN"
+      ]
+    },
+    "inputTruncation": {
+      "type": "string",
+      "enum": [
+        "NONE_DECLARED",
+        "DECLARED",
+        "DETECTED",
+        "UNKNOWN"
+      ]
+    },
+    "outputTruncation": {
+      "type": "string",
+      "enum": [
+        "NONE_DECLARED",
+        "DECLARED",
+        "DETECTED",
+        "UNKNOWN"
+      ]
+    },
+    "omittedRegions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "SYSTEM_PREAMBLE",
+              "SUBJECT_GRAPH",
+              "PRIOR_FINDINGS",
+              "CRITERIA",
+              "NARRATION",
+              "RATIONALE",
+              "MODEL_ANSWER",
+              "OTHER"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "role",
+          "reason",
+          "byteSize"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "disposition": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED",
+        "REJECTED",
+        "QUARANTINED",
+        "REPAIR_REQUESTED",
+        "NO_RESPONSE"
+      ]
+    },
+    "parseOutcome": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "PARSED",
+            "EMPTY_RESPONSE",
+            "JSON_EXTRACTION_FAILED",
+            "JSON_PARSE_FAILED",
+            "SCHEMA_COERCION_FAILED",
+            "NOT_ATTEMPTED"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "detail"
+      ],
+      "additionalProperties": false
+    },
+    "promptTemplateFingerprint": {
+      "type": "string"
+    },
+    "requestedAt": {
+      "type": "string"
+    },
+    "respondedAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "objectType",
+    "schemaVersion",
+    "semanticVersion",
+    "revision",
+    "lifecycleStatus",
+    "createdAt",
+    "createdBy",
+    "updatedAt",
+    "updatedBy",
+    "provenance",
+    "tags",
+    "extensions",
+    "exchangeRole",
+    "attemptOrdinal",
+    "runToken",
+    "plane",
+    "invokerId",
+    "subjectObjectId",
+    "subjectObjectType",
+    "subjectSemanticVersion",
+    "resolvedProvider",
+    "resolvedModel",
+    "resolvedModelVersion",
+    "materializedInputRef",
+    "rawOutputBeforeCoercionRef",
+    "answerSpanRef",
+    "volunteeredReasoningRef",
+    "inputRedactionManifestRef",
+    "redactionState",
+    "inputTruncation",
+    "outputTruncation",
+    "omittedRegions",
+    "disposition",
+    "parseOutcome",
+    "requestedAt",
+    "respondedAt"
+  ],
+  "additionalProperties": false,
+  "$id": "urn:janumi:rph:schema:object:ModelExchange:1"
+}

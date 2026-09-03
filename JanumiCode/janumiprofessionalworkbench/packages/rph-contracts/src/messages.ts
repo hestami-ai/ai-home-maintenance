@@ -69,6 +69,9 @@ import {
 	EscalationPolicySchema,
 	EscalationRuleSchema,
 	EvidenceRequirementSchema,
+	ExchangeContentRefSchema,
+	ExchangeIdentityFactSchema,
+	ExchangeParseOutcomeSchema,
 	ExecutionProvenanceSchema,
 	ExecutionSkipAuthorizationSchema,
 	ExecutionStepSchema,
@@ -78,6 +81,7 @@ import {
 	ModelSelectionPolicySchema,
 	NoOutputResultSchema,
 	ObligationAllocationSchema,
+	OmittedRegionSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
 	RecompositionConflictSchema,
@@ -864,6 +868,37 @@ export const DefineRequirementPayloadSchema = z.strictObject({
 	requirementType: RequirementTypeSchema
 });
 export type DefineRequirementPayload = z.infer<typeof DefineRequirementPayloadSchema>;
+export const RecordModelExchangePayloadSchema = z.strictObject({
+	exchangeId: z.string(),
+	exchangeRole: z.enum(['INITIAL', 'RETRY', 'REFORMAT', 'REPAIR']),
+	predecessorExchangeId: z.string().optional(),
+	attemptOrdinal: z.number().int(),
+	runToken: z.string(),
+	plane: z.enum(['WORK', 'ASSURANCE', 'GOVERNANCE', 'BASELINE', 'EXECUTION', 'AUTHORING']),
+	invokerId: z.string(),
+	assurancePolicyId: z.string().optional(),
+	subjectObjectId: z.string(),
+	subjectObjectType: ProfessionalWorkObjectTypeSchema,
+	subjectSemanticVersion: z.number().int(),
+	resolvedProvider: ExchangeIdentityFactSchema,
+	resolvedModel: ExchangeIdentityFactSchema,
+	resolvedModelVersion: ExchangeIdentityFactSchema,
+	materializedInputRef: ExchangeContentRefSchema,
+	rawOutputBeforeCoercionRef: ExchangeContentRefSchema,
+	answerSpanRef: ExchangeContentRefSchema,
+	volunteeredReasoningRef: ExchangeContentRefSchema,
+	inputRedactionManifestRef: ExchangeContentRefSchema,
+	redactionState: z.enum(['NONE_APPLIED', 'APPLIED', 'NOT_IMPLEMENTED', 'UNKNOWN']),
+	inputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	outputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	omittedRegions: z.array(OmittedRegionSchema),
+	disposition: z.enum(['ACCEPTED', 'REJECTED', 'QUARANTINED', 'REPAIR_REQUESTED', 'NO_RESPONSE']),
+	parseOutcome: ExchangeParseOutcomeSchema,
+	promptTemplateFingerprint: z.string().optional(),
+	requestedAt: z.string(),
+	respondedAt: z.string()
+});
+export type RecordModelExchangePayload = z.infer<typeof RecordModelExchangePayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1984,6 +2019,37 @@ export const RequirementDefinedPayloadSchema = z.strictObject({
 	requirementType: RequirementTypeSchema
 });
 export type RequirementDefinedPayload = z.infer<typeof RequirementDefinedPayloadSchema>;
+export const ModelExchangeRecordedPayloadSchema = z.strictObject({
+	exchangeId: z.string(),
+	exchangeRole: z.enum(['INITIAL', 'RETRY', 'REFORMAT', 'REPAIR']),
+	predecessorExchangeId: z.string().optional(),
+	attemptOrdinal: z.number().int(),
+	runToken: z.string(),
+	plane: z.enum(['WORK', 'ASSURANCE', 'GOVERNANCE', 'BASELINE', 'EXECUTION', 'AUTHORING']),
+	invokerId: z.string(),
+	assurancePolicyId: z.string().optional(),
+	subjectObjectId: z.string(),
+	subjectObjectType: ProfessionalWorkObjectTypeSchema,
+	subjectSemanticVersion: z.number().int(),
+	resolvedProvider: ExchangeIdentityFactSchema,
+	resolvedModel: ExchangeIdentityFactSchema,
+	resolvedModelVersion: ExchangeIdentityFactSchema,
+	materializedInputRef: ExchangeContentRefSchema,
+	rawOutputBeforeCoercionRef: ExchangeContentRefSchema,
+	answerSpanRef: ExchangeContentRefSchema,
+	volunteeredReasoningRef: ExchangeContentRefSchema,
+	inputRedactionManifestRef: ExchangeContentRefSchema,
+	redactionState: z.enum(['NONE_APPLIED', 'APPLIED', 'NOT_IMPLEMENTED', 'UNKNOWN']),
+	inputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	outputTruncation: z.enum(['NONE_DECLARED', 'DECLARED', 'DETECTED', 'UNKNOWN']),
+	omittedRegions: z.array(OmittedRegionSchema),
+	disposition: z.enum(['ACCEPTED', 'REJECTED', 'QUARANTINED', 'REPAIR_REQUESTED', 'NO_RESPONSE']),
+	parseOutcome: ExchangeParseOutcomeSchema,
+	promptTemplateFingerprint: z.string().optional(),
+	requestedAt: z.string(),
+	respondedAt: z.string()
+});
+export type ModelExchangeRecordedPayload = z.infer<typeof ModelExchangeRecordedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2673,6 +2739,12 @@ export const COMMANDS = {
 		targetAggregateType: 'REQUIREMENT',
 		emitsEvent: 'RequirementDefined',
 		firstSlice: false
+	},
+	RecordModelExchange: {
+		payload: RecordModelExchangePayloadSchema,
+		targetAggregateType: 'MODEL_EXCHANGE',
+		emitsEvent: 'ModelExchangeRecorded',
+		firstSlice: false
 	}
 } as const;
 
@@ -3045,7 +3117,11 @@ export const EVENTS = {
 	CapabilityDefined: { payload: CapabilityDefinedPayloadSchema, aggregateType: 'Capability' },
 	UserJourneyDefined: { payload: UserJourneyDefinedPayloadSchema, aggregateType: 'UserJourney' },
 	ScenarioDefined: { payload: ScenarioDefinedPayloadSchema, aggregateType: 'Scenario' },
-	RequirementDefined: { payload: RequirementDefinedPayloadSchema, aggregateType: 'Requirement' }
+	RequirementDefined: { payload: RequirementDefinedPayloadSchema, aggregateType: 'Requirement' },
+	ModelExchangeRecorded: {
+		payload: ModelExchangeRecordedPayloadSchema,
+		aggregateType: 'MODEL_EXCHANGE'
+	}
 } as const;
 
 /** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not
@@ -3072,7 +3148,8 @@ export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {
 	ValidatorDegraded: ValidatorDegradedPayloadSchema,
 	ValidatorRestored: ValidatorRestoredPayloadSchema,
 	ValidatorDisabled: ValidatorDisabledPayloadSchema,
-	ValidatorEnabled: ValidatorEnabledPayloadSchema
+	ValidatorEnabled: ValidatorEnabledPayloadSchema,
+	ModelExchangeRecorded: ModelExchangeRecordedPayloadSchema
 };
 
 export interface CommandEventBinding {
