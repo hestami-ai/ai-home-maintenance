@@ -29845,3 +29845,56 @@ several Artifacts"*). Structural, not discretionary.
   last-write-wins. **The audit trigger is: does this key determine every field it stores?**
 - **Merge target:** `packages/rph-ports/src/defaults/artifact-store.ts`. **Owed:** an S3-compatible §31
   adapter must reproduce the class-in-key rule; the port docblock now states it so both must honour it.
+
+### REG-F-338 — a CONTENT STORE failure was recorded as a malformed model response, and it bought a second billed model call to do it
+
+- **Date:** 2026-09-03 · **Type:** DIVERGENCE FINDING (shipped defect, driven) · **Class:**
+  CODE_DIVERGES — corrupts the one disposition that distinguishes a bad blob from a bad day ·
+  **Status:** ✅ CLOSED by narrowing the `try` to the parse alone.
+
+**THE DEFECT.** In `reasoning-review-validator.ts`, `capture(...)` sat INSIDE the same `try` as
+`JSON.parse(extractJson(...))`, under a **bare `catch`**. So when the model's answer parsed cleanly and the
+CONTENT STORE then threw:
+
+1. the judgement had **already been computed** — and was discarded;
+2. the bare catch treated the store's fault as though the **blob** were bad;
+3. a **second billed model call** was issued to "repair" an answer that was never malformed;
+4. the exchange was recorded with disposition **`repair-requested`**.
+
+- ⭑ **AFTER THAT, `repair-requested` NO LONGER MEANS "THE MODEL RETURNED SOMETHING UNUSABLE" — which is the
+  only thing that disposition is for.** The record plane says the model misbehaved; the model did not. This
+  is worse than a lost record: it is a **false one**, and `PER-9` requires the stream to be reproducible and
+  challengeable.
+- ⚠ **THE INNER REPAIR `try` WAS ALREADY CORRECT** — its `capture` calls sit outside the guarded expression.
+  **Only the outer one was wrong**, which is why reading the block quickly reads as fine.
+
+**THE RED TEST HAD TO BE DESIGNED AROUND A MASKING EFFECT, AND THAT IS THE PART TO KEEP.** An
+**always-failing** store does NOT expose this: the catch block's own `capture('initial', …,
+'repair-requested')` is its first statement, so it throws before `print(repairPrompt)` is reached and the
+spurious call never happens. ⭑ **The defect is only visible with a store that fails EXACTLY ONCE.** A
+naïve fault-injection stub would have shown green and certified the bug.
+
+**THE FIX, AND THE JUDGEMENT CALL INSIDE IT.** The `try` now covers the parse and nothing else; a retention
+fault **propagates**. ⚠ **The alternative was considered and is recorded at the site rather than discarded
+silently**: falling back to a DISCLOSED `PENDING_CONTENT_PLANE` ref and continuing with the judgement
+legitimately reached is defensible under `PER-9`'s disclosed-absence allowance. It was not chosen because
+`REG-D-050` requires the governed stream to be *"fully auditable and reconstructable"* and quiet degradation
+after a failed record is this programme's recurring hollow-layer shape — **and because no store is wired in
+production today, so loud costs nothing now and silence would cost a record.** If a real adapter makes this
+path flaky, reconsider on that evidence.
+
+- **TWO MUTANTS, BOTH SINGLE-VICTIM ON A CLEAN BASELINE.** `N1` (return `capture` to the `try` — the shipped
+  defect) reddens **only** the main test. `N2` (rethrow on parse failure — narrowing turns into *disabling*
+  the repair path) reddens **only** the CONTROL.
+- ⚠ **AND `check-types` CAUGHT WHAT vitest COULD NOT.** The test first indexed
+  `Parameters<typeof createAgyReasoningReviewValidator>[0]['artifacts']` — the parameter is optional, so the
+  type is `AgyValidatorOptions | undefined` and not indexable. **All ten tests passed green while the file
+  did not typecheck**, because vitest does not typecheck. Corrected to import `ArtifactStore` directly.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a `try` block is a CLAIM about which failures are
+  equivalent.** Every statement inside one is asserted to fail for the same reason as every other. Here a
+  network/IO fault and a model-output fault were declared interchangeable by nothing more than sharing a
+  brace. **The audit trigger is: does this `catch` name a cause, and does every statement in its `try` have
+  that cause?**
+- **Merge target:** `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`. **Owed:** nothing
+  for this defect. The same audit shape is owed against the other bare `catch` sites in the assurance path.

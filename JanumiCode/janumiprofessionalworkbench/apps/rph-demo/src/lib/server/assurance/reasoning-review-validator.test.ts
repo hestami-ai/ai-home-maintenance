@@ -22,6 +22,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import { MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
+import { createExchangeSink } from './exchange-capture.js';
+import type { ArtifactStore } from '@janumipwb/rph-ports';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwa_conformance',
@@ -78,6 +80,79 @@ const ctx = (
 		narration: over.narration ?? '',
 		...(over.rationale ? { rationale: over.rationale } : {})
 	}
+});
+
+/** A store whose FIRST put rejects and whose later puts succeed. The once-only failure is what exposes the
+ *  defect: an always-failing store throws from the catch block's own capture before the repair is reached, so
+ *  the spurious second model call never happens and the bug stays invisible. */
+function failOncePut() {
+	let calls = 0;
+	const store = {
+		async put() {
+			calls += 1;
+			if (calls === 1) throw new Error('content store unavailable');
+			return { storageProvider: 'x', storageKey: 'k', contentHash: 'sha256:0', byteSize: 1 };
+		},
+		async get() {
+			return undefined;
+		},
+		async stat() {
+			return undefined;
+		},
+		async purge() {
+			return { purged: false as const, refusedBecause: 'n/a' };
+		}
+	};
+	return { store: store as unknown as ArtifactStore };
+}
+
+describe('Reasoning Review Validator — a CONTENT STORE failure is not a malformed model response', () => {
+	it('does not re-prompt the model, and does not label a well-formed answer repair-requested', async () => {
+		const { prompts, print } = capturing();
+		const { store } = failOncePut();
+		const exchanges = createExchangeSink();
+
+		// THE DEFECT: `capture(...)` sat INSIDE the same `try` as `JSON.parse`, under a bare `catch`. The model's
+		// answer parsed cleanly and the judgement was already computed — then the store threw, the bare catch
+		// swallowed it as if the BLOB were bad, the good judgement was discarded, a second paid model call was
+		// issued, and the exchange was recorded as `repair-requested`. After that, `repair-requested` no longer
+		// means "the model returned something unusable", which is the one thing that disposition is for.
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
+				SUBJECT,
+				ctx()
+			)
+		).rejects.toThrow(/content store unavailable/);
+
+		// EXACTLY ONE model call. The repair prompt is a second billed invocation provoked by an infrastructure
+		// fault that has nothing to do with the model.
+		expect(prompts).toHaveLength(1);
+		// And no record may claim the model was asked to repair anything.
+		expect(exchanges.drain().some((e) => e.disposition === 'repair-requested')).toBe(false);
+	});
+
+	it('CONTROL — a genuinely malformed answer DOES still trigger exactly one repair', async () => {
+		// Without this the fix could not be told apart from "never repair". The repair path is the reason the
+		// try/catch exists; narrowing it must not disable it.
+		let n = 0;
+		const print: AgyPrint = async (p) => {
+			prompts.push(p);
+			n += 1;
+			return n === 1 ? 'not json at all' : CLEAN;
+		};
+		const prompts: string[] = [];
+		const exchanges = createExchangeSink();
+
+		const result = await createAgyReasoningReviewValidator({
+			print,
+			modelId: JUDGE,
+			exchanges
+		}).evaluate(SUBJECT, ctx());
+
+		expect(result.executionFailed).toBe(false);
+		expect(prompts).toHaveLength(2);
+		expect(exchanges.drain().some((e) => e.disposition === 'repair-requested')).toBe(true);
+	});
 });
 
 describe('Reasoning Review Validator — §14.3 conformance: no private chain-of-thought', () => {

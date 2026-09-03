@@ -216,10 +216,31 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 
 			const firstRaw = await print(prompt);
 			let judgement: ReasoningReviewJudgement;
+			// ⚠ THE TRY COVERS THE PARSE AND NOTHING ELSE, AND THAT IS THE POINT.
+			//
+			// `capture(...)` used to sit inside this `try` under a bare `catch`. So when the model's answer parsed
+			// cleanly and the CONTENT STORE then threw, the catch swallowed the store's fault as though the BLOB
+			// were bad: the good judgement was discarded, a second billed model call was issued, and the exchange
+			// was recorded `repair-requested`. After that, `repair-requested` no longer means "the model returned
+			// something unusable" — which is the only thing that disposition is for (REG-F-338).
+			//
+			// A retention fault therefore PROPAGATES rather than degrading quietly. That is deliberate: `REG-D-050`
+			// requires the governed stream to be "fully auditable and reconstructable", and silently continuing
+			// after a failed record is the hollow-layer shape this programme keeps recording. ⚠ The alternative —
+			// fall back to a DISCLOSED `PENDING_CONTENT_PLANE` ref and carry on with the judgement legitimately
+			// reached — is defensible under `PER-9`'s disclosed-absence allowance and should be reconsidered if a
+			// real store ever makes this path flaky. It is not chosen now because no store is wired in production,
+			// so loud costs nothing today and silence would cost a record.
+			let firstParsed: ReasoningReviewJudgement | undefined;
 			try {
-				judgement = coerceJudgement(JSON.parse(extractJson(firstRaw)), input);
-				await capture('initial', prompt, firstRaw, 'accepted');
+				firstParsed = coerceJudgement(JSON.parse(extractJson(firstRaw)), input);
 			} catch {
+				firstParsed = undefined;
+			}
+			if (firstParsed) {
+				judgement = firstParsed;
+				await capture('initial', prompt, firstRaw, 'accepted');
+			} else {
 				// E-5 recorded for the FAILING try before the repair is attempted — finding #62 is precisely that
 				// this outcome was swallowed by a bare catch and recorded nowhere.
 				const first = await capture('initial', prompt, firstRaw, 'repair-requested');
