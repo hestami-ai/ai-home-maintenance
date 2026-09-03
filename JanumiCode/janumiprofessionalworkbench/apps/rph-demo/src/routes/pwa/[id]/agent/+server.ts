@@ -197,8 +197,11 @@ function recordEvent(
 	const kind = TRANSCRIPT_KIND[ev.kind] ?? '';
 	if (!isRecordable(kind)) {
 		// ICP-03 — DECLARE the omission instead of performing it silently. PER-9: "record-plane omission is
-		// not [legal]". The bytes still cannot be retained (no purgeable plane — DEF-W2-001), but recording
-		// THAT they were dropped is metadata and needs no content store.
+		// not [legal]". Recording THAT they were dropped is metadata and needs no content store.
+		// ⚠ CORRECTED (`REG-F-348`): this said "no purgeable plane — DEF-W2-001". A purgeable plane exists at
+		// HEAD; THIS ROUTE IS NOT WIRED TO IT. ⛔ And the omissions built here are `transcript.ts`'s
+		// `OmittedRegion`, NOT `exchange-record.ts`'s — two same-named interfaces, and only this one is ever
+		// produced. They compose a user-facing message and reach no governed record. `REG-F-345`.
 		const region = omissionFor(kind);
 		if (region && omitted) omitted.push(region);
 		return;

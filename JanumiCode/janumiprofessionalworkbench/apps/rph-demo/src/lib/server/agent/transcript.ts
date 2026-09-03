@@ -68,10 +68,16 @@ const OMISSION_ROLE: Readonly<Partial<Record<AuthoringEventKind, string>>> = {
 /** Why each governed omission happened, in terms naming the invariants that force it. */
 const OMISSION_REASON =
 	'Volunteered reasoning was produced and DROPPED at the write boundary. PER-12 requires it retained where ' +
+	// ⚠ CORRECTED (`REG-F-348`): this asserted "no purgeable content plane exists (DEF-W2-001)". One exists at
+	// HEAD — `ArtifactStore` classifies `PURGEABLE_AT_EXPIRY` and implements `purge`. ⛔ THE OMISSION IS STILL
+	// REAL AND THE GROUND HAS MOVED: the plane exists, and THIS PATH IS NOT WIRED TO IT. That is a smaller and
+	// more actionable gap than the one this string used to claim, and it is the more embarrassing one to state,
+	// which is why it is stated. ⚠ This text reaches the USER (`routes/pwa/[id]/agent/+server.ts:380-385`).
 	'available as a typed Artifact and purgeable at retention expiry (PER-8); domain_events is immutable and ' +
-	'permanent (§9.4) and no purgeable content plane exists (DEF-W2-001), so admitting it here would create an ' +
-	'unpurgeable artifact. Retention is blocked on ICP-03; this record discharges PER-9’s "record-plane omission ' +
-	'is not [legal]" by DECLARING the omission rather than performing it silently.';
+	'permanent (§9.4). A purgeable content plane NOW EXISTS (ArtifactStore, PURGEABLE_AT_EXPIRY) and the ' +
+	'assurance path uses it — THIS authoring path is not yet wired to it, so the bytes are dropped rather ' +
+	'than retained. This record discharges PER-9’s "record-plane omission is not [legal]" by DECLARING the ' +
+	'omission rather than performing it silently.';
 
 const OMISSION_REASON_BY_ROLE: Readonly<Record<string, string>> = {
 	VOLUNTEERED_REASONING: OMISSION_REASON,

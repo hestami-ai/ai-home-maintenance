@@ -13,11 +13,14 @@
 // independently: the RECORD is permanent (PER-8, no hard delete after participation) and the CONTENT is
 // purgeable at retention expiry (PER-12), so they cannot share a store.
 //
-// ⚠ THE REFERENTS DO NOT EXIST YET, AND THAT IS DISCLOSED RATHER THAN HIDDEN. There is no content store
-// (`REG-F-315`; specified at Single-Node Runtime Profile §31, deferred as `DEF-W2-001`) and no redaction
-// anywhere (finding #60). So the content refs are born `PENDING_CONTENT_PLANE` with a reason. A record that
-// SAYS its bytes are unretained is the disclosed omission PER-9 permits; today's code performs the silent one
-// PER-9 forbids ("record-plane omission is not").
+// ⚠ THE REFERENTS NOW EXIST — THIS PARAGRAPH USED TO SAY THEY DID NOT (`REG-F-348`). It read "There is no
+// content store (`REG-F-315` … deferred as `DEF-W2-001`)", and at HEAD `ArtifactStore` has two adapters
+// (`SqliteArtifactStore` durable, in-memory process-local), both wired through `getArtifactStore()`.
+// Refs are still BORN `PENDING_CONTENT_PLANE`, for a different and smaller reason: a producer constructed
+// WITHOUT a store retains nothing, and `captureTry` overwrites these the moment one is supplied. ⭑ Redaction
+// is the half that has not moved (finding #60), so `inputRedactionManifestRef` stays PENDING on every path.
+// A record that SAYS its bytes are unretained is the disclosed omission PER-9 permits; the silent one PER-9
+// forbids ("record-plane omission is not") is what this module exists to avoid.
 
 import type { ContentDurability, Purgeability } from '@janumipwb/rph-ports';
 
@@ -168,9 +171,15 @@ export interface BeginExchangeInput {
 const PENDING_CONTENT: ContentRef = {
 	status: 'PENDING_CONTENT_PLANE',
 	reason:
-		'No content store exists (REG-F-315; specified at Single-Node Runtime Profile §31, deferred as DEF-W2-001) ' +
-		'and no redaction exists (finding #60). Retaining bytes in the permanent event store would violate PER-12’s ' +
-		'purge-at-expiry requirement. Blocked on ICP-03.'
+		// ⚠ CORRECTED (`REG-F-348`). This said "No content store exists (REG-F-315 … deferred as DEF-W2-001)",
+		// and a content store EXISTS at HEAD — `ArtifactStore` with two adapters, one durable. The reason is
+		// stamped onto every ref of every record this path produces, so the falsehood was reproduced per write.
+		// What remains true is narrower and is what a reader actually needs: none was SUPPLIED TO THIS CALL.
+		'No content store was supplied to this capture, so these bytes were not retained. A store EXISTS ' +
+		'(ArtifactStore; SqliteArtifactStore is durable, the in-memory default is process-local) — this ' +
+		'record’s producer was constructed without one, which is a wiring fact about this call and not a ' +
+		'statement about the system. Redaction is still unimplemented (finding #60), so E-6 stays PENDING ' +
+		'independently of the store.'
 };
 
 function toIdentity(model: ModelInput): ResolvedModelIdentity {

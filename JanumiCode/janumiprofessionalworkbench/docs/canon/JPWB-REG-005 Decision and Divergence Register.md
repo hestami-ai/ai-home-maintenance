@@ -30551,3 +30551,337 @@ field was drafted, defended as 'retained whole', and withdrawn. Do not write the
   split write) and `packages/rph-application/src/handlers/model-exchange.ts` (the narrowed guard), with the
   conformance limb moving alongside per item 23's conjunction. **Owed:** `REG-Q-066` marked ADJUDICATED;
   `ASR-11` limb 3 re-dispositioned a second time once the split is driven. Status: CLOSED.
+
+### REG-F-345 — the §9.7 split preserves BYTES and not ORDER: two different replies produce one identical record
+
+- **Date:** 2026-09-03 · **Type:** FINDING (defect in work landed the same day) · **Class:**
+  FINDING — CODE_IS_WRONG; a self-correction against `REG-D-056`'s implementation ·
+  **Status:** 🔴 OPEN. Blocked on `REG-Q-076`.
+
+**THE DEFECT, DRIVEN BEFORE IT WAS DESCRIBED.** `captureTry` computes the volunteered half as
+`span.prefix + span.suffix` (`apps/rph-demo/src/lib/server/assurance/exchange-capture.ts:187`) — the text
+*before* the answer and the text *after* it, welded into one stored object. **The join index is recorded
+nowhere.** So the map from reply to record is **not injective**, and that is a measurement:
+
+| driven at HEAD, real `captureTry`, real in-memory store | `answerSpanRef.contentHash` | `volunteeredReasoningRef.contentHash` | `rawOutputBeforeCoercionRef` |
+|---|---|---|---|
+| `thinking hard here {"r":1}` | `sha256:b244c53f…` (7 B) | `sha256:24c403f9…` (19 B) | PENDING |
+| `{"r":1}thinking hard here ` | `sha256:b244c53f…` (7 B) | `sha256:24c403f9…` (19 B) | PENDING |
+
+⭑ **Reason-then-answer and answer-then-post-hoc-rationalisation are the same record.** For a Reasoning
+Review — an assurance policy whose whole subject is *derivational integrity*, and whose named concerns
+include *"premature convergence"* and *"invalid or circular inference"* (`ASR-4`, DOC-003:253) — **the order
+of reasoning and conclusion is not incidental to the diagnosis; it very nearly is the diagnosis.**
+
+- **THE MODULE STATES ITS OWN LOSSLESSNESS CRITERION AND THE CAPTURE STEP DOES NOT MEET IT.**
+  `agy-cli.ts:130-132`, verbatim: *"a split built on it would silently drop the whitespace between the spans
+  and be lossy in exactly the way `PER-9` forbids. When `located`, this holds exactly:
+  `prefix + answer + suffix === raw`."* `splitAnswerSpan` honours that three-way identity; **`captureTry`
+  then degrades the ordered triple to an unordered pair.** The loss is not in the splitter — it is in what
+  the record keeps.
+- ⛔ **AND THE ESCAPE HATCH IS STRUCTURALLY CLOSED.** A hash of the whole reply would at least permit a
+  brute-force reassembly over the |V|+1 insertion points. It cannot be attached: in the mixed case
+  `rawOutputBeforeCoercionRef` is PENDING, and the handler refuses a PENDING ref that carries a
+  `contentHash` or `byteSize` (`packages/rph-application/src/handlers/model-exchange.ts:117-120` —
+  *"a ref cannot both disclaim its bytes and describe them"*). That guard is right; it just leaves no
+  representation.
+
+> ### ⭑ THE FIELD FOR THIS EXISTS, IS REQUIRED, AND HAS NEVER BEEN WRITTEN
+> `MODEL_EXCHANGE.omittedRegions` is a REQUIRED `OmittedRegion[]`. It is initialised `[]`
+> (`agent/exchange-record.ts:213`) and **no producer exists anywhere**: `grep -rn "omittedRegions"` over
+> `apps packages verif` minus `node_modules` returns the contract definition, the app-local interface, the
+> one mapper, and tests — no append, no push, no non-empty literal. **POSITIVE CONTROL, same instrument and
+> population:** `beginExchange` from the same module resolves at a live call site
+> (`assurance/exchange-capture.ts:130`); `unsatisfiedElements` resolves only at its own definition and one
+> doc-comment. The instrument distinguishes a used export from an unused one.
+>
+> ⚠⚠ **AND THAT SENTENCE WAS WRONG WHEN FIRST DRAFTED — CORRECTED HERE RATHER THAN QUIETLY REPAIRED, BECAUSE
+> THE NEAR-MISS IS THE BETTER FINDING.** I grepped the FIELD NAME. Grepping the TYPE returns a **producer**:
+> `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:324` builds `const omitted: OmittedRegion[] = []` and
+> `:203` pushes into it. ⭑ **It is a DIFFERENT `OmittedRegion`.** There are **two structurally identical
+> interfaces of that name in one directory** — `agent/transcript.ts:36` (produced, on the PWA authoring
+> route) and `agent/exchange-record.ts:82` (governed, bound to `ExchangeRecord.omittedRegions`, never
+> written) — plus the contract's third at `rph-contracts/src/objects.ts:358`. The produced one is consumed at
+> `+server.ts:380-385` to compose a **user-facing message** and reaches no record at all.
+>
+> ⛔ **AND THE PRODUCED TYPE'S OWN DOC-COMMENT ASSERTS THE CONNECTION THAT DOES NOT EXIST**
+> (`transcript.ts:34-35`): *"One declared omission — PER-9's 'declared truncation or omission' (E-4), **in the
+> shape `ExchangeRecord` carries as `omittedRegions`**."* A reader grepping `OmittedRegion` finds producers,
+> reads that comment, and concludes the governed field is fed. **It is not.** So the corrected claim is
+> narrower than the draft and worse than it: not *"the shape was never built"* but *"the shape was built
+> twice, one copy is filled, and the copy the governed record binds is empty."*
+>
+> ⚠ **And the mapper FABRICATES the field it cannot supply.** The app-local `OmittedRegion` is `{role,
+> reason}` (`exchange-record.ts:82-85`); the contract's requires `byteSize: number`; so
+> `assurance/exchange-recorder.ts:190` writes `byteSize: 0` for every region. Empty today, therefore
+> harmless today — **and the first producer to append a region will silently record "0 bytes omitted".**
+>
+> ⭑ **THE OBLIGATION IS IN THE SAME SENTENCE THAT NAMES THE ELEMENTS.** Guide `:1340`: *"Record the
+> materialized input …, the returned answer output before schema coercion or repair, the resolved
+> provider/model/version actually invoked, **any declared truncation or omission**, and the
+> parse/validation/repair outcome."* `PER-9` (DOC-003:369) repeats it: *"declared truncation or omission"*.
+> **The split IS an omission, and it is declared only as English prose in a `reason` string.**
+
+> ### ⚠ AND THE REPOSITORY'S OWN PER-9 PREDICATE IS RIGHT ABOUT THIS FOR A REASON IT DOES NOT STATE
+> `unsatisfiedElements` (`exchange-record.ts:231`) tests `rawOutputBeforeCoercionRef.status !== 'STORED'`.
+> **DRIVEN on the mixed path at HEAD:** both spans `STORED`, `omittedRegions: []`, and the predicate returns
+> `["E-2","E-4","E-6"]` — **it reports E-2 UNSATISFIED on the very path `REG-D-056`'s retention succeeded.**
+>
+> My first reading was that the split had silently narrowed a predicate keyed on the old single field, and
+> that the predicate needed teaching. ⭑ **It does not. It is CORRECT — E-2 is genuinely unsatisfied, because
+> the returned output cannot be recovered from what was kept.** It reaches the right verdict through a test
+> that knows nothing about the split, the ordering, or the reason it is right.
+>
+> **This is `REG-F-344`'s general form appearing in code rather than in the register:** a verdict that is
+> right while its warrant is unrelated to why. Had I "fixed" it to accept the two spans, I would have
+> replaced a correct answer with a false one **and called it a repair.** ⛔ **It is left exactly as it is.**
+
+**WHICH §9.7 TRIGGER FIRES — AND IT IS NOT THE ONE THIS PROGRAMME HAS BEEN ARGUING ABOUT.** Guide `:1340`
+closes with **two** conditions: *"Where the spans cannot be separated losslessly, **or accepted contracts
+cannot represent these records losslessly**, block the capability and resolve Section 16 item 23."* The
+separation is lossless — `splitAnswerSpan` proves it per blob. ⭑ **It is the SECOND trigger that fires: the
+contract cannot represent the result.** `RecordModelExchangePayloadSchema` is a `z.strictObject` of 28 fields
+(`packages/rph-contracts/src/messages.ts:871-900`) with no offset, index or span position, and `strictObject`
+refuses an ad-hoc one as `unrecognized_keys`.
+
+- ⛔ **AND THE OPEN-DICTIONARY ESCAPE THAT REFUTED THAT TRIGGER ONCE IS NOT AVAILABLE HERE.** `REG-F-341`'s
+  refutation rested on `ArtifactReferenceSchema` being `z.record(z.string(), z.unknown())` — *"A `z.record`
+  represents anything losslessly, so that trigger does not fire."* That dictionary hangs off
+  `EvidenceObjectSchema.contentReference`, **not off `MODEL_EXCHANGE`**, which has no open field at all. And
+  reaching for one would be refused on its own: `PER-9` forbids *"hid[ing] core relationships in one generic
+  JSON document"*, and the position of an answer inside the reply it was extracted from is exactly such a
+  relationship.
+
+- **SEARCHED, AND NOT ALREADY FILED — WITH THE ONE HIT THAT LOOKED LIKE IT OPENED AND READ.** `grep -ci`
+  over the register: `reassembl` → **0**, `injective` → **0**, `insertion point` → **0**. **POSITIVE
+  CONTROLS, same instrument and file:** `splitAnswerSpan` → **6**, `prefix` → **129**. ⚠ `interleav` →
+  **4, and I opened all four**: three are concurrency interleavings (`:1910`, `:2137`, `:3656`); the fourth
+  (`:29631`) reads *"malformed one, where interleaved prose is swallowed by `slice(first, last + 1)`"* — that
+  is the LOCATED question and `REG-F-339`'s subject, not the ordering of a located split. The one mention of the reconstruction identity is
+  **`REG-F-339`** (`R:29957`), scoped to `located: false` — *"`located: false` IS NOT A SPAN. When no `{…}` is
+  found the reconstruction identity does not hold"* — a different case. **`REG-F-341`** (`R:30077-30084`) disposed
+  of §9.7's second trigger as *"REFUTED on its own terms … A `z.record` represents anything losslessly"* —
+  but it measured `ArtifactReferenceSchema` and the ProposeEvidence bag, **a different population, and it
+  predates `MODEL_EXCHANGE` by a day.** `REG-D-056`'s own *"WHAT THIS DOES NOT DO"* names exactly one
+  residual, the non-separable case; this is not it.
+- **BOUND, so this is not read wider than it is.** Where only ONE side is non-empty — reasoning entirely
+  before the answer, or entirely after — the pair *is* invertible in principle, since one of `prefix`/`suffix`
+  is empty. **The record does not say which**, so the invertibility is not available to a reader; but the
+  information loss is confined to replies with material on BOTH sides, and this entry does not claim to have
+  measured how often that occurs.
+- **Merge target:** `REG-Q-076` — the remedy is a contract question, not an implementation choice, and §9.7's
+  own instruction on this trigger is *"block the capability and resolve Section 16 item 23."* **Owed:** the
+  sponsor's ruling. Status: OPEN.
+
+### REG-Q-076 — RULING SOUGHT: §9.7's second trigger has fired on the record just authorised, and the three lawful answers are not equivalent
+
+- **Date:** 2026-09-03 · **Type:** QUESTION (sponsor) · **Class:**
+  QUESTION — puts `REG-F-345` to the sponsor because every available answer either edits a contract inside
+  §16 item 23's frozen surface or narrows a ruling made hours earlier ·
+  **Status:** 🔴 OPEN.
+
+**THE QUESTION IN PLAIN LANGUAGE.** *When the reviewer's reply mixes its answer with its reasoning, we now
+keep both halves — but we no longer record which came first, so we cannot put the reply back together. Do we
+(a) also record where the answer sat, (b) keep the halves as two separate pieces, or (c) stop keeping mixed
+replies at all?*
+
+**WHY IT IS NOT MINE TO DECIDE.** `REG-D-055` (sponsor) licensed `MODEL_EXCHANGE` as a stored object under
+§16 item 23, whose instruction is a conjunction: *"Evolve policy registry, schemas, persistence, projections,
+fixtures, and conformance tests together before claiming support"* (Guide `:2520`). **Every option below is a
+schema evolution inside that surface**, and the corpus's default instruction on this trigger is to *block* —
+which would undo `REG-D-056`'s retention on the one row it exists to serve.
+
+| | What it does | Cost | Against it |
+|---|---|---|---|
+| **(a) Record the position** | one `OmittedRegion{role:'MODEL_ANSWER', reason, byteSize}` **plus a byte offset** on the region | one new field on a helper sub-type; `omittedRegions` gains its first producer, which it has needed since it was authored | widens the contract for a case nothing yet reads (`REG-F-244`, `REG-F-245(b′)`, both OPEN) |
+| **(b) Two refs instead of one** | `volunteeredReasoningRef` becomes a prefix ref and a suffix ref | two fields, and every span keeps one retention class — no fabrication anywhere | 28 fields → 29; two more PENDING states to disclose |
+| **(c) Block the mixed case** | mixed replies retain nothing, exactly as before `REG-D-056` | none | ⛔ **surrenders the sponsor's ruling on the row it was made for** |
+
+- ⭑ **THE RECOMMENDATION IS (a), AND THE REASON IS NOT ECONOMY.** `omittedRegions` is REQUIRED, has never
+  been written, and its `role` union already carries a `'MODEL_ANSWER'` member — **the vocabulary was authored
+  for an omission of exactly this shape and has been sitting unused.** (a) gives the field its first producer
+  and its first meaning, and it removes the `byteSize: 0` fabrication `REG-F-345` records rather than leaving
+  it latent. **(b) is equally lossless and structurally cleaner; it is second only because it adds a field
+  where (a) fills one that already exists.**
+- ⚠ **AND THE DISCLOSURE THIS QUESTION OWES.** `REG-F-341` already disposed of §9.7's second trigger as
+  *"REFUTED on its own terms"* — **against a different population, before `MODEL_EXCHANGE` existed.** This
+  question does not overturn that finding; it records that its scope never covered this record.
+- **Merge target:** Register. **Owed:** a ruling. Until then `REG-F-345` stands OPEN and the split ships as
+  it is — **retention that is honest about being partial beats retention withdrawn.** Status: OPEN.
+
+### REG-F-346 — `limb:ASR-11:3` re-dispositioned a SECOND time: the arm is PARTIAL, and "discharged for the separable case" was over-claimed
+
+- **Date:** 2026-09-03 · **Type:** FINDING (re-disposition of a standing limb; second) · **Class:**
+  FINDING — discharges `REG-D-056`'s Owed line and corrects a claim made in this programme's own report ·
+  **Status:** ✅ CLOSED as a re-disposition. **`limb:ASR-11:3` moves `UNENFORCED_NO_SHAPE` → `PARTIAL`.**
+
+**THE LIMB** (`JPWB-DOC-003:285`, third of four clauses in one sentence): *"raw output is retained for
+diagnostics."* `REG-F-344` kept the verdict UNMET and replaced its stated reason. `REG-D-056` then ruled
+*"Yes, save raw answer."*, and its Owed line requires this second pass **once the split is driven**. It is
+driven, and green, at `a838943b`.
+
+**WHAT MOVED, MEASURED PER ROW.**
+
+| Reply shape | Retained at HEAD | Limb 3 |
+|---|---|---|
+| Separable, no reasoning arrived | whole output STORED as both `answerSpanRef` and `rawOutputBeforeCoercionRef` | ✅ **MET** |
+| Separable, reasoning inline | both spans STORED; the reply itself unrecoverable (`REG-F-345`) | ⚠ **PARTIAL** |
+| Not separable | all three refs PENDING — §9.7's own instruction | ⛔ **UNMET** |
+
+> ### ⚠ THE CLAIM I MADE TO THE SPONSOR WAS TOO STRONG, AND THE SECOND ROW IS WHY
+> I reported limb 3 *"met for the separable case"*. On the separable-with-reasoning row — **the only row the
+> split exists to serve** — the field whose name is the limb's own noun, `rawOutputBeforeCoercionRef`, is
+> deliberately **PENDING**. No field on that record holds the raw output. The discharge therefore rests
+> entirely on reading *"raw output is retained"* as satisfied by a **partition** of it — and `REG-F-345`
+> drove the partition to be **non-invertible**. ⭑ **The literal reading fails on the field; the partition
+> reading fails on invertibility. Neither yields MET on that row.** The honest arm is PARTIAL.
+
+**THE RESIDUAL IS ONE NAMED PARSE OUTCOME, NOT "THE MALFORMED CASE" — AND MY OWN FRAMING OF IT WAS WRONG
+TWICE OVER.** I put it to an adversarial pass that the residual might be the limb's *core* case, since ASR-11
+governs validator failure and a blocked reply is a malformed reply. **Three independent refuters broke it,
+and the code settles it by construction.** `classifyParse`
+(`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:178-186`) tests in this order:
+
+1. `raw.trim() === ''` → `EMPTY_RESPONSE` — no bytes exist, so limb 3 is **vacuous** (`REG-F-344`'s bound).
+2. `!splitAnswerSpan(raw).located` → `JSON_EXTRACTION_FAILED` — ⛔ **the residual, and all of it.**
+3. `error instanceof SyntaxError` → `JSON_PARSE_FAILED` — reached only when `located === true`, so **retained.**
+4. otherwise → `SCHEMA_COERCION_FAILED` — likewise `located === true`, so **retained.**
+
+⭑ **Two of the taxonomy's four failure outcomes are `located === true` BY CONSTRUCTION, and both are now
+retained in full.** So *"the separable case is the case where the validator succeeded"* is false: the
+separable case is the success case **plus half the malformed taxonomy**. `REG-F-340` had already corrected
+this exact over-reach — *"Separability is a per-blob property, measured, not a property of the malformed
+class"* — and I re-proposed it anyway. **The residual's name is `JSON_EXTRACTION_FAILED`**, a string
+appearing **0 times** in the register before this entry (**positive control, same instrument and file:**
+`splitAnswerSpan` → 6).
+
+**AND THE MET HALF IS CONDITIONAL IN TWO WAYS A READER MUST NOT INFER AWAY.**
+
+1. **Conditional on an unbuilt mechanism.** `exchange-capture.ts:214` is the **first and only** production
+   site anywhere that stores bytes under `PURGEABLE_AT_EXPIRY`. `PER-12` requires those bytes purgeable at
+   expiry; `ArtifactStore.purge` exists and **has no production caller** — `REG-F-245` is OPEN and says so.
+   Today's green rests on a mechanism nothing drives.
+2. **Conditional on deployment.** `getArtifactStore()` (`apps/rph-demo/src/lib/server/workbench.ts:159-165`)
+   returns `SqliteArtifactStore` only when `JPWB_DEMO_DB` is set, and `createInMemoryArtifactStore()`
+   otherwise. **Unconfigured, retention does not survive a restart** — which the record discloses per ref via
+   `contentDurability`, and which no entry had yet stated as a bound on the limb.
+
+- **SUPERSEDES A CLAUSE OF `REG-F-344`, WITHOUT REWRITING IT.** `R:30437` reads *"`limb:ASR-11:3` REMAINS
+  UNMET; **`REG-Q-066` REMAINS OPEN**"*. `REG-Q-066` was adjudicated the same day (`R:21021`) and the limb has
+  now moved. Under `REG-005`'s append-only rule that clause is superseded **here**, by new entry; `REG-F-344`
+  stands as written and its own Status remains correct as a re-disposition.
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY TOUCHES:** `limb:ASR-11:3` — **arm moved, not closed.** The
+  ledger move and the reason it was not performed by `REG-F-344` are filed separately at **`REG-F-347`**.
+- **Merge target:** `docs/tracking/w3b/invariant-verdicts.ndjson` (row 221) and
+  `verif/invariant-verdict-census.test.ts` (the pinned distribution). **Owed:** `REG-Q-076`'s ruling moves
+  the second row from PARTIAL to MET; nothing else is outstanding on this limb. Status: CLOSED.
+
+### REG-F-347 — the re-disposition moved the register and not the RECONCILABLE record, and the protocol cannot see a re-disposition at all
+
+- **Date:** 2026-09-03 · **Type:** FINDING (process defect; self-correction against `REG-F-344`) · **Class:**
+  FINDING — a ratified rule was not applied to my own entry, and the row is falsified by the instrument it
+  itself names · **Status:** ✅ CLOSED by the ledger move landing with this entry.
+
+**THE RULE I DID NOT APPLY TO MYSELF.** `REG-F-273` (`R:25613`), ratified: *"The census row is the
+reconcilable record; the register is not."* `REG-F-344` corrected limb 3's stated reason **in the register
+prose** (`R:30443-30447`) and left `docs/tracking/w3b/invariant-verdicts.ndjson:221` exactly as it stood. ⭑
+**It corrected the half the corpus says is not reconcilable and left the half that is.**
+
+**THE ROW IS FALSIFIED BY ITS OWN INSTRUMENT, RE-RUN AT HEAD.** The row's `census` field records the command
+verbatim. I re-ran it byte-for-byte, same population, same flags:
+
+```
+grep -rniE "rawOutput|rawResponse|rawText|rawResult|rawPayload" --include=*.ts --include=*.svelte \
+  packages/rph-contracts/src packages/rph-application/src packages/rph-domain/src \
+  packages/rph-assurance/src packages/rph-engine/src apps/rph-demo/src | grep -v "\.test\.ts" | grep -c .
+```
+
+**Recorded: `-> 0`. Observed at HEAD: `21`.** Its own positive control (`residualUncertainty|evidenceRejected|
+boundaryReason`, identical command) recorded `-> 47` and returns **`49`** — non-zero both times, so the
+instrument is intact and the first number is a real falsification rather than a broken pattern. The row's
+`missing_shape` clause (a) still reads *"NO field, command or event anywhere in the RPH engine holds the raw
+text a validator or judge model returned"*; `rawOutputBeforeCoercionRef`, `answerSpanRef` and
+`volunteeredReasoningRef` are typed REQUIRED fields on a registered command and its event.
+
+> ### ⭑ AND THE PROTOCOL COULD NOT HAVE CAUGHT THIS, WHICH IS THE FINDING BEHIND THE FINDING
+> The register's reconciliation rule is stated as *"Every entry names the limb ids it **closes**"*
+> (`R:16082`). ⚠ **A re-disposition changes a reason or an arm and closes nothing** — so it falls straight
+> through the one check built to keep the two records in step. That is exactly how a row survived **two**
+> re-dispositions still reading `UNENFORCED_NO_SHAPE` with a census of zero. The gate is not weak here; it
+> is keyed on the wrong event.
+> **The rule this entry adds: an entry names the limb ids it TOUCHES, and closure is one way to touch one.**
+
+- **THE MOVE, AND WHAT IT COSTS THE PINS.** Row 221 → `PARTIAL`, carrying `superseded_verdict:
+  UNENFORCED_NO_SHAPE` and a recorded reason, per `invariant-verdict-census.test.ts:444` (*"a row whose arm
+  the refuter changed records the arm its narrative was written for"*). Its `refutation` stays **HELD** —
+  the refuter was right on what was visible in August; a later pass built the shape. Distribution pin:
+  `UNENFORCED_NO_SHAPE 21 → 20`, `PARTIAL 61 → 62`. `owed` and `missing_shape` are **re-authored for the arm
+  the row now holds** rather than stamped, so `owed_for_verdict` moves honestly and the unreconciled-owed
+  debt stays at **46** instead of rising to 47.
+- **GENERAL FORM, DERIVED not enumerated:** `REG-F-344` derived *"re-checking a verdict is not re-checking
+  its warrant."* One level up: ⭑ **an entry that corrects a record must ask which OTHER record was
+  authoritative for the same fact — and the corpus, not the author's habit, says which one that is.** The
+  derivation is mechanical: for any claim, enumerate the records that assert it, then check the corpus for a
+  ratified precedence among them. Here the precedence was ratified, in this register, by me, and unapplied.
+- **Merge target:** `docs/tracking/w3b/invariant-verdicts.ndjson`, `verif/invariant-verdict-census.test.ts`.
+  **Owed:** nothing. Status: CLOSED.
+
+### REG-F-348 — this work destroyed the warrant of three standing records, and the discharging party is the only one positioned to know
+
+- **Date:** 2026-09-03 · **Type:** FINDING (corpus + in-code staleness created by landed work) · **Class:**
+  FINDING — corrects the GROUNDS of two OPEN records and two in-code rationales · **Status:** ✅ CLOSED by
+  the in-code corrections landing with this entry; the two register entries are annotated, not overturned.
+
+**THE SHAPE.** `MXR-07` built an `ArtifactStore` port with two adapters and wired one into the floor. Several
+standing records rest their reasoning on **the non-existence of exactly that thing**. Their conclusions may
+survive; their stated grounds do not.
+
+1. ⚠ **`REG-F-245` sub-item (d), OPEN** (`R:14860-14861`): *"The port is also the OBJECT/EVENT seam only:
+   **there is no blob-storage port at all**, which is the other half of (b′)."* **False at HEAD** —
+   `packages/rph-ports/src/ports/artifact-store.ts` defines `put`, `get`, `stat` and `purge`, and
+   `packages/rph-persistence/src/sqlite-artifact-store.ts` implements them durably. ⭑ **The finding's
+   HEADLINE survives and its (d) does not:** nothing still *calls* `purge`, so "nothing can purge anything"
+   holds — but it now holds for want of a **caller**, not for want of a **port**, and those are different
+   remedies. Annotated here; `REG-F-245` stays OPEN on its surviving grounds.
+2. ⚠ **`REG-F-338`'s reconsideration trigger has been pulled** (`R:29909-29911`): a retention fault
+   propagates rather than degrading, chosen *"because no store is wired in production today, so loud costs
+   nothing now and silence would cost a record. **If a real adapter makes this path flaky, reconsider on that
+   evidence.**"* A store is wired now — always (`workbench.ts:159-165`), durably when `JPWB_DEMO_DB` is set.
+   ⛔ **The live consequence is not cosmetic: a content-plane fault now aborts an assurance judgement that
+   was legitimately reached** — which makes retention capable of leaving assurance incomplete, and that is
+   `ASR-11` **limb 1**'s subject, not limb 3's. The condition the finding named has occurred; **no flakiness
+   has yet been observed**, so this entry records that the trigger is armed rather than that it has fired.
+3. **Two in-code rationales now assert falsehoods, and both are CORRECTED IN PLACE with this entry**, since
+   neither is a register record:
+   - `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:280-281`: *"It is not chosen now because no
+     store is wired in production."*
+   - `apps/rph-demo/src/lib/server/agent/exchange-record.ts:168-173`: *"No content store exists (REG-F-315;
+     … deferred as DEF-W2-001)"* — written onto **every** born-PENDING ref, so the falsehood is stamped on
+     each record the no-store path produces.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **discharging an obligation invalidates the warrant of every
+  other record that cited the same absence as its ground — and the discharging party is the only one in a
+  position to notice.** A verdict change is a local edit; **an absence removal is a global one.** The
+  affected set is not "entries about `ASR-11`" but *"every record whose evidence asserts the non-existence of
+  something this change created"* — computed, not listed: grep the created artifacts (`ArtifactStore`,
+  `purge`, `rawOutputBeforeCoercionRef`, `PURGEABLE_AT_EXPIRY`, *"no content store"*) across the register,
+  `docs/tracking/`, and in-code rationales. ⚠ **AND THE FIRST DRAFT OF THIS ENTRY SAID "four records", WHICH
+  IS THE VERY ERROR IT DESCRIBES.** Run properly at the moment of repair, the derivation returns **six**: the
+  three above, the ledger row at `REG-F-347`, and **two more in-code assertions that no purgeable content
+  plane exists** — `apps/rph-demo/src/lib/server/agent/transcript.ts:72` (*"no purgeable content plane exists
+  (DEF-W2-001)"*, written into `OMISSION_REASON`, which the authoring route **shows to the user**) and
+  `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:198-200` (*"The bytes still cannot be retained (no
+  purgeable plane — DEF-W2-001)"*). Both are **false at HEAD**: `ArtifactStore` defines `PURGEABLE_AT_EXPIRY`
+  and `purge`, and `SqliteArtifactStore` implements them. **Both are corrected with this entry.** ⭑ *I wrote
+  the general form and then under-ran it in the same entry — which is the strongest available evidence that
+  the derivation has to be RUN and not recalled.*
+- ⛔ **TWO FURTHER HITS ARE LEFT UNTOUCHED, DELIBERATELY.** `packages/csaa/src/subject/subject.test.ts:2745`
+  and `:2751` carry the same stale assertion. **CSAA belongs to the CSAA agent under a standing instruction
+  to touch only what we break, and this work did not break them** — they are comments describing the demo's
+  behaviour. Recorded here so the derivation is complete and the omission is a decision rather than a miss.
+- **THE AUDIT TRIGGER, in one line, for reuse:** *what did this change make EXIST, and who is on record
+  saying it does not?*
+- **BOUND.** This entry does not re-adjudicate `REG-F-245` or `REG-F-338`; both stay as they are, with their
+  grounds corrected here. It does not claim the derivation is exhaustive beyond the corpora named.
+- **Merge target:** `reasoning-review-validator.ts`, `agent/exchange-record.ts`. **Owed:** nothing.
+  Status: CLOSED.

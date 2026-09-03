@@ -247,7 +247,15 @@ describe('W-3b — the invariant enforcement census', () => {
 			ENFORCED_MULTI_SITE: 20,
 			ENFORCED_AT_SURFACE_ONLY: 2,
 			ENFORCED_AT_PRESENTATION: 1,
-			PARTIAL: 61,
+			// ⚠ 61 -> 62 and 21 -> 20: `limb:ASR-11:3` moved, and it moved because a LATER PASS BUILT THE SHAPE
+			// the August lane correctly reported absent. `UNENFORCED_NO_SHAPE` asserts canon requires something
+			// the model has no field for; `MODEL_EXCHANGE` now carries `rawOutputBeforeCoercionRef`,
+			// `answerSpanRef` and `volunteeredReasoningRef` as typed REQUIRED fields on a registered command.
+			// ⭑ THE ROW'S OWN `census` INSTRUMENT, RE-RUN VERBATIM AT HEAD, RETURNS 21 WHERE IT RECORDED 0 —
+			// its own positive control 49 against a recorded 47, so the instrument is intact and the row was
+			// falsified by the very command it names. The move is REG-F-346; the two-day delay in making it,
+			// and the reconciliation rule that could not see a re-disposition, are REG-F-347.
+			PARTIAL: 62,
 			DIVERGENT: 49,
 			// ⚠ 64 -> 65 and 12 -> 11: `limb:REL-2:3` moved, and it moved because its own recorded `arm_doubt`
 			// was RIGHT. `UNENFORCED_DEAD_PREDICATE` means, by its only definition anywhere, "a kernel predicate
@@ -263,7 +271,7 @@ describe('W-3b — the invariant enforcement census', () => {
 			// class and wrong about that member.
 			UNENFORCED_OBSERVED_ADMISSION: 68,
 			UNENFORCED_DEAD_PREDICATE: 8,
-			UNENFORCED_NO_SHAPE: 21,
+			UNENFORCED_NO_SHAPE: 20,
 			UNENFORCED_NO_SUBJECT: 5
 		});
 	});
@@ -470,7 +478,16 @@ describe('W-3b — the invariant enforcement census', () => {
 		// not a regression: the narrative it outlived is now MARKED as outlived instead of silently standing.
 		// 81 -> 84: the three V-13 arm moves each set `superseded_verdict`, which is what this counts. The
 		// narrative each row was written for is now marked as outlived rather than silently standing.
-		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(84);
+		// ⚠ 84 -> 85: `limb:ASR-11:3`, AND IT IS THE FIRST ROW TO ENTER THIS SET BECAUSE THE CODE CAUGHT UP
+		// WITH THE CANON RATHER THAN THE OTHER WAY ROUND. Every prior entrant was a re-reading of evidence the
+		// lane already had. This one's lane was RIGHT in August — no field held raw model output — and two
+		// sponsor rulings (REG-D-055, REG-D-056) built the field. So `refutation` stays HELD and the reason
+		// lives in `merge_note`, which is exactly the branch the gate above was widened to allow: an arm moves
+		// when a refuter overturns it OR when a later pass establishes a fact the refuter did not have.
+		// ⭑ AND THE ROW'S OWN NARRATIVE WAS RE-AUTHORED RATHER THAN STAMPED — `owed`, `missing_shape` and
+		// `owed_for_verdict` all move to the new arm with the superseded text kept beneath a rule, so the
+		// unreconciled-owed debt below stays at 46 instead of rising to 47.
+		expect(changed.length, 'rows whose lane-authored narrative outlived the arm it argued').toBe(85);
 	});
 
 	// ── ⚠ GATE THE PROVENANCE, BECAUSE THE PROSE CANNOT BE GATED ───────────────────────────────────────────
@@ -954,7 +971,10 @@ describe('W-3b — the invariant enforcement census', () => {
 		const noShape = verdicts.filter((v) => String(v.verdict) === 'UNENFORCED_NO_SHAPE');
 		// 26 before the NO_SUBJECT split. ⚠ None of the five moved rows was one of the five SILENT rows, so
 		// this arm shrank for exactly one reason and the pinned list below is unchanged by the split.
-		expect(noShape.length, 'the arm').toBe(21);
+		// 21 -> 20 with `limb:ASR-11:3`'s move (see the distribution pin). ⚠ IT WAS NOT ONE OF THE SILENT
+		// ROWS and it carried `missing_shape` throughout, so both assertions below move together — an arm
+		// shrinking by a row that STATED its shape must not change the silent set.
+		expect(noShape.length, 'the arm').toBe(20);
 		const silent = noShape
 			.filter((v) => String(v.missing_shape ?? '').trim().length < 40)
 			.map((v) => String(v.limb_id))
@@ -981,7 +1001,7 @@ describe('W-3b — the invariant enforcement census', () => {
 		expect(
 			noShape.filter((v) => String(v.missing_shape ?? '').trim().length >= 40).length,
 			'rows that DO state their missing shape — must equal the whole arm'
-		).toBe(21);
+		).toBe(20);
 
 		// ⚠ THE MECHANISM IS PINNED WHERE IT CAN STILL BE FALSIFIED. The old form looped over `silent` and
 		// asserted each was an OVERTURN — which is now a loop over an empty array, i.e. nothing. The claim it

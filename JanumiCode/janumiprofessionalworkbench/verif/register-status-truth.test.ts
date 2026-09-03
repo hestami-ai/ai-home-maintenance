@@ -832,12 +832,20 @@ describe('P-5b — no entry advertises work a later entry has already discharged
 				'⚠ THE FOURTH ARRIVED ON THE DAY THIS GATE SHIPPED, from the entry announcing it: REG-F-285 ' +
 				'both DESCRIBES the possessive guard and TRIPS it, because a partial discharge is naturally ' +
 				'written as “X’s Y leg”. That is the guard working, not a regression — and it is why this ' +
-				'control pins the dropped set by name rather than by count.'
+				'control pins the dropped set by name rather than by count. ' +
+				'⚠ THE FIFTH ARRIVED THE SAME WAY, and it is the SECOND time the pattern has repeated: ' +
+				'REG-F-346 discharges REG-D-056’S OWED LINE — the instruction to re-disposition ASR-11 ' +
+				'limb 3 once the split was driven — while REG-D-056 itself is already CLOSED and is not ' +
+				'discharged by anything. Verified at source: REG-D-056’s Status reads “✅ CLOSED” and its ' +
+				'Owed line is a possession of it. ⭐ A RE-DISPOSITION IS INHERENTLY POSSESSIVE — it discharges ' +
+				'an obligation a ruling LEFT, never the ruling — so this arrival was predictable from the ' +
+				'entry kind, and a count-based pin would have hidden it.'
 		).toEqual([
 			'REG-D-022>REG-D-021',
 			'REG-F-121>REG-F-087',
 			'REG-F-122>REG-F-119',
-			'REG-F-285>REG-F-284'
+			'REG-F-285>REG-F-284',
+			'REG-F-346>REG-D-056'
 		]);
 		expect(
 			staleStatuses(text, { rawObjects: true })

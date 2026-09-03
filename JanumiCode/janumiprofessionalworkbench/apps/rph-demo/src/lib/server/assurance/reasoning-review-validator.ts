@@ -277,8 +277,17 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// after a failed record is the hollow-layer shape this programme keeps recording. ⚠ The alternative —
 			// fall back to a DISCLOSED `PENDING_CONTENT_PLANE` ref and carry on with the judgement legitimately
 			// reached — is defensible under `PER-9`'s disclosed-absence allowance and should be reconsidered if a
-			// real store ever makes this path flaky. It is not chosen now because no store is wired in production,
-			// so loud costs nothing today and silence would cost a record.
+			// real store ever makes this path flaky.
+			//
+			// ⚠⚠ THAT CONDITION HAS NOW OCCURRED, AND THIS COMMENT USED TO DENY IT (`REG-F-348`). It read
+			// "it is not chosen now because no store is wired in production" — false at HEAD: `getArtifactStore()`
+			// (`workbench.ts:159-165`) ALWAYS returns a store, durable when `JPWB_DEMO_DB` is set. `REG-F-338`
+			// chose to propagate on the stated ground that "loud costs nothing now", and named its own
+			// reconsideration trigger: "if a real adapter makes this path flaky, reconsider on that evidence."
+			// ⛔ THE LIVE CONSEQUENCE: a content-plane fault now aborts an assurance judgement that was
+			// legitimately reached — which makes RETENTION capable of leaving assurance incomplete, and that is
+			// `ASR-11` LIMB 1's subject, not limb 3's. The trigger is ARMED, not fired: no flakiness has been
+			// observed, so the behaviour is left as `REG-F-338` chose it and the ground is corrected instead.
 			let firstParsed: ReasoningReviewJudgement | undefined;
 			let firstError: unknown;
 			try {
