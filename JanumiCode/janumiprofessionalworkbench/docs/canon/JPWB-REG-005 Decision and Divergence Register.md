@@ -21020,6 +21020,12 @@ proposed for it was withdrawn as the chain-of-thought hazard PER-12 has since ra
 
 **Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
 
+- ⚠ **THE GROUND BELOW IS SUPERSEDED, AND THE VERDICT IS NOT — READ `REG-F-344` (2026-09-03) WITH THIS
+  ENTRY.** The limb is still UNMET, but ~~*no shape in the RPH engine can hold it*~~ is no longer true: a
+  typed carrier exists (`MODEL_EXCHANGE`, `REG-D-055`), the write is implemented and gated, and what refuses
+  it now is **this question's own instruction** — *"do not write the field before the ruling"* — enforced in
+  the handler. ⭑ **The remaining work is a RULING, not a carrier.** A reader acting on the paragraph below
+  would rebuild something that already exists.
 - **THE DEFECT, IN ONE PARAGRAPH.** ASR-11's third limb is a six-word consequent — *"raw output is
   retained for diagnostics"* — and **no shape in the RPH engine can hold it.** The REFUSED path leaves
   neither an event nor a `command_receipts` row, so the malformed output that CAUSED the refusal is
@@ -30420,3 +30426,67 @@ bounded try**, **born terminal** at revision 0 — no second command, no state m
 - **Merge target:** `packages/rph-contracts/vocab/*` (generated surface), `ids.ts`, the handler registry,
   persistence, projections, fixtures and conformance tests — item 23's conjunction, together.
   **Owed:** `ROADMAP-JAN-MXR` is amended by this ruling; `REG-Q-066` remains OPEN and untouched. Status: CLOSED.
+
+### REG-F-344 — `ASR-11` limb 3 RE-DISPOSITIONED: the verdict is unchanged and the diagnosis is obsolete, which is the more expensive error
+
+- **Date:** 2026-09-03 · **Type:** FINDING (re-disposition of a standing limb) · **Class:**
+  FINDING — corrects the recorded REASON for an unmet obligation, and a self-correction ·
+  **Status:** ✅ CLOSED as a re-disposition. **`limb:ASR-11:3` REMAINS UNMET; `REG-Q-066` REMAINS OPEN.**
+
+**THE LIMB, VERBATIM** (`JPWB-DOC-003:285`, third of four clauses in one sentence — ⚠ **the section was read
+off the heading map, and the line carries four limbs**): *"raw output is retained for diagnostics."* Its
+**WHY** (`:286`): *"letting unparsed prose become findings hands authority to noise."* Its **SCOPE** (`:287`):
+*"governs assurance-process failures and observation quality."*
+
+**THE VERDICT IS UNCHANGED. THE DIAGNOSIS IS NOT.**
+
+| | Recorded 2026-08-23 (`REG-Q-066`) | Measured 2026-09-03 |
+|---|---|---|
+| Is limb 3 met? | **No** | **No** |
+| Why not? | *"no shape in the RPH engine can hold it"* — a STRUCTURAL gap | **A shape exists, the write is implemented and gated, and ONE OPEN QUESTION refuses it** — a PROCEDURAL gap |
+
+- **WHAT NOW EXISTS, measured at HEAD.** `MODEL_EXCHANGE` (`REG-D-055`) carries
+  `rawOutputBeforeCoercionRef`, `answerSpanRef` and `volunteeredReasoningRef` as typed, REQUIRED fields;
+  `RecordModelExchange` is registered and driven; the record is durable across a reopen and catalogued without
+  projecting bytes. **The carrier `REG-Q-066` said did not exist, exists.**
+- ⛔ **AND THE WRITE IS REFUSED ON PURPOSE.** `packages/rph-application/src/handlers/model-exchange.ts`
+  rejects any of those three arriving `STORED`, citing `REG-Q-066`'s own instruction — *"Do not write the
+  field before the ruling."* **So limb 3 is unmet by a REFUSAL THIS PROGRAMME CHOSE, not by an absence it
+  discovered.** That is a different fact about the world and the register should say so.
+
+> ### ⚠ AND A CORRECTION TO MY OWN FRAMING, MADE TO THE SPONSOR AN HOUR AGO
+> I reported `E-1` retention as partial progress toward this limb — *"E-1 is retained now; E-2 still isn't"* —
+> which invites the reading that limb 3 is partly discharged. **It is not discharged at all.**
+> ⭑ **Read in its own sentence, limb 3's "raw output" is the VALIDATOR'S OUTPUT**: the clause immediately
+> before it is *"Malformed or invalid validator output can never mutate authoritative state or create
+> authoritative findings"*, and *"raw output"* is that same output. **`E-1` is the materialized INPUT.**
+> Retaining what we SENT satisfies `PER-9`'s exchange-record obligation and contributes **nothing** to a limb
+> about what came BACK. **Two obligations, one of them now met, and I let the met one lend credit to the
+> unmet one.**
+
+**ONE BOUND, so this is not read wider than it is.** For an **infrastructure failure** — `agy` never answers —
+there IS no raw output, so limb 3 is **VACUOUS** on that path rather than unmet. It bites only where the
+validator returned something that could not be used. `REG-F-333`'s sanitisation deliberately discards the
+process diagnostic on that path, which is a different question (`E-5`'s home) and not this limb.
+
+**SEARCH DISCLOSED.** `grep -rn "rawOutputBeforeCoercionRef" --include=*.ts packages/ apps/` minus
+`node_modules`/`dist` → the contract field, the handler's refusal guard, the recorder's blocked constant, and
+their tests. **POSITIVE CONTROL, identical instrument and population:** `materializedInputRef` resolves in the
+same files **and additionally at a live write site**, which is precisely the asymmetry this entry records — one
+element is written, the other is refused.
+
+- **WHY THE STALE DIAGNOSIS IS THE EXPENSIVE HALF.** A reader landing on `REG-Q-066` today is told the work is
+  to build a carrier. **That work is done.** They would rebuild `MODEL_EXCHANGE`, or conclude the limb is
+  blocked behind the staged Attempt decisions it is no longer blocked behind. ⭑ **An entry whose VERDICT is
+  right and whose REASON has rotted misdirects more confidently than one that is simply out of date**, because
+  nothing about it looks stale.
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **re-checking a verdict is not re-checking its warrant, and the
+  warrant rots first.** This programme re-measured "is limb 3 met?" several times and got the same answer each
+  time, which felt like confirmation; nobody re-measured "and is it still unmet for the reason we wrote down?"
+  **The audit trigger is: when a status has not changed, when was its REASON last measured?**
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY TOUCHES:** `limb:ASR-11:3` — **re-dispositioned, NOT closed.**
+  It closes nothing else: `:1` is filed at the surface, `:2` is closed by `REG-F-229`, `:4` is a different
+  object and command.
+- **Merge target:** **Register** — `REG-Q-066`'s stated ground is superseded by this entry and its own text is
+  struck accordingly. **Owed:** `REG-Q-066`'s ruling, which is now the ONLY thing between this limb and
+  discharge. Status: limb UNMET, reason RESTATED.
