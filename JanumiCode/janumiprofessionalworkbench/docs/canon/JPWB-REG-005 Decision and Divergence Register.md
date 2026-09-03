@@ -30035,7 +30035,9 @@ blocked sends the next reader to redesign instead of to ask.
 
 - **Date:** 2026-09-03 · **Type:** DIVERGENCE FINDING + correction · **Class:**
   FINDING — corrects `REG-F-340` (filed the same day) and re-warrants the `E-2` block from the Guide onto
-  ratified canon · **Status:** ✅ CLOSED as a finding. **`H-1` gated; item 23 remains the substantive block.**
+  ratified canon · **Status:** ✅ CLOSED as a finding. **~~`H-1` gated~~ — `H-1` is gated for
+  STORE-WITHOUT-SINK only; `REG-F-343` (2026-09-03) records that the guard tests a sink's EXISTENCE and
+  not its DURABILITY, so store-with-ephemeral-sink still passes. item 23 remains the substantive block.**
 
 **THE CORRECTION.** `REG-F-340` closed with *"Both technical prerequisites for `E-2` now exist… What remains
 is PROCEDURAL: `REG-Q-066` is OPEN and sponsor-reserved."* ⭑ **The two-item enumeration is HAND-LISTED where
@@ -30179,3 +30181,79 @@ looks intact**.
 - **Merge target:** `packages/rph-ports/src/{ports,defaults}/artifact-store.ts`,
   `apps/rph-demo/src/lib/server/{agent/exchange-record.ts,assurance/exchange-capture.ts}`. **Owed:** `H-2` is
   DISCLOSED, not resolved — the §31 durable adapter is still owed and must land WITH the record consumer.
+
+### REG-F-343 — `GATE-1` checks that a sink EXISTS, not that it is DURABLE, so the §31 adapter would walk straight through it
+
+- **Date:** 2026-09-03 · **Type:** FINDING (a bound on a control I filed hours earlier) · **Class:**
+  FINDING — narrows `REG-F-341`'s *"`H-1` gated"* claim · **Status:** ✅ CLOSED as a disclosure. **No code
+  change: the gate is correct for what it guards, and the residue is a SEQUENCING rule, not a missing check.**
+
+**THE BOUND.** `captureTry` refuses when `input.store` is set and `input.sink` is not
+(`apps/rph-demo/src/lib/server/assurance/exchange-capture.ts`). ⭑ **That is an EXISTENCE test.** The only sink
+implementation is `createExchangeSink()` — a JS array with no production consumer — so supplying a **durable**
+store together with that sink **passes the gate** and still yields **durable content whose record dies at end
+of run.** That is `REG-F-336` C-2's orphan one step further along: not content with no record, but content
+with a record that does not outlive the process.
+
+- ⚠ **SO "`H-1` GATED" IN `REG-F-341` IS TRUE OF THE CASE IT NAMES AND NARROWER THAN IT READS.** The gate
+  closes *store-without-sink*. It does not close *store-with-ephemeral-sink*, and **the §31 durable adapter is
+  exactly the change that would create the second case.**
+- ⭑ **WHY NO FURTHER GUARD IS ADDED HERE.** A check for sink durability would have nothing to check: there is
+  one sink, it is ephemeral, and the durable one is the record consumer that item 23 blocks. **A gate whose
+  only possible verdict today is "fail" is not a control, it is a blocked build with extra steps** — and
+  adding it would also make the ordering look enforced when it is not. The residue is recorded as a
+  **sequencing rule** instead: *the §31 adapter lands WITH the record consumer, never before it*
+  (`REG-F-342`), and that rule now has a stated mechanism rather than an assertion.
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a guard over an optional dependency tests PRESENCE, and
+  presence is not fitness.** `captureTry` cannot ask "is this sink durable?" because the port does not say —
+  the same gap `REG-F-342` closed for the STORE by adding `ContentDurability`, unclosed for the SINK because
+  the sink has no port at all. **The audit trigger is: does this guard check that the collaborator EXISTS, or
+  that it is ADEQUATE?**
+- **Merge target:** **Register** + `docs/_working/DESIGN-item23-exchange-record-resolution.md` §4, which states
+  the bound at the point where a reader would otherwise act on it. **Owed:** nothing until item 23 resolves;
+  then the sink gains a durable implementation and this becomes checkable.
+
+### REG-Q-075 — RATIFICATION SOUGHT: resolve §16 item 23 for the exchange-record limb only, licensing one typed event
+
+**Date:** 2026-09-03 · **Type:** QUESTION (ratification ask) · **Status:** OPEN — sponsor-reserved.
+
+**WHY IT IS ITEM 23'S.** Item 23 (Guide `:2520`) names *"producing-Attempt/context and protected-transition
+binding"* among what current contracts do not freeze — **which is the exchange record's exact blocker**, and
+three Guide clauses route here (`:1338`, `:1340`, `:1369`). `DESIGN-durable-exchange-record.md` §2 enumerates
+every candidate carrier and shows the only untyped route is `PER-9`'s forbidden generic JSON document.
+
+**WHAT IS ASKED, SCOPED AS NARROWLY AS THE OBLIGATION ALLOWS:**
+
+> Resolve §16 item 23 **for the exchange-record limb only** — licensing one typed command/event pair
+> recording a bounded model try onto **the plane's existing aggregate**, with content **by reference** and
+> **no new Professional Work Object** — and accept that this overrides §10.1's *"not permission to add…
+> Events"* for that limb, under `PER-2`'s permanence.
+
+- **HOW IT SURVIVES EACH RULE THAT KILLED THE ALTERNATIVES.** Typed fields, so not `PER-9`'s *"generic JSON
+  document"*; scoped to bounded model tries, so not a *"universal stream-record type"*; the normal
+  command→event pipeline, so no *"duplicate event authority"*; bytes in the existing `ArtifactStore` port, so
+  it *"adds no dedicated reasoning store"* and is not item 21's *"raw-CoT store"*.
+- ⭑ **AND IT SATISFIES `PER-12`'s "never projected" STRUCTURALLY.** `governedIdsByType`
+  (`packages/rph-engine/src/queries.ts:321-329`, read in full) buckets by `aggregateType`/`aggregateId`, so an
+  event on an aggregate that **already exists** contributes **no new catalog entry**. The Decision Center
+  picker never sees it — **no filter to fail, and no green control to fight**, which is the hazard `REG-D-053`
+  measured.
+
+**⚠ THE COSTS, STATED BEFORE THE PERMISSION IS GRANTED.** (1) §10.1:1369 is the clause being overridden, and
+it must be overridden **explicitly, not silently.** (2) `PER-2`: *"Persisted event schemas are permanent —
+evolution uses upcasters at read time, never event rewriting"* — **the shape must be right the first time**,
+which is the strongest argument for ratifying a shape rather than shipping one. (3) Item 23's own instruction
+is a conjunction — *"registry, schemas, persistence, projections, fixtures, and conformance tests together"* —
+so a contracts-only change would not discharge it. (4) **`E-3` needs a new resolved-identity shape**:
+`ActorReferenceSchema` has seven fields and no `version`, and `PER-9` requires *"provider, model, and version
+actually invoked"*.
+
+- **EXPLICITLY OUT OF SCOPE:** the generalized `AssurancePlan`, coverage topology, conjunctive independence,
+  and every other limb item 23 names. **This package takes no position on them.**
+- **IF REFUSED — the honest consequence, so refusal is a real option.** `ASR-11` limb 3 and `PER-9`'s
+  durable-exchange-record clause stay unmet, `ICP-02` stays inert, and the register should read **blocked
+  pending item 23** rather than as a buildable gap. ⭑ **That outcome is itself worth having**, and it is what
+  `REG-F-341` already recommends over a premature `REG-Q-066` ruling.
+- **Merge target:** **Corpus** — Guide §16 item 23, plus the new command/event in
+  `packages/rph-contracts`. **Sequencing:** item 23 → §31 adapter **with** the record consumer → `REG-Q-066`.
+  Status: OPEN.
