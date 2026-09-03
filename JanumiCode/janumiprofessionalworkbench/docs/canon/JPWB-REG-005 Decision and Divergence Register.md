@@ -30107,5 +30107,75 @@ single-victim.
   from the obligation, or recalled?**
 - **Merge target:** `docs/_working/DESIGN-durable-exchange-record.md` (options + the exhaustive carrier
   enumeration) and this register. **Owed:** §16 item 23 is the substantive block and should be sequenced
-  BEFORE `REG-Q-066`; `H-2` (a durable record naming non-durable content) is ungated; and **(b)'s sync/async
-  consumer seam has no owner.**
+  BEFORE `REG-Q-066`; ~~`H-2` (a durable record naming non-durable content) is ungated; and **(b)'s
+  sync/async consumer seam has no owner.**~~ ⭑ **BOTH ADDRESSED 2026-09-03 BY `REG-F-342`:** `H-2` is now
+  DISCLOSED on the record (`ContentRef.contentDurability`, read from the store) though not resolved — the
+  §31 durable adapter is still owed; and **(b) is NOT a blocker** — dispatch's caller is async, so the
+  consumer is written at that layer and dispatches a synchronous command carrying only the ref, which is
+  the placement `REG-F-328` already recorded.
+
+### REG-F-342 — the sync/async "blocker" is a PLACEMENT CONSTRAINT the register already recorded, and `H-2` is now disclosed on the record rather than invisible
+
+- **Date:** 2026-09-03 · **Type:** FINDING + correction · **Class:**
+  FINDING — corrects `REG-F-341` limb (b), filed the same day; addresses `H-2` from
+  `docs/_working/DESIGN-durable-exchange-record.md` · **Status:** ✅ CLOSED.
+
+**CORRECTION TO `REG-F-341` (b).** It reads: *"THE RECORD CONSUMER CANNOT BE WRITTEN WHERE THE BYTES ARE
+WRITTEN… ⚠ Answered by NEITHER open question. Architectural, and unowned."* ⭑ **The premise is true and the
+conclusion overstates it into a blocker.** Measured at HEAD:
+
+- `CommandHandler` (`packages/rph-application/src/handlers/kit.ts:36-40`) returns `CommandResult` —
+  **synchronous**, confirmed.
+- **But dispatch's CALLER is async.** `handle.dispatch(command)` is invoked without `await`
+  (`packages/rph-engine/src/record-assurance.ts:119`, `reference-undertaking.ts:262`, `seed-workbench.ts:204`),
+  and production route actions are `async` (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:825`,
+  `:875`, `:963`, `:967`).
+
+**So the two-phase placement works today with no contract change:** `await store.put(…)` at the async layer,
+then dispatch a **synchronous** command carrying only the resulting `StoredArtifactRef` — plain data. ⚠ **The
+consumer is not unwritable; it simply may not live INSIDE a handler.** And `REG-F-328` already said so —
+*"The consumer belongs one layer out, where the engine is."* ⭑ **I filed as a novel architectural blocker
+something this register had already dispositioned as a placement rule**, which is the same failure
+`REG-F-336` C-1 records against me. **(b) is struck as a blocker and restated as a constraint;
+`REG-F-341`'s other three limbs stand.**
+
+**`H-2` — THE INVERSE ORPHAN, NOW DISCLOSED RATHER THAN GATED AWAY.** The record plane is durable
+(`SqliteStorageAdapter`) and the content plane is not (`createInMemoryArtifactStore` is the only
+implementation). After one restart a permanent record names a `storageKey` whose store answer is
+**byte-indistinguishable from a key never written** — worse than the plain orphan, because **the record still
+looks intact**.
+
+- **THE PORT NOW DECLARES DURABILITY.** `ContentDurability = 'DURABLE' | 'PROCESS_LOCAL'` on `ArtifactStore`;
+  the in-memory default declares `PROCESS_LOCAL`. ⚠ **Declared, not inferred** — a host cannot be asked to
+  know this about an injected implementation, and a gate recognising non-durable stores **by name** would
+  repeat `REG-F-333` exactly: probing the name while the property travels by shape.
+- **THE RECORD CARRIES IT.** `ContentRef.contentDurability` is copied from the store that actually holds the
+  bytes. **DRIVEN both directions:** declaring `DURABLE` at the port reddens the RECORD's test (`R2`), and
+  hardcoding the value in `storedRef` instead of reading the store reddens the same test (`R3`) — so the
+  assertion cannot be satisfied by a constant. A `PENDING` ref classifies nothing, on the same reasoning the
+  file already applies to `purgeability`: a durability claim about absent bytes asserts a fact about nothing.
+
+> ### ⚠ AND THE STORE WAS ASSERTING SOMETHING IT CANNOT OBSERVE
+> `purge()` on an absent key returned *"nothing was stored under it"*. **This store cannot know that.** Entries
+> live in a `Map`, so after a restart a key that HELD bytes minutes earlier is indistinguishable from one that
+> never existed — and the old text **stated the second as fact.** `PER-9`: *"record-plane omission is not
+> legal"*; ⭑ **asserting an absence you cannot observe is worse than omitting it, because a reader cannot
+> discount it.** The refusal is unchanged; only the claim about WHY is now bounded by what is knowable, and it
+> names its own limitation (`PROCESS_LOCAL`, tombstones do not survive the process).
+>
+> ⚠ **A PRE-EXISTING TEST REDDENED ON THIS CHANGE, WHICH IS THE RIGHT SIGNAL.** It asserted
+> `/unknown|not stored|no such/i` — matching the very phrase being removed. **It was re-aimed at the surviving
+> obligation** (the refusal must still IDENTIFY the absent-key case) rather than deleted or loosened, and the
+> narrowing is recorded at the site so a later reader does not read it as a weakened control.
+
+- **FOUR MUTANTS, ALL SOUND ON A CLEAN BASELINE.** `R1` false durability at the port → only the port test.
+  `R2` false durability at the port → only the RECORD's test, proving the value is read rather than assumed.
+  `R3` hardcode it in `storedRef` → the same test, proving the assertion is not satisfiable by a constant.
+  `R4` restore *"nothing was stored"* → the two message tests, each independently killable.
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **an implementation that cannot observe a property must not
+  assert it — and the fix is a DECLARATION, not a detection.** Both halves here are the same move: the store
+  declares its durability instead of the host guessing, and the store declines to declare an absence it cannot
+  see. **The audit trigger is: does this message state something the code could distinguish?**
+- **Merge target:** `packages/rph-ports/src/{ports,defaults}/artifact-store.ts`,
+  `apps/rph-demo/src/lib/server/{agent/exchange-record.ts,assurance/exchange-capture.ts}`. **Owed:** `H-2` is
+  DISCLOSED, not resolved — the §31 durable adapter is still owed and must land WITH the record consumer.

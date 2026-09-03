@@ -118,13 +118,42 @@ describe('ArtifactStore — PER-8 / PER-12', () => {
 		expect(await store.get(volunteered.storageKey)).toBeUndefined();
 	});
 
-	it('purging something never stored says so, rather than reporting success', async () => {
+	it('a refusal for an absent key does NOT assert that nothing was ever stored', async () => {
+		const store = createInMemoryArtifactStore();
+		const outcome = await store.purge('tnt-7f3a/PURGEABLE_AT_EXPIRY/never-written');
+
+		// ⚠ THE OLD WORDING SAID "nothing was stored under it", AND THIS STORE CANNOT KNOW THAT. Entries live
+		// in a Map, so after a restart a key that HELD bytes minutes earlier is indistinguishable here from
+		// one that never existed - and the old text stated the second as fact. Driven: a fresh store returns
+		// byte-identical text for a key it held and for a key it never had.
+		//
+		// THE MUTANT: restore "nothing was stored under it". PER-9 - "record-plane omission is not legal" -
+		// and asserting an absence you cannot observe is worse than omitting it, because a reader cannot
+		// discount it.
+		expect(outcome.purged).toBe(false);
+		expect(outcome.purged === false && outcome.refusedBecause).not.toMatch(/nothing was stored/i);
+		// It must still say what it DOES know, or the disclosure has been replaced by silence.
+		expect(outcome.purged === false && outcome.refusedBecause).toMatch(/cannot distinguish/i);
+		expect(outcome.purged === false && outcome.refusedBecause).toMatch(/PROCESS_LOCAL/);
+	});
+
+	it('declares its durability, so a record can disclose what it references', () => {
+		// THE MUTANT: declare 'DURABLE'. captureTry copies this onto every STORED ref, so a wrong declaration
+		// here makes a permanent record claim content that a restart erased.
+		expect(createInMemoryArtifactStore().durability).toBe('PROCESS_LOCAL');
+	});
+
+	it('purging an absent key refuses, rather than reporting success', async () => {
 		const store = createInMemoryArtifactStore();
 		const outcome = await store.purge('tnt-7f3a/nothing-here');
 
-		// THE MUTANT: return {purged:true} for an unknown key. A purge log that cannot distinguish "removed" from
+		// THE MUTANT: return {purged:true} for an absent key. A purge log that cannot distinguish "removed" from
 		// "was not there" cannot evidence a retention policy was executed.
 		expect(outcome.purged).toBe(false);
-		expect(outcome.purged === false && outcome.refusedBecause).toMatch(/unknown|not stored|no such/i);
+		// ⚠ THE PHRASING WAS NARROWED WITH THE MESSAGE, NOT THE INTENT. This asserted `/unknown|not stored|no
+		// such/i`, and the message no longer claims the key was "never stored" — because this store cannot
+		// observe that (see the sibling test). What must still hold is that the refusal IDENTIFIES the
+		// absent-key case rather than going quiet, so the assertion tracks that and nothing weaker.
+		expect(outcome.purged === false && outcome.refusedBecause).toMatch(/no entry is present/i);
 	});
 });

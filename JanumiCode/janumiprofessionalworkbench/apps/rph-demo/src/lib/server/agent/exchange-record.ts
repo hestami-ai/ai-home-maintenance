@@ -19,7 +19,7 @@
 // SAYS its bytes are unretained is the disclosed omission PER-9 permits; today's code performs the silent one
 // PER-9 forbids ("record-plane omission is not").
 
-import type { Purgeability } from '@janumipwb/rph-ports';
+import type { ContentDurability, Purgeability } from '@janumipwb/rph-ports';
 
 /** PER-9-a's unit. Taken VERBATIM from `ModelExchangeRecord` — a narrower set would silently re-merge cases
  *  the corpus separates, which is the defect at `reasoning-review-validator.ts:180`. */
@@ -51,6 +51,16 @@ export interface ContentRef {
 	 *  until it is actually retained, because a classification on absent bytes asserts a fact about nothing. */
 	readonly purgeability?: Purgeability;
 	readonly status: 'PENDING_CONTENT_PLANE' | 'STORED';
+	/**
+	 * Set only when STORED — whether the referenced bytes survive a restart.
+	 *
+	 * ⭑ THE RECORD DISCLOSES THIS BECAUSE THE INVERSE ORPHAN IS OTHERWISE INVISIBLE. This record plane can be
+	 * durable while the content plane is not; after one restart the reference then names bytes that are gone,
+	 * and the store's answer is indistinguishable from a key never written — so the record still LOOKS intact.
+	 * Carrying the content store's declared durability turns that from an undetectable hazard into a disclosed
+	 * one, which is the posture `PER-9` requires: *"record-plane omission is not legal."*
+	 */
+	readonly contentDurability?: ContentDurability;
 	/** Set only when STORED — the `ARTIFACT.storageKey` the bytes live under. */
 	readonly storageKey?: string;
 	/** Set only when PENDING — why, in terms a reader can act on. */

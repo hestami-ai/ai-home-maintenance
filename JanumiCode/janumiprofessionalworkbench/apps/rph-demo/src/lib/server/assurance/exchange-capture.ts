@@ -20,7 +20,7 @@
 // "record-plane omission is not [legal]"). Redaction preserves reconstructability because the manifest records
 // what was removed; purge does not. That is why these two are not interchangeable, and why nothing here is
 // marked purgeable — only volunteered reasoning is, and `PER-8`'s NON-EXAMPLE names it by name.
-import type { ArtifactStore, StoredArtifactRef } from '@janumipwb/rph-ports';
+import type { ArtifactStore, ContentDurability, StoredArtifactRef } from '@janumipwb/rph-ports';
 import {
 	beginExchange,
 	type ExchangeDisposition,
@@ -71,11 +71,15 @@ export interface CaptureTryInput {
 	readonly disposition: ExchangeDisposition;
 }
 
-function storedRef(ref: StoredArtifactRef) {
+function storedRef(ref: StoredArtifactRef, durability: ContentDurability) {
 	return {
 		status: 'STORED' as const,
 		storageKey: ref.storageKey,
-		purgeability: 'RETAINED_BY_PARTICIPATION' as const
+		purgeability: 'RETAINED_BY_PARTICIPATION' as const,
+		// Taken from the store that actually holds the bytes, never assumed. A durable record naming
+		// process-local content is lawful only if it SAYS SO — otherwise the reference survives the bytes
+		// and nothing on the record reveals it.
+		contentDurability: durability
 	};
 }
 
@@ -172,7 +176,7 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 
 	const recorded: ExchangeRecord = {
 		...base,
-		materializedInputRef: storedRef(inputRef),
+		materializedInputRef: storedRef(inputRef, input.store.durability),
 		rawOutputBeforeCoercionRef: {
 			status: 'PENDING_CONTENT_PLANE',
 			reason:

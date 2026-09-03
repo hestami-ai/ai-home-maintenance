@@ -221,3 +221,48 @@ describe('captureTry - a store without a sink is a misconfiguration, not a degra
 	// present at all) reddens SIX tests, so the discrimination this guard needs is already in the file. A
 	// control that cannot get its own single-victim mutant is noise, which this repository keeps recording.
 });
+
+describe('the record discloses the DURABILITY of the content it names - H-2', () => {
+	it('a STORED ref carries the content store declared durability', async () => {
+		const { store, sink } = harness();
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-1',
+			role: 'initial',
+			model: MODEL,
+			prompt: 'JUDGE THIS GRAPH',
+			rawOutput: '{}',
+			disposition: 'accepted'
+		});
+
+		// H-2, the INVERSE orphan: this record plane can be durable (SqliteStorageAdapter) while the content
+		// plane is not. After one restart the reference names bytes that are gone, and the store answer is
+		// indistinguishable from a key never written - so the record still LOOKS intact. That is worse than
+		// the plain orphan, which at least leaves nothing pointing anywhere.
+		//
+		// THE MUTANT: hardcode 'DURABLE', or drop the field. Either way a permanent record silently claims
+		// content it cannot produce. PER-9: "record-plane omission is not legal."
+		expect(rec.materializedInputRef.contentDurability).toBe('PROCESS_LOCAL');
+		// Taken FROM THE STORE, not assumed - so a durable adapter changes this without touching captureTry.
+		expect(rec.materializedInputRef.contentDurability).toBe(store.durability);
+	});
+
+	it('a PENDING ref classifies nothing, because there are no bytes to classify', async () => {
+		const rec = await captureTry({
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-1',
+			role: 'initial',
+			model: MODEL,
+			prompt: 'P',
+			rawOutput: '{}',
+			disposition: 'accepted'
+		});
+
+		// Same reasoning the file already applies to `purgeability`: a durability claim about absent bytes
+		// asserts a fact about nothing.
+		expect(rec.materializedInputRef.status).toBe('PENDING_CONTENT_PLANE');
+		expect(rec.materializedInputRef.contentDurability).toBeUndefined();
+	});
+});

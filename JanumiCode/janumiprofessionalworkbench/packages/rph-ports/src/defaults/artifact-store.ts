@@ -41,6 +41,10 @@ export function createInMemoryArtifactStore(): ArtifactStore {
 	const entries = new Map<string, Entry>();
 
 	return {
+		// The bytes live in a Map. Declaring this is what lets a record disclose that the content it names is
+		// process-local, instead of a durable record silently pointing at content that a restart erased.
+		durability: 'PROCESS_LOCAL',
+
 		async put(input: ArtifactContentInput): Promise<StoredArtifactRef> {
 			const contentHash = hashBytes(input.bytes);
 			// §31.2 — the tenant prefix is part of the key, and the suffix is the opaque content address rather
@@ -90,7 +94,13 @@ export function createInMemoryArtifactStore(): ArtifactStore {
 			if (!entry)
 				return {
 					purged: false,
-					refusedBecause: `unknown storageKey '${storageKey}' — nothing was stored under it, so nothing was purged. Reported rather than answered with success, because a purge log that cannot tell "removed" from "was not there" cannot evidence that a retention policy ran.`
+					// ⚠ IT USED TO ASSERT "nothing was stored under it", AND THIS STORE CANNOT KNOW THAT.
+					// Entries live in a Map, so after a restart a key that HELD bytes minutes earlier is
+					// indistinguishable here from one that never existed — and the old wording stated the
+					// second as fact. `PER-9`: "record-plane omission is not legal"; asserting an absence you
+					// cannot observe is worse than omitting it, because a reader cannot discount it.
+					// The refusal is unchanged; only the claim about WHY is now bounded by what is knowable.
+					refusedBecause: `no entry is present under storageKey '${storageKey}', so nothing was purged. ⚠ THIS STORE CANNOT DISTINGUISH "never stored" from "stored and lost at restart": it is PROCESS_LOCAL and its entries, including tombstones, do not survive the process. A durable adapter must tell these apart. Reported rather than answered with success, because a purge log that cannot tell "removed" from "was not there" cannot evidence that a retention policy ran.`
 				};
 			if (entry.meta.purgeability === 'RETAINED_BY_PARTICIPATION')
 				return {

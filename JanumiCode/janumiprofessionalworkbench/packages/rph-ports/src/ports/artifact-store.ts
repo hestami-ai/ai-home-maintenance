@@ -74,7 +74,25 @@ export type PurgeOutcome =
 	| { readonly purged: true }
 	| { readonly purged: false; readonly refusedBecause: string };
 
+/**
+ * Whether this store's bytes survive a process restart.
+ *
+ * ⭑ THE PORT DECLARES THIS BECAUSE THE INVERSE ORPHAN IS OTHERWISE UNDETECTABLE. The record plane can be
+ * durable (a SQLite adapter) while the content plane is not, and then a permanent record names a `storageKey`
+ * whose store answer, after one restart, is byte-indistinguishable from a key that was never stored. That is
+ * the defect `purge`'s docblock names one paragraph down — *"a reader cannot tell 'purged on schedule' from
+ * 'never stored' from 'lost'"* — arriving from the other direction, and it is worse than the plain orphan
+ * because **the record still looks intact**.
+ *
+ * ⚠ IT IS DECLARED, NOT INFERRED. A host cannot be asked to know this about an injected implementation, and a
+ * gate that recognised non-durable stores BY NAME would be the same defect `REG-F-333` records: probing for
+ * the name while the property travels by shape.
+ */
+export type ContentDurability = 'DURABLE' | 'PROCESS_LOCAL';
+
 export interface ArtifactStore {
+	/** Declared, so a record can disclose the durability of the content it references. */
+	readonly durability: ContentDurability;
 	put(input: ArtifactContentInput): Promise<StoredArtifactRef>;
 	get(storageKey: string): Promise<string | undefined>;
 	stat(storageKey: string): Promise<StoredArtifactMeta | undefined>;

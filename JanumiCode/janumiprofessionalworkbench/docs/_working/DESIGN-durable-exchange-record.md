@@ -94,7 +94,7 @@ cosmetic:
 |---|---|---|
 | i | The reasoning half's referencing record has **no typed carrier** | **§16 item 23** |
 | ii | The answer half's `ARTIFACT` write needs four unratified vocabulary values | `REG-Q-056` (OPEN) |
-| iii | ⚠ **The record consumer cannot be written where the bytes are written** — `CommandHandler` is **synchronous** (`kit.ts:36-40`), `ArtifactStore` is **async** (`artifact-store.ts:78-89`) | **nothing — architectural, unowned** |
+| iii | ~~The record consumer cannot be written where the bytes are written~~ ⭑ **CORRECTED — NOT A BLOCKER.** `CommandHandler` *is* synchronous, but **dispatch's caller is async** (route actions; `handle.dispatch(...)` is invoked without `await`). So the consumer is written at the async layer and dispatches a **sync** command carrying only the `StoredArtifactRef` — plain data, no contract change. A **placement constraint**, which `REG-F-328` already recorded. | ~~unowned~~ **nothing — resolved** |
 | iv | Writing the `E-2` field itself | `REG-Q-066` (OPEN, sponsor-reserved) |
 
 ⭑ **Findings (i) and (iv) are the same finding seen from two planes.** `REG-D-053` forecloses `ARTIFACT` for
@@ -127,11 +127,16 @@ leave no durable trace — while the register reads as though one sponsor senten
 
 - **H-1 — the orphan armed on a one-line change. ✅ NOW GATED.** `captureTry` refuses when a store is supplied
   without a sink. Predicted red observed first; `Q1` (remove the guard) is single-victim.
-- **H-2 — the INVERSE orphan, ungated.** The demo's **record** plane is durable (`SqliteStorageAdapter`) while
-  the **content** plane is not (`createInMemoryArtifactStore` is the only implementation). Wire `ARTIFACT` for
-  the answer half and, after one restart, a durable PWO names a `storageKey` whose store answer is
-  **byte-indistinguishable from one never stored** — the port's own doctrine names this defect. **The owed §31
-  adapter must land WITH the record consumer, not after it.**
+- **H-2 — the INVERSE orphan. ✅ NOW DISCLOSED (not resolved).** The demo's **record** plane is durable
+  (`SqliteStorageAdapter`) while the **content** plane is not. After one restart a durable record names a
+  `storageKey` whose store answer is **byte-indistinguishable from one never stored** — worse than the plain
+  orphan, because the record still *looks* intact. **Addressed by declaration rather than detection**
+  (`REG-F-342`): `ArtifactStore` now declares `ContentDurability`, and `ContentRef.contentDurability` carries
+  it onto every stored ref, **read from the store rather than assumed** — driven in both directions. A
+  durable record naming process-local content now says so on its face. ⚠ **Still owed: the §31 durable
+  adapter, which must land WITH the record consumer, not after it.**
+  Also fixed in the same pass: `purge()` on an absent key asserted *"nothing was stored under it"* — a claim
+  a `Map`-backed store **cannot observe** after a restart. It now names its own limitation instead.
 - **H-3 — projection exposure, closed by ruling only.** An `ARTIFACT` PWO is projected by construction.
   `REG-D-053` closes this structurally by minting no reasoning PWO. **Any design that mints one re-arms it and
   must fight a green committed control.**
