@@ -5,6 +5,7 @@
 // without purge would not make retention lawful — it would only move the unlawfulness. So purge is proven
 // first, and the guard that refuses to purge PARTICIPATING content is proven before the happy path.
 import { describe, expect, it } from 'vitest';
+import { artifactStoreContract } from '../testing.js';
 import { createInMemoryArtifactStore } from './artifact-store.js';
 
 const REASONING = {
@@ -15,6 +16,12 @@ const REASONING = {
 } as const;
 
 const EVIDENCE = { ...REASONING, purgeability: 'RETAINED_BY_PARTICIPATION' } as const;
+
+// ⭑ THE IN-MEMORY DEFAULT RUNS THE SHARED CONTRACT TOO. If only the durable adapter ran it, "shared" would be
+// a claim rather than a fact, and the reference implementation could drift away from the invariants it defines.
+describe('createInMemoryArtifactStore — the ArtifactStore contract', () => {
+	artifactStoreContract(() => createInMemoryArtifactStore());
+});
 
 describe('ArtifactStore — PER-8 / PER-12', () => {
 	it('REFUSES to purge content that participated — PER-8 has no exception', async () => {

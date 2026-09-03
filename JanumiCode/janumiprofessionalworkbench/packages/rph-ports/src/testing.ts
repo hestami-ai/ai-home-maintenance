@@ -125,3 +125,5 @@ export function testDirectory(principals: readonly Principal[]): {
 		}
 	};
 }
+
+export { artifactStoreContract } from './artifact-store-contract.js';

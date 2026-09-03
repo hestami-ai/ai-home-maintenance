@@ -18,7 +18,8 @@ import {
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
-import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { SqliteArtifactStore, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
@@ -136,6 +137,33 @@ export function openWorkbench(dbPath?: string): EngineHandle {
 }
 
 /** The shared, seeded engine (created + seeded once per server process). */
+/**
+ * The CONTENT plane — where retained artifact bytes live, as distinct from the record plane above.
+ *
+ * ⭑ A SEPARATE DATABASE, DELIBERATELY. The two planes have opposite retention semantics: the record is
+ * permanent (`PER-8`) and the content is purgeable at retention expiry (`PER-12`). Sharing a schema would put
+ * a purge path inside the store whose whole guarantee is that nothing is deleted, and would add a table to
+ * Section 10's typed persistence, which §10.1 says these information requirements are "not permission" to do.
+ *
+ * ⚠ AND THE FALLBACK IS DISCLOSED, NOT SILENT. Without a configured database this is the process-local store,
+ * whose bytes do not survive a restart — which is lawful only because the store DECLARES its durability and
+ * every record copies that onto its refs (`REG-F-342`). A durable record naming process-local content then
+ * says so on its face instead of looking intact and being empty.
+ *
+ * §31 was long cited here as making S3-compatible storage normative. It does not: *"Large binary and document
+ * Artifacts SHOULD use S3-compatible storage"* — SHOULD, and scoped to LARGE BINARY AND DOCUMENT artifacts.
+ * §31's actual SHALLs are tenant-scoped key prefixes (§31.2) and cryptographic content hashes (§31.3), which
+ * both adapters honour. A judge prompt is neither large nor binary.
+ */
+let artifacts: ArtifactStore | undefined;
+export function getArtifactStore(): ArtifactStore {
+	if (!artifacts)
+		artifacts = DB_PATH
+			? new SqliteArtifactStore({ filename: `${DB_PATH}.content.sqlite` })
+			: createInMemoryArtifactStore();
+	return artifacts;
+}
+
 export function getEngine(): EngineHandle {
 	handle ??= openWorkbench(DB_PATH);
 	return handle;

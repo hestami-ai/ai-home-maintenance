@@ -22,13 +22,13 @@ import {
 	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
+import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
 import type { AgyPrint } from './assurance/reasoning-review-validator.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
 import { recordExchanges } from './assurance/exchange-recorder.js';
 import { SESSION_CREDENTIAL } from './identity.js';
-import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
+import { buildPwaExport, getArtifactStore, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
 
 /**
  * Read the ACTIVE `floor.reasoning-review` policy's criteria FROM THE STORE — the store→runtime content path.
@@ -304,6 +304,8 @@ export async function runPwaFloor(
 		 * unassertable. Tests pass their own host; production omits it.
 		 */
 		canonical?: AuthedEngineHandle;
+		/** The content plane, injectable so a gate can assert against a store it controls. */
+		artifacts?: ArtifactStore;
 		/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
 		narration?: string;
 		priorGaps?: string[];
@@ -354,7 +356,7 @@ export async function runPwaFloor(
 	// are gone. REG-F-342 made that visible instead of silent: the store DECLARES its durability and every
 	// stored ref carries it, so the record says on its face that its content is process-local. The §31 durable
 	// adapter (MXR-07) is what turns the disclosure into a fix.
-	const artifacts = createInMemoryArtifactStore();
+	const artifacts = opts.artifacts ?? getArtifactStore();
 	const exchanges = createExchangeSink();
 	const plan = await runFloorAndPlanRecording(
 		subject,
