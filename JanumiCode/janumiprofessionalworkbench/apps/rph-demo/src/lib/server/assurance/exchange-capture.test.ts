@@ -41,12 +41,23 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 		expect(sink.drain()).toHaveLength(1);
 
 		// ⛔ E-2 IS BLOCKED ON PURPOSE, AND THE BLOCK IS ASSERTED RATHER THAN ASSUMED. Guide §9.7 requires the
-		// spans separated at retention, and Purgeability admits ONE class per stored object — so a mixed blob
-		// cannot be represented losslessly and the corpus's instruction is to block. REG-Q-066 (OPEN) forbids
-		// writing this field before its ruling. THE MUTANT: store it anyway, which is what REG-F-330 records
-		// having shipped.
+		// spans separated at retention; REG-Q-066 (OPEN, sponsor-reserved) forbids writing this field before
+		// its ruling. THE MUTANT: store it anyway, which is what REG-F-330 records having shipped.
 		expect(rec.rawOutputBeforeCoercionRef.status).toBe('PENDING_CONTENT_PLANE');
-		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/REG-Q-066|separat/i);
+
+		// ⚠ WAS `toMatch(/REG-Q-066|separat/i)`, AND AN ALTERNATION IS SATISFIED BY EITHER HALF — so a reason
+		// that named only the separation, or only the register, passed identically. Both limbs are now asserted
+		// separately, which is the only arrangement that can tell them apart.
+		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/REG-Q-066/);
+		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/separat/i);
+
+		// ⭑ AND THE REASON MUST NOT CLAIM A TECHNICAL IMPOSSIBILITY THAT NO LONGER EXISTS. It used to say the
+		// contract "cannot represent a partly-purgeable blob losslessly" — false, and the load-bearing sentence
+		// of a filed blocker (REG-F-336). One STORED OBJECT carries one class; a capture may produce several
+		// (DOC-003:89). With `splitAnswerSpan` (REG-F-339) and REG-D-053 the remaining block is PROCEDURAL, and
+		// a disclosure that misstates why it is blocked sends the next reader to redesign instead of to ask.
+		expect(rec.rawOutputBeforeCoercionRef.reason).not.toMatch(/cannot (represent|express)/i);
+		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/procedural/i);
 	});
 
 	it('the stored bytes are the EXACT prompt — retrievable, not merely referenced', async () => {

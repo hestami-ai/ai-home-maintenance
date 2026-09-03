@@ -29541,7 +29541,9 @@ disclosed loss beats an unlawful retention**, which is the same posture as `REG-
 
 - **Date:** 2026-09-02 · **Type:** FINDING (a correction to my own reading, plus two blockers neither the
   question nor I anticipated) · **Class:** FINDING — bounds `REG-Q-066`, discloses a gap in `ICP-02` as
-  delivered · **Status:** ✅ CLOSED as a correction. **`REG-Q-066` REMAINS OPEN and sponsor-reserved.**
+  delivered · **Status:** ✅ CLOSED as a correction. ⚠ **FIVE OF ITS SENTENCES ARE CORRECTED BY `REG-F-340`
+  (2026-09-03) — read the two together; the correction is listed sentence by sentence there.**
+  **`REG-Q-066` REMAINS OPEN and sponsor-reserved.**
 
 **THE READING, AND WHY IT DOES NOT HOLD.** A decision package over `REG-Q-066` returned the headline that
 *"'no shape in the RPH engine can hold it' is NO LONGER TRUE — a lawful carrier landed ten days after the
@@ -29679,7 +29681,8 @@ taken up.
 
 - **Date:** 2026-09-02 · **Type:** FINDING (corrections to entries filed the same day) · **Class:**
   FINDING — amends `REG-F-334` and `docs/_working/DECISION-REG-Q-066-raw-validator-output.md` §7 ·
-  **Status:** ✅ CLOSED as a correction. **`REG-Q-066` remains OPEN and sponsor-reserved.**
+  **Status:** ✅ CLOSED as a correction. ⚠ **C-2 AND C-3 ARE CORRECTED BY `REG-F-340` (2026-09-03).**
+  **`REG-Q-066` remains OPEN and sponsor-reserved.**
 
 **C-1 — THE `Purgeability` BLOCKER WAS NOT NEW, AND I HAD RECORDED IT MYSELF HOURS EARLIER.** `REG-F-334`
 presents it as *"a third blocker, which neither the question nor I anticipated."* ⚠ **The second half is
@@ -29952,3 +29955,68 @@ located }` with the invariant `prefix + answer + suffix === raw` whenever `locat
   return type cannot express?**
 - **Merge target:** `apps/rph-demo/src/lib/server/assurance/agy-cli.ts`. **Owed:** a caller — no production
   code splits yet; that is `ICP-02`'s wiring, and it now has its primitive.
+
+### REG-F-340 — the sentence that blocked `E-2` was false, and it stood in production code, in two register entries, and in the runtime disclosure
+
+- **Date:** 2026-09-03 · **Type:** FINDING (consolidated correction) · **Class:**
+  FINDING — corrects `REG-F-334` and `REG-F-336`, both filed 2026-09-02, and the code they described ·
+  **Status:** ✅ CLOSED. **`REG-Q-066` remains OPEN and sponsor-reserved; nothing here lifts it.**
+
+**THE FALSE SENTENCE, AND ITS FOUR HOMES.** *"`Purgeability` admits ONE class per stored object, so the
+contract cannot express a blob that is partly `PURGEABLE_AT_EXPIRY` and partly
+`RETAINED_BY_PARTICIPATION`."* ⛔ **The first clause is true and the second does not follow.** One STORED
+OBJECT carries one class; **nothing limits a capture to one stored object**, and canon says the opposite
+outright — `JPWB-DOC-003:89`: *"One Representation may have several Artifacts."* Two `put()` calls under two
+classes has since been **driven against the shipped adapter**. **Only the whole-blob write ever failed.**
+
+It stood in: `exchange-capture.ts`'s block comment; the runtime `PENDING_CONTENT_PLANE` **disclosure string**
+read by anyone inspecting a record; `REG-F-334` §3; and `REG-F-336` C-1, which repeated it while correcting
+something else. ⭑ **A correction pass ran over this text and did not catch it, because it was auditing
+NOVELTY rather than TRUTH.**
+
+**CORRECTIONS TO `REG-F-334`, sentence by sentence.**
+
+1. *"A THIRD BLOCKER, WHICH NEITHER THE QUESTION NOR I ANTICIPATED."* → **Not a blocker, and anticipated.**
+   `REG-F-330`'s Owed line already named *"a lossless span separation into two artifacts"* as the exit.
+2. *"One object cannot carry both classes, so even option 2 fails **as a whole-blob write**."* → **KEEP. True
+   as literally written**, and its qualifier is correct. ⚠ The overreach was never in this sentence — it was
+   in the code comment, which **dropped the qualifier**. Recorded so a future pass does not strike a true
+   sentence while the false paraphrase survives.
+3. *"The complement … is **not** computable for a malformed one."* → **Overstated.** It is not computable by
+   `extractJson`'s regex for SOME malformed shapes; `splitAnswerSpan` (`REG-F-339`) recovers the rest, and
+   reports `located: false` where it genuinely cannot. **Separability is a per-blob property, measured, not a
+   property of the malformed class.**
+4. *"The malformed case is `REG-Q-066`'s entire subject, and §9.7 already answers it: block."* → **Over-broad.**
+   §9.7 blocks where separation is *actually* impossible — which is now a runtime flag, not an assumption.
+5. ⭑ **PROMOTE what it got right.** Its Attempt-anchor paragraph — *"a corpus tension the question did not
+   surface, which is the real residue"* — **survived the full adversarial audit intact and was the actual
+   blocker.** It sat one paragraph BENEATH a non-blocker. It is now discharged by `REG-D-053`.
+
+**CORRECTIONS TO `REG-F-336`.**
+
+- **C-3's headline** *"THE REAL BLOCKER IS `REG-Q-056`, WHICH IS OPEN."* → `REG-Q-056` blocks the **governed
+  record plane only**. Under `REG-D-053` the reasoning half mints no `ARTIFACT` PWO, so **no `RecordArtifact`
+  is dispatched for it and `REG-Q-056` is off its critical path entirely.** It still governs the answer half's
+  governed-record write.
+- **C-2's** *"store, sink, and record consumer must land together or not at all."* → Correct as a rule, but it
+  **conflates two different record planes**: the app-local `ExchangeRecord` sink needs no ruling; the governed
+  `ARTIFACT` PWO needs `REG-Q-056`. Different consumers, different blockers.
+
+**THE RESULTING STATE, STATED PLAINLY BECAUSE IT HAS MOVED.** Both technical prerequisites for `E-2` now
+exist — the separation primitive (`REG-F-339`) and the anchor (`REG-D-053`). ⛔ **What remains is
+PROCEDURAL: `REG-Q-066` is OPEN and sponsor-reserved.** The disclosure string now says exactly that, and a
+test asserts it does **not** claim a technical impossibility, because a disclosure that misstates WHY it is
+blocked sends the next reader to redesign instead of to ask.
+
+- ⚠ **THE PIN THAT LET THIS ROT WAS AN ALTERNATION.** `exchange-capture.test.ts` asserted
+  `toMatch(/REG-Q-066|separat/i)` — **satisfied by either half**, so a reason naming only one, or naming both
+  while asserting a falsehood, passed identically. **Driven:** a mutant restoring the old string — which
+  contains BOTH tokens — passes the old assertion and reddens the new one. Both limbs are now asserted
+  separately, plus `not.toMatch(/cannot (represent|express)/i)`.
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a claim paraphrased into a second location loses its
+  qualifier, and the paraphrase is what the next reader acts on.** The register sentence carried *"as a
+  whole-blob write"* and was true; the code comment dropped four words and was false; the disclosure string
+  inherited the false one. **The audit trigger is: where else does this sentence live, and did the qualifier
+  travel with it?**
+- **Merge target:** `apps/rph-demo/src/lib/server/assurance/exchange-capture.ts` + this register.
+  **Owed:** nothing. `REG-Q-066`'s ruling remains the sponsor's.

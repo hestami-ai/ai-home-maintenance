@@ -123,14 +123,26 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 	// 8.4. Where the spans cannot be separated losslessly, OR ACCEPTED CONTRACTS CANNOT REPRESENT THESE RECORDS
 	// LOSSLESSLY, block the capability and resolve Section 16 item 23."
 	//
-	// That second trigger is UNCONDITIONAL and fires here whether or not reasoning ever arrives: `Purgeability`
-	// is ONE value per `put()`, so the contract cannot express a blob that is partly PURGEABLE_AT_EXPIRY
-	// (reasoning, PER-12) and partly RETAINED_BY_PARTICIPATION (the answer, PER-8). Storing it whole under
-	// either class is wrong in one direction or the other.
+	// ⚠ THIS COMMENT USED TO CLAIM THAT SECOND TRIGGER FIRES UNCONDITIONALLY, BECAUSE "`Purgeability` is ONE
+	// value per `put()`, so the contract cannot express a blob that is partly PURGEABLE_AT_EXPIRY (reasoning,
+	// PER-12) and partly RETAINED_BY_PARTICIPATION (the answer, PER-8)." ⛔ THAT WAS FALSE, and it was the
+	// load-bearing sentence of a blocker filed in the register (corrected by REG-F-336). One STORED OBJECT
+	// carries one class. NOTHING limits a capture to one stored object — canon says the opposite outright
+	// (DOC-003:89, "One Representation may have several Artifacts"), and two `put()` calls under two classes
+	// has since been DRIVEN against the shipped adapter. Whole-blob was the only case that ever failed.
 	//
-	// ⚠ AND THE REGISTER FORBADE THIS BY NAME BEFORE IT WAS WRITTEN. REG-Q-066 is OPEN and reserved to the
+	// BOTH TECHNICAL PREREQUISITES NOW EXIST:
+	//   • the lossless separation primitive — `splitAnswerSpan` (REG-F-339), whose `located` flag reports
+	//     exactly when §9.7's FIRST trigger fires and when it does not, instead of assuming it always does;
+	//   • an anchor for the reasoning half — REG-D-053 discharges PER-12's "producing Attempt" onto the plane's
+	//     own governed-stream record, so no governed ARTIFACT is minted and "never projected" holds
+	//     STRUCTURALLY rather than by a filter.
+	//
+	// ⛔ WHAT STILL BLOCKS E-2 IS PROCEDURAL, AND IT IS NOT MINE TO LIFT. REG-Q-066 is OPEN and reserved to the
 	// sponsor — "item 23's `rawOutput` field was drafted, defended as 'retained whole', and withdrawn. Do not
-	// write the field before the ruling." A first version of this module wrote it anyway (REG-F-330).
+	// write the field before the ruling." A first version of this module wrote it anyway (REG-F-330). ⭑ The
+	// remedy is now one sentence from the sponsor rather than one more design pass — and this comment must not
+	// go on implying a technical impossibility that no longer exists.
 	//
 	// E-1 is NOT affected: the judge prompt is composed by JPWB from its own scaffolding and the graph export,
 	// so it is not a reasoning trace — which is exactly the warrant REG-D-050 states for it, and exactly the
@@ -143,11 +155,13 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		rawOutputBeforeCoercionRef: {
 			status: 'PENDING_CONTENT_PLANE',
 			reason:
-				'E-2 BLOCKED-AND-DISCLOSED per Guide §9.7: the pre-coercion output may carry volunteered reasoning ' +
-				'inline with the answer, and Purgeability admits ONE class per stored object — so the contract ' +
-				'cannot represent a partly-purgeable blob losslessly. REG-Q-066 (OPEN, sponsor-reserved) forbids ' +
-				'writing this field before its ruling. Unblocking requires lossless span separation into two ' +
-				'artifacts (answer RETAINED_BY_PARTICIPATION, reasoning PURGEABLE_AT_EXPIRY) or that ruling.'
+				'E-2 BLOCKED-AND-DISCLOSED. The pre-coercion output may carry volunteered reasoning inline with ' +
+				'the answer, so it is stored only as two separated spans — answer RETAINED_BY_PARTICIPATION, ' +
+				'reasoning PURGEABLE_AT_EXPIRY — never whole. The TECHNICAL prerequisites now exist: ' +
+				'splitAnswerSpan separates them losslessly wherever they are separable (REG-F-339), and ' +
+				'REG-D-053 discharges the reasoning half onto the plane governed-stream record. What remains ' +
+				'is PROCEDURAL: REG-Q-066 is OPEN and sponsor-reserved and forbids writing this field before ' +
+				'its ruling.'
 		},
 		disposition: input.disposition
 	};
