@@ -63,6 +63,18 @@ export interface ContentRef {
 	readonly contentDurability?: ContentDurability;
 	/** Set only when STORED — the `ARTIFACT.storageKey` the bytes live under. */
 	readonly storageKey?: string;
+	/**
+	 * Set only when STORED — the rest of what §18.1 needs to ADDRESS the bytes.
+	 *
+	 * ⚠ THESE WERE BEING DROPPED. `storedRef` kept only the key, so a record could name a location without
+	 * saying which provider held it, what the bytes hashed to, or how many there were — and `contentHash` is
+	 * the only thing that can later prove the retained bytes are the ones this try actually saw. A reference
+	 * that cannot be verified is a reference that cannot be challenged, which is the half of PER-9 that makes
+	 * a record worth keeping.
+	 */
+	readonly storageProvider?: string;
+	readonly contentHash?: string;
+	readonly byteSize?: number;
 	/** Set only when PENDING — why, in terms a reader can act on. */
 	readonly reason?: string;
 }

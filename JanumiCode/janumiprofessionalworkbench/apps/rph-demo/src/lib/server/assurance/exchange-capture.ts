@@ -84,6 +84,11 @@ function storedRef(ref: StoredArtifactRef, durability: ContentDurability) {
 	return {
 		status: 'STORED' as const,
 		storageKey: ref.storageKey,
+		// The whole address, not just the key — see ContentRef. contentHash is what later proves the retained
+		// bytes are the ones this try saw; without it the reference cannot be challenged.
+		storageProvider: ref.storageProvider,
+		contentHash: ref.contentHash,
+		byteSize: ref.byteSize,
 		purgeability: 'RETAINED_BY_PARTICIPATION' as const,
 		// Taken from the store that actually holds the bytes, never assumed. A durable record naming
 		// process-local content is lawful only if it SAYS SO — otherwise the reference survives the bytes

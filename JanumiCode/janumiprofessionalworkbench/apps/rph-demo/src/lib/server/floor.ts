@@ -22,7 +22,11 @@ import {
 	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
+import type { AgyPrint } from './assurance/reasoning-review-validator.js';
+import { createExchangeSink } from './assurance/exchange-capture.js';
+import { recordExchanges } from './assurance/exchange-recorder.js';
 import { SESSION_CREDENTIAL } from './identity.js';
 import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
 
@@ -287,6 +291,19 @@ export async function runPwaFloor(
 		rationale?: ProfessionalRationaleSummary;
 		/** Exact app-local semantic hash of the PWA/PWU-Type candidate reviewed in this run. */
 		candidateSubjectHash?: string;
+		/** MXR-05: the model call, injectable so the retention wiring is reachable in a gate rather than only
+		 *  by spawning a real agy. See createFloorRegistry's own note. */
+		print?: AgyPrint;
+		/**
+		 * The CANONICAL handle the exchange records are written through.
+		 *
+		 * ⛔ NEVER PASS THE CANDIDATE FORK HERE. The default is the workbench's canonical engine, and it is
+		 * correct: a `MODEL_EXCHANGE` records an act that HAPPENED, so it must survive a discarded turn. This
+		 * exists because `runPwaFloor` otherwise reaches module state (`getEngine()`), which no test can
+		 * observe — the drain would dispatch into an engine the caller cannot see, and the wiring would be
+		 * unassertable. Tests pass their own host; production omits it.
+		 */
+		canonical?: AuthedEngineHandle;
 		/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
 		narration?: string;
 		priorGaps?: string[];
@@ -329,10 +346,20 @@ export async function runPwaFloor(
 			...(opts.priorGaps?.length ? { prior: { gaps: opts.priorGaps } } : {})
 		}
 	};
+	// MXR-05. BOTH OR NEITHER: `captureTry` refuses a store supplied without a sink, because bytes retained
+	// with no record referencing them are the orphan REG-F-336 C-2 forbids.
+	//
+	// ⚠ THE STORE IS PROCESS-LOCAL AND THAT IS LAWFUL ONLY BECAUSE IT IS DISCLOSED. This record plane is
+	// durable (SQLite) while the content plane is not, so after a restart a permanent record names bytes that
+	// are gone. REG-F-342 made that visible instead of silent: the store DECLARES its durability and every
+	// stored ref carries it, so the record says on its face that its content is process-local. The §31 durable
+	// adapter (MXR-07) is what turns the disclosure into a fix.
+	const artifacts = createInMemoryArtifactStore();
+	const exchanges = createExchangeSink();
 	const plan = await runFloorAndPlanRecording(
 		subject,
 		ctx,
-		createFloorRegistry({ testMode: isTestMode() })
+		createFloorRegistry({ testMode: isTestMode(), artifacts, exchanges, ...(opts.print ? { print: opts.print } : {}) })
 	);
 	recordAssuranceRecordingPlan(engine, plan, {
 		issuedAt: hostNow(),
@@ -342,6 +369,51 @@ export async function runPwaFloor(
 		idPrefix: mintUiId('floorrun'),
 		newId: (prefix) => mintUiId(prefix)
 	});
+	// ⭑ THE DRAIN — PER-9's durable exchange record, one per bounded try.
+	//
+	// ⛔ ON THE CANONICAL HANDLE, DELIBERATELY, AND NOT ON `engine`. This function is called with
+	// `turn.engine` — the authoring fork's CANDIDATE engine (`+server.ts:127`, `:153`). Dispatching there
+	// would make every exchange record live or die with the turn, and a try that was MADE, cost money and
+	// produced a bad answer is precisely the try PER-9 wants kept. Recording an act that happened is not
+	// candidate state. That property is why REG-D-055 made this record its own aggregate, and routing it
+	// through the fork would silently hand it back.
+	const canonical = opts.canonical ?? getEngine().as(SESSION_CREDENTIAL);
+	const drained = exchanges.drain();
+	if (drained.length > 0) {
+		const outcome = recordExchanges(
+			(payload, aggregateId) =>
+				canonical.dispatch({
+					commandId: mintUiId('cmd'),
+					commandType: 'RecordModelExchange',
+					commandSchemaVersion: 1,
+					targetAggregateType: 'MODEL_EXCHANGE',
+					targetAggregateId: aggregateId,
+					issuedAt: hostNow(),
+					correlationId: `model-exchange:${pwaId}`,
+					idempotencyKey: `mex:${aggregateId}`,
+					payload
+				}),
+			drained,
+			{
+				runToken: mintUiId('floorrun'),
+				plane: 'ASSURANCE',
+				invokerId: 'agy.reasoning-review',
+				assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+				subjectObjectId: pwaId,
+				subjectObjectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+				subjectSemanticVersion: 1,
+				newId: (prefix) => mintUiId(prefix)
+			}
+		);
+		// A retention fault must not fail an assurance run that already reached its conclusion — but it must
+		// not vanish either. Surfacing it is the disclosed shortfall PER-9 permits; swallowing it is the
+		// silent omission it forbids.
+		if (outcome.failures.length > 0)
+			console.warn(
+				`[MXR] ${outcome.recorded}/${drained.length} exchange records written; ${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
+			);
+	}
+
 	const rr = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
 	return {
 		subjectId: pwaId,

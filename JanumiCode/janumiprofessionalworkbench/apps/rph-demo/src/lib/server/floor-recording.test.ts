@@ -137,4 +137,145 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 		).rejects.toThrow(/RPH_AUTHENTICATION_REQUIRED|acting principal/);
 		expect(listByType(session, 'ASSURANCE_ASSESSMENT')).toHaveLength(0);
 	});
+
+	// ── MXR-05: A FLOOR RUN PRODUCES DURABLE EXCHANGE RECORDS ────────────────────────────────────────────────
+	//
+	// ⭑ THIS IS THE TEST THAT MAKES THE WHOLE PACKAGE NON-HOLLOW. Contracts, a handler, durability and
+	// projection proofs all existed while NO MODEL CALL PRODUCED A RECORD — the hollow governed layer this
+	// programme keeps recording against itself. Everything above this line was true of that state too.
+	//
+	// It forces the REAL reviewer (`JPWB_ASSESSOR=agy`) rather than the deterministic mock, because the mock
+	// never captures anything: an end-to-end assertion against it would observe zero records and prove nothing.
+	// The model call itself is injected, so the gate never spawns a subprocess.
+	describe('MXR-05 — the floor run writes one MODEL_EXCHANGE per bounded try', () => {
+		const JUDGEMENT = JSON.stringify({ findings: [], recommendation: 'SATISFIED', residualUncertainty: [] });
+
+		beforeEach(() => {
+			process.env.JPWB_ASSESSOR = 'agy';
+			process.env.JPWB_JUDGE_MODEL = 'test-judge-model';
+		});
+		afterEach(() => {
+			delete process.env.JPWB_ASSESSOR;
+			delete process.env.JPWB_JUDGE_MODEL;
+		});
+
+		it('records the try, with E-1 STORED and its content durability disclosed', async () => {
+			const floor = await runPwaFloor(
+				PWA,
+				{ prompt: 'assess it', producer: PRODUCER, print: async () => JUDGEMENT, canonical: session },
+				session
+			);
+			expect(floor, 'the floor run did not complete').toBeDefined();
+
+			// THE MUTANT: unwire either `artifacts` or `exchanges` at the composition root. The floor still
+			// completes, every assertion above this describe still passes, and this one goes to zero — which is
+			// exactly how the layer stayed hollow for so long.
+			const records = listByType(session, 'MODEL_EXCHANGE');
+			expect(records.length, 'a model call produced no durable record').toBeGreaterThan(0);
+
+			const state = records[0]!.state as Record<string, unknown>;
+			expect(state.plane).toBe('ASSURANCE');
+			expect(state.invokerId).toBe('agy.reasoning-review');
+			expect(state.subjectObjectId, 'the record names what was being judged').toBe(PWA);
+
+			// E-1 is retained (REG-D-050 classified it RETAINED_BY_PARTICIPATION), and the record DISCLOSES that
+			// its bytes are process-local — the inverse orphan REG-F-342 made visible instead of silent.
+			const input = state.materializedInputRef as Record<string, unknown>;
+			expect(input.status, 'the materialized input is actually retained').toBe('STORED');
+			expect(input.contentDurability, 'and the record says so on its face').toBe('PROCESS_LOCAL');
+			expect(input.contentHash, 'with an address that can later be verified').toMatch(/^sha256:/);
+		});
+
+		it('⛔ E-2 stays PENDING with its reason — REG-Q-066 is still open', async () => {
+			await runPwaFloor(
+				PWA,
+				{ prompt: 'assess it', producer: PRODUCER, print: async () => JUDGEMENT, canonical: session },
+				session
+			);
+			const state = listByType(session, 'MODEL_EXCHANGE')[0]!.state as Record<string, unknown>;
+
+			// The FIELD ships because the event schema is permanent (PER-2); the BLOCK is at the write. A future
+			// reader must be able to see WHY it is empty, or they will redesign instead of asking.
+			for (const f of ['rawOutputBeforeCoercionRef', 'answerSpanRef', 'volunteeredReasoningRef']) {
+				const ref = state[f] as Record<string, unknown>;
+				expect(ref.status, `${f} must not be stored while REG-Q-066 is open`).toBe(
+					'PENDING_CONTENT_PLANE'
+				);
+				expect(ref.reason, `${f} must say why it is empty`).toMatch(/REG-Q-066/);
+			}
+		});
+
+		// ⭑ THE PROPERTY THE WHOLE DESIGN EXISTS FOR, AND MY FIRST VERSION COULD NOT SEE IT.
+		//
+		// `runPwaFloor` is called in production with `turn.engine` — the authoring fork's CANDIDATE handle. If
+		// the drain dispatched there, every exchange record would live or die with the turn, and a try that was
+		// MADE and cost money would vanish when a human discarded the draft. That is the property REG-D-055
+		// gave as the reason to make this record its own aggregate.
+		//
+		// ⚠ DRIVEN AND FOUND WANTING FIRST: the earlier tests passed the SAME handle as both `engine` and
+		// `canonical`, so replacing the canonical handle with the candidate one reddened NOTHING. They could
+		// not tell the two apart — a control that cannot fail. This one routes the canonical handle through a
+		// counter, so using the candidate instead bypasses it and the count goes to zero.
+		it('writes through the CANONICAL handle, not the one the floor ran on', async () => {
+			let recordedHere = 0;
+			const counting = {
+				...session,
+				dispatch: (command: DomainCommand) => {
+					if (command.commandType === 'RecordModelExchange') recordedHere += 1;
+					return session.dispatch(command);
+				}
+			} as unknown as AuthedEngineHandle;
+
+			await runPwaFloor(
+				PWA,
+				{
+					prompt: 'assess it',
+					producer: PRODUCER,
+					print: async () => JUDGEMENT,
+					canonical: counting
+				},
+				// The floor itself runs on the plain handle — standing in for the candidate fork.
+				session
+			);
+
+			expect(
+				recordedHere,
+				'the exchange record did not go through the canonical handle — a discarded turn would erase it'
+			).toBeGreaterThan(0);
+			expect(listByType(session, 'MODEL_EXCHANGE').length).toBe(recordedHere);
+		});
+
+		it('a REPAIR produces a SECOND record chained to the first by a DURABLE id', async () => {
+			// The first answer is unparseable, so the validator repairs — two bounded tries, two records.
+			let call = 0;
+			const print = async () => (++call === 1 ? 'I think the graph is fine, honestly.' : JUDGEMENT);
+
+			await runPwaFloor(PWA, { prompt: 'assess it', producer: PRODUCER, print, canonical: session }, session);
+
+			const records = listByType(session, 'MODEL_EXCHANGE');
+			expect(records.length, 'a retry is its own record — PER-9').toBeGreaterThanOrEqual(2);
+
+			const repair = records.find((r) => (r.state as Record<string, unknown>).exchangeRole === 'REPAIR');
+			expect(repair, 'the repair try was not recorded').toBeDefined();
+			const predecessor = (repair!.state as Record<string, unknown>).predecessorExchangeId as string;
+
+			// ⭑ THE CHAIN POINTS AT A REAL AGGREGATE, NOT A RUN-LOCAL LABEL. `tryCounter` restarts per validator
+			// instance and the floor runs twice per turn, so `exch-1` collided across runs (REG-D-055). The
+			// predecessor link must resolve to a minted id that actually exists.
+			expect(predecessor, 'the repair names no predecessor').toBeDefined();
+			expect(predecessor.startsWith('mex_'), 'the link must be a minted aggregate id').toBe(true);
+			expect(
+				records.some((r) => r.id === predecessor),
+				'the predecessor link points at a record that does not exist'
+			).toBe(true);
+
+			// And the parse outcome says WHY the first try failed, not merely that it did.
+			const first = records.find((r) => (r.state as Record<string, unknown>).exchangeRole === 'INITIAL');
+			const outcome = (first!.state as Record<string, unknown>).parseOutcome as Record<string, unknown>;
+			expect(outcome.outcome, 'prose is an extraction failure, not a schema failure').toBe(
+				'JSON_EXTRACTION_FAILED'
+			);
+		});
+	});
+
 });
