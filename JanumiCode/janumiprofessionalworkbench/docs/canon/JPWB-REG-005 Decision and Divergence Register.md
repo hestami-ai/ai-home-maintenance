@@ -30279,7 +30279,9 @@ time."* **Refusal was offered as a real option with its consequence spelled out.
 
 **WHAT THIS LICENSES.** One typed command (`RecordModelExchange`) and its event (`ModelExchangeRecorded`),
 dispatched onto **the plane's existing aggregate**, carrying `PER-9`'s six elements as **typed fields** with
-content **by reference**. **No new Professional Work Object type.** §10.1:1369's *"not permission to add…
+content **by reference**. ~~**No new Professional Work Object type.**~~ ⭑ **SUPERSEDED SAME DAY BY
+`REG-D-055`** — the sponsor widened this deliberately (*"proper container please"*); the bound was MY scoping,
+and both narrow options were later measured DEAD. §10.1:1369's *"not permission to add…
 Events"* is overridden **for this limb and no other**.
 
 **WHAT IT DOES NOT LICENSE, stated so this is never read wider.**
@@ -30304,10 +30306,93 @@ Events"* is overridden **for this limb and no other**.
   change does not discharge this ruling**, and no support may be claimed until every limb of that list moves.
 - **`PER-12`'s *"never projected"* must remain structural.** It holds because `governedIdsByType`
   (`packages/rph-engine/src/queries.ts:321-329`) buckets by `aggregateType`/`aggregateId`, so an event on an
-  aggregate that already exists adds no catalog entry. **Any later change that mints an object for this
-  record re-arms the hazard `REG-D-053` measured** and must be refused on that ground.
+  aggregate that already exists adds no catalog entry. ~~**Any later change that mints an object for this
+  record re-arms the hazard `REG-D-053` measured** and must be refused on that ground.~~ ⭑ **SUPERSEDED BY
+  `REG-D-055`.** This rested on the premise that minting an object puts REASONING in the catalog. It does not:
+  `PER-12`'s *"never projected"* names the BYTES, `governedRow` can read only
+  `title`/`name`/`displayName`/`selectedOption` — none of which `MODEL_EXCHANGE` declares — and every content
+  position is a reference with no bytes field. **The property this clause protected is maintained
+  structurally; the clause itself is withdrawn.**
 
 - **Merge target:** **Corpus** — Guide §16 item 23 gains the exchange-record limb's disposition.
   **Repository** — `packages/rph-contracts`, the handler registry, persistence, projections, fixtures and
   conformance tests, together. **Sequencing unchanged:** this → the §31 durable adapter **with** the record
   consumer → `REG-Q-066`. Status: CLOSED.
+
+### REG-D-055 — SPONSOR RULING: build the model-call container as a STORED OBJECT, superseding `REG-D-054`'s no-new-object bound
+
+- **Date:** 2026-09-03 · **Type:** RULING (sponsor, two instructions) · **Class:**
+  DECISION — supersedes two clauses of `REG-D-054` (same day); ratifies the staged Attempt choice at
+  `HARMONIZATION-LOG.md:4142` · **Status:** ✅ CLOSED.
+
+**THE SPONSOR'S TWO INSTRUCTIONS, VERBATIM.** (1) *"Proper container please."* (2) *"Probably should be a
+stored object in its own right if I had to guess or even express a preference."*
+
+**THE CONTEXT THEY WERE GIVEN, so the ruling is not read as uninformed.** They were told the natural home for
+trace data is the model call itself; that **no such object exists** in this engine; that building it is *"a
+bigger change and needs its own decision"*; and that the narrow alternative would deliver *"full audit data
+this week, hung off an awkward parent."* ⭑ **They chose the larger change on the stated ground that the trace
+belongs to the call — which is `PER-9`'s own framing.**
+
+> ### ⭑ AND BOTH NARROW OPTIONS WERE DEAD, WHICH THE ASK DID NOT KNOW
+> The fork put to the sponsor — hang the record on `ASSURANCE_ASSESSMENT` or on `AUTHORING_CONVERSATION` —
+> **had no good branch, measured after the ruling:**
+> - **No `ASSURANCE_ASSESSMENT` exists at `captureTry` time, and its id is not yet minted.** It is created
+>   strictly AFTER every model call of that floor run (`floor.ts:332-337`; `record-assurance.ts:127-128`
+>   mints `asmt`). An event naming it would mint a catalog entry for a non-existent assessment — the exact
+>   `PER-12` re-arm. **Pre-minting breaks the run**: `RequestAssuranceAssessment` is create-only, so the
+>   recorder hits `REVISION_CONFLICT` and throws (`record-assurance.ts:119-124`).
+> - **No `AUTHORING_CONVERSATION` exists either** on a PWA's first turn — `recordConversation` runs after the
+>   floor returns (`+server.ts:405-407`).
+> - ⚠ **And one turn's four tries span TWO assessments** (the auto-refine pass is a second full floor run,
+>   `+server.ts:127`/`:153`), so neither aggregate could hold one turn's chain.
+>
+> ⭑ **So the sponsor's preference was not merely preferred — it was the only workable answer, and the fork I
+> posed was defective.**
+
+**THE THREE RECORDED OBJECTIONS TO A STORED OBJECT, ALL REFUTED FIRST-HAND.** `HARMONIZATION-LOG.md:4142`
+recorded the staged analysis as favouring a projection. Re-read at HEAD:
+
+1. *"§16 item 21 forbids a competing Event authority."* ⛔ **Item 21 (Guide `:2518`) forbids a SECOND EVENT
+   STORE**, not a typed aggregate on the one store — its safe-default clause *requires* *"one logical causally
+   linked history across current typed objects, Events, audit, Artifacts, and Evidence."* ⚠ **And this log
+   already adjudicated it**: `HARMONIZATION-LOG.md:236-243` records §16 as *"a construction spec, not a wall"*
+   and marks `DECISION-item23-attempt-record.md` as having *"read a construction spec as a prohibition"* and
+   **superseded**. ⭑ **The `:4142` objection is the superseded reading, and I had been citing it.**
+2. *"A second store would double-record."* ⛔ **`PER-2` blesses exactly that:** *"Materialized current state is
+   a cache of this history, not a second authority."* It is also structurally unavoidable — `CommitInput`
+   declares `currentState` **non-optional**, and the adapter writes `professional_work_objects` and
+   `professional_work_object_versions` **before** the event insert. Measured: `eventPayload` appears across
+   **15** non-test handler files. **If the objection held it would forbid every existing object.**
+3. *"O(N²) under a retry storm."* ⛔ **Mis-aimed.** `DESIGN-execution-attempt-staged.md:133-136` argues against
+   **embedding attempts in the Execution Plan's state**, which re-copies prior attempts into each revision. A
+   standalone object written **once at revision 0** re-copies nothing: N tries → N version rows of O(1).
+
+**WHAT IS LICENSED.** A new Professional Work Object type `MODEL_EXCHANGE` (id prefix `mex`), **one per
+bounded try**, **born terminal** at revision 0 — no second command, no state machine, no arrows. `PER-9`:
+*"each retry, reformat, and repair request included — is its own durable exchange record."*
+
+**WHAT THIS SUPERSEDES IN `REG-D-054`, STRUCK RATHER THAN READ AROUND.**
+
+- ~~*"No new Professional Work Object type."*~~ → **superseded**; that bound was **my scoping, not the
+  sponsor's**, and they widened it deliberately.
+- ~~*"Any later change that mints an object for this record re-arms the hazard `REG-D-053` measured and must
+  be refused on that ground."*~~ → **superseded, and the property it protected is maintained independently.**
+  ⭑ **The record IS catalogued, and that is correct** — `PER-12`'s *"never projected"* names **the bytes**,
+  not the record that references them, and `PER-9` requires the record to be nameable *"so its conclusion can
+  be reproduced and challenged."* The bytes stay out **structurally**: `governedRow`
+  (`packages/rph-engine/src/queries.ts:333-354`) can read only `title`/`name`/`displayName`/`selectedOption`,
+  **none of which `MODEL_EXCHANGE` declares**, so its projected label falls back to its own minted id; every
+  content position is a reference with **no bytes field** on a `z.strictObject`; and **no `RecordArtifact` is
+  dispatched for reasoning**, which is `REG-D-053`'s property preserved by the record/content split.
+
+- **TWO THINGS THE STANDALONE OBJECT BUYS THAT NEITHER NARROW OPTION COULD.** (1) ⭑ **A failed try becomes
+  durable even when the human DISCARDS the turn** — it carries a freshly minted id, so it never enters the
+  authoring fork's `affectedIds` and is dispatched on the canonical handle rather than the candidate one.
+  **That is `PER-9`'s whole purpose, and both narrow options lost it.** (2) **An `exchangeId` COLLISION is
+  removed by construction**: `tryCounter` restarts per validator instance and a fresh validator is built per
+  floor run, so two floor runs per turn both emitted `exch-1` — **the predecessor chain was already
+  ambiguous.** The aggregate id becomes the exchange id.
+- **Merge target:** `packages/rph-contracts/vocab/*` (generated surface), `ids.ts`, the handler registry,
+  persistence, projections, fixtures and conformance tests — item 23's conjunction, together.
+  **Owed:** `ROADMAP-JAN-MXR` is amended by this ruling; `REG-Q-066` remains OPEN and untouched. Status: CLOSED.
