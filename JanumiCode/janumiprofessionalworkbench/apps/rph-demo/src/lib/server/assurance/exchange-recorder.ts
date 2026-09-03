@@ -75,13 +75,6 @@ const REGION_ROLES = new Set([
 	'OTHER'
 ]);
 
-/** Blocked for the same reason at every site: `REG-Q-066` is OPEN and reserved to the sponsor. */
-const E2_BLOCKED = {
-	status: 'PENDING_CONTENT_PLANE' as const,
-	reason:
-		'REG-Q-066 is OPEN and sponsor-reserved: the pre-coercion output may not be written before its ruling. ' +
-		'The FIELD exists because the event schema is permanent (PER-2); the block is at the write.'
-};
 
 function contentRef(ref: ContentRef) {
 	return ref.status === 'STORED'
@@ -176,11 +169,13 @@ export function toRecordModelExchange(
 		subjectSemanticVersion: ctx.subjectSemanticVersion,
 		...identityFacts(rec.resolvedModelIdentity),
 		materializedInputRef: contentRef(rec.materializedInputRef),
-		// ⛔ All three E-2 refs stay blocked while REG-Q-066 is open — see E2_BLOCKED. The handler refuses a
-		// STORED value here independently, so this is a belt AND braces rather than the only guard.
-		rawOutputBeforeCoercionRef: E2_BLOCKED,
-		answerSpanRef: E2_BLOCKED,
-		volunteeredReasoningRef: E2_BLOCKED,
+		// ⭑ E-2 NOW PASSES THROUGH AS CAPTURED. REG-D-056 permits retention; captureTry performs the §9.7 split
+		// and decides per blob whether the whole output was storable, so the mapping must not second-guess it.
+		// The handler independently refuses the one unlawful combination (a stored blob beside a stored
+		// reasoning span), so a bug here is caught rather than committed.
+		rawOutputBeforeCoercionRef: contentRef(rec.rawOutputBeforeCoercionRef),
+		answerSpanRef: contentRef(rec.answerSpanRef),
+		volunteeredReasoningRef: contentRef(rec.volunteeredReasoningRef),
 		inputRedactionManifestRef: contentRef(rec.inputRedactionManifestRef),
 		// No redaction exists anywhere in this codebase (finding #60). Saying NOT_IMPLEMENTED is the disclosed
 		// absence; NONE_APPLIED would claim a decision that was never made.

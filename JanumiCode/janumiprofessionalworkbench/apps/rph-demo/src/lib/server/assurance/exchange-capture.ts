@@ -20,9 +20,16 @@
 // "record-plane omission is not [legal]"). Redaction preserves reconstructability because the manifest records
 // what was removed; purge does not. That is why these two are not interchangeable, and why nothing here is
 // marked purgeable — only volunteered reasoning is, and `PER-8`'s NON-EXAMPLE names it by name.
-import type { ArtifactStore, ContentDurability, StoredArtifactRef } from '@janumipwb/rph-ports';
+import type {
+	ArtifactStore,
+	ContentDurability,
+	Purgeability,
+	StoredArtifactRef
+} from '@janumipwb/rph-ports';
+import { splitAnswerSpan } from './agy-cli.js';
 import {
 	beginExchange,
+	type ContentRef,
 	type ExchangeDisposition,
 	type ExchangeParseOutcome,
 	type ExchangeRecord,
@@ -80,16 +87,25 @@ export interface CaptureTryInput {
 	readonly parseOutcome: ExchangeParseOutcome;
 }
 
-function storedRef(ref: StoredArtifactRef, durability: ContentDurability) {
+/** A disclosed absence, which PER-9 permits — as distinct from the silent one it forbids. */
+function pendingRef(reason: string): ContentRef {
+	return { status: 'PENDING_CONTENT_PLANE', reason };
+}
+
+function storedRef(
+	ref: StoredArtifactRef,
+	durability: ContentDurability,
+	purgeability: Purgeability
+): ContentRef {
 	return {
 		status: 'STORED' as const,
+		purgeability,
 		storageKey: ref.storageKey,
 		// The whole address, not just the key — see ContentRef. contentHash is what later proves the retained
 		// bytes are the ones this try saw; without it the reference cannot be challenged.
 		storageProvider: ref.storageProvider,
 		contentHash: ref.contentHash,
 		byteSize: ref.byteSize,
-		purgeability: 'RETAINED_BY_PARTICIPATION' as const,
 		// Taken from the store that actually holds the bytes, never assumed. A durable record naming
 		// process-local content is lawful only if it SAYS SO — otherwise the reference survives the bytes
 		// and nothing on the record reveals it.
@@ -148,63 +164,80 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		return pending;
 	}
 
-	const put = (bytes: string) =>
-		input.store!.put({
-			tenantPrefix: input.tenantPrefix,
-			bytes,
-			mediaType: 'text/plain',
-			// REG-D-050. Never PURGEABLE_AT_EXPIRY: this is the basis of a recorded professional judgement.
-			purgeability: 'RETAINED_BY_PARTICIPATION'
-		});
+	// The class is per-span now, not per-call: REG-D-050 classified the input and the answer as participating
+	// and volunteered reasoning as purgeable, and one stored object carries exactly one class.
+	const put = (bytes: string, purgeability: Purgeability) =>
+		input.store!.put({ tenantPrefix: input.tenantPrefix, bytes, mediaType: 'text/plain', purgeability });
 
-	// ⛔ E-2 IS BLOCKED, DELIBERATELY, AND ONLY E-1 IS STORED.
+	// ⭑ E-2 IS RETAINED, AND THE SHAPE IS THE COROLLARY RATHER THAN A CHOICE.
 	//
-	// The raw pre-coercion output is a MIXED object: a reason-then-answer model returns its derivation and its
-	// answer in one blob, and a measured `agy --print` run did exactly that. Guide §9.7 (:1340): "where it
-	// arrives inline with the answer, separate it at retention so that only the answer span binds under Section
-	// 8.4. Where the spans cannot be separated losslessly, OR ACCEPTED CONTRACTS CANNOT REPRESENT THESE RECORDS
-	// LOSSLESSLY, block the capability and resolve Section 16 item 23."
+	// `REG-D-056` (sponsor, 2026-09-03): *"Yes, save raw answer."* Guide §9.7 (:1340) dictates HOW: *"where it
+	// arrives inline with the answer, separate it at retention so that only the answer span binds under
+	// Section 8.4. Where the spans cannot be separated losslessly … block the capability."*
 	//
-	// ⚠ THIS COMMENT USED TO CLAIM THAT SECOND TRIGGER FIRES UNCONDITIONALLY, BECAUSE "`Purgeability` is ONE
-	// value per `put()`, so the contract cannot express a blob that is partly PURGEABLE_AT_EXPIRY (reasoning,
-	// PER-12) and partly RETAINED_BY_PARTICIPATION (the answer, PER-8)." ⛔ THAT WAS FALSE, and it was the
-	// load-bearing sentence of a blocker filed in the register (corrected by REG-F-336). One STORED OBJECT
-	// carries one class. NOTHING limits a capture to one stored object — canon says the opposite outright
-	// (DOC-003:89, "One Representation may have several Artifacts"), and two `put()` calls under two classes
-	// has since been DRIVEN against the shipped adapter. Whole-blob was the only case that ever failed.
+	// The two halves carry OPPOSITE obligations — the answer participated in a recorded judgement and is
+	// RETAINED_BY_PARTICIPATION (PER-8); volunteered reasoning "participates in nothing" and is
+	// PURGEABLE_AT_EXPIRY (PER-12). Both were already classified by `REG-D-050`. One stored object carries one
+	// class, so a mixed blob written whole is wrong in one direction or the other — which is precisely the
+	// `rawOutput` field item 23 drafted, defended as "retained whole", and WITHDREW.
 	//
-	// BOTH TECHNICAL PREREQUISITES NOW EXIST:
-	//   • the lossless separation primitive — `splitAnswerSpan` (REG-F-339), whose `located` flag reports
-	//     exactly when §9.7's FIRST trigger fires and when it does not, instead of assuming it always does;
-	//   • an anchor for the reasoning half — REG-D-053 discharges PER-12's "producing Attempt" onto the plane's
-	//     own governed-stream record, so no governed ARTIFACT is minted and "never projected" holds
-	//     STRUCTURALLY rather than by a filter.
-	//
-	// ⛔ WHAT STILL BLOCKS E-2 IS PROCEDURAL, AND IT IS NOT MINE TO LIFT. REG-Q-066 is OPEN and reserved to the
-	// sponsor — "item 23's `rawOutput` field was drafted, defended as 'retained whole', and withdrawn. Do not
-	// write the field before the ruling." A first version of this module wrote it anyway (REG-F-330). ⭑ The
-	// remedy is now one sentence from the sponsor rather than one more design pass — and this comment must not
-	// go on implying a technical impossibility that no longer exists.
-	//
-	// E-1 is NOT affected: the judge prompt is composed by JPWB from its own scaffolding and the graph export,
-	// so it is not a reasoning trace — which is exactly the warrant REG-D-050 states for it, and exactly the
-	// property never established for E-2.
-	const inputRef = await put(input.prompt);
+	// ⚠ SO THE WHOLE BLOB IS STORED ONLY WHEN THERE IS NOTHING TO SEPARATE. When reasoning arrives inline the
+	// spans carry it and the whole-blob ref says so — that is not a block, it is the §9.7 representation.
+	const span = splitAnswerSpan(input.rawOutput);
+	const volunteered = span.located ? span.prefix + span.suffix : '';
+
+	let answerSpanRef: ContentRef;
+	let volunteeredReasoningRef: ContentRef;
+	let rawOutputRef: ContentRef;
+
+	if (!span.located) {
+		// ⛔ §9.7's OWN INSTRUCTION, and the only branch that still refuses. `located` is a MEASUREMENT
+		// (REG-F-339), so this is entered on evidence about THIS blob rather than on a class of blob assumed
+		// unsplittable — the over-broad claim REG-F-340 corrected.
+		const blocked = pendingRef(
+			'No answer span could be located, so the answer and any volunteered reasoning cannot be separated ' +
+				'losslessly. Guide §9.7: block the capability and resolve Section 16 item 23. Retaining the blob ' +
+				'whole would classify reasoning as participating (PER-8, permanent) or the answer as purgeable ' +
+				'(PER-12) — wrong in one direction or the other.'
+		);
+		answerSpanRef = blocked;
+		volunteeredReasoningRef = blocked;
+		rawOutputRef = blocked;
+	} else {
+		answerSpanRef = storedRef(
+			await put(span.answer, 'RETAINED_BY_PARTICIPATION'),
+			input.store.durability,
+			'RETAINED_BY_PARTICIPATION'
+		);
+		volunteeredReasoningRef = volunteered
+			? storedRef(
+					await put(volunteered, 'PURGEABLE_AT_EXPIRY'),
+					input.store.durability,
+					'PURGEABLE_AT_EXPIRY'
+				)
+			: pendingRef(
+					'No volunteered reasoning arrived with this answer. PER-12: availability is provider- and ' +
+						'configuration-dependent and there is no obligation to solicit or procure a trace — so this ' +
+						'is an observed absence, not an unretained presence.'
+				);
+		rawOutputRef = volunteered
+			? pendingRef(
+					'Separated at retention per Guide §9.7: the answer span and the volunteered reasoning are ' +
+						'retained as two objects under their own classes. The whole blob is not stored because one ' +
+						'stored object carries one retention class and this one is mixed.'
+				)
+			: // Nothing to separate: the whole output IS the answer, so a single class fits it exactly.
+				answerSpanRef;
+	}
+
+	const inputRef = await put(input.prompt, 'RETAINED_BY_PARTICIPATION');
 
 	const recorded: ExchangeRecord = {
 		...base,
-		materializedInputRef: storedRef(inputRef, input.store.durability),
-		rawOutputBeforeCoercionRef: {
-			status: 'PENDING_CONTENT_PLANE',
-			reason:
-				'E-2 BLOCKED-AND-DISCLOSED. The pre-coercion output may carry volunteered reasoning inline with ' +
-				'the answer, so it is stored only as two separated spans — answer RETAINED_BY_PARTICIPATION, ' +
-				'reasoning PURGEABLE_AT_EXPIRY — never whole. The TECHNICAL prerequisites now exist: ' +
-				'splitAnswerSpan separates them losslessly wherever they are separable (REG-F-339), and ' +
-				'REG-D-053 discharges the reasoning half onto the plane governed-stream record. What remains ' +
-				'is PROCEDURAL: REG-Q-066 is OPEN and sponsor-reserved and forbids writing this field before ' +
-				'its ruling.'
-		},
+		materializedInputRef: storedRef(inputRef, input.store.durability, 'RETAINED_BY_PARTICIPATION'),
+		rawOutputBeforeCoercionRef: rawOutputRef,
+		answerSpanRef,
+		volunteeredReasoningRef,
 		disposition: input.disposition,
 		parseOutcome: input.parseOutcome
 	};

@@ -93,8 +93,21 @@ export interface ExchangeRecord {
 	readonly resolvedModelIdentity: ResolvedModelIdentity;
 	/** E-1 — the exact materialized input, by reference. */
 	readonly materializedInputRef: ContentRef;
-	/** E-2 — the returned output before schema coercion or repair, by reference. */
+	/**
+	 * E-2 — the returned output before schema coercion or repair, by reference.
+	 *
+	 * ⭑ THREE REFS, BECAUSE THE BLOB IS MIXED AND ITS HALVES CARRY OPPOSITE OBLIGATIONS. The answer
+	 * participated in a recorded judgement (`PER-8`, permanent); volunteered reasoning "participates in
+	 * nothing" (`PER-12`, purgeable at expiry). One stored object carries one class, so §9.7 requires them
+	 * SEPARATED at retention. `rawOutputBeforeCoercionRef` therefore holds the whole blob ONLY when there is
+	 * nothing to separate; when reasoning arrives inline it is PENDING with that reason, which is a
+	 * representation and not a block. `REG-D-056` is the ruling; `REG-D-050` classified the halves.
+	 */
 	readonly rawOutputBeforeCoercionRef: ContentRef;
+	/** E-2's answer half — what binds under §8.4. */
+	readonly answerSpanRef: ContentRef;
+	/** E-2's reasoning half — purgeable, never Evidence, never projected (`PER-12`). */
+	readonly volunteeredReasoningRef: ContentRef;
 	/** E-6 — what was redacted from the input, by reference. */
 	readonly inputRedactionManifestRef: ContentRef;
 	/** INDEX, NEVER SUBSTITUTE (PER-9). Present or not, it does not satisfy E-1 — see `unsatisfiedElements`. */
@@ -189,6 +202,8 @@ export function beginExchange(input: BeginExchangeInput): ExchangeRecord {
 		resolvedModelIdentity: toIdentity(input.model),
 		materializedInputRef: PENDING_CONTENT,
 		rawOutputBeforeCoercionRef: PENDING_CONTENT,
+		answerSpanRef: PENDING_CONTENT,
+		volunteeredReasoningRef: PENDING_CONTENT,
 		inputRedactionManifestRef: PENDING_CONTENT,
 		...(input.promptTemplateFingerprint
 			? { promptTemplateFingerprint: input.promptTemplateFingerprint }

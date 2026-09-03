@@ -53,24 +53,24 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 		expect(rec.materializedInputRef.status).toBe('STORED');
 		expect(sink.drain()).toHaveLength(1);
 
-		// ⛔ E-2 IS BLOCKED ON PURPOSE, AND THE BLOCK IS ASSERTED RATHER THAN ASSUMED. Guide §9.7 requires the
-		// spans separated at retention; REG-Q-066 (OPEN, sponsor-reserved) forbids writing this field before
-		// its ruling. THE MUTANT: store it anyway, which is what REG-F-330 records having shipped.
-		expect(rec.rawOutputBeforeCoercionRef.status).toBe('PENDING_CONTENT_PLANE');
+		// ⭑ E-2 IS NOW RETAINED, SPLIT AT RETENTION (REG-D-056 + Guide §9.7). This fixture's rawOutput is a
+		// bare JSON object with no prose around it, so there is nothing to separate: the whole output IS the
+		// answer, and a single retention class fits it exactly.
+		expect(rec.answerSpanRef.status, 'the answer span is retained').toBe('STORED');
+		expect(rec.answerSpanRef.purgeability, 'the answer participated in a judgement — PER-8').toBe(
+			'RETAINED_BY_PARTICIPATION'
+		);
+		expect(rec.rawOutputBeforeCoercionRef.status, 'nothing to separate, so the blob is storable').toBe(
+			'STORED'
+		);
 
-		// ⚠ WAS `toMatch(/REG-Q-066|separat/i)`, AND AN ALTERNATION IS SATISFIED BY EITHER HALF — so a reason
-		// that named only the separation, or only the register, passed identically. Both limbs are now asserted
-		// separately, which is the only arrangement that can tell them apart.
-		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/REG-Q-066/);
-		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/separat/i);
-
-		// ⭑ AND THE REASON MUST NOT CLAIM A TECHNICAL IMPOSSIBILITY THAT NO LONGER EXISTS. It used to say the
-		// contract "cannot represent a partly-purgeable blob losslessly" — false, and the load-bearing sentence
-		// of a filed blocker (REG-F-336). One STORED OBJECT carries one class; a capture may produce several
-		// (DOC-003:89). With `splitAnswerSpan` (REG-F-339) and REG-D-053 the remaining block is PROCEDURAL, and
-		// a disclosure that misstates why it is blocked sends the next reader to redesign instead of to ask.
-		expect(rec.rawOutputBeforeCoercionRef.reason).not.toMatch(/cannot (represent|express)/i);
-		expect(rec.rawOutputBeforeCoercionRef.reason).toMatch(/procedural/i);
+		// THE MUTANT: store the volunteered-reasoning ref anyway. PER-12's availability is provider-dependent
+		// and there is no obligation to procure a trace, so an ABSENCE must be recorded as observed rather
+		// than as an unretained presence — the distinction this repository records as its most common defect.
+		expect(rec.volunteeredReasoningRef.status).toBe('PENDING_CONTENT_PLANE');
+		expect(rec.volunteeredReasoningRef.reason, 'an observed absence, not a block').toMatch(
+			/no volunteered reasoning arrived/i
+		);
 	});
 
 	it('the stored bytes are the EXACT prompt — retrievable, not merely referenced', async () => {

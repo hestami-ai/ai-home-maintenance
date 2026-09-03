@@ -21018,7 +21018,10 @@ non-blocking and hedge-free: which reading binds, and what supplies canon's "whe
 ### REG-Q-066 — nothing anywhere in the engine retains raw validator output, and the one carrier ever
 proposed for it was withdrawn as the chain-of-thought hazard PER-12 has since ratified
 
-**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** OPEN
+**Date:** 2026-08-23 · **Type:** QUESTION · **Status:** ✅ ADJUDICATED 2026-09-03 by sponsor ruling
+(`REG-D-056`) — **GRANTED, in the shape §9.7 dictates** (*"Yes, save raw answer."*): the answer span is
+retained, volunteered reasoning is retained purgeably and separately, and a NON-SEPARABLE blob stays
+blocked. Superseding ~~OPEN~~.
 
 - ⚠ **THE GROUND BELOW IS SUPERSEDED, AND THE VERDICT IS NOT — READ `REG-F-344` (2026-09-03) WITH THIS
   ENTRY.** The limb is still UNMET, but ~~*no shape in the RPH engine can hold it*~~ is no longer true: a
@@ -30490,3 +30493,61 @@ element is written, the other is refused.
 - **Merge target:** **Register** — `REG-Q-066`'s stated ground is superseded by this entry and its own text is
   struck accordingly. **Owed:** `REG-Q-066`'s ruling, which is now the ONLY thing between this limb and
   discharge. Status: limb UNMET, reason RESTATED.
+
+### REG-D-056 — SPONSOR RULING on `REG-Q-066`: the returned output IS retained — and the corpus dictates the SHAPE of that retention
+
+- **Date:** 2026-09-03 · **Type:** RULING (sponsor) · **Class:**
+  DECISION — adjudicates `REG-Q-066` (OPEN since 2026-08-23); unblocks `E-2` and discharges the operative
+  half of `ASR-11` limb 3 · **Status:** ✅ CLOSED.
+
+**THE QUESTION, PUT IN PLAIN LANGUAGE AT THE SPONSOR'S REQUEST AND ANSWERED IN IT.** *"May we save the
+reviewer's raw answer?"* — with the standing bound disclosed: `REG-Q-066` closes *"item 23's `rawOutput`
+field was drafted, defended as 'retained whole', and withdrawn. Do not write the field before the ruling."*
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"Yes, save raw answer."*
+
+> ### ⭑ THE READING, STATED BECAUSE "SAVE THE RAW ANSWER" HAS EXACTLY ONE LAWFUL SHAPE
+> A model reply can arrive as an answer with **volunteered reasoning inline**, and those two halves carry
+> **opposite** obligations: the answer participated in a recorded judgement and is `RETAINED_BY_PARTICIPATION`
+> (`PER-8`); the reasoning *"participates in nothing"* and is `PURGEABLE_AT_EXPIRY` (`PER-12`, and `PER-8`'s
+> NON-EXAMPLE names it). Both classifications are already sponsor-ruled at `REG-D-050`.
+>
+> Guide §9.7 (`:1340`) settles the shape, verbatim: *"where it arrives inline with the answer, **separate it
+> at retention so that only the answer span binds under Section 8.4**. Where the spans cannot be separated
+> losslessly … block the capability and resolve Section 16 item 23."*
+>
+> ⛔ **SO THIS RULING IS NOT READ AS LICENSING A WHOLE-BLOB WRITE.** Retaining a mixed blob under either class
+> is wrong in one direction or the other, and *"retained whole"* is the precise formulation item 23 drafted,
+> defended and **withdrew**. ⚠ **The sponsor authorised the RETENTION; the corpus dictates the SHAPE, and the
+> narrower reading is the only one that satisfies both.**
+
+**WHAT IS NOW PERMITTED, per blob, decided at runtime rather than by taxonomy.**
+
+| Case | `answerSpanRef` | `volunteeredReasoningRef` | `rawOutputBeforeCoercionRef` |
+|---|---|---|---|
+| Separable, reasoning present | **STORED**, `RETAINED_BY_PARTICIPATION` | **STORED**, `PURGEABLE_AT_EXPIRY` | PENDING — *separated at retention per §9.7*, not blocked |
+| Separable, no reasoning arrived | **STORED**, `RETAINED_BY_PARTICIPATION` | PENDING — *none arrived* (`PER-12`: no obligation to procure) | **STORED** — the whole output IS the answer, so one class fits |
+| **Not** separable | PENDING | PENDING | PENDING — ⛔ **§9.7's own instruction: block** |
+
+- ⭑ **`splitAnswerSpan` (`REG-F-339`) IS WHAT MAKES THIS A MEASUREMENT RATHER THAN A GUESS.** Its `located`
+  flag reports per blob whether the spans can be separated, so the third row is entered on evidence and not on
+  a class of blob assumed to be unsplittable — which is the over-broad claim `REG-F-340` corrected.
+- **AND THE HANDLER'S REFUSAL NARROWS RATHER THAN DISAPPEARS.** `model-exchange.ts` refuses any E-2 ref
+  arriving `STORED`; that guard must now permit the two spans and **keep refusing a mixed whole-blob write**.
+  ⚠ **Deleting the guard outright would discard the one protection this ruling does not lift.**
+
+**WHAT THIS DOES NOT DO.**
+
+1. **It does not make retention unconditional.** The non-separable case stays blocked, by §9.7's own words, and
+   `ASR-11` limb 3 is therefore discharged **for the separable case only**. `REG-F-344` re-dispositions the
+   limb; this ruling moves it, and a residual survives.
+2. **It does not admit reasoning anywhere `PER-12` bars it.** The reasoning span is content-plane bytes with a
+   purgeable class; **no `RecordArtifact` is dispatched for it**, it enters no projection, and it remains
+   inadmissible as Evidence or as an input to any assurance tier.
+3. **It does not touch redaction.** `PER-9`'s *"subject to recorded redaction"* is still unimplemented
+   (finding #60), so `redactionState` stays `NOT_IMPLEMENTED` and says so.
+
+- **Merge target:** `apps/rph-demo/src/lib/server/assurance/{exchange-capture,exchange-recorder}.ts` (the
+  split write) and `packages/rph-application/src/handlers/model-exchange.ts` (the narrowed guard), with the
+  conformance limb moving alongside per item 23's conjunction. **Owed:** `REG-Q-066` marked ADJUDICATED;
+  `ASR-11` limb 3 re-dispositioned a second time once the split is driven. Status: CLOSED.

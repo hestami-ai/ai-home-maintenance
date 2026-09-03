@@ -32,17 +32,18 @@ const MODEL_EXCHANGE = 'MODEL_EXCHANGE';
 const FOLLOW_ON_ROLES = new Set(['RETRY', 'REFORMAT', 'REPAIR']);
 
 /**
- * ⛔ The `E-2` refs, which stay PENDING until `REG-Q-066` is answered.
+ * ⛔ THE ONE E-2 COMBINATION THAT STAYS REFUSED.
  *
- * `REG-Q-066` is OPEN and sponsor-reserved, and closes: *"item 23's `rawOutput` field was drafted, defended as
- * 'retained whole', and withdrawn. Do not write the field before the ruling."* The FIELDS exist because
- * `PER-2` makes the schema permanent — omitting them would mean an upcaster forever, or a second event type for
- * the same act, which is `PER-9`'s *"duplicate event authority"*. So the block lives HERE, at the write.
+ * `REG-D-056` (sponsor): *"Yes, save raw answer."* So the answer span and the volunteered reasoning are now
+ * retainable — SEPARATELY, under their own classes, which is what Guide §9.7 requires: *"separate it at
+ * retention so that only the answer span binds under Section 8.4."*
  *
- * ⚠ `E-1` and `E-6` are deliberately absent from this set: `REG-D-050` classified the materialized input
- * `RETAINED_BY_PARTICIPATION` outright, and no ruling blocks a redaction manifest.
+ * ⚠ WHAT THE RULING DOES NOT LIFT IS THE MIXED WHOLE-BLOB WRITE. If a reasoning span was separated out, then
+ * the whole blob demonstrably CONTAINS reasoning, and storing it whole classifies that reasoning as
+ * participating — permanent under `PER-8`, when `PER-12` requires it purgeable. That is the `rawOutput` field
+ * item 23 drafted, defended as *"retained whole"*, and WITHDREW. The handler cannot see bytes, but it can see
+ * this: a stored whole blob ALONGSIDE a stored reasoning span is that write, and nothing else is.
  */
-const E2_REFS = ['rawOutputBeforeCoercionRef', 'answerSpanRef', 'volunteeredReasoningRef'] as const;
 
 type Ref = { status: string; reason?: string } & Record<string, unknown>;
 type Fact = { availability: string; evidence: string; value?: string; rationale?: string };
@@ -120,14 +121,17 @@ export const recordModelExchange: CommandHandler = (ctx, command, payload) => {
 		}
 	}
 
-	// ⛔ THE REG-Q-066 BLOCK, ENFORCED AT THE WRITE.
-	for (const name of E2_REFS) {
-		const r = (p as unknown as Record<string, Ref>)[name]!;
-		if (r.status !== 'PENDING_CONTENT_PLANE')
-			return bad(
-				`${name} may not be STORED: REG-Q-066 is OPEN and sponsor-reserved, and forbids writing the pre-coercion output before its ruling. The FIELD exists because the event schema is permanent (PER-2); the BLOCK is here, at the write. Emit it PENDING_CONTENT_PLANE with the reason.`
-			);
-	}
+	// ⛔ THE ONE COMBINATION REG-D-056 DOES NOT PERMIT.
+	const raw = (p as unknown as Record<string, Ref>).rawOutputBeforeCoercionRef!;
+	const reasoning = (p as unknown as Record<string, Ref>).volunteeredReasoningRef!;
+	if (raw.status === 'STORED' && reasoning.status === 'STORED')
+		return bad(
+			'rawOutputBeforeCoercionRef may not be STORED while volunteeredReasoningRef is also STORED. A ' +
+				'reasoning span was separated out, so the whole blob demonstrably contains reasoning, and storing ' +
+				'it whole would classify that reasoning as participating — permanent under PER-8, when PER-12 ' +
+				'requires it purgeable at expiry. Guide §9.7: separate it at retention. Store the spans, not the ' +
+				'blob. (REG-D-056 permits the spans; it does not lift this.)'
+		);
 
 	// ── E-3 IDENTITY FACTS. Per-fact, so "the provider reported nothing" stays distinguishable from
 	//    "nobody looked" — the distinction an optional string cannot carry.

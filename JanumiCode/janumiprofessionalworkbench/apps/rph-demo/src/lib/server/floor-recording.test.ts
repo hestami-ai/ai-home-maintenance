@@ -186,7 +186,7 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			expect(input.contentHash, 'with an address that can later be verified').toMatch(/^sha256:/);
 		});
 
-		it('⛔ E-2 stays PENDING with its reason — REG-Q-066 is still open', async () => {
+		it('⭑ E-2 is RETAINED end to end, split at retention — REG-D-056', async () => {
 			await runPwaFloor(
 				PWA,
 				{ prompt: 'assess it', producer: PRODUCER, print: async () => JUDGEMENT, canonical: session },
@@ -194,55 +194,88 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			);
 			const state = listByType(session, 'MODEL_EXCHANGE')[0]!.state as Record<string, unknown>;
 
-			// The FIELD ships because the event schema is permanent (PER-2); the BLOCK is at the write. A future
-			// reader must be able to see WHY it is empty, or they will redesign instead of asking.
-			for (const f of ['rawOutputBeforeCoercionRef', 'answerSpanRef', 'volunteeredReasoningRef']) {
-				const ref = state[f] as Record<string, unknown>;
-				expect(ref.status, `${f} must not be stored while REG-Q-066 is open`).toBe(
-					'PENDING_CONTENT_PLANE'
-				);
-				expect(ref.reason, `${f} must say why it is empty`).toMatch(/REG-Q-066/);
-			}
+			// The reviewer's answer is now kept — which is the whole point of ASR-11 limb 3, and was the one
+			// thing this chain was waiting on.
+			const answer = state.answerSpanRef as Record<string, unknown>;
+			expect(answer.status, 'the reviewer answer was not retained').toBe('STORED');
+			expect(answer.purgeability).toBe('RETAINED_BY_PARTICIPATION');
+			expect(answer.contentHash, 'with an address that can later be verified').toMatch(/^sha256:/);
+
+			// This fixture returns clean JSON, so no reasoning arrived — recorded as an OBSERVED ABSENCE
+			// (PER-12: no obligation to solicit or procure a trace), never as a silent gap.
+			const reasoning = state.volunteeredReasoningRef as Record<string, unknown>;
+			expect(reasoning.status).toBe('PENDING_CONTENT_PLANE');
+			expect(reasoning.reason).toMatch(/no volunteered reasoning arrived/i);
 		});
 
-		// ⭑ THE PROPERTY THE WHOLE DESIGN EXISTS FOR, AND MY FIRST VERSION COULD NOT SEE IT.
-		//
-		// `runPwaFloor` is called in production with `turn.engine` — the authoring fork's CANDIDATE handle. If
-		// the drain dispatched there, every exchange record would live or die with the turn, and a try that was
-		// MADE and cost money would vanish when a human discarded the draft. That is the property REG-D-055
-		// gave as the reason to make this record its own aggregate.
-		//
-		// ⚠ DRIVEN AND FOUND WANTING FIRST: the earlier tests passed the SAME handle as both `engine` and
-		// `canonical`, so replacing the canonical handle with the candidate one reddened NOTHING. They could
-		// not tell the two apart — a control that cannot fail. This one routes the canonical handle through a
-		// counter, so using the candidate instead bypasses it and the count goes to zero.
-		it('writes through the CANONICAL handle, not the one the floor ran on', async () => {
-			let recordedHere = 0;
-			const counting = {
-				...session,
-				dispatch: (command: DomainCommand) => {
-					if (command.commandType === 'RecordModelExchange') recordedHere += 1;
-					return session.dispatch(command);
-				}
-			} as unknown as AuthedEngineHandle;
+		it('⭑ a MIXED reply is SPLIT — answer retained, reasoning retained PURGEABLY, blob not stored whole', async () => {
+			// ⚠ THIS IS THE CASE THE RULING TURNS ON, AND IT WAS MISSING. Every other fixture returns clean JSON,
+			// so nothing was ever separated — and a mutant that stored the blob whole even when mixed reddened
+			// NOTHING. The one behaviour REG-D-056 was careful not to authorise had no test at all.
+			const NL = String.fromCharCode(10);
+			const MIXED = [
+				'Let me reason about this first. The graph has a single root and no orphans.',
+				JUDGEMENT,
+				'That is my assessment.'
+			].join(NL);
 
+			await runPwaFloor(
+				PWA,
+				{ prompt: 'assess it', producer: PRODUCER, print: async () => MIXED, canonical: session },
+				session
+			);
+			const state = listByType(session, 'MODEL_EXCHANGE')[0]!.state as Record<string, unknown>;
+
+			const answer = state.answerSpanRef as Record<string, unknown>;
+			const reasoning = state.volunteeredReasoningRef as Record<string, unknown>;
+			const whole = state.rawOutputBeforeCoercionRef as Record<string, unknown>;
+
+			// The two halves are retained under OPPOSITE classes — which is the entire reason they cannot share
+			// one stored object, and why §9.7 says separate at retention.
+			expect(answer.status).toBe('STORED');
+			expect(answer.purgeability, 'the answer participated — PER-8').toBe('RETAINED_BY_PARTICIPATION');
+			expect(reasoning.status, 'volunteered reasoning was dropped rather than retained').toBe('STORED');
+			expect(reasoning.purgeability, 'reasoning participates in nothing — PER-12').toBe(
+				'PURGEABLE_AT_EXPIRY'
+			);
+
+			// ⛔ AND THE BLOB IS NOT STORED WHOLE. Storing it would classify the reasoning inside it as
+			// participating — permanent under PER-8 — which is the "retained whole" formulation item 23 withdrew.
+			expect(whole.status, 'a mixed blob must not be stored whole').toBe('PENDING_CONTENT_PLANE');
+			expect(whole.reason).toMatch(/separated at retention/i);
+
+			// They are DIFFERENT objects, not one blob referenced twice: content-addressed keys differ, and the
+			// reasoning half must be independently purgeable without touching the answer.
+			expect(reasoning.storageKey).not.toBe(answer.storageKey);
+		});
+
+		it('⛔ and a NON-SEPARABLE answer is still BLOCKED — §9.7, which the ruling did not lift', async () => {
+			// Prose with no locatable JSON object: the answer and any reasoning cannot be separated losslessly,
+			// so §9.7's own instruction is to block. The sponsor authorised retention; it did not authorise
+			// retaining a blob whose halves cannot be told apart, which is wrong in one direction or the other.
+			//
+			// Both tries fail here, so the run itself throws — the record is what this asserts, not the verdict.
 			await runPwaFloor(
 				PWA,
 				{
 					prompt: 'assess it',
 					producer: PRODUCER,
-					print: async () => JUDGEMENT,
-					canonical: counting
+					print: async () => 'I had a look and it seems broadly fine to me.',
+					canonical: session
 				},
-				// The floor itself runs on the plain handle — standing in for the candidate fork.
 				session
-			);
+			).catch(() => undefined);
 
-			expect(
-				recordedHere,
-				'the exchange record did not go through the canonical handle — a discarded turn would erase it'
-			).toBeGreaterThan(0);
-			expect(listByType(session, 'MODEL_EXCHANGE').length).toBe(recordedHere);
+			const records = listByType(session, 'MODEL_EXCHANGE');
+			expect(records.length, 'the failed tries were not recorded at all').toBeGreaterThan(0);
+			const state = records[0]!.state as Record<string, unknown>;
+			for (const f of ['rawOutputBeforeCoercionRef', 'answerSpanRef', 'volunteeredReasoningRef']) {
+				const ref = state[f] as Record<string, unknown>;
+				expect(ref.status, `${f} must stay blocked when the spans cannot be separated`).toBe(
+					'PENDING_CONTENT_PLANE'
+				);
+				expect(ref.reason, `${f} must cite the rule that blocks it`).toMatch(/separated losslessly|§9.7/i);
+			}
 		});
 
 		it('a REPAIR produces a SECOND record chained to the first by a DURABLE id', async () => {

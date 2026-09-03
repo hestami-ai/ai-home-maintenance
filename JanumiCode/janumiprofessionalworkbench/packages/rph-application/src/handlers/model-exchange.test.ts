@@ -125,14 +125,34 @@ describe('RecordModelExchange — one bounded model try becomes a durable record
 		for (const k of Object.keys(wellFormed())) expect(payload, `event payload must carry ${k}`).toHaveProperty(k);
 	});
 
-	it('⛔ REFUSES a STORED E-2 ref — REG-Q-066 is OPEN and the block lives at the WRITE', () => {
-		// The FIELD exists because the event schema is permanent (PER-2): omitting it would mean an upcaster
-		// forever, or a second event type for the same act, which is PER-9's "duplicate event authority".
-		// THE MUTANT: drop this guard and the register's one standing instruction — "do not write the field
-		// before the ruling" — is violated by the shape's own existence, which is REG-F-330 exactly.
-		const r = record(wellFormed({ rawOutputBeforeCoercionRef: STORED }));
-		expect(r.status, 'a stored pre-coercion output must not be accepted').not.toBe('ACCEPTED');
+	it('⛔ REFUSES a whole blob stored ALONGSIDE a separated reasoning span', () => {
+		// REG-D-056 (sponsor): "Yes, save raw answer." The spans are now retainable. What the ruling does NOT
+		// lift is the mixed whole-blob write: if a reasoning span was separated out, the blob demonstrably
+		// CONTAINS reasoning, and storing it whole classifies that reasoning as participating — permanent under
+		// PER-8, when PER-12 requires it purgeable. That is the `rawOutput` field item 23 drafted, defended as
+		// "retained whole", and withdrew.
+		//
+		// THE MUTANT: delete this guard along with the old blanket one. The ruling would then be read as
+		// permitting the very formulation it was careful not to permit.
+		const r = record(
+			wellFormed({ rawOutputBeforeCoercionRef: STORED, volunteeredReasoningRef: STORED })
+		);
+		expect(r.status, 'a mixed whole-blob write must not be accepted').not.toBe('ACCEPTED');
 		expect(emitted(), 'and no event may be written for a refused command').toHaveLength(0);
+	});
+
+	it('CONTROL — the two SPANS may both be STORED, so the refusal is about mixing, not storing', () => {
+		// Without this the guard could not be told apart from "refuse every stored E-2 ref", which would
+		// silently keep REG-Q-066's block in force after the sponsor lifted it.
+		const r = record(wellFormed({ answerSpanRef: STORED, volunteeredReasoningRef: STORED }));
+		expect(r.status, 'the separated spans are exactly what REG-D-056 permits').toBe('ACCEPTED');
+	});
+
+	it('CONTROL — a whole blob with NO reasoning separated out is accepted', () => {
+		// When nothing was separated, the whole output IS the answer and one class fits it exactly. Refusing
+		// here would block the case §9.7 explicitly contemplates.
+		const r = record(wellFormed({ rawOutputBeforeCoercionRef: STORED, answerSpanRef: STORED }));
+		expect(r.status).toBe('ACCEPTED');
 	});
 
 	it('CONTROL — E-1 MAY be STORED, so the refusal above is about E-2 and not about storing', () => {
