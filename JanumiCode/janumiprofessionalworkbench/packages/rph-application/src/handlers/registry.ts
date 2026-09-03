@@ -56,6 +56,7 @@ import {
 } from './runtime-binding.js';
 import { recordArtifact } from './artifact.js';
 import { deferScope } from './deferral.js';
+import { recordModelExchange } from './model-exchange.js';
 import {
 	defineActor,
 	defineCapability,
@@ -194,6 +195,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// command-dispatch census refuses a ratified command nothing dispatches, which is how a declared-but-
 	// unproduced deferral plane would have been caught — and was.
 	DeferScope: deferScope,
+	RecordModelExchange: recordModelExchange,
 	// JAN-SLICE-SWP-05 — the W7 product-behavior plane (REG-D-046 Ruling 2; FSM §30.2's deferral condition
 	// met for four of its seven, plus SCENARIO on its own warrant — REG-F-302). Registered here for the same
 	// reason DeferScope is: 24 of 24 object types were reachable by a command before this, so five shape-only

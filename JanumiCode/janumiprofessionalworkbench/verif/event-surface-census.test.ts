@@ -86,6 +86,18 @@ const EMITTED_2026_08_04 = new Set([
 	'UserJourneyDefined',
 	'ScenarioDefined',
 	'RequirementDefined',
+	// + 2026-09-03, JAN-MXR (REG-D-055): `ModelExchangeRecorded` acquires its first and only emitter,
+	// `RecordModelExchange`. Recorded BY HAND for the reason this set exists — no single vitest worker sees
+	// the whole suite's emissions — but the emission is DRIVEN rather than asserted:
+	// `packages/rph-application/src/handlers/model-exchange.test.ts` dispatches the command and reads the
+	// event back off the store, and each of its refusals has a single-victim mutant, so the handler guards
+	// are proven load-bearing rather than riding on schema rejection.
+	//
+	// ⚠ THIS LIMB IS WHY THE BINDING AND THE EMITTER MUST LAND IN ONE COMMIT. The two directions of this
+	// census fire OPPOSITELY: with the m3 binding added and no emitter, the event is bound-but-unemitted;
+	// adding it here without a real emitter would make the pin a fiction instead. `JAN-MXR-01` shipped the
+	// binding and DISCLOSED this red rather than pre-adding the name.
+	'ModelExchangeRecorded',
 	// + 2026-08-13, REG-F-131: `IntentSuperseded` acquires its FIRST emitter, `SupersedeIntent`. It had been a
 	// RATIFIED event (it is in the Canonical Domain Model's own event list) that was neither bound nor emitted —
 	// the corpus named the event and the six arrows into SUPERSEDED, and no command reached them, so an Intent
