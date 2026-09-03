@@ -29535,7 +29535,14 @@ disclosed loss beats an unlawful retention**, which is the same posture as `REG-
   it. Third instance today of a test passing for a reason unrelated to its subject.
 
 - **Merge target:** `agy-cli.ts`. **Owed:** a lawful home for the diagnostic (`E-5` wiring), and
-  `verif/agy-stderr-unbound.test.ts` now needs a companion that probes the SHAPE, not the name.
+  ~~`verif/agy-stderr-unbound.test.ts` now needs a companion that probes the SHAPE, not the name.~~
+  ⭑ **THE COMPANION LANDED 2026-09-03** — `agy-failure-sanitisation.test.ts`, *"the sentinel appears
+  NOWHERE in the outcome, and the run really did fail"*. It plants a sentinel in the judge prompt, fails
+  the child process, and runs the REAL `agyPrint` + validator + `runDeMinimisFloor`, then asserts the
+  sentinel appears nowhere in the serialized assurance outcome — **the property at its destination, by
+  any route, rather than a token the next leak would not use.** It carries two positive controls against
+  vacuity: the sentinel is asserted to have REACHED argv, and the failure path is asserted to have been
+  TAKEN. **Driven:** restoring the raw rethrow reddens it. ⚠ **`E-5` wiring remains owed.**
 
 ### REG-F-334 — the reading that would have dissolved `REG-Q-066` answers a blocker the question never named — and the carrier it cites is one I authored hours earlier, and never wired
 
