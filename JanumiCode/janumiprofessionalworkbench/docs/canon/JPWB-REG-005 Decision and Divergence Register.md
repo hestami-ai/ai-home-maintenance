@@ -30215,7 +30215,8 @@ with a record that does not outlive the process.
 
 ### REG-Q-075 — RATIFICATION SOUGHT: resolve §16 item 23 for the exchange-record limb only, licensing one typed event
 
-**Date:** 2026-09-03 · **Type:** QUESTION (ratification ask) · **Status:** OPEN — sponsor-reserved.
+**Date:** 2026-09-03 · **Type:** QUESTION (ratification ask) · **Status:** ✅ ADJUDICATED 2026-09-03 by
+sponsor ruling (`REG-D-054`) — **GRANTED** (*"Yes, you may. Proceed."*). Superseding ~~OPEN — sponsor-reserved~~.
 
 **WHY IT IS ITEM 23'S.** Item 23 (Guide `:2520`) names *"producing-Attempt/context and protected-transition
 binding"* among what current contracts do not freeze — **which is the exchange record's exact blocker**, and
@@ -30257,3 +30258,56 @@ actually invoked"*.
 - **Merge target:** **Corpus** — Guide §16 item 23, plus the new command/event in
   `packages/rph-contracts`. **Sequencing:** item 23 → §31 adapter **with** the record consumer → `REG-Q-066`.
   Status: OPEN.
+
+### REG-D-054 — SPONSOR RATIFICATION: §16 item 23 is resolved for the exchange-record limb, licensing ONE typed command/event pair
+
+- **Date:** 2026-09-03 · **Type:** RULING (sponsor ratification) · **Class:**
+  DECISION — adjudicates `REG-Q-075`; unblocks the durable exchange record · **Status:** ✅ CLOSED.
+
+**WHAT WAS PUT TO THE SPONSOR** (`REG-Q-075`, verbatim): *"Resolve §16 item 23 **for the exchange-record limb
+only** — licensing one typed command/event pair recording a bounded model try onto **the plane's existing
+aggregate**, with content **by reference** and **no new Professional Work Object** — and accept that this
+overrides §10.1's 'not permission to add… Events' for that limb, under `PER-2`'s permanence."*
+
+⚠ **It was put in plain language first, at the sponsor's request, and the plain-language framing is what was
+answered.** The material terms as stated there: *"may I add one new record type, just for this?"*, with both
+costs disclosed — that the addition needs explicit permission because *"these requirements are not permission
+to add new record types"*, and that **new record types are permanent**, so *"it has to be right the first
+time."* **Refusal was offered as a real option with its consequence spelled out.**
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"Yes, you may. Proceed."*
+
+**WHAT THIS LICENSES.** One typed command (`RecordModelExchange`) and its event (`ModelExchangeRecorded`),
+dispatched onto **the plane's existing aggregate**, carrying `PER-9`'s six elements as **typed fields** with
+content **by reference**. **No new Professional Work Object type.** §10.1:1369's *"not permission to add…
+Events"* is overridden **for this limb and no other**.
+
+**WHAT IT DOES NOT LICENSE, stated so this is never read wider.**
+
+1. **No other limb of item 23.** The generalized `AssurancePlan`, coverage topology, material-boundary
+   classification, locked inherited policy assignment and conjunctive independence remain unresolved, and this
+   ruling takes **no position** on them.
+2. **No new object type**, no new store, no new table. `PER-9`'s bar on a *"universal stream-record type"*,
+   *"duplicate event authority"* and hiding relationships in *"one generic JSON document"* is untouched and
+   still binds this shape.
+3. ⛔ **It does not rule `REG-Q-066`**, which stays OPEN and sponsor-reserved. This ruling makes a future
+   ruling there *useful*; it does not pre-empt it, and `E-2` stays blocked until it is answered.
+
+**THE OBLIGATIONS THAT COME WITH IT, AND THEY ARE THE EXPENSIVE HALF.**
+
+- ⚠ **`PER-2`: *"Persisted event schemas are permanent — evolution uses upcasters at read time, never event
+  rewriting."*** The shape ships once. **A field omitted now is an upcaster forever**, which is why `E-3`
+  carries its own resolved-identity shape rather than reusing `ActorReferenceSchema` (seven fields, **no
+  `version`**, while `PER-9` requires *"provider, model, and version actually invoked"*).
+- ⚠ **Item 23's instruction is a CONJUNCTION, not a menu:** *"Evolve policy registry, schemas, persistence,
+  projections, fixtures, and conformance tests **together** before claiming support."* ⭑ **A contracts-only
+  change does not discharge this ruling**, and no support may be claimed until every limb of that list moves.
+- **`PER-12`'s *"never projected"* must remain structural.** It holds because `governedIdsByType`
+  (`packages/rph-engine/src/queries.ts:321-329`) buckets by `aggregateType`/`aggregateId`, so an event on an
+  aggregate that already exists adds no catalog entry. **Any later change that mints an object for this
+  record re-arms the hazard `REG-D-053` measured** and must be refused on that ground.
+
+- **Merge target:** **Corpus** — Guide §16 item 23 gains the exchange-record limb's disposition.
+  **Repository** — `packages/rph-contracts`, the handler registry, persistence, projections, fixtures and
+  conformance tests, together. **Sequencing unchanged:** this → the §31 durable adapter **with** the record
+  consumer → `REG-Q-066`. Status: CLOSED.
