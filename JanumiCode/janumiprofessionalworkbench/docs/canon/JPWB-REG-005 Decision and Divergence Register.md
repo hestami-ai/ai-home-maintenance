@@ -29898,3 +29898,57 @@ path flaky, reconsider on that evidence.
   that cause?**
 - **Merge target:** `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`. **Owed:** nothing
   for this defect. The same audit shape is owed against the other bare `catch` sites in the assurance path.
+
+### REG-F-339 — `extractJson` computed the retention boundary on every call and threw it away, and had no tests at all
+
+- **Date:** 2026-09-03 · **Type:** FINDING (a discarded computation + an untested primitive) · **Class:**
+  FINDING — supplies the prerequisite `REG-D-053`'s split requires · **Status:** ✅ CLOSED by
+  `splitAnswerSpan`.
+
+**THE FINDING.** Guide §9.7 (`:1340`) mandates *"where it arrives inline with the answer, separate it at
+retention so that only the answer span binds under Section 8.4."* `extractJson`
+(`apps/rph-demo/src/lib/server/assurance/agy-cli.ts`) **already derives exactly that boundary** — it locates
+the fence and both brace offsets — and then **returns only the answer, discarding the complement.** ⭑ **The
+single operation the corpus mandates was being computed and dropped on every call.** This is finding **#25**
+restated at its mechanism.
+
+- ⚠ **AND IT HAD ZERO TESTS.** `agy-cli.test.ts` covered `judgeModel` and the prompt budget only; `extractJson`
+  — the function every judge reply passes through, whose THROW drives the entire repair path — was
+  **unasserted**. Ten cases now cover it.
+
+**THE FIX, AND WHAT WAS DELIBERATELY NOT DONE.** `splitAnswerSpan(raw)` returns `{ prefix, answer, suffix,
+located }` with the invariant `prefix + answer + suffix === raw` whenever `located`.
+
+- ⭑ **OFFSETS ARE ABSOLUTE AGAINST `raw`, AND THAT IS THE WHOLE DIFFICULTY.** The legacy path calls `.trim()`
+  twice, and **a trimmed offset cannot address the original bytes** — a split built on it silently drops the
+  whitespace between spans and is lossy in precisely the way `PER-9` forbids (*"record-plane omission is not
+  legal"*). The fence body's position is read from the regex's `d`-flag match **indices** rather than by
+  searching for the captured text, which would pick the wrong occurrence.
+- ⚠ **`extractJson` IS LEFT BYTE-IDENTICAL, ON PURPOSE.** Its throw drives the repair path and every caller
+  feeds it straight to `JSON.parse`. `splitAnswerSpan` is added BESIDE it, and the equivalence — `located` ⇒
+  `splitAnswerSpan(raw).answer === extractJson(raw)` — is **pinned by test** so the two cannot drift.
+- **`located: false` IS NOT A SPAN.** When no `{…}` is found the reconstruction identity does not hold and
+  the result is marked unusable for retention. ⭑ **The mutant that matters here returns `located: true` with
+  the whole blob as the answer** — a caller would then retain a mixed blob under the ANSWER's retention
+  class, which is `REG-F-337`'s mistake one layer up.
+
+- **THREE MUTANTS, ALL PRECISE ON A CLEAN BASELINE.** `P1` (drop the suffix) reddens the three reconstruction
+  cases that carry content around the span **and correctly NOT the bare-object case, which has no suffix to
+  lose** — the discrimination is real, not incidental. `P2` (claim a span was located) reddens exactly the two
+  unlocated cases. `P3` (change `extractJson` only on unlocated shapes) reddens **only** the CONTROL — the
+  control has its own single-victim mutant rather than riding on the subject's.
+
+- **⚠ A TOOLING TRAP, RECORDED BECAUSE IT PRODUCED A FILE THAT LOOKED RIGHT.** The test block was first
+  written through a quoted heredoc into a Python script. **The `\n` sequences were collapsed to real newlines
+  before Python saw them**, so every fixture string became an unterminated literal and the whole file failed
+  to parse — `Tests: no tests`, which reads like a config problem rather than mangled content. **A quoted
+  heredoc did not make the content literal.** Redone with a Python **raw** string (`r'''…'''`), and the
+  fixtures verified by reading the written bytes back before running.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **when a function computes more than it returns, the discarded
+  half is the one the next requirement will ask for.** `extractJson` knew the boundary; the corpus mandates
+  separating on that boundary; and the gap between them survived because the function's SIGNATURE hid what it
+  had already worked out. **The audit trigger is: what does this function know at its last line that its
+  return type cannot express?**
+- **Merge target:** `apps/rph-demo/src/lib/server/assurance/agy-cli.ts`. **Owed:** a caller — no production
+  code splits yet; that is `ICP-02`'s wiring, and it now has its primitive.

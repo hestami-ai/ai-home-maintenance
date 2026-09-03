@@ -116,7 +116,56 @@ export async function agyPrint(
 	}
 }
 
-/** Strip markdown fences and extract the outermost JSON object from a model reply. */
+/**
+ * The answer span and everything around it, VERBATIM.
+ *
+ * ⭑ WHY THE COMPLEMENT IS RETURNED RATHER THAN DISCARDED. Guide §9.7 (`:1340`): *"where it arrives inline with
+ * the answer, separate it at retention so that only the answer span binds under Section 8.4."* `extractJson`
+ * already DERIVES that boundary — it locates the fence and both brace offsets — and then throws the complement
+ * away, so the one operation the corpus mandates was computed and dropped on every call. `REG-D-053` makes the
+ * split the forward path; this is its prerequisite.
+ *
+ * ⚠ OFFSETS ARE ABSOLUTE AGAINST `raw`, WHICH IS THE WHOLE DIFFICULTY. The legacy path trims twice, and a
+ * trimmed offset cannot address the original bytes — so a split built on it would silently drop the whitespace
+ * between the spans and be lossy in exactly the way `PER-9` forbids. When `located`, this holds exactly:
+ *
+ *     prefix + answer + suffix === raw
+ */
+export interface AnswerSpan {
+	readonly prefix: string;
+	readonly answer: string;
+	readonly suffix: string;
+	/** ⚠ When FALSE no `{…}` span was found: `answer` is the legacy best-effort string, `prefix`/`suffix` are
+	 *  empty, and the reconstruction identity does NOT hold. Never retain a split from an unlocated result. */
+	readonly located: boolean;
+}
+
+export function splitAnswerSpan(raw: string): AnswerSpan {
+	// The `d` flag yields match INDICES, so the fence body's position in `raw` is read off the match rather
+	// than recomputed by searching for the captured text — which would pick the wrong occurrence whenever the
+	// body also appears in the opening delimiter's vicinity.
+	const fence = /```(?:json)?([\s\S]*?)```/di.exec(raw);
+	const at = fence?.indices?.[1];
+	const from = at ? at[0] : 0;
+	const to = at ? at[1] : raw.length;
+	const windowed = raw.slice(from, to);
+	const first = windowed.indexOf('{');
+	const last = windowed.lastIndexOf('}');
+	if (first < 0 || last <= first)
+		return { prefix: '', answer: extractJson(raw), suffix: '', located: false };
+	const start = from + first;
+	const end = from + last + 1;
+	return { prefix: raw.slice(0, start), answer: raw.slice(start, end), suffix: raw.slice(end), located: true };
+}
+
+/**
+ * Strip markdown fences and extract the outermost JSON object from a model reply.
+ *
+ * ⚠ BEHAVIOUR DELIBERATELY UNCHANGED. Every caller feeds this straight to `JSON.parse`, and its THROW is what
+ * drives the repair path — so this is left byte-identical and `splitAnswerSpan` is added beside it rather than
+ * replacing it. The equivalence (`located` ⇒ `splitAnswerSpan(raw).answer === extractJson(raw)`) is pinned by
+ * test, so the two cannot drift apart silently.
+ */
 export function extractJson(raw: string): string {
 	let s = raw.trim();
 	const fence = /```(?:json)?([\s\S]*?)```/i.exec(s);
