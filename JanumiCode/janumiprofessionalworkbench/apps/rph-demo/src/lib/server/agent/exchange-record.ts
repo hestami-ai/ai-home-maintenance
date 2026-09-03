@@ -90,6 +90,32 @@ export interface ExchangeRecord {
 	readonly truncationState: TruncationState;
 	readonly omittedRegions: readonly OmittedRegion[];
 	readonly disposition?: ExchangeDisposition;
+	/** 1-based position of this try within its run. The aggregate id orders nothing across aggregates. */
+	readonly attemptOrdinal: number;
+	/**
+	 * PER-11 occurrence time, bracketing the model call itself.
+	 *
+	 * ⭑ THESE CANNOT BE RECONSTRUCTED AT THE DRAIN, WHICH IS WHY THEY ARE CAPTURED HERE. The event's own
+	 * `occurredAt`/`recordedAt` are stamped when the record is WRITTEN — up to two round-trips after the act —
+	 * so without these, latency is unrecoverable and a timeout is permanently indistinguishable from a slow
+	 * but successful answer.
+	 */
+	readonly requestedAt: string;
+	readonly respondedAt: string;
+	/** E-5. PER-9 names "the parse/validation/repair outcome"; a bare disposition loses WHY it went that way. */
+	readonly parseOutcome: ExchangeParseOutcome;
+}
+
+/** E-5's detail — what became of the bytes between the model and the judgement. */
+export interface ExchangeParseOutcome {
+	readonly outcome:
+		| 'PARSED'
+		| 'EMPTY_RESPONSE'
+		| 'JSON_EXTRACTION_FAILED'
+		| 'JSON_PARSE_FAILED'
+		| 'SCHEMA_COERCION_FAILED'
+		| 'NOT_ATTEMPTED';
+	readonly detail: string;
 }
 
 /** Either a resolved model, or a stated reason there is none. */
@@ -107,6 +133,11 @@ export interface BeginExchangeInput {
 	readonly predecessor?: ExchangeRecord;
 	readonly model: ModelInput;
 	readonly promptTemplateFingerprint?: string;
+	/** 1-based position within the run. */
+	readonly attemptOrdinal: number;
+	/** PER-11 occurrence times, bracketing the model call. Only the caller can know these. */
+	readonly requestedAt: string;
+	readonly respondedAt: string;
 }
 
 const PENDING_CONTENT: ContentRef = {
@@ -152,7 +183,13 @@ export function beginExchange(input: BeginExchangeInput): ExchangeRecord {
 			: {}),
 		// NEVER 'none-declared' by default: that would assert a fact nobody established (finding #61).
 		truncationState: 'unknown',
-		omittedRegions: []
+		omittedRegions: [],
+		attemptOrdinal: input.attemptOrdinal,
+		requestedAt: input.requestedAt,
+		respondedAt: input.respondedAt,
+		// NOT_ATTEMPTED until the caller says otherwise — the same reasoning as `truncationState: 'unknown'`.
+		// A default of PARSED would assert an outcome nobody observed.
+		parseOutcome: { outcome: 'NOT_ATTEMPTED', detail: 'The try has not been dispositioned yet.' }
 	};
 }
 

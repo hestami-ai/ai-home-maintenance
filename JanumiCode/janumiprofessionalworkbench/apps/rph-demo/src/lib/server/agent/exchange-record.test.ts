@@ -14,8 +14,18 @@ import {
 const MODEL = { modelId: 'gemini-2.5-pro', providerId: 'google' };
 
 function initial(): ExchangeRecord {
-	return beginExchange({ exchangeId: 'exch-1', role: 'initial', model: MODEL });
+	return beginExchange({ exchangeId: 'exch-1', role: 'initial', model: MODEL, ...TRY_FACTS });
 }
+
+// The per-try facts PER-9 requires and only the caller can know: where this try sits in its run, and the
+// occurrence times bracketing the model call. They are REQUIRED rather than optional because an absent
+// ordinal or an absent time is not "unknown" — it is a record that cannot be ordered or reconciled, which is
+// the record-plane omission PER-9 forbids. Fixed values here so the gate is not wall-clock dependent.
+const TRY_FACTS = {
+	attemptOrdinal: 1,
+	requestedAt: '2026-09-03T10:00:00Z',
+	respondedAt: '2026-09-03T10:00:01Z'
+};
 
 describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 	it('a repair produces a SECOND record that names its predecessor', () => {
@@ -24,7 +34,7 @@ describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 			exchangeId: 'exch-2',
 			role: 'repair',
 			predecessor: first,
-			model: MODEL
+			model: MODEL, ...TRY_FACTS
 		});
 
 		// THE MUTANT: emit one record per turn. PER-9 counts TRIES — "each retry, reformat, and repair request
@@ -42,7 +52,7 @@ describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 			exchangeId: 'exch-2',
 			role: 'repair',
 			predecessor: first,
-			model: MODEL
+			model: MODEL, ...TRY_FACTS
 		});
 
 		// THE MUTANT: reassign the predecessor's output the way `raw = await print(...)` does at
@@ -55,7 +65,7 @@ describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 		const rec = beginExchange({
 			exchangeId: 'exch-1',
 			role: 'initial',
-			model: MODEL,
+			model: MODEL, ...TRY_FACTS,
 			promptTemplateFingerprint: 'sha256:deadbeef'
 		});
 
@@ -68,10 +78,10 @@ describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 
 	it('a non-initial role REQUIRES a predecessor, and initial forbids one', () => {
 		expect(() =>
-			beginExchange({ exchangeId: 'x', role: 'retry', model: MODEL })
+			beginExchange({ exchangeId: 'x', role: 'retry', model: MODEL, ...TRY_FACTS })
 		).toThrow(/predecessor/i);
 		expect(() =>
-			beginExchange({ exchangeId: 'x', role: 'initial', predecessor: initial(), model: MODEL })
+			beginExchange({ exchangeId: 'x', role: 'initial', predecessor: initial(), model: MODEL, ...TRY_FACTS })
 		).toThrow(/initial/i);
 	});
 
@@ -79,7 +89,8 @@ describe('ICP-02 · exchange record — PER-9-a: the TRY is the unit', () => {
 		const rec = beginExchange({
 			exchangeId: 'exch-1',
 			role: 'initial',
-			model: { unavailable: 'unreported', rationale: 'provider returned no model header' }
+			model: { unavailable: 'unreported', rationale: 'provider returned no model header' },
+			...TRY_FACTS
 		});
 
 		// THE MUTANT: drop the union's second arm and let identity be optional. PER-12: availability is

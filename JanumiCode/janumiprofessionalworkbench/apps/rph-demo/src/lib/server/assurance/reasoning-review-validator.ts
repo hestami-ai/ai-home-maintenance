@@ -17,10 +17,11 @@ import {
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
 import { renderRationale } from '../agent/rationale.js';
-import { agyPrint, extractJson, judgeModel, MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
+import { agyPrint, extractJson, judgeModel, MAX_AGY_PROMPT_CHARS, splitAnswerSpan } from './agy-cli.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
+import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 
 const DISPOSITIONS = new Set<Disposition>([
 	'SATISFIED',
@@ -157,6 +158,33 @@ function coerceJudgement(parsed: unknown, input: ReasoningReviewInput): Reasonin
  *  trivially", so the fake captures the materialized prompt and the test asserts over it. */
 export type AgyPrint = (prompt: string) => Promise<string>;
 
+/** The accepted outcome, named once so the two success paths cannot drift apart. */
+const PARSED: ExchangeParseOutcome = {
+	outcome: 'PARSED',
+	detail: 'Extracted, parsed and coerced against the judgement schema.'
+};
+
+/**
+ * Classify WHY a try failed to yield a judgement.
+ *
+ * ⭑ THE THREE FAULTS HAVE THREE DIFFERENT REMEDIES, which is why PER-9 asks for the outcome and not merely the
+ * fact of failure: an empty response is an infrastructure or budget problem, prose is a prompt problem, and
+ * well-formed JSON of the wrong shape is a contract problem. Collapsing them loses the only thing the record
+ * was kept for.
+ *
+ * `splitAnswerSpan` (REG-F-339) is what distinguishes the second from the third: it reports whether an answer
+ * span could be LOCATED at all, which `JSON.parse` throwing cannot.
+ */
+function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
+	const detail = error instanceof Error ? error.message : String(error);
+	if (raw.trim() === '')
+		return { outcome: 'EMPTY_RESPONSE', detail: 'The model returned no bytes at all.' };
+	if (!splitAnswerSpan(raw).located)
+		return { outcome: 'JSON_EXTRACTION_FAILED', detail: `No JSON object span could be located. ${detail}` };
+	if (error instanceof SyntaxError) return { outcome: 'JSON_PARSE_FAILED', detail };
+	return { outcome: 'SCHEMA_COERCION_FAILED', detail };
+}
+
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	modelId?: string;
@@ -167,10 +195,13 @@ export interface AgyValidatorOptions {
 	/** Where the retained bytes go. Absent -> the refs stay PENDING_CONTENT_PLANE, a DISCLOSED absence. */
 	artifacts?: ArtifactStore;
 	tenantPrefix?: string;
+	/** PER-11 occurrence clock, injectable so the gate is not wall-clock dependent. */
+	clock?: () => string;
 }
 
 export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}): Validator {
 	const print = opts.print ?? agyPrint;
+	const clock = opts.clock ?? (() => new Date().toISOString());
 	// Per-instance, so ids restart with each floor run and are stable within it.
 	let tryCounter = 0;
 	return {
@@ -192,11 +223,16 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
 			// answer on the repair path, which is finding #25. CSAA-007 states the rule this now enforces
 			// structurally rather than by discipline: "Repair never rewrites predecessor raw output."
+			// ⭑ THE TIMES BRACKET THE MODEL CALL AND CANNOT BE RECOVERED LATER. The event's own stamps are taken
+			// at the DRAIN, up to two round-trips after the act, so without these latency is unrecoverable and a
+			// timeout is permanently indistinguishable from a slow but successful answer (PER-11).
 			const capture = (
 				role: 'initial' | 'repair',
 				text: string,
 				rawOutput: string,
 				disposition: 'accepted' | 'rejected' | 'repair-requested',
+				times: { requestedAt: string; respondedAt: string },
+				parseOutcome: ExchangeParseOutcome,
 				predecessor?: ExchangeRecord
 			) => {
 				tryCounter += 1;
@@ -210,11 +246,23 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					model: { modelId: evaluator.modelId ?? '', providerId: evaluator.providerId ?? '' },
 					prompt: text,
 					rawOutput,
-					disposition
+					disposition,
+					attemptOrdinal: tryCounter,
+					requestedAt: times.requestedAt,
+					respondedAt: times.respondedAt,
+					parseOutcome
 				});
 			};
 
-			const firstRaw = await print(prompt);
+			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent. */
+			const timed = async (p: string) => {
+				const requestedAt = clock();
+				const text = await print(p);
+				return { text, times: { requestedAt, respondedAt: clock() } };
+			};
+
+			const firstTry = await timed(prompt);
+			const firstRaw = firstTry.text;
 			let judgement: ReasoningReviewJudgement;
 			// ⚠ THE TRY COVERS THE PARSE AND NOTHING ELSE, AND THAT IS THE POINT.
 			//
@@ -232,29 +280,50 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// real store ever makes this path flaky. It is not chosen now because no store is wired in production,
 			// so loud costs nothing today and silence would cost a record.
 			let firstParsed: ReasoningReviewJudgement | undefined;
+			let firstError: unknown;
 			try {
 				firstParsed = coerceJudgement(JSON.parse(extractJson(firstRaw)), input);
-			} catch {
+			} catch (e) {
 				firstParsed = undefined;
+				firstError = e;
 			}
 			if (firstParsed) {
 				judgement = firstParsed;
-				await capture('initial', prompt, firstRaw, 'accepted');
+				await capture('initial', prompt, firstRaw, 'accepted', firstTry.times, PARSED);
 			} else {
 				// E-5 recorded for the FAILING try before the repair is attempted — finding #62 is precisely that
 				// this outcome was swallowed by a bare catch and recorded nowhere.
-				const first = await capture('initial', prompt, firstRaw, 'repair-requested');
+				// ⭑ THE OUTCOME IS CLASSIFIED RATHER THAN COLLAPSED. PER-9 names "the parse/validation/repair
+				// outcome"; a bare `repair-requested` cannot say whether the model returned nothing, returned
+				// prose, or returned well-formed JSON of the wrong shape — three faults with three remedies.
+				const first = await capture(
+					'initial',
+					prompt,
+					firstRaw,
+					'repair-requested',
+					firstTry.times,
+					classifyParse(firstRaw, firstError)
+				);
 				const repairPrompt = `${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`;
-				const repairRaw = await print(repairPrompt);
+				const repairTry = await timed(repairPrompt);
+				const repairRaw = repairTry.text;
 				try {
 					judgement = coerceJudgement(JSON.parse(extractJson(repairRaw)), input);
 				} catch (e) {
 					// The repair failed too. Record it as REJECTED before rethrowing — otherwise the try that
 					// finally broke the run would be the one try with no record, which is the defect inverted.
-					await capture('repair', repairPrompt, repairRaw, 'rejected', first);
+					await capture(
+						'repair',
+						repairPrompt,
+						repairRaw,
+						'rejected',
+						repairTry.times,
+						classifyParse(repairRaw, e),
+						first
+					);
 					throw e;
 				}
-				await capture('repair', repairPrompt, repairRaw, 'accepted', first);
+				await capture('repair', repairPrompt, repairRaw, 'accepted', repairTry.times, PARSED, first);
 			}
 			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same
 			// `input.criteria` to both is what makes the two unable to diverge — the rubric asking about one set

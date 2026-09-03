@@ -15,6 +15,18 @@ import { captureTry, createExchangeSink } from './exchange-capture.js';
 const MODEL = { modelId: 'gemini-2.5-pro', providerId: 'google' };
 const TENANT = 'tnt-test';
 
+// The per-try facts PER-9 requires and only the caller can know: where this try sits in its run, and the
+// occurrence times bracketing the model call. They are REQUIRED rather than optional because an absent
+// ordinal or an absent time is not "unknown" — it is a record that cannot be ordered or reconciled, which is
+// the record-plane omission PER-9 forbids. Fixed values here so the gate is not wall-clock dependent.
+const CAPTURE_FACTS = {
+	attemptOrdinal: 1,
+	requestedAt: '2026-09-03T10:00:00Z',
+	respondedAt: '2026-09-03T10:00:01Z',
+	// E-5's detail. NOT_ATTEMPTED would assert an outcome nobody observed; these fixtures do parse.
+	parseOutcome: { outcome: 'PARSED' as const, detail: 'Fixture: coerced without repair.' }
+};
+
 function harness() {
 	return { store: createInMemoryArtifactStore(), sink: createExchangeSink() };
 }
@@ -30,6 +42,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'JUDGE THIS GRAPH',
 			rawOutput: '{"recommendation":"SATISFIED"}',
 			disposition: 'accepted'
@@ -69,6 +82,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'JUDGE THIS GRAPH',
 			rawOutput: 'raw',
 			disposition: 'accepted'
@@ -88,6 +102,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'JUDGE THIS GRAPH',
 			rawOutput: 'raw',
 			disposition: 'accepted'
@@ -114,6 +129,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'P1',
 			rawOutput: 'MALFORMED-FIRST-ANSWER',
 			disposition: 'repair-requested'
@@ -126,6 +142,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			role: 'repair',
 			predecessor: first,
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'P1 + repair suffix',
 			rawOutput: '{"ok":true}',
 			disposition: 'accepted'
@@ -160,6 +177,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'P',
 			rawOutput: 'bad',
 			disposition: 'repair-requested'
@@ -179,6 +197,7 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'P',
 			rawOutput: 'r',
 			disposition: 'accepted'
@@ -207,6 +226,7 @@ describe('captureTry - a store without a sink is a misconfiguration, not a degra
 				exchangeId: 'exch-1',
 				role: 'initial',
 				model: { modelId: 'm', providerId: 'p' },
+				...CAPTURE_FACTS,
 				prompt: 'PROMPT BYTES',
 				rawOutput: '{}',
 				disposition: 'accepted'
@@ -232,6 +252,7 @@ describe('the record discloses the DURABILITY of the content it names - H-2', ()
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'JUDGE THIS GRAPH',
 			rawOutput: '{}',
 			disposition: 'accepted'
@@ -255,6 +276,7 @@ describe('the record discloses the DURABILITY of the content it names - H-2', ()
 			exchangeId: 'exch-1',
 			role: 'initial',
 			model: MODEL,
+			...CAPTURE_FACTS,
 			prompt: 'P',
 			rawOutput: '{}',
 			disposition: 'accepted'

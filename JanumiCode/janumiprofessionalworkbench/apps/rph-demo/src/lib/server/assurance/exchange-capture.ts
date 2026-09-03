@@ -24,6 +24,7 @@ import type { ArtifactStore, ContentDurability, StoredArtifactRef } from '@janum
 import {
 	beginExchange,
 	type ExchangeDisposition,
+	type ExchangeParseOutcome,
 	type ExchangeRecord,
 	type ExchangeRole,
 	type ModelInput
@@ -69,6 +70,14 @@ export interface CaptureTryInput {
 	readonly rawOutput: string;
 	/** E-5 — what became of it. */
 	readonly disposition: ExchangeDisposition;
+	/** 1-based position within the run. */
+	readonly attemptOrdinal: number;
+	/** PER-11 occurrence times, bracketing the model call. Only this caller can know them: the event's own
+	 *  stamps are taken at the DRAIN, up to two round-trips later. */
+	readonly requestedAt: string;
+	readonly respondedAt: string;
+	/** E-5's detail — what became of the bytes between the model and the judgement. */
+	readonly parseOutcome: ExchangeParseOutcome;
 }
 
 function storedRef(ref: StoredArtifactRef, durability: ContentDurability) {
@@ -101,7 +110,10 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		exchangeId: input.exchangeId,
 		role: input.role,
 		...(input.predecessor ? { predecessor: input.predecessor } : {}),
-		model: input.model
+		model: input.model,
+		attemptOrdinal: input.attemptOrdinal,
+		requestedAt: input.requestedAt,
+		respondedAt: input.respondedAt
 	});
 
 	// ⛔ A STORE WITHOUT A SINK IS A MISCONFIGURATION, NOT A DEGRADED MODE — REFUSE IT.
@@ -126,7 +138,7 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		);
 
 	if (!input.store) {
-		const pending = { ...base, disposition: input.disposition };
+		const pending = { ...base, disposition: input.disposition, parseOutcome: input.parseOutcome };
 		input.sink?.record(pending);
 		return pending;
 	}
@@ -188,7 +200,8 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 				'is PROCEDURAL: REG-Q-066 is OPEN and sponsor-reserved and forbids writing this field before ' +
 				'its ruling.'
 		},
-		disposition: input.disposition
+		disposition: input.disposition,
+		parseOutcome: input.parseOutcome
 	};
 	input.sink?.record(recorded);
 	return recorded;
