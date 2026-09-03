@@ -83,6 +83,41 @@ describe('ArtifactStore — PER-8 / PER-12', () => {
 		expect(a.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
 	});
 
+	it('a PURGEABLE re-put of participating bytes CANNOT downgrade them — PER-8 is a one-way door', async () => {
+		const store = createInMemoryArtifactStore();
+
+		// ⚠ REASONING and EVIDENCE carry IDENTICAL BYTES and differ only in purgeability. That collision was
+		// already latent in this file's fixtures and nothing exercised it. Before the fix the storage key was
+		// `tenantPrefix/contentHash` alone, so the second put OVERWROTE the first: `stat` then reported
+		// PURGEABLE_AT_EXPIRY for content that had participated, `purge` succeeded, and the bytes a recorded
+		// assessment was based on were destroyed. PER-8: participation "is never hard-deleted", and it is
+		// irreversible — so a store that lets a later, lower classification reach an existing entry is a
+		// hard-delete vector wearing a retention label.
+		const participating = await store.put(EVIDENCE);
+		const volunteered = await store.put(REASONING);
+
+		// THE FIX IS STRUCTURAL, NOT A GUARD: retention class is part of the stored object's identity, so a put
+		// under a different class cannot address — and therefore cannot overwrite — the existing entry.
+		expect(volunteered.storageKey).not.toBe(participating.storageKey);
+		expect((await store.stat(participating.storageKey))?.purgeability).toBe('RETAINED_BY_PARTICIPATION');
+
+		// THE MUTANT: drop purgeability from the key. Both keys collide, the entry is overwritten, and all four
+		// of these fail together.
+		expect((await store.purge(participating.storageKey)).purged).toBe(false);
+		expect(await store.get(participating.storageKey)).toBe(EVIDENCE.bytes);
+	});
+
+	it('CONTROL — the purgeable copy of those same bytes IS still purgeable', async () => {
+		const store = createInMemoryArtifactStore();
+		await store.put(EVIDENCE);
+		const volunteered = await store.put(REASONING);
+
+		// Without this the fix above could not be told apart from "refuse every purge". PER-12 requires the
+		// volunteered half to remain purgeable at retention expiry; separating identity must not over-retain it.
+		expect((await store.purge(volunteered.storageKey)).purged).toBe(true);
+		expect(await store.get(volunteered.storageKey)).toBeUndefined();
+	});
+
 	it('purging something never stored says so, rather than reporting success', async () => {
 		const store = createInMemoryArtifactStore();
 		const outcome = await store.purge('tnt-7f3a/nothing-here');

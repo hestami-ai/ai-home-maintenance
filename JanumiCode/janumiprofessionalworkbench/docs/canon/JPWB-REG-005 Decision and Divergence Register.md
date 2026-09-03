@@ -29794,3 +29794,54 @@ governed-stream record"*). The retained trace lives on the **content plane**, re
   recorded as a governed Professional Work Object and therefore never enters the governed-object catalog."*
   **Repository** — the exchange record must become durable before it can discharge an anchor; today the sink
   is in-memory with no consumer (`REG-F-334`). Status: CLOSED.
+
+### REG-F-337 — the ArtifactStore had a live PER-8 hard-delete vector: a PURGEABLE re-put of participating bytes silently downgraded them, and then `purge()` destroyed them
+
+- **Date:** 2026-09-03 · **Type:** DIVERGENCE FINDING (shipped defect, driven end-to-end) · **Class:**
+  CODE_DIVERGES — the port whose stated reason for existing is to make retention LAWFUL contained the
+  hard-delete it was built to prevent · **Status:** ✅ CLOSED by making retention class part of the stored
+  object's identity.
+
+**THE DEFECT, MEASURED.** `createInMemoryArtifactStore` keyed entries as
+`` `${input.tenantPrefix}/${contentHash}` `` — **purgeability was not part of the key** — and `entries.set`
+is unconditional. So two puts of the SAME BYTES under DIFFERENT classes collided, and the second overwrote
+the first. Driven against the shipped module:
+
+1. `put(bytes, RETAINED_BY_PARTICIPATION)` → key `K`; `purge(K)` correctly **refused**.
+2. `put(bytes, PURGEABLE_AT_EXPIRY)` → **the same key `K`**; `stat(K)` now reported `PURGEABLE_AT_EXPIRY`.
+3. `purge(K)` → **succeeded**, and the participating bytes were **gone**.
+
+- ⚠⚠ **`PER-8`: participating material *"is never hard-deleted"*, and participation is IRREVERSIBLE.** This
+  is the exact violation `artifact-store.ts`'s own header says the port exists to prevent — *"a store that
+  purges on demand is a hard-delete vector wearing a retention label."* **It was one, by a route the header
+  did not consider.**
+- ⭑ **AND THE COLLISION WAS PRE-BUILT IN THE TEST FILE'S OWN FIXTURES.** `REASONING` and `EVIDENCE`
+  (`packages/rph-ports/src/defaults/artifact-store.test.ts:10-17`) carry **identical `bytes`** and differ
+  **only** in `purgeability`. Every ingredient of the defect sat in the file, and **no test put both.** The
+  95-line suite had five cases and not one re-put.
+
+**THE FIX IS IDENTITY, NOT A DOWNGRADE GUARD, AND THE DIFFERENCE IS LOAD-BEARING.** The key is now
+`` `${tenantPrefix}/${purgeability}/${hash}` ``. ⚠ **A guard was considered and rejected**: it must pick a
+winner for one key, and **either choice breaks a rule** — keeping `RETAINED` over-retains the volunteered
+copy `PER-12` requires to stay purgeable, and keeping `PURGEABLE` *is* the hard-delete. **Two retention fates
+are two stored objects**, which canon licenses outright (`JPWB-DOC-003:89`: *"One Representation may have
+several Artifacts"*). Structural, not discretionary.
+
+- **`contentHash` IS UNCHANGED.** §31.3 requires the hash to be over the artifact's bytes; only the KEY
+  carries the class, and the pre-existing byte-hash test still pins it.
+- **TWO MUTANTS, BOTH SINGLE-VICTIM ON A CLEAN BASELINE.** `M1` (drop purgeability from the key — the
+  shipped defect) reddens **only** the downgrade test. `M2'` (over-retain on collision: keys still differ,
+  but bytes also present under `RETAINED` are marked `RETAINED`) reddens **only** the CONTROL.
+- ⚠ **THE FIRST CONTROL MUTANT WAS DISCARDED FOR TRIPPING THREE GUARDS.** Forcing every entry to `RETAINED`
+  reddened the control **and** two pre-existing tests. **An arrangement that trips three conjuncts proves
+  none of them**, so it was replaced with the collision-scoped `M2'` above. ⭑ **The discarded mutant also
+  showed the control was nearly redundant** — the pre-existing *"purges content that never participated"*
+  already covers plain purgeability; the control earns its place only because it asserts purgeability
+  survives THE COLLISION, which nothing else sets up.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a store keyed on content alone cannot express a property
+  that is not a function of the content.** Purgeability is a property of the CONTENT'S HISTORY — whether it
+  participated — not of its bytes. Any field of that kind, keyed content-addressably, is silently
+  last-write-wins. **The audit trigger is: does this key determine every field it stores?**
+- **Merge target:** `packages/rph-ports/src/defaults/artifact-store.ts`. **Owed:** an S3-compatible §31
+  adapter must reproduce the class-in-key rule; the port docblock now states it so both must honour it.

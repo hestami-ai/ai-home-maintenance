@@ -45,7 +45,23 @@ export function createInMemoryArtifactStore(): ArtifactStore {
 			const contentHash = hashBytes(input.bytes);
 			// §31.2 — the tenant prefix is part of the key, and the suffix is the opaque content address rather
 			// than anything derived from a name or a path the caller controls.
-			const storageKey = `${input.tenantPrefix}/${contentHash.slice('sha256:'.length)}`;
+			//
+			// ⭑ RETENTION CLASS IS PART OF THE IDENTITY, AND THAT IS A PER-8 REQUIREMENT RATHER THAN A
+			// CONVENIENCE. Keyed on `tenantPrefix/hash` alone, two puts of the SAME BYTES under DIFFERENT
+			// classes collided, and `entries.set` is unconditional — so a later `PURGEABLE_AT_EXPIRY` put
+			// silently DOWNGRADED an existing `RETAINED_BY_PARTICIPATION` entry, after which `purge()`
+			// succeeded and the bytes a recorded assessment rested on were destroyed. PER-8: participating
+			// material "is never hard-deleted", and participation is irreversible.
+			//
+			// ⚠ THE FIX IS IDENTITY, NOT A DOWNGRADE GUARD, AND THE DIFFERENCE MATTERS. A guard would have to
+			// pick a winner for one key, and either choice breaks a rule: keeping RETAINED over-retains the
+			// volunteered copy that PER-12 requires to stay purgeable, and keeping PURGEABLE is the very
+			// hard-delete this closes. Two retention fates are two stored objects. Canon licenses exactly
+			// that — DOC-003:89, "One Representation may have several Artifacts".
+			//
+			// `contentHash` is NOT affected: §31.3 requires the hash to be over the artifact's bytes, and the
+			// test above pins it. Only the KEY carries the class.
+			const storageKey = `${input.tenantPrefix}/${input.purgeability}/${contentHash.slice('sha256:'.length)}`;
 			const byteSize = Buffer.byteLength(input.bytes, 'utf8');
 			entries.set(storageKey, {
 				bytes: input.bytes,
