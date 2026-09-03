@@ -29967,7 +29967,10 @@ located }` with the invariant `prefix + answer + suffix === raw` whenever `locat
 
 - **Date:** 2026-09-03 · **Type:** FINDING (consolidated correction) · **Class:**
   FINDING — corrects `REG-F-334` and `REG-F-336`, both filed 2026-09-02, and the code they described ·
-  **Status:** ✅ CLOSED. **`REG-Q-066` remains OPEN and sponsor-reserved; nothing here lifts it.**
+  **Status:** ✅ CLOSED. ⚠ **ITS CLOSING CLAIM — *"what remains is PROCEDURAL"* — IS CORRECTED BY
+  `REG-F-341` (2026-09-03): true of the `E-2` FIELD, false of `E-2` RETENTION, which is blocked by three
+  further prerequisites, none procedural.** **`REG-Q-066` remains OPEN and sponsor-reserved; nothing here
+  lifts it.**
 
 **THE FALSE SENTENCE, AND ITS FOUR HOMES.** *"`Purgeability` admits ONE class per stored object, so the
 contract cannot express a blob that is partly `PURGEABLE_AT_EXPIRY` and partly
@@ -30027,3 +30030,82 @@ blocked sends the next reader to redesign instead of to ask.
   travel with it?**
 - **Merge target:** `apps/rph-demo/src/lib/server/assurance/exchange-capture.ts` + this register.
   **Owed:** nothing. `REG-Q-066`'s ruling remains the sponsor's.
+
+### REG-F-341 — `REG-F-340`'s "what remains is PROCEDURAL" was a hand-listed set standing in for a derived one, and the durable exchange record has no typed carrier at all
+
+- **Date:** 2026-09-03 · **Type:** DIVERGENCE FINDING + correction · **Class:**
+  FINDING — corrects `REG-F-340` (filed the same day) and re-warrants the `E-2` block from the Guide onto
+  ratified canon · **Status:** ✅ CLOSED as a finding. **`H-1` gated; item 23 remains the substantive block.**
+
+**THE CORRECTION.** `REG-F-340` closed with *"Both technical prerequisites for `E-2` now exist… What remains
+is PROCEDURAL: `REG-Q-066` is OPEN and sponsor-reserved."* ⭑ **The two-item enumeration is HAND-LISTED where
+it should have been DERIVED — this programme's most-recorded defect class, committed in an entry whose own
+subject was a claim that outran its checking.** It never asks *"is there a durable record to reference the
+bytes?"* — **the third prerequisite `REG-F-336` C-2 established ONE DAY EARLIER, in this register, by the
+same author.** Three further prerequisites exist and **none is procedural**:
+
+- **(a) The reasoning half's referencing record has NO TYPED CARRIER.** Under `REG-D-053` no `RecordArtifact`
+  is dispatched for reasoning, so the carrier must be *"the plane's own governed-stream record"* — which on
+  the authoring plane is a four-field `ConversationEntry` that refuses every exchange key, and on the
+  assurance plane does not exist. **Owned by §16 item 23.**
+- **(b) THE RECORD CONSUMER CANNOT BE WRITTEN WHERE THE BYTES ARE WRITTEN.** `CommandHandler`
+  (`packages/rph-application/src/handlers/kit.ts:36-40`) returns `CommandResult` — **synchronous**;
+  `ArtifactStore` (`packages/rph-ports/src/ports/artifact-store.ts:78-89`) is **async**. ⚠ **Answered by
+  NEITHER open question. Architectural, and unowned.**
+- **(c) BOTH PLANES ARE IN-MEMORY AT HEAD**, so a complete wire still would not survive restart — which
+  `REG-D-053`'s own Repository target forbids.
+
+> ### ⭑⭑ THE BLOCK IS CORRECT AND ITS WARRANT ON RECORD IS NOT — RE-FILED ONTO CANON
+> Guide §9.7's second trigger reads *"accepted contracts cannot represent these records losslessly."*
+> **REFUTED on its own terms.** `ArtifactReferenceSchema` (`packages/rph-contracts/src/objects.ts:73`) is
+> `z.record(z.string(), z.unknown())` — **an open dictionary on a durable PWO** — carried by
+> `EvidenceObjectSchema.contentReference` (`:514`) and wired end to end through `ProposeEvidence` into **both**
+> object state and event payload. **DRIVEN: a whole exchange record is ACCEPTED**, against a control
+> (`ArtifactReferenceSchema ← a string → REFUSED | invalid_type`). **A `z.record` represents anything
+> losslessly, so that trigger does not fire.**
+>
+> **The block stands on `PER-9` (`DOC-003:369`) instead**, which forbids the move by name — *"do not implement
+> a universal stream-record type, duplicate event authority, or **hide core relationships in one generic JSON
+> document**"* — and whose next sentence enumerates exactly what would be hidden inside the bag.
+>
+> ⭑ **THE RE-FILE IS NOT COSMETIC, FOR THREE REASONS.** (1) **Authority tier** — `PER-9` is ratified canon;
+> the Guide is self-declared *"Proposed consolidated baseline"*, DETAIL authority only under `CON-000` B1.
+> (2) **It avoids repeating a recorded error** — `HARMONIZATION-LOG.md:199-205`: *"I manufactured the blocker
+> I reported… The §9.7 sentence I invoked to justify blocking the capability is a sentence I wrote."*
+> (3) ⭑ **It survives refutation.** A reader who finds `contentReference` — one `grep` away — dissolves the
+> §9.7 warrant instantly. **The `PER-9` warrant is not dissolvable by finding an open field; finding one is
+> what TRIGGERS it.**
+
+**AND E-3 IS UNSATISFIABLE ANYWHERE IN THE ACCEPTED SURFACE.** `PER-9` requires *"the resolved provider,
+model, and **version** actually invoked."* `ActorReferenceSchema` (`packages/rph-contracts/src/envelopes.ts:23-31`)
+is the only place model identity exists and its seven fields are `actorId`, `actorType`, `displayName`,
+`roleId`, `modelId`, `providerId`, `executionInstanceId` — **no version**, confirmed by count (`0`) with the
+field list read back. Driven: `+version` and `+modelVersion` both → `unrecognized_keys`.
+
+⚠ **THE DECLARED EXTENSIBILITY CHANNEL IS UNREACHABLE FROM THE MESSAGE SURFACE.** `ExtensionPayload.data`
+(`packages/rph-contracts/src/common.ts:33-41`) calls itself *"The ONLY forward-compatible extensibility
+channel"*, but `extensions[]` lives solely on `objectEnvelopeShape` — **`grep -c objectEnvelopeShape` returns
+31 in `objects.ts` and 0 in `messages.ts`**, against a control of **265** `z.strictObject` in the same file.
+**No command or event payload can carry an extension.**
+
+**`H-1` — THE ORPHAN ARMED ON A ONE-LINE CHANGE, NOW GATED.** `artifacts` and `exchanges` are INDEPENDENTLY
+optional; `captureTry` early-returned only when NO store was supplied, so supplying a store alone ran `put()`
+unconditionally while `input.sink?.record(...)` — optional-chained — silently dropped the record. **One added
+property at the composition root would have retained bytes no record references.** `captureTry` now refuses.
+**Predicted red observed first** (the promise resolved instead of rejecting); `Q1` (remove the guard) is
+single-victim.
+
+- ⭑ **AND NO NEW CONTROL WAS KEPT, WHICH IS A FINDING NOT AN OMISSION.** Two were drafted and **both were
+  redundant** — `Q2` (refuse whenever a store is present at all) reddened **five pre-existing tests**, proving
+  the discrimination was already in the file. **A control that cannot earn its own single-victim mutant is
+  noise**, and this is the second time in two days that driving one has revealed the control rather than the
+  subject.
+
+- **GENERAL FORM, DERIVED not enumerated:** ⭑ **a prerequisite list is a claim about a SEARCH, and a
+  hand-listed one is that claim unverified.** `REG-F-340` named two prerequisites because two were in
+  working memory; the third was in the register one day older. **The audit trigger is: was this list derived
+  from the obligation, or recalled?**
+- **Merge target:** `docs/_working/DESIGN-durable-exchange-record.md` (options + the exhaustive carrier
+  enumeration) and this register. **Owed:** §16 item 23 is the substantive block and should be sequenced
+  BEFORE `REG-Q-066`; `H-2` (a durable record naming non-durable content) is ungated; and **(b)'s sync/async
+  consumer seam has no owner.**

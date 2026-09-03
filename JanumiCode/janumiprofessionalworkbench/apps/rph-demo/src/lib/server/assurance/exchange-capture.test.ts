@@ -186,3 +186,38 @@ describe('ICP-02 d2b · exchange capture — one record per bounded try', () => 
 		expect(rec.materializedInputRef.status).toBe('PENDING_CONTENT_PLANE');
 	});
 });
+
+describe('captureTry - a store without a sink is a misconfiguration, not a degraded mode', () => {
+	it('REFUSES when bytes would be retained with no record to reference them', async () => {
+		// H-1, and it arms on ONE added property. `artifacts` and `exchanges` are independently optional on
+		// AgyValidatorOptions, and captureTry early-returns only when NO store is supplied. Supply a store
+		// without a sink and `put()` runs unconditionally while the record goes to `input.sink?.record(...)`
+		// - optional-chained, so it is silently dropped. The result is retained bytes that no record
+		// references, which REG-F-336 C-2 forbids in terms: "content on the content plane with no record on
+		// the record plane pointing at it. A half-wire is worse than the disclosed absence it replaces."
+		//
+		// PREDICTED RED BEFORE THE FIX: this test fails, because the current code silently SUCCEEDS.
+		const store = createInMemoryArtifactStore();
+
+		await expect(
+			captureTry({
+				store,
+				// no sink - the whole point
+				tenantPrefix: 'tnt-local',
+				exchangeId: 'exch-1',
+				role: 'initial',
+				model: { modelId: 'm', providerId: 'p' },
+				prompt: 'PROMPT BYTES',
+				rawOutput: '{}',
+				disposition: 'accepted'
+			})
+		).rejects.toThrow(/sink|record plane|orphan/i);
+	});
+
+	// ⭑ NO NEW CONTROL IS ADDED, AND THAT IS A FINDING RATHER THAN AN OMISSION.
+	// Two were drafted — "a store WITH a sink still captures normally" and "NEITHER store nor sink still
+	// degrades" — and BOTH were redundant: the first duplicates the five store-using tests above, the second
+	// duplicates "works with NO store and NO sink". DRIVEN: the control mutant (refuse whenever a store is
+	// present at all) reddens SIX tests, so the discrimination this guard needs is already in the file. A
+	// control that cannot get its own single-victim mutant is noise, which this repository keeps recording.
+});

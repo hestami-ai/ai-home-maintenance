@@ -100,6 +100,27 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		model: input.model
 	});
 
+	// ⛔ A STORE WITHOUT A SINK IS A MISCONFIGURATION, NOT A DEGRADED MODE — REFUSE IT.
+	//
+	// `artifacts` and `exchanges` are INDEPENDENTLY OPTIONAL on `AgyValidatorOptions`, and everything below
+	// runs `put()` unconditionally while handing the record to `input.sink?.record(...)` — optional-chained,
+	// so with no sink the record is silently dropped. ⚠ ONE added property at the composition root would
+	// therefore retain bytes that NO record references: exactly what `REG-F-336` C-2 forbids — *"content on
+	// the content plane with no record on the record plane pointing at it… a half-wire is worse than the
+	// disclosed absence it replaces."*
+	//
+	// ⭑ IT REFUSES RATHER THAN DEGRADING BECAUSE THIS CANNOT HAPPEN AT RUNTIME. It is reachable only by
+	// wiring the host wrong, so the failure belongs at the moment of misconfiguration, loudly, and not as a
+	// quiet orphan discovered later by someone auditing retention. The NEITHER case below is a different
+	// thing entirely and stays legal: it is the DISCLOSED absence `PER-9` permits.
+	if (input.store && !input.sink)
+		throw new Error(
+			'captureTry: a store was supplied with no sink. The bytes would be retained on the content plane ' +
+				'with no exchange record on the record plane referencing them — an orphan (REG-F-336 C-2). ' +
+				'Supply both, or neither: with neither, capture degrades to the disclosed PENDING_CONTENT_PLANE ' +
+				'absence, which PER-9 permits. Store, sink and record consumer land together or not at all.'
+		);
+
 	if (!input.store) {
 		const pending = { ...base, disposition: input.disposition };
 		input.sink?.record(pending);
