@@ -31085,3 +31085,65 @@ permitted use `REG-F-244` names is the reasoning half, which `REG-Q-077` still b
 - **Merge target:** `packages/rph-application/src/exchange-resolution.ts`,
   `apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts`, `routes/pwa/[id]/+page.server.ts` and
   `+page.svelte`. **Owed:** `REG-Q-077`'s ruling for the reasoning half. Status: CLOSED.
+
+### REG-D-058 — SPONSOR RULING: prompt templates are OWNED by the work-unit type — and canon already ratifies more of this than either of us knew
+
+- **Date:** 2026-09-04 · **Type:** RULING (sponsor) · **Class:**
+  DECISION — settles the ownership axis for `JAN-PROMPT`; supplies the warrant for
+  `DESIGN-prompt-template-and-context.md` · **Status:** ✅ CLOSED as a ruling; the design it licenses is OPEN.
+
+**THE QUESTION PUT.** *Is a prompt template OWNED by the work-unit type — versioning with the architecture,
+no reuse — or BOUND to it from a separate governed library, reusable across architectures?*
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"I will assert a prompt templates are owned."*
+
+> ### ⭑ WHY THIS QUESTION WAS ASKED BEFORE ANY DESIGN, AND NOT DISCOVERED INSIDE ONE
+> The sponsor's own diagnosis opened the programme: *"a PWU is an agent with a prompt template and relevant
+> context … none of that existed in reality. So a PWA actually could not truly run and do real work."*
+> **Measured, and correct.** Every object definition searched for a prompt/template/context/instruction field
+> yields **two hits in the whole model and neither is a template** (positive control, same instrument and
+> population: `name`/`description` → 14). One is `contextAssemblyPolicyId`, written once as the hardcoded
+> literal `'ctx-default'` and read nowhere; the other is `promptTemplateFingerprint` — ⭑ **a fingerprint of a
+> template with no home**, under a `PER-9` clause reading *"it never substitutes for it."*
+
+**AND THE CORPUS ALREADY RULES ON THREE THINGS THE DESIGN WOULD OTHERWISE HAVE INVENTED.** Searched first,
+per `REG-F-093`'s standing rule; all three are ratified `JPWB-DOC-003` text:
+
+1. **`DEC-1` (`:211`) bounds the sponsor's own framing.** *"**Do not create a PWU for prompt rendering** …
+   **Those are execution steps** unless they independently carry professional meaning, obligation, evidence,
+   and lifecycle."* ⭑ **This does not refute the ruling; it locates the parts** — the type OWNS the template,
+   the STEP renders it, and a PWU may not become a wrapper around a prompt.
+2. **`ASR-4` (`:241`) is the ratified pattern for exactly this ownership.** *"prompts, models, and
+   deterministic checks are **runtime assets of the policy, never the policy itself**."* Carried across, it
+   settles the hard question this programme flagged in advance: **editing a prompt does NOT invalidate
+   assurance already recorded**, because a prompt is not the type's meaning. ⛔ **It is not free either** —
+   `ASR-4` speaks to MEANING and says nothing about REPRODUCIBILITY, so the template a run used stays pinned
+   by that run's exchange record and a later edit cannot reach backwards.
+3. **`DEC-4` (`:224-225`) already governs context assembly, exhaustively.** Its SCOPE names it: *"governs
+   decomposition, delegation, semantic revision, **and context assembly (a context omission must not silently
+   remove a mandatory constraint)**."* Five named fates per mandatory constraint; silence is illegal.
+
+> ### ⚠ AND A CORRECTION TO WHAT I TOLD THE SPONSOR AN HOUR AGO
+> I reported that context *"does not exist as a concept"*. **Wrong about the concept, right about the
+> carrier.** `DEC-4` is ratified, exhaustive and directly on point. **The design does not invent a context
+> model — it builds the carrier for a rule that has existed all along**, which is a materially smaller and
+> better-warranted piece of work than the one I described.
+
+- ⭑ **WHAT OWNERSHIP BUYS, and it is cheaper as well as ruled.** The template rides `PWU_TYPE`'s own
+  aggregate (`packages/rph-application/src/handlers/pwa-authoring.ts:708`, `aggregateType: PWU_TYPE`), which
+  is *scoped* to a PWA by `pwaId`/`pwaVersion`. So it inherits the scoping the type already carries; it
+  freezes when the PWA publishes (`apps/rph-demo/e2e/agent-sse.e2e.ts:78`); and **it cannot outlive its
+  type** — the dangling-pointer failure `REG-F-245` records for `storageKey` and `contextAssemblyPolicyId`
+  cannot arise by construction. ⚠ **A first draft of the design said the template lives "inside the PWA
+  aggregate". That was INFERRED, not measured, and it is wrong** — corrected in place before the design left
+  draft, and recorded here because an aggregate boundary asserted from a field name is exactly the class of
+  error this register exists to catch.
+- **WHAT THIS RULING DOES NOT DO.** It does not make execution real: nothing anywhere calls a model on behalf
+  of an execution step, and the demo's execute button is an eleven-command script. This supplies the ASSET; a
+  separate increment supplies the CALLER. It does not touch the risk-graduated assurance ladder (inert,
+  pending its own ruling), and it does not model memory — `memoryPolicyId` stays an ungrounded id
+  deliberately.
+- **Merge target:** `docs/_working/DESIGN-prompt-template-and-context.md`, then a roadmap, then contracts.
+  **Owed:** three narrow questions the design asks with recommendations attached — whether a DRAFT template
+  versions per edit, whether a missing declared placeholder refuses or discloses, and whether an ACTIVE
+  template needs approval separate from publishing. Status: CLOSED as a ruling.
