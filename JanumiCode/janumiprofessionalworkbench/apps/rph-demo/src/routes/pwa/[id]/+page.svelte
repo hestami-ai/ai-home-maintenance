@@ -1880,6 +1880,21 @@
 								{#each data.floor.reasoningGaps.slice(0, 5) as g}<li>{g}</li>{/each}
 							</ul>
 						{/if}
+						<!-- MXREAD-03 — what the reviewer actually returned, re-hashed before it is shown. Until this
+						     block the retention had no reader: the record named a storageKey nothing resolved. The
+						     ANSWER only; volunteered reasoning is PER-12 material behind REG-Q-077 and `reviewerAnswer`
+						     has no field that could carry it, so this template makes no filtering decision. -->
+						{#if data.reviewerAnswer}
+							<details class="revans" data-testid="reviewer-answer">
+								<summary>What the reviewer returned (try {data.reviewerAnswer.attemptOrdinal})</summary>
+								{#if data.reviewerAnswer.answer}
+									<pre class="revanstext">{data.reviewerAnswer.answer}</pre>
+								{/if}
+								<!-- Shown whether or not the answer is: a verified read and an unchecked one must not
+								     look the same, and a refusal has to say why it refused. -->
+								<p class="revansnote">{data.reviewerAnswer.disclosure}</p>
+							</details>
+						{/if}
 						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so REVISION is the only route past
 						     it and this hint may not name another. It used to read "revise the graph and re-run, or record
 						     a waiver", and the waived arm above it announced "publishing is permitted despite the floor" —
@@ -2945,4 +2960,28 @@
 	.floorwaiver { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--sc); padding-top: 10px; }
 	.floorwaiver input { padding: 6px 8px; border: 1px solid var(--sc); border-radius: 6px; background: var(--surface); color: inherit; font-size: 11px; }
 	.waivedbadge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--tertiary-soft); color: var(--tertiary); }
+
+	.revans {
+		margin: 0.5rem 0 0;
+		font-size: 0.78rem;
+	}
+	.revans summary {
+		cursor: pointer;
+		color: var(--muted, #667);
+	}
+	.revanstext {
+		margin: 0.35rem 0 0.25rem;
+		padding: 0.4rem 0.5rem;
+		background: rgba(127, 127, 127, 0.08);
+		border-radius: 3px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 12rem;
+		overflow: auto;
+	}
+	.revansnote {
+		margin: 0;
+		color: var(--muted, #667);
+		font-size: 0.72rem;
+	}
 </style>

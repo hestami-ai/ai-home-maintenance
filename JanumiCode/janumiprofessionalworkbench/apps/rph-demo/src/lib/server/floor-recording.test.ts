@@ -30,6 +30,8 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
 import { runPwaFloor, type FloorProducer } from './floor.js';
+import { loadReviewerAnswer } from './assurance/reviewer-answer.js';
+import { getArtifactStore } from './workbench.js';
 
 const TS = '2026-08-05T09:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
@@ -184,6 +186,53 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			expect(input.status, 'the materialized input is actually retained').toBe('STORED');
 			expect(input.contentDurability, 'and the record says so on its face').toBe('PROCESS_LOCAL');
 			expect(input.contentHash, 'with an address that can later be verified').toMatch(/^sha256:/);
+		});
+
+		// ── ⭑⭑ MXREAD-03 — THE ROUND TRIP, AND THE ONLY THING THAT MAKES THE READ PATH NON-HOLLOW ───────────
+		//
+		// Everything before this line proved bytes went IN. `verifyExchangeContent` and `readAnswerSpan` prove
+		// they can come back, but against fixtures. This is the first assertion in the repository that a model
+		// call's answer survives the whole route — capture, content plane, dispatch, canonical record — and
+		// returns as THE SAME BYTES to a caller who only has the subject's id.
+		//
+		// THE MUTANT: have `loadReviewerAnswer` skip `readAnswerSpan` and return the record's `contentHash`
+		// instead. Every fixture test still passes; this one goes from the judgement text to a hash string.
+		it('⭑ the reviewer answer comes BACK — verified, by subject id alone', async () => {
+			await runPwaFloor(
+				PWA,
+				{ prompt: 'assess it', producer: PRODUCER, print: async () => JUDGEMENT, canonical: session },
+				session
+			);
+
+			const view = await loadReviewerAnswer(PWA, session, getArtifactStore());
+			expect(view, 'no exchange was found for the subject').toBeDefined();
+			expect(view!.answer, 'the reviewer answer did not survive the round trip').toBe(JUDGEMENT);
+			expect(view!.disclosure, 'a verified read must say it was verified').toMatch(/re-hashed/i);
+
+			// ⛔ AND THE VOLUNTEERED HALF HAS NO CONTENT-BEARING FIELD — not merely an empty one. PER-12 material
+			// is behind REG-Q-077, and a view carrying it "for the page to filter" would put that decision in a
+			// template.
+			//
+			// ⚠ THE FIRST VERSION OF THIS ASSERTED THE STRING "volunteered" WAS ABSENT FROM THE VIEW, AND THAT
+			// WAS WRONG — it reddened on `verdicts`, which names `volunteeredReasoningRef` and reports its
+			// retention verdict. That naming is the DISCLOSURE PER-9 requires, not a leak: a reader learns the
+			// element's state and never its bytes. The assertion was measuring the wrong thing, so it is
+			// replaced by a structural one that cannot drift.
+			expect(
+				Object.keys(view!).sort(),
+				'a new field on this view is a new disclosure and must be a deliberate one'
+			).toEqual(['answer', 'attemptOrdinal', 'disclosure', 'exchangeId', 'verdicts']);
+			expect(
+				view!.verdicts.map((v) => v.field),
+				'every content element is accounted for, bytes disclosed for none but the answer'
+			).toContain('volunteeredReasoningRef');
+		});
+
+		it('CONTROL — a subject with no exchange returns undefined rather than an empty answer', async () => {
+			// Without this, "the answer came back" could not be told apart from a function that returns a view
+			// for anything — and an empty view rendered next to a real assessment reads as "the reviewer said
+			// nothing", which is a claim nobody made.
+			expect(await loadReviewerAnswer('pwa_does_not_exist', session, getArtifactStore())).toBeUndefined();
 		});
 
 		it('⭑ E-2 is RETAINED end to end, split at retention — REG-D-056', async () => {

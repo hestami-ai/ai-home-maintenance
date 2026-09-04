@@ -20,3 +20,15 @@ export { HANDLERS } from './handlers/registry.js';
 export { PWU_SEMANTIC_LIFECYCLE_COMMANDS } from './handlers/pwu.js';
 export type { OwnedLifecycleTarget } from './handlers/pwu.js';
 export type { CommandHandler, HandlerContext } from './handlers/kit.js';
+export {
+	verifyExchangeContent,
+	readAnswerSpan
+} from './exchange-resolution.js';
+export type {
+	RetentionVerdict,
+	RefResolution,
+	RetentionReport,
+	ResolvableRef,
+	ResolvableExchange,
+	AnswerSpanRead
+} from './exchange-resolution.js';

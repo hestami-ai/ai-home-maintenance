@@ -44,6 +44,8 @@ import {
 	type ConversationEntry,
 	type UiCommandInput
 } from '$lib/server/workbench';
+import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
+import { getArtifactStore } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
 import { SESSION_CREDENTIAL } from '$lib/server/identity';
 import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
@@ -76,7 +78,7 @@ function toLogEntry(e: ConversationEntry): LogEntry {
 	}
 }
 
-export const load: PageServerLoad = ({ params }) => {
+export const load: PageServerLoad = async ({ params }) => {
 	const canonicalEngine = getEngine();
 	const candidate = getPendingAuthoringTurn(params.id);
 	const engine = candidate?.engine ?? canonicalEngine;
@@ -209,6 +211,19 @@ export const load: PageServerLoad = ({ params }) => {
 		// floor is being run on their behalf — and `engine` here may be an authoring FORK, which is why the
 		// credential is applied to that handle rather than reaching for the canonical one.
 		floor: loadPwaFloor(params.id, engine.as(SESSION_CREDENTIAL)),
+		// ⭑ MXREAD-03 — THE REVIEWER'S OWN ANSWER, READ BACK AND VERIFIED. `ASR-11` limb 3 keeps raw output
+		// *"for diagnostics"*, and until this call the retention had no reader at all: the record named a
+		// storageKey nothing ever resolved (`REG-F-245` (b′)). The bytes are re-hashed before they are shown,
+		// so a verified answer is distinguishable from an unchecked one — the point of keeping a hash.
+		//
+		// ⛔ THE ANSWER ONLY. Volunteered reasoning is `PER-12` material behind `REG-Q-077`, and this view has
+		// no field that could carry it: reads are authority-checked nowhere in this system, so the decision
+		// cannot be left to a template.
+		reviewerAnswer: await loadReviewerAnswer(
+			params.id,
+			engine.as(SESSION_CREDENTIAL),
+			getArtifactStore()
+		),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
 		// boundary explicit to the browser and supplies the exact hash required by the accept action.
 		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined

@@ -27,9 +27,16 @@ import { load } from '../../routes/pwa/[id]/+page.server.js';
 
 const event = (id: string) => ({ params: { id } }) as unknown as Parameters<typeof load>[0];
 
-function loadOutcome(id: string): number | { name: string; publicationStatus: string } {
+// ⚠ AWAITED, AND THE `await` IS NOT COSMETIC. `load` became async under MXREAD-03 so it can resolve and
+// re-hash the reviewer's retained answer. Before this change the helper called it synchronously and caught the
+// 404 in a `try`; afterwards the throw arrived as a REJECTED PROMISE, the `catch` never fired, and all three
+// cases read `data.pwa` off `undefined` — so a guard that still worked perfectly reported as broken. The
+// production behaviour did not change; the way this helper observes it did.
+async function loadOutcome(
+	id: string
+): Promise<number | { name: string; publicationStatus: string }> {
 	try {
-		const data = load(event(id)) as unknown as {
+		const data = (await load(event(id))) as unknown as {
 			pwa: { name: string; publicationStatus: string };
 		};
 		return { name: data.pwa.name, publicationStatus: data.pwa.publicationStatus };
@@ -39,23 +46,23 @@ function loadOutcome(id: string): number | { name: string; publicationStatus: st
 }
 
 describe('the PWA Designer surfaces refuse an id that is not a PWA', () => {
-	it('the loader refuses an UNDERTAKING id instead of rendering it as a DRAFT PWA', () => {
+	it('the loader refuses an UNDERTAKING id instead of rendering it as a DRAFT PWA', async () => {
 		expect(
-			loadOutcome(SEED_UNDERTAKING),
+			await loadOutcome(SEED_UNDERTAKING),
 			'/pwa/<an Undertaking id> must be REFUSED, not rendered — and never as DRAFT, which unlocks authoring'
 		).toBe(404);
 	});
 
-	it('the loader refuses a guessable NON-ULID id (an assurance policy constant)', () => {
+	it('the loader refuses a guessable NON-ULID id (an assurance policy constant)', async () => {
 		// The ids are not all opaque: floor policy ids are module constants and appear in the corpus.
-		expect(loadOutcome('floor.reasoning-review')).toBe(404);
+		expect(await loadOutcome('floor.reasoning-review')).toBe(404);
 	});
 
-	it('CONTROL: the real PWA still loads, and reports its TRUE publication status', () => {
+	it('CONTROL: the real PWA still loads, and reports its TRUE publication status', async () => {
 		// Load-bearing twice over. It proves the guard discriminates, AND it pins the inversion: the
 		// genuine subject is PUBLISHED, which is exactly the value the agent endpoint's guard REFUSES —
 		// so any fabricated 'DRAFT' is strictly more permissive than the truth.
-		expect(loadOutcome(SEED_PWA)).toEqual({
+		expect(await loadOutcome(SEED_PWA)).toEqual({
 			name: 'Product Realization',
 			publicationStatus: 'PUBLISHED'
 		});

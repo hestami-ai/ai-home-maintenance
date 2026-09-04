@@ -30966,3 +30966,122 @@ fixtures, and conformance tests together before claiming support"* — Guide `:2
 - **Merge target:** the six limbs tabled above. **Owed:** nothing on this ruling. `REG-Q-076` is ADJUDICATED
   and `REG-F-345` is CLOSED by this entry; both status lines are struck in place rather than rewritten.
   Status: CLOSED.
+
+### REG-Q-077 — may volunteered reasoning be read back, and under whose authority? The recommendation is NOT YET, and the reason is a measurement
+
+- **Date:** 2026-09-04 · **Type:** QUESTION (sponsor) · **Class:**
+  QUESTION — the residual `REG-F-244` remedy 3 names, put with its own recommendation so one line settles it ·
+  **Status:** 🔴 OPEN.
+
+**THE QUESTION IN PLAIN LANGUAGE.** *We can now read back the reviewer's answer. Should we also be able to
+read back the private reasoning it arrived with — and if so, who is allowed to?*
+
+> ### ⭑ THE MEASUREMENT THAT MAKES THIS SUBSTANTIVE RATHER THAN PROCEDURAL
+> `packages/rph-engine/src/engine.ts:195` is `loadObject: (id) => store.loadObject(id)`. The credential is
+> threaded through `dispatch` and **not** through reads. ⛔ **Every governed object in this system is readable
+> by anything holding a handle.**
+>
+> So a surface returning volunteered reasoning would be **the first read in this repository that anyone needed
+> permission for**, with no mechanism to hang it on — and `PER-12` material (*"never logged, never projected,
+> never Evidence"*) is the worst possible first case to get wrong. **The block `REG-F-244` recorded is real.
+> This entry adds the fact that makes it so; the finding asserted it without this.**
+
+**AND THE DOOR IT WALKS THROUGH IS STILL SHUT, RE-VERIFIED AT HEAD** rather than inherited — a recorded remedy
+is a hypothesis, and this programme has had three wrong in a day:
+
+1. **`REG-Q-056` is OPEN.** `JPWB-REG-005:11685`, quoted in code so this entry does not read as carrying a
+   second live status of its own — the distinction `REG-F-113` records: `**Date:** 2026-08-22 · **Type:** QUESTION · **Status:** OPEN`.
+2. **The four columns have no ratified values.** `handlers/artifact.ts:16-19`: *"no enum for them exists
+   anywhere in the corpus — so they are `string` here."*
+3. **A green test exists to catch anyone inventing them.** `handlers/artifact.test.ts:123-136`, its own words:
+   *"This test exists to LOCK the absence of invented enums … sends them to the corpus first."* It is
+   **unedited** by this work, and that is a boundary rather than a coincidence.
+
+**THE RECOMMENDATION: NOT YET — and what was built instead.** `JAN-MXREAD` ships the half that needs no
+access model, because the ratified vocabulary already draws the line:
+
+| | Answer span | Volunteered reasoning |
+|---|---|---|
+| Retention class (`REG-D-050`) | `RETAINED_BY_PARTICIPATION` | `PURGEABLE_AT_EXPIRY` |
+| Participated in a recorded judgement | **yes** | no — `PER-8`'s NON-EXAMPLE names it |
+| Readable now | ✅ **yes**, verified before it is shown | ⛔ behind this question |
+
+⭑ **Reading the answer half is `REG-D-050` PERFORMED, not a new permission** — *"the governed stream is fully
+auditable and reconstructable"* — and the guard turns on the **stored retention class**, not on the field
+name, so it invents nothing.
+
+- ⚠ **WHAT THIS QUESTION MUST DISCLOSE, so the roadmap cannot quietly claim it.** With 2b unbuilt, `ASR-11`
+  limb 3's *diagnostic* purpose remains unmet for the case it most concerns — a reply that could not be
+  parsed. **`limb:ASR-11:3` does NOT move on this work**, and the ledger row says so.
+- **Merge target:** Register. **Owed:** a ruling, or a decision to leave it shut. Status: OPEN.
+
+### REG-F-349 — the retained answer has a reader, and the mutant that proves the reader real survived twice before it fell
+
+- **Date:** 2026-09-04 · **Type:** FINDING (capability landed; two self-corrections) · **Class:**
+  FINDING — closes the read half of `REG-F-245` (b′); narrows the grounds of three standing clauses ·
+  **Status:** ✅ CLOSED.
+
+**WHAT LANDED.** `packages/rph-application/src/exchange-resolution.ts` —
+`verifyExchangeContent` (resolve every content ref and report) and `readAnswerSpan` (return the participating
+half, verified first) — wired at `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:222` and rendered in the
+floor panel. **Driven end to end:** a model call's answer now survives capture → content plane → dispatch →
+canonical record → read-back, returning **the same bytes** to a caller holding only the subject's id.
+
+> ### ⚠⚠ THE MUTANT SURVIVED TWICE, AND BOTH SURVIVALS ARE THE FINDING
+> A verification layer is the easiest code in the world to write as ceremony: it compares two copies of one
+> claim and **cannot fail**. The mutant is `const actual = meta.contentHash` — trust `stat` instead of
+> re-hashing the bytes.
+>
+> - **Survival 1.** My first test "tampered" by REPOINTING the record at a different key. Both hashes then
+>   descend from the same `put` and agree with each other. **Mutant applied: 10/10 green.**
+> - **Survival 2.** I added a store whose `stat` and `get` disagree — and substituted 30 bytes for 16, so the
+>   **byte-size arm** caught it whichever hash the code used. **Mutant applied: 11/11 green.**
+> - **Death.** A length-preserving substitution (`{"verdict":"ok"}` → `{"verdict":"NO"}`, both 16 bytes) over
+>   inconsistent metadata. One victim, and the test carries a control asserting the two lengths are equal, so
+>   it cannot silently regress into survival 2.
+>
+> ⭑ **GENERAL FORM, DERIVED:** *when a check has several arms, a fixture that trips more than one proves
+> nothing about any of them* — and the arm that happens to fire is the one you were not testing. This is
+> `feedback_an_arrangement_that_trips_two_guards` arriving inside a single function rather than across two
+> guards, and the isolating fixture is the only version worth keeping.
+
+**THREE STANDING CLAUSES ARE NARROWED — DERIVED BY RUNNING THE SEARCH, NOT BY RECALLING IT.** `REG-F-348`'s
+audit trigger is *"what did this change make EXIST, and who is on record saying it does not?"*, and it
+under-ran by two the last time it was answered from memory. Run at HEAD:
+
+1. **`REG-F-245` (b′), `R:14841`:** *"The system records WHERE an artifact's content lives and **never once
+   resolves it**."* — now false. `resolveOne` resolves every content ref, and the read path re-hashes.
+2. **`REG-F-245`, `R:14791`:** *"the pointer that would name the bytes to remove, `storageKey`, is written and
+   **never resolved either**."* — now false. ⭑ **I would not have listed this clause from memory; the grep
+   found it.**
+3. **`REG-F-244`, `R:14545`:** *"the permitted use has no carrier: there is **no diagnostic read path**, no
+   inspection surface…"* — now false **for the participating half only**.
+
+⛔ **ALL THREE ARE ANNOTATED, NOT OVERTURNED.** Both findings stay OPEN on grounds that survive: nothing calls
+`purge` (so `REG-F-245`'s headline holds — it now holds for want of a CALLER, not a resolver), and the
+permitted use `REG-F-244` names is the reasoning half, which `REG-Q-077` still blocks.
+
+- ⭑ **AND THE LAYER IS NOT HOLLOW, WHICH WAS THE DESIGN'S OWN EXIT CONDITION.** `DESIGN-exchange-resolution.md`
+  §5 records the rule in advance: the resolution layer's only natural callers are the blocked surface and the
+  unbuilt purge scheduler, so *"they ship together or neither ships."* **Verified with a positive control on
+  the same instrument:** `loadReviewerAnswer` resolves at a non-test call site (`+page.server.ts:222`), the
+  same shape as `loadPwaFloor` at `:213`.
+- **A SECOND SELF-CORRECTION, SMALLER.** My first end-to-end assertion required the string *"volunteered"* to
+  be absent from the view. It reddened — on `verdicts`, which names `volunteeredReasoningRef` and reports its
+  retention verdict. ⚠ **That naming is the DISCLOSURE `PER-9` requires, not a leak:** a reader learns the
+  element's state and never its bytes. The assertion was measuring the wrong thing and is replaced by a
+  structural one that pins the view's whole key set, so a new field is a deliberate act.
+- **ONE PRODUCTION BEHAVIOUR CHANGED, DISCLOSED BECAUSE IT LOOKED LIKE A TEST BREAK.** The PWA page's `load`
+  is now `async`. `pwa-surface-object-type.test.ts` called it synchronously and caught a 404 in a `try`; the
+  throw became a rejected promise, the `catch` stopped firing, and three cases read off `undefined`. **The
+  guard never changed — the way the test observed it did**, and the helper is awaited rather than the guard
+  relaxed.
+- **BOUNDARIES HELD.** No new vocabulary; `handlers/artifact.test.ts:123-136` green and **unedited**; no
+  read-authority mechanism invented; no new command or event; no CSAA.
+- **CENSUS RECONCILIATION — LIMB IDS THIS ENTRY TOUCHES:** `limb:ASR-11:3`, **which does NOT move.** The arm
+  stays `PARTIAL`: this work gives the limb a reader for the participating half, and limb 3's *"raw output"*
+  is the whole returned output, whose other half is behind `REG-Q-077`. **Said in advance in
+  `ROADMAP-exchange-resolution.md` so the claim could not drift**, and the ledger row carries it.
+- **Merge target:** `packages/rph-application/src/exchange-resolution.ts`,
+  `apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts`, `routes/pwa/[id]/+page.server.ts` and
+  `+page.svelte`. **Owed:** `REG-Q-077`'s ruling for the reasoning half. Status: CLOSED.

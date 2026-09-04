@@ -158,7 +158,19 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES RATHER THAN ACCUMULATES, which is what SL-L4 actually asks: it absorbs the open
 			// limbs of `JAN-ICP`'s `ICP-02`/`ICP-03` (the durable exchange record and the content/retention
 			// seam), and it is bounded by an exit criterion that retires it rather than leaving it standing.
-		).toBe(20);
+			//
+			// 20 -> 21 (2026-09-04): `ROADMAP-exchange-resolution.md` (`JAN-MXREAD`). ⚠ THE WARRANT, STATED
+			// RATHER THAN ASSUMED, and it is a different KIND from the twentieth. This one exists because its
+			// design reaches a conclusion a register entry cannot enforce: `REG-F-244` remedy 3 blocks the
+			// diagnostic read surface behind `REG-Q-056`, and the buildable remainder is a PAIR — a resolution
+			// layer and its reader — with the rule "they ship together or neither ships". ⭑ That rule is the
+			// whole point: shipped alone the resolution layer would be the hollow governed layer this
+			// repository has recorded against itself repeatedly, and a rule binding two stages across one
+			// commit is exactly what a roadmap holds and an entry does not.
+			// ⭑ IT SUBSUMES: it closes the read half of `REG-F-245` (b′) — *"the system records WHERE an
+			// artifact's content lives and never once resolves it"* — rather than opening a new front, and its
+			// exit criterion (a non-test caller, verified with a positive control) retires it.
+		).toBe(21);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
