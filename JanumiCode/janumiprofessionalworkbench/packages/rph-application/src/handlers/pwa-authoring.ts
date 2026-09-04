@@ -14,6 +14,7 @@ import type {
 	EditPwuTypePayload,
 	PublishPwaPayload
 } from '@janumipwb/rph-contracts';
+import { EditPwuTypePayloadSchema } from '@janumipwb/rph-contracts';
 import {
 	analyzePwaGraph,
 	buildPwaGraphExport,
@@ -472,6 +473,14 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		requiredAssurancePolicyIds: p.requiredAssurancePolicyIds ?? [],
 		completionRule:
 			p.completionRule ?? 'Execution succeeded AND required outputs exist AND assurance satisfied',
+		// ⚠ JAN-PROMPT — AND THE DEFINE PATH NEEDED ITS OWN LINE, WHICH IS THE FINDING. `buildRedefinedTypeState`
+		// (the EDIT path) was updated first and the feature looked done: the unit test passed, the handler
+		// accepted a prompt-only edit, and the e2e that EDITS a prompt went green. The e2e that CREATES one
+		// caught it — define builds its state here, separately, and silently dropped the field. ⭑ Two write
+		// paths for one field is the drift this module's own reader comment warns about, and the warning did
+		// not save me from it.
+		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
+		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {}),
 		status: 'DRAFT'
 	};
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, state, p.pwuTypeId);
@@ -622,20 +631,22 @@ function requireDraftOwner(
  *  authored after the initial DefinePwuType. */
 /** The EditPwuType patch fields (JAN-CMDPRE DWP-08 EDIT no-op compares these RAW payload fields vs current — NOT the
  *  derived `next`, whose executionBoundary default + permittedChildTypeIds re-derivation would skew the comparison). */
-const EDITABLE_PWU_TYPE_FIELDS = [
-	'name',
-	'purpose',
-	'pwuKind',
-	'isRoot',
-	'completionRule',
-	'permittedChildTypeIds',
-	'permittedChildren',
-	'requiredInputs',
-	'requiredOutputs',
-	'requiredAssurancePolicyIds',
-	'executionBoundary',
-	'boundaryContract'
-] as const satisfies readonly (keyof EditPwuTypePayload)[];
+//
+// ⭑⭑ DERIVED FROM THE PAYLOAD, NOT ENUMERATED — AND THE HAND-WRITTEN VERSION WAS A TRAP WITH A DATE ON IT.
+// This was a literal list of twelve field names, `satisfies readonly (keyof EditPwuTypePayload)[]`. That type
+// guarantees every entry IS a payload key; it guarantees NOTHING about the reverse, so a field added to the
+// payload is silently absent from the no-op comparison. `JAN-PROMPT` added two (`promptTemplate`,
+// `contextSpecification`) and the consequence would have been exact and user-visible: an edit changing ONLY
+// the prompt compares equal on all twelve, is refused as "nothing changed", and the screen cannot save. That
+// is the sponsor's original complaint — *"I couldn't see where to view or edit the PWU's prompt template"* —
+// reproduced one layer down, by the fix for it.
+//
+// So the list is derived from the schema and the trap cannot recur: every payload key except the target's own
+// identity is editable BY CONSTRUCTION. `pwuTypeId` addresses the aggregate; comparing it to itself would make
+// every edit look like a change.
+const EDITABLE_PWU_TYPE_FIELDS: readonly string[] = Object.keys(
+	EditPwuTypePayloadSchema.shape
+).filter((f) => f !== 'pwuTypeId');
 const pwuTypeEditNoOp = noOpEditPrecondition('EditPwuType', EDITABLE_PWU_TYPE_FIELDS);
 
 /** Build the redefined PWU Type state: the carried-forward envelope plus every payload-present editable field.
@@ -668,7 +679,11 @@ function buildRedefinedTypeState(
 		...(p.requiredOutputs !== undefined ? { requiredOutputs: p.requiredOutputs } : {}),
 		...(p.requiredAssurancePolicyIds !== undefined
 			? { requiredAssurancePolicyIds: p.requiredAssurancePolicyIds }
-			: {})
+			: {}),
+		// JAN-PROMPT / REG-D-058 — the runtime assets the type OWNS. Undefined-means-absent like every sibling
+		// above, so an edit that does not mention the template leaves it alone rather than clearing it.
+		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
+		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {})
 	};
 }
 

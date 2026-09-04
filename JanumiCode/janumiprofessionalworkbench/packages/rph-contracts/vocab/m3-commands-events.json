@@ -2609,6 +2609,18 @@
 					"field": "boundaryContract",
 					"required": false,
 					"type": "BoundaryContract"
+				},
+				{
+					"field": "promptTemplate",
+					"required": false,
+					"type": "PromptTemplate",
+					"note": "REG-D-058 (sponsor): the template is OWNED by the type, so it is authored through the type's own commands rather than a separate library. Optional under PER-2 — every PwuTypeDefined already written carries none."
+				},
+				{
+					"field": "contextSpecification",
+					"required": false,
+					"type": "ContextSpecification",
+					"note": "The DEC-4 carrier: for every mandatory parent constraint, exactly one fate, no silent omission."
 				}
 			]
 		},
@@ -2844,6 +2856,18 @@
 					"field": "boundaryContract",
 					"required": false,
 					"type": "BoundaryContract"
+				},
+				{
+					"field": "promptTemplate",
+					"required": false,
+					"type": "PromptTemplate",
+					"note": "REG-D-058 (sponsor): the template is OWNED by the type, so it is authored through the type's own commands rather than a separate library. Optional under PER-2 — every PwuTypeDefined already written carries none."
+				},
+				{
+					"field": "contextSpecification",
+					"required": false,
+					"type": "ContextSpecification",
+					"note": "The DEC-4 carrier: for every mandatory parent constraint, exactly one fate, no silent omission."
 				}
 			]
 		},

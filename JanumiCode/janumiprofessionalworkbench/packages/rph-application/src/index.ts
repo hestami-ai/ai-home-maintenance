@@ -32,3 +32,5 @@ export type {
 	ResolvableExchange,
 	AnswerSpanRead
 } from './exchange-resolution.js';
+export { renderPromptTemplate, markersIn, promptTemplateFingerprint } from './prompt-render.js';
+export type { RenderOutcome } from './prompt-render.js';

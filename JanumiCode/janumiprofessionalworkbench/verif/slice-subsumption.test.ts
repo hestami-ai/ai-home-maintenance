@@ -170,7 +170,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: it closes the read half of `REG-F-245` (b′) — *"the system records WHERE an
 			// artifact's content lives and never once resolves it"* — rather than opening a new front, and its
 			// exit criterion (a non-test caller, verified with a positive control) retires it.
-		).toBe(21);
+			//
+			// 21 -> 22 (2026-09-04): `ROADMAP-prompt-template-and-context.md` (`JAN-PROMPT`). ⚠ THE WARRANT IS
+			// THE SPONSOR'S OWN DIAGNOSIS, not a programme's convenience: *"a PWU is an agent with a prompt
+			// template and relevant context … none of that existed in reality. So a PWA actually could not truly
+			// run and do real work."* Measured and correct — every object definition searched for a
+			// prompt/template/context field returned TWO hits and neither was a template. `REG-D-058` (sponsor)
+			// then ruled the ownership axis, and item-23-style discipline applies: schema, handler, render guard,
+			// surface and conformance move together or the field is a governed thing with no screen — which is
+			// the defect being fixed, so shipping it that way would be self-refuting.
+			// ⭑ IT SUBSUMES: canon already ratifies most of the hard half (DEC-1 puts rendering at the STEP,
+			// ASR-4 makes a prompt a runtime asset rather than meaning, DEC-4 governs context assembly
+			// exhaustively), so this roadmap builds CARRIERS for existing rules rather than opening a front —
+			// and its exit criterion is a browser spec that reads a stored prompt back.
+		).toBe(22);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

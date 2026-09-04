@@ -177,6 +177,18 @@ export const ConflictResolutionRuleSchema = z.strictObject({
 	action: z.string()
 });
 export type ConflictResolutionRule = z.infer<typeof ConflictResolutionRuleSchema>;
+export const ConstraintDispositionSchema = z.strictObject({
+	constraintId: z.string(),
+	fate: z.enum([
+		'PROPAGATED',
+		'RETAINED_AT_PARENT',
+		'INAPPLICABLE_WITH_RATIONALE',
+		'WAIVED_THROUGH_AUTHORITY',
+		'SUPERSEDED_BY_STRONGER'
+	]),
+	rationale: z.string().optional()
+});
+export type ConstraintDisposition = z.infer<typeof ConstraintDispositionSchema>;
 export const ConstraintPropagationSchema = z.strictObject({
 	constraintId: z.string(),
 	childWorkUnitIds: z.array(z.string()),
@@ -188,6 +200,11 @@ export const ConstraintPropagationSchema = z.strictObject({
 	supersededByConstraintId: z.string().optional()
 });
 export type ConstraintPropagation = z.infer<typeof ConstraintPropagationSchema>;
+export const ContextSpecificationSchema = z.strictObject({
+	requiredElements: z.array(z.string()),
+	constraintDispositions: z.array(ConstraintDispositionSchema)
+});
+export type ContextSpecification = z.infer<typeof ContextSpecificationSchema>;
 export const ConversationEntrySchema = z.strictObject({
 	role: z.string(),
 	kind: z.string(),
@@ -363,6 +380,14 @@ export const PermittedChildRuleSchema = z.strictObject({
 	applicabilityNote: z.string().optional()
 });
 export type PermittedChildRule = z.infer<typeof PermittedChildRuleSchema>;
+export const PromptTemplateSchema = z.strictObject({
+	templateText: z.string(),
+	templateVersion: z.number().int(),
+	declaredPlaceholders: z.array(z.string()),
+	outputContract: z.string().optional(),
+	status: z.enum(['DRAFT', 'ACTIVE'])
+});
+export type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
 export const RecompositionConflictSchema = z.strictObject({
 	conflictType: z.string(),
 	conflictingChildWorkUnitIds: z.array(z.string()),
@@ -789,6 +814,8 @@ export const PwuTypeSchema = z.strictObject({
 	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	executionBoundary: ExecutionBoundarySchema.optional(),
 	boundaryContract: BoundaryContractSchema.optional(),
+	promptTemplate: PromptTemplateSchema.optional(),
+	contextSpecification: ContextSpecificationSchema.optional(),
 	requiredInputs: z.array(z.string()),
 	requiredOutputs: z.array(z.string()),
 	requiredAssurancePolicyIds: z.array(z.string()),

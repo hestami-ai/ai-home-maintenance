@@ -19,7 +19,7 @@ import type {
 	ExecutionBoundary,
 	PermittedChildRule
 } from '@janumipwb/rph-authoring';
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, PromptTemplate } from '@janumipwb/rph-contracts';
 import { readPolicyFields } from './policy-fields';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
@@ -44,6 +44,7 @@ import {
 	type ConversationEntry,
 	type UiCommandInput
 } from '$lib/server/workbench';
+import { markersIn } from '@janumipwb/rph-application';
 import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
 import { getArtifactStore } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
@@ -139,7 +140,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		executionBoundary: (t.state.executionBoundary === 'DELEGATED_EXTERNAL'
 			? 'DELEGATED_EXTERNAL'
 			: 'INTERNAL') as ExecutionBoundary,
-		boundaryContract: t.state.boundaryContract as BoundaryContract | undefined
+		boundaryContract: t.state.boundaryContract as BoundaryContract | undefined,
+		// JAN-PROMPT — projected so the editor can SHOW the prompt, not merely accept one. A field the page
+		// can write and cannot read back is the sponsor's original complaint with the arrow reversed.
+		promptTemplate: t.state.promptTemplate as PromptTemplate | undefined
 	}));
 	// The engine's Assurance Policy library (real ASSURANCE_POLICY objects): the manager lists these, the PWU-type
 	// picker offers the ACTIVE non-floor ones, and the rail resolves ids to names. Floor policies are flagged locked.
@@ -244,6 +248,9 @@ interface TypeFields {
 	executionBoundary: ExecutionBoundary;
 	/** Present iff executionBoundary is DELEGATED_EXTERNAL (STD-3). */
 	boundaryContract?: BoundaryContract;
+	/** JAN-PROMPT / REG-D-058 — the runtime asset the type OWNS. Absent when the author wrote no prompt, which
+	 *  is TRUE of every type that exists today and is a fact rather than a placeholder. */
+	promptTemplate?: PromptTemplate;
 }
 
 /** Copy a stored ratified-array field through verbatim, falling back to a single-value array. Never String():
@@ -298,7 +305,30 @@ function readTypeFields(form: FormData): TypeFields {
 			...(applicabilityNote ? { applicabilityNote } : {})
 		};
 	}
+	// ⭑ JAN-PROMPT — PARSED HERE, IN THE READER BOTH ACTIONS SHARE. Reading it separately in `defineType` and
+	// `editType` is how two paths drift: the sponsor's original complaint was a field with no screen, and a
+	// field savable on create but not on edit is the same complaint with an extra step.
+	//
+	// ⚠ `declaredPlaceholders` IS DERIVED FROM THE TEXT, NOT ASKED FOR. Making an author list them by hand
+	// creates exactly the drift the render guard exists to refuse — they would type `{subject}` and forget to
+	// declare it, and the prompt would be unrenderable at the moment it mattered. The closed list is still
+	// enforced downstream; this just stops the UI manufacturing violations.
+	const templateText = String((form.get('promptTemplateText') ?? '') as string).trim();
+	const promptTemplate: PromptTemplate | undefined = templateText
+		? {
+				templateText,
+				templateVersion: Number(form.get('promptTemplateVersion') ?? 1) || 1,
+				declaredPlaceholders: markersIn(templateText),
+				...(String((form.get('promptOutputContract') ?? '') as string).trim()
+					? { outputContract: String(form.get('promptOutputContract') as string).trim() }
+					: {}),
+				// ACTIVE only when the author says so. A DRAFT template is authored text, not an approved
+				// instruction, and `renderPromptTemplate` refuses it.
+				status: form.has('promptActive') ? 'ACTIVE' : 'DRAFT'
+			}
+		: undefined;
 	return {
+		promptTemplate,
 		name: String((form.get('name') ?? '') as string).trim(),
 		pwuKind: String((form.get('pwuKind') ?? '') as string)
 			.trim()
@@ -547,7 +577,8 @@ export const actions: Actions = {
 			requiredOutputs: f.requiredOutputs,
 			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
 			executionBoundary: f.executionBoundary,
-			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {})
+			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {}),
+			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { definedType: id };
@@ -593,7 +624,8 @@ export const actions: Actions = {
 			requiredOutputs: f.requiredOutputs,
 			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
 			executionBoundary: f.executionBoundary,
-			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {})
+			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {}),
+			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedType: pwuTypeId };

@@ -418,7 +418,14 @@
 		// contract's scalar parts. attestedAssurancePolicyIds is a separate checkbox-selection state below.
 		executionBoundary: 'INTERNAL',
 		counterpartyLabel: '',
-		boundaryApplicabilityNote: ''
+		boundaryApplicabilityNote: '',
+		// JAN-PROMPT / REG-D-058 — the prompt this type's execution steps render. `declaredPlaceholders` is NOT
+		// asked for: the server derives it from the text, because asking an author to keep a hand-list in step
+		// with their own prose manufactures exactly the drift the render guard refuses.
+		promptTemplateText: '',
+		promptOutputContract: '',
+		promptActive: false,
+		promptTemplateVersion: 1
 	});
 	let children = $state<string[]>([]);
 	// Selected declared assurance policy ids for the type being authored (distinct from data.policies, the library).
@@ -469,7 +476,11 @@
 			requiredOutputs: '',
 			executionBoundary: 'INTERNAL',
 			counterpartyLabel: '',
-			boundaryApplicabilityNote: ''
+			boundaryApplicabilityNote: '',
+			promptTemplateText: '',
+			promptOutputContract: '',
+			promptActive: false,
+			promptTemplateVersion: 1
 		});
 		children = [];
 		selectedPolicyIds = [];
@@ -494,7 +505,14 @@
 			requiredOutputs: t.requiredOutputs.join(', '),
 			executionBoundary: t.executionBoundary,
 			counterpartyLabel: t.boundaryContract?.counterpartyLabel ?? '',
-			boundaryApplicabilityNote: t.boundaryContract?.applicabilityNote ?? ''
+			boundaryApplicabilityNote: t.boundaryContract?.applicabilityNote ?? '',
+			// ⭑ READ BACK, not merely writable. The sponsor's report was that there was nowhere to VIEW or edit
+			// this; a form that accepts a prompt and cannot show the one already stored is half an answer.
+			promptTemplateText: t.promptTemplate?.templateText ?? '',
+			promptOutputContract: t.promptTemplate?.outputContract ?? '',
+			promptActive: t.promptTemplate?.status === 'ACTIVE',
+			// Bumped on save so the fingerprint on every recorded model call resolves to the exact text used.
+			promptTemplateVersion: (t.promptTemplate?.templateVersion ?? 0) + 1
 		});
 		children = [...t.permittedChildTypeIds];
 		selectedPolicyIds = [...t.requiredAssurancePolicyIds];
@@ -1462,6 +1480,58 @@
 							<div class="ffield">
 								{@render fhead('Purpose', PWU_TYPE_HELP.purpose, 'pwu-type-purpose')}
 								<textarea id="pwu-type-purpose" name="purpose" bind:value={f.purpose} rows="2"></textarea>
+							</div>
+							<!-- JAN-PROMPT / REG-D-058 — HOW the work is attempted, beside WHAT it is. Purpose says what
+							     the unit is for; this says what an agent is told. DEC-1 keeps them apart: the type OWNS
+							     the template, an execution STEP renders it, and a PWU is never merely a prompt. -->
+							<div class="ffield">
+								{@render fhead(
+									'Prompt template',
+									'What an agent is told when this type is executed. Use {placeholder} markers for context that gets filled in at run time — they are recorded automatically, and a marker nothing supplies REFUSES the run rather than sending a prompt with a hole in it.',
+									'pwu-type-prompt'
+								)}
+								<textarea
+									id="pwu-type-prompt"
+									name="promptTemplateText"
+									data-testid="pwu-type-prompt"
+									bind:value={f.promptTemplateText}
+									rows="5"
+									placeholder={'Assess {subject} against {criteria}, and report findings.'}
+								></textarea>
+								<input type="hidden" name="promptTemplateVersion" value={f.promptTemplateVersion} />
+								{#if f.promptTemplateText.trim()}
+									{@const markers = [
+										...new Set(
+											[...f.promptTemplateText.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map((m) => m[1])
+										)
+									]}
+									<p class="promptnote" data-testid="pwu-type-prompt-markers">
+										{#if markers.length}
+											Context this prompt needs: {markers.join(', ')}
+										{:else}
+											No context markers — this prompt is the same every run.
+										{/if}
+									</p>
+								{/if}
+							</div>
+							<div class="ffield">
+								{@render fhead(
+									'Expected answer shape',
+									'What a usable answer looks like. An answer that does not match is inert — it creates no findings and changes nothing.',
+									'pwu-type-output-contract'
+								)}
+								<input
+									id="pwu-type-output-contract"
+									name="promptOutputContract"
+									bind:value={f.promptOutputContract}
+									placeholder="(optional) e.g. JSON with findings[] and recommendation"
+								/>
+								<label class="promptactive">
+									<input type="checkbox" name="promptActive" bind:checked={f.promptActive} />
+									<!-- A DRAFT template is authored text, not an approved instruction: renderPromptTemplate
+									     refuses it, so this checkbox is the difference between writing and arming. -->
+									Ready to use — an unchecked prompt is saved but will not run
+								</label>
 							</div>
 							<div class="ffield">
 								{@render fhead(
@@ -2983,5 +3053,19 @@
 		margin: 0;
 		color: var(--muted, #667);
 		font-size: 0.72rem;
+	}
+
+	.promptnote {
+		margin: 0.3rem 0 0;
+		font-size: 0.72rem;
+		color: var(--muted, #667);
+	}
+	.promptactive {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-top: 0.45rem;
+		font-size: 0.75rem;
+		color: var(--muted, #667);
 	}
 </style>

@@ -31147,3 +31147,70 @@ per `REG-F-093`'s standing rule; all three are ratified `JPWB-DOC-003` text:
   **Owed:** three narrow questions the design asks with recommendations attached — whether a DRAFT template
   versions per edit, whether a missing declared placeholder refuses or discloses, and whether an ACTIVE
   template needs approval separate from publishing. Status: CLOSED as a ruling.
+
+### REG-F-350 — a work-unit type can now say HOW its work is attempted, and the e2e caught what four green unit tests did not
+
+- **Date:** 2026-09-04 · **Type:** FINDING (capability landed under `REG-D-058`) · **Class:**
+  FINDING — closes the sponsor's reported defect; two self-corrections · **Status:** ✅ CLOSED.
+
+**WHAT LANDED.** `PWU_TYPE` carries an optional `promptTemplate` and `contextSpecification`
+(`packages/rph-contracts/vocab/m1-object-fields.json`, regenerated); both `DefinePwuType` and `EditPwuType`
+accept them; `renderPromptTemplate` enforces the sponsor's refusal ruling; and **the PWA Designer has the
+screen** — authored, stored, and **read back on reopen**, proven through a real browser
+(`apps/rph-demo/e2e/pwu-prompt-template.e2e.ts`, 2/2).
+
+> ### ⚠⚠ THE E2E CAUGHT WHAT FOUR GREEN UNIT TESTS DID NOT, AND THAT IS THE FINDING
+> `promptTemplate` was wired into `buildRedefinedTypeState` — the **EDIT** path — and the feature looked
+> finished: contracts green, handler green, a driven test proving a prompt-only edit is ACCEPTED and lands in
+> state, and the browser spec that EDITS a prompt passing. ⛔ **The browser spec that CREATES one failed.**
+> `definePwuType` builds its state **separately**, and dropped the field silently.
+>
+> ⭑ **The module's own reader comment warns about exactly this** — *"Reading it separately in `defineType` and
+> `editType` is how two paths drift"* — and I wrote that warning **in this same change**, one layer up, while
+> leaving the drift one layer down. **A warning about a defect is not a guard against it.**
+>
+> **GENERAL FORM, DERIVED:** *a field with two write paths needs a test on each, and the one you built second
+> is the one that already passes for the wrong reason.* The unit tests all exercised EDIT because that is
+> where the interesting guard (the no-op comparison) lives; CREATE had no guard, so nothing drew a test to it.
+
+> ### ⚠ AND A SECOND SELF-CORRECTION, INSIDE THE TEST THAT WAS MEANT TO BE THE STRICT ONE
+> My first unit test for the no-op trap asserted that `promptTemplate` is a key of
+> `EditPwuTypePayloadSchema`. **That is true whether the comparison is derived from the schema or hand-written
+> from a stale list** — it tested the payload, not the comparison, and would have survived its own named
+> mutant. Replaced by a **driven** test: a real engine, a real PWA, a real type, an edit changing only the
+> prompt, asserted ACCEPTED and read back from the store. **Driven: with the twelve-name list restored, that
+> test is the single victim in 973.**
+
+- ⭑ **THE NO-OP LIST IS NOW DERIVED, so the trap cannot recur.** `EDITABLE_PWU_TYPE_FIELDS` was twelve literal
+  names `satisfies readonly (keyof EditPwuTypePayload)[]` — a type that guarantees every entry IS a payload key
+  and **nothing about the reverse**. It is now `Object.keys(EditPwuTypePayloadSchema.shape)` minus the
+  aggregate's own id. **Hand-listing was the defect one level up**, and the consequence would have been exact:
+  an edit changing only the prompt compares equal on all twelve, is refused as *"nothing changed"*, and the
+  screen cannot save — **the sponsor's original complaint reproduced by the fix for it.**
+- **THE RENDER GUARD RUNS IN BOTH DIRECTIONS, and each catches a different real failure.** Declared-but-
+  unsupplied is `DEC-4`'s silent omission arriving through the front door; **present-in-the-text-but-
+  undeclared** is the one without which the closed list is decorative — an author adds `{priorFindings}`,
+  declares nothing, and the first check never fires because it only walks the declared list. ⭑ **The UI does
+  not ask for the declared list at all**: the server derives it from the text, because asking an author to
+  keep a hand-list in step with their own prose manufactures precisely the drift the guard refuses.
+  **Three mutants, three single victims** (empty-substitute, undeclared-allowed, render-any-status), with a
+  control proving an *empty supplied value* is not a *missing* one.
+- **`promptTemplateFingerprint` HAS A REFERENT FOR THE FIRST TIME.** `PER-9`: *"A prompt or template
+  fingerprint identifies that record; it never substitutes for it."* It fingerprinted a template with no home
+  — an identifier for a thing that did not exist. It now resolves to an owning type and a version.
+- **WHAT THIS DOES NOT DO, stated so the roadmap cannot quietly claim it.**
+  1. ⛔ **It does not make execution real.** Nothing anywhere calls a model on behalf of an execution step; the
+     demo's execute button remains an eleven-command script. **This supplies the ASSET, not the CALLER.**
+  2. **The context specification has a carrier and no editor.** `constraintDispositions` needs constraints to
+     point at, and a user cannot author an obligation or a constraint at all — so an editor today would be an
+     empty form. Scoped out deliberately, and recorded rather than discovered.
+  3. **It does not touch the risk-graduated assurance ladder** (inert, pending its own ruling) or memory
+     (`memoryPolicyId` stays an ungrounded id).
+- **DERIVATION RE-RUN, NOT RECALLED** (`REG-F-348`'s trigger — *what did this change make EXIST, and who is on
+  record saying it does not?*). Searched at HEAD: the only records asserting a prompt template does not exist
+  are this programme's own design and roadmap, which say so in the past tense and cite the measurement.
+  **No standing entry is falsified by this change** — a narrower answer than the last two runs, and it is the
+  answer the search returned rather than the one I expected.
+- **Merge target:** contracts vocab + generated; `handlers/pwa-authoring.ts`; `prompt-render.ts`;
+  `routes/pwa/[id]/+page.server.ts` and `+page.svelte`; `e2e/pwu-prompt-template.e2e.ts`. **Owed:** nothing on
+  this stage. Status: CLOSED.

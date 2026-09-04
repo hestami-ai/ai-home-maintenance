@@ -1377,6 +1377,18 @@
 					"note": "JAN-PRPWA-DS-001 STD-3 (R-9): the org-boundary ICD authored in lieu of decomposition. Present iff executionBoundary is DELEGATED_EXTERNAL (INV-1); the handler enforces coherence both ways (present-when-delegated, absent-when-internal) at the write boundary."
 				},
 				{
+					"field": "promptTemplate",
+					"type": "PromptTemplate",
+					"required": false,
+					"note": "REG-D-058 (sponsor): OWNED by this type, not bound from a library. OPTIONAL IS FORCED, NOT PREFERRED — PER-2 makes event schemas permanent, and every PwuTypeDefined already written carries no template; a required field would either falsify those records or demand an upcaster inventing a template nobody authored. Absence means 'this type declares no agent behaviour', which is TRUE of every type that exists today."
+				},
+				{
+					"field": "contextSpecification",
+					"type": "ContextSpecification",
+					"required": false,
+					"note": "The DEC-4 carrier. Optional for the same PER-2 reason as promptTemplate."
+				},
+				{
 					"field": "requiredInputs",
 					"type": "string[]",
 					"required": true
@@ -3739,6 +3751,82 @@
 					"type": "string",
 					"required": false,
 					"note": "Non-REPORTED only; refused empty."
+				}
+			]
+		},
+		{
+			"name": "PromptTemplate",
+			"note": "JAN-PROMPT / REG-D-058 (sponsor: \"prompt templates are owned\"). The runtime asset a PWU_TYPE owns so its execution steps can attempt the work. ASR-4 (DOC-003:241) is the ratified pattern: prompts are 'runtime assets of the policy, never the policy itself' — so this does NOT restate what the type MEANS, and editing it does not invalidate assurance already recorded. DEC-1 (:211) forbids a PWU that IS a prompt: the type owns the template, the STEP renders it.",
+			"fields": [
+				{
+					"field": "templateText",
+					"type": "string",
+					"required": true,
+					"note": "The template, with {placeholder} markers. Untrusted on the way back in (PER-10), never on the way out — this is authored by a professional, not returned by a model."
+				},
+				{
+					"field": "templateVersion",
+					"type": "number",
+					"required": true,
+					"note": "Monotonic within the owning type. What MODEL_EXCHANGE.promptTemplateFingerprint finally resolves to — PER-9: a fingerprint 'identifies that record; it never substitutes for it', and until REG-D-058 there was no referent."
+				},
+				{
+					"field": "declaredPlaceholders",
+					"type": "string[]",
+					"required": true,
+					"note": "CLOSED. Every marker in templateText must appear here and every entry here must be supplied at render, both directions — an undeclared marker is a hole nobody declared, and a declared-but-unsupplied one is a hole nobody filled. Sponsor ruling 2026-09-04: a missing placeholder REFUSES rather than rendering and disclosing."
+				},
+				{
+					"field": "outputContract",
+					"type": "string",
+					"required": false,
+					"note": "What a conforming answer looks like, so a malformed one is INERT (ASR-11) rather than interpreted."
+				},
+				{
+					"field": "status",
+					"type": "'DRAFT' | 'ACTIVE'",
+					"required": true,
+					"note": "A DRAFT template is not a runnable asset. No approval separate from publishing the owning PWA (sponsor, 2026-09-04): publishing IS the review moment."
+				}
+			]
+		},
+		{
+			"name": "ConstraintDisposition",
+			"note": "DEC-4 (DOC-003:224) made carriable. The five fates are QUOTED FROM CANON, not invented, and the union is CLOSED because DEC-4's whole content is that exactly one holds per relevant child and 'no silent omission' is legal.",
+			"fields": [
+				{
+					"field": "constraintId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "fate",
+					"type": "'PROPAGATED' | 'RETAINED_AT_PARENT' | 'INAPPLICABLE_WITH_RATIONALE' | 'WAIVED_THROUGH_AUTHORITY' | 'SUPERSEDED_BY_STRONGER'",
+					"required": true
+				},
+				{
+					"field": "rationale",
+					"type": "string",
+					"required": false,
+					"note": "DEC-4 names the rationale INSIDE one fate ('marked inapplicable with rationale'), so it is required for INAPPLICABLE_WITH_RATIONALE and optional elsewhere — enforced by the handler, since the schema cannot express a per-member requirement."
+				}
+			]
+		},
+		{
+			"name": "ContextSpecification",
+			"note": "JAN-PROMPT. The carrier for a rule that already existed: DEC-4's SCOPE names context assembly explicitly — 'a context omission must not silently remove a mandatory constraint'. This object does not invent a context model; it makes the ratified one sayable.",
+			"fields": [
+				{
+					"field": "requiredElements",
+					"type": "string[]",
+					"required": true,
+					"note": "What the type declares must be assembled for it. Aligns with the template's declaredPlaceholders; the render guard is what holds them together."
+				},
+				{
+					"field": "constraintDispositions",
+					"type": "ConstraintDisposition[]",
+					"required": true,
+					"note": "DEC-4: for every mandatory parent constraint, exactly one fate. REQUIRED and possibly empty — an empty list says 'no mandatory constraints applied', which is a claim; an ABSENT list would say nothing, which is the silent omission DEC-4 forbids."
 				}
 			]
 		},

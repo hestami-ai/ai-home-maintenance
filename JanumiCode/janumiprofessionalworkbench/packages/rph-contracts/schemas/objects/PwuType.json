@@ -326,6 +326,87 @@
       ],
       "additionalProperties": false
     },
+    "promptTemplate": {
+      "type": "object",
+      "properties": {
+        "templateText": {
+          "type": "string"
+        },
+        "templateVersion": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "declaredPlaceholders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputContract": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "DRAFT",
+            "ACTIVE"
+          ]
+        }
+      },
+      "required": [
+        "templateText",
+        "templateVersion",
+        "declaredPlaceholders",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "contextSpecification": {
+      "type": "object",
+      "properties": {
+        "requiredElements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraintDispositions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "constraintId": {
+                "type": "string"
+              },
+              "fate": {
+                "type": "string",
+                "enum": [
+                  "PROPAGATED",
+                  "RETAINED_AT_PARENT",
+                  "INAPPLICABLE_WITH_RATIONALE",
+                  "WAIVED_THROUGH_AUTHORITY",
+                  "SUPERSEDED_BY_STRONGER"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "constraintId",
+              "fate"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "requiredElements",
+        "constraintDispositions"
+      ],
+      "additionalProperties": false
+    },
     "requiredInputs": {
       "type": "array",
       "items": {

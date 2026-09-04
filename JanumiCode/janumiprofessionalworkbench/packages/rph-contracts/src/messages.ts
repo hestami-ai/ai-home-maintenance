@@ -61,6 +61,7 @@ import {
 	ConfidenceAssessmentSchema,
 	ConflictResolutionRuleSchema,
 	ConstraintPropagationSchema,
+	ContextSpecificationSchema,
 	ControlActionRecommendationSchema,
 	ConversationEntrySchema,
 	CoverageClaimSchema,
@@ -84,6 +85,7 @@ import {
 	OmittedRegionSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
+	PromptTemplateSchema,
 	RecompositionConflictSchema,
 	RemediationRuleSchema,
 	RetryPolicySchema,
@@ -628,7 +630,9 @@ export const DefinePwuTypePayloadSchema = z.strictObject({
 	requiredAssurancePolicyIds: z.array(z.string()).optional(),
 	completionRule: z.string().optional(),
 	executionBoundary: ExecutionBoundarySchema.optional(),
-	boundaryContract: BoundaryContractSchema.optional()
+	boundaryContract: BoundaryContractSchema.optional(),
+	promptTemplate: PromptTemplateSchema.optional(),
+	contextSpecification: ContextSpecificationSchema.optional()
 });
 export type DefinePwuTypePayload = z.infer<typeof DefinePwuTypePayloadSchema>;
 export const SubmitPwaForReviewPayloadSchema = z.strictObject({});
@@ -679,7 +683,9 @@ export const EditPwuTypePayloadSchema = z.strictObject({
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional(),
 	executionBoundary: ExecutionBoundarySchema.optional(),
-	boundaryContract: BoundaryContractSchema.optional()
+	boundaryContract: BoundaryContractSchema.optional(),
+	promptTemplate: PromptTemplateSchema.optional(),
+	contextSpecification: ContextSpecificationSchema.optional()
 });
 export type EditPwuTypePayload = z.infer<typeof EditPwuTypePayloadSchema>;
 export const RemovePwuTypePayloadSchema = z.strictObject({
