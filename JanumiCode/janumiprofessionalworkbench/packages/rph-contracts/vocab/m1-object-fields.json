@@ -3744,7 +3744,7 @@
 		},
 		{
 			"name": "OmittedRegion",
-			"note": "E-4 detail. role is a CLOSED union: a free string is an untyped discriminator inside a record whose whole warrant is typed relationships.",
+			"note": "E-4 detail. role is a CLOSED union: a free string is an untyped discriminator inside a record whose whole warrant is typed relationships. REG-D-057 (sponsor) added byteOffset: a region records WHERE it was cut out, not merely that it was, because size alone does not let a reader put the original back together.",
 			"fields": [
 				{
 					"field": "role",
@@ -3759,7 +3759,14 @@
 				{
 					"field": "byteSize",
 					"type": "number",
-					"required": true
+					"required": true,
+					"note": "UTF-8 bytes of the omitted region, measured with Buffer.byteLength — NOT string length, which differs the moment the reply is not ASCII."
+				},
+				{
+					"field": "byteOffset",
+					"type": "number",
+					"required": true,
+					"note": "REG-D-057. Where the region began, as a UTF-8 byte offset into the ORIGINAL reply. With this the retained pieces reassemble exactly: raw = retained.slice(0, byteOffset) + omitted + retained.slice(byteOffset). Without it the same two stored objects are produced by reason-then-answer and by answer-then-rationalisation (REG-F-345, driven)."
 				}
 			]
 		},

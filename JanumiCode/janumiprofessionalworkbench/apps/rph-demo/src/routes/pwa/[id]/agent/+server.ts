@@ -16,7 +16,7 @@ import {
 	narrationOf,
 	omissionFor,
 	TRANSCRIPT_KIND,
-	type OmittedRegion,
+	type DeclaredOmission,
 	type TranscriptEntry
 } from '$lib/server/agent/transcript';
 import {
@@ -192,7 +192,7 @@ async function runFloorAfterTurn(ctx: {
 function recordEvent(
 	transcript: TurnEntry[],
 	ev: AuthoringAgentEvent,
-	omitted?: OmittedRegion[]
+	omitted?: DeclaredOmission[]
 ): void {
 	const kind = TRANSCRIPT_KIND[ev.kind] ?? '';
 	if (!isRecordable(kind)) {
@@ -200,8 +200,9 @@ function recordEvent(
 		// not [legal]". Recording THAT they were dropped is metadata and needs no content store.
 		// ⚠ CORRECTED (`REG-F-348`): this said "no purgeable plane — DEF-W2-001". A purgeable plane exists at
 		// HEAD; THIS ROUTE IS NOT WIRED TO IT. ⛔ And the omissions built here are `transcript.ts`'s
-		// `OmittedRegion`, NOT `exchange-record.ts`'s — two same-named interfaces, and only this one is ever
-		// produced. They compose a user-facing message and reach no governed record. `REG-F-345`.
+		// `DeclaredOmission` — renamed under `REG-F-345` precisely because it was NOT the governed
+		// `OmittedRegion` its own comment claimed to be. These compose a user-facing message and reach no
+		// governed record; the governed one now carries a byte offset and is reversible.
 		const region = omissionFor(kind);
 		if (region && omitted) omitted.push(region);
 		return;
@@ -324,7 +325,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			// drop has to happen before the write, not after. See $lib/server/agent/transcript.
 			// ICP-03: omissions accumulate for the turn. They are METADATA (what was dropped and why), never
 			// the dropped content — so they are available today while retention waits on ICP-03's ruling.
-			const omitted: OmittedRegion[] = [];
+			const omitted: DeclaredOmission[] = [];
 			const record = (ev: AuthoringAgentEvent) => recordEvent(transcript, ev, omitted);
 			try {
 				if (pwa.publicationStatus !== 'DRAFT') {

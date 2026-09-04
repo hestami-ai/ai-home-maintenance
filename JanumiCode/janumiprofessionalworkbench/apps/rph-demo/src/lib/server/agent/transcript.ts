@@ -31,9 +31,18 @@ export function isRecordable(kind: string): boolean {
 	return RECORDABLE.has(kind);
 }
 
-/** One declared omission — PER-9's "declared truncation or omission" (E-4), in the shape `ExchangeRecord`
- *  carries as `omittedRegions`. */
-export interface OmittedRegion {
+/**
+ * One declared omission on the AUTHORING transcript — `PER-9`'s *"declared truncation or omission"* (E-4).
+ *
+ * ⚠ RENAMED FROM `OmittedRegion` (`REG-F-345`). A second interface of that exact name lives one file away in
+ * `exchange-record.ts`, bound to the governed `MODEL_EXCHANGE` record, and this file's doc-comment used to
+ * claim to be *"the shape `ExchangeRecord` carries as `omittedRegions`"*. It never was: nothing routes these
+ * into any exchange record, and a reader grepping the type name found producers here and concluded the
+ * governed field was fed. It is not. ⭑ The names are now different because the things are different — this
+ * one declares a DROP with nothing retained, and the governed one declares a SEPARATION that can be undone
+ * (it carries `byteSize` and `byteOffset`; this one has nothing to offset into).
+ */
+export interface DeclaredOmission {
 	readonly role: string;
 	readonly reason: string;
 }
@@ -106,7 +115,7 @@ export function dispositionOf(kind: string): WriteDisposition | undefined {
  * available today even though the retained half is not — and the difference between a silent drop and a
  * declared one is exactly the difference PER-9 draws between an illegal omission and a legal one.
  */
-export function omissionFor(kind: string): OmittedRegion | undefined {
+export function omissionFor(kind: string): DeclaredOmission | undefined {
 	if (dispositionOf(kind) !== 'DROPPED_GOVERNED') return undefined;
 	const role = OMISSION_ROLE[kind as AuthoringEventKind];
 	return role ? { role, reason: OMISSION_REASON_BY_ROLE[role] } : undefined;

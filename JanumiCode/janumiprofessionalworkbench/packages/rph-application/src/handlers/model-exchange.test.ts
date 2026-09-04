@@ -19,6 +19,14 @@ const MEX = 'mex_01ARZ3NDEKTSV4RRFFQ69G0301';
 const PRIOR = 'mex_01ARZ3NDEKTSV4RRFFQ69G0300';
 const SUBJECT = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5A80';
 
+/** The one region a separated exchange owes — REG-D-057. Sizes are the real ones from REG-F-345's drive. */
+const CUT = {
+	role: 'MODEL_ANSWER' as const,
+	reason: 'The answer span was cut out of the retained reasoning at retention (Guide §9.7).',
+	byteSize: 7,
+	byteOffset: 19
+};
+
 const STORED = {
 	status: 'STORED',
 	storageProvider: 'jpwb:in-memory',
@@ -27,6 +35,13 @@ const STORED = {
 	byteSize: 2048,
 	purgeability: 'RETAINED_BY_PARTICIPATION',
 	contentDurability: 'PROCESS_LOCAL'
+};
+
+/** The arrangement the §9.7 split actually produces: both spans stored, the blob NOT, and the cut declared. */
+const SEPARATED = {
+	answerSpanRef: STORED,
+	volunteeredReasoningRef: STORED,
+	omittedRegions: [CUT]
 };
 
 /** The disclosed absence PER-9 permits — as distinct from the silent one it forbids. */
@@ -144,8 +159,47 @@ describe('RecordModelExchange — one bounded model try becomes a durable record
 	it('CONTROL — the two SPANS may both be STORED, so the refusal is about mixing, not storing', () => {
 		// Without this the guard could not be told apart from "refuse every stored E-2 ref", which would
 		// silently keep REG-Q-066's block in force after the sponsor lifted it.
-		const r = record(wellFormed({ answerSpanRef: STORED, volunteeredReasoningRef: STORED }));
+		// ⚠ THIS FIXTURE GAINED `omittedRegions` AND THAT IS THE POINT OF THE NEXT TEST, not an accommodation:
+		// under REG-D-057 a separation is only lawful if it says WHERE it cut, so "both spans stored" is no
+		// longer a complete arrangement by itself.
+		const r = record(wellFormed({ ...SEPARATED }));
 		expect(r.status, 'the separated spans are exactly what REG-D-056 permits').toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a separation that does not say WHERE it cut — REG-D-057', () => {
+		// The answer was cut out of the retained reasoning. Without the region's byteOffset the two stored
+		// objects reassemble in two different orders, and the reply that actually arrived is unrecoverable —
+		// REG-F-345 drove exactly that, on a policy whose subject is HOW the reviewer reasoned.
+		//
+		// THE MUTANT: delete this guard. Nothing else reddens — which is the whole hazard. A record missing
+		// its region still satisfies every other rule here and still LOOKS complete; the loss is only visible
+		// to someone who tries to rebuild the reply and finds two candidates.
+		const r = record(wellFormed({ ...SEPARATED, omittedRegions: [] }));
+		expect(r.status, 'a separation with no declared cut must not be accepted').not.toBe('ACCEPTED');
+		expect(JSON.stringify(r), 'the refusal must name what is missing').toMatch(
+			/MODEL_ANSWER omitted region/
+		);
+		expect(emitted(), 'and no event may be written for a refused command').toHaveLength(0);
+	});
+
+	it('⛔ REFUSES a MODEL_ANSWER region whose byteSize is zero — a fabricated measurement', () => {
+		// The shape this replaces: the mapper used to hardcode `byteSize: 0` because the app-local region
+		// carried no size (REG-F-345). It was harmless only while nothing produced a region. ⭑ A zero that
+		// READS as a measurement is worse than an absent field, because a reader cannot discount it.
+		//
+		// THE MUTANT: drop the byteSize check and keep the cardinality one. The test above still passes.
+		const r = record(
+			wellFormed({ ...SEPARATED, omittedRegions: [{ ...CUT, byteSize: 0 }] })
+		);
+		expect(r.status).not.toBe('ACCEPTED');
+		expect(JSON.stringify(r), 'the refusal must quote the value it refused').toMatch(/byteSize 0/);
+	});
+
+	it('CONTROL — an UNSEPARATED exchange owes no region, so the rule is about separation', () => {
+		// Without this, the two refusals above could not be told apart from "every exchange must declare a
+		// MODEL_ANSWER region", which would refuse the clean-reply case REG-D-056 explicitly permits.
+		const r = record(wellFormed({ rawOutputBeforeCoercionRef: STORED, answerSpanRef: STORED }));
+		expect(r.status, 'nothing was cut out, so nothing is owed').toBe('ACCEPTED');
 	});
 
 	it('CONTROL — a whole blob with NO reasoning separated out is accepted', () => {

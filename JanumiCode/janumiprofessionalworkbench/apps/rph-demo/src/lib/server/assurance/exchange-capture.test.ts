@@ -32,6 +32,118 @@ function harness() {
 }
 
 describe('ICP-02 d2b · exchange capture — one record per bounded try', () => {
+	// ── ⭑ REG-D-057 — THE OMISSION IS DECLARED WITH ENOUGH STRUCTURE TO UNDO IT ────────────────────────────
+	//
+	// This is the test the whole ruling exists for. `REG-F-345` drove the defect: the split stored
+	// `prefix + suffix` as one object and recorded the join nowhere, so `thinking hard here {"r":1}` and
+	// `{"r":1}thinking hard here ` produced BYTE-IDENTICAL records. Reason-then-answer and
+	// answer-then-rationalisation were the same record — on a policy whose subject is HOW the reviewer
+	// reasoned. The sponsor ruled option (a): record where the answer sat.
+	it('⭑ a MIXED reply REASSEMBLES to the exact bytes that arrived', async () => {
+		const { store, sink } = harness();
+		const RAW = 'Let me think. {"verdict":"ok"} On reflection, yes.';
+
+		await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-round-trip',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'assess it',
+			rawOutput: RAW,
+			disposition: 'accepted'
+		});
+
+		const rec = sink.drain()[0]!;
+		const cut = rec.omittedRegions.find((r) => r.role === 'MODEL_ANSWER');
+		expect(cut, 'a separated reply owes a declared MODEL_ANSWER omission').toBeDefined();
+
+		// Read the two retained objects back and put them together the way the region says to.
+		const reasoning = await store.get(rec.volunteeredReasoningRef.storageKey!);
+		const answer = await store.get(rec.answerSpanRef.storageKey!);
+		const bytes = Buffer.from(reasoning!, 'utf8');
+		const rebuilt = Buffer.concat([
+			bytes.subarray(0, cut!.byteOffset),
+			Buffer.from(answer!, 'utf8'),
+			bytes.subarray(cut!.byteOffset)
+		]).toString('utf8');
+
+		// THE MUTANT: drop `byteOffset` from the region, or append the answer at the end instead of at the
+		// offset. Before this ruling the record simply could not distinguish the two, and this assertion is
+		// the only thing in the repository that would notice.
+		expect(rebuilt, 'the retained halves must rebuild the reply exactly').toBe(RAW);
+		expect(cut!.byteSize).toBe(Buffer.byteLength('{"verdict":"ok"}', 'utf8'));
+	});
+
+	// ── ⚠ AND THE UNITS ARE BYTES, WHICH ONLY A NON-ASCII REPLY CAN PROVE ──────────────────────────────────
+	//
+	// `byteSize` everywhere else in this record is `Buffer.byteLength`; `String.prototype.length` is UTF-16
+	// code units. They agree on ASCII and diverge the moment they matter — which is exactly the shape that
+	// ships green and corrupts real traffic. THE MUTANT: use `span.prefix.length` in `captureTry`. The test
+	// above still passes; this one reddens, and it is the ONLY thing that does.
+	it('⭑ and it reassembles a NON-ASCII reply, so the offset is bytes and not code units', async () => {
+		const { store, sink } = harness();
+		// Accented Latin (2 bytes each), a CJK sentence (3 bytes each) and an emoji (4 bytes, a surrogate
+		// pair in UTF-16) — every class where the two measurements disagree, ahead of the answer span.
+		const RAW = 'Réflexion préalable — 慎重に検討します 🧭 {"verdict":"ok"} Fin.';
+
+		await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-utf8',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'assess it',
+			rawOutput: RAW,
+			disposition: 'accepted'
+		});
+
+		const rec = sink.drain()[0]!;
+		const cut = rec.omittedRegions.find((r) => r.role === 'MODEL_ANSWER')!;
+
+		// The control that makes this test mean something: if these two agreed, the fixture would be ASCII
+		// and the mutant would survive. They must differ, or this test is not testing what it claims.
+		const prefix = RAW.slice(0, RAW.indexOf('{'));
+		expect(
+			Buffer.byteLength(prefix, 'utf8'),
+			'the fixture must be one where bytes and code units DISAGREE'
+		).not.toBe(prefix.length);
+		expect(cut.byteOffset, 'the offset is UTF-8 bytes').toBe(Buffer.byteLength(prefix, 'utf8'));
+
+		const reasoning = Buffer.from((await store.get(rec.volunteeredReasoningRef.storageKey!))!, 'utf8');
+		const answer = Buffer.from((await store.get(rec.answerSpanRef.storageKey!))!, 'utf8');
+		const rebuilt = Buffer.concat([
+			reasoning.subarray(0, cut.byteOffset),
+			answer,
+			reasoning.subarray(cut.byteOffset)
+		]).toString('utf8');
+		expect(rebuilt).toBe(RAW);
+	});
+
+	// ⛔ AND A CLEAN REPLY OWES NO REGION — without this the two tests above could not be told apart from
+	// "every exchange declares a MODEL_ANSWER omission", which would be false and would refuse the case
+	// REG-D-056 permits: nothing was cut out, so nothing is declared.
+	it('CONTROL — a reply with nothing separated declares no omission', async () => {
+		const { store, sink } = harness();
+		await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-clean',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'assess it',
+			rawOutput: '{"verdict":"ok"}',
+			disposition: 'accepted'
+		});
+		expect(sink.drain()[0]!.omittedRegions).toEqual([]);
+	});
+
 	it('records the try, and the materialized input is STORED rather than pending', async () => {
 		const { store, sink } = harness();
 

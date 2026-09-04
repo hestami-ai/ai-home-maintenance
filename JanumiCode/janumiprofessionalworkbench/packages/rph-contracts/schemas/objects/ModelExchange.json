@@ -708,12 +708,18 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "byteOffset": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
           "role",
           "reason",
-          "byteSize"
+          "byteSize",
+          "byteOffset"
         ],
         "additionalProperties": false
       }

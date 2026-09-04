@@ -82,9 +82,26 @@ export interface ContentRef {
 	readonly reason?: string;
 }
 
+/**
+ * One region cut out of what was retained — `PER-9`'s *"declared truncation or omission"* (E-4).
+ *
+ * ⭑ `byteOffset` IS WHAT MAKES THE OMISSION REVERSIBLE, AND IT WAS ABSENT UNTIL `REG-D-057`. A region that
+ * records only its SIZE says something was removed; it does not say from where, so the retained pieces cannot
+ * be put back in order. `REG-F-345` drove the consequence: the replies `thinking hard here {"r":1}` and
+ * `{"r":1}thinking hard here ` produced BYTE-IDENTICAL records. Reason-then-answer and
+ * answer-then-rationalisation were the same record, on a policy whose subject is how the reviewer reasoned.
+ *
+ * ⚠ BOTH NUMBERS ARE UTF-8 BYTES, NOT STRING LENGTHS. They differ the moment a reply is not ASCII, and a
+ * reconstruction that mixes the two units silently corrupts every non-English reply. Measured with
+ * `Buffer.byteLength` at the producer and asserted against a non-ASCII fixture.
+ */
 export interface OmittedRegion {
 	readonly role: string;
 	readonly reason: string;
+	/** UTF-8 bytes removed. */
+	readonly byteSize: number;
+	/** Where the removal began, as a UTF-8 byte offset into the ORIGINAL reply. */
+	readonly byteOffset: number;
 }
 
 export interface ExchangeRecord {

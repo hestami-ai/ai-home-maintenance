@@ -353,7 +353,8 @@ export const OmittedRegionSchema = z.strictObject({
 		'OTHER'
 	]),
 	reason: z.string(),
-	byteSize: z.number().int()
+	byteSize: z.number().int(),
+	byteOffset: z.number().int()
 });
 export type OmittedRegion = z.infer<typeof OmittedRegionSchema>;
 export const PermittedChildRuleSchema = z.strictObject({

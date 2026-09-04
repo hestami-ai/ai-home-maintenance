@@ -30,6 +30,7 @@ import { splitAnswerSpan } from './agy-cli.js';
 import {
 	beginExchange,
 	type ContentRef,
+	type OmittedRegion,
 	type ExchangeDisposition,
 	type ExchangeParseOutcome,
 	type ExchangeRecord,
@@ -189,6 +190,11 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 	let answerSpanRef: ContentRef;
 	let volunteeredReasoningRef: ContentRef;
 	let rawOutputRef: ContentRef;
+	// ⭑ `REG-D-057` (sponsor, option (a)): the split DECLARES the omission it performs, and declares it with
+	// enough structure to undo. Guide §9.7 and `PER-9` both require *"declared truncation or omission"* in the
+	// same sentence that names the elements to record — so this is the field the obligation always pointed at,
+	// filled for the first time since it was authored.
+	let omittedRegions: OmittedRegion[] = [];
 
 	if (!span.located) {
 		// ⛔ §9.7's OWN INSTRUCTION, and the only branch that still refuses. `located` is a MEASUREMENT
@@ -224,10 +230,28 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 			? pendingRef(
 					'Separated at retention per Guide §9.7: the answer span and the volunteered reasoning are ' +
 						'retained as two objects under their own classes. The whole blob is not stored because one ' +
-						'stored object carries one retention class and this one is mixed.'
+						'stored object carries one retention class and this one is mixed. The reply is NOT lost: ' +
+						'`omittedRegions` carries the answer span’s byte offset, so the two retained objects ' +
+						'reassemble into the exact bytes that arrived.'
 				)
 			: // Nothing to separate: the whole output IS the answer, so a single class fits it exactly.
 				answerSpanRef;
+
+		if (volunteered)
+			omittedRegions = [
+				{
+					role: 'MODEL_ANSWER',
+					reason:
+						'The answer span was cut out of the retained reasoning at retention (Guide §9.7) because ' +
+						'the two halves carry opposite retention classes. It is retained separately as ' +
+						'`answerSpanRef` under RETAINED_BY_PARTICIPATION. Reassemble the reply as ' +
+						'reasoning.slice(0, byteOffset) + answer + reasoning.slice(byteOffset), in BYTES.',
+					// ⚠ UTF-8 BYTES, measured — not `String.length`, which is UTF-16 code units and disagrees
+					// with `byteSize` everywhere else in this record the moment a reply is not ASCII.
+					byteSize: Buffer.byteLength(span.answer, 'utf8'),
+					byteOffset: Buffer.byteLength(span.prefix, 'utf8')
+				}
+			];
 	}
 
 	const inputRef = await put(input.prompt, 'RETAINED_BY_PARTICIPATION');
@@ -238,6 +262,7 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		rawOutputBeforeCoercionRef: rawOutputRef,
 		answerSpanRef,
 		volunteeredReasoningRef,
+		omittedRegions,
 		disposition: input.disposition,
 		parseOutcome: input.parseOutcome
 	};

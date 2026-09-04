@@ -106,6 +106,7 @@ describe('MXR-06 — MODEL_EXCHANGE carries PER-9 as TYPED relationships, not a 
 			'E-3 version': 'resolvedModelVersion',
 			'E-4 input truncation': 'inputTruncation',
 			'E-4 output truncation': 'outputTruncation',
+			'E-4 declared omission': 'omittedRegions',
 			'E-5 disposition': 'disposition',
 			'E-5 parse outcome': 'parseOutcome',
 			'E-6 redaction manifest': 'inputRedactionManifestRef',
@@ -120,6 +121,29 @@ describe('MXR-06 — MODEL_EXCHANGE carries PER-9 as TYPED relationships, not a 
 			expect(props, `${element} has no field`).toHaveProperty(field);
 			expect(required.has(field), `${element} (${field}) must be REQUIRED, not optional`).toBe(true);
 		}
+	});
+
+	it('⭑ E-4 declares an omission REVERSIBLY — a size without a position is not a declaration', () => {
+		// ⭑ THE PROPERTY `REG-D-057` WAS GRANTED ON, and item 23's conjunction requires this limb to move with
+		// the schema rather than after it. `REG-F-345` drove what a size-only region costs: the §9.7 split
+		// stored `prefix + suffix` as one object and recorded the join nowhere, so two replies differing only
+		// in whether the model reasoned BEFORE or AFTER answering produced byte-identical records.
+		//
+		// THE MUTANT: demote `byteOffset` to optional in the vocabulary and regenerate. Every other assertion
+		// in this file still passes; a producer may then omit it, and the loss is invisible on the record.
+		const region = nodes(SCHEMA).find(
+			(n) => Array.isArray(n.required) && (n.required as string[]).includes('byteOffset')
+		);
+		expect(region, 'no node in the tree requires byteOffset').toBeDefined();
+		const req = region!.required as string[];
+		for (const f of ['role', 'reason', 'byteSize', 'byteOffset'])
+			expect(req, `an omitted region must require ${f}`).toContain(f);
+
+		// A CLOSED role union, so the omission's kind is a typed discriminator rather than free text — the
+		// same property every other node in this tree is held to.
+		const role = (region!.properties as Record<string, Record<string, unknown> | undefined>).role;
+		expect(role, 'the region has no role field').toBeDefined();
+		expect(role?.enum, 'role must be a closed union').toContain('MODEL_ANSWER');
 	});
 
 	it('⭑ E-3 carries a VERSION, which ActorReference could not', () => {

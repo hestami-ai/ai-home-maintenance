@@ -133,6 +133,31 @@ export const recordModelExchange: CommandHandler = (ctx, command, payload) => {
 				'blob. (REG-D-056 permits the spans; it does not lift this.)'
 		);
 
+	// ⛔ AND THE ONE `REG-D-057` REQUIRES, WHICH IS THE SAME SPLIT SEEN FROM THE OTHER SIDE.
+	//
+	// A separation is only lawful under Guide §9.7 if it is LOSSLESS. When the answer was cut out of the
+	// retained reasoning, the record must say WHERE — otherwise the two stored objects reassemble in two
+	// orders and the reply that actually arrived is unrecoverable. `REG-F-345` drove that: two replies
+	// differing only in whether the model reasoned BEFORE or AFTER answering produced byte-identical records.
+	//
+	// ⭑ THIS IS FAIL-CLOSED BY CHOICE. The producer already declares the region; without this guard the
+	// invariant would be a convention one refactor away from silence, and its failure is invisible — the
+	// record still looks complete. Refusing here makes reversibility a property of the CONTRACT.
+	const answer = (p as unknown as Record<string, Ref>).answerSpanRef!;
+	const separated =
+		answer.status === 'STORED' && reasoning.status === 'STORED' && raw.status !== 'STORED';
+	if (separated) {
+		const cut = p.omittedRegions.filter((r) => r.role === 'MODEL_ANSWER');
+		if (cut.length !== 1)
+			return bad(
+				`a separated exchange must declare exactly one MODEL_ANSWER omitted region and this one declares ${cut.length}. The answer span was cut out of the retained reasoning, so PER-9's "declared truncation or omission" is owed for it — and without the region's byteOffset the retained halves cannot be put back in the order they arrived (REG-D-057).`
+			);
+		if (cut[0]!.byteSize <= 0)
+			return bad(
+				`the MODEL_ANSWER omitted region reports byteSize ${cut[0]!.byteSize}, but a span was separated out and stored, so its size is not zero. A fabricated size is worse than an absent one: it reads as a measurement.`
+			);
+	}
+
 	// ── E-3 IDENTITY FACTS. Per-fact, so "the provider reported nothing" stays distinguishable from
 	//    "nobody looked" — the distinction an optional string cannot carry.
 	for (const name of factFields(p)) {

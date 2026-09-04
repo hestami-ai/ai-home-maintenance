@@ -184,10 +184,15 @@ export function toRecordModelExchange(
 		// The app-local record carries ONE truncation state, so the same measurement answers both questions
 		// until something distinguishes them. Recorded here rather than silently duplicated at the call site.
 		outputTruncation: TRUNCATION[rec.truncationState],
+		// ⚠ `byteSize` USED TO BE HARDCODED `0` HERE, because the app-local region carried no size and the
+		// contract required one. It was harmless only because nothing ever produced a region — the first
+		// producer would have silently recorded "0 bytes omitted" (`REG-F-345`). Both numbers are now real,
+		// measured in UTF-8 bytes at the split, and passed through rather than invented.
 		omittedRegions: rec.omittedRegions.map((r) => ({
 			role: REGION_ROLES.has(r.role) ? r.role : 'OTHER',
 			reason: r.reason,
-			byteSize: 0
+			byteSize: r.byteSize,
+			byteOffset: r.byteOffset
 		})),
 		disposition: rec.disposition ? DISPOSITION[rec.disposition] : 'NO_RESPONSE',
 		parseOutcome: rec.parseOutcome,

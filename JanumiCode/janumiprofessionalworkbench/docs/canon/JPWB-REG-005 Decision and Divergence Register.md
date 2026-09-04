@@ -30556,7 +30556,8 @@ field was drafted, defended as 'retained whole', and withdrawn. Do not write the
 
 - **Date:** 2026-09-03 · **Type:** FINDING (defect in work landed the same day) · **Class:**
   FINDING — CODE_IS_WRONG; a self-correction against `REG-D-056`'s implementation ·
-  **Status:** 🔴 OPEN. Blocked on `REG-Q-076`.
+  **Status:** ✅ CLOSED 2026-09-04 by `REG-D-057` — the sponsor ruled option (a) and the field landed with
+  its guard, its conformance limb and four driven mutants. Superseding ~~🔴 OPEN. Blocked on `REG-Q-076`.~~
 
 **THE DEFECT, DRIVEN BEFORE IT WAS DESCRIBED.** `captureTry` computes the volunteered half as
 `span.prefix + span.suffix` (`apps/rph-demo/src/lib/server/assurance/exchange-capture.ts:187`) — the text
@@ -30678,7 +30679,9 @@ refuses an ad-hoc one as `unrecognized_keys`.
 - **Date:** 2026-09-03 · **Type:** QUESTION (sponsor) · **Class:**
   QUESTION — puts `REG-F-345` to the sponsor because every available answer either edits a contract inside
   §16 item 23's frozen surface or narrows a ruling made hours earlier ·
-  **Status:** 🔴 OPEN.
+  **Status:** ✅ ADJUDICATED 2026-09-04 by sponsor ruling (`REG-D-057`) — **option (a) GRANTED**
+  (*"So the recommendation / option (a) is agreeable."*): a declared omission records WHERE it cut.
+  Superseding ~~🔴 OPEN.~~
 
 **THE QUESTION IN PLAIN LANGUAGE.** *When the reviewer's reply mixes its answer with its reasoning, we now
 keep both halves — but we no longer record which came first, so we cannot put the reply back together. Do we
@@ -30884,4 +30887,82 @@ survive; their stated grounds do not.
 - **BOUND.** This entry does not re-adjudicate `REG-F-245` or `REG-F-338`; both stay as they are, with their
   grounds corrected here. It does not claim the derivation is exhaustive beyond the corpora named.
 - **Merge target:** `reasoning-review-validator.ts`, `agent/exchange-record.ts`. **Owed:** nothing.
+  Status: CLOSED.
+
+### REG-D-057 — SPONSOR RULING on `REG-Q-076`: option (a) — a declared omission records WHERE it cut, not merely that it did
+
+- **Date:** 2026-09-04 · **Type:** RULING (sponsor) · **Class:**
+  DECISION — adjudicates `REG-Q-076`; closes `REG-F-345`; licenses one field inside §16 item 23's surface ·
+  **Status:** ✅ CLOSED, implemented and gated in the same commit per item 23's conjunction.
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"So the recommendation / option (a) is agreeable."*
+
+**WHAT WAS LICENSED, AND IT IS ONE NUMBER.** `OmittedRegion` gains `byteOffset: number`, REQUIRED — where the
+omitted region began, as a **UTF-8 byte offset into the original reply**. With it the two retained objects
+reassemble exactly: `raw = retained.slice(0, byteOffset) + omitted + retained.slice(byteOffset)`, in bytes.
+
+> ### ⭑ WHAT THIS ACTUALLY REPAIRS, IN ONE LINE
+> Before: the §9.7 split stored `prefix + suffix` as one object and recorded the join nowhere, so
+> `thinking hard here {"r":1}` and `{"r":1}thinking hard here ` produced **byte-identical records**
+> (`REG-F-345`, driven). Reason-then-answer and answer-then-rationalisation were the same record — on a policy
+> (`ASR-4`) whose named concerns include *"premature convergence"* and *"invalid or circular inference"*.
+> After: the reply reassembles to the exact bytes that arrived, **driven, including on a non-ASCII fixture.**
+
+**ITEM 23'S CONJUNCTION, LIMB BY LIMB** (*"Evolve policy registry, schemas, persistence, projections,
+fixtures, and conformance tests together before claiming support"* — Guide `:2520`). Nothing here is deferred:
+
+| Limb | Where |
+|---|---|
+| **Schema** | `packages/rph-contracts/vocab/m1-object-fields.json` → regenerated `objects.ts`, `messages.ts`, `schemas/objects/ModelExchange.json` |
+| **Persistence** | carried by the existing `RecordModelExchange` / `ModelExchangeRecorded` pair; no new event, no upcaster needed — **every persisted record to date carries `omittedRegions: []`, and an empty array is unaffected by a required field on its element type** |
+| **Producer** | `apps/rph-demo/src/lib/server/assurance/exchange-capture.ts` — the split now declares the omission it performs |
+| **Projections** | `exchange-recorder.ts` passes both numbers through; ⭑ **the `byteSize: 0` fabrication `REG-F-345` recorded is GONE rather than left latent** |
+| **Fixtures** | `exchange-capture.test.ts`, `floor-recording.test.ts`, `model-exchange.test.ts` |
+| **Conformance** | `verif/model-exchange-conformance.test.ts` — a new limb asserting the region is REVERSIBLE, not merely present |
+
+- ⛔ **AND THE GUARD IS FAIL-CLOSED, WHICH IS THE PART THAT MATTERS.**
+  `packages/rph-application/src/handlers/model-exchange.ts` now REFUSES a separated exchange — both spans
+  `STORED`, the blob not — that declares no `MODEL_ANSWER` region, or declares one with `byteSize` 0.
+  ⭑ **Reversibility is a property of the CONTRACT rather than a convention the producer happens to honour.**
+  Without it the invariant is one refactor from silence, and its failure is invisible: the record still looks
+  complete, and only someone trying to rebuild the reply would find two candidates.
+- ⚠ **THE UNITS ARE BYTES, AND ONLY A NON-ASCII FIXTURE CAN PROVE IT.** `byteSize` everywhere else in this
+  record is `Buffer.byteLength`; `String.prototype.length` is UTF-16 code units. They agree on ASCII and
+  diverge exactly where it matters — **the shape that ships green and corrupts real traffic.** The fixture
+  `'Réflexion préalable — 慎重に検討します 🧭 {"verdict":"ok"} Fin.'` spans 2-, 3- and 4-byte sequences ahead of
+  the answer span, and carries its own control asserting that bytes and code units **disagree** on it — without
+  that control the fixture could silently become ASCII and the mutant would survive.
+
+**FOUR MUTANTS, EACH WITH A PREDICTED VICTIM, ALL DRIVEN.**
+
+| | Mutant | Predicted | Observed |
+|---|---|---|---|
+| `M1` | `byteOffset` uses `.length` (code units) | only the non-ASCII test | **1 victim** — the ASCII reassembly test survives, which is what makes the non-ASCII one load-bearing |
+| `M2` | the split stops declaring its omission | the reassembly tests | **3 victims** — both, plus the end-to-end floor test, ⭑ **proving the handler guard is reachable through production wiring and not only in unit fixtures** |
+| `M3` | the whole `REG-D-057` guard removed | the two guard tests | **2 victims**, and nothing else in 1142 |
+| `M4` | `byteOffset` demoted to optional in the vocabulary, regenerated | the conformance limb | **1 victim** in 966 |
+
+- ⭑ **AND THE NEAR-MISS FROM `REG-F-345` IS REPAIRED AT ITS CAUSE, NOT ANNOTATED.** Two structurally identical
+  interfaces named `OmittedRegion` sat one file apart — one produced on the PWA authoring route, one bound to
+  the governed record and never written — and the produced one's doc-comment claimed to be *"the shape
+  `ExchangeRecord` carries as `omittedRegions`"*. **The authoring one is renamed `DeclaredOmission`**
+  (`agent/transcript.ts`, `routes/pwa/[id]/agent/+server.ts`). The names now differ because the things do: a
+  `DeclaredOmission` declares a DROP with nothing retained; an `OmittedRegion` declares a SEPARATION that can
+  be undone. **A reader grepping the type name can no longer conclude the governed field is fed.**
+
+**WHAT THIS DOES NOT DO, so the limb is not read wider than it moved.**
+
+1. **It does not close `ASR-11` limb 3.** The non-separable case — `JSON_EXTRACTION_FAILED`, and *only* that
+   outcome (`REG-F-346`) — still retains nothing, blocked by §9.7's own instruction. The limb stays **PARTIAL**;
+   what changed is the reason, and the ledger row is re-authored with this entry rather than after it, per
+   `REG-F-347`'s amended rule.
+2. **It does not add a diagnostic read path.** Nothing yet resolves a `storageKey` back to bytes in production
+   — filed twice already at `REG-F-244` and `REG-F-245(b′)`, both OPEN, and this ruling does not touch them.
+   ⚠ **The reassembly proven here is proven BY TEST, and the test is currently its only consumer.**
+3. **It does not make the purgeable half purgeable in practice.** `ArtifactStore.purge` still has no
+   production caller (`REG-F-245`, OPEN).
+4. **It does not touch redaction.** `redactionState` stays `NOT_IMPLEMENTED` (finding #60).
+
+- **Merge target:** the six limbs tabled above. **Owed:** nothing on this ruling. `REG-Q-076` is ADJUDICATED
+  and `REG-F-345` is CLOSED by this entry; both status lines are struck in place rather than rewritten.
   Status: CLOSED.
