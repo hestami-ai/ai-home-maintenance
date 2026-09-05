@@ -241,7 +241,30 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// a tool or vendor, and `PER-2` would make a deployment fact permanent), and no change to `agyPrint`
 			// — it reaches two ratified slots that had never been reachable, `evidence: PROVIDER_REPORTED` and
 			// `ActorRef.providerId` on the producer.
-		).toBe(27);
+			//
+			// 27 -> 28 (2026-09-05): `ROADMAP-live-execution-lane.md` (`JAN-LIVEEXEC`). ⭑ A ROADMAP BECAUSE ITS
+			// FIRST TWO UNITS ARE DEFECT FIXES WITH MUTANTS, not lane plumbing: the executor's mock-vs-real
+			// switch was still the ASSURANCE env var, and the reviewer was told every subject was "a canonical
+			// graph export" — false of a work product, and a review conducted on a false account of its own
+			// subject is worse than none because it is RECORDED as one.
+			// ⭑ IT SUBSUMES AND TERMINATES A LINE THE GATES COULD NOT REACH: it added no policy and no vocabulary,
+			// and its exit is an OBSERVATION rather than a green tick — the lane exists to say whether the
+			// reviewer is any good, which no deterministic gate can answer.
+			//
+			// 28 -> 29 (2026-09-05): `ROADMAP-execution-rationale.md` (`JAN-EXECRAT`). ⚠ FILED ON A SPONSOR
+			// RULING (`REG-D-060`) that arrived from a LIVE run, not from planning: GLM-5.2 rejected a real work
+			// product for omitting the §9.7 rationale, and the rejection landed on an incoherence this programme
+			// had introduced — an executor prompt that said *"do not explain your reasoning."*
+			// ⭑ A roadmap rather than a ticket because its design exists to FORBID two shortcuts the register
+			// already names: `REG-D-058` forbids putting the requirement in the TYPE's template (it is owned by
+			// the type), and §9.7 forbids SYNTHESIZING a rationale when none was declared — *"a contract
+			// shortfall to record, never an absence to infer from."* A stage list without those invites both.
+			//
+			// ⚠ AND THE 28th WAS ADDED WITHOUT THIS RATCHET BEING RUN. `JAN-LIVEEXEC` was gated on check-types,
+			// lint, vitest and playwright — not on `verif` — so it landed red here and stayed red until the next
+			// slice happened to run the full gate. The full gate is all five, and running four of them is how a
+			// ratchet dies quietly.
+		).toBe(29);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

@@ -55,10 +55,16 @@ describe('JAN-TOOLSUITE — the execution producer names its OWN tool', () => {
 		// `REG-F-351` records that the §9.7 split locates a JSON object, so an UNDELIMITED prose answer is
 		// blocked from retention and a step's work product is never kept.
 		const answer = await deterministicExecutionPrint('Assess the northern route against the safety rubric.');
-		const parsed = JSON.parse(answer) as { workProduct?: string; basis?: string };
-		expect(parsed.workProduct).toBeTruthy();
+		const parsed = JSON.parse(answer) as {
+			workProduct?: { finding?: string; basis?: string };
+			rationale?: { rationale?: string };
+		};
+		expect(parsed.workProduct?.finding).toBeTruthy();
 		// It echoes a fragment of the prompt, so a test can prove the model SAW the rendered template.
-		expect(parsed.basis).toContain('Assess the northern route');
+		expect(parsed.workProduct?.basis).toContain('Assess the northern route');
+		// ⭑ AND IT MODELS A COMPLIANT ANSWER (`JAN-EXECRAT`). A fixture that omitted the rationale would take the
+		// shortfall branch on every gate run, so the compliant path would be exercised by nothing.
+		expect(parsed.rationale?.rationale, 'the fixture must honour the execution contract').toBeTruthy();
 	});
 });
 

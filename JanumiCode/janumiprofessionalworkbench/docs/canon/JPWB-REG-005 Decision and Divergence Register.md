@@ -31795,3 +31795,88 @@ asserts the retained bytes **are** the answer — and promptly failed on a case 
 
 `REG-Q-077` — may volunteered reasoning be read back? — was theoretical because nothing produced any; it stays
 theoretical **only** while `thinkingLevel: 'off'` holds.
+
+### REG-D-060 — SPONSOR RULING: an execution step DECLARES a rationale — and a LIVE mutant proved the change, rather than a finding merely vanishing
+
+- **Date:** 2026-09-05 · **Type:** DECISION (sponsor ruling; `JAN-EXECRAT` landed) ·
+  **Class:** RULING + FINDING — settles an incoherence this programme introduced, on evidence a live run
+  produced · **Status:** ✅ CLOSED.
+
+**THE SPONSOR'S WORDS, VERBATIM:** *"An execution step should declare a rationale."* With the reasoning:
+*"if not the actual thinking tokens then some sort of explanation is probably key."*
+
+**WHAT FORCED THE QUESTION.** `JAN-LIVEEXEC`'s first successful run had **GLM-5.2 reject a real work product**:
+*"returned the required JSON output but omitted the Section 9.7 professional rationale summary entirely,
+implicitly treating output production as sufficient without accounting for how the obligation was discharged."*
+⚠ That rejection landed on an incoherence **I** introduced in `JAN-TOOLSUITE` `TS-03`: the executor's system
+prompt said *"Do not narrate, do not explain your reasoning."* We instructed the producer not to do the thing
+the reviewer then faulted it for omitting. The ruling settles it in the reviewer's favour: **the prompt was
+wrong.**
+
+⭑⭑ **THE DISTINCTION THE RULING TURNS ON IS ALREADY CANON, AND HAD SIMPLY NEVER BEEN DRAWN ON THIS PLANE.**
+
+| | **Volunteered reasoning** (thinking tokens) | **Professional rationale summary** (§9.7) |
+|---|---|---|
+| How it arises | emitted unbidden | **CONTRACTED** — asked for, part of the deliverable |
+| Retention | `PURGEABLE_AT_EXPIRY` (`PER-12`) | `RETAINED_BY_PARTICIPATION` — it participates |
+| May an evaluator see it? | ⛔ **never** — *"a hidden-context independence violation (ASR-13)"* | ⭑ it is what the evaluator is **for** |
+| Obligation to produce | none — *"no obligation to solicit or procure a trace"* | **required** by this contract |
+
+So `thinkingLevel: 'off'` **STAYS** — we still do not solicit chain-of-thought. What changed is that we now
+require the contracted account that was always meant to stand in its place. The authoring agent's own
+instruction has said so all along: *"An independent reviewer reads this and nothing else about your reasoning."*
+
+**THE SPONSOR'S PAPER, READ AND REPORTED HONESTLY.** *"The Lifecycle of LLM-as-a-Judge for Large-Scale
+Recommendation Explanations"* (arXiv 2608.18300, Netflix). The sponsor flagged they had not read it and that it
+might not align. Three things land, one does not:
+
+1. ⭑ *"most work treats a judge as a static artifact… an LLM judge operating in a deployed system is better
+   understood as having a **lifecycle**."* That is our reviewer exactly — a rubric seeded once, never tuned,
+   with no drift detection. **Named, not taken:** it is a programme, not an increment.
+2. ⭑⭑ Phase III puts **one judge in two roles: *"quality gating and reflective generation."*** That is
+   `REG-D-059` — findings fed back to the executing agent — arrived at independently by a production system
+   running hundreds of thousands of judgements a week. Direct corroboration that gating and feedback are one
+   judge's two jobs.
+3. ⭑ Phase I builds benchmarks with *"human labels **and rationales**"*; Phase II tunes rubrics via a
+   **meta-judge over reasoning output**. Rationales are first-class evaluation data — the sponsor's point,
+   reached from another direction.
+4. ⛔ **WHAT DOES NOT CARRY OVER.** RART learns from *reasoning output*. Ours may not be the **producer's**
+   interior: `PER-12` forbids precisely that. Netflix's judges evaluate explanations that are *deliverables
+   shown to members* — that is our §9.7 rationale, not our thinking tokens. Adopting RART wholesale would walk
+   straight through `ASR-13`'s hidden-context dimension.
+
+**WHERE THE REQUIREMENT LIVES.** ⛔ **NOT in the type's prompt template** — `REG-D-058` ruled the template is
+OWNED by the work-unit type and authored by a professional; injecting into it would silently edit someone
+else's contract. It lives in the **executor's system prompt**, which the harness owns: **the type says WHAT
+work; the harness says the EXECUTION CONTRACT.** The envelope `{workProduct, rationale}` wraps the
+professional's contract rather than replacing it — `workProduct` is re-serialized as the ARTIFACT, so the
+type's own `outputContract` still means what it says.
+
+**⛔ NON-COMPLIANCE IS A RECORDED SHORTFALL, NOT A FABRICATION AND NOT A FAILURE.** No envelope, or no rationale
+in it, and the WHOLE ANSWER IS THE WORK PRODUCT — a professional's work is not discarded because the harness's
+wrapper was ignored — while the rationale is recorded as **not declared**. The authoring seam already stated
+this rule: *"a contract shortfall to record, never an absence to infer from."* A reviewer may then legitimately
+find against the absence, which is exactly the verdict `GLM-5.2` reached, arrived at lawfully.
+
+⭑⭑ **AND THE EVIDENCE IS A LIVE PREDICTED RED, NOT A FINDING THAT MERELY VANISHED.** After the change all three
+assessments came back SATISFIED — which is *weaker* evidence than it looks, because a finding that disappears
+needs more verification than the finding did. So the executor prompt was REVERTED and the lane re-run:
+
+- **with** the execution contract → `SATISFIED ×3` (reproduced twice)
+- **without** it → `REJECTED`: *"The producer omitted the Section 9.7 professional rationale summary entirely,
+  an unacknowledged completeness shortcut that leaves the basis for its framing of 'insufficient'
+  unauditable."*
+
+⭑ Same substance, different words across runs — a reviewer genuinely reasoning rather than matching a string.
+The change CAUSED the difference; the finding did not evaporate on its own.
+
+**A FIXTURE DEFECT CAUGHT ON THE WAY.** `deterministicExecutionPrint` returned `{workProduct, basis}` — a shape
+that collides with the envelope's, so it would have been read as a MALFORMED envelope and taken the shortfall
+branch on **every gate run**, green and silently exercising the non-compliant path forever. The fixture now
+models a COMPLIANT answer, and a test asserts it honours the contract.
+
+**OWED.** The judge's own lifecycle (the paper's central claim) — our rubric is seeded once and never tuned.
+`REG-D-059`'s feedback loop, now doubly motivated and finally supplied with real findings. And the reviewer
+still records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`: `readReportedModel` reads
+the model out of Devin's ATIF export and **is never called**, because the assurance seam still returns a bare
+string exactly as the execution seam did before `TS-04`.

@@ -18,6 +18,8 @@ import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
+import { splitExecutionEnvelope } from './execution-contract.js';
+import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 
 export interface RunModelStepInput {
@@ -78,6 +80,16 @@ export type RunModelStepOutcome =
 			};
 			/** How that identity was obtained — the tool's own grade, or HOST_CONFIGURED when it reported none. */
 			readonly identityEvidence: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
+			/**
+			 * ⭑ §9.7 — THE PRODUCER'S OWN ACCOUNT OF HOW THE WORK PRODUCT DISCHARGES THE OBLIGATION.
+			 *
+			 * ⚠ `undefined` means NOT DECLARED, and that is a CONTRACT SHORTFALL TO RECORD — never an absence to
+			 * infer from, and never a summary to synthesize. A reviewer may legitimately find against it, which
+			 * is precisely the verdict `GLM-5.2` reached in `JAN-LIVEEXEC` before this field existed.
+			 */
+			readonly rationale?: ProfessionalRationaleSummary;
+			/** Set when the execution contract was not honoured, in terms a record can carry. */
+			readonly rationaleShortfall?: string;
 	  }
 	| { readonly ran: false; readonly refusedBecause: string };
 
@@ -139,6 +151,15 @@ export async function runModelInvocationStep(
 			refusedBecause: `The model call failed: ${e instanceof Error ? e.message : String(e)}`
 		};
 	}
+
+	// ⭑ THE EXECUTION CONTRACT IS UNWRAPPED HERE, NOT IN THE ADAPTER. Every executing tool is asked for the same
+	// envelope by the same system prompt, so interpreting it is a property of the STEP rather than of whichever
+	// tool answered — and a second adapter must not be able to interpret it differently.
+	//
+	// ⚠ THE WORK PRODUCT IS WHAT GETS RETAINED, NOT THE ENVELOPE. The professional's own `outputContract` still
+	// means what it says; the harness's wrapper is unwrapped and then forgotten.
+	const envelope = splitExecutionEnvelope(answer);
+	answer = envelope.workProduct;
 
 	const respondedAt = input.now();
 	// ⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, because they can differ: a configured label may
@@ -202,7 +223,9 @@ export async function runModelInvocationStep(
 			modelId: identity.modelId,
 			providerId: identity.providerId
 		},
-		identityEvidence: produced?.identityEvidence ?? 'HOST_CONFIGURED'
+		identityEvidence: produced?.identityEvidence ?? 'HOST_CONFIGURED',
+		...(envelope.rationale ? { rationale: envelope.rationale } : {}),
+		...(envelope.shortfall ? { rationaleShortfall: envelope.shortfall } : {})
 	};
 }
 

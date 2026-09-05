@@ -28,9 +28,18 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
 	// Echoes a fragment of the prompt so a test can prove the MODEL SAW THE RENDERED TEMPLATE, rather than
 	// proving only that some string came back.
 	const seen = prompt.slice(0, 120).replace(/["\\\n]/g, ' ').trim();
+	// ⭑ IT NOW RETURNS THE EXECUTION CONTRACT'S ENVELOPE, because a fixture that does not model a COMPLIANT
+	// answer exercises the non-compliant path forever. `JAN-EXECRAT` requires `{workProduct, rationale}`;
+	// the old shape happened to carry a top-level `workProduct` key and would have been read as a
+	// MALFORMED envelope — green, and silently taking the shortfall branch on every single run.
 	return JSON.stringify({
-		workProduct: 'Assessment complete.',
-		basis: seen
+		workProduct: { finding: 'Assessment complete.', basis: seen },
+		rationale: {
+			rationale: 'The instruction asked for an assessment and the finding states one.',
+			assumptions: ['The rendered instruction is complete.'],
+			limitations: ['This fixture performs no analysis.'],
+			residualUncertainty: []
+		}
 	});
 }
 

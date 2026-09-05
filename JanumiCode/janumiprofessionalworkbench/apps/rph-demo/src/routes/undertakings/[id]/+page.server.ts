@@ -1053,7 +1053,10 @@ export const actions: Actions = {
 					// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
 					// refuse. The outcome now carries who actually produced the work product.
 					producerModelId: outcome.producer.modelId,
-					producerProviderId: outcome.producer.providerId
+					producerProviderId: outcome.producer.providerId,
+					// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
+					// declare one — a recorded shortfall, never a synthesized summary.
+					...(outcome.rationale ? { rationale: outcome.rationale } : {})
 				},
 				uiSession(),
 				{

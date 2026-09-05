@@ -14,6 +14,7 @@ import {
 } from '@janumipwb/rph-assurance';
 import { recordAssuranceRecordingPlan } from '@janumipwb/rph-engine';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
@@ -41,6 +42,14 @@ export interface WorkProductSubject {
 	 * why `DIFFERENT_PROVIDER` was unreachable on this path whatever the policy said.
 	 */
 	readonly producerProviderId: string;
+	/**
+	 * ⭑ §9.7 — the producer's CONTRACTED account of how the work product discharges its obligation.
+	 *
+	 * ⚠ THIS IS NOT VOLUNTEERED REASONING AND MUST NEVER BE CONFUSED WITH IT. Chain-of-thought is emitted
+	 * unbidden, is `PURGEABLE_AT_EXPIRY`, and an evaluator may NEVER see it (`PER-12`). This is ASKED FOR,
+	 * is part of the deliverable, and is exactly what the evaluator is FOR.
+	 */
+	readonly rationale?: ProfessionalRationaleSummary;
 }
 
 /**
@@ -149,7 +158,11 @@ export async function runWorkProductFloor(
 			// that came back. Handing it a summary would make the judgement about the summary.
 			prompt: subject.producingPrompt,
 			content: subject.answer,
-			rationale: undefined,
+			// ⚠ PASSED UNCONDITIONALLY — the section renders `(none recorded)` when absent. §9.7: presence or
+			// absence is never a signal, so the reviewer's INPUT SHAPE must not encode whether the producer
+			// declared one. What the reviewer may do is find against a real absence, which is a judgement about
+			// the work rather than a difference in what it was handed.
+			rationale: subject.rationale,
 			narration: undefined,
 			prior: undefined
 		}

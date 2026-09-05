@@ -18,6 +18,7 @@ import {
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
 import { executorModel } from './backing-tool.js';
+import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { ToolInvocationResult } from './backing-tool.js';
 
 /**
@@ -74,7 +75,7 @@ export async function piExecute(prompt: string): Promise<ToolInvocationResult> {
 		// and project rules would put material into the producer's context that no record names — and if the
 		// reviewer ever loaded the same material, that is ASR-13's *"shared hidden context"* dimension, which
 		// nothing in this codebase detects. The step's prompt is the step's context.
-		systemPromptOverride: () => EXECUTOR_SYSTEM_PROMPT
+		systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT
 	});
 	await loader.reload();
 
@@ -130,15 +131,3 @@ export async function piExecute(prompt: string): Promise<ToolInvocationResult> {
 		identityEvidence: 'PROVIDER_REPORTED'
 	};
 }
-
-/**
- * The executor's system prompt.
- *
- * ⚠ DELIBERATELY MINIMAL. The work-unit's own prompt template is the instruction; anything added here is context
- * the PWU_TYPE did not author and the record does not name. `REG-D-058` ruled prompt templates are OWNED by the
- * work-unit type, and a system prompt that reasoned about the work would compete with that ownership.
- */
-const EXECUTOR_SYSTEM_PROMPT =
-	'You are executing one professional work unit. Follow the instruction exactly and return only the work ' +
-	'product it asks for, in the format it specifies. Do not narrate, do not explain your reasoning, and do ' +
-	'not ask questions.';
