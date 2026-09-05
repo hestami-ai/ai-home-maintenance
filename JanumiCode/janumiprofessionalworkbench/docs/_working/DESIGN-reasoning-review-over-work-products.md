@@ -57,9 +57,21 @@ saw**, which is what makes the judgement about the work rather than about a summ
 model identity, so *"the reviewer was the same invocation"* is **decidable on evidence**. A review that fails
 it records `INDEPENDENCE_VIOLATION`, which the existing classifier already routes to `CHANGE_REVIEWER`.
 
-⚠ **In the demo today the producer and the reviewer are the same configured judge model.** That satisfies
-*separate invocation* — the weakest rung — and nothing more. **The design records that plainly rather than
-implying a stronger independence than the deployment has.**
+⛔ **SUPERSEDED — and it was wrong twice, so it is struck rather than edited.** This paragraph read: *"In the
+demo today the producer and the reviewer are the same configured judge model. That satisfies separate
+invocation — the weakest rung — and nothing more."*
+
+`REG-F-356` found both errors. **First**, the reasoning-review policy requires `DIFFERENT_MODEL`
+(`floor-policies.ts:146`), not separate invocation — so sameness did not "satisfy the weakest rung", it
+**REFUSED outright**. **Second**, it described a *collision* as though it were a deployment choice: the
+execution producer had no configuration of its own and read the ASSURANCE model `JPWB_JUDGE_MODEL`, so producer
+and reviewer were identical **by construction** and the check could only ever fail.
+
+⭑ **What is true now (`JAN-TOOLSUITE`).** The executor is configured separately (`JPWB_EXECUTOR` /
+`JPWB_EXECUTOR_MODEL`) from the reviewer (`JPWB_ASSURANCE_TOOL` / `JPWB_ASSURANCE_MODEL`), and the producer
+identity recorded is the model that **actually answered**, reported by the tool that ran it. Whether the two
+differ is therefore a fact `checkIndependence` **measures**, not a constant this document can assert — which is
+the only form this disclosure can honestly take. See `DESIGN-backing-agent-tool-suite.md` §8.
 
 ### 3.5 What happens to the step
 

@@ -226,7 +226,22 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// new policy, no invented criterion ids — both are read from the policy), and its exit criterion is
 			// a model-executed work unit reaching COMPLETED with its output assured. That closes the chain
 			// REG-D-058 opened, so nothing follows it in this line.
-		).toBe(26);
+			//
+			// 26 -> 27 (2026-09-05): `ROADMAP-backing-agent-tool-suite.md` (`JAN-TOOLSUITE`). ⚠ AND IT REOPENS
+			// THE LINE THE ENTRY ABOVE CALLED TERMINATED, which is the honest reading rather than a
+			// contradiction: `JAN-WPREVIEW` closed the chain `REG-D-058` opened — a work unit runs, is reviewed,
+			// completes — while leaving the review NON-INDEPENDENT, because the executor read the ASSURANCE
+			// model `JPWB_JUDGE_MODEL` and producer and reviewer were the same model BY CONSTRUCTION.
+			// ⭑ A ROADMAP RATHER THAN A TICKET FOR THE USUAL REASON: its design exists to FORBID shortcuts the
+			// register already names. `REG-D-052` forbids an application-default model (`REG-F-331`: a pinned
+			// label rotted and every review failed); `REG-F-353` forbids naming a tool on `PWU_TYPE`; and
+			// `REG-D-048` requires `ModelSelectionPolicy` be answered or DEFERRED EXPLICITLY. A stage list that
+			// did not carry those would invite all three.
+			// ⭑ IT SUBSUMES: no new policy, no new ratified enum member (of the 100 closed enums NOT ONE names
+			// a tool or vendor, and `PER-2` would make a deployment fact permanent), and no change to `agyPrint`
+			// — it reaches two ratified slots that had never been reachable, `evidence: PROVIDER_REPORTED` and
+			// `ActorRef.providerId` on the producer.
+		).toBe(27);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

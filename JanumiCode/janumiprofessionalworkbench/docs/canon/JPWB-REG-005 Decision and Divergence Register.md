@@ -31666,3 +31666,108 @@ substituting an easier problem"*).
   thing — a reviewer that can read a work product"* is now discharged, and its status is struck accordingly.
 - **OWED:** the LIVE reviewer's work-product prompt (the offline arm judges structure only, and says so); and
   `REG-D-059`'s feedback loop, which now has findings to loop on for the first time. Status: CLOSED.
+
+### REG-F-357 — the executor stops borrowing the assurance judge — and THREE of my own claims were refuted before any of them reached code
+
+- **Date:** 2026-09-05 · **Type:** FINDING (`JAN-TOOLSUITE` TS-01..TS-04, TS-07, TS-09 landed) ·
+  **Class:** FINDING — one real defect fixed; three self-corrections; two ratified slots reached for the first
+  time · **Status:** PARTIAL (TS-05/TS-06/TS-08 owed).
+
+**SPONSOR DIRECTION (2026-09-05).** *"We will use Pi CLI for the executor or PWU executing agent backing tool;
+and we will use Devin CLI as another agent tool for the assurance policies backing tool."* Then: *"Use GLM-5.2
+with Devin."*
+
+⭑⭑ **THE DEFECT WAS ONE LINE OF CONFIGURATION.** The execution producer had none of its own: `execution/model.ts`
+read the ASSURANCE backend switch `JPWB_ASSESSOR` and the ASSURANCE model `JPWB_JUDGE_MODEL`. So the producing
+model **was** the reviewing model by construction, and `checkIndependence('DIFFERENT_MODEL', …)` could only ever
+refuse. `REG-F-356` recorded that refusal happening and read it as a field-placement mistake alone; the deeper
+cause was that the seam could not carry a producer identity at all.
+
+**THREE OF MY OWN CLAIMS WERE REFUTED, EACH BEFORE IT REACHED CODE.**
+
+1. ⛔ **"JPWB has zero Pi support."** I searched for `piPrint` and `pi-cli` — **nouns I coined** — got zero, and
+   reported an absence. The obligation-shaped search for the word `Pi` returns **56 hits across 18 files**,
+   including a complete `pi-agent.ts` and a declared dependency `@earendil-works/pi-coding-agent@0.80.6`. Pi was
+   already the **live authoring agent**, in-process via its SDK. `reasoning-review-validator.ts:2` already
+   declared the sponsor's architecture: agy *"is a DIFFERENT vendor than the Pi/Codex executor (model/provider
+   independence)"*.
+2. ⛔ **"`DIFFERENT_PROVIDER` is a STRONGER rung than `DIFFERENT_MODEL`."** It is **orthogonal**.
+   `checkIndependence` is a flat switch of single-dimension equality tests; `DIFFERENT_PROVIDER` checks
+   `providerId` **only**. Swapping the floor to it would **stop checking the model** — a weakening dressed as a
+   strengthening, the trade `REG-D-013` says to refuse. Recommendation reversed.
+3. ⛔ **"Devin CLI is not installed."** It is. `devin.exe` is at `AppData\Local\devin\cli\bin`, and that
+   directory **is** in the registry `Path` — it is the one entry missing from this session's **process**
+   environment, which started before it was added. Diffing registry `Path` against process `Path` returned
+   exactly one difference and it was the Devin entry. ⭑ Checking a single shell's `PATH` and calling a tool
+   absent is the coined-noun error in a different costume: **the instrument was stale, not the fact.**
+
+**TWO RATIFIED SLOTS REACHED FOR THE FIRST TIME.** `ExchangeIdentityFact.evidence = 'PROVIDER_REPORTED'` had
+**zero producers** since the day it was authored (CONTROL: `HOST_CONFIGURED` had 26 uses) — because the seam
+`print: (prompt) => Promise<string>` returns a bare string and could not carry a provider or model **by
+construction**. It now returns `string | ToolInvocationResult`, and the grade is supplied by the **tool**, never
+decided by `identityFacts`, which had it hardcoded. `ActorRef.providerId` — *"DOC-007 §6 addition (for
+validator-independence resolution)"* — is populated on the producer for the first time. ⚠ That mattered
+mechanically, not cosmetically: `differs()` **fails closed on absence** (*"an absence cannot evidence
+independence"*), so any provider-based rung was a **permanent block** while the field was missing.
+
+**MEASURED, NOT READ ABOUT.** Pi: reads **stdin** (so agy's 28,000-char argv ceiling and the rule that its
+diagnostic be DESTROYED both dissolve); `--mode json` reports provider/model/api/responseId/usage/cost;
+`thinking` and `text` are separate typed blocks. Devin `3000.6.14`: `--prompt-file` keeps the prompt out of argv
+entirely; `--export` emits **ATIF-v1.7** carrying `agent.model_name` and per-step
+`extra.generation_model` (`"glm-5-2"`); **no** `thinking`/`reasoning`/`thought` anywhere in a full export, so
+the reviewer volunteers none and `PER-12` records an **observed absence**. ⚠ Devin also injects ambient context
+(`<rules type="always-on">` from a Windsurf memories path, plus `<available_skills>`) — an ASR-13 *shared hidden
+context* concern that nothing detects; suppressed where possible, disclosed where not.
+
+⭑ **AND THE CODEBASE HAD ALREADY RULED THE HARDEST PART.** I planned to capture Pi's reasoning, split it
+structurally and retain it `PURGEABLE_AT_EXPIRY`. `pi-agent.ts` already sets `thinkingLevel: 'off'` because
+*"§9.7: never solicit private chain-of-thought"*, and `PER-12` agrees — *"no obligation to solicit or procure a
+trace"*. So the hazard **does not arise** rather than being managed. It matters: `PER-12` holds that volunteered
+reasoning *"in an evaluator's context is a hidden-context independence violation (ASR-13)"*, and ASR-13's
+*"shared hidden context"* and *"shared prompt lineage"* dimensions have **ZERO representation in code**.
+
+**WHAT THE REGISTER FORBADE, FOUND BEFORE BUILDING.** `REG-D-052` — the model is configured, never pinned;
+absence is a refusal (`REG-F-331`: a pinned label rotted and EVERY review failed). `REG-F-353` — no fourth
+`workDischarge` member and no `PWU_TYPE` field naming a tool; which tool runs a step is **deployment
+configuration**, not a property of the work-unit type. `ASR-4` via `REG-D-058` is the **warrant**: models are
+*"runtime assets of the policy, never the policy itself"*, so a tool change is not a policy change — fenced by
+`ASR-4`'s silence on reproducibility, so a run's identity stays pinned by its own exchange record.
+
+**TWO DISPOSITIONS STATED EXPLICITLY RATHER THAN LEFT IMPLIED.**
+
+- **`ModelSelectionPolicy` is DEFERRED**, as `REG-D-048` requires be done explicitly. Grounds: no field shape
+  anywhere in the corpus, **no reader**, **no command that can set it**, and the demo **never creates a
+  `RUNTIME_BINDING`**. Populating it would author vocabulary for a slot nothing can write or read.
+- **`REG-Q-069` / `REG-F-270` are NOT annexed.** The three-rung profile ladder is unread dead data and
+  `REG-F-270` owns the `minIndependence` conjunct; filing it a third time is forbidden.
+
+**TWO STALE CLAIMS REPAIRED, NOT INHERITED.** `REG-F-356` corrected the *"same configured judge satisfies
+separate invocation"* error and left the prose live in two places: `work-product-floor.ts:88-91` and
+`DESIGN-reasoning-review-over-work-products.md:60`. Both are struck and replaced. The E-3 version rationale —
+*"agy --print reports no model version"* — is also now **false about Pi and Devin**, so it is tool-neutral; the
+absence still holds for all three (each returns a **label**, and a label is not a version), and a test asserts
+the rationale names no single tool.
+
+**GREEN WAS NOT TRUSTED UNTIL A RED WAS SEEN — AND ONE GREEN WAS HOLLOW.** After wiring the suite into the
+execution path, all 235 tests passed **because `getExecutionPrint` had no test at all** and `RPH_DEMO_MODE` is
+unset under vitest: the new branch was reachable and nothing called it. A suite that cannot redden for a change
+is not evidence about that change. Three mutants were then run and reverted — `?? JPWB_JUDGE_MODEL` on the
+executor model, the silent `agy` fallback, and discarding the reported identity — each reddening exactly the
+predicted test. ⭑ A fourth red was **not** planned and taught something: the prompt-leak check probed three
+FIXED windows, and a test echoing the last 120 characters slipped through because `trim()` shifted the tail by
+one character. The **function** was fixed, not the expectation: overlapping windows, because a leak does not
+align itself to the windows we happen to check.
+
+⚠ **CSAA: 27 failures observed, and they are NOT ours.** The `project-hybrid-static-prerequisites` projection
+reads exactly five live files — `workbench.ts`, `command-bus.ts`, `floor.ts`, `governance.ts`, `agy-cli.ts`
+(`JPWB_HYBRID_STATIC_REQUIRED_PATHS`). The set of files changed by this slice has **zero intersection** with
+them. ⭑ CONTROL: the changed set **does** contain `assurance/index.ts`, sitting beside `assurance/agy-cli.ts`,
+so an overlap would have shown. Finding 55 flipped `SATISFIED → UNSUPPORTED` on a region this slice never
+touched. Standing sponsor instruction: CSAA belongs to the CSAA agent, and we attend only to what we break.
+
+**OWED.** `TS-05` (the §9.7 split over a tool that declares `reasoning: NONE` vs `STRUCTURAL`), `TS-06`
+(sanitisation applied at the **assurance** seam — the Validator wraps **no** call to `print(...)`, so an
+injected backend's raw rejection still reaches a projected observation), `TS-08` (the end-to-end showing
+producer and reviewer differing on recorded identity, with the refusal path asserted). `REG-Q-077` — may
+volunteered reasoning be read back? — was theoretical because nothing produced any; it stays theoretical
+**only** while `thinkingLevel: 'off'` holds.
