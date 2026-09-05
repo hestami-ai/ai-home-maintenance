@@ -33,6 +33,10 @@ test.describe('PWA Designer — a PWU type carries the prompt its work is attemp
 		await page.locator('input[name="name"]').fill('Route Assessment');
 		await page.locator('input[name="pwuKind"]').fill('ROUTE_ASSESSMENT');
 		await page.getByLabel(/Root type/i).check();
+		// JAN-DISCHARGE — the type must SAY a model does this work. Rule 2 refuses an ACTIVE prompt on a type
+		// that declares anything else, so this line is the spec obeying the coherence rule rather than
+		// dodging it: an armed prompt and a declared discharge are one decision, said once.
+		await page.getByTestId('pwu-type-discharge').selectOption('MODEL');
 		const PROMPT = 'Assess {subject} against {criteria}, and report findings.';
 		await page.getByTestId('pwu-type-prompt').fill(PROMPT);
 
@@ -90,6 +94,10 @@ test.describe('PWA Designer — a PWU type carries the prompt its work is attemp
 		await page.locator('input[name="name"]').fill('Route Assessment');
 		await page.locator('input[name="pwuKind"]').fill('ROUTE_ASSESSMENT');
 		await page.getByLabel(/Root type/i).check();
+		// JAN-DISCHARGE — the type must SAY a model does this work. Rule 2 refuses an ACTIVE prompt on a type
+		// that declares anything else, so this line is the spec obeying the coherence rule rather than
+		// dodging it: an armed prompt and a declared discharge are one decision, said once.
+		await page.getByTestId('pwu-type-discharge').selectOption('MODEL');
 		await page.getByTestId('pwu-type-prompt').fill('First draft of the prompt.');
 		await page.getByRole('button', { name: 'Add type' }).click();
 		await expect(

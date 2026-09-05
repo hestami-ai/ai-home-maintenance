@@ -1377,6 +1377,12 @@
 					"note": "JAN-PRPWA-DS-001 STD-3 (R-9): the org-boundary ICD authored in lieu of decomposition. Present iff executionBoundary is DELEGATED_EXTERNAL (INV-1); the handler enforces coherence both ways (present-when-delegated, absent-when-internal) at the write boundary."
 				},
 				{
+					"field": "workDischarge",
+					"type": "'MODEL' | 'HUMAN' | 'UNDECLARED'",
+					"required": false,
+					"note": "JAN-DISCHARGE. How this type's work gets discharged, said out loud instead of inferred from whether a prompt happens to exist. ABSENT AND 'UNDECLARED' ARE DIFFERENT FACTS and both are kept: absent = authored before the question existed (nobody was asked); UNDECLARED = asked and deferred. That is ExchangeIdentityFact.availability's ratified shape one object over (REPORTED/UNREPORTED/UNRESOLVABLE/NOT_PROBED), where 'nobody looked' and 'looked and found nothing' are likewise distinct. NO 'EXTERNAL_PARTY' MEMBER: executionBoundary=DELEGATED_EXTERNAL already says the work leaves the organisation, and a second way to say one thing is the duplication defect - a delegated type declares no discharge, its boundaryContract answers it. Coherence is enforced BOTH WAYS by the handler: MODEL requires an ACTIVE promptTemplate, and an ACTIVE promptTemplate requires MODEL (else a carefully authored prompt sits inert on a HUMAN type with nothing saying so)."
+				},
+				{
 					"field": "promptTemplate",
 					"type": "PromptTemplate",
 					"required": false,

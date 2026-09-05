@@ -143,7 +143,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		boundaryContract: t.state.boundaryContract as BoundaryContract | undefined,
 		// JAN-PROMPT — projected so the editor can SHOW the prompt, not merely accept one. A field the page
 		// can write and cannot read back is the sponsor's original complaint with the arrow reversed.
-		promptTemplate: t.state.promptTemplate as PromptTemplate | undefined
+		promptTemplate: t.state.promptTemplate as PromptTemplate | undefined,
+		// ⭑ PROJECTED SO THE EDITOR CAN SHOW THE GAP. The whole point of JAN-DISCHARGE is that "nobody has
+		// decided" stops being invisible; a field the page can write and cannot read back keeps it invisible.
+		workDischarge: t.state.workDischarge as 'MODEL' | 'HUMAN' | 'UNDECLARED' | undefined
 	}));
 	// The engine's Assurance Policy library (real ASSURANCE_POLICY objects): the manager lists these, the PWU-type
 	// picker offers the ACTIVE non-floor ones, and the rail resolves ids to names. Floor policies are flagged locked.
@@ -251,6 +254,9 @@ interface TypeFields {
 	/** JAN-PROMPT / REG-D-058 — the runtime asset the type OWNS. Absent when the author wrote no prompt, which
 	 *  is TRUE of every type that exists today and is a fact rather than a placeholder. */
 	promptTemplate?: PromptTemplate;
+	/** JAN-DISCHARGE — who does this work, said out loud. Absent means the author was never asked (a type
+	 *  predating the question); 'UNDECLARED' means they were asked and deferred. Different facts, both kept. */
+	workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 }
 
 /** Copy a stored ratified-array field through verbatim, falling back to a single-value array. Never String():
@@ -313,6 +319,16 @@ function readTypeFields(form: FormData): TypeFields {
 	// creates exactly the drift the render guard exists to refuse — they would type `{subject}` and forget to
 	// declare it, and the prompt would be unrenderable at the moment it mattered. The closed list is still
 	// enforced downstream; this just stops the UI manufacturing violations.
+	// ⭑ THE DECLARATION IS READ BEFORE THE TEMPLATE, because it decides whether a template means anything.
+	// An empty posted value is ABSENT rather than UNDECLARED: the form always offers the question, so a blank
+	// can only come from a client that did not render it, and inventing "deferred" on that basis would put an
+	// answer in the professional's mouth.
+	const rawDischarge = String((form.get('workDischarge') ?? '') as string).trim();
+	const workDischarge =
+		rawDischarge === 'MODEL' || rawDischarge === 'HUMAN' || rawDischarge === 'UNDECLARED'
+			? rawDischarge
+			: undefined;
+
 	const templateText = String((form.get('promptTemplateText') ?? '') as string).trim();
 	const promptTemplate: PromptTemplate | undefined = templateText
 		? {
@@ -328,6 +344,7 @@ function readTypeFields(form: FormData): TypeFields {
 			}
 		: undefined;
 	return {
+		...(workDischarge ? { workDischarge } : {}),
 		promptTemplate,
 		name: String((form.get('name') ?? '') as string).trim(),
 		pwuKind: String((form.get('pwuKind') ?? '') as string)
@@ -578,7 +595,8 @@ export const actions: Actions = {
 			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
 			executionBoundary: f.executionBoundary,
 			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {}),
-			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {})
+			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {}),
+			...(f.workDischarge ? { workDischarge: f.workDischarge } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { definedType: id };
@@ -625,7 +643,8 @@ export const actions: Actions = {
 			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
 			executionBoundary: f.executionBoundary,
 			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {}),
-			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {})
+			...(f.promptTemplate ? { promptTemplate: f.promptTemplate } : {}),
+			...(f.workDischarge ? { workDischarge: f.workDischarge } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedType: pwuTypeId };

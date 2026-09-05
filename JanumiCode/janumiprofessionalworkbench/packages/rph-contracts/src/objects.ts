@@ -814,6 +814,7 @@ export const PwuTypeSchema = z.strictObject({
 	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	executionBoundary: ExecutionBoundarySchema.optional(),
 	boundaryContract: BoundaryContractSchema.optional(),
+	workDischarge: z.enum(['MODEL', 'HUMAN', 'UNDECLARED']).optional(),
 	promptTemplate: PromptTemplateSchema.optional(),
 	contextSpecification: ContextSpecificationSchema.optional(),
 	requiredInputs: z.array(z.string()),

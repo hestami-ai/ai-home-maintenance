@@ -23,6 +23,8 @@ import type { AuthedEngine } from '../index.js';
 const TS = '2026-09-04T00:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P10';
 const TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P20';
+const TYPE2 = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P21';
+const TYPE3 = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P22';
 
 let seq = 0;
 let store: SqliteStorageAdapter;
@@ -147,6 +149,75 @@ describe('JAN-PROMPT — the type owns its prompt', () => {
 		expect(state.promptTemplate?.templateText, 'the prompt was accepted and not stored').toBe(
 			TEMPLATE.templateText
 		);
+	});
+
+	// ── JAN-DISCHARGE — a type must not disagree with itself about who does its work ────────────────────────
+	it('⛔ REFUSES an ACTIVE prompt on a type that does not declare MODEL', () => {
+		// ⭑ THE DIRECTION THAT WOULD OTHERWISE BE SILENT. A carefully authored prompt sits on a HUMAN type,
+		// nothing ever renders it, and no field anywhere says so — authored, reviewed, published, inert.
+		//
+		// THE MUTANT: keep only the obvious rule (MODEL needs a template) and drop this one. Every other test
+		// here still passes, and the inert-prompt state becomes reachable and invisible.
+		const engine = fresh();
+		dispatch(engine, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
+			pwaId: PWA, name: 'T', description: 'd', domain: 'test', version: '1.0.0'
+		});
+		const r = dispatch(engine, 'DefinePwuType', TYPE, 'PWU_TYPE', {
+			pwuTypeId: TYPE, pwaId: PWA, pwuKind: 'analysis', name: 'A', purpose: 'p', isRoot: true,
+			workDischarge: 'HUMAN',
+			promptTemplate: { ...TEMPLATE, status: 'ACTIVE' }
+		});
+		expect(r.status).not.toBe('ACCEPTED');
+		expect(JSON.stringify(r)).toMatch(/never be rendered|ACTIVE prompt template/);
+	});
+
+	it('⛔ REFUSES a discharge on a DELEGATED_EXTERNAL type — the counterparty owns that answer', () => {
+		// executionBoundary already says the work leaves the organisation and boundaryContract names who does
+		// it. THE MUTANT: allow it. Two statements of one fact, free to disagree.
+		const engine = fresh();
+		dispatch(engine, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
+			pwaId: PWA, name: 'T', description: 'd', domain: 'test', version: '1.0.0'
+		});
+		const r = dispatch(engine, 'DefinePwuType', TYPE, 'PWU_TYPE', {
+			pwuTypeId: TYPE, pwaId: PWA, pwuKind: 'analysis', name: 'A', purpose: 'p', isRoot: true,
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: { counterpartyLabel: 'Acme', attestedAssurancePolicyIds: [] },
+			workDischarge: 'HUMAN'
+		});
+		expect(r.status).not.toBe('ACCEPTED');
+		expect(JSON.stringify(r)).toMatch(/DELEGATED_EXTERNAL/);
+	});
+
+	it('⭑ CONTROL — MODEL mid-draft, HUMAN, and a plain delegated type are ALL accepted', () => {
+		// Without this the two refusals above could not be told apart from "refuse every discharge".
+		//
+		// ⚠⚠ AND THE FIRST CASE IS A RULE THIS PROGRAMME DROPPED ON EVIDENCE. A symmetric rule refusing MODEL
+		// with no ACTIVE template was implemented and shipped; the first e2e that authored a type failed,
+		// because DECLARING MODEL AND THEN WRITING THE PROMPT IS THE NORMAL ORDER. It also bought nothing —
+		// `prepareModelInvocation` already refuses at run time with a better message. Pinning it accepted here
+		// is what stops someone re-adding it on the same reasoning.
+		const engine = fresh();
+		dispatch(engine, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
+			pwaId: PWA, name: 'T', description: 'd', domain: 'test', version: '1.0.0'
+		});
+		const mid = dispatch(engine, 'DefinePwuType', TYPE, 'PWU_TYPE', {
+			pwuTypeId: TYPE, pwaId: PWA, pwuKind: 'analysis', name: 'A', purpose: 'p', isRoot: true,
+			workDischarge: 'MODEL'
+		});
+		expect(mid.status, 'declaring MODEL before the prompt is written must be allowed').toBe('ACCEPTED');
+
+		const human = dispatch(engine, 'DefinePwuType', TYPE2, 'PWU_TYPE', {
+			pwuTypeId: TYPE2, pwaId: PWA, pwuKind: 'analysis', name: 'B', purpose: 'p', isRoot: false,
+			workDischarge: 'HUMAN'
+		});
+		expect(human.status, JSON.stringify(human)).toBe('ACCEPTED');
+
+		const delegated = dispatch(engine, 'DefinePwuType', TYPE3, 'PWU_TYPE', {
+			pwuTypeId: TYPE3, pwaId: PWA, pwuKind: 'analysis', name: 'C', purpose: 'p', isRoot: false,
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: { counterpartyLabel: 'Acme', attestedAssurancePolicyIds: [] }
+		});
+		expect(delegated.status, JSON.stringify(delegated)).toBe('ACCEPTED');
 	});
 
 	it('CONTROL — an edit that changes genuinely nothing IS still refused', () => {

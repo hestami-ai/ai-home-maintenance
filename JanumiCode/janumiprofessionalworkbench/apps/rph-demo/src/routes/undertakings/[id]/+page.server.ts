@@ -901,7 +901,11 @@ export const actions: Actions = {
 		const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);
 		const pwuType = pwuTypeId ? getObject(getEngine(), pwuTypeId) : undefined;
 		const template = pwuType?.promptTemplate as PromptTemplate | undefined;
-		const isModelStep = template?.status === 'ACTIVE';
+		// ⭑ JAN-DISCHARGE — DECLARED, NOT SNIFFED. This read `template?.status === 'ACTIVE'`, which inferred a
+		// decision from an artefact: a type became model-executed because someone happened to arm a prompt. The
+		// type now SAYS who does its work, and `checkDischargeCoherence` keeps the two from disagreeing — an
+		// ACTIVE template on a non-MODEL type is refused at the handler, so this single read is sufficient.
+		const isModelStep = pwuType?.workDischarge === 'MODEL';
 
 		const err = runSteps([
 			['BeginPwuShaping', PWU, pwuId, {}],

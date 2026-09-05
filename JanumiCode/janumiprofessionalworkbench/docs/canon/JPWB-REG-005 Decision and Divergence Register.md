@@ -31342,3 +31342,68 @@ same stored object. **Driven through a real browser**, asserted against engine s
 - **Merge target:** `routes/undertakings/[id]/+page.server.ts` (the button),
   `lib/server/execution/model.ts` (the seam), `test-api/introspect` + `e2e/support/harness.ts` (ground truth),
   `e2e/execution-model-invocation.e2e.ts`. **Owed:** assurance over execution artifacts. Status: CLOSED.
+
+### REG-F-353 — a work-unit type now says who does its work, and a rule I implemented was refuted by the first test that ran it
+
+- **Date:** 2026-09-05 · **Type:** FINDING (`JAN-DISCHARGE` landed) · **Class:**
+  FINDING — closes a defect the previous programme created; two self-corrections ·
+  **Status:** ✅ CLOSED.
+
+**THE DEFECT `JAN-EXECRUN` CREATED.** Making *"a model does this work"* sayable made **one silence stand for
+three different facts**: a person does it, a model does it, or nobody has decided. ⭑ **A professional could
+not tell an unfinished type from a deliberately human one, and neither could the system** — the same shape as
+*"a reader cannot tell 'purged on schedule' from 'never stored' from 'lost'"*, arriving on the authoring plane.
+
+**WHAT LANDED.** `PWU_TYPE.workDischarge` — a closed `MODEL | HUMAN | UNDECLARED`, optional under `PER-2` —
+with a selector on the type editor that renders an unanswered type as **owing an answer**, and
+`beginExecute` now reading a **declaration** instead of sniffing whether a prompt happens to be armed.
+
+- ⭑ **ABSENT AND `UNDECLARED` ARE KEPT APART, and that is the repository's own ratified pattern.** Absent means
+  *authored before the question existed* — nobody was asked; `UNDECLARED` means *asked and deferred*. This is
+  `ExchangeIdentityFact.availability` one object over (`objects.ts:252-257`), whose `NOT_PROBED` exists for the
+  same reason. **The surface renders both as owing an answer; the record keeps them distinct.**
+- ⛔ **NO `EXTERNAL_PARTY` MEMBER.** `executionBoundary: DELEGATED_EXTERNAL` already says the work leaves the
+  organisation and `boundaryContract` names who does it. A second way to say one thing is how restated
+  vocabulary comes to disagree — so a delegated type declares no discharge, and the handler refuses one.
+
+> ### ⚠⚠ A RULE I IMPLEMENTED WAS REFUTED BY THE FIRST TEST THAT RAN IT
+> The design specified two coherence rules and called the symmetric pair the point. Rule 1 refused `MODEL`
+> with no ACTIVE template: *"a type that says a model does the work and gives it nothing to do is a promise
+> with no content."* It shipped, type-checked, and **the first e2e that authored a type failed** — because
+> **declaring `MODEL` and then writing the prompt is the normal authoring order**, and a rule that refuses
+> work-in-progress is a rule against drafting.
+>
+> ⭑ **AND IT BOUGHT NOTHING, WHICH IS WHAT SETTLED IT.** `prepareModelInvocation` already refuses at RUN TIME
+> with a better message — naming the type and the remedy at the moment it matters. Rule 1 was a second
+> statement of one rule, blocking a legitimate state to say something the system already says later and says
+> better. **Dropped, with its reasoning kept at the site so nobody re-adds it on the same argument**, and the
+> accepted case is pinned by a CONTROL.
+>
+> **The surviving asymmetry is principled, not an oversight:** an ARMED prompt that can never fire is
+> incoherent *whenever* it exists and nothing downstream would ever mention it; an unfulfilled promise is a
+> normal mid-draft state the runtime reports precisely. ⭑ **Rule 2 — an ACTIVE template on a non-`MODEL` type —
+> is the one that would otherwise be silent, and it is the mutant this entry names first.**
+
+> ### ⚠ AND A COUNT I ASSERTED TWICE WAS WRONG
+> The design said *"the authoring catalog offers **11** blueprint types"*, measured with
+> `grep -c "pwuKind:"`. **That instrument counts the interface's own field declaration and a help-text key as
+> well as the entries.** Derived properly — loading the built module and reading `PWU_TYPE_CATALOG.length` —
+> the answer is **9**, and all 9 are answered. ⭑ **A count taken from a pattern that matches more than the
+> thing being counted** is the defect this register records against itself most often; it appeared here in a
+> document arguing for measurement over inference.
+
+- ⭑ **AND THE ROADMAP'S OWN INSTRUCTION FOR THE BLUEPRINTS WAS WRONG TOO.** It read *"leaving them undeclared
+  would propagate the exact defect"*. **The defect was AMBIGUITY, not the absence of a decision.** A blueprint
+  cannot know whether a given organisation discharges Intent Definition by a person or a model, and guessing
+  would put an answer in the professional's mouth. **All nine declare `UNDECLARED`** — which removes the
+  ambiguity and hands over a *visible* open question, which is what the field was added to do.
+  **The structural guard is that `workDischarge` is REQUIRED on `PwuTypeTemplate` and optional on the object**:
+  the object must tolerate absence (`PER-2`), a blueprint written today has no such excuse, and a new blueprint
+  cannot be added without answering.
+- **THE EXECUTION SPEC PASSED UNCHANGED**, which the roadmap named as its own check that the switch from
+  sniffing to declaring was behaviour-preserving — its type declares `MODEL` because rule 2 forces it to.
+- **OWED AND UNSCHEDULED:** tightening `workDischarge` to REQUIRED on the object. That makes every undeclared
+  type invalid — a migration with a fixture sweep — and naming it here is the alternative to it arriving as a
+  surprise.
+- **Merge target:** contracts vocab + generated; `handlers/pwa-authoring.ts`; `packages/rph-authoring/src/catalog.ts`;
+  `routes/pwa/[id]/+page.{server.ts,svelte}`; `routes/undertakings/[id]/+page.server.ts`. Status: CLOSED.

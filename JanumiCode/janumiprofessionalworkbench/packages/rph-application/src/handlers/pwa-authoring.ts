@@ -271,6 +271,70 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
  * rejection, whereas `error` (kit.ts `invariant.produced_state_invalid`) is reserved for a handler that built a
  * bad state — a genuine fault. The record makes the violation queryable without a false alarm.
  */
+/**
+ * JAN-DISCHARGE — a work-unit type must not disagree with itself about who does its work.
+ *
+ * ⭑ THE RULES RUN BOTH WAYS, AND THE SECOND ONE IS WHY. Requiring an ACTIVE template for a `MODEL` type is
+ * obvious. The reverse — an ACTIVE template on a type that does NOT declare `MODEL` — is the silent one: a
+ * prompt is authored, reviewed and published, nothing ever renders it, and no field anywhere says so. A rule
+ * that only runs in the obvious direction is the rule that lets the defect in.
+ *
+ * ⛔ AND A DELEGATED TYPE DECLARES NOTHING HERE. `executionBoundary: DELEGATED_EXTERNAL` already says the work
+ * leaves the organisation and its `boundaryContract` names the counterparty; a discharge mode on top would be
+ * a second way to say one thing, which is how restated vocabulary comes to disagree with itself.
+ */
+function checkDischargeCoherence(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	next: Record<string, unknown>,
+	id: string
+): CommandResult | null {
+	const discharge = next.workDischarge as string | undefined;
+	const template = next.promptTemplate as { status?: string } | undefined;
+	const templateIsActive = template?.status === 'ACTIVE';
+	const delegated = next.executionBoundary === 'DELEGATED_EXTERNAL';
+	const violation = (reason: string, message: string): CommandResult => {
+		ctx.logger.warn('invariant.discharge_coherence_violation', {
+			correlationId: command.correlationId,
+			aggregateId: id,
+			commandType: command.commandType,
+			reason
+		});
+		return reject(command, 'RPH_INVARIANT_VIOLATION', message, [id]);
+	};
+
+	if (delegated && discharge !== undefined)
+		return violation(
+			'delegated_declares_discharge',
+			`PWU Type ${id} is DELEGATED_EXTERNAL and also declares workDischarge ${discharge}. A delegated type's work is discharged by the counterparty named in its boundaryContract; declaring it twice is how two statements of one fact come to disagree.`
+		);
+
+	// ⚠⚠ THE SYMMETRIC RULE WAS DRAFTED, IMPLEMENTED, AND DROPPED ON EVIDENCE — recorded rather than deleted.
+	//
+	// It refused `MODEL` with no ACTIVE template, on the reasoning that "a type that says a model does the work
+	// and gives it nothing to do is a promise with no content." It shipped, and the FIRST e2e that authored a
+	// type failed: declaring MODEL and then writing the prompt is the NORMAL AUTHORING ORDER, and a rule that
+	// refuses work-in-progress is a rule against drafting.
+	//
+	// ⭑ AND IT BOUGHT NOTHING, WHICH IS THE PART THAT SETTLES IT. `prepareModelInvocation` already refuses at
+	// RUN TIME with a better message — *"declares no agent behaviour … author one on the type"* — naming the
+	// type and the remedy at the moment it matters. An authoring-time copy would have been a second statement
+	// of one rule, blocking a legitimate state to say something the system already says later and says better.
+	//
+	// The asymmetry with the rule below is therefore principled, not an oversight: an ARMED prompt that can
+	// never fire is incoherent WHENEVER it exists, and nothing downstream would ever mention it. An UNFULFILLED
+	// promise is a normal mid-draft state that the runtime reports precisely.
+
+	// ⭑ THE DIRECTION THAT WOULD OTHERWISE BE SILENT.
+	if (templateIsActive && discharge !== 'MODEL')
+		return violation(
+			'active_template_without_model_discharge',
+			`PWU Type ${id} carries an ACTIVE prompt template but declares workDischarge ${discharge ?? '(none)'}. The prompt would never be rendered and nothing would say so — an authored, reviewed, published instruction sitting inert. Declare MODEL, or leave the template DRAFT.`
+		);
+
+	return null;
+}
+
 function checkBoundaryCoherence(
 	ctx: HandlerContext,
 	command: DomainCommand,
@@ -479,12 +543,15 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		// caught it — define builds its state here, separately, and silently dropped the field. ⭑ Two write
 		// paths for one field is the drift this module's own reader comment warns about, and the warning did
 		// not save me from it.
+		...(p.workDischarge !== undefined ? { workDischarge: p.workDischarge } : {}),
 		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
 		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {}),
 		status: 'DRAFT'
 	};
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, state, p.pwuTypeId);
 	if (boundaryViolation) return boundaryViolation;
+	const dischargeViolation = checkDischargeCoherence(ctx, command, state, p.pwuTypeId);
+	if (dischargeViolation) return dischargeViolation;
 	const policyViolation = checkPolicyRefsOnState(ctx, command, state, undefined, p.pwuTypeId);
 	if (policyViolation) return policyViolation;
 	// Adding a PWU Type materially edits the PWA's graph: raise the PWA's semanticVersion with it, so a floor
@@ -682,6 +749,7 @@ function buildRedefinedTypeState(
 			: {}),
 		// JAN-PROMPT / REG-D-058 — the runtime assets the type OWNS. Undefined-means-absent like every sibling
 		// above, so an edit that does not mention the template leaves it alone rather than clearing it.
+		...(p.workDischarge !== undefined ? { workDischarge: p.workDischarge } : {}),
 		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
 		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {})
 	};
@@ -716,6 +784,8 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	}
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, next, id);
 	if (boundaryViolation) return boundaryViolation;
+	const dischargeViolation = checkDischargeCoherence(ctx, command, next, id);
+	if (dischargeViolation) return dischargeViolation;
 	const policyViolation = checkPolicyRefsOnState(ctx, command, next, loaded.state, id);
 	if (policyViolation) return policyViolation;
 	const event = makeEvent(ctx, command, {

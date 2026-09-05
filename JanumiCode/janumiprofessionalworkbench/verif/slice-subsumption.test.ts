@@ -196,7 +196,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: it is the CALLER `DESIGN-prompt-template-and-context.md` §4 named as owed by a
 			// separate increment, and it writes to the `EXECUTION` plane that `REG-D-055` created and nothing
 			// has ever used. Its exit criterion is a work unit that runs.
-		).toBe(23);
+			//
+			// 23 -> 24 (2026-09-05): `ROADMAP-work-discharge-declaration.md` (`JAN-DISCHARGE`). ⭑ THE WARRANT IS
+			// A DEFECT THE PREVIOUS ROADMAP CREATED, which is why it is separate rather than folded in.
+			// `JAN-EXECRUN` made "a model does this work" sayable, and thereby made ONE SILENCE stand for three
+			// different facts: a person does it, a model does it, or nobody has decided. A professional could
+			// not tell an unfinished type from a deliberately human one — the same shape as "a reader cannot
+			// tell 'purged on schedule' from 'never stored' from 'lost'", arriving on the authoring plane.
+			// ⭑ IT SUBSUMES: it makes the execute button read a DECLARATION instead of sniffing whether a
+			// prompt happens to be armed, and its exit criterion is a visible open question rather than an
+			// invisible gap.
+		).toBe(24);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

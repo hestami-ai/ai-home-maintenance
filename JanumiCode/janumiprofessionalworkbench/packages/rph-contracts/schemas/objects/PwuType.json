@@ -326,6 +326,14 @@
       ],
       "additionalProperties": false
     },
+    "workDischarge": {
+      "type": "string",
+      "enum": [
+        "MODEL",
+        "HUMAN",
+        "UNDECLARED"
+      ]
+    },
     "promptTemplate": {
       "type": "object",
       "properties": {

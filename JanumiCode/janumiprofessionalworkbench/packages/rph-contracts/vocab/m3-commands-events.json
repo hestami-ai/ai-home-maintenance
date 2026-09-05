@@ -2621,6 +2621,12 @@
 					"required": false,
 					"type": "ContextSpecification",
 					"note": "The DEC-4 carrier: for every mandatory parent constraint, exactly one fate, no silent omission."
+				},
+				{
+					"field": "workDischarge",
+					"required": false,
+					"type": "'MODEL' | 'HUMAN' | 'UNDECLARED'",
+					"note": "JAN-DISCHARGE. Declared, not inferred: beginExecute keys on this rather than sniffing whether a prompt template happens to be ACTIVE."
 				}
 			]
 		},
@@ -2868,6 +2874,12 @@
 					"required": false,
 					"type": "ContextSpecification",
 					"note": "The DEC-4 carrier: for every mandatory parent constraint, exactly one fate, no silent omission."
+				},
+				{
+					"field": "workDischarge",
+					"required": false,
+					"type": "'MODEL' | 'HUMAN' | 'UNDECLARED'",
+					"note": "JAN-DISCHARGE. Declared, not inferred: beginExecute keys on this rather than sniffing whether a prompt template happens to be ACTIVE."
 				}
 			]
 		},

@@ -632,7 +632,8 @@ export const DefinePwuTypePayloadSchema = z.strictObject({
 	executionBoundary: ExecutionBoundarySchema.optional(),
 	boundaryContract: BoundaryContractSchema.optional(),
 	promptTemplate: PromptTemplateSchema.optional(),
-	contextSpecification: ContextSpecificationSchema.optional()
+	contextSpecification: ContextSpecificationSchema.optional(),
+	workDischarge: z.enum(['MODEL', 'HUMAN', 'UNDECLARED']).optional()
 });
 export type DefinePwuTypePayload = z.infer<typeof DefinePwuTypePayloadSchema>;
 export const SubmitPwaForReviewPayloadSchema = z.strictObject({});
@@ -685,7 +686,8 @@ export const EditPwuTypePayloadSchema = z.strictObject({
 	executionBoundary: ExecutionBoundarySchema.optional(),
 	boundaryContract: BoundaryContractSchema.optional(),
 	promptTemplate: PromptTemplateSchema.optional(),
-	contextSpecification: ContextSpecificationSchema.optional()
+	contextSpecification: ContextSpecificationSchema.optional(),
+	workDischarge: z.enum(['MODEL', 'HUMAN', 'UNDECLARED']).optional()
 });
 export type EditPwuTypePayload = z.infer<typeof EditPwuTypePayloadSchema>;
 export const RemovePwuTypePayloadSchema = z.strictObject({

@@ -425,7 +425,11 @@
 		promptTemplateText: '',
 		promptOutputContract: '',
 		promptActive: false,
-		promptTemplateVersion: 1
+		promptTemplateVersion: 1,
+		// JAN-DISCHARGE — who does this work. A NEW type starts UNDECLARED rather than blank: the author is
+		// being asked here and now, so "not yet decided" is the honest starting answer. Absence is reserved for
+		// types authored before the question existed.
+		workDischarge: 'UNDECLARED'
 	});
 	let children = $state<string[]>([]);
 	// Selected declared assurance policy ids for the type being authored (distinct from data.policies, the library).
@@ -480,7 +484,8 @@
 			promptTemplateText: '',
 			promptOutputContract: '',
 			promptActive: false,
-			promptTemplateVersion: 1
+			promptTemplateVersion: 1,
+			workDischarge: 'UNDECLARED'
 		});
 		children = [];
 		selectedPolicyIds = [];
@@ -512,7 +517,11 @@
 			promptOutputContract: t.promptTemplate?.outputContract ?? '',
 			promptActive: t.promptTemplate?.status === 'ACTIVE',
 			// Bumped on save so the fingerprint on every recorded model call resolves to the exact text used.
-			promptTemplateVersion: (t.promptTemplate?.templateVersion ?? 0) + 1
+			promptTemplateVersion: (t.promptTemplate?.templateVersion ?? 0) + 1,
+			// ⚠ ABSENT STAYS ABSENT, and that is the point rather than an oversight. A type authored before this
+			// question existed was never asked; showing it as "not yet decided" would claim someone deferred.
+			// The banner below renders both as owing an answer without conflating what they record.
+			workDischarge: t.workDischarge ?? ''
 		});
 		children = [...t.permittedChildTypeIds];
 		selectedPolicyIds = [...t.requiredAssurancePolicyIds];
@@ -535,6 +544,9 @@
 			pwuKind: t.pwuKind,
 			purpose: t.purpose,
 			isRoot: t.isRoot,
+			// JAN-DISCHARGE — the blueprint's own answer, carried rather than reset. Every blueprint says
+			// UNDECLARED, so a scaffolded type arrives with the question VISIBLY open instead of invisibly so.
+			workDischarge: t.workDischarge,
 			requiredInputs: (t.requiredInputs ?? []).join(', '),
 			requiredOutputs: (t.requiredOutputs ?? []).join(', '),
 			executionBoundary: 'INTERNAL',
@@ -1481,10 +1493,43 @@
 								{@render fhead('Purpose', PWU_TYPE_HELP.purpose, 'pwu-type-purpose')}
 								<textarea id="pwu-type-purpose" name="purpose" bind:value={f.purpose} rows="2"></textarea>
 							</div>
+							<!-- JAN-DISCHARGE — who does this work. Before this existed, "no prompt" stood for three
+							     different facts at once: a person does it, a model does it, or nobody has decided. A
+							     professional could not tell an unfinished type from a deliberately human one. -->
+							{#if f.executionBoundary !== 'DELEGATED_EXTERNAL'}
+								<div class="ffield">
+									{@render fhead(
+										'How is this work done?',
+										'A person, a model, or not yet decided. Choosing "a model" means this type carries the prompt the model is given — and an unanswered question is shown as unanswered rather than assumed.',
+										'pwu-type-discharge'
+									)}
+									<select
+										id="pwu-type-discharge"
+										name="workDischarge"
+										data-testid="pwu-type-discharge"
+										bind:value={f.workDischarge}
+									>
+										<!-- The empty option exists ONLY for types authored before the question did. It is
+										     not offered as a choice — selecting it would be indistinguishable from never
+										     having been asked, which is the conflation this field removes. -->
+										{#if f.workDischarge === ''}
+											<option value="" disabled>— never asked (authored earlier) —</option>
+										{/if}
+										<option value="UNDECLARED">Not yet decided</option>
+										<option value="HUMAN">A person does this work</option>
+										<option value="MODEL">A model does this work</option>
+									</select>
+									{#if f.workDischarge !== 'MODEL' && f.workDischarge !== 'HUMAN'}
+										<p class="dischargewarn" data-testid="pwu-type-discharge-open">
+											This type does not yet say who does its work.
+										</p>
+									{/if}
+								</div>
+							{/if}
 							<!-- JAN-PROMPT / REG-D-058 — HOW the work is attempted, beside WHAT it is. Purpose says what
 							     the unit is for; this says what an agent is told. DEC-1 keeps them apart: the type OWNS
 							     the template, an execution STEP renders it, and a PWU is never merely a prompt. -->
-							<div class="ffield">
+							<div class="ffield" hidden={f.workDischarge !== 'MODEL'}>
 								{@render fhead(
 									'Prompt template',
 									'What an agent is told when this type is executed. Use {placeholder} markers for context that gets filled in at run time — they are recorded automatically, and a marker nothing supplies REFUSES the run rather than sending a prompt with a hole in it.',
@@ -1514,7 +1559,7 @@
 									</p>
 								{/if}
 							</div>
-							<div class="ffield">
+							<div class="ffield" hidden={f.workDischarge !== 'MODEL'}>
 								{@render fhead(
 									'Expected answer shape',
 									'What a usable answer looks like. An answer that does not match is inert — it creates no findings and changes nothing.',
@@ -3067,5 +3112,11 @@
 		margin-top: 0.45rem;
 		font-size: 0.75rem;
 		color: var(--muted, #667);
+	}
+
+	.dischargewarn {
+		margin: 0.3rem 0 0;
+		font-size: 0.72rem;
+		color: var(--warn, #8a5320);
 	}
 </style>

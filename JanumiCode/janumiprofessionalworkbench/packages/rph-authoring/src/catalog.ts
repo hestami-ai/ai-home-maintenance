@@ -41,6 +41,21 @@ export interface PwuTypeTemplate {
 	readonly pwuKind: string;
 	readonly purpose: string;
 	readonly isRoot: boolean;
+	/**
+	 * JAN-DISCHARGE — who does this work. ⭑ REQUIRED HERE, AND OPTIONAL ON THE OBJECT, DELIBERATELY. The object
+	 * must tolerate absence (`PER-2`: types authored before the question existed were never asked). A BLUEPRINT
+	 * has no such excuse — it is written today, and a new one that omits the answer would hand every type
+	 * copied from it an unanswered question nobody was even shown. Requiring it here is the structural version
+	 * of "the blueprints get real answers".
+	 *
+	 * ⚠ AND EVERY ONE OF THEM SAYS `UNDECLARED`, WHICH IS AN ANSWER RATHER THAN A DODGE. `JAN-DISCHARGE`'s
+	 * roadmap said "an unanswered blueprint is the defect propagating"; that was WRONG and is corrected here.
+	 * The defect was AMBIGUITY — one silence standing for "a person does it", "a model does it" and "nobody
+	 * decided". A blueprint cannot know which of those holds for a given organisation's Intent Definition, and
+	 * guessing would put an answer in the professional's mouth. `UNDECLARED` removes the ambiguity and hands
+	 * over a VISIBLE open question, which is exactly what this field was added to do.
+	 */
+	readonly workDischarge: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 	/** Named artifacts an Instance of this type consumes (concern-3 data-flow) — a starting point, fully editable. */
 	readonly requiredInputs?: readonly string[];
 	/** Named artifacts an Instance of this type produces (concern-3 data-flow) — a starting point, fully editable. */
@@ -55,6 +70,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Product Realization',
 		pwuKind: 'PRODUCT_REALIZATION',
 		isRoot: true,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Root: structure product work from originating intent to authoritative baselines.',
 		requiredInputs: ['originating-intent'],
 		requiredOutputs: ['authoritative-baseline']
@@ -64,6 +80,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Intent & Product Definition',
 		pwuKind: 'INTENT_AND_PRODUCT_DEFINITION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Originating intent, stakeholders, product boundary.',
 		requiredInputs: ['originating-intent'],
 		requiredOutputs: ['product-definition']
@@ -73,6 +90,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Product Behavior Definition',
 		pwuKind: 'PRODUCT_BEHAVIOR_DEFINITION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Actors, capabilities, journeys, requirements.',
 		requiredInputs: ['product-definition'],
 		requiredOutputs: ['approved-behavior']
@@ -82,6 +100,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Architecture Definition',
 		pwuKind: 'ARCHITECTURE_DEFINITION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'A coherent technical structure realizing approved behavior.',
 		requiredInputs: ['approved-behavior'],
 		requiredOutputs: ['architecture-baseline']
@@ -91,6 +110,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Implementation Planning',
 		pwuKind: 'IMPLEMENTATION_PLANNING',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Increments, decomposition, dependencies, test + migration planning.',
 		requiredInputs: ['architecture-baseline'],
 		requiredOutputs: ['implementation-plan']
@@ -100,6 +120,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Product Implementation',
 		pwuKind: 'PRODUCT_IMPLEMENTATION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Realize the planned increments.',
 		requiredInputs: ['implementation-plan'],
 		requiredOutputs: ['implemented-increments']
@@ -109,6 +130,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Integrated Product Validation',
 		pwuKind: 'INTEGRATED_PRODUCT_VALIDATION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Journey / requirement / architecture / fitness validation.',
 		requiredInputs: ['implemented-increments'],
 		requiredOutputs: ['validation-evidence']
@@ -118,6 +140,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Product Baseline Promotion',
 		pwuKind: 'PRODUCT_BASELINE_PROMOTION',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'Evidence package, residual-risk + promotion decisions, authoritative baseline.',
 		requiredInputs: ['validation-evidence'],
 		requiredOutputs: ['authoritative-baseline']
@@ -127,6 +150,7 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 		name: 'Architecture Concern',
 		pwuKind: 'ARCHITECTURE_CONCERN',
 		isRoot: false,
+		workDischarge: 'UNDECLARED',
 		purpose: 'A generic architecture concern contributing to Architecture Definition.',
 		requiredInputs: ['approved-behavior'],
 		requiredOutputs: ['architecture-baseline']
