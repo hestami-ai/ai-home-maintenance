@@ -31547,8 +31547,9 @@ assurance finding back to a model that executed a work unit, because until `REG-
 
 - **Date:** 2026-09-05 · **Type:** FINDING (`JAN-EXECREVIEW` XA-01..03 landed) · **Class:**
   FINDING — closes the "cannot be satisfied" half of `REG-F-352`'s gap up to the reviewer; one self-inflicted
-  bug found by driving · **Status:** 🟡 PARTIAL — the floor runs and blocks with a stated reason; it is not
-  yet satisfiable, and the reason is named below rather than left to be discovered.
+  bug found by driving · **Status:** ✅ CLOSED 2026-09-05 by `REG-F-356`, which supplied the reviewer this
+  entry named as the one thing remaining. Superseding ~~🟡 PARTIAL — the floor runs and blocks with a stated
+  reason; it is not yet satisfiable, and the reason is named below rather than left to be discovered.~~
 
 **WHAT LANDED.** `workProductFloorFacts` derives the two deterministic fact sets from the recorded `ARTIFACT`,
 the producing `MODEL_EXCHANGE` and `verifyExchangeContent`; `runWorkProductFloor` runs the three floor
@@ -31603,3 +31604,65 @@ it — facts, subject, recording, gate, remediation classification — is built 
 - **Merge target:** `apps/rph-demo/src/lib/server/execution/work-product-floor.ts`, `run-model-step.ts`,
   `routes/undertakings/[id]/+page.server.ts`, `lib/server/floor.ts` (one export).
   **Owed:** a reviewer that can read a work product; then `REG-D-059`'s loop. Status: PARTIAL.
+
+### REG-F-356 — a model-executed work unit COMPLETES, assured — and the independence check caught me declaring the producer wrong
+
+- **Date:** 2026-09-05 · **Type:** FINDING (`JAN-WPREVIEW` landed; the chain `REG-D-058` opened is closed) ·
+  **Class:** FINDING — one self-inflicted defect the assurance system itself found; two corrections to this
+  programme's own design · **Status:** ✅ CLOSED.
+
+⭑⭑ **A model now does a work unit's work, its output is reviewed, and the step COMPLETES.** Driven through a
+real browser: a professional authors what an agent is told, publishes it, instantiates work from it, presses
+Execute — and the work unit reaches `SUCCEEDED` **because its work product was assured**, not because nothing
+checked. That is the first time in this system's history.
+
+**WHAT LANDED.** One new arm on the existing offline reviewer, routed on `subject.objectType === 'ARTIFACT'`.
+**No second validator, no new policy, no invented criterion ids** — both ids are read from the policy and
+their wording fits: `RR-04-no-proxy-satisfaction` for a work product that parses and says nothing (*"no proxy
+or surface satisfaction that conceals the underlying problem"*), `RR-01-no-problem-substitution` for one that
+merely restates its prompt (*"the result genuinely discharges its delegated obligation rather than
+substituting an easier problem"*).
+
+> ### ⚠⚠ THE INDEPENDENCE CHECK REFUSED MY REVIEW, AND IT WAS RIGHT
+> Every work-product review came back `INCONCLUSIVE`, and three rounds of probing the browser learned nothing
+> because server stdout is not surfaced on an assertion failure. **Driving the floor run in-process gave the
+> answer in one line:** `INDEPENDENCE_VIOLATION`.
+>
+> The reasoning-review policy requires **`DIFFERENT_MODEL`** (`floor-policies.ts:146`), and `checkIndependence`
+> requires **both sides DEFINED and different** — *"an absence never evidences independence."* ⛔ **I had put
+> the producing model's id in `agentId` and left `modelId` undefined**, so the check could not observe a
+> difference and refused rather than assume one.
+>
+> ⭑ **The check was right and my declaration was wrong.** Had I filled the field correctly at the start I
+> would never have learned the check is live and load-bearing; as it is, an e2e mutant now names it.
+
+> ### ⚠ AND TWO CLAIMS IN MY OWN DESIGN WERE WRONG
+> `DESIGN-reasoning-review-over-work-products.md` §3.4 stated that in this deployment producer and reviewer are
+> *"the same configured judge, so this satisfies separate invocation and nothing more."* **Wrong twice:** the
+> policy requires `DIFFERENT_MODEL`, not separate invocation; and with the offline reviewer the models
+> genuinely differ, so the review is independent at the rung the policy actually asks for. ⚠ **What remains
+> true and is now the real disclosure:** with the LIVE reviewer configured, producer and reviewer would be the
+> same model, and this check would then correctly refuse. That is a deployment fact worth knowing before
+> anyone switches it on.
+
+- ⛔ **THE SHORTCUT WAS NAMED FIRST AND NOT TAKEN.** `REG-F-355`'s e2e recorded the mutant: *"teach the offline
+  reviewer to pass any parseable work product, at which point 'assured' would mean a JSON parse."* The arm
+  performs real checks and **records what it did not check** — every `SATISFIED` carries a limitation saying
+  it judged STRUCTURE only and did not assess professional quality. **`ASR-11` requires a valid result to
+  identify its limitations; this is the one that keeps the word honest.**
+- ⭑ **THE ECHO RULE FIRES ON *EVERY* VALUE, NOT *ANY*, and a test pins it against the demo's own fixture
+  shape** — which returns one value quoting the prompt and one that does not. An `ANY` rule would reject the
+  demo's own work product, and **that defect would have been discovered by breaking the demo rather than by
+  reasoning about the rule.**
+- ⚠ **A CONTROL OF MINE WAS WRONG AND THE CODE WAS RIGHT.** I asserted an empty graph is *"well-formed"* and
+  should pass the graph arm; `analyzePwaGraph` disagrees — no root, not well-formed. ⭑ **The correction made
+  the control SHARPER than intended:** the work-product arm fed the same bytes would return `SATISFIED`, so
+  `REJECTED` is reachable *only* through the graph arm, which is exactly what the control needs to prove.
+- ⚠ **AND A COMMENT I WROTE CLAIMED COVERAGE THAT DID NOT EXIST.** Removing a now-false assertion, I wrote that
+  the refusal path was *"proven by the sibling spec below"* — there was no such spec. **A driven refusal was
+  added** (real engine, real floor, empty work product, `RR-04` recorded) and the comment now names the file.
+  *"It is covered elsewhere"* is how coverage gets asserted rather than shown.
+- **DERIVATION RE-RUN, NOT RECALLED.** No standing entry is falsified: `REG-F-355`'s *"what remains is one
+  thing — a reviewer that can read a work product"* is now discharged, and its status is struck accordingly.
+- **OWED:** the LIVE reviewer's work-product prompt (the offline arm judges structure only, and says so); and
+  `REG-D-059`'s feedback loop, which now has findings to loop on for the first time. Status: CLOSED.

@@ -216,7 +216,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: it reuses the floor validators, the remediation classifier and the recording plan
 			// unchanged — three things measured subject-agnostic — and adds no second classifier. Its exit
 			// criterion is a floor that RUNS over an artifact and says WHY it blocks.
-		).toBe(25);
+			//
+			// 25 -> 26 (2026-09-05): `ROADMAP-work-product-reviewer.md` (`JAN-WPREVIEW`). ⭑ THE LAST PIECE, and
+			// a roadmap rather than a ticket because its design exists to FORBID a shortcut its own predecessor
+			// named: `REG-F-355`'s e2e records the mutant as *"teach the offline reviewer to pass any parseable
+			// work product, at which point 'assured' would mean a JSON parse."* A stage list that did not carry
+			// that constraint would invite exactly it.
+			// ⭑ IT SUBSUMES AND TERMINATES: it adds one arm to an existing validator (no second validator, no
+			// new policy, no invented criterion ids — both are read from the policy), and its exit criterion is
+			// a model-executed work unit reaching COMPLETED with its output assured. That closes the chain
+			// REG-D-058 opened, so nothing follows it in this line.
+		).toBe(26);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

@@ -107,49 +107,37 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		const step = plan.steps?.[0] ?? {};
 		expect(step.stepType, 'an AI-attempted step is a MODEL_INVOCATION').toBe('MODEL_INVOCATION');
 
-		// ── ⭑⭑ AND THE ASSURANCE FLOOR BITES, WHICH IS THE POINT OF THE WHOLE SYSTEM ──────────────────────
+		// ── ⭑⭑ AND IT COMPLETED BECAUSE IT WAS ASSURED, NOT BECAUSE NOTHING CHECKED ──────────────────────
 		//
-		// `floor-gate.ts:30` makes a MODEL_INVOCATION AI-produced BY CONSTRUCTION, so completing it requires
-		// the three floor policies satisfied against the work product. ⭑ THIS GATE HAS NEVER FIRED IN THIS
-		// DEMO — the existing lifecycle step is a TRANSFORMATION a human drove, and the demo's own comment
-		// says it is non-AI "so the floor gate admits it". The first genuinely model-executed work unit is the
-		// first thing ever to meet it.
+		// `floor-gate.ts:30` makes a MODEL_INVOCATION AI-produced BY CONSTRUCTION, so completing it REQUIRES
+		// the three floor policies satisfied against the work product. Three assessments now exist against the
+		// ARTIFACT, and the reasoning review is SATISFIED.
 		//
-		// ⛔ SO THE STEP DOES NOT COMPLETE, AND THAT IS THE ASSERTION. THE MUTANT: relax the gate, or record
-		// the operator as executor so signal 0 never fires. The demo would go green and a model's output would
-		// have been accepted as finished work with no review — the exact thing this system exists to refuse.
-		expect(step.stepState, 'an unreviewed AI step must not read as completed').not.toBe('COMPLETED');
-
-		// ── ⭑⭑ AND THE FLOOR NOW RUNS OVER THE WORK PRODUCT, WHICH IS WHAT `JAN-EXECREVIEW` ADDED ─────────
-		//
-		// Before this increment nothing assessed an artifact at all: the gate refused for want of any
-		// assessment. Now three are recorded AGAINST THE ARTIFACT, and the refusal has a reason.
+		// ⛔ THE MUTANT: weaken the gate, or record the operator as executor so the AI signal never fires. The
+		// step would complete with nothing reviewed — the thing this system exists to refuse.
 		const artifactId = String(art.id ?? snap.artifacts[0]!.id);
 		const overArtifact = snap.assessments.filter((a) =>
 			((a.state.subjectObjectIds as string[] | undefined) ?? []).includes(artifactId)
 		);
 		expect(overArtifact.length, 'the floor never ran over the work product').toBe(3);
+		const rr = overArtifact.find((a) => a.state.assurancePolicyId === 'floor.reasoning-review');
+		expect(rr?.state.assessmentState, 'the work product was not assured').toBe('SATISFIED');
 
-		// ⭑ AND THE REASONING REVIEW IS *INCONCLUSIVE*, NOT REJECTED — a distinction that is the whole finding.
-		// The offline reviewer judges a PWA GRAPH EXPORT; a work product is not one, so it cannot read its
-		// subject and FAILS CLOSED. Its own docblock records why that matters: both arms once returned
-		// SATISFIED with zero findings, "a control that cannot fail, sitting inside the assurance floor".
-		//
-		// ⛔ THIS IS A REVIEWER PROBLEM, NOT A WORK PROBLEM, and the two must not read the same. THE MUTANT:
-		// teach the offline reviewer to return SATISFIED for any parseable work product. The step completes,
-		// this spec goes green, and "assured" would mean a JSON parse.
-		const rr = overArtifact.find(
-			(a) => a.state.assurancePolicyId === 'floor.reasoning-review'
-		);
-		expect(rr, 'no reasoning review was recorded over the work product').toBeDefined();
+		// ⚠ AND THE REVIEW WAS INDEPENDENT OF THE PRODUCER, which is not a formality: the policy requires
+		// DIFFERENT_MODEL, and `checkIndependence` refuses when either side leaves the field undefined — an
+		// absence never evidences independence. THE MUTANT: put the producing model id in `agentId` and leave
+		// `modelId` unset. Every assertion above fails, which is how this was found.
 		expect(
-			rr!.state.assessmentState,
-			'a reviewer that cannot read its subject has not reviewed it — neither a pass nor a rejection'
-		).toBe('INCONCLUSIVE');
-		await expect(
-			page.getByRole('alert'),
-			'the refusal must be surfaced, not swallowed'
-		).toContainText(/assurance floor/i);
+			(rr?.state.observationIds as string[] | undefined) ?? [],
+			'an independence violation would have been recorded'
+		).toHaveLength(0);
+		// ⚠ THE "REFUSAL IS SURFACED" ASSERTION LIVED HERE AND IS GONE, DELIBERATELY. It was correct while the
+		// floor could only refuse; now the step completes, there is no alert, and keeping it would have meant
+		// asserting that a successful run still shows an error. ⭑ **The refusal path is not lost, and it is
+		// proven by a DRIVEN test rather than by this comment**: `work-product-floor-run.test.ts` runs the real
+		// floor over an empty work product against a real engine and asserts it is NOT satisfied, with RR-04
+		// recorded. Naming the file is deliberate — "it is covered elsewhere" is how coverage gets asserted
+		// rather than shown.
 
 		// ⭑ AND THE WORK THAT DID HAPPEN SURVIVES THE REFUSAL. The model ran and produced something; that is a
 		// FACT, and whether the step may complete is a JUDGEMENT about it. An earlier version of this path

@@ -108,7 +108,18 @@ export async function runWorkProductFloor(
 		objectType: 'ARTIFACT',
 		semanticVersion: Number(subject.artifact.semanticVersion ?? 1),
 		isAiProduced: true,
-		producer: { actorType: 'AGENT' as const, agentId: subject.producerModelId }
+		// ⚠⚠ `modelId`, NOT ONLY `agentId`, AND THE INDEPENDENCE CHECK CAUGHT ME PUTTING IT IN THE WRONG FIELD.
+		// The reasoning-review policy requires `DIFFERENT_MODEL` (`floor-policies.ts:146`), and `checkIndependence`
+		// requires BOTH sides DEFINED and different — an undefined field is never "different", because an
+		// absence cannot evidence independence. With the model id only in `agentId`, `producer.modelId` was
+		// undefined, and the review was BOUNDARY_REJECTED for non-independence every time.
+		// ⭑ THE CHECK WAS RIGHT AND MY DECLARATION WAS WRONG. The producer of a work product IS a model, so its
+		// `modelId` is the field that must differ from the reviewer's.
+		producer: {
+			actorType: 'AGENT' as const,
+			agentId: `execution.model-invocation:${subject.artifactId}`,
+			modelId: subject.producerModelId
+		}
 	};
 
 	const ctx: ValidatorContext = {
