@@ -19,6 +19,9 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { splitAnswerSpan } from '../assurance/agy-cli.js';
 import { createFloorRegistry } from '../assurance/index.js';
+import { createExchangeSink } from '../assurance/exchange-capture.js';
+import { recordExchanges } from '../assurance/exchange-recorder.js';
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import { isTestMode } from '../workbench.js';
 
 /** What this module needs about the artifact and the call that produced it. Structural, so a test can drive it. */
@@ -152,12 +155,22 @@ export async function runWorkProductFloor(
 		}
 	};
 
+	// ⭑⭑ BOTH OR NEITHER — AND THE LIVE LANE IS WHAT FOUND THIS. `captureTry` REFUSES a store supplied without
+	// a sink, because bytes retained with no record referencing them are the orphan `REG-F-336 C-2` forbids.
+	// This call passed `artifacts` and no `exchanges`, so the FIRST real reviewer ever pointed at a work
+	// product failed with `VALIDATOR_EXECUTION_FAILED: a store was supplied with no sink`.
+	//
+	// ⚠ THE MOCK COULD NEVER HAVE CAUGHT IT: it captures nothing, so the sink was never reached and every gate
+	// run was green. That is the whole argument for a live lane — the guard was working correctly and the
+	// wiring around it had never been exercised.
+	const exchanges = createExchangeSink();
 	const plan = await runFloorAndPlanRecording(
 		assuranceSubject,
 		ctx,
 		createFloorRegistry({
 			testMode: isTestMode(),
 			artifacts: opts.artifacts,
+			exchanges,
 			...(opts.print ? { print: opts.print } : {})
 		})
 	);
@@ -167,6 +180,48 @@ export async function runWorkProductFloor(
 		idPrefix: opts.newId('wpfloor'),
 		newId: opts.newId
 	});
+
+	// ⭑ THE DRAIN — `PER-9`'s durable record of the REVIEWING call, one per bounded try. Without it the review
+	// happened and nothing says so: the producing call is recorded on the EXECUTION plane and the reviewing
+	// call would have no record at all, which is the record-plane omission `PER-9` calls illegal.
+	const drained = exchanges.drain();
+	if (drained.length > 0) {
+		const outcome = recordExchanges(
+			(payload, aggregateId) =>
+				engine.dispatch({
+					commandId: opts.newId('cmd'),
+					commandType: 'RecordModelExchange',
+					commandSchemaVersion: 1,
+					targetAggregateType: 'MODEL_EXCHANGE',
+					targetAggregateId: aggregateId,
+					issuedAt: opts.now(),
+					correlationId: `model-exchange:${subject.artifactId}`,
+					idempotencyKey: `mex:${aggregateId}`,
+					payload
+				}),
+			drained,
+			{
+				runToken: opts.newId('wpfloorrun'),
+				// ⚠ THE REVIEW IS AN ASSURANCE ACT EVEN THOUGH ITS SUBJECT CAME OFF THE EXECUTION PLANE. The
+				// plane names WHO IS ACTING, not where the subject came from — conflating them would file the
+				// reviewer's call as though the work unit had made it.
+				plane: 'ASSURANCE',
+				invokerId: 'reasoning-review',
+				assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+				subjectObjectId: subject.artifactId,
+				subjectObjectType: 'ARTIFACT',
+				subjectSemanticVersion: Number(subject.artifact.semanticVersion ?? 1),
+				newId: opts.newId
+			}
+		);
+		// A retention fault must not fail a review that already reached its conclusion — but it must not vanish
+		// either. Surfacing it is the disclosed shortfall PER-9 permits; swallowing it is what it forbids.
+		if (outcome.failures.length > 0)
+			console.warn(
+				`[MXR] ${outcome.recorded}/${drained.length} work-product exchange records written; ` +
+					`${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
+			);
+	}
 
 	return {
 		satisfied: plan.gatePermitsTransition,

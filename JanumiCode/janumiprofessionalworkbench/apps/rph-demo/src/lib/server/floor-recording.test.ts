@@ -146,18 +146,22 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 	// projection proofs all existed while NO MODEL CALL PRODUCED A RECORD — the hollow governed layer this
 	// programme keeps recording against itself. Everything above this line was true of that state too.
 	//
-	// It forces the REAL reviewer (`JPWB_ASSESSOR=agy`) rather than the deterministic mock, because the mock
-	// never captures anything: an end-to-end assertion against it would observe zero records and prove nothing.
-	// The model call itself is injected, so the gate never spawns a subprocess.
+	// It forces the REAL reviewer rather than the deterministic mock, because the mock never captures anything:
+	// an end-to-end assertion against it would observe zero records and prove nothing. The model call itself is
+	// INJECTED, so the gate never spawns a subprocess.
+	//
+	// ⚠ THE SWITCH CHANGED UNDER THIS TEST, AND SAYING SO IS THE POINT. It used to set `JPWB_ASSESSOR='agy'`,
+	// where the value `'agy'` had stopped meaning *agy* and started meaning *not the mock*. `JAN-LIVEEXEC` made
+	// the two sides symmetric: a real reviewer is selected by NAMING one. The new form says what it means.
 	describe('MXR-05 — the floor run writes one MODEL_EXCHANGE per bounded try', () => {
 		const JUDGEMENT = JSON.stringify({ findings: [], recommendation: 'SATISFIED', residualUncertainty: [] });
 
 		beforeEach(() => {
-			process.env.JPWB_ASSESSOR = 'agy';
+			process.env.JPWB_ASSURANCE_TOOL = 'agy';
 			process.env.JPWB_JUDGE_MODEL = 'test-judge-model';
 		});
 		afterEach(() => {
-			delete process.env.JPWB_ASSESSOR;
+			delete process.env.JPWB_ASSURANCE_TOOL;
 			delete process.env.JPWB_JUDGE_MODEL;
 		});
 

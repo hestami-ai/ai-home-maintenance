@@ -1,6 +1,7 @@
 // The de minimis floor Validator registry for this host — the deployment-time capability binding (§8.9 layer 2).
 // Two deterministic Validators + a Reasoning-Review Validator (agy/Gemini in dev/prod, the deterministic structural
-// mock under E2E; JPWB_ASSESSOR forces a backend). The registry is an in-process seam, not a persisted contract.
+// mock under E2E; setting JPWB_ASSURANCE_TOOL forces a real backend and names which one). The registry is an
+// in-process seam, not a persisted contract.
 import {
 	createValidatorRegistry,
 	identityProvenanceValidatorInstance,
@@ -33,15 +34,20 @@ export function createFloorRegistry(opts: {
 	clock?: () => string;
 }): ValidatorRegistry {
 	// Fail closed (§8.4): no local instruction, env var, or planner optimization may suppress the Reasoning
-	// Review floor. JPWB_ASSESSOR selects a backend only INSIDE test mode — outside it the real Validator is the
-	// only option. Previously `JPWB_ASSESSOR=mock` swapped in the content-blind mock in ANY environment while the
-	// floor still recorded SATISFIED.
-	const forced = opts.testMode ? process.env.JPWB_ASSESSOR : undefined;
-	const useMock = opts.testMode && forced !== 'agy';
-	// ⭑ WHICH REAL TOOL REVIEWS IS A DIFFERENT QUESTION FROM WHETHER A REAL TOOL REVIEWS, and only the second
-	// one is fail-closed. `JPWB_ASSESSOR` decides mock-vs-real and stays test-mode-only for the recorded reason
-	// above. `JPWB_ASSURANCE_TOOL` decides WHICH real tool, which cannot suppress the floor — the worst it can
-	// do is refuse, and it defaults to `agy` so existing deployments are unchanged.
+	// Review floor.
+	// ⭑ SYMMETRIC WITH THE EXECUTOR (`execution/model.ts`): the REAL reviewer is selected when a reviewing tool
+	// has been EXPLICITLY configured. That retires the `JPWB_ASSESSOR='agy'`-means-real sentinel, in which the
+	// value `'agy'` had quietly stopped meaning *agy* and started meaning *not the mock* — so forcing a real
+	// review while selecting Devin required writing `assessor=agy` and `assurance tool=devin` together, a
+	// configuration that reads as a contradiction.
+	//
+	// ⛔ FAIL-CLOSED IS UNCHANGED AND IS THE POINT OF THE `opts.testMode` CONJUNCT. A mock may be selected ONLY
+	// inside test mode; outside it the real Validator is the only option, because `JPWB_ASSESSOR=mock` once
+	// swapped in the content-blind mock in ANY environment while the floor still recorded SATISFIED.
+	const useMock = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL;
+	// ⭑ WHICH REAL TOOL REVIEWS IS A DIFFERENT QUESTION FROM WHETHER A REAL TOOL REVIEWS, and neither can
+	// suppress the floor — the worst a tool selection can do is REFUSE. It defaults to `agy` when the real
+	// path is reached without a named tool, so existing deployments are unchanged.
 	const assuranceTool = (process.env.JPWB_ASSURANCE_TOOL ?? 'agy').trim();
 	const registry = createValidatorRegistry();
 	registry.register(schemaInvariantValidatorInstance);

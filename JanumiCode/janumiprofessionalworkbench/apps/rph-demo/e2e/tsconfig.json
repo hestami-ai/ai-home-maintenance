@@ -4,5 +4,12 @@
 		"types": ["node"],
 		"noEmit": true
 	},
-	"include": ["**/*.ts", "../playwright.config.ts"]
+	"include": [
+		"**/*.ts",
+		"../e2e-live/**/*.ts",
+		"../e2e-live-exec/**/*.ts",
+		"../playwright.config.ts",
+		"../playwright.live.config.ts",
+		"../playwright.live-exec.config.ts"
+	]
 }

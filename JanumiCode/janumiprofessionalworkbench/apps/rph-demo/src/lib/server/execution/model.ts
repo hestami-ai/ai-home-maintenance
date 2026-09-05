@@ -10,7 +10,8 @@
 // through `REG-Q-056`'s door for no gain. This increment reuses the host's configured judge model — the same
 // configuration, the same refusal when nothing is set — and the binding gets its meaning when it gets an editor.
 import { agyPrint } from '../assurance/agy-cli.js';
-import { executorToolId, selectBackingTool } from '../tools/backing-tool.js';
+import { executorToolId, resolveExecutorToolId, selectBackingTool } from '../tools/backing-tool.js';
+import type { ToolInvocationResult } from '../tools/backing-tool.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 
@@ -40,9 +41,20 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  * recorded as a failed try (`runModelInvocationStep`) rather than swallowed — a step that could not run says
  * so, and the work unit does not advance as though it had.
  */
-export function getExecutionPrint(): (prompt: string) => Promise<string> {
-	const forced = TEST_MODE ? process.env.JPWB_ASSESSOR : undefined;
-	if (TEST_MODE && forced !== 'agy') return deterministicExecutionPrint;
+export function getExecutionPrint(): (prompt: string) => Promise<string | ToolInvocationResult> {
+	// ⭑⭑ THE EXECUTOR IS LIVE EXACTLY WHEN IT HAS BEEN CONFIGURED — no borrowed switch.
+	//
+	// ⛔ THIS LINE USED TO READ THE **ASSURANCE** SWITCH: `JPWB_ASSESSOR !== 'agy'` selected the fixture, so
+	// running the executor live required setting the ASSESSOR variable to the literal string `'agy'` — while
+	// also setting `JPWB_ASSURANCE_TOOL=devin`, a configuration that reads as a contradiction. `JAN-TOOLSUITE`
+	// gave the executor its own MODEL and its own TOOL and left this behind: the same borrowed-configuration
+	// defect, one layer over, and it was found by trying to use the thing rather than by reasoning about it.
+	//
+	// ⚠ FAIL-CLOSED IS PRESERVED, NOT WEAKENED. The rule `createFloorRegistry` records is that a deterministic
+	// stand-in may be chosen ONLY inside test mode — because a switch honoured in any environment once let the
+	// floor record SATISFIED while nothing reviewed anything. Outside test mode there is still exactly one
+	// option and it is the real call; this condition only decides which way INSIDE test mode.
+	if (TEST_MODE && !resolveExecutorToolId()) return deterministicExecutionPrint;
 
 	// ⭑⭑ THE EXECUTOR NOW NAMES ITS OWN TOOL, WHICH IS THE WHOLE POINT OF `JAN-TOOLSUITE`. Until this line the
 	// function returned `agyPrint` unconditionally, so the producing tool and model were the ASSURANCE tool and
@@ -54,7 +66,16 @@ export function getExecutionPrint(): (prompt: string) => Promise<string> {
 	const tool = selectBackingTool(executorToolId(), 'EXECUTION');
 	if (tool.toolId === 'pi')
 		// Loaded lazily so the gate never pulls Pi's heavy Node deps — the rule `agent/index.ts` already follows.
-		return async (prompt: string) => (await import('../tools/pi-executor.js')).piExecute(prompt).then((r) => r.answerText);
+		//
+		// ⛔ RETURNS THE WHOLE RESULT, AND IT USED TO SAY `.then((r) => r.answerText)`. `TS-04` widened this seam
+		// precisely so a tool could report WHO ANSWERED — and this line, written before that, threw the identity
+		// away and handed back a bare string. The record then fell to the host-configured fallback and wrote
+		// `resolvedModel: "unresolved"` while a real model had in fact answered.
+		//
+		// ⚠ NO UNIT TEST COULD HAVE CAUGHT IT. Every test of `runModelInvocationStep` INJECTS its own `print`
+		// returning a rich result, so the one adapter that narrows it was never on any tested path. The LIVE
+		// lane found it on its second run — which is the argument for the lane, in one line.
+		return async (prompt: string) => (await import('../tools/pi-executor.js')).piExecute(prompt);
 	if (tool.toolId === 'agy') return (prompt: string) => agyPrint(prompt);
 	throw new Error(
 		`Backing tool '${tool.toolId}' declares the EXECUTION role but this host has no adapter wired for it yet.`

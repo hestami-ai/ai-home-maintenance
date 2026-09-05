@@ -356,3 +356,57 @@ describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', ()
 		expect(caught).not.toMatch(/WITHHELD/);
 	});
 });
+
+describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually looking at', () => {
+	// ⛔ THE PROMPT USED TO TELL EVERY REVIEWER IT WAS READING *"a canonical graph export / serialized subject"* —
+	// true of a PWA, FALSE of a work product, which became a subject in `REG-F-355`. A reviewer handed a route
+	// assessment and told it is reading a graph export has been MISDESCRIBED TO, and a review conducted on a
+	// false account of its own subject is worse than no review, because it is RECORDED as one.
+
+	const ARTIFACT: AssuranceSubject = { ...SUBJECT, objectType: 'ARTIFACT' };
+
+	async function promptFor(subject: AssuranceSubject): Promise<string> {
+		let seen = '';
+		const capture: AgyPrint = async (p: string) => {
+			seen = p;
+			return CLEAN;
+		};
+		await createAgyReasoningReviewValidator({ print: capture, modelId: JUDGE }).evaluate(subject, ctx());
+		return seen;
+	}
+
+	it('⭑ an ARTIFACT subject is described as a WORK PRODUCT, never as a graph export', async () => {
+		// THE MUTANT: keep one framing for both. The reviewer is then told a work product is a canonical graph
+		// export, and its judgement is made against a description of something else.
+		const p = await promptFor(ARTIFACT);
+		expect(p).toMatch(/WORK PRODUCT/);
+		expect(p, 'a work product is not a graph export').not.toMatch(/canonical graph export/);
+	});
+
+	it('⭑ CONTROL — a PWA subject KEEPS the graph framing, so this is routing and not replacement', async () => {
+		// Without this, "describe everything as a work product" passes the test above — and the authoring
+		// floor's reviewer would silently be told it is reading something it is not.
+		const p = await promptFor(SUBJECT);
+		expect(p).toMatch(/canonical graph export/);
+		expect(p).not.toMatch(/WORK PRODUCT/);
+	});
+
+	it('⚠ BOTH framings still render rationale and narration — §9.7: absence is never a signal', async () => {
+		// An executing model declares no rationale, so these sections render "(none recorded)". THE MUTANT: drop
+		// them for work products. The reviewer's INPUT SHAPE would then encode whether the producer said
+		// anything, which is exactly what §9.7 forbids the reviewer from being able to see.
+		for (const s of [ARTIFACT, SUBJECT]) {
+			const p = await promptFor(s);
+			expect(p).toMatch(/PROFESSIONAL RATIONALE SUMMARY/);
+			expect(p).toMatch(/observable narration/);
+		}
+	});
+
+	it('⭑ and the rubric ids come from the POLICY in both framings, not from a second rubric', async () => {
+		// `ASR-4`: policy meaning is stable across validator replacement — what varies with the subject is how
+		// the review is CONDUCTED, never what the policy means. THE MUTANT: invent a work-product rubric here.
+		// `coerceJudgement` would then drop every finding as unrecognised, and the review would silently pass.
+		const first = SEEDED_REASONING_REVIEW_CRITERIA[0]!.id;
+		for (const s of [ARTIFACT, SUBJECT]) expect(await promptFor(s)).toContain(first);
+	});
+});

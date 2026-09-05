@@ -3,7 +3,7 @@
 // ⚠ THIS FILE EXISTS BECAUSE ITS ABSENCE MADE A GREEN GATE MEANINGLESS. `getExecutionPrint` had NO test, so
 // wiring the backing-tool suite into it left 235 tests passing while nothing exercised the new branch at all.
 // A suite that cannot redden for a change is not evidence about that change.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deterministicExecutionPrint, getExecutionPrint } from './model.js';
 
 const SAVED = process.env.JPWB_EXECUTOR;
@@ -59,5 +59,57 @@ describe('JAN-TOOLSUITE — the execution producer names its OWN tool', () => {
 		expect(parsed.workProduct).toBeTruthy();
 		// It echoes a fragment of the prompt, so a test can prove the model SAW the rendered template.
 		expect(parsed.basis).toContain('Assess the northern route');
+	});
+});
+
+describe('JAN-LIVEEXEC LE-01 — the executor no longer borrows the ASSURANCE switch', () => {
+	// ⚠ `TEST_MODE` IS READ AT MODULE LOAD, so these cases need a fresh module with the env already set.
+	// Without the reset the branch below is simply unreachable and the tests would assert nothing while
+	// showing green — the hollow-green shape this file's header already records.
+	// ⚠ THE ENV MUST STILL BE SET WHEN THE ASSERTION RUNS, and my first version restored it in a `finally`
+	// before the caller ever called `getExecutionPrint()` — which reads the environment at CALL time, not at
+	// import time. The helper was wrong and the code was right; it now runs the assertion INSIDE the window.
+	async function inTestModeWith(
+		env: Record<string, string | undefined>,
+		assertion: (m: typeof import('./model.js')) => void
+	) {
+		vi.resetModules();
+		const saved = { ...process.env };
+		process.env.RPH_DEMO_MODE = 'test';
+		for (const [k, v] of Object.entries(env)) {
+			if (v === undefined) delete process.env[k];
+			else process.env[k] = v;
+		}
+		try {
+			assertion(await import('./model.js?le01=' + Math.random().toString(36).slice(2)));
+		} finally {
+			process.env = saved;
+		}
+	}
+
+	it('⭑ CONTROL — in test mode with NOTHING configured, the deterministic fixture is returned', async () => {
+		// ⛔ THE MOST IMPORTANT ASSERTION IN THIS FILE. If this regresses, every gate run starts spawning real
+		// model calls: slow, billed, non-deterministic, and network-dependent.
+		await inTestModeWith({ JPWB_EXECUTOR: undefined, JPWB_ASSESSOR: undefined }, (m) => {
+			expect(m.getExecutionPrint()).toBe(m.deterministicExecutionPrint);
+		});
+	});
+
+	it('⭑ configuring the EXECUTOR selects a real tool — with the ASSURANCE switch unset entirely', async () => {
+		// ⭑⭑ THIS IS THE DEFECT LE-01 REMOVED. Running the executor live used to require setting the ASSURANCE
+		// variable to the literal string 'agy' — while also naming Devin as the assurance tool, a configuration
+		// that reads as a contradiction. THE MUTANT: restore `JPWB_ASSESSOR !== 'agy'`; this reddens because
+		// JPWB_ASSESSOR is not set at all here.
+		await inTestModeWith({ JPWB_EXECUTOR: 'agy', JPWB_ASSESSOR: undefined }, (m) => {
+			expect(m.getExecutionPrint()).not.toBe(m.deterministicExecutionPrint);
+		});
+	});
+
+	it('⛔ and the ASSURANCE switch alone NO LONGER makes the executor live', async () => {
+		// The converse mutant: keep reading JPWB_ASSESSOR. Without this, "reads the new variable" cannot be told
+		// apart from "reads both", and the borrowed switch survives in a form nothing detects.
+		await inTestModeWith({ JPWB_EXECUTOR: undefined, JPWB_ASSESSOR: 'agy' }, (m) => {
+			expect(m.getExecutionPrint()).toBe(m.deterministicExecutionPrint);
+		});
 	});
 });

@@ -64,7 +64,19 @@ const NARRATION_MAX = 2_000;
 const CONTENT_MAX = 24_000; // never render MORE graph than this even when there is room (the original cap)
 const CONTENT_MIN = 4_000; // always give the reviewer at least this much graph
 
-function judgePrompt(input: ReasoningReviewInput): string {
+/**
+ * ⭑ THE SUBJECT IS DESCRIBED CORRECTLY, AND THAT IS NOT COSMETIC. This told every reviewer it was looking at
+ * *"a canonical graph export / serialized subject"* — true of a PWA, and FALSE of a work product, which is now
+ * also a subject (`REG-F-355`). A reviewer handed a route assessment and told it is reading a graph export has
+ * been MISDESCRIBED TO, and a review conducted on a false account of its own subject is worse than no review,
+ * because it is recorded as one.
+ *
+ * ⚠ TWO FRAMINGS, ONE RUBRIC. The criteria still come FROM THE POLICY: `ASR-4` holds that policy meaning is
+ * stable across validator replacement, so what varies with the subject is how the review is CONDUCTED, never
+ * what the policy means. Inventing a second rubric here would be the restated-vocabulary defect `REG-F-353`
+ * names — *"a second way to say one thing is how restated vocabulary comes to disagree."*
+ */
+function judgePrompt(input: ReasoningReviewInput, isWorkProduct: boolean): string {
 	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
 	// the seeded ASSURANCE_POLICY object a projection of this file — written at seed time and never read again.
 	// `description` is DOC-004 §7's field (the constant called it `label`).
@@ -84,10 +96,16 @@ function judgePrompt(input: ReasoningReviewInput): string {
 			'plausible substitute that conceals the underlying problem. You review observable rationale and structure — not',
 			'private chain-of-thought.',
 			'',
-			'The artifact was produced by a DIFFERENT AI agent from this intent:',
+			isWorkProduct
+				? 'The WORK PRODUCT below was produced by a DIFFERENT AI agent, which was given exactly this instruction:'
+				: 'The artifact was produced by a DIFFERENT AI agent from this intent:',
 			`"""${userIntent}"""`,
 			'',
-			'The artifact (a canonical graph export / serialized subject) to review:',
+			isWorkProduct
+				? // ⭑ NAMED FOR WHAT IT IS, AND FOR WHAT JUDGING IT MEANS. The reviewer's question is whether the
+					// instruction was DISCHARGED — not whether a graph is well-formed.
+					'The WORK PRODUCT to review — the output a professional work unit produced by running the instruction above:'
+				: 'The artifact (a canonical graph export / serialized subject) to review:',
 			'',
 			content,
 			// §8.4 puts the contracted account first: this is what the producer is accountable for having written.
@@ -230,7 +248,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				// Defaults preserve today's behaviour exactly; a second tool supplies its own.
 				providerId: opts.providerId ?? 'google'
 			};
-			const prompt = judgePrompt(input);
+			const prompt = judgePrompt(input, subject.objectType === 'ARTIFACT');
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
 			// answer on the repair path, which is finding #25. CSAA-007 states the rule this now enforces

@@ -15,6 +15,7 @@
     "e2e": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test",
     "e2e:server": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4319 --strictPort",
     "e2e:live": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test --config playwright.live.config.ts",
+    "e2e:live-exec": "node ../../node_modules/@sveltejs/kit/svelte-kit.js sync && node ../../node_modules/@playwright/test/cli.js test --config playwright.live-exec.config.ts",
     "e2e:server:live": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4321 --strictPort"
   },
   "dependencies": {
