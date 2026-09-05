@@ -49,7 +49,11 @@ import { buildPwaExport, getArtifactStore, getEngine, hostNow, isTestMode, mintU
  * possible moment. §8.4 L854 agrees — a required review that is unavailable "cannot satisfy assurance or permit
  * its protected transition".
  */
-function reasoningReviewCriteria(engine: AuthedEngineHandle): readonly AssessmentCriterion[] {
+/** ⭑ EXPORTED FOR THE EXECUTION PLANE (`JAN-EXECREVIEW`). The work-product review is governed by the SAME
+ *  policy object as the authoring review, read from the store. Restating the rubric in a second module is
+ *  how four descriptions of one AssessmentCriterion came to disagree — the defect this function's own
+ *  fail-closed errors exist to prevent, one plane over. */
+export function reasoningReviewCriteria(engine: AuthedEngineHandle): readonly AssessmentCriterion[] {
 	const policy = getObject(engine, FLOOR_POLICY_IDS.REASONING_REVIEW);
 	if (!policy) {
 		throw new Error(

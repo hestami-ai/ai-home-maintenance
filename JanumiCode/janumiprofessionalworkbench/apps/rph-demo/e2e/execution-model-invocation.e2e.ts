@@ -119,6 +119,33 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		// the operator as executor so signal 0 never fires. The demo would go green and a model's output would
 		// have been accepted as finished work with no review — the exact thing this system exists to refuse.
 		expect(step.stepState, 'an unreviewed AI step must not read as completed').not.toBe('COMPLETED');
+
+		// ── ⭑⭑ AND THE FLOOR NOW RUNS OVER THE WORK PRODUCT, WHICH IS WHAT `JAN-EXECREVIEW` ADDED ─────────
+		//
+		// Before this increment nothing assessed an artifact at all: the gate refused for want of any
+		// assessment. Now three are recorded AGAINST THE ARTIFACT, and the refusal has a reason.
+		const artifactId = String(art.id ?? snap.artifacts[0]!.id);
+		const overArtifact = snap.assessments.filter((a) =>
+			((a.state.subjectObjectIds as string[] | undefined) ?? []).includes(artifactId)
+		);
+		expect(overArtifact.length, 'the floor never ran over the work product').toBe(3);
+
+		// ⭑ AND THE REASONING REVIEW IS *INCONCLUSIVE*, NOT REJECTED — a distinction that is the whole finding.
+		// The offline reviewer judges a PWA GRAPH EXPORT; a work product is not one, so it cannot read its
+		// subject and FAILS CLOSED. Its own docblock records why that matters: both arms once returned
+		// SATISFIED with zero findings, "a control that cannot fail, sitting inside the assurance floor".
+		//
+		// ⛔ THIS IS A REVIEWER PROBLEM, NOT A WORK PROBLEM, and the two must not read the same. THE MUTANT:
+		// teach the offline reviewer to return SATISFIED for any parseable work product. The step completes,
+		// this spec goes green, and "assured" would mean a JSON parse.
+		const rr = overArtifact.find(
+			(a) => a.state.assurancePolicyId === 'floor.reasoning-review'
+		);
+		expect(rr, 'no reasoning review was recorded over the work product').toBeDefined();
+		expect(
+			rr!.state.assessmentState,
+			'a reviewer that cannot read its subject has not reviewed it — neither a pass nor a rejection'
+		).toBe('INCONCLUSIVE');
 		await expect(
 			page.getByRole('alert'),
 			'the refusal must be surfaced, not swallowed'

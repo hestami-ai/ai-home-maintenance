@@ -31542,3 +31542,64 @@ assurance finding back to a model that executed a work unit, because until `REG-
 - **Merge target:** `DESIGN-assurance-over-execution-artifacts.md` (§5 replaced by this ruling) and a
   successor design for the loop. **Owed:** the reasoning review over work products; then the loop, bounded by
   the flaw-trend classifier; then escalation. Status: CLOSED as a ruling.
+
+### REG-F-355 — the floor now RUNS over a work product, and what remains is a reviewer that can read one
+
+- **Date:** 2026-09-05 · **Type:** FINDING (`JAN-EXECREVIEW` XA-01..03 landed) · **Class:**
+  FINDING — closes the "cannot be satisfied" half of `REG-F-352`'s gap up to the reviewer; one self-inflicted
+  bug found by driving · **Status:** 🟡 PARTIAL — the floor runs and blocks with a stated reason; it is not
+  yet satisfiable, and the reason is named below rather than left to be discovered.
+
+**WHAT LANDED.** `workProductFloorFacts` derives the two deterministic fact sets from the recorded `ARTIFACT`,
+the producing `MODEL_EXCHANGE` and `verifyExchangeContent`; `runWorkProductFloor` runs the three floor
+policies with the **artifact as subject** and records the assessments against it. **Driven end to end:** after
+a model executes a work unit, **three assessments now exist against the work product**, where before this
+increment nothing assessed an artifact at all.
+
+> ### ⭑⭑ AND THE OFFLINE REVIEWER CORRECTLY REFUSES TO JUDGE IT — WHICH IS THE FINDING
+> The floor still blocks, and **the reason is now legible**: the reasoning review is `INCONCLUSIVE`, not
+> `REJECTED`. The offline reviewer judges a **PWA graph export**; a work product is not one, so it **cannot
+> read its subject and fails closed**.
+>
+> ⭑ **That is the reviewer being honest, not a defect.** Its own docblock records why the distinction is
+> load-bearing: both of its unreadable arms *"used to return `SATISFIED` with zero findings — a control that
+> cannot fail, sitting inside the assurance floor, on the one Validator path the gate can run."*
+>
+> ⛔ **AND IT IS A REVIEWER PROBLEM, NOT A WORK PROBLEM.** `ASR-11` limb 1: a validator that could not read its
+> subject *"neither rejects nor satisfies"* it. Feeding an `INCONCLUSIVE` back to the producing model would
+> manufacture work from silence — the exact point the sponsor's question about the word *"reviewer"* surfaced.
+> **The e2e asserts `INCONCLUSIVE` specifically**, and names as its mutant the tempting fix: teach the offline
+> reviewer to pass any parseable work product, at which point *"assured"* would mean a JSON parse.
+
+**SO WHAT REMAINS IS ONE THING, AND IT IS NAMED.** A reviewer that can read a work product. Everything around
+it — facts, subject, recording, gate, remediation classification — is built and driven.
+
+> ### ⚠ A BUG I INTRODUCED, FOUND ONLY BY DRIVING IT
+> `runModelInvocationStep` returned an `exchangeId` that resolved to nothing, so the floor read `.status` off
+> an absent ref and the route threw a 500. ⭑ **Two id namespaces for one thing**: `recordExchanges` MINTS a
+> `mex_…` aggregate id per try, while `exch_…` identifies the in-process record the sink collected. I returned
+> the app-local one. **Types could not catch it — both are `string`** — and no unit test did either, because
+> the field had no consumer until this increment. It is now captured **at dispatch**, from the value the
+> recorder actually used, with the namespace confusion recorded at the field.
+
+- **THREE THINGS WERE REUSED UNCHANGED**, each measured subject-agnostic rather than assumed: the floor
+  validators (`REG-F-354`), `recordAssuranceRecordingPlan`, and `classifyFloorRemediation` — whose axis
+  (*did the review produce anything actionable?*) this programme adopted **in place of the disposition-based
+  rule it first proposed**, because `REJECTED`-with-no-findings and `INCONCLUSIVE`-with-findings both break
+  that rule and neither breaks the existing one.
+- ⭑ **AND THE CRITERIA COME FROM THE SAME POLICY OBJECT** the authoring review reads —
+  `reasoningReviewCriteria` is now exported rather than restated. Restating a rubric in a second module is how
+  four descriptions of one `AssessmentCriterion` came to disagree.
+- ⚠ **INDEPENDENCE, STATED PLAINLY.** `ASR-13` graduates independence from *separate invocation* upward. In
+  this deployment the producing and reviewing models are **the same configured judge**, so the review
+  satisfies the weakest rung and nothing more. **Recorded at the site and here, rather than implied away.**
+- ⚠ **AND `schemaValid` MEANS PARSEABLE.** `outputContract` is free text and not machine-checkable, so
+  contract conformance cannot be decided; the violation code says `WORK_PRODUCT_NOT_PARSEABLE` and **a test
+  asserts the code does not claim conformance** — with the mutant being the more useful-sounding name.
+  A machine-checkable output contract stays owed.
+- **FOUR MUTANTS, FOUR SINGLE VICTIMS** (schemaValid always true; traceComplete asserted; producer from the
+  work unit alone; the conformance-claiming violation code), with a CONTROL proving a well-formed product
+  yields all-true — without which every refusal is satisfiable by "always false".
+- **Merge target:** `apps/rph-demo/src/lib/server/execution/work-product-floor.ts`, `run-model-step.ts`,
+  `routes/undertakings/[id]/+page.server.ts`, `lib/server/floor.ts` (one export).
+  **Owed:** a reviewer that can read a work product; then `REG-D-059`'s loop. Status: PARTIAL.

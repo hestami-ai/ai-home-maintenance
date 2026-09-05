@@ -42,6 +42,12 @@ export type RunModelStepOutcome =
 	| {
 			readonly ran: true;
 			readonly answer: string;
+			/** ⭑ THE RENDERED PROMPT, so a reviewer can judge the SAME PAIR the producer saw rather than a
+			 *  summary of it. Omitted from the first version of this outcome, and the work-product review could
+			 *  not be wired without it — a return value that stops one field short of its only consumer. */
+			readonly prompt: string;
+			/** The exchange this call created, so a caller can resolve its record without searching for it. */
+			readonly exchangeId: string;
 			readonly fingerprint: string;
 			/** Where the answer is retained. The exchange record already names these exact bytes. */
 			readonly storageKey: string;
@@ -68,6 +74,7 @@ export async function runModelInvocationStep(
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 
 	const sink = createExchangeSink();
+	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
 	let answer: string;
 	try {
@@ -80,7 +87,7 @@ export async function runModelInvocationStep(
 			store: input.store,
 			sink,
 			tenantPrefix: input.tenantPrefix,
-			exchangeId: input.newId('exch'),
+			exchangeId,
 			role: 'initial',
 			model: { modelId: input.modelId, providerId: input.providerId },
 			prompt: plan.prompt,
@@ -107,7 +114,7 @@ export async function runModelInvocationStep(
 		store: input.store,
 		sink,
 		tenantPrefix: input.tenantPrefix,
-		exchangeId: input.newId('exch'),
+		exchangeId,
 		role: 'initial',
 		model: { modelId: input.modelId, providerId: input.providerId },
 		prompt: plan.prompt,
@@ -125,7 +132,7 @@ export async function runModelInvocationStep(
 		promptTemplateFingerprint: plan.fingerprint
 	});
 
-	const exchangesRecorded = record(input, sink);
+	const recording = record(input, sink);
 
 	// The same bytes, the same class — therefore the same key the exchange record already names.
 	const stored = await input.store.put({
@@ -138,16 +145,27 @@ export async function runModelInvocationStep(
 	return {
 		ran: true,
 		answer,
+		prompt: plan.prompt,
+		// The LAST aggregate id recorded is this call's: one try, one record. Falling back to the app-local id
+		// would reintroduce the namespace confusion this field's docblock records, so it does not.
+		exchangeId: recording.aggregateIds.at(-1) ?? '',
 		fingerprint: plan.fingerprint,
 		storageKey: stored.storageKey,
 		contentHash: stored.contentHash,
 		byteSize: stored.byteSize,
-		exchangesRecorded
+		exchangesRecorded: recording.recorded
 	};
 }
 
-function record(input: RunModelStepInput, sink: ReturnType<typeof createExchangeSink>): number {
-	const outcome = recordExchanges(input.dispatchExchange, sink.drain(), {
+function record(
+	input: RunModelStepInput,
+	sink: ReturnType<typeof createExchangeSink>
+): { recorded: number; aggregateIds: string[] } {
+	const aggregateIds: string[] = [];
+	const outcome = recordExchanges((payload, aggregateId) => {
+		aggregateIds.push(aggregateId);
+		return input.dispatchExchange(payload, aggregateId);
+	}, sink.drain(), {
 		runToken: input.newId('execrun'),
 		// ⭑ THE EXECUTION PLANE, WHICH THIS ENUM HAS CARRIED SINCE REG-D-055 AND NOTHING HAS EVER WRITTEN.
 		plane: 'EXECUTION',
@@ -157,5 +175,5 @@ function record(input: RunModelStepInput, sink: ReturnType<typeof createExchange
 		subjectSemanticVersion: input.subjectSemanticVersion,
 		newId: input.newId
 	});
-	return outcome.recorded;
+	return { recorded: outcome.recorded, aggregateIds };
 }

@@ -206,7 +206,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: it makes the execute button read a DECLARATION instead of sniffing whether a
 			// prompt happens to be armed, and its exit criterion is a visible open question rather than an
 			// invisible gap.
-		).toBe(24);
+			//
+			// 24 -> 25 (2026-09-05): `ROADMAP-reasoning-review-over-work-products.md` (`JAN-EXECREVIEW`). ⭑ THE
+			// WARRANT IS THAT `REG-F-352` LEFT THE FLOOR ABLE TO REFUSE AND UNABLE TO SATISFY: a model-executed
+			// work unit could run, produce a work product, and never complete. A roadmap rather than a ticket
+			// because the design's own §4 records a SCOPE JUDGEMENT — the deterministic facts are hours and the
+			// reviewer is the part that decides whether "assured" means anything, so the two must not be
+			// conflated by whoever picks this up.
+			// ⭑ IT SUBSUMES: it reuses the floor validators, the remediation classifier and the recording plan
+			// unchanged — three things measured subject-agnostic — and adds no second classifier. Its exit
+			// criterion is a floor that RUNS over an artifact and says WHY it blocks.
+		).toBe(25);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

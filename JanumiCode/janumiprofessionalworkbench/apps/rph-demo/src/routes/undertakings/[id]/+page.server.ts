@@ -58,6 +58,8 @@ import {
 } from '$lib/server/workbench';
 import { actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
+import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
+import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionPrint } from '$lib/server/execution/model';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
 import type { ActorReference, PromptTemplate } from '@janumipwb/rph-contracts';
@@ -1029,6 +1031,34 @@ export const actions: Actions = {
 			]);
 			if (recorded) return fail(400, { error: `Recording the work product failed: ${recorded}` });
 
+			// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
+			//
+			// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
+			// refused it correctly and nothing could satisfy it. This is the run that can.
+			//
+			// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
+			// come from the SAME policy object the authoring review reads — restating the rubric here is how
+			// four descriptions of one criterion came to disagree.
+			const review = await runWorkProductFloor(
+				{
+					artifactId,
+					artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
+					// The exchange the call just recorded — resolved by the id the outcome now carries, rather
+					// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
+					exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
+					answer: outcome.answer,
+					producingPrompt: outcome.prompt,
+					producerModelId: resolveJudgeModel() ?? 'unresolved'
+				},
+				uiSession(),
+				{
+					artifacts: getArtifactStore(),
+					now: hostNow,
+					newId: mintUiId,
+					criteria: reasoningReviewCriteria(uiSession())
+				}
+			);
+
 			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
 			//
 			// `floor-gate.ts:30` — `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])` — makes this step AI-produced
@@ -1072,9 +1102,13 @@ export const actions: Actions = {
 			]);
 			if (completed)
 				return fail(400, {
-					error:
-						`The model ran and its work product is recorded, and the step cannot COMPLETE until the ` +
-						`assurance floor is satisfied for it — which is the floor working, not a fault. ${completed}`
+					error: review.satisfied
+						? `The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete. ${completed}`
+						: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
+							// check, and the two must not read the same. The findings are surfaced; feeding them back
+							// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
+							// next increment — so this one stops at surfacing and says so.
+							`The model ran and its work product was reviewed, and the assurance floor is NOT satisfied for it: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}`
 				});
 			return { advanced: 'executed' };
 		}
