@@ -120,19 +120,30 @@ injected backend's raw rejection reaches the floor runner and is projected today
 
 ---
 
-### `TS-07` — Devin: declared, unbound, refusing specifically
+### `TS-07` — the Devin reviewer adapter (BOUND — contract measured)
 
-Registered with `bound: false`. Selecting it refuses, naming what is missing.
+`devin --print --model glm-5-2 --prompt-file <FILE> --export <PATH>`, parsing **ATIF-v1.7**.
+
+⭑ **`--prompt-file` is the right call over an inline prompt**: the prompt never enters argv, so the
+prompt-in-diagnostic problem that forces agy's diagnostic to be destroyed cannot arise here at all.
+
+Identity from the export: `agent.model_name` and per-step `extra.generation_model` (`"glm-5-2"`) →
+`PROVIDER_REPORTED`. Reasoning: **none emitted** → recorded as an *observed absence*, never as a blocked split.
 
 **Predicted reds:**
 
 | Mutant | Must redden |
 |---|---|
-| selecting Devin silently falls back to another tool | the refusal test — a silent substitution is the fiction `REG-D-052` forbids |
-| the refusal is generic | the message test: it must name *Devin* and *what is unmeasured* |
+| record `HOST_CONFIGURED` for Devin | the identity-evidence test — Devin reports its own model |
+| record the requested id instead of the **reported** one | the mismatch test: configure `glm-5-2`, assert the value came from the export |
+| record reasoning as "blocked" rather than absent | the observed-absence test (`PER-12`: no obligation to solicit a trace) |
+| pass `--respect-workspace-trust false` | ⛔ the **no-bypass** test — the probe succeeded without it; an untrusted directory must refuse, to be fixed by trusting the directory |
+| pass the prompt inline instead of via `--prompt-file` | the argv test — the prompt must not appear in argv |
 
-⚠ **No adapter is written against a guessed contract.** `devin` is not on PATH and its non-interactive shape is
-unknown; the `agy` docblock records what guessing costs.
+⚠ **Disclosed, not fixed here:** Devin injects ambient context into the reviewer (`<rules type="always-on">`
+from `.codeium\windsurf\memories\global_rules…`, plus `<available_skills>`). ASR-13 names *"shared hidden
+context"* as a dimension and nothing detects it. The adapter suppresses what it can and **records what it
+cannot** — see design §5.3.
 
 ---
 

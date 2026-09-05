@@ -282,24 +282,64 @@ canary result in §1.2 becomes a test rather than an assumption.
 
 ---
 
-## 5. Devin: declared, specified, and deliberately unbound
+## 5. Devin: MEASURED, and the reviewer is GLM-5.2
 
-**Devin CLI is not installed** (`command -v devin` → not on PATH), and web lookup is unavailable in this
-environment. Its non-interactive contract — flags, stdin behaviour, output format, whether it reports its own
-model — is **unknown to me**.
+⚠ **A correction, and it was mine.** I reported Devin *"not installed"* on the strength of `command -v devin`
+returning nothing in Git Bash. The sponsor was right: it **is** installed. `devin.exe` sits at
+`C:\Users\mchen\AppData\Local\devin\cli\bin\`, and that directory **is in the registry `Path`** — it is simply
+the one entry **missing from this session's process environment**, which started before it was added.
 
-⛔ I will not write an adapter against a guessed contract. The `agy` seam records what that costs: its docblock
-documents that the prompt rides in argv, that an empty `--print` errors, that `-` is taken literally, and that
-Windows caps the command line near 32,767 chars — **all of it learned by driving the tool**. Guessing Devin's
-shape would produce an adapter that type-checks, passes a mocked test, and fails on first contact.
+⭑ The diagnostic that settled it is worth keeping: comparing the **registry** `Path` against the **process**
+`Path` returned exactly one difference, and it was the Devin entry. Checking a single shell's `PATH` and calling
+a tool absent is the same error as searching for a coined noun — the instrument was stale, not the fact.
 
-⭑ So Devin enters the suite the way the suite is designed to admit a tool: as a **declaration with an unbound
-adapter**. It appears in the registry, the UI can show it, and any attempt to *select* it refuses with a message
-naming exactly what is missing. The moment someone installs it, measuring its contract and filling the adapter is
-a contained change — and the declaration is already there to be filled.
+**Sponsor direction (2026-09-05):** *"Use GLM-5.2 with Devin."*
 
-This is the same discipline as `REG-D-052`'s refusal-over-default, applied one level up: **an unmeasured tool is
-refused, not approximated.**
+### 5.1 The measured contract — `devin 3000.6.14`
+
+| Fact | Value |
+|---|---|
+| Non-interactive | `-p` / `--print [<PROMPT>]`, clean stdout (returned exactly `PONG`), exit 0 |
+| ⭑ Prompt off argv | `--prompt-file <FILE>` — stronger than stdin: the prompt never touches argv |
+| Model | `--model <MODEL>` (env `DEVIN_MODEL`); `devin models list` enumerates 46 families |
+| ⭑ Structured record | `--export <PATH>` → **ATIF-v1.7** JSON |
+| ⭑ Reports its own model | `agent.model_name: "GLM-5.2 High"` **and** per-step `extra.generation_model: "glm-5-2"` |
+| Usage | `final_metrics.{total_prompt_tokens, total_completion_tokens, total_cached_tokens, total_steps}` |
+| ⭑ Volunteered reasoning | **NONE** — `thinking` / `reasoning` / `thought` appear nowhere in the export |
+| Backend | `agent.extra.backend: "Windsurf"`, `permission_mode: "Normal"` |
+
+**Chosen model:** `glm-5-2` (GLM-5.2 High, 200K context, **Free**). ⭑ Free matters for a reviewer that runs on
+every work product. `glm-5-2-none` ("No Thinking") and 1M-context variants exist if wanted later.
+
+### 5.2 Why this pairing is a good one
+
+| Role | Tool | Model | Volunteered reasoning |
+|---|---|---|---|
+| Producer | Pi (SDK) | `gpt-5.x` via `openai-codex` | **emits it** → split, retained `PURGEABLE_AT_EXPIRY` |
+| Reviewer | Devin | `glm-5-2` | **emits none** → recorded as an *observed absence* |
+
+`differs('modelId')`: `gpt-5.x` ≠ `glm-5-2`. ⭑ **`DIFFERENT_MODEL` is satisfied on recorded evidence** — the
+first time on this path. Both tools report their own identity, so **both** sides record `PROVIDER_REPORTED`
+rather than `HOST_CONFIGURED`.
+
+### 5.3 ⚠ Two hazards the measurement exposed
+
+1. ⛔ **Devin injects ambient context into the reviewer.** The export's system steps carry
+   `<rules type="always-on">` loaded from `C:\Users\mchen\.codeium\windsurf\memories\global_rules…` and an
+   `<available_skills>` block. **The reviewer's context is therefore not only the reviewer's prompt.** ASR-13
+   names *"shared hidden context"* as one of its eight dimensions, and if the producing side ever loads the same
+   ambient rules, that is a shared-context violation nothing currently detects. The adapter must suppress
+   ambient context where it can (`--config` override) and **disclose** what it cannot.
+2. ⚠ **Print mode fails in an untrusted directory.** The help states it plainly, and the fix flag
+   (`--respect-workspace-trust false`) is a trust bypass. ⭑ It proved unnecessary — the repository directory is
+   already trusted and the call succeeded without it — so the adapter **must not** pass that flag, and an
+   untrusted-directory failure must surface as a refusal to be fixed by trusting the directory, never bypassed.
+
+### 5.4 What still holds from the original position
+
+The discipline that would have applied to an unmeasured tool stays available for the *next* one: a tool is
+admitted by **declaration plus measurement**, and an unmeasured adapter refuses rather than approximates. Devin
+has now been measured, so it is **bound**. Nothing here was guessed.
 
 ---
 
@@ -308,12 +348,56 @@ refused, not approximated.**
 | # | Question | Recommendation |
 |---|---|---|
 | Q1 | Change the reasoning-review floor from `DIFFERENT_MODEL` to `DIFFERENT_PROVIDER`? | ⛔ **No — it would stop checking the model** (§4.5). Keep `DIFFERENT_MODEL`. If both are wanted, that is a **conjunction that does not exist** and is a canon question, not a policy edit. ⚠ And never as "a profile selects it": `REG-Q-069` records the profile ladder is unread dead data, and `REG-F-270` owns that conjunct. |
-| Q2 | Devin: install it so its contract can be measured, or leave it declared-unbound? | **Declared-unbound now.** It is the honest state and it costs nothing to fill later. |
+| Q2 | Devin | ✅ **SETTLED** — installed, measured (§5.1), bound. Reviewer model `glm-5-2` per sponsor. |
 | Q3 | Which Pi model executes work units? | **Do not pin one** (`REG-D-052`). Configure `JPWB_EXECUTOR_MODEL`; refuse when unset. |
-| Q4 | Should the executor use the Pi **SDK** (already integrated, in-process) or the Pi **CLI** (subprocess)? | **SDK.** It is already a dependency, already reports `ProducerIdentity`, and needs no argv budget or subprocess sanitisation. |
+| Q4 | Pi **SDK** or Pi **CLI**? | ✅ **SETTLED — SDK, as a practical try** (sponsor, 2026-09-05), with the reservation in §6.1 recorded rather than dismissed. |
 
-⚠ Q4 is a deliberate divergence from the literal words *"Pi CLI"*, on the evidence that the SDK path already
-exists and is strictly richer. Flagged rather than assumed.
+### 6.1 ⚠ The sponsor's reservation about the SDK, recorded not waved away
+
+> *"I'm concerned because there are some differences between what's available through the SDK and what's
+> available through the CLI. E.g., I don't think the SDK approach provides methods to know if / when the context
+> window is about to need compression. There were some other tradeoffs as well. But let's give it a practical
+> try."*
+
+⭑ **This is a real risk and it has a bounded blast radius here**, which is why "a practical try" is a sound call
+rather than a gamble:
+
+- The execution producer runs **one bounded turn per execution step** — render a prompt, get a work product back.
+  It is not a long-running conversation, so compaction pressure is structurally unlikely on *this* path. The
+  **authoring** agent is the long conversation, and it already uses the SDK today.
+- ⛔ **But "unlikely" is not "measured", and a silent compaction would be the worst failure mode available**: it
+  would truncate the materialized input (`PER-9` E-1) *after* the record claimed what was sent. So the adapter
+  **records the token accounting it can see** and treats a missing signal as an **`UNREPORTED` measurement**, not
+  as "no compaction happened".
+- **The fallback is cheap.** The Pi CLI's `--mode json` stream carries per-message `usage` (input / output /
+  cacheRead / cacheWrite / totalTokens). If the SDK proves blind to compaction, the adapter swaps to the CLI
+  behind the same `BackingTool` declaration — which is precisely what the suite abstraction is for. ⭑ Nothing
+  else in the design moves.
+
+### 6.2 ⭑ The reservation, checked — the SDK DOES expose the signal
+
+The concern was specific and checkable, so it was checked rather than deferred. **`@earendil-works/pi-coding-agent@0.80.6`
+re-exports these from its package root** (`exports["."] → dist/index.d.ts`, verified — not merely present in
+`dist/`):
+
+| Public export | What it gives |
+|---|---|
+| ⭑ `shouldCompact(contextTokens, contextWindow, settings): boolean` | *"Check if compaction should trigger based on context usage."* — **precisely the "is it about to need compression" signal** |
+| `calculateContextTokens(usage): number` | total context tokens from a `Usage` |
+| `getLastAssistantUsage(entries): Usage \| undefined` | the live usage to feed the above |
+| `estimateTokens(message): number` | conservative per-message estimate |
+| `compact()`, `DEFAULT_COMPACTION_SETTINGS`, `CompactionResult` | the compaction operation and its result |
+
+⭑ **And they are pure functions** — the module says so: *"Pure functions for compaction logic. The session
+manager handles I/O."* So the adapter can call `shouldCompact` purely to **observe and record**, without
+surrendering control of when compaction happens. That is a better shape than a CLI status line, which would have
+to be parsed out of a stream.
+
+⚠ One precision: `estimateContextTokens` (the richer `{tokens, usageTokens, trailingTokens, lastUsageIndex}`
+estimate) is **internal** — it is not in the root re-export list. The four public functions above are sufficient.
+
+**Resolution:** the reservation does not hold for this SDK version. It was a reasonable prior — it is simply not
+what `0.80.6` ships. The CLI fallback in §6.1 stays documented as the escape hatch, unexercised.
 
 ---
 
