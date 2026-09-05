@@ -31407,3 +31407,72 @@ with a selector on the type editor that renders an unanswered type as **owing an
   surprise.
 - **Merge target:** contracts vocab + generated; `handlers/pwa-authoring.ts`; `packages/rph-authoring/src/catalog.ts`;
   `routes/pwa/[id]/+page.{server.ts,svelte}`; `routes/undertakings/[id]/+page.server.ts`. Status: CLOSED.
+
+### REG-Q-078 — what happens to an execution step whose work product the reasoning review REJECTS?
+
+- **Date:** 2026-09-05 · **Type:** QUESTION (sponsor) · **Class:**
+  QUESTION — the one decision `JAN-EXECASSURE`'s design cannot make for itself ·
+  **Status:** 🔴 OPEN.
+
+**THE QUESTION IN PLAIN LANGUAGE.** *A model does a work unit's work. A reviewer looks at what it produced and
+says it is not good enough. What happens to the step?*
+
+| | What it means | Against it |
+|---|---|---|
+| **(a) The step FAILS** | the work was attempted and did not achieve its purpose | a step that ran without error is recorded as failed |
+| **(b) The step completes, the work unit stays unassured** | the work product exists; nothing blesses it | ⛔ a completed step **reads as done** |
+| **(c) A repair try runs** | the assurance path already does this for its own judgements | an unbounded loop unless the retry policy binds it |
+
+- ⭑ **RECOMMENDATION: (a).** `INV-5`'s whole content is that execution success and assurance are separate
+  axes, and this system already refuses *"no green without assurance"*. **A work product the reviewer rejected
+  is an execution that did not achieve its purpose**, and `FailExecutionStep` exists to say exactly that with
+  the observation cited. (b) is the one to avoid: *completed* is what a reader trusts.
+- ⚠ **AND (c) IS NOT WRONG, IT IS UNBOUNDED.** The assurance path's repair try is bounded by a hard attempt
+  limit; an execution repair would need the plan's `retryPolicy` to bind it, and that field is an empty bag on
+  every plan the demo creates. **Choosing (c) makes `retryPolicy` load-bearing for the first time**, which is
+  a larger change than it looks.
+- **Merge target:** `DESIGN-assurance-over-execution-artifacts.md`. **Owed:** a ruling before the reasoning
+  review over work products is built. Status: OPEN.
+
+### REG-F-354 — the floor validators are SUBJECT-AGNOSTIC, so assuring an execution artifact needs FACTS, not validators
+
+- **Date:** 2026-09-05 · **Type:** FINDING (design measurement; scope judgement recorded) · **Class:**
+  FINDING — corrects an assumption this programme was about to build on ·
+  **Status:** 🟡 DESIGNED, NOT BUILT. `JAN-EXECASSURE` is scoped and its substantive half is deliberately
+  unstarted — see the scope note below, which is a decision rather than a discovery.
+
+**THE ASSUMPTION, AND WHY IT WAS WRONG.** `REG-F-352` left the floor able to REFUSE a model-executed step and
+unable to SATISFY it, and I expected the remedy to be artifact-shaped validators — a substantial subsystem.
+
+⭑ **Measured instead: the floor validators do not inspect their subject at all.**
+`packages/rph-assurance/src/floor.ts:161` and `:213` take `(subject, facts)`, and the fact shapes are five and
+two booleans respectively. **The caller supplies the facts** — which the demo already does for a PWA at
+`apps/rph-demo/src/lib/server/floor.ts:242,329-333`. So assuring an artifact derives FACTS about an artifact
+and reuses the validators unchanged. **A subsystem I was about to design does not need to exist.**
+
+- ⭑ **AND TWO PIECES BUILT FOR OTHER REASONS ANSWER TWO OF THE FACTS.** `traceComplete` is what
+  `verifyExchangeContent` already computes (`JAN-MXREAD`, built for diagnostics); `schemaValid` is
+  `splitAnswerSpan(...).located`, the same deterministic measurement the retention path makes (`REG-F-351`).
+  **Neither was built for this and both fit exactly**, which is what a coherent model looks like from the
+  inside.
+- ⚠ **BUT `schemaValid` IS WEAKER THAN ITS NAME, AND THE DESIGN SAYS SO IN THOSE WORDS.**
+  `PromptTemplate.outputContract` is **free text** and not machine-checkable, so *"the work product conforms to
+  its contract"* cannot be decided today. What can be decided is that it **parses**. ⛔ **Claiming conformance
+  from a parse would be the fabricated-measurement defect this register records repeatedly** — so the fact
+  means *parseable*, the observation will say so, and **a machine-checkable output contract is recorded as
+  owed.**
+- **AND INDEPENDENCE IS CHECKABLE RATHER THAN ASSUMED.** `ASR-13` graduates independence from *separate
+  invocation* upward. The producing exchange records the resolved model identity, so a reviewer that is the
+  same invocation can be **refused on evidence** — which is what stops a model marking its own homework.
+
+> ### ⚠ THE SCOPE JUDGEMENT, RECORDED AS A DECISION AND NOT AS A DISCOVERY
+> The deterministic two are a few hours of fact derivation. **The reasoning review over a work product is the
+> piece that decides whether "assured" means anything**, and it needs its own prompt, an independence check
+> with a driven mutant, and `REG-Q-078`'s ruling on what a REJECTED product does to the step.
+>
+> ⭑ **Landing the deterministic two alone would change nothing visible** — the floor needs all three, so the
+> step still would not complete — and would leave the substantive third looking like remaining plumbing when
+> it is the part that carries the meaning. **An assurance mechanism is the worst possible thing to rush**, and
+> this entry records that as a judgement made deliberately rather than a stage that quietly did not happen.
+- **Merge target:** `docs/_working/DESIGN-assurance-over-execution-artifacts.md`. **Owed:** `REG-Q-078`'s
+  ruling, then the roadmap and the build. Status: DESIGNED, NOT BUILT.
