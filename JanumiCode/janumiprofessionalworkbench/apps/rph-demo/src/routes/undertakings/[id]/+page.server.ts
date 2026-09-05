@@ -59,6 +59,7 @@ import {
 import { actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
+import { classifyTrend, mayRetry } from '$lib/server/execution/loop-detection';
 import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionPrint } from '$lib/server/execution/model';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
@@ -962,110 +963,155 @@ export const actions: Actions = {
 		// command that says so. Rolling the start back would erase a try that happened, cost money, and is
 		// exactly what `PER-9` keeps records for.
 		if (isModelStep) {
-			const outcome = await runModelInvocationStep({
-				subject: {
-					id: pwuId,
-					title: String((pwu?.title ?? '') as string),
-					description: String((pwu?.description ?? '') as string),
-					purpose: String((pwuType?.purpose ?? '') as string),
-					expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
-					inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
-				},
-				subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
-				pwuTypeId,
-				template,
-				print: getExecutionPrint(),
-				store: getArtifactStore(),
-				tenantPrefix: EXECUTION_TENANT_PREFIX,
-				dispatchExchange: (payload, aggregateId) =>
-					dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
-				newId: mintUiId,
-				now: hostNow,
-				modelId: resolveJudgeModel() ?? 'unresolved',
-				providerId: 'agy'
-			});
+			// ── ⭑⭑ JAN-EXECLOOP — THE LOOP `REG-D-059` LICENSED AND LEFT OPEN ─────────────────────────────
+			//
+			// The sponsor: *"the automated reviews / policies … are fed back into the executing agent of the PWU
+			// so that it may attempt to address the identified findings. However, that could go in loops so
+			// there is expected to be a loop detection capability … At some point — say two loops or three —
+			// there would be an escalation."* `REG-D-059` measured the ground and named the gap exactly: three
+			// of the four parts existed; **what was missing is the LOOP** — a bound greater than one, and the
+			// classification that decides when to stop.
+			//
+			// ⚠ EVERY TRY IS ITS OWN ARTIFACT AND ITS OWN EXCHANGE RECORD. `PER-9` requires *"each retry,
+			// reformat, and repair request"* be recorded, and CSAA-007 that *"repair never rewrites predecessor
+			// raw output"* — so a superseded try is SUPERSEDED, never overwritten. Reusing one artifact id
+			// across tries would destroy the evidence the loop exists to produce.
+			let outcome!: Extract<Awaited<ReturnType<typeof runModelInvocationStep>>, { ran: true }>;
+			let review!: Awaited<ReturnType<typeof runWorkProductFloor>>;
+			let artifactId = '';
+			let priorFindings: readonly { code: string; statement: string }[] = [];
+			const openPerTry: number[] = [];
+			let loopEnded = '';
 
-			if (!outcome.ran) {
-				// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
-				// which is the whole difference between a demo and a record.
-				runSteps([
+			for (let attempt = 1; ; attempt++) {
+				const tryOutcome = await runModelInvocationStep({
+					subject: {
+						id: pwuId,
+						title: String((pwu?.title ?? '') as string),
+						description: String((pwu?.description ?? '') as string),
+						purpose: String((pwuType?.purpose ?? '') as string),
+						expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
+						inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+					},
+					subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
+					pwuTypeId,
+					template,
+					print: getExecutionPrint(),
+					store: getArtifactStore(),
+					tenantPrefix: EXECUTION_TENANT_PREFIX,
+					dispatchExchange: (payload, aggregateId) =>
+						dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+					newId: mintUiId,
+					now: hostNow,
+					modelId: resolveJudgeModel() ?? 'unresolved',
+					providerId: 'agy',
+					priorFindings
+				});
+
+				if (!tryOutcome.ran) {
+					// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
+					// which is the whole difference between a demo and a record.
+					runSteps([
+						[
+							'FailExecutionStep',
+							'EXECUTION_PLAN',
+							planId,
+							{ stepId, failureReason: tryOutcome.refusedBecause }
+						]
+					]);
+					return fail(400, { error: `The model invocation did not run: ${tryOutcome.refusedBecause}` });
+				}
+				outcome = tryOutcome;
+
+				// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
+				// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
+				// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
+				// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
+				// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
+				// went against it is the erasure `PER-9` exists to prevent.
+				artifactId = mintUiId('art');
+				const recorded = runSteps([
 					[
-						'FailExecutionStep',
-						'EXECUTION_PLAN',
-						planId,
-						{ stepId, failureReason: outcome.refusedBecause }
-					]
+						'RecordArtifact',
+						'ARTIFACT',
+						artifactId,
+						{
+							artifactId,
+							artifactType: 'work-product',
+							mediaType: 'text/plain',
+							storageProvider: 'jpwb:content-plane',
+							storageKey: tryOutcome.storageKey,
+							contentHash: tryOutcome.contentHash,
+							byteSize: tryOutcome.byteSize,
+							producingPwuId: pwuId,
+							// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
+							// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
+							// one. Free strings here are the honest shape, not laziness.
+							securityClassification: 'unclassified',
+							retentionClass: 'retained-by-participation',
+							status: 'recorded'
+						}
+					],
 				]);
-				return fail(400, { error: `The model invocation did not run: ${outcome.refusedBecause}` });
-			}
+				if (recorded) return fail(400, { error: `Recording the work product failed: ${recorded}` });
 
-			// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
-			// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
-			// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
-			// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
-			// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
-			// went against it is the erasure `PER-9` exists to prevent.
-			const artifactId = mintUiId('art');
-			const recorded = runSteps([
-				[
-					'RecordArtifact',
-					'ARTIFACT',
-					artifactId,
+				// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
+				//
+				// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
+				// refused it correctly and nothing could satisfy it. This is the run that can.
+				//
+				// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
+				// come from the SAME policy object the authoring review reads — restating the rubric here is how
+				// four descriptions of one criterion came to disagree.
+				review = await runWorkProductFloor(
 					{
 						artifactId,
-						artifactType: 'work-product',
-						mediaType: 'text/plain',
-						storageProvider: 'jpwb:content-plane',
-						storageKey: outcome.storageKey,
-						contentHash: outcome.contentHash,
-						byteSize: outcome.byteSize,
-						producingPwuId: pwuId,
-						// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
-						// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
-						// one. Free strings here are the honest shape, not laziness.
-						securityClassification: 'unclassified',
-						retentionClass: 'retained-by-participation',
-						status: 'recorded'
+						artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
+						// The exchange the call just recorded — resolved by the id the outcome now carries, rather
+						// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
+						exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
+						answer: tryOutcome.answer,
+						producingPrompt: tryOutcome.prompt,
+						// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
+						// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
+						// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
+						// refuse. The outcome now carries who actually produced the work product.
+						producerModelId: tryOutcome.producer.modelId,
+						producerProviderId: tryOutcome.producer.providerId,
+						// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
+						// declare one — a recorded shortfall, never a synthesized summary.
+						...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {})
+					},
+					uiSession(),
+					{
+						artifacts: getArtifactStore(),
+						now: hostNow,
+						newId: mintUiId,
+						criteria: reasoningReviewCriteria(uiSession())
 					}
-				],
-			]);
-			if (recorded) return fail(400, { error: `Recording the work product failed: ${recorded}` });
+				);
+				if (review.satisfied) break;
 
-			// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
-			//
-			// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
-			// refused it correctly and nothing could satisfy it. This is the run that can.
-			//
-			// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
-			// come from the SAME policy object the authoring review reads — restating the rubric here is how
-			// four descriptions of one criterion came to disagree.
-			const review = await runWorkProductFloor(
-				{
-					artifactId,
-					artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
-					// The exchange the call just recorded — resolved by the id the outcome now carries, rather
-					// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
-					exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
-					answer: outcome.answer,
-					producingPrompt: outcome.prompt,
-					// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
-					// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
-					// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
-					// refuse. The outcome now carries who actually produced the work product.
-					producerModelId: outcome.producer.modelId,
-					producerProviderId: outcome.producer.providerId,
-					// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
-					// declare one — a recorded shortfall, never a synthesized summary.
-					...(outcome.rationale ? { rationale: outcome.rationale } : {})
-				},
-				uiSession(),
-				{
-					artifacts: getArtifactStore(),
-					now: hostNow,
-					newId: mintUiId,
-					criteria: reasoningReviewCriteria(uiSession())
+				// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
+				// is already filtered to valid SUBJECT findings, never operational failures.
+				openPerTry.push(review.remediation.findings.length);
+				const trend = classifyTrend(openPerTry);
+				const gate = mayRetry(attempt, trend);
+
+				// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
+				// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
+				// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
+				if (!review.remediation.autoRefine || !gate.retry) {
+					loopEnded = review.remediation.autoRefine
+						? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
+						: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
+					break;
 				}
-			);
+				priorFindings = review.remediation.findings.map((f) => ({
+					code: f.code,
+					statement: f.statement
+				}));
+			}
 
 			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
 			//
@@ -1099,7 +1145,11 @@ export const actions: Actions = {
 						// the assurance floor is entitled to know which it was.
 						executionProvenance: {
 							executedBy: {
-								actorId: `model:${resolveJudgeModel() ?? 'unresolved'}`,
+								// ⭑ THE MODEL THAT ACTUALLY ANSWERED. This read `resolveJudgeModel()` — the REVIEWER's
+								// model — so the execution provenance credited the judge with doing the work. The same
+								// fiction `JAN-TOOLSUITE` removed from the floor, surviving one layer over because
+								// nothing read this field back.
+								actorId: `model:${outcome.producer.modelId}`,
 								actorType: 'AGENT',
 								displayName: 'Execution model'
 							}
@@ -1116,7 +1166,10 @@ export const actions: Actions = {
 							// check, and the two must not read the same. The findings are surfaced; feeding them back
 							// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
 							// next increment — so this one stops at surfacing and says so.
-							`The model ran and its work product was reviewed, and the assurance floor is NOT satisfied for it: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}`
+							// ⭑ AND IT SAYS WHY THE LOOP STOPPED, not merely that it did. `REG-D-059` bounds the
+							// repair loop and escalates at the bound; an operator reading this needs to know
+							// whether the producer ran out of tries, stalled, or made things worse.
+							`The model ran, its work product was reviewed over ${openPerTry.length + 1} ${openPerTry.length === 0 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}`
 				});
 			return { advanced: 'executed' };
 		}

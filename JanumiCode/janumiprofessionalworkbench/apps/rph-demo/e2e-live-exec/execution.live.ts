@@ -192,6 +192,10 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		const assessments = snap.assessments.map((r) => r.state as Record<string, unknown>);
 		const observations = snap.observations.map((r) => r.state as Record<string, unknown>);
 		console.log('\n─── LIVE REVIEW OUTCOME ' + '─'.repeat(52));
+		// ⭑ JAN-EXECLOOP — ONE EXECUTION EXCHANGE PER TRY, so this IS the try count. `PER-9` requires each
+		// retry and repair request be its own record, which makes the loop's behaviour readable from the
+		// governed stream rather than from a log line.
+		console.log(`tries    : ${execution.length}  (execution-plane exchanges)`);
 		console.log(`producer : ${producer.value}  (${producer.evidence})`);
 		console.log(`reviewer : ${reviewer.value}  (${reviewer.evidence})`);
 		for (const a of assessments)

@@ -264,7 +264,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// lint, vitest and playwright — not on `verif` — so it landed red here and stayed red until the next
 			// slice happened to run the full gate. The full gate is all five, and running four of them is how a
 			// ratchet dies quietly.
-		).toBe(29);
+			//
+			// 29 -> 30 (2026-09-05): `ROADMAP-execution-feedback-loop.md` (`JAN-EXECLOOP`). ⭑ NOT A NEW LINE —
+			// it is the increment `REG-D-059` LICENSED AND LEFT OPEN, and that entry named both the gap and the
+			// order: *"three of the four parts exist … What is missing is the LOOP — a bound greater than one,
+			// and the classification that decides when to stop"*, to be built *"after the reasoning review over
+			// work products"*, which landed in `REG-F-355`/`356`. Filing it as a roadmap rather than a ticket is
+			// what the ruling asked for.
+			// ⭑ IT SUBSUMES: no new policy, no new vocabulary, and THREE STATES rather than the sibling
+			// monitor's four — `SCOPE_BLIND` keys on tool-call history and a JPWB execution step invokes no
+			// tools, so porting it would ship a check that CANNOT FAIL.
+		).toBe(30);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

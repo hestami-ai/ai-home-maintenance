@@ -47,6 +47,15 @@ export interface RunModelStepInput {
 	/** The model the host CONFIGURED. ⚠ Used only when the tool reports nothing better — see `print`. */
 	readonly modelId: string;
 	readonly providerId: string;
+	/**
+	 * ⭑ JAN-EXECLOOP — findings from a PREVIOUS try, to be addressed on this one.
+	 *
+	 * ⚠ STRUCTURED PAIRS, NOT THE REVIEWER'S PROSE. `classifyFloorRemediation` reads codes *"never prose"*, and
+	 * the same discipline applies going back: the producer is told WHAT failed, by its criterion id, and asked
+	 * to address it. ⛔ It is NOT told HOW — that would be the harness doing the professional work, and the
+	 * work unit's whole point is that a professional (or a model acting as one) does it.
+	 */
+	readonly priorFindings?: readonly { readonly code: string; readonly statement: string }[];
 }
 
 export type RunModelStepOutcome =
@@ -109,6 +118,24 @@ export async function runModelInvocationStep(
 	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template);
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 
+	// ⭑ THE REPAIR PROMPT IS THE ORIGINAL PLUS WHAT THE REVIEW FOUND, and it is assembled HERE so that the
+	// prompt RECORDED is the prompt SENT. `PER-9` E-1 is *"the exact bytes presented to the model"*; appending
+	// at the call site and recording the plan's version would make the record describe a different call.
+	//
+	// ⚠ THE TEMPLATE FINGERPRINT IS UNCHANGED, and correctly so: the TYPE's template did not change. What
+	// changed is the context this try was given, which is the exchange record's business, not the template's.
+	const prompt = input.priorFindings?.length
+		? [
+				plan.prompt,
+				'',
+				'── AN INDEPENDENT ASSURANCE REVIEW OF YOUR PREVIOUS ATTEMPT FOUND THE FOLLOWING ──',
+				...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
+				'',
+				'Produce the work product again, addressing these findings. Do not argue with them and do not',
+				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+			].join('\n')
+		: plan.prompt;
+
 	const sink = createExchangeSink();
 	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
@@ -117,7 +144,7 @@ export async function runModelInvocationStep(
 	// told us only its answer", which is a different fact and grades the evidence weaker rather than absent.
 	let produced: ToolInvocationResult | undefined;
 	try {
-		const returned = await input.print(plan.prompt);
+		const returned = await input.print(prompt);
 		if (isToolInvocationResult(returned)) {
 			produced = returned;
 			answer = returned.answerText;
@@ -133,7 +160,7 @@ export async function runModelInvocationStep(
 			exchangeId,
 			role: 'initial',
 			model: { modelId: input.modelId, providerId: input.providerId },
-			prompt: plan.prompt,
+			prompt,
 			rawOutput: '',
 			disposition: 'rejected',
 			attemptOrdinal: 1,
@@ -179,7 +206,7 @@ export async function runModelInvocationStep(
 		exchangeId,
 		role: 'initial',
 		model: identity,
-		prompt: plan.prompt,
+		prompt,
 		rawOutput: answer,
 		disposition: 'accepted',
 		attemptOrdinal: 1,
@@ -207,7 +234,7 @@ export async function runModelInvocationStep(
 	return {
 		ran: true,
 		answer,
-		prompt: plan.prompt,
+		prompt,
 		// The LAST aggregate id recorded is this call's: one try, one record. Falling back to the app-local id
 		// would reintroduce the namespace confusion this field's docblock records, so it does not.
 		exchangeId: recording.aggregateIds.at(-1) ?? '',

@@ -20,6 +20,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { splitAnswerSpan } from '../assurance/agy-cli.js';
 import { createFloorRegistry } from '../assurance/index.js';
+import { classifyFloorRemediation, type FloorRemediation, type FloorView } from '../floor.js';
 import { createExchangeSink } from '../assurance/exchange-capture.js';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
@@ -126,7 +127,14 @@ export async function runWorkProductFloor(
 		readonly criteria: readonly AssessmentCriterion[];
 		readonly print?: (prompt: string) => Promise<string>;
 	}
-): Promise<{ satisfied: boolean; observations: { code: string; statement: string }[] }> {
+): Promise<{
+	satisfied: boolean;
+	observations: { code: string; statement: string }[];
+	/** ⭑ JAN-EXECLOOP — what to DO about an unsatisfied floor, decided by the SAME classifier the authoring
+	 *  plane uses. Computing it here rather than in the route keeps one definition of "these findings may go
+	 *  back to the producer", which is the distinction `REG-D-059` turns on. */
+	remediation: FloorRemediation;
+}> {
 	const facts = await workProductFloorFacts(subject, opts.artifacts);
 
 	const assuranceSubject: AssuranceSubject = {
@@ -240,6 +248,21 @@ export async function runWorkProductFloor(
 		satisfied: plan.gatePermitsTransition,
 		observations: plan.assessments.flatMap((a) =>
 			a.observations.map((o) => ({ code: o.code, statement: o.statement }))
-		)
+		),
+		// ⚠ THE SAME CLASSIFIER, NOT A SECOND ONE. `classifyFloorRemediation` is subject-agnostic — it reads
+		// policy ids, dispositions and observation CODES, "never prose" — so an artifact subject is the same
+		// call with different content. Writing a work-product-specific one here is how two descriptions of one
+		// rule come to disagree (`REG-F-353`).
+		remediation: classifyFloorRemediation({
+			subjectId: subject.artifactId,
+			satisfied: plan.gatePermitsTransition,
+			waived: false,
+			policies: plan.assessments.map((a) => ({
+				policyId: a.policyId,
+				disposition: a.disposition,
+				independenceOk: a.independenceOk,
+				observations: a.observations
+			}))
+		} as unknown as FloorView)
 	};
 }

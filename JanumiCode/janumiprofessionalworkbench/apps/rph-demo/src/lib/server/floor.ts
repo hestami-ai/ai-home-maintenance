@@ -142,6 +142,11 @@ export interface FloorRemediation {
 
 const OPERATIONAL_REVIEW_CODES = new Set(['VALIDATOR_EXECUTION_FAILED', 'INDEPENDENCE_VIOLATION']);
 
+/** The dispositions that JUDGED the subject and found something in it — the only ones whose findings may
+ *  be sent back to the producer. Of `AggregateAssuranceDisposition`'s six members these are the two that
+ *  assert something ABOUT THE WORK; the other four assert something about the REVIEW. */
+const FEEDS_BACK_TO_PRODUCER: ReadonlySet<string> = new Set(['REJECTED', 'CONDITIONALLY_SATISFIED']);
+
 /** Classify remediation from policy identity, disposition, independence, and observation CODES — never prose.
  *
  * `VALIDATOR_EXECUTION_FAILED` covers missing host configuration and external process/provider failures alike. The
@@ -199,7 +204,22 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	}
 
 	const subjectFindings = review.observations.filter((o) => !OPERATIONAL_REVIEW_CODES.has(o.code));
-	if (review.disposition !== 'SATISFIED' && subjectFindings.length > 0) {
+	// ⛔ ONLY A DISPOSITION THAT ACTUALLY JUDGES THE SUBJECT MAY SEND WORK BACK TO ITS PRODUCER.
+	//
+	// This read `disposition !== 'SATISFIED'`, which swept in `INCONCLUSIVE` — and `REG-D-059` rules that out in
+	// terms: *"INCONCLUSIVE — the reviewer could not tell — must not feed a finding back to the agent, because
+	// there is no finding … Feeding an inconclusive review back as though it were a critique would MANUFACTURE
+	// WORK FROM SILENCE."* `ASR-11` limb 1 says the same: a validator failure *"neither rejects nor satisfies
+	// the subject."*
+	//
+	// ⚠ THE GAP WAS UNREACHABLE UNTIL A LIVE REVIEWER EXISTED. The offline arm returns INCONCLUSIVE only with
+	// operational codes, which this filter already drops — so the condition could never be met and the defect
+	// was invisible. A live model CHOOSES its disposition, and may return INCONCLUSIVE alongside subject-coded
+	// observations.
+	//
+	// ⭑ `UNASSESSED` and `EVIDENCE_REQUIRED` are excluded for their own reasons, not by oversight: nothing
+	// assessed the subject in the first, and the remedy is EVIDENCE rather than a subject edit in the second.
+	if (FEEDS_BACK_TO_PRODUCER.has(review.disposition) && subjectFindings.length > 0) {
 		return {
 			action: 'REFINE_SUBJECT',
 			autoRefine: true,
