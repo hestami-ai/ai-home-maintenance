@@ -16,6 +16,9 @@ export interface EngineSnapshot {
 	readonly pwus: ObjectRow[];
 	readonly executionPlans: ObjectRow[];
 	readonly assessments: ObjectRow[];
+	/** JAN-EXECRUN — what the engine holds after an execution step ran. */
+	readonly modelExchanges: ObjectRow[];
+	readonly artifacts: ObjectRow[];
 	// ⚠ MISSING UNTIL REG-F-166, AND NOTHING COULD HAVE TOLD ANYONE. `test-api/introspect/+server.ts` has
 	// returned `assurancePolicies` all along; this interface simply did not say so, and `apps/rph-demo/e2e/` was
 	// under NO type gate at all — 38 specs typechecked by nothing — so the omission could not surface. The specs

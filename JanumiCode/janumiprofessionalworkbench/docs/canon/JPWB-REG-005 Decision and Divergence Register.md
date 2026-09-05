@@ -31285,3 +31285,60 @@ member `REG-D-055` created and **nothing has ever written to**.
   `assurance/exchange-capture.ts`. **Owed:** `XR-03`, and a decision on whether an execution template's
   `outputContract` should be REQUIRED rather than optional — the residual above makes it load-bearing.
   Status: PARTIAL.
+
+### REG-F-352 — a work unit ran, and the assurance floor bit for the first time in this system's history
+
+- **Date:** 2026-09-05 · **Type:** FINDING (`JAN-EXECRUN` XR-03 landed; one design correction the evidence
+  forced) · **Class:** FINDING — closes the sponsor's reported defect end to end ·
+  **Status:** ✅ CLOSED. **`REG-F-351` moves PARTIAL → CLOSED with it.**
+
+**WHAT LANDED.** Pressing **Begin & Execute** on a work unit whose type carries an ACTIVE prompt template now
+plans a `MODEL_INVOCATION` step, renders that type's own template against the work unit's facts, invokes a
+model, records the exchange on the **`EXECUTION` plane**, and records the answer as an `ARTIFACT` naming the
+same stored object. **Driven through a real browser**, asserted against engine state.
+
+> ### ⭑⭑ AND THEN THE FLOOR REFUSED THE COMPLETION — WHICH IS THE SYSTEM WORKING, AND IT HAS NEVER HAPPENED
+> `packages/rph-application/src/handlers/floor-gate.ts:30`: `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])`.
+> **A model-invocation step is AI-produced BY CONSTRUCTION**, and the recorded provenance names an `AGENT`, so
+> signal 0 fires as well. Completing it therefore requires the three floor policies satisfied against the work
+> product — and they are not.
+>
+> ⭑ **THIS GATE HAS NEVER FIRED IN THE DEMO'S LIFETIME.** The existing lifecycle step is a `TRANSFORMATION` a
+> human drove, and the demo's own comment says so in terms: *"Non-AI (TRANSFORMATION + HUMAN operator), so the
+> floor gate admits it."* **Nothing has ever been AI-executed, so nothing has ever met the gate this whole
+> system exists to impose.** The first genuinely model-executed work unit met it immediately.
+>
+> ⛔ **NOTHING WAS WEAKENED TO MAKE THE DEMO PASS**, and the roadmap said so BEFORE the work rather than after:
+> *"If the assurance floor then blocks the PWU, THAT IS THE RESULT."* The refusal is surfaced with its reason,
+> the step stays RUNNING, and the e2e **asserts the block** — including that an unreviewed AI step must not
+> read as completed.
+
+> ### ⚠ THE DESIGN CORRECTION THE EVIDENCE FORCED, AND I WOULD NOT HAVE FOUND IT BY READING
+> My first version batched `RecordArtifact` and `CompleteExecutionStep` **atomically**. The floor refused the
+> completion — correctly — and **took the artifact down with it**: a model call that DID happen and DID
+> produce a work product left no work product behind. The e2e reported `artifacts: []` and that was the whole
+> signal.
+>
+> ⭑ **THE PRINCIPLE THE FAILURE TAUGHT:** the model's output is a **FACT** about the world; whether the step
+> may complete is a **JUDGEMENT** about that fact. Rolling the fact back because the judgement went against it
+> is the erasure `PER-9` exists to prevent. The artifact is now recorded on its own, and the completion is
+> attempted separately — so what happened is on the record and what is owed is legible.
+
+- ⭑ **THE EXECUTOR IS THE MODEL.** `executionProvenance.executedBy` names an `AGENT`, not the operator who
+  clicked. The existing `TRANSFORMATION` path records the human correctly — a human drove it — and reusing
+  that here would have been a fiction that also **silenced signal 0**, letting an unreviewed model output
+  complete. ⚠ **The e2e names that as its mutant**, because it is the one where every other assertion still
+  passes.
+- **AND A PROMPTLESS TYPE IS UNTOUCHED.** A type with no ACTIVE template declares no agent behaviour — true of
+  every type authored before `REG-D-058` — and keeps the existing `TRANSFORMATION` lifecycle exactly.
+  **CONTROL asserted:** it invokes no model and still reaches `executionState: SUCCEEDED`, so "Execute invokes
+  a model" cannot be confused with "Execute always invokes a model".
+- **THE SPONSOR'S DIAGNOSIS IS CLOSED.** *"A PWA actually could not truly run and do real work."* It can now:
+  a professional authors what an agent is told, publishes it, instantiates work from it, and the work is
+  attempted by a model whose call is recorded, whose output is retained, and whose completion is gated by
+  assurance. ⚠ **What remains is that the floor cannot yet be SATISFIED for an execution artifact** — the
+  assurance path assesses PWAs, not work products. That is the next increment, and naming it here is the
+  alternative to discovering it later.
+- **Merge target:** `routes/undertakings/[id]/+page.server.ts` (the button),
+  `lib/server/execution/model.ts` (the seam), `test-api/introspect` + `e2e/support/harness.ts` (ground truth),
+  `e2e/execution-model-invocation.e2e.ts`. **Owed:** assurance over execution artifacts. Status: CLOSED.

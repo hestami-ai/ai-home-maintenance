@@ -44,6 +44,10 @@ export const GET: RequestHandler = () => {
 		// ("MUST NOT assert a SURFACE journey by inspecting server-rendered HTML alone"). The Slice drives the
 		// real UI and then reads the ENGINE here, so what it proves is that the operator's acts reached the store.
 		evidence: listByType(e, 'EVIDENCE'),
+		// JAN-EXECRUN — the ground truth for "a work unit actually ran". A spec that asserted the PAGE said
+		// so would prove only that the page says what the page says; these two are what the engine holds.
+		modelExchanges: listByType(e, 'MODEL_EXCHANGE'),
+		artifacts: listByType(e, 'ARTIFACT'),
 		decisions: listDecisions(e, { kind: 'WORKSPACE' }),
 		baselines: listBaselines(e, { kind: 'WORKSPACE' }),
 		conversations: listConversations(e),

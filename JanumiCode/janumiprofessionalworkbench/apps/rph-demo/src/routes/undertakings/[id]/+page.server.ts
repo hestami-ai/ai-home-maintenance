@@ -49,6 +49,7 @@ import {
 	buildPwaExport,
 	dispatch,
 	dispatchBatch,
+	getArtifactStore,
 	getEngine,
 	getRegisteredIntent,
 	hostNow,
@@ -56,7 +57,15 @@ import {
 	uiSession
 } from '$lib/server/workbench';
 import { actingActor } from '$lib/server/identity';
-import type { ActorReference } from '@janumipwb/rph-contracts';
+import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
+import { getExecutionPrint } from '$lib/server/execution/model';
+import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
+import type { ActorReference, PromptTemplate } from '@janumipwb/rph-contracts';
+
+/** ⚠ ONE TENANT, DECLARED RATHER THAN INLINE. §31.2 requires an opaque tenant-scoped key prefix, and this demo
+ *  is single-tenant; naming the constant keeps the day it becomes multi-tenant a one-line change instead of a
+ *  search for string literals. */
+const EXECUTION_TENANT_PREFIX = 'tnt-local';
 import type { Actions, PageServerLoad } from './$types';
 
 type PwuRecord = ReturnType<typeof listPwus>[number];
@@ -878,6 +887,22 @@ export const actions: Actions = {
 		const planId = mintUiId('plan');
 		const stepId = mintUiId('step');
 		const attemptId = mintUiId('attempt');
+
+		// ── ⭑ JAN-EXECRUN XR-03 — DOES THIS WORK UNIT'S TYPE SAY HOW ITS WORK IS ATTEMPTED? ─────────────────
+		//
+		// A type carrying an ACTIVE prompt template declares agent behaviour, and the step that discharges it is
+		// a MODEL_INVOCATION — which is what `StepTypeSchema`'s first member has meant since it was generated,
+		// and what Guide §:1137 defines a step to BE.
+		//
+		// ⛔ NO TEMPLATE MEANS NO SUBSTITUTION. A type without one declares no agent behaviour — true of every
+		// type authored before `REG-D-058` — and the demo keeps its existing TRANSFORMATION lifecycle for those,
+		// unchanged. Inventing a prompt so every work unit LOOKS executable is the defect `REG-F-351` refuses.
+		const pwu = getObject(getEngine(), pwuId);
+		const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);
+		const pwuType = pwuTypeId ? getObject(getEngine(), pwuTypeId) : undefined;
+		const template = pwuType?.promptTemplate as PromptTemplate | undefined;
+		const isModelStep = template?.status === 'ACTIVE';
+
 		const err = runSteps([
 			['BeginPwuShaping', PWU, pwuId, {}],
 			[
@@ -897,8 +922,10 @@ export const actions: Actions = {
 						{
 							id: stepId,
 							executionPlanId: planId,
-							stepType: 'TRANSFORMATION',
-							purpose: 'Produce the PWU output',
+							stepType: isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION',
+							purpose: isModelStep
+								? `Attempt the work described by ${pwuTypeId}'s prompt template`
+								: 'Produce the PWU output',
 							inputBindings: [],
 							outputBindings: [],
 							preconditions: [],
@@ -918,7 +945,137 @@ export const actions: Actions = {
 			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]),
 			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]),
 			['StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId }],
-			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId]),
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId])
+		]);
+		if (err) return fail(400, { error: `Execution failed: ${err}` });
+
+		// ── ⭑ THE MODEL CALL HAPPENS HERE, OUTSIDE THE BATCH, AND THAT IS NOT A COMPROMISE ─────────────────
+		//
+		// `runSteps` dispatches atomically. An external call cannot join that batch, and it should not: a step
+		// whose model call failed has genuinely STARTED and genuinely FAILED, and `FailExecutionStep` is the
+		// command that says so. Rolling the start back would erase a try that happened, cost money, and is
+		// exactly what `PER-9` keeps records for.
+		if (isModelStep) {
+			const outcome = await runModelInvocationStep({
+				subject: {
+					id: pwuId,
+					title: String((pwu?.title ?? '') as string),
+					description: String((pwu?.description ?? '') as string),
+					purpose: String((pwuType?.purpose ?? '') as string),
+					expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
+					inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+				},
+				subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
+				pwuTypeId,
+				template,
+				print: getExecutionPrint(),
+				store: getArtifactStore(),
+				tenantPrefix: EXECUTION_TENANT_PREFIX,
+				dispatchExchange: (payload, aggregateId) =>
+					dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+				newId: mintUiId,
+				now: hostNow,
+				modelId: resolveJudgeModel() ?? 'unresolved',
+				providerId: 'agy'
+			});
+
+			if (!outcome.ran) {
+				// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
+				// which is the whole difference between a demo and a record.
+				runSteps([
+					[
+						'FailExecutionStep',
+						'EXECUTION_PLAN',
+						planId,
+						{ stepId, failureReason: outcome.refusedBecause }
+					]
+				]);
+				return fail(400, { error: `The model invocation did not run: ${outcome.refusedBecause}` });
+			}
+
+			// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
+			// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
+			// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
+			// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
+			// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
+			// went against it is the erasure `PER-9` exists to prevent.
+			const artifactId = mintUiId('art');
+			const recorded = runSteps([
+				[
+					'RecordArtifact',
+					'ARTIFACT',
+					artifactId,
+					{
+						artifactId,
+						artifactType: 'work-product',
+						mediaType: 'text/plain',
+						storageProvider: 'jpwb:content-plane',
+						storageKey: outcome.storageKey,
+						contentHash: outcome.contentHash,
+						byteSize: outcome.byteSize,
+						producingPwuId: pwuId,
+						// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
+						// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
+						// one. Free strings here are the honest shape, not laziness.
+						securityClassification: 'unclassified',
+						retentionClass: 'retained-by-participation',
+						status: 'recorded'
+					}
+				],
+			]);
+			if (recorded) return fail(400, { error: `Recording the work product failed: ${recorded}` });
+
+			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
+			//
+			// `floor-gate.ts:30` — `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])` — makes this step AI-produced
+			// BY CONSTRUCTION, and the recorded provenance names an AGENT, so signal 0 fires too. Completing it
+			// therefore requires the three floor policies SATISFIED against the produced artifact.
+			//
+			// ⭑ THIS GATE HAS NEVER FIRED IN THIS DEMO, because nothing was ever AI-executed: the existing
+			// lifecycle step is a TRANSFORMATION a human drove, and its own comment says so. The first genuine
+			// model-executed work unit is the first thing to meet it.
+			//
+			// ⛔ NOTHING HERE WEAKENS IT. A refusal is reported with its reason and the step stays RUNNING; the
+			// exchange and the work product are already recorded, so what happened is on the record and what is
+			// owed is legible. Making the demo pass by relaxing the gate would defeat the system's central claim.
+			const completed = runSteps([
+				[
+					'CompleteExecutionStep',
+					'EXECUTION_PLAN',
+					planId,
+					{
+						executionStepId: stepId,
+						executionAttemptId: attemptId,
+						resultStatus: 'SUCCEEDED',
+						// ⭑ AN ACTUAL OUTPUT, WHERE THE DEMO HAS ONLY EVER RECORDED `noOutputResult`.
+						outputArtifactIds: [artifactId],
+						proposedEvidenceIds: [],
+						detectedAssumptionIds: [],
+						structuredResult: {},
+						// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
+						// clicked, correctly — a human drove it. Recording a human here would be a fiction, and
+						// the assurance floor is entitled to know which it was.
+						executionProvenance: {
+							executedBy: {
+								actorId: `model:${resolveJudgeModel() ?? 'unresolved'}`,
+								actorType: 'AGENT',
+								displayName: 'Execution model'
+							}
+						}
+					}
+				],
+				chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId])
+			]);
+			if (completed)
+				return fail(400, {
+					error:
+						`The model ran and its work product is recorded, and the step cannot COMPLETE until the ` +
+						`assurance floor is satisfied for it — which is the floor working, not a fault. ${completed}`
+				});
+			return { advanced: 'executed' };
+		}
+
+		const legacy = runSteps([
 			// Explicit no-output completion (RPH-EXE-006 permits it) — the demo shows the lifecycle, not artifact
 			// authoring. Non-AI (TRANSFORMATION + HUMAN operator), so the floor gate admits it. executionProvenance is
 			// required (§16.1); recording the human operator keeps the step non-AI.
@@ -951,7 +1108,7 @@ export const actions: Actions = {
 			// Earned, and cited: the plan whose step actually succeeded now backs executionState=SUCCEEDED.
 			chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId])
 		]);
-		if (err) return fail(400, { error: `Execution failed: ${err}` });
+		if (legacy) return fail(400, { error: `Execution failed: ${legacy}` });
 		return { advanced: 'executed' };
 	},
 
