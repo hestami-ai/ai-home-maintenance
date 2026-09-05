@@ -188,6 +188,16 @@ function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	modelId?: string;
+	/**
+	 * WHO is reviewing, and on whose infrastructure.
+	 *
+	 * ⛔ `providerId` USED TO BE HARDCODED `'google'`, which was true only while agy/Gemini was the sole
+	 * reviewer. With a second backing tool that literal becomes a FALSE RECORD — Devin running `glm-5-2` is not
+	 * Google — and `§8.4` requires the evaluator's ACTUAL identity. It also feeds `checkIndependence`, so a
+	 * wrong provider silently corrupts an independence verdict rather than merely mislabelling a row.
+	 */
+	agentId?: string;
+	providerId?: string;
 	/** ICP-02 d2b — where the per-try exchange records go. Optional: the Validator is constructed fresh on every
 	 *  floor run with an empty options object, so a hard dependency would break the assurance path rather than
 	 *  degrade to today's behaviour. */
@@ -214,9 +224,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// and §14.6 the "allowed and resolved" model. Throws when unpinned rather than record a placeholder.
 			const evaluator: Identity = {
 				actorType: 'AGENT',
-				agentId: 'agy',
+				agentId: opts.agentId ?? 'agy',
 				modelId: opts.modelId ?? judgeModel(),
-				providerId: 'google'
+				// Defaults preserve today's behaviour exactly; a second tool supplies its own.
+				providerId: opts.providerId ?? 'google'
 			};
 			const prompt = judgePrompt(input);
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.

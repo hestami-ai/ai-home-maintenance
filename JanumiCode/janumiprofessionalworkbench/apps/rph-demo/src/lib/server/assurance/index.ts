@@ -11,6 +11,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeSink } from './exchange-capture.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
+import { assuranceModel, devinPrint } from '../tools/devin-reviewer.js';
 
 export function createFloorRegistry(opts: {
 	testMode: boolean;
@@ -37,6 +38,11 @@ export function createFloorRegistry(opts: {
 	// floor still recorded SATISFIED.
 	const forced = opts.testMode ? process.env.JPWB_ASSESSOR : undefined;
 	const useMock = opts.testMode && forced !== 'agy';
+	// ⭑ WHICH REAL TOOL REVIEWS IS A DIFFERENT QUESTION FROM WHETHER A REAL TOOL REVIEWS, and only the second
+	// one is fail-closed. `JPWB_ASSESSOR` decides mock-vs-real and stays test-mode-only for the recorded reason
+	// above. `JPWB_ASSURANCE_TOOL` decides WHICH real tool, which cannot suppress the floor — the worst it can
+	// do is refuse, and it defaults to `agy` so existing deployments are unchanged.
+	const assuranceTool = (process.env.JPWB_ASSURANCE_TOOL ?? 'agy').trim();
 	const registry = createValidatorRegistry();
 	registry.register(schemaInvariantValidatorInstance);
 	registry.register(identityProvenanceValidatorInstance);
@@ -46,8 +52,22 @@ export function createFloorRegistry(opts: {
 			: createAgyReasoningReviewValidator({
 					...(opts.artifacts ? { artifacts: opts.artifacts } : {}),
 					...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
-					...(opts.print ? { print: opts.print } : {}),
-					...(opts.clock ? { clock: opts.clock } : {})
+					...(opts.clock ? { clock: opts.clock } : {}),
+					// ⚠ AN EXPLICITLY INJECTED `print` STILL WINS. It is the seam the gate uses to exercise this
+					// wiring without spawning anything, and a tool selection that overrode it would make the
+					// retention assertions untestable — the reason `AgyPrint` was made injectable at all.
+					...(opts.print
+						? { print: opts.print }
+						: assuranceTool === 'devin'
+							? {
+									print: devinPrint,
+									agentId: 'devin',
+									modelId: assuranceModel(),
+									// Devin brokers many vendors, so the PROVIDER is the broker, not the model family.
+									// Claiming `zhipu` for `glm-5-2` would assert a relationship this host cannot see.
+									providerId: 'devin'
+								}
+							: {})
 				})
 	);
 	return registry;
