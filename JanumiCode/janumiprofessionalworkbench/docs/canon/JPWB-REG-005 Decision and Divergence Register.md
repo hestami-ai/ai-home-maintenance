@@ -31671,7 +31671,7 @@ substituting an easier problem"*).
 
 - **Date:** 2026-09-05 · **Type:** FINDING (`JAN-TOOLSUITE` TS-01..TS-04, TS-07, TS-09 landed) ·
   **Class:** FINDING — one real defect fixed; three self-corrections; two ratified slots reached for the first
-  time · **Status:** PARTIAL (TS-05/TS-06/TS-08 owed).
+  time · ~~**Status:** PARTIAL (TS-05/TS-06/TS-08 owed).~~ **Status:** ✅ **CLOSED — TS-01..TS-10 all landed (2026-09-05, same day).** The three owed items are discharged; see the closing account below.
 
 **SPONSOR DIRECTION (2026-09-05).** *"We will use Pi CLI for the executor or PWU executing agent backing tool;
 and we will use Devin CLI as another agent tool for the assurance policies backing tool."* Then: *"Use GLM-5.2
@@ -31765,9 +31765,33 @@ them. ⭑ CONTROL: the changed set **does** contain `assurance/index.ts`, sittin
 so an overlap would have shown. Finding 55 flipped `SATISFIED → UNSUPPORTED` on a region this slice never
 touched. Standing sponsor instruction: CSAA belongs to the CSAA agent, and we attend only to what we break.
 
-**OWED.** `TS-05` (the §9.7 split over a tool that declares `reasoning: NONE` vs `STRUCTURAL`), `TS-06`
-(sanitisation applied at the **assurance** seam — the Validator wraps **no** call to `print(...)`, so an
-injected backend's raw rejection still reaches a projected observation), `TS-08` (the end-to-end showing
-producer and reviewer differing on recorded identity, with the refusal path asserted). `REG-Q-077` — may
-volunteered reasoning be read back? — was theoretical because nothing produced any; it stays theoretical
-**only** while `thinkingLevel: 'off'` holds.
+~~**OWED.** `TS-05` … `TS-06` … `TS-08` …~~ **DISCHARGED THE SAME DAY. The closing account:**
+
+- **`TS-06` closed a REAL hole, not a theoretical one.** `agyPrint` and `devinPrint` each scrub their own
+  failures, so the guarantee held only for the two adapters that remembered to — the Validator wrapped its
+  `print(...)` call in **nothing**, so any injected backend's raw rejection reached a projected
+  `VALIDATOR_EXECUTION_FAILED` statement. ⭑ **An adapter that sanitises is a DISCIPLINE; a seam that sanitises
+  is a PROPERTY.** The mutant's failure output showed the live leak verbatim: `Command failed: agy --print You
+  are a…`. The check moved to a pure module so the Validator need not import `node:child_process`; the test
+  asserts the prompt's **own bytes** are absent, because asserting the word *"WITHHELD"* would pass on a message
+  that also carried the prompt. CONTROL: a **clean** diagnostic survives — withholding everything would repeat
+  agy's disclosed loss for no reason (`REG-F-333`).
+- **`TS-05` pins an `ASR-13` protection with nothing else guarding it.** The answer/reasoning separation is the
+  only thing standing between the producer's interior and the reviewer's context, because the *shared hidden
+  context* and *shared prompt lineage* dimensions have zero code representation. Mutant
+  `answer = returned.rawOutput` reddens.
+- **`TS-08` is the pair this slice exists for**, deterministic because the offline reviewer declares a fixed
+  identity: a producer whose model **differs** is assured; the **same** model on both sides is REFUSED with an
+  `INDEPENDENCE` observation. Before this slice only the refusing half was reachable. ⚠ A browser e2e **cannot**
+  prove it — under `RPH_DEMO_MODE=test` both sides resolve to the same placeholder — so it is driven in-process,
+  the lesson `work-product-floor-run.test.ts` already recorded. And the refusal asserts the **observation**, not
+  merely `satisfied`: an empty work product is also unsatisfied, so an arrangement tripping two guards proves
+  neither.
+
+⚠ **AND ONE OF MY TESTS COULD NOT FAIL — THE TYPE-CHECKER FOUND IT, NOT THE SUITE.** It read
+`stored?.bytes ?? ''`; `store.get` returns a **string**, so `.bytes` was `undefined`, `?? ''` made it empty, and
+*"the empty string does not contain the reasoning"* is true whatever was stored. Green, proving nothing. It now
+asserts the retained bytes **are** the answer — and promptly failed on a case error, which is how I know it can.
+
+`REG-Q-077` — may volunteered reasoning be read back? — was theoretical because nothing produced any; it stays
+theoretical **only** while `thinkingLevel: 'off'` holds.
