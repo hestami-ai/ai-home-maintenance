@@ -64,6 +64,7 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 				} as never,
 				answer: ANSWER,
 				producingPrompt: 'Assess the northern delivery route.',
+				producerProviderId: 'test-provider',
 				producerModelId: 'test-model'
 			},
 			session,
@@ -108,6 +109,7 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 				} as never,
 				answer: EMPTY,
 				producingPrompt: 'Assess the northern delivery route.',
+				producerProviderId: 'test-provider',
 				producerModelId: 'test-model'
 			},
 			session,

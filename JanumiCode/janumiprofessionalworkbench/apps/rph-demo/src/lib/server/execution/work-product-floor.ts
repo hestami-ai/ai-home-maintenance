@@ -31,6 +31,13 @@ export interface WorkProductSubject {
 	/** The prompt the PRODUCING model was given, so the reviewer judges the same pair the producer saw. */
 	readonly producingPrompt: string;
 	readonly producerModelId: string;
+	/**
+	 * ⭑ REQUIRED, BECAUSE `differs()` FAILS CLOSED ON ABSENCE. `checkIndependence` treats an undefined field
+	 * as never-different — *"an absence cannot evidence independence"* — so a provider-based rung selected
+	 * while this is missing is a PERMANENT BLOCK, not a strict check. It was absent here entirely, which is
+	 * why `DIFFERENT_PROVIDER` was unreachable on this path whatever the policy said.
+	 */
+	readonly producerProviderId: string;
 }
 
 /**
@@ -85,10 +92,17 @@ export function workProductFloorFacts(
  * ⭑ THE SUBJECT IS THE ARTIFACT, not the work unit and not the architecture — because that is what
  * `floorGateBlock` looks for when it decides whether the step may complete.
  *
- * ⚠ INDEPENDENCE, STATED PLAINLY RATHER THAN IMPLIED. `ASR-13` graduates independence from *separate
- * invocation* upward. In this deployment the producing model and the reviewing model are THE SAME CONFIGURED
- * JUDGE, so this satisfies the weakest rung and nothing more. That is a deployment fact, disclosed here, not a
- * claim that the review is independent in the stronger senses the policy can require.
+ * ⚠ INDEPENDENCE — AND THIS DISCLOSURE WAS WRONG TWICE, SO IT IS REPLACED RATHER THAN EDITED.
+ *
+ * It used to read: *"the producing model and the reviewing model are THE SAME CONFIGURED JUDGE, so this
+ * satisfies the weakest rung and nothing more."* ⛔ Wrong twice, as `REG-F-356` found: the reasoning-review
+ * policy requires `DIFFERENT_MODEL`, not separate invocation — so sameness did not "satisfy" a weaker rung, it
+ * REFUSED outright. And it described a collision as though it were a deployment choice.
+ *
+ * ⭑ WHAT IS TRUE NOW: the producer identity below is the model that ACTUALLY ANSWERED, reported by the tool
+ * that ran it (`JAN-TOOLSUITE`), and the executor is configured separately from the judge. Whether the two
+ * differ is therefore a fact about the deployment that `checkIndependence` MEASURES, rather than a constant
+ * this comment can assert. `providerId` is populated so a provider-based rung is decidable at all.
  */
 export async function runWorkProductFloor(
 	subject: WorkProductSubject,
@@ -118,7 +132,8 @@ export async function runWorkProductFloor(
 		producer: {
 			actorType: 'AGENT' as const,
 			agentId: `execution.model-invocation:${subject.artifactId}`,
-			modelId: subject.producerModelId
+			modelId: subject.producerModelId,
+				providerId: subject.producerProviderId
 		}
 	};
 

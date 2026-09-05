@@ -138,6 +138,36 @@ export function selectBackingTool(
 	return tool;
 }
 
+/**
+ * One backing-tool invocation, carrying the facts the exchange record needs.
+ *
+ * ⭑ THE OLD SEAM COULD NOT CARRY THESE, WHICH IS WHY `PROVIDER_REPORTED` HAD NO PRODUCER. The execution seam was
+ * `print: (prompt) => Promise<string>` — a bare string: no provider, no model, no separated reasoning span. The
+ * evidence arm was unreachable *by construction*, not by oversight.
+ *
+ * ⚠ IT LIVES HERE, NOT IN THE PI ADAPTER, SO IMPORTING IT COSTS NOTHING. `run-model-step` needs this type, and
+ * the adapter imports Pi's SDK at module scope — a type import from there would pull Pi's heavy Node deps into
+ * the gate and undo the lazy loading `agent/index.ts` established.
+ */
+export interface ToolInvocationResult {
+	/** E-2, answer half — the work product. */
+	readonly answerText: string;
+	/** E-2, reasoning half. ⭑ `undefined` means NONE AROSE — an observed absence (PER-12), not a capture failure. */
+	readonly volunteeredReasoning?: string;
+	/** E-2, whole — retained for the blocked path only. */
+	readonly rawOutput: string;
+	/** E-3 — the ACTUAL producer, never a role label. */
+	readonly producer: { readonly agentId: string; readonly modelId: string; readonly providerId: string };
+	/** E-3 evidence grade, supplied by the tool that answered. */
+	readonly identityEvidence: ToolIdentityEvidence;
+}
+
+/** Narrow a seam return that may be either shape. ⭑ A bare string is a tool that told us only its answer, so its
+ *  identity can only ever be HOST_CONFIGURED — the caller supplies what it configured. */
+export function isToolInvocationResult(v: string | ToolInvocationResult): v is ToolInvocationResult {
+	return typeof v !== 'string';
+}
+
 // ── The executor's OWN configuration ────────────────────────────────────────────────────────────────────────
 //
 // ⭑⭑ THIS IS THE ACTUAL DEFECT, AND IT IS ONE LINE OF CONFIGURATION. Until now the execution producer had no

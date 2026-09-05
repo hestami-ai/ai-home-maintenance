@@ -96,28 +96,47 @@ function contentRef(ref: ContentRef) {
 /**
  * E-3, split into three facts.
  *
- * ⭑ THE VERSION ARM IS ALWAYS UNREPORTED, AND THAT IS A MEASUREMENT RATHER THAN A PLACEHOLDER. `agy --print`
- * returns no version on stdout and `judgeModel()` resolves only a label, so no version is available to record.
- * Saying `UNREPORTED` with that rationale is the disclosed absence `PER-9` permits; writing the model label
- * into the version field would be the substitution it forbids.
+ * ⭑ THE VERSION ARM IS ALWAYS UNREPORTED, AND THAT IS A MEASUREMENT RATHER THAN A PLACEHOLDER. Every backing
+ * tool this host drives returns a model LABEL and none returns a version: `agy --print` prints nothing on
+ * stdout, Pi's JSON stream carries `model: "gpt-5.4-mini"`, and Devin's ATIF export carries
+ * `generation_model: "glm-5-2"`. Saying `UNREPORTED` with that rationale is the disclosed absence `PER-9`
+ * permits; writing a label into the version field would be the substitution it forbids.
+ *
+ * ⚠ THE PROVIDER AND MODEL ARMS ARE A DIFFERENT MATTER, and conflating them is what kept `PROVIDER_REPORTED`
+ * dead. Whether a model VERSION exists is a fact about the provider's API; whether the tool CONFIRMED the
+ * model it ran is a fact about the tool. agy confirms nothing, so its grade is `HOST_CONFIGURED`. Pi and Devin
+ * both echo the resolved model back, so theirs is `PROVIDER_REPORTED` — a stronger grade on the same field,
+ * and the caller supplies it because only the caller knows which tool answered.
  */
 function identityFacts(id: ResolvedModelIdentity) {
 	if (id.kind === 'resolved')
 		return {
 			resolvedProvider: {
 				availability: 'REPORTED' as const,
-				evidence: 'HOST_CONFIGURED' as const,
+				// ⭑ THE GRADE COMES FROM THE TOOL, NOT FROM THIS FUNCTION. It was hardcoded `HOST_CONFIGURED`
+				// because agy is the only tool that ever reached here and agy confirms nothing about itself —
+				// so the ratified `PROVIDER_REPORTED` member had ZERO producers since the day it was authored.
+				// Pi and Devin both echo back which model answered, which is a stronger fact and now records as one.
+				evidence: id.evidence ?? ('HOST_CONFIGURED' as const),
 				value: id.providerId
 			},
 			resolvedModel: {
 				availability: 'REPORTED' as const,
-				evidence: 'HOST_CONFIGURED' as const,
+				evidence: id.evidence ?? ('HOST_CONFIGURED' as const),
 				value: id.modelId
 			},
 			resolvedModelVersion: {
 				availability: 'UNREPORTED' as const,
 				evidence: 'NONE' as const,
-				rationale: 'agy --print reports no model version, and the host configures only a label.'
+				// ⚠ THE RATIONALE IS NOW TOOL-NEUTRAL, AND THAT IS A CORRECTION RATHER THAN A TIDY-UP. It read
+				// "agy --print reports no model version", which is FALSE about Pi and Devin — a record that
+				// explains an absence by naming a tool that was not used states something untrue.
+				// ⭑ The absence itself still holds for all three: they report a model LABEL (`gpt-5.4-mini`,
+				// `glm-5-2`), and a label is not a version. Writing one into the version field is the
+				// substitution `PER-9` forbids, so the arm stays UNREPORTED.
+				rationale:
+					'No backing tool this host drives reports a resolved model VERSION: each returns a model label, ' +
+					'and a label is not a version.'
 			}
 		};
 	const arm = {

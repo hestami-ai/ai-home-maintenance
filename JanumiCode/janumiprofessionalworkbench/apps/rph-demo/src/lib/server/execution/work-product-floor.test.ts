@@ -40,6 +40,9 @@ async function subjectFor(
 		answer: ANSWER,
 		producingPrompt: 'Assess the route.',
 		producerModelId: 'test-judge-model',
+		// ⚠ REQUIRED: `differs()` fails closed on absence, so a provider-based rung with this missing is a
+		// permanent block rather than a strict check.
+		producerProviderId: 'test-provider',
 		...over
 	};
 }

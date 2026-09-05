@@ -43,7 +43,17 @@ export type ExchangeDisposition = 'accepted' | 'rejected' | 'quarantined' | 'rep
  *  dependent". An optional field cannot distinguish "the provider reported nothing" from "nobody looked" —
  *  and conflating those two is this repository's single most-recorded defect. Stating it costs one union. */
 export type ResolvedModelIdentity =
-	| { readonly kind: 'resolved'; readonly modelId: string; readonly providerId: string }
+	| {
+			readonly kind: 'resolved';
+			readonly modelId: string;
+			readonly providerId: string;
+			/** ⭑ HOW THE IDENTITY WAS OBTAINED, which is a different fact from the identity itself. A tool that
+			 *  ECHOES BACK which model answered evidences its own identity (`PROVIDER_REPORTED`); a tool the host
+			 *  merely configured evidences nothing (`HOST_CONFIGURED`), and grading an assertion as confirmation
+			 *  is the fabricated-measurement defect. Optional, defaulting to the weaker grade, because every
+			 *  existing caller IS host-configured and silently promoting them would be that same defect. */
+			readonly evidence?: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
+	  }
 	| { readonly kind: 'unreported'; readonly rationale: string }
 	| { readonly kind: 'unresolvable'; readonly rationale: string };
 
@@ -165,7 +175,11 @@ export interface ExchangeParseOutcome {
 
 /** Either a resolved model, or a stated reason there is none. */
 export type ModelInput =
-	| { readonly modelId: string; readonly providerId: string }
+	| {
+			readonly modelId: string;
+			readonly providerId: string;
+			readonly evidence?: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
+	  }
 	| { readonly unavailable: 'unreported' | 'unresolvable'; readonly rationale: string };
 
 export interface BeginExchangeInput {
@@ -202,7 +216,12 @@ const PENDING_CONTENT: ContentRef = {
 function toIdentity(model: ModelInput): ResolvedModelIdentity {
 	return 'unavailable' in model
 		? { kind: model.unavailable, rationale: model.rationale }
-		: { kind: 'resolved', modelId: model.modelId, providerId: model.providerId };
+		: {
+				kind: 'resolved',
+				modelId: model.modelId,
+				providerId: model.providerId,
+				...(model.evidence ? { evidence: model.evidence } : {})
+			};
 }
 
 /**

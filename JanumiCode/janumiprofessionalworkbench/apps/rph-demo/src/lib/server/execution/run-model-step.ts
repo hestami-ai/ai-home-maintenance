@@ -17,6 +17,7 @@ import {
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
+import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 
 export interface RunModelStepInput {
@@ -24,8 +25,15 @@ export interface RunModelStepInput {
 	readonly subjectSemanticVersion: number;
 	readonly pwuTypeId: string;
 	readonly template: PromptTemplate | undefined;
-	/** The model seam. Injected so the gate never spawns a subprocess and a live run is configuration. */
-	readonly print: (prompt: string) => Promise<string>;
+	/**
+	 * The model seam. Injected so the gate never spawns a subprocess and a live run is configuration.
+	 *
+	 * ⭑ IT MAY RETURN THE ANSWER ALONE, OR THE ANSWER PLUS WHO PRODUCED IT. A bare string is a tool that told us
+	 * only its answer, so the identity below can only be what the host CONFIGURED. A `ToolInvocationResult` is a
+	 * tool that ECHOED BACK which model answered, which is a stronger fact — and until this union existed the
+	 * seam could not carry it, which is why the ratified `PROVIDER_REPORTED` grade had zero producers.
+	 */
+	readonly print: (prompt: string) => Promise<string | ToolInvocationResult>;
 	readonly store: ArtifactStore;
 	readonly tenantPrefix: string;
 	readonly dispatchExchange: (
@@ -34,6 +42,7 @@ export interface RunModelStepInput {
 	) => { status: string };
 	readonly newId: (prefix: string) => string;
 	readonly now: () => string;
+	/** The model the host CONFIGURED. ⚠ Used only when the tool reports nothing better — see `print`. */
 	readonly modelId: string;
 	readonly providerId: string;
 }
@@ -54,6 +63,21 @@ export type RunModelStepOutcome =
 			readonly contentHash: string;
 			readonly byteSize: number;
 			readonly exchangesRecorded: number;
+			/**
+			 * ⭑ WHO ACTUALLY PRODUCED THIS, so the floor stops inventing it.
+			 *
+			 * ⛔ BEFORE THIS FIELD THE CALLER PASSED `resolveJudgeModel()` AS THE PRODUCER — it labelled the
+			 * producing model with the REVIEWING model's id, which is both a fiction and a guaranteed
+			 * `checkIndependence('DIFFERENT_MODEL', …)` refusal, since the two sides were the same string BY
+			 * CONSTRUCTION. `REG-F-356` recorded that refusal and read it as a field-placement mistake alone.
+			 */
+			readonly producer: {
+				readonly agentId: string;
+				readonly modelId: string;
+				readonly providerId: string;
+			};
+			/** How that identity was obtained — the tool's own grade, or HOST_CONFIGURED when it reported none. */
+			readonly identityEvidence: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
 	  }
 	| { readonly ran: false; readonly refusedBecause: string };
 
@@ -77,8 +101,15 @@ export async function runModelInvocationStep(
 	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
 	let answer: string;
+	// ⭑ SET ONLY WHEN THE TOOL REPORTED ITS OWN IDENTITY. `undefined` here is not "no producer" — it is "the tool
+	// told us only its answer", which is a different fact and grades the evidence weaker rather than absent.
+	let produced: ToolInvocationResult | undefined;
 	try {
-		answer = await input.print(plan.prompt);
+		const returned = await input.print(plan.prompt);
+		if (isToolInvocationResult(returned)) {
+			produced = returned;
+			answer = returned.answerText;
+		} else answer = returned;
 	} catch (e) {
 		// ⚠ A FAILED CALL IS STILL A TRY THAT HAPPENED. `PER-9` wants the record; recording nothing here would
 		// make the one call that broke the run the one call with no evidence, which is the defect inverted.
@@ -110,13 +141,23 @@ export async function runModelInvocationStep(
 	}
 
 	const respondedAt = input.now();
+	// ⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, because they can differ: a configured label may
+	// resolve to a different model, and `PER-9` E-3 wants the model ACTUALLY invoked. When the tool reported
+	// nothing the configured values stand, graded HOST_CONFIGURED by default in `identityFacts`.
+	const identity = produced
+		? {
+				modelId: produced.producer.modelId,
+				providerId: produced.producer.providerId,
+				evidence: produced.identityEvidence
+			}
+		: { modelId: input.modelId, providerId: input.providerId };
 	await captureTry({
 		store: input.store,
 		sink,
 		tenantPrefix: input.tenantPrefix,
 		exchangeId,
 		role: 'initial',
-		model: { modelId: input.modelId, providerId: input.providerId },
+		model: identity,
 		prompt: plan.prompt,
 		rawOutput: answer,
 		disposition: 'accepted',
@@ -153,7 +194,15 @@ export async function runModelInvocationStep(
 		storageKey: stored.storageKey,
 		contentHash: stored.contentHash,
 		byteSize: stored.byteSize,
-		exchangesRecorded: recording.recorded
+		exchangesRecorded: recording.recorded,
+		producer: produced?.producer ?? {
+			// ⚠ THE SAME agentId THE TOOL ADAPTERS USE, so a reader cannot tell the two paths apart by accident.
+			// What DOES differ is the evidence grade below, which is the honest place for the difference.
+			agentId: 'execution.model-invocation',
+			modelId: identity.modelId,
+			providerId: identity.providerId
+		},
+		identityEvidence: produced?.identityEvidence ?? 'HOST_CONFIGURED'
 	};
 }
 

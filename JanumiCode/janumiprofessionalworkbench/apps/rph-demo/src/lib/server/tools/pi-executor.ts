@@ -17,30 +17,8 @@ import {
 	SessionManager,
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
-import type { ProducerIdentity } from '../agent/types.js';
 import { executorModel } from './backing-tool.js';
-import type { ToolIdentityEvidence } from './backing-tool.js';
-
-/**
- * One backing-tool invocation, carrying the facts the exchange record needs.
- *
- * ⭑ THE OLD SEAM COULD NOT CARRY THESE, WHICH IS WHY `PROVIDER_REPORTED` HAD NO PRODUCER. `print: (prompt) =>
- * Promise<string>` returns a bare string: no provider, no model, no separated reasoning span. The evidence arm
- * was unreachable *by construction*, not by oversight.
- */
-export interface ToolInvocationResult {
-	/** E-2, answer half — the work product. */
-	readonly answerText: string;
-	/** E-2, reasoning half. ⭑ `undefined` here means NONE AROSE, which is an observed absence (PER-12), not a
-	 *  failure to capture. See `thinkingLevel` below for why none arises. */
-	readonly volunteeredReasoning?: string;
-	/** E-2, whole — retained for the blocked path only. */
-	readonly rawOutput: string;
-	/** E-3 — the ACTUAL producer, never a role label. */
-	readonly producer: ProducerIdentity;
-	/** E-3 evidence grade. `PROVIDER_REPORTED` because the values below come back FROM the resolved model. */
-	readonly identityEvidence: ToolIdentityEvidence;
-}
+import type { ToolInvocationResult } from './backing-tool.js';
 
 /**
  * Resolve the executing model. ⛔ NO FALLBACK CHAIN, and that is the difference from the authoring agent.

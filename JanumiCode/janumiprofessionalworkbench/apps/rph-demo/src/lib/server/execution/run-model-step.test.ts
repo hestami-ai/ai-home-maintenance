@@ -160,3 +160,65 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		expect(dispatched[0]!.plane).toBe('EXECUTION');
 	});
 });
+
+describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
+	it('⭑⭑ a tool that REPORTS its identity is recorded as PROVIDER_REPORTED, with ITS model', async () => {
+		// ⭑ THIS IS THE FIELD THAT MAKES THE WHOLE SLICE VISIBLE IN THE RECORD. Before it, the caller passed
+		// `resolveJudgeModel()` as the producer — labelling the PRODUCING model with the REVIEWING model's id, so
+		// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only refuse.
+		//
+		// THE MUTANT: keep using `input.modelId`. The reported identity is then discarded, the grade silently
+		// weakens to HOST_CONFIGURED, and `PROVIDER_REPORTED` goes back to having zero producers.
+		const { input, dispatched } = harness({
+			print: async () => ({
+				answerText: ANSWER,
+				rawOutput: ANSWER,
+				producer: {
+					agentId: 'execution.model-invocation',
+					modelId: 'gpt-5.4-mini',
+					providerId: 'openai-codex'
+				},
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			})
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+
+		// The TOOL's model, not the host's configured `test-model`.
+		expect(out.producer.modelId).toBe('gpt-5.4-mini');
+		expect(out.producer.providerId).toBe('openai-codex');
+		expect(out.identityEvidence).toBe('PROVIDER_REPORTED');
+
+		// ⭑ AND IT REACHES THE EXCHANGE RECORD, not just the return value. A producer identity that stops short
+		// of E-3 is a field with no consumer — the defect this repository calls "delivery is not the end".
+		const rec = dispatched.at(-1)!;
+		expect(rec.resolvedModel).toMatchObject({ value: 'gpt-5.4-mini', evidence: 'PROVIDER_REPORTED' });
+		expect(rec.resolvedProvider).toMatchObject({ value: 'openai-codex', evidence: 'PROVIDER_REPORTED' });
+	});
+
+	it('⭑ CONTROL — a tool that returns only a string keeps the CONFIGURED identity, graded HOST_CONFIGURED', async () => {
+		// Without this, "always PROVIDER_REPORTED" passes the test above — and grading a host assertion as
+		// provider confirmation is the fabricated-measurement defect the grade exists to prevent.
+		const { input, dispatched } = harness();
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		expect(out.producer.modelId).toBe('test-model');
+		expect(out.identityEvidence).toBe('HOST_CONFIGURED');
+		expect(dispatched.at(-1)!.resolvedModel).toMatchObject({ evidence: 'HOST_CONFIGURED' });
+	});
+
+	it('⚠ the model VERSION stays UNREPORTED, and its rationale names no single tool', async () => {
+		// THE MUTANT: write the model label into `resolvedModelVersion`. A label is not a version and PER-9
+		// forbids the substitution. The rationale is also asserted because the old one said "agy --print reports
+		// no model version", which is FALSE about Pi and Devin — an absence explained by naming a tool that was
+		// never used states something untrue.
+		const { input, dispatched } = harness();
+		await runModelInvocationStep(input);
+		const version = dispatched.at(-1)!.resolvedModelVersion;
+		expect(version.availability).toBe('UNREPORTED');
+		expect(version.value).toBeUndefined();
+		expect(version.rationale ?? '').not.toMatch(/agy/i);
+	});
+});

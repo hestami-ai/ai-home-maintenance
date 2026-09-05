@@ -1048,7 +1048,12 @@ export const actions: Actions = {
 					exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
 					answer: outcome.answer,
 					producingPrompt: outcome.prompt,
-					producerModelId: resolveJudgeModel() ?? 'unresolved'
+					// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
+					// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
+					// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
+					// refuse. The outcome now carries who actually produced the work product.
+					producerModelId: outcome.producer.modelId,
+					producerProviderId: outcome.producer.providerId
 				},
 				uiSession(),
 				{
