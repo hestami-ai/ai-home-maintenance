@@ -10,6 +10,7 @@
 // through `REG-Q-056`'s door for no gain. This increment reuses the host's configured judge model — the same
 // configuration, the same refusal when nothing is set — and the binding gets its meaning when it gets an editor.
 import { agyPrint } from '../assurance/agy-cli.js';
+import { executorToolId, selectBackingTool } from '../tools/backing-tool.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 
@@ -42,5 +43,20 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
 export function getExecutionPrint(): (prompt: string) => Promise<string> {
 	const forced = TEST_MODE ? process.env.JPWB_ASSESSOR : undefined;
 	if (TEST_MODE && forced !== 'agy') return deterministicExecutionPrint;
-	return (prompt: string) => agyPrint(prompt);
+
+	// ⭑⭑ THE EXECUTOR NOW NAMES ITS OWN TOOL, WHICH IS THE WHOLE POINT OF `JAN-TOOLSUITE`. Until this line the
+	// function returned `agyPrint` unconditionally, so the producing tool and model were the ASSURANCE tool and
+	// model — producer and reviewer identical BY CONSTRUCTION, and `checkIndependence('DIFFERENT_MODEL', …)`
+	// could only ever refuse. `REG-F-356` recorded that refusal happening.
+	//
+	// ⛔ REFUSES WHEN UNCONFIGURED rather than defaulting to agy. A default would silently restore the collision
+	// while every test still passed — which is exactly how it arrived the first time.
+	const tool = selectBackingTool(executorToolId(), 'EXECUTION');
+	if (tool.toolId === 'pi')
+		// Loaded lazily so the gate never pulls Pi's heavy Node deps — the rule `agent/index.ts` already follows.
+		return async (prompt: string) => (await import('../tools/pi-executor.js')).piExecute(prompt).then((r) => r.answerText);
+	if (tool.toolId === 'agy') return (prompt: string) => agyPrint(prompt);
+	throw new Error(
+		`Backing tool '${tool.toolId}' declares the EXECUTION role but this host has no adapter wired for it yet.`
+	);
 }
