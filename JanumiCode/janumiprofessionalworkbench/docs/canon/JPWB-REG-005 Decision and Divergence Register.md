@@ -31412,7 +31412,7 @@ with a selector on the type editor that renders an unanswered type as **owing an
 
 - **Date:** 2026-09-05 · **Type:** QUESTION (sponsor) · **Class:**
   QUESTION — the one decision `JAN-EXECASSURE`'s design cannot make for itself ·
-  **Status:** 🔴 OPEN.
+  **Status:** ✅ ADJUDICATED 2026-09-05 by `REG-D-059`. Superseding ~~🔴 OPEN.~~
 
 **THE QUESTION IN PLAIN LANGUAGE.** *A model does a work unit's work. A reviewer looks at what it produced and
 says it is not good enough. What happens to the step?*
@@ -31432,7 +31432,8 @@ says it is not good enough. What happens to the step?*
   every plan the demo creates. **Choosing (c) makes `retryPolicy` load-bearing for the first time**, which is
   a larger change than it looks.
 - **Merge target:** `DESIGN-assurance-over-execution-artifacts.md`. **Owed:** a ruling before the reasoning
-  review over work products is built. Status: OPEN.
+  review over work products is built. Superseding ~~Status: OPEN.~~ **✅ ADJUDICATED 2026-09-05 by
+  `REG-D-059` — none of the three; the answer is (c) with the bound this question said it lacked.**
 
 ### REG-F-354 — the floor validators are SUBJECT-AGNOSTIC, so assuring an execution artifact needs FACTS, not validators
 
@@ -31476,3 +31477,68 @@ and reuses the validators unchanged. **A subsystem I was about to design does no
 > this entry records that as a judgement made deliberately rather than a stage that quietly did not happen.
 - **Merge target:** `docs/_working/DESIGN-assurance-over-execution-artifacts.md`. **Owed:** `REG-Q-078`'s
   ruling, then the roadmap and the build. Status: DESIGNED, NOT BUILT.
+
+### REG-D-059 — SPONSOR INTENT: assurance findings go BACK to the executing agent, bounded by loop detection, escalating to humans — and three of the four parts already exist
+
+- **Date:** 2026-09-05 · **Type:** RULING (sponsor intent) · **Class:**
+  DECISION — adjudicates `REG-Q-078`; supplies the bound that question said option (c) lacked ·
+  **Status:** ✅ CLOSED as a ruling; the increments it licenses are OPEN.
+
+**THE SPONSOR'S ANSWER, VERBATIM:** *"the intention for the automated reviews / policies are that they are
+fed back into the executing agent of the PWU so that it may attempt to address the identified findings.
+However, that could go in loops so there is expected to be a loop detection capability as was introduced in
+JanumiCode with loop detection and unsticking agent. Those I don't know if they were implemented but that
+would be the ideal intention here at least in terms of concept … At some point - say two loops or three -
+there would be an escalation to the relevant human(s)."*
+
+> ### ⭑ THIS IS OPTION (c), AND IT SUPPLIES THE BOUND THE QUESTION SAID IT LACKED
+> `REG-Q-078` offered three answers and recorded of (c) — a repair try — that it was *"not wrong, it is
+> unbounded."* **The bound is loop detection**, and the ruling is therefore not one of the three: findings are
+> fed back, the loop is classified, and escalation is the terminal arm.
+
+**MEASURED, BECAUSE THE SPONSOR SAID THEY DID NOT KNOW.** Both capabilities exist in the sibling project:
+
+| | Where | What it does |
+|---|---|---|
+| **Loop detection** | `JanumiCode/janumicode_v2/src/lib/orchestrator/loopDetectionMonitor.ts` (191 lines) | Runs **from attempt 2 onward**, classifying into `CONVERGING` / `STALLED` / `DIVERGING` / `SCOPE_BLIND` from the high-severity flaw-count TREND, identical tool-call sequences, and available-but-unused tools. Cites spec §7.9. |
+| **Unsticking agent** | `JanumiCode/janumicode_v2/src/lib/agents/unstickingAgent.ts` (206 lines) | Two simultaneous modes — **Socratic elicitation** (ask the stuck agent what would help) and **environmental detective** (independent reasoning from workspace context), with access to the full governed stream including tool results. Cites spec v2.3 §8.6. |
+
+> ### ⭑⭑ AND JPWB ALREADY IMPLEMENTS THE CONCEPT — ON THE AUTHORING PLANE, AT A BOUND OF ONE
+> This was not known to this programme and changes what the work is.
+> `classifyFloorRemediation` (`apps/rph-demo/src/lib/server/floor.ts:149-220`) already returns the findings
+> **with guidance for the producing agent** and an `autoRefine` flag; the authoring route feeds them back for
+> **exactly one** pass (`routes/pwa/[id]/agent/+server.ts:141`). ⭑ **And escalation is already a modelled
+> outcome**: `ESCALATE_REVIEW` — *"Route the recorded review to the governed human or alternate independent-
+> review path"* — alongside `CHANGE_REVIEWER` for an independence violation.
+>
+> **So three of the four parts exist**: feed-back, guidance, and a human-escalation arm. **What is missing is
+> the LOOP** — a bound greater than one, and the classification that decides when to stop.
+
+**WHAT PORTS, AND WHAT CANNOT YET.** ⚠ Stated now because assuming otherwise would build two signals against
+facts that do not exist:
+
+- ✅ **The flaw-count trend ports today.** JPWB's assurance produces `ASSURANCE_OBSERVATION`s carrying
+  severity, which is precisely what `CONVERGING` / `STALLED` / `DIVERGING` are computed from.
+- ⛔ **`SCOPE_BLIND` and the tool-call-loop signal cannot.** Both key on tool-call history, and a JPWB
+  execution step invokes **no tools** — `MODEL_INVOCATION` is the only step type anything runs. Porting them
+  now would mean deriving a signal from an empty history, which reads as "no loop" forever: **a check that
+  cannot fail.**
+
+**AND THE EXECUTION PLANE HAS NO FEED-BACK AT ALL.** The authoring loop refines a PWA graph. Nothing feeds an
+assurance finding back to a model that executed a work unit, because until `REG-F-352` nothing executed one.
+
+- **SCOPE, PER THE SPONSOR.** They bounded it themselves: escalation to *"the relevant human(s) for the
+  relevant PWU, PWA or larger concept"* is *"possibly getting a bit far afield of where we are today."*
+  **Recorded as intent, not as this increment's obligation** — and the `ESCALATE_REVIEW` arm already exists to
+  build onto.
+- ⚠ **AND `REG-Q-078` WAS UNDER-SPECIFIED IN THREE WAYS**, found by the sponsor asking what "reviewer" meant.
+  It implied the reviewer is always a model (`ASR-13` graduates independence up to *"human or organizational"*);
+  it implied a binary verdict when `AggregateAssuranceDisposition` has **six** members; and it asked about the
+  reasoning review when the floor needs **all three** policies. ⭑ **The six-member point is the substantive
+  one:** `INCONCLUSIVE` — *the reviewer could not tell* — must not feed a finding back to the agent, because
+  there is no finding. `ASR-11` limb 1 says it in terms: a validator failure *"neither rejects nor satisfies
+  the subject."* **Feeding an inconclusive review back as though it were a critique would manufacture work
+  from silence.**
+- **Merge target:** `DESIGN-assurance-over-execution-artifacts.md` (§5 replaced by this ruling) and a
+  successor design for the loop. **Owed:** the reasoning review over work products; then the loop, bounded by
+  the flaw-trend classifier; then escalation. Status: CLOSED as a ruling.
