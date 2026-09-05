@@ -31214,3 +31214,74 @@ screen** — authored, stored, and **read back on reopen**, proven through a rea
 - **Merge target:** contracts vocab + generated; `handlers/pwa-authoring.ts`; `prompt-render.ts`;
   `routes/pwa/[id]/+page.server.ts` and `+page.svelte`; `e2e/pwu-prompt-template.e2e.ts`. **Owed:** nothing on
   this stage. Status: CLOSED.
+
+### REG-F-351 — the first model call ever made on behalf of an execution step — and the retention split was built for judgements, not work products
+
+- **Date:** 2026-09-05 · **Type:** FINDING (capability landed; one refutation, one discovery, one self-correction) ·
+  **Class:** FINDING — refutes a recorded boundary; opens a residual on `REG-D-056`'s split ·
+  **Status:** 🟡 PARTIAL — `XR-01`/`XR-02` landed and gated; `XR-03` (the button) is not built.
+
+**WHAT LANDED.** `prepareModelInvocation` (assemble context, render, refuse) and `runModelInvocationStep`
+(call the model, record the exchange, retain the answer). **Driven:** a model receives a prompt rendered from
+a work-unit type's own authored template, and the call is recorded on the **`EXECUTION` plane** — an enum
+member `REG-D-055` created and **nothing has ever written to**.
+
+> ### ⭑ AND I NEARLY ASKED THE SPONSOR FOR A RULING THAT THE CORPUS ALREADY GIVES
+> An audit of this repository reported that *"the register records that this system governs plans and hosts no
+> tool invocation, and allocates actually running things to a platform layer that does not exist yet,"* and
+> recommended the sponsor decide whether that boundary holds. **I searched before deferring, and it is the
+> opposite.**
+>
+> - **Guide `:1137`, verbatim:** *"An **Execution Step** is temporal machinery: **model/tool invocation**,
+>   retrieval, transformation, human interaction, wait, branch, parallel group, or assurance invocation."*
+>   ⭑ **A step IS the invocation.** That is the ratified definition of the thing.
+> - **`StepTypeSchema`'s FIRST member is `MODEL_INVOCATION`** (`packages/rph-contracts/src/enums.ts:770-780`).
+> - **Searched both directions:** `"hosts no"`, `"platform layer"`, `"does not execute"`, `"no tool
+>   invocation"` → **0 in DOC-003, 0 in the Guide, 0 relevant in the register.** *(Positive control, same
+>   instrument: `"execution"` → 26 / 118.)*
+>
+> **The audit's sentence was a PARAPHRASE, not a quotation**, and deferring to it would have cost a sponsor
+> round-trip on a question canon had already answered. ⚠ **An adversarially-verified audit is still a
+> secondary source, and its paraphrases carry the same authority as anyone's.**
+
+> ### ⚠⚠ THE DISCOVERY, AND IT IS A RESIDUAL ON `REG-D-056` NOBODY HAD SEEN
+> **The §9.7 retention split was built for JUDGEMENTS and an execution step produces a WORK PRODUCT.**
+> `splitAnswerSpan` locates a JSON object because the assurance validator's answer IS one and everything
+> around it is volunteered reasoning. **An execution answer is prose.** `located: false`, and §9.7's own
+> instruction blocks retention — **so the work product a step produces is not retained at all.**
+>
+> ⭑ **THAT IS CORRECT BEHAVIOUR, NOT A BUG TO ROUTE AROUND.** Retaining undelimited prose whole would classify
+> any volunteered reasoning inside it as `RETAINED_BY_PARTICIPATION` — permanent under `PER-8`, when `PER-12`
+> requires it purgeable — which is exactly the whole-blob write `REG-D-056` was careful not to permit. The
+> block is the ruling working in a case the ruling never contemplated.
+>
+> ⭑⭑ **AND THE REMEDY ALREADY EXISTS, ON THE OBJECT AUTHORED THE DAY BEFORE.**
+> `PromptTemplate.outputContract` — *"what a conforming answer looks like, so a malformed one is inert"* — is
+> what makes an execution answer locatable. A template that states its output contract gets a delimited answer
+> and the existing split works unchanged. **Both directions are pinned by test** so neither can drift into the
+> other, and no ruling is needed.
+
+- ⚠ **A SELF-CORRECTION, AND A CAST WAS THE BUG.** `runModelInvocationStep` passed
+  `promptTemplateFingerprint` into `captureTry` behind an `as never` cast. **`captureTry` neither declared nor
+  forwarded the field** — `beginExchange` has accepted one all along — so the first caller with a real
+  fingerprint (`REG-D-058` finally gave the field a referent) had it silently dropped, and it **compiled**.
+  ⭑ **The cast was the defect, not the shape**: removing it surfaced the gap in one type-check, and the field
+  is now declared, forwarded, and asserted to resolve to `<pwuTypeId>@v<n>`.
+- **THE EXECUTOR IS THE MODEL.** The demo's existing lifecycle step records the human who clicked, correctly —
+  it is a `TRANSFORMATION` a human drove. This path is different in kind, and recording a human for work a
+  model did would be a fiction the assurance floor is entitled to see through. ⚠ **If the floor then blocks
+  the PWU, that is the result** — the roadmap says so in advance, before anyone could be tempted to weaken a
+  gate to make a demo pass.
+- **A FAILED CALL IS STILL RECORDED.** A throw is captured before it propagates, so the one try that broke a
+  run is not the one try with no evidence — the defect inverted.
+- **WHAT IS NOT BUILT, AND THE STATUS SAYS SO.** `XR-03` — the execute button still fires its eleven-command
+  script with a `TRANSFORMATION` step and `noOutputResult`. **A user cannot yet make a work unit run.** The
+  caller exists, is gated, and has no button; naming that here is the alternative to discovering it later.
+- **DERIVATION RE-RUN, NOT RECALLED.** `REG-F-348`'s trigger, run at HEAD: the only record asserting that
+  nothing invokes a model on behalf of a step is this programme's own design, which says so in the past tense
+  and cites the measurement. **No standing entry is falsified.**
+- **Merge target:** `packages/rph-application/src/execution-invocation.ts`,
+  `apps/rph-demo/src/lib/server/execution/run-model-step.ts`, and the fingerprint repair in
+  `assurance/exchange-capture.ts`. **Owed:** `XR-03`, and a decision on whether an execution template's
+  `outputContract` should be REQUIRED rather than optional — the residual above makes it load-bearing.
+  Status: PARTIAL.

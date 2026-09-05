@@ -78,6 +78,9 @@ export interface CaptureTryInput {
 	readonly rawOutput: string;
 	/** E-5 — what became of it. */
 	readonly disposition: ExchangeDisposition;
+	/** PER-9's index, not its substitute: `<pwuTypeId>@v<n>` for a template-driven call. Absent for calls whose
+	 *  prompt is assembled in code rather than from an authored template. */
+	readonly promptTemplateFingerprint?: string;
 	/** 1-based position within the run. */
 	readonly attemptOrdinal: number;
 	/** PER-11 occurrence times, bracketing the model call. Only this caller can know them: the event's own
@@ -135,7 +138,14 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		model: input.model,
 		attemptOrdinal: input.attemptOrdinal,
 		requestedAt: input.requestedAt,
-		respondedAt: input.respondedAt
+		respondedAt: input.respondedAt,
+		// ⚠ JAN-EXECRUN — THIS WAS DROPPED SILENTLY AND A CAST HID IT. `beginExchange` has accepted a
+		// `promptTemplateFingerprint` all along; `captureTry` neither declared nor forwarded one, so the first
+		// caller with a real fingerprint (`REG-D-058` finally gave the field a referent) passed it in and it
+		// vanished. It compiled because that call site cast its argument — the cast was the bug, not the shape.
+		...(input.promptTemplateFingerprint
+			? { promptTemplateFingerprint: input.promptTemplateFingerprint }
+			: {})
 	});
 
 	// ⛔ A STORE WITHOUT A SINK IS A MISCONFIGURATION, NOT A DEGRADED MODE — REFUSE IT.

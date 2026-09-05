@@ -183,7 +183,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ASR-4 makes a prompt a runtime asset rather than meaning, DEC-4 governs context assembly
 			// exhaustively), so this roadmap builds CARRIERS for existing rules rather than opening a front —
 			// and its exit criterion is a browser spec that reads a stored prompt back.
-		).toBe(22);
+			//
+			// 22 -> 23 (2026-09-05): `ROADMAP-model-invocation-step.md` (`JAN-EXECRUN`). ⭑ THE WARRANT IS A
+			// REFUTATION, which is why it is a roadmap and not a ticket. An audit of this repository reported
+			// that the system *"governs plans and hosts no tool invocation"* and recommended the sponsor rule on
+			// whether that boundary still holds. Searched at HEAD, the corpus says the OPPOSITE: Guide `:1137`
+			// defines an Execution Step AS *"model/tool invocation, retrieval, transformation…"*, and
+			// `StepTypeSchema`'s FIRST member is `MODEL_INVOCATION`. `"hosts no"`, `"platform layer"`,
+			// `"no tool invocation"` → 0 across DOC-003, the Guide and the register (control: `"execution"` →
+			// 26 / 118). The caller was unbuilt, never forbidden — and a paraphrase would have cost a sponsor
+			// round-trip.
+			// ⭑ IT SUBSUMES: it is the CALLER `DESIGN-prompt-template-and-context.md` §4 named as owed by a
+			// separate increment, and it writes to the `EXECUTION` plane that `REG-D-055` created and nothing
+			// has ever used. Its exit criterion is a work unit that runs.
+		).toBe(23);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
