@@ -222,3 +222,57 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 		expect(version.rationale ?? '').not.toMatch(/agy/i);
 	});
 });
+
+describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s reasoning', () => {
+	it('⛔ the ANSWER excludes volunteered reasoning, even when the tool returns both', async () => {
+		// ⭑⭑ THIS IS AN ASR-13 PROTECTION WITH NOTHING ELSE GUARDING IT. `PER-12`: volunteered reasoning is
+		// "never an input to any tier of assurance policy", and "its presence in an evaluator's context is a
+		// hidden-context independence violation (ASR-13)". The survey found ASR-13's "shared hidden context" and
+		// "shared prompt lineage" dimensions have ZERO representation in code — so this separation is the only
+		// thing standing between the producer's interior and the reviewer's context.
+		//
+		// THE MUTANT: `answer = returned.rawOutput`. The reviewer is then handed the reasoning along with the
+		// work product, and the violation is manufactured by the very code meant to prevent it. Nothing else in
+		// the suite would notice.
+		const REASONING = 'First I considered the southern leg, then rejected it.';
+		const { input } = harness({
+			print: async () => ({
+				answerText: ANSWER,
+				volunteeredReasoning: REASONING,
+				rawOutput: REASONING + ANSWER,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			})
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+
+		expect(out.answer).toBe(ANSWER);
+		expect(out.answer).not.toContain(REASONING);
+		// ⭑ AND THE WORK PRODUCT THAT IS STORED — the bytes an assurance policy actually reads — carries none of
+		// it either. Asserting only the return value would miss a retention path that stored the raw blob.
+		// ⚠ AND THIS ASSERTION COULD NOT FAIL UNTIL THE TYPE-CHECKER SAID SO. It read `stored?.bytes ?? ''`;
+		// `store.get` returns a STRING, so `.bytes` was undefined, `?? ''` made it empty, and "the empty string
+		// does not contain the reasoning" is true no matter what was stored. Green, and proving nothing.
+		const stored = await input.store.get(out.storageKey);
+		expect(stored, 'the work product must actually be retained').toBeTruthy();
+		expect(stored, 'the retained bytes ARE the answer').toContain(ANSWER);
+		expect(stored).not.toContain(REASONING);
+	});
+
+	it('⭑ CONTROL — a tool that volunteers NONE still produces the same answer, so the check is not "strip everything"', async () => {
+		// Devin volunteers no reasoning at all (measured: no thinking/reasoning/thought in a full ATIF export).
+		// Without this control, "always return the empty string" would pass the assertion above.
+		const { input } = harness({
+			print: async () => ({
+				answerText: ANSWER,
+				rawOutput: ANSWER,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			})
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran && out.answer).toBe(ANSWER);
+	});
+});

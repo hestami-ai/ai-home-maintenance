@@ -21,6 +21,7 @@ import { agyPrint, extractJson, judgeModel, MAX_AGY_PROMPT_CHARS, splitAnswerSpa
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
+import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -268,7 +269,18 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent. */
 			const timed = async (p: string) => {
 				const requestedAt = clock();
-				const text = await print(p);
+				let text: string;
+				try {
+					text = await print(p);
+				} catch (e) {
+					// ⛔ THE SEAM SANITISES, NOT JUST THE ADAPTERS — and that gap was real. `agyPrint` and
+					// `devinPrint` each scrub their own failures, so the guarantee held only for the two adapters
+					// that remembered to. This call was WRAPPED IN NOTHING, so any injected backend's raw
+					// rejection reached the floor runner and was written verbatim into a projected
+					// `VALIDATOR_EXECUTION_FAILED` observation — finding #60 reachable through a different door.
+					// ⭑ An adapter that sanitises is a DISCIPLINE; a seam that sanitises is a PROPERTY.
+					throw sanitiseToolFailure(e, p, 'reasoning-review backing tool');
+				}
 				return { text, times: { requestedAt, respondedAt: clock() } };
 			};
 

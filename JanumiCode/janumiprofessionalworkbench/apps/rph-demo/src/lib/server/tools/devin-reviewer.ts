@@ -11,6 +11,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
 
 const run = promisify(execFile);
 
@@ -82,30 +83,6 @@ export async function devinPrint(prompt: string): Promise<string> {
 	} finally {
 		await rm(dir, { recursive: true, force: true }).catch(() => undefined);
 	}
-}
-
-/**
- * Does this diagnostic contain the prompt we just sent?
- *
- * ⚠ A WHOLE-STRING COMPARISON WOULD MISS THE CASE THAT MATTERS. A tool that echoes a TRUNCATED prompt still
- * leaks it, so this looks for a substantial contiguous run rather than the whole thing. Short prompts are
- * compared whole because a short probe would false-positive on ordinary English.
- */
-export function diagnosticCarriesPrompt(diagnostic: string, prompt: string): boolean {
-	const needle = prompt.trim();
-	if (needle.length === 0) return false;
-	if (needle.length <= 120) return diagnostic.includes(needle);
-	// ⭑ OVERLAPPING WINDOWS, NOT THREE FIXED PROBES — and the difference was found by a RED, not by reasoning.
-	// The first version probed the head, middle and tail. A test echoing the last 120 characters slipped
-	// through, because `trim()` shifted the tail by one character and the fixed probe no longer aligned.
-	// ⛔ THE LESSON GENERALISES: a leak does not align itself to the windows we happen to check. Windows of
-	// WINDOW characters advancing by half that mean ANY contiguous echo of 1.5x WINDOW or more contains at
-	// least one window whole, whatever its offset.
-	const WINDOW = 60;
-	for (let i = 0; i + WINDOW <= needle.length; i += WINDOW / 2)
-		if (diagnostic.includes(needle.slice(i, i + WINDOW))) return true;
-	// The final window, so the last characters are covered when the length is not a multiple of the step.
-	return diagnostic.includes(needle.slice(-WINDOW));
 }
 
 /**

@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assuranceModel, diagnosticCarriesPrompt, readReportedModel, resolveAssuranceModel } from './devin-reviewer.js';
+import { assuranceModel, readReportedModel, resolveAssuranceModel } from './devin-reviewer.js';
+// ⭑ THE LEAK CHECK MOVED TO A PURE MODULE so the ASSURANCE SEAM can use it without dragging
+// `node:child_process` into the Validator. Adapter-level sanitising is a discipline; seam-level is a
+// property, and TS-06 made it the seam's.
+import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
 
 const LONG = 'Assess the northern delivery route against the safety rubric. '.repeat(8);
 

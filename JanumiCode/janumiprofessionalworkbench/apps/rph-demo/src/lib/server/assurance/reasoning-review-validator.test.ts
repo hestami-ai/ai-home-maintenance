@@ -312,3 +312,47 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		expect(prompts).toHaveLength(1); // parsed first time — no reformat retry needed
 	});
 });
+
+describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', () => {
+	// ⛔ THE HOLE THIS CLOSES WAS REAL AND UNGUARDED. `agyPrint` and `devinPrint` each scrub their own failures,
+	// so the guarantee held only for the two adapters that remembered to. The Validator wrapped its `print(...)`
+	// call in NOTHING, so ANY injected backend's raw rejection reached the floor runner and was written verbatim
+	// into a `VALIDATOR_EXECUTION_FAILED` observation `statement` — dispatched and PROJECTED. That is finding
+	// #60 reachable through a different door.
+
+	it('⛔ a backing tool that throws WITH the prompt in its message does not leak it', async () => {
+		// THE MUTANT: remove the try/catch around `print(p)`. The materialized judge prompt — graph export,
+		// rubric, the producer's declared rationale and narration — then lands in a permanent projected record.
+		let sent = '';
+		const leaky: AgyPrint = async (p: string) => {
+			sent = p;
+			throw new Error(`Command failed: agy --print ${p} --model X`);
+		};
+		await expect(
+			createAgyReasoningReviewValidator({ print: leaky, modelId: JUDGE }).evaluate(SUBJECT, ctx())
+		).rejects.toThrow(/WITHHELD from the record plane/);
+
+		// ⭑ AND THE ASSERTION THAT ACTUALLY MATTERS: the prompt's own bytes are absent from what propagates.
+		// Asserting only the word "WITHHELD" would pass on a message that ALSO carried the prompt.
+		expect(sent.length).toBeGreaterThan(200);
+		const caught = await createAgyReasoningReviewValidator({ print: leaky, modelId: JUDGE })
+			.evaluate(SUBJECT, ctx())
+			.then(() => '', (e: unknown) => (e instanceof Error ? e.message : String(e)));
+		expect(caught).not.toContain(sent.slice(0, 120));
+		expect(caught).not.toContain(sent.slice(-120));
+	});
+
+	it('⭑ CONTROL — a CLEAN diagnostic survives, so the fix does not destroy what it exists to save', async () => {
+		// Without this, "withhold everything" passes the test above — and that would repeat agy's disclosed loss
+		// for no reason. `REG-F-333` records that the diagnostic's lawful home is the exchange record's E-5 and
+		// that losing it was accepted only because there was no alternative.
+		const clean: AgyPrint = async () => {
+			throw new Error('devin exited with code 2: model not available for this account');
+		};
+		const caught = await createAgyReasoningReviewValidator({ print: clean, modelId: JUDGE })
+			.evaluate(SUBJECT, ctx())
+			.then(() => '', (e: unknown) => (e instanceof Error ? e.message : String(e)));
+		expect(caught).toContain('model not available for this account');
+		expect(caught).not.toMatch(/WITHHELD/);
+	});
+});

@@ -119,3 +119,70 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 		expect(out.observations.map((o) => o.code)).toContain('RR-04-no-proxy-satisfaction');
 	});
 });
+
+describe('JAN-TOOLSUITE TS-08 — independence is DECIDED on the recorded producer identity', () => {
+	// ⭑⭑ THIS IS THE PAIR THE WHOLE SLICE EXISTS FOR, and it is deterministic because the offline reviewer
+	// declares a fixed identity (`modelId: 'mock-reasoning-review'`). Before `JAN-TOOLSUITE` the producer was
+	// labelled with `resolveJudgeModel()` — the REVIEWER's model — so the two sides were the same string BY
+	// CONSTRUCTION and only the refusing half of this pair was reachable.
+	//
+	// ⚠ A BROWSER E2E CANNOT PROVE THIS. Under `RPH_DEMO_MODE=test` both the executor and the judge resolve to
+	// the same placeholder, so the two cases below are indistinguishable through the UI. Driving the floor
+	// in-process is where the distinction lives — the same lesson this file's header already records.
+
+	async function runWith(producerModelId: string) {
+		const { session, artifacts, newId } = harness();
+		const ref = await artifacts.put({
+			tenantPrefix: 'tnt-t',
+			bytes: ANSWER,
+			mediaType: 'text/plain',
+			purgeability: 'RETAINED_BY_PARTICIPATION'
+		});
+		const stored = {
+			status: 'STORED' as const,
+			storageKey: ref.storageKey,
+			contentHash: ref.contentHash,
+			byteSize: ref.byteSize,
+			purgeability: 'RETAINED_BY_PARTICIPATION' as const,
+			contentDurability: artifacts.durability
+		};
+		return runWorkProductFloor(
+			{
+				artifactId: 'art_01ARZ3NDEKTSV4RRFFQ69G5B01',
+				artifact: { semanticVersion: 1, provenance: {}, producingPwuId: 'pwu_1' },
+				exchange: {
+					exchangeId: 'mex_1',
+					materializedInputRef: stored,
+					rawOutputBeforeCoercionRef: stored,
+					answerSpanRef: stored,
+					volunteeredReasoningRef: { status: 'PENDING_CONTENT_PLANE', reason: 'none' }
+				} as never,
+				answer: ANSWER,
+				producingPrompt: 'Assess the northern delivery route.',
+				producerProviderId: 'openai-codex',
+				producerModelId
+			},
+			session,
+			{ artifacts, now: () => TS, newId, criteria: reasoningReviewCriteria(session) }
+		);
+	}
+
+	it('⭑ a producer whose model DIFFERS from the reviewer is assured', async () => {
+		// Pi on `gpt-5.4-mini` producing, the reviewer on its own model. This is the arrangement the sponsor
+		// asked for, reduced to the one fact `checkIndependence` actually reads.
+		const out = await runWith('gpt-5.4-mini');
+		expect(out.satisfied, `not satisfied: ${JSON.stringify(out.observations)}`).toBe(true);
+	});
+
+	it('⛔ and the SAME model on both sides is REFUSED — which is the check working, not a fault', async () => {
+		// THE MUTANT: drop the producer identity back to the judge's model (what the call site used to pass).
+		// The case above then flips to this one, and every model-executed step becomes unassurable.
+		//
+		// ⚠ THE ASSERTION IS ON THE OBSERVATION, NOT MERELY ON `satisfied`. An empty work product is ALSO not
+		// satisfied, so `satisfied === false` alone cannot tell a non-independent review apart from a rejected
+		// one — an arrangement that trips two guards proves neither.
+		const out = await runWith('mock-reasoning-review');
+		expect(out.satisfied).toBe(false);
+		expect(JSON.stringify(out.observations)).toMatch(/INDEPENDENCE/i);
+	});
+});
