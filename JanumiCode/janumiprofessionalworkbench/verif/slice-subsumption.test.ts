@@ -293,7 +293,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: the `fate` vocabulary is `DEC-4`'s five, ADOPTED not derived, and volunteered
 			// reasoning gets NO element kind because `REG-Q-077` is open — the slot must not exist before the
 			// permission.
-		).toBe(32);
+			//
+			// 32 -> 33 (2026-09-06): `ROADMAP-assurance-reported-identity.md` (`JAN-ASRIDENT`). ⭑ NOT A NEW LINE
+			// — it DISCHARGES the item this register left standing open in its own last paragraph: *"the reviewer
+			// still records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`:
+			// `readReportedModel` … is never called, because the assurance seam still returns a bare string
+			// exactly as the execution seam did before `TS-04`."* A named, dated, already-recorded debt, paid.
+			// ⭑ IT SUBSUMES: no new policy, no new vocabulary, and NO NEW TYPE — `ToolInvocationResult` and
+			// `isToolInvocationResult` already exist for the execution seam, and this is their SECOND consumer.
+			// The obligation is `ASR-4` (`DOC-003:253`, *"whose actual identities and lineage are recorded"*) and
+			// `PER-9` (`:369`, *"actually invoked"*), both ratified before this slice.
+			// ⚠ AND IT DELIBERATELY DOES NOT TAKE `materializedInput` for the assurance plane: the ATIF export
+			// carries the model, not the composed input, so claiming an E-1 composite from it would be a
+			// fabricated measurement.
+		).toBe(33);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

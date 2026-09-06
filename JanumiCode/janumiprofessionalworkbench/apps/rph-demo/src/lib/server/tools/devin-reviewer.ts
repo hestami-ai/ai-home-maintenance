@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
+import type { ToolInvocationResult } from './backing-tool.js';
 
 const run = promisify(execFile);
 
@@ -57,7 +58,12 @@ export function assuranceModel(): string {
  * BYPASS. It proved unnecessary — the probe succeeded without it — so an untrusted-directory failure surfaces
  * as a refusal to be fixed by trusting the directory, never by disabling the check.
  */
-export async function devinPrint(prompt: string): Promise<string> {
+export async function devinPrint(prompt: string): Promise<string | ToolInvocationResult> {
+	// ⚠ RESOLVED BEFORE THE DIRECTORY EXISTS. `assuranceModel()` REFUSES when unconfigured (`REG-F-331`), and
+	// my first version of this line put it after `mkdtemp` and outside the `try` — so an unconfigured host
+	// would leak a temp directory on every refusal. Resolving first means the refusal happens before anything
+	// is created, and it reaches the caller unwrapped rather than dressed as "devin invocation failed".
+	const configured = assuranceModel();
 	const dir = await mkdtemp(join(tmpdir(), 'jpwb-devin-'));
 	const promptPath = join(dir, 'prompt.txt');
 	const exportPath = join(dir, 'export.json');
@@ -65,10 +71,33 @@ export async function devinPrint(prompt: string): Promise<string> {
 		await writeFile(promptPath, prompt, 'utf8');
 		const { stdout } = await run(
 			DEVIN_BIN,
-			['--print', '--model', assuranceModel(), '--prompt-file', promptPath, '--export', exportPath],
+			['--print', '--model', configured, '--prompt-file', promptPath, '--export', exportPath],
 			{ timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
-		return stdout;
+		// ⭑⭑ THE READ HAPPENS HERE, AND THE PLACEMENT IS THE WHOLE FIX. `readReportedModel` was written with
+		// `devinPrint` and could never be called by anyone: the `finally` below deletes `dir` before this
+		// function returns, so the export it reads is gone by the time any caller holds the answer. It was not
+		// an unused export — it was a function whose only possible caller was its own enclosing function.
+		const reported = await readReportedModel(exportPath);
+		// ⛔ NO REPORT MEANS THE WEAKER GRADE, NOT THE CONFIGURED VALUE DRESSED UP. An unreadable export is an
+		// absence of evidence about the model; returning the bare string lets the caller record what the HOST
+		// configured, graded `HOST_CONFIGURED`, which is the honest fact.
+		if (!reported) return stdout;
+		return {
+			answerText: stdout,
+			rawOutput: stdout,
+			producer: {
+				agentId: 'devin',
+				modelId: reported,
+				// Devin brokers many vendors, so the PROVIDER is the broker. Claiming `zhipu` for `glm-5-2`
+				// would assert a relationship this host cannot see — the same reasoning `assurance/index.ts`
+				// already records for the configured path.
+				providerId: 'devin'
+			},
+			// ⭑ THE GRADE IS EARNED BY THE READ ABOVE, not by the tool's entry in `BACKING_TOOLS`. A catalog
+			// declaration says what a tool CAN report; this says what it DID.
+			identityEvidence: 'PROVIDER_REPORTED'
+		};
 	} catch (e) {
 		const raw = e instanceof Error ? e.message : String(e);
 		// ⭑ THE MEASUREMENT. If the prompt somehow reached the diagnostic anyway, withhold it — PER-12 forbids
@@ -77,7 +106,7 @@ export async function devinPrint(prompt: string): Promise<string> {
 		throw new Error(
 			diagnosticCarriesPrompt(raw, prompt)
 				? 'devin invocation failed. Its diagnostic is WITHHELD: it was measured to contain the prompt, ' +
-					'which may not reach the record plane (PER-12), and no redaction exists here.'
+						'which may not reach the record plane (PER-12), and no redaction exists here.'
 				: `devin invocation failed: ${raw}`
 		);
 	} finally {

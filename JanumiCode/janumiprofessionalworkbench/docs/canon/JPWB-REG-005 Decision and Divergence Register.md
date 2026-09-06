@@ -31876,10 +31876,12 @@ branch on **every gate run**, green and silently exercising the non-compliant pa
 models a COMPLIANT answer, and a test asserts it honours the contract.
 
 **OWED.** The judge's own lifecycle (the paper's central claim) — our rubric is seeded once and never tuned.
-`REG-D-059`'s feedback loop, now doubly motivated and finally supplied with real findings. And the reviewer
+`REG-D-059`'s feedback loop, now doubly motivated and finally supplied with real findings. ~~And the reviewer
 still records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`: `readReportedModel` reads
 the model out of Devin's ATIF export and **is never called**, because the assurance seam still returns a bare
-string exactly as the execution seam did before `TS-04`.
+string exactly as the execution seam did before `TS-04`.~~ ✅ **DISCHARGED 2026-09-06 by `REG-F-359`**, which
+also corrects this sentence: *"never called"* understates it — `devinPrint` deleted the export in its own
+`finally`, so no caller could have called it.
 
 ---
 
@@ -32041,3 +32043,109 @@ by tests and dormant in the demo's data. And `memoryPolicyId` remains ratified, 
 `seed-workbench.ts`, the vocabulary, and five test files); `JPWB-DOC-003` `DEC-4` carries the semantic
 requirement unchanged — this slice implements it for context assembly and adds no semantic requirement of its
 own. The entry's single live status is stated in its header, above.
+
+---
+
+### REG-F-359 — the reviewer records the model that ANSWERED, and the gate I wrote to catch the class first failed its own mutant
+
+- **Date:** 2026-09-06 · **Type:** FINDING (`JAN-ASRIDENT` AI-01..AI-04) ·
+  **Class:** FINDING — a recorded debt discharged; one dead-by-construction export wired; ⚠ **two instrument
+  defects found in my own checkers, one of them inside the gate written to catch this very class** ·
+  **Status:** ✅ **CLOSED.**
+
+**THIS DISCHARGES AN ITEM THIS REGISTER LEFT STANDING OPEN** in `REG-D-060`'s closing paragraph, struck in
+place above. ⭑ No sponsor decision was gated on it: canon already required the fact, and the type that carries
+it already existed.
+
+**THE OBLIGATION, QUOTED.** `ASR-4` (`JPWB-DOC-003:253`) requires an evaluator *"whose actual identities and
+lineage are recorded"*. `PER-9` (`:369`) requires every try's record to capture *"the resolved provider, model,
+and version **actually invoked**"*. ⚠ The code cites `§8.4` for this (`reasoning-review-validator.ts:242`); that
+is the **Guide**, not `DOC-003`, and this entry does not rest on it — `ASR-4` and `PER-9` say the operative
+thing directly and are ratified.
+
+**THE FOUR LIMBS, EACH VERIFIED BEFORE ANY CODE WAS WRITTEN.**
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| `readReportedModel` is never called | at `HEAD`, `grep -rn` over `apps/rph-demo/src` + `packages` excluding tests → **exactly one line: its own declaration** | ✔ |
+| The assurance seam returns a bare string | `AgyPrint = (prompt: string) => Promise<string>` (`:178`) | ✔ |
+| The reviewer records `HOST_CONFIGURED` | `identityFacts` defaults `evidence: id.evidence ?? 'HOST_CONFIGURED'`; the validator never supplied one | ✔ |
+| The suite declares Devin `PROVIDER_REPORTED` | `backing-tool.ts:97` | ✔ |
+
+⭑⭑ **AND THE REGISTER'S OWN ACCOUNT WAS UNDERSTATED, WHICH CHANGED THE REMEDY.** *"Never called"* reads as an
+oversight — add a call site. `devinPrint` creates the export inside a `mkdtemp` directory and **deletes that
+directory in its own `finally`** before returning, so **no caller of `devinPrint` could ever have called it**:
+the file is gone by the time the answer is in the caller's hands. `readReportedModel` was not an unused export.
+It was a function whose only possible caller was its own enclosing function — so the fix is placement (read
+before cleanup), not wiring.
+
+**WHY IT MATTERED BEYOND A RECORD FIELD.** `evaluator` flows to `reasoningReviewResultFromJudgement`
+(`:383`), which is what `checkIndependence` compares against the producer. The ladder was therefore comparing
+the producer's **reported** model against the reviewer's **configured** one — two different kinds of fact on
+the two sides of one equality test. `REG-D-052` settled that the model is configured, never pinned;
+`REG-F-331` recorded a pinned label rotting; and Devin's own export shows the two diverging in the fixture
+derived from a real run (`agent.model_name: "GLM-5.2 High"` vs `generation_model: "glm-5-2"`).
+
+---
+
+**⚠⚠ TWO INSTRUMENT DEFECTS, BOTH MINE, AND THE SECOND IS THE MORE INSTRUCTIVE.**
+
+**1. A dead-export derivation that was wrong twice.** My first pass reported four dead exports. It searched
+`name(` — call syntax — so it flagged `devinPrint`, which is passed as a VALUE (`print: devinPrint`) and never
+called; and it joined paths with mixed separators, so every in-file lookup silently returned empty. ⭑ Three
+controls now run before any result is believed: the tree contains a known file, a known value-reference is
+found, and a name that cannot exist finds nothing.
+
+**2. ⛔ THE GATE WRITTEN TO CATCH THIS CLASS WENT GREEN ON ITS OWN MUTANT.** `AI-01b` asserts no exported
+adapter capability is unreferenced in production. I mutated the fix away — and the gate passed.
+`readReportedModel` is **named in a docblock two lines above the call that uses it**, and the gate matched raw
+lines, so it counted a MENTION as a USE. That is the defect the file exists to catch, reproduced inside the
+catcher. ⭑ It is also the reason the original was so easy to miss for two slices: the dead function was
+documented, discussed in an e2e comment, and looked entirely alive. Comments are now stripped, and a CONTROL
+that the gate FAILED is written down as a test.
+
+⚠ **What that gate does NOT catch, stated so it is not read as stronger than it is.** It sees an unreferenced
+export. It cannot see a LIFETIME — that `devinPrint` deleted the file its own helper needed. No static check
+does; only a live run would. The gate pins the checkable symptom and says so in its own header.
+
+**3. ⚠ AN EXISTING GREEN TEST OVERCLAIMED IN ITS TITLE, and I have annotated rather than renamed it.**
+*"records the ACTUAL evaluator identity so independence is checkable against the producer (§8.4)"* asserts that
+the CONFIGURED value round-trips instead of a placeholder. That is a real property and it is what caught the
+literal `'agy:default'`. But its fake reports nothing, so the configured value is the strongest fact available
+to it, and the assertion holds equally whether or not the seam can carry a reported identity. For two slices
+that title read as coverage of exactly the gap that existed. ⛔ The title stands: it names what the test was
+written to catch, and rewriting it would erase that.
+
+---
+
+**WHAT LANDED.** `devinPrint` reads the export **before** its `finally` and returns a `ToolInvocationResult`
+when a model was reported, a bare string when it was not. `AgyPrint` widens to the union;
+`isToolInvocationResult` narrows. The evaluator identity is resolved **after** the call, and the grade travels
+with the id into `identityFacts`. ⭑ **No new type and no new vocabulary** — `ToolInvocationResult` was authored
+for the execution seam at `TS-04` and this is its second consumer.
+
+⚠ **A regression I introduced and caught in the same pass:** resolving the model before the `try` but *after*
+`mkdtemp` would leak a temp directory on every refusal of an unconfigured host. The resolve now happens before
+the directory exists, so a `REG-F-331` refusal creates nothing and reaches the caller unwrapped.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM:** identity fixed before the call → *the REPORTED model reaches the
+exchange record*; assign the reported producer unconditionally → *an EMPTY reported id does not overwrite the
+configured one*; drop the grade → *…and is graded `PROVIDER_REPORTED`*; truthiness instead of the type narrow →
+16 reds including *a bare STRING answer still works*; revert the export read → `AI-01b` names
+`readReportedModel`.
+
+**GATES:** check-types 22/22 · lint · verif 56 files / 409 tests (ratchet 32 → 33 with a derived warrant) ·
+`rph-application`+`rph-engine`+`rph-assurance` 1301 · `app:rph-demo` 307 · playwright 86.
+
+**⚠ OWED AND NOT CLAIMED.** `agy` still grades `HOST_CONFIGURED` — **correctly**, it confirms nothing about
+itself. The version arm stays `UNREPORTED`: the ATIF export carries a label, not a version.
+`materializedInput` is NOT taken for the assurance plane — the export carries the model, not the composed
+input, and claiming an E-1 composite from it would be a fabricated measurement. ⛔ **And no census counts
+producers of `PROVIDER_REPORTED`**: the execution side produces it, so any gate asking merely *"does this enum
+member have a producer"* would have been GREEN throughout this defect. That absence is disclosed rather than
+closed — such a census would pin the symptom, and `AI-01b` pins something a reader can act on instead.
+
+**Merge target:** Repository (`devin-reviewer.ts`, `reasoning-review-validator.ts`,
+`verif/tool-adapter-exports-reachable.test.ts`, `verif/slice-subsumption.test.ts`, and the validator tests);
+`JPWB-DOC-003` `ASR-4`/`PER-9` carry the requirement unchanged — this slice implements it for the assurance
+plane and adds no obligation of its own.

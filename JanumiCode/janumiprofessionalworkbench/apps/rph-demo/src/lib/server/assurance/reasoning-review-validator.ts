@@ -17,11 +17,22 @@ import {
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
 import { renderRationale } from '../agent/rationale.js';
-import { agyPrint, extractJson, judgeModel, MAX_AGY_PROMPT_CHARS, splitAnswerSpan } from './agy-cli.js';
+import {
+	agyPrint,
+	extractJson,
+	judgeModel,
+	MAX_AGY_PROMPT_CHARS,
+	splitAnswerSpan
+} from './agy-cli.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
 import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
+import {
+	isToolInvocationResult,
+	type ToolIdentityEvidence,
+	type ToolInvocationResult
+} from '../tools/backing-tool.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -80,7 +91,10 @@ function judgePrompt(input: ReasoningReviewInput, isWorkProduct: boolean): strin
 	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
 	// the seeded ASSURANCE_POLICY object a projection of this file — written at seed time and never read again.
 	// `description` is DOC-004 §7's field (the constant called it `label`).
-	const rubric = excerpt(input.criteria.map((c) => `- ${c.id}: ${c.description}`).join('\n'), RUBRIC_MAX);
+	const rubric = excerpt(
+		input.criteria.map((c) => `- ${c.id}: ${c.description}`).join('\n'),
+		RUBRIC_MAX
+	);
 	const priorLine = input.prior?.gaps.length
 		? `\nA PREVIOUS review flagged: ${excerpt(JSON.stringify(input.prior.gaps), PRIOR_MAX)}. Judge whether those are genuinely resolved.`
 		: '';
@@ -140,7 +154,10 @@ function judgePrompt(input: ReasoningReviewInput, isWorkProduct: boolean): strin
 	// cannot occur in authored content. The file is now text, and therefore reviewable.
 	const SENTINEL = '\u0000';
 	const scaffoldingLen = assemble(SENTINEL).length - SENTINEL.length;
-	const contentBudget = Math.max(CONTENT_MIN, Math.min(CONTENT_MAX, PROMPT_BUDGET - scaffoldingLen));
+	const contentBudget = Math.max(
+		CONTENT_MIN,
+		Math.min(CONTENT_MAX, PROMPT_BUDGET - scaffoldingLen)
+	);
 	return assemble(excerpt(input.content, contentBudget));
 }
 
@@ -175,7 +192,7 @@ function coerceJudgement(parsed: unknown, input: ReasoningReviewInput): Reasonin
  *  judgePrompt → extractJson → coerceJudgement → reasoningReviewResultFromJudgement — hermetically, without a
  *  subprocess. §14.3 requires the scenario exercise the real Validator: "a stub that ignores the input passes this
  *  trivially", so the fake captures the materialized prompt and the test asserts over it. */
-export type AgyPrint = (prompt: string) => Promise<string>;
+export type AgyPrint = (prompt: string) => Promise<string | ToolInvocationResult>;
 
 /** The accepted outcome, named once so the two success paths cannot drift apart. */
 const PARSED: ExchangeParseOutcome = {
@@ -199,7 +216,10 @@ function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
 	if (raw.trim() === '')
 		return { outcome: 'EMPTY_RESPONSE', detail: 'The model returned no bytes at all.' };
 	if (!splitAnswerSpan(raw).located)
-		return { outcome: 'JSON_EXTRACTION_FAILED', detail: `No JSON object span could be located. ${detail}` };
+		return {
+			outcome: 'JSON_EXTRACTION_FAILED',
+			detail: `No JSON object span could be located. ${detail}`
+		};
 	if (error instanceof SyntaxError) return { outcome: 'JSON_PARSE_FAILED', detail };
 	return { outcome: 'SCHEMA_COERCION_FAILED', detail };
 }
@@ -241,13 +261,28 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			if (!input) throw new Error('reasoning-review context (prompt + content) is missing');
 			// Resolved per call, never at module load: §8.4 requires the evaluator's ACTUAL identity be recorded,
 			// and §14.6 the "allowed and resolved" model. Throws when unpinned rather than record a placeholder.
-			const evaluator: Identity = {
+			// ── ⭑⭑ JAN-ASRIDENT — THE CONFIGURED IDENTITY IS A STARTING POINT, NOT THE RECORD ────────────
+			//
+			// `ASR-4` (`DOC-003:253`) requires an evaluator *"whose actual identities and lineage are
+			// recorded"*, and `PER-9` (`:369`) *"the resolved provider, model, and version actually invoked"*.
+			// What this object holds until the call returns is what the HOST ASKED FOR — and `REG-D-052` settled
+			// that the model is configured, never pinned, while `REG-F-331` recorded a pinned label rotting. The
+			// two can differ, and Devin reports the difference in every export.
+			//
+			// ⛔ IT IS NOT ONLY A RECORD FIELD: `evaluator` flows to `reasoningReviewResultFromJudgement` below,
+			// which is what `checkIndependence` compares against the producer. Left as configured, the ladder
+			// compares the producer's REPORTED model against the reviewer's CONFIGURED one — two different kinds
+			// of fact on the two sides of one equality test.
+			let evaluator: Identity = {
 				actorType: 'AGENT',
 				agentId: opts.agentId ?? 'agy',
 				modelId: opts.modelId ?? judgeModel(),
 				// Defaults preserve today's behaviour exactly; a second tool supplies its own.
 				providerId: opts.providerId ?? 'google'
 			};
+			// ⭑ `undefined` UNTIL A TOOL REPORTS ONE, and `identityFacts` then defaults to `HOST_CONFIGURED`.
+			// Seeding it with a grade here would assert confirmation before any tool had spoken.
+			let identityEvidence: ToolIdentityEvidence | undefined;
 			const prompt = judgePrompt(input, subject.objectType === 'ARTIFACT');
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
@@ -273,7 +308,14 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					exchangeId: `exch-${tryCounter}`,
 					role,
 					...(predecessor ? { predecessor } : {}),
-					model: { modelId: evaluator.modelId ?? '', providerId: evaluator.providerId ?? '' },
+					// ⭑ READ AT CALL TIME, NOT CLOSED OVER AT CONSTRUCTION. `capture` runs after `timed`, so by
+					// here the tool has spoken — and the grade travels with the id, because a stronger value
+					// with no grade to justify it is the fabricated-measurement defect this arm exists to stop.
+					model: {
+						modelId: evaluator.modelId ?? '',
+						providerId: evaluator.providerId ?? '',
+						...(identityEvidence ? { evidence: identityEvidence } : {})
+					},
 					prompt: text,
 					rawOutput,
 					disposition,
@@ -289,7 +331,24 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				const requestedAt = clock();
 				let text: string;
 				try {
-					text = await print(p);
+					const returned = await print(p);
+					if (isToolInvocationResult(returned)) {
+						text = returned.answerText;
+						// ⭑⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, exactly as it does on the
+						// execution side (`run-model-step`). ⚠ ONLY WHEN NON-EMPTY: `checkIndependence` requires
+						// both sides defined and different, so an empty id overwriting a configured one would
+						// fail the check CLOSED — safe, but for the wrong reason, and indistinguishable from
+						// genuine sameness to a reader.
+						if (returned.producer.modelId && returned.producer.providerId) {
+							evaluator = {
+								...evaluator,
+								agentId: returned.producer.agentId || evaluator.agentId,
+								modelId: returned.producer.modelId,
+								providerId: returned.producer.providerId
+							};
+							identityEvidence = returned.identityEvidence;
+						}
+					} else text = returned;
 				} catch (e) {
 					// ⛔ THE SEAM SANITISES, NOT JUST THE ADAPTERS — and that gap was real. `agyPrint` and
 					// `devinPrint` each scrub their own failures, so the guarantee held only for the two adapters
@@ -373,7 +432,15 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					);
 					throw e;
 				}
-				await capture('repair', repairPrompt, repairRaw, 'accepted', repairTry.times, PARSED, first);
+				await capture(
+					'repair',
+					repairPrompt,
+					repairRaw,
+					'accepted',
+					repairTry.times,
+					PARSED,
+					first
+				);
 			}
 			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same
 			// `input.criteria` to both is what makes the two unable to diverge — the rubric asking about one set

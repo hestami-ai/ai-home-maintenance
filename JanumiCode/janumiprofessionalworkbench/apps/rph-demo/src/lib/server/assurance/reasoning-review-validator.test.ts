@@ -118,10 +118,12 @@ describe('Reasoning Review Validator — a CONTENT STORE failure is not a malfor
 		// issued, and the exchange was recorded as `repair-requested`. After that, `repair-requested` no longer
 		// means "the model returned something unusable", which is the one thing that disposition is for.
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
-				SUBJECT,
-				ctx()
-			)
+			createAgyReasoningReviewValidator({
+				print,
+				modelId: JUDGE,
+				artifacts: store,
+				exchanges
+			}).evaluate(SUBJECT, ctx())
 		).rejects.toThrow(/content store unavailable/);
 
 		// EXACTLY ONE model call. The repair prompt is a second billed invocation provoked by an infrastructure
@@ -237,7 +239,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		expect(ok.limitations.some((l) => l.includes('no professional rationale summary'))).toBe(false);
 	});
 
-	it('budgets the WHOLE prompt under agy\'s command-line ceiling on a huge graph (the ENAMETOOLONG fix)', async () => {
+	it("budgets the WHOLE prompt under agy's command-line ceiling on a huge graph (the ENAMETOOLONG fix)", async () => {
 		const { prompts, print } = capturing();
 		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
 			SUBJECT,
@@ -281,6 +283,15 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		// report sameness, which is the common-mode failure §8.8 names.
 		expect(result.evaluator.modelId).toBe(JUDGE);
 		expect(result.evaluator.modelId).not.toBe('agy:default');
+		// ── ⚠ WHAT THIS TEST ESTABLISHES, AND WHAT ITS TITLE OVERCLAIMED (`JAN-ASRIDENT`) ────────────────────
+		// It asserts the CONFIGURED value round-trips instead of a placeholder, and that is a real property —
+		// it is what caught the literal `'agy:default'` the comment above records. ⛔ But it is NOT *"the
+		// ACTUAL evaluator identity"*: `capturing()` is a fake that reports nothing, so the configured value is
+		// the strongest fact available to it, and this assertion holds equally whether or not the seam can
+		// carry a reported one. For two slices that title read as coverage of precisely the gap that existed —
+		// Devin reporting `glm-5-2` while every record said the configured label, graded `HOST_CONFIGURED`.
+		// The reported half is covered by `JAN-ASRIDENT` below. The title is left as it stands: it names what
+		// the test was written to catch, and rewriting it would erase that.
 	});
 
 	it('exercises the real parse/repair path — a fenced, prose-wrapped reply still yields a schema-conformant result', async () => {
@@ -337,7 +348,10 @@ describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', ()
 		expect(sent.length).toBeGreaterThan(200);
 		const caught = await createAgyReasoningReviewValidator({ print: leaky, modelId: JUDGE })
 			.evaluate(SUBJECT, ctx())
-			.then(() => '', (e: unknown) => (e instanceof Error ? e.message : String(e)));
+			.then(
+				() => '',
+				(e: unknown) => (e instanceof Error ? e.message : String(e))
+			);
 		expect(caught).not.toContain(sent.slice(0, 120));
 		expect(caught).not.toContain(sent.slice(-120));
 	});
@@ -351,7 +365,10 @@ describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', ()
 		};
 		const caught = await createAgyReasoningReviewValidator({ print: clean, modelId: JUDGE })
 			.evaluate(SUBJECT, ctx())
-			.then(() => '', (e: unknown) => (e instanceof Error ? e.message : String(e)));
+			.then(
+				() => '',
+				(e: unknown) => (e instanceof Error ? e.message : String(e))
+			);
 		expect(caught).toContain('model not available for this account');
 		expect(caught).not.toMatch(/WITHHELD/);
 	});
@@ -371,7 +388,10 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 			seen = p;
 			return CLEAN;
 		};
-		await createAgyReasoningReviewValidator({ print: capture, modelId: JUDGE }).evaluate(subject, ctx());
+		await createAgyReasoningReviewValidator({ print: capture, modelId: JUDGE }).evaluate(
+			subject,
+			ctx()
+		);
 		return seen;
 	}
 
@@ -408,5 +428,112 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 		// `coerceJudgement` would then drop every finding as unrecognised, and the review would silently pass.
 		const first = SEEDED_REASONING_REVIEW_CRITERIA[0]!.id;
 		for (const s of [ARTIFACT, SUBJECT]) expect(await promptFor(s)).toContain(first);
+	});
+});
+
+// ── ⭑⭑ JAN-ASRIDENT AI-02/AI-03 — THE REVIEWER'S *ACTUAL* IDENTITY REACHES THE RECORD ──────────────────────
+//
+// `ASR-4` (`DOC-003:253`) requires an evaluator *"whose actual identities and lineage are recorded"*; `PER-9`
+// (`:369`) *"the resolved provider, model, and version actually invoked"*. Until this seam widened, the record
+// carried what the HOST ASKED FOR — and `REG-D-052` settled that the model is configured, never pinned.
+describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () => {
+	/** A backing tool that reports its own identity, as Devin does through its ATIF export. */
+	const reporting =
+		(modelId = 'glm-5-2'): AgyPrint =>
+		async () => ({
+			answerText: CLEAN,
+			rawOutput: CLEAN,
+			producer: { agentId: 'devin', modelId, providerId: 'devin' },
+			identityEvidence: 'PROVIDER_REPORTED' as const
+		});
+
+	it('⭑⭑ the REPORTED model reaches the exchange record, and is graded PROVIDER_REPORTED', async () => {
+		// THE MUTANT: build `evaluator` before the call, as it was. The reported value is not known yet, so the
+		// CONFIGURED one is recorded — which is the defect: a configured label and the model that answered can
+		// differ, and Devin's own export shows two different strings ("GLM-5.2 High" vs "glm-5-2").
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({
+			print: reporting(),
+			modelId: JUDGE,
+			exchanges
+		}).evaluate(SUBJECT, ctx());
+		const [record] = exchanges.drain();
+		const identity = record!.resolvedModelIdentity as {
+			kind: string;
+			modelId: string;
+			evidence?: string;
+		};
+		expect(identity.modelId, 'the model that ANSWERED, not the one configured').toBe('glm-5-2');
+		expect(identity.modelId).not.toBe(JUDGE);
+		// ⭑ THE GRADE TRAVELS WITH THE ID. A stronger value with no grade to justify it is the
+		// fabricated-measurement defect the evidence arm exists to prevent.
+		expect(identity.evidence).toBe('PROVIDER_REPORTED');
+	});
+
+	it('⭑⭑ CONTROL — a tool that reports NOTHING is unchanged: configured id, HOST_CONFIGURED', async () => {
+		// ⛔ WITHOUT THIS, "records the reported identity" cannot be told apart from "records whatever the last
+		// tool said" — and `agy` reports nothing about itself, so its weaker grade is CORRECT and must survive.
+		// THE MUTANT: grade every review `PROVIDER_REPORTED`. It would claim agy confirmed an identity it has
+		// never once stated.
+		const exchanges = createExchangeSink();
+		const { print } = capturing();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		const identity = exchanges.drain()[0]!.resolvedModelIdentity as {
+			modelId: string;
+			evidence?: string;
+		};
+		expect(identity.modelId).toBe(JUDGE);
+		// `identityFacts` defaults an absent grade to the weaker one; asserting the DEFAULT is what proves no
+		// promotion happened, rather than asserting a field nobody set.
+		expect(identity.evidence).toBeUndefined();
+	});
+
+	it('⛔ an EMPTY reported id does not overwrite the configured one', async () => {
+		// ⭑ `checkIndependence` requires BOTH sides defined and different. An empty id overwriting a configured
+		// one fails the check CLOSED — safe, but for the wrong reason, and a reader cannot tell that from
+		// genuine sameness. THE MUTANT: assign the reported producer unconditionally.
+		const exchanges = createExchangeSink();
+		const blank: AgyPrint = async () => ({
+			answerText: CLEAN,
+			rawOutput: CLEAN,
+			producer: { agentId: 'devin', modelId: '', providerId: '' },
+			identityEvidence: 'PROVIDER_REPORTED' as const
+		});
+		await createAgyReasoningReviewValidator({ print: blank, modelId: JUDGE, exchanges }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		const identity = exchanges.drain()[0]!.resolvedModelIdentity as {
+			modelId: string;
+			evidence?: string;
+		};
+		expect(identity.modelId).toBe(JUDGE);
+		expect(identity.evidence, 'no report, so no promotion').toBeUndefined();
+	});
+
+	it('⭑ the reported identity also reaches the ASSESSMENT, which is what independence reads', async () => {
+		// ⛔ NOT ONLY A RECORD FIELD. `evaluator` flows to `reasoningReviewResultFromJudgement`, and that is what
+		// `checkIndependence` compares against the producer. Left configured, the ladder compares the producer's
+		// REPORTED model against the reviewer's CONFIGURED one — two different kinds of fact on the two sides of
+		// one equality test. THE MUTANT: pass the pre-call `evaluator` to the result builder.
+		const result = await createAgyReasoningReviewValidator({
+			print: reporting('glm-5-2'),
+			modelId: JUDGE
+		}).evaluate(SUBJECT, ctx());
+		expect(JSON.stringify(result)).toContain('glm-5-2');
+	});
+
+	it('⭑ CONTROL — a bare STRING answer still works, which every other test in this file relies on', async () => {
+		// THE MUTANT: narrow the union with a truthiness check instead of `isToolInvocationResult`. A non-empty
+		// string is truthy, so every existing injected `print` would be read as a result object and lose its
+		// answer entirely.
+		const result = await createAgyReasoningReviewValidator({
+			print: async () => CLEAN,
+			modelId: JUDGE
+		}).evaluate(SUBJECT, ctx());
+		expect(result).toBeDefined();
 	});
 });
