@@ -274,7 +274,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭑ IT SUBSUMES: no new policy, no new vocabulary, and THREE STATES rather than the sibling
 			// monitor's four — `SCOPE_BLIND` keys on tool-call history and a JPWB execution step invokes no
 			// tools, so porting it would ship a check that CANNOT FAIL.
-		).toBe(30);
+			//
+			// 30 -> 31 (2026-09-06): `ROADMAP-producer-session-per-work-unit.md` (`JAN-EXECSESS`). ⭑ IT CLOSES A
+			// GAP THE PREVIOUS SLICE NAMED AND DID NOT FIX: `JAN-EXECLOOP` put the loop's state on the producer
+			// — correctly — but delivered it as a PROMPT SPLICE into a fresh ephemeral session, so the producer
+			// could not reason about how it had responded. The sponsor supplied the mechanism from JanumiCode v2:
+			// *"the CLI session wasn't closed or released until the phase or sub-phase completed."*
+			// ⭑ IT SUBSUMES: no new policy and no new vocabulary — the seam changes SHAPE (one-shot call to
+			// turn-taking session) because a one-shot call has nowhere for a second turn to land, and the two
+			// memoryless tools declare `retainsHistory: false` rather than being retrofitted with a capability
+			// they do not have.
+		).toBe(31);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

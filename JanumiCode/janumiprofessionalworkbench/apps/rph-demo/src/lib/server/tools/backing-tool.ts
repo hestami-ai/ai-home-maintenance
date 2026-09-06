@@ -160,6 +160,15 @@ export interface ToolInvocationResult {
 	readonly producer: { readonly agentId: string; readonly modelId: string; readonly providerId: string };
 	/** E-3 evidence grade, supplied by the tool that answered. */
 	readonly identityEvidence: ToolIdentityEvidence;
+	/**
+	 * ⭑ E-1 — THE PROVIDER PAYLOAD AS SENT, when the tool can report it.
+	 *
+	 * ⚠ THIS IS NOT THE TURN TEXT, AND THE DIFFERENCE IS THE POINT. With a HELD session (`JAN-EXECSESS`)
+	 * the model's real input is the system prompt plus every prior turn plus this one; recording the turn
+	 * alone would name a turn while the model saw a conversation. `PER-9`: a template *"never substitutes
+	 * for"* the record. Absent for one-shot tools, whose turn text IS very nearly the composite.
+	 */
+	readonly materializedInput?: string;
 }
 
 /** Narrow a seam return that may be either shape. ⭑ A bare string is a tool that told us only its answer, so its

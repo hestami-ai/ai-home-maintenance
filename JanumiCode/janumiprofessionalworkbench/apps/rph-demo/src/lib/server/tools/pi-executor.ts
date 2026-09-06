@@ -20,6 +20,8 @@ import {
 import { executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { ToolInvocationResult } from './backing-tool.js';
+import type { ProducerSession } from '../execution/producer-session.js';
+import { createMaterializedInputRecorder, type PayloadHookHost } from '../agent/materialized-input.js';
 
 /**
  * Resolve the executing model. ⛔ NO FALLBACK CHAIN, and that is the difference from the authoring agent.
@@ -61,7 +63,19 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
  * tool use; an executing work unit produces a WORK PRODUCT. Granting it tools would let a step mutate the
  * workbench outside the command surface that governs every other change.
  */
-export async function piExecute(prompt: string): Promise<ToolInvocationResult> {
+/**
+ * Open ONE Pi session for a work unit and hand back a turn-taking handle.
+ *
+ * ⭑ THE SESSION OUTLIVES THE TURN, WHICH IS THE WHOLE POINT (`JAN-EXECSESS`). `piExecute` used to create and
+ * dispose a session per call, so a repair try met a model with no idea what it had produced — and the findings
+ * had to be spliced into a re-rendered instruction to compensate. Held open, the producer's own history carries
+ * its previous work, which is the *"chat history, context window, context engineering"* the sponsor named as
+ * the component responsible for tracking how it responded to feedback.
+ *
+ * ⛔ `thinkingLevel: 'off'` STILL. History is not chain-of-thought: it is the producer's record of its own
+ * TURNS, which is what §9.7 says an account should rest on. `PER-12` is untouched by this change.
+ */
+export async function openPiExecutionSession(): Promise<ProducerSession> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
 	const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
@@ -71,63 +85,75 @@ export async function piExecute(prompt: string): Promise<ToolInvocationResult> {
 		cwd: process.cwd(),
 		agentDir: getAgentDir(),
 		settingsManager,
-		// ⚠ AMBIENT CONTEXT IS SUPPRESSED DELIBERATELY. A resource loader left to discover AGENTS.md/CLAUDE.md
-		// and project rules would put material into the producer's context that no record names — and if the
-		// reviewer ever loaded the same material, that is ASR-13's *"shared hidden context"* dimension, which
-		// nothing in this codebase detects. The step's prompt is the step's context.
 		systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT
 	});
 	await loader.reload();
 
-	let session: Awaited<ReturnType<typeof createAgentSession>>['session'] | undefined;
-	let unsubscribe: (() => void) | undefined;
-	let answer = '';
-	let reasoning = '';
-	try {
-		const created = await createAgentSession({
-			model,
-			thinkingLevel: 'off',
-			noTools: 'builtin',
-			customTools: [],
-			resourceLoader: loader,
-			// Ephemeral: an execution step is one bounded turn, and a persisted session would carry context
-			// between steps that no record accounts for.
-			sessionManager: SessionManager.inMemory(),
-			settingsManager,
-			authStorage,
-			modelRegistry
-		});
-		session = created.session;
+	const created = await createAgentSession({
+		model,
+		thinkingLevel: 'off',
+		noTools: 'builtin',
+		customTools: [],
+		resourceLoader: loader,
+		// ⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
+		// so the memory this change adds is per-unit and process-local, which the design states rather than
+		// letting a reader infer durability that is not there.
+		sessionManager: SessionManager.inMemory(),
+		settingsManager,
+		authStorage,
+		modelRegistry
+	});
+	const session = created.session;
 
-		unsubscribe = session.subscribe((event) => {
-			if (event.type !== 'message_update') return;
-			const e = event.assistantMessageEvent;
-			if (e.type === 'text_delta') answer += e.delta;
-			// ⭑ CAPTURED, NOT SOLICITED. With `thinkingLevel: 'off'` this should stay empty; if a model volunteers
-			// reasoning anyway, recording it as an OBSERVED presence is honest, and silently discarding it would
-			// be the undeclared omission `REG-D-057` forbids.
-			else if (e.type === 'thinking_delta') reasoning += e.delta;
-		});
-
-		await session.prompt(prompt);
-	} finally {
-		unsubscribe?.();
-		session?.dispose();
-	}
+	// ⭑⭑ E-1 MUST RECORD THE COMPOSITE ONCE THE SESSION IS HELD. `pi-agent.ts:157` states why: *"THIS IS THE
+	// ONLY POINT WHERE THE COMPOSITE EXISTS … Pi assembles resources, tool schemas and HISTORY on top."* With a
+	// session, turn 2's real input is the system prompt plus turn 1's exchange plus the findings — so recording
+	// the turn TEXT as E-1 would name a turn while the model saw a conversation, and `PER-9` is explicit that a
+	// template *"never substitutes for"* the record. Installed AFTER creation because the hook lives on
+	// `session.agent`.
+	const inputs = createMaterializedInputRecorder();
+	inputs.install(session.agent as unknown as PayloadHookHost);
 
 	return {
-		answerText: answer,
-		...(reasoning ? { volunteeredReasoning: reasoning } : {}),
-		rawOutput: reasoning ? reasoning + answer : answer,
-		producer: {
-			// ⭑ THE ROLE, THE MODEL AND THE PROVIDER ARE THREE DIFFERENT FACTS. `REG-F-356` caught me putting the
-			// model id in `agentId` and leaving `modelId` undefined, which made every review non-independent —
-			// `differs()` requires BOTH sides defined, because an absence can never evidence independence.
-			agentId: 'execution.model-invocation',
-			modelId: model.id,
-			providerId: model.provider
-		},
-		// The values above came back from the resolved model, not from host configuration alone.
-		identityEvidence: 'PROVIDER_REPORTED'
+		retainsHistory: true,
+		dispose: () => session.dispose(),
+		async turn(text: string): Promise<ToolInvocationResult> {
+			let answer = '';
+			let reasoning = '';
+			const before = inputs.captured().length;
+			const unsubscribe = session.subscribe((event) => {
+				if (event.type !== 'message_update') return;
+				const e = event.assistantMessageEvent;
+				if (e.type === 'text_delta') answer += e.delta;
+				// ⭑ CAPTURED, NOT SOLICITED. With `thinkingLevel: 'off'` this stays empty; a model that
+				// volunteers reasoning anyway is recorded as an OBSERVED presence, because silently discarding
+				// it is the undeclared omission `REG-D-057` forbids.
+				else if (e.type === 'thinking_delta') reasoning += e.delta;
+			});
+			try {
+				await session.prompt(text);
+			} finally {
+				unsubscribe();
+			}
+
+			// The payloads this turn produced — one per provider request, so a repair/retry inside Pi is included.
+			const turnInputs = inputs.captured().slice(before);
+			const composite = turnInputs.at(-1)?.payload;
+
+			return {
+				answerText: answer,
+				...(reasoning ? { volunteeredReasoning: reasoning } : {}),
+				rawOutput: reasoning ? reasoning + answer : answer,
+				producer: {
+					agentId: 'execution.model-invocation',
+					modelId: model.id,
+					providerId: model.provider
+				},
+				identityEvidence: 'PROVIDER_REPORTED',
+				...(composite === undefined
+					? {}
+					: { materializedInput: JSON.stringify(composite) })
+			};
+		}
 	};
 }

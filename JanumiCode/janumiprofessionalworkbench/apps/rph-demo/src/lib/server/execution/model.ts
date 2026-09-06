@@ -11,7 +11,7 @@
 // configuration, the same refusal when nothing is set — and the binding gets its meaning when it gets an editor.
 import { agyPrint } from '../assurance/agy-cli.js';
 import { executorToolId, resolveExecutorToolId, selectBackingTool } from '../tools/backing-tool.js';
-import type { ToolInvocationResult } from '../tools/backing-tool.js';
+import { oneShotSession, type OpenProducerSession } from './producer-session.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 
@@ -50,7 +50,7 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  * recorded as a failed try (`runModelInvocationStep`) rather than swallowed — a step that could not run says
  * so, and the work unit does not advance as though it had.
  */
-export function getExecutionPrint(): (prompt: string) => Promise<string | ToolInvocationResult> {
+export function getExecutionSession(): OpenProducerSession {
 	// ⭑⭑ THE EXECUTOR IS LIVE EXACTLY WHEN IT HAS BEEN CONFIGURED — no borrowed switch.
 	//
 	// ⛔ THIS LINE USED TO READ THE **ASSURANCE** SWITCH: `JPWB_ASSESSOR !== 'agy'` selected the fixture, so
@@ -63,7 +63,10 @@ export function getExecutionPrint(): (prompt: string) => Promise<string | ToolIn
 	// stand-in may be chosen ONLY inside test mode — because a switch honoured in any environment once let the
 	// floor record SATISFIED while nothing reviewed anything. Outside test mode there is still exactly one
 	// option and it is the real call; this condition only decides which way INSIDE test mode.
-	if (TEST_MODE && !resolveExecutorToolId()) return deterministicExecutionPrint;
+	if (TEST_MODE && !resolveExecutorToolId())
+		// ⚠ ONE-SHOT BY NATURE, AND IT SAYS SO. The fixture has no memory; wrapping it in a session that
+		// CLAIMED history would be the fabricated-capability defect.
+		return async () => oneShotSession(deterministicExecutionPrint);
 
 	// ⭑⭑ THE EXECUTOR NOW NAMES ITS OWN TOOL, WHICH IS THE WHOLE POINT OF `JAN-TOOLSUITE`. Until this line the
 	// function returned `agyPrint` unconditionally, so the producing tool and model were the ASSURANCE tool and
@@ -84,8 +87,9 @@ export function getExecutionPrint(): (prompt: string) => Promise<string | ToolIn
 		// ⚠ NO UNIT TEST COULD HAVE CAUGHT IT. Every test of `runModelInvocationStep` INJECTS its own `print`
 		// returning a rich result, so the one adapter that narrows it was never on any tested path. The LIVE
 		// lane found it on its second run — which is the argument for the lane, in one line.
-		return async (prompt: string) => (await import('../tools/pi-executor.js')).piExecute(prompt);
-	if (tool.toolId === 'agy') return (prompt: string) => agyPrint(prompt);
+		return async () => (await import('../tools/pi-executor.js')).openPiExecutionSession();
+	// ⚠ `agy --print` is a fresh process per call: no memory, and the session says so.
+	if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));
 	throw new Error(
 		`Backing tool '${tool.toolId}' declares the EXECUTION role but this host has no adapter wired for it yet.`
 	);

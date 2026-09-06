@@ -19,6 +19,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { splitExecutionEnvelope } from './execution-contract.js';
+import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 
@@ -28,14 +29,13 @@ export interface RunModelStepInput {
 	readonly pwuTypeId: string;
 	readonly template: PromptTemplate | undefined;
 	/**
-	 * The model seam. Injected so the gate never spawns a subprocess and a live run is configuration.
+	 * The producer's SESSION, held across the work unit's tries (`JAN-EXECSESS`).
 	 *
-	 * ⭑ IT MAY RETURN THE ANSWER ALONE, OR THE ANSWER PLUS WHO PRODUCED IT. A bare string is a tool that told us
-	 * only its answer, so the identity below can only be what the host CONFIGURED. A `ToolInvocationResult` is a
-	 * tool that ECHOED BACK which model answered, which is a stronger fact — and until this union existed the
-	 * seam could not carry it, which is why the ratified `PROVIDER_REPORTED` grade had zero producers.
+	 * ⭑ IT REPLACED A ONE-SHOT `print`, because a one-shot call has nowhere for a second turn to land — which
+	 * is why the loop's first version spliced findings into a re-rendered instruction. Injected so the gate
+	 * never spawns a subprocess and a live run is configuration.
 	 */
-	readonly print: (prompt: string) => Promise<string | ToolInvocationResult>;
+	readonly session: ProducerSession;
 	readonly store: ArtifactStore;
 	readonly tenantPrefix: string;
 	readonly dispatchExchange: (
@@ -118,17 +118,18 @@ export async function runModelInvocationStep(
 	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template);
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 
-	// ⭑ THE REPAIR PROMPT IS THE ORIGINAL PLUS WHAT THE REVIEW FOUND, and it is assembled HERE so that the
-	// prompt RECORDED is the prompt SENT. `PER-9` E-1 is *"the exact bytes presented to the model"*; appending
-	// at the call site and recording the plan's version would make the record describe a different call.
+	// ⭑⭑ A REPAIR IS A FOLLOW-UP TURN, NOT A RE-RENDERED INSTRUCTION. The first version of this loop appended
+	// findings to the original prompt and sent the whole thing again — which asks the model to produce the work
+	// afresh, as though it had never seen it. With the session held (`JAN-EXECSESS`) the producer's own history
+	// carries what it produced, so the turn says what it actually is.
 	//
-	// ⚠ THE TEMPLATE FINGERPRINT IS UNCHANGED, and correctly so: the TYPE's template did not change. What
-	// changed is the context this try was given, which is the exchange record's business, not the template's.
-	const prompt = input.priorFindings?.length
+	// ⚠ AND THIS CLOSES AN ACCIDENTAL CHANNEL. While the findings were spliced into the producing prompt, the
+	// REVIEWER saw them too — it receives that prompt as the "intent" — so it gained state it was never
+	// designed to have, by accident and mislabelled. The sponsor ruled the reviewer COLD by default; removing
+	// the splice is what makes that true rather than nominal.
+	const turnText = input.priorFindings?.length
 		? [
-				plan.prompt,
-				'',
-				'── AN INDEPENDENT ASSURANCE REVIEW OF YOUR PREVIOUS ATTEMPT FOUND THE FOLLOWING ──',
+				'An independent assurance review of the work product you just produced found the following:',
 				...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
 				'',
 				'Produce the work product again, addressing these findings. Do not argue with them and do not',
@@ -144,7 +145,7 @@ export async function runModelInvocationStep(
 	// told us only its answer", which is a different fact and grades the evidence weaker rather than absent.
 	let produced: ToolInvocationResult | undefined;
 	try {
-		const returned = await input.print(prompt);
+		const returned = await input.session.turn(turnText);
 		if (isToolInvocationResult(returned)) {
 			produced = returned;
 			answer = returned.answerText;
@@ -160,7 +161,7 @@ export async function runModelInvocationStep(
 			exchangeId,
 			role: 'initial',
 			model: { modelId: input.modelId, providerId: input.providerId },
-			prompt,
+			prompt: turnText,
 			rawOutput: '',
 			disposition: 'rejected',
 			attemptOrdinal: 1,
@@ -206,7 +207,11 @@ export async function runModelInvocationStep(
 		exchangeId,
 		role: 'initial',
 		model: identity,
-		prompt,
+		// ⭑⭑ E-1 IS THE COMPOSITE WHEN THE TOOL CAN REPORT IT. With a held session the model's real input is the
+		// system prompt plus every prior turn plus this one — so recording `turnText` alone would name a turn
+		// while the model saw a CONVERSATION. `PER-9`: a template *"never substitutes for"* the record.
+		// ⚠ Falls back to the turn for one-shot tools, whose turn IS very nearly the whole input.
+		prompt: produced?.materializedInput ?? turnText,
 		rawOutput: answer,
 		disposition: 'accepted',
 		attemptOrdinal: 1,
@@ -234,7 +239,10 @@ export async function runModelInvocationStep(
 	return {
 		ran: true,
 		answer,
-		prompt,
+		// ⚠ THE INSTRUCTION, NOT THE TURN AND NOT THE COMPOSITE. The reviewer judges the work product against
+		// the OBLIGATION it was given; handing it a findings turn would make it judge the repair request, and
+		// handing it the serialized provider payload would drown it in machinery.
+		prompt: plan.prompt,
 		// The LAST aggregate id recorded is this call's: one try, one record. Falling back to the app-local id
 		// would reintroduce the namespace confusion this field's docblock records, so it does not.
 		exchangeId: recording.aggregateIds.at(-1) ?? '',

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { runModelInvocationStep } from './run-model-step.js';
+import { oneShotSession } from './producer-session.js';
 
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
@@ -33,7 +34,7 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		subjectSemanticVersion: 1,
 		pwuTypeId: 'pwut_9',
 		template: ACTIVE,
-		print: async (_p: string) => ANSWER,
+		session: oneShotSession(async () => ANSWER),
 		store,
 		tenantPrefix: 'tnt-test',
 		dispatchExchange: (payload: RecordModelExchangePayload) => {
@@ -53,10 +54,10 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 	it('⭑ calls the model with the RENDERED prompt and records it on the EXECUTION plane', async () => {
 		let seen = '';
 		const { input, dispatched } = harness({
-			print: async (p: string) => {
+			session: oneShotSession(async (p: string) => {
 				seen = p;
 				return ANSWER;
-			}
+			})
 		});
 
 		const out = await runModelInvocationStep(input);
@@ -121,7 +122,7 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		// class or a minted key. Two keys for one answer, and a reader cannot tell which the assessment rested
 		// on — the ambiguity REG-F-345 spent three attempts to remove one layer up.
 		const DELIMITED = '{"finding":"The route is viable; the northern leg carries the risk."}';
-		const { input, dispatched, store } = harness({ print: async () => DELIMITED });
+		const { input, dispatched, store } = harness({ session: oneShotSession(async () => DELIMITED) });
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(true);
 		if (!out.ran) return;
@@ -148,9 +149,9 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		// THE MUTANT: let the throw propagate before capture. The record then exists for every call except the
 		// one anybody would want to look at, which is the defect inverted.
 		const { input, dispatched } = harness({
-			print: async () => {
+			session: oneShotSession(async (_p: string) => {
 				throw new Error('provider unreachable');
-			}
+			})
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(false);
@@ -170,7 +171,7 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 		// THE MUTANT: keep using `input.modelId`. The reported identity is then discarded, the grade silently
 		// weakens to HOST_CONFIGURED, and `PROVIDER_REPORTED` goes back to having zero producers.
 		const { input, dispatched } = harness({
-			print: async () => ({
+			session: oneShotSession(async () => ({
 				answerText: ANSWER,
 				rawOutput: ANSWER,
 				producer: {
@@ -179,7 +180,7 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 					providerId: 'openai-codex'
 				},
 				identityEvidence: 'PROVIDER_REPORTED' as const
-			})
+			}))
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(true);
@@ -236,13 +237,13 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 		// the suite would notice.
 		const REASONING = 'First I considered the southern leg, then rejected it.';
 		const { input } = harness({
-			print: async () => ({
+			session: oneShotSession(async () => ({
 				answerText: ANSWER,
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 				identityEvidence: 'PROVIDER_REPORTED' as const
-			})
+			}))
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(true);
@@ -265,14 +266,80 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 		// Devin volunteers no reasoning at all (measured: no thinking/reasoning/thought in a full ATIF export).
 		// Without this control, "always return the empty string" would pass the assertion above.
 		const { input } = harness({
-			print: async () => ({
+			session: oneShotSession(async () => ({
 				answerText: ANSWER,
 				rawOutput: ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 				identityEvidence: 'PROVIDER_REPORTED' as const
-			})
+			}))
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran && out.answer).toBe(ANSWER);
+	});
+});
+
+describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-rendered instruction', () => {
+	// ⭑ SPONSOR (2026-09-06): *"the CLI session wasn't closed or released until the phase or sub-phase completed
+	// … This approach allowed the assurance policies feedback to be fed back to the implementing agent before
+	// that phase or sub-phase was determined complete."*
+
+	/** A session that REMEMBERS, so the difference between a turn and a fresh call is observable. */
+	function recordingSession() {
+		const turns: string[] = [];
+		return {
+			turns,
+			session: {
+				retainsHistory: true,
+				dispose: () => undefined,
+				turn: async (text: string) => {
+					turns.push(text);
+					return ANSWER;
+				}
+			}
+		};
+	}
+
+	it('⭑⭑ turn 1 carries the INSTRUCTION; turn 2 carries the FINDINGS — on the same session', async () => {
+		// THE MUTANT: re-render the template on retry (what `JAN-EXECLOOP` shipped). Turn 2 then asks the model
+		// to produce the work afresh, as though it had never seen it — and the producer's history, which is the
+		// component the sponsor made responsible for tracking its responses, is wasted.
+		const { turns, session } = recordingSession();
+		const { input } = harness({ session });
+		await runModelInvocationStep(input);
+		await runModelInvocationStep({
+			...input,
+			priorFindings: [{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }]
+		});
+
+		expect(turns).toHaveLength(2);
+		// Turn 1 is the rendered template, with the work unit's own facts in it.
+		expect(turns[0]).toContain('Route Assessment');
+		// ⛔ Turn 2 must NOT be the instruction again.
+		expect(turns[1]).not.toContain('Route Assessment');
+		expect(turns[1]).toContain('RR-01-no-problem-substitution');
+		expect(turns[1]).toContain('It restated the prompt.');
+	});
+
+	it('⚠ and the REVIEWER still receives the INSTRUCTION, never the repair turn', async () => {
+		// ⭑ THIS IS WHAT KEEPS THE REVIEWER COLD. While findings were spliced into the producing prompt, the
+		// reviewer saw them too — it receives that prompt as the "intent" — so it gained state it was never
+		// designed to have, by accident. THE MUTANT: return `turnText` as `outcome.prompt`. The reviewer would
+		// then judge the work against a repair request rather than against the obligation.
+		const { session } = recordingSession();
+		const { input } = harness({ session });
+		const out = await runModelInvocationStep({
+			...input,
+			priorFindings: [{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }]
+		});
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		expect(out.prompt, 'the reviewer judges against the obligation').toContain('Route Assessment');
+		expect(out.prompt).not.toContain('RR-01-no-problem-substitution');
+	});
+
+	it('⛔ a one-shot tool declares that it does NOT retain history', async () => {
+		// Retrofitting memory onto `agy` or the fixture would be the fabricated-capability defect: they have
+		// none — each call is a fresh process with a fresh context. THE MUTANT: default `retainsHistory` to true.
+		expect(oneShotSession(async () => ANSWER).retainsHistory).toBe(false);
 	});
 });

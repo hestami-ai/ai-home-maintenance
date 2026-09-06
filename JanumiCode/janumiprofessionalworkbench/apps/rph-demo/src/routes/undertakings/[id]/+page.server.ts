@@ -61,7 +61,7 @@ import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
 import { classifyTrend, mayRetry, reviewSeesPriorFindings } from '$lib/server/execution/loop-detection';
 import { reasoningReviewCriteria } from '$lib/server/floor';
-import { getExecutionPrint } from '$lib/server/execution/model';
+import { getExecutionSession } from '$lib/server/execution/model';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
 import type { ActorReference, PromptTemplate } from '@janumipwb/rph-contracts';
 
@@ -983,6 +983,13 @@ export const actions: Actions = {
 			const openPerTry: number[] = [];
 			let loopEnded = '';
 
+			// ⭑⭑ ONE SESSION FOR THE WHOLE WORK UNIT (`JAN-EXECSESS`). The sponsor's v2 mechanism: *"the CLI
+			// session wasn't closed or released until the phase or sub-phase completed … This approach allowed
+			// the assurance policies feedback to be fed back to the implementing agent before that phase or
+			// sub-phase was determined complete."* Opened before the loop and released in `finally`, so a
+			// repair turn reaches a producer that remembers what it produced.
+			const producer = await getExecutionSession()();
+			try {
 			for (let attempt = 1; ; attempt++) {
 				const tryOutcome = await runModelInvocationStep({
 					subject: {
@@ -996,7 +1003,6 @@ export const actions: Actions = {
 					subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
 					pwuTypeId,
 					template,
-					print: getExecutionPrint(),
 					store: getArtifactStore(),
 					tenantPrefix: EXECUTION_TENANT_PREFIX,
 					dispatchExchange: (payload, aggregateId) =>
@@ -1005,6 +1011,7 @@ export const actions: Actions = {
 					now: hostNow,
 					modelId: resolveJudgeModel() ?? 'unresolved',
 					providerId: 'agy',
+					session: producer,
 					priorFindings
 				});
 
@@ -1119,6 +1126,11 @@ export const actions: Actions = {
 					code: f.code,
 					statement: f.statement
 				}));
+			}
+			} finally {
+				// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
+				// a `finally` so a refusal mid-loop cannot strand a live session.
+				producer.dispose();
 			}
 
 			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
