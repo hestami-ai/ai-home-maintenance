@@ -200,6 +200,16 @@ export const ConstraintPropagationSchema = z.strictObject({
 	supersededByConstraintId: z.string().optional()
 });
 export type ConstraintPropagation = z.infer<typeof ConstraintPropagationSchema>;
+export const ContextSourceRuleSchema = z.strictObject({
+	source: z.enum([
+		'RENDERED_INSTRUCTION',
+		'PRIOR_WORK_PRODUCT',
+		'PRIOR_REVIEW_FINDING',
+		'PRIOR_RATIONALE'
+	]),
+	scope: z.enum(['THIS_TRY', 'THIS_WORK_UNIT', 'THIS_UNDERTAKING'])
+});
+export type ContextSourceRule = z.infer<typeof ContextSourceRuleSchema>;
 export const ContextSpecificationSchema = z.strictObject({
 	requiredElements: z.array(z.string()),
 	constraintDispositions: z.array(ConstraintDispositionSchema)
@@ -985,6 +995,14 @@ export const ModelExchangeSchema = z.strictObject({
 });
 export type ModelExchange = z.infer<typeof ModelExchangeSchema>;
 
+/** CONTEXT_ASSEMBLY_POLICY — id prefix: ctxpol */
+export const ContextAssemblyPolicySchema = z.strictObject({
+	...objectEnvelopeShape,
+	policyId: z.string(),
+	permittedSources: z.array(ContextSourceRuleSchema)
+});
+export type ContextAssemblyPolicy = z.infer<typeof ContextAssemblyPolicySchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -1088,5 +1106,10 @@ export const OBJECT_SCHEMAS = {
 		idPrefixEntity: 'REQUIREMENT',
 		tsName: 'RequirementObject'
 	},
-	MODEL_EXCHANGE: { schema: ModelExchangeSchema, idPrefixEntity: 'mex', tsName: 'ModelExchange' }
+	MODEL_EXCHANGE: { schema: ModelExchangeSchema, idPrefixEntity: 'mex', tsName: 'ModelExchange' },
+	CONTEXT_ASSEMBLY_POLICY: {
+		schema: ContextAssemblyPolicySchema,
+		idPrefixEntity: 'ctxpol',
+		tsName: 'ContextAssemblyPolicy'
+	}
 } as const;

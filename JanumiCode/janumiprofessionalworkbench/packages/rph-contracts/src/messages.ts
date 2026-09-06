@@ -61,6 +61,7 @@ import {
 	ConfidenceAssessmentSchema,
 	ConflictResolutionRuleSchema,
 	ConstraintPropagationSchema,
+	ContextSourceRuleSchema,
 	ContextSpecificationSchema,
 	ControlActionRecommendationSchema,
 	ConversationEntrySchema,
@@ -907,6 +908,13 @@ export const RecordModelExchangePayloadSchema = z.strictObject({
 	respondedAt: z.string()
 });
 export type RecordModelExchangePayload = z.infer<typeof RecordModelExchangePayloadSchema>;
+export const CreateContextAssemblyPolicyPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	permittedSources: z.array(ContextSourceRuleSchema)
+});
+export type CreateContextAssemblyPolicyPayload = z.infer<
+	typeof CreateContextAssemblyPolicyPayloadSchema
+>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -2058,6 +2066,13 @@ export const ModelExchangeRecordedPayloadSchema = z.strictObject({
 	respondedAt: z.string()
 });
 export type ModelExchangeRecordedPayload = z.infer<typeof ModelExchangeRecordedPayloadSchema>;
+export const ContextAssemblyPolicyCreatedPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	permittedSources: z.array(ContextSourceRuleSchema)
+});
+export type ContextAssemblyPolicyCreatedPayload = z.infer<
+	typeof ContextAssemblyPolicyCreatedPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2753,6 +2768,12 @@ export const COMMANDS = {
 		targetAggregateType: 'MODEL_EXCHANGE',
 		emitsEvent: 'ModelExchangeRecorded',
 		firstSlice: false
+	},
+	CreateContextAssemblyPolicy: {
+		payload: CreateContextAssemblyPolicyPayloadSchema,
+		targetAggregateType: 'CONTEXT_ASSEMBLY_POLICY',
+		emitsEvent: 'ContextAssemblyPolicyCreated',
+		firstSlice: false
 	}
 } as const;
 
@@ -3129,6 +3150,10 @@ export const EVENTS = {
 	ModelExchangeRecorded: {
 		payload: ModelExchangeRecordedPayloadSchema,
 		aggregateType: 'MODEL_EXCHANGE'
+	},
+	ContextAssemblyPolicyCreated: {
+		payload: ContextAssemblyPolicyCreatedPayloadSchema,
+		aggregateType: 'CONTEXT_ASSEMBLY_POLICY'
 	}
 } as const;
 
@@ -3157,7 +3182,8 @@ export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {
 	ValidatorRestored: ValidatorRestoredPayloadSchema,
 	ValidatorDisabled: ValidatorDisabledPayloadSchema,
 	ValidatorEnabled: ValidatorEnabledPayloadSchema,
-	ModelExchangeRecorded: ModelExchangeRecordedPayloadSchema
+	ModelExchangeRecorded: ModelExchangeRecordedPayloadSchema,
+	ContextAssemblyPolicyCreated: ContextAssemblyPolicyCreatedPayloadSchema
 };
 
 export interface CommandEventBinding {

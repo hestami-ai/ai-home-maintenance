@@ -265,13 +265,20 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// notes above give — EVENTS is not one of the four w2 populations. This is the third time that
 		// distinction has been load-bearing here: a move of +10 would have meant the events had started
 		// counting, and a move of +6 would have meant something else changed that nobody had noticed.
+		// 276 -> 277: `CreateContextAssemblyPolicy` (JAN-CTXPOL / ICP-04, sponsor grant D-1). +1 for ONE
+		// COMMAND, and its event `ContextAssemblyPolicyCreated` does not move this number for the same reason
+		// every note below gives — EVENTS is not one of the four w2 populations. ⭑ FIFTH time that distinction
+		// has been load-bearing, and it was used as the CHECK again: +1 is evidence the new event is bound
+		// where it belongs, while +2 would have meant events had started counting and +0 that the census could
+		// not see the command at all — which is precisely what `command-dispatch-census` caught first, before
+		// a handler test named the command where the scanner could find it.
 		// 275 -> 276: `RecordModelExchange` (JAN-MXR / REG-D-055). +1 for ONE COMMAND, and its event
 		// `ModelExchangeRecorded` does not move this number for the same reason the three notes above give —
 		// EVENTS is not one of the four w2 populations. ⭑ FOURTH time that distinction has been load-bearing,
 		// and here it is the CHECK rather than a footnote: a move of +2 would have meant events had started
 		// counting, and +1 is therefore evidence the new event is bound where it belongs rather than leaking
 		// into a population it does not belong to. The new OBJECT TYPE moves nothing here either.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 276 }]);
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 277 }]);
 	});
 });
 

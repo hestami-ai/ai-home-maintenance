@@ -168,6 +168,19 @@ describe('validate', () => {
 		// two genuinely new enums). The four new helper sub-types add none either — helpers are inlined into the
 		// schemas that use them and were never registry entries, which is why SWP-05's derivation counts objects,
 		// enums and payload shapes and nothing else.
-		expect(buildContractRegistry().ids()).toHaveLength(383);
+		// 383 -> 386 (2026-09-06, JAN-CTXPOL / ICP-04, sponsor grant D-1): `ContextAssemblyPolicySchema`,
+		// `CreateContextAssemblyPolicyPayloadSchema`, `ContextAssemblyPolicyCreatedPayloadSchema`. **+3** — one
+		// object schema plus a command/event pair minting one payload shape each, the SAME arithmetic
+		// MODEL_EXCHANGE used above.
+		// ⭑ DERIVED, NOT READ OFF THE FAILURE, as the note above demands: the registry was built and filtered
+		// and returns EXACTLY those three ids, so the delta is fully accounted for.
+		// ⭑ AND +3 RATHER THAN +5 IS THE LOAD-BEARING PART. `CONTEXT_ASSEMBLY_POLICY` is a new member of the
+		// EXISTING `ProfessionalWorkObjectType` enum, so it mints no enum id; `ContextSourceRule` is a helper
+		// sub-type, inlined into the schemas that use it and never a registry entry.
+		// ⚠ THIS WARRANT REPLACES ONE THAT WAS STALE WITHIN THE HOUR. An earlier version said '+1 … the pair is
+		// the next increment', written when only the object existed. The pair landed in the same slice, so the
+		// number AND its reasoning were corrected together — a pin whose warrant describes a different change
+		// is worse than an unexplained pin, because it reads as verified.
+		expect(buildContractRegistry().ids()).toHaveLength(386);
 	});
 });

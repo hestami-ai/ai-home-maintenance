@@ -48,7 +48,11 @@ export const ID_PREFIXES = {
 	// before adding an object prefix", and `ids.test.ts` holds this map equal to `canonical-vocabulary.json`'s
 	// `idPrefixRegistry`. `AUTHORING_CONVERSATION` is the counter-example to NOT copy: it carries
 	// `idPrefixEntity: 'conv'` in the object vocab while appearing in neither registry.
-	MODEL_EXCHANGE: 'mex'
+	MODEL_EXCHANGE: 'mex',
+	// JAN-CTXPOL / ICP-04. ⭑ THE OBJECT ID IS NOT THE POLICY ID, and the emitted schema is what made that
+	// explicit: a `RUNTIME_BINDING` names a POLICY ('ctx-default'), the way FLOOR_POLICY_IDS names
+	// 'floor.reasoning-review' — while the stored object needs a mintable identity of its own.
+	CONTEXT_ASSEMBLY_POLICY: 'ctxpol'
 } as const;
 
 export type IdEntity = keyof typeof ID_PREFIXES;

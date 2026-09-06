@@ -11,6 +11,7 @@ import {
 	humanizeCode,
 	type Severity
 } from '@janumipwb/rph-assurance';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import type { AuthedEngineHandle, EngineSeedPolicy } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
@@ -242,6 +243,30 @@ function sender(handle: AuthedEngineHandle, prefix: string) {
  * makes this safe, and what made the 54 refusals a false declaration rather than a real scope conflict.
  * `floor-declared-scope.test.ts` holds declared ⊇ enforced so the two cannot part again.
  */
+/**
+ * JAN-CTXPOL / ICP-04 — seed the context assembly policy every `RUNTIME_BINDING` already names.
+ *
+ * ⛔ THE SEEDED POLICY IS A TRUE STATEMENT, NOT A PERMISSIVE STUB. `ICP-04` names the trap it must avoid: *"a
+ * fail-closed default breaks every existing binding; a permissive seed reproduces the vacuous route."* This
+ * seeds what the execution path ACTUALLY does today — the rendered instruction, nothing prior — so the id
+ * resolves (no binding breaks) and the policy is FALSIFIABLE (the day behaviour widens, it is wrong until
+ * updated). A permit-everything default would resolve and mean nothing.
+ */
+export function seedContextAssemblyPolicy(handle: AuthedEngineHandle): void {
+	const send = sender(handle, 'seedctx');
+	// ⚠ THE OBJECT ID IS MINTED; THE POLICY ID IS CONTENT. A binding names the POLICY, so the two are different
+	// identities and the emitted schema enforces the object one (`ctxpol_<ULID>`).
+	send(
+		'CreateContextAssemblyPolicy',
+		'CONTEXT_ASSEMBLY_POLICY',
+		'ctxpol_00000000000000000000000CTX',
+		{
+			policyId: DEFAULT_CONTEXT_ASSEMBLY_POLICY.policyId,
+			permittedSources: DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources
+		}
+	);
+}
+
 export function seedFloorPolicies(handle: AuthedEngineHandle): void {
 	const send = sender(handle, 'seedpol');
 	for (const def of FLOOR_POLICY_DEFINITIONS) {

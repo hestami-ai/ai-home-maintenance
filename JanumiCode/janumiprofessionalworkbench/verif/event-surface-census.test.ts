@@ -61,6 +61,16 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-09-06, JAN-CTXPOL / ICP-04 (sponsor grant D-1): `ContextAssemblyPolicyCreated` acquires its first
+	// and only emitter, `CreateContextAssemblyPolicy`. Recorded BY HAND for the reason this set exists — no
+	// single vitest worker sees the whole suite's emissions — but the emission is DRIVEN, not asserted:
+	// `handlers/context-assembly-policy.test.ts` dispatches the command and reads the event back out of the
+	// store, and `seed-context-assembly.test.ts` drives it again through the seed.
+	// ⚠ ADDED IN THE SAME CHANGE AS THE BINDING, DELIBERATELY. The note below explains why declaring a contract
+	// AHEAD of its emitter is sometimes right — it makes the gap countable — but that reasoning applies to an
+	// event whose handler is a LATER increment. Here the handler ships with the contract, so an entry in BOUND
+	// without one here would describe a gap that does not exist.
+	'ContextAssemblyPolicyCreated',
 	// + 2026-08-30, JAN-SLICE-SWP-02a (REG-D-046 Ruling 2): `ScopeDeferred` acquires its first and only emitter,
 	// `DeferScope`. Recorded by hand for the reason this set exists — no single vitest worker sees the whole
 	// suite's emissions — but the emission is DRIVEN in two places rather than asserted: the reference

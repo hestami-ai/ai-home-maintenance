@@ -1,3 +1,4 @@
+import { createContextAssemblyPolicy } from './context-assembly-policy.js';
 // The command handler registry — commandType -> handler. dispatch() looks a command up here after the generic
 // pre-stages (idempotency + payload validation). A command with no registered handler is REJECTED (the same
 // posture the M4 skeleton had for everything but CaptureIntent), so the surface grows one handler group at a time.
@@ -220,6 +221,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// `assessFalsification`, and `canAuthorizeNewWork` — which already refused FALSIFIED and could never see it.
 	FalsifyAssumption: falsifyAssumption,
 	CreateAssurancePolicy: createAssurancePolicy,
+	CreateContextAssemblyPolicy: createContextAssemblyPolicy,
 	EditAssurancePolicy: editAssurancePolicy,
 	SupersedeAssurancePolicy: supersedeAssurancePolicy,
 	SuspendAssurancePolicy: suspendAssurancePolicy,

@@ -2050,6 +2050,25 @@
 					"note": "PER-11 occurrence time."
 				}
 			]
+		},
+		{
+			"objectType": "CONTEXT_ASSEMBLY_POLICY",
+			"tsName": "ContextAssemblyPolicy",
+			"idPrefixEntity": "ctxpol",
+			"note": "ICP-04, authored 2026-09-06 under SPONSOR GRANT (JAN-CTXPOL D-1). Extends ObjectEnvelope. THE OBJECT `contextAssemblyPolicyId` HAS ALWAYS NAMED AND NEVER HAD: that field is REQUIRED on RUNTIME_BINDING and every binding is minted with the constant 'ctx-default' (handlers/runtime-binding.ts:67) pointing at nothing. VERIFIED GENUINELY UNDEFINED IN THE CORPUS BEFORE AUTHORING, with controls: the corpus declares the REFERENCE (Canonical Domain Model :1329; Persistence §10.5 :889) and names a 'Context Assembly Service' inside a BARE LIST of 19 service names (Migration :1407), but nowhere gives the policy fields; `grep -rn CONTEXT_ASSEMBLY_POLICY` over packages/ and apps/ returned ZERO, CONTROL being that the same grep form finds RUNTIME_BINDING. CANON ALREADY GOVERNS THE ACT: DEC-4's SCOPE (DOC-003:225) names context assembly explicitly — 'a context omission must not silently remove a mandatory constraint' — so this object makes a ratified rule sayable rather than inventing a context model.",
+			"fields": [
+				{
+					"field": "policyId",
+					"type": "string",
+					"required": true
+				},
+				{
+					"field": "permittedSources",
+					"type": "ContextSourceRule[]",
+					"required": true,
+					"note": "REQUIRED AND POSSIBLY EMPTY, on the same reasoning ContextSpecification.constraintDispositions records: an empty list is a CLAIM ('this deployment assembles nothing beyond the instruction'), while an ABSENT list would say nothing — the silent omission DEC-4 forbids."
+				}
+			]
 		}
 	],
 	"helperSubTypes": [
@@ -3833,6 +3852,24 @@
 					"type": "ConstraintDisposition[]",
 					"required": true,
 					"note": "DEC-4: for every mandatory parent constraint, exactly one fate. REQUIRED and possibly empty — an empty list says 'no mandatory constraints applied', which is a claim; an ABSENT list would say nothing, which is the silent omission DEC-4 forbids."
+				}
+			]
+		},
+		{
+			"name": "ContextSourceRule",
+			"note": "JAN-CTXPOL / ICP-04, authored under sponsor grant 2026-09-06. WHICH SOURCE a deployment permits a producer to be given, and at what scope. ⛔ IT CARRIES NO `fate`: DEC-4's five fates are already QUOTED FROM CANON in ConstraintDisposition, and a second differently-spelled copy is REG-F-353's 'a second way to say one thing is how restated vocabulary comes to disagree' — the first draft of this design made exactly that mistake and the existing vocabulary caught it. This governs SOURCES; ConstraintDisposition governs constraint fates; ContextSpecification (on PWU_TYPE) declares what a type NEEDS. Three different questions, three carriers.",
+			"fields": [
+				{
+					"field": "source",
+					"type": "'RENDERED_INSTRUCTION' | 'PRIOR_WORK_PRODUCT' | 'PRIOR_REVIEW_FINDING' | 'PRIOR_RATIONALE'",
+					"required": true,
+					"note": "CLOSED, and every member is drawn from the PARTICIPATING half REG-Q-077's own table marks readable now — reading it is 'REG-D-050 PERFORMED, not a new permission'. ⛔ NO VOLUNTEERED_REASONING MEMBER: REG-Q-077 is OPEN and PER-12 forbids reasoning reaching an evaluator's context, so the slot must not exist before the permission. The union therefore cannot express an unlawful assembly."
+				},
+				{
+					"field": "scope",
+					"type": "'THIS_TRY' | 'THIS_WORK_UNIT' | 'THIS_UNDERTAKING'",
+					"required": true,
+					"note": "How far back the source may be drawn. THIS_WORK_UNIT is what a bounded repair loop needs (REG-D-059); THIS_UNDERTAKING is the cross-unit question and is declarable but not yet assembled."
 				}
 			]
 		},

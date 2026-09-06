@@ -31,7 +31,8 @@
     "USER_JOURNEY",
     "SCENARIO",
     "REQUIREMENT",
-    "MODEL_EXCHANGE"
+    "MODEL_EXCHANGE",
+    "CONTEXT_ASSEMBLY_POLICY"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }

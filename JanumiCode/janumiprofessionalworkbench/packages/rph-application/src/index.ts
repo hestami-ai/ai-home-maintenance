@@ -36,3 +36,4 @@ export { renderPromptTemplate, markersIn, promptTemplateFingerprint } from './pr
 export type { RenderOutcome } from './prompt-render.js';
 export { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
 export type { InvocationPlan, InvocationSubject } from './execution-invocation.js';
+export * from './context-assembly.js';

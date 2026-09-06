@@ -3926,6 +3926,27 @@
 					"note": "PER-11 occurrence time."
 				}
 			]
+		},
+		{
+			"commandType": "CreateContextAssemblyPolicy",
+			"targetAggregateType": "CONTEXT_ASSEMBLY_POLICY",
+			"emitsEvent": "ContextAssemblyPolicyCreated",
+			"schematized": false,
+			"sourceSection": "PAYLOAD FIELDS: AUTHORED 2026-09-06 under SPONSOR GRANT (JAN-CTXPOL D-1; roadmap ICP-04). THE FIELD `contextAssemblyPolicyId` IS RATIFIED and REQUIRED on RUNTIME_BINDING (Canonical Domain Model :1329; Persistence §10.5 :889), but the corpus never gives the object it names a shape - it appears only as a reference and as one entry in a bare list of 19 service names (Migration :1407). Verified genuinely undefined before authoring, with controls: a repo-wide grep for the type returned ZERO while the same grep form finds RUNTIME_BINDING. CANON ALREADY GOVERNS THE ACT that this object carries - DEC-4's SCOPE (DOC-003:225) names context assembly explicitly, 'a context omission must not silently remove a mandatory constraint' - so the shape makes a ratified rule sayable rather than inventing a context model. THIS PROVENANCE IS DELIBERATELY CLEAN OF THE PROVENANCE CAUTION MARKER, on the same reasoning REG-D-055 recorded for RecordModelExchange: gen-messages admits an event to the enforced payload map only when its sourceSection is present and unmarked, so marking a sponsor-granted shape would ship a PERMANENT artefact (PER-2) with its payload gate DISABLED - the opposite of what the caution exists for.",
+			"payloadFields": [
+				{
+					"field": "policyId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref, the target aggregate id echoed into the payload - the AppendConversationEntries idiom."
+				},
+				{
+					"field": "permittedSources",
+					"required": true,
+					"type": "ContextSourceRule[]",
+					"note": "REQUIRED AND POSSIBLY EMPTY: an empty list is a CLAIM (this deployment assembles nothing beyond the instruction), an ABSENT one says nothing - the silent omission DEC-4 forbids."
+				}
+			]
 		}
 	],
 	"events": [
@@ -8835,6 +8856,23 @@
 					"required": true,
 					"type": "string",
 					"note": "PER-11 occurrence time."
+				}
+			]
+		},
+		{
+			"eventType": "ContextAssemblyPolicyCreated",
+			"aggregateType": "CONTEXT_ASSEMBLY_POLICY",
+			"sourceSection": "PAYLOAD FIELDS: AUTHORED 2026-09-06 under SPONSOR GRANT (JAN-CTXPOL D-1; roadmap ICP-04). THE FIELD `contextAssemblyPolicyId` IS RATIFIED and REQUIRED on RUNTIME_BINDING (Canonical Domain Model :1329; Persistence §10.5 :889), but the corpus never gives the object it names a shape - it appears only as a reference and as one entry in a bare list of 19 service names (Migration :1407). Verified genuinely undefined before authoring, with controls: a repo-wide grep for the type returned ZERO while the same grep form finds RUNTIME_BINDING. CANON ALREADY GOVERNS THE ACT that this object carries - DEC-4's SCOPE (DOC-003:225) names context assembly explicitly, 'a context omission must not silently remove a mandatory constraint' - so the shape makes a ratified rule sayable rather than inventing a context model. THIS PROVENANCE IS DELIBERATELY CLEAN OF THE PROVENANCE CAUTION MARKER, on the same reasoning REG-D-055 recorded for RecordModelExchange: gen-messages admits an event to the enforced payload map only when its sourceSection is present and unmarked, so marking a sponsor-granted shape would ship a PERMANENT artefact (PER-2) with its payload gate DISABLED - the opposite of what the caution exists for. THE EVENT PAYLOAD IS THE FULL FIELD SET, deliberately: PER-2 requires that authoritative history remains reconstructable and that materialized current state is a cache of this history, not a second authority.",
+			"payloadFields": [
+				{
+					"field": "policyId",
+					"required": true,
+					"type": "string"
+				},
+				{
+					"field": "permittedSources",
+					"required": true,
+					"type": "ContextSourceRule[]"
 				}
 			]
 		}

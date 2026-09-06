@@ -1,6 +1,6 @@
 # DESIGN — context assembly as a governed object (`ICP-04`)
 
-**Status:** design, pre-roadmap. ⛔ **Implementation is BLOCKED on a sponsor grant** — see §6. This design exists
+**Status:** design. ✅ **D-1 GRANTED 2026-09-06**; implementation proceeds — see §6. This design exists
 to make that grant a decision rather than a blank page.
 
 ---
@@ -42,32 +42,45 @@ roadmap itself names:
 still requires the object to have fields. Every route to a resolving id passes through minting a governed
 object type the ratified corpus does not define.
 
-## 4. The proposed shape
+## 4. The proposed shape — CORRECTED after measurement
 
-⭑ **Derived from `DEC-4`, not invented.** Canon already governs context assembly and already supplies the
-vocabulary of fates — `DOC-003:225`: *"governs decomposition, delegation, semantic revision, and **context
-assembly** (a context omission must not silently remove a mandatory constraint)"*, over `DEC-4`'s five
-exhaustive dispositions with **no silent omission**.
+⚠⚠ **MY FIRST DRAFT OF THIS SECTION SHIPPED THE DEFECT IT WARNS ABOUT, and the vocabulary caught it.** I
+proposed a `fate` union spelled `PROPAGATED | RETAINED_AT_PARENT | INAPPLICABLE | WAIVED | SUPERSEDED`. Two
+ratified sub-types already exist:
+
+- **`ConstraintDisposition`** — *"DEC-4 (DOC-003:224) made carriable. The five fates are QUOTED FROM CANON, not
+  invented, and the union is CLOSED"*, spelled `PROPAGATED | RETAINED_AT_PARENT | INAPPLICABLE_WITH_RATIONALE |
+  WAIVED_THROUGH_AUTHORITY | SUPERSEDED_BY_STRONGER`.
+- **`ContextSpecification`** (on `PWU_TYPE`, added by `JAN-PROMPT`) — `requiredElements: string[]` +
+  `constraintDispositions: ConstraintDisposition[]`.
+
+⭑ So my union was a **second, differently-spelled copy of the ratified five** — `REG-F-353`'s *"a second way to
+say one thing is how restated vocabulary comes to disagree"*, which §4 of this very document had invoked against
+a sixth member. Corrected before any vocabulary was written.
+
+### 4.1 What is actually missing
+
+The two existing carriers say **what a type needs** (`ContextSpecification.requiredElements`) and **what became
+of each mandatory constraint** (`ConstraintDisposition`). Neither says **which sources a deployment permits a
+producer to be given**. That is the policy's job, and it is the only new thing:
 
 ```
 CONTEXT_ASSEMBLY_POLICY
-  policyId            string
-  elements            ContextElementRule[]   // what may be assembled, and from where
-  omissionDisclosure  'DECLARED' | 'BLOCKED' // what happens when an element cannot be supplied
+  policyId          string
+  permittedSources  ContextSourceRule[]   // REQUIRED, possibly empty — an empty list is a CLAIM
+                                          // ("this deployment assembles nothing"), an absent one says nothing
 
-ContextElementRule
-  elementKind   'RENDERED_INSTRUCTION' | 'PRIOR_WORK_PRODUCT' | 'PRIOR_REVIEW_FINDING'
-              | 'PRIOR_RATIONALE' | 'PRIOR_MATERIALIZED_INPUT'
-  scope         'THIS_TRY' | 'THIS_WORK_UNIT' | 'THIS_UNDERTAKING'
-  fate          'PROPAGATED' | 'RETAINED_AT_PARENT' | 'INAPPLICABLE' | 'WAIVED' | 'SUPERSEDED'
-  rationale     string        // REQUIRED when fate is INAPPLICABLE or WAIVED
+ContextSourceRule
+  source  'RENDERED_INSTRUCTION' | 'PRIOR_WORK_PRODUCT' | 'PRIOR_REVIEW_FINDING' | 'PRIOR_RATIONALE'
+  scope   'THIS_TRY' | 'THIS_WORK_UNIT' | 'THIS_UNDERTAKING'
 ```
 
-⚠ **`fate` is `DEC-4`'s five, adopted rather than derived** — the *adopt-don't-derive* move `REG-F-318`
-prescribes. A sixth member would be a second way to say one thing (`REG-F-353`).
+⛔ **No `VOLUNTEERED_REASONING` source, and no `fate` field.** The first because `REG-Q-077` is OPEN and the slot
+must not exist before the permission. The second because `ConstraintDisposition` already carries it — this
+policy governs *sources*, not constraint fates.
 
-⛔ **No `elementKind` for volunteered reasoning, and that is deliberate.** `REG-Q-077` is OPEN and its own table
-says the reasoning half is not readable; giving it a member here would create the slot before the permission.
+⭑ **Every `source` member is drawn from the participating half** that `REG-Q-077`'s own table marks readable
+now — so the union cannot express an unlawful assembly.
 
 ## 5. ⭑ What the policy should SAY — the sponsor's memory vision, expressed
 
@@ -80,9 +93,12 @@ not a new permission."* Enforced at `exchange-resolution.ts:218-225`, keyed on t
 So a policy that says
 
 ```
-PRIOR_REVIEW_FINDING  scope THIS_WORK_UNIT  fate PROPAGATED
-PRIOR_RATIONALE       scope THIS_WORK_UNIT  fate PROPAGATED
-PRIOR_WORK_PRODUCT    scope THIS_WORK_UNIT  fate PROPAGATED
+permittedSources: [
+  { source: 'RENDERED_INSTRUCTION',  scope: 'THIS_TRY' },
+  { source: 'PRIOR_REVIEW_FINDING',  scope: 'THIS_WORK_UNIT' },
+  { source: 'PRIOR_RATIONALE',       scope: 'THIS_WORK_UNIT' },
+  { source: 'PRIOR_WORK_PRODUCT',    scope: 'THIS_WORK_UNIT' }
+]
 ```
 
 is **lawful today**, needs no new permission, and would reconstruct a producer's working context **from the
@@ -98,10 +114,14 @@ of a policy-declared, stream-sourced context, not the memory itself.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D-1 | **Grant to author `CONTEXT_ASSEMBLY_POLICY`** — the corpus declares the reference, never the shape. Verified undefined with controls (§2). | **Grant**, on the `JAN-CAPBIND` precedent: *"Verified genuinely undefined in the corpus before authoring."* |
+| D-1 | **Grant to author `CONTEXT_ASSEMBLY_POLICY`** | ✅ **GRANTED by the sponsor, 2026-09-06.** Recorded in the enum's vocab note with the corpus verification and its controls. |
 | D-2 | Does `'ctx-default'` **resolve or refuse**? | ⭑ **Seed a REAL minimal policy** stating today's actual behaviour (instruction only, nothing prior). It resolves, so no binding breaks; and it is a **true statement** rather than a permissive stub, so the refusal test still fires for an id that names nothing. |
 | D-3 | Should the seeded default then be **widened** to the §5 rules? | **Not in the same change.** Widening is a behaviour change to every execution; it wants its own red test and its own live run. |
 | D-4 | `memoryPolicyId` — ratified, never written. In scope? | **No.** One authored type at a time; and its content is the cross-PWU question, which is larger. |
 
-⚠ **Nothing is implemented until D-1 is answered.** Minting a governed object type is a ratification act, not a
+⚠ **D-2/D-3/D-4 were not answered explicitly**, so this proceeds on the recommendations above and says so
+rather than reading silence as approval: a true minimal seed, no widening in this change, `memoryPolicyId`
+out of scope.
+
+⚠ **Minting a governed object type is a ratification act**, Minting a governed object type is a ratification act, not a
 wiring task, and this programme's own register records what happens when authored vocabulary ships without one.

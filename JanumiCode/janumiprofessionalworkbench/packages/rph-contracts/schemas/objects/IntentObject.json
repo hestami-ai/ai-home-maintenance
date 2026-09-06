@@ -38,7 +38,8 @@
         "USER_JOURNEY",
         "SCENARIO",
         "REQUIREMENT",
-        "MODEL_EXCHANGE"
+        "MODEL_EXCHANGE",
+        "CONTEXT_ASSEMBLY_POLICY"
       ]
     },
     "schemaVersion": {
