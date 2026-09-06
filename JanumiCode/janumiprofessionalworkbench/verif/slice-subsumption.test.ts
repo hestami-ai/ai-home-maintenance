@@ -284,7 +284,16 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// turn-taking session) because a one-shot call has nowhere for a second turn to land, and the two
 			// memoryless tools declare `retainsHistory: false` rather than being retrofitted with a capability
 			// they do not have.
-		).toBe(31);
+			//
+			// 31 -> 32 (2026-09-06): `ROADMAP-context-assembly-policy.md` (`JAN-CTXPOL`, roadmap `ICP-04`). ⭑ IT IS
+			// A ROADMAP THAT STARTS BLOCKED, AND THAT IS ITS POINT. The corpus declares `contextAssemblyPolicyId`
+			// (Canonical Domain Model :1329; Persistence :889) and NEVER defines the object it names — a bare
+			// service list is the closest it comes. Minting `CONTEXT_ASSEMBLY_POLICY` is therefore a RATIFICATION
+			// act, and every unit is gated on the sponsor grant rather than started and then paused.
+			// ⭑ IT SUBSUMES: the `fate` vocabulary is `DEC-4`'s five, ADOPTED not derived, and volunteered
+			// reasoning gets NO element kind because `REG-Q-077` is open — the slot must not exist before the
+			// permission.
+		).toBe(32);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
