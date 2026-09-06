@@ -27,17 +27,36 @@ export type ContextAssemblyPolicyContent = z.infer<typeof PolicyContentSchema>;
 export const DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID = 'ctx-default';
 
 /**
- * What this deployment permits a producer to be given, seeded as a TRUE statement of today's behaviour.
+ * What this deployment permits a producer to be given, stated TRUTHFULLY of today's behaviour.
  *
  * ⛔ NOT A PERMISSIVE STUB, AND THAT IS THE WHOLE POINT OF `D-2`. The roadmap names the trap in terms: *"a
  * fail-closed default breaks every existing binding; a permissive seed reproduces the vacuous route."* A policy
- * that permitted everything would resolve and mean nothing — the check could never fire. This one says exactly
- * what the execution path does today: it assembles the rendered instruction and nothing prior. It resolves, so
- * no binding breaks; and it is FALSIFIABLE, so the day the behaviour widens the policy is wrong until updated.
+ * that permitted everything would resolve and mean nothing — the check could never fire.
+ *
+ * ── ⚠⚠ CORRECTED AT `CP-04`, BECAUSE THE FIRST VERSION OF THIS CONSTANT WAS FALSE ────────────────────────────
+ * `CP-03` seeded `RENDERED_INSTRUCTION` alone, claiming it was *"what the code does today"*. It was not, and
+ * had not been for two slices: `REG-D-059`/`JAN-EXECLOOP` gives the producer PRIOR REVIEW FINDINGS on a repair
+ * turn, and `JAN-EXECSESS` holds the session across the work unit so that turn also carries the producer's own
+ * PRIOR WORK PRODUCT and PRIOR RATIONALE. ⭑ `ContextSourceRule.scope`'s own vocab note — authored in the SAME
+ * COMMIT as the seed — already said *"THIS_WORK_UNIT is what a bounded repair loop needs (REG-D-059)"*: the
+ * vocabulary and the seed contradicted each other inside one commit, and nothing could notice because nothing
+ * consulted the policy. Removing exactly that is what `CP-04` is for.
+ *
+ * ⚠ THIS IS NOT `D-3`. `D-3` is widening the policy to draw prior work from the STREAM — a behaviour change to
+ * every execution, still not taken. Here the BEHAVIOUR is untouched and the CLAIM is corrected to match it.
+ *
+ * ⭑ AND IT KEEPS ITS TEETH: `THIS_UNDERTAKING` is permitted for NOTHING. The producer's session is opened and
+ * disposed per work unit, so no material crosses into a second one — and the day it does, this policy is wrong
+ * until someone updates it, which is the property that makes it worth storing.
  */
 export const DEFAULT_CONTEXT_ASSEMBLY_POLICY: ContextAssemblyPolicyContent = Object.freeze({
 	policyId: DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID,
-	permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+	permittedSources: [
+		{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+		{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+	]
 }) as ContextAssemblyPolicyContent;
 
 /**

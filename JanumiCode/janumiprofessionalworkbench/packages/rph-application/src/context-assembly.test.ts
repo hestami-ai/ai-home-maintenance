@@ -43,24 +43,60 @@ describe('JAN-CTXPOL — the id resolves, or the binding refuses', () => {
 });
 
 describe('JAN-CTXPOL — the seeded default is a TRUE statement, not a permissive stub', () => {
-	it('⭑⭑ it permits the rendered instruction and NOTHING PRIOR — which is what the code does today', () => {
-		// ⭑ THIS IS `D-2`'s WHOLE ARGUMENT. A permit-everything default would resolve and mean nothing. This one
-		// is FALSIFIABLE: the day the execution path starts assembling prior work, this policy is WRONG until
-		// someone updates it — which is the property that makes it worth storing.
+	// ── ⚠⚠ THIS BLOCK WAS CORRECTED AT `CP-04`, AND THE CORRECTION IS TO THE CLAIM, NOT TO THE CODE ─────────
+	//
+	// Its first version asserted the seed permits *"the rendered instruction and NOTHING PRIOR — which is what
+	// the code does today"*. ⛔ THAT WAS FALSE WHEN WRITTEN, and had been for two slices: `REG-D-059` sends
+	// prior review findings back on a repair turn, and `JAN-EXECSESS` holds the session so that turn also
+	// carries the producer's own prior work product and rationale. Nothing could notice, because until `CP-04`
+	// nothing consulted the policy.
+	//
+	// ⭑ FLIPPING AN ASSERTION FROM false TO true IS THE SHAPE OF BENDING A TEST TO MATCH A BUG, so the reason
+	// it is not that here has to be stated: the BEHAVIOUR is a sponsor decision, landed and tested
+	// (`REG-D-059`, `JAN-EXECLOOP`); what was wrong was this file's statement about it. And the falsifiable
+	// content is not lost — it MOVES to the scope boundary below, which is a claim the code can still violate.
+
+	it('⭑⭑ it permits exactly what the execution path assembles — instruction, findings, own prior turns', () => {
 		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'RENDERED_INSTRUCTION', 'THIS_TRY')).toBe(true);
-		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_WORK_PRODUCT', 'THIS_WORK_UNIT')).toBe(false);
+		// `run-model-step.ts` — the findings turn, `REG-D-059`.
 		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_REVIEW_FINDING', 'THIS_WORK_UNIT')).toBe(
-			false
+			true
 		);
-		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_RATIONALE', 'THIS_WORK_UNIT')).toBe(false);
+		// The held session — `pi-executor.ts` `retainsHistory: true`, `JAN-EXECSESS`.
+		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_WORK_PRODUCT', 'THIS_WORK_UNIT')).toBe(
+			true
+		);
+		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_RATIONALE', 'THIS_WORK_UNIT')).toBe(
+			true
+		);
+	});
+
+	it('⭑⭑ and it permits NOTHING at THIS_UNDERTAKING — the boundary that survives the correction', () => {
+		// ⭑ THE FALSIFIABLE CONTENT, and it is a real claim about the code: the producer's session is opened and
+		// disposed PER WORK UNIT (`+page.server.ts` — `getExecutionSession()()` before the loop, `dispose()` in
+		// `finally`), so no material crosses into a second unit. The day something does, this policy is wrong
+		// until someone updates it.
+		//
+		// THE MUTANT: seed `THIS_UNDERTAKING` for any source. Every other assertion in this file still passes —
+		// which is exactly why the permissive seed `D-2` refuses is a trap rather than a shortcut.
+		for (const source of [
+			'RENDERED_INSTRUCTION',
+			'PRIOR_REVIEW_FINDING',
+			'PRIOR_WORK_PRODUCT',
+			'PRIOR_RATIONALE'
+		] as const)
+			expect(
+				permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, source, 'THIS_UNDERTAKING'),
+				`${source} must not be drawable across the undertaking`
+			).toBe(false);
 	});
 
 	it('⚠ scope is part of the permission, not decoration', () => {
 		// THE MUTANT: match on `source` alone. A policy permitting an instruction for THIS_TRY would then also
 		// permit drawing instructions from across the whole undertaking.
-		expect(permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'RENDERED_INSTRUCTION', 'THIS_UNDERTAKING')).toBe(
-			false
-		);
+		expect(
+			permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'RENDERED_INSTRUCTION', 'THIS_UNDERTAKING')
+		).toBe(false);
 	});
 
 	it('⛔ the source union cannot express an UNLAWFUL assembly', () => {

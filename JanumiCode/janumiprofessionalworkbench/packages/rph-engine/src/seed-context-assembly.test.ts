@@ -58,17 +58,26 @@ describe('JAN-CTXPOL — the seeded policy resolves from a real engine', () => {
 		// permissive default so the check can never fire"* — and it is the second horn of `D-2`.
 		const engine = build();
 		seedContextAssemblyPolicy(engine);
-		expect(() => resolveContextAssemblyPolicy(finder(engine), 'ctx-nope')).toThrow(/does not resolve/);
+		expect(() => resolveContextAssemblyPolicy(finder(engine), 'ctx-nope')).toThrow(
+			/does not resolve/
+		);
 	});
 
-	it('⭑ the STORED policy says what the code actually does — instruction only, nothing prior', () => {
-		// ⚠ THE SEED IS A CLAIM, NOT A STUB, and this asserts the claim is the true one. THE MUTANT: seed a
-		// permit-everything policy. It would resolve, every test above would still pass, and the object would
-		// mean nothing — the vacuous route `ICP-04` exists to avoid.
+	it('⭑ the STORED policy says what the code actually does — CORRECTED at CP-04', () => {
+		// ⚠ THE SEED IS A CLAIM, NOT A STUB, and this asserts the claim is the true one. Its first version
+		// asserted `PRIOR_WORK_PRODUCT` was NOT permitted, which was false the day it was written: the held
+		// session (`JAN-EXECSESS`) carries the producer's own prior work product into a repair turn. The
+		// behaviour was right; this assertion about it was wrong.
+		//
+		// THE MUTANT: seed a permit-everything policy. It would resolve, every test above would still pass, and
+		// the object would mean nothing — the vacuous route `ICP-04` exists to avoid. It is caught by the
+		// SECOND assertion, which is now where the falsifiable content lives.
 		const engine = build();
 		seedContextAssemblyPolicy(engine);
 		const policy = resolveContextAssemblyPolicy(finder(engine), DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID);
 		expect(permits(policy, 'RENDERED_INSTRUCTION', 'THIS_TRY')).toBe(true);
-		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_WORK_UNIT')).toBe(false);
+		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_WORK_UNIT')).toBe(true);
+		// ⭑ The boundary the correction keeps: the session is per work unit, so nothing crosses into a second.
+		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_UNDERTAKING')).toBe(false);
 	});
 });

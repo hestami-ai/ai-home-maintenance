@@ -59,11 +59,20 @@ import {
 import { actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
-import { classifyTrend, mayRetry, reviewSeesPriorFindings } from '$lib/server/execution/loop-detection';
+import {
+	classifyTrend,
+	mayRetry,
+	reviewSeesPriorFindings
+} from '$lib/server/execution/loop-detection';
 import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionSession } from '$lib/server/execution/model';
+import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
-import type { ActorReference, PromptTemplate } from '@janumipwb/rph-contracts';
+import type {
+	ActorReference,
+	ContextSpecification,
+	PromptTemplate
+} from '@janumipwb/rph-contracts';
 
 /** ⚠ ONE TENANT, DECLARED RATHER THAN INLINE. §31.2 requires an opaque tenant-scoped key prefix, and this demo
  *  is single-tenant; naming the constant keeps the day it becomes multi-tenant a one-line change instead of a
@@ -433,7 +442,11 @@ export const load: PageServerLoad = ({ params }) => {
 		// considering nothing. The four sibling reads on this page all pass `undertakingScope`; this one did not,
 		// which is the exact defect `QueryScope`'s header records being repaired four times.
 		for (const a of listAssessments(engine, undertakingScope)) {
-			if (!['EVIDENCE_PENDING', 'READY', 'ASSESSING'].includes(String((a.state.assessmentState ?? '') as string)))
+			if (
+				!['EVIDENCE_PENDING', 'READY', 'ASSESSING'].includes(
+					String((a.state.assessmentState ?? '') as string)
+				)
+			)
 				continue;
 			const subjects = Array.isArray(a.state.subjectObjectIds)
 				? (a.state.subjectObjectIds as unknown[]).map(String)
@@ -717,7 +730,12 @@ function openAssessmentFor(pwuId: string, assessmentId: string): Step[] {
 		? []
 		: [
 				['CreateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD],
-				['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+				[
+					'ActivateAssurancePolicy',
+					'ASSURANCE_POLICY',
+					DEMO_POLICY_ID,
+					{ policyId: DEMO_POLICY_ID }
+				]
 			];
 	steps.push([
 		'RequestAssuranceAssessment',
@@ -988,145 +1006,170 @@ export const actions: Actions = {
 			// the assurance policies feedback to be fed back to the implementing agent before that phase or
 			// sub-phase was determined complete."* Opened before the loop and released in `finally`, so a
 			// repair turn reaches a producer that remembers what it produced.
+			// ── ⭑⭑ CP-04d — THE POLICY IS RESOLVED FROM THE STORE, BEFORE A SINGLE TURN IS SENT ────────────
+			//
+			// `ICP-04`'s exit test is *"point a binding at a policy that does not exist. This MUST refuse"*, and
+			// until this line it stood only in a unit test with a hand-built finder. ⚠ The refusal FAILS THE
+			// STEP rather than throwing past it: the step has already STARTED (the batch above ran
+			// `StartExecutionStep`), so a try that cannot proceed is a failure with a reason, not an absence.
+			let governing: ReturnType<typeof resolveContextPolicy>;
+			try {
+				governing = resolveContextPolicy(getEngine(), stepId);
+			} catch (e) {
+				const why = e instanceof Error ? e.message : String(e);
+				runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+				return fail(400, { error: `The model invocation did not run: ${why}` });
+			}
+
 			const producer = await getExecutionSession()();
 			try {
-			for (let attempt = 1; ; attempt++) {
-				const tryOutcome = await runModelInvocationStep({
-					subject: {
-						id: pwuId,
-						title: String((pwu?.title ?? '') as string),
-						description: String((pwu?.description ?? '') as string),
-						purpose: String((pwuType?.purpose ?? '') as string),
-						expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
-						inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
-					},
-					subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
-					pwuTypeId,
-					template,
-					store: getArtifactStore(),
-					tenantPrefix: EXECUTION_TENANT_PREFIX,
-					dispatchExchange: (payload, aggregateId) =>
-						dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
-					newId: mintUiId,
-					now: hostNow,
-					modelId: resolveJudgeModel() ?? 'unresolved',
-					providerId: 'agy',
-					session: producer,
-					priorFindings
-				});
+				for (let attempt = 1; ; attempt++) {
+					const tryOutcome = await runModelInvocationStep({
+						subject: {
+							id: pwuId,
+							title: String((pwu?.title ?? '') as string),
+							description: String((pwu?.description ?? '') as string),
+							purpose: String((pwuType?.purpose ?? '') as string),
+							expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
+							inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+						},
+						subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
+						pwuTypeId,
+						template,
+						store: getArtifactStore(),
+						tenantPrefix: EXECUTION_TENANT_PREFIX,
+						dispatchExchange: (payload, aggregateId) =>
+							dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+						newId: mintUiId,
+						now: hostNow,
+						modelId: resolveJudgeModel() ?? 'unresolved',
+						providerId: 'agy',
+						session: producer,
+						priorFindings,
+						// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the
+						// assembly happens; resolving it is the caller's because that is what needs the store.
+						contextPolicy: governing.policy,
+						// ⭑ `PWU_TYPE.contextSpecification` — ratified, and read by NOTHING until CP-04b.
+						...(pwuType?.contextSpecification
+							? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
+							: {})
+					});
 
-				if (!tryOutcome.ran) {
-					// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
-					// which is the whole difference between a demo and a record.
-					runSteps([
+					if (!tryOutcome.ran) {
+						// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
+						// which is the whole difference between a demo and a record.
+						runSteps([
+							[
+								'FailExecutionStep',
+								'EXECUTION_PLAN',
+								planId,
+								{ stepId, failureReason: tryOutcome.refusedBecause }
+							]
+						]);
+						return fail(400, {
+							error: `The model invocation did not run: ${tryOutcome.refusedBecause}`
+						});
+					}
+					outcome = tryOutcome;
+
+					// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
+					// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
+					// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
+					// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
+					// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
+					// went against it is the erasure `PER-9` exists to prevent.
+					artifactId = mintUiId('art');
+					const recorded = runSteps([
 						[
-							'FailExecutionStep',
-							'EXECUTION_PLAN',
-							planId,
-							{ stepId, failureReason: tryOutcome.refusedBecause }
+							'RecordArtifact',
+							'ARTIFACT',
+							artifactId,
+							{
+								artifactId,
+								artifactType: 'work-product',
+								mediaType: 'text/plain',
+								storageProvider: 'jpwb:content-plane',
+								storageKey: tryOutcome.storageKey,
+								contentHash: tryOutcome.contentHash,
+								byteSize: tryOutcome.byteSize,
+								producingPwuId: pwuId,
+								// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
+								// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
+								// one. Free strings here are the honest shape, not laziness.
+								securityClassification: 'unclassified',
+								retentionClass: 'retained-by-participation',
+								status: 'recorded'
+							}
 						]
 					]);
-					return fail(400, { error: `The model invocation did not run: ${tryOutcome.refusedBecause}` });
-				}
-				outcome = tryOutcome;
+					if (recorded)
+						return fail(400, { error: `Recording the work product failed: ${recorded}` });
 
-				// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
-				// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
-				// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
-				// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
-				// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
-				// went against it is the erasure `PER-9` exists to prevent.
-				artifactId = mintUiId('art');
-				const recorded = runSteps([
-					[
-						'RecordArtifact',
-						'ARTIFACT',
-						artifactId,
+					// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
+					//
+					// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
+					// refused it correctly and nothing could satisfy it. This is the run that can.
+					//
+					// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
+					// come from the SAME policy object the authoring review reads — restating the rubric here is how
+					// four descriptions of one criterion came to disagree.
+					review = await runWorkProductFloor(
 						{
 							artifactId,
-							artifactType: 'work-product',
-							mediaType: 'text/plain',
-							storageProvider: 'jpwb:content-plane',
-							storageKey: tryOutcome.storageKey,
-							contentHash: tryOutcome.contentHash,
-							byteSize: tryOutcome.byteSize,
-							producingPwuId: pwuId,
-							// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
-							// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
-							// one. Free strings here are the honest shape, not laziness.
-							securityClassification: 'unclassified',
-							retentionClass: 'retained-by-participation',
-							status: 'recorded'
+							artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
+							// The exchange the call just recorded — resolved by the id the outcome now carries, rather
+							// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
+							exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
+							answer: tryOutcome.answer,
+							producingPrompt: tryOutcome.prompt,
+							// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
+							// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
+							// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
+							// refuse. The outcome now carries who actually produced the work product.
+							producerModelId: tryOutcome.producer.modelId,
+							producerProviderId: tryOutcome.producer.providerId,
+							// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
+							// declare one — a recorded shortfall, never a synthesized summary.
+							...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
+							// ⛔ OFF BY DEFAULT. The sponsor's model puts the loop's state on the PRODUCER — *"the
+							// component responsible for tracking or remembering how it responded to the various
+							// feedback"* — and the paper's deployed pipeline does the same: the judge's reason is
+							// appended to the GENERATOR's prompt and the judge re-scores each draft cold. Supplied
+							// here only when a deployment has explicitly chosen otherwise.
+							...(reviewSeesPriorFindings() && priorFindings.length
+								? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
+								: {})
+						},
+						uiSession(),
+						{
+							artifacts: getArtifactStore(),
+							now: hostNow,
+							newId: mintUiId,
+							criteria: reasoningReviewCriteria(uiSession())
 						}
-					],
-				]);
-				if (recorded) return fail(400, { error: `Recording the work product failed: ${recorded}` });
+					);
+					if (review.satisfied) break;
 
-				// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
-				//
-				// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
-				// refused it correctly and nothing could satisfy it. This is the run that can.
-				//
-				// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
-				// come from the SAME policy object the authoring review reads — restating the rubric here is how
-				// four descriptions of one criterion came to disagree.
-				review = await runWorkProductFloor(
-					{
-						artifactId,
-						artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
-						// The exchange the call just recorded — resolved by the id the outcome now carries, rather
-						// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
-						exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
-						answer: tryOutcome.answer,
-						producingPrompt: tryOutcome.prompt,
-						// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
-						// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
-						// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
-						// refuse. The outcome now carries who actually produced the work product.
-						producerModelId: tryOutcome.producer.modelId,
-						producerProviderId: tryOutcome.producer.providerId,
-						// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
-						// declare one — a recorded shortfall, never a synthesized summary.
-						...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
-						// ⛔ OFF BY DEFAULT. The sponsor's model puts the loop's state on the PRODUCER — *"the
-						// component responsible for tracking or remembering how it responded to the various
-						// feedback"* — and the paper's deployed pipeline does the same: the judge's reason is
-						// appended to the GENERATOR's prompt and the judge re-scores each draft cold. Supplied
-						// here only when a deployment has explicitly chosen otherwise.
-						...(reviewSeesPriorFindings() && priorFindings.length
-							? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
-							: {})
-					},
-					uiSession(),
-					{
-						artifacts: getArtifactStore(),
-						now: hostNow,
-						newId: mintUiId,
-						criteria: reasoningReviewCriteria(uiSession())
+					// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
+					// is already filtered to valid SUBJECT findings, never operational failures.
+					openPerTry.push(review.remediation.findings.length);
+					const trend = classifyTrend(openPerTry);
+					const gate = mayRetry(attempt, trend);
+
+					// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
+					// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
+					// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
+					if (!review.remediation.autoRefine || !gate.retry) {
+						loopEnded = review.remediation.autoRefine
+							? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
+							: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
+						break;
 					}
-				);
-				if (review.satisfied) break;
-
-				// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
-				// is already filtered to valid SUBJECT findings, never operational failures.
-				openPerTry.push(review.remediation.findings.length);
-				const trend = classifyTrend(openPerTry);
-				const gate = mayRetry(attempt, trend);
-
-				// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
-				// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
-				// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
-				if (!review.remediation.autoRefine || !gate.retry) {
-					loopEnded = review.remediation.autoRefine
-						? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
-						: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
-					break;
+					priorFindings = review.remediation.findings.map((f) => ({
+						code: f.code,
+						statement: f.statement
+					}));
 				}
-				priorFindings = review.remediation.findings.map((f) => ({
-					code: f.code,
-					statement: f.statement
-				}));
-			}
 			} finally {
 				// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
 				// a `finally` so a refusal mid-loop cannot strand a live session.
@@ -1439,7 +1482,9 @@ export const actions: Actions = {
 		if (!evidenceId || !pwuId) return fail(400, { error: 'Missing evidence or PWU.' });
 		const assessmentId = pendingAssessmentFor(pwuId);
 		if (!assessmentId)
-			return fail(400, { error: 'No open assessment to admit this evidence to. Propose evidence first.' });
+			return fail(400, {
+				error: 'No open assessment to admit this evidence to. Propose evidence first.'
+			});
 		const ev = getObject(getEngine(), evidenceId);
 		const err = runSteps([
 			[
@@ -1467,7 +1512,8 @@ export const actions: Actions = {
 		const pwuId = String((form.get('pwuId') ?? '') as string).trim();
 		if (!evidenceId || !pwuId) return fail(400, { error: 'Missing evidence or PWU.' });
 		const assessmentId = pendingAssessmentFor(pwuId);
-		if (!assessmentId) return fail(400, { error: 'No open assessment to submit this evidence to.' });
+		if (!assessmentId)
+			return fail(400, { error: 'No open assessment to submit this evidence to.' });
 		const err = runSteps([
 			[
 				'SubmitEvidenceForAssessment',

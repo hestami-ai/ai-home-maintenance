@@ -57,15 +57,65 @@ nothing prior"* is exactly what the code does today, so the object and the behav
 
 ### `CP-04` — the reader is CONSULTED, not merely resolved
 
-⭑ The unit that stops this being another authored-with-no-consumer field. `prepareModelInvocation` obeys the
-policy: it assembles only the declared elements, and records the fates of those it did not.
+⭑ The unit that stops this being another authored-with-no-consumer field. **REVISED 2026-09-06 after measuring
+the shipped execution path** — see `DESIGN` §7. The original body is kept below with its disposition, because
+one of its two predicted reds turned out to be already discharged and the other exposed a defect in `CP-03`.
 
-**Predicted reds:**
+#### `CP-04a` — the CEILING: everything assembled must be permitted, or REFUSE
+
+`prepareModelInvocation` takes the resolved policy as a **required** parameter — required so that *"resolve the
+policy and ignore it"* is not expressible — plus the sources the step will assemble beyond the instruction.
+`RENDERED_INSTRUCTION`/`THIS_TRY` is itself checked. The refusal precedes the render.
 
 | Mutant | Must redden |
 |---|---|
-| resolve the policy and ignore it | the consultation test — three ratified slots already have no reader; a fourth is the defect, not the fix |
-| omit an element without recording its fate | `DEC-4`: *"a context omission must not silently remove a mandatory constraint"* |
+| make the policy parameter optional | the type-checker, at every call site — an optional consultation is the defect wearing a default |
+| exempt `RENDERED_INSTRUCTION` from the check | the empty-policy test — `permittedSources: []` is *"a CLAIM"* and must refuse everything |
+| check `source` and ignore `scope` | the `THIS_UNDERTAKING` test — the surviving falsifiable boundary |
+| refuse after rendering | the ordering test — `prompt-render.ts:8-12`, *"the disclosure arrives after the harm"* |
+| **CONTROL** | the permitted repair turn RUNS — otherwise the ceiling is "refuse everything", `D-2`'s first horn again |
+
+#### `CP-04b` — the FLOOR: a required element omitted must be DISPOSITIONED, or REFUSE
+
+⭑ `PWU_TYPE.contextSpecification.requiredElements` is ratified and **read by nothing**. A type may require an
+element its own template never declares; `assembleStepContext` walks `declaredPlaceholders` and
+`renderPromptTemplate` checks declared-vs-supplied — neither ever looks at `requiredElements`. That is `DEC-4`'s
+*"a context omission must not silently remove a mandatory constraint"* with nothing watching.
+
+| Mutant | Must redden |
+|---|---|
+| drop the check | the silent-omission test — a required element absent from the assembled context and no disposition |
+| accept ANY disposition | the naming test — the disposition must name the omitted element in `constraintId` |
+| **CONTROL** | a required element the context DOES supply needs no disposition, and a dispositioned omission PROCEEDS |
+
+⛔ **NOT built: a disposition path for template placeholders.** `renderPromptTemplate:66-71` already REFUSES
+that omission, under a sponsor ruling of 2026-09-04 which declined *"render the hole and disclose it
+afterwards"*. A second, weaker path for one rule is `REG-F-353`, and it would soften a ruling.
+
+#### `CP-04c` — the seed becomes TRUE, because `CP-04a` proved it false
+
+The corrected seed permits all four sources at `THIS_TRY`/`THIS_WORK_UNIT`. ⚠ **Not `D-3`** — behaviour is
+untouched; the claim is corrected to match it. `THIS_UNDERTAKING` stays permitted for nothing.
+
+| Mutant | Must redden |
+|---|---|
+| leave the seed at instruction-only | `CP-04a`'s live-path test — the demo's own repair turn refuses |
+| permit `THIS_UNDERTAKING` | the boundary test — the session is per work unit (`+page.server.ts:991,1133`) |
+
+#### `CP-04d` — the id is resolved on the LIVE path
+
+The execution action resolves the id **from the store**: from the step's `RUNTIME_BINDING` when one names it,
+otherwise from the host's configured default **as a disclosed gap** (the demo's plans carry
+`authorizedRuntimeBindingIds: []`). An id that names nothing REFUSES — `ICP-04`'s exit test, off the unit bench.
+
+---
+
+**ORIGINAL `CP-04` BODY, retained with disposition:**
+
+| Mutant | Must redden | Disposition |
+|---|---|---|
+| resolve the policy and ignore it | the consultation test | ⭑ **KEPT and strengthened** — `CP-04a`, made unexpressible rather than merely tested |
+| omit an element without recording its fate | `DEC-4` | ⚠ **ALREADY DISCHARGED for placeholders** by `renderPromptTemplate`'s refusal under the 2026-09-04 ruling; **relocated** to `requiredElements` (`CP-04b`), where it is genuinely unenforced |
 
 ---
 

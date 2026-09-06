@@ -374,6 +374,15 @@ function rawFindings(
  *  always populated and the floor policies are present as (locked) real objects. */
 export function seedPolicyLibrary(handle: AuthedEngineHandle): void {
 	seedFloorPolicies(handle);
+	// ⛔ ADDED AT CP-04d, AND THE SLICE THAT AUTHORED IT SHIPPED WITHOUT THIS LINE. `seedContextAssemblyPolicy`
+	// existed, was exported, was tested — and was CALLED BY NOTHING but its own test. The green proved the
+	// function worked; it did not prove any deployment ran it, so `ctx-default` resolved in the engine package
+	// and nowhere else. `CP-04d`'s live-path CONTROL is what failed, which is what a control is for.
+	//
+	// ⭑ HERE RATHER THAN IN `seedWorkbench`, alongside `seedFloorPolicies`, for the reason this docblock already
+	// gives: EVERY engine needs it. A context assembly policy is deployment configuration, not reference data —
+	// a cold-start install that cannot say what its producers may be given is the same gap in a smaller room.
+	seedContextAssemblyPolicy(handle);
 	seedAdditivePolicies(handle);
 }
 

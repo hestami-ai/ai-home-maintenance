@@ -125,3 +125,96 @@ out of scope.
 
 ⚠ **Minting a governed object type is a ratification act**, Minting a governed object type is a ratification act, not a
 wiring task, and this programme's own register records what happens when authored vocabulary ships without one.
+
+---
+
+## 7. ⭑ `CP-04` measured — what consulting the reader actually forced (2026-09-06)
+
+`CP-04` says *"`prepareModelInvocation` obeys the policy: it assembles only the declared elements, and records
+the fates of those it did not."* Working out what that means against the shipped execution path changed three
+things in this design. All three are corrections, and two of them are corrections **to `CP-03`, which I wrote**.
+
+### 7.1 ⛔ The seeded default is a FALSE statement, and the vocab note in the same commit already said so
+
+`CP-03` seeded `'ctx-default'` as `RENDERED_INSTRUCTION`/`THIS_TRY` **only**, on the claim that this is *"what
+the code does today"*. It is not. Measured at `HEAD`:
+
+| What the producer is actually given | Where | Since |
+|---|---|---|
+| the rendered instruction, this try | `run-model-step.ts:138` | `JAN-EXECRUN` |
+| **prior review findings, this work unit** | `run-model-step.ts:130-138` — the findings turn | `REG-D-059` / `JAN-EXECLOOP` |
+| **its own prior work product, this work unit** | the held session — `pi-executor.ts:118` `retainsHistory: true` | `JAN-EXECSESS` |
+| **its own prior rationale, this work unit** | same session, same turns | `JAN-EXECRAT` |
+
+⭑ **I did not need the code to catch this.** `ContextSourceRule.scope`'s own vocab note — authored in the same
+commit as the seed — reads *"`THIS_WORK_UNIT` is what a bounded repair loop needs (`REG-D-059`)"*. The
+vocabulary and the seed contradict each other **inside one commit**, and nothing could notice because nothing
+consulted the policy. That is precisely the property `CP-04` exists to remove.
+
+⚠ **This is NOT `D-3`.** `D-3` is *widening the seeded policy to draw prior work from the STREAM* — a behaviour
+change to every execution, still not taken. This is the opposite: the behaviour is untouched and the **claim**
+is corrected to match it. The code was right (`REG-D-059` is a sponsor decision, landed and tested); the
+statement about the code was wrong.
+
+**Corrected seed** — and it still has teeth, because `THIS_UNDERTAKING` is permitted for nothing:
+
+```
+{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY'        },
+{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT'  },
+{ source: 'PRIOR_WORK_PRODUCT',   scope: 'THIS_WORK_UNIT'  },
+{ source: 'PRIOR_RATIONALE',      scope: 'THIS_WORK_UNIT'  }
+```
+
+The session is opened and disposed **per work unit** (`+page.server.ts:991,1133`), so nothing crosses into a
+second unit. `THIS_UNDERTAKING` is the falsifiable boundary that survives the correction.
+
+### 7.2 `permittedSources` is a CEILING, not an obligation — so the consultation is a subset check
+
+The vocab note settles it: *"WHICH SOURCE a deployment **permits** a producer to be given"*. So the rule is
+
+> everything the step will place in front of the producer must be **within** the permitted set — otherwise refuse.
+
+⭑ **`RENDERED_INSTRUCTION` is itself checked**, which is what stops the check being vacuous on the common path:
+a policy with `permittedSources: []` — the empty list the field's note calls *"a CLAIM"* — refuses every
+invocation, which is exactly what that claim should mean.
+
+⛔ **The refusal must precede the render**, on the sponsor's own ordering argument at `prompt-render.ts:8-12`:
+*"the disclosure arrives after the harm. Refusing is the only order that works."*
+
+### 7.3 ⚠ `CP-04`'s second predicted red is ALREADY DISCHARGED — by a stronger mechanism, under a sponsor ruling
+
+`CP-04` predicts *"omit an element without recording its fate → `DEC-4`"*. For **template placeholders** that
+is already enforced, and by **refusal** rather than disposition: `renderPromptTemplate:66-71` refuses when the
+assembled context supplies no value for a declared placeholder, and its docblock records the sponsor declining
+the alternative on 2026-09-04. Building a disposition path for the same omission would be a second way to say
+one thing (`REG-F-353`) **and** would soften a ruling the sponsor made. It is not built.
+
+⭑ **What IS genuinely unenforced is one layer up**, and it needs the other no-reader slot. `PWU_TYPE.contextSpecification`
+declares `requiredElements` — what the TYPE requires in its context — and **nothing reads it**. A type may
+require an element its own template never declares: `assembleStepContext` walks `declaredPlaceholders`, and
+`renderPromptTemplate` checks declared-vs-supplied and text-vs-declared. Neither ever looks at
+`requiredElements`, so such an element is silently absent. That is `DEC-4`'s *"context omission"* with nothing
+watching.
+
+The remedy is the canonical one, using only ratified carriers: an omitted required element must be
+**dispositioned** in the same `contextSpecification.constraintDispositions` the type already carries, or the
+invocation refuses.
+
+⚠ **And this does NOT re-open 2026-09-04.** That ruling refused *rendering a hole and disclosing it afterwards*
+— disclosure arriving after the prompt reached the model. A `constraintDisposition` is authored **on the type**,
+before any run, and is read **before** the prompt is built. Different order, and the order was the whole
+argument.
+
+### 7.4 ⛔ Where the policy id comes from, and the gap that is disclosed rather than papered
+
+`contextAssemblyPolicyId` lives on `RUNTIME_BINDING`. The demo's execution action mints its plan inline and
+activates it with `authorizedRuntimeBindingIds: []` (`+page.server.ts:951`) — **the step has no binding**. So:
+
+- when a `RUNTIME_BINDING` names the step, its `contextAssemblyPolicyId` is used — the ratified carrier, read;
+- when none does, the **host's** configured default id is used, and that is a **disclosed gap**, not a fallback
+  dressed up as a resolution. Either way the id is **resolved against the store** and an id that names nothing
+  REFUSES, which is `ICP-04`'s exit test now standing on the live path rather than in a unit test alone.
+
+⛔ **Minting a binding for demo-run steps is not taken here.** `RequestRuntimeBinding` refuses an empty
+capability request (N-20) and `AuthorizeRuntimeBinding` refuses an authorization granting nothing (N-22); doing
+it properly is a capability-modelling exercise, not a line in this slice.

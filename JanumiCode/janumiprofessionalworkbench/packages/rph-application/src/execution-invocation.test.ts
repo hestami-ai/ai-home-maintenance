@@ -1,7 +1,9 @@
 // JAN-EXECRUN XR-01 — what a model would be told, and when it is told nothing.
 import { describe, expect, it } from 'vitest';
-import type { PromptTemplate } from '@janumipwb/rph-contracts';
+import type { ContextSpecification, PromptTemplate } from '@janumipwb/rph-contracts';
 import { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
+import type { ContextAssemblyPolicyContent } from './context-assembly.js';
 
 const PWU = {
 	id: 'pwu_1',
@@ -19,9 +21,12 @@ const ACTIVE: PromptTemplate = {
 	status: 'ACTIVE'
 };
 
+/** Try 1 under the seeded policy: the rendered instruction and nothing else. */
+const ASSEMBLY = { policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] } as const;
+
 describe('JAN-EXECRUN — preparing a model invocation', () => {
 	it('renders the prompt and resolves the fingerprint to something a reader can look up', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
 		// PER-9: a fingerprint "identifies that record; it never substitutes for it". Before REG-D-058 this
 		// field named a template with no home.
@@ -33,14 +38,14 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 		// demo would then appear to execute every work unit, and every one of them would be executed against an
 		// instruction nobody authored, reviewed or published. That is the seeded-policy-as-projection defect
 		// this repository already records — an object standing in for a decision nobody made.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined, ASSEMBLY);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the type').toMatch(/pwut_9/);
 		expect(!plan.ready && plan.reason).toMatch(/declares no agent behaviour/);
 	});
 
 	it('⛔ REFUSES a DRAFT template — authoring is not arming', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' });
+		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' }, ASSEMBLY);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/DRAFT/);
 	});
@@ -54,9 +59,11 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 			templateText: 'Assess {subject} against {criteria}.',
 			declaredPlaceholders: ['subject', 'criteria']
 		};
-		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, ASSEMBLY);
 		expect(plan.ready).toBe(false);
-		expect(!plan.ready && plan.reason, 'the refusal must name the missing marker').toMatch(/\{criteria\}/);
+		expect(!plan.ready && plan.reason, 'the refusal must name the missing marker').toMatch(
+			/\{criteria\}/
+		);
 	});
 
 	it('⛔ the context supplies ONLY what the template declared', () => {
@@ -76,5 +83,159 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 		const ctx = assembleStepContext(bare, ACTIVE);
 		expect(ctx).toEqual({});
 		expect('subject' in ctx, 'absent, not present-and-empty').toBe(false);
+	});
+});
+
+// ── ⭑⭑ JAN-CTXPOL / CP-04 — THE POLICY IS CONSULTED, AND CAN REFUSE ─────────────────────────────────────────
+describe('CP-04a — the CEILING: nothing is assembled that the policy does not permit', () => {
+	const REPAIR = [
+		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+		{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+	] as const;
+
+	it('⭑⭑ CONTROL — a repair turn the policy PERMITS runs', () => {
+		// ⛔ WITHOUT THIS THE CEILING IS "REFUSE EVERYTHING", which is `D-2`'s first horn and would make every
+		// refusal below unfalsifiable. It is also the test that proves the CORRECTED seed: under the seed this
+		// slice replaced — `RENDERED_INSTRUCTION` alone — this call REFUSES, and the demo's own repair turn
+		// with it.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+			alsoAssembles: REPAIR
+		});
+		expect(plan.ready).toBe(true);
+	});
+
+	it('⛔ REFUSES a source the policy does not permit, and NAMES it', () => {
+		// THE MUTANT: resolve the policy and never read it — the roadmap's own predicted red, and the exact
+		// shape of the three ratified slots this system already has with no reader.
+		const instructionOnly: ContextAssemblyPolicyContent = {
+			policyId: 'ctx-narrow',
+			permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+		};
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			policy: instructionOnly,
+			alsoAssembles: REPAIR
+		});
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/ctx-narrow/);
+		expect(
+			!plan.ready && plan.reason,
+			'a refusal a reader cannot act on is itself an omission'
+		).toMatch(/PRIOR_REVIEW_FINDING at THIS_WORK_UNIT/);
+	});
+
+	it('⛔ an EMPTY policy refuses even the rendered instruction', () => {
+		// ⭑ THE VACUITY TEST. `permittedSources`'s vocab note calls an empty list *"a CLAIM ('this deployment
+		// assembles nothing beyond the instruction')"*. THE MUTANT: exempt `RENDERED_INSTRUCTION` from the
+		// check as "always allowed" — the claim then becomes unsayable and the ceiling never fires on the one
+		// path every invocation takes.
+		const nothing: ContextAssemblyPolicyContent = { policyId: 'ctx-empty', permittedSources: [] };
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			policy: nothing,
+			alsoAssembles: []
+		});
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/RENDERED_INSTRUCTION at THIS_TRY/);
+	});
+
+	it('⚠ SCOPE is checked, not only source', () => {
+		// THE MUTANT: match on `source` alone. A policy permitting prior findings within THIS_WORK_UNIT would
+		// then also permit drawing them from across the whole undertaking — which is the boundary the corrected
+		// seed keeps, and the only falsifiable content it has left.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+			alsoAssembles: [{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }]
+		});
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/THIS_UNDERTAKING/);
+	});
+
+	it('⛔ the ceiling refuses BEFORE the render, so a bad assembly is never built', () => {
+		// ⭑ THE ORDERING IS THE SPONSOR'S, at `prompt-render.ts:8-12`: *"the disclosure arrives after the harm.
+		// Refusing is the only order that works."* This template ALSO fails to render (`{criteria}` is
+		// unsupplied), so the reason it gives says which check ran first. THE MUTANT: consult the policy after
+		// rendering — the render refusal wins and the prompt has already been built from unpermitted material.
+		const needsMore: PromptTemplate = {
+			...ACTIVE,
+			templateText: 'Assess {subject} against {criteria}.',
+			declaredPlaceholders: ['subject', 'criteria']
+		};
+		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, {
+			policy: { policyId: 'ctx-empty', permittedSources: [] },
+			alsoAssembles: []
+		});
+		expect(!plan.ready && plan.reason, 'the POLICY refusal, not the render refusal').toMatch(
+			/does not permit/
+		);
+		expect(!plan.ready && plan.reason).not.toMatch(/supplies no value/);
+	});
+});
+
+describe("CP-04b — the FLOOR: a type's required element may not be silently omitted", () => {
+	const REQUIRES_CRITERIA: ContextSpecification = {
+		requiredElements: ['criteria'],
+		constraintDispositions: []
+	};
+
+	it('⛔ REFUSES a required element the assembled context does not carry', () => {
+		// ⭑⭑ THIS IS THE GAP NOTHING ELSE WATCHES. `assembleStepContext` walks `declaredPlaceholders`;
+		// `renderPromptTemplate` checks declared-vs-supplied and text-vs-declared. A type may require an element
+		// its own template never declares — as here — and every one of those checks passes while the element is
+		// simply absent. `DEC-4` SCOPE (`DOC-003:225`): *"a context omission must not silently remove a
+		// mandatory constraint."* THE MUTANT: drop this check; `requiredElements` returns to having no reader.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: REQUIRES_CRITERIA
+		});
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/criteria/);
+		expect(!plan.ready && plan.reason, 'the rule it enforces, quotable').toMatch(/DEC-4/);
+	});
+
+	it('⭑ CONTROL — with the omission DISPOSITIONED, the invocation proceeds', () => {
+		// `DEC-4` does not forbid omission; it forbids SILENT omission — *"marked inapplicable with rationale"*
+		// is one of its five legal fates. THE MUTANT: refuse regardless of the disposition. The check would then
+		// be "a type may never require anything its template omits", which is a rule canon does not state.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: {
+				requiredElements: ['criteria'],
+				constraintDispositions: [
+					{
+						constraintId: 'criteria',
+						fate: 'INAPPLICABLE_WITH_RATIONALE',
+						rationale:
+							'This type is assessed against its own expected outputs, not external criteria.'
+					}
+				]
+			}
+		});
+		expect(plan.ready).toBe(true);
+	});
+
+	it('⚠ the disposition must name the OMITTED element, not merely exist', () => {
+		// THE MUTANT: accept any non-empty `constraintDispositions`. A type could then discharge every future
+		// omission with one unrelated disposition authored once — which is the exhaustiveness in `DEC-4`'s own
+		// name ("for every mandatory parent constraint, exactly one holds") quietly deleted.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: {
+				requiredElements: ['criteria'],
+				constraintDispositions: [{ constraintId: 'somethingElse', fate: 'PROPAGATED' }]
+			}
+		});
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/criteria/);
+	});
+
+	it('⭑ CONTROL — a required element the context DOES supply needs no disposition', () => {
+		// Without this, the floor is satisfiable by refusing whenever a specification exists at all, and the
+		// CONTROL above could not tell "dispositioned" from "never checked".
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: { requiredElements: ['subject'], constraintDispositions: [] }
+		});
+		expect(plan.ready).toBe(true);
 	});
 });

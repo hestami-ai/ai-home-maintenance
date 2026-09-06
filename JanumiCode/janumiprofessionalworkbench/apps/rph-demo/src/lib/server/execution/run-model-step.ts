@@ -12,9 +12,15 @@
 // which it was. That the floor may then BLOCK is the system working.
 import {
 	prepareModelInvocation,
+	type ContextAssemblyPolicyContent,
 	type InvocationSubject
 } from '@janumipwb/rph-application';
-import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
+import type {
+	ContextSourceRule,
+	ContextSpecification,
+	PromptTemplate,
+	RecordModelExchangePayload
+} from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
@@ -56,6 +62,43 @@ export interface RunModelStepInput {
 	 * work unit's whole point is that a professional (or a model acting as one) does it.
 	 */
 	readonly priorFindings?: readonly { readonly code: string; readonly statement: string }[];
+	/**
+	 * ⭑ CP-04 — the policy this deployment operates under, RESOLVED, not an id.
+	 *
+	 * ⛔ Required, so that *"resolve the policy and ignore it"* is not expressible here either. Resolution is
+	 * the caller's job because it needs the store; obeying it is this step's, because this is where the
+	 * assembly happens.
+	 */
+	readonly contextPolicy: ContextAssemblyPolicyContent;
+	/** The work-unit TYPE's context specification, when it declares one. */
+	readonly contextSpecification?: ContextSpecification;
+}
+
+/**
+ * What this call will place in front of the producer, beyond the rendered instruction.
+ *
+ * ⭑⭑ DERIVED FROM THE TWO FACTS THAT DECIDE IT, not declared by a caller who might get it wrong. A repair turn
+ * carries the findings; and when the session REMEMBERS, the producer's context on that turn also holds its own
+ * prior work product and prior rationale — which is what `JAN-EXECSESS` bought and what `retainsHistory` has
+ * declared since, with no consumer but tests until now.
+ *
+ * ⚠ NOTHING IS ASSEMBLED ON TRY 1 BEYOND THE INSTRUCTION, even with a remembering session: a fresh session has
+ * no prior turns to hold. Listing them anyway would be a claim about material that does not exist.
+ */
+export function assembledSources(
+	priorFindings: readonly unknown[] | undefined,
+	retainsHistory: boolean
+): readonly ContextSourceRule[] {
+	if (!priorFindings?.length) return [];
+	return [
+		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+		...(retainsHistory
+			? ([
+					{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+					{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+				] as const)
+			: [])
+	];
 }
 
 export type RunModelStepOutcome =
@@ -115,7 +158,11 @@ export type RunModelStepOutcome =
 export async function runModelInvocationStep(
 	input: RunModelStepInput
 ): Promise<RunModelStepOutcome> {
-	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template);
+	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template, {
+		policy: input.contextPolicy,
+		alsoAssembles: assembledSources(input.priorFindings, input.session.retainsHistory),
+		...(input.contextSpecification ? { specification: input.contextSpecification } : {})
+	});
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 
 	// ⭑⭑ A REPAIR IS A FOLLOW-UP TURN, NOT A RE-RENDERED INSTRUCTION. The first version of this loop appended
@@ -269,18 +316,22 @@ function record(
 	sink: ReturnType<typeof createExchangeSink>
 ): { recorded: number; aggregateIds: string[] } {
 	const aggregateIds: string[] = [];
-	const outcome = recordExchanges((payload, aggregateId) => {
-		aggregateIds.push(aggregateId);
-		return input.dispatchExchange(payload, aggregateId);
-	}, sink.drain(), {
-		runToken: input.newId('execrun'),
-		// ⭑ THE EXECUTION PLANE, WHICH THIS ENUM HAS CARRIED SINCE REG-D-055 AND NOTHING HAS EVER WRITTEN.
-		plane: 'EXECUTION',
-		invokerId: `execution.model-invocation:${input.pwuTypeId}`,
-		subjectObjectId: input.subject.id,
-		subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
-		subjectSemanticVersion: input.subjectSemanticVersion,
-		newId: input.newId
-	});
+	const outcome = recordExchanges(
+		(payload, aggregateId) => {
+			aggregateIds.push(aggregateId);
+			return input.dispatchExchange(payload, aggregateId);
+		},
+		sink.drain(),
+		{
+			runToken: input.newId('execrun'),
+			// ⭑ THE EXECUTION PLANE, WHICH THIS ENUM HAS CARRIED SINCE REG-D-055 AND NOTHING HAS EVER WRITTEN.
+			plane: 'EXECUTION',
+			invokerId: `execution.model-invocation:${input.pwuTypeId}`,
+			subjectObjectId: input.subject.id,
+			subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
+			subjectSemanticVersion: input.subjectSemanticVersion,
+			newId: input.newId
+		}
+	);
 	return { recorded: outcome.recorded, aggregateIds };
 }

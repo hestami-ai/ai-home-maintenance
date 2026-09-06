@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
-import { runModelInvocationStep } from './run-model-step.js';
+import { assembledSources, runModelInvocationStep } from './run-model-step.js';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
 
 const SUBJECT = {
@@ -45,6 +46,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		now: () => '2026-09-05T10:00:00Z',
 		modelId: 'test-model',
 		providerId: 'test-provider',
+		// ⭑ CP-04 — the deployment's own policy. Required, so no call site can skip the consultation.
+		contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 		...over
 	};
 	return { input, dispatched, store };
@@ -72,7 +75,9 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		// unit was executed by a model at all.
 		expect(dispatched, 'a model call left no record').toHaveLength(1);
 		expect(dispatched[0]!.plane).toBe('EXECUTION');
-		expect(dispatched[0]!.subjectObjectId, 'the record names the work unit it ran for').toBe(SUBJECT.id);
+		expect(dispatched[0]!.subjectObjectId, 'the record names the work unit it ran for').toBe(
+			SUBJECT.id
+		);
 		expect(dispatched[0]!.subjectObjectType).toBe('PROFESSIONAL_WORK_UNIT');
 	});
 
@@ -122,12 +127,16 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		// class or a minted key. Two keys for one answer, and a reader cannot tell which the assessment rested
 		// on — the ambiguity REG-F-345 spent three attempts to remove one layer up.
 		const DELIMITED = '{"finding":"The route is viable; the northern leg carries the risk."}';
-		const { input, dispatched, store } = harness({ session: oneShotSession(async () => DELIMITED) });
+		const { input, dispatched, store } = harness({
+			session: oneShotSession(async () => DELIMITED)
+		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(true);
 		if (!out.ran) return;
 
-		expect(await store.get(out.storageKey), 'the answer is not retained where it says').toBe(DELIMITED);
+		expect(await store.get(out.storageKey), 'the answer is not retained where it says').toBe(
+			DELIMITED
+		);
 		const answerRef = dispatched[0]!.answerSpanRef as { storageKey?: string; status?: string };
 		expect(answerRef.status).toBe('STORED');
 		expect(answerRef.storageKey, 'the artifact and the exchange must name one object').toBe(
@@ -194,8 +203,14 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 		// ⭑ AND IT REACHES THE EXCHANGE RECORD, not just the return value. A producer identity that stops short
 		// of E-3 is a field with no consumer — the defect this repository calls "delivery is not the end".
 		const rec = dispatched.at(-1)!;
-		expect(rec.resolvedModel).toMatchObject({ value: 'gpt-5.4-mini', evidence: 'PROVIDER_REPORTED' });
-		expect(rec.resolvedProvider).toMatchObject({ value: 'openai-codex', evidence: 'PROVIDER_REPORTED' });
+		expect(rec.resolvedModel).toMatchObject({
+			value: 'gpt-5.4-mini',
+			evidence: 'PROVIDER_REPORTED'
+		});
+		expect(rec.resolvedProvider).toMatchObject({
+			value: 'openai-codex',
+			evidence: 'PROVIDER_REPORTED'
+		});
 	});
 
 	it('⭑ CONTROL — a tool that returns only a string keeps the CONFIGURED identity, graded HOST_CONFIGURED', async () => {
@@ -308,7 +323,9 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 		await runModelInvocationStep(input);
 		await runModelInvocationStep({
 			...input,
-			priorFindings: [{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }]
+			priorFindings: [
+				{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }
+			]
 		});
 
 		expect(turns).toHaveLength(2);
@@ -329,7 +346,9 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 		const { input } = harness({ session });
 		const out = await runModelInvocationStep({
 			...input,
-			priorFindings: [{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }]
+			priorFindings: [
+				{ code: 'RR-01-no-problem-substitution', statement: 'It restated the prompt.' }
+			]
 		});
 		expect(out.ran).toBe(true);
 		if (!out.ran) return;
@@ -341,5 +360,49 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 		// Retrofitting memory onto `agy` or the fixture would be the fabricated-capability defect: they have
 		// none — each call is a fresh process with a fresh context. THE MUTANT: default `retainsHistory` to true.
 		expect(oneShotSession(async () => ANSWER).retainsHistory).toBe(false);
+	});
+});
+
+// ── ⭑ JAN-CTXPOL / CP-04a — WHAT THIS STEP DECLARES IT IS ASSEMBLING ──────────────────────────────────────
+describe('assembledSources — the claim the policy is checked against', () => {
+	it('⭑ try 1 assembles NOTHING beyond the instruction, even with a remembering session', () => {
+		// ⚠ THE MUTANT: list the prior sources whenever `retainsHistory` is true. A FRESH session has no prior
+		// turns to hold, so that would be a claim about material which does not exist — and it would make the
+		// policy check pass or fail on a fiction.
+		expect(assembledSources(undefined, true)).toEqual([]);
+		expect(assembledSources([], true)).toEqual([]);
+	});
+
+	it('⭑ a repair turn assembles the findings — and, when the session REMEMBERS, its own prior turns', () => {
+		// ⭑⭑ THIS IS `retainsHistory`'s FIRST CONSUMER. The field has been declared since `JAN-EXECSESS` and
+		// read by nothing but tests: a held session genuinely carries the producer's own prior work product and
+		// rationale into the repair turn, and that IS assembled context whether or not the harness handed it
+		// over. THE MUTANT: ignore `retainsHistory` — a remembering producer would then be checked against a
+		// policy describing a forgetful one.
+		expect(assembledSources([{ code: 'C1', statement: 's' }], false)).toEqual([
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' }
+		]);
+		expect(assembledSources([{ code: 'C1', statement: 's' }], true)).toEqual([
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+		]);
+	});
+
+	it('⛔ and the step REFUSES when the policy does not permit what it is about to assemble', async () => {
+		// ⭑ THE CONSULTATION, END TO END THROUGH THE STEP rather than through the pure function alone. THE
+		// MUTANT: pass `alsoAssembles: []` unconditionally — the ceiling then approves every repair turn ever
+		// made, because it is never told one happened.
+		const { input } = harness({
+			priorFindings: [{ code: 'C1', statement: 'the basis is not stated' }],
+			contextPolicy: {
+				policyId: 'ctx-narrow',
+				permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/ctx-narrow/);
+		expect(!out.ran && out.refusedBecause).toMatch(/PRIOR_REVIEW_FINDING/);
 	});
 });

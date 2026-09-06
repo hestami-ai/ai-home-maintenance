@@ -31880,3 +31880,164 @@ models a COMPLIANT answer, and a test asserts it honours the contract.
 still records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`: `readReportedModel` reads
 the model out of Devin's ATIF export and **is never called**, because the assurance seam still returns a bare
 string exactly as the execution seam did before `TS-04`.
+
+---
+
+### REG-F-358 — `contextAssemblyPolicyId` finally names something, and consulting it refuted the seed I had written the day before
+
+- **Date:** 2026-09-06 · **Type:** FINDING (`JAN-CTXPOL` CP-01..CP-05, roadmap `ICP-04`) ·
+  **Class:** FINDING — one ratified reference given an object and a reader; **three defects of my own found by
+  the consultation**, two of them in the immediately preceding commit · **Status:** ✅ **CLOSED for `ICP-04`;
+  `D-3`/`D-4` explicitly NOT taken.**
+
+**SPONSOR GRANT (`D-1`, 2026-09-06):** *"Grant approved."* — authorizing the minting of the governed object
+type `CONTEXT_ASSEMBLY_POLICY`. ⚠ Minting a governed object type is a **ratification act**, not a wiring task,
+which is why the design asked rather than proceeding.
+
+⭑⭑ **THE OBJECT `contextAssemblyPolicyId` HAS ALWAYS NAMED AND NEVER HAD.** The field is REQUIRED on every
+`RUNTIME_BINDING` and every binding is minted with the constant `'ctx-default'`
+(`handlers/runtime-binding.ts:67`) pointing at nothing. `ICP-04`'s deliverable is *"an object, an id that
+resolves, and **a reader**"*.
+
+**THE ABSENCE WAS VERIFIED IN BOTH DIRECTIONS, WITH CONTROLS.** The corpus declares the REFERENCE (Canonical
+Domain Model `:1329`; Persistence §10.5 `:889`) and names a *"Context Assembly Service"* inside a **bare list of
+19 service names** (Migration `:1407`) with no fields anywhere. `grep -rn CONTEXT_ASSEMBLY_POLICY` over
+`packages/` and `apps/` returned **zero**; CONTROL — the same grep form finds `RUNTIME_BINDING`. And canon
+already governs the ACT: `DEC-4`'s SCOPE (`DOC-003:225`) names context assembly in terms — *"a context omission
+must not silently remove a mandatory constraint"* — so the object makes a ratified rule sayable rather than
+inventing a context model.
+
+⚠ **CORRECTION TO `JAN-ICP-DR-001` F-3** (`docs/Instruction and Context Plane/JAN-ICP-DR-001 Detailed
+Implementation Roadmap.md:60-62`). Its phrasing — *"`CONTEXT_ASSEMBLY_POLICY`, `OBSERVABILITY_POLICY`,
+`MEMORY_POLICY` return **0** as object types"* — is true but reads as **declared types with no instances**.
+There was **no type**. The query returned 0 because nothing could ever have been stored, and a reader would
+otherwise build on the wrong picture. ⚠ **The correction applies to all three names in that sentence**, and
+`OBSERVABILITY_POLICY` and `MEMORY_POLICY` remain exactly where `CONTEXT_ASSEMBLY_POLICY` was — a constant
+(`observabilityPolicyId: 'obs-default'`) and a ratified field with no writer respectively. This slice mints one
+of the three and says so.
+
+---
+
+**⭑⭑ THE THREE DEFECTS THE CONSULTATION FOUND, ALL MINE, TWO OF THEM ONE COMMIT OLD.**
+
+**1. ⛔ THE SEEDED POLICY WAS A FALSE STATEMENT — and the vocab note in the SAME COMMIT already contradicted it.**
+`CP-03` seeded `'ctx-default'` as `RENDERED_INSTRUCTION`/`THIS_TRY` **only**, on the explicit claim that this is
+*"what the code does today"*. It was not, and had not been for two slices:
+
+| What the producer is actually given | Where | Since |
+|---|---|---|
+| the rendered instruction, this try | `run-model-step.ts` | `JAN-EXECRUN` |
+| **prior review findings, this work unit** | the findings turn | `REG-D-059` / `JAN-EXECLOOP` |
+| **its own prior work product, this work unit** | the held session — `pi-executor.ts` `retainsHistory: true` | `JAN-EXECSESS` |
+| **its own prior rationale, this work unit** | same session, same turns | `REG-D-060` |
+
+⭑ **I did not need the code to catch this.** `ContextSourceRule.scope`'s own vocab note — authored in the same
+commit as the seed — reads *"`THIS_WORK_UNIT` is what a bounded repair loop needs (`REG-D-059`)"*. The
+vocabulary and the seed **contradicted each other inside one commit**, and nothing could notice, because
+nothing consulted the policy. Removing exactly that is what `CP-04` is for.
+
+⚠ **The correction is to the CLAIM, not the code, and that distinction has to be stated** because flipping an
+assertion from `false` to `true` is the shape of bending a test to match a bug. The BEHAVIOUR is a sponsor
+decision, landed and mutation-tested (`REG-D-059`); what was wrong was the statement about it. ⛔ **And this is
+NOT `D-3`** — `D-3` is widening the policy to draw prior work from the **stream**, a behaviour change to every
+execution, still not taken.
+
+**The falsifiable content is not lost; it MOVES.** The corrected seed permits **nothing at `THIS_UNDERTAKING`**.
+The producer's session is opened and disposed **per work unit**, so no material crosses into a second one — and
+the day it does, the policy is wrong until someone updates it.
+
+**2. ⛔ `seedContextAssemblyPolicy` WAS EXPORTED, TESTED, AND CALLED BY NOTHING.** The `JAN-CTXPOL` commit
+shipped the function and an engine-package test that called it **directly**. Nothing in any deployment did:
+`seedPolicyLibrary` called `seedFloorPolicies` and not this. So `'ctx-default'` resolved in one test file and
+**nowhere else** — the green proved the function worked, not that any engine ran it. ⭑ `CP-04d`'s live-path
+CONTROL (*"the seeded policy RESOLVES from the real store"*) is what went red, which is what a control is for.
+Fixed at `seedPolicyLibrary`, beside `seedFloorPolicies`, because a context assembly policy is **deployment
+configuration** and every engine needs one — a cold-start install that cannot say what its producers may be
+given is the same gap in a smaller room.
+
+**3. ⚠ A MUTANT REPORTED GREEN BECAUSE THE EDIT NEVER APPLIED.** Verifying the ceiling, I mutated
+`[RENDERED_INSTRUCTION, ...alsoAssembles]` → `[...alsoAssembles]` and the suite stayed green — which I nearly
+recorded as an unkilled mutant. **The replace had matched nothing:** prettier had wrapped that line across four
+lines the moment it was written. The mutation harness now `assert`s the edit applied before it will report
+anything. ⛔ A mutant that cannot be applied and a mutant that is not caught produce the **same output**, and
+they are opposite facts — a broken instrument agreeing with its subject.
+
+⚠ **And a related self-inflicted loss, recorded because it nearly cost the correction:** restoring a mutated
+file with `git checkout <path>` reverted it to `HEAD` — discarding the uncommitted seed correction along with
+the mutant. The harness now backs up and restores by copy.
+
+---
+
+**WHAT `CP-04` ACTUALLY BUILT, AND WHY ITS SECOND PREDICTED RED WAS RELOCATED.**
+
+**`CP-04a` — the CEILING.** `prepareModelInvocation` takes the resolved policy as a **REQUIRED** parameter, so
+the roadmap's predicted red — *"resolve the policy and ignore it"* — is **not expressible**: the type-checker
+names every call site that has not consulted one. Everything the step will assemble must be **within**
+`permittedSources`, which the vocab note defines as a permission (*"WHICH SOURCE a deployment PERMITS a producer
+to be given"*). ⭑ `RENDERED_INSTRUCTION` is checked like any other member, which is what keeps the check
+non-vacuous on the common path: a policy with `permittedSources: []` — *"a CLAIM"* per the field's own note —
+refuses every invocation. ⛔ The refusal precedes the render, on the sponsor's ordering argument of 2026-09-04:
+*"the disclosure arrives after the harm. Refusing is the only order that works."*
+
+**`CP-04b` — the FLOOR, RELOCATED.** The roadmap predicted *"omit an element without recording its fate →
+`DEC-4`"*. ⚠ **For template placeholders that red is ALREADY DISCHARGED, by a STRONGER mechanism, under a
+sponsor ruling:** `renderPromptTemplate` REFUSES when the assembled context supplies no value for a declared
+placeholder, and its docblock records the sponsor declining *"render the hole and disclose it afterwards"* on
+2026-09-04. Building a disposition path for the same omission would be a second way to say one thing
+(`REG-F-353`) **and would soften a ruling**. It was not built.
+
+⭑ **What IS unenforced is one layer up, and it needed the other no-reader slot.**
+`PWU_TYPE.contextSpecification.requiredElements` declares what the TYPE requires in its context and **nothing
+read it**. A type may require an element its own template never declares: `assembleStepContext` walks
+`declaredPlaceholders`; `renderPromptTemplate` checks declared-vs-supplied and text-vs-declared. Neither ever
+looks at `requiredElements`, so such an element is **silently absent** — `DEC-4`'s context omission with nothing
+watching. An omitted required element must now be **dispositioned** in the type's own
+`constraintDispositions` — one of `DEC-4`'s five legal fates — or the invocation refuses. ⚠ **This does not
+re-open 2026-09-04:** a disposition is authored on the TYPE, before any run, and read BEFORE the prompt is
+built. The order was the whole argument.
+
+**`CP-04d` — resolution on the LIVE path.** `ICP-04`'s exit test (*"point a binding at a policy that does not
+exist. This MUST refuse"*) stood only in a unit test with a hand-built finder. The execution action now resolves
+the id from the engine's own store before a single turn is sent, and a refusal **FAILS THE STEP** with a reason
+rather than throwing past it — the step has already `Start`ed. ⛔ **A disclosed gap, not papered over:**
+`contextAssemblyPolicyId` lives on `RUNTIME_BINDING`, and the demo's action mints its plan inline with
+`authorizedRuntimeBindingIds: []`, so a demo-run step **has no binding**. The resolver returns the id's
+**provenance** — `RUNTIME_BINDING` or `HOST_DEFAULT` — because a fallback that does not say it is one is the
+value-standing-in-for-a-decision defect this whole programme is about. Minting a binding is not taken here:
+`RequestRuntimeBinding` refuses a request naming no capability (N-20) and `AuthorizeRuntimeBinding` refuses an
+authorization granting nothing (N-22).
+
+**AND `retainsHistory` GOT ITS FIRST NON-TEST CONSUMER.** Declared since `JAN-EXECSESS` and read by nothing but
+assertions, it now decides what the step DECLARES it is assembling: on a repair turn a remembering session
+genuinely carries the producer's own prior work product and rationale, and that IS assembled context whether or
+not the harness handed it over. ⚠ Nothing is declared on try 1 even with a remembering session — a fresh
+session has no prior turns, and listing them would be a claim about material that does not exist.
+
+---
+
+**`D-2` DISPOSED.** *"A fail-closed default breaks every existing binding; a permissive seed reproduces the
+vacuous route."* Taken: a **real minimal policy stating today's behaviour** — it resolves, so no binding
+breaks, and it is falsifiable, so it can be wrong. ⛔ **`D-3` (widen to the stream) and `D-4` (`memoryPolicyId`,
+ratified and still with no writer) NOT taken**, and named here so their absence is a decision rather than an
+oversight.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM** (`packages/rph-application/src/execution-invocation.test.ts`):
+exempt `RENDERED_INSTRUCTION` → *an EMPTY policy refuses even the rendered instruction*; match on `source`
+alone → *SCOPE is checked, not only source*; drop the floor check → *REFUSES a required element the assembled
+context does not carry*; accept any non-empty dispositions → *the disposition must name the OMITTED element*;
+consult the policy after rendering → *the ceiling refuses BEFORE the render*.
+
+**GATES:** check-types 22/22 · lint · verif 55 files / 405 tests · `rph-application`+`rph-engine`+`rph-assurance`
+1301 · `app:rph-demo` 302 · playwright 86. ⚠ **The roadmap ratchet stays at 32**: this slice REVISED
+`ROADMAP-context-assembly-policy.md` rather than adding a roadmap, so an increment would assert a document that
+does not exist.
+
+**⚠ OWED AND NOT CLAIMED.** The `THIS_UNDERTAKING` boundary is asserted but has no cross-unit path to violate it
+yet. `RUNTIME_BINDING`-sourced policy ids are covered by unit test only, because no production step carries a
+binding. `contextSpecification` has a reader but **no seeded PWU_TYPE declares one**, so `CP-04b` is exercised
+by tests and dormant in the demo's data. And `memoryPolicyId` remains ratified, unwritten, unread.
+
+**Merge target:** Repository (`context-assembly.ts`, `execution-invocation.ts`, `context-policy.ts`,
+`seed-workbench.ts`, the vocabulary, and five test files); `JPWB-DOC-003` `DEC-4` carries the semantic
+requirement unchanged — this slice implements it for context assembly and adds no semantic requirement of its
+own. The entry's single live status is stated in its header, above.
