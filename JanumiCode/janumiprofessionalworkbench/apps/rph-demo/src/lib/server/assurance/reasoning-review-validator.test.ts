@@ -69,13 +69,15 @@ const ctx = (
 		rationale: ProfessionalRationaleSummary;
 		narration: string;
 		content: string;
+		/** ⭑ JAN-OUTCONTRACT — the producing INSTRUCTION, which is where the type's outputContract now rides. */
+		prompt: string;
 	}> = {}
 ): ValidatorContext => ({
 	reasoningReview: {
 		// The policy's criteria AS SEEDED — what the store holds, which is what the composition root reads and
 		// threads in. Not the `REASONING_REVIEW_CRITERIA` constant: the rubric and the score are the POLICY's now.
 		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
-		prompt: 'Author a product realization PWA',
+		prompt: over.prompt ?? 'Author a product realization PWA',
 		content: over.content ?? '{"pwuTypes":[{"id":"t1"}]}',
 		narration: over.narration ?? '',
 		...(over.rationale ? { rationale: over.rationale } : {})
@@ -535,5 +537,39 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx());
 		expect(result).toBeDefined();
+	});
+});
+
+// ── ⚠ JAN-OUTCONTRACT OC-02 — THE ONE LIMITATION THE PLACEMENT INTRODUCES, MEASURED RATHER THAN ASSUMED ────
+describe('JAN-OUTCONTRACT — the instruction carries the contract, and truncation is DECLARED', () => {
+	it('⭑ a contract inside the instruction reaches the reviewer verbatim', async () => {
+		const { prompts, print } = capturing();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+			SUBJECT,
+			ctx({
+				prompt:
+					'Assess the delivery route.\n\nThe output this work requires:\nA single JSON object: {"finding": string}.'
+			})
+		);
+		expect(prompts[0]).toContain('The output this work requires:');
+		expect(prompts[0]).toContain('{"finding": string}');
+	});
+
+	it('⚠ over USER_INTENT_MAX the contract is the FIRST thing cut — and the cut is DECLARED, not silent', async () => {
+		// ⭑ THE HONEST CONSEQUENCE OF PUTTING THE CONTRACT AT THE END OF THE INSTRUCTION. `excerpt` keeps the
+		// head and appends a marker, so a very long template pushes the contract past the 4,000-char intent
+		// budget. Pinned here so it is a MEASURED property rather than a surprise found in a live run.
+		//
+		// ⛔ IT IS ACCEPTABLE ONLY BECAUSE THE LOSS IS DISCLOSED: the reviewer is told the instruction was
+		// truncated, so it cannot mistake a cut contract for an absent one. THE MUTANT: make `excerpt` slice
+		// silently — the reviewer would then judge against an instruction it believed complete.
+		const { prompts, print } = capturing();
+		const huge = `${'x'.repeat(4_500)}\n\nThe output this work requires:\nSENTINEL_CONTRACT`;
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+			SUBJECT,
+			ctx({ prompt: huge })
+		);
+		expect(prompts[0], 'the contract is beyond the budget').not.toContain('SENTINEL_CONTRACT');
+		expect(prompts[0], 'and the reviewer is TOLD so').toContain('…(truncated)');
 	});
 });

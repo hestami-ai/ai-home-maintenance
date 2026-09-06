@@ -306,7 +306,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⚠ AND IT DELIBERATELY DOES NOT TAKE `materializedInput` for the assurance plane: the ATIF export
 			// carries the model, not the composed input, so claiming an E-1 composite from it would be a
 			// fabricated measurement.
-		).toBe(33);
+			//
+			// 33 -> 34 (2026-09-06): `ROADMAP-output-contract-reaches-the-work.md` (`JAN-OUTCONTRACT`). ⭑ NOT A
+			// NEW LINE — it keeps a promise this system ALREADY MAKES IN WRITING to every model it invokes.
+			// `EXECUTION_CONTRACT_PROMPT` opens *"You will be given an instruction that states the work and the
+			// exact output it requires"*, and `PromptTemplate.outputContract` — the field where a professional
+			// declares exactly that — was authored through the PWA Designer, stored on the type, and read by NO
+			// code on ANY path. CONTROL that this is a field left off a working conveyor rather than a missing
+			// capability: `expectedOutputs` travels the same route and arrives.
+			// ⭑ IT SUBSUMES: no new vocabulary, no new field, and — after measurement — HALF THE ROADMAP WAS
+			// WITHDRAWN. `OC-02` was drafted as a second `ReasoningReviewInput.outputContract`; tracing the chain
+			// showed the reviewer ALREADY receives the contract inside the instruction it is handed, so the
+			// field would have been `REG-F-353`'s *"a second way to say one thing"* — with a concrete
+			// disagreement available, since nothing would say which of the two wins.
+		).toBe(34);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

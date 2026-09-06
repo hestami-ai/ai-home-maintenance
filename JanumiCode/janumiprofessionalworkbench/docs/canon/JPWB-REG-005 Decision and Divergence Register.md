@@ -32149,3 +32149,108 @@ closed — such a census would pin the symptom, and `AI-01b` pins something a re
 `verif/tool-adapter-exports-reachable.test.ts`, `verif/slice-subsumption.test.ts`, and the validator tests);
 `JPWB-DOC-003` `ASR-4`/`PER-9` carry the requirement unchanged — this slice implements it for the assurance
 plane and adds no obligation of its own.
+
+---
+
+### REG-F-360 — a professional's `outputContract` reached nothing, and measurement withdrew half the roadmap that was to fix it
+
+- **Date:** 2026-09-06 · **Type:** FINDING (`JAN-OUTCONTRACT` OC-01..OC-03) ·
+  **Class:** FINDING — a fifth authored-with-no-consumer field, wired; ⭑ **one planned unit WITHDRAWN as a
+  restated-vocabulary defect before it was written**; one vocab-note miscitation corrected ·
+  **Status:** ✅ **CLOSED.**
+
+**THE MEASUREMENT.** `PromptTemplate.outputContract` is authored through the PWA Designer
+(`routes/pwa/[id]/+page.server.ts:339`, `+page.svelte:517`), stored on the work-unit type, and **read by no
+code on any path**:
+
+| Where it could be used | What was there |
+|---|---|
+| the rendered instruction | `assembleStepContext`'s closed list — `subject, title, description, statement, purpose, expectedOutputs, inputRequirements`. Not present. |
+| the reviewer's prompt | `judgePrompt` receives `criteria, prompt, content, narration, rationale, prior`. Not present. |
+| the floor | `schemaValid` = `splitAnswerSpan(answer).located` — parseable, nothing more. |
+
+⭑ **CONTROL — the conveyor works.** `expectedOutputs` travels handler → `InvocationSubject` →
+`assembleStepContext` → rendered prompt. So this was a field left OFF a working mechanism, not a missing
+capability. Every other `grep` hit across `packages/` and `apps/` is a **comment mentioning it**.
+
+⚠ **THE FIFTH SUCH FIELD IN RECENT SLICES** — `contextAssemblyPolicyId` (`REG-F-358`), `retainsHistory` and
+`readReportedModel` (`REG-F-359`), `contextSpecification.requiredElements` (`REG-F-358`), and now this. Each
+was fixed on its own evidence; the recurrence is recorded here because five is a pattern, not a coincidence.
+
+---
+
+**⭑⭑ THE OBLIGATION IS THIS SYSTEM'S OWN WRITTEN PROMISE, NOT AN INVENTED ONE.**
+`EXECUTION_CONTRACT_PROMPT` — the system prompt every executing model receives — opens:
+
+> *"You will be given an instruction that states the work **and the exact output it requires**."*
+
+The assembly did not keep it. The instruction stated the required output only when a template author happened
+to repeat it inside `templateText`. Nothing new is asserted by this slice; a standing commitment is honoured.
+
+⚠ **AND THE FIELD'S OWN VOCAB NOTE MISCITES ITS AUTHORITY.** It reads *"What a conforming answer looks like, so
+a malformed one is INERT (`ASR-11`) rather than interpreted."* `ASR-11` is *"Validator failure is not a verdict;
+invalid output is inert"*, and its **SCOPE** is *"governs assurance-process failures and observation quality"* —
+**validator** output, not the producer's work product. The citation is a stretch, corrected here rather than
+repeated in new code.
+
+**WHERE IT BELONGS, AND THE BOUNDARY THAT DECIDES IT.** `execution-contract.ts` already states the rule: *"The
+type says WHAT work; the harness says the EXECUTION CONTRACT. Injecting this into the template would silently
+edit someone else's contract."* ⭑ That cuts **both ways**, and it settles the placement: the harness's prompt
+is set once per SESSION (`systemPromptOverride`), so putting one type's contract there would carry it across
+every later work unit the session touches. `templateText` and `outputContract` are both the TYPE's content;
+joining them in `prepareModelInvocation` is the type stating its whole requirement.
+
+⭑ **AND IT REMAINS `RENDERED_INSTRUCTION` AT `THIS_TRY`.** `CP-04`'s ceiling is untouched and no context
+assembly policy needs widening — asserted by a test so a later reader need not re-derive it.
+
+---
+
+**⭑⭑ HALF THE ROADMAP WAS WITHDRAWN BY MEASUREMENT, BEFORE ANY CODE WAS WRITTEN.**
+
+`OC-02` was drafted as *"`ReasoningReviewInput` gains an optional `outputContract`, threaded into
+`judgePrompt`"*, complete with predicted reds. Tracing the chain first showed it was already discharged by
+`OC-01`:
+
+> `plan.prompt` (now built WITH the contract) → `outcome.prompt` → `producingPrompt` → `input.prompt` → the
+> judge prompt's *"was given exactly this instruction"*.
+
+⛔ **Adding the field would have been `REG-F-353`** — *"a second way to say one thing is how restated vocabulary
+comes to disagree"* — and the disagreement here is concrete rather than theoretical: a reviewer handed an
+instruction saying one thing and a separate contract field saying another has **no rule for which wins**.
+`OC-02` became a chain test plus a disclosure instead.
+
+⚠ **THE ONE LIMITATION THE PLACEMENT INTRODUCES, MEASURED AND PINNED.** The contract sits at the END of the
+instruction and `judgePrompt` excerpts the instruction at `USER_INTENT_MAX` (4,000 chars), so a very long
+template pushes the contract out of the reviewer's view — **the contract is the first thing cut**. It is
+acceptable ONLY because `excerpt` appends `…(truncated)`: the loss is DECLARED, so a reviewer cannot mistake a
+cut contract for an absent one. A test pins both halves, and a mutant making `excerpt` silent reddens it.
+⚠ No seeded type declares a template at all, so there is no corpus of real lengths to measure this against —
+the 4,000-char boundary is the pinned property, not a claim about observed data.
+
+---
+
+**⚠ AND TWO INSTRUMENT SLIPS, BOTH CAUGHT BY THE HARNESS'S OWN ASSERTION.** A mutation anchor failed to match
+twice — once because prettier had reflowed the target, once because a template literal had been written with
+real newlines instead of `\n` escapes (the same string, but not the text the anchor expected). Both surfaced as
+`AssertionError: the mutation did not match — the instrument, not the code`, which is the guard added at
+`REG-F-358` doing its job on the two following slices.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM:** drop the contract → *the contract is APPENDED to the instruction*
+and *the prompt the outcome carries … includes the contract*; append an empty trailer → *a template with NO
+contract renders EXACTLY as before, byte for byte*; contract before the work → *the contract follows the
+rendered work*; hand the reviewer the turn → *the REVIEWER still receives the INSTRUCTION* (⚠ a
+**pre-existing** test, not one added here); silent truncation → *the cut is DECLARED, not silent*.
+
+**GATES:** check-types 22/22 · lint · verif 56 files / 409 tests (ratchet 33 → 34 with a derived warrant) ·
+`rph-application`+`rph-engine`+`rph-assurance` 1306 · `app:rph-demo` 311 · playwright 86.
+
+**⚠ OWED AND NOT CLAIMED.** ⛔ **`schemaValid` STILL MEANS PARSEABLE.** The floor's own disclosure
+(`work-product-floor.ts:62-67`) stands unchanged: `outputContract` is free text, contract conformance is still
+not machine-decidable, and structuring it is a vocabulary change wanting its own grant — exactly as
+`CONTEXT_ASSEMBLY_POLICY` did. What this slice buys is that the producer is now TOLD the contract and the
+reviewer can now READ it; whether the answer conforms remains a judgement, not a check. ⚠ And no seeded type
+declares an `outputContract`, so — like `CP-04b` — the path is exercised by tests and dormant in the demo's
+data. Authoring one to make it fire would be inventing professional content to justify my own wiring.
+
+**Merge target:** Repository (`execution-invocation.ts` and four test files);
+`JPWB-DOC-003` gains nothing — this slice honours a promise the harness already made.

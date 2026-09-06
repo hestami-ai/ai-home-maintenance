@@ -186,7 +186,37 @@ export function prepareModelInvocation(
 
 	return {
 		ready: true,
-		prompt: rendered.text,
+		prompt: withOutputContract(rendered.text, template.outputContract),
 		fingerprint: promptTemplateFingerprint(pwuTypeId, template)
 	};
+}
+
+/**
+ * Append the type's own `outputContract` to its rendered instruction.
+ *
+ * ⭑⭑ THE HARNESS ALREADY PROMISED THIS AND THE ASSEMBLY DID NOT KEEP IT. `EXECUTION_CONTRACT_PROMPT` — the
+ * system prompt every executing model is given — opens: *"You will be given an instruction that states the work
+ * and the exact output it requires."* `outputContract` is the field where a professional declares exactly that,
+ * and it reached NOTHING: authored through the PWA Designer, stored on the type, and read by no code on any
+ * path. The instruction stated the required output only when a template author happened to repeat it inside
+ * `templateText`.
+ *
+ * ⛔ IT GOES IN THE INSTRUCTION, NOT IN THE SYSTEM PROMPT, and `execution-contract.ts` states the rule that
+ * decides it: *"The type says WHAT work; the harness says the EXECUTION CONTRACT. Injecting this into the
+ * template would silently edit someone else's contract."* That cuts both ways. The harness's prompt is set once
+ * per SESSION (`systemPromptOverride`), so putting one type's contract there would carry it across every later
+ * work unit the session touches. `templateText` and `outputContract` are both the TYPE's content; joining them
+ * is the type stating its whole requirement, not a boundary crossing.
+ *
+ * ⚠ AND IT IS STILL `RENDERED_INSTRUCTION` AT `THIS_TRY`. `CP-04`'s ceiling is unchanged and no context
+ * assembly policy needs widening — the instruction simply says what it was always supposed to say.
+ *
+ * ⚠ ABSENT MEANS ABSENT. An empty trailer would tell the producer a contract exists and then show it nothing,
+ * which is worse than silence.
+ */
+function withOutputContract(rendered: string, outputContract: string | undefined): string {
+	const contract = outputContract?.trim();
+	// ⚠ THE CONTRACT FOLLOWS THE WORK. The instruction reads "do this work / and return it in this shape";
+	// inverting it makes the producer meet an output shape before it has been told what the work is.
+	return contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
 }

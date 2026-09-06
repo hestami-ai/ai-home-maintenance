@@ -406,3 +406,41 @@ describe('assembledSources — the claim the policy is checked against', () => {
 		expect(!out.ran && out.refusedBecause).toMatch(/PRIOR_REVIEW_FINDING/);
 	});
 });
+
+// ── ⭑⭑ JAN-OUTCONTRACT OC-02 — THE CONTRACT REACHES THE REVIEWER, AND IT DOES SO INSIDE THE INSTRUCTION ────
+//
+// ⭑ THE ROADMAP PREDICTED A SECOND FIELD AND MEASUREMENT REFUTED IT. `OC-02` was drafted as
+// `ReasoningReviewInput.outputContract` threaded into `judgePrompt`. Then the chain was traced:
+// `plan.prompt` (which `OC-01` now builds WITH the contract) -> `outcome.prompt` -> `producingPrompt` ->
+// `input.prompt` -> the judge prompt's *"was given exactly this instruction"*. The reviewer already has it.
+//
+// ⛔ ADDING THE FIELD WOULD HAVE BEEN `REG-F-353` — *"a second way to say one thing is how restated vocabulary
+// comes to disagree"* — and here the disagreement is concrete: a reviewer handed an instruction saying one
+// thing and a separate contract field saying another has no rule for which wins.
+describe('OC-02 — the reviewer is handed the contract as part of the instruction', () => {
+	it('⭑⭑ the prompt the outcome carries — what the reviewer judges against — includes the contract', async () => {
+		// THE MUTANT: return `rendered.text` from `prepareModelInvocation`, or have this step return `turnText`
+		// instead of `plan.prompt`. Either drops the contract from the reviewer's view of the obligation, so it
+		// would judge the work product against an instruction the producer never received.
+		const { input } = harness({
+			template: {
+				...ACTIVE,
+				outputContract: 'A single JSON object: {"finding": string, "basis": string[]}.'
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		expect(out.ran && out.prompt).toContain('{"finding": string, "basis": string[]}');
+		// ⭑ AND IT IS THE SAME STRING THE PRODUCER WAS GIVEN, which is the property that makes the review a
+		// judgement of the same pair rather than of a summary.
+		expect(out.ran && out.prompt).toContain('Assess Route Assessment');
+	});
+
+	it('⭑ CONTROL — with no contract the reviewer’s instruction is unchanged', async () => {
+		// Without this, "carries the contract" cannot be told apart from "carries a section always", and every
+		// existing prompt would silently gain a trailer.
+		const { input } = harness();
+		const out = await runModelInvocationStep(input);
+		expect(out.ran && out.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+	});
+});

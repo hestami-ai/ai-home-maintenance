@@ -239,3 +239,67 @@ describe("CP-04b — the FLOOR: a type's required element may not be silently om
 		expect(plan.ready).toBe(true);
 	});
 });
+
+// ── ⭑⭑ JAN-OUTCONTRACT OC-01 — THE INSTRUCTION STATES THE OUTPUT THE TYPE REQUIRES ─────────────────────────
+//
+// `EXECUTION_CONTRACT_PROMPT` promises every executing model *"an instruction that states the work and the
+// exact output it requires"*. `PromptTemplate.outputContract` is where a professional declares exactly that —
+// authored through the PWA Designer, stored on the type, and until this slice read by NO code on ANY path.
+describe('OC-01 — the type’s outputContract reaches the rendered instruction', () => {
+	const WITH_CONTRACT: PromptTemplate = {
+		...ACTIVE,
+		outputContract: 'A single JSON object: {"finding": string, "basis": string[]}.'
+	};
+
+	it('⭑⭑ the contract is APPENDED to the instruction', () => {
+		// THE MUTANT: render the template and drop the contract — i.e. today's behaviour. The harness's own
+		// promise then goes unkept for every type whose author did not repeat the contract inside templateText.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY);
+		expect(plan.ready && plan.prompt).toContain('Assess Route Assessment');
+		expect(plan.ready && plan.prompt).toContain('{"finding": string, "basis": string[]}');
+	});
+
+	it('⭑ CONTROL — a template with NO contract renders EXACTLY as before, byte for byte', () => {
+		// ⛔ WITHOUT THIS, "appends the contract" cannot be told apart from "appends a section always". An empty
+		// trailer would announce a contract and then show the producer nothing, which is worse than silence —
+		// and it would change every existing prompt fingerprint's rendered text for no reason.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
+		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+	});
+
+	it('⚠ a whitespace-only contract is treated as ABSENT, not as an empty contract', () => {
+		// THE MUTANT: test truthiness on the raw string. The authoring form submits `.trim()`ed input, but a
+		// stored value of "   " would otherwise render a header with nothing under it.
+		const plan = prepareModelInvocation(
+			PWU,
+			'pwut_9',
+			{ ...ACTIVE, outputContract: '   ' },
+			ASSEMBLY
+		);
+		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+	});
+
+	it('⭑ the contract follows the rendered work, never precedes it', () => {
+		// The instruction reads as "do this work / and return it in this shape". Inverting the order makes the
+		// producer meet the output shape before it has been told what the work is.
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY);
+		const text = plan.ready ? plan.prompt : '';
+		expect(text.indexOf('Assess Route Assessment')).toBeLessThan(text.indexOf('{"finding"'));
+	});
+
+	it('⛔ it is STILL a RENDERED_INSTRUCTION at THIS_TRY — CP-04’s ceiling is untouched', () => {
+		// ⭑ ASSERTED SO A LATER READER DOES NOT HAVE TO RE-DERIVE IT. Appending the type's own contract does not
+		// introduce a context SOURCE; the instruction simply says what it was always supposed to say. THE
+		// MUTANT: treat the contract as a separate source — the seeded policy would then need widening for a
+		// change that assembles nothing new.
+		const instructionOnly: ContextAssemblyPolicyContent = {
+			policyId: 'ctx-instruction-only',
+			permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+		};
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, {
+			policy: instructionOnly,
+			alsoAssembles: []
+		});
+		expect(plan.ready).toBe(true);
+	});
+});
