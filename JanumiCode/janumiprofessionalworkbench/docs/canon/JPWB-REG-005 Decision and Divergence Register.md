@@ -32254,3 +32254,94 @@ data. Authoring one to make it fire would be inventing professional content to j
 
 **Merge target:** Repository (`execution-invocation.ts` and four test files);
 `JPWB-DOC-003` gains nothing — this slice honours a promise the harness already made.
+
+---
+
+### REG-F-361 — the `DEC-4` check I shipped two days earlier read `constraintId` and ignored `fate`, and a general derivation found it in minutes
+
+- **Date:** 2026-09-06 · **Type:** FINDING (`JAN-CTXPOL` `CP-04b` corrected) ·
+  **Class:** FINDING — a defect of my own in shipped code, found by DERIVATION rather than by accident;
+  a pre-existing vocabulary duplication uncovered and NOT taken; one dissenting reading recorded, not resolved ·
+  **Status:** ✅ **CLOSED.**
+
+**HOW IT WAS FOUND, WHICH IS THE POINT OF THE ENTRY.** Asked whether the recurring authored-with-no-consumer
+defect deserved a general gate rather than another one-at-a-time fix, I derived the general set:
+**28 of 406 declared vocabulary fields have no production reference outside the generated contracts.**
+`ConstraintDisposition.fate` was on that list — and the checker written to give it a reader, `CP-04b`, shipped
+**two days earlier**, is what left it there.
+
+```ts
+const dispositioned = new Set(dispositions.map((d) => d.constraintId));   // fate never read
+```
+
+⭑ Every prior instance in this series (`contextAssemblyPolicyId`, `retainsHistory`, `readReportedModel`,
+`requiredElements`, `outputContract`) was found **by accident**, weeks apart, while doing something else. This
+one was found **on purpose, in minutes**, by asking the general form. That difference is the argument for the
+gate, made better than it could be made in the abstract.
+
+**THE DEFECT.** `DEC-4` (`DOC-003:223`) lists five fates as ALTERNATIVES — *"propagated (retaining authority and
+strength); retained at parent level; marked inapplicable with rationale; waived through authority; or superseded
+by a stronger constraint."* Four say why something is ABSENT. **`PROPAGATED` asserts it is PRESENT.** Against an
+element the assembled context does not supply, a `PROPAGATED` disposition is not a weak excuse — it is a claim
+**this assembly contradicts**, and it now refuses more loudly rather than less, with a message distinct from the
+no-disposition case. ⚠ My own `CP-04b` test used `fate: 'PROPAGATED'` in a fixture and never noticed.
+
+**THE PER-FATE RULES ARE ADOPTED FROM THE KERNEL, NOT DERIVED.** `rph-domain`'s `checkConstraintDisposition`
+already ratifies them: `RETAINED` is *"always a valid disposition (§11.2)"*; `INAPPLICABLE` requires a rationale
+(`RPH-CNS-003`); `WAIVED` requires authority (`RPH-CNS-004`); `SUPERSEDED` requires a replacement.
+
+⛔ **AND THE CARRIER CANNOT EXPRESS TWO OF THOSE RULES, DISCLOSED RATHER THAN FAKED.**
+`ConstraintDispositionSchema` is `{constraintId, fate, rationale?}` — no `authorityDecisionId`, no
+`supersededByConstraintId`. So the rationale half of `INAPPLICABLE_WITH_RATIONALE` **is** enforced (the fate's
+own name demands it); the authority behind a waiver and the replacement behind a supersession have nowhere to
+live in this carrier and are **not checked and not pretended to be**.
+
+---
+
+**⚠ A PRE-EXISTING DUPLICATION THIS UNCOVERED, RECORDED AND NOT TAKEN.** `DEC-4`'s five fates are spelled
+**twice** in shipped code by two owners:
+
+| | Spelling |
+|---|---|
+| `rph-domain` (kernel) | `PROPAGATED · RETAINED · INAPPLICABLE · WAIVED · SUPERSEDED` |
+| `rph-contracts` (vocabulary) | `PROPAGATED · RETAINED_AT_PARENT · INAPPLICABLE_WITH_RATIONALE · WAIVED_THROUGH_AUTHORITY · SUPERSEDED_BY_STRONGER` |
+
+⛔ This is `REG-F-353`'s shape — *"a second way to say one thing is how restated vocabulary comes to disagree"* —
+and `DESIGN-context-assembly-policy.md` §4 **missed it while congratulating itself** for adopting the contracts
+spelling rather than inventing a sixth. Both predate this programme; merging them is a cross-package change
+with its own blast radius. **Owed, not taken.**
+
+**⚠ A DISSENTING READING, RECORDED RATHER THAN RESOLVED.** The triage argued `RETAINED_AT_PARENT` and
+`SUPERSEDED_BY_STRONGER` *"likewise assert the constraint still binds"* and should not excuse an absence either,
+leaving only two excusing fates. Not adopted — the kernel calls `RETAINED` *"always a valid disposition"* and
+says a constraint relevant to no child *"is retained wholly at the parent"*, which is exactly the case where the
+child's context does not carry it. ⚠ It is a question about what canon MEANS, so it is recorded for the sponsor.
+⛔ If it is ever reopened, note the direction: the implemented reading excuses four of five, so if it is wrong it
+is wrong **permissively**, and this is the notice. What is NOT in dispute is `PROPAGATED`.
+
+---
+
+**THE PREDICTED RED WAS THE SHIPPED DEFECT ITSELF.** Rather than invent a mutant, the pre-fix logic was restored
+verbatim — `new Set(...map((d) => d.constraintId))` — and reddened exactly three of the new tests: *PROPAGATED
+does NOT excuse an omission*, *the PROPAGATED refusal is DISTINCT from the no-disposition refusal*, and
+*INAPPLICABLE_WITH_RATIONALE with NO rationale does not excuse it*. The other 23 stayed green.
+
+**⭑ AND A SIXTH FATE NOW CANNOT SLIP THROUGH, PROVED RATHER THAN ASSERTED.** The switch carries a `never`
+exhaustiveness guard, and a test derives the fate set from `ConstraintDispositionSchema` instead of hand-listing
+it. ⚠ **My first probe of the compile-time half was INVALID** — adding a sixth member to
+`packages/rph-contracts/src/objects.ts` produced no error, because `rph-application` resolves the package to
+`dist`. Rebuilt, the probe is decisive: `error TS2322: Type '"A_SIXTH_FATE"' is not assignable to type 'never'`,
+and the tree is clean again after restore. A claim in a test comment that I could not verify would have been
+worse than no claim.
+
+**GATES:** check-types 22/22 · lint · verif 409 · `rph-application`+`rph-engine`+`rph-assurance` 1312 ·
+`app:rph-demo` 311 · playwright 86.
+
+**⚠ OWED.** The 28-field derivation's remaining findings are triaged but not filed — `requiredIndependence`
+(`DispositionRule`), `riskConditions` (`ApplicabilityRule`) and `validUntil` (`AuthorityReference`) were each
+classified CONTROL_INPUT with drive-the-engine evidence, and several were **already recorded** elsewhere in this
+repository (`docs/tracking/w3b/invariant-verdicts.ndjson`, `REG-E-027`, `DESIGN-trust-boundary.md`). That they
+were already known and still stand is itself the finding, and it belongs in its own entry rather than this one.
+
+**Merge target:** Repository (`execution-invocation.ts` + its tests, the design and roadmap corrections).
+`JPWB-DOC-003` `DEC-4` unchanged — this reads the fates it already declares.

@@ -167,14 +167,19 @@ export function prepareModelInvocation(
 	// written when the type was authored, and is read HERE — before the prompt exists. The order was the whole
 	// argument, and this is on the right side of it.
 	const required = assembly.specification?.requiredElements ?? [];
-	const dispositioned = new Set(
-		(assembly.specification?.constraintDispositions ?? []).map((d) => d.constraintId)
-	);
-	const undisposed = required.filter((e) => context[e] === undefined && !dispositioned.has(e));
-	if (undisposed.length > 0)
+	const dispositions = assembly.specification?.constraintDispositions ?? [];
+	const unexcused = required
+		.filter((e) => context[e] === undefined)
+		.map((element) => ({ element, why: omissionRefusal(element, dispositions) }))
+		.filter((r): r is { element: string; why: string } => r.why !== undefined);
+	if (unexcused.length > 0)
 		return {
 			ready: false,
-			reason: `The work-unit type ${pwuTypeId} requires ${undisposed.join(', ')} in its assembled context and the context supplies ${undisposed.length === 1 ? 'it' : 'them'} not. DEC-4 (DOC-003:225) governs context assembly and forbids a silent omission: record what became of ${undisposed.length === 1 ? 'it' : 'each'} in contextSpecification.constraintDispositions, or supply ${undisposed.length === 1 ? 'it' : 'them'}.`
+			reason:
+				`The work-unit type ${pwuTypeId} requires ${unexcused.map((r) => r.element).join(', ')} in its ` +
+				`assembled context and the context supplies ${unexcused.length === 1 ? 'it' : 'them'} not. ` +
+				`DEC-4 (DOC-003:225) governs context assembly and forbids a silent omission. ` +
+				unexcused.map((r) => `${r.element}: ${r.why}`).join(' ')
 		};
 
 	const rendered = renderPromptTemplate(template, context);
@@ -219,4 +224,76 @@ function withOutputContract(rendered: string, outputContract: string | undefined
 	// ⚠ THE CONTRACT FOLLOWS THE WORK. The instruction reads "do this work / and return it in this shape";
 	// inverting it makes the producer meet an output shape before it has been told what the work is.
 	return contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
+}
+
+/**
+ * Why an omitted required element is still unexcused — or `undefined` when a disposition legitimately covers it.
+ *
+ * ⛔⛔ THE FIRST VERSION OF THIS CHECK READ `constraintId` AND IGNORED `fate` ENTIRELY, so any disposition
+ * excused any omission. Found by a derivation of governed fields with no production reader:
+ * `ConstraintDisposition.fate` was ON that list, and this — the checker written to give it one — was what left
+ * it there.
+ *
+ * ⭑ THE FIVE FATES ARE NOT INTERCHANGEABLE, AND ONE OF THEM CANNOT EXCUSE AN ABSENCE AT ALL. `DEC-4`
+ * (`DOC-003:223`) lists them as alternatives — *"propagated (retaining authority and strength); retained at
+ * parent level; marked inapplicable with rationale; waived through authority; or superseded by a stronger
+ * constraint."* Four say why something is ABSENT. **`PROPAGATED` asserts it is PRESENT** — so against an
+ * element the context does not supply it is not a weak excuse but a claim that is FALSE about this assembly,
+ * and it refuses more loudly rather than less.
+ *
+ * ⭑ THE PER-FATE RULES ARE ADOPTED FROM THE KERNEL, NOT DERIVED HERE. `rph-domain`'s
+ * `checkConstraintDisposition` already ratifies them: `RETAINED` is *"always a valid disposition (§11.2)"*;
+ * `INAPPLICABLE` requires a rationale (`RPH-CNS-003`); `WAIVED` requires authority (`RPH-CNS-004`);
+ * `SUPERSEDED` requires a replacement constraint.
+ *
+ * ⛔ AND THE CARRIER CANNOT EXPRESS TWO OF THOSE RULES, WHICH IS DISCLOSED RATHER THAN FAKED.
+ * `ConstraintDispositionSchema` is `{constraintId, fate, rationale?}` — it has no `authorityDecisionId` and no
+ * `supersededByConstraintId`. The rationale half of `INAPPLICABLE_WITH_RATIONALE` IS checkable and the fate's
+ * own name demands it; the authority behind a waiver and the replacement behind a supersession have nowhere to
+ * live here, so they are NOT checked and this docblock says so instead of a check pretending to.
+ *
+ * ⚠ THE SWITCH IS EXHAUSTIVE ON PURPOSE. A sixth fate added to the vocabulary becomes a COMPILE ERROR here
+ * rather than a silently-permitted excuse — which is the failure mode that produced this defect.
+ */
+function omissionRefusal(
+	element: string,
+	dispositions: readonly ContextSpecification['constraintDispositions'][number][]
+): string | undefined {
+	const named = dispositions.filter((d) => d.constraintId === element);
+	if (named.length === 0)
+		return 'no constraintDisposition names it, so its omission is silent — record what became of it, or supply it.';
+	// ⭑ ANY ONE SUFFICIENT DISPOSITION EXCUSES IT. A constraint may be dispositioned by several records — the
+	// kernel says so in terms ("a constraint may be dispositioned by several records") — so this asks whether
+	// ONE of them covers the absence, and reports the objection to the others only when none does.
+	const objections: string[] = [];
+	for (const d of named) {
+		switch (d.fate) {
+			case 'RETAINED_AT_PARENT':
+			case 'WAIVED_THROUGH_AUTHORITY':
+			case 'SUPERSEDED_BY_STRONGER':
+				return undefined;
+			case 'INAPPLICABLE_WITH_RATIONALE':
+				if (d.rationale?.trim()) return undefined;
+				objections.push(
+					'its disposition is INAPPLICABLE_WITH_RATIONALE and carries no rationale — the fate names the rationale it requires (RPH-CNS-003)'
+				);
+				break;
+			case 'PROPAGATED':
+				objections.push(
+					'its disposition says PROPAGATED, which asserts the constraint was carried FORWARD — that is a claim this assembly contradicts, not a reason for the absence'
+				);
+				break;
+			default: {
+				// ⭑ THE EXHAUSTIVENESS GUARD, AND IT IS LOAD-BEARING RATHER THAN DECORATIVE. Without it a sixth
+				// fate added to the vocabulary would fall through this switch, contribute no objection, and be
+				// SILENTLY TREATED AS EXCUSING THE OMISSION — which is the same shape as the defect this function
+				// was written to fix. TypeScript does not check switch exhaustiveness on its own; this makes it.
+				const unhandled: never = d.fate;
+				throw new Error(
+					`ConstraintDisposition carries a fate this check does not handle: ${String(unhandled)}. A new fate must be decided FOR CONTEXT OMISSION explicitly — whether it explains an absence (like RETAINED_AT_PARENT) or asserts a presence (like PROPAGATED) — never defaulted.`
+				);
+			}
+		}
+	}
+	return `${objections.join('; ')}.`;
 }

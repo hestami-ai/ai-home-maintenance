@@ -86,6 +86,8 @@ element its own template never declares; `assembleStepContext` walks `declaredPl
 |---|---|
 | drop the check | the silent-omission test — a required element absent from the assembled context and no disposition |
 | accept ANY disposition | the naming test — the disposition must name the omitted element in `constraintId` |
+| ⛔ **ADDED 2026-09-06** — accept any FATE | the fate test — `PROPAGATED` asserts the constraint is PRESENT, so it cannot excuse an absence; see `DESIGN` §8 |
+| ⛔ **ADDED 2026-09-06** — accept `INAPPLICABLE_WITH_RATIONALE` with no rationale | the kernel's own `RPH-CNS-003`, and the fate's own name |
 | **CONTROL** | a required element the context DOES supply needs no disposition, and a dispositioned omission PROCEEDS |
 
 ⛔ **NOT built: a disposition path for template placeholders.** `renderPromptTemplate:66-71` already REFUSES

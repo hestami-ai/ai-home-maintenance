@@ -218,3 +218,79 @@ activates it with `authorizedRuntimeBindingIds: []` (`+page.server.ts:951`) — 
 ⛔ **Minting a binding for demo-run steps is not taken here.** `RequestRuntimeBinding` refuses an empty
 capability request (N-20) and `AuthorizeRuntimeBinding` refuses an authorization granting nothing (N-22); doing
 it properly is a capability-modelling exercise, not a line in this slice.
+
+---
+
+## 8. ⛔ `CP-04b` CORRECTED — the check read `constraintId` and ignored `fate` (2026-09-06)
+
+Found by a general derivation of governed fields with no production reader: **`ConstraintDisposition.fate` was
+on that list**, and the checker that was supposed to have given it one is the one I shipped at `CP-04b`.
+
+```ts
+const dispositioned = new Set(dispositions.map((d) => d.constraintId));   // fate never read
+```
+
+⭑ **The five fates are not interchangeable, and one of them cannot excuse an omission at all.** `DEC-4`
+(`DOC-003:223`) lists them as alternatives — *"propagated (retaining authority and strength); retained at parent
+level; marked inapplicable with rationale; waived through authority; or superseded by a stronger constraint."*
+Four explain why something is ABSENT. **`PROPAGATED` asserts it is PRESENT.**
+
+⚠ So a `PROPAGATED` disposition against an element the context does not supply is not a weak excuse — it is a
+disposition that is **false about this assembly**, and it should refuse more loudly than a missing one, not less.
+
+### 8.1 ⭑ The semantics are already ratified in the KERNEL, and are adopted rather than re-derived
+
+`packages/rph-domain/src/decomposition.ts` — `checkConstraintDisposition` — already encodes what each
+disposition REQUIRES to be valid:
+
+| Kernel disposition | Its rule | Rule id |
+|---|---|---|
+| `PROPAGATED` | strength preserved; weakening needs authority | `RPH-CNS-001/002` |
+| `RETAINED` | *"retention at parent level is always a valid disposition (§11.2)"* | — |
+| `INAPPLICABLE` | **rationale AND an authority basis required** | `RPH-CNS-003` |
+| `WAIVED` | authority required; an expired waiver fails | `RPH-CNS-004` |
+| `SUPERSEDED` | a replacement constraint id required | — |
+
+⛔ **AND THE CARRIER CANNOT EXPRESS TWO OF THOSE RULES, WHICH IS DISCLOSED RATHER THAN FAKED.**
+`ConstraintDispositionSchema` is `{constraintId, fate, rationale?}` — three fields. It has **no**
+`authorityDecisionId` and **no** `supersededByConstraintId`. So:
+
+- `INAPPLICABLE_WITH_RATIONALE` → the rationale half **is** checkable, and the fate's own NAME demands it.
+- `WAIVED_THROUGH_AUTHORITY` / `SUPERSEDED_BY_STRONGER` → their supporting facts have nowhere to live in this
+  carrier. ⚠ **Not checked, and not pretended to be.** Adding those fields is a vocabulary change; asserting the
+  check without the field would be the fabricated-measurement defect.
+
+### 8.2 ⚠ And a pre-existing duplication this uncovered, recorded and NOT fixed here
+
+`DEC-4`'s five fates are spelled **twice** in shipped code, by two different owners:
+
+| | Spelling |
+|---|---|
+| `rph-domain` (kernel) | `PROPAGATED · RETAINED · INAPPLICABLE · WAIVED · SUPERSEDED` |
+| `rph-contracts` (vocabulary) | `PROPAGATED · RETAINED_AT_PARENT · INAPPLICABLE_WITH_RATIONALE · WAIVED_THROUGH_AUTHORITY · SUPERSEDED_BY_STRONGER` |
+
+⛔ This is `REG-F-353`'s shape — *"a second way to say one thing is how restated vocabulary comes to disagree"* —
+and §4 of this very design missed it while congratulating itself for adopting the contracts spelling rather
+than inventing a sixth. Both predate this programme, both are in use, and merging them is a cross-package
+vocabulary change with its own blast radius. **Recorded as owed; not taken here.**
+
+### 8.3 ⚠ A DISSENTING READING, RECORDED RATHER THAN RESOLVED
+
+The triage that surfaced this defect also read the fates differently. Its agent argued that
+`RETAINED_AT_PARENT` and `SUPERSEDED_BY_STRONGER` *"likewise assert the constraint still binds"* and therefore
+cannot excuse an absence either — which would leave `WAIVED_THROUGH_AUTHORITY` and
+`INAPPLICABLE_WITH_RATIONALE` as the only two excusing fates.
+
+**Not adopted, and here is the argument against it.** The kernel is explicit that
+`RETAINED` is *"always a valid disposition (§11.2)"*, and that a constraint relevant to no child *"is retained
+wholly at the parent and needs no record"* — retention at the PARENT is precisely the case where the CHILD's
+context does not carry it. `SUPERSEDED_BY_STRONGER` is weaker ground: the stronger constraint presumably ought
+to be present in its place, and this carrier has no field naming it, so that cannot be checked either way.
+
+⚠ **It is a question about what canon MEANS, not about what the code does**, so it is recorded for the sponsor
+rather than settled by me. ⛔ The safe direction is clear if it is ever reopened: refusing MORE is fail-closed
+and loud; excusing more is the silent omission `DEC-4` forbids. The implemented reading excuses four of five —
+if that is wrong, it is wrong in the permissive direction, and this paragraph is the notice.
+
+⭑ **What is NOT in dispute** — and is what this fix turns on — is `PROPAGATED`: every reading agrees it asserts
+the constraint was carried forward, so it cannot explain an absence.

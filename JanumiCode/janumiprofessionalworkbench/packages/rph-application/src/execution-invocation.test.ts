@@ -1,6 +1,7 @@
 // JAN-EXECRUN XR-01 — what a model would be told, and when it is told nothing.
 import { describe, expect, it } from 'vitest';
 import type { ContextSpecification, PromptTemplate } from '@janumipwb/rph-contracts';
+import { ConstraintDispositionSchema } from '@janumipwb/rph-contracts';
 import { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
 import type { ContextAssemblyPolicyContent } from './context-assembly.js';
@@ -301,5 +302,107 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 			alsoAssembles: []
 		});
 		expect(plan.ready).toBe(true);
+	});
+});
+
+// ── ⛔⛔ CP-04b CORRECTED — THE CHECK READ `constraintId` AND IGNORED `fate` ────────────────────────────────
+//
+// Found by a derivation of governed vocabulary fields with no production reader: `ConstraintDisposition.fate`
+// was ON that list, and the checker written to give it one — `CP-04b`, two commits earlier — is what left it
+// there. `dispositioned = new Set(dispositions.map((d) => d.constraintId))` excused an omission with ANY
+// disposition naming the element.
+describe('CP-04b CORRECTED — the FIVE FATES are not interchangeable', () => {
+	const spec = (
+		dispositions: ContextSpecification['constraintDispositions']
+	): ContextSpecification => ({
+		requiredElements: ['criteria'],
+		constraintDispositions: dispositions
+	});
+
+	const planFor = (dispositions: ContextSpecification['constraintDispositions']) =>
+		prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: spec(dispositions)
+		});
+
+	it('⛔⛔ PROPAGATED does NOT excuse an omission — it asserts the constraint is PRESENT', () => {
+		// ⭑ THE DEFECT, PINNED. `DEC-4` (`DOC-003:223`) lists the five as alternatives — *"propagated (retaining
+		// authority and strength); retained at parent level; marked inapplicable with rationale; waived through
+		// authority; or superseded by a stronger constraint."* Four say why a thing is ABSENT. PROPAGATED says it
+		// was CARRIED FORWARD. Against an element the context does not supply, it is not a weak excuse — it is a
+		// claim this assembly contradicts.
+		const plan = planFor([{ constraintId: 'criteria', fate: 'PROPAGATED' }]);
+		expect(plan.ready).toBe(false);
+		expect(
+			!plan.ready && plan.reason,
+			'and the refusal says WHY this fate cannot excuse it'
+		).toMatch(/carried FORWARD/);
+	});
+
+	it('⚠ the PROPAGATED refusal is DISTINCT from the no-disposition refusal', () => {
+		// THE MUTANT: collapse both into one message. A reader could then not tell "nobody said what became of
+		// this" from "someone claimed it was carried forward and it is not here" — two different authoring
+		// mistakes with two different repairs.
+		const missing = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
+			...ASSEMBLY,
+			specification: spec([])
+		});
+		expect(!missing.ready && missing.reason).toMatch(/no constraintDisposition names it/);
+		expect(!missing.ready && missing.reason).not.toMatch(/carried FORWARD/);
+	});
+
+	it('⛔ INAPPLICABLE_WITH_RATIONALE with NO rationale does not excuse it', () => {
+		// ⭑ THE FATE'S OWN NAME DEMANDS THE RATIONALE, and the kernel ratifies it: `rph-domain`'s
+		// `checkConstraintDisposition` emits `INAPPLICABLE_WITHOUT_RATIONALE` under `RPH-CNS-003`. THE MUTANT:
+		// accept the fate alone — a type could then discharge any omission with a bare label.
+		const plan = planFor([{ constraintId: 'criteria', fate: 'INAPPLICABLE_WITH_RATIONALE' }]);
+		expect(plan.ready).toBe(false);
+		expect(!plan.ready && plan.reason).toMatch(/carries no rationale/);
+		// ⚠ Whitespace is not a rationale.
+		expect(
+			planFor([{ constraintId: 'criteria', fate: 'INAPPLICABLE_WITH_RATIONALE', rationale: '  ' }])
+				.ready
+		).toBe(false);
+	});
+
+	it('⭑ CONTROL — the three unconditional fates DO excuse it', () => {
+		// ⛔ WITHOUT THIS THE CHECK IS "REFUSE EVERY DISPOSITION", which would make the mechanism useless and
+		// could not be told apart from the fix. `RETAINED_AT_PARENT` is the kernel's own always-valid case:
+		// *"retention at parent level is always a valid disposition (§11.2)"*.
+		for (const fate of [
+			'RETAINED_AT_PARENT',
+			'WAIVED_THROUGH_AUTHORITY',
+			'SUPERSEDED_BY_STRONGER'
+		] as const)
+			expect(planFor([{ constraintId: 'criteria', fate }]).ready, `${fate} must excuse`).toBe(true);
+	});
+
+	it('⭑ ONE sufficient disposition among several excuses the omission', () => {
+		// The kernel states it in terms: *"a constraint may be dispositioned by several records"*. THE MUTANT:
+		// require EVERY record to be sufficient — a type that propagated a constraint to one child and retained
+		// it for another would then be refused for being precise.
+		expect(
+			planFor([
+				{ constraintId: 'criteria', fate: 'PROPAGATED' },
+				{ constraintId: 'criteria', fate: 'RETAINED_AT_PARENT' }
+			]).ready
+		).toBe(true);
+	});
+
+	it('⭑⭑ CONTROL — every fate the SCHEMA declares is exercised above, derived not enumerated', () => {
+		// ⚠ THE INSTRUMENT CHECK. Hand-listing the fates here is the defect one level up: a sixth member added to
+		// the vocabulary would leave this suite silently covering five of six. The set is read from the schema,
+		// so the day it grows this reddens and someone has to decide what the new fate means for an omission.
+		// (The production switch is exhaustive, so it would ALSO fail to compile — belt and braces, deliberately:
+		// the compile error names the code, this names the decision.)
+		const declared = ConstraintDispositionSchema.shape.fate.options;
+		const exercised = [
+			'PROPAGATED',
+			'INAPPLICABLE_WITH_RATIONALE',
+			'RETAINED_AT_PARENT',
+			'WAIVED_THROUGH_AUTHORITY',
+			'SUPERSEDED_BY_STRONGER'
+		];
+		expect([...declared].sort()).toEqual([...exercised].sort());
 	});
 });
