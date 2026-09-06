@@ -3,7 +3,12 @@
 // ⭑ THIS IS THE INCREMENT `REG-D-059` LICENSED AND LEFT OPEN: *"three of the four parts exist … What is
 // missing is the LOOP — a bound greater than one, and the classification that decides when to stop."*
 import { describe, expect, it } from 'vitest';
-import { classifyTrend, mayRetry, DEFAULT_REPAIR_BOUND } from './loop-detection.js';
+import {
+	classifyTrend,
+	mayRetry,
+	DEFAULT_REPAIR_BOUND,
+	reviewSeesPriorFindings
+} from './loop-detection.js';
 import { classifyFloorRemediation, type FloorView } from '../floor.js';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 
@@ -127,5 +132,34 @@ describe('JAN-EXECLOOP — only a disposition that JUDGED the subject may send w
 		// second. Neither is a critique of the work.
 		expect(classifyFloorRemediation(floorWith('UNASSESSED')).autoRefine).toBe(false);
 		expect(classifyFloorRemediation(floorWith('EVIDENCE_REQUIRED')).autoRefine).toBe(false);
+	});
+});
+
+describe("JAN-EXECLOOP — the reviewer is COLD by default, and that is the sponsor's design", () => {
+	// ⭑⭑ SPONSOR (2026-09-06): *"the original hypothesis is that assurance policies being basically LLM as judge
+	// approach should be the no, each try reviewed cold because they weren't intended to have state as such …
+	// That responsibility was on the PWU executing agent's memory."*
+	//
+	// ⭑ AND THE PAPER'S DEPLOYED PIPELINE AGREES (arXiv 2608.18300 §6.1): *"the judge's reason is appended to
+	// the generator prompt and the generator is re-invoked, up to K retries."* The judge re-scores each draft
+	// COLD. The loop's state lives on the GENERATOR side, exactly as the sponsor hypothesised.
+
+	it('⛔ DEFAULT IS COLD — an unset flag does not give the reviewer state it was not designed to have', () => {
+		// THE MUTANT: default to true. The reviewer silently gains memory across tries, which is a different
+		// system from the one the sponsor described — and it touches ASR-13's *shared prompt lineage*
+		// dimension, which nothing in this codebase checks.
+		expect(reviewSeesPriorFindings(undefined)).toBe(false);
+		expect(reviewSeesPriorFindings('')).toBe(false);
+		expect(reviewSeesPriorFindings('0')).toBe(false);
+		// ⚠ And nothing ACCIDENTALLY enables it: a stray value is not consent.
+		expect(reviewSeesPriorFindings('yes')).toBe(false);
+		expect(reviewSeesPriorFindings('please')).toBe(false);
+	});
+
+	it('⭑ CONTROL — it CAN be turned on, because the sponsor ruled it configurable', () => {
+		// Without this the flag is decoration and the ruling is unimplemented.
+		expect(reviewSeesPriorFindings('1')).toBe(true);
+		expect(reviewSeesPriorFindings('true')).toBe(true);
+		expect(reviewSeesPriorFindings(' TRUE ')).toBe(true);
 	});
 });

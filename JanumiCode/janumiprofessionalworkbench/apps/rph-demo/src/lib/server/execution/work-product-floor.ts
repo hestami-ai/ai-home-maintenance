@@ -51,6 +51,9 @@ export interface WorkProductSubject {
 	 * is part of the deliverable, and is exactly what the evaluator is FOR.
 	 */
 	readonly rationale?: ProfessionalRationaleSummary;
+	/** ⚠ OFF BY DEFAULT — see `reviewSeesPriorFindings`. Supplied only when the deployment has chosen to
+	 *  give the reviewer state it was not designed to have. */
+	readonly priorGaps?: readonly string[];
 }
 
 /**
@@ -172,7 +175,12 @@ export async function runWorkProductFloor(
 			// the work rather than a difference in what it was handed.
 			rationale: subject.rationale,
 			narration: undefined,
-			prior: undefined
+			// ⭑ THE DESIGNED CHANNEL, USED ONLY WHEN CONFIGURED. `judgePrompt` frames it as *"A PREVIOUS review
+			// flagged … Judge whether those are genuinely resolved"* — which is the right framing IF the
+			// reviewer is meant to know. It defaults to unset because the sponsor's model puts that state on
+			// the PRODUCER, and the paper's deployed pipeline does the same: the judge's reason goes to the
+			// GENERATOR's prompt, and the judge re-scores each draft cold.
+			prior: subject.priorGaps?.length ? { gaps: [...subject.priorGaps] } : undefined
 		}
 	};
 

@@ -59,7 +59,7 @@ import {
 import { actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
-import { classifyTrend, mayRetry } from '$lib/server/execution/loop-detection';
+import { classifyTrend, mayRetry, reviewSeesPriorFindings } from '$lib/server/execution/loop-detection';
 import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionPrint } from '$lib/server/execution/model';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
@@ -1080,7 +1080,15 @@ export const actions: Actions = {
 						producerProviderId: tryOutcome.producer.providerId,
 						// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
 						// declare one — a recorded shortfall, never a synthesized summary.
-						...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {})
+						...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
+						// ⛔ OFF BY DEFAULT. The sponsor's model puts the loop's state on the PRODUCER — *"the
+						// component responsible for tracking or remembering how it responded to the various
+						// feedback"* — and the paper's deployed pipeline does the same: the judge's reason is
+						// appended to the GENERATOR's prompt and the judge re-scores each draft cold. Supplied
+						// here only when a deployment has explicitly chosen otherwise.
+						...(reviewSeesPriorFindings() && priorFindings.length
+							? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
+							: {})
 					},
 					uiSession(),
 					{

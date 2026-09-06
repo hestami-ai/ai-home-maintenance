@@ -76,3 +76,30 @@ export function mayRetry(
 		};
 	return { retry: true, reason: trend === 'CONVERGING' ? 'Findings are reducing.' : 'No trend yet.' };
 }
+
+/**
+ * ⛔ MAY THE REVIEWER SEE ITS OWN PRIOR FINDINGS? **NO BY DEFAULT**, and that default is the sponsor's original
+ * hypothesis — since corroborated by the deployed system in the paper they supplied.
+ *
+ * **SPONSOR (2026-09-06):** *"the original hypothesis is that assurance policies being basically LLM as judge
+ * approach should be the no, each try reviewed cold because they weren't intended to have state as such … That
+ * responsibility was on the PWU executing agent's memory via its chat history, context window, context
+ * engineering … it is the component responsible for tracking or remembering how it responded to the various
+ * feedback from the various assurance policies."*
+ *
+ * ⭑⭑ AND THE PAPER DEPLOYS EXACTLY THAT. arXiv 2608.18300 §6.1, verbatim: *"the tuned judge scores it against
+ * the criteria … emitting a pass/fail label and reason per criterion. If all criteria pass, the explanation is
+ * served; if any fails, **the judge's reason is appended to the generator prompt and the generator is
+ * re-invoked**, up to K retries."* The judge re-scores each draft COLD; the loop's state lives on the
+ * GENERATOR side. Nothing in that pipeline hands the judge its own prior reasons.
+ *
+ * ⚠ SO THIS FLAG EXISTS BECAUSE THE SPONSOR RULED IT CONFIGURABLE, NOT BECAUSE IT IS RECOMMENDED. Turning it on
+ * gives the reviewer the designed `prior` framing — *"A PREVIOUS review flagged … Judge whether those are
+ * genuinely resolved"* — which is a real capability and a real question. It also gives the reviewer state it
+ * was not designed to have, and touches `ASR-13`'s *shared prompt lineage* dimension, which nothing checks.
+ */
+export function reviewSeesPriorFindings(
+	configured = process.env.JPWB_REVIEW_SEES_PRIOR
+): boolean {
+	return configured?.trim() === '1' || configured?.trim().toLowerCase() === 'true';
+}
