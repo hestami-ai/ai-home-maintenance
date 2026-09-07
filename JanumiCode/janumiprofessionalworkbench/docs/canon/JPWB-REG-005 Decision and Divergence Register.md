@@ -32345,3 +32345,88 @@ were already known and still stand is itself the finding, and it belongs in its 
 
 **Merge target:** Repository (`execution-invocation.ts` + its tests, the design and roadmap corrections).
 `JPWB-DOC-003` `DEC-4` unchanged — this reads the fates it already declares.
+
+---
+
+### REG-F-362 — SPONSOR CORRECTION: a constraint disposition cannot excuse a missing context element, because they are different things
+
+- **Date:** 2026-09-07 · **Type:** FINDING (`JAN-CTXPOL` `CP-04b` corrected a SECOND time) ·
+  **Class:** FINDING — a **category error** in a check I authored, corrected by the sponsor; the previous
+  correction (`REG-F-361`) made the wrong mechanism more precise instead of removing it ·
+  **Status:** ✅ **CLOSED — the excuse path is deleted, not narrowed.**
+
+**SPONSOR, 2026-09-07:** *"Am I wrong in thinking that if it's missing but is required then the only answer is
+that this will have to fail because those other options are about the 'disposition' of ownership and relevance.
+But missing is missing."*
+
+⭑ **Not wrong — and the vocabulary already said it, in two notes I had read separately and never joined:**
+
+> **`requiredElements`** — *"What the type declares must be assembled for it. Aligns with the template's
+> `declaredPlaceholders`; **the render guard is what holds them together**."*
+>
+> **`constraintDispositions`** — *"DEC-4: for every mandatory **parent constraint**, exactly one fate."*
+
+**TWO AXES, TWO NAMESPACES.** `constraintId` names a CONSTRAINT — an obligation flowing from a parent work unit
+in a decomposition. `requiredElements` names a CONTEXT ELEMENT. `CP-04b` matched `constraintId === element` and
+built an excuse mechanism on a lock-and-key relationship **the vocabulary never declares**. Both `REG-F-358`
+(which authored it) and `REG-F-361` (which "fixed" it) reasoned inside that invented frame.
+
+⛔ **AND THE SOPHISTICATED READING IS NOT COMPUTABLE.** *"Refuse if the omission removes a mandatory
+constraint"* needs to know WHICH constraint depends on WHICH element, and no carrier expresses that. Asserting
+it would invent a relationship the data does not hold — **the exact defect class this series exists to remove,
+committed by the person removing it, twice.**
+
+**⭑ THE ABSENCE WAS SEARCHED FOR, WITH TWO POSITIVE CONTROLS.** Searched
+`packages/rph-contracts/vocab/m1-object-fields.json` (the M1 field vocabulary) for any field co-mentioning a
+constraint and a context element: **0 hits**. The two sub-types' complete field sets, DERIVED from the vocabulary
+rather than recalled, are `ConstraintDisposition -> {constraintId, fate, rationale}` and
+`ContextSpecification -> {requiredElements, constraintDispositions}` — no field on either side names the other's
+members. **CONTROL 1:** the same grep form finds constraint↔child/parent co-occurrences (**2 hits**), so the
+instrument does report a cross-reference when one exists. **CONTROL 2:** context elements ARE linked to
+something — `declaredPlaceholders` (**2 hits**), which is the linkage `requiredElements`' own note names — so
+the zero above is specific to the constraint axis and not an instrument that finds nothing.
+
+**⚠ WHAT `REG-F-361` ACTUALLY WAS.** It argued at length about which of `DEC-4`'s five fates may excuse an
+omission, mounted a `never` exhaustiveness guard, derived the fate set from the schema, and killed its mutants.
+Every one of those disciplines worked. **They were applied to a question that should never have been posed.**
+A rigorous answer to the wrong question is still the wrong answer, and no amount of mutation testing detects
+that — only a reader who asks what the fields MEAN. Here that reader was the sponsor.
+
+---
+
+**THE RULE, WHICH IS SHORTER THAN WHAT IT REPLACES.** A `requiredElement` the assembled context does not supply
+→ **REFUSE**. No excuse path. The refusal says WHY a disposition cannot excuse it, because an author who
+reached for the wrong instrument needs to be told which instrument it was.
+
+⭑ **THE ORIGINAL FINDING SURVIVES AND IS STRONGER FOR IT.** A type may require an element its own template
+never declares: `assembleStepContext` walks `declaredPlaceholders`, `renderPromptTemplate` checks
+declared-vs-supplied and text-vs-declared, and neither ever looks at `requiredElements`. That gap is now closed
+by a plain refusal — **less code, stronger guarantee.**
+
+⚠ **`constraintDispositions` returns to having NO reader on this path, and that is CORRECT** — not a regression
+to be re-fixed. Its reader belongs on the DECOMPOSITION path, where `rph-domain`'s `checkConstraintDisposition`
+already implements `RPH-CNS-001..004`. ⛔ A future census that flags it as unread must not be answered by
+re-wiring it here.
+
+**THE DISSENT IN `REG-F-361` IS MOOT, AND WAS HALF-RIGHT FOR THE WRONG REASON.** The triage argued
+`RETAINED_AT_PARENT` and `SUPERSEDED_BY_STRONGER` should not excuse an omission. Under this correction NO fate
+excuses one, so its conclusion is subsumed — but its reasoning (*"they assert the constraint still binds"*)
+still treated the two axes as linked. Both readings were inside a frame that needed rejecting, not refining.
+
+**THE PREDICTED RED IS THE REJECTED CODE ITSELF.** Restoring the excuse set — `new Set(...map((d) =>
+d.constraintId))` — reddens exactly two tests: *NO constraintDisposition excuses it — not even one naming the
+element* (which tries **every fate the schema declares**, derived not enumerated) and *the refusal SAYS why a
+disposition cannot excuse it*. The other 19 stay green.
+
+**GATES:** check-types 22/22 · lint · verif 409 · `rph-application` 1013 · `rph-engine` 247 · `rph-assurance` 47
+· `app:rph-demo` 311 · playwright 86.
+
+**⚠ WHAT THIS SAYS ABOUT THE SERIES.** Five authored-with-no-consumer fields were found and wired
+(`REG-F-358`/`359`/`360`). This entry is the counterweight: **wiring a field is not automatically a fix.**
+`requiredElements` needed a reader; `constraintDispositions` needed one too — but not *here*, and joining them
+manufactured a rule canon does not state. ⛔ The frozen-census instrument proposed at `REG-F-361` must record a
+field's KIND and REASON precisely so that "unread" prompts a question rather than a wiring reflex.
+
+**Merge target:** Repository (`execution-invocation.ts` — a net DELETION — and its tests; `DESIGN` §8 struck and
+§9 added; the roadmap's predicted reds superseded in place). `JPWB-DOC-003` `DEC-4` unchanged, and now
+un-misread.

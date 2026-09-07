@@ -162,24 +162,44 @@ export function prepareModelInvocation(
 	// checks declared-vs-supplied and text-vs-declared. Neither ever looks here, so such an element is simply
 	// absent — the silent omission, with nothing watching.
 	//
-	// ⚠ AND THE DISPOSITION IS AUTHORED BEFORE THE RUN, WHICH IS WHY THIS DOES NOT RE-OPEN 2026-09-04. That
-	// ruling refused rendering a hole and disclosing it AFTERWARDS. A `constraintDisposition` sits on the TYPE,
-	// written when the type was authored, and is read HERE — before the prompt exists. The order was the whole
-	// argument, and this is on the right side of it.
-	const required = assembly.specification?.requiredElements ?? [];
-	const dispositions = assembly.specification?.constraintDispositions ?? [];
-	const unexcused = required
-		.filter((e) => context[e] === undefined)
-		.map((element) => ({ element, why: omissionRefusal(element, dispositions) }))
-		.filter((r): r is { element: string; why: string } => r.why !== undefined);
-	if (unexcused.length > 0)
+	// ── ⛔⛔ AND MISSING IS MISSING. THE EXCUSE PATH THAT STOOD HERE WAS A CATEGORY ERROR ──────────────────
+	//
+	// SPONSOR, 2026-09-07: *"if it's missing but is required then the only answer is that this will have to
+	// fail because those other options are about the 'disposition' of ownership and relevance. But missing is
+	// missing."* Correct, and the vocabulary says so in two notes I had read and not joined:
+	//
+	//   `requiredElements`        — *"What the type declares must be assembled for it. Aligns with the
+	//                               template's declaredPlaceholders; the render guard is what holds them
+	//                               together."*
+	//   `constraintDispositions`  — *"DEC-4: for every mandatory PARENT CONSTRAINT, exactly one fate."*
+	//
+	// ⛔ TWO AXES, TWO NAMESPACES. `constraintId` names a CONSTRAINT — an obligation flowing from a parent work
+	// unit in a decomposition. `requiredElements` names a CONTEXT ELEMENT. The first version of this check
+	// matched `constraintId === element` and built an excuse mechanism on a lock-and-key relationship the
+	// vocabulary never declares. Correcting the FATE reading afterwards (`REG-F-361`) made a wrong mechanism
+	// more precise instead of removing it.
+	//
+	// ⚠ AND THE SOPHISTICATED READING IS NOT COMPUTABLE EITHER. "Refuse if the omission removes a mandatory
+	// constraint" needs to know WHICH constraint depends on WHICH element, and no carrier expresses that.
+	// Claiming it would invent a relationship the data does not hold — the defect class this whole series has
+	// been removing.
+	//
+	// ⭑ THE ORIGINAL FINDING STANDS AND IS STRONGER FOR IT. A type may require an element its own template
+	// never declares: `assembleStepContext` walks `declaredPlaceholders`, and `renderPromptTemplate` checks
+	// declared-vs-supplied and text-vs-declared. Neither ever looks at `requiredElements`, so such an element
+	// is simply absent. That gap is now closed by a plain refusal rather than a fabricated excuse.
+	const missing = (assembly.specification?.requiredElements ?? []).filter(
+		(e) => context[e] === undefined
+	);
+	if (missing.length > 0)
 		return {
 			ready: false,
 			reason:
-				`The work-unit type ${pwuTypeId} requires ${unexcused.map((r) => r.element).join(', ')} in its ` +
-				`assembled context and the context supplies ${unexcused.length === 1 ? 'it' : 'them'} not. ` +
-				`DEC-4 (DOC-003:225) governs context assembly and forbids a silent omission. ` +
-				unexcused.map((r) => `${r.element}: ${r.why}`).join(' ')
+				`The work-unit type ${pwuTypeId} requires ${missing.join(', ')} in its assembled context and the ` +
+				`context supplies ${missing.length === 1 ? 'it' : 'them'} not. DEC-4 (DOC-003:225) governs context ` +
+				`assembly and forbids a silent omission. Supply ${missing.length === 1 ? 'it' : 'them'}, or stop ` +
+				`declaring ${missing.length === 1 ? 'it' : 'them'} required — a constraintDisposition cannot excuse ` +
+				`this, because it dispositions a mandatory parent CONSTRAINT and not a context ELEMENT.`
 		};
 
 	const rendered = renderPromptTemplate(template, context);
@@ -224,76 +244,4 @@ function withOutputContract(rendered: string, outputContract: string | undefined
 	// ⚠ THE CONTRACT FOLLOWS THE WORK. The instruction reads "do this work / and return it in this shape";
 	// inverting it makes the producer meet an output shape before it has been told what the work is.
 	return contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
-}
-
-/**
- * Why an omitted required element is still unexcused — or `undefined` when a disposition legitimately covers it.
- *
- * ⛔⛔ THE FIRST VERSION OF THIS CHECK READ `constraintId` AND IGNORED `fate` ENTIRELY, so any disposition
- * excused any omission. Found by a derivation of governed fields with no production reader:
- * `ConstraintDisposition.fate` was ON that list, and this — the checker written to give it one — was what left
- * it there.
- *
- * ⭑ THE FIVE FATES ARE NOT INTERCHANGEABLE, AND ONE OF THEM CANNOT EXCUSE AN ABSENCE AT ALL. `DEC-4`
- * (`DOC-003:223`) lists them as alternatives — *"propagated (retaining authority and strength); retained at
- * parent level; marked inapplicable with rationale; waived through authority; or superseded by a stronger
- * constraint."* Four say why something is ABSENT. **`PROPAGATED` asserts it is PRESENT** — so against an
- * element the context does not supply it is not a weak excuse but a claim that is FALSE about this assembly,
- * and it refuses more loudly rather than less.
- *
- * ⭑ THE PER-FATE RULES ARE ADOPTED FROM THE KERNEL, NOT DERIVED HERE. `rph-domain`'s
- * `checkConstraintDisposition` already ratifies them: `RETAINED` is *"always a valid disposition (§11.2)"*;
- * `INAPPLICABLE` requires a rationale (`RPH-CNS-003`); `WAIVED` requires authority (`RPH-CNS-004`);
- * `SUPERSEDED` requires a replacement constraint.
- *
- * ⛔ AND THE CARRIER CANNOT EXPRESS TWO OF THOSE RULES, WHICH IS DISCLOSED RATHER THAN FAKED.
- * `ConstraintDispositionSchema` is `{constraintId, fate, rationale?}` — it has no `authorityDecisionId` and no
- * `supersededByConstraintId`. The rationale half of `INAPPLICABLE_WITH_RATIONALE` IS checkable and the fate's
- * own name demands it; the authority behind a waiver and the replacement behind a supersession have nowhere to
- * live here, so they are NOT checked and this docblock says so instead of a check pretending to.
- *
- * ⚠ THE SWITCH IS EXHAUSTIVE ON PURPOSE. A sixth fate added to the vocabulary becomes a COMPILE ERROR here
- * rather than a silently-permitted excuse — which is the failure mode that produced this defect.
- */
-function omissionRefusal(
-	element: string,
-	dispositions: readonly ContextSpecification['constraintDispositions'][number][]
-): string | undefined {
-	const named = dispositions.filter((d) => d.constraintId === element);
-	if (named.length === 0)
-		return 'no constraintDisposition names it, so its omission is silent — record what became of it, or supply it.';
-	// ⭑ ANY ONE SUFFICIENT DISPOSITION EXCUSES IT. A constraint may be dispositioned by several records — the
-	// kernel says so in terms ("a constraint may be dispositioned by several records") — so this asks whether
-	// ONE of them covers the absence, and reports the objection to the others only when none does.
-	const objections: string[] = [];
-	for (const d of named) {
-		switch (d.fate) {
-			case 'RETAINED_AT_PARENT':
-			case 'WAIVED_THROUGH_AUTHORITY':
-			case 'SUPERSEDED_BY_STRONGER':
-				return undefined;
-			case 'INAPPLICABLE_WITH_RATIONALE':
-				if (d.rationale?.trim()) return undefined;
-				objections.push(
-					'its disposition is INAPPLICABLE_WITH_RATIONALE and carries no rationale — the fate names the rationale it requires (RPH-CNS-003)'
-				);
-				break;
-			case 'PROPAGATED':
-				objections.push(
-					'its disposition says PROPAGATED, which asserts the constraint was carried FORWARD — that is a claim this assembly contradicts, not a reason for the absence'
-				);
-				break;
-			default: {
-				// ⭑ THE EXHAUSTIVENESS GUARD, AND IT IS LOAD-BEARING RATHER THAN DECORATIVE. Without it a sixth
-				// fate added to the vocabulary would fall through this switch, contribute no objection, and be
-				// SILENTLY TREATED AS EXCUSING THE OMISSION — which is the same shape as the defect this function
-				// was written to fix. TypeScript does not check switch exhaustiveness on its own; this makes it.
-				const unhandled: never = d.fate;
-				throw new Error(
-					`ConstraintDisposition carries a fate this check does not handle: ${String(unhandled)}. A new fate must be decided FOR CONTEXT OMISSION explicitly — whether it explains an absence (like RETAINED_AT_PARENT) or asserts a presence (like PROPAGATED) — never defaulted.`
-				);
-			}
-		}
-	}
-	return `${objections.join('; ')}.`;
 }

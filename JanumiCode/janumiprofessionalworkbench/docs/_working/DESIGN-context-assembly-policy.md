@@ -221,7 +221,14 @@ it properly is a capability-modelling exercise, not a line in this slice.
 
 ---
 
-## 8. ⛔ `CP-04b` CORRECTED — the check read `constraintId` and ignored `fate` (2026-09-06)
+## 8. ~~⛔ `CP-04b` CORRECTED — the check read `constraintId` and ignored `fate`~~ (2026-09-06)
+
+> ⛔⛔ **SUPERSEDED IN WHOLE BY §9 (2026-09-07).** This section argued about WHICH FATES may excuse a context
+> omission. The sponsor's answer is that **none of them can**, because a disposition and a required element are
+> different things — see §9. What follows is retained because it is the record of how the error was reasoned,
+> and because §8.1's kernel survey and §8.2's duplication finding remain true and useful. **Its conclusion does
+> not.**
+
 
 Found by a general derivation of governed fields with no production reader: **`ConstraintDisposition.fate` was
 on that list**, and the checker that was supposed to have given it one is the one I shipped at `CP-04b`.
@@ -294,3 +301,51 @@ if that is wrong, it is wrong in the permissive direction, and this paragraph is
 
 ⭑ **What is NOT in dispute** — and is what this fix turns on — is `PROPAGATED`: every reading agrees it asserts
 the constraint was carried forward, so it cannot explain an absence.
+
+---
+
+## 9. ⛔⛔ `CP-04b` CORRECTED AGAIN — a disposition cannot excuse a missing element, because they are different things
+
+**SPONSOR, 2026-09-07:** *"Am I wrong in thinking that if it's missing but is required then the only answer is
+that this will have to fail because those other options are about the 'disposition' of ownership and relevance.
+But missing is missing."*
+
+⭑ **Not wrong. The vocabulary says it in two notes I had read separately and never joined:**
+
+> **`requiredElements`** — *"What the type declares must be assembled for it. Aligns with the template's
+> `declaredPlaceholders`; **the render guard is what holds them together**."*
+>
+> **`constraintDispositions`** — *"DEC-4: for every mandatory **parent constraint**, exactly one fate."*
+
+**TWO AXES, TWO NAMESPACES.** `constraintId` names a CONSTRAINT — an obligation flowing from a parent work unit
+in a decomposition. `requiredElements` names a CONTEXT ELEMENT. `CP-04b` matched `constraintId === element` and
+built an excuse mechanism on a lock-and-key relationship **the vocabulary never declares**.
+
+⚠ **And §8 made it worse.** Correcting the FATE reading made a wrong mechanism *more precise* instead of
+removing it — which is why §8's whole argument (four fates excuse, one does not) was answering a question that
+should never have been posed.
+
+⛔ **THE SOPHISTICATED READING IS NOT COMPUTABLE EITHER.** *"Refuse if the omission removes a mandatory
+constraint"* requires knowing WHICH constraint depends on WHICH element, and no carrier expresses that
+relationship. Asserting it would invent a link the data does not hold — the defect class this entire series has
+been removing, committed by the person removing it.
+
+### 9.1 The rule, and what it costs
+
+**A `requiredElement` the assembled context does not supply → REFUSE. No excuse path.**
+
+⭑ **The original finding survives and is stronger for it.** A type may require an element its own template never
+declares; `assembleStepContext` walks `declaredPlaceholders` and `renderPromptTemplate` checks
+declared-vs-supplied — neither ever looks at `requiredElements`. That gap is now closed by a plain refusal
+instead of a fabricated excuse, which is less code and a stronger guarantee.
+
+⚠ **`constraintDispositions` returns to having NO reader on this path, and that is correct.** Its reader belongs
+on the DECOMPOSITION path, where `rph-domain`'s `checkConstraintDisposition` already implements the per-fate
+rules `RPH-CNS-001..004`. Reading it here was the category error; not reading it here is not a regression.
+
+### 9.2 ⚠ The dissent in §8.3 is now MOOT, and the triage was half-right for the wrong reason
+
+The triage argued `RETAINED_AT_PARENT` and `SUPERSEDED_BY_STRONGER` should not excuse an omission. Under §9
+**no fate excuses one**, so its conclusion is subsumed — but its reasoning (*"they assert the constraint still
+binds"*) still treated the two axes as linked. Both of us were arguing inside a frame that should have been
+rejected. ⭑ The sponsor rejected the frame.
