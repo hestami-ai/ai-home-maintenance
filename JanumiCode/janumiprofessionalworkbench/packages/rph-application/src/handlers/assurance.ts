@@ -2078,6 +2078,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 						dispositionRules?: ReadonlyArray<{
 							disposition?: string;
 							forbiddenOpenSeverities?: readonly string[];
+							// ⭑ CARRIED AT LAST (`JAN-DISPIND`). This narrowing kept `forbiddenOpenSeverities` and
+							// dropped `requiredIndependence`, so no downstream line could read it even in principle —
+							// a policy could demand independence FOR A SPECIFIC DISPOSITION and the demand was inert.
+							// Recorded as owed by `limb:ASR-2:6` and driven-admitted at its `L4e`.
+							requiredIndependence?: string;
 						}>;
 						escalationRules?: ReadonlyArray<{
 							escalateOnOpenSeverities?: readonly string[];
@@ -2168,16 +2173,68 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// arrow, which INV-8 forbids from ever reaching SATISFIED) would never be recorded. Runs only when the
 	// requirement resolves, is not NONE, and both operands are present; else falls through unverified (recorded,
 	// never a fabricated pass).
-	const independenceRequirement = policyState?.independenceRequirement;
+	// ── ⭑⭑ JAN-DISPIND — THE DISPOSITION RULE'S OWN DEMAND IS CONJOINED, NOT RANKED ─────────────────────────
+	//
+	// A policy may declare independence twice: once for itself (`independenceRequirement`) and once for a
+	// SPECIFIC disposition (`DispositionRule.requiredIndependence`). ⛔ THE RECORDED REMEDY SAID "take the
+	// STRONGEST of the two" AND THERE IS NO STRONGEST. `checkIndependence` is a flat switch of SINGLE-DIMENSION
+	// equality tests — `DIFFERENT_AGENT` compares `agentId` only, `DIFFERENT_MODEL` compares `modelId` only —
+	// the same fact `REG-F-357` recorded when it refuted *"DIFFERENT_PROVIDER is a stronger rung"*. Picking one
+	// would silently DROP the other's dimension: a weakening dressed as a composition.
+	//
+	// ⚠ THE RULE IS MATCHED THE WAY GATE C MATCHES IT (`:1881`), by the RECOMMENDED disposition, so two gates
+	// cannot select different rules from one array and make the policy mean two things.
+	const dispositionRuleIndependence = (policyState?.dispositionRules ?? []).find(
+		(r) => r?.disposition === disposition
+	)?.requiredIndependence;
+	// Distinct requirements only: declaring the same one twice is one demand, not two.
+	const requirements = [
+		...new Set([policyState?.independenceRequirement, dispositionRuleIndependence])
+	]
+		.filter((r): r is string => Boolean(r) && r !== 'NONE')
+		.map((r) => ({
+			requirement: r as IndependenceRequirement,
+			from:
+				r === dispositionRuleIndependence && r !== policyState?.independenceRequirement
+					? `the ${disposition} disposition rule`
+					: 'the policy'
+		}));
 	// 'VERIFIED' only when the check RAN and PASSED; left undefined when it did not run (see the gate note above) so
 	// the §38 view reads that as "unknown", never a fabricated pass. The negative branch returns early below.
 	let independenceResult: string | undefined;
-	if (independenceRequirement && independenceRequirement !== 'NONE' && producer && evaluator) {
-		const verdict = checkIndependence(
-			independenceRequirement as IndependenceRequirement,
-			actorReferenceToIdentity(producer),
-			actorReferenceToIdentity(evaluator)
-		);
+	/** The demand that FAILED, when one did — hoisted so the violation event can name it. */
+	let failed:
+		| {
+				requirement: IndependenceRequirement;
+				from: string;
+				verdict: { independent: boolean; reason?: string };
+		  }
+		| undefined;
+	if (requirements.length > 0 && producer && evaluator) {
+		// ⭑ EVERY declared requirement must hold. The first failure decides, and its reason names WHICH demand
+		// and WHERE it came from — a reason a reader cannot act on is the silent omission `PER-9` forbids.
+		const producerIdentity = actorReferenceToIdentity(producer);
+		const evaluatorIdentity = actorReferenceToIdentity(evaluator);
+		failed = requirements
+			.map((r) => ({
+				...r,
+				verdict: checkIndependence(r.requirement, producerIdentity, evaluatorIdentity)
+			}))
+			.find((r) => !r.verdict.independent);
+		// ⚠ THE PROVENANCE SUFFIX APPEARS ONLY WHEN THERE IS SOMETHING TO DISAMBIGUATE. With a single declared
+		// requirement the existing message is complete — the event payload already carries the requirement — and
+		// `assurance-independence.test.ts:249` pins that message deliberately. Appending unconditionally would
+		// change a reason string for a path this slice does not touch, for no reader benefit. With TWO demands in
+		// play the suffix is the only thing that says WHICH failed and WHERE it came from.
+		const verdict = failed
+			? {
+					independent: false,
+					reason:
+						requirements.length > 1
+							? `${failed.verdict.reason} (${failed.requirement} required by ${failed.from})`
+							: failed.verdict.reason
+				}
+			: { independent: true as const, reason: undefined };
 		if (!verdict.independent) {
 			return advanceStatus(ctx, command, {
 				objectType: ASSESSMENT,
@@ -2196,7 +2253,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 					policyVersion: next.policyVersion,
 					subjectObjectIds: subjectIds,
 					subjectSemanticVersions: versions,
-					independenceRequirement,
+					// ⭑ THE REQUIREMENT THAT WAS VIOLATED, which may be the DISPOSITION RULE's rather than the
+					// policy's (`JAN-DISPIND`). Recording the policy-level one unconditionally would name a demand
+					// that was MET while the one that failed went unrecorded — an event unable to answer what it
+					// exists to answer.
+					independenceRequirement: failed?.requirement ?? policyState?.independenceRequirement,
 					reason: verdict.reason ?? 'required independence not satisfied'
 				}),
 				// Record BOTH identities the check compared (contract-drift fix): an INV-8 violation whose object

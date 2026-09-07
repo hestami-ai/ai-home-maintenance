@@ -32543,3 +32543,104 @@ would be inventing professional content to justify the wiring, refused here as i
 
 **Merge target:** Repository (`governance.ts` + both call sites + three test files). No canon artifact changes —
 this repairs a supply path to a rule already ratified and already implemented.
+
+---
+
+### REG-F-364 — a disposition rule could demand independence and nothing read it; the recorded remedy would have dropped one of two demands
+
+- **Date:** 2026-09-07 · **Type:** FINDING (`JAN-DISPIND` DI-01, DI-02) ·
+  **Class:** FINDING — discharges an item `limb:ASR-2:6` records as OWED; ⚠ **corrects that row's stated remedy
+  and its stated mechanism**; ⛔ leaves one half to the sponsor rather than deciding it ·
+  **Status:** ✅ **CLOSED for the inert field; the `producer`-omission dodge remains OPEN and is put to the
+  sponsor.**
+
+**THE OWED ITEM, VERBATIM** (`docs/tracking/w3b/invariant-verdicts.ndjson`, `limb:ASR-2:6`, field `owed`):
+
+> *"The `DispositionRule.requiredIndependence` hole is **NOT filed and is owed a REG-F finding**: a policy may
+> demand independence for a specific disposition and no code reads the field, so the demand is inert (census: 2
+> hits, zero readers; driven-admitted at **L4e**)."*
+
+⚠ **That row's `owed` field still reads "NOT filed" and is not edited** — the tracking file records what was
+observed when it was written. **This entry is its discharge**, and it is named here so a reader arriving from
+either direction lands correctly.
+
+**THE CENSUS, RE-RUN AT HEAD WITH ITS POSITIVE CONTROL.** `grep -rn "requiredIndependence" --include=*.ts
+packages apps`, excluding `node_modules`, `/dist/` and `*.test.ts` → **2 hits, neither a reader**:
+`enums.ts:488` (a doc comment naming the field) and `objects.ts:245` (the declaration). **POSITIVE CONTROL,
+same form, the sibling field on the SAME rule object:** `forbiddenOpenSeverities` → reaches a live executable
+read at `assurance.ts:1901`. So the machinery works and the census finds fields that ARE read; this one was not.
+**The observation was already driven** — `L4e`: `dispositionRules[SATISFIED].requiredIndependence =
+DIFFERENT_AGENT`, no producer → `ACCEPTED`, `assessmentState SATISFIED`.
+
+---
+
+**⛔⛔ THE RECORDED REMEDY WAS WRONG, AND CORRECTING IT IS THE SUBSTANCE OF THE SLICE.**
+
+The triage that surfaced this said: *"take the **strongest** of the policy-level requirement and any matched
+rule's demand."* **There is no strongest.** `checkIndependence` (`assurance-rules.ts:185-216`) is a flat switch
+of **single-dimension equality tests** — `DIFFERENT_AGENT` compares `agentId` only, `DIFFERENT_MODEL` compares
+`modelId` only, `DIFFERENT_PROVIDER` compares `providerId` only. ⭑ This is the same fact `REG-F-357` recorded
+when it refuted *"`DIFFERENT_PROVIDER` is a stronger rung than `DIFFERENT_MODEL`"*: they are **orthogonal**, and
+substituting one for the other stops checking the first.
+
+**So the two demands are CONJOINED.** A policy demanding `DIFFERENT_AGENT` and a rule demanding
+`DIFFERENT_MODEL` are two independent demands; satisfying either says nothing about the other. Ranking them
+would silently drop one — a weakening dressed as a composition, the trade `REG-D-013` says to refuse. **A mutant
+implementing "strongest" reddens two tests**, one of them the mirror arrangement that exists precisely so
+"conjunction" cannot be faked by only ever checking the rule.
+
+**⚠ AND THE ROW'S STATED MECHANISM IS ALSO WRONG, FOUND BY A MUTANT THAT DID NOT REDDEN.** Both the row and the
+triage describe the field as *discarded by a structural narrowing* at the policy load. It is not: the
+"narrowing" is a TypeScript **`as` cast**, which is erased at runtime and discards nothing. Removing
+`requiredIndependence` from it produces **`error TS2339`**, not a behaviour change — I ran exactly that mutant,
+watched the suite stay green, and only then found its true victim is the **type checker**. ⭑ The honest
+statement is narrower and more useful: **the field was always present at runtime and simply never read**, and
+the cast is what made writing that read impossible without an edit. A field can be inert without anything
+throwing it away.
+
+---
+
+**WHAT LANDED.** `requiredIndependence` is carried through the policy load; the rule for the **recommended**
+disposition is matched with the same predicate Gate C uses (`:1881`), so two gates cannot select different rules
+from one array and make a policy mean two things; every distinct declared requirement must hold. The violation
+event records the requirement that **actually failed** — which may be the rule's, not the policy's — because
+recording the policy-level one unconditionally would name a demand that was MET while the one that failed went
+unrecorded.
+
+⚠ **The reason string gains a provenance suffix ONLY under ambiguity.** With a single demand the existing
+message is complete and `assurance-independence.test.ts:249` pins it; appending unconditionally would change a
+message on a path this slice does not touch. With two demands the suffix is the only thing that says which
+failed and where it came from.
+
+---
+
+**⛔ WHAT IS NOT TAKEN, AND WHY IT IS THE SPONSOR'S.** The same row names a second half — the `producer`-omission
+dodge, *"the fix is either to make `producer` required … or to refuse the completion when the requirement
+resolves and an operand is missing — the fail-closed reading of §13.3 the same file already quotes."*
+
+**That fall-through is deliberate, reasoned and PINNED** (`assurance-independence.test.ts:298`: *"the check is
+SKIPPED (proceeds, not violated) when the caller supplies no producer — **the chosen gate** … pinned here so it
+cannot silently become either outcome"*). Both readings have corpus support:
+
+| Keep it | Fail closed |
+|---|---|
+| `independenceResult` is left `undefined` = **unknown**; the §38 view reads it as unknown. Nothing false is asserted, and fabricating `VERIFIED` would be far worse. | §13.3, quoted **in this same function**: *"Fail closed on missing identity, tenant, policy, schema, or authority context."* A producer IS an identity — and the handler already applies that rule to refuse on missing subject versions. |
+| | §8.4: *"If required independence is not satisfied: the assessment cannot receive `SATISFIED`."* |
+
+⛔ I will not overturn a pinned, reasoned choice on my own judgement: it changes behaviour, and it turns on
+whether *unverified* counts as *not satisfied*. ⚠ **AND THE CONSEQUENCE FOR THIS SLICE IS PINNED, NOT GLOSSED:**
+a test asserts that a rule-level demand is **exactly as dodgeable** as a policy-level one. This slice makes the
+two consistent; it does not make either fail-closed, and no reader should take *"`requiredIndependence` is now
+read"* for *"`requiredIndependence` is now enforced against an omitting caller."*
+
+**MUTANTS, EACH WITH ITS NAMED VICTIM:** never read the field (the true pre-fix behaviour) → *L4e REPRODUCED*,
+*THE CONJUNCTION*, and the reason test; take "the strongest" → *and the other way round* + the reason test;
+drop the field from the cast → **`error TS2339`**, the type checker. Controls that must stay green and did: the
+rule demand satisfied completes normally, a rule for a DIFFERENT disposition does not apply, a policy with no
+rules behaves exactly as before.
+
+**GATES:** check-types 22/22 · lint · verif 412 (ratchet 35 → 36 with a derived warrant) · `rph-domain` 582 ·
+`rph-application` 1021 · `rph-engine` 247 · `rph-assurance` 52 · `app:rph-demo` 311 · playwright 86.
+
+**Merge target:** Repository (`handlers/assurance.ts` + `assurance-disposition-independence.test.ts`). No canon
+artifact changes — `ASR-2` limb 6 (*"when independence is unsatisfied"*) is implemented further, not amended.

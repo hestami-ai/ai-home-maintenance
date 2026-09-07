@@ -336,7 +336,24 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⛔ AND `riskConditions` IS NOT WIRED: the kernel already discloses it as an ACTIVATION condition
 			// (§5.3), not a SCOPE condition, and its element type is *"NAMED by §5.1 and DEFINED NOWHERE in the
 			// corpus"*.
-		).toBe(35);
+			//
+			// 35 -> 36 (2026-09-07): `ROADMAP-disposition-rule-independence.md` (`JAN-DISPIND`). ⭑ NOT A NEW LINE
+			// — it discharges an item `limb:ASR-2:6` records as OWED in terms: *"The
+			// `DispositionRule.requiredIndependence` hole is NOT filed and is owed a REG-F finding: a policy may
+			// demand independence for a specific disposition and no code reads the field, so the demand is
+			// inert."* The observation was already DRIVEN at that row's `L4e`.
+			// ⭑ IT SUBSUMES: no vocabulary, no new field, no new gate — the demand joins the independence check
+			// that already exists, matched by the same predicate Gate C uses so two gates cannot select different
+			// rules from one array.
+			// ⛔ AND IT CORRECTS THE RECORDED REMEDY. That row said *"take the STRONGEST of the policy-level
+			// requirement and any matched rule's demand"*; there is no strongest. `checkIndependence` is a flat
+			// switch of SINGLE-DIMENSION equality tests — the same fact `REG-F-357` recorded when it refuted
+			// *"DIFFERENT_PROVIDER is a stronger rung"* — so ranking two orthogonal demands DROPS one. They are
+			// CONJOINED, and a mutant implementing "strongest" reddens two tests.
+			// ⚠ IT DOES NOT CLOSE THE `producer`-OMISSION DODGE, which is DELIBERATE, REASONED AND PINNED
+			// (`assurance-independence.test.ts:298`, *"the chosen gate"*). Overturning it turns on whether
+			// UNVERIFIED counts as NOT SATISFIED under §8.4 — a sponsor question, with both readings recorded.
+		).toBe(36);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
