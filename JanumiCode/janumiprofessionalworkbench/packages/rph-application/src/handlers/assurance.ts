@@ -18,6 +18,7 @@ import {
 	applicabilityPermitsAssessment,
 	assessFalsification,
 	classifyEvidenceInvalidation,
+	applicabilitySubjectFrom,
 	policyApplicability,
 	TraceGraph
 } from '@janumipwb/rph-domain';
@@ -1296,16 +1297,17 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	const applicabilityBlock = ((): CommandResult | null => {
 		const subjectId = p.subjectObjectIds?.[0];
 		if (!subjectId) return null;
-		const subject = ctx.store.loadObject(subjectId)?.state as
-			{ objectType?: unknown; pwuKind?: unknown; tags?: unknown } | undefined;
-		if (typeof subject?.objectType !== 'string') return null; // cannot decide; do not decide
+		// ⭑ ONE PROJECTOR (`JAN-APPLSUBJ`). This built the subject inline and dropped `riskProfile`, so a rule
+		// gated `RISK_AT_LEAST` read `false` for every subject — including PWUs where the field is REQUIRED and
+		// stored. The other call site dropped it independently, which is why the projection now lives beside the
+		// type in the kernel rather than at each caller.
+		const subject = applicabilitySubjectFrom(
+			ctx.store.loadObject(subjectId)?.state as Record<string, unknown> | undefined
+		);
+		if (!subject) return null; // cannot decide; do not decide
 		const outcome = policyApplicability(
 			policy.applicability ?? { objectTypeConditions: policy.applicableObjectTypes },
-			{
-				objectType: subject.objectType,
-				...(typeof subject.pwuKind === 'string' ? { pwuKind: subject.pwuKind } : {}),
-				...(Array.isArray(subject.tags) ? { tags: subject.tags as string[] } : {})
-			},
+			subject,
 			// The DOC-007 §18 evaluator, injected (rph-domain cannot import rph-assurance — cycle). Passing it is
 			// what makes an `expression` DECIDE rather than come back undecidable; see policyApplicability's note.
 			(expr, subj) => evaluateApplicability(expr as never, subj)

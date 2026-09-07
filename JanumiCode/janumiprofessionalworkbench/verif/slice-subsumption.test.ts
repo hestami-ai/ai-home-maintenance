@@ -319,7 +319,24 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// showed the reviewer ALREADY receives the contract inside the instruction it is handed, so the
 			// field would have been `REG-F-353`'s *"a second way to say one thing"* — with a concrete
 			// disagreement available, since nothing would say which of the two wins.
-		).toBe(34);
+			//
+			// 34 -> 35 (2026-09-07): `ROADMAP-applicability-subject-projection.md` (`JAN-APPLSUBJ`). ⭑ NOT A NEW
+			// LINE — it repairs the SUPPLY to a reader that already works. `RISK_AT_LEAST` resolves
+			// `$.riskProfile` and is correct; both production callers hand-built `{objectType, pwuKind?, tags?}`
+			// and dropped the field INDEPENDENTLY, so the operator read `false` for every subject — including
+			// PWUs, where `riskProfile` is REQUIRED and stored.
+			// ⭑ IT SUBSUMES: no vocabulary, no new field, no ratified meaning changed, and a NET SIMPLIFICATION —
+			// two inline projections collapse into one `applicabilitySubjectFrom` beside the type it produces, so
+			// the next field added to `ApplicabilitySubject` reaches every caller or none.
+			// ⚠ AND ITS SCOPE IS SMALLER THAN THE TRIAGE THAT SURFACED IT CLAIMED. *"Every risk-gated policy is
+			// silently excluded"* is NOT established: `RISK_AT_LEAST` occurs in production nowhere, seeded
+			// policies carry no `expression`, and the HIGH_ASSURANCE "risk gate" is PROSE inside an
+			// `appliesToRisk` description string. A primed trap pinned before it is stepped in — not live
+			// suppression.
+			// ⛔ AND `riskConditions` IS NOT WIRED: the kernel already discloses it as an ACTIVATION condition
+			// (§5.3), not a SCOPE condition, and its element type is *"NAMED by §5.1 and DEFINED NOWHERE in the
+			// corpus"*.
+		).toBe(35);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

@@ -17,7 +17,11 @@
 // the same `policyApplicability` kernel (and the same DOC-007 §18 expression evaluator) that
 // `RequestAssuranceAssessment` runs. Same function, same data, so the two cannot answer differently.
 import { evaluateApplicability } from '@janumipwb/rph-assurance';
-import { applicabilityPermitsAssessment, policyApplicability } from '@janumipwb/rph-domain';
+import {
+	applicabilityPermitsAssessment,
+	applicabilitySubjectFrom,
+	policyApplicability
+} from '@janumipwb/rph-domain';
 import type { EngineHandle } from './engine.js';
 
 export interface GoverningPolicies {
@@ -59,11 +63,10 @@ export function selectGoverningPolicies(handle: EngineHandle, pwuId: string): Go
 			// A policy created before `applicability` existed carries only `applicableObjectTypes`; deriving the
 			// rule from it is what lets one determination read both shapes.
 			pol.applicability ?? { objectTypeConditions: pol.applicableObjectTypes },
-			{
-				objectType: 'PROFESSIONAL_WORK_UNIT',
-				...(pwu?.pwuKind ? { pwuKind: pwu.pwuKind } : {}),
-				...(pwu?.tags ? { tags: pwu.tags } : {})
-			},
+			// ⭑ ONE PROJECTOR (`JAN-APPLSUBJ`) — see the kernel note. `objectType` is asserted rather than read
+			// because this loop is over PWUs by construction; everything else comes from the stored state, so a
+			// field added to `ApplicabilitySubject` arrives here without an edit.
+			applicabilitySubjectFrom({ ...pwu, objectType: 'PROFESSIONAL_WORK_UNIT' })!,
 			(expr, subj) => evaluateApplicability(expr as never, subj)
 		);
 		if (applicabilityPermitsAssessment(outcome)) selected.push(policyId);

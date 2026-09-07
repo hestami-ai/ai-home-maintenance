@@ -32430,3 +32430,116 @@ field's KIND and REASON precisely so that "unread" prompts a question rather tha
 **Merge target:** Repository (`execution-invocation.ts` — a net DELETION — and its tests; `DESIGN` §8 struck and
 §9 added; the roadmap's predicted reds superseded in place). `JPWB-DOC-003` `DEC-4` unchanged, and now
 un-misread.
+
+---
+
+### REG-F-363 — a risk gate that could never fire, because both callers dropped the field it asks about — and the triage that found it overstated it twice
+
+- **Date:** 2026-09-07 · **Type:** FINDING (`JAN-APPLSUBJ` AS-01..AS-03) ·
+  **Class:** FINDING — a latent supply defect repaired and its duplication removed; ⚠ **two corrections to the
+  audit that surfaced it**, one of which I had already repeated to the sponsor ·
+  **Status:** ✅ **CLOSED.**
+
+**THE DEFECT.** `policyApplicability`'s `expression` escape hatch supports `RISK_AT_LEAST`, which resolves
+`$.riskProfile` on the subject and works correctly. Both production callers projected a subject that cannot
+carry one:
+
+| Call site | Projection |
+|---|---|
+| `packages/rph-application/src/handlers/assurance.ts:1305-1309` | `{ objectType, pwuKind?, tags? }` |
+| `packages/rph-engine/src/governing-policies.ts:61-65` | `{ objectType, pwuKind?, tags? }` |
+
+Meanwhile `riskProfile` is **REQUIRED** on `PROFESSIONAL_WORK_UNIT` (`objects.ts:532`, no `.optional()`),
+authored through the UI, and stored (`handlers/pwu.ts:334`).
+
+⭑ **THE SILENCE IS THE DEFECT, NOT THE `false`.** `return false` on an absent profile is CORRECT for a subject
+that genuinely has none — a `PWA` carries no risk and a risk-gated policy rightly does not govern it. The
+failure is that the CALLER dropped a field the subject HAS, so the operator cannot tell *"this subject has no
+risk profile"* from *"nobody passed one."* ⚠ And the module is conspicuously careful about exactly that
+distinction everywhere else: unparseable `objectTypeConditions` → `REQUIRES_HUMAN_DETERMINATION`, *"undecidable
+here rather than unsatisfied"*; an unknown op → *"a fail-loud error, never a silent true/false."* The risk
+clause was the odd one out, and only because of what it was fed.
+
+---
+
+**⚠⚠ TWO CORRECTIONS TO THE TRIAGE THAT SURFACED THIS, AND I HAD ALREADY REPEATED THE FIRST TO THE SPONSOR.**
+
+**1. It is LATENT, not live.** The triage reported *"every risk-gated policy — including the HIGH_ASSURANCE
+profile — evaluates its risk clause false and is silently excluded."* Measured, that is not established:
+
+- `RISK_AT_LEAST` occurs in production **nowhere** — only `applicability.test.ts` and the generated enum JSON.
+- Seeded policies carry `applicability: { objectTypeConditions, pwuKindConditions? }` — **no `expression`**.
+- The HIGH_ASSURANCE *"risk gate"* (`ontology.data.ts:3630`) is **PROSE inside an `appliesToRisk` description
+  string**, not an executable expression.
+
+⭑ What IS true: `ApplicabilityRuleSchema` — `expression` included — is accepted by the policy command payloads
+(`messages.ts:725,746`), so a risk-gated policy is authorable today and the first one would be `NOT_APPLICABLE`
+forever with nothing saying why. **A primed trap, pinned before it is stepped in.** ⛔ I passed the
+overstatement to the sponsor before checking it; the correction is recorded here rather than quietly dropped.
+
+**⚠ AND MY OWN FIRST SEARCH FOR THAT CORRECTION WAS WRONG, WHICH IS WHY THE SEARCH IS STATED.** I claimed
+`RISK_AT_LEAST` *"occurs in production nowhere"*. **RAN:** `grep -rn "RISK_AT_LEAST" --include=*.ts packages
+apps`, excluding `node_modules`, `/dist/`, `*.test.ts` and the operator's own `applicability.ts` → **15 hits,
+and I read all 15.** Every one is TEXTUAL: enum declarations and doc comments (`enums.ts`), prose inside
+`appliesToRisk` description strings (`ontology.data.ts`), a docblock in the authoring parser
+(`apps/rph-demo/src/lib/authoring/riskProfile.ts`), an e2e test name, and comments I had just written myself.
+**ZERO are an executable expression object.** The claim survives; the phrasing *"occurs nowhere"* did not.
+**The discriminating search, RAN:** `grep -rn "expression:" --include=*.ts packages/rph-engine/src
+packages/rph-product-realization-pwa/src` excluding tests → **0**. **POSITIVE CONTROL, same form, same
+population:** `grep -rn "objectTypeConditions:" --include=*.ts packages/rph-engine/src` → **3**, so seeded
+policies do carry applicability rules and the instrument finds them — the zero is specific to `expression`.
+
+**⭑⭑ AND THE SEARCH TURNED UP THE SHARPEST FACT IN THE ENTRY.** `apps/rph-demo/src/lib/authoring/riskProfile.ts`
+— the `DR-002 W-4` surface that stopped every PWU being written with five hardcoded `MEDIUM`s — states the
+causal chain in its own docblock: *"`riskProfile` selects the assurance profile
+(`rph-assurance/src/applicability.ts` resolves `$.riskProfile`), and HIGH_ASSURANCE gates on
+`RISK_AT_LEAST(CONSEQUENCE,HIGH) OR …`"*. **W-4 made professionals declare a real risk profile, and the
+declared profile then reached nothing** — because two projections between the surface and the operator dropped
+it. This slice completes W-4's own stated purpose, and the docblock is evidence that the chain was BELIEVED to
+work by the person who wrote the surface.
+
+**2. `riskConditions` is not a defect at all, and the kernel says so in writing.** The triage classified it
+`CONTROL_INPUT`. The kernel's own docblock (`governance.ts:706`):
+
+> *"`lifecycleTriggers`, `eventTriggers`, `riskConditions` and `semanticChangeConditions` are **ACTIVATION**
+> conditions (§5.3 — when a policy activates), not **SCOPE** conditions (what it governs). This kernel answers
+> scope only … activation is a separate concern and is not silently folded in here."*
+
+And its element type is *"NAMED by §5.1 and DEFINED NOWHERE in the corpus"*, typed `z.array(z.unknown())`. **A
+reader cannot be written for a type canon never defined, and writing one would mint vocabulary.** ⚠ The
+repository's own prior audit (`docs/tracking/w3b/invariant-verdicts.ndjson:276`) had already run this exact
+census and read that exact docblock. **Third finding this week to dissolve on reading the disclosure.**
+
+---
+
+**⭑ THE DUPLICATION WAS THE CAUSE, AND IT IS WHAT WAS ACTUALLY FIXED.** One dropped field is a slip; the same
+field dropped at two sites independently is a structure — every future addition to `ApplicabilitySubject`
+starts life missing at every caller. The projection now lives **once**, as `applicabilitySubjectFrom` beside the
+type it produces, in the kernel both callers already depend on (`rph-assurance` cannot be imported by
+`rph-domain` — cycle — so the kernel is the only placement that reaches both without a new edge). `AS-02` is a
+verif gate asserting no production caller of `policyApplicability` builds the subject itself; its reach is
+disclosed in its own header — it cannot see a call site nobody has written.
+
+**⚠ WHY NO TEST CAUGHT THIS, WHICH IS THE TRANSFERABLE PART.** `applicability.test.ts` builds its subject **by
+hand, `riskProfile` included**, so every `RISK_AT_LEAST` assertion passed while production supplied a subject
+with no profile at all. **A suite that constructs the input the production path fails to supply cannot fail for
+that reason.** Same shape as `REG-F-357`'s `.then((r) => r.answerText)`, where every unit test injected its own
+rich `print`. The new `applicability-chain.test.ts` takes its subject from the PROJECTOR, so the link under test
+is the one production uses.
+
+**THE PREDICTED RED IS THE PRE-FIX PROJECTION.** Reverting `applicabilitySubjectFrom` to
+`{objectType, pwuKind?, tags?}` reddens three tests — including the chain test, which is the one that mirrors
+production. ⭑ **Every CONTROL stayed green** (LOW-consequence excluded, no-profile excluded, ungated policy
+still `REQUIRED`, expression still only narrows), which is what proves this is an ADDITION and not a rewrite of
+existing verdicts. Reverting one call site to an inline literal reddens `AS-02`, naming the file.
+
+**GATES:** check-types 22/22 · lint · verif 412 (ratchet 34 → 35 with a derived warrant) · `rph-domain` 582 ·
+`rph-application` 1013 · `rph-engine` 247 · `rph-assurance` 52 · `app:rph-demo` 311 · playwright 86.
+
+**⛔ NOT TAKEN.** Wiring `riskConditions` (above). Authoring a risk-gated policy to make the path fire — that
+would be inventing professional content to justify the wiring, refused here as it was for `CP-04b` and
+`outputContract`. Changing `RISK_AT_LEAST`'s `false`-on-absence — it would flip every PWA subject to
+`REQUIRES_HUMAN_DETERMINATION`, a behaviour change to a case that is already correct.
+
+**Merge target:** Repository (`governance.ts` + both call sites + three test files). No canon artifact changes —
+this repairs a supply path to a rule already ratified and already implemented.

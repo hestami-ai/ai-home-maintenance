@@ -633,6 +633,44 @@ export interface ApplicabilitySubject {
 	/** PWU kind, when the subject is a PWU. Absent for other object types. */
 	readonly pwuKind?: string;
 	readonly tags?: readonly string[];
+	/**
+	 * The §4.3 work risk profile, when the subject carries one.
+	 *
+	 * ⭑ IT IS HERE BECAUSE A RULE CAN ASK ABOUT IT. `RISK_AT_LEAST` resolves `$.riskProfile` on this object, and
+	 * both production callers projected `{objectType, pwuKind?, tags?}` — so the operator read `false` for every
+	 * subject, including PWUs where `riskProfile` is REQUIRED and stored. Structural (`unknown`) rather than a
+	 * typed profile because this kernel must not import contracts, and the injected evaluator owns the shape.
+	 */
+	readonly riskProfile?: unknown;
+}
+
+/**
+ * Project a stored object into the subject an applicability rule is decided against.
+ *
+ * ⭑⭑ ONE PROJECTOR, BECAUSE THE DEFECT WAS TWO. `riskProfile` was dropped at BOTH call sites independently —
+ * which says the duplication, not the field, is the cause: every future addition to `ApplicabilitySubject`
+ * starts life missing in *n* places, and a reader that works is fed a subject that cannot answer it.
+ *
+ * ⚠ ABSENT STAYS ABSENT. A key present-and-`undefined` is not the same as no key: `EXISTS` tests
+ * `resolvePath(...) !== undefined`, so spreading an undefined value would answer that operator wrongly. Each
+ * field is included only when it is actually there.
+ *
+ * ⛔ AND A MISSING PROFILE IS NOT SYNTHESIZED. A `PWA` has no `riskProfile`, and a risk-gated policy correctly
+ * does NOT govern it — `RISK_AT_LEAST` returns `false`, which is the right answer for a subject that genuinely
+ * carries no risk. Projecting `{}` to look decidable would convert a correct exclusion into a fiction.
+ */
+export function applicabilitySubjectFrom(
+	state: Readonly<Record<string, unknown>> | undefined
+): ApplicabilitySubject | undefined {
+	if (typeof state?.objectType !== 'string') return undefined; // cannot decide; do not decide
+	return {
+		objectType: state.objectType,
+		...(typeof state.pwuKind === 'string' ? { pwuKind: state.pwuKind } : {}),
+		...(Array.isArray(state.tags) ? { tags: state.tags as readonly string[] } : {}),
+		...(state.riskProfile !== undefined && state.riskProfile !== null
+			? { riskProfile: state.riskProfile }
+			: {})
+	};
 }
 
 /** The §5.1 fields this kernel can decide from. Everything else in the rule is ignored, deliberately — see below. */
