@@ -19,6 +19,14 @@ export interface EngineSnapshot {
 	/** JAN-EXECRUN — what the engine holds after an execution step ran. */
 	readonly modelExchanges: ObjectRow[];
 	readonly artifacts: ObjectRow[];
+	/**
+	 * ⭑ JAN-EXECGOV EG-02 — the ground truth for `STA-8`, *"Execution requires an approved plan and AUTHORIZED
+	 * Runtime Bindings."* Until that slice the production count was ZERO, so a spec asserting it had nothing to
+	 * read. ⚠ Declared HERE and not only in the endpoint, for the reason the `assurancePolicies` note below
+	 * records: an under-described payload pushes its consumers into inline casts, which is hand-annotation
+	 * where the type should have spoken.
+	 */
+	readonly runtimeBindings: ObjectRow[];
 	// ⚠ MISSING UNTIL REG-F-166, AND NOTHING COULD HAVE TOLD ANYONE. `test-api/introspect/+server.ts` has
 	// returned `assurancePolicies` all along; this interface simply did not say so, and `apps/rph-demo/e2e/` was
 	// under NO type gate at all — 38 specs typechecked by nothing — so the omission could not surface. The specs

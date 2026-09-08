@@ -67,6 +67,7 @@ import {
 import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionSession } from '$lib/server/execution/model';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
+import { stepBindingFor } from '$lib/server/execution/step-binding';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
 import type {
 	ActorReference,
@@ -928,8 +929,39 @@ export const actions: Actions = {
 		// ACTIVE template on a non-MODEL type is refused at the handler, so this single read is sufficient.
 		const isModelStep = pwuType?.workDischarge === 'MODEL';
 
+		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
+		//
+		// *"Execution requires an approved plan and AUTHORIZED RUNTIME BINDINGS."* `REG-F-365` measured zero
+		// production dispatches of `RequestRuntimeBinding`, so every step took `OUT_OF_SCOPE` and the binding
+		// checks — live and tested — were unreachable on real work. This is the first production binding.
+		//
+		// ⚠ ONLY FOR A MODEL STEP. A TRANSFORMATION needs no network and gets no binding, which keeps
+		// `OUT_OF_SCOPE` reachable — the kernel records that collapsing it makes every plan in the reference
+		// seed permanently unstartable.
+		const bindingId = mintUiId('bind');
+		const binding = stepBindingFor(
+			isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION',
+			pwuType?.workDischarge as string | undefined,
+			bindingId,
+			stepId
+		);
+
 		const err = runSteps([
 			['BeginPwuShaping', PWU, pwuId, {}],
+			// ⭑ BEFORE THE PLAN. `ProposeExecutionPlan` REFUSES a step naming a binding that was requested for a
+			// different step (`execution.ts:246`), so the binding must exist first — and it must be AUTHORIZED,
+			// because `STA-8` says authorized, not merely requested.
+			...(binding
+				? ([
+						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding],
+						[
+							'AuthorizeRuntimeBinding',
+							'RUNTIME_BINDING',
+							bindingId,
+							{ grantedCapabilities: [...binding.requestedCapabilities] }
+						]
+					] satisfies Step[])
+				: []),
 			[
 				'MarkPwuReady',
 				PWU,
@@ -948,6 +980,9 @@ export const actions: Actions = {
 							id: stepId,
 							executionPlanId: planId,
 							stepType: isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION',
+							// ⭑ THE STEP NAMES ITS BINDING, which is what makes `bindingAuthorityVerdict` resolve
+							// something other than OUT_OF_SCOPE for the first time in production.
+							...(binding ? { runtimeBindingId: bindingId } : {}),
 							purpose: isModelStep
 								? `Attempt the work described by ${pwuTypeId}'s prompt template`
 								: 'Produce the PWU output',
@@ -966,7 +1001,17 @@ export const actions: Actions = {
 				}
 			],
 			['ApproveExecutionPlan', 'EXECUTION_PLAN', planId, {}],
-			['ActivateExecutionPlan', 'EXECUTION_PLAN', planId, { authorizedRuntimeBindingIds: [] }],
+			[
+				'ActivateExecutionPlan',
+				'EXECUTION_PLAN',
+				planId,
+				// ⚠ NOW A TRUE STATEMENT RATHER THAN AN EMPTY ONE. ⛔ The REFUSAL keyed on this list stays
+				// WITHDRAWN — `REG-005` records it as *"an UNRECOVERABLE WEDGE whose refusal message prescribed a
+				// remedy the engine categorically forbids"*, because a plan cannot be re-activated to repair
+				// itself. Populating the field makes the plan's own declaration accurate; it does not revive the
+				// refusal, and a step with no binding still activates with an empty list exactly as before.
+				{ authorizedRuntimeBindingIds: binding ? [bindingId] : [] }
+			],
 			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]),
 			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]),
 			['StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId }],

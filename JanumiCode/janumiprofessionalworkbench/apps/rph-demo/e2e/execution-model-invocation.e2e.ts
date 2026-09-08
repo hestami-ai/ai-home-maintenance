@@ -74,6 +74,29 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		// ── 4. ENGINE STATE ───────────────────────────────────────────────────────────────────────────────
 		const snap = await introspect(request);
 
+		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` IS SATISFIED ON A REAL EXECUTION, FOR THE FIRST TIME ──────────
+		//
+		// *"Execution requires an approved plan and AUTHORIZED Runtime Bindings."* `REG-F-365` measured the
+		// production count of RUNTIME_BINDING at ZERO — `RequestRuntimeBinding` had no dispatch site at all —
+		// so every step took `bindingAuthorityVerdict`'s `OUT_OF_SCOPE` limb and the four binding checks were
+		// live, tested, and unreachable on real work. THE MUTANT: drop the request/authorize pair from the
+		// batch; the run still succeeds and the invariant is silently unmet again, exactly as before.
+		const bindings = snap.runtimeBindings as { state: Record<string, unknown> }[];
+		expect(bindings, 'no RUNTIME_BINDING was created for the model step').toHaveLength(1);
+		const bind = bindings[0]!.state;
+		// ⭑ AUTHORIZED, not merely REQUESTED — `STA-8` says authorized, and `RPH-EXE-003` refuses a start on a
+		// binding still in REQUESTED. That refusal has never been reachable in production until now.
+		expect(bind.authorizationStatus, 'STA-8 requires an AUTHORIZED binding').toBe('AUTHORIZED');
+		// ⭑ AND IT AUTHORIZES THIS STEP. A binding authorizes the step it names and no other.
+		expect(bind.executionStepId, 'the binding must name the step it authorizes').toBe(
+			(snap.executionPlans[0]!.state.steps as { id: string }[])[0]!.id
+		);
+		// ⛔ THE CAPABILITY IS THE RATIFIED ONE. `RPH-EXE-004` names `network` in its own example; nothing here
+		// is coined. THE MUTANT: grant a capability the request did not ask for — §22.1's
+		// *"requested capability is not granted capability"* runs the other way, but an unrequested grant is
+		// privilege expansion without an authorization event.
+		expect(bind.grantedCapabilities).toEqual([{ capability: 'network' }]);
+
 		// ⭑ THE FIRST RECORD EVER WRITTEN TO THE EXECUTION PLANE. `plane` has carried an `EXECUTION` member
 		// since REG-D-055 and every record in the system said ASSURANCE or AUTHORING.
 		expect(snap.modelExchanges, 'no model was invoked for the step').toHaveLength(1);
@@ -81,9 +104,10 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		expect(mex.plane).toBe('EXECUTION');
 		expect(mex.subjectObjectType).toBe('PROFESSIONAL_WORK_UNIT');
 		// PER-9's index, finally resolving to something a reader can look up (REG-D-058).
-		expect(String(mex.promptTemplateFingerprint ?? ''), 'the fingerprint must name the template').toMatch(
-			/^pwut_.*@v1$/
-		);
+		expect(
+			String(mex.promptTemplateFingerprint ?? ''),
+			'the fingerprint must name the template'
+		).toMatch(/^pwut_.*@v1$/);
 
 		// ⭑ THE MODEL SAW THE RENDERED TEMPLATE, not a generic instruction. The deterministic backend echoes
 		// what it was given, so this proves the authored prompt reached it with the work unit's facts in place.
@@ -183,6 +207,17 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		const snap = await introspect(request);
 		expect(snap.modelExchanges.length, 'a promptless type must invoke no model').toBe(before);
 		const pwu = snap.pwus.find((p) => p.state.title === 'Arch Work')!;
-		expect(pwu.state.executionState, 'and the existing lifecycle still completes').toBe('SUCCEEDED');
+		expect(pwu.state.executionState, 'and the existing lifecycle still completes').toBe(
+			'SUCCEEDED'
+		);
+		// ⛔⛔ AND NO BINDING WAS MINTED — the control that keeps `OUT_OF_SCOPE` REACHABLE (`JAN-EXECGOV`).
+		// A TRANSFORMATION step invokes no model and needs no network. The kernel records why this matters:
+		// collapsing the no-binding case *"would make every plan in the reference seed — which authors no
+		// RuntimeBinding whatsoever — permanently unstartable"*. THE MUTANT: bind every step. This run would
+		// still pass its other assertions while every pre-existing plan in the system broke.
+		expect(
+			snap.runtimeBindings,
+			'a step that invokes no model must need no binding — OUT_OF_SCOPE has to stay reachable'
+		).toHaveLength(0);
 	});
 });

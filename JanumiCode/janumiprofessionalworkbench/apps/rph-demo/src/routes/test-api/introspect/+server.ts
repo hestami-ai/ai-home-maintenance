@@ -48,6 +48,11 @@ export const GET: RequestHandler = () => {
 		// so would prove only that the page says what the page says; these two are what the engine holds.
 		modelExchanges: listByType(e, 'MODEL_EXCHANGE'),
 		artifacts: listByType(e, 'ARTIFACT'),
+		// ⭑ JAN-EXECGOV EG-02 — the ground truth for `STA-8`, *"Execution requires an approved plan and
+		// AUTHORIZED Runtime Bindings"*. Until this slice the production count was ZERO, so a spec asserting it
+		// had nothing to read. Exposed here rather than asserted from the page, for the reason the two comments
+		// above give: a page saying so proves only that the page says so.
+		runtimeBindings: listByType(e, 'RUNTIME_BINDING'),
 		decisions: listDecisions(e, { kind: 'WORKSPACE' }),
 		baselines: listBaselines(e, { kind: 'WORKSPACE' }),
 		conversations: listConversations(e),

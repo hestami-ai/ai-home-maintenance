@@ -32747,3 +32747,103 @@ step and the producer becomes resolvable from the record).
 
 **Merge target:** `docs/_working/DESIGN-execution-governance-layer.md` and its roadmap. No code in this entry —
 **the breach is filed before anything is built**, because it stands whether or not `G-1` is granted.
+
+---
+
+### REG-F-366 — a model step now runs under an AUTHORIZED runtime binding, and the capability grant was handed back unspent
+
+- **Date:** 2026-09-08 · **Type:** FINDING (`JAN-EXECGOV` `EG-02`) ·
+  **Class:** FINDING — `REG-F-365`'s breach closed for the steps that need a binding; ⭑ **a sponsor grant
+  RETURNED UNUSED because the vocabulary already existed** · **Status:** ✅ **CLOSED for `EG-02`;
+  `RPH-EXE-004` remains `UNENFORCED_DISCLOSED` and is not touched here.**
+
+**WHAT `REG-F-365` MEASURED.** `STA-8` (`JPWB-DOC-003:203`) — *"Execution requires an approved plan and
+**authorized Runtime Bindings**"* — against **zero** production dispatches of `RequestRuntimeBinding` (positive
+control, same form: `ApproveExecutionPlan` → 4). Every step therefore took `bindingAuthorityVerdict`'s
+`OUT_OF_SCOPE` limb, leaving four live, tested checks unreachable on real work.
+
+**WHAT LANDED.** A `MODEL_INVOCATION` step now requests a binding, authorizes it, and names it; the plan's
+`authorizedRuntimeBindingIds` names it too. The e2e asserts against the ENGINE — binding present,
+`authorizationStatus: 'AUTHORIZED'`, `executionStepId` equal to the step it authorizes, and
+`grantedCapabilities: [{capability:'network'}]`.
+
+---
+
+**⭑⭑ THE SPONSOR GRANTED AUTHORITY TO NAME CAPABILITY VOCABULARY, AND IT WAS RETURNED UNSPENT.**
+
+`REG-F-365` recorded that minting a binding requires naming a capability, that a capability is
+`{ capability: z.string() }` with the vocab note *"Helper undefined"*, and that naming one would therefore be
+coining governed vocabulary the schema would not stop. The sponsor granted it (`G-1`, 2026-09-08).
+
+⛔ **The grant was not needed.** `RPH-EXE-004`, ratified conformance
+(`packages/rph-domain/vocab/m12-conformance.json`), names the capabilities in its own statement:
+
+> *"When a binding requests **file-system and network access** but only **file-system** is granted, **network
+> operations** fail authorization (requested capability is not granted capability)."*
+
+A model invocation reaches a provider over the network. `network` is **ADOPTED** from the rule's own example —
+the same move as adopting `DEC-4`'s five fates rather than respelling them. ⭑ **A grant given in good faith is
+returned rather than spent on something adjacent**; if a later step needs a capability the corpus does not name,
+that will be asked for specifically.
+
+**⭑ AND `roleId` WAS NOT COINED EITHER, WHICH WAS THE HARDER HALF.** `RequestRuntimeBinding` requires a
+`roleId`; it is a free string with no vocab note, and the register records `ActorReference.roleId` as a
+**hollow** (`REG-F-059`) whose intended source is the principal (`D-3` of the trust-boundary design,
+`REG-D-026`) — which **no session sets today**. Coining `role-executor` was available and refused: it exists in
+**two tests and no production use**, and inventing it would pre-empt a filed design.
+
+**BOTH ABSENCES SEARCHED, WITH POSITIVE CONTROLS ON THE SAME POPULATION AND FORM.** (1) *"no session sets
+`roleId`"* — **RAN:** `grep -rn "roleId" apps/rph-demo/src/lib/server/identity.ts` minus the projection's own
+`p.roleId === undefined` guard → **0 setters**. **CONTROL, same file, same form:** `displayName` → **5**, so
+principals demonstrably do carry fields and the instrument finds them. (2) *"`role-executor` is test-only"* —
+**RAN:** `grep -rn "role-executor" --include=*.ts packages apps`, excluding `node_modules`, `/dist/` and
+`*.test.ts` → **1 hit**, and ⚠ **that hit is a comment I wrote in this very slice**
+(`step-binding.ts:22`) stating that the string appears only in tests. A MENTION counted as a USE — the same trap
+`REG-F-359` records, in miniature, and caught here only because the gate forced the search to be stated.
+Production uses: **zero**. **CONTROL, same form:** `evaluatorRole: 'REVIEWER'` → **3** production hits, so a
+role string that IS used in production is found.
+
+Instead the binding's role is `PWU_TYPE.workDischarge` — a **ratified enum** (`'MODEL' | 'HUMAN' |
+'UNDECLARED'`) stating who discharges the type's work, authored by the professional. ⭑ And the authoring
+handler already **REFUSES** a type carrying an ACTIVE prompt template that declares anything but `MODEL`
+(`pwa-authoring.ts:332`), so for exactly the steps bound here the value is guaranteed **by a gate**, not
+assumed.
+
+---
+
+**⚠ WHAT IS AND IS NOT CLAIMED.** A model step now runs under an authorized binding. ⛔ This entry does **NOT**
+claim `STA-8` is satisfied for every step: a `TRANSFORMATION` step is deliberately left unbound, and whether
+such a step needs one is a question this slice does not answer. The kernel's own reading is that a step naming
+no binding is `OUT_OF_SCOPE` — *"collapsing them would make every plan in the reference seed, which authors no
+RuntimeBinding whatsoever, permanently unstartable"* (`rph-domain/src/execution.ts:195-196`) — and that reading
+is inherited, not extended.
+
+⛔ **THE WEDGE WAS DESIGNED AROUND, NOT REDISCOVERED.** `REG-005` records `JAN-EXEBIND`'s refusal keyed on
+`authorizedRuntimeBindingIds` as *"an UNRECOVERABLE WEDGE whose refusal message prescribed a remedy the engine
+categorically forbids"* — a plan cannot be re-activated to repair itself. That refusal **stays withdrawn**.
+This slice only POPULATES the list, making the plan's declaration true where it was empty; a step with no
+binding still activates with `[]` exactly as before. ⭑ A test asserts the unbound case explicitly, because
+keeping `OUT_OF_SCOPE` reachable is the property that stops every pre-existing plan breaking.
+
+⚠ **`RPH-EXE-003` IS NOW REACHABLE BUT NOT EXERCISED IN PRODUCTION.** The refusal — starting a step on a binding
+still in `REQUESTED` — has something to act on for the first time, but the demo authorizes in the same batch, so
+the negative path is covered by unit tests rather than by the live route. Stated so "reachable" is not read as
+"exercised".
+
+⛔ **`RPH-EXE-004` IS UNTOUCHED.** The enforcement register records it `UNENFORCED_DISCLOSED`: nothing checks
+that an operation falls inside the granted capabilities at the point of use. A granted `network` therefore
+constrains nothing yet — the binding is authorized, and the authorization is not consulted when the model is
+called. That is the next honest increment and it is **not** folded in here.
+
+**THE PREDICTED RED IS THE SHIPPED STATE.** Suppressing the binding — `const binding = undefined` — reddens the
+e2e with *"no RUNTIME_BINDING was created for the model step"*, which is precisely the condition `REG-F-365`
+measured. Six unit tests cover the decision function, including the two controls that matter: a
+`TRANSFORMATION` step gets **no** binding, and a `MODEL_INVOCATION` on a non-`MODEL` type gets none either
+(binding it would assert a role the type denies).
+
+**GATES:** check-types 22/22 · lint · verif 412 · `rph-domain` 582 · `rph-application` 1021 · `rph-engine` 247 ·
+`rph-assurance` 52 · `app:rph-demo` 316 · playwright 86.
+
+**Merge target:** Repository (`step-binding.ts` + its tests, the execution action, the introspect endpoint and
+the e2e harness type). No canon artifact changes — `STA-8` and `RPH-EXE-004` are implemented against, not
+amended.
