@@ -81,6 +81,92 @@ settable-but-unread** (including `AssessmentCriterion.criterionType`, `evaluatio
 deferred concerns. The remedy is that **a surface must not present an unread setting as though editing it
 does something** — which is a disclosure problem, not a wiring problem, and it is checkable.
 
+## 5b. ⚠⚠ §5 MEASURED, AND THE MEASUREMENT MOVED THE DEFECT — 2026-09-08, before `EG-04` was built
+
+§5 above stands as written, with **one clause corrected and one defect added that is larger than the one it
+names**. Both came from re-deriving the census from code instead of building against the recorded list.
+
+**⭑ FIRST, THE CORRECTION I ALMOST MADE AND WHICH WAS ITSELF WRONG.** The re-derivation found **no form control
+on the surface whose posted value nothing reads**, and the obvious conclusion — *"§5 is wrong in direction"* —
+was drafted, put to four adversarial readers, and **refuted**. §5 censused **object fields the surface writes**;
+the re-derivation censused **form controls the author fills**. Five of §5's eleven names have no control at all
+(`criterionType`, `evaluationMethod`, `mayBeNotApplicable`, `requiredEvidenceIds` are minted as constants inside
+`policy-fields.ts:44-48`; `findingDefinitions` is hardcoded `[]` at `+page.server.ts:771`), so they are outside
+the second census **by construction**. It refutes §5 on **0 of the 11 names**. ⛔ **These are two findings, not
+one overturning the other** — and a dissolution that survives only by changing the population is not a
+dissolution.
+
+⚠ **AND §5'S DIRECTION IS NOT EMPTY EVEN INSIDE THE STRICTER POPULATION.** `ASSURANCE_POLICY.evaluatorRole` has
+a real control (`+page.svelte:1361`), is stored (`assurance.ts:218`) and is patchable (`assurance.ts:276`) — and
+**nothing anywhere compares it**; every other occurrence is an assignment or a projection. Policy `rationale` is
+the same shape. Both clear "is it read?" only on the render limb, and only via the same editor form that posted
+them. **A field echoed back by the form that set it is not thereby consulted**, and §5's remedy — disclosure —
+is exactly right for them.
+
+---
+
+**⛔⛔ SECOND, AND THIS IS THE LARGER ONE: THE INVERSE DEFECT IS LIVE AND IT WIDENS GOVERNANCE.**
+
+`ASSURANCE_POLICY.applicableObjectTypes` is read from the form at `policy-fields.ts:62` and **no control in the
+3,122-line markup emits it** — measured, and measured across history: `name="applicableObjectTypes"` has
+**never** appeared in any `.svelte` file in this repository. The reader was written on 2026-07-15 (`691aa014`)
+for a control that was never built, and `+page.server.ts:173-179` still projects the stored value into the form
+model under a comment describing *"a comma-separated text input"* that does not exist.
+
+⚠ **THE GUARDS THAT SHOULD HAVE CAUGHT IT FAIL BECAUSE `[]` IS TRUTHY.** `csvList(null)` returns `[]`;
+`+page.server.ts:766`'s `f.applicableObjectTypes || 'PROFESSIONAL_WORK_UNIT'` is therefore **dead** (and
+type-wrong — a string where the schema demands an array, so it would be REJECTED had it ever fired), and
+`:811`'s `f.applicableObjectTypes ? {…} : {}` is **always taken**. Three lines below, `:819` guards `criteria`
+with `f.criteria.length`. ⭑ **Two spellings of the same guard, in one function, on one screen** — and the wrong
+spelling is used on all three array fields.
+
+**MEASURED BY DRIVING THE ENGINE, not by reading it.** Create with `['PROFESSIONAL_WORK_UNIT']`, then send
+exactly what a *rename* sends:
+
+| | `applicableObjectTypes` | `applicability.objectTypeConditions` | applies to a PWA? |
+|---|---|---|---|
+| after create | `['PROFESSIONAL_WORK_UNIT']` | `['PROFESSIONAL_WORK_UNIT']` | `NOT_APPLICABLE` |
+| after a rename | `[]` | `[]` | ⛔ **`REQUIRED`** |
+
+Both commands `ACCEPTED`. ⛔ **The empty list does not narrow — it WIDENS.** `governance.ts:767-769` guards the
+`NOT_APPLICABLE` limb on `objectTypes.length > 0`, so an empty condition set skips the guard and falls through
+to `REQUIRED`. `reconcileApplicability` (`assurance.ts:336-346`) early-returns only on `undefined`, so `[]`
+propagates into `applicability` — **the field the enforced §5.1 determination prefers**. The kernel's *"scope
+untouched by this edit"* limb exists and **this surface can never reach it**.
+
+⭑ **WHAT KEEPS IT FROM BEING CATASTROPHIC IS A PROPERTY OF THE DATA, NOT OF THE CODE.** All twelve seeded
+catalog policies carry a second `pwuKindConditions` arm that still refuses. The reachable population is the demo
+sign-off policy (`demo-policy.ts:58`, object-type arm only) plus **every policy created through the UI**, which
+is born unscoped with no edit required.
+
+**⛔ AND THE SECOND ARM IS DESTROYED BY A THIRD PATH.** `successorPolicyPayload` (`+page.server.ts:411-437`)
+says *"every field of the predecessor copied verbatim"* and copies **seventeen**, omitting `applicability` and
+`remediationRules`. Since create derives `applicability ?? { objectTypeConditions: applicableObjectTypes }`,
+**versioning any kind-scoped policy returns a successor with no `pwuKindConditions`** — the one arm protecting
+the twelve.
+
+---
+
+**⭑ THE GENERAL FORM, WHICH IS WHY THIS IS A GATE AND NOT A POINT FIX.** *A server action that reads a form key
+no control emits does not fail — it silently writes the reader's default, and whether that is benign or
+destructive turns on whether the default is falsy.* Derived across the whole route tree, the reader-without-a-
+control set is exactly two, and they land on opposite sides of that line: `version` (`+page.server.ts:840`)
+defaults to `''`, which is **falsy**, so its `||` rescues it and the only cost is an unreachable feature;
+`applicableObjectTypes` defaults to `[]`, which is **truthy**, so its guard does not.
+
+⚠ **AND THE DERIVATION THAT FOUND THEM IS NOT THE GATE.** A literal `form.get('X')` scan is blind to five reader
+idioms in this application — template-literal keys (`cardinality:${typeId}`), a callback reader
+(`parseRiskProfile(read)`), a line-split `form\n.getAll(…)`, `getAll` itself, and dynamic emitters
+(`name={riskFieldName(d.field)}`) — and it was correct here **only because each blind spot happened to pair a
+missed reader with a missed emitter**. ⛔ That is cancellation, not method. The gate must handle the idioms or
+DECLARE what it cannot analyse, in the recorded-fail-open shape `SPEC-001-NF-32` requires of an ungated offer.
+
+**⛔ WHAT CANON DOES AND DOES NOT SAY ABOUT THIS.** The nearest ratified rule is `SPEC-001` O-4's exclusion —
+*"a display-only computation that gates nothing … SHALL NOT be rendered as an Affordance"* — and it does not
+reach here: a form input is not an Affordance, and the defect is a control that is **absent**, not one that is
+inert. This is doctrine with a measured harm behind it, and it is recorded as such rather than dressed as an
+invariant.
+
 ## 6. Decisions
 
 | # | Decision | Recommendation |

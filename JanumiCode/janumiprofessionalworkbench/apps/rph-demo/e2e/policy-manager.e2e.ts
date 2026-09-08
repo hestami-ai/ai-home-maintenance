@@ -188,4 +188,80 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		expect(publishedRoot.state.requiredAssurancePolicyIds).toContain(successorId);
 		expect(publishedRoot.state.requiredAssurancePolicyIds).not.toContain(newest[0].id);
 	});
+
+	// ── ⛔⛔ JAN-EXECGOV EG-04 — EDITING A POLICY MUST NOT WIDEN WHAT IT GOVERNS ──────────────────────────────
+	//
+	// THE DEFECT, MEASURED. `policy-fields.ts` read `form.get('applicableObjectTypes')` and NO control emitted
+	// it — the name has never appeared in any `.svelte` file in this repository's history. `csvList(null)`
+	// returned `[]`, `[]` is TRUTHY, so the create fallback was DEAD and the edit guard ALWAYS fired. Every
+	// UI-authored policy was born with an empty scope, and every edit re-emptied it.
+	//
+	// ⚠ AND AN EMPTY SCOPE DOES NOT NARROW — IT WIDENS. `governance.ts` guards its `NOT_APPLICABLE` limb on
+	// `objectTypes.length > 0`, so an empty condition set skips the guard and falls through to `REQUIRED`.
+	// Driven against the engine before the fix: a policy created for `PROFESSIONAL_WORK_UNIT` was
+	// `NOT_APPLICABLE` to a PWA, and after a RENAME it was `REQUIRED`. Both commands ACCEPTED.
+	//
+	// ⭑⭑ THIS SPEC EXISTS BECAUSE THE UNIT TESTS CANNOT SEE THE ROUTE. `policy-round-trip.test.ts` proves
+	// `policyEditPatch` omits the field; nothing there proves the ACTION CALLS IT. Reverting the route to its
+	// eight inline spreads leaves every unit test green — which is the wired-but-unproven shape this repository
+	// has recorded against itself repeatedly. The assertions below read the ENGINE, through `introspect`.
+	test('editing and versioning a policy cannot widen what it applies to (EG-04)', async ({
+		page,
+		request
+	}) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Scope Integrity PWA');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		await gotoHydrated(
+			page,
+			(await page.getByRole('link', { name: /Scope Integrity PWA/ }).getAttribute('href'))!
+		);
+		await page.getByRole('button', { name: '⚖ Policies' }).click();
+
+		await page.getByRole('button', { name: '＋ New policy' }).click();
+		await page.locator('input[name="name"]').fill('Scope Integrity Review');
+		await page.locator('textarea[name="purpose"]').fill('That a policy keeps the scope it was born with.');
+		await page.locator('textarea[name="criteria"]').fill('The scope survives an edit.');
+		await page.getByRole('button', { name: 'Create policy' }).click();
+
+		const scopeOf = async (name: string) => {
+			const snap = await introspect(request);
+			const row = must(
+				snap.assurancePolicies.find((p: { state: { name?: string } }) => p.state.name === name),
+				`assurance policy ${name} exists`
+			);
+			return row.state as {
+				applicableObjectTypes?: string[];
+				applicability?: { objectTypeConditions?: string[] };
+			};
+		};
+
+		// ⭑ THE ARRANGEMENT, ASSERTED. Before the fix this was `[]` — so a spec that only checked the edge
+		// would have compared one empty scope against another and passed while measuring nothing.
+		const born = await scopeOf('Scope Integrity Review');
+		expect(born.applicableObjectTypes, 'a UI-authored policy is born SCOPED, not universal').toEqual([
+			'PROFESSIONAL_WORK_UNIT'
+		]);
+		expect(born.applicability?.objectTypeConditions).toEqual(['PROFESSIONAL_WORK_UNIT']);
+
+		// ⛔ A RENAME. Nothing about changing a policy's wording should change what it governs — the same
+		// sentence `policy-fields.ts` already carried about severity, on the other half of the round trip.
+		const card = page.locator('.policycard', { hasText: 'Scope Integrity Review' });
+		await card.getByRole('button', { name: 'Edit', exact: true }).click();
+		await page.locator('input[name="name"]').fill('Scope Integrity Review (renamed)');
+		await page.getByRole('button', { name: 'Save changes' }).click();
+		await expect(page.getByText('Scope Integrity Review (renamed)')).toBeVisible();
+
+		const renamed = await scopeOf('Scope Integrity Review (renamed)');
+		expect(renamed.applicableObjectTypes, 'a rename must not empty the scope').toEqual([
+			'PROFESSIONAL_WORK_UNIT'
+		]);
+		// ⭑ THE FIELD THE ENFORCED §5.1 DETERMINATION ACTUALLY PREFERS. Asserting `applicableObjectTypes` alone
+		// would pass on the day someone "fixes" this by writing `[]` consistently into both places.
+		expect(
+			renamed.applicability?.objectTypeConditions,
+			'reconcileApplicability must have taken its "scope untouched by this edit" limb'
+		).toEqual(['PROFESSIONAL_WORK_UNIT']);
+	});
 });

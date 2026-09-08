@@ -43,18 +43,56 @@ The point of `EG-02` is not the object; it is that `bindingAuthorityVerdict`'s l
 
 ---
 
-### `EG-04` — the authoring surface stops presenting unread settings as control  *(needs no grant)*
+### `EG-04` — a form key nobody can set stops widening governance  *(needs no grant)*
 
-⭑ The sponsor's own case: a human edits a field in the UI and nothing reads it. **The remedy is disclosure, not
-wiring** — several of the eleven are legitimately descriptive, and some belong to deferred concerns.
+⚠ **RE-AIMED 2026-09-08 AFTER MEASURING — see `DESIGN` §5b.** This item was written to disclose *"eleven
+settable-but-unread fields"*. Re-derived from code, the surface's live defect is the **inverse**: a form key with
+a reader and **no control**, whose empty default is truthy and therefore passes every guard on the way to the
+engine. `ASSURANCE_POLICY.applicableObjectTypes` — read at `policy-fields.ts:62`, emitted by no `.svelte` file
+in this repository's history — makes every UI-authored policy universally applicable, driven and confirmed
+against the engine (`NOT_APPLICABLE` → **`REQUIRED`** on a rename).
+
+⛔ **AND THE ORIGINAL ITEM IS NOT SUPERSEDED BY IT.** Four adversarial readers refuted the tidy conclusion that
+one census overturned the other: the two measure different populations, overlapping on **0 of 11 names**. The
+disclosure work is real and moves to `EG-05`.
 
 | Mutant | Must redden |
 |---|---|
-| add a new settable field with no reader and no disclosure | the surface census — derived from the form and the command payloads, never hand-listed |
-| **CONTROL** | a field that IS read needs no disclosure, so this is not "label everything" |
+| restore `applicableObjectTypes: []` on the edit payload | the round-trip test — a rename must not change what a policy applies to. ⭑ The assertion is the **applicability outcome**, not the field: asserting the field alone passes on the day someone "fixes" it by writing `[]` into both places |
+| swap the fixed guard back to bare truthiness (`f.x ? … : {}`) | the same test — this is the exact live shape, and `[]` is truthy |
+| drop `applicability` from `successorPolicyPayload` | the successor test — versioning a kind-scoped policy must not unscope it. ⚠ This is a SECOND live path onto the same harm, and the one that destroys the `pwuKindConditions` arm that is currently the only reason the twelve catalog policies are safe |
+| add a `form.get('newThing')` with no control | the surface gate below |
+| **CONTROL** | a policy whose scope the author never touches keeps it — the kernel's *"scope untouched by this edit"* limb (`assurance.ts:340`) must become REACHABLE, not merely present |
+| **CONTROL** | `version` — a reader with no control whose default is FALSY — is left alone, so the gate is not "every unmatched key is a bug" |
 
-⚠ **Its reach is stated, not claimed away:** a static check sees whether a field has a production reader. It
-cannot see whether the reader is *meaningful*. That limit goes in the gate's own header.
+⚠ **THE GATE'S REACH IS STATED, NOT CLAIMED AWAY.** The derivation that found these two is blind to five reader
+idioms in this app (template-literal keys, a callback reader, a line-split `.getAll`, `getAll` itself, dynamic
+`name={…}` emitters) and was right here **only by cancellation** — each blind spot paired a missed reader with a
+missed emitter. The gate must either analyse the idiom or **DECLARE** it, in the recorded-fail-open shape
+`SPEC-001-NF-32` requires; a silent skip is the defect one level up. Controls must prove it SEES the dynamic
+pairs it declares.
+
+---
+
+### `EG-05` — the authoring surface stops presenting unread settings as control  *(needs no grant)*
+
+⭑ The sponsor's own case, and `EG-04`'s original subject, now stated against measurement rather than against a
+recorded list. Two shapes, and they need different remedies:
+
+- **A control whose value nothing consults.** `ASSURANCE_POLICY.evaluatorRole` and policy `rationale` are
+  stored, patchable, and compared by nothing; they clear "is it read?" only by being echoed back into the form
+  that posted them. ⚠ **An echo is not a reader.**
+- **A governed field with no control at all.** `applicableObjectTypes` after `EG-04` (the author still cannot
+  set it), `version`, and the five `EG-04`-era names that are minted constants inside `policy-fields.ts`.
+
+⛔ **The remedy is DISCLOSURE, not wiring** — several are legitimately descriptive, and `evaluationMethod`'s
+absent reader is **already filed** (`REG-F-243`), so re-wiring it here would re-file a finding this register has
+answered.
+
+| Mutant | Must redden |
+|---|---|
+| add a settable field with no reader and no disclosure | the surface census — derived from the markup and the payloads, never hand-listed |
+| **CONTROL** | a field that IS consulted needs no disclosure, so this is not "label everything" |
 
 ---
 

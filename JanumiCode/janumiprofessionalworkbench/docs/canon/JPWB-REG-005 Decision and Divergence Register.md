@@ -32936,3 +32936,122 @@ permanently unstartable."*
 **Merge target:** Repository (`step-binding.ts`, `run-model-step.ts` + tests, the execution action,
 `enforcement-register.ts` re-disposition, `dead-kernel-census.test.ts`, `unreachability-grounds.test.ts`, and
 the regenerated W-3 census). `RPH-EXE-004` is implemented against in part, not amended.
+
+---
+
+### REG-F-368 — a form key nobody can set was WIDENING what every UI-authored policy governs, and the tidy conclusion that it overturned `REG-F-365` was itself refuted
+
+- **Date:** 2026-09-08 · **Type:** FINDING (`JAN-EXECGOV` `EG-04`) ·
+  **Class:** CODE_DIVERGES — a live, reachable fail-open on the §5.1 applicability determination, standing since
+  2026-07-15; ⭑ **a general form gated**; ⚠ **two self-corrections, one of them of a correction** ·
+  **Status:** ✅ **CLOSED for the widening. `EG-05` (disclosure) is OPEN and is `REG-F-365`'s subject, which
+  this entry does NOT close.**
+
+**⛔⛔ THE DEFECT.** `policy-fields.ts:62` read `form.get('applicableObjectTypes')` and **no control emitted it**.
+`csvList(null)` returned `[]`; **`[]` is TRUTHY**, so `+page.server.ts:766`'s `f.applicableObjectTypes ||
+'PROFESSIONAL_WORK_UNIT'` was **dead** — and type-wrong, a string against a `z.array(...)` field, so it would
+have been REJECTED had it ever fired — and `:811`'s `f.applicableObjectTypes ? {…} : {}` was **always taken**.
+Three lines below, `:819` guarded `criteria` with `.length`. **Two spellings of one guard, in one function, on
+one screen.**
+
+**MEASURED BY DRIVING THE ENGINE, NOT BY READING IT.** Create with `['PROFESSIONAL_WORK_UNIT']`, then send
+exactly what a *rename* sends:
+
+| | `applicableObjectTypes` | `applicability.objectTypeConditions` | applies to a PWA? |
+|---|---|---|---|
+| after create | `['PROFESSIONAL_WORK_UNIT']` | `['PROFESSIONAL_WORK_UNIT']` | `NOT_APPLICABLE` |
+| after a rename | `[]` | `[]` | ⛔ **`REQUIRED`** |
+
+Both commands `ACCEPTED`; nothing refused. ⛔ **AN EMPTY SCOPE DOES NOT NARROW — IT WIDENS.**
+`governance.ts:767-769` guards the `NOT_APPLICABLE` limb on `objectTypes.length > 0`, so an empty condition set
+**skips** the guard and falls through to `REQUIRED`. `reconcileApplicability` (`assurance.ts:336-346`)
+early-returns only on `undefined`, so `[]` propagated into `applicability` — the field the enforced
+determination PREFERS. ⭑ **The kernel's own *"scope untouched by this edit"* limb existed and this surface could
+never reach it.**
+
+⚠ **WHAT KEPT IT FROM BEING CATASTROPHIC IS A PROPERTY OF THE DATA, NOT OF THE CODE.** All twelve seeded catalog
+policies carry a second `pwuKindConditions` arm that still refuses. The reachable population is the demo
+sign-off policy (`demo-policy.ts:58`, object-type arm only) plus **every policy created through the UI**, born
+unscoped with no edit required.
+
+**⛔ AND A SECOND PATH DESTROYED THE ARM THAT WAS DOING THE PROTECTING.** `successorPolicyPayload` said *"every
+field of the predecessor copied verbatim"* and copied **seventeen**, omitting `applicability` and
+`remediationRules`. Create derives `applicability ?? { objectTypeConditions: applicableObjectTypes }`, so
+pressing **"Create & activate version"** on any kind-scoped catalog policy returned a successor with **no
+`pwuKindConditions`**. The two defects compose.
+
+---
+
+**⚠⚠ THE SELF-CORRECTION THAT MATTERS MOST, AND IT IS A CORRECTION OF A CORRECTION.** Re-deriving the census
+found **no form control whose posted value nothing reads**, and the conclusion drafted from it — *"`REG-F-365`
+is wrong in direction"* — was put to four adversarial readers and **REFUTED**. `REG-F-365` censused **object
+fields the surface writes**; the re-derivation censused **form controls the author fills**. Five of its eleven
+names have no control at all, so they are outside the second population **by construction**. It refutes
+`REG-F-365` on **0 of the 11 names**. ⛔ **Two findings, not one overturning the other** — and a dissolution that
+survives only by changing the population is not a dissolution.
+
+⭑ **AND `REG-F-365`'S DIRECTION IS NOT EMPTY EVEN INSIDE THE STRICTER POPULATION.** `evaluatorRole` has a real
+control, is stored and is patchable — and **nothing compares it anywhere**. Policy `rationale` is the same
+shape. Both clear "is it read?" only by being echoed back into the form that posted them, and **an echo is not a
+reader**. Carried to `EG-05`; `REG-F-365`'s remedy — disclosure — is right for them and is **not** discharged
+here.
+
+**⚠ AND A CONTROL I WROTE CAUGHT ME WEAKENING IT.** The gate requires every declared exception to carry a
+REASON, not a name; my own entry for one of the six read *"The same risk-profile callback."* — 31 characters
+against a 60-character floor. It went red. The bar was raised to a reason rather than lowered to the entry.
+
+---
+
+**⭑ THE GENERAL FORM, WHICH IS WHY THIS IS A GATE.** *A server action that reads a form key no control emits
+does not fail — it silently writes the reader's default, and whether that is benign or destructive turns on
+whether the default is FALSY.* Across the whole route tree the reader-without-a-control set is exactly **two**,
+and they land on opposite sides of that line: `version` defaults to `''` (falsy — its `||` rescues it; an
+unreachable feature, no wrong write); `applicableObjectTypes` defaulted to `[]` (truthy — it did not).
+
+⛔ **AND THE DERIVATION THAT FOUND THEM IS NOT THE GATE.** A literal `form.get('X')` scan is blind to five
+reader idioms here — a template-literal key, a callback reader, a line-split `.getAll`, a module const, and a
+`(f: FormData, k: string)` helper — and it was right **only because each blind spot paired a missed reader with
+a missed emitter**. That is cancellation, not method: an instrument correct by luck is the instrument failing
+exactly like its subject. `verif/form-key-emitter-census.test.ts` therefore **DECLARES** every unanalysable read
+with the emitter it pairs with, in the recorded-fail-open shape `SPEC-001-NF-32` requires, and a sixth idiom
+fails the gate rather than being skipped.
+
+**⛔ WHAT CANON DOES AND DOES NOT SAY.** The nearest ratified rule is `SPEC-001` O-4's exclusion — *"a
+display-only computation that gates nothing … SHALL NOT be rendered as an Affordance"* — and **it does not reach
+here**: a form input is not an Affordance, and the defect is a control that is ABSENT, not one that is inert.
+Doctrine with a measured harm behind it, recorded as such rather than dressed as an invariant.
+
+---
+
+**⚠⚠ A MUTANT SURVIVED, BY DESIGN, AND SAYING SO IS THE POINT.** Reverting `policyEditPatch`'s `!== undefined`
+to bare truthiness leaves the suite **GREEN**. Once `csvList` can return `undefined`, the two spellings agree on
+every value an array field can take — `undefined` is falsy, `[]` is truthy, so both omit the first and patch the
+second. **The consolidation is a maintenance property, not a behavioural one**, and claiming otherwise would be
+**a control that cannot fail** — this register's own recurring name for the shape — **18 occurrences**
+of the exact phrase (counted, not recalled: my first figure was seven, taken from a truncated grep). One of them
+states the practice that catches it: *"I only found it by asking which mutant would redden it"*. So it was given
+a mutant it CAN fail — guard with `?.length` and an author's deliberate CLEARING is swallowed, making "cleared"
+indistinguishable from "never asked", which is the conflation this slice exists to end.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (5 of 6; the sixth is the declared survivor above):** absent
+collapses to `[]` → 3 unit tests **and both e2e specs**; successor drops `applicability` → the successor test;
+successor drops `remediationRules` → its own test; a new `form.get('newThing')` with no control → the surface
+gate; the clearing guard → the clearing test; **the route bypasses the shared patch → the e2e**, which is why
+the e2e exists at all — every unit test stays green on that one.
+
+**⚠ THE SEARCHES BEHIND THIS ENTRY'S ABSENCE CLAIMS.** (a) *"`name="applicableObjectTypes"` has never appeared
+in any `.svelte` file"*: `git log -S` over `apps/rph-demo/src/**/*.svelte` across all history → **0 commits**.
+**POSITIVE CONTROL:** the same search for `form.get('applicableObjectTypes')` over `apps/rph-demo/` returns
+**two** — `691aa014` (2026-07-15) and `581be51b` (2026-07-16) — so the instrument resolves the reader it is
+paired with and reports absence only for the emitter. ⭑ `581be51b` is *"adversarial review turned on my own
+commit message, and it was right"*, the review that fixed the OTHER lossy round trip in this same function: it
+compared the reader against the PAYLOAD and never against the MARKUP. (b) *"nothing compares `evaluatorRole`"*:
+45 non-test production sites, **0** containing `===`, `!==` or `.includes(`. **POSITIVE CONTROL:** its sibling
+`independenceRequirement` is compared at `assurance.ts:2198`.
+
+**GATES:** check-types 22/22 · lint · verif 424 · `rph-domain` + `rph-application` + `rph-engine` +
+`rph-assurance` 1900 · `app:rph-demo` 331 · playwright 87.
+
+**Merge target:** Repository (`policy-fields.ts`, the route action, `policy-round-trip.test.ts`,
+`policy-manager.e2e.ts`, `verif/form-key-emitter-census.test.ts`) and `docs/_working/` design §5b + roadmap.
+No canon artifact changes.

@@ -20,7 +20,12 @@ import type {
 	PermittedChildRule
 } from '@janumipwb/rph-authoring';
 import type { AssessmentCriterion, PromptTemplate } from '@janumipwb/rph-contracts';
-import { readPolicyFields } from './policy-fields';
+import {
+	listOrDefault,
+	policyEditPatch,
+	readPolicyFields,
+	successorPolicyPayload
+} from './policy-fields';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 /** Clamp a form-supplied cardinality to a valid code (anything else -> M1, mandatory exactly one). */
@@ -170,7 +175,12 @@ export const load: PageServerLoad = async ({ params }) => {
 		rationale: String((p.state.rationale ?? '') as string),
 		version: String((p.state.version ?? '') as string),
 		status: String((p.state.status ?? 'DRAFT') as string),
-		// The three ratified ARRAYS, rendered for a comma-separated text input and split back by `csvList` on save.
+		// The three ratified ARRAYS. ⚠ THIS COMMENT USED TO SAY THEY ARE *"rendered for a comma-separated text
+		// input"*, AND THAT SENTENCE IS HOW EG-04's DEFECT SURVIVED EIGHT WEEKS OF REVIEW. Two of the three are
+		// rendered as single <select>s; `applicableObjectTypes` is rendered by NOTHING — `name="applicableObjectTypes"`
+		// has never appeared in any .svelte file in this repository, and the client's `pf` model drops it. It is
+		// projected here and read by no control, which is EG-05's subject; what EG-04 fixes is that saving the form
+		// no longer WRITES BACK an empty scope for it.
 		// Joined EXPLICITLY: `String(['A','B'])` also yields 'A, B'-ish, but only by accident of Array.toString —
 		// it silently produces 'A,B' with no space and would quietly do something else for any non-array value.
 		evaluatedClaimTypes: joinList(p.state.evaluatedClaimTypes),
@@ -257,12 +267,6 @@ interface TypeFields {
 	/** JAN-DISCHARGE — who does this work, said out loud. Absent means the author was never asked (a type
 	 *  predating the question); 'UNDECLARED' means they were asked and deferred. Different facts, both kept. */
 	workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
-}
-
-/** Copy a stored ratified-array field through verbatim, falling back to a single-value array. Never String():
- *  that stringifies an array into 'A,B' and the strictly-typed payload then rejects it. */
-function strList(v: unknown, fallback: string): string[] {
-	return Array.isArray(v) && v.length ? (v as string[]).map(String) : [fallback];
 }
 
 /** Render a stored ratified-array field into the comma-separated text input the policy form uses. */
@@ -402,40 +406,6 @@ function bumpVersion(v: string): string {
 
 /** One row of the PWU-Type query, named so the version-migration helpers below can take it by type. */
 type PwuTypeRow = ReturnType<typeof listPwuTypes>[number];
-
-/** Copy a stored array-valued field through BY REFERENCE (never a clone), or an empty array when it is absent
- *  or not an array — the shape every rule-array field of a successor policy is copied with. */
-function arrayOrEmpty(v: unknown): unknown[] {
-	return Array.isArray(v) ? v : [];
-}
-
-/** The content-preserving payload for a policy's successor version: every field of the predecessor copied
- *  verbatim, under a fresh id and the new version string. */
-function successorPolicyPayload(
-	prev: Record<string, unknown>,
-	successorId: string,
-	newVersion: string
-): Record<string, unknown> {
-	return {
-		policyId: successorId,
-		version: newVersion,
-		name: String((prev.name ?? 'Policy') as string),
-		purpose: String((prev.purpose ?? '') as string),
-		rationale: String((prev.rationale ?? '') as string),
-		applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
-		evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
-		criteria: arrayOrEmpty(prev.criteria),
-		evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
-		independenceRequirement: String((prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string),
-		findingDefinitions: arrayOrEmpty(prev.findingDefinitions),
-		waiverRules: arrayOrEmpty(prev.waiverRules),
-		requiredEvidence: arrayOrEmpty(prev.requiredEvidence),
-		optionalEvidence: arrayOrEmpty(prev.optionalEvidence),
-		dispositionRules: arrayOrEmpty(prev.dispositionRules),
-		escalationRules: arrayOrEmpty(prev.escalationRules),
-		permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
-	};
-}
 
 /** Every live PWU Type that declares `policyId`, together with the subset whose owning PWA is still DRAFT.
  *  Only the DRAFT-owned ones may have their reference migrated; the rest stay pinned to the historical id.
@@ -763,13 +733,17 @@ export const actions: Actions = {
 			name: f.name,
 			purpose: f.purpose || f.name,
 			rationale: f.rationale || 'Authored in the PWA Designer.',
-			applicableObjectTypes: f.applicableObjectTypes || 'PROFESSIONAL_WORK_UNIT',
-			evaluatedClaimTypes: f.evaluatedClaimTypes || 'CORRECTNESS',
+			// ⛔ ALL THREE OF THESE FALLBACKS WERE DEAD AND TYPE-WRONG. `csvList` returned `string[]`, `[]` is
+			// TRUTHY, so `||` never fired — and had it fired it would have sent a STRING to a `z.array(...)` field
+			// and been rejected. The dead branch is why every UI-created policy was born with an EMPTY scope, which
+			// `governance.ts` reads as applying to EVERYTHING. `listOrDefault` is the same intent, correctly typed.
+			applicableObjectTypes: listOrDefault(f.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
+			evaluatedClaimTypes: listOrDefault(f.evaluatedClaimTypes, 'CORRECTNESS'),
 			criteria: f.criteria,
 			evaluatorRole: f.evaluatorRole || 'reviewer',
 			independenceRequirement: f.independenceRequirement || 'DIFFERENT_AGENT',
 			findingDefinitions: [],
-			permittedControlActions: f.permittedControlActions || 'ESCALATE'
+			permittedControlActions: listOrDefault(f.permittedControlActions, 'ESCALATE')
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { createdPolicy: id };
@@ -800,19 +774,10 @@ export const actions: Actions = {
 			policyId,
 			{
 				policyId,
-				...(f.name ? { name: f.name } : {}),
-				...(f.purpose ? { purpose: f.purpose } : {}),
-				...(f.rationale ? { rationale: f.rationale } : {}),
-				...(f.evaluatedClaimTypes ? { evaluatedClaimTypes: f.evaluatedClaimTypes } : {}),
-				...(f.evaluatorRole ? { evaluatorRole: f.evaluatorRole } : {}),
-				...(f.independenceRequirement
-					? { independenceRequirement: f.independenceRequirement }
-					: {}),
-				...(f.applicableObjectTypes ? { applicableObjectTypes: f.applicableObjectTypes } : {}),
-				...(f.permittedControlActions
-					? { permittedControlActions: f.permittedControlActions }
-					: {}),
-				...(f.criteria.length ? { criteria: f.criteria } : {})
+				// ⛔⛔ ONE GUARD, IN ONE PLACE. This was eight inline spreads holding TWO spellings of one rule three
+				// lines apart — `f.applicableObjectTypes ? …` beside `f.criteria.length ? …`. A truthiness test on an
+				// ARRAY is never a guard, so the first always patched. See `policyEditPatch`.
+				...policyEditPatch(f)
 			},
 			expectedRevision
 		);
