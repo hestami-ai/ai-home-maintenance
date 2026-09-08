@@ -65,7 +65,9 @@ function coverageByMachine(): Map<string, string> {
 	);
 	const out = new Map<string, string>();
 	for (const [name, def] of Object.entries(MACHINES)) {
-		const covered = def.transitions.filter((t) => declared.has(`${name}  ${t.from} -> ${t.to}`)).length;
+		const covered = def.transitions.filter((t) =>
+			declared.has(`${name}  ${t.from} -> ${t.to}`)
+		).length;
 		out.set(name, `${covered}/${def.transitions.length}`);
 	}
 	return out;
@@ -102,7 +104,9 @@ function registerLedgerConflicts(
 	for (const a of guardedArrows())
 		if (ledger[a.guard]?.disposition === 'ENFORCED') enforcedMachines.add(a.machine);
 	if (enforcedMachines.size === 0)
-		throw new Error('registerLedgerConflicts: C-0b records no ENFORCED guard at all — the reader is broken');
+		throw new Error(
+			'registerLedgerConflicts: C-0b records no ENFORCED guard at all — the reader is broken'
+		);
 
 	const names = Object.keys(MACHINES);
 	const out: string[] = [];
@@ -159,13 +163,15 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 	// answering about coverage.
 	it('CONTROL — the scan reads real arm-3 rows and real coverage', () => {
 		const rows = Object.values(REGISTER).filter((r) => r.kind === 'NOT_A_COMMAND_REFUSAL');
-		expect(rows.length, 'arm 3 is the register’s largest arm — if this collapses, the scan is blind').toBeGreaterThan(
-			40
-		);
+		expect(
+			rows.length,
+			'arm 3 is the register’s largest arm — if this collapses, the scan is blind'
+		).toBeGreaterThan(40);
 		const coverage = coverageByMachine();
-		expect(coverage.get('Claim.status'), 'the census must answer about a machine known to be covered').toBe(
-			'7/15'
-		);
+		expect(
+			coverage.get('Claim.status'),
+			'the census must answer about a machine known to be covered'
+		).toBe('7/15');
 		expect(
 			coverage.get('Harness.status'),
 			'and about one known to be covered by nothing — a scan returning the same answer for both is broken'
@@ -175,7 +181,9 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 	// ⚠ THE BOUND, ASSERTED SO IT CANNOT DRIFT INTO AN IMPLIED CLAIM OF COVERAGE. This gate sees only the arm-3
 	// rows that name a machine. If that fraction changes, the honest reach of this instrument changed with it.
 	it('pins how little of arm 3 this gate can actually see', () => {
-		const armThree = Object.values(REGISTER).filter((r) => r.kind === 'NOT_A_COMMAND_REFUSAL').length;
+		const armThree = Object.values(REGISTER).filter(
+			(r) => r.kind === 'NOT_A_COMMAND_REFUSAL'
+		).length;
 		const seen = Object.keys(armThreeMachineClaims()).length;
 		expect(
 			{ armThreeRows: armThree, rowsThisGateCanSee: seen },
@@ -184,7 +192,12 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 			// RPH-EVD-002 moved to ENFORCED — a row leaving because its ground was acted on. The same numbers
 			// would appear if the row had simply been DELETED, which is why the by-name pin above is the primary
 			// record and this is the bound on it.
-		).toEqual({ armThreeRows: 56, rowsThisGateCanSee: 3 });
+			// 56 -> 57 (2026-09-08, `JAN-EXECGOV` EG-03): `RPH-EXE-004` moved from `UNENFORCED_DISCLOSED` into
+			// arm 3. Its predicate `capabilityAuthorized` acquired a production caller, so `DEAD_PREDICATE` was
+			// false; and the consequent is an OUTCOME (the step is failed with a reason) rather than a rejected
+			// command, so `ENFORCED` would promise a refusal shape it does not have. ⚠ `rowsThisGateCanSee`
+			// does NOT move: this gate still cannot read the new row, which is the point it exists to pin.
+		).toEqual({ armThreeRows: 57, rowsThisGateCanSee: 3 });
 	});
 
 	// ── THE TWO INSTRUMENTS ARE FINALLY COMPARED (REG-F-140) ────────────────────────────────────────────────
@@ -205,7 +218,10 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 	it('CONTROL — a synthetic arm-3 row contradicting C-0b is caught, and an innocent one is not', () => {
 		const base = registerLedgerConflicts(REGISTER, GUARD_LEDGER).length;
 		const guilty = registerLedgerConflicts(
-			{ ...REGISTER, 'RPH-CONTROL-001': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Claim.status`' } },
+			{
+				...REGISTER,
+				'RPH-CONTROL-001': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Claim.status`' }
+			},
 			GUARD_LEDGER
 		);
 		expect(guilty.length, 'the synthetic contradiction must surface').toBe(base + 1);
@@ -214,9 +230,14 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 		// `Harness.status` is a real machine that no ENFORCED guard touches — so an arm-3 row resting on it is
 		// exactly the case this check must NOT flag, and the difference proves the check discriminates.
 		const innocent = registerLedgerConflicts(
-			{ ...REGISTER, 'RPH-CONTROL-002': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Harness.status`' } },
+			{
+				...REGISTER,
+				'RPH-CONTROL-002': { kind: 'NOT_A_COMMAND_REFUSAL', why: 'nothing drives `Harness.status`' }
+			},
 			GUARD_LEDGER
 		);
-		expect(innocent.length, 'a row on a machine with no ENFORCED guard is not a conflict').toBe(base);
+		expect(innocent.length, 'a row on a machine with no ENFORCED guard is not a conflict').toBe(
+			base
+		);
 	});
 });

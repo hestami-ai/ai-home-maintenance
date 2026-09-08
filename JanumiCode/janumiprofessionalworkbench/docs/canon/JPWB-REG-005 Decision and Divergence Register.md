@@ -32847,3 +32847,92 @@ measured. Six unit tests cover the decision function, including the two controls
 **Merge target:** Repository (`step-binding.ts` + its tests, the execution action, the introspect endpoint and
 the e2e harness type). No canon artifact changes — `STA-8` and `RPH-EXE-004` are implemented against, not
 amended.
+
+---
+
+### REG-F-367 — the granted capability now constrains something, a disclosed deferral was reopened ON ITS OWN EXIT TERMS, and I caught myself building the dodge I had filed two days earlier
+
+- **Date:** 2026-09-08 · **Type:** FINDING (`JAN-EXECGOV` `EG-03`) ·
+  **Class:** FINDING — `RPH-EXE-004` re-dispositioned after its predicate acquired a production caller;
+  ⭑ **three instruments fired and each was right**; ⚠ **one self-correction mid-slice** ·
+  **Status:** ✅ **CLOSED for the tier JPWB owns; the OPERATION tier remains the Platform's.**
+
+**WHAT `REG-F-366` DISCLOSED AND THIS CLOSES.** *"A granted `network` therefore constrains nothing yet — the
+binding is authorized, and the authorization is not consulted when the model is called."*
+
+**THE DEFERRAL WAS REOPENED ON ITS OWN STATED TERMS, NOT OVERRIDDEN.** `RPH-EXE-004` was
+`UNENFORCED_DISCLOSED` with a `DEAD_PREDICATE` guard, and its own header warned that *"wiring it to clear the
+census would be the substitution this register exists to prevent."* Two of its grounds are false at HEAD:
+
+| Stated ground | State at HEAD |
+|---|---|
+| *"JPWB is never in the path of an operation: it governs plans and **hosts no tool invocation**"* | ⛔ It does. `runModelInvocationStep` invokes models. `rph-application/src/execution-invocation.ts:3-8` already refutes that exact sentence against Guide `:1137` — *"A step IS the invocation … The caller was unbuilt, never forbidden."* |
+| *"its caller **does not exist yet**. EXIT: revisit **when a broker exists to call it**"* | ⭑ The broker exists. **The row's own exit condition is met.** |
+
+⛔ **AND THE THIRD GROUND STILL HOLDS, WHICH IS WHY THIS IS A PARTIAL CLOSE.** The OPERATION tier — intercepting
+a call as it is made — remains the **Platform's** (§33.4 Runtime Authorization Service; the Charter allocates
+tool execution there) and is **not built**. ⚠ ADMISSION still has no ratified subject: `requiredCapabilities`
+lives on `VALIDATOR_REGISTRY_ENTRY`, **not** `ExecutionStep`, so the requirement is DERIVED by the harness
+rather than declared by the step. Engine-level enforcement waits on that declaration being ratified — a minting
+act, not taken.
+
+---
+
+**⚠⚠ THE SELF-CORRECTION, AND IT IS THE PART I WOULD MOST WANT A READER TO SEE.** My first version made the
+binding facts an **OPTIONAL** input. That makes *"skip the capability check"* expressible **by omission** — the
+exact shape of the `producer`-omission dodge this programme filed at `REG-F-364` two days earlier and declined
+to fix on its own authority. And it is the shape `CP-04` refused when it made the context policy a **required**
+parameter *"so that 'resolve the policy and ignore it' is not expressible."*
+
+⭑ **I applied a weaker standard to a check of my own than to one I had audited.** Corrected before commit: the
+input is REQUIRED and carries an explicit `{ kind: 'NONE' }`, so a caller must SAY which case it is in — the
+same distinction the kernel draws between a step naming no binding (`OUT_OF_SCOPE`, legal) and one naming a
+binding that does not resolve (fail closed).
+
+---
+
+**⭑ THREE INSTRUMENTS FIRED, AND EACH WAS RIGHT.**
+
+1. **The dead-kernel census** caught the predicate acquiring a caller — its own message names it *"the good
+   failure, and the one the prose lists could never produce"* — and instructed both halves of the follow-up:
+   delete the row **and** check whether a claim about the same rule is now stale. It was.
+2. **The register's header-census gate** refused a prose paragraph whose digits the rows contradicted.
+3. ⭑⭑ **The ADJECTIVE gate put the right word back, and I did not.** The paragraph's *"a MAJORITY states
+   outcomes… that do not exist"* was true at 58 of 112, left standing through a correction to 56 (`REG-F-141`),
+   filed as `REG-F-148`, and replaced with *"EXACTLY HALF"*. At **57 of 112** arm 3 is a majority AGAIN. I wrote
+   *"just over half"*; the gate went red with *"arm 3 IS a majority — the paragraph should say so"*. **The check
+   `REG-F-148` bought is what restored the word** — a gate that checks the digits and not the word they qualify
+   is checking the citation, not the claim.
+
+⚠ **AND A FOURTH THING BROKE THAT SHOULD NOT HAVE.** My first correction struck the numbers **in place** —
+`and ~~56~~ 57` — which broke the gate's own `and (\d+)` and turned a census check into a **null match**. The
+history now lives in the note beneath; the sentence stays machine-readable. **A strike-through is a documentation
+convention, and a parsed sentence is an interface.**
+
+---
+
+**⚠ AND A STALE DERIVED ARTIFACT, FOUND IN PASSING AND WORTH ITS OWN LOOK.** The tracker's W-3 census
+(`docs/tracking/census/w3-verdicts.ndjson`) is regenerated by `scripts/tracker/measure.ts --write` and is
+**committed**. Regenerating it moved **25 items**, not one: `CreateContextAssemblyPolicy` and
+`RecordModelExchange` were **absent entirely**, so the artifact had drifted silently across several commits this
+week. It was only regenerated now because a DIFFERENT gate went red for an unrelated reason. ⛔ **There is no
+freshness gate on this artifact** — recorded, not fixed here.
+
+**WHAT LANDED.** `stepCapabilityRefusal` asks the kernel's `capabilityAuthorized` before any turn is taken. The
+grant is read from the STORE on every try, so `RevokeRuntimeCapability` changes the answer — §22.1's *"revoked
+bindings cannot be used for new attempts."* ⭑ Comparing the request against itself would have been a check that
+cannot fail; that is why the stored grant is the operand.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM:** run the check AFTER the turn → *REFUSES … BEFORE any model call*
+(the assertion that matters is `calls === 0` — a refusal after the model answered disclosed the harm
+afterwards); compare the sets for EQUALITY instead of coverage → *a grant that is a SUPERSET still passes* plus
+the message test. Controls that stayed green: a binding that DOES grant it proceeds, and a step with **no**
+binding still runs — the `OUT_OF_SCOPE` case whose collapse *"would make every plan in the reference seed …
+permanently unstartable."*
+
+**GATES:** check-types 22/22 · lint · verif 412 · `rph-domain` 580 · `rph-application` 1021 · `rph-engine` 247 ·
+`rph-assurance` 52 · `app:rph-demo` 321 · playwright 86.
+
+**Merge target:** Repository (`step-binding.ts`, `run-model-step.ts` + tests, the execution action,
+`enforcement-register.ts` re-disposition, `dead-kernel-census.test.ts`, `unreachability-grounds.test.ts`, and
+the regenerated W-3 census). `RPH-EXE-004` is implemented against in part, not amended.

@@ -25,6 +25,7 @@
 // carrying an ACTIVE prompt template that declares anything but `MODEL` (`pwa-authoring.ts:332`), so for
 // precisely the steps bound here the value is guaranteed by a gate rather than assumed.
 import type { CapabilityRequest } from '@janumipwb/rph-contracts';
+import { capabilityAuthorized } from '@janumipwb/rph-domain';
 
 /** What a step's binding must ask for, and on whose behalf. */
 export interface StepBindingRequest {
@@ -69,4 +70,45 @@ export function stepBindingFor(
 		// scope must be explicit."*
 		requestedCapabilities: [{ capability: 'network' }]
 	};
+}
+
+/**
+ * Refuse to invoke when the binding no longer grants what the step needs — or `undefined` to proceed.
+ *
+ * ⭑⭑ THIS GIVES `capabilityAuthorized` ITS FIRST PRODUCTION CALLER, AND THE REGISTER SAYS IT HAD NONE BY
+ * DESIGN. `RPH-EXE-004` is recorded `UNENFORCED_DISCLOSED` with a reasoned three-way split — DECLARATION is
+ * JPWB's and enforced; ADMISSION *"has NO SUBJECT — no ratified step-level required-capability declaration
+ * exists"*; OPERATION *"is the Platform's and is deferred to M5."* Two of that entry's stated grounds are now
+ * FALSE, and its own exit condition is met:
+ *
+ *   • *"JPWB is never in the path of an operation: it governs plans and hosts no tool invocation."* ⛔ It does
+ *     now — `runModelInvocationStep` invokes models and records exchanges. `execution-invocation.ts:3-8`
+ *     already refutes that sentence against the Guide: *"A step IS the invocation … The caller was unbuilt,
+ *     never forbidden."*
+ *   • *"its caller does not exist yet. EXIT: revisit when a broker exists to call it."* ⭑ The broker exists.
+ *
+ * ⛔ AND THE OPERATION TIER IS STILL NOT BUILT, WHICH IS THE PART THAT MATTERS. This does NOT intercept a
+ * network call — that is the Platform's, and the Charter allocates it there. It refuses to BEGIN an invocation
+ * whose binding does not authorise it, which is plan-and-step governance and squarely JPWB's.
+ *
+ * ⚠ AND IT CAN ACTUALLY FAIL, which is the difference between a control and a ceremony. The grant is read from
+ * the STORE at invocation time, not from the request that produced it, so `RevokeRuntimeCapability` — §22.1's
+ * *"Revoked bindings cannot be used for new attempts"* — changes the answer. Comparing the request against
+ * itself would be a check that cannot fail.
+ */
+export function stepCapabilityRefusal(
+	binding: StepBindingRequest,
+	grantedCapabilities: readonly string[]
+): string | undefined {
+	for (const { capability } of binding.requestedCapabilities) {
+		const verdict = capabilityAuthorized({ grantedCapabilities, requiredCapability: capability });
+		if (!verdict.ok)
+			return (
+				`Runtime binding ${binding.runtimeBindingId} does not grant '${capability}', which this step ` +
+				`needs to invoke a model (${verdict.errorCode}: ${verdict.reason}). §22.1: requested capability ` +
+				`is not granted capability, and a revoked binding cannot be used for new attempts. Authorize the ` +
+				`capability on the binding, or do not run this step as a model invocation.`
+			);
+	}
+	return undefined;
 }

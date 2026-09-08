@@ -1066,6 +1066,14 @@ export const actions: Actions = {
 				return fail(400, { error: `The model invocation did not run: ${why}` });
 			}
 
+			/** The capabilities the binding CURRENTLY grants, from the store — never the request. */
+			const grantsFor = (id: string): string[] =>
+				(
+					(listByType(getEngine(), 'RUNTIME_BINDING')
+						.map((b) => b.state as Record<string, unknown>)
+						.find((b) => b.id === id)?.grantedCapabilities ?? []) as { capability?: unknown }[]
+				).map((c) => String(c.capability ?? ''));
+
 			const producer = await getExecutionSession()();
 			try {
 				for (let attempt = 1; ; attempt++) {
@@ -1097,7 +1105,13 @@ export const actions: Actions = {
 						// ⭑ `PWU_TYPE.contextSpecification` — ratified, and read by NOTHING until CP-04b.
 						...(pwuType?.contextSpecification
 							? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
-							: {})
+							: {}),
+						// ⭑ EG-03 — the binding's CURRENT grant, read from the store on EVERY try. Revocation
+						// between tries changes the answer, which is the whole reason this is the stored grant
+						// and not the request echoed back at itself.
+						binding: binding
+							? { kind: 'BOUND', request: binding, granted: grantsFor(bindingId) }
+							: { kind: 'NONE' }
 					});
 
 					if (!tryOutcome.ran) {

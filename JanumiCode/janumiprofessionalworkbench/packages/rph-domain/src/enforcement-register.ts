@@ -76,9 +76,26 @@
 //
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
 // every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 31 are
-// ENFORCED, 25 are UNENFORCED_DISCLOSED and 56 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
-// catalog is a refusal the engine actually performs, and ~~a MAJORITY~~ EXACTLY HALF (56 of 112) states
-// outcomes, permissions, or planes that do not exist.
+// ENFORCED, 24 are UNENFORCED_DISCLOSED and 57 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
+// catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes
+// that do not exist.
+// ⭑ 25 -> 24 AND 56 -> 57 (2026-09-08, `JAN-EXECGOV` EG-03): `RPH-EXE-004` moved arms when its predicate
+// acquired a production caller. ⚠ THE NUMBERS ARE NOT STRUCK IN PLACE HERE, DELIBERATELY: a gate parses this
+// exact sentence (`enforcement-register.test.ts:265`), and my first correction put `~~56~~ 57` between "and"
+// and the digit — which broke `and (\d+)` and turned a census check into a null match. The history belongs in
+// this note; the sentence has to stay machine-readable.
+// ⭑⭑ AND THE ADJECTIVE CAME BACK, WHICH IS THE PART WORTH READING. This paragraph said "a MAJORITY" while arm
+// 3 held 58 of 112; `REG-F-141` corrected the count to 56 and left the word standing, and `REG-F-148` filed
+// that — a gate that checks the digits in a sentence and not the word they qualify is checking the citation,
+// not the claim. The word was then replaced with "EXACTLY HALF (56 of 112)". At 57 of 112 arm 3 is a majority
+// AGAIN, so "MAJORITY" is restored — and I did not restore it by judgement: I wrote "just over half", the
+// adjective gate went RED with *"arm 3 IS a majority — the paragraph should say so"*, and the check that
+// `REG-F-148` bought is what put the right word back.
+// ⭑ 25 -> 24 AND 56 -> 57 (2026-09-08, `JAN-EXECGOV` EG-03): `RPH-EXE-004` moved arms when its predicate
+// acquired a production caller. ⚠ AND THE ADJECTIVE MOVED WITH THE NUMBER THIS TIME — the note below records
+// that "MAJORITY" was left standing through TWO corrections after it stopped being true, and "EXACTLY HALF" has
+// now stopped being true in its turn. A census sentence carries a word that the count can falsify, and this one
+// has falsified two.
 // ⚠ THE ADJECTIVE WAS FALSIFIED BY THE CENSUS CORRECTION IN ITS OWN SENTENCE (REG-F-148). At 58 rows
 // "MAJORITY" was true; REG-F-141 corrected 58 -> 56 four words earlier and left it standing. The same word
 // was diagnosed three commits later in `verif/unreachability-grounds.test.ts` — "56 of 112 is EXACTLY HALF,
@@ -607,42 +624,46 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// the corpus ratifies a step-level required-capability declaration. Either makes a real guarantee available;
 	// neither is available now.
 	//
-	// `capabilityAuthorized` therefore KEEPS no production caller BY DESIGN. Wiring it to clear the census would be
-	// the substitution this register exists to prevent.
+	// ~~`capabilityAuthorized` therefore KEEPS no production caller BY DESIGN. Wiring it to clear the census would be
+	// the substitution this register exists to prevent.~~
+	// ⭑⭑ SUPERSEDED 2026-09-08 (`JAN-EXECGOV` EG-03), AND NOT TO CLEAR THE CENSUS. The row's own EXIT was
+	// *"revisit when a broker exists to call it"*; `runModelInvocationStep` is that broker, and the row's other
+	// stated ground — *"JPWB is never in the path of an operation: it governs plans and hosts no tool
+	// invocation"* — is refuted at `rph-application/src/execution-invocation.ts:3-8` against Guide `:1137`
+	// (*"A step IS the invocation … The caller was unbuilt, never forbidden"*). The predicate now has a
+	// production caller and the census below is updated to say so.
 	'RPH-EXE-004': {
-		kind: 'UNENFORCED_DISCLOSED',
-		// THE ROW THAT RAISED V-4, AND THE ALARM WAS OVERSTATED — recorded because the correction matters more than
-		// the finding. It was closed out as "§22.1's invariants have no canon carrier, so RPH-EXE-004 loses its only
-		// textual home on retirement". That was written from RECALL rather than from a search of docs/canon/, which
-		// is this lineage's recurring error pointed the other way: a claim about my search reported as a claim about
-		// the world. Measured, §22.1's seven sentences are THREE carried, TWO carried only by a general rule, and
-		// TWO carried nowhere — and this rule is one of the carried ones.
+		// ⚠ RE-DISPOSITIONED 2026-09-08 from `UNENFORCED_DISCLOSED` + `DEAD_PREDICATE`. The predicate acquired a
+		// production caller, which the dead-kernel census caught as *"the good failure ... the symbol has
+		// acquired a production call site"* - and that gate instructs a re-disposition plus a check for a stale
+		// claim about the same rule. It was stale: two of the grounds below are false at HEAD.
+		//
+		// ⛔ IT IS `NOT_A_COMMAND_REFUSAL`, NOT `ENFORCED`, AND THE DISTINCTION IS THE HONEST PART. The
+		// consequent is an OUTCOME - the step does not run and is failed with a reason - not a rejected command
+		// carrying an `error.code`. Claiming ENFORCED would promise a refusal shape this does not have.
+		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'only runtime policy grants it',
-			note: 'JPWB-DOC-001 §5 principle 3 (Capability is not Authority): "a PWA, plan, prompt, or agent may request a capability; only runtime policy grants it." That IS §22.1\'s request/grant distinction, in canon, and it survives retirement. What canon does NOT carry is the OPERATION tier below — which is consistent with the disposition here, since that tier is the Platform\'s.'
+			note: 'JPWB-DOC-001 §5 principle 3 (Capability is not Authority): a PWA, plan, prompt, or agent may request a capability; only runtime policy grants it. That IS the §22.1 request/grant distinction, in canon, and it survives retirement.'
 		},
 		why:
-			'A BOUNDARY, NOT A GAP — and the two reasons recorded here before 2026-07-26 were both FALSIFIED (see the ' +
-			'comment above; neither was caught by a gate, because no gate reads prose). The ratified statement is ' +
-			'about AN OPERATION AT OPERATION TIME, and JPWB is never in the path of an operation: it governs plans ' +
-			'and hosts no tool invocation. The corpus names a different enforcer (§33.4 Runtime Authorization ' +
-			'Service; the Charter allocates tool execution and policy enforcement to the Platform). The rule splits ' +
-			'in three: DECLARATION (granted within requested, monotone, outcome derived, step runs only on its own ' +
-			"live binding) is JPWB's and is ENFORCED; ADMISSION (a step declaring what it needs) has NO SUBJECT — " +
-			'no ratified step-level required-capability declaration exists, though `requiredCapabilities` DOES exist ' +
-			'on ValidatorContract, so the concept is not absent from the corpus, only from ExecutionStep; OPERATION ' +
-			"is the Platform's and is deferred to M5. R1 (ruled 2026-07-26): a JPWB-side invocation ledger is NOT " +
-			'built — it would be a record rather than a control, post hoc, unable to compel disclosure, blind to the ' +
-			'bound, and its caller does not exist yet. EXIT: revisit when a broker exists to call it, or when a ' +
-			'step-level capability declaration is ratified. capabilityAuthorized keeps no production caller BY ' +
-			'DESIGN. SEPARATELY: the FIRST-authorization containment hole is N-4 and is CLOSED, deliberately not ' +
-			'filed under this rule, whose statement is about operations.',
-		guard: {
-			kind: 'DEAD_PREDICATE',
-			deadPredicate: 'capabilityAuthorized',
-			referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
-		}
+			'PARTIALLY ADDRESSED, AND THE PART THAT IS NOT IS NAMED. The ratified statement splits in three. ' +
+			'DECLARATION (granted within requested, monotone, a step runs only on its own live binding) belongs ' +
+			'to JPWB and was already enforced. OPERATION - intercepting a call as it is made - remains with the ' +
+			'PLATFORM (§33.4 Runtime Authorization Service; the Charter allocates tool execution there) and is ' +
+			'NOT built. What changed is the middle tier: JPWB now REFUSES TO BEGIN a model invocation whose ' +
+			'binding does not currently grant what the step needs (stepCapabilityRefusal -> capabilityAuthorized, ' +
+			'called from runModelInvocationStep before any turn is taken). The grant is read from the STORE on ' +
+			'every try, so RevokeRuntimeCapability changes the answer - §22.1: a revoked binding cannot be used ' +
+			'for new attempts. Comparing the request against itself would be a check that cannot fail. ' +
+			'⚠ ADMISSION STILL HAS NO RATIFIED SUBJECT: no step-level required-capability declaration exists ' +
+			'(requiredCapabilities is on VALIDATOR_REGISTRY_ENTRY, not ExecutionStep), so the requirement is ' +
+			'DERIVED by the harness rather than declared by the step. Engine-level enforcement waits on that ' +
+			'declaration being ratified, which is a minting act. ⛔ The refusal is therefore harness-sited, and ' +
+			'the input carrying it is REQUIRED with an explicit NONE so that skipping the check cannot be ' +
+			'expressed by omission - the dodge shape REG-F-364 records. EXIT for the remaining tier: the ' +
+			'Platform runtime authorization service, deferred to M5.'
 	},
 	'RPH-EXE-005': {
 		// CLOSED 2026-07-26 by JAN-CAPBIND WP-3, and the blocker recorded here was REAL rather than an excuse — which
@@ -719,12 +740,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'The adjacent guarantee this engine DOES make — a re-submitted idempotency key returns the prior result and ' +
 			'appends no events — is RPH-PER-002. LAYER CORRECTED 2026-08-02: this sentence read "covered at the store ' +
 			'layer" for six commits. The DECISION is at the COMMAND layer — `command-bus.ts` step 1, in ' +
-			'packages/rph-application/ — and only the receipt LOOKUP (`getReceipt`) is the store\'s. A register whose ' +
+			"packages/rph-application/ — and only the receipt LOOKUP (`getReceipt`) is the store's. A register whose " +
 			'entire subject is layer precision may not be loose about its own prose, and no gate reads prose. Found ' +
 			'while dispositioning RPH-PER-002, which also found REG-F-012: canon PER-5 adds a third clause ("Reuse of ' +
 			'a key with a different payload fails") ~~that this engine violates — a DIFFERENT command reusing a key ' +
 			'is silently swallowed and reported DUPLICATE.~~ CLOSED 2026-08-04, struck rather than deleted. All ' +
-			'three of PER-5\'s dimensions are now compared before a DUPLICATE is returned — command type and target ' +
+			"three of PER-5's dimensions are now compared before a DUPLICATE is returned — command type and target " +
 			'aggregate from columns already stored, and PAYLOAD from `command_receipts.payload_hash`, added in the ' +
 			'first forward schema migration this engine has run (v1 → v2).'
 	},
@@ -829,7 +850,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'and nothing performs it. The route that falsifies the tempting reading (that the command vocabulary makes ' +
 			'an unreified assertion unrepresentable, so the rule is satisfied by construction) is RECOMPOSITION: ' +
 			'`CompleteRecomposition` carries `parentCompletionClaimSupported: z.boolean().optional()` ' +
-			'(packages/rph-contracts/src/messages.ts), which is an agent\'s completion judgement travelling as a ' +
+			"(packages/rph-contracts/src/messages.ts), which is an agent's completion judgement travelling as a " +
 			'CALLER-TYPED BOOLEAN. It is defaulted to `true` in packages/rph-application/src/handlers/decomposition.ts ' +
 			'and consumed directly by `evaluateRecomposition` (packages/rph-domain/src/decomposition.ts) with no Claim ' +
 			'Object mediating — while the sibling `parentCompletionClaimId`, which IS required on both ' +
@@ -850,13 +871,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:
-				'CompleteRecomposition carrying `parentCompletionClaimSupported: true` and a `parentCompletionClaimId` that names no existing Claim aggregate — the agent\'s completion assertion reaching evaluation unreified',
+				"CompleteRecomposition carrying `parentCompletionClaimSupported: true` and a `parentCompletionClaimId` that names no existing Claim aggregate — the agent's completion assertion reaching evaluation unreified",
 			control:
 				'the same CompleteRecomposition dispatched WITHOUT the arranging BeginRecomposition, which the same handler refuses — so the acceptance above is a missing limb, not a command that is never refused',
 			whyNoPredicate:
 				'No kernel predicate decides whether a completion assertion is reified; `evaluateRecomposition` takes the ' +
 				'boolean as an input rather than deriving it. DEAD_PREDICATE is unavailable for a second and independent ' +
-				'reason: `parentCompletionClaimId`\'s production census ALREADY CONTAINS handlers/decomposition.ts, so a ' +
+				"reason: `parentCompletionClaimId`'s production census ALREADY CONTAINS handlers/decomposition.ts, so a " +
 				'census guard could not detect the very wiring it would exist to detect.'
 		}
 	},
@@ -917,7 +938,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) and this engine now enforces it. ⚠ THIS FIELD PREVIOUSLY READ "even though this engine has no command that could violate it" — false from 2026-08-06 and left standing by the REG-F-133 strike on the adjacent `why`, because that strike visited SENTENCES and not FIELDS (REG-F-137). The carriage/enforcement independence RPH-EXE-007 demonstrates in the other direction still holds; it was the example that was wrong, not the principle.'
 		},
 		enforcedAt:
-			'packages/rph-application/src/handlers/assurance.ts — recordClaimAssessment, whose advanceStatus guard returns a rejection when the claim is absent from claimsWithAdmissibleEvidence(hctx). That set folds COMMITTED evidence events and tests status === ADMISSIBLE, so it cannot be satisfied from the command payload. Scoped to target === SUPPORTED, which is the machine\'s only in-arrow to that state.',
+			"packages/rph-application/src/handlers/assurance.ts — recordClaimAssessment, whose advanceStatus guard returns a rejection when the claim is absent from claimsWithAdmissibleEvidence(hctx). That set folds COMMITTED evidence events and tests status === ADMISSIBLE, so it cannot be satisfied from the command payload. Scoped to target === SUPPORTED, which is the machine's only in-arrow to that state.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'cannot be SUPPORTED: no ADMISSIBLE evidence supports it',
 		declaredMutations: [
@@ -928,7 +949,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			// absent from STATUS_FOR_CODE. The probe added with this row is what now kills it.
 			"swap the guard's refusal code to 'RPH_VALIDATION_SEMANTIC_FAILED' — SURVIVED the whole suite before this row was probed (F134-the-evd002-refusal-code-is-unpinned)",
 			'delete the `if (claimsWithAdmissibleEvidence(hctx).has(...)) return null` arm so every move to SUPPORTED is refused — caught by the probe CONTROL, not by the observation',
-			"weaken the ADMISSIBLE test in claimsWithAdmissibleEvidence to a presence check, so PROPOSED evidence counts — the one mutation that separates ADMISSIBLE from merely PRESENT"
+			'weaken the ADMISSIBLE test in claimsWithAdmissibleEvidence to a presence check, so PROPOSED evidence counts — the one mutation that separates ADMISSIBLE from merely PRESENT'
 		]
 	},
 	// RE-DISPOSITIONED 2026-08-02, UNENFORCED_DISCLOSED -> ENFORCED, BY THE DISCLOSURE'S OWN GUARD.
@@ -974,12 +995,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'The operative clause is a MANDATORY disjunction — "must be rejected or qualified as out of scope" — whose ' +
 			'first disjunct is exactly what AdmitEvidence already performs for the sibling limbs of the same guard. The ' +
 			'plane, the aggregate, the ratified status machine, the registered command and the refusal mechanism all ' +
-			'exist; only this limb does not. NOTHING in production compares an evidence scope to a claim\'s breadth: ' +
+			"exist; only this limb does not. NOTHING in production compares an evidence scope to a claim's breadth: " +
 			'`Evidence.scope` is read at exactly one production site, feeding `evidenceAdmissibility`, whose sole scope ' +
 			'limb is `if (!e.scope) failed.push(\'SCOPE_STATED\')` — a non-empty-string test, i.e. "a scope is STATED", ' +
 			'not "the scope is not EXCEEDED". `admittedScope` is written onto the EvidenceAdmitted payload and read by ' +
 			'no production consumer repo-wide. The comparison is not unrepresentable, which is the argument that had ' +
-			'to be tested and failed: `ClaimTypeSchema` contains `FITNESS`, the rule\'s own consequent noun. So a ' +
+			"to be tested and failed: `ClaimTypeSchema` contains `FITNESS`, the rule's own consequent noun. So a " +
 			'TEST_RESULT of scope "unit" offered for a FITNESS claim is accepted by every path in this engine, and it ' +
 			'is neither rejected nor qualified.',
 		guard: {
@@ -991,7 +1012,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			whyNoPredicate:
 				'No kernel predicate compares evidence scope to claim breadth. `evidenceAdmissibility` has a RELEVANT ' +
 				'limb (`opts.claimId` set-membership), but membership is not breadth, and the call site deliberately ' +
-				'does not pass `claimId` at all. `admittedScope`\'s census already contains handlers/assurance.ts.'
+				"does not pass `claimId` at all. `admittedScope`'s census already contains handlers/assurance.ts."
 		}
 	},
 	'RPH-EVD-005': {
@@ -1018,31 +1039,31 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'Contradicting evidence remains attached and visible; the record never self-curates toward support.',
-			note: 'JPWB-DOC-003 §7. Note this anchor and RPH-EVD-005\'s resolve to the SAME LINE of the same artifact — one canon sentence carrying two ratified rules — and the two anchors are distinct substrings of it, so neither claim is satisfied by the other\'s text.'
+			note: "JPWB-DOC-003 §7. Note this anchor and RPH-EVD-005's resolve to the SAME LINE of the same artifact — one canon sentence carrying two ratified rules — and the two anchors are distinct substrings of it, so neither claim is satisfied by the other's text."
 		},
 		why:
 			'⚠ THE WHOLE ARGUMENT BELOW IS STRUCK, CORRECTED 2026-08-22 BY A DRIVEN REFUTATION. It is quoted ' +
 			'rather than deleted because a row certifying a FALSE ABSENCE is worse than silence — a reader who ' +
 			'trusts it stops looking — so the sentence that did that here stays legible. AS WRITTEN: ~~"What the ' +
-			'rule forbids is a SILENT DISCARD, and no command\'s acceptance discards contradicting evidence, so ' +
+			"rule forbids is a SILENT DISCARD, and no command's acceptance discards contradicting evidence, so " +
 			'there is nothing a dispatch could be arranged to refuse. The one real tension is that `AssertClaim` ' +
 			'carries the subject noun `contradictingEvidenceIds` on its payload — but it routes through ' +
 			'`createObject` with `expectedRevision: undefined`, which the storage adapter turns into a no-op for ' +
-			'an existing aggregate, so a re-assertion cannot overwrite a claim\'s evidence links either. The rule ' +
+			"an existing aggregate, so a re-assertion cannot overwrite a claim's evidence links either. The rule " +
 			'is satisfied by the absence of any curating command rather than by a guard, and there is no ' +
 			'arrangement that would demonstrate otherwise — which is what separates this from the three ' +
 			'disclosures above, each of which is backed by an observed admission."~~ ' +
 			'THE ARRANGEMENT EXISTS AND IT IS `RecordClaimAssessment`, WHICH DID NOT YET EXIST WHEN THIS ROW WAS ' +
-			'WRITTEN: this row landed in aa6843fd (2026-08-01) and both the command\'s registration and the ' +
+			"WRITTEN: this row landed in aa6843fd (2026-08-01) and both the command's registration and the " +
 			'curating write landed in b40220bd (2026-08-06) — the same commit that re-dispositioned RPH-EVD-002, ' +
 			'whose ground the identical handler had just expired (REG-F-133). Two rows of one family, killed by ' +
-			'one commit, and only the neighbour noticed. THE MECHANISM: `recordClaimAssessment`\'s `mutate` ' +
+			"one commit, and only the neighbour noticed. THE MECHANISM: `recordClaimAssessment`'s `mutate` " +
 			'(packages/rph-application/src/handlers/assurance.ts:892-894) writes `contradictingEvidenceIds: ' +
 			'p.contradictingEvidenceIds` whenever the payload carries a NON-EMPTY list — a wholesale REPLACEMENT ' +
-			'of the claim\'s contradicting links, not a union — and that arm is unscoped by target status, so it ' +
+			"of the claim's contradicting links, not a union — and that arm is unscoped by target status, so it " +
 			'fires on the hop INTO SUPPORTED. DRIVEN THROUGH `Engine.dispatch`: a claim carrying one ADMISSIBLE ' +
 			'supporting item and one ADMISSIBLE contradicting item EVBAD; `RecordClaimAssessment{targetStatus: ' +
-			'\'SUPPORTED\', contradictingEvidenceIds: [EVOTHER]}` ACCEPTED; the claim then reads status ' +
+			"'SUPPORTED', contradictingEvidenceIds: [EVOTHER]}` ACCEPTED; the claim then reads status " +
 			'SUPPORTED, `contradictingEvidenceIds: [EVOTHER]`, and EVBAD appears NOWHERE in the claim aggregate ' +
 			'— not in state, and not in any of its three events, because `ClaimAsserted` carries no ' +
 			'contradicting field and `ClaimSupported` carries only the supporting one. A silent discard, ' +
@@ -1051,7 +1072,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'SUPPORTED, and leaves EVBAD attached — so the discard is attributable to that one optional field, ' +
 			'not to the status hop and not to a replace-on-every-write. A second control closes the other ' +
 			'reading: supplying `[EVBAD, EVOTHER]` keeps BOTH. THE SUBSIDIARY MECHANISM WAS ALSO WRONG, in the ' +
-			'direction that happens to be safe (REG-F-141\'s shape — a conclusion that survives its argument): a ' +
+			"direction that happens to be safe (REG-F-141's shape — a conclusion that survives its argument): a " +
 			're-issued `AssertClaim` is REFUSED, `CONFLICT` / `RPH_REVISION_CONFLICT` / "Revision conflict on ' +
 			'<claimId> (actual revision 2)", not silently no-opped, and the claim\'s links are unchanged. ' +
 			'WHAT SURVIVES OF THE ORIGINAL, so this is not read wider than it is: no DELETION verb exists — ' +
@@ -1061,10 +1082,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'REPLACEMENT on the CLAIM, which is precisely what a census of curating COMMANDS cannot see; that is ' +
 			'how the original argument reached the wrong answer honestly. THE ARM IS NOW OWED A MOVE to ' +
 			'UNENFORCED_DISCLOSED with an OBSERVED_ADMISSION guard — the arrangement and the control above are ' +
-			'that guard\'s two fields already. It is NOT taken in this edit, in RPH-EVD-002\'s own order ' +
+			"that guard's two fields already. It is NOT taken in this edit, in RPH-EVD-002's own order " +
 			'(correction first, move second): the probe map in `disclosure-observed.test.ts` is TOTAL over the ' +
 			'OBSERVED_ADMISSION rows, so flipping the kind without landing the observation there turns this ' +
-			'register\'s own gate red.'
+			"register's own gate red."
 	},
 	'RPH-EVD-007': {
 		kind: 'ENFORCED',
@@ -1086,7 +1107,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		declaredMutations: [
 			'delete the `guard` from admitEvidence — the status advance then succeeds and the probe reports ADMITTED',
 			"remove the `if (!e.scope) failed.push('SCOPE_STATED')` limb from evidenceAdmissibility",
-			'stop passing `scope: state.scope` into the guard\'s evidenceAdmissibility call — the limb survives but can no longer see the field, the F-30 shape',
+			"stop passing `scope: state.scope` into the guard's evidenceAdmissibility call — the limb survives but can no longer see the field, the F-30 shape",
 			'delete or rename the arranging ProposeEvidence so the aggregate is never created: `loadOrReject` then refuses with the SAME code RPH_VALIDATION_SEMANTIC_FAILED and the message "Aggregate <id> does not exist", so a code-only probe would report a false KILLED and only the marker reports MASKED (observed)'
 		]
 	},
@@ -1111,7 +1132,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED_BY_GENERAL_RULE',
-			canonAnchor: 'all-steps-succeeded leaves assurance unassessed until required policies complete',
+			canonAnchor:
+				'all-steps-succeeded leaves assurance unassessed until required policies complete',
 			note: 'JPWB-DOC-003 §5 STA-2 (execution success never confers satisfaction) names the same junction and the same operative noun ("required policies"), but states the obligation NEGATIVELY and mentions no Architecture PWU, no Architecture Coverage, no profile, and no REQUEST. GENERAL rather than CARRIED because the general rule survives retirement of the pre-canon §14 corpus and this Architecture-specific application does not.'
 		},
 		why:
@@ -1120,11 +1142,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'as one that must be refused. THE PLANE THAT WOULD PERFORM IT DOES NOT EXIST: `command-bus.ts` resolves a ' +
 			'handler exactly once per dispatch and no handler re-enters the table, and the only event fan-out is an ' +
 			'`EventSubscriber = (event) => void` — a read-only observer with no dispatch capability. One command can ' +
-			'never mint another; this engine has no reactor or process-manager plane at all. SEPARATELY, the rule\'s ' +
+			"never mint another; this engine has no reactor or process-manager plane at all. SEPARATELY, the rule's " +
 			'"profile" subject is ERASED AT THE ENGINE PORT: `ConformanceProfile` exists only as PWA ontology data, ' +
 			'the engine types the array as `readonly unknown[]`, and the published-PWA seam hard-codes it empty. What ' +
 			'the engine actually does with "required but unassessed" is a READ-MODEL row — `buildApplicablePolicies` ' +
-			'joins the PwuType\'s requiredAssurancePolicyIds against the assessment view and reports `assessed: false` ' +
+			"joins the PwuType's requiredAssurancePolicyIds against the assessment view and reports `assessed: false` " +
 			'— and a read-model consequence is this arm by definition.'
 	},
 	'RPH-ASR-002': {
@@ -1140,7 +1162,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		refusalMarker: 'a positive disposition cannot stand with unmet mandatory evidence',
 		declaredMutations: [
 			'delete the GATE A block from completeAssuranceAssessment',
-			'compute `unmet` against the policy\'s full requirement list instead of the `requiredForDispositions` subset — the gate then fires for every assessment and the CONTROL reddens instead, which is the over-refusal shape',
+			"compute `unmet` against the policy's full requirement list instead of the `requiredForDispositions` subset — the gate then fires for every assessment and the CONTROL reddens instead, which is the over-refusal shape",
 			'treat a requirement as satisfied when any evidence was submitted at all, rather than evidence submitted FOR that requirement'
 		]
 	},
@@ -1150,7 +1172,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'the assessment cannot be satisfied, an independence violation is recorded as a first-class outcome, and another evaluator or a policy-permitted scoped waiver is required',
-			note: 'JPWB-DOC-003 ASR-13 (independence is a verified runtime property) carries all three consequents verbatim and in order — and canon\'s own wording, "recorded as a first-class OUTCOME", is precisely why this is not a refusal. Note canon says another EVALUATOR and a POLICY-PERMITTED SCOPED waiver where the ratified statement says validator and waiver; the anchor is canon\'s wording, not the rule\'s.'
+			note: "JPWB-DOC-003 ASR-13 (independence is a verified runtime property) carries all three consequents verbatim and in order — and canon's own wording, \"recorded as a first-class OUTCOME\", is precisely why this is not a refusal. Note canon says another EVALUATOR and a POLICY-PERMITTED SCOPED waiver where the ratified statement says validator and waiver; the anchor is canon's wording, not the rule's."
 		},
 		why:
 			'THE RULE IS ENFORCED — AND NOT BY A REFUSAL, which is the distinction this arm exists to keep. ' +
@@ -1162,7 +1184,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'accepted command whose consequents are outcomes. Recorded explicitly because the tempting move is to ' +
 			'file this under DEAD_PREDICATE on the strength of the pure-kernel test of `checkIndependence`, which ' +
 			'would be the exact substitution this register was built to stop, pointed the other way: the predicate ' +
-			'has a live command-layer caller, so both clauses of `deadPredicate`\'s contract would be false.'
+			"has a live command-layer caller, so both clauses of `deadPredicate`'s contract would be false."
 	},
 	'RPH-ASR-004': {
 		kind: 'UNENFORCED_DISCLOSED',
@@ -1179,13 +1201,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'rejection to INCONCLUSIVE, never to REJECTED, so it does not implement the ratified consequent even ' +
 			'where it runs. At the command surface, completeAssuranceAssessment consults the policy for permitted ' +
 			'control actions, forbidden open severities, escalation and mandatory evidence — and never compares the ' +
-			'validator\'s recommendation against its own criterion results. A validator may therefore recommend ' +
+			"validator's recommendation against its own criterion results. A validator may therefore recommend " +
 			'SATISFIED with a BLOCKING criterion NOT_MET and be taken at its word, which is the precise thing the ' +
 			'rule exists to forbid.',
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:
-				'a policy whose single criterion is severityIfNotMet BLOCKING, activated, an assessment requested against it, then CompleteAssuranceAssessment carrying dispositionRecommendation SATISFIED while that criterion\'s result is NOT_MET — accepted',
+				"a policy whose single criterion is severityIfNotMet BLOCKING, activated, an assessment requested against it, then CompleteAssuranceAssessment carrying dispositionRecommendation SATISFIED while that criterion's result is NOT_MET — accepted",
 			control:
 				'the byte-identical completion with `subjectSemanticVersions: {}` while `subjectObjectIds` is unchanged, which the SAME handler refuses in `parseCompletion` — the site rejects malformed validator output and simply never compares the recommendation to the criteria',
 			whyNoPredicate:
@@ -1201,26 +1223,26 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Unable-to-determine is never treated as met.',
-			note: 'JPWB-DOC-003 §7 states it as an absolute, with no policy override — which is what makes the engine\'s silence a gap rather than a configuration choice.'
+			note: "JPWB-DOC-003 §7 states it as an absolute, with no policy override — which is what makes the engine's silence a gap rather than a configuration choice."
 		},
 		why:
 			'A mandatory criterion whose result is UNABLE_TO_DETERMINE does not prevent the assessment from being ' +
 			'completed as SATISFIED. The engine derives mandatoriness correctly — BLOCKING severity marks a criterion ' +
 			'mandatory in the kernel — but completeAssuranceAssessment never reads criterion RESULTS at all: its four ' +
-			'gates read the policy\'s permitted control actions, its forbidden open severities, its escalation rules ' +
+			"gates read the policy's permitted control actions, its forbidden open severities, its escalation rules " +
 			'and its mandatory EVIDENCE requirements. None of them asks what the criteria came back as. So the ' +
 			'distinction canon draws — that an undetermined mandatory criterion is not a met one — has no reader on ' +
 			'the command path, and the disposition the validator recommends stands unexamined.',
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:
-				'a policy with one BLOCKING criterion, activated and assessed, completed with dispositionRecommendation SATISFIED while that criterion\'s result is UNABLE_TO_DETERMINE — accepted',
+				"a policy with one BLOCKING criterion, activated and assessed, completed with dispositionRecommendation SATISFIED while that criterion's result is UNABLE_TO_DETERMINE — accepted",
 			control:
 				'the same completion with `subjectSemanticVersions: {}`, refused by `parseCompletion` at the same site with RPH_VALIDATOR_OUTPUT_INVALID',
 			whyNoPredicate:
 				'No predicate on the command path maps a criterion RESULT to a disposition constraint. The kernel ' +
 				'helpers that could are floor-path only and fold to INCONCLUSIVE rather than blocking satisfaction, ' +
-				'so naming one would fail both clauses of `deadPredicate`\'s contract exactly as RPH-ASR-004 records.'
+				"so naming one would fail both clauses of `deadPredicate`'s contract exactly as RPH-ASR-004 records."
 		}
 	},
 	'RPH-ASR-006': {
@@ -1248,7 +1270,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'Malformed or invalid validator output can never mutate authoritative state or create authoritative findings',
-			note: 'JPWB-DOC-003 §8 carries the rule\'s operative consequent verbatim — no authoritative observations, no disposition change.'
+			note: "JPWB-DOC-003 §8 carries the rule's operative consequent verbatim — no authoritative observations, no disposition change."
 		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/assurance.ts — completeAssuranceAssessment, whose first statement calls `parseCompletion`; the refusing limb requires validatorResult.subjectSemanticVersions to name a version for every declared subject.',
@@ -1287,7 +1309,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'path reads no findings at any severity, and `PwuAxes` has no field that could carry one, so there the ' +
 			'check is INEXPRESSIBLE rather than merely absent. That is the site the dead kernel predicate ' +
 			'`controllerMarksPwuSatisfied` would have served; it states the rule as a three-limb conjunction and is ' +
-			'called by nothing. RECORDED HERE RATHER THAN AS A NEW FINDING, deliberately: reading DOC-003 ASR-10\'s ' +
+			"called by nothing. RECORDED HERE RATHER THAN AS A NEW FINDING, deliberately: reading DOC-003 ASR-10's " +
 			'"open critical findings block satisfaction" as governing PWU workLifecycle would be a SUBJECT ' +
 			'SUBSTITUTION — that rule is titled "Composition is strictest-wins" and its subject throughout is ' +
 			'AGGREGATE ASSURANCE. One rule, two unenforced sites, one row.',
@@ -1296,7 +1318,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			arrangement:
 				'a CRITICAL observation recorded OPEN against a PWU AFTER its assessment settled SATISFIED, then that PWU advanced to workLifecycleState SATISFIED citing the satisfied assessment — accepted',
 			control:
-				'THE BYTE-IDENTICAL command with ONE field changed — assuranceState left at ASSESSING rather than SATISFIED — which IS refused, by the cross-axis guard that owns this arrow. So the SITE is alive and simply never looks at findings; the arrangement is not failing somewhere upstream. ⚠ THE PREVIOUS CONTROL RETIRED ON 2026-08-10 (REG-D-042): it added dispositionRules to the policy and watched the completion be refused, proving that what was missing was THE ENGINE\'S OWN DEFAULT rather than the mechanism. That default now exists, and a control whose point has been conceded is no longer a control.',
+				"THE BYTE-IDENTICAL command with ONE field changed — assuranceState left at ASSESSING rather than SATISFIED — which IS refused, by the cross-axis guard that owns this arrow. So the SITE is alive and simply never looks at findings; the arrangement is not failing somewhere upstream. ⚠ THE PREVIOUS CONTROL RETIRED ON 2026-08-10 (REG-D-042): it added dispositionRules to the policy and watched the completion be refused, proving that what was missing was THE ENGINE'S OWN DEFAULT rather than the mechanism. That default now exists, and a control whose point has been conceded is no longer a control.",
 			whyNoPredicate:
 				'`dispositionFromFindings` implements the rule correctly and its census does exclude the command ' +
 				'layer, so a DEAD_PREDICATE row would pass the precondition gate — and would still be false, because ' +
@@ -1313,7 +1335,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §7 carries all four surfaces verbatim — and all four are projections, which is the disposition.'
 		},
 		why:
-			'Every one of the rule\'s four consequents is a VISIBILITY property of a projection: the assessment ' +
+			"Every one of the rule's four consequents is a VISIBILITY property of a projection: the assessment " +
 			'object, the PWU assurance view, the review package and the baseline package. Nothing here is a command ' +
 			'envelope, and no dispatch can violate the rule by being accepted — a condition is either carried into ' +
 			'the read models or it is not, and if it is not, the defect surfaces as a missing field in a projection ' +
@@ -1321,7 +1343,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`dispositionFromFindings` returns CONDITIONALLY_SATISFIED and `aggregateDisposition` propagates it, but ' +
 			'neither ' +
 			'has a visibility limb and no predicate anywhere takes a "surfaces" argument. Recorded as a read-model ' +
-			'obligation, which is the register\'s third arm by definition — and note that if the projections DID drop ' +
+			"obligation, which is the register's third arm by definition — and note that if the projections DID drop " +
 			'the condition, the instrument that would catch it is a projection test, not this register.'
 	},
 	// RE-DISPOSITIONED 2026-08-02, BEFORE ANY PROBE WAS WRITTEN, and the direction matters: this row was drafted
@@ -1361,7 +1383,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'every subject (`parseCompletion`, which is RPH-ASR-007 and is a COMPLETENESS check, not a MATCH check). ' +
 			'The one site that compares a version is the de minimis floor gate on the PWA publish path — real ' +
 			'enforcement over a different subject, and adopting it here would be the layer/subject substitution this ' +
-			'register exists to prevent. So the rule\'s second clause — that a semantic change to the subject ' +
+			"register exists to prevent. So the rule's second clause — that a semantic change to the subject " +
 			'invalidates or forces review of prior assessments — has no reader at all: nothing recomputes, ' +
 			'invalidates, or even flags a prior assessment when its subject moves.',
 		guard: {
@@ -1372,8 +1394,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the same completion with `subjectSemanticVersions: {}`, refused by `parseCompletion` at the same site — the parse step reads the field and rejects it for being INCOMPLETE, which is precisely what shows the missing check is the MATCH, not the reading',
 			whyNoPredicate:
 				'The kernel classifier that returns RPH_SUBJECT_VERSION_MISMATCH is not dead — it is asked on the ' +
-				'floor path — so naming it would fail `deadPredicate`\'s first clause. What is absent is a caller on ' +
-				'the assessment path that knows the subject\'s CURRENT version to compare against, so there is no ' +
+				"floor path — so naming it would fail `deadPredicate`'s first clause. What is absent is a caller on " +
+				"the assessment path that knows the subject's CURRENT version to compare against, so there is no " +
 				'symbol whose census could witness the gap closing.'
 		}
 	},
@@ -1381,8 +1403,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED',
-			canonAnchor: 'both remain visible and the aggregate becomes contested, inconclusive, or escalated',
-			note: 'JPWB-DOC-003 §7. The same canon line carries RPH-ASR-008 and RPH-ASR-012 through different substrings; each anchor is distinct, so no claim is satisfied by another\'s text.'
+			canonAnchor:
+				'both remain visible and the aggregate becomes contested, inconclusive, or escalated',
+			note: "JPWB-DOC-003 §7. The same canon line carries RPH-ASR-008 and RPH-ASR-012 through different substrings; each anchor is distinct, so no claim is satisfied by another's text."
 		},
 		why:
 			'All three consequents are outcomes of accepted commands, not refusals. "Both remain visible" is a ' +
@@ -1411,7 +1434,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'every ratified assessment disposition returns a range of exactly six values, containing neither ' +
 			'CONTESTED nor ESCALATED. TWO OF THE THREE CONSEQUENTS ARE UNDERIVABLE, NOT MERELY UNDERIVED, so this ' +
 			'sentence must not be read as disposing of them, and the instrument named at the end of this row cannot ' +
-			'hold them either: a property test cannot assert an outcome outside its function\'s own return type. ' +
+			"hold them either: a property test cannot assert an outcome outside its function's own return type. " +
 			'Closing that half needs a contract change, and it is owed a REG-F finding of its own. And ' +
 			'"results are not averaged silently" forbids an IMPLEMENTATION TECHNIQUE rather than a command: there is ' +
 			'no dispatch whose acceptance would constitute averaging, so there is no arrangement a probe could make. ' +
@@ -1427,9 +1450,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		why:
 			'The kernel composes correctly and the command surface never asks it to. `aggregateDisposition` ' +
-			'implements strictest-unresolved and is unit-proven, but a PWU\'s assuranceState is set by ChangePwuState, ' +
+			"implements strictest-unresolved and is unit-proven, but a PWU's assuranceState is set by ChangePwuState, " +
 			'whose backing check — `rejectUnbackedDisposition` — asks only whether the cited assessments SUPPORT the ' +
-			'asserted disposition. It never enumerates the PWU\'s REQUIRED policies, and never composes across them. ' +
+			"asserted disposition. It never enumerates the PWU's REQUIRED policies, and never composes across them. " +
 			'So with five required policies, four SATISFIED and one REJECTED, asserting the aggregate SATISFIED while ' +
 			'citing the four satisfied assessments is accepted: the controller selects its own evidence and the ' +
 			'strictest unresolved disposition is simply not consulted. The composition rule and the backing rule are ' +
@@ -1442,7 +1465,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the byte-identical ChangePwuState citing ONLY the REJECTED assessment, which `rejectUnbackedDisposition` refuses at the same site — the backing check is alive; it is the COMPOSITION across required policies that is absent',
 			whyNoPredicate:
 				'`aggregateDisposition` is not dead — it is unit-proven and reached on the floor path — so naming it ' +
-				'would fail `deadPredicate`\'s first clause. What is missing is not a predicate but a CALLER: nothing ' +
+				"would fail `deadPredicate`'s first clause. What is missing is not a predicate but a CALLER: nothing " +
 				'on the command path assembles the required-policy set to compose over, so there is no symbol whose ' +
 				'census could witness the gap closing.'
 		}
@@ -1489,11 +1512,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'The same shape as RPH-INT-001, and non-enforced for the same reason: "accepting FormalizeIntent sets ' +
 			'status FORMALIZED, increments the semantic version, persists desired outcomes and success conditions, ' +
 			'and emits IntentFormalized" describes a SUCCESSFUL dispatch in full. The only refusal in the vicinity ' +
-			'belongs to a different rule — approveIntent\'s precondition refuses an out-of-state approval, which is ' +
+			"belongs to a different rule — approveIntent's precondition refuses an out-of-state approval, which is " +
 			'RPH-INT-003 — and crediting it here would be a subject substitution. What could go wrong with this rule ' +
 			'is a field silently dropped on the success path, which is the F-I shape; the instrument for that is a ' +
 			'state-and-event assertion, not a refusal probe. ' +
-			'AND IT HAS GONE WRONG — DISCOVERED WHILE BUILDING RPH-INT-003\'s PROBE, 2026-08-02, and filed as ' +
+			"AND IT HAS GONE WRONG — DISCOVERED WHILE BUILDING RPH-INT-003's PROBE, 2026-08-02, and filed as " +
 			'REG-F-009. The clause "increments semantic version" IS NOT PERFORMED: `formalizeIntent` does not set ' +
 			'`bumpSemanticVersion`, so a FORMALIZED intent is still at v1; only `reviseIntent` bumps. The probe ' +
 			'fixtures approved v2 on that assumption and had to be corrected to v1 against the running engine. The ' +
@@ -1524,7 +1547,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'loses it.'
 		},
 		enforcedAt:
-			'DECLARATION: packages/rph-application/src/handlers/intent.ts — approveIntent declares `precondition: fromStates(\'FORMALIZED\', \'REVISED\')`. MECHANISM: packages/rph-application/src/handlers/command-precondition.ts — the FROM_STATES arm of evaluatePrecondition, which mints the code and the message. INVOCATION: intent.ts — advanceIntent evaluates the precondition immediately after loadOrReject and BEFORE the precheck and BEFORE checkTransition.',
+			"DECLARATION: packages/rph-application/src/handlers/intent.ts — approveIntent declares `precondition: fromStates('FORMALIZED', 'REVISED')`. MECHANISM: packages/rph-application/src/handlers/command-precondition.ts — the FROM_STATES arm of evaluatePrecondition, which mints the code and the message. INVOCATION: intent.ts — advanceIntent evaluates the precondition immediately after loadOrReject and BEFORE the precheck and BEFORE checkTransition.",
 		refusalCode: 'RPH_ILLEGAL_STATE_TRANSITION',
 		// THE TAIL IS THE MARKER, and it has to be. `RPH_ILLEGAL_STATE_TRANSITION` is produced by the machine, by
 		// four prechecks, and by every source set in the system; a code-only probe would prove only that SOMETHING
@@ -1565,7 +1588,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 states the version-binding rule for DECISIONS generally; this rule is its Intent instance. GENERAL rather than CARRIED because canon names decisions and not intent approval specifically — the general rule survives retirement of the pre-canon §7 corpus, the Intent-specific application does not.'
 		},
 		enforcedAt:
-			'packages/rph-application/src/handlers/intent.ts — approveIntent, the SECOND limb of its `precheck` (labelled W3-INC-1): the approval\'s `approvedSemanticVersion` must equal the intent\'s current semanticVersion.',
+			"packages/rph-application/src/handlers/intent.ts — approveIntent, the SECOND limb of its `precheck` (labelled W3-INC-1): the approval's `approvedSemanticVersion` must equal the intent's current semanticVersion.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// DELIBERATELY NOT sharing RPH-INT-004's marker, and the two are refused by the SAME precheck in sequence —
 		// the RPH-PWU-009/010 situation. INT-004 fires FIRST, so this row's probe must supply desired outcomes to
@@ -1574,7 +1597,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		declaredMutations: [
 			'delete the version-comparison arm from approveIntent’s precheck — a stale approval is accepted and the probe reports ADMITTED',
 			'compare against the approval’s own `approvedSemanticVersion` instead of the intent’s current `semanticVersion` — the check becomes a tautology, the F-30 shape',
-			'drop the `typeof currentVersion === \'number\'` fail-closed guard so an unversioned intent skips the comparison entirely'
+			"drop the `typeof currentVersion === 'number'` fail-closed guard so an unversioned intent skips the comparison entirely"
 		]
 	},
 	'RPH-INT-006': {
@@ -1609,15 +1632,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §5 STA-6 states the rule verbatim. ~~Carriage is total here even though enforcement is absent — the independence of the two axes, in the direction RPH-EXE-007 already demonstrates.~~ CORRECTED 2026-08-13 (REG-F-130): enforcement is NO LONGER ABSENT — REG-F-129 landed the guard at proposePwu — so this row must not be cited for that independence. Carriage remains total.'
 		},
 		enforcedAt:
-			'DECLARATION: packages/rph-application/src/handlers/pwu.ts — proposePwu reads `intentStatus` off the '  +
-			'loaded intent and refuses SUPERSEDED. MECHANISM: an inline refusal in the handler, sited AFTER '  +
+			'DECLARATION: packages/rph-application/src/handlers/pwu.ts — proposePwu reads `intentStatus` off the ' +
+			'loaded intent and refuses SUPERSEDED. MECHANISM: an inline refusal in the handler, sited AFTER ' +
 			"PWU-002's existence check (so an absent intent still refuses as absent) and BEFORE the intent state is " +
-			'narrowed to `{ ontologyId, ontologyVersion }` — the narrowing that made `intentStatus` unreadable is '  +
-			'exactly why this rule went unenforced for so long. INVOCATION: proposePwu is the SOLE production '  +
-			'creator of a PWU aggregate — derived, not assumed, by an AST walk over 636 files finding 27 '  +
-			'aggregate-creation sites repo-wide (creation = `expectedRevision: undefined`, the only branch reaching '  +
-			'the adapter INSERT), of which exactly two carry a PWU objectType and one is a test. So the guard covers '  +
-			'every creation, root and child alike — `parentWorkUnitId` is a payload field on this same command, not '  +
+			'narrowed to `{ ontologyId, ontologyVersion }` — the narrowing that made `intentStatus` unreadable is ' +
+			'exactly why this rule went unenforced for so long. INVOCATION: proposePwu is the SOLE production ' +
+			'creator of a PWU aggregate — derived, not assumed, by an AST walk over 636 files finding 27 ' +
+			'aggregate-creation sites repo-wide (creation = `expectedRevision: undefined`, the only branch reaching ' +
+			'the adapter INSERT), of which exactly two carry a PWU objectType and one is a test. So the guard covers ' +
+			'every creation, root and child alike — `parentWorkUnitId` is a payload field on this same command, not ' +
 			'a separate creator.',
 		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
 		// THE TAIL IS THE MARKER, and it has to be. `RPH_VALIDATION_SEMANTIC_FAILED` is minted by PWU-002's own
@@ -1627,17 +1650,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		// check would get the same code with a different message, and only this marker separates them.
 		refusalMarker: 'it is SUPERSEDED, and a superseded intent authorizes no new work',
 		declaredMutations: [
-			'delete the intentStatus check — the arrangement is ACCEPTED and a PWU is created under a superseded '  +
+			'delete the intentStatus check — the arrangement is ACCEPTED and a PWU is created under a superseded ' +
 				'intent, so the probe reports the refusal missing entirely',
-			"widen it to the readiness set `INTENT_AT_LEAST_PROVISIONAL` — SUPERSEDED is still refused, so a " +
-				'code-and-marker probe reports a FALSE KILLED; only the RAW control in sta6-superseded-intent.test.ts '  +
+			'widen it to the readiness set `INTENT_AT_LEAST_PROVISIONAL` — SUPERSEDED is still refused, so a ' +
+				'code-and-marker probe reports a FALSE KILLED; only the RAW control in sta6-superseded-intent.test.ts ' +
 				'catches it, which is why that control exists and why this mutation is declared here',
-			'move the check ABOVE PWU-002\'s existence refusal — a proposal naming a NONEXISTENT intent then '  +
-				'refuses with this rule\'s message instead of the missing-intent one, so the marker is right and the '  +
+			"move the check ABOVE PWU-002's existence refusal — a proposal naming a NONEXISTENT intent then " +
+				"refuses with this rule's message instead of the missing-intent one, so the marker is right and the " +
 				'subject is wrong',
-			'refuse WITHDRAWN as well — nothing reddens in the ratified direction, which is the point: the '  +
+			'refuse WITHDRAWN as well — nothing reddens in the ratified direction, which is the point: the ' +
 				'over-refusal is caught by the deliberate non-rule pin, not by this rule'
-		],
+		]
 		// ── THE HISTORY, KEPT AS A COMMENT BECAUSE AN ENFORCED ROW HAS NO `why` FIELD BY TYPE ─────────────────
 		//
 		// This row was NOT_A_COMMAND_REFUSAL on ONE ground, and it was RIGHT when written: THE ANTECEDENT WAS
@@ -1696,7 +1719,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'arrangement for a probe to observe being refused and none for a disclosure to observe being admitted. ' +
 			'The failure mode is a handler writing the WRONG initial value on a path that succeeds, and the ' +
 			'instrument for that is an assertion over created state and emitted event — which `pwu.test.ts` carries ' +
-			'— not a refusal probe. Recorded rather than omitted so the family is legible: four of this register\'s ' +
+			"— not a refusal probe. Recorded rather than omitted so the family is legible: four of this register's " +
 			'rows are now in this arm for this same reason, and it is a property of how these rules are WRITTEN, not ' +
 			'a gap in what the engine does.'
 	},
@@ -1798,7 +1821,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'rule in the "only when" form, which reads as a GATE, and under that reading the rule would be a ' +
 			'refusal — the negative case being a PWU reaching SATISFIED with a condition unmet. That negative case is ' +
 			'already carried by RPH-PWU-007, which IS dispositioned as a disclosure with an observed admission. So ' +
-			'the two readings do not disagree about the engine\'s behaviour, only about which row records it, and ' +
+			"the two readings do not disagree about the engine's behaviour, only about which row records it, and " +
 			'recording it twice would let one arrangement green two rules — the duplicate-marker failure, one level ' +
 			'up. If the sponsor rules that canon\'s "only when" governs, this row becomes a duplicate of RPH-PWU-007 ' +
 			'rather than a new finding.'
@@ -1808,13 +1831,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'NO_CANON_CARRIER',
 			why:
-				'Canon states the PARENTAGE obligation nowhere. JPWB-DOC-003 §5 STA-5 governs a PWU\'s shape ' +
+				"Canon states the PARENTAGE obligation nowhere. JPWB-DOC-003 §5 STA-5 governs a PWU's shape " +
 				'readiness and enumerates required inputs, expected outputs and verification criteria — it never ' +
 				'mentions a parent, an authority, or the root/non-root distinction. The architecture-side rules ' +
 				'(DOC-001 §5, the PWA composition invariants) govern the PWU TYPE graph, which is a different object: ' +
 				'they say a non-root TYPE is reachable from the root type, not that a non-root INSTANCE must have a ' +
 				'parent instance. Adopting either as the carrier would be the subject substitution this register ' +
-				'records twice already (RPH-EXE-005 over STA-5, RPH-ASR-010 over the floor gate). So this rule\'s ' +
+				"records twice already (RPH-EXE-005 over STA-5, RPH-ASR-010 over the floor gate). So this rule's " +
 				'only textual home is the pre-canon conformance specification (§8), and retirement loses it.'
 		},
 		why:
@@ -1823,7 +1846,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'a `parentWorkUnitId` that does not resolve. There is no arm for the parent being ABSENT, and no arm for ' +
 			'the "independent authority" the ratified statement offers as the alternative — no field on ProposePwu ' +
 			'carries one. THE REFUSAL THAT LOOKS LIKE THIS RULE AND IS NOT IT: that named-but-absent-parent guard ' +
-			"ends its message \"(PWU-003)\", so production CLAIMS this rule id. It enforces the converse — a wrong " +
+			'ends its message "(PWU-003)", so production CLAIMS this rule id. It enforces the converse — a wrong ' +
 			'parent, not a missing one — and reading the id as evidence would have bought an ENFORCED row with a ' +
 			'real marker, a real code and a passing probe, for a rule nothing enforces. That is why this row exists ' +
 			'and why its control is that very refusal: the delta between the admitted arrangement and the refused ' +
@@ -1838,7 +1861,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'No kernel predicate decides whether a non-root instance has parentage. `INTENT_AT_LEAST_PROVISIONAL` ' +
 				'and the rest of `checkPwuShapeReadiness` quantify over a ROOT PWU at MarkPwuReady, not any PWU at ' +
 				'proposal, so a non-root instance escapes them entirely — and that predicate is asked from ' +
-				'markPwuReady, so it fails `deadPredicate`\'s first clause as well. Naming it would be the ' +
+				"markPwuReady, so it fails `deadPredicate`'s first clause as well. Naming it would be the " +
 				'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss at once.'
 		}
 	},
@@ -1854,7 +1877,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'does require a real backing assessment — `rejectUnbackedDisposition` refuses a controller asserting a ' +
 			'disposition with nothing behind it, and the UNDER_ASSURANCE->SATISFIED cross-axis guard refuses the ' +
 			'arrow unless assuranceState is SATISFIED. Both are live and both are probed. What neither does is ' +
-			'quantify over the PWU\'s REQUIRED assessments: the controller supplies `supportingObjectIds`, the guard ' +
+			"quantify over the PWU's REQUIRED assessments: the controller supplies `supportingObjectIds`, the guard " +
 			'validates THOSE, and a second assessment sitting in REJECTED against a policy the PWU itself declares is ' +
 			'never loaded. THE DECLARATION EXISTS AND IS INERT: `assurancePolicyIds` is a REQUIRED field on ' +
 			'ProposePwu and is written to the aggregate (pwu.ts), and — measured — it is read by nothing anywhere for ' +
@@ -1872,7 +1895,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			whyNoPredicate:
 				'`satisfiesP1` and the cross-axis guard are both asked on this path, so neither is dead. The missing ' +
 				'thing is not a predicate but a QUANTIFIER with nothing to quantify over at the call site: no handler ' +
-				'assembles the PWU\'s required-assessment set, so there is no symbol whose census could witness the ' +
+				"assembles the PWU's required-assessment set, so there is no symbol whose census could witness the " +
 				'gap closing — the RPH-ASR-012 shape exactly.'
 		}
 	},
@@ -1935,7 +1958,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'arrangement can be refused and none can be observed being admitted. ARM 1 IS STRUCTURALLY UNBUILDABLE ' +
 			'rather than merely unwarranted: `classifyRefusal` returns ADMITTED for status ACCEPTED in BOTH arms and ' +
 			'only KILLED is a pass, so a row whose evidence IS an acceptance can never produce one. ' +
-			'AND IT IS ALREADY THE REGISTER\'S POSITIVE CONTROL: every probe\'s control half — "the SAME command ' +
+			"AND IT IS ALREADY THE REGISTER'S POSITIVE CONTROL: every probe's control half — \"the SAME command " +
 			'ACCEPTED before the arranging act" — is an instance of this rule, so it is continuously exercised ' +
 			'without being a row. Minting an UNENFORCED row would make the disclosure set and the control set share ' +
 			'an arrangement, one dispatch simultaneously proving a gap and proving the machinery alive. ' +
@@ -1961,7 +1984,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		why:
 			'`loadOrReject` polices a revision that is WRONG and ignores one that is ABSENT — the RPH-PWU-003 delta, ' +
 			'in the concurrency plane. A command updating an existing aggregate with `expectedRevision` omitted is ' +
-			'accepted and the aggregate really moves. The ratified statement\'s escape clause makes it worse rather ' +
+			"accepted and the aggregate really moves. The ratified statement's escape clause makes it worse rather " +
 			'than better: "unless the command type is explicitly exempt" presupposes an exemption mechanism, and NO ' +
 			'EXEMPTION MECHANISM OF ANY KIND EXISTS in the repository — so the rule is not partially enforced with a ' +
 			'declared allowlist, it is enforced for no command and exempt for none. Last-write-wins is precisely ' +
@@ -1987,7 +2010,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'NO_CANON_CARRIER',
 			why:
 				'CON-000 B1 delegates exact shapes — explicitly including "wire envelopes" and enum spellings — to ' +
-				'the repository\'s generated contracts. No canon sentence states a timestamp format, and none should; ' +
+				"the repository's generated contracts. No canon sentence states a timestamp format, and none should; " +
 				'the ratified vocabulary is where RFC-3339 would be expressed. As with the other RPH-CON rows the ' +
 				'retirement risk does not apply, because the carrier would be generated code rather than prose.'
 		},
@@ -1997,7 +2020,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'commands and two different fields: `ProposeEvidence.capturedAt` accepts "definitely not a timestamp" ' +
 			'(and `\'\'`), and `ProposeDecision.effectiveAt` accepts "whenever, honestly". This is not a boundary ' +
 			'that refuses nothing — the SAME payload gate refuses a bad `evidenceType` at the same dispatch, which ' +
-			'is this row\'s control. What is missing is the format constraint on the declared field, and the ' +
+			"is this row's control. What is missing is the format constraint on the declared field, and the " +
 			'consequence reaches further than validation: an unparseable `capturedAt` is what freshness and ' +
 			'staleness rules would have to compare against.',
 		guard: {
@@ -2019,7 +2042,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Partial output — an unanswered mandatory criterion — is invalid output.',
-			note: 'JPWB-DOC-003 §6 states it as an absolute. Note this anchor and RPH-CON-006/007\'s are distinct substrings of the SAME canon region — one passage carrying three ratified rules, as DOC-003 §7 does for RPH-EVD-005/006.'
+			note: "JPWB-DOC-003 §6 states it as an absolute. Note this anchor and RPH-CON-006/007's are distinct substrings of the SAME canon region — one passage carrying three ratified rules, as DOC-003 §7 does for RPH-EVD-005/006."
 		},
 		why:
 			'`completeAssuranceAssessment` never reads criterion RESULTS at all — the same absence RPH-ASR-004 and ' +
@@ -2036,7 +2059,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the byte-adjacent completion with `subjectSemanticVersions: {}` while `subjectObjectIds` still names the subject, which `parseCompletion` refuses at the SAME site with RPH_VALIDATOR_OUTPUT_INVALID',
 			whyNoPredicate:
 				'`mandatoryCriterionUnmet` exists in rph-assurance and is reached only on the floor path, where it ' +
-				'folds to INCONCLUSIVE rather than rejecting — so it fails both clauses of `deadPredicate`\'s ' +
+				"folds to INCONCLUSIVE rather than rejecting — so it fails both clauses of `deadPredicate`'s " +
 				'contract, the RPH-ASR-004 finding restated for this rule.'
 		}
 	},
@@ -2054,7 +2077,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`rph-assurance/src/assurance-rules.ts` — as a `reason` STRING on a boundary classification the floor ' +
 			'path folds to INCONCLUSIVE. It is never an `error.code`. Observed: an assessment requested against a ' +
 			'policy at version 1.2.0, completed by a validator result declaring 1.1.0, is ACCEPTED — and the emitted ' +
-			'event records the ASSESSMENT\'s 1.2.0, erasing the version the validator actually claimed to judge. The ' +
+			"event records the ASSESSMENT's 1.2.0, erasing the version the validator actually claimed to judge. The " +
 			'record is not merely un-refused; it is silently corrected to look consistent. Filed system-wide as ' +
 			'REG-F-010 group 2.',
 		guard: {
@@ -2066,7 +2089,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			whyNoPredicate:
 				'`classifyValidatorResult` computes the mismatch and returns it as a boundary `reason`; it is asked ' +
 				'on the floor path, so it is not dead, and it does not produce a refusal, so it does not implement ' +
-				'the rule. Both clauses of `deadPredicate`\'s contract fail.'
+				"the rule. Both clauses of `deadPredicate`'s contract fail."
 		}
 	},
 	'RPH-CON-007': {
@@ -2111,7 +2134,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'contain, and this repository has no presentation command schema of any kind — the arrangement was ' +
 			'attempted rather than assumed: dispatching `UpdateCanvasLayout` carrying a semantic version field, a ' +
 			'lifecycle mutation, an assurance disposition and a baseline id returns "Unknown command type", and so ' +
-			'does `MoveNode` with an EMPTY payload. A refusal insensitive to the rule\'s antecedent is not this rule ' +
+			"does `MoveNode` with an EMPTY payload. A refusal insensitive to the rule's antecedent is not this rule " +
 			'being enforced, and the identical response to both is what closes the ENFORCED arm. The UNENFORCED arm ' +
 			'is closed too: OBSERVED_ADMISSION needs the engine to ACCEPT what the rule forbids, and there is ' +
 			'nothing to accept. This is a rule about a plane that does not exist — arm 3 by its own definition, and ' +
@@ -2132,10 +2155,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`{ objectId, semanticVersion, contentHash? }` — a shape with no lifecycle field to quantify over — and ' +
 			'calls `ctx.store.loadObject` on no item at all. Measured: `workLifecycleState` and `lifecycleStatus` ' +
 			'occur in both governance modules only as WRITES inside `newEnvelope` at object creation; the promotion ' +
-			'path reads a PWU\'s state on no axis. So a PWU sitting in INVALIDATED is frozen into an AUTHORITATIVE ' +
+			"path reads a PWU's state on no axis. So a PWU sitting in INVALIDATED is frozen into an AUTHORITATIVE " +
 			'baseline and the engine never asks. WHAT IS ENFORCED NEXT DOOR, recorded so the two are not confused: ' +
 			'the same handler DOES refuse a promotion resting on invalidated EVIDENCE (RPH-BAS family), which is why ' +
-			'this row\'s control is available at the same site — the machinery polices invalidation of one object ' +
+			"this row's control is available at the same site — the machinery polices invalidation of one object " +
 			'type and not of the item it is promoting.',
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
@@ -2145,7 +2168,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the byte-identical promotion whose decision considered an Evidence that is then INVALIDATED, which the SAME handler refuses — same command, same site, same word "invalidated", one object type over',
 			whyNoPredicate:
 				'`canPromoteBaseline` is not dead — it is asked on this very path — so naming it would fail ' +
-				'`deadPredicate`\'s first clause. And it could not implement the rule if it were: its item view has ' +
+				"`deadPredicate`'s first clause. And it could not implement the rule if it were: its item view has " +
 				'no lifecycle field, so the rule is inexpressible to it, which is the RPH-EVD-003 shape before that ' +
 				'row was fixed. What is absent is a subject on the type, not a caller.'
 		}
@@ -2210,29 +2233,29 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Replaying a mutation with the same idempotency key returns the prior result',
-			note: "JPWB-DOC-003 §9 PER-5 (Idempotency at the business-effect level), near-verbatim against the ratified statement. CANON STATES STRICTLY MORE THAN THIS RULE: PER-5's third clause is \"Reuse of a key with a different payload fails\", ~~a REFUSAL that nothing performs~~ — CLOSED 2026-08-04 (REG-F-012), struck rather than deleted; the bus now performs it, and the surplus is a surplus the engine honours rather than one it violates. THE ROW'S DISPOSITION IS UNCHANGED AND THAT IS DELIBERATE: this rule's own statement is still an OUTCOME (\"returns the prior result\"), which no refusal arm can carry, so it remains NOT_A_COMMAND_REFUSAL. What changed is the neighbouring sentence, not this one. Cited to DOC-003, not to REG-005, which also carries the sentence only because REG-F-012 quotes it."
+			note: 'JPWB-DOC-003 §9 PER-5 (Idempotency at the business-effect level), near-verbatim against the ratified statement. CANON STATES STRICTLY MORE THAN THIS RULE: PER-5\'s third clause is "Reuse of a key with a different payload fails", ~~a REFUSAL that nothing performs~~ — CLOSED 2026-08-04 (REG-F-012), struck rather than deleted; the bus now performs it, and the surplus is a surplus the engine honours rather than one it violates. THE ROW\'S DISPOSITION IS UNCHANGED AND THAT IS DELIBERATE: this rule\'s own statement is still an OUTCOME ("returns the prior result"), which no refusal arm can carry, so it remains NOT_A_COMMAND_REFUSAL. What changed is the neighbouring sentence, not this one. Cited to DOC-003, not to REG-005, which also carries the sentence only because REG-F-012 quotes it.'
 		},
 		why:
 			'THE STATEMENT IS AN OUTCOME AND THE OUTCOME IS PRODUCED, so neither the ENFORCED arm (which observes ' +
 			'refusals) nor the UNENFORCED arm (which observes admissions of what must be refused) can hold it. ' +
-			'Observed: a re-submitted idempotency key returns status DUPLICATE carrying the PRIOR receipt\'s ' +
+			"Observed: a re-submitted idempotency key returns status DUPLICATE carrying the PRIOR receipt's " +
 			'`producedEventIds`, the event count is unchanged, and the aggregate does not advance. ENFORCED AT ' +
 			'`packages/rph-application/src/command-bus.ts` — `dispatch` step 1, the `store.getReceipt` lookup — ' +
-			'which is the COMMAND layer; only the receipt READ is the store\'s. (RPH-EXE-007\'s row said "the store ' +
+			"which is the COMMAND layer; only the receipt READ is the store's. (RPH-EXE-007's row said \"the store " +
 			'layer" for six commits and is corrected in the same commit as this row.) ~~THE PART CANON ADDS AND ' +
 			'THIS ENGINE VIOLATES, recorded here because a reader of this row must not conclude PER-5 holds: a key ' +
 			'reused for a DIFFERENT command is silently swallowed. Observed — a `CaptureIntent` for aggregate A ' +
 			'accepted under key K, then a wholly different `CaptureIntent` for aggregate B reusing K, returns ' +
-			'DUPLICATE and aggregate B IS NEVER CREATED, with the caller handed A\'s event id as its result. ' +
+			"DUPLICATE and aggregate B IS NEVER CREATED, with the caller handed A's event id as its result. " +
 			'`command_receipts` stores `command_type`, `target_aggregate_id` AND `result_hash`, `getReceipt` ' +
 			'returns all three, and step 1 compares none of them.~~ CLOSED 2026-08-04 (REG-F-012), struck rather ' +
 			'than deleted so a reader sees both the claim and its clearance. Step 1 now compares command type, ' +
 			'target aggregate, and PAYLOAD — the last via `command_receipts.payload_hash`, a new column carried by ' +
-			'this engine\'s first forward schema migration, because `result_hash` is `contentHash(nextState)` and ' +
+			"this engine's first forward schema migration, because `result_hash` is `contentHash(nextState)` and " +
 			'reaching it means having already executed the command. An ABSENT stored hash (any receipt written ' +
 			'before v2) is SKIPPED rather than treated as a difference — absence of evidence is not evidence of ' +
 			'difference, and reading it the other way would refuse every legitimate replay in an upgraded durable ' +
-			'store. REG-F-012 was filed separately and DELIBERATELY NOT folded into this row: this rule\'s own ' +
+			"store. REG-F-012 was filed separately and DELIBERATELY NOT folded into this row: this rule's own " +
 			'statement held then and holds now, and letting a satisfied rule carry a disclosure about a ' +
 			'neighbouring sentence is the subject substitution this register records four times over. That is also ' +
 			'why the disposition below is untouched by the fix.'
@@ -2260,13 +2283,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		why:
 			'THE SAME-AGGREGATE HALF IS ENFORCED AND IS NOT THE RULE. `ApproveDecision` and `GrantWaiver` both ' +
-			'carry `fromStates(\'PROPOSED\')`, so re-approving an already-EFFECTIVE Decision is refused with ' +
+			"carry `fromStates('PROPOSED')`, so re-approving an already-EFFECTIVE Decision is refused with " +
 			'RPH_ILLEGAL_STATE_TRANSITION — and that precondition is load-bearing rather than decorative, because ' +
 			'the MACHINE would admit the re-issue: `Decision.status` declares `illegal: []`, so EFFECTIVE -> ' +
 			'EFFECTIVE classifies NOOP and `checkTransition` lets a NOOP through. WHAT IS UNENFORCED is the rule as ' +
 			'stated. `proposeDecision` takes its id straight from `command.targetAggregateId`, declares NO ' +
-			'precondition at all, and consults no other Decision; `approveDecision`\'s precondition and guard both ' +
-			'read ONLY the target aggregate\'s own state, and `ctx.store` is never touched inside the guard. The ' +
+			"precondition at all, and consults no other Decision; `approveDecision`'s precondition and guard both " +
+			"read ONLY the target aggregate's own state, and `ctx.store` is never touched inside the guard. The " +
 			'kernel cannot express the rule either: `authorizeDecisionEffective` takes a SINGLE `DecisionView` — ' +
 			'there is no collection parameter in the signature, so uniqueness is inexpressible to it in principle, ' +
 			'not merely unimplemented. THE CONTRAST CASE IN THIS SAME REPOSITORY, which is what makes this a gap ' +
@@ -2277,10 +2300,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			arrangement:
 				'two DISTINCT Decision aggregates proposed over the SAME subjectObjectIds, both APPROVAL, both approved — the second is ACCEPTED and both are EFFECTIVE, which is "two effective decisions" in the rule\'s own words',
 			control:
-				"a re-issued ApproveDecision on the FIRST decision, already EFFECTIVE, refused at the same site with RPH_ILLEGAL_STATE_TRANSITION — so the acceptance above is a missing quantifier, not a command that is never refused",
+				'a re-issued ApproveDecision on the FIRST decision, already EFFECTIVE, refused at the same site with RPH_ILLEGAL_STATE_TRANSITION — so the acceptance above is a missing quantifier, not a command that is never refused',
 			whyNoPredicate:
 				'No predicate could be named without lying about its shape. `authorizeDecisionEffective` is not ' +
-				'dead — it is asked on this very path — so it fails `deadPredicate`\'s first clause; and its input ' +
+				"dead — it is asked on this very path — so it fails `deadPredicate`'s first clause; and its input " +
 				'is one `DecisionView` with no collection parameter, so it could not implement the rule if it were ' +
 				'dead. What is absent is a QUERY over decisions, and a census cannot name a function nobody wrote.'
 		}
@@ -2289,7 +2312,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'UNENFORCED_DISCLOSED',
 		canonCarriage: {
 			kind: 'CARRIED',
-			canonAnchor: 'Retries must never duplicate commits, external API mutations, baseline promotions',
+			canonAnchor:
+				'Retries must never duplicate commits, external API mutations, baseline promotions',
 			note: 'JPWB-DOC-003 §9 PER-5. A LONGER span than RPH-PER-003 cites of the same sentence, deliberately: the two rules instantiate adjacent items of one enumeration, and identical anchors would leave a reader unable to tell which clause each row rests on.'
 		},
 		why:
@@ -2299,9 +2323,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`classifyTransition` consults the illegal table BEFORE the from===to shortcut, so a re-promotion of ' +
 			'the same baseline is ILLEGAL_EXPLICIT at the machine layer rather than a NOOP. Two independent ' +
 			'defences, both same-aggregate. THE RULE STILL FAILS: `createBaseline` takes its id from ' +
-			'`command.targetAggregateId`, applies no precondition, reads the ITEMS\' versions and never asks ' +
-			'whether another Baseline already freezes them; `canPromoteBaseline`\'s entire input describes ONE ' +
-			'baseline (its only status field is the target\'s own) and its nine finding codes name no competing or ' +
+			"`command.targetAggregateId`, applies no precondition, reads the ITEMS' versions and never asks " +
+			"whether another Baseline already freezes them; `canPromoteBaseline`'s entire input describes ONE " +
+			"baseline (its only status field is the target's own) and its nine finding codes name no competing or " +
 			'already-authoritative sibling; and `listBaselines` filters by undertaking scope with no status ' +
 			'selection, so two AUTHORITATIVE baselines over one item are both returned as rows. THE FIELD THAT ' +
 			'WOULD HAVE CARRIED THE ANSWER IS RATIFIED AND DEAD: `ProfessionalWorkUnit.currentBaselineId` exists ' +
@@ -2309,7 +2333,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'writes it and none reads it. That is precisely the shape `activeExecutionPlanId` had before ' +
 			'RPH-EXE-001 was enforced, and RPH-EXE-001 is the proof that this class of rule IS implementable here. ' +
 			'ONE SHAPE TRAP FOR WHOEVER IMPLEMENTS THIS, learned the hard way: the wiring mutant written to redden ' +
-			'this row FAILED TO KILL on its first run, because it read the baseline\'s items from `itemObjectIds` ' +
+			"this row FAILED TO KILL on its first run, because it read the baseline's items from `itemObjectIds` " +
 			'— the CreateBaseline PAYLOAD field — while the persisted aggregate carries `itemObjectVersions`, an ' +
 			'array of `{objectId, semanticVersion}`. The check compiled, ran, and could never fire. A guard written ' +
 			'against the payload field would be exactly as vacuous, and would pass its own tests.',
@@ -2338,15 +2362,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'THE ARRANGEMENT IS UNREACHABLE BY ANY DISPATCH, so this is arm 3 on the strength of a WRITE-PATH census ' +
 			'rather than a subject that does not exist. `ctx.store.commit` has exactly ONE production caller ' +
 			'repo-wide — `commitState` in packages/rph-application/src/handlers/kit.ts — which derives ' +
-			'`newRevision` as `loaded.revision + 1` (or 0 on the create path) and sets the event\'s ' +
+			"`newRevision` as `loaded.revision + 1` (or 0 on the create path) and sets the event's " +
 			'`aggregateRevision` to that same number. No handler chooses a revision; no command carries one. So no ' +
 			'command can produce a gap or a duplicate, and an UNENFORCED_DISCLOSED row would be claiming a gap no ' +
 			'arrangement can demonstrate — the RPH-EVD-002 reasoning. WHAT IS TRUE AT THE STORE, measured directly ' +
-			'against the adapter because the rule names the event store as its enforcer and this register\'s ' +
+			"against the adapter because the rule names the event store as its enforcer and this register's " +
 			'instrument only reaches Engine.dispatch — and the two halves DIVERGE. DUPLICATE: refused, by the ' +
-			'schema\'s `UNIQUE (aggregate_type, aggregate_id, aggregate_revision)` — but it THROWS a raw SqliteError ' +
+			"schema's `UNIQUE (aggregate_type, aggregate_id, aggregate_revision)` — but it THROWS a raw SqliteError " +
 			'out of `commit`, because `CommitResult` has exactly one failure reason (`REVISION_CONFLICT`) and no ' +
-			'way to RETURN this one. That is REG-F-011\'s shape one layer deeper, and the envelope-identity fix does ' +
+			"way to RETURN this one. That is REG-F-011's shape one layer deeper, and the envelope-identity fix does " +
 			'not cover it. GAP: ADMITTED — `commit` returned `{ok:true}` for an event whose `aggregateRevision` was ' +
 			'99 on an aggregate at revision 0, leaving the stream [0, 99]. Nothing anywhere checks contiguity. Canon ' +
 			'says gapless; the store permits a gap; only the derived write path makes it unreachable.'
@@ -2362,9 +2386,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'A REPLAY-EQUIVALENCE PROPERTY, not a refusal: it asserts that two computations agree. No command is ' +
 			'refused and none could be. IT IS GENUINELY PROVED, which is why this row also records where — ' +
 			'`packages/rph-projections/src/pwu-replay.ts` (`replayPwuAxes`, the only production function in the ' +
-			'repository that reconstructs an AGGREGATE\'S OWN STATE from its own event stream — the qualifier ' +
+			"repository that reconstructs an AGGREGATE'S OWN STATE from its own event stream — the qualifier " +
 			'added the day this row landed, because an adversarial pass surfaced `buildConditionSubject` in ' +
-			'rph-domain, which also folds ONE plan\'s events but produces a guard-evaluation subject rather than ' +
+			"rph-domain, which also folds ONE plan's events but produces a guard-evaluation subject rather than " +
 			'the aggregate, and `executionAttempts` in rph-projections, which folds Execution* events into ' +
 			'per-attempt records. Neither reconstructs the object, but a reader deserves to find them here rather ' +
 			'than conclude this row missed them), asserted in ' +
@@ -2373,7 +2397,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'(1) The rule names "an Intent or PWU" and only the PWU half has a reducer; nothing reconstructs an ' +
 			'INTENT. (2) The reducer rebuilds the four AXES, not the whole object. Also recorded: the conformance ' +
 			'manifest lists 006 among the ids awaiting the M13 harness and gives it no per-id row, while the test ' +
-			'asserts it by name — an UNDERclaim, the opposite of this register\'s usual finding, and left as it is ' +
+			"asserts it by name — an UNDERclaim, the opposite of this register's usual finding, and left as it is " +
 			'because correcting a manifest row to claim coverage is a step that deserves its own scrutiny.'
 	},
 	'RPH-PER-007': {
@@ -2408,14 +2432,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §9 PER-3 (One authoritative write path). Canon enumerates the five things that commit together, which is exactly the ratified rule plus the two the rule leaves implicit.'
 		},
 		why:
-			'AN ATOMICITY PROPERTY OF THE STORE, not a refusal — nothing is rejected, and the rule\'s second clause ' +
+			"AN ATOMICITY PROPERTY OF THE STORE, not a refusal — nothing is rejected, and the rule's second clause " +
 			'("a transaction rollback leaves neither persisted") is a statement about a path no command can take. ' +
 			'THE STRUCTURE HOLDS, by construction rather than by check: in `SqliteStorageAdapter.commit` the event ' +
 			'INSERT and the outbox INSERT are in the SAME `for` loop body inside the SAME transaction callback, and ' +
-			'the outbox row\'s `global_sequence` is `Number(info.lastInsertRowid)` read off the event insert\'s own ' +
+			"the outbox row's `global_sequence` is `Number(info.lastInsertRowid)` read off the event insert's own " +
 			'return — so the outbox row is DATA-DEPENDENT on the event row and cannot precede it. There is exactly ' +
 			'one `INSERT INTO outbox_messages` in the repository and it is inside that transaction; no relay, no ' +
-			'post-commit write. THREE RESIDUES WORTH THE NEXT READER\'S ATTENTION, none of which this row\'s arm can ' +
+			"post-commit write. THREE RESIDUES WORTH THE NEXT READER'S ATTENTION, none of which this row's arm can " +
 			'hold: the schema declares NO foreign key from `outbox_messages.event_id` to `domain_events.event_id`, ' +
 			'so nothing at the DDL level would prevent an orphan; the one rollback test is titled for the outbox and ' +
 			'never queries it; and `SnapshotOverlayStorageAdapter.commit` — unlike the SQLite one — opens no ' +
@@ -2424,10 +2448,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'overlay is NOT untested: it is constructed only by `EngineHandle.fork()`, which is called three times ' +
 			'in `packages/rph-engine/src/engine.test.ts` — a search for the CLASS NAME finds nothing, and the ' +
 			'original claim was made from exactly that search. It has a production caller too ' +
-			'(apps/rph-demo\'s authoring turn). What survives is narrower and still worth recording: no test ' +
-			'exercises the overlay\'s ROLLBACK path, and its `commit` really does lack the self-wrapping boundary ' +
+			"(apps/rph-demo's authoring turn). What survives is narrower and still worth recording: no test " +
+			"exercises the overlay's ROLLBACK path, and its `commit` really does lack the self-wrapping boundary " +
 			'the SQLite adapter has. (2) "No post-commit write" was too strong — `markOutboxPublished` is a ' +
-			'post-commit UPDATE of the outbox row\'s status, invoked from `drainOutbox`. The precise claim, and the ' +
+			"post-commit UPDATE of the outbox row's status, invoked from `drainOutbox`. The precise claim, and the " +
 			'one the rule needs, is that there is exactly one INSERT INTO outbox_messages and it is inside the ' +
 			'commit transaction: no second APPENDER, so no orphan row can be created after the fact.'
 	},
@@ -2481,14 +2505,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED',
-			canonAnchor: 'Read projections may be rebuilt, delayed, optimized, and independently versioned',
+			canonAnchor:
+				'Read projections may be rebuilt, delayed, optimized, and independently versioned',
 			note: 'JPWB-DOC-003 §9 PER-7. The canon sentence carries the rule\'s premise (projections lag and are rebuilt) rather than its restart clause; PER-6\'s "Professional correctness never depends on in-memory state" carries the durability half.'
 		},
 		why:
 			'A RECOVERY PROPERTY, not a refusal. IT IS ALSO VACUOUS TODAY, and saying so is the whole value of the ' +
 			'row: the rule\'s premise is "the projection update is interrupted", and there is no persisted ' +
 			'projection to interrupt — the schema declares five tables and none is a read model, ' +
-			'`IncrementalProjection`\'s checkpoint is an in-process integer, and the demo surfaces re-fold the whole ' +
+			"`IncrementalProjection`'s checkpoint is an in-process integer, and the demo surfaces re-fold the whole " +
 			'event log on every request. WHAT DOES EXIST is the outbox recovery path (`Engine.recoverOutbox`), and ' +
 			'its census is recorded because it is not what the rule is about and could be mistaken for it: exactly ' +
 			'ONE production caller (`openWorkbench` in apps/rph-demo), invoked once per server process. TWO ' +
@@ -2541,9 +2566,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'while one of its inputs is unrepresentable. FOUR NEAR-MISSES, named so they are not mistaken for ' +
 			'wiring: `recoverOutbox`\'s docblock phrase "restart recovery avoids duplicate external side effects" ' +
 			'(subject is the outbox); the ratified error code `RPH_EXTERNAL_OPERATION_UNCERTAIN`, which exists for ' +
-			'exactly this condition and has two repo-wide references, both its own declaration (REG-F-010\'s ' +
+			"exactly this condition and has two repo-wide references, both its own declaration (REG-F-010's " +
 			'census, corroborated independently); the `RETRYING` state and the FAILED->QUEUED retry arrow, whose ' +
-			'machine entry carries `guarded: []`; and the authoring turn\'s COMMIT_FAILED state, where the doctrine ' +
+			"machine entry carries `guarded: []`; and the authoring turn's COMMIT_FAILED state, where the doctrine " +
 			'IS realised — by offering no retry arrow — but for an in-memory surface candidate, not an attempt.',
 		guard: {
 			kind: 'DEAD_PREDICATE',
@@ -2568,13 +2593,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'approval", which is FALSE as written — `PWU.executionState` has a WAITING member (RUNNING->WAITING on ' +
 			'ExecutionStepWaiting), and the PWU carries four state axes, not one. The original claim was made from ' +
 			'reading `WorkLifecycleStateSchema` alone, which is a claim about a search reported as a claim about ' +
-			'the world. WHAT IS ACTUALLY TRUE, and it still empties the rule\'s second clause: no state ' +
+			"the world. WHAT IS ACTUALLY TRUE, and it still empties the rule's second clause: no state " +
 			'DISTINGUISHES a human-approval wait from any other, because the wait carries a FREE-TEXT `waitReason` ' +
 			'against no ratified vocabulary. And the "extension" the rule names does not exist as a package: this ' +
 			'engine ships as a web host. WHAT SURVIVES A RESTART, and it does so by construction ' +
 			'rather than by a recovery path: the Decision is a row in the durable store, and the two duplicate ' +
-			'defences — `fromStates(\'PROPOSED\')` on the approval commands and the `command_receipts` idempotency ' +
-			'lookup — are both store-backed, so neither depends on process memory. That is the rule\'s intent ' +
+			"defences — `fromStates('PROPOSED')` on the approval commands and the `command_receipts` idempotency " +
+			"lookup — are both store-backed, so neither depends on process memory. That is the rule's intent " +
 			'satisfied by a different mechanism than the rule describes, which is precisely why it is recorded as a ' +
 			'declared silence rather than certified.'
 	},
@@ -2582,8 +2607,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED_BY_GENERAL_RULE',
-			canonAnchor: "When an external operation's completion is uncertain — including across restarts",
-			note: 'JPWB-DOC-003 §9 PER-6. GENERAL because canon\'s subject is an external OPERATION and an Attempt; it nowhere mentions an Assurance Service, a raw validator result, or a disposition boundary. The idempotent-resumption half is carried by PER-5.'
+			canonAnchor:
+				"When an external operation's completion is uncertain — including across restarts",
+			note: "JPWB-DOC-003 §9 PER-6. GENERAL because canon's subject is an external OPERATION and an Attempt; it nowhere mentions an Assurance Service, a raw validator result, or a disposition boundary. The idempotent-resumption half is carried by PER-5."
 		},
 		why:
 			'THE PREMISE HAS NO REFERENT IN THIS ENGINE, so there is no interrupted state to resume from. The rule ' +
@@ -2592,9 +2618,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`CompleteAssuranceAssessment` COMMAND payload, and `parseCompletion` validates it and derives the ' +
 			'disposition IN THE SAME DISPATCH that commits the terminal transition. NARROWED THE DAY THIS ROW ' +
 			'LANDED, by an adversarial pass, because "no such intermediate is ever written" was too strong: the ' +
-			'engine\'s assurance driver dispatches `RecordAssuranceObservation` — a validator-DERIVED aggregate, ' +
+			"engine's assurance driver dispatches `RecordAssuranceObservation` — a validator-DERIVED aggregate, " +
 			'durably committed — BEFORE `CompleteAssuranceAssessment`. So something validator-derived does survive ' +
-			'a restart in that window. What does not is the raw §20 ValidatorResult itself, which is the rule\'s ' +
+			"a restart in that window. What does not is the raw §20 ValidatorResult itself, which is the rule's " +
 			'actual subject, and the state that would mark the window: every one of the fifteen ' +
 			'`AssuranceAssessmentState` members was enumerated and none means "validator result in hand, ' +
 			'disposition not yet authoritative". ~~The assessment is born directly in ASSESSING~~ CORRECTED: the ' +
@@ -2602,11 +2628,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'by a separate `BeginAssuranceAssessment` dispatch (REG-F-021) — and no state on that path means "validator ' +
 			'result in hand, disposition not yet authoritative" either. VALIDATOR_FAILED is a terminal disposition, not ' +
 			'a pending one. ' +
-			'The validator\'s content rides the EVENT, never a pre-disposition object. Nor is there a separately ' +
+			"The validator's content rides the EVENT, never a pre-disposition object. Nor is there a separately " +
 			'restartable Assurance Service: the path runs in-process. So validation and disposition are ONE atomic ' +
 			'act, and the window the rule describes does not exist to be interrupted. WHAT WOULD SERVE IF IT DID: ' +
-			'the durable `command_receipts` idempotency check plus `fromStates(\'ASSESSING\')` on the completion. ' +
-			'ONE CAVEAT ON THAT, recorded because it bounds the resumption claim: the engine\'s own assurance ' +
+			"the durable `command_receipts` idempotency check plus `fromStates('ASSESSING')` on the completion. " +
+			"ONE CAVEAT ON THAT, recorded because it bounds the resumption claim: the engine's own assurance " +
 			'driver builds its idempotency key from a prefix documented as "unique per recording run", so a ' +
 			'restarted run mints FRESH keys and the receipt lookup would not fire — resumption would rest on the ' +
 			'state precondition alone.'
@@ -2659,7 +2685,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'A DISPLAY OBLIGATION — "must display all three states distinctly in Work View". Nothing is refused, and ' +
 			'the subject is a view, not a command. THE INDEPENDENCE IT DEPENDS ON IS REAL AND IS ENFORCED ELSEWHERE: ' +
 			'the four axes are separate fields on the PWU with separate machines, and the cross-axis guard is ' +
-			'RPH-PWU territory, not this rule\'s. What this rule adds is that the SURFACE must not re-collapse what ' +
+			"RPH-PWU territory, not this rule's. What this rule adds is that the SURFACE must not re-collapse what " +
 			'the model keeps apart — an obligation on rendering, which `classifyRefusal` cannot observe because ' +
 			'rendering returns no `CommandResult`.'
 	},
@@ -2667,7 +2693,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED',
-			canonAnchor: 'all-steps-succeeded leaves assurance unassessed until required policies complete',
+			canonAnchor:
+				'all-steps-succeeded leaves assurance unassessed until required policies complete',
 			note: 'JPWB-DOC-003 §5 STA-2 (Execution success never confers satisfaction; successor of legacy INV-5). A DIFFERENT span of STA-2 than the RPH-PWU rows cite, deliberately: this rule is about what may be SHOWN, and this clause is the one about the gap between all-steps-succeeded and assurance.'
 		},
 		why:
@@ -2678,7 +2705,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'SATISFIED); it becomes the `qualifiedSuccess` field on the graph node in ' +
 			'`packages/rph-projections/src/graph-view.ts`; and `apps/rph-demo/src/lib/toFlow.ts` gates the green ' +
 			'marker on that field in three places. One rule, one predicate, three layers, no duplication. BUT NO ' +
-			'COMMAND IS REFUSED. The rule\'s subject is what the UI may SHOW, and `classifyRefusal` reads a ' +
+			"COMMAND IS REFUSED. The rule's subject is what the UI may SHOW, and `classifyRefusal` reads a " +
 			'`CommandResult` — a renderer produces none. Filing it ENFORCED would mean the register certifying a ' +
 			'guarantee it never observed, which is DS-001 item 2 committed deliberately rather than by accident. ' +
 			'THE STATE-LEVEL SIBLING IS A DIFFERENT RULE, and an adversarial pass on this row forced it to be named ' +
@@ -2712,21 +2739,22 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		kind: 'NOT_A_COMMAND_REFUSAL',
 		canonCarriage: {
 			kind: 'CARRIED',
-			canonAnchor: 'No presentation operation may change semantic state or increment a semantic version',
+			canonAnchor:
+				'No presentation operation may change semantic state or increment a semantic version',
 			note: 'JPWB-DOC-003 §2 LYR-3 (Presentation is meaning-inert), which states the rule more strongly than the ratified statement and adds "Layout has its own revision plane" — the plane this repository does not have.'
 		},
 		why:
-			'THE SUBJECT DOES NOT EXIST, and this row is RPH-CON-008\'s twin: that rule forbids a presentation ' +
+			"THE SUBJECT DOES NOT EXIST, and this row is RPH-CON-008's twin: that rule forbids a presentation " +
 			'CONTRACT from referencing a mutating command, this one constrains what a presentation OPERATION may ' +
 			'do, and neither has anything to quantify over. Searched as a concept, not a spelling — position, ' +
 			'layout, canvas, viewport, collapse, ordering — across the command vocabulary, the generated schemas ' +
-			'and the command/event vocab JSON: no presentation command exists among the 100 (the vocabulary\'s own ' +
+			"and the command/event vocab JSON: no presentation command exists among the 100 (the vocabulary's own " +
 			'`commands` array, re-counted and RE-SEARCHED 2026-08-13 over every entry, not only the census original), ' +
 			'and no ' +
 			'`presentationRevision` field exists anywhere, so canon\'s "Layout has its own revision plane" describes ' +
 			'a plane this repository has not built. THE PWA DESIGNER DOES RENDER A NODE GRAPH, which is exactly why ' +
 			'this was checked rather than assumed; its layout is computed client-side and never persisted. THE ' +
-			'RESIDUE IS THE SAME AS RPH-CON-008\'s: the day layout IS persisted, this rule becomes live with a real ' +
+			"RESIDUE IS THE SAME AS RPH-CON-008's: the day layout IS persisted, this rule becomes live with a real " +
 			'subject and nothing here would notice. It is satisfied by absence, which is not the same as enforced.'
 	},
 	'RPH-PRJ-005': {
@@ -2788,8 +2816,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'(validate, orphan, unsupported, dangling, unreachable) nothing performs it. UNENFORCED_DISCLOSED needs ' +
 			'an arrangement the engine ACCEPTS, and there is no dispatch whose acceptance would demonstrate this ' +
 			'gap — the RPH-CON-008 shape. THE NEAR-MISS, named so it is not mistaken for coverage: baseline ' +
-			'promotion IS a gate that could plausibly carry this check, and `canPromoteBaseline`\'s nine finding ' +
-			'codes do not include it. Adopting promotion as this rule\'s enforcement site would substitute a ' +
+			"promotion IS a gate that could plausibly carry this check, and `canPromoteBaseline`'s nine finding " +
+			"codes do not include it. Adopting promotion as this rule's enforcement site would substitute a " +
 			'governance act for a validation pass. THE CONCRETE FORM OF THE GAP, found by an adversarial pass and ' +
 			'kept because a future implementer needs the exact site: `recordArtifact` ' +
 			'(packages/rph-application/src/handlers/artifact.ts) is 76 lines containing NO `reject`, NO ' +
@@ -2797,7 +2825,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`producingPwuId` and `producingExecutionAttemptId`, so BOTH may be absent, `producerIds` is `[]`, and ' +
 			'that empty array is written straight to `sourceObjectIds`. An unsupported artifact is not merely ' +
 			'undetected later — it is minted freely now. WHY THAT STILL IS NOT A DISCLOSURE, and the second reason ' +
-			'is a structural limit of the arm worth recording: (1) the rule\'s subject is a validation pass, and ' +
+			"is a structural limit of the arm worth recording: (1) the rule's subject is a validation pass, and " +
 			'filing it against the minting command would assert that `RecordArtifact` should have refused, which is ' +
 			'not what the rule says; (2) OBSERVED_ADMISSION requires a CONTROL — a sibling defect at the SAME SITE ' +
 			'that IS refused, proving the refusal machinery is alive — and a handler that refuses nothing for any ' +
@@ -2817,7 +2845,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'THE OBJECT THIS RULE PROTECTS IS NEVER CREATED. `TraceLinkSchema` is a ratified contract object, and ' +
 			'its only production reference in the repository is its own declaration in ' +
 			'`packages/rph-contracts/src/objects.ts` — no command mints one, no handler reads one, no table stores ' +
-			'one. THE TYPE A READER WILL FIND FIRST IS A DIFFERENT TYPE: `rph-projections`\' `TraceLink` is a ' +
+			"one. THE TYPE A READER WILL FIND FIRST IS A DIFFERENT TYPE: `rph-projections`' `TraceLink` is a " +
 			'separate interface built per request from event payloads, and it is recomputed rather than stored, so ' +
 			'"never silently rewritten" is vacuously true of it — there is nothing to rewrite. Immutability holds ' +
 			'because nothing is mutable, which is not the same as being enforced. THIS IS AN INSTANCE OF REG-F-001 ' +
@@ -2860,14 +2888,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'file in the SAME run, and the identical script with only the InvalidateEvidence dispatch removed scores ' +
 			'`validateLinkDirectionality` 0. The pair is LIVE, on every InvalidateEvidence. LIVE IS NOT THE SAME AS ' +
 			'LOAD-BEARING, which is the honest version of the original point: the sole production caller passes the ' +
-			'literal `relation: \'SUPPORTS\'` with literal endpoint types EVIDENCE/CLAIM, so no wire value picks ' +
+			"literal `relation: 'SUPPORTS'` with literal endpoint types EVIDENCE/CLAIM, so no wire value picks " +
 			'the relation. It is still not unreachable — two ProposeEvidence dispatches, the second naming its OWN ' +
 			'evidence id in `supportsClaimIds`, were both ACCEPTED, and a later InvalidateEvidence against the ' +
 			'FIRST, well-formed evidence THREW `Invalid trace link: SUPPORTS source must be one of ' +
 			'EVIDENCE|ASSURANCE_ASSESSMENT, got CLAIM` out of `dispatch` instead of returning a rejection. That is a ' +
 			'defect at `supportsGraph`, not at this predicate, and it is recorded here because this row is where a ' +
 			'reader who trusted "nothing asks" would have stopped looking. WHAT THE CORRECTION DOES NOT CHANGE: the ' +
-			'pair is still deliberately NOT filed as this row\'s guard, because it implements link DIRECTIONALITY, ' +
+			"pair is still deliberately NOT filed as this row's guard, because it implements link DIRECTIONALITY, " +
 			'which no ratified RPH-TRC rule states, and attaching a predicate ' +
 			'to a rule it does not implement is the substitution this register exists to prevent.'
 	},
@@ -2877,7 +2905,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'Derived compatibility milestone where legacy support requires it; never ontology',
-			note: 'JPWB-DOC-002 §8 (Retired and compatibility terminology), the `phase` row. ONE canon line carries all four RPH-CMP rules — derivation, non-authority, and non-storage — which is why every row in this family cites it. Canon\'s carrier for this family is in the VOCABULARY, not the invariant catalog.'
+			note: "JPWB-DOC-002 §8 (Retired and compatibility terminology), the `phase` row. ONE canon line carries all four RPH-CMP rules — derivation, non-authority, and non-storage — which is why every row in this family cites it. Canon's carrier for this family is in the VOCABULARY, not the invariant catalog."
 		},
 		why:
 			'A DERIVATION property ("derives compatibility milestone INTAKE = COMPLETE"). Nothing is refused. THE ' +
@@ -2885,7 +2913,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`milestoneForKind`) folds the milestone from events, built in W2-INC-3 / WP-2-006. WHAT IS NOT BUILT ' +
 			'is the derivation this rule actually states: the current map is PWU KIND -> milestone, a stable ' +
 			'lookup, while the rule conditions the milestone on an approved Intent Baseline and COMPLETED PWUs. ' +
-			'The projector\'s own header discloses exactly this and names the successor work package (W5 ' +
+			"The projector's own header discloses exactly this and names the successor work package (W5 " +
 			'WP-5-003, "Compatibility Milestone Derivation"). So the row records a real, named, honest deferral — ' +
 			'which is what made REG-F-013 visible: the manifest had deferred this family for a DIFFERENT and wrong ' +
 			'reason while a legitimate one was written in the source file all along.'
@@ -2919,7 +2947,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		},
 		why:
 			'A DERIVATION property, and the one that best shows WHY the family must not be authoritative: it ' +
-			'requires the compatibility view and the PWU\'s own state to DISAGREE — ARCHITECTURE complete while the ' +
+			"requires the compatibility view and the PWU's own state to DISAGREE — ARCHITECTURE complete while the " +
 			'root Product Realization PWU is not — without that disagreement being a defect. Nothing is refused; ' +
 			'what the rule constrains is what a derived label may say. As with RPH-CMP-001 the current derivation ' +
 			'is the W2 baseline kind->milestone map, and the axis-sensitive rules this statement needs are W5 ' +
@@ -2939,7 +2967,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'half is satisfied by construction for the same reason as RPH-CMP-002: the whole compatibility view is ' +
 			'an in-memory fold with no persisted column, so there is nowhere for a milestone to be stored AS ' +
 			'lifecycle state even if something tried. THE REPLAN CONTROL ACTION the rule conditions on is the part ' +
-			'with no subject: `REPLAN` exists as a `DecisionType` and in the ontology\'s phase mapping, but nothing ' +
+			"with no subject: `REPLAN` exists as a `DecisionType` and in the ontology's phase mapping, but nothing " +
 			'derives a milestone FROM an active control action — the projector keys on PWU kind alone.'
 	},
 
@@ -2996,7 +3024,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 ASR-15 (Authority is positional, attributable, and version-bound), which also states "Authority is checked *before* effect" — satisfied here, the guard runs ahead of any DecisionEffective — and "an approval whose actor … cannot be identified is not authority", which is the clause REG-F-014 reports unmet.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — authorizeDecisionEffective, whose doc comment names this rule by id. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — the `guard` inside makeDecisionEffective, shared by ApproveDecision and GrantWaiver, which computes `authorityHeld` from the DECISION\'s recorded `authority.actorType` (HUMAN or SYSTEM) and rejects otherwise. THE SUBJECT IS THE RECORDED AUTHORITY, NOT THE ISSUER of the command — see the comment above. ~~`command.issuedBy` is consulted by NO decision handler.~~ CORRECTED 2026-08-03: that clause was imprecise when written (`requestWaiver`, which creates a DECISION, has always set `authority: command.issuedBy`) and is now false outright — `proposeDecision` refuses when the declared authority is not the issuer (REG-F-014). This guard is still the one that reads the RECORDED authority; what changed is that the recorded authority can no longer name an actor the issuer is not.',
+			"DECISION: packages/rph-domain/src/governance.ts — authorizeDecisionEffective, whose doc comment names this rule by id. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — the `guard` inside makeDecisionEffective, shared by ApproveDecision and GrantWaiver, which computes `authorityHeld` from the DECISION's recorded `authority.actorType` (HUMAN or SYSTEM) and rejects otherwise. THE SUBJECT IS THE RECORDED AUTHORITY, NOT THE ISSUER of the command — see the comment above. ~~`command.issuedBy` is consulted by NO decision handler.~~ CORRECTED 2026-08-03: that clause was imprecise when written (`requestWaiver`, which creates a DECISION, has always set `authority: command.issuedBy`) and is now false outright — `proposeDecision` refuses when the declared authority is not the issuer (REG-F-014). This guard is still the one that reads the RECORDED authority; what changed is that the recorded authority can no longer name an actor the issuer is not.",
 		refusalCode: 'RPH_AUTHORITY_INSUFFICIENT',
 		refusalStatus: 'UNAUTHORIZED',
 		// THE FIRST ROW IN THE REGISTER AT THIS STATUS. `kit.ts`'s STATUS_FOR_CODE has mapped
@@ -3008,7 +3036,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'widen `authorityHeld` in makeDecisionEffective to accept any actorType — the probe reports ADMITTED',
 			'delete the `if (!check.ok)` arm of the guard — the transition-legality limb of authorizeDecisionEffective still refuses, but with a DIFFERENT reason string, so the probe reports MASKED rather than ADMITTED',
 			"drop `RPH_AUTHORITY_INSUFFICIENT` from STATUS_FOR_CODE in kit.ts — the refusal becomes REJECTED and this row's declared UNAUTHORIZED no longer matches, so the probe reports ADMITTED",
-			'~~NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED.~~ CLOSED 2026-08-03 (REG-F-014). Struck rather than deleted so a reader sees the claim existed and how it was cleared. `proposeDecision` now REFUSES when the declared `authority` is not the issuing actor, so that sequence stops at the first command. The bypass is therefore a MUTATION again rather than a live fact: neutralise that guard and `decision-authority-provenance.test.ts` reddens on three tests while both its controls stay green. Surveyed before changing behaviour — of 139 ProposeDecision dispatches in the suite, 137 already agreed, and the two that did not were this very scenario written benignly (including THIS row\'s own probe, which now issues as the agent it names).'
+			"~~NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED.~~ CLOSED 2026-08-03 (REG-F-014). Struck rather than deleted so a reader sees the claim existed and how it was cleared. `proposeDecision` now REFUSES when the declared `authority` is not the issuing actor, so that sequence stops at the first command. The bypass is therefore a MUTATION again rather than a live fact: neutralise that guard and `decision-authority-provenance.test.ts` reddens on three tests while both its controls stay green. Surveyed before changing behaviour — of 139 ProposeDecision dispatches in the suite, 137 already agreed, and the two that did not were this very scenario written benignly (including THIS row's own probe, which now issues as the agent it names)."
 		]
 	},
 	'RPH-GOV-002': {
@@ -3021,15 +3049,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		why:
 			'AN OUTCOME ASSERTION — "creates NO effective governance decision until an authorized actor approves it" ' +
 			'— and both of its limbs hold, neither by a refusal. Limb 1: `proposeDecision` writes the literal ' +
-			'`status: \'PROPOSED\'` into both the state and the emitted event, and applies no authority check at ' +
+			"`status: 'PROPOSED'` into both the state and the emitted event, and applies no authority check at " +
 			'all, so an agent MAY propose — which is what the rule permits, not what it forbids. Limb 2 is guarded ' +
 			'by the refusal RPH-GOV-001 already claims. THAT IS THE REASON THIS ROW IS ARM 3 AND NOT A SECOND ' +
 			'ENFORCED ROW, and it is the marker-distinctness hazard one level up: filing it ENFORCED would give two ' +
 			'rules ONE refusal site, so a single mutant would redden both and the register would report two ' +
 			'enforced rules where one arrangement had ever been driven. RPH-PWU-009/010 share a site and are ' +
 			'distinguishable only because they carry genuinely different reason strings; here there is one string. ' +
-			'ALSO RECORDED: the rule\'s own dedicated kernel predicate `isEffectiveApproval` is DEAD — its only ' +
-			'reference outside tests is its own definition. It is not named as this row\'s guard because arm 3 has ' +
+			"ALSO RECORDED: the rule's own dedicated kernel predicate `isEffectiveApproval` is DEAD — its only " +
+			"reference outside tests is its own definition. It is not named as this row's guard because arm 3 has " +
 			'no guard, but a reader looking for why the rule feels unenforced should find it here rather than ' +
 			'conclude the census missed it.'
 	},
@@ -3046,13 +3074,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'WAIVED, rationale and authority recorded, evidence unchanged. Nothing is refused. AND THE OUTCOME IS ' +
 			'NOT PRODUCED EITHER, which is the part worth recording rather than leaving as a silence: `GrantWaiver` ' +
 			'advances the DECISION aggregate to EFFECTIVE and emits `WaiverGranted`, and NO command anywhere sets ' +
-			'an `AssuranceObservation.disposition` to WAIVED — so the rule\'s second limb names a state transition ' +
+			"an `AssuranceObservation.disposition` to WAIVED — so the rule's second limb names a state transition " +
 			'no dispatch performs. Of the other three limbs: "finding stays visible" is satisfied VACUOUSLY ' +
 			'(nothing deletes observations, so nothing can fail it); "records rationale and authority" is met at ' +
 			'the SCHEMA layer, since `RequestWaiverPayloadSchema` requires `rationale`, so its violation surfaces ' +
 			'as VALIDATION_FAILED rather than as this rule; and "leaves evidence unchanged" has no guard at all. ' +
 			'The dedicated kernel predicate `waiverPreservesFindings` is DEAD — definition only, no non-test ' +
-			'reference — which is the same shape as RPH-GOV-002\'s and RPH-GOV-007\'s and is why this family needed ' +
+			"reference — which is the same shape as RPH-GOV-002's and RPH-GOV-007's and is why this family needed " +
 			'a census rather than a reading.'
 	},
 	// ⚠ THIS BLOCK DESCRIBED AN ENFORCEMENT THAT NO LONGER EXISTS, IN THE PRESENT TENSE, DIRECTLY ABOVE A ROW WHOSE
@@ -3113,7 +3141,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			// wearing the authority of a checked record." Filed against myself; the row's own repair missed it.
 			"neutralise the OBJECT conjunct in `resolveWaiverAuthorization` (waiver-authorization.ts) so a waiver naming ANOTHER object authorizes this one — this row's probe reports ADMITTED where it must report REFUSED, and its refusal marker 'A waiver of one object' disappears",
 			"neutralise `waiverCovers`' waivedCriterionId conjunct — rph-domain's governance.test.ts reddens. ⚠ ITS FORMER COMMAND-LAYER CONTROL IS GONE: pwa-authoring.test.ts used to pair this with a waiver that PUBLISHED, and under ASR-3 no waiver publishes anything, so the criterion limb is now kernel-proven only. Recorded rather than left as a silent downgrade.",
-			"⚠ DO NOT DECLARE A BUS-LEVEL VERSION MUTANT. The version pins are derived at PROPOSAL time and no command in reach moves the version between proposal and waive, so an arrangement built through the bus would be a control that cannot fail. `waiver-authority.test.ts` drives that limb at the resolver instead, and says so.",
+			'⚠ DO NOT DECLARE A BUS-LEVEL VERSION MUTANT. The version pins are derived at PROPOSAL time and no command in reach moves the version between proposal and waive, so an arrangement built through the bus would be a control that cannot fail. `waiver-authority.test.ts` drives that limb at the resolver instead, and says so.',
 			"NO MUTATION IS NEEDED TO SHOW WHAT THIS ROW'S CITE USED TO REST ON — floor-waiver-scope.test.ts, the file named for this rule, passed for months while seeding no floor policies, arranging no assessments, and never once reaching waiverCovers. See REG-F-015."
 		]
 	},
@@ -3131,7 +3159,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'assert consequences of a SUCCESSFUL `RevokeDecision`, so no dispatch could be rejected for violating ' +
 			'them, and the impact-analysis plane they need is the same one REG-F-006 records as blocking DEC-2. ' +
 			'`revokeDecision` advances the Decision to REVOKED and does nothing else; nothing cascades. THE PART ' +
-			'THAT IS WORSE THAN DEAD, and the reason this row is longer than its disposition warrants: the rule\'s ' +
+			"THAT IS WORSE THAN DEAD, and the reason this row is longer than its disposition warrants: the rule's " +
 			'dedicated kernel predicate `assessDecisionRevocation` is not merely uncalled outside its own test — it ' +
 			'is a CONSTANT FUNCTION. It ignores its `DecisionView` argument entirely and can never return the ' +
 			'`REVOKED` half of its own declared `RevocationOutcome` union. Its unit test therefore cannot ' +
@@ -3183,7 +3211,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'the promoted version exactly matching the reviewed version',
-			note: 'JPWB-DOC-003 §8 ASR-16. Canon states the requirement as one of promotion\'s preconditions; the ratified rule names the error code that must carry its refusal.'
+			note: "JPWB-DOC-003 §8 ASR-16. Canon states the requirement as one of promotion's preconditions; the ratified rule names the error code that must carry its refusal."
 		},
 		why:
 			'THE STATEMENT IS A COMMAND REFUSAL NAMING ITS OWN ERROR CODE ("fails with ' +
@@ -3192,7 +3220,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`findVersionMismatches` compares each item to itself. SECOND, THE CODE IS CARRIED NOWHERE: ' +
 			'`RPH_BASELINE_VERSION_MISMATCH` is one of the fifteen ratified error codes and its only non-test ' +
 			'occurrences are its own declaration in `errors.ts` and a kernel finding-code string — it is never an ' +
-			'`error.code` on any CommandResult. That is REG-F-010\'s census, hitting a rule that names the code in ' +
+			"`error.code` on any CommandResult. That is REG-F-010's census, hitting a rule that names the code in " +
 			'its own ratified text. OBSERVED, not argued: a baseline froze `semanticVersion: 1`, and a promotion ' +
 			'naming `semanticVersion: 999` for the same object was ACCEPTED and the baseline became AUTHORITATIVE.',
 		guard: {
@@ -3203,7 +3231,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the same PromoteBaseline against a baseline still in CANDIDATE (never submitted or approved), refused at the same site with RPH_ILLEGAL_STATE_TRANSITION — so the acceptance is a missing comparison, not a command that is never refused',
 			whyNoPredicate:
 				'`findVersionMismatches` is NOT dead — it is called on this very dispatch, so naming it would fail ' +
-				'`deadPredicate`\'s first clause. What is defective is the ARGUMENT it is given. A census over the ' +
+				"`deadPredicate`'s first clause. What is defective is the ARGUMENT it is given. A census over the " +
 				'symbol would stay green forever while the rule went unenforced, which is precisely the case the ' +
 				'OBSERVED_ADMISSION arm was added for.'
 		}
@@ -3217,7 +3245,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 ASR-16, near-verbatim against the ratified statement.'
 		},
 		why:
-			'NO DISPATCHABLE COMMAND CAN CHANGE A BASELINE\'S ITEM SET. The command vocabulary holds exactly five ' +
+			"NO DISPATCHABLE COMMAND CAN CHANGE A BASELINE'S ITEM SET. The command vocabulary holds exactly five " +
 			'baseline commands (Create, SubmitForReview, Approve, Promote, Supersede) and `itemObjectVersions` is ' +
 			'written at exactly one site, inside `createBaseline`, on the create path. There is no Edit, Revise, ' +
 			'Amend or AddItem command of any spelling. So immutability holds by the ABSENCE OF A MUTATOR, not by a ' +
@@ -3249,7 +3277,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'`BaselineSupersededPayloadSchema` — a `z.strictObject` — declares REQUIRED.~~ CORRECTED 2026-08-04 ' +
 			'(REG-F-020), struck rather than deleted: the handler now supplies an `eventPayload` and the persisted ' +
 			'payload is `{ supersedingBaselineId, status }`, with `status` read off the COMMITTED NEXT STATE. THE ' +
-			'ROW\'S DISPOSITION IS UNCHANGED and that is the point — the trace is still carried ONLY by an event ' +
+			"ROW'S DISPOSITION IS UNCHANGED and that is the point — the trace is still carried ONLY by an event " +
 			'and by no object field, which is what this row discloses. What changed is that the event no longer ' +
 			'ALSO violates the shape this repository authored for it. Recorded because the struck sentences were ' +
 			'in the PRESENT TENSE and nothing would have caught them going stale; a claim about an emitted payload ' +
@@ -3307,12 +3335,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'AN OUTCOME ASSERTION — a material premise "causes Assumption Disclosure to CREATE an Assumption ' +
 			'Object". A creating command exists (`DetectAssumption`), and it contains no reject, no precondition ' +
 			'and no guard, so nothing about it can be refused. WHAT IS ABSENT IS THE CAUSAL LINK THE RULE NAMES: ' +
-			'no production site derives an Assumption from model or validator output. The rule\'s subject is a ' +
+			"no production site derives an Assumption from model or validator output. The rule's subject is a " +
 			'DETECTION that happens upstream of any command, and this engine has no detector — an Assumption exists ' +
 			'exactly when a caller dispatches `DetectAssumption` about one. TWO FACTS THAT BOUND THE OUTCOME, ' +
 			'recorded because they make the reification thinner than it reads: the `affectedObjectIds` link is ' +
 			'taken verbatim from the payload and never checked for resolvability, and nothing validates that ' +
-			'`CompleteExecutionStep`\'s `detectedAssumptionIds` resolve to existing ASSUMPTION aggregates. The ' +
+			"`CompleteExecutionStep`'s `detectedAssumptionIds` resolve to existing ASSUMPTION aggregates. The " +
 			'kernel predicate written for the rule, `requiresReification`, has no caller outside its own module.'
 	},
 	// ── RPH-ASM-002 — the one ASM disclosure whose predicate is BOTH correct and completely unasked ──────────
@@ -3336,7 +3364,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'correct, and NOTHING CALLS IT. `validateAssumptionReification` has exactly one non-test reference: its ' +
 			'own definition. THE ARRANGEMENT IS REACHABLE, which is what makes this a disclosure rather than an ' +
 			'unreachable-antecedent arm-3 row: an adversarial pass established that a validator CAN carry a ' +
-			'material assumption to the handler, because four of `ValidatorResultSchema`\'s sixteen fields — ' +
+			"material assumption to the handler, because four of `ValidatorResultSchema`'s sixteen fields — " +
 			'`claimResults`, `evidenceRejected`, `observations`, and the control-action recommendations — are ' +
 			'`z.record(z.string(), z.unknown())` rather than strict objects. The top-level schema is strict; those ' +
 			'nested arrays are not. So the "assessment completes with a material assumption only in prose" ' +
@@ -3358,7 +3386,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'THE ACT IS NOT DISPATCHABLE. There is no `AcceptAssumption` command in the registry, so no ' +
 			'CommandResult can carry or violate this rule. Dispatching the name would be refused by the bus with ' +
 			'"No handler registered for command type" — a ROUTING refusal identical for every unknown string, ' +
-			'naming no rule, and adopting it as this rule\'s enforcement would be the vacuous negative DS-001 §4 ' +
+			"naming no rule, and adopting it as this rule's enforcement would be the vacuous negative DS-001 §4 " +
 			'describes. THE MACHINE IS AUTHORED AND WOULD BE READY: `Assumption.status` declares BOTH in-arrows to ' +
 			'ACCEPTED (from DISCLOSED and from UNDER_VERIFICATION), each carrying the guard prose "ACCEPTED is NOT ' +
 			'equivalent to VERIFIED (§12.2)", and a separate arrow to VERIFIED. The distinction the rule protects ' +
@@ -3382,13 +3410,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'consequence of falsification can be driven by a caller asserting it, while the assumption itself ' +
 			'cannot be falsified at all.~~ ⚠ EXPIRED 2026-08-08, CAUGHT 2026-08-13 (REG-F-133), AND REFUTED BY THIS ' +
 			"ROW'S OWN TEXT TEN LINES BELOW: `FalsifyAssumption` IS registered and `AssumptionFalsified` IS emitted, " +
-			'which the struck sentence further down already records — *\'CORRECTED 2026-08-08 (REG-F-069): it is ' +
+			"which the struck sentence further down already records — *'CORRECTED 2026-08-08 (REG-F-069): it is " +
 			"called by `falsifyAssumption`'*. **A correcting pass fixed the ADJACENT sentence and left the " +
 			'LOAD-BEARING one standing**, so this row has contradicted itself, in one string, for five days. The ' +
 			'cascade limbs may still be unenforced — that is a separate question this correction does NOT settle — ' +
 			'but the stated GROUND (the act is not dispatchable) is gone. That is the REG-F-014 shape a third time — ' +
 			'a caller-supplied fact taken ' +
-			'as true where the engine could have resolved it — and it is why that finding\'s remediation is a ' +
+			"as true where the engine could have resolved it — and it is why that finding's remediation is a " +
 			'survey rather than a patch. ~~`assessFalsification` has no caller outside its own module.~~ CORRECTED 2026-08-08 (REG-F-069): it is called by `falsifyAssumption` in handlers/assurance.ts.'
 	},
 	// ── RPH-ASM-005 — THE PREDICATE WITH ZERO CALLERS ANYWHERE, INCLUDING ITS OWN MODULE ─────────────────────
@@ -3456,7 +3484,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'A decomposition is incomplete until it explains how child results will establish the parent claim',
-			note: 'JPWB-DOC-003 §6 DEC-2 (Decomposition is a Claim with a mandatory contract), whose enumeration covers all three of this rule\'s limbs — obligation allocation, constraint disposition, and a recomposition strategy.'
+			note: "JPWB-DOC-003 §6 DEC-2 (Decomposition is a Claim with a mandatory contract), whose enumeration covers all three of this rule's limbs — obligation allocation, constraint disposition, and a recomposition strategy."
 		},
 		why:
 			'GRAMMATICALLY A PERMISSION — a decomposition meeting three conditions "MAY become VALID" — which no ' +
@@ -3465,8 +3493,8 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'(obligation allocation, constraint propagation/retention) ARE gated before the VALID advance, and are ' +
 			'recorded as RPH-DEC-002 and RPH-DEC-003. Limb 3 — "and has a recomposition contract" — is read ' +
 			'NOWHERE: `recompositionContractId` is written onto the contract, echoed into the event, and never ' +
-			'loaded, compared or required. That gap is RPH-DEC-005\'s. THE COMPOSITION THAT WOULD HAVE JOINED ALL ' +
-			'THREE IS DEAD: `rph-domain`\'s own decomposition validator is called by no non-test file — the handler ' +
+			"loaded, compared or required. That gap is RPH-DEC-005's. THE COMPOSITION THAT WOULD HAVE JOINED ALL " +
+			"THREE IS DEAD: `rph-domain`'s own decomposition validator is called by no non-test file — the handler " +
 			'calls the two leaf predicates directly and skips it — so its three exclusive finding codes ' +
 			'(MISSING_RECOMPOSITION_CONTRACT, CHILD_DOES_NOT_TRACE_TO_PARENT, CHILD_INTENT_DIVERGENCE) can never ' +
 			'appear in any CommandResult. A NAME COLLISION MAKES THIS EASY TO GET WRONG, recorded so the next ' +
@@ -3516,7 +3544,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'the identical decomposition, declaring the same divergence, but leaving a mandatory parent obligation unallocated — REFUSED at the same site by the conservation arm, which proves the validate path is live and simply has no limb for intent divergence',
 			whyNoPredicate:
 				'A census is the wrong instrument for this rule, and the reason generalises. The only implementation ' +
-				'is `rph-domain`\'s `validateDecomposition`, whose bare identifier is shared by an application ' +
+				"is `rph-domain`'s `validateDecomposition`, whose bare identifier is shared by an application " +
 				'handler — so a census over IT returns four files and looks wired. Censusing the input field it ' +
 				'reads instead dodges the collision but is BLIND TO THE WIRING, because the field does not move ' +
 				'when the composition gains a caller. Behaviour is sensitive to both: this row now reddens when the ' +
@@ -3534,12 +3562,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'AN OUTCOME ASSERTION — recomposition "LEAVES the parent not satisfied, SETS recomposition state ' +
 			'CONFLICTED, and EMITS a conflict observation". Nothing is refused; `CompleteRecomposition` is ' +
 			'ACCEPTED. ONE OF THE THREE LIMBS IS GENUINELY PERFORMED: the contract really does land in CONFLICTED, ' +
-			'routed by the kernel\'s outcome map. THE OTHER TWO ARE NOT. Nothing writes to the parent PWU from the ' +
+			"routed by the kernel's outcome map. THE OTHER TWO ARE NOT. Nothing writes to the parent PWU from the " +
 			'recomposition path at all — the kernel computes `parentSatisfied` and the handler DISCARDS it — and no ' +
 			'ASSURANCE_OBSERVATION object is minted; the only emission is a domain event whose payload is not an ' +
 			'observation. AND THE CONFLICT IS CALLER-SUPPLIED: `detectedConflicts` comes straight from the payload, ' +
 			'so the "incompatible tenant-identity models" the rule names has no engine-side detector. Only child ' +
-			'ACCEPTABILITY is derived. That is REG-F-014\'s shape a fourth time, on the input that decides whether ' +
+			"ACCEPTABILITY is derived. That is REG-F-014's shape a fourth time, on the input that decides whether " +
 			'a recomposition conflicts at all.'
 	},
 	'RPH-DEC-007': {
@@ -3548,13 +3576,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'Mandatory parent obligations = allocated to children + retained by parent + already satisfied',
-			note: 'JPWB-DOC-003 §6 DEC-3 (Obligation conservation), the equation itself. A DIFFERENT span from RPH-DEC-002\'s anchor of the same rule, so a reader can tell the equation from its consequence.'
+			note: "JPWB-DOC-003 §6 DEC-3 (Obligation conservation), the equation itself. A DIFFERENT span from RPH-DEC-002's anchor of the same rule, so a reader can tell the equation from its consequence."
 		},
 		why:
 			'A PROPERTY RESTATEMENT OF RPH-DEC-002, and arm 3 for a structural reason rather than a gap. Its own ' +
 			'ratified text begins "Property:" and ends "(Equivalent to Property P2.)", and the conformance ' +
-			'manifest carries properties in a separate map. The equation IS enforced — at DEC-002\'s site, by ' +
-			'DEC-002\'s predicate, producing DEC-002\'s finding code, in a message that names RPH-DEC-007 by id. ' +
+			"manifest carries properties in a separate map. The equation IS enforced — at DEC-002's site, by " +
+			"DEC-002's predicate, producing DEC-002's finding code, in a message that names RPH-DEC-007 by id. " +
 			'THAT IS EXACTLY WHY IT CANNOT BE A SECOND ENFORCED ROW: the obligation finding type declares ONE code ' +
 			'literal, so both rules would carry the identical marker, one mutant would redden both, and the ' +
 			'register would report two enforced rules where one arrangement had ever been driven. The ' +
@@ -3575,7 +3603,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		why:
 			'THE ARRANGEMENT CANNOT BE EXPRESSED ON THE WIRE. The kernel arm is written and correct — one line ' +
 			'producing CONSTRAINT_WEAKENED_WITHOUT_AUTHORITY when a propagated strength is non-MANDATORY without ' +
-			'an authority decision — and it reads `propagatedStrength`, a field that exists ONLY on the kernel\'s ' +
+			"an authority decision — and it reads `propagatedStrength`, a field that exists ONLY on the kernel's " +
 			'own record type. `ConstraintPropagationSchema`, the wire shape both ProposeDecomposition and ' +
 			'ReviseDecomposition carry, is a `z.strictObject` of seven fields and `propagatedStrength` is not among ' +
 			'them; being strict, it would REFUSE the field if a caller sent it. So no dispatch can weaken a ' +
@@ -3598,7 +3626,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'THE SAME UNREACHABLE ARM AS RPH-CNS-001 — the two are decided by ONE line of kernel code, and the ' +
 			'comment above it says so: "RPH-CNS-001: propagation preserves strength. RPH-CNS-002: weakening ' +
 			'requires authority." Everything recorded on that row about the wire schema applies here. WHAT IS ' +
-			'SHARPER HERE is the rule\'s narrower subject: a mandatory SECURITY constraint. `constraintType` IS ' +
+			"SHARPER HERE is the rule's narrower subject: a mandatory SECURITY constraint. `constraintType` IS " +
 			'carried on both the command payload and the object, and NO production file branches on it — the gate ' +
 			'keys on strength MANDATORY and a live status only. So even were the strength field wired, the ' +
 			'security-specific reading would still be unenforced, and the two gaps would need separate fixes. ' +
@@ -3611,16 +3639,16 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		canonCarriage: {
 			kind: 'CARRIED_BY_GENERAL_RULE',
 			canonAnchor: 'waived through authority',
-			note: 'JPWB-DOC-003 §6 DEC-4 lists waiver as one of the five permitted constraint dispositions but says nothing about expiry; ASR-14\'s "Expired waivers stop waiving" carries the expiry half and is RPH-GOV-006\'s anchor. GENERAL because no canon sentence joins constraint disposition to waiver expiry, which is this rule\'s actual subject.'
+			note: "JPWB-DOC-003 §6 DEC-4 lists waiver as one of the five permitted constraint dispositions but says nothing about expiry; ASR-14's \"Expired waivers stop waiving\" carries the expiry half and is RPH-GOV-006's anchor. GENERAL because no canon sentence joins constraint disposition to waiver expiry, which is this rule's actual subject."
 		},
 		why:
 			'A THREE-LIMB OUTCOME CASCADE on an act that cannot be dispatched. (1) "the waiver becomes expired" — ' +
 			'no command expires a waiver and no handler emits WaiverExpired; expiry is COMPUTED, not recorded, and ' +
-			'in exactly one place: the floor gate resolves `expiresAt <= now` against the command\'s own `issuedAt` ' +
+			"in exactly one place: the floor gate resolves `expiresAt <= now` against the command's own `issuedAt` " +
 			'(deliberately, so replay stays deterministic — the kernel is clock-free by design). (2) "affected ' +
 			'work becomes review-required" — no such effect exists anywhere. (3) "baseline promotion is blocked" — ' +
 			'that is RPH-GOV-006, which is a disclosure, and filing it here as well would let one gap green two ' +
-			'rows. THE CONSTRAINT-SIDE ARM IS UNREACHABLE FOR THE SAME REASON AS RPH-CNS-001/002: the kernel\'s ' +
+			"rows. THE CONSTRAINT-SIDE ARM IS UNREACHABLE FOR THE SAME REASON AS RPH-CNS-001/002: the kernel's " +
 			'WAIVED_EXPIRED branch reads `waiverExpired`, and `ConstraintPropagationSchema` has no such field, so ' +
 			'no dispatch can assert it. The engine therefore knows how to expire a waiver at ONE gate, and the ' +
 			'constraint and promotion planes cannot ask.'
@@ -3646,11 +3674,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'MISSING_OBLIGATION_ALLOCATION(',
 		declaredMutations: [
-			'drop the `strength !== MANDATORY` filter in validateObligationConservation so ADVISORY obligations gate too — the probe still kills, but decomposition-conservation.test.ts\'s ADVISORY case reddens, which is where that mutant belongs',
+			"drop the `strength !== MANDATORY` filter in validateObligationConservation so ADVISORY obligations gate too — the probe still kills, but decomposition-conservation.test.ts's ADVISORY case reddens, which is where that mutant belongs",
 			'make checkDecompositionConservation return null unconditionally — the probe reports ADMITTED',
 			"remove the guard from the ValidateDecomposition site (`mapping.target === 'INVALID' ? undefined : …`) — ADMITTED",
 			'THE LIMB NO MUTATION CAN REACH, recorded as a residual rather than a mutant: the ratified statement\'s second half — "and BLOCKS CHILD EXECUTION" — has no production site at all. No execution, PWU, assurance or governance handler ever loads a DECOMPOSITION_CONTRACT or consults its status. This row is ENFORCED on limb one only.',
-			'ALSO NOT WHAT THE RULE SAYS: the rule\'s stated effect is that the decomposition BECOMES INVALID. The engine REFUSES the ValidateDecomposition command instead, leaving the contract in UNDER_REVIEW. Refusing the transition is the stronger act and the register records it as enforcement — but a reader looking for an INVALID contract will not find one.'
+			"ALSO NOT WHAT THE RULE SAYS: the rule's stated effect is that the decomposition BECOMES INVALID. The engine REFUSES the ValidateDecomposition command instead, leaving the contract in UNDER_REVIEW. Refusing the transition is the stronger act and the register records it as enforcement — but a reader looking for an INVALID contract will not find one."
 		]
 	},
 	'RPH-DEC-003': {
@@ -3683,7 +3711,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		refusalMarker: 'INAPPLICABLE_WITHOUT_RATIONALE(',
 		declaredMutations: [
 			'delete the INAPPLICABLE arm of checkConstraintDisposition — the probe reports ADMITTED',
-			'stop mapping `rationale` in buildConstraintInput — the arm can no longer see it, so EVERY inapplicable disposition refuses and the probe\'s CONTROL reddens instead: the over-refusal failure, which is why this row\'s control is a byte-adjacent record that differs only by carrying a rationale',
+			"stop mapping `rationale` in buildConstraintInput — the arm can no longer see it, so EVERY inapplicable disposition refuses and the probe's CONTROL reddens instead: the over-refusal failure, which is why this row's control is a byte-adjacent record that differs only by carrying a rationale",
 			'THE ALTERNATIVE THE RULE ALLOWS AND THE KERNEL DOES NOT: the ratified statement permits "an authority OR POLICY BASIS". The arm accepts only an `authorityDecisionId`; there is no policy-basis representation. ~~And that id is never resolved to a real Decision — any non-empty string satisfies it, which is the REG-F-014 shape on a fifth field.~~ CLOSED 2026-08-03, struck rather than deleted. `buildConstraintInput` now RESOLVES the id and passes it on only when it loads as an EFFECTIVE Decision, so this arm\'s truthiness test finally means what it reads as. The kernel is untouched — it cannot load objects and should not. THIS ROW\'S OWN PROBE WAS ONE OF THE TWO CALLERS CITING A FAKE ID (the only two in the suite); it now mints a real decision and approves it.'
 		]
 	},
@@ -3713,11 +3741,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'\u26a0 THE CONCLUSION HOLDS AND ITS CITED CAUSE WAS THE WRONG ONE \u2014 corrected 2026-08-14 (REG-F-161). The neighbour note is about `requiredWaivers`, which feeds `findExpiredWaivers` and RPH-GOV-006\u2019s EXPIRED_REQUIRED_WAIVER \u2014 a DIFFERENT argument for a DIFFERENT finding code. **THIS row\u2019s waiver arm is `!o.waived` inside `findOpenBlockingObservations`, and it is NOT starved: `openObservations` IS passed.** It is dead for an unrelated reason \u2014 `observationsAgainstBaselineItems` computes `waived: disposition === \u2018WAIVED\u2019` and `AssuranceObservation.disposition` has exactly ONE write in the repository, the birth at `assurance.ts:2324` with value `OPEN` (write funnel, REG-F-156). So `!o.waived` is always true and this arm reduces to `if (o.blocking)`. **TWO INDEPENDENT CAUSES, and repairing the cited one would not touch this one** \u2014 a reader who supplied `requiredWaivers` would still find the escape dead. Ledger CONTROL: `F161-the-baseline-waiver-escape-is-starved`, whose survival was MEASURED at 132 files / 1464 tests.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline, the OPEN_BLOCKING_FINDING arm. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, fed by observationsAgainstBaselineItems, which walks the event log for ASSURANCE_OBSERVATION objects whose subjectObjectIds intersect the baseline\'s OWN frozen item set and maps severity/disposition through BLOCKING_SEVERITIES and UNSETTLED_DISPOSITIONS.',
+			"DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline, the OPEN_BLOCKING_FINDING arm. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline's guard, fed by observationsAgainstBaselineItems, which walks the event log for ASSURANCE_OBSERVATION objects whose subjectObjectIds intersect the baseline's OWN frozen item set and maps severity/disposition through BLOCKING_SEVERITIES and UNSETTLED_DISPOSITIONS.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'OPEN_BLOCKING_FINDING',
 		declaredMutations: [
-			'restore `openObservations: []` at the promoteBaseline call site — the arm iterates nothing and the probe reports ADMITTED. This is not hypothetical: the file\'s own header records that this WAS the code, and that no observation ever blocked a promotion until it was repaired.',
+			"restore `openObservations: []` at the promoteBaseline call site — the arm iterates nothing and the probe reports ADMITTED. This is not hypothetical: the file's own header records that this WAS the code, and that no observation ever blocked a promotion until it was repaired.",
 			'delete BLOCKING from BLOCKING_SEVERITIES so only CRITICAL gates',
 			'drop OPEN from UNSETTLED_DISPOSITIONS — an open finding then reads as settled',
 			'THE RULE\'S OWN NARROWING IS UNENFORCED: it names an "open blocking TENANT-ISOLATION finding", and no production code keys on tenant isolation, or on any finding category. The gate is severity-and-disposition only, so the general rule is enforced and the specific one is not.'
@@ -3759,20 +3787,20 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'and `requiredWaivers` is not among them, so the loop runs over `[]` every time and the code is ' +
 			'unreachable in production. THE ABSENCE IS STRUCTURAL, NOT A MISSING LINE: nothing anywhere marks a ' +
 			'waiver as REQUIRED BY a promotion — the waiver names findings, the gate reads observations by subject, ' +
-			'and no field or derivation joins them — so the rule\'s antecedent cannot arise. Observed: a promotion ' +
-			'over an item covered by a waiver whose expiresAt is a month past the command\'s issuedAt is ACCEPTED, ' +
+			"and no field or derivation joins them — so the rule's antecedent cannot arise. Observed: a promotion " +
+			"over an item covered by a waiver whose expiresAt is a month past the command's issuedAt is ACCEPTED, " +
 			'with no finding of any kind. The same expiry IS honoured at the publication floor, where ' +
 			'`waiverStillDischarges` reads it — so an expired waiver stops waiving at one protected transition and ' +
 			'not at the other.',
 		guard: {
 			kind: 'OBSERVED_ADMISSION',
 			arrangement:
-				'PromoteBaseline over an item covered by an EFFECTIVE waiver whose expiresAt (2026-07-01) is a month before the command\'s issuedAt (2026-08-01) — ACCEPTED, and the baseline becomes AUTHORITATIVE',
+				"PromoteBaseline over an item covered by an EFFECTIVE waiver whose expiresAt (2026-07-01) is a month before the command's issuedAt (2026-08-01) — ACCEPTED, and the baseline becomes AUTHORITATIVE",
 			control:
 				'the identical promotion, with the identical expired waiver, plus an OPEN BLOCKING observation over the same baselined item — REFUSED with OPEN_BLOCKING_FINDING at the same gate. The expired waiver is present in BOTH runs precisely because it is not the variable: the control shows the gate reads this item set and refuses, and that the waiver contributes nothing either way.',
 			whyNoPredicate:
 				'`findExpiredWaivers` is not dead — `canPromoteBaseline` calls it on every promotion — so naming ' +
-				'it would fail the census\'s first clause, the same reason RPH-ASR-010 is guarded by observation. ' +
+				"it would fail the census's first clause, the same reason RPH-ASR-010 is guarded by observation. " +
 				'What is absent is the ARGUMENT `requiredWaivers`, and an absent argument has no symbol whose ' +
 				'reference set a grep could watch. A behavioural guard is also strictly the right instrument here: ' +
 				'it reddens the day a promotion starts refusing an expired waiver, whether that comes from wiring ' +
@@ -3787,7 +3815,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 ASR-16, the promotion precondition this rule instantiates for assessments.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline\'s findAssessmentDefects, which emits REQUIRED_ASSESSMENT_INCOMPLETE for an assessment still ASSESSING or REQUESTED and REQUIRED_ASSESSMENT_NOT_SATISFIED for one that completed without SATISFIED/WAIVED. ENFORCEMENT: promoteBaseline\'s guard.',
+			"DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline's findAssessmentDefects, which emits REQUIRED_ASSESSMENT_INCOMPLETE for an assessment still ASSESSING or REQUESTED and REQUIRED_ASSESSMENT_NOT_SATISFIED for one that completed without SATISFIED/WAIVED. ENFORCEMENT: promoteBaseline's guard.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'REQUIRED_ASSESSMENT_NOT_SATISFIED',
 		declaredMutations: [
@@ -3803,10 +3831,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			kind: 'CARRIED',
 			canonAnchor:
 				'A commit may exist without promotion; promotion is a separate governance event over exact versions',
-			note: 'JPWB-DOC-003 §8 ASR-17 (A repository commit is never a baseline), which carries the rule\'s antecedent; ASR-16 carries the consequent (promotion needs effective authority).'
+			note: "JPWB-DOC-003 §8 ASR-17 (A repository commit is never a baseline), which carries the rule's antecedent; ASR-16 carries the consequent (promotion needs effective authority)."
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline\'s NO_EFFECTIVE_PROMOTION_DECISION arm, fed from the STORE: the payload names a decision id, the handler loads it and reads its real status, decisionType and authority. ENFORCEMENT: promoteBaseline\'s guard, with the precondition fromStates(\'APPROVED\') and the machine\'s declared illegal UNDER_REVIEW -> AUTHORITATIVE as independent second and third defences.',
+			"DECISION: packages/rph-domain/src/governance.ts — canPromoteBaseline's NO_EFFECTIVE_PROMOTION_DECISION arm, fed from the STORE: the payload names a decision id, the handler loads it and reads its real status, decisionType and authority. ENFORCEMENT: promoteBaseline's guard, with the precondition fromStates('APPROVED') and the machine's declared illegal UNDER_REVIEW -> AUTHORITATIVE as independent second and third defences.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'NO_EFFECTIVE_PROMOTION_DECISION',
 		declaredMutations: [
@@ -3823,7 +3851,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §8 ASR-15, verbatim against the ratified statement.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/governance.ts — decisionAuthorizesVersions. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline\'s guard, at a LATER arm than canPromoteBaseline: the gate first proves the decision is EFFECTIVE, then this proves it is still CURRENT. Its own comment records that the kernel was previously unreachable and a stale-version approval promoted to AUTHORITATIVE.',
+			"DECISION: packages/rph-domain/src/governance.ts — decisionAuthorizesVersions. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — promoteBaseline's guard, at a LATER arm than canPromoteBaseline: the gate first proves the decision is EFFECTIVE, then this proves it is still CURRENT. Its own comment records that the kernel was previously unreachable and a stale-version approval promoted to AUTHORITATIVE.",
 		// THE GENERIC CODE IS A RECORDED DECISION, NOT AN OVERSIGHT (REG-F-010 group 3 / REG-E-022, 2026-08-03).
 		// Its sibling refusal one arm away — the invalidated-evidence promotion — moved off this generic code the
 		// same day, because `RPH_EVIDENCE_INVALIDATED` names that condition exactly. NO ratified code names this
@@ -3837,10 +3865,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		refusalMarker: 'STALE_DECISION_VERSION',
 		declaredMutations: [
 			'delete the decisionAuthorizesVersions arm — the probe reports ADMITTED, restoring the exact defect the comment says W1 WIRE-4 fixed',
-			'compare against the DECISION\'s recorded versions only, ignoring the subject\'s current version — the arm can never fire',
-			'~~THE INTEGRITY CAVEAT, and it is REG-F-014\'s second instance: the versions this arm compares against are CALLER-SUPPLIED at approval time. `proposeDecision` PINS them from the store, and `approveDecision`\'s extraMutate then OVERWRITES that pin with the payload. So the binding this rule enforces is exact against a number the approver chose. The refusal is real; what it is exact ABOUT is not verified.~~ CLOSED 2026-08-03 (REG-F-017), struck rather than deleted. The pin is now IMMUTABLE — set at proposal from the store, never written by approval — so this arm compares against the versions the approver actually REVIEWED. An approval STATING anything else is refused.',
-			'THIS ROW\'S OWN PROBE WAS BUILT ON THAT DEFECT, AND IS NOT ANY MORE (REG-F-017, filed and fixed 2026-08-03). `promotionProbe(\'stale-version\')` used to make the decision bind v2 while the subject sat at v1 by having the approver STATE v2 — the caller-supplied-fact bug, used as a fixture device. Measured at the time: of 132 ApproveDecision dispatches, 13 diverged from the store, and 2 of those were this probe and its sibling test.',
-			'AND THE HONEST ARRANGEMENT IS UNREACHABLE FOR THIS SUBJECT. Censused every semantic-version write: only INTENT, DECOMPOSITION_CONTRACT and PROFESSIONAL_WORK_ARCHITECTURE can ever move their semanticVersion. A PWU\'s is 1 at creation and no command changes it — so over a PWU subject the rule\'s antecedent (the subject moving on after approval) CANNOT BE PRODUCED, which is why the forgery was needed to produce it. So the probe was RE-BASED: the decision now names the INTENT as a co-subject beside the baselined PWU, and the intent is genuinely REVISED after approval (semanticVersion 1 -> 2, `ReviseIntent`). The refusal is proved from a TRUE premise for the first time — the world moved, and nothing about the decision was edited. Re-basing did not cost the probe its sensitivity: neutralising this arm still reddens both it and its sibling test. The other three defects `promotionProbe` serves (RPH-BAS-003/004/006) keep the exact decision they had.'
+			"compare against the DECISION's recorded versions only, ignoring the subject's current version — the arm can never fire",
+			"~~THE INTEGRITY CAVEAT, and it is REG-F-014's second instance: the versions this arm compares against are CALLER-SUPPLIED at approval time. `proposeDecision` PINS them from the store, and `approveDecision`'s extraMutate then OVERWRITES that pin with the payload. So the binding this rule enforces is exact against a number the approver chose. The refusal is real; what it is exact ABOUT is not verified.~~ CLOSED 2026-08-03 (REG-F-017), struck rather than deleted. The pin is now IMMUTABLE — set at proposal from the store, never written by approval — so this arm compares against the versions the approver actually REVIEWED. An approval STATING anything else is refused.",
+			"THIS ROW'S OWN PROBE WAS BUILT ON THAT DEFECT, AND IS NOT ANY MORE (REG-F-017, filed and fixed 2026-08-03). `promotionProbe('stale-version')` used to make the decision bind v2 while the subject sat at v1 by having the approver STATE v2 — the caller-supplied-fact bug, used as a fixture device. Measured at the time: of 132 ApproveDecision dispatches, 13 diverged from the store, and 2 of those were this probe and its sibling test.",
+			"AND THE HONEST ARRANGEMENT IS UNREACHABLE FOR THIS SUBJECT. Censused every semantic-version write: only INTENT, DECOMPOSITION_CONTRACT and PROFESSIONAL_WORK_ARCHITECTURE can ever move their semanticVersion. A PWU's is 1 at creation and no command changes it — so over a PWU subject the rule's antecedent (the subject moving on after approval) CANNOT BE PRODUCED, which is why the forgery was needed to produce it. So the probe was RE-BASED: the decision now names the INTENT as a co-subject beside the baselined PWU, and the intent is genuinely REVISED after approval (semanticVersion 1 -> 2, `ReviseIntent`). The refusal is proved from a TRUE premise for the first time — the world moved, and nothing about the decision was edited. Re-basing did not cost the probe its sensitivity: neutralising this arm still reddens both it and its sibling test. The other three defects `promotionProbe` serves (RPH-BAS-003/004/006) keep the exact decision they had."
 		]
 	},
 	// ── THE ONE LIVE WIRING IN A FAMILY OF FOUR DEAD PREDICATES ───────────────────────────────────────────────
@@ -3858,14 +3886,14 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			note: 'JPWB-DOC-003 §4 OBJ-4, verbatim. The ratified rule names plan approval as the act; canon states the principle over "work" generally, which is broader and is not enforced beyond this one arrow.'
 		},
 		enforcedAt:
-			'DECISION: packages/rph-domain/src/decomposition.ts — canAuthorizeNewWork, which refuses EXPIRED, FALSIFIED and SUPERSEDED. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — approveExecutionPlan\'s guard, via assumptionsAuthorizeNewWork, which loads the plan\'s PWU, walks its assumptionIds, and returns the first dead one. The precondition fromStates(\'UNDER_REVIEW\') is sited AHEAD of the guard, which the handler\'s comment records as correcting a latent mask: a wrong-state plan whose PWU also had a dead assumption used to refuse with this rule\'s code instead of the state code.',
+			"DECISION: packages/rph-domain/src/decomposition.ts — canAuthorizeNewWork, which refuses EXPIRED, FALSIFIED and SUPERSEDED. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — approveExecutionPlan's guard, via assumptionsAuthorizeNewWork, which loads the plan's PWU, walks its assumptionIds, and returns the first dead one. The precondition fromStates('UNDER_REVIEW') is sited AHEAD of the guard, which the handler's comment records as correcting a latent mask: a wrong-state plan whose PWU also had a dead assumption used to refuse with this rule's code instead of the state code.",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'cannot authorize new work (RPH-ASM-006)',
 		declaredMutations: [
 			'widen canAuthorizeNewWork to accept EXPIRED — the probe reports ADMITTED',
 			'delete the guard from approveExecutionPlan — ADMITTED',
 			'drop the `a?.objectType !== ASSUMPTION` skip in assumptionsAuthorizeNewWork so an unresolvable id gates — the probe still kills; what reddens is any fixture naming a non-existent assumption, and the skip is a DELIBERATE fail-open the handler comments as "unknown status → not gatable (sound)"',
-			'~~TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.~~ CORRECTED 2026-08-08 (REG-F-069), struck rather than deleted. FALSIFIED became reachable when `FalsifyAssumption` landed. FOUR ASSUMPTION-targeting commands now exist — DetectAssumption, DiscloseAssumption, ExpireAssumption, FalsifyAssumption — and NONE targets SUPERSEDED; every production `target: \'SUPERSEDED\'` site is on another aggregate (PWU, AssurancePolicy, DecompositionContract, ExecutionPlan, Decision, Baseline). So ONE status the predicate refuses is still unreachable, and this row is enforced on two thirds of its own predicate.',
+			"~~TWO STATUSES THE PREDICATE REFUSES AND NO COMMAND CAN REACH: FALSIFIED and SUPERSEDED. Only DetectAssumption and ExpireAssumption exist, so EXPIRED is the sole reachable arm of the three. This row is enforced on one third of its own predicate.~~ CORRECTED 2026-08-08 (REG-F-069), struck rather than deleted. FALSIFIED became reachable when `FalsifyAssumption` landed. FOUR ASSUMPTION-targeting commands now exist — DetectAssumption, DiscloseAssumption, ExpireAssumption, FalsifyAssumption — and NONE targets SUPERSEDED; every production `target: 'SUPERSEDED'` site is on another aggregate (PWU, AssurancePolicy, DecompositionContract, ExecutionPlan, Decision, Baseline). So ONE status the predicate refuses is still unreachable, and this row is enforced on two thirds of its own predicate.",
 			'AND THE SET IT WALKS IS WRITE-ONCE: only ProposePwu writes `assumptionIds`, so an Assumption created later by DetectAssumption can never become gatable on an already-proposed PWU. The rule holds for assumptions declared at proposal time and for no others.'
 		]
 	},
@@ -3893,7 +3921,7 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'requires, reads or resolves a recomposition contract before a decomposition is marked VALID; the ' +
 			'carrier field is write-only. NOR IS THE LINK ENFORCED IN THE OTHER DIRECTION: `ProposeRecomposition` ' +
 			'takes a parent and required children and never references the decomposition contract that should have ' +
-			'named it, so the two objects are related by a string nothing checks. THE RULE\'S OWN QUALIFIER IS ALSO ' +
+			"named it, so the two objects are related by a string nothing checks. THE RULE'S OWN QUALIFIER IS ALSO " +
 			'UNDEFINED — "a MATERIAL parent" has no field, predicate or classifier on the command plane deciding ' +
 			'materiality, so even a wired gate would have to invent the scope. A NEAR-MISS THAT LOOKS LIKE ' +
 			'COVERAGE, named so it is not mistaken for it: the handler file cites "§14.1 / RPH-DEC-005/006" over ' +

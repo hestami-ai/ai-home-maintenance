@@ -25,6 +25,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { splitExecutionEnvelope } from './execution-contract.js';
+import { stepCapabilityRefusal, type StepBindingRequest } from './step-binding.js';
 import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
@@ -72,7 +73,35 @@ export interface RunModelStepInput {
 	readonly contextPolicy: ContextAssemblyPolicyContent;
 	/** The work-unit TYPE's context specification, when it declares one. */
 	readonly contextSpecification?: ContextSpecification;
+	/**
+	 * ⭑ JAN-EXECGOV EG-03 — the step's RUNTIME_BINDING and what it CURRENTLY grants.
+	 *
+	 * ⛔⛔ REQUIRED, WITH AN EXPLICIT `NONE`, AND THE FIRST VERSION OF THIS FIELD WAS OPTIONAL — which made
+	 * "skip the capability check" expressible by OMISSION. That is the exact shape of the `producer`-omission
+	 * dodge this programme filed at `REG-F-364` and declined to fix on its own authority, and it is the shape
+	 * `CP-04` refused when it made the context policy a REQUIRED parameter so that *"resolve the policy and
+	 * ignore it"* could not be written. Applying a weaker standard to a check of my own than to one I audited
+	 * is how a dodge gets built by the person who documented it.
+	 *
+	 * ⭑ `NONE` IS A DECLARATION, NOT AN ABSENCE — the same distinction the kernel draws between a step naming
+	 * no binding (`OUT_OF_SCOPE`, legal) and one naming a binding that does not resolve (fail closed). A caller
+	 * must say which case it is in.
+	 *
+	 * ⚠ AND THE GRANT IS READ FROM THE STORE, not taken from the request that produced it. Comparing a request
+	 * against itself is a check that cannot fail; reading the stored grant means `RevokeRuntimeCapability`
+	 * changes the answer — §22.1's *"revoked bindings cannot be used for new attempts."*
+	 */
+	readonly binding: StepBindingFacts;
 }
+
+/** What the caller knows about this step's binding. ⛔ `NONE` must be SAID, never left out. */
+export type StepBindingFacts =
+	| { readonly kind: 'NONE' }
+	| {
+			readonly kind: 'BOUND';
+			readonly request: StepBindingRequest;
+			readonly granted: readonly string[];
+	  };
 
 /**
  * What this call will place in front of the producer, beyond the rendered instruction.
@@ -158,6 +187,20 @@ export type RunModelStepOutcome =
 export async function runModelInvocationStep(
 	input: RunModelStepInput
 ): Promise<RunModelStepOutcome> {
+	// ── ⭑⭑ EG-03 — THE BINDING MUST STILL AUTHORIZE THIS, AND IT IS CHECKED BEFORE ANYTHING IS BUILT ───────
+	//
+	// `EG-02` made a step run under an AUTHORIZED binding; a grant that constrains nothing is a record, not a
+	// control. This refuses BEFORE the prompt is rendered and before any model is called, on the same ordering
+	// argument `prompt-render.ts:8-12` makes: a check that fires after the call disclosed the harm afterwards.
+	//
+	// ⛔ THIS IS NOT THE OPERATION TIER. `RPH-EXE-004`'s operation tier — intercepting the call itself — is the
+	// Platform's and stays deferred. This refuses to BEGIN an invocation the binding does not authorise, which
+	// is step governance and JPWB's.
+	if (input.binding.kind === 'BOUND') {
+		const refusal = stepCapabilityRefusal(input.binding.request, input.binding.granted);
+		if (refusal) return { ran: false, refusedBecause: refusal };
+	}
+
 	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template, {
 		policy: input.contextPolicy,
 		alsoAssembles: assembledSources(input.priorFindings, input.session.retainsHistory),

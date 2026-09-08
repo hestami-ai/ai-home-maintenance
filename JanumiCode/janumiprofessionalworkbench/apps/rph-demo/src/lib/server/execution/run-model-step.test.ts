@@ -48,6 +48,9 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		providerId: 'test-provider',
 		// ⭑ CP-04 — the deployment's own policy. Required, so no call site can skip the consultation.
 		contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+		// ⛔ SAID, NOT OMITTED. `binding` is required with an explicit NONE so that skipping the capability
+		// check cannot be expressed by leaving a field out — the dodge shape `REG-F-364` records.
+		binding: { kind: 'NONE' as const },
 		...over
 	};
 	return { input, dispatched, store };
@@ -442,5 +445,80 @@ describe('OC-02 — the reviewer is handed the contract as part of the instructi
 		const { input } = harness();
 		const out = await runModelInvocationStep(input);
 		expect(out.ran && out.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+	});
+});
+
+// ── ⭑⭑ JAN-EXECGOV EG-03 — THE GRANT CONSTRAINS SOMETHING ──────────────────────────────────────────────────
+//
+// `EG-02` made a model step run under an AUTHORIZED binding, and disclosed what it did NOT do: *"a granted
+// capability still constrains nothing at the point of use."* This is that increment.
+//
+// ⛔ AND IT REOPENS A DISCLOSED DEFERRAL ON ITS OWN STATED TERMS. `RPH-EXE-004` is recorded
+// `UNENFORCED_DISCLOSED` because *"JPWB is never in the path of an operation: it governs plans and hosts no tool
+// invocation"* and *"its caller does not exist yet. EXIT: revisit when a broker exists to call it."* Both
+// grounds are now false — `runModelInvocationStep` IS the broker, and `execution-invocation.ts:3-8` already
+// refutes the first sentence against the Guide. ⛔ The OPERATION tier stays the Platform's and is NOT built.
+describe('EG-03 — the binding must still authorize the invocation', () => {
+	const BINDING = {
+		runtimeBindingId: 'bind_1',
+		executionStepId: 'step_1',
+		roleId: 'MODEL',
+		requestedCapabilities: [{ capability: 'network' }]
+	} as const;
+
+	it('⭑⭑ REFUSES when the stored grant no longer covers what the step needs — BEFORE any model call', async () => {
+		// ⚠ THE ASSERTION THAT MATTERS IS `calls === 0`. A refusal that fires after the model has answered has
+		// disclosed the harm afterwards — the ordering `prompt-render.ts:8-12` settles. THE MUTANT: run the check
+		// after `session.turn(...)`; the refusal still returns, and a paid, unauthorized invocation has happened.
+		let calls = 0;
+		const { input } = harness({
+			session: oneShotSession(async () => {
+				calls += 1;
+				return ANSWER;
+			}),
+			binding: { kind: 'BOUND' as const, request: BINDING, granted: [] }
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/does not grant 'network'/);
+		expect(calls, 'the model must not be invoked at all').toBe(0);
+	});
+
+	it('⚠ the refusal names the rule and what to do, not just the failure', async () => {
+		// A refusal a reader cannot act on is the silent omission `PER-9` forbids one layer up. THE MUTANT:
+		// return a bare boolean and let the caller invent a message.
+		const { input } = harness({
+			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['file-system'] }
+		});
+		const out = await runModelInvocationStep(input);
+		expect(!out.ran && out.refusedBecause).toMatch(/RPH_CAPABILITY_NOT_GRANTED/);
+		expect(!out.ran && out.refusedBecause).toMatch(
+			/revoked binding cannot be used for new attempts/
+		);
+	});
+
+	it('⭑ CONTROL — a binding that DOES grant it proceeds, so this is not "refuse everything"', async () => {
+		// ⛔ Without this the check is satisfiable by refusing unconditionally, and `EG-02`'s whole path breaks.
+		const { input } = harness({
+			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network'] }
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⭑⭑ CONTROL — a step with NO binding still runs, and that must stay true', async () => {
+		// The `OUT_OF_SCOPE` case the kernel records as load-bearing: collapsing it *"would make every plan in
+		// the reference seed — which authors no RuntimeBinding whatsoever — permanently unstartable."* THE
+		// MUTANT: require a binding. Every TRANSFORMATION step, and every pre-existing plan, stops.
+		expect((await runModelInvocationStep(harness().input)).ran).toBe(true);
+	});
+
+	it('⚠ a grant that is a SUPERSET still passes — the rule is coverage, not equality', async () => {
+		// `RPH-EXE-004`'s example grants a subset and fails the operation outside it; nothing says a grant may
+		// not exceed the request. THE MUTANT: compare the two sets for equality — a binding authorized for more
+		// than this step asked would refuse a step it plainly covers.
+		const { input } = harness({
+			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network', 'file-system'] }
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(true);
 	});
 });

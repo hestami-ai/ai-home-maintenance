@@ -155,11 +155,12 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	// These are the only entries whose deadness is a defect the register already carries. Each `ruleId` is
 	// cross-checked below against the register's own disposition, so this file cannot claim a disclosure the
 	// register does not make.
-	capabilityAuthorized: {
-		kind: 'DISCLOSED',
-		ruleId: 'RPH-EXE-004',
-		why: 'Capability authorisation for a runtime binding. Its row records that wiring it would be the subject substitution the register exists to prevent, and carries an exit criterion rather than a date.'
-	},
+	// ~~capabilityAuthorized — REMOVED 2026-09-08 (`JAN-EXECGOV` EG-03).~~ It ACQUIRED A PRODUCTION CALLER:
+	// `stepCapabilityRefusal` (`apps/rph-demo/src/lib/server/execution/step-binding.ts`) asks it before a
+	// model invocation begins. ⭐ THIS GATE IS WHAT FOUND IT — *"DECLARED DEAD BUT NOW CALLED — this is the
+	// good failure, and the one the prose lists could never produce"* — and its own instruction was followed:
+	// the row is deleted here AND the register claim about the same rule was re-dispositioned, because it had
+	// gone stale (`RPH-EXE-004`, `DEAD_PREDICATE` -> `NOT_A_COMMAND_REFUSAL`).
 	classifyInterruptedAttempt: {
 		kind: 'DISCLOSED',
 		ruleId: 'RPH-PER-012',
