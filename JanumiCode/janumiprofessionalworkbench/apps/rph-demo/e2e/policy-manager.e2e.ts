@@ -264,4 +264,41 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 			'reconcileApplicability must have taken its "scope untouched by this edit" limb'
 		).toEqual(['PROFESSIONAL_WORK_UNIT']);
 	});
+
+	// ── ⭑⭑ JAN-EXECGOV EG-05 — AN UNCONSULTED SETTING SAYS SO, WHERE A PROFESSIONAL READS IT ────────────────
+	//
+	// The sponsor's case: a human edits a field in the UI and nothing reads it. Measured across the eight
+	// controls of this form, three are stored, patchable, and consulted by nothing this surface can reach.
+	//
+	// ⚠ THIS SPEC EXISTS BECAUSE THE GATE CANNOT SEE A BROWSER. `verif/authoring-field-disposition.test.ts`
+	// proves the declaration is complete, falsifiable, and referenced by the markup; it cannot prove the text
+	// reaches a person. A disclosure that renders only in a unit test discloses nothing — which is this
+	// repository's own recurring finding, content authored and terminated at the surface boundary.
+	test('a setting nothing consults discloses that to the author (EG-05)', async ({ page }) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Disclosure PWA');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		await gotoHydrated(
+			page,
+			(await page.getByRole('link', { name: /Disclosure PWA/ }).getAttribute('href'))!
+		);
+		await page.getByRole('button', { name: '⚖ Policies' }).click();
+		await page.getByRole('button', { name: '＋ New policy' }).click();
+
+		const form = page.locator('form.typeform');
+
+		// ⛔ THE DISCLOSURE. `evaluatorRole` has 45 production sites and not one of them compares it.
+		await expect(form.getByText(/not currently used to select or constrain an evaluator/i)).toBeVisible();
+		// And it names what DOES govern, so the author is redirected rather than merely warned off.
+		await expect(form.getByText(/independence requirement below is what the engine actually enforces/i)).toBeVisible();
+		await expect(form.getByText(/does not affect any assessment, disposition, or gate/i)).toBeVisible();
+
+		// ⭐ CONTROL — A CONSULTED FIELD IS NOT DISCLAIMED, and this is the assertion that stops the remedy
+		// becoming "label everything". A professional told that nothing works stops reading the notes at all.
+		await expect(form.getByText(/ENFORCED: an assessment that does not meet it is refused/i)).toBeVisible();
+		await expect(
+			form.getByText(/ENFORCED: a rule naming an action outside this set is refused/i)
+		).toBeVisible();
+	});
 });

@@ -233,3 +233,97 @@ export function assurancePolicyLabel(id: string): string {
 		id
 	);
 }
+
+/**
+ * ⭑⭑ JAN-EXECGOV EG-05 — WHAT EACH ASSURANCE POLICY CONTROL DOES, INCLUDING THE ONES THAT DO NOTHING.
+ *
+ * The sponsor's case: *"the human user may use the UI to make manual changes as well."* A setting a person edits
+ * and nothing consults is a **fiction presented as control**, and the remedy is DISCLOSURE rather than wiring —
+ * removing the control would lose the author's intent, and wiring it would invent governance the corpus has not
+ * asked for. (`evaluationMethod`'s absent reader is already filed as `REG-F-243`, OPEN.)
+ *
+ * ⚠ `consulted` IS A FALSIFIABLE CLAIM, NOT A BOOLEAN, AND THAT IS THE WHOLE DESIGN. Each entry that claims a
+ * reader must NAME the file and QUOTE it; `verif/authoring-field-disposition.test.ts` fails if the quote is not
+ * in that file. A quote rather than a line number because this register already records that line citations rot.
+ *
+ * ⛔⛔ AND THE OBVIOUS ALTERNATIVE IS ALREADY DEFEATED — MEASURED, NOT FEARED. A gate that DERIVED "consulted" by
+ * looking for the field name inside a conditional would report `evaluatorRole` and `evaluatedClaimTypes` as
+ * consulted at HEAD, because EG-04's own `policyEditPatch` added `if (f.evaluatorRole)` — a presence guard, not
+ * a consultation. The commit that fixed their sibling would have silenced the gate for them. So the disposition
+ * is declared by a human and made checkable, rather than inferred by a pattern that a refactor can satisfy.
+ */
+export interface AuthoringFieldDisposition {
+	/** Rendered to the professional beside the control. For an unconsulted field it SAYS SO. */
+	readonly help: string;
+	/** The reader that consults this value, or `null` when nothing does. */
+	readonly consulted: { readonly file: string; readonly quote: string } | null;
+}
+
+export const ASSURANCE_POLICY_FIELDS: Readonly<Record<string, AuthoringFieldDisposition>> = {
+	name: {
+		help: 'The human name of this policy, shown wherever the policy is referenced.',
+		consulted: {
+			file: 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte',
+			quote: '<span class="pcname">{p.name}</span>'
+		}
+	},
+	purpose: {
+		help: 'One or two sentences on what this policy is for. Read by a professional, not by the engine.',
+		consulted: {
+			file: 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte',
+			quote: '<p class="pcpurpose">{p.purpose}</p>'
+		}
+	},
+	rationale: {
+		// ⛔ NOT CONSULTED. Three production sites, all `String((x.state.rationale ?? '') as string)` projections
+		// into a view model. Nothing branches on it.
+		help:
+			'Why this policy exists. Recorded and kept with the policy, and NOT read by the engine — it does not ' +
+			'affect any assessment, disposition, or gate.',
+		consulted: null
+	},
+	evaluatedClaimTypes: {
+		// ⛔ NOT CONSULTED FOR A POLICY THIS SURFACE CAN AUTHOR. Its one reader copies the value into a FLOOR
+		// policy's finding definitions (`floor-policies.ts`), and floor policies are seeded and locked — this form
+		// cannot reach that path. ⚠ The distinction matters: the field is not dead in the system, it is inert HERE,
+		// and saying "nothing reads it" would be false.
+		help:
+			'Which kind of claim this policy is about. Recorded on the policy; for a policy authored here it is ' +
+			'not read by any gate — only the seeded floor policies feed this into their finding definitions.',
+		consulted: null
+	},
+	evaluatorRole: {
+		// ⛔ NOT CONSULTED. 45 non-test production sites, every one an assignment or a projection; nothing
+		// compares it. POSITIVE CONTROL for that search: its sibling `independenceRequirement` IS compared,
+		// at `assurance.ts:2198`, and the same search finds it.
+		help:
+			'Who is expected to evaluate against this policy. Recorded, and NOT currently used to select or ' +
+			'constrain an evaluator — the independence requirement below is what the engine actually enforces.',
+		consulted: null
+	},
+	independenceRequirement: {
+		help: 'How independent the evaluator must be from whoever did the work. ENFORCED: an assessment that does not meet it is refused.',
+		consulted: {
+			file: 'packages/rph-application/src/handlers/assurance.ts',
+			quote: "r !== policyState?.independenceRequirement"
+		}
+	},
+	permittedControlActions: {
+		help: 'Which control actions this policy may call for. ENFORCED: a rule naming an action outside this set is refused.',
+		consulted: {
+			file: 'packages/rph-application/src/handlers/assurance.ts',
+			quote: 'if (permittedControlActions === undefined) return null;'
+		}
+	},
+	criteria: {
+		help: 'One criterion per line. ENFORCED: each is assessed, and a BLOCKING criterion that is not met rejects the disposition.',
+		// ⚠ THE FIRST QUOTE I REACHED FOR HERE WAS `criteria: p.criteria` — a WRITE into created state, which
+		// is the exact shape this file calls out for `evaluatorRole`. A declaration citing a copy would have
+		// passed the gate and proved nothing. This one consults a criterion's own severity to decide whether it
+		// blocks, which is a criterion changing an outcome.
+		consulted: {
+			file: 'packages/rph-assurance/src/validators.ts',
+			quote: 'mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet)'
+		}
+	}
+};

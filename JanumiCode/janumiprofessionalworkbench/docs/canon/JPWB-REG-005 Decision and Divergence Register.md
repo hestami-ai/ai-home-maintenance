@@ -33055,3 +33055,95 @@ compared the reader against the PAYLOAD and never against the MARKUP. (b) *"noth
 **Merge target:** Repository (`policy-fields.ts`, the route action, `policy-round-trip.test.ts`,
 `policy-manager.e2e.ts`, `verif/form-key-emitter-census.test.ts`) and `docs/_working/` design §5b + roadmap.
 No canon artifact changes.
+
+---
+
+### REG-F-369 — three policy settings a professional edits are consulted by nothing, and the obvious gate for that was already defeated by the commit that fixed their sibling
+
+- **Date:** 2026-09-08 · **Type:** FINDING (`JAN-EXECGOV` `EG-05`) ·
+  **Class:** FINDING — `REG-F-365`'s direction, measured and DISCLOSED rather than wired;
+  ⭑ **the derived instrument was refuted before it was built, by its own repository state** ·
+  **Status:** ✅ **CLOSED for the Assurance Policy form. The PWU Type form's thirty controls are NOT censused
+  here, and that boundary is stated rather than implied.**
+
+**WHAT `REG-F-365` ASKED FOR AND THIS DISCHARGES.** *"A setting a person edits and nothing reads is a fiction
+presented as control … the remedy is DISCLOSURE, not wiring."* Sponsor decision `G-2` chose disclosure over
+removal, on the ground that removal loses the author's intent. ⚠ `REG-F-368` established that the surrounding
+claim needed re-measuring, and **explicitly did not close this**.
+
+**MEASURED, by reading every production site of each name and separating a CONSULTATION from a copy:**
+
+| control | disposition | evidence |
+|---|---|---|
+| `name` · `purpose` | ⭑ read by a PROFESSIONAL — rendered on the policy card | `+page.svelte` card meta |
+| `criteria` | ✓ consulted | `validators.ts:229` — a criterion's severity decides whether it blocks |
+| `independenceRequirement` | ✓ consulted | `assurance.ts:2198` — a real comparison |
+| `permittedControlActions` | ✓ consulted | `assurance.ts:149`, `:1855` — subset validation |
+| `evaluatorRole` | ⛔ **NOT consulted** | 45 non-test production sites, every one an assignment or a projection |
+| `rationale` | ⛔ **NOT consulted** | three sites, all `String((x.state.rationale ?? '') as string)` view projections |
+| `evaluatedClaimTypes` | ⛔ **NOT consulted for a policy this surface can author** | its one reader copies it into a FLOOR policy's finding definitions (`floor-policies.ts:88`), and floor policies are seeded and locked |
+
+⚠ **THE THIRD ROW IS PHRASED CAREFULLY AND THE CARE IS THE POINT.** `evaluatedClaimTypes` is **not** dead in the
+system; it is inert **here**. Writing *"nothing reads it"* would have been false, and the disclosure a
+professional sees says the narrower true thing.
+
+---
+
+**⛔⛔ THE INSTRUMENT THIS ENTRY DID NOT BUILD, AND WHY — MEASURED, NOT FEARED.**
+
+The obvious gate derives "is it consulted?" by looking for the field name inside a conditional. **That gate is
+already defeated at HEAD.** `REG-F-368`'s own `policyEditPatch` added `if (f.evaluatorRole)` and
+`if (f.evaluatedClaimTypes !== undefined)` — **presence guards, not consultations** — so a name-in-a-conditional
+derivation reports BOTH unread fields as CONSULTED. ⭑ **The commit that fixed their sibling would have silenced
+the gate for them, on the same day, in the same file.** An instrument a refactor can satisfy is not an
+instrument.
+
+⭑ **SO THE DISPOSITION IS DECLARED BY A HUMAN AND MADE FALSIFIABLE INSTEAD.** A `consulted` claim must NAME a
+file and QUOTE the reader; `verif/authoring-field-disposition.test.ts` fails if the quote is not in that file.
+A **quote rather than a line number**, because this register already records that line citations rot while the
+text they point at moves.
+
+⚠ **AND I CAUGHT MYSELF CITING A COPY AS A CONSULTATION.** The first reader quoted for `criteria` was
+`criteria: p.criteria` — a WRITE into created state, which is **the exact shape this entry disqualifies
+`evaluatorRole` for**. It would have resolved, passed the gate, and proved nothing. Replaced with
+`validators.ts:229`, where a criterion's own severity changes an outcome.
+
+⛔ **WHAT THE QUOTE CHECK CANNOT DO, PROVED BY ITS OWN MUTANT.** It cannot tell a consultation from any
+occurrence. Mutant `G2` re-declared `evaluatorRole` as consulted with the quote `'evaluatorRole'` — which
+**genuinely appears** in `assurance.ts`, so the quote check PASSED. It was caught by the **population pin**
+instead. Two independent limbs, and the entry says which one did the work rather than crediting the wrong one.
+
+---
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (6 of 6):** a `consulted` claim with an invented quote → the quote
+check; flipping an unconsulted field to consulted to remove its note → the population pin (**not** the quote
+check, above); softening a disclosure into ordinary help → the admission check; a declared help string no longer
+rendered → the render check; a new control with no declaration → the population pin; **the note never reaching
+the browser → the playwright spec**, which is the limb the other five cannot cover.
+
+⭑ **THE PLAYWRIGHT LIMB IS NOT CEREMONY.** Every static assertion here stays green when the rendered text is
+replaced by `''`. *"Content authored, validated, and terminated at the surface boundary"* is this repository's
+own recurring finding; a disclosure that renders only in a unit test discloses nothing.
+
+**⛔ WHAT WAS DELIBERATELY NOT DONE.** Nothing was wired. `evaluationMethod`'s absent reader is **already filed**
+(`REG-F-243`, OPEN); giving it a reader here would re-file a finding this register has answered, and would mint
+the permitted-pairs table that entry's own remedy says it lacks. ⚠ The PWU Type form's controls are **not**
+censused — the gate's population is bounded by the policy form's own action, and widening it is a separate
+increment rather than a silent one.
+
+**⚠ THE SEARCHES BEHIND THIS ENTRY'S ABSENCE CLAIMS.** *"Nothing consults `evaluatorRole`"*: 45 non-test
+production sites across `packages/*/src` and `apps/rph-demo/src`; the two that match a conditional are both
+`policyEditPatch` presence guards written by `REG-F-368` hours earlier. **POSITIVE CONTROL:** the same search
+resolves a genuine comparison for its sibling `independenceRequirement` at `assurance.ts:2198`, so it finds one
+when one exists. *"`policy.rationale` is projected, never branched on"*: three production sites, all of the form
+`String((x.state.rationale ?? '') as string)`. ⚠ **AND THE FIRST INSTRUMENT FOR THAT ONE WAS WRONG** — a bare
+`rationale` search returns **426** sites and 19 apparent comparisons, because the name is shared with the
+DECISION object; the count is meaningless until the subject is qualified, which is the name-versus-shape limit
+this register already records.
+
+**GATES:** check-types 22/22 · lint · verif 431 · `rph-domain` + `rph-application` + `rph-engine` +
+`rph-assurance` + `app:rph-demo` 2232 · playwright 88.
+
+**Merge target:** Repository (`catalog.ts`, the `$lib/authoring/pwuType` re-export, the policy form markup,
+`policy-manager.e2e.ts`, `verif/authoring-field-disposition.test.ts`) and the `JAN-EXECGOV` roadmap. No canon
+artifact changes.

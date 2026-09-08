@@ -77,22 +77,41 @@ pairs it declares.
 ### `EG-05` — the authoring surface stops presenting unread settings as control  *(needs no grant)*
 
 ⭑ The sponsor's own case, and `EG-04`'s original subject, now stated against measurement rather than against a
-recorded list. Two shapes, and they need different remedies:
+recorded list. **MEASURED 2026-09-08** across the eight controls of the Assurance Policy form, by reading every
+production site of each name and separating a CONSULTATION from a copy:
 
-- **A control whose value nothing consults.** `ASSURANCE_POLICY.evaluatorRole` and policy `rationale` are
-  stored, patchable, and compared by nothing; they clear "is it read?" only by being echoed back into the form
-  that posted them. ⚠ **An echo is not a reader.**
-- **A governed field with no control at all.** `applicableObjectTypes` after `EG-04` (the author still cannot
-  set it), `version`, and the five `EG-04`-era names that are minted constants inside `policy-fields.ts`.
+| control | disposition | evidence |
+|---|---|---|
+| `name` · `purpose` | ⭑ read by a PROFESSIONAL — rendered on the policy card | `+page.svelte` card meta |
+| `criteria` | ✓ consulted — assessed, and its severity decides the disposition | assessment path |
+| `independenceRequirement` | ✓ consulted | `assurance.ts:2198`, a real comparison |
+| `permittedControlActions` | ✓ consulted | `assurance.ts:149`, `:1855` — subset validation |
+| `evaluatorRole` | ⛔ **NOT consulted** | 45 production sites, every one an assignment or a projection |
+| `rationale` | ⛔ **NOT consulted** | three sites, all `String((x.state.rationale ?? '') as string)` view projections |
+| `evaluatedClaimTypes` | ⛔ **NOT consulted for a policy this surface can author** | its one reader copies it into a FLOOR policy's finding definitions (`floor-policies.ts:88`), and floor policies are seeded and locked |
 
-⛔ **The remedy is DISCLOSURE, not wiring** — several are legitimately descriptive, and `evaluationMethod`'s
-absent reader is **already filed** (`REG-F-243`), so re-wiring it here would re-file a finding this register has
-answered.
+⛔ **The remedy is DISCLOSURE, not wiring.** `evaluationMethod`'s absent reader is **already filed**
+(`REG-F-243`, OPEN), so wiring here would re-file a finding this register has answered.
+
+⚠⚠ **AND THE OBVIOUS GATE IS ALREADY DEFEATED — MEASURED, NOT FEARED.** A gate that derives "consulted" by
+looking for the field name in a conditional reports `evaluatorRole` and `evaluatedClaimTypes` as CONSULTED at
+HEAD, because `EG-04`'s own `policyEditPatch` added `if (f.evaluatorRole)` — a presence guard, not a
+consultation. **The commit that fixed their sibling would silence the gate for them.** So the disposition is
+DECLARED, and the declaration is made falsifiable instead: a `consulted` claim must name a file and QUOTE the
+reader, and the gate fails if that quote is not in that file. A quote rather than a line, because
+`REG-005` already records that line citations rot.
 
 | Mutant | Must redden |
 |---|---|
-| add a settable field with no reader and no disclosure | the surface census — derived from the markup and the payloads, never hand-listed |
-| **CONTROL** | a field that IS consulted needs no disclosure, so this is not "label everything" |
+| add a control to the policy form and declare no disposition for it | the population pin — derived from the markup, never hand-listed |
+| flip a `NOT consulted` field to `consulted` with an invented reader | the quote check — the claim must resolve in the named file |
+| delete a disclosure's rendering from the markup while keeping the text | the render check: a declared disclosure a professional cannot see is the fiction this item exists to end |
+| **CONTROL** | `independenceRequirement` and `permittedControlActions` are consulted and get NO disclosure — two of them, on the same form, so this is not "label everything" |
+| **CONTROL** | a professional actually SEES a disclosure in the browser (playwright), because a note that renders only in a unit test discloses nothing |
+
+⚠ **Its reach is stated, not claimed away:** the gate checks that a declaration EXISTS, is falsifiable, and is
+rendered. It cannot judge whether a reader is *meaningful*, and it does not try — that limit is in the gate's
+own header, and it is why the dispositions above cite what they cite.
 
 ---
 

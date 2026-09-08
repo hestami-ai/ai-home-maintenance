@@ -40,6 +40,7 @@
 	import {
 		PWU_TYPE_CATALOG,
 		PWU_TYPE_HELP,
+		ASSURANCE_POLICY_FIELDS,
 		ASSURANCE_FLOOR,
 		assurancePolicyLabel
 	} from '$lib/authoring/pwuType';
@@ -1339,42 +1340,48 @@
 										{#if pediting}<input type="hidden" name="policyId" value={policyEditingId} />
 							<input type="hidden" name="expectedRevision" value={policyEditingRevision} />{/if}
 										<div class="ffield">
-											<span class="flabel">Name</span>
-											<input name="name" bind:value={pf.name} required />
+											{@render fhead('Name', ASSURANCE_POLICY_FIELDS.name.help, 'apol-name')}
+											<input id="apol-name" name="name" bind:value={pf.name} required />
 										</div>
 										<div class="ffield">
-											<span class="flabel">Purpose</span>
-											<textarea name="purpose" bind:value={pf.purpose} rows="2"></textarea>
+											{@render fhead('Purpose', ASSURANCE_POLICY_FIELDS.purpose.help, 'apol-purpose')}
+											<textarea id="apol-purpose" name="purpose" bind:value={pf.purpose} rows="2"></textarea>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Rationale</span>
-											<textarea name="rationale" bind:value={pf.rationale} rows="2"></textarea>
+											{@render fhead('Rationale', ASSURANCE_POLICY_FIELDS.rationale.help, 'apol-rationale')}
+											<textarea id="apol-rationale" name="rationale" bind:value={pf.rationale} rows="2"></textarea>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Evaluated claim type</span>
-											<select name="evaluatedClaimTypes" bind:value={pf.evaluatedClaimTypes}>
+											{@render fhead('Evaluated claim type', ASSURANCE_POLICY_FIELDS.evaluatedClaimTypes.help, 'apol-claimtype')}
+											<select id="apol-claimtype" name="evaluatedClaimTypes" bind:value={pf.evaluatedClaimTypes}>
 												{#each CLAIM_TYPES as c (c)}<option value={c}>{c}</option>{/each}
 											</select>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Evaluator role</span>
-											<input name="evaluatorRole" bind:value={pf.evaluatorRole} placeholder="reviewer" />
+											{@render fhead('Evaluator role', ASSURANCE_POLICY_FIELDS.evaluatorRole.help, 'apol-evalrole')}
+											<input
+												id="apol-evalrole"
+												name="evaluatorRole"
+												bind:value={pf.evaluatorRole}
+												placeholder="reviewer"
+											/>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Independence requirement</span>
-											<select name="independenceRequirement" bind:value={pf.independenceRequirement}>
+											{@render fhead('Independence requirement', ASSURANCE_POLICY_FIELDS.independenceRequirement.help, 'apol-indep')}
+											<select id="apol-indep" name="independenceRequirement" bind:value={pf.independenceRequirement}>
 												{#each INDEPENDENCE as i (i)}<option value={i}>{i}</option>{/each}
 											</select>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Permitted control action</span>
-											<select name="permittedControlActions" bind:value={pf.permittedControlActions}>
+											{@render fhead('Permitted control action', ASSURANCE_POLICY_FIELDS.permittedControlActions.help, 'apol-controls')}
+											<select id="apol-controls" name="permittedControlActions" bind:value={pf.permittedControlActions}>
 												{#each CONTROL_ACTIONS as a (a)}<option value={a}>{a}</option>{/each}
 											</select>
 										</div>
 										<div class="ffield">
-											<span class="flabel">Criteria (one per line)</span>
+											{@render fhead('Criteria (one per line)', ASSURANCE_POLICY_FIELDS.criteria.help, 'apol-criteria')}
 											<textarea
+												id="apol-criteria"
 												name="criteria"
 												bind:value={pf.criteria}
 												rows="4"

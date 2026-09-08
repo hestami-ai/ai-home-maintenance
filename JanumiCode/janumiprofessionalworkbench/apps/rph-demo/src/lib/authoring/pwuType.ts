@@ -4,6 +4,8 @@
 // thin re-export keeps the existing form/spec imports (`$lib/authoring/pwuType`) stable.
 export {
 	PWU_TYPE_HELP,
+	ASSURANCE_POLICY_FIELDS,
+	type AuthoringFieldDisposition,
 	PWU_TYPE_CATALOG,
 	catalogTemplate,
 	type PwuTypeTemplate,
