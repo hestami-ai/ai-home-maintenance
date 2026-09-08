@@ -353,7 +353,24 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⚠ IT DOES NOT CLOSE THE `producer`-OMISSION DODGE, which is DELIBERATE, REASONED AND PINNED
 			// (`assurance-independence.test.ts:298`, *"the chosen gate"*). Overturning it turns on whether
 			// UNVERIFIED counts as NOT SATISFIED under §8.4 — a sponsor question, with both readings recorded.
-		).toBe(36);
+			//
+			// 36 -> 37 (2026-09-08): `ROADMAP-execution-governance-layer.md` (`JAN-EXECGOV`). ⭑ ADDED AT SPONSOR
+			// DIRECTION — *"This needs to be addressed holistically and systemically … and not just a point fix
+			// while the wider issue remains unaddressed."* Four slices this week each wired ONE unread carrier;
+			// this measures the whole layer (142 declared fields across four surfaces, plus canon) so the next
+			// move is chosen rather than stumbled into.
+			// ⭑⭑ AND ITS PRINCIPAL FINDING IS A RESTRAINT, WHICH IS WHY IT SUBSUMES RATHER THAN ACCUMULATES.
+			// Exactly ONE ratified rule is unmet — `STA-8`, *"Execution requires an approved plan and authorized
+			// Runtime Bindings"*, against ZERO production dispatches of `RequestRuntimeBinding` (control:
+			// `ApproveExecutionPlan` → 4). Everything else in the layer is DELIBERATELY OPEN: `modelSelectionPolicy`
+			// is configuration by `REG-D-052`, its shape is an explicit `REG-D-048` deferral, declared-vs-resolved
+			// model identity is NOT a rule canon makes, and the activation-condition carriers are a disclosed
+			// deferral with types the corpus never defines. Wiring those would be an implementer inventing
+			// governance — so this roadmap's larger half is a list of what NOT to build.
+			// ⛔ ITS BUILD UNITS ARE GATED on sponsor decision `G-1`: minting a RUNTIME_BINDING requires naming a
+			// capability, capabilities are free strings the corpus never defines, and naming one is a ratification
+			// act the schema will not stop.
+		).toBe(37);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

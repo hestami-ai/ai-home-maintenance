@@ -32644,3 +32644,106 @@ rules behaves exactly as before.
 
 **Merge target:** Repository (`handlers/assurance.ts` + `assurance-disposition-independence.test.ts`). No canon
 artifact changes — `ASR-2` limb 6 (*"when independence is unsatisfied"*) is implemented further, not amended.
+
+---
+
+### REG-F-365 — `STA-8` requires authorized Runtime Bindings and NONE ARE EVER CREATED; and most of the layer around it is deliberately open, not broken
+
+- **Date:** 2026-09-08 · **Type:** FINDING (`JAN-EXECGOV` `EG-01`) ·
+  **Class:** FINDING — a standing breach of a ratified invariant on every production execution, filed before
+  any build; ⭑ **and a larger counter-finding: the carriers around it are mostly DELIBERATELY UNGOVERNED and
+  must not be wired** · **Status:** 🔴 **OPEN — `EG-02`/`EG-03` are gated on sponsor decision `G-1`.**
+
+**SPONSOR DIRECTION (2026-09-08):** *"This needs to be addressed holistically and systemically … and not just a
+point fix while the wider issue remains unaddressed."* This entry is the measurement that direction asked for.
+
+**SCOPE OF THE MEASUREMENT.** 142 declared fields across four carrier surfaces — `RUNTIME_BINDING` (10),
+`PWU_TYPE`/`EXECUTION_STEP`/`EXECUTION_PLAN` (24), `ASSURANCE_POLICY` and its sub-objects (79), and the
+authoring surface (39, overlapping) — plus the ratified corpus. Every field list DERIVED from the vocabulary or
+the schema, never hand-listed.
+
+---
+
+**⛔⛔ THE BREACH.** `STA-8` (`JPWB-DOC-003:203`), verbatim: *"Execution requires an approved plan and
+**authorized Runtime Bindings**, and high-risk irreversible execution requires plan approval before it
+begins."*
+
+**No `RUNTIME_BINDING` is ever created in production.** **SEARCH, RAN:** `grep -rn "'RequestRuntimeBinding'"
+--include=*.ts --include=*.svelte packages apps`, excluding `node_modules`, `/dist/`, `.svelte-kit`, `*.test.ts`
+and e2e → **1 hit, and it is not a dispatch**: `packages/rph-contracts/src/messages.ts:3605`, a contract
+declaration. **POSITIVE CONTROL, same form, same population:** `'ApproveExecutionPlan'` → **4 hits**, including
+real dispatch sites. So a sibling execution command is dispatched four times and the binding-minting command
+zero times.
+
+Both production `ActivateExecutionPlan` call sites pass `authorizedRuntimeBindingIds: []`
+(`+page.server.ts:969`, `reference-undertaking.ts:723`).
+
+⚠ **AND THE GATE THAT WOULD NOTICE CANNOT.** `bindingAuthorityVerdict` (`rph-domain/src/execution.ts:279-280`)
+returns `{ ok: true, limb: 'OUT_OF_SCOPE' }` when the step names no binding — **correctly**, because two
+absences mean opposite things and collapsing them *"would make every plan in the reference seed … permanently
+unstartable"* (`:195-196`). But since every production step names none, **every step takes `OUT_OF_SCOPE`**, and
+the four binding checks are live, tested, and **unreachable on real work**.
+
+⭑ **THE ABSENCE IS ALREADY DISCLOSED; THE BREACH IS NOT.** `SPEC-001:10145` records *"`grep -c "RUNTIME_BINDING"
+packages/rph-engine/src/reference-undertaking.ts` returns **0**. The reference seed authors no RuntimeBinding
+whatsoever."* And `execution.ts:1192-1207` records the allowlist refusal being **deliberately WITHDRAWN** as
+*"an UNRECOVERABLE WEDGE"*, leaving `authorizedRuntimeBindingIds` *"persisted, and read by nothing. That is a
+real problem and it is recorded as OPEN rather than as closed."* **What no artifact states is that `STA-8` —
+a ratified invariant — is therefore unmet on every execution the system performs.** That is what this entry
+files.
+
+---
+
+**⛔ IT CANNOT BE FIXED WITHOUT A GRANT.** Minting a binding requires naming a capability: `RequestRuntimeBinding`
+refuses an empty request (`N-20`) and `AuthorizeRuntimeBinding` refuses an authorization granting nothing
+(`N-22`). A capability is `{ capability: z.string() }` — a **free string** — and its vocab note reads *"Helper
+undefined (persistence: capability_requests §31)."*
+
+⚠ **So the schema will accept any name, and that is precisely the danger.** Naming a capability is **coining
+governed vocabulary**, the same act as minting `CONTEXT_ASSEMBLY_POLICY` under `D-1`. The difference is that
+the emitted schema stopped that one and will not stop this one. **A ratification act nothing enforces is still
+a ratification act.** Recorded as decision `G-1`.
+
+---
+
+**⭑⭑ THE LARGER FINDING IS A RESTRAINT: MOST OF THIS LAYER IS DELIBERATELY OPEN, NOT BROKEN.**
+
+The layer looks under-connected, and the reflex — visible in four slices this week — is to wire the next unread
+field. Measured against canon, that reflex would be **wrong** for almost all of what remains:
+
+| Carrier | Why it must NOT be wired |
+|---|---|
+| `modelSelectionPolicy` | `REG-D-052`, sponsor verbatim: *"We won't be pinning judge model … it will need to be configurable."* `ASR-4`: models are *"runtime assets of the policy, never the policy itself."* **Configuration, by ruling.** |
+| `ModelSelectionPolicy`'s shape | `REG-005:31738` — *"DEFERRED, as `REG-D-048` requires be done explicitly. Grounds: no field shape anywhere in the corpus, no reader, no command that can set it."* |
+| binding declared-vs-resolved model | **NOT A RULE.** `PER-9` requires recording *"the resolved provider, model, and version actually invoked"* and **never requires declaring an allowed one, nor binds the two**. *"allowed and resolved"* occurs **once** in the corpus, in an observability section, with no stated consequence. **CONTROL:** canon knows how to write identity-binding — `ASR-16`, *"exactly matching the reviewed version"* — and did not write it here. |
+| context selection beyond constraints | `DEC-4`'s SCOPE binds context assembly **for mandatory constraints only**; selection, freshness and compression are assigned to Context Engineering (`DOC-001:154`) with no invariant behind them. |
+| `memoryPolicyId` | Ratified field, no writer, no shape — same class as `ModelSelectionPolicy`. |
+| `riskConditions` · `lifecycleTriggers` · `eventTriggers` · `semanticChangeConditions` | Disclosed deferral: *"ACTIVATION conditions (§5.3), not SCOPE conditions … not silently folded in here"*; element types *"DEFINED NOWHERE in the corpus."* |
+
+⛔ **Wiring any of these would be an implementer inventing a rule the corpus declined to make** — and for most,
+the register already records the deferral. ⭑ This half of the finding is the more useful one: it converts an
+open-ended "connect the layer" instinct into **one** decision.
+
+---
+
+**⚠ THE AUTHORING SURFACE, WHICH NEEDS NO GRANT.** The sponsor's case — *"the human user may use the UI to make
+manual changes as well"* — is where the measurement bites. Of 39 settable fields, **22 govern and 11 are
+settable-but-unread** (`AssessmentCriterion.criterionType`, `evaluationMethod`, `mayBeNotApplicable`,
+`requiredEvidenceIds`; `ASSURANCE_POLICY.evaluatorRole`, `evaluatedClaimTypes`, `findingDefinitions`, and
+others). **A setting a person edits and nothing reads is a fiction presented as control.** ⛔ The remedy is
+DISCLOSURE, not wiring eleven fields — several are legitimately descriptive and some belong to deferred
+concerns.
+
+⚠ **AN INSTRUMENT CORRECTION FROM THE MEASUREMENT ITSELF, recorded because it nearly corrupted the numbers:**
+one lane's first census used `rg -g '!*.test.ts' … -g '*.ts'`, and in ripgrep **later globs win**, so the
+trailing include re-admitted every test file. It was caught by the lane, re-measured with exclusions last, and
+verified against a control that returns production-only hits. Absence claims made under the broken instrument
+remain sound (0 with tests included implies 0 without); every nonzero count was re-taken.
+
+**DECISIONS PUT TO THE SPONSOR:** `G-1` (grant to name capability vocabulary — the only thing that unblocks the
+breach); `G-2` (disclose unread authoring settings rather than remove them); `G-3` (`REG-F-364`'s
+`producer`-omission dodge, which `G-1` would make far less urgent, since a binding names the role that ran the
+step and the producer becomes resolvable from the record).
+
+**Merge target:** `docs/_working/DESIGN-execution-governance-layer.md` and its roadmap. No code in this entry —
+**the breach is filed before anything is built**, because it stands whether or not `G-1` is granted.
