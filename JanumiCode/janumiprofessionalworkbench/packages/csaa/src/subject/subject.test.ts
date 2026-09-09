@@ -2727,7 +2727,32 @@ describe('live JPWB and inventory projection', () => {
 		// retention surface the question asks about (a model CLI’s stderr can echo prompt content), so the gate
 		// reddens on that day and sends the author back to the question. It carries its own positive control,
 		// driven: pointing the source walk at a missing directory reddens the CONTROL, not just the assertion.
-		expect(counts.get('verif/tsconfig.json')).toBe(63);
+		// ⚠ 63 -> 69, AND THE FINDING IS THE ROUTE, NOT THE NUMBER: SIX CONSECUTIVE PROGRAMMES IN SIX DAYS EACH
+		// MOVED THIS POPULATION AND NONE OF THEM SAW IT MOVE. Derived, not enumerated: `verif/*.ts` in git is 63
+		// at dbe1a955 (the commit that last set this pin) and 69 at HEAD, with six added and NONE removed, and
+		// the live projection agrees at 69 — so this is growth, not a re-measurement, and the population is
+		// larger rather than emptier. The six, each with the commit that introduced it:
+		//   +1 `verif/model-exchange-conformance.test.ts`             93e19525  2026-09-03  JAN-MXR-06
+		//   +1 `verif/tool-adapter-exports-reachable.test.ts`         d6e3e9ac  2026-09-06  JAN-ASRIDENT
+		//   +1 `verif/applicability-subject-single-projector.test.ts` f4455c35  2026-09-07  JAN-APPLSUBJ
+		//   +1 `verif/form-key-emitter-census.test.ts`                9ac93165  2026-09-08  JAN-EXECGOV EG-04
+		//   +1 `verif/authoring-field-disposition.test.ts`            39f4a905  2026-09-08  JAN-EXECGOV EG-05
+		//   +1 `verif/tracker-census-freshness.test.ts`               2b236b08  2026-09-08  REG-F-370
+		// This file has already recorded the same detection route under JAN-SLICE-SWP-04, JAN-ICP-01, JAN-ICP-02
+		// and JAN-ICP-03: a scoped run hides CSAA population moves. What is new is that it happened SIX TIMES IN
+		// A ROW without anyone noticing. ⚠ THE MECHANISM FIRST WRITTEN HERE WAS WRONG AND A CONTROL FALSIFIED IT:
+		// it said `packages/csaa` declares no `test` script so `turbo run test` never reaches it. But NO package
+		// declares one — `rph-domain` has no `test` script either and its tests run — and `vitest.projects.ts`
+		// DERIVES the project set from the filesystem, so `csaa` is discovered like every other package.
+		// ⭐ THE REAL REASON IS A HABIT, NOT A CONFIG GAP, AND IT IS THE AUTHORS' OWN: every one of those six ran
+		// vitest with NAMED `--project` filters (verif, rph-domain, rph-application, rph-engine, rph-assurance,
+		// app:rph-demo) and never the unfiltered suite — several of them said so in their own commit messages,
+		// which record gate lines ending `csaa excluded`. A population nobody runs is a population nobody moves
+		// deliberately, and naming a config gap for it would have put the fault somewhere it is not. The pin is a tripwire and it did trip; it tripped six
+		// commits late, in a window belonging to none of the authors who moved it. Corrected here by the
+		// sponsor-directed CSAA investigation of 2026-09-09, and recorded rather than quietly folded into the new
+		// number, per this file's own standing instruction.
+		expect(counts.get('verif/tsconfig.json')).toBe(69);
 		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
 		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
 		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands
@@ -2778,7 +2803,45 @@ describe('live JPWB and inventory projection', () => {
 		// verbatim into a VALIDATOR_EXECUTION_FAILED observation statement, which is persisted and projected.
 		// PER-12: never logged, never projected. The failure is now sanitised at the boundary and the
 		// diagnostic is disclosed-as-withheld rather than leaked (REG-F-333).
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(105);
+		// ⚠ 105 -> 130, AND THIS PIN WAS INVISIBLE WHILE THE ONE ABOVE IT WAS STALE. `expect` throws, so the
+		// verif assertion above aborted this test before this line was ever evaluated: twenty-five files of
+		// drift across FIFTEEN commits and six days were being masked by a single earlier number. That masking
+		// is itself a finding about this test's shape and is recorded as one at the end of this block; the two
+		// pins went stale INDEPENDENTLY and neither caused the other.
+		// The arithmetic, derived from git rather than read off the failure message, shows the drift is entirely
+		// SOURCE growth and that the generated half did not move at all:
+		//   at 95c71798 (the commit that set 105): 91 `src/**/*.{ts,js,svelte}` + 1 `vite.config.ts`
+		//                                          + 3 `.svelte-kit` ambient d.ts
+		//                                          + 10 `.svelte-kit/types/**/$types.d.ts` = 105
+		//   at HEAD:                              116 + 1 + 3 + 10 = 130
+		// Same ten routes, same three ambient files: +25 source files, 0 removed. Note what that decomposition
+		// also says — 13 of these 130 are SvelteKit GENERATED output, so this pin is partly a function of
+		// `svelte-kit sync`. The recorded generated-context evidence is separately stale at the time of writing,
+		// and it is NOT the cause of this move.
+		// The twenty-five, by the work package that introduced them:
+		//   JAN-MXR-05b        51fd5400                              2026-09-03  assurance/exchange-recorder.ts
+		//   JAN-MXREAD         58a57944                              2026-09-04  assurance/reviewer-answer.ts
+		//   JAN-TOOLSUITE      024ebb9d, 2a5c4587, a1a3d913, bdff99ce 2026-09-05 tools/backing-tool{,.test}.ts,
+		//                      tools/pi-executor.ts, execution/model.test.ts, tools/diagnostic-safety.ts,
+		//                      tools/devin-reviewer{,.test}.ts       (TS-01/02, TS-03, TS-05/06/08, TS-07)
+		//   JAN-EXECRUN        8c42d8b9, 69d0203d                    2026-09-05  execution/run-model-step{,.test}.ts,
+		//                      execution/model.ts                    (XR-01/02, XR-03)
+		//   JAN-EXECREVIEW     79411a07                              2026-09-05  execution/work-product-floor{,.test}.ts
+		//   JAN-EXECRAT        ff678386                              2026-09-05  execution/execution-contract{,.test}.ts
+		//   JAN-EXECLOOP       10aa8c4a                              2026-09-05  execution/loop-detection{,.test}.ts
+		//   JAN-WPREVIEW       8a72226d                              2026-09-05  assurance/work-product-review.test.ts,
+		//                      execution/work-product-floor-run.test.ts
+		//   JAN-CTXPOL CP-04   efa830c1                              2026-09-06  execution/context-policy{,.test}.ts
+		//   JAN-EXECSESS       dcbaf254                              2026-09-06  execution/producer-session.ts
+		//   JAN-EXECGOV EG-02  4c4cbe39                              2026-09-08  execution/step-binding{,.test}.ts
+		// ⚠ OPEN, DELIBERATELY NOT FIXED HERE: this test asserts its root populations as SEQUENTIAL `expect`s, so
+		// it can only ever report the FIRST stale pin. That is why one number being six days out of date concealed
+		// a second number being twenty-five files out of date, and it will conceal the next one the same way. The
+		// repair is to compare all the roots as ONE object, so every drifted population is named in a single
+		// failure. It is left undone because restructuring the assertion would displace the per-pin narrative
+		// above, which is the part of this test that has repeatedly done the teaching — that trade needs a CSAA
+		// decision, not a passing agent's.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(130);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

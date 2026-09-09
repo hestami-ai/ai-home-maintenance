@@ -2730,9 +2730,22 @@ function assertRequiredSelectedPaths(
 }
 
 function assertJpwbTestPopulations(subject: FrozenSubject): void {
+	// ⚠ THE EXACT ARITY IS THE POINT, AND IT STAYS EXACT. This list is the only thing standing between the
+	// inventory and an unwired stray `playwright.*.config.ts` — or a duplicated vitest lane — being admitted as
+	// sanctioned assurance. Every pair is ENUMERATED here and then cross-checked against an INDEPENDENT census
+	// of subject artifacts below; deriving the set from the same configuration files discovery already read
+	// would make the guard vacuous. So a new lane MUST be recorded here by hand, deliberately.
+	//
+	// ⭑ PLAYWRIGHT/LIVE_EXEC was added by f35cb69d (2026-09-05, JAN-LIVEEXEC): apps/rph-demo/
+	// playwright.live-exec.config.ts, testDir `e2e-live-exec`, testMatch `**/*.live.ts`, wired as the
+	// `e2e:live-exec` script in apps/rph-demo/package.json. That lane is deliberately OUTSIDE the gate (it hits
+	// real models and costs money), but it is a CONFIGURED test population and discovery finds it, so this guard
+	// has to account for it. It went unrecorded for four days and reddened the arity check rather than being
+	// silently absorbed — which is this guard working, not failing. Recorded rather than quietly widened.
 	const expectedProfiles = [
 		['PLAYWRIGHT', 'DETERMINISTIC'],
 		['PLAYWRIGHT', 'LIVE'],
+		['PLAYWRIGHT', 'LIVE_EXEC'],
 		['VITEST', 'DIST'],
 		['VITEST', 'SOURCE']
 	] as const;
@@ -2768,10 +2781,16 @@ function assertJpwbTestPopulations(subject: FrozenSubject): void {
 	const expectedLive = artifactPaths.filter((path) =>
 		/^apps\/rph-demo\/e2e-live\/.*\.live\.ts$/u.test(path)
 	);
+	// The two live directories are distinguished by the literal slash: `e2e-live/` cannot swallow `e2e-live-exec/`
+	// and vice versa, so neither census can be satisfied by the other lane's files.
+	const expectedLiveExec = artifactPaths.filter((path) =>
+		/^apps\/rph-demo\/e2e-live-exec\/.*\.live\.ts$/u.test(path)
+	);
 	for (const [actual, expected, name] of [
 		[source, expectedUnit, 'Vitest'],
 		[population('PLAYWRIGHT', 'DETERMINISTIC'), expectedDeterministic, 'Playwright deterministic'],
-		[population('PLAYWRIGHT', 'LIVE'), expectedLive, 'Playwright live']
+		[population('PLAYWRIGHT', 'LIVE'), expectedLive, 'Playwright live'],
+		[population('PLAYWRIGHT', 'LIVE_EXEC'), expectedLiveExec, 'Playwright live execution']
 	] as const)
 		if (canonicalJson(actual) !== canonicalJson(expected))
 			throw new Error(`Required JPWB ${name} test population differs from its independent census.`);
