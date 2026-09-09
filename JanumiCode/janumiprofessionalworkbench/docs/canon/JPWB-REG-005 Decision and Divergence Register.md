@@ -33784,3 +33784,64 @@ files RED as designed.
 **Merge target:** Repository (`vitest.projects.ts`, `vitest.config.ts`, `vitest.census.config.ts`,
 `package.json`, the JAN-CSAADEC design + roadmap).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-378 — the census list gets an instrument, the check that was specified for it turned out to be unbuildable, and the equality assertion I nearly shipped would have read two silences as agreement
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-CSAADEC` `CD-04`) ·
+  **Class:** INSTRUMENTATION — a hand-maintained list gated; two would-be vacuous controls caught ·
+  **Status:** ✅ **`CD-04` CLOSED. `CD-05`/`CD-06` remain.**
+
+**WHAT LANDED.** Five limbs in `verif/test-modes.test.ts`, each killed by its NAMED victim: a plausible non-empty
+census; every `CSAA_CENSUS` path EXISTS; the `csaa` lane excludes exactly what the census lane includes; the
+census lane is absent from BOTH gate configs; and both gate configs carry the SAME harness watchdogs.
+
+⚠ **NOT A NEW `verif/` FILE, AND THE REASON IS THE PROGRAMME ITSELF.** Adding a file to `verif/` moves the very
+population the census pins. A gate ABOUT the census that churns the census would be its own first defect.
+`test-modes.test.ts` already owns this class, so the limbs joined it and the verif population stayed at 72.
+
+---
+
+**⭑⭑ THE PART WORTH KEEPING (1): THE EQUALITY ASSERTION I NEARLY SHIPPED COULD NOT HAVE FAILED.** The watchdog
+limb began as `expect(watchdogsOf(srcConfig)).toEqual(watchdogsOf(distConfig))`. ⛔ **Two configs that both
+declare NOTHING compare EQUAL.** Stripping the settings from both would have satisfied it — and read as
+agreement — forever. Mutant `N5` removes all three from BOTH files and must redden; it does, because the limb
+now asserts the VALUES as well as their equality. ⭑ This is `a control that cannot fail` in its purest form:
+the assertion was about a RELATION, and a relation between two absences holds trivially.
+
+**⭑ THE PART WORTH KEEPING (2): `passWithNoTests: false` DOES NOT COVER THE ROT IT LOOKS LIKE IT COVERS.** It
+fires only when ALL census files vanish. Delete or mistype ONE of three and the lane finds the other two, exits
+0, and the third is silently unmeasured. That is `N-16`'s shape scoped to a list of three, and it now has its
+own limb (`N1`).
+
+---
+
+**⛔ WHAT WAS SPECIFIED FOR THIS INCREMENT AND IS UNBUILDABLE, RECORDED RATHER THAN QUIETLY DROPPED.** The
+roadmap asked for *"a `verif/` test asserting that no file in the `csaa` lane reads the live workbench tree."*
+Measured, **SIX csaa-lane files transitively reach a live-tree module and pass perfectly well** — importing
+`collect-inventory.ts` is not executing its assertions. The check would have failed on its first run.
+
+⛔ **AND THE OBVIOUS REPAIR IS SELF-DEFEATING.** Pinning the reachable SET instead would fire on any CSAA change,
+inside the `verif` gate that runs on everything — which is precisely the coupling `CD-03` removed, reintroduced
+one file over. So exhaustiveness is NOT gated, the test says so in terms, and `CD-05` answers it behaviourally
+and on demand. ⭑ **The block gates the LIST; it does not pretend to gate the JUDGEMENT that produced it.** A
+roadmap's specified remedy is a hypothesis — the fourth time this programme has had to correct one.
+
+**⚠ AND A MUTANT OF MINE WAS WRONG BEFORE IT WAS RIGHT, WHICH IS WHY IT IS RECORDED.** `N6` first replaced one
+census entry with a `...[]` spread — leaving TWO entries, not zero — and SURVIVED. My first reading was that a
+limb was weak. The gate was correct; the mutant was not. ⭑ But its survival located something true: removing
+ONE entry from `CSAA_CENSUS` is caught by no limb in this file. It is caught by the file returning to the gated
+lane and reddening it, which is `CD-03`'s `M1`. The coverage exists; it does not live where I looked for it, and
+a surviving mutant is a question about WHERE the guarantee sits before it is a claim that none does.
+
+**MUTANTS (6 run, 6 killed by their named victim):** `N1` an entry mistyped → the existence limb; `N2` the
+`exclude` clause removed → the partition limb; `N3` census added back into `projectsFor()` → the
+absent-from-the-gate limb; `N4` source config loses one watchdog → the symmetry limb; `N5` BOTH configs lose all
+three → the same limb via its non-vacuity half; `N6` list emptied → the floor.
+
+**GATES:** check-types 22/22 · lint · verif **62 files, 472 passed** (from 467 — the five new limbs) · verif
+population unchanged at 72, so nothing here moved the census.
+
+**Merge target:** Repository (`verif/test-modes.test.ts`, the JAN-CSAADEC roadmap).
+⚠ No ratified artifact was amended.

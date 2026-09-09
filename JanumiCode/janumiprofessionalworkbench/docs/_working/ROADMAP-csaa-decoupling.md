@@ -115,23 +115,49 @@ fresh judgement, and picking different values would recreate the divergence from
 
 ## CD-04 — a gate over the exclusion list
 
-**Status:** ⬜ PLANNED · **Gated by:** `CD-03`
+**Status:** ✅ LANDED — 2026-09-09, as five limbs added to `verif/test-modes.test.ts`
 
 ⭑⭑ **A HAND-MAINTAINED LIST GETS AN INSTRUMENT, OR IT ROTS — THAT IS THIS REPOSITORY'S OWN STANDING FINDING.**
-`CD-03` introduces the first enumerated list in `vitest.projects.ts`. `CD-04` is what stops it becoming the
-defect the file was written to prevent.
+`CD-03` introduced the first enumerated list in `vitest.projects.ts`. These limbs are what stop it becoming the
+defect that file was written to prevent.
 
-**The check.** A `verif/` test asserting that no file in the `csaa` lane reads the live workbench tree — the
-static half, cheap enough for the gate: no `process.cwd()`, no `readdirSync` rooted above the package, no import
-reaching the eight live-tree modules named in the design's `§3`.
+⚠ **NOT A NEW `verif/` FILE, AND THE REASON IS THE PROGRAMME ITSELF.** Adding a file to `verif/` moves the very
+population the census pins — a gate ABOUT the census that churns the census would be its own first defect.
+`test-modes.test.ts` already owns this class: it is where *"both modes run the same project set"* and
+*"`passWithNoTests: false` everywhere"* live.
 
-⭑ **AND A SECOND LIMB THAT IS NEARLY FREE, SURFACED BY `CD-03`:** assert that the two configs which derive
-from `projectsFor()` carry the SAME watchdog settings. `CD-03b` existed because they did not, and nothing would
-have said so. That check is three comparisons and it closes the class, not the instance.
+| limb | mutant | result |
+| --- | --- | --- |
+| a plausible, non-empty census | `N6` list emptied | ✅ RED |
+| names only files that EXIST | `N1` an entry mistyped | ✅ RED |
+| the csaa lane excludes EXACTLY what the census includes | `N2` `exclude` clause removed | ✅ RED |
+| the census lane is absent from both gate configs | `N3` census added back into `projectsFor()` | ✅ RED |
+| both gate configs carry the SAME watchdogs | `N4` source config loses one | ✅ RED |
+| …and the non-vacuity half of that limb | `N5` **both** configs lose all three | ✅ RED |
 
-⚠ **AND ITS OWN LIMIT IS DECLARED IN THE TEST.** The static check is an over-approximation; the design records
-that both static instruments were wrong. The behavioural check — perturb and diff — is `CD-05`, deliberately not
-in the gate.
+⭑ **`N5` IS THE ONE THAT MATTERS.** Two configs that both declare NOTHING compare EQUAL — the equality assertion
+alone is a control that cannot fail, and would have read as agreement forever. The limb asserts the values as
+well as their equality, so stripping both reddens it.
+
+⭑ **AND `N1`'S LIMB EXISTS BECAUSE `passWithNoTests: false` DOES NOT COVER IT.** That flag fires only when ALL
+census files vanish. Delete or mistype ONE of three and the lane finds the other two, exits 0, and the third is
+silently unmeasured — `N-16`'s shape scoped to a list of three.
+
+⛔ **WHAT WAS SPECIFIED AND IS UNBUILDABLE, RECORDED RATHER THAN QUIETLY DROPPED.** This increment was written up
+as *"a `verif/` test asserting that no file in the `csaa` lane reads the live workbench tree."* Measured, **six
+csaa-lane files transitively reach a live-tree module and pass perfectly well** — importing
+`collect-inventory.ts` is not executing its assertions. That check would have failed on its first run.
+
+⛔ **AND THE OBVIOUS REPAIR IS SELF-DEFEATING.** Pinning the reachable SET instead would fire on any CSAA change,
+inside the `verif` gate that runs on everything — which is precisely the coupling `CD-03` removed, reintroduced
+one file over. ⭑ So exhaustiveness is NOT gated, the test says so in terms, and `CD-05` answers it behaviourally
+and on demand. **This block gates the LIST; it does not pretend to gate the JUDGEMENT that produced it.**
+
+⚠ **A MUTANT OF MINE WAS WRONG BEFORE IT WAS RIGHT, AND THE WRONG ONE TAUGHT MORE.** `N6` first replaced one
+entry with a `...[]` spread — which leaves TWO entries, not zero — and survived. The gate was correct; the
+mutant was not. ⭑ But its survival located something true: removing ONE entry from `CSAA_CENSUS` is caught by no
+limb here. It is caught by the file returning to the gated lane and reddening it — `CD-03`'s `M1`. The coverage
+exists; it just does not live where I first looked for it.
 
 ## CD-05 — the behavioural exhaustiveness check, on demand
 
