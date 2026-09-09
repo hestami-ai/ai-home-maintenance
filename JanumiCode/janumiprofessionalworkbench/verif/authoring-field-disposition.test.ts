@@ -27,7 +27,12 @@
 // counting.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ASSURANCE_POLICY_FIELDS } from '@janumipwb/rph-authoring/catalog';
+import { ASSURANCE_POLICY_FIELDS, PWU_TYPE_HELP } from '@janumipwb/rph-authoring/catalog';
+
+/** `PWU_TYPE_HELP` is `as const`, so indexing it by a `string` is a type error. Widened ONCE, here, rather
+ *  than casting at six call sites — and deliberately NOT `any`: a missing key must read as `undefined` so the
+ *  control below can catch a rename, not be silently allowed through. */
+const HELP: Readonly<Record<string, string | undefined>> = PWU_TYPE_HELP;
 
 const MARKUP_PATH = 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte';
 const MARKUP = readFileSync(MARKUP_PATH, 'utf8');
@@ -136,5 +141,125 @@ describe('EG-05 — every policy control declares what it does', () => {
 				.map(([f]) => f)
 				.sort()
 		).toEqual(['evaluatedClaimTypes', 'evaluatorRole', 'rationale']);
+	});
+});
+
+// ── ⭑⭑ JAN-EXECGOV EG-06 — THE PWU TYPE FORM'S HELP MUST NOT CLAIM GOVERNANCE THAT DOES NOT EXIST ────────────
+//
+// `EG-05` handled a form with BARE LABELS. This is the opposite and harder case: the PWU Type form already had
+// help, single-sourced and rendered — and measurement (four adjudication lanes, each attacked by a skeptic)
+// found FIVE of its twenty strings claiming a guarantee the code does not make.
+//
+// ⛔ A FIELD WITH NO EXPLANATION LEAVES A PROFESSIONAL UNCERTAIN; A FIELD WITH A FALSE ONE LEAVES THEM CONFIDENT
+// AND WRONG. The worst was `completionRule` — *"When an Instance of this type is DONE … (no green without
+// assurance)"* — where nothing evaluates the field and *"no green without assurance"* is a REAL guarantee, made
+// by `requireGoverningPolicies` and the locked floor and keyed on other fields entirely. A true guarantee
+// attached to an inert textbox is a reason to trust it.
+//
+// ⚠⚠ AND THE ADMISSION CHECK IS A REGEX OVER PROSE, WHICH A FRAGMENT CAN SATISFY — MEASURED, NOT SUPPOSED.
+// The first two mutants written against it SURVIVED: each replaced only the TAIL of a help string, leaving
+// the admission phrase standing earlier in the same entry, so the text matched while the sentence had
+// stopped being true. Re-aimed at the WHOLE entry — which is what "restore the original" actually means —
+// both went red. The limitation is real and stated: this pins that an admission is PRESENT, not that the
+// surrounding sentence is coherent. A human reads the string; this stops it vanishing.
+//
+// ⚠ WHAT THIS GATE DOES AND DOES NOT DO. It pins the ADMISSIONS: a field measured as unenforced must keep saying
+// so. It does NOT re-derive "is this consulted?" — that judgment came from an adversarial adjudication and lives
+// in `REG-F-371`, and a static test cannot redo it. The full per-control disposition declaration for this form,
+// in the shape `ASSURANCE_POLICY_FIELDS` already uses, is `EG-07` and is deliberately not folded in here.
+describe('EG-06 — the PWU Type form admits what it does not enforce', () => {
+	/** Fields measured unenforced, each with the admission its help must carry. Struck through would be silent. */
+	const MUST_ADMIT: Readonly<Record<string, RegExp>> = {
+		// Nothing evaluates it: all production sites are schema, assignment, presence guard or stored default.
+		completionRule: /not evaluated|no gate reads it/i,
+		// Two admissions on ONE key, because one control is described by one string. `permittedChildTypeIds`
+		// had its own entry and it was rendered by NOTHING — deleted, and its admission folded here.
+		// ZERO occurrences in rph-domain/src, handlers/pwu.ts and handlers/decomposition.ts; and four
+		// cardinality codes are declared while only the mandatory/conditional split is enforced.
+		permittedChildren: /NOT AN ALLOW-LIST[\s\S]*upper bound is NOT enforced/i,
+		// Beyond the id-validity check it changes no outcome.
+		attestedAssurancePolicyIds: /CHANGES NO OUTCOME|nothing at Undertaking or assessment time reads/i,
+		// No matcher exists; `work-product-floor.ts` says so itself.
+		promptOutputContract: /nothing compares the answer back against it|not machine-checked/i
+	};
+
+	it('⛔⛔ every field measured UNENFORCED still says so in the text a professional reads', () => {
+		// THE MUTANT: restore any of the five original strings. Each asserted a guarantee that does not exist, and
+		// `completionRule`'s borrowed a real one from a different field.
+		const silent = Object.entries(MUST_ADMIT)
+			.filter(([field, admission]) => !admission.test(HELP[field] ?? ''))
+			.map(([f]) => f);
+		expect(
+			silent,
+			'this field was measured as unenforced and its help no longer admits it — the fiction EG-06 exists to end'
+		).toEqual([]);
+	});
+
+	it('⭑ CONTROL — every named field EXISTS in the help map, so a rename cannot empty this gate', () => {
+		// ⛔ Without this, renaming a key makes `HELP[field]` undefined; the regex would fail and read as
+		// a missing admission rather than as a broken gate. Worse, deleting a key AND its entry here would pass.
+		for (const field of Object.keys(MUST_ADMIT))
+			expect(HELP[field], `${field} is not a key of PWU_TYPE_HELP`).toBeTypeOf('string');
+	});
+
+	it('⭑⭑ CONTROL — the ENFORCED fields do NOT disclaim themselves, so this is not "disclaim everything"', () => {
+		// ⛔ THE FAILURE THIS GUARDS IS REAL AND IT IS THE OPPOSITE ONE. 15 of the 20 controls ARE consulted; a
+		// professional told that nothing works stops reading the notes, and the two fields that genuinely gate
+		// publication (`isRoot`) and policy selection (`pwuKind`) would lose their reader with them.
+		const DISCLAIMER = /not evaluated|no gate reads it|changes no outcome|not an allow-list/i;
+		for (const field of ['name', 'pwuKind', 'purpose', 'isRoot', 'requiredAssurancePolicyIds'])
+			expect(DISCLAIMER.test(HELP[field] ?? ''), `${field} is consulted and must not disclaim itself`).toBe(
+				false
+			);
+	});
+
+	it('⛔ the PWU Type form single-sources ALL its help — no form carries two vocabularies for one thing', () => {
+		// ⚠ MEASURED, NOT FEARED: three of these fifteen were INLINE LITERALS in the markup while their twelve
+		// siblings came from the catalog — and those three were exactly the ones the agent's tool schema cannot
+		// see, so the two authors of one object were reading different words. THE MUTANT: inline any help string
+		// back into an `{@render fhead(...)}` call.
+		const start = MARKUP.indexOf("action={editing ? '?/editType' : '?/defineType'}");
+		expect(start, 'the PWU Type form action could not be located').toBeGreaterThan(-1);
+		const region = MARKUP.slice(start, MARKUP.indexOf('</form>', start));
+		const calls = [...region.matchAll(/\{@render fhead\(\s*([^)]*?)\)\}/gs)].map((m) => m[1]!);
+		expect(calls.length, 'the region yielded no fhead calls — the derivation broke').toBeGreaterThanOrEqual(12);
+		const inline = calls
+			.map((c) => c.split(/,(?![^(]*\))/)[1]?.trim() ?? '')
+			.filter((arg) => arg.startsWith("'") || arg.startsWith('"') || arg.startsWith('`'));
+		expect(
+			inline,
+			'this help string is written inline in the markup instead of PWU_TYPE_HELP. One form, one vocabulary — ' +
+				'and only the catalog is reachable by the authoring agent.'
+		).toEqual([]);
+	});
+
+	it('⛔⛔ no help string is read by NOBODY — the e2e found one, so the gate now derives it', () => {
+		// ⚠ THIS LIMB EXISTS BECAUSE THE UNIT TESTS COULD NOT SEE IT. `permittedChildTypeIds` was authored,
+		// rendered by no form, named by no tool schema — and EG-06 CORRECTED IT before noticing, so a false
+		// governance claim was replaced by a true sentence nobody could read. The e2e assertion that a person can
+		// SEE the text is what failed; this is that failure made cheap and general.
+		//
+		// ⭑ THE POSITIVE CONTROL IS BUILT IN: twelve of the thirteen remaining keys are used by BOTH consumers, so
+		// a derivation that stopped resolving either one would empty the "used" set and redden loudly rather than
+		// reporting a clean map.
+		const tools = readFileSync('apps/rph-demo/src/lib/server/agent/tools.ts', 'utf8');
+		// ⚠ `\\b` and `\\.`, not `\b`/`\.`: inside a TEMPLATE LITERAL those are a backspace character and a
+		// literal dot-escape, so the first version of this line built a RegExp matching nothing and the CONTROL
+		// below caught it — reporting "no key is used by both" rather than "no key is unread".
+		const usedByAgent = (k: string) => new RegExp(`\\bhelp\\.${k}\\b`).test(tools);
+		const renderedInForm = (k: string) => MARKUP.includes(`PWU_TYPE_HELP.${k}`);
+		const keys = Object.keys(HELP);
+
+		expect(keys.length, 'PWU_TYPE_HELP is empty — the import or the map broke').toBeGreaterThan(10);
+		expect(
+			keys.filter((k) => renderedInForm(k) && usedByAgent(k)).length,
+			'CONTROL: neither consumer resolves, so "read by nobody" would be true of everything'
+		).toBeGreaterThanOrEqual(10);
+
+		expect(
+			keys.filter((k) => !renderedInForm(k) && !usedByAgent(k)),
+			'this help string is rendered by no form and named by no tool schema. Authored content that reaches ' +
+				'no reader is the shape this programme keeps recording — render it, give it to the agent, or delete it.'
+		).toEqual([]);
 	});
 });

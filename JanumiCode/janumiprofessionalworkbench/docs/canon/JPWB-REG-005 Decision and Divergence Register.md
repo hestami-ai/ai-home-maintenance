@@ -33208,3 +33208,84 @@ caught in the commit that makes it rather than a week later by an unrelated gate
 **Merge target:** Repository (`verif/tracker-census-freshness.test.ts`). No change to `measure.ts`,
 `check.ts`, or the census itself — the artifact was already current when the gate was added, which is the only
 state in which a ratchet like this may be introduced silently.
+
+---
+
+### REG-F-371 — five help strings on the PWU Type form claimed governance the code does not make, one of them borrowing a REAL guarantee for an inert textbox, and a sixth was corrected before anyone noticed nothing renders it
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-EXECGOV` `EG-06`) ·
+  **Class:** CODE_DIVERGES — the surface asserts guarantees the engine does not make ·
+  **Status:** ✅ **CLOSED for the five overclaims and the dead string. ⛔ Two findings are FILED AND NOT FIXED
+  below; the full per-control disposition declaration for this form is `EG-07`.**
+
+**⭑⭑ THE OPPOSITE CASE TO `REG-F-369`, AND THE HARDER ONE.** The Assurance Policy form had bare labels and no
+help. This form **already had** help — `PWU_TYPE_HELP`, single-sourced, rendered — and measurement across its
+twenty controls (four adjudication lanes, each attacked by a skeptic) found **15 CONSULTED · 3 RENDERED_ONLY ·
+1 NOT_CONSULTED · 5 whose help OVERCLAIMS.** ⛔ **A field with no explanation leaves a professional uncertain; a
+field with a false one leaves them confident and wrong.**
+
+| control | verdict | the overclaim, corrected |
+|---|---|---|
+| `completionRule` | ⛔ **RENDERED_ONLY** | ⭑ **the worst.** *"When an Instance of this type is DONE … (no green without assurance)"*. Nothing evaluates it — all 39 production sites are schema, assignment, presence guard or stored default. **And *"no green without assurance"* is a REAL guarantee**, made by `requireGoverningPolicies` and the locked floor and keyed on `pwuKind` + `requiredAssurancePolicyIds`. Borrowing a true guarantee for an inert box is not vagueness; it is a reason to trust it |
+| `permittedChildTypeIds` | CONSULTED | *"the **allowed** composition"* reads as a permission constraint. **There is none** — the name occurs **ZERO** times in `rph-domain/src`, `handlers/pwu.ts` and `handlers/decomposition.ts`. It BUILDS the initial graph and feeds an `info` lint about reachability |
+| `permittedChildren` | CONSULTED | four cardinality codes declared, **one distinction enforced**: M1/M+ both instantiate, C1/C+ both offer, no upper bound is checked, and an unrecognised code is silently read as M1 |
+| `attestedAssurancePolicyIds` | CONSULTED | its *"disclosure is not verification"* limb was already honest and is KEPT. What was missing: **beyond the id-validity check it changes no outcome** — nothing at Undertaking or assessment time reads the ids, and the delegated banner appears whether the list is full or empty |
+| `promptOutputContract` | CONSULTED | *"An answer that does not match is inert — it creates no findings and changes nothing."* **Both limbs false.** There is no matcher — `work-product-floor.ts` says so itself, *"not machine-checkable, so contract conformance cannot be decided today"* — and an unlocatable answer DOES create a finding (`WORK_PRODUCT_NOT_PARSEABLE`) |
+
+⚠ **AND TWO CORRECTIONS RUN THE OTHER WAY, so this is not "every string was too strong."** `pwuKind`'s help
+UNDER-states: it does not say the kind SELECTS WHICH ASSURANCE POLICIES GOVERN the instance, nor that the server
+silently rewrites what is typed to SCREAMING_SNAKE. Recorded, not corrected here.
+
+---
+
+**⭑⭑ THE SIXTH STRING, AND IT IS THE ONE WORTH READING.** `permittedChildTypeIds` was corrected — and then the
+e2e assertion that a professional can SEE the text **failed**. Cross-tabulated against both consumers, it was
+the one key of fourteen that **neither the form renders nor the agent's tool schema names**. ⛔ **A false
+governance claim had been replaced with a true sentence nobody could read.** The admission was folded into
+`permittedChildren`, which IS rendered, and the dead entry deleted. ⭑ The unit gate could not see this; the
+browser assertion could, which is the whole reason that limb exists. It is now DERIVED: no help key may be
+unread by both consumers, with the positive control built in (12 of the remaining 13 are used by both).
+
+**⚠ TWO MUTANTS SURVIVED THE FIRST PASS, AND THE REASON IS A REAL LIMIT OF THE INSTRUMENT.** The admission check
+is a regex over prose. My first mutants replaced only the TAIL of each string, leaving the admission phrase
+standing earlier in the same entry — so the text matched while the sentence had stopped being true. Re-aimed at
+the WHOLE entry, both went red. ⛔ **The limit is stated in the gate's own header rather than papered over:**
+this pins that an admission is PRESENT, not that the surrounding sentence is coherent.
+
+⚠ **AND THE NEW LIMB'S OWN CONTROL CAUGHT ME.** Its first version built `new RegExp(\`\bhelp\.${k}\b\`)` inside
+a TEMPLATE LITERAL, where `\b` is a backspace character — a pattern matching nothing. The control asserting that
+≥10 keys resolve as used-by-both went red with *"expected 0 to be greater than or equal to 10"*, so a broken
+derivation reported itself as broken instead of certifying a clean map.
+
+---
+
+**⛔⛔ TWO FINDINGS FILED AND NOT FIXED — each would be an implementer inventing governance.**
+
+1. **Decomposition does not enforce permitted children.** A PWU may be decomposed into a type its parent's type
+   does not list, and nothing refuses. Whether it SHOULD is a ratification question.
+2. ⭑⭑ **THE TWO AUTHORS OF A PWU TYPE DO NOT HAVE THE SAME SURFACE, AND THE GAP REACHES `STA-8`.** The
+   authoring AGENT cannot set `workDischarge`, `promptTemplateText`, `promptOutputContract`, `promptActive` or
+   `promptTemplateVersion`: `DefineTypeInput` carries none of them (12 fields, measured) and the tool schema
+   names none. **Measured: `workDischarge: 'MODEL'` is reachable ONLY by a human choosing it in the form's
+   select** — the sole production writer is the e2e driving that select at
+   `execution-model-invocation.e2e.ts:37`. So an agent-authored type is never `MODEL`, `stepBindingFor` returns
+   no binding, and `bindingAuthorityVerdict` takes `OUT_OF_SCOPE` — **the exact pre-`EG-02` condition
+   `REG-F-365` measured.** ⚠ `REG-F-366` hedged correctly that it did not claim `STA-8` for every step, but it
+   did not state THIS boundary: `EG-02`/`EG-03` closed `STA-8` for the HUMAN path only.
+
+**⚠ AN INSTRUMENT CORRECTION, recorded because it nearly produced a false finding.** A first cross-tabulation
+reported SEVEN dead help keys. Six were `ASSURANCE_POLICY_FIELDS` entries: the slice terminated on `\n};` and
+ran past `PWU_TYPE_HELP` into the object appended to the same file the previous day — **a collision my own
+`EG-05` commit created.** Re-derived by brace matching: 14 keys, exactly one dead. A bad slice returns
+"consumed by nothing" for healthy entries, which is indistinguishable from the finding it was looking for.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (5 of 5):** restore the `completionRule` overclaim → the admission
+limb; restore *"the allowed composition"* → the same; restore the four cardinality semantics → the same; inline
+a help string back into the markup → the single-source limb; ⭑ **disclaim a field that IS enforced (`isRoot`) →
+the "not disclaim everything" CONTROL**, which is the failure in the opposite direction and the one that keeps
+this remedy from degrading into noise.
+
+**GATES:** check-types 22/22 · lint · verif 445 · packages + demo 2232 · playwright 89.
+
+**Merge target:** Repository (`catalog.ts`, the PWU Type form markup, `pwa-authoring.e2e.ts`,
+`verif/authoring-field-disposition.test.ts`) and the `JAN-EXECGOV` roadmap. No canon artifact changes.

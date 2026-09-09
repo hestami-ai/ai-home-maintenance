@@ -115,6 +115,54 @@ own header, and it is why the dispositions above cite what they cite.
 
 ---
 
+### `EG-06` — the PWU Type form's help stops claiming governance that does not exist  *(needs no grant)*
+
+⭑⭑ **THIS IS THE HARDER HALF OF `EG-05`, AND THE DEFECT IS THE OPPOSITE ONE.** The policy form had bare labels
+and no help. The PWU Type form **already has help** — `PWU_TYPE_HELP`, single-sourced and rendered — and
+measurement says **five of its strings claim a guarantee the code does not make**. A field with no explanation
+leaves a professional uncertain; a field whose explanation is false leaves them confident and wrong.
+
+**MEASURED 2026-09-09** across the form's twenty controls, four adjudication lanes each attacked by a skeptic:
+**15 CONSULTED · 3 RENDERED_ONLY · 1 NOT_CONSULTED · 5 whose help OVERCLAIMS.**
+
+| control | verdict | the overclaim |
+|---|---|---|
+| `completionRule` | ⛔ **RENDERED_ONLY** | ⭑ **the worst of the five.** *"When an Instance of this type is DONE … Defaults to the RPH rule … (no green without assurance)"*. Nothing evaluates it — every production site is a default, a presence guard, or a projection. *"No green without assurance"* is a REAL platform guarantee, and the help attaches it to an inert textbox |
+| `permittedChildTypeIds` | CONSULTED | *"which PWU Types **may be** decomposed UNDER this type — the **allowed** composition"* reads as a permission constraint. **There is none**: the name occurs ZERO times in `rph-domain/src`, `handlers/pwu.ts` and `handlers/decomposition.ts`. It GENERATES the initial tree and feeds an `info` lint; it does not gate decomposition |
+| `cardinality:<childId>` | CONSULTED | same class — it decides whether a child is instantiated, not whether one is permitted |
+| `attestedAssurancePolicyIds` | CONSULTED | ⚠ the counterparty's own claim, not a verified treatment — *"disclosure is not verification"*, which the markup says beside the control and the help does not |
+| `promptOutputContract` | CONSULTED | claims a shape the engine does not check |
+
+⚠ **AND TWO CORRECTIONS RUN THE OTHER WAY, so this is not "every string is too strong":** `pwuKind`'s help
+UNDER-states — it does not say the kind SELECTS WHICH ASSURANCE POLICIES GOVERN the instance, nor that the
+server silently rewrites what is typed to SCREAMING_SNAKE. `name`'s help does not say a duplicate raises a graph
+finding.
+
+---
+
+**⛔ TWO FINDINGS THIS ITEM FILES AND DOES NOT FIX** — each would be inventing governance:
+
+1. **Decomposition does not enforce permitted children.** A PWU can be decomposed into a type its parent's type
+   does not permit and nothing refuses. Whether it SHOULD is a ratification question, not an implementer's.
+2. ⭑⭑ **The two authors of a PWU Type do not have the same surface, and the gap reaches `STA-8`.** The authoring
+   AGENT cannot set `workDischarge`, `promptTemplateText`, `promptOutputContract`, `promptActive` or
+   `promptTemplateVersion` — `DefineTypeInput` carries none of them and the tool schema names none of them.
+   Measured: `workDischarge: 'MODEL'` is reachable **only** by a human choosing it in the form's select
+   (`execution-model-invocation.e2e.ts:37`), so an agent-authored type is never `MODEL`, never gets a
+   `RUNTIME_BINDING` from `stepBindingFor`, and takes `bindingAuthorityVerdict`'s `OUT_OF_SCOPE` limb —
+   **the exact pre-`EG-02` condition `REG-F-365` measured.** `EG-02`/`EG-03` closed `STA-8` for the human path
+   only, and that boundary was not stated at the time.
+
+| Mutant | Must redden |
+|---|---|
+| restore any of the five overclaiming strings | the disposition gate — a `RENDERED_ONLY` field whose help asserts a guarantee |
+| declare `completionRule` CONSULTED with an invented reader | the quote check (`EG-05`'s limb, now covering both forms) |
+| add a control to EITHER form and declare nothing | the population pin, derived per form region from the markup |
+| **CONTROL** | the 15 consulted controls keep their help unchanged, so this is not "disclaim everything" |
+| **CONTROL** | a professional still SEES the corrected text in a browser (playwright) |
+
+---
+
 ## ⛔ NOT TAKEN — and this is the larger half of the design
 
 `modelSelectionPolicy` (configuration by `REG-D-052`), `ModelSelectionPolicy`'s shape (explicitly deferred),

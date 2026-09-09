@@ -13,12 +13,29 @@ export const PWU_TYPE_HELP = {
 	purpose: 'One or two sentences on what work of this type accomplishes and what it produces.',
 	isRoot:
 		'Exactly one type in a PWA is the root — the top of every Undertaking’s Professional Work Graph. Publishing requires a root.',
+	// ⛔ EG-06: this said *"When an Instance of this type is DONE … (no green without assurance)"*. Nothing
+	// evaluates it — all 39 production sites are a schema entry, an assignment, a presence guard or a stored
+	// default. *"No green without assurance"* IS a real guarantee, made by `requireGoverningPolicies` and the
+	// locked floor and keyed on `pwuKind` + `requiredAssurancePolicyIds` — NOT by this box. Attaching a true
+	// guarantee to an inert field is worse than saying nothing: it is a reason to trust it.
 	completionRule:
-		'When an Instance of this type is DONE. Defaults to the RPH rule: execution succeeded AND required outputs exist AND assurance satisfied (no green without assurance).',
-	permittedChildTypeIds:
-		'Which PWU Types may be decomposed UNDER this type in the graph — the allowed composition.',
+		'Your statement of when work of this type is DONE. RECORDED AND SHOWN, not evaluated — no gate reads it, ' +
+		'and editing it changes no outcome. What actually holds a PWU back is its assurance: the locked floor plus ' +
+		'the policies selected by this type\u2019s kind and declared policy ids.',
+	// ⛔⛔ EG-06 DELETED `permittedChildTypeIds` FROM THIS MAP. It was authored, corrected, and read by
+	// NOBODY: cross-tabulated against both consumers, it was the one key of fourteen that neither the form
+	// renders nor the agent's tool schema names (12 of the other 13 are used by both, which is the positive
+	// control). Its control is described by `permittedChildren` above, which IS rendered, so the admission was
+	// folded there rather than corrected in a string no professional could reach.
+	// ⭐ FOUND BY THE E2E, NOT BY THE UNIT GATE — the assertion that a person can SEE the text is what failed.
 	permittedChildren:
-		'Per-child composition cardinality (parallel to permittedChildTypeIds): each rule is {typeId, cardinality, applicabilityNote?}. cardinality is M1 (mandatory exactly one), M+ (mandatory one or more), C1 (conditional zero or one), or C+ (conditional zero or more). Use a free-text applicabilityNote to say WHEN a conditional (C*) child applies.',
+		'The child types this one is composed of, each with a cardinality. Used to BUILD the initial graph when ' +
+		'an Undertaking is instantiated, and to warn when a type is unreachable from the root. ⚠ IT IS NOT AN ' +
+		'ALLOW-LIST: nothing refuses a decomposition into a type outside it. ' +
+		'⚠ ONLY THE MANDATORY/CONDITIONAL SPLIT IS ENFORCED. M1 and M+ both instantiate the child; C1 and C+ ' +
+		'both record it as an offer and instantiate nothing. The upper bound is NOT enforced — \u201cexactly one\u201d ' +
+		'and \u201cone or more\u201d behave identically, and an unrecognised code is silently read as M1. ' +
+		'The applicabilityNote is free text saying WHEN a conditional child applies; it is shown, never evaluated.',
 	requiredAssurancePolicyIds:
 		'Ids of ACTIVE non-floor assurance policies future Instances of this type MUST satisfy (declared/required treatment, §11.7.4) — e.g. Requirement Coverage or Intent Preservation. DRAFT, SUSPENDED, SUPERSEDED, missing, and locked-floor ids are rejected when newly added. This is required treatment, not a runtime assessment; the locked de-minimis floor always applies on top and is never listed here.',
 	requiredInputs:
@@ -30,7 +47,29 @@ export const PWU_TYPE_HELP = {
 	counterpartyLabel:
 		'For a DELEGATED_EXTERNAL type: the external party that performs the work (e.g. "Contract Lab — Hematology"). Required when delegating — it names who is accountable across the boundary.',
 	attestedAssurancePolicyIds:
-		'For a DELEGATED_EXTERNAL type: ids of ACTIVE non-floor assurance policies the counterparty ATTESTS it satisfies (assurance-by-attestation). This is the counterparty’s CLAIM, not your own review — disclosure is not verification. Same id rules as requiredAssurancePolicyIds (locked-floor, DRAFT, SUSPENDED, and missing ids are rejected). May be empty.',
+		'For a DELEGATED_EXTERNAL type: ids of ACTIVE non-floor assurance policies the counterparty ATTESTS it ' +
+		'satisfies. This is the counterparty\u2019s CLAIM, not your own review — disclosure is not verification. ' +
+		'Same id rules as requiredAssurancePolicyIds (locked-floor, DRAFT, SUSPENDED and missing ids are rejected). ' +
+		'⚠ BEYOND THAT ID CHECK IT CHANGES NO OUTCOME: nothing at Undertaking or assessment time reads these ids, ' +
+		'and the delegated-boundary banner appears whether the list is full or empty. May be empty.',
+	// ⛔ EG-06: THESE THREE LIVED AS INLINE LITERALS IN THE MARKUP while their twelve siblings were
+	// single-sourced here — two vocabularies for one form, and the three the agent's tool schema cannot see.
+	workDischarge:
+		'A person, a model, or not yet decided. Choosing \u201ca model\u201d means this type carries the prompt the ' +
+		'model is given — and an unanswered question is shown as unanswered rather than assumed. ⚠ It is also what ' +
+		'lets an execution step request a runtime binding: only a MODEL type gets one.',
+	promptTemplateText:
+		'What an agent is told when this type is executed. Use {placeholder} markers for values supplied at run ' +
+		'time; a marker nothing supplies refuses the step rather than rendering empty.',
+	// ⛔ EG-06: this said *"An answer that does not match is inert — it creates no findings and changes
+	// nothing"*, and BOTH limbs were wrong. There is no matcher at all — `work-product-floor.ts` says so
+	// itself: *"`PromptTemplate.outputContract` is FREE TEXT … not machine-checkable, so contract conformance
+	// cannot be decided today."* And an answer that cannot be located DOES create a finding
+	// (`WORK_PRODUCT_NOT_PARSEABLE`), so it is not inert either.
+	promptOutputContract:
+		'What a usable answer looks like. This text is APPENDED VERBATIM to the instruction the model receives, ' +
+		'so changing it changes the work — but nothing compares the answer back against it. Contract conformance ' +
+		'is not machine-checked today.',
 	boundaryApplicabilityNote:
 		'For a DELEGATED_EXTERNAL type: free-text scope/condition of the delegation (e.g. "STAT panels only; routine handled internally"). Optional.'
 } as const;

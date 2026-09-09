@@ -1507,7 +1507,7 @@
 								<div class="ffield">
 									{@render fhead(
 										'How is this work done?',
-										'A person, a model, or not yet decided. Choosing "a model" means this type carries the prompt the model is given — and an unanswered question is shown as unanswered rather than assumed.',
+										PWU_TYPE_HELP.workDischarge,
 										'pwu-type-discharge'
 									)}
 									<select
@@ -1539,7 +1539,7 @@
 							<div class="ffield" hidden={f.workDischarge !== 'MODEL'}>
 								{@render fhead(
 									'Prompt template',
-									'What an agent is told when this type is executed. Use {placeholder} markers for context that gets filled in at run time — they are recorded automatically, and a marker nothing supplies REFUSES the run rather than sending a prompt with a hole in it.',
+									PWU_TYPE_HELP.promptTemplateText,
 									'pwu-type-prompt'
 								)}
 								<textarea
@@ -1569,7 +1569,7 @@
 							<div class="ffield" hidden={f.workDischarge !== 'MODEL'}>
 								{@render fhead(
 									'Expected answer shape',
-									'What a usable answer looks like. An answer that does not match is inert — it creates no findings and changes nothing.',
+									PWU_TYPE_HELP.promptOutputContract,
 									'pwu-type-output-contract'
 								)}
 								<input
