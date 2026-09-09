@@ -33693,3 +33693,94 @@ runs themselves: `--project csaa` 188 files, baseline and two perturbed rounds, 
 **Merge target:** Repository (`docs/_working/DESIGN-csaa-decoupling.md`,
 `docs/_working/ROADMAP-csaa-decoupling.md`, this entry).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-377 — the three CSAA tests that measure US leave the gate, the gate goes fully green for the first time in days — and the cause of a week of unreadable verdicts was that one of two sibling configs never got a correction the other documented
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-CSAADEC` `CD-03` + `CD-03b`) ·
+  **Class:** REMEDIATION — an obligation removed without removing a guarantee; plus a one-of-two-writers defect ·
+  **Status:** ✅ **`CD-03` CLOSED. `CD-04`–`CD-06` remain.**
+
+**WHAT LANDED.** `vitest.projects.ts` gains `CSAA_CENSUS` — the three files `REG-F-376` measured — and emits two
+lanes where it emitted one: `csaa` (185 files, `exclude: CSAA_CENSUS`, stays in the default gate) and
+`csaa-census` (exactly those three, consumed ONLY by the new `vitest.census.config.ts`, run by
+`bun run test:csaa:census`).
+
+⭑ **ONE CONSTANT, TWO CONSUMERS, AND THAT IS THE STRUCTURAL POINT.** `projectsFor()` excludes what
+`censusProjectsFor()` includes, from the same list, so every CSAA test file runs in exactly one lane BY
+CONSTRUCTION. Measured: 185 + 3 = 188 files, and the gate lost exactly 94 tests — 65 + 20 + 9, the three files'
+own totals. Nothing dropped, nothing double-counted.
+
+⛔ **NOTHING IS SKIPPED, WEAKENED OR DELETED.** All three files are byte-identical and keep every assertion.
+They are RED on the current tree and MUST BE — a census lane that went green by leaving the gate would be a
+control that cannot fail.
+
+**⛔ AND THE OBJECTION THIS FILE RAISES AGAINST ITSELF IS ANSWERED, NOT STEPPED AROUND.** `vitest.projects.ts`
+exists because *"a list that must be edited when a package is added is a list that will silently rot"*. The
+answer is an ASYMMETRY: an enumerated INCLUSION list fails DANGEROUSLY — a new package omitted is silently
+unmeasured, which is `N-16` itself — while an enumerated EXCLUSION list fails SAFELY, because a file absent from
+it RUNS. That reasoning sits at the constant, or the next reader is right to object.
+
+**THREE PREDICTIONS NAMED BEFORE THE EDIT, ALL HELD:** `--project csaa` 185 files green; the census lane 3 files
+RED carrying `expected 72 to be 69`; the default gate containing that string ZERO times — **537 files, 6255
+passed, 0 failed.**
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING (1): A MUTANT REFUTED A COMMENT I HAD ALREADY WRITTEN.** At the census lane's
+`passWithNoTests: false` I wrote *"`false` HERE IS LOAD-BEARING"*. `M4` flipped it to `true` with the list
+emptied and predicted GREEN; it came back **RED**. Vitest's ROOT-level *"no test files found"* catches the
+vacuum first. Only removing BOTH guards produces the vacuous pass — driven, exit 0 over zero tests. ⭑ The line
+stays and the comment now says the true thing: the root behaviour is vitest's DEFAULT, not something this
+repository declares, so the day someone sets `passWithNoTests: true` on the census config for an unrelated
+reason this line is the only guard left. ⛔ **A comment asserting that something is load-bearing is a CLAIM, and
+a claim in a comment is exactly as unverified as a claim in prose until a mutant is pointed at it.** I have
+filed the wired-but-unproven shape repeatedly; this is the same shape one layer further in, where nobody looks.
+
+**MUTANTS (4 run, 3 killed by their named victim, 1 refuting):** `M1` census list loses `subject.test.ts` → RED,
+186 files; `M2` `exclude` clause removed → RED, 188 files; `M3` census list emptied → RED; `M4` above.
+
+---
+
+**⭑⭑ THE PART WORTH KEEPING (2), AND IT IS BIGGER THAN THE INCREMENT: PREDICTION 1 FAILED FIRST TIME, AND
+CHASING IT FOUND THE CAUSE OF A WEEK OF UNREADABLE MEASUREMENTS.**
+
+`--project csaa` came back with two file-level failures and **ZERO failed tests** — both files 33/33 GREEN run
+alone. The cause: `vitest.dist.config.ts` sets `hookTimeout: 60_000`, `testTimeout: 60_000` and
+`maxWorkers: 4`, and says why in its own header — *"The Vitest 5-second defaults predate the compiler-backed
+CSAA fixtures and now expire during otherwise-valid scheduling contention"*, and *"the default host-sized pool
+caused Windows Git/process fixtures to contend on temporary handles and exceed their local watchdogs."*
+`vitest.config.ts` — the SOURCE mode, the default `test:src`, and the basis for coverage and mutation — set
+**NONE OF THE THREE**.
+
+⛔ **`REG-F-024`'S EXACT SHAPE: a gate that covers one of two writers is not a gate.** The two configs derive
+from one shared project list *precisely so they cannot diverge*; the correction was applied to one of them and
+not its sibling, and the divergence was invisible because it only ever showed up as flakiness.
+
+**AND EVERY ONE OF THESE WAS PREVIOUSLY FILED AS A SEPARATE PUZZLE:** 38 failures at the vitest default versus 4
+at 120 s on one unchanged tree; a full CSAA run reporting SIX failures where the same tree under lighter load
+reported THREE; `resolve-working-subject.test.ts` red in the suite and 32/32 green alone; two overlay-report
+files flapping between runs on nothing. ⭑ They were one defect. A measurement that moves with load is
+uninterpretable in BOTH directions — it cannot establish a defect and it cannot clear one — and I spent a week
+reading its output as signal.
+
+⚠ The three values are COPIED from the sibling, not chosen: matching it exactly is a consistency repair needing
+no fresh judgement, and picking different values would recreate the divergence from the other side. Raising a
+watchdog can mask real slowness, so it is bounded and declared — 60 s is a harness watchdog, not a product SLO
+and not a CSAA operation budget.
+
+**⚠ AND CSAA DETECTED THE CHANGE THAT DECOUPLES IT**, which is worth recording plainly rather than tidying away:
+`subject.test.ts` pins the JPWB Vitest discovery implementation BY SEMANTIC TOKENS and pins the configured
+test-population profile set, so adding a fourth config and a second CSAA project reddened three further
+assertions — inside the census lane, where such detections now belong. ⭑ That is the churn mechanism in its
+purest form and it is also the strongest thing that can be said FOR the tool: it noticed. `REG-F-376`'s claim is
+unchanged and narrow — those pins are not GATE material — and noticing a deliberate structural change one hour
+after it is made, in a lane run on demand, is exactly the use this split preserves.
+
+**GATES:** check-types 22/22 · lint · **full default vitest 537 files, 6255 passed, 0 failed** · census lane 3
+files RED as designed.
+
+**Merge target:** Repository (`vitest.projects.ts`, `vitest.config.ts`, `vitest.census.config.ts`,
+`package.json`, the JAN-CSAADEC design + roadmap).
+⚠ No ratified artifact was amended.

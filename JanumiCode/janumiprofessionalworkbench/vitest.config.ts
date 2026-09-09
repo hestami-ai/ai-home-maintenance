@@ -92,6 +92,32 @@ export default defineConfig({
 		// mode — so the flag is correct by construction and cannot drift from the `resolve.conditions` above it.
 		// Cross-platform env plumbing in npm scripts needs `cross-env`; this needs nothing.
 		env: { RPH_TEST_RESOLVE: 'source' },
+		// ⭑⭑ JAN-CSAADEC CD-03 — THE SAME WATCHDOGS `vitest.dist.config.ts` HAS SET SINCE IT WAS WRITTEN, AND THE
+		// REASON THEY WERE MISSING HERE IS THE SHAPE THIS REPOSITORY KEEPS FILING. That file says, in terms:
+		// *"The Vitest 5-second defaults predate the compiler-backed CSAA fixtures and now expire during
+		// otherwise-valid scheduling contention"*, and *"the default host-sized pool caused Windows Git/process
+		// fixtures to contend on temporary handles and exceed their local watchdogs."* The correction was applied
+		// to ONE of the two configs derived from one project list. `REG-F-024`: a gate that covers one of two
+		// writers is not a gate.
+		//
+		// ⛔ AND IT IS NOT A COSMETIC ASYMMETRY — IT WAS PRODUCING UNINTERPRETABLE VERDICTS ALL WEEK. Measured on
+		// one unchanged tree: 38 failures at the vitest default versus 4 at 120 s; a full CSAA run reporting SIX
+		// failures where the same tree under lighter load reported THREE; `resolve-working-subject.test.ts` red in
+		// the suite and 32/32 GREEN run alone; the two overlay-report files flapping between runs on nothing. A
+		// measurement that moves with load is uninterpretable in BOTH directions — it cannot establish a defect
+		// and it cannot clear one.
+		//
+		// ⚠ THESE NUMBERS ARE COPIED, NOT CHOSEN. Matching the sibling exactly is a consistency repair and needs
+		// no fresh judgement; picking different values here would recreate the divergence from the other side.
+		// `maxWorkers: 4` is included for the same reason it is there: the timeouts alone leave the CONTENTION
+		// that trips them. `test:coverage` already passes `--maxWorkers=4` on the command line, so plain
+		// `vitest run` was the only path in this repository that got neither.
+		//
+		// ⛔ RAISING A WATCHDOG CAN MASK REAL SLOWNESS, WHICH IS WHY THIS IS BOUNDED. 60 s is a harness watchdog,
+		// not a product SLO and not a CSAA operation budget; nothing here is a performance claim.
+		hookTimeout: 60_000,
+		testTimeout: 60_000,
+		maxWorkers: 4,
 		// SHARED WITH `vitest.dist.config.ts` (N-16). The two modes must cover exactly the same files, or the
 		// cross-check above is silently partial; the list is derived from the filesystem rather than enumerated so
 		// a new package cannot be silently unmeasured; and it carries `passWithNoTests: false`, which is the fix
