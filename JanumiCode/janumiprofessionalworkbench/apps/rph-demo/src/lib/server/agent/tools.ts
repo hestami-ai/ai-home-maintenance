@@ -10,8 +10,10 @@ import {
 	type ExecutionBoundary,
 	type LinkTypesInput,
 	type PwaAuthoringBroker,
-	type ProposalResult
+	type ProposalResult,
+	type PromptTemplate
 } from '@janumipwb/rph-authoring';
+import { markersIn } from '@janumipwb/rph-application';
 import { buildPwuBehaviorProjection } from '@janumipwb/rph-projections';
 import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
@@ -49,6 +51,47 @@ function executionBoundaryError(a: Record<string, unknown>): string | null {
  *  A boundaryContract is assembled whenever ANY of its scalar parts is provided; the engine — not the tool —
  *  enforces INV-1/STD-3 coherence (F-10: tools do not re-implement the invariant). Assumes executionBoundary has
  *  already passed executionBoundaryError. */
+/**
+ * ⭑⭑ JAN-EXECGOV EG-07b — reassemble the FLATTENED discharge + prompt params into what the broker carries.
+ *
+ * SPONSOR DIRECTION: *"the PWA authoring agent should be able to declare how work is discharged"*, answered
+ * `G-4` as *"text plus arming, AFTER the review surface lands"* — which `EG-07a` discharged, so arming is live.
+ *
+ * ⚠ EVERY FIELD IS CONDITIONAL, AND `isRoot: bool(a.isRoot)` TWENTY LINES BELOW IS WHY THAT MATTERS. `bool()`
+ * turns an absent argument into `false`; the same idiom here would turn an agent that said NOTHING about
+ * discharge into one that declared something. Absent and `UNDECLARED` are different facts the engine keeps
+ * apart — *"absent means the author was never asked; UNDECLARED means they were asked and deferred"* — and a
+ * default would put an answer in the agent's mouth exactly as it would in a professional's.
+ *
+ * ⛔ `declaredPlaceholders` IS DERIVED, NEVER TAKEN FROM THE AGENT. `markersIn` is the one grammar for what a
+ * marker is; letting a caller declare its own placeholder list would be a second spelling of that rule, and the
+ * render guard that refuses an unsupplied marker would then be checking the agent's claim about its own text.
+ */
+function dischargeInput(a: Record<string, unknown>): {
+	workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	promptTemplate?: PromptTemplate;
+} {
+	const out: { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } = {};
+	if (a.workDischarge === 'MODEL' || a.workDischarge === 'HUMAN' || a.workDischarge === 'UNDECLARED')
+		out.workDischarge = a.workDischarge;
+	const templateText = str(a.promptTemplateText).trim();
+	if (templateText) {
+		const outputContract = str(a.promptOutputContract).trim();
+		out.promptTemplate = {
+			templateText,
+			templateVersion: 1,
+			declaredPlaceholders: markersIn(templateText),
+			...(outputContract ? { outputContract } : {}),
+			// ⛔ ARMING. A DRAFT template is authored text that `renderPromptTemplate` refuses; ACTIVE is the
+			// instruction a model is actually given. The authoring handler already refuses an ACTIVE template on a
+			// type that does not declare MODEL, so this cannot arm a prompt on human-discharged work — the two are
+			// one decision and the engine, not this helper, holds them together.
+			status: a.promptActive === true ? 'ACTIVE' : 'DRAFT'
+		};
+	}
+	return out;
+}
+
 function boundaryInput(a: Record<string, unknown>): {
 	executionBoundary?: ExecutionBoundary;
 	boundaryContract?: BoundaryContract;
@@ -286,6 +329,10 @@ export function buildAuthoringTools(
 							type: 'string[]',
 							description: help.requiredAssurancePolicyIds
 						},
+						workDischarge: { type: 'string', description: help.workDischarge },
+						promptTemplateText: { type: 'string', description: help.promptTemplateText },
+						promptOutputContract: { type: 'string', description: help.promptOutputContract },
+						promptActive: { type: 'boolean', description: help.promptActive },
 						executionBoundary: { type: 'string', description: help.executionBoundary },
 						counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
 						attestedAssurancePolicyIds: {
@@ -354,6 +401,7 @@ export function buildAuthoringTools(
 					requiredInputs: strArr(o.requiredInputs),
 					requiredOutputs: strArr(o.requiredOutputs),
 					requiredAssurancePolicyIds: strArr(o.requiredAssurancePolicyIds),
+					...dischargeInput(o),
 					...boundaryInput(o),
 					childTempKeys: strArr(o.childTempKeys),
 					childCardinalities: Array.isArray(o.childCardinalities)
@@ -457,6 +505,10 @@ export function buildAuthoringTools(
 					type: 'string[]',
 					description: help.requiredAssurancePolicyIds
 				},
+				workDischarge: { type: 'string', description: help.workDischarge },
+				promptTemplateText: { type: 'string', description: help.promptTemplateText },
+				promptOutputContract: { type: 'string', description: help.promptOutputContract },
+				promptActive: { type: 'boolean', description: help.promptActive },
 				executionBoundary: { type: 'string', description: help.executionBoundary },
 				counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
 				attestedAssurancePolicyIds: {
@@ -481,6 +533,7 @@ export function buildAuthoringTools(
 					requiredInputs: strArr(a.requiredInputs),
 					requiredOutputs: strArr(a.requiredOutputs),
 					requiredAssurancePolicyIds: strArr(a.requiredAssurancePolicyIds),
+					...dischargeInput(a),
 					...boundaryInput(a)
 				});
 				return fromProposal(r, `Defined PWU Type "${str(a.name)}" as ${r.id}.`);
@@ -529,6 +582,10 @@ export function buildAuthoringTools(
 					type: 'string[]',
 					description: help.requiredAssurancePolicyIds
 				},
+				workDischarge: { type: 'string', description: help.workDischarge },
+				promptTemplateText: { type: 'string', description: help.promptTemplateText },
+				promptOutputContract: { type: 'string', description: help.promptOutputContract },
+				promptActive: { type: 'boolean', description: help.promptActive },
 				executionBoundary: { type: 'string', description: help.executionBoundary },
 				counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
 				attestedAssurancePolicyIds: {
@@ -554,6 +611,7 @@ export function buildAuthoringTools(
 				if ('requiredOutputs' in a) patch.requiredOutputs = strArr(a.requiredOutputs);
 				if ('requiredAssurancePolicyIds' in a)
 					patch.requiredAssurancePolicyIds = strArr(a.requiredAssurancePolicyIds);
+				Object.assign(patch, dischargeInput(a));
 				Object.assign(patch, boundaryInput(a));
 				return fromProposal(
 					broker.editType(str(a.pwuTypeId), patch),

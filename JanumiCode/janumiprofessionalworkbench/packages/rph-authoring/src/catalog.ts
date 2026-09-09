@@ -66,6 +66,14 @@ export const PWU_TYPE_HELP = {
 	// itself: *"`PromptTemplate.outputContract` is FREE TEXT … not machine-checkable, so contract conformance
 	// cannot be decided today."* And an answer that cannot be located DOES create a finding
 	// (`WORK_PRODUCT_NOT_PARSEABLE`), so it is not inert either.
+	// ⛔ EG-07b ADDED THIS KEY. EG-06 measured it absent while its explanation lived inline in the markup on a
+	// bare <label> — which the single-source limb structurally cannot see, since that limb only inspects
+	// {@render fhead(...)} calls. It is needed here because the agent's tool schema can only describe a
+	// parameter with a string this map carries.
+	promptActive:
+		'Whether this template is ARMED. A DRAFT template is authored text and renders nothing — the step that ' +
+		'would use it is refused. ACTIVE is the instruction the model is actually given. A type must declare ' +
+		'MODEL to arm one: the engine refuses an ACTIVE template on work discharged any other way.',
 	promptOutputContract:
 		'What a usable answer looks like. This text is APPENDED VERBATIM to the instruction the model receives, ' +
 		'so changing it changes the work — but nothing compares the answer back against it. Contract conformance ' +

@@ -242,3 +242,129 @@ describe('PWU-Type boundary tool params (JAN-PRPWA DWP-04)', () => {
 		);
 	});
 });
+
+// ── ⭑⭑ JAN-EXECGOV EG-07b — THE AGENT MAY DECLARE HOW WORK IS DISCHARGED, AND ARM THE INSTRUCTION ───────────
+//
+// SPONSOR DIRECTION: *"the PWA authoring agent should be able to declare how work is discharged, and the human
+// reviewing the full PWA before approving its use would be the model."* Decision `G-4`: **text plus arming,
+// AFTER the review surface lands** — `EG-07a` discharged that condition, so arming is live here.
+//
+// ⛔ MEASURED BEFORE THIS: `DefineTypeInput` carried 12 fields and none was `workDischarge`; the tool schema
+// named none of the prompt fields. `workDischarge: 'MODEL'` was reachable ONLY by a human choosing it in a
+// select, so an agent-authored type was never MODEL, never got a `RUNTIME_BINDING`, and took
+// `bindingAuthorityVerdict`'s `OUT_OF_SCOPE` limb — the pre-`EG-02` state, for the agent path only.
+describe('EG-07b — the agent can declare discharge and author a prompt', () => {
+	const captured: Record<string, unknown>[] = [];
+	const brokerFor = () => {
+		captured.length = 0;
+		return {
+			help: () => ({
+				name: 'n',
+				pwuKind: 'k',
+				purpose: 'p',
+				isRoot: 'r',
+				completionRule: 'c',
+				requiredInputs: 'i',
+				requiredOutputs: 'o',
+				requiredAssurancePolicyIds: 'a',
+				executionBoundary: 'b',
+				counterpartyLabel: 'cl',
+				attestedAssurancePolicyIds: 'ap',
+				boundaryApplicabilityNote: 'ban',
+				permittedChildren: 'pc',
+				workDischarge: 'wd',
+				promptTemplateText: 'ptt',
+				promptOutputContract: 'poc',
+				promptActive: 'pa'
+			}),
+			defineType: vi.fn((input: Record<string, unknown>) => {
+				captured.push(input);
+				return { ok: true, id: 'pwut_1', status: 'ACCEPTED' };
+			})
+		} as unknown as PwaAuthoringBroker;
+	};
+	const sink = { declare: vi.fn(), get: () => undefined } as unknown as RationaleSink;
+	const defineTool = (b: PwaAuthoringBroker) =>
+		buildAuthoringTools(b, sink).find((t) => t.name === 'define_pwu_type')!;
+
+	it('⭑ the tool SCHEMA offers the four parameters, described by the shared help', () => {
+		// ⛔ The schema is the agent's whole view of what it may say. EG-06 single-sourced these strings under a
+		// comment naming them "the three the agent's tool schema cannot see"; this is that sentence being retired.
+		const params = defineTool(brokerFor()).parameters as Record<string, { description?: string }>;
+		for (const p of ['workDischarge', 'promptTemplateText', 'promptOutputContract', 'promptActive'])
+			expect(params[p], `${p} must be offered to the agent`).toBeDefined();
+		expect(params.workDischarge!.description).toBe('wd');
+		expect(params.promptActive!.description).toBe('pa');
+	});
+
+	it('⛔⛔ ABSENCE IS PRESERVED — an agent that says nothing declares nothing', () => {
+		// ⚠⚠ THE ASSERTION THAT MATTERS MOST IN THIS INCREMENT. `isRoot: bool(a.isRoot)` sits twenty lines from
+		// the new helper and turns an absent argument into `false`. The same idiom on discharge would turn an
+		// agent that never mentioned it into one that DECLARED something, destroying the distinction the engine
+		// keeps: "absent means the author was never asked; UNDECLARED means they were asked and deferred".
+		// THE MUTANT: forward unconditionally, or default to 'UNDECLARED'.
+		const b = brokerFor();
+		defineTool(b).run({ name: 'T', pwuKind: 'K' });
+		expect(captured).toHaveLength(1);
+		expect(captured[0]).not.toHaveProperty('workDischarge');
+		expect(captured[0]).not.toHaveProperty('promptTemplate');
+	});
+
+	it('a declared discharge reaches the broker verbatim', () => {
+		const b = brokerFor();
+		defineTool(b).run({ name: 'T', pwuKind: 'K', workDischarge: 'MODEL' });
+		expect(captured[0]!.workDischarge).toBe('MODEL');
+	});
+
+	it('⭑ a value outside the ratified enum is DROPPED, not passed through', () => {
+		// The enum is ratified; an agent inventing a fourth discharge would otherwise reach the engine and be
+		// refused there — which is safe but tells the agent nothing about WHICH field was wrong.
+		const b = brokerFor();
+		defineTool(b).run({ name: 'T', pwuKind: 'K', workDischarge: 'ROBOT' });
+		expect(captured[0]).not.toHaveProperty('workDischarge');
+	});
+
+	it('⭑⭑ a prompt is assembled with DERIVED placeholders, and is DRAFT unless armed', () => {
+		// ⛔ `declaredPlaceholders` is derived by `markersIn` and never taken from the agent: it is the one grammar
+		// for what a marker is, and letting a caller declare its own list would make the render guard check the
+		// agent's claim about its own text rather than the text.
+		const b = brokerFor();
+		defineTool(b).run({
+			name: 'T',
+			pwuKind: 'K',
+			workDischarge: 'MODEL',
+			promptTemplateText: 'Assess {subject} against {criteria}.',
+			promptOutputContract: 'JSON with findings[]'
+		});
+		const t = captured[0]!.promptTemplate as {
+			declaredPlaceholders: string[];
+			status: string;
+			outputContract?: string;
+		};
+		expect(t.declaredPlaceholders.sort()).toEqual(['criteria', 'subject']);
+		expect(t.outputContract).toBe('JSON with findings[]');
+		expect(t.status, 'unarmed unless the agent says otherwise').toBe('DRAFT');
+	});
+
+	it('⛔ ARMING is explicit — promptActive true, and nothing else, makes it ACTIVE', () => {
+		// THE MUTANT: treat any truthy value, or the template's presence, as arming. A DRAFT template is authored
+		// text; an ACTIVE one is what a model is actually told, and the difference is a decision.
+		const b = brokerFor();
+		defineTool(b).run({
+			name: 'T',
+			pwuKind: 'K',
+			workDischarge: 'MODEL',
+			promptTemplateText: 'Do the thing.',
+			promptActive: true
+		});
+		expect((captured[0]!.promptTemplate as { status: string }).status).toBe('ACTIVE');
+	});
+
+	it('⭑ CONTROL — no prompt text means no template at all, not an empty one', () => {
+		// An empty template would be an authored instruction saying nothing, and `renderPromptTemplate` would have
+		// to decide what that means. Absence is the honest representation.
+		const b = brokerFor();
+		defineTool(b).run({ name: 'T', pwuKind: 'K', promptActive: true, promptOutputContract: 'x' });
+		expect(captured[0]).not.toHaveProperty('promptTemplate');
+	});
+});

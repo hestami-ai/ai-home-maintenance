@@ -33376,3 +33376,137 @@ are this programme's to hand over, and they are named here so the hand-over is e
 
 **Merge target:** Repository (`broker.ts`, `broker.test.ts`, the PWA Designer inspector, `pwa-authoring.e2e.ts`)
 and `docs/_working/` §7 + roadmap `EG-07`. No canon artifact changes.
+
+---
+
+### REG-F-374 — CORRECTION to `REG-F-372`: the CSAA debt it handed over does not exist, and the control I offered could not have told the two hypotheses apart
+
+- **Date:** 2026-09-09 · **Type:** CORRECTION (`JAN-EXECGOV`) ·
+  **Class:** SELF-CORRECTION — a factual claim in a committed entry, wrong ·
+  **Status:** ✅ `REG-F-372`'s finding and remedy STAND; its closing debt paragraph is WITHDRAWN.
+
+**WHAT `REG-F-372` SAID, and it is wrong:** *"`packages/csaa` enumerates every top-level `verif/` asset by
+name, and this session added three … none of which are listed … The three verif entries are this programme's to
+hand over."*
+
+**⛔ MEASURED TODAY: THE LIST IS A REQUIRED-SUBSET FLOOR, NOT AN ENUMERATION.** Those names are consumed by
+`assertRequiredSelectedPaths(selectedPaths, required, description)`, whose whole body is *"for each required
+path, throw if the discovered set lacks it"* — and every call site names it *"Required JPWB … source"*. It
+asserts PRESENCE of a floor; it never asserts the discovered set EQUALS the list. New `verif/` assets are
+DISCOVERED, and adding one cannot break it. ⭑ Driven: with the three still unlisted, `inventory.test.ts` passes
+**20 of 20** once an unrelated blocker cleared. **Nothing was owed to another programme.**
+
+**⚠⚠ HOW I GOT IT WRONG, WHICH IS THE PART WORTH KEEPING.** I reasoned from the test's NAME — *"discovers every
+current workspace manifest and every top-level verif TypeScript asset"* — plus one positive control: an older
+`verif/` file IS in the list, my three are not. ⛔ **That control is consistent with BOTH hypotheses.** An
+exhaustive enumeration and a required-subset floor both contain the old file and both omit the new ones. A
+control that cannot distinguish the competing readings is not a control, however satisfying it feels to run —
+and I ran it, reported it as decisive, and committed the claim.
+
+⭑ **The instrument that WOULD have settled it was one line away:** read the function the list is passed to. I
+read the list and the test name and not the consumer. This register already carries the general form —
+*a record that governs work must be machine-readable in the dimension it is consulted on* — and its dual is what
+bit here: **a list must be read in the dimension it is CONSUMED on, not the dimension its name suggests.**
+
+⚠ **AND THE BLOCKER THAT MADE IT UNFALSIFIABLE AT THE TIME WAS REAL,** which is why the entry could be written
+at all: `assertJpwbTestPopulations` threw before any file enumeration ran, so the assertion I was reasoning
+about was unreachable and my claim could not be tested. **An unfalsifiable claim stated as measured is the
+defect**, not the blocker. The honest form would have been *"unknown until the generator runs"*.
+
+**WHAT WAS ACTUALLY WRONG WITH CSAA, now diagnosed:** `f35cb69d` (2026-09-05, `JAN-LIVEEXEC`) added
+`apps/rph-demo/playwright.live-exec.config.ts` — ordinary product work — making FIVE configured test
+populations where `assertJpwbTestPopulations` hard-codes exactly FOUR. It threw *"Required JPWB configured
+test-population profile set is incompatible"*, naming neither the config nor the count, and that single throw
+broke the inventory test, the `csaa:inventory` generator, and everything downstream of them. ⭑ The lane is now
+recorded deliberately (`PLAYWRIGHT/LIVE_EXEC`, with its own independent census over `e2e-live-exec/`, so the
+guard's arity stays exact rather than being widened) and the generator runs again, reporting an ordinary stale
+pin instead of throwing.
+
+⚠ **AND THE FAILURE COUNT WENT 28 → 47, WHICH IS UNMASKING RATHER THAN REGRESSION** — the early throw was
+short-circuiting whole classes of check. ⛔ That number is nonetheless NOT reportable as a measurement: it was
+taken while five repair agents were editing the tree and three workflows saturated the machine. **A measurement
+taken on a mutating tree under contention is uninterpretable in both directions**, and the same trap caught a
+gate run earlier the same day: it reported THIRTEEN failures across eleven files, every one of them a TIMEOUT
+(a five-second limit exceeded; a normally-instant git-walking test taking twenty-two seconds) because two
+workflows were saturating the machine. Twice in one day, from the same cause. ⚠ THE TELL IS IN THE TIMINGS,
+NEVER IN THE COUNTS — and a count is what a reader reaches for first.
+
+**Merge target:** this register only. No code change; `REG-F-372`'s repository changes are unaffected.
+
+---
+
+### REG-F-373 — the authoring agent can now declare how work is discharged and arm the instruction, and a surviving mutant showed the agent-tool tests could not see the broker at all
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-EXECGOV` `EG-07b`) ·
+  **Class:** REMEDIATION — closes the writer half of `REG-F-372`'s bidirectional blindness ·
+  **Status:** ✅ **CLOSED for the declare + arm surface. ⛔ `EG-07c`–`EG-07f` remain.**
+
+**SPONSOR DECISION `G-4`, ANSWERED 2026-09-09:** *"text plus arming, **after the review surface lands**."*
+`EG-07a` discharged that condition, so this is the increment it gated. ⭑ **The ordering was a sponsor condition,
+and it is recorded in the roadmap rather than carried in a memory** — an ordering that lives only in a head is
+an ordering that gets lost.
+
+**WHAT LANDED.** `workDischarge` and an assembled `promptTemplate` on `DefineTypeInput`, `EditTypeInput` and
+`ScaffoldSpec`; both projected back on `PwuTypeView`; four parameters on each of the three agent tool schemas,
+described by the catalog strings `EG-06` single-sourced. ⛔ No refusal, no command, no object, no wire-schema
+change — the payload schemas already accepted all of it.
+
+**⛔⛔ THREE WRITERS, NOT ONE, AND THE THIRD WAS ALMOST MISSED.** `scaffold` builds its **own** `DefinePwuType`
+payload rather than routing through `defineType`. Adding the field to `defineType` and `editType` only would
+have left the agent's most-used path — scaffolding an entire graph in one act — unable to declare how any of its
+work is discharged. That is `REG-F-024`'s *"a gate that covers one of two writers is not a gate"* in the writer
+direction, and it was found by counting the occurrences of a field rather than by reading the two obvious sites.
+
+**⚠ THE `bool()` TRAP, TWENTY LINES AWAY.** `isRoot: bool(a.isRoot)` turns an absent argument into `false`. The
+same idiom on discharge would turn an agent that said NOTHING into one that DECLARED something, destroying the
+distinction the engine keeps — *"absent means the author was never asked; `UNDECLARED` means they were asked and
+deferred."* Every new field is conditional, and the mutant that collapses it is the first test in the block.
+
+⭑ **`declaredPlaceholders` IS DERIVED, NEVER TAKEN FROM THE AGENT.** `markersIn` is the one grammar for what a
+marker is. Letting a caller declare its own placeholder list would be a second spelling of that rule, and the
+render guard that refuses an unsupplied marker would then be checking the agent's claim about its own text
+rather than the text.
+
+---
+
+**⚠⚠ A MUTANT SURVIVED, AND WHAT IT EXPOSED IS THE ENTRY.** Deleting the broker's forward of `promptTemplate`
+left **all fifteen** agent-tool tests GREEN. They drive a **MOCK** broker (`defineType: vi.fn()` capturing its
+input), so they prove the TOOL assembles the right object and prove **nothing** about the broker carrying it to
+the engine. ⛔ **That is the wired-but-unproven shape this register keeps recording** — the same gap the `EG-04`
+e2e was written for, reappearing one layer down and in a different package.
+
+Closed by two tests in `broker.test.ts`, which drives a **real engine**: a declared discharge and an armed
+prompt must reach the STORED type, and an omitted discharge must be stored as **absent** rather than
+`UNDECLARED`. The mutant then reddens.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (5 of 5):** absence collapsed into a declaration → the absence test
+(⭑ the one that matters); an unratified enum value passed through instead of dropped → its own test; placeholders
+taken from the agent → the derivation test; a template that arms itself → the arming test; **the broker drops
+the forward → the real-engine test**, which is the one that had to be written because the mock could not see it.
+
+**⚠ AND A HELP KEY WAS ADDED, NOT INVENTED.** `promptActive` had no `PWU_TYPE_HELP` entry — `EG-06` measured it
+absent while its explanation lived inline in the markup on a bare `<label>`, which the single-source limb
+structurally cannot see (that limb inspects only `{@render fhead(...)}` calls). The agent's schema can describe
+a parameter only with a string that map carries, so the key is now there and both authors read the same words.
+
+---
+
+**⚠ AN OPERATIONAL FINDING ABOUT HOW THIS WORK WAS RUN, worth more than it looks.** Two repair/assessment
+workflows were running against the same working tree while this increment's gate ran. The gate reported **13
+failures across 11 files** — and every one was a **TIMEOUT**, not a logical failure: a 5-second limit exceeded
+and a normally-instant git-walking test taking 22 seconds. ⛔ **A gate taken under contention is unusable in
+BOTH directions** — its red is not a defect and its green would not be evidence. Re-run on a quiet machine: **2684 passed across 304 files, ZERO failures** — every one of the thirteen was
+contention. ⭐ THE SAME TRAP PRODUCED A THIRD UNINTERPRETABLE NUMBER THE SAME DAY (a CSAA count of 47 taken on
+a tree five agents were editing), and a repair lane then measured its general form: the CSAA suite reports
+**38** failures at vitest's default 5s timeout and **4** at 120s, ON THE SAME TREE. The tell is in the
+TIMINGS, never in the counts — and a count is what a reader reaches for first.
+
+⚠ Those workflows also left two scratch files in `scripts/`, a directory that several gates ENUMERATE. Agent
+debris in an enumerated directory is a defect waiting to be misattributed.
+
+**GATES:** check-types 22/22 · lint · verif + `rph-domain` + `rph-application` + `rph-engine` + `rph-assurance`
++ `app:rph-demo` **2684 passed / 304 files** · playwright 90. ⛔ `csaa` excluded; its state is disclosed at
+`REG-F-372` and under separate repair.
+
+**Merge target:** Repository (`broker.ts`, `broker.test.ts`, `catalog.ts`, `agent/tools.ts`,
+`agent/tools.test.ts`). No canon artifact changes.

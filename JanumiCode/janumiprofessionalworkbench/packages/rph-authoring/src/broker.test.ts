@@ -329,6 +329,36 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		});
 	});
 
+	it('⛔⛔ EG-07b — a declared discharge and an authored prompt reach the STORED type', () => {
+		// ⚠ THIS TEST EXISTS BECAUSE A MUTANT SURVIVED WITHOUT IT. The agent-tool tests drive a MOCK broker and
+		// capture the input, so they prove the TOOL assembles the right object and prove NOTHING about the broker
+		// carrying it: deleting the forward in `defineType` left all fifteen of them green. That is the
+		// wired-but-unproven shape this repository keeps recording. This one drives the real engine.
+		const r = broker.defineType({
+			name: 'Model Discharged',
+			pwuKind: 'MODEL_WORK',
+			workDischarge: 'MODEL',
+			promptTemplate: {
+				templateText: 'Assess {subject}.',
+				templateVersion: 1,
+				declaredPlaceholders: ['subject'],
+				status: 'ACTIVE'
+			}
+		});
+		expect(r.ok, r.error).toBe(true);
+		expect(broker.getType(r.id!)).toMatchObject({
+			workDischarge: 'MODEL',
+			promptTemplate: { status: 'ACTIVE', declaredPlaceholders: ['subject'] }
+		});
+	});
+
+	it('⭐ CONTROL — an omitted discharge is stored as ABSENT, not as UNDECLARED', () => {
+		// The distinction the engine keeps, asserted at the layer that persists it rather than only at the tool.
+		const r = broker.defineType({ name: 'Unasked', pwuKind: 'UNASKED_WORK' });
+		expect(r.ok).toBe(true);
+		expect(broker.getType(r.id!)).not.toHaveProperty('workDischarge');
+	});
+
 	it('⭐ an explicit override still beats the blueprint, so the template is a default and not a pin', () => {
 		// ⚠ CONTROL for the line above. Without it the fix is satisfiable by PINNING the template's value, which
 		// would make the catalog's answer unoverridable — the opposite defect, and worse, because a professional

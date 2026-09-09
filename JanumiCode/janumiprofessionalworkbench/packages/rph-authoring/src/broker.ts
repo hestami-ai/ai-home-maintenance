@@ -14,7 +14,8 @@ import type {
 	CommandResult,
 	DomainCommand,
 	ExecutionBoundary,
-	PermittedChildRule
+	PermittedChildRule,
+	PromptTemplate
 } from '@janumipwb/rph-contracts';
 
 // Re-export the PWU-Type authoring value types so every authoring surface (the agent tools, the UI) can name them
@@ -23,7 +24,8 @@ export type {
 	BoundaryContract,
 	CardinalityCode,
 	ExecutionBoundary,
-	PermittedChildRule
+	PermittedChildRule,
+	PromptTemplate
 } from '@janumipwb/rph-contracts';
 import {
 	getObject,
@@ -77,6 +79,9 @@ export interface PwuTypeView {
 	 * ⚠ OPTIONAL ON PURPOSE: `undefined` means the author was never asked, which is not `UNDECLARED`.
 	 */
 	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	/** JAN-PROMPT — projected back for the same reason `workDischarge` is: an author that can write a value
+	 *  and not read it back is the blindness EG-07a measured, with the arrow reversed. */
+	readonly promptTemplate?: PromptTemplate;
 }
 
 /** The outcome of a PROPOSE operation. `ok` mirrors the engine's acceptance; on failure `error` carries the
@@ -117,6 +122,20 @@ export interface DefineTypeInput {
 	 * exactly the collapse this field exists to prevent.
 	 */
 	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	/**
+	 * JAN-PROMPT — what a model is told when this type is executed. Added EG-07b under sponsor decision `G-4`
+	 * (*"text plus arming, AFTER the review surface lands"*), which `EG-07a` discharged.
+	 *
+	 * ⚠ TAKEN ASSEMBLED, NOT AS FLAT TEXT, and the package boundary is the reason: `declaredPlaceholders` must
+	 * be derived by `markersIn`, which lives in `rph-application` — and this package depends only on contracts
+	 * and the engine. Assembling it here would either duplicate the marker grammar (a second spelling of one
+	 * rule) or add a package edge to satisfy a convenience. The caller assembles; this carries.
+	 *
+	 * ⛔ `status: 'ACTIVE'` IS THE ARMING ACT. `renderPromptTemplate` refuses a DRAFT, and the authoring handler
+	 * refuses an ACTIVE template on a type that does not declare MODEL — so arming and declaring are one
+	 * decision, already enforced, and this input cannot separate them.
+	 */
+	readonly promptTemplate?: PromptTemplate;
 }
 
 /** A patch to an existing PWU Type — only the present fields change (mirrors the EditPwuType field-patch). */
@@ -130,6 +149,10 @@ export interface EditTypeInput {
 	readonly permittedChildren?: readonly PermittedChildRule[];
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
+	/** JAN-DISCHARGE / JAN-PROMPT — EG-07b. Patchable for the same reason every sibling here is: an author
+	 *  that can SET a field on create and never change it has been given a declaration, not a decision. */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly promptTemplate?: PromptTemplate;
 	readonly requiredAssurancePolicyIds?: readonly string[];
 	/** STD-2 — reassign the execution boundary. The engine strips a stale contract on a DELEGATED→INTERNAL flip. */
 	readonly executionBoundary?: ExecutionBoundary;
@@ -182,6 +205,16 @@ export interface ScaffoldSpec {
 	readonly completionRule?: string;
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
+	/**
+	 * JAN-DISCHARGE / JAN-PROMPT — EG-07b, and carried HERE as well as on `DefineTypeInput` because
+	 * `scaffoldCommand` builds its OWN `DefinePwuType` payload rather than routing through `defineType`.
+	 * ⛔ THREE WRITERS, NOT ONE: `defineType`, `defineFromTemplate` (via it), and the scaffold. Adding the
+	 * field to two of the three would leave the agent's most-used path — scaffolding a whole graph in one
+	 * act — unable to declare how any of its work is discharged, which is `REG-F-024`'s *"a gate that covers
+	 * one of two writers is not a gate"* in the writer direction.
+	 */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly promptTemplate?: PromptTemplate;
 	readonly requiredAssurancePolicyIds?: readonly string[];
 	/** Temp keys of other specs in THIS batch that this type permits as children. */
 	readonly childTempKeys?: readonly string[];
@@ -237,6 +270,7 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 		...(s.workDischarge !== undefined
 			? { workDischarge: s.workDischarge as 'MODEL' | 'HUMAN' | 'UNDECLARED' }
 			: {}),
+		...(s.promptTemplate !== undefined ? { promptTemplate: s.promptTemplate as PromptTemplate } : {}),
 		permittedChildTypeIds: arr(s.permittedChildTypeIds),
 		permittedChildren: Array.isArray(s.permittedChildren)
 			? (s.permittedChildren as PermittedChildRule[])
@@ -416,7 +450,8 @@ export class PwaAuthoringBroker {
 				...(input.executionBoundary ? { executionBoundary: input.executionBoundary } : {}),
 				...(input.boundaryContract ? { boundaryContract: input.boundaryContract } : {}),
 				...(input.completionRule ? { completionRule: input.completionRule } : {}),
-				...(input.workDischarge !== undefined ? { workDischarge: input.workDischarge } : {})
+				...(input.workDischarge !== undefined ? { workDischarge: input.workDischarge } : {}),
+				...(input.promptTemplate !== undefined ? { promptTemplate: input.promptTemplate } : {})
 			})
 		);
 		return accepted(r) ? { ok: true, id, status: r.status } : rejected(r);
@@ -490,7 +525,9 @@ export class PwaAuthoringBroker {
 			...(patch.executionBoundary !== undefined
 				? { executionBoundary: patch.executionBoundary }
 				: {}),
-			...(patch.boundaryContract !== undefined ? { boundaryContract: patch.boundaryContract } : {})
+			...(patch.boundaryContract !== undefined ? { boundaryContract: patch.boundaryContract } : {}),
+			...(patch.workDischarge !== undefined ? { workDischarge: patch.workDischarge } : {}),
+			...(patch.promptTemplate !== undefined ? { promptTemplate: patch.promptTemplate } : {})
 		};
 	}
 
@@ -707,6 +744,8 @@ export class PwaAuthoringBroker {
 				permittedChildren: childRules,
 				requiredInputs: [...(s.requiredInputs ?? [])],
 				requiredOutputs: [...(s.requiredOutputs ?? [])],
+				...(s.workDischarge !== undefined ? { workDischarge: s.workDischarge } : {}),
+				...(s.promptTemplate !== undefined ? { promptTemplate: s.promptTemplate } : {}),
 				requiredAssurancePolicyIds: [...(s.requiredAssurancePolicyIds ?? [])],
 				...(s.executionBoundary ? { executionBoundary: s.executionBoundary } : {}),
 				...(s.boundaryContract ? { boundaryContract: s.boundaryContract } : {}),
