@@ -370,7 +370,29 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⛔ ITS BUILD UNITS ARE GATED on sponsor decision `G-1`: minting a RUNTIME_BINDING requires naming a
 			// capability, capabilities are free strings the corpus never defines, and naming one is a ratification
 			// act the schema will not stop.
-		).toBe(37);
+			//
+			// 37 -> 38 (2026-09-09): `ROADMAP-csaa-decoupling.md` (`JAN-CSAADEC`). ⭑ ADDED AT SPONSOR DIRECTION —
+			// *"I'm going to look to decoupling CSAA from the build process because it is currently not providing
+			// any (overt) value but generates a lot of recurrent build related updates"*, then narrowed: *"by
+			// decoupling CSAA, I didn't mean deleting it, in part or in whole. Rather just removing the coupling
+			// to the test suite running"*.
+			// ⭑⭑ IT SUBSUMES BECAUSE IT IS A SUBTRACTION, NOT A LINE OF WORK. No vocabulary, no new field, no new
+			// governed object, no new gate over the product. Its whole effect is to stop 185 CSAA test files being
+			// obliged to run on every product commit, and to move three — `inventory/inventory.test.ts`,
+			// `subject/subject.test.ts`, `providers/runtime/project-hybrid-static-prerequisites.test.ts` — into a
+			// lane that is not the default gate. Those three assert over the LIVE WORKBENCH TREE; nothing else in
+			// the package does.
+			// ⛔ AND IT EXISTS PARTLY TO REPAIR A BREACH OF THIS REPOSITORY'S OWN SEQUENCE. `CD-01`/`CD-02` landed
+			// in `4e0df056` with no design document, no roadmap and no register entry — delegated sub-agents went
+			// from a conversational brief straight to code. The roadmap records them as LANDED-BEFORE-DOCUMENTED
+			// rather than back-dating them into order, so a roadmap that regularises existing work is the opposite
+			// of an accumulated one.
+			// ⚠ AND THE HONEST NOTE, BECAUSE THIS ASSERTION IS THE SAME CLASS OF INSTRUMENT THE PROGRAMME IS
+			// DECOUPLING: `SL-L4` is a hard-coded population count over the repository, exactly like the CSAA pins.
+			// The difference is not the shape, it is the reliance — this one caught the addition on the first run
+			// and its message named the remedy, while the CSAA pins drifted through six consecutive programmes
+			// unnoticed. A pin is gate material when someone reads it; `CD-00b` measured that nobody read those.
+		).toBe(38);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

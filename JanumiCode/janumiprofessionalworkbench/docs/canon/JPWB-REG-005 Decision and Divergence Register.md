@@ -33609,3 +33609,87 @@ a genuine unevidenced absence standing three paragraphs above it.
 
 **Merge target:** Repository (`lint.ts`, `lint.test.ts`, the PWA Designer load + topbar, `pwa-authoring.e2e.ts`).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-376 — CSAA's suite needs the workbench for THREE of its 188 files, not 46 and not 9 — and two of my own three instruments were wrong, in opposite directions
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-CSAADEC` `CD-00b`, and the retroactive record for `CD-01`/`CD-02`) ·
+  **Class:** MEASUREMENT — a proxy mistaken for the thing it proxies, twice ·
+  **Status:** ✅ **MEASUREMENT CLOSED. `CD-03`–`CD-06` remain.**
+
+**THE SPONSOR'S QUESTION.** *"does the CSAA test suite 'only' need to run when there are changes to the CSAA
+library or other CSAA?"* — and the follow-on instruction that decoupling means removing the coupling to the test
+suite running, **not deleting CSAA in part or in whole**.
+
+**THE ANSWER: 185 of 188 files, yes. Three, no.** `inventory/inventory.test.ts`, `subject/subject.test.ts`, and
+`providers/runtime/project-hybrid-static-prerequisites.test.ts` assert over the LIVE WORKBENCH TREE. Everything
+else is indifferent to it.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: I ANSWERED THIS TWICE BEFORE GETTING IT RIGHT, AND BOTH WRONG ANSWERS PASSED A
+CONTROL.**
+
+**Instrument 1 — "the test names a repo path".** Regex over each file for `apps/rph-demo`, `packages/rph-*`,
+`verif/*.ts`, `docs/canon`, `docs/tracking`. Answer: **46 of 188**. ⭑ It even carried a control that WORKED — a
+comparable package, `rph-domain`, scored 3 of 33, so the probe was demonstrably not matching something
+ubiquitous. ⛔ **And it was still a fifteen-fold over-count.** Naming a path inside a string fixture is not
+reading the tree. 41 of the 46 never touch the workbench.
+
+**Instrument 2 — transitive imports of the census module.** Reverse-reachability from `collect-inventory.ts`.
+Answer: **9 of 188**. ⛔ **Wrong in BOTH directions simultaneously.** Cross-tabbed against instrument 1: four
+files it called clean DO import the census module — importing it is not executing its assertions — while 41 that
+instrument 1 called coupled do not appear at all. And the seed was one module: a census of live-tree readers
+found **eight** modules using `process.cwd()` / `readdirSync`, so reachability from one under-approximates too.
+
+⭑ **Instrument 3 — PERTURB THE TREE AND SEE WHO CHANGES VERDICT.** No proxy at all. Add files of exactly the
+shape that broke CSAA before, run all 188, restore, diff. Round 1: a sixth `playwright.*.config.ts` at the
+`apps/rph-demo` root (the literal shape of `f35cb69d`), a source file under `apps/rph-demo/src/lib/`, a `verif/`
+asset. Round 2: the same plus sources under `rph-domain`, `rph-contracts`, `rph-engine`.
+
+**BOTH ROUNDS RETURNED THE SAME THREE FILES AND ONLY THOSE THREE**, and the perturbations demonstrably
+registered rather than being ignored: the population pin moved `expected 72 to be 69` → `expected 73 to be 69`
+in round 1, a second pin moved `expected 30 to be 29` in round 2, and round 2 raised *"Required JPWB configured
+test-population profile set is incompatible"* — **the original `f35cb69d` break, reproduced on demand.**
+
+**⭑ AND A FOURTH INSTRUMENT AGREED WITHOUT BEING TOLD.** Across all history the most-frequently-modified CSAA
+test files are `index.test.ts` (38 commits — CSAA's own export-surface pin, correctly not in the coupled set),
+then `inventory/inventory.test.ts` (37) and `subject/subject.test.ts` (33). Two of the three the perturbation
+named are the top repo-driven churn sites in the git record.
+
+**THE GENERAL FORM.** *A control proves the instrument discriminates. It does not prove the instrument measures
+the thing you named it after.* Instrument 1's control was sound and its answer was wrong by 15×, because
+"discriminating" and "correct" are different properties and only the first is cheap to test.
+
+---
+
+**⚠ THE NOISE FLOOR, RECORDED BECAUSE IT NEARLY INVERTED THE FINDING.** The full-suite baseline reported **six**
+failures. The perturbed run — which should break MORE — reported **three**. That is not a coupling signal; three
+of the baseline six were timeouts against in-file limits (`Hook timed out in 10000ms`, `Test timed out in
+15000ms`) that vanished under lighter load. ⛔ The same tree yields six or three depending on contention, which
+is the third time this class has produced an uninterpretable measurement. Every count above is from a run whose
+timeout total was zero.
+
+**⛔ THE PROCESS BREACH, RECORDED AGAINST MYSELF.** `CD-01` and `CD-02` landed in `4e0df056` with **no design
+document, no roadmap document, and no register entry** — delegated sub-agents went from a conversational brief
+straight to code, against the standing sequence. The increments are sound and are not unwound; the design and
+roadmap now exist and mark them `LANDED (documented retroactively)` rather than back-dating them into order.
+
+**SEARCHED, FOR THE RELIANCE CLAIM.** `docs/canon/JPWB-REG-005` for `csaa` citations attributing a finding to the
+tool: **zero**, against a control of 34 for a comparable instrument; `_GATE_EFFECT` across the CSAA corpus:
+**36/36 `NONE`**; product imports of `@janumipwb/csaa` outside its own package: **none**; CI invocation: none.
+⭑ That is an argument about OBLIGATION, not about worth — a pin nobody consults is not worthless, it is
+worthless *as a gate*, and only the second claim is being made.
+
+**WHAT `CD-03` WILL DO, AND WHAT IT WILL NOT.** A `csaa-census` project holding exactly those three files,
+excluded from the default gate; `csaa` keeps the other 185 and stays in the gate. ⛔ Nothing is deleted, no
+assertion is weakened, and the census lane must stay RED on the current tree — a census lane that goes green by
+leaving the gate would be a control that cannot fail.
+
+**GATES:** no product code changed in this increment — documents and this register entry only. The measurement
+runs themselves: `--project csaa` 188 files, baseline and two perturbed rounds, tree verified clean after each.
+
+**Merge target:** Repository (`docs/_working/DESIGN-csaa-decoupling.md`,
+`docs/_working/ROADMAP-csaa-decoupling.md`, this entry).
+⚠ No ratified artifact was amended.
