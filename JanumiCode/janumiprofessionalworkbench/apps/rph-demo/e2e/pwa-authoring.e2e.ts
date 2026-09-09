@@ -92,4 +92,55 @@ test.describe('PWA Designer — author PWU Types and publish', () => {
 		// "disclaim everything", and a professional told that nothing works stops reading the notes at all.
 		await expect(form.getByText(/Publishing requires a root/i)).toBeVisible();
 	});
+
+	// ── ⭑⭑ JAN-EXECGOV EG-07a — THE APPROVAL MOMENT CAN SEE WHAT IT APPROVES ──────────────────────────────
+	//
+	// SPONSOR DIRECTION: "the human reviewing the full PWA before approving its use would be the model."
+	// MEASURED: that control failed at its own control point. `editable = isDraft && (!hasStagedCandidate ||
+	// running)`, and the type FORM — the ONLY surface in this repository that rendered workDischarge or the
+	// prompt — sits behind `{:else if editable && formMode !== null}`. With an agent candidate STAGED, editable
+	// is FALSE and the panel falls to the read-only inspector, which showed Kind, Boundary, Purpose, Completion
+	// rule, Required inputs, Required outputs — and NEITHER. So at acceptAgentCandidate, documented as "explicit
+	// human acceptance of the exact assured preview", the human approved how work is discharged and what an
+	// agent would be told without either being on screen.
+	//
+	// ⚠ WHAT THIS SPEC DOES AND DOES NOT REACH. It drives the read-only inspector directly — the same component
+	// the staged-candidate path falls to — rather than standing up the agent harness. It therefore proves the
+	// SURFACE renders the facts; it does not by itself prove the staged-candidate route reaches this component.
+	// Stated rather than implied.
+	test('the read-only inspector shows how work is discharged, and the prompt status (EG-07a)', async ({
+		page
+	}) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Discharge Visibility PWA');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		await gotoHydrated(
+			page,
+			(await page.getByRole('link', { name: /Discharge Visibility PWA/ }).getAttribute('href'))!
+		);
+
+		await page.getByRole('button', { name: '+ Define PWU Type' }).click();
+		await page.locator('input[name="name"]').fill('Model Discharged Type');
+		await page.locator('input[name="pwuKind"]').fill('MODEL_WORK');
+		await page.getByTestId('pwu-type-discharge').selectOption('MODEL');
+		await page.getByTestId('pwu-type-prompt').fill('Assess {subject} and report findings.');
+		await page.getByRole('button', { name: 'Add type' }).click();
+
+		// The node is selected and NOT being edited — the state a staged candidate also lands in.
+		await page.locator('.svelte-flow__node').filter({ hasText: 'Model Discharged Type' }).click();
+
+		// ⛔ THE TWO FACTS THE APPROVAL MOMENT COULD NOT SEE.
+		// ⚠⚠ `toBeVisible` BEFORE `toContainText`, AND A MUTANT PROVED IT NECESSARY. The first version asserted
+		// only `toContainText`, which reads textContent and PASSES ON A HIDDEN ELEMENT — so adding `hidden` to
+		// the field left the suite green. A test that accepts DOM presence in place of visibility is asserting
+		// exactly the defect this increment exists to fix, one layer down.
+		await expect(page.getByTestId('inspector-discharge')).toBeVisible();
+		await expect(page.getByTestId('inspector-discharge')).toContainText('A MODEL');
+		await expect(page.getByTestId('inspector-prompt')).toBeVisible();
+		await expect(page.getByTestId('inspector-prompt')).toContainText('DRAFT');
+		// ⭑ And the prompt's status is stated in consequence terms, not as a bare token: an unarmed instruction
+		// renders nothing, which is the fact a professional needs at the moment they approve it.
+		await expect(page.getByTestId('inspector-prompt')).toContainText(/authored, not armed/i);
+	});
 });

@@ -68,6 +68,15 @@ export interface PwuTypeView {
 	readonly executionBoundary: ExecutionBoundary;
 	/** JAN-PRPWA-DS-001 STD-3 — the org-boundary ICD; present iff executionBoundary is DELEGATED_EXTERNAL (INV-1). */
 	readonly boundaryContract?: BoundaryContract;
+	/**
+	 * JAN-DISCHARGE — who does this work. ⭑ PROJECTED BACK (EG-07a) because the blindness was BIDIRECTIONAL:
+	 * the agent could not write this field AND could not read what a human had declared. `+page.server.ts`
+	 * already states the rule for the other author — *"a field the page can write and cannot read back is the
+	 * sponsor's original complaint with the arrow reversed"* — and it holds here in both directions.
+	 *
+	 * ⚠ OPTIONAL ON PURPOSE: `undefined` means the author was never asked, which is not `UNDECLARED`.
+	 */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 }
 
 /** The outcome of a PROPOSE operation. `ok` mirrors the engine's acceptance; on failure `error` carries the
@@ -98,6 +107,16 @@ export interface DefineTypeInput {
 	readonly executionBoundary?: ExecutionBoundary;
 	/** STD-3 — the org-boundary ICD, authored only when executionBoundary is DELEGATED_EXTERNAL. */
 	readonly boundaryContract?: BoundaryContract;
+	/**
+	 * JAN-DISCHARGE — who does this work, said out loud. Added EG-07a under sponsor direction: *"the PWA
+	 * authoring agent should be able to declare how work is discharged."*
+	 *
+	 * ⚠ OPTIONAL, AND FORWARDED BY CONDITIONAL SPREAD ONLY. Absent and `UNDECLARED` are DIFFERENT FACTS the
+	 * engine keeps apart — *"absent means the author was never asked; UNDECLARED means they were asked and
+	 * deferred"* — so writing a value where the caller said nothing would destroy "never asked" and is
+	 * exactly the collapse this field exists to prevent.
+	 */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 }
 
 /** A patch to an existing PWU Type — only the present fields change (mirrors the EditPwuType field-patch). */
@@ -213,6 +232,11 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 		purpose: String((s.purpose ?? '') as string),
 		isRoot: Boolean(s.isRoot),
 		completionRule: String((s.completionRule ?? '') as string),
+		// ⚠ SPREAD, NOT A DEFAULT. `String(s.workDischarge ?? '')` would turn "never asked" into a value and
+		// erase the distinction the engine keeps; the field is simply absent when the state has none.
+		...(s.workDischarge !== undefined
+			? { workDischarge: s.workDischarge as 'MODEL' | 'HUMAN' | 'UNDECLARED' }
+			: {}),
 		permittedChildTypeIds: arr(s.permittedChildTypeIds),
 		permittedChildren: Array.isArray(s.permittedChildren)
 			? (s.permittedChildren as PermittedChildRule[])
@@ -391,7 +415,8 @@ export class PwaAuthoringBroker {
 				...(input.permittedChildren ? { permittedChildren: [...input.permittedChildren] } : {}),
 				...(input.executionBoundary ? { executionBoundary: input.executionBoundary } : {}),
 				...(input.boundaryContract ? { boundaryContract: input.boundaryContract } : {}),
-				...(input.completionRule ? { completionRule: input.completionRule } : {})
+				...(input.completionRule ? { completionRule: input.completionRule } : {}),
+				...(input.workDischarge !== undefined ? { workDischarge: input.workDischarge } : {})
 			})
 		);
 		return accepted(r) ? { ok: true, id, status: r.status } : rejected(r);
@@ -406,6 +431,12 @@ export class PwaAuthoringBroker {
 			pwuKind: t.pwuKind,
 			purpose: t.purpose,
 			isRoot: t.isRoot,
+			// ⛔ EG-07a: THIS LINE WAS MISSING AND `workDischarge` IS A *REQUIRED* FIELD OF `PwuTypeTemplate`
+			// (catalog.ts, no `?`). The blueprint answers the question and the blueprint's answer was DISCARDED,
+			// so a type defined from a catalog template carried no discharge at all — not even UNDECLARED.
+			// REG-005:31400 calls that required field "the structural guard"; it was defeated on exactly the
+			// path EG-07b opens to the agent. `...overrides` still wins, so a caller may say something else.
+			workDischarge: t.workDischarge,
 			requiredInputs: t.requiredInputs ?? [],
 			requiredOutputs: t.requiredOutputs ?? [],
 			...overrides

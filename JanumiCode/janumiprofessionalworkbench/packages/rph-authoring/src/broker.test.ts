@@ -318,8 +318,24 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 			// Definition'. The template's own `name` was already that; only the kind token had been shortened.
 			pwuKind: 'ARCHITECTURE_DEFINITION',
 			requiredInputs: ['approved-behavior'],
-			requiredOutputs: ['architecture-baseline']
+			requiredOutputs: ['architecture-baseline'],
+			// ⛔⛔ EG-07a. THIS TEST IS NAMED "carrying the blueprint fields" AND CHECKED THREE OF THEM, which is
+			// how the drop went unnoticed: `defineFromTemplate` forwarded six fields and `workDischarge` — a
+			// REQUIRED field of `PwuTypeTemplate` — was not among them, so a type defined from a blueprint carried
+			// no discharge at all, not even UNDECLARED. `REG-005:31400` calls that required field "the structural
+			// guard"; it was defeated on exactly the path EG-07b opens to the agent.
+			// THE MUTANT: delete `workDischarge: t.workDischarge` from defineFromTemplate — the state at HEAD.
+			workDischarge: 'UNDECLARED'
 		});
+	});
+
+	it('⭐ an explicit override still beats the blueprint, so the template is a default and not a pin', () => {
+		// ⚠ CONTROL for the line above. Without it the fix is satisfiable by PINNING the template's value, which
+		// would make the catalog's answer unoverridable — the opposite defect, and worse, because a professional
+		// could no longer say a templated type is discharged by a model.
+		const r = broker.defineFromTemplate('architecture', { workDischarge: 'MODEL' });
+		expect(r.ok).toBe(true);
+		expect(broker.getType(r.id!)).toMatchObject({ workDischarge: 'MODEL' });
 	});
 
 	it('edits a PWU Type in place, changing only the present fields', () => {

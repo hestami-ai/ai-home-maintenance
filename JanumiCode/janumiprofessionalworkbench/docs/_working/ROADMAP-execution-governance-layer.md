@@ -163,6 +163,72 @@ finding.
 
 ---
 
+### `EG-07` — the two authors of a PWA see the same thing  *(sponsor-directed 2026-09-09; two decisions ANSWERED)*
+
+**SPONSOR DIRECTION:** *"the (presumably PWA) authoring agent should be able to declare how work is discharged
+and that the human reviewing the full PWA before approving its use would be the model."* Design: §7.
+
+⛔⛔ **THE ORDER BELOW IS A SPONSOR CONDITION, NOT A PREFERENCE.** Decision `G-4` was answered *"text plus
+arming, **after the review surface lands**"*. `EG-07a` therefore GATES `EG-07b`: nothing may be armed that the
+approval surface cannot show. This is written here because an ordering that lives only in a memory is an
+ordering that gets lost.
+
+**ANSWERED DECISIONS.** `G-4` (how far the agent's declare-surface reaches) → **text PLUS arming, sequenced
+after the review surface.** `G-5` (does discharge enter the reasoning review's subject) → **yes, add both to
+`buildPwaExport`; NO new criterion** — the ratified floor policy is not edited.
+
+---
+
+#### `EG-07a` — the approval moment can see what it approves  ⛔ **GATES `EG-07b`**
+
+| Mutant | Must redden |
+|---|---|
+| hide either field from the read-only inspector | the acceptance e2e — with a candidate STAGED, `editable` is false and the type form is gone; this is the state a human actually approves in |
+| collapse the four-way distinction to a boolean | the e2e — *never asked* and *not yet decided* are different facts and the code keeps them apart |
+| revert `defineFromTemplate`'s `workDischarge` line | a broker test — the blueprint's REQUIRED answer is discarded today, on exactly the path `EG-07b` opens |
+| **CONTROL** | a type whose discharge IS declared renders it plainly, so this is not "warn on everything" |
+
+#### `EG-07b` — the agent may declare, and arm  *(only after `EG-07a`)*
+
+| Mutant | Must redden |
+|---|---|
+| forward a field unconditionally instead of by conditional spread | ⚠ the ABSENCE test: writing `UNDECLARED` where the agent said nothing destroys *"never asked"*, which the corpus distinguishes |
+| omit `workDischarge` from `PwuTypeView` | the read-back test — an agent that cannot see what a human declared is the same defect with the arrow reversed |
+| **CONTROL** | a human-authored declaration still round-trips unchanged |
+
+#### `EG-07c` — the consequence is spoken where the author is standing
+
+| Mutant | Must redden |
+|---|---|
+| make the undeclared case a REFUSAL | ⛔ the wedge test — `JAN-EXEBIND` produced *"an UNRECOVERABLE WEDGE"* and that refusal stays withdrawn |
+| emit one message for both undeclared and absent | the two-message test |
+| render the lint to the agent only | ⭑ the human-render test, which makes `lint.ts`'s own header sentence true for the first time |
+| **CONTROL** | `DELEGATED_EXTERNAL` stays silent — its own gate already refuses any discharge value |
+
+#### `EG-07d` — the whole-PWA reviewer sees it too  *(sponsor decision `G-5`)*
+
+| Mutant | Must redden |
+|---|---|
+| leave `buildPwaExport` at 8 fields | the export test — the one assurance act that reviews the whole PWA could not assess how work is discharged |
+| **CONTROL** | the REASONING_REVIEW floor policy's criteria are UNCHANGED — a ratified policy is not edited to carry a new rule |
+
+#### `EG-07e` — the symmetry becomes checkable, with no exemption
+
+| Mutant | Must redden |
+|---|---|
+| add a help key one author can read and the other cannot | the symmetry limb, in EITHER direction |
+| **CONTROL** | landing it requires no exemption — `childCardinalities` and `promptActive` are repaired first, because an exemption granted on a gate's first day is how a gate rots |
+
+#### `EG-07f` — `STA-8` closes for the AGENT path, proved end to end
+
+⭑ `REG-F-371` recorded that `EG-02`/`EG-03` closed `STA-8` for the HUMAN path only. This is the other half.
+
+| Mutant | Must redden |
+|---|---|
+| revert `DefineTypeInput` to its 12 fields | the e2e — an agent-authored plan yields a step with no `RUNTIME_BINDING`, which is exactly `REG-F-365`'s measured state |
+
+---
+
 ## ⛔ NOT TAKEN — and this is the larger half of the design
 
 `modelSelectionPolicy` (configuration by `REG-D-052`), `ModelSelectionPolicy`'s shape (explicitly deferred),

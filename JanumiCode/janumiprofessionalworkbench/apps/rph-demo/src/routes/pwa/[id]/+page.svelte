@@ -1815,6 +1815,52 @@
 							</p>
 						</div>
 						<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
+						<!-- ⭑⭑ JAN-EXECGOV EG-07a — WHAT THE APPROVAL MOMENT COULD NOT SEE.
+						     `editable = isDraft && (!hasStagedCandidate || running)`, and the type FORM — the only
+						     surface in this repository that rendered `workDischarge` or the prompt — sits behind
+						     `{:else if editable && formMode !== null}`. With an agent candidate STAGED, `editable` is
+						     FALSE and the panel falls HERE. So at `acceptAgentCandidate`, documented as "explicit human
+						     acceptance of the exact assured preview", the human approved how the work is discharged and
+						     what an agent would be told WITHOUT EITHER BEING ON SCREEN.
+						     ⚠ FOUR STATES, NOT THREE, AND NOT A BOOLEAN. "never asked" (absent) and "not yet decided"
+						     (UNDECLARED) are different facts the engine deliberately keeps apart, and collapsing them
+						     is the conflation this field was added to remove. -->
+						<div class="field" data-testid="inspector-discharge">
+							<span class="flabel">How the work is done</span>
+							<p>
+								{#if current.workDischarge === 'MODEL'}
+									<span class="dischargebadge model">A MODEL</span>
+								{:else if current.workDischarge === 'HUMAN'}
+									<span class="dischargebadge human">A PERSON</span>
+								{:else if current.workDischarge === 'UNDECLARED'}
+									<span class="dischargebadge undeclared">NOT YET DECIDED</span>
+								{:else}
+									<span class="dischargebadge unasked">NEVER ASKED</span>
+								{/if}
+								{#if current.workDischarge !== 'MODEL'}
+									<span class="leafkind">requests no runtime binding · runs as a transformation</span>
+								{/if}
+							</p>
+						</div>
+						<div class="field" data-testid="inspector-prompt">
+							<span class="flabel">Prompt</span>
+							<p>
+								{#if current.promptTemplate}
+									<span
+										class={current.promptTemplate.status === 'ACTIVE'
+											? 'promptbadge active'
+											: 'promptbadge draft'}>{current.promptTemplate.status}</span>
+									<span class="leafkind"
+										>v{current.promptTemplate.templateVersion} · {current.promptTemplate.status === 'ACTIVE'
+											? 'this is what the model is told'
+											: 'authored, not armed — it renders nothing'}</span
+									>
+								{:else}
+									<span class="promptbadge none">NONE</span>
+									<span class="leafkind">no instruction is authored for this type</span>
+								{/if}
+							</p>
+						</div>
 						<div class="field">
 							<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
 						</div>
@@ -2760,6 +2806,37 @@
 		color: var(--delegated-text);
 		border: 1px solid var(--delegated-border);
 		background: var(--delegated-background);
+	}
+	.dischargebadge,
+	.promptbadge {
+		display: inline-block;
+		padding: 0.05rem 0.4rem;
+		border-radius: 3px;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.03em;
+		border: 1px solid currentColor;
+	}
+	/* ⚠ THE TWO UNDECLARED STATES ARE DELIBERATELY NOT THE SAME COLOUR as each other or as a declared one:
+	   a professional scanning the panel should be able to tell "nobody asked" from "asked and deferred". */
+	.dischargebadge.model {
+		color: var(--accent, #2563eb);
+	}
+	.dischargebadge.human {
+		color: #15803d;
+	}
+	.dischargebadge.undeclared {
+		color: #b45309;
+	}
+	.dischargebadge.unasked,
+	.promptbadge.none {
+		color: var(--muted, #6b7280);
+	}
+	.promptbadge.active {
+		color: var(--accent, #2563eb);
+	}
+	.promptbadge.draft {
+		color: #b45309;
 	}
 	.leafkind {
 		color: var(--outline);

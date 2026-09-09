@@ -33289,3 +33289,90 @@ this remedy from degrading into noise.
 
 **Merge target:** Repository (`catalog.ts`, the PWU Type form markup, `pwa-authoring.e2e.ts`,
 `verif/authoring-field-disposition.test.ts`) and the `JAN-EXECGOV` roadmap. No canon artifact changes.
+
+---
+
+### REG-F-372 — the human approving an agent's PWA could not see how the work would be discharged or what the agent would be told, and the blueprint's own required answer was being discarded
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-EXECGOV` `EG-07a`) ·
+  **Class:** CODE_DIVERGES — the sponsor's own control failed at its control point ·
+  **Status:** ✅ **CLOSED for the approval surface and the blueprint drop. ⛔ `EG-07b`–`EG-07f` remain; the
+  arming half is SEQUENCED BEHIND this entry by sponsor condition.**
+
+**SPONSOR DIRECTION, 2026-09-09:** *"the (presumably PWA) authoring agent should be able to declare how work is
+discharged and that the human reviewing the full PWA before approving its use would be the model."*
+
+**⛔⛔ THE MEASUREMENT THAT DIRECTION PRODUCED IS LARGER THAN THE ASYMMETRY IT NAMES.** A PWU Type has **two**
+authors, and each is blind to things the other sees — in **both** directions:
+
+| direction | measured |
+|---|---|
+| agent cannot WRITE | `DefineTypeInput` carried 12 fields; `workDischarge` and every prompt field were none of them |
+| agent cannot READ BACK | `PwuTypeView`/`toTypeView` did not project `workDischarge`, so the agent could not see what a human declared |
+| ⛔⛔ human cannot SEE **at the approval moment** | `editable = isDraft && (!hasStagedCandidate \|\| running)`, and the type FORM — the ONLY surface in the repository rendering `workDischarge` or the prompt — sits behind `{:else if editable && formMode !== null}`. With a candidate STAGED, `editable` is FALSE and the panel falls to the read-only inspector: Kind · Boundary · Purpose · Completion rule · Required inputs · Required outputs, **and neither** |
+
+⭑ **THE THIRD ROW IS THE ENTRY.** `acceptAgentCandidate` is documented as *"explicit human acceptance of the
+exact assured preview"*. The human accepting it could not see how the work would be discharged, or what an
+agent would be told to do. **The control the sponsor named as the model was failing exactly where it was
+supposed to hold.** The repository already states the rule for the other author at `+page.server.ts:151` — *"a
+field the page can write and cannot read back is the sponsor's original complaint with the arrow reversed"* —
+and it held here in both directions at once.
+
+**⚠ AND A ONE-LINE BUG ON EXACTLY THE PATH THE NEXT INCREMENT OPENS.** `defineFromTemplate` forwarded six fields
+and dropped `workDischarge` — a **REQUIRED** field of `PwuTypeTemplate` (`catalog.ts`, no `?`). The blueprint
+answers the question and the answer was discarded, so a type defined from a catalog template carried no
+discharge at all — **not even `UNDECLARED`**. `REG-005:31400` calls that required field *"the structural
+guard"*. ⭑ **Its own test is named *"carrying the blueprint fields"* and asserted THREE of them**, which is how
+it went unnoticed.
+
+**WHAT LANDED.** Two fields in the read-only inspector rendering the **four-way** distinction — *a model · a
+person · not yet decided · **never asked*** — and the prompt's `ACTIVE`/`DRAFT` status stated in consequence
+terms (*"authored, not armed — it renders nothing"*). `workDischarge` on `DefineTypeInput` and projected back on
+`PwuTypeView`, both by **conditional spread**, because writing a value where the caller said nothing destroys
+*"never asked"*. ⛔ **No refusal, no command, no object, no wire-schema change** — the payload schemas already
+accepted all of it.
+
+⛔ **THE ORDER IS A SPONSOR CONDITION AND IS RECORDED AS ONE.** Decision `G-4` was answered *"text plus arming,
+**after the review surface lands**"* — so `EG-07a` gates `EG-07b`: nothing may be armed that this surface cannot
+show. `G-5`: discharge and prompt status enter `buildPwaExport`, with **no new criterion** on the ratified floor
+policy.
+
+---
+
+**⚠⚠ A MUTANT SURVIVED AND IT CAUGHT MY OWN TEST COMMITTING THIS ENTRY'S DEFECT.** Adding `hidden` to the
+inspector field left the e2e **GREEN**: `toContainText` reads `textContent` and passes on a hidden element. **A
+test that accepts DOM presence in place of visibility is asserting the exact defect this increment exists to
+fix, one layer down** — content present and unreadable. `toBeVisible()` added ahead of each assertion; the
+mutant then went red.
+
+⚠ **AND THE FIRST ATTEMPT AT THE BLUEPRINT TEST LANDED ON THE WRONG TEST.** A `replace(old, new, 1)` matched an
+earlier assertion block, putting the `workDischarge` expectation on a test that builds its own input and never
+touches a blueprint. It failed loudly rather than passing in the wrong place, and was moved.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (5 of 5):** drop `workDischarge` from `defineFromTemplate` (the state
+at HEAD) → the blueprint test; **pin** the template's value past `...overrides` → ⭑ the override CONTROL, which
+is the opposite defect and would make a professional unable to say a templated type is model-discharged; drop
+the `toTypeView` projection → the read-back test; hide the inspector field → the visibility assertion above;
+blank the prompt's consequence text → the e2e.
+
+---
+
+**⛔ A DEBT TO ANOTHER PROGRAMME, RECORDED BECAUSE I CANNOT DISCHARGE IT.** `packages/csaa` enumerates every
+top-level `verif/` asset by name, and this session added **three** — `form-key-emitter-census.test.ts`,
+`authoring-field-disposition.test.ts`, `tracker-census-freshness.test.ts` — none of which are listed (positive
+control: `verif/route-action-census.test.ts`, which predates this session, IS listed). ⚠ **The sanctioned
+mechanism to fix it, `bun run csaa:inventory --write`, is itself BROKEN** by a pre-existing CSAA failure:
+*"Required JPWB configured test-population profile set is incompatible"*, thrown from `assertJpwbTestPopulations`
+before any file enumeration runs. That assertion expects four fixed provider/profile pairs and is unrelated to
+anything this session touched; the last change to the vitest project config is a CSAA commit.
+
+⛔ **So the pin is NOT hand-edited.** Writing a generated artifact by hand is the defect class this register
+keeps recording, and the edit would be unverifiable while the generator throws. **28 CSAA tests across 20 files
+are red at HEAD; 27 of them are unrelated to this session and are the CSAA agent's.** The three verif entries
+are this programme's to hand over, and they are named here so the hand-over is explicit rather than discovered.
+
+**GATES:** check-types 22/22 · lint · verif + `rph-domain` + `rph-application` + `rph-engine` + `rph-assurance`
++ `app:rph-demo` **2677 passed / 304 files** · playwright 89. ⛔ `csaa` excluded and its state disclosed above.
+
+**Merge target:** Repository (`broker.ts`, `broker.test.ts`, the PWA Designer inspector, `pwa-authoring.e2e.ts`)
+and `docs/_working/` §7 + roadmap `EG-07`. No canon artifact changes.

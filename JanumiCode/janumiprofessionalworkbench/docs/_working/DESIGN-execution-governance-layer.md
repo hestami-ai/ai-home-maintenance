@@ -177,3 +177,96 @@ invariant.
 
 ⛔ **NOT proposed:** wiring anything in §4. Each would invent a rule canon declined to make, and the register
 already records the deferral for most of them.
+
+## 7. ⭑⭑ THE TWO AUTHORS OF A PWA DO NOT SEE THE SAME THING — in BOTH directions, and nothing checks it
+
+**SPONSOR DIRECTION, 2026-09-09, verbatim:** *"the (presumably PWA) authoring agent should be able to declare
+how work is discharged and that the human reviewing the full PWA before approving its use would be the model."*
+
+That direction is answerable, and the measurement underneath it turned out to be larger than the asymmetry it
+names. A PWU Type has **two** authors — the authoring agent and the professional — and each is blind to things
+the other sees. Three instances, all verified, all pointing the same way:
+
+| # | direction | what was measured |
+|---|---|---|
+| 1 | agent cannot WRITE | `DefineTypeInput` carries 12 fields; `workDischarge`, `promptTemplateText`, `promptOutputContract`, `promptActive`, `promptTemplateVersion` are none of them, and the tool schema names none. The only production writer of `'MODEL'` is a human choosing it in a select |
+| 2 | agent cannot READ BACK | `PwuTypeView` / `toTypeView` do not project `workDischarge` or `promptTemplate`, so the agent cannot even see what a human declared. ⭑ The repository already states this rule for the human at `+page.server.ts:151` — *"a field the page can write and cannot read back is the sponsor's original complaint with the arrow reversed"* |
+| 3 | ⛔⛔ human cannot SEE, **at the approval moment** | `editable = isDraft && (!hasStagedCandidate \|\| running)`, and the type FORM — the only surface in the repository that renders `workDischarge` or the prompt — sits behind `{:else if editable && formMode !== null}`. With a candidate STAGED, the panel falls to the read-only inspector, which shows Kind · Boundary · Purpose · Completion rule · Required inputs · Required outputs, **and neither discharge nor prompt** |
+
+⛔ **INSTANCE 3 IS THE ONE THAT MATTERS, BECAUSE IT IS THE SPONSOR'S OWN CONTROL FAILING AT ITS CONTROL POINT.**
+`acceptAgentCandidate` is documented as *"explicit human acceptance of the exact assured preview"*. The human
+accepting it cannot see how the work will be discharged, or what an agent will be told to do.
+
+⭑ **AND A FOURTH, IN THE SAME SHAPE.** `lint.ts`'s own header says *"The agent runs this on itself … **and a
+human can read the same list**."* Its only production caller is `tools.ts:249`, the agent's tool. **The sentence
+is false.** An advisory authored for a human that only the agent consumes is `EG-06`'s dead help string with the
+arrow reversed — the third such inversion this programme has found in two days.
+
+**⚠ AND A ONE-LINE BUG ON EXACTLY THE PATH THIS DESIGN OPENS.** `defineFromTemplate` forwards six fields —
+`name`, `pwuKind`, `purpose`, `isRoot`, `requiredInputs`, `requiredOutputs` — and **drops `workDischarge`**,
+which is a REQUIRED field of `PwuTypeTemplate` (`catalog.ts:97`, no `?`). The blueprint's own answer is
+discarded. `REG-005:31400` calls that required field *"the structural guard"*; it is defeated on the very path
+the agent will use.
+
+---
+
+## 7.1 The design — and it adds no refusal, no command, no object, no wire-schema change
+
+⭑ **THE SPINE IS SYMMETRY, NOT A NEW RULE.** Everything below either makes an existing engine limb reachable,
+projects a value that is already stored, or renders a string that already exists. Three independent designs were
+put against this question; the one that minted new surface (a `DeclarationCensus` projection and a count above
+the publish buttons) was **rejected for inventing governance** — a running count of undeclared types rendered at
+the approval moment is one step from a rule the corpus has not made.
+
+**A · WRITER AND READER SYMMETRY.** `DefineTypeInput`/`EditTypeInput` and the two tool schemas gain
+`workDischarge`, `promptTemplateText`, `promptOutputContract`, `promptActive`; `PwuTypeView`/`toTypeView`
+project `workDischarge` and `promptTemplate` back. ⛔ Forwarded by **conditional spread only** — never the
+unconditional `bool(...)` idiom used elsewhere in `tools.ts` — because collapsing ABSENT into a written value
+destroys the distinction the code deliberately keeps: *"Absent means the author was never asked; `UNDECLARED`
+means they were asked and deferred."* **No contract change is needed:** `DefinePwuTypePayloadSchema`,
+`EditPwuTypePayloadSchema` and `PwuTypeSchema` already accept all of it. **No new vocabulary is authored:**
+`EG-06` single-sourced those three help strings hours earlier, under a comment naming them *"the three the
+agent's tool schema cannot see"*.
+
+**B · THE APPROVAL MOMENT CAN SEE WHAT IT APPROVES — and this is SEQUENCED FIRST BY SPONSOR CONDITION.** Two
+fields in the read-only inspector, rendering the **four-way** distinction (*a model · a person · not yet decided
+· never asked*) and the prompt's `ACTIVE`/`DRAFT` status, plus the same on the whole-PWA walkthrough — the
+surface that literally is *"reviewing the full PWA"*. Both values are **already projected into page data**; no
+new plumbing. ⛔ **The sponsor's condition is that nothing may be ARMED that this surface cannot show, so B
+lands before the arming half of A.**
+
+**C · THE EXECUTION CONSEQUENCE, SPOKEN WHERE THE AUTHOR IS STANDING.** `isModelStep = pwuType?.workDischarge
+=== 'MODEL'` silently downgrades an undeclared type to `TRANSFORMATION`: no binding requested, `OUT_OF_SCOPE`,
+and nothing says so. ⛔ **NOT a refusal** — `step-binding.ts` records the `JAN-EXEBIND` wedge, *"an UNRECOVERABLE
+WEDGE whose refusal message prescribed a remedy the engine categorically forbids"*. Instead `lintComposition`
+gains `checkDischargeDeclared`: silent for `MODEL`/`HUMAN`, silent for `DELEGATED_EXTERNAL` (whose own gate
+already refuses any discharge value), and **two distinct `info` messages** for `UNDECLARED` versus absent, each
+naming the consequence. ⭑ And the lint is rendered **for the human** beside the lifecycle buttons, which makes
+its own header sentence true for the first time.
+
+**D · THE REVIEWER SEES IT TOO** *(sponsor decision, 2026-09-09)*. `buildPwaExport` — exactly 8 fields, and the
+content the independent reasoning review reads — gains `workDischarge` and the prompt's status. ⛔ **No new
+criterion**: the ratified floor policy is untouched. `REG-005:6149-6154` already establishes the reading that
+PWA metadata **is** reviewed content *because* it is a member of the export, so adding a member is transcription
+rather than a new rule.
+
+**E · THE GATE STOPS BEING GREEN OVER THE DEFECT.** `EG-06`'s disposition gate asserts no help key is read by
+NOBODY — and the asymmetry needs **BOTH**. It already computes both-ness and discards it. One limb, its own
+message: *"one author of a PWU Type can read this and the other cannot"*, symmetric so agent-only drift is
+caught too. ⛔ **Landed with NO exemption**, which requires two small repairs first — `tools.ts`'s inline
+`childCardinalities` description must point at `PWU_TYPE_HELP.permittedChildren`, and `promptActive` needs the
+help key it never had. **An exemption granted on a gate's first day is how a gate rots.**
+
+---
+
+## 7.2 ⛔ NOT TAKEN, and why
+
+- **No `ApprovePwa` command, no human-attestation object.** Approval is inferred from the lifecycle acts that
+  exist. Minting an attestation object is a ratification act and the corpus has not asked for one. **Disclosed.**
+- **No refusal anywhere.** Not at publish for an undeclared type, not at planning, not at decomposition. Every
+  disclosure lands in a channel that already exists and is already advisory by charter.
+- **`m1-object-fields.json:1383`** still says *"MODEL requires an ACTIVE promptTemplate"* — a contract authority
+  describing a gate that was dropped on evidence. Real, and **filed as its own item** rather than annexed here.
+- **Instance-time composition** (`permittedChildTypeIds` as an allow-list) stays unbuilt: `REG-005:1049` reads
+  candidate children as *"a menu the PWA may narrow and may never contradict"* — an AUTHORING-time property,
+  which is asserted, not an instance-time refusal.
