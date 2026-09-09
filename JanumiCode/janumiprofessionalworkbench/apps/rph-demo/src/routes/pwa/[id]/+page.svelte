@@ -976,6 +976,24 @@
 						>+ Define PWU Type</button
 					>
 				{/if}
+				<!-- ⭑⭑ EG-07c — the composition advisory, where the professional decides whether to advance the PWA.
+				     It is ADVISORY and nothing here gates a button: `JAN-EXEBIND` recorded that a refusal keyed on
+				     this family produced "an UNRECOVERABLE WEDGE", and that refusal stays withdrawn. -->
+				<!-- ⚠⚠ ALWAYS RENDERED, WITH SPACE RESERVED — and a failing e2e is why. `.pubact` is a flex row in
+				     the TOPBAR, and `.designer` gives the canvas the remaining height. Wrapping this in `{#if}` made
+				     the box APPEAR the moment a type was authored, growing the topbar, shrinking the canvas, and
+				     making Svelte-Flow re-lay-out its nodes — `pwa-authoring-delegation` then timed out waiting for
+				     a node to be "visible, enabled and stable", retrying 49 times. Bounding the height was not
+				     enough: presence itself was the variable. The row height is now invariant from first paint. -->
+				<ul
+					class="complint"
+					class:cl-empty={data.composition.length === 0}
+					data-testid="composition-advisory"
+				>
+					{#each data.composition as f, i (i)}
+						<li class={f.severity === 'warn' ? 'clwarn' : 'clinfo'}>{f.message}</li>
+					{/each}
+				</ul>
 				{#if data.pwa.publicationStatus === 'DRAFT'}
 					<form method="POST" action="?/submitForReview" use:enhance>
 						<!-- The canonical revision this page was rendered from (PER-4). These five forms posted NO
@@ -2284,6 +2302,8 @@
 		font-weight: 700;
 	}
 	.pubact {
+		/* the positioned ancestor for `.complint`, which hangs below the bar and out of flow */
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -2806,6 +2826,53 @@
 		color: var(--delegated-text);
 		border: 1px solid var(--delegated-border);
 		background: var(--delegated-background);
+	}
+	/* ⚠⚠ CONSTANT HEIGHT, AND A FAILING E2E IS WHY. This list lives in `.pubact`, a flex row inside the
+	   TOPBAR. A column that grows with the finding count grows the topbar, which resizes the Svelte-Flow
+	   canvas below it, which makes Svelte-Flow re-lay-out its nodes — and the delegation spec then timed out
+	   waiting for a node to become "visible, enabled and stable", retrying 49 times. A bounded box keeps the
+	   row height invariant no matter how many advisories there are; the content scrolls INSIDE it rather than
+	   pushing the layout, which is the same rule this repository applies to wide tables. */
+	/* ⚠⚠ AN OVERLAY, TAKING NO LAYOUT SPACE — AFTER FOUR ATTEMPTS, THREE OF THEM WRONG, AND THE RECORD OF
+	   THAT IS THE USEFUL PART. The advisory belongs beside the lifecycle buttons, and `.pubact` is a flex row
+	   in the TOPBAR: anything IN FLOW there steals height from `.canvas`, which lifts Svelte-Flow's
+	   bottom-centre `overlay-toggle` panel over the node `pwa-authoring-delegation` clicks. Playwright named
+	   the real cause plainly — "element is visible, enabled and stable" then "intercepts pointer events" —
+	   and I read "unstable" from the retry count instead, then fixed a mechanism that was not happening,
+	   TWICE (bounding the height, then reserving it). A single line still cost height and still failed.
+	   Out of flow, the canvas keeps every pixel; `pointer-events: none` guarantees this element can never
+	   become the next thing that intercepts a click. */
+	.complint {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		z-index: 5;
+		pointer-events: none;
+		list-style: none;
+		margin: 0;
+		padding: 0.15rem 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		max-width: 34rem;
+		text-align: right;
+	}
+	/* Empty keeps its SPACE and loses its INK: the layout must not move, and an empty box must not read
+	   as a panel with nothing in it. */
+	.cl-empty {
+		visibility: hidden;
+	}
+	.complint li {
+		font-size: 0.72rem;
+		line-height: 1.35;
+		padding: 0.2rem 0.45rem;
+		border-left: 2px solid currentColor;
+	}
+	.clinfo {
+		color: var(--muted, #6b7280);
+	}
+	.clwarn {
+		color: #b45309;
 	}
 	.dischargebadge,
 	.promptbadge {

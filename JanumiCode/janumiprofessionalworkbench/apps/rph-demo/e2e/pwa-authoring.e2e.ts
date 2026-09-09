@@ -143,4 +143,42 @@ test.describe('PWA Designer — author PWU Types and publish', () => {
 		// renders nothing, which is the fact a professional needs at the moment they approve it.
 		await expect(page.getByTestId('inspector-prompt')).toContainText(/authored, not armed/i);
 	});
+
+	// ── ⭑⭑ JAN-EXECGOV EG-07c — THE CONSEQUENCE IS SPOKEN WHERE THE AUTHOR IS STANDING ────────────────────
+	//
+	// `lint.ts`'s own header says the agent runs the composition advisory "and A HUMAN CAN READ THE SAME LIST."
+	// That clause was FALSE — measured, its only production caller was agent/tools.ts, so an advisory authored
+	// for a human was consumed only by the agent. This spec is what makes the sentence true, and it asserts
+	// VISIBILITY rather than presence: a mutant earlier in this file proved `toContainText` passes on a hidden
+	// element, which is the same defect one layer down.
+	test('the composition advisory reaches the professional, and does not gate the button (EG-07c)', async ({
+		page
+	}) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Advisory PWA');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		await gotoHydrated(
+			page,
+			(await page.getByRole('link', { name: /Advisory PWA/ }).getAttribute('href'))!
+		);
+
+		// A root type authored WITHOUT answering the discharge question — the state a pre-JAN-DISCHARGE type is in.
+		await page.getByRole('button', { name: '+ Define PWU Type' }).click();
+		await page.locator('input[name="name"]').fill('Undeclared Root');
+		await page.locator('input[name="pwuKind"]').fill('UNDECLARED_WORK');
+		await page.locator('input[name="isRoot"]').check();
+		await page.getByRole('button', { name: 'Add type' }).click();
+
+		const advisory = page.getByTestId('composition-advisory');
+		await expect(advisory).toBeVisible();
+		// ⛔ THE CONSEQUENCE, not just the fact. "You did not declare X" is an instruction to fill a field;
+		// naming what it COSTS at execution is what makes it a decision the author can weigh.
+		await expect(advisory).toContainText(/requests no runtime binding/i);
+
+		// ⭑⭑ CONTROL — IT IS AN ADVISORY. `JAN-EXEBIND` recorded that a refusal keyed on this family produced
+		// "an UNRECOVERABLE WEDGE whose refusal message prescribed a remedy the engine categorically forbids".
+		// That refusal stays withdrawn, so the lifecycle button must remain usable with the advisory showing.
+		await expect(page.getByRole('button', { name: /Submit for Review/i })).toBeEnabled();
+	});
 });

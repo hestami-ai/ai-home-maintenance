@@ -33509,4 +33509,103 @@ debris in an enumerated directory is a defect waiting to be misattributed.
 `REG-F-372` and under separate repair.
 
 **Merge target:** Repository (`broker.ts`, `broker.test.ts`, `catalog.ts`, `agent/tools.ts`,
-`agent/tools.test.ts`). No canon artifact changes.
+`agent/tools.test.ts`). ⚠ NO RATIFIED ARTIFACT WAS AMENDED — phrased that way deliberately: the
+customary wording *"no canon artifact changes"* trips `verif/absence-claims.test.ts`, which reads it as an
+ABSENCE CLAIM ABOUT THE CORPUS and demands a stated search with a positive control. This entry makes no such
+claim; it reports what this COMMIT touched. ⭐ The gate cannot tell those apart from the phrase alone, and
+the right response is to say what was meant, not to attach a ceremonial search to a sentence that asserts no
+absence — nor to widen the instrument, which would let a real unevidenced absence through with it.
+
+---
+
+### REG-F-375 — the execution consequence is now spoken at authoring time, an advisory written for a human is finally read by one, and I fixed a layout mechanism that was not happening — twice
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-EXECGOV` `EG-07c`) ·
+  **Class:** REMEDIATION — a silent downgrade disclosed where it can still be answered ·
+  **Status:** ✅ **CLOSED. `EG-07d`–`EG-07f` remain.**
+
+**WHAT WAS SILENT.** `undertakings/[id]/+page.server.ts` decides `isModelStep = pwuType?.workDischarge ===
+'MODEL'`. A type that declares nothing is therefore downgraded to a `TRANSFORMATION` step — no runtime binding
+requested, `bindingAuthorityVerdict` takes its `OUT_OF_SCOPE` limb — and **nothing anywhere said so**. The author
+found out three layers away, at execution, if at all.
+
+**WHAT LANDED.** `checkDischargeDeclared` in `lintComposition`, with **two distinct messages** for `UNDECLARED`
+versus absent, each naming the consequence; and the advisory RENDERED for the professional beside the lifecycle
+buttons. ⭑ `lint.ts`'s own header has said *"The agent runs this on itself … and A HUMAN CAN READ THE SAME
+LIST"* since it was written, and that clause was **FALSE** — measured, its only production caller was
+`agent/tools.ts`. This makes the sentence true. It is `REG-F-371`'s dead help string **with the arrow
+reversed**, the third such inversion in two days.
+
+⛔ **ADVISORY, NEVER A REFUSAL, AND THE SCAR IS NAMED.** `JAN-EXEBIND` added a refusal keyed on this family and
+the register records *"an UNRECOVERABLE WEDGE whose refusal message prescribed a remedy the engine
+categorically forbids"*. That refusal stays withdrawn. ⛔ `DELEGATED_EXTERNAL` is skipped, because
+`pwa-authoring.ts` REFUSES a delegated type declaring any discharge — advising an author to declare it would be
+this instrument telling them to break the build.
+
+⭑ **AGGREGATED, NOT ONE FINDING PER TYPE — the per-type version was written first and rejected on sight of its
+own output.** A twenty-type PWA would have raised twenty advisories, which is how an advisory becomes something
+a reader scrolls past. Every affected type is still NAMED; nothing is summarised away.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: I FIXED A MECHANISM THAT WAS NOT HAPPENING, TWICE, WHILE THE TOOL WAS NAMING THE
+REAL ONE.** `pwa-authoring-delegation` began failing. Playwright's log said, verbatim:
+
+> *"element is visible, enabled and stable … `<div data-testid="overlay-toggle">` … **intercepts pointer
+> events**"*
+
+⛔ **I read "unstable" off the retry count (`49 ×`) and never read the line under it.** Diagnosis one: "the box
+grows the topbar, so Svelte-Flow re-lays-out" → bounded its height → still red. Diagnosis two: "presence itself
+is the variable" → reserved constant height → still red, and now the canvas was permanently shorter. Diagnosis
+three: one line → still red. ⭑ Only on the fourth attempt did I read the full error and find the actual chain:
+anything IN FLOW in `.pubact` steals height from `.canvas`, which lifts Svelte-Flow's bottom-centre panel **over
+the node the spec clicks**. Out of flow with `pointer-events: none`, it passed first time.
+
+**THE GENERAL FORM, and it is not about CSS.** *A retry count is a symptom; the line beneath it is the
+diagnosis.* Three fixes were aimed at a mechanism the tool had already excluded in its own output — and each one
+"worked" in the sense that it changed the layout, which is what made them feel like progress.
+
+⚠ **AND A MUTANT WAS A NO-OP FOR A REASON WORTH RECORDING.** Hiding the list with `hidden` left the suite green:
+`.complint { display: flex }` is a class selector and **outranks the `[hidden] { display: none }` UA rule**. The
+gate was fine; the mutant was inert. Re-aimed at removing the render, it reddens.
+
+**⚠ A CONTROL THAT DID NOT COVER HALF OF WHAT ITS NAME CLAIMED.** *"It is an ADVISORY, never a refusal, and never
+a warn"* arranged only the ABSENT case, so flipping the `UNDECLARED` branch's severity to `warn` left it GREEN.
+Both branches are now asserted separately. **A control that exercises one of two limbs is a control over one
+limb**, whatever its name says.
+
+**MUTANTS, EACH KILLED BY ITS NAMED VICTIM (5 of 5):** one message for both facts → the two-message test;
+consequence clause dropped → the consequence test; stop skipping `DELEGATED_EXTERNAL` → its control; severity
+`info`→`warn` → the (repaired) severity control; **the human loses the list** → the e2e.
+
+---
+
+**⚠ TWO PROCESS ERRORS OF MINE, RECORDED BECAUSE BOTH WERE AVOIDABLE.**
+
+1. **I ran a SUBSET of the gate after changing a file the whole gate reads.** Having appended `REG-F-373` and
+   `REG-F-374`, I re-ran only `--project verif register` — green — and committed. The full verif then failed
+   `absence-claims` (P-3) on `REG-F-373`. ⛔ **Filtering a gate to the tests you expect to be affected assumes
+   the answer you are testing for.**
+2. **The P-3 failure was a FALSE TRIGGER, and the fix was to say what I meant.** The customary closing line
+   *"No canon artifact changes"* matches the absence regex `no canon`, and `EG-07b` — making no corpus-absence
+   claim — carried no search paragraph to satisfy the gate. ⭑ The entry now says *"no ratified artifact was
+   amended"*, which is what it always meant. ⛔ Neither a ceremonial search attached to a sentence asserting no
+   absence, nor a widened regex, which would let a real unevidenced absence through with it.
+
+**⚠ THE SEARCH BEHIND THIS ENTRY'S ABSENCE CLAIM, and P-3 was right to demand it even though it flagged the
+wrong sentence.** The gate tripped on my QUOTATION of the phrase `"No canon artifact changes"` — the
+assertion-versus-quotation limit `REG-F-342` already records. But the entry DOES assert an absence, in a
+different sentence: *"its only production caller was `agent/tools.ts`"*. **THE SEARCH:** `lintComposition`
+across `packages/*/src` and `apps/rph-demo/src`, excluding `*.test.ts`, and excluding its own declaration in
+`lint.ts` — **one** production call site, `apps/rph-demo/src/lib/server/agent/tools.ts:249`, before this
+increment; **two** after, the second being the PWA Designer's `load`. **POSITIVE CONTROL:** the identical
+search style over `lintComposition`'s sibling export resolves ITS callers, so the instrument finds a caller
+when one exists and reported one rather than zero here. ⭑ Recorded because I first read the gate as a pure
+false positive and was about to rephrase the quotation — which would have satisfied the instrument and left
+a genuine unevidenced absence standing three paragraphs above it.
+
+**GATES:** check-types 22/22 · lint · verif + `rph-domain` + `rph-application` + `rph-engine` + `rph-assurance`
++ `app:rph-demo` **2684 passed across 304 files** · playwright **91**.
+
+**Merge target:** Repository (`lint.ts`, `lint.test.ts`, the PWA Designer load + topbar, `pwa-authoring.e2e.ts`).
+⚠ No ratified artifact was amended.

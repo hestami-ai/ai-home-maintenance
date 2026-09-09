@@ -15,6 +15,10 @@ export interface CompositionNode {
 	/** The distinct deliverables the type produces — the structural proxy the under-decomposition advisory reads
 	 *  (INV-4b). Optional so pre-existing CompositionNode literals keep compiling. */
 	readonly requiredOutputs?: readonly string[];
+	/** JAN-DISCHARGE — who does this type's work. ⚠ ABSENT AND `UNDECLARED` ARE DIFFERENT FACTS and the
+	 *  advisory below says so in two different sentences: absent means the author was never asked (a type
+	 *  predating the question), `UNDECLARED` means they were asked and deferred. */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 }
 
 export interface CompositionFinding {
@@ -110,6 +114,59 @@ function checkOrphans(
 
 /** Advisory structural findings for a PWU-Type graph (empty = clean). Never throws; order: root → fan-out →
  *  under-decomposition → orphans. */
+/**
+ * ⭑⭑ JAN-EXECGOV EG-07c — THE EXECUTION CONSEQUENCE, SPOKEN WHERE THE AUTHOR IS STANDING.
+ *
+ * `undertakings/[id]/+page.server.ts` decides `isModelStep = pwuType?.workDischarge === 'MODEL'`. A type that
+ * declares nothing is therefore SILENTLY DOWNGRADED to a TRANSFORMATION step: no runtime binding is requested,
+ * `bindingAuthorityVerdict` takes its `OUT_OF_SCOPE` limb, and NOTHING ANYWHERE SAYS SO. The author learns it
+ * three layers away, at execution, if at all.
+ *
+ * ⛔ IT IS AN ADVISORY AND NOT A REFUSAL, AND THAT IS A DECISION WITH A SCAR BEHIND IT. `JAN-EXEBIND` added a
+ * refusal keyed on this family and the register records the result: *"an UNRECOVERABLE WEDGE whose refusal
+ * message prescribed a remedy the engine categorically forbids"* — the plan could not be re-activated to repair
+ * itself. That refusal stays withdrawn. This file is advisory by charter; the consequence is DISCLOSED here, at
+ * authoring time, where it is still cheap to answer.
+ *
+ * ⚠ TWO MESSAGES, NOT ONE, because they are two different facts and collapsing them is the conflation
+ * `workDischarge` exists to remove — see `CompositionNode.workDischarge`.
+ *
+ * ⛔ AND `DELEGATED_EXTERNAL` IS SILENT, which is not an oversight: `pwa-authoring.ts` REFUSES a delegated type
+ * that declares any discharge value at all (the counterparty discharges the work; saying it twice is how two
+ * statements of one fact come to disagree). Advising an author to declare something the engine would refuse
+ * would be this instrument telling them to break the build. The same skip that `checkUnderDecomposition`
+ * already makes for INV-4a, for the same reason.
+ */
+function checkDischargeDeclared(
+	types: readonly CompositionNode[],
+	findings: CompositionFinding[]
+): void {
+	// ⚠ AGGREGATED, NOT ONE FINDING PER TYPE — and the per-type version was written first and rejected on
+	// sight of its own output: a twenty-type PWA would raise twenty advisories, which is how an advisory
+	// becomes something a reader scrolls past. `checkRoot` already reports at population grain ("2 root
+	// types"); this follows it. Every affected type is still NAMED, so nothing is summarised away.
+	const undeclared: string[] = [];
+	const unasked: string[] = [];
+	for (const t of types) {
+		if (t.executionBoundary === 'DELEGATED_EXTERNAL') continue;
+		if (t.workDischarge === 'MODEL' || t.workDischarge === 'HUMAN') continue;
+		(t.workDischarge === 'UNDECLARED' ? undeclared : unasked).push(t.name);
+	}
+	const consequence =
+		' An execution step for such a type runs as a TRANSFORMATION: it requests no runtime binding and' +
+		' renders no prompt.';
+	if (undeclared.length > 0)
+		findings.push({
+			severity: 'info',
+			message: `${undeclared.length} type(s) have not yet decided who does the work: ${undeclared.join(', ')}.${consequence}`
+		});
+	if (unasked.length > 0)
+		findings.push({
+			severity: 'info',
+			message: `${unasked.length} type(s) were never asked who does the work — they predate the question: ${unasked.join(', ')}.${consequence}`
+		});
+}
+
 export function lintComposition(types: readonly CompositionNode[]): CompositionFinding[] {
 	const findings: CompositionFinding[] = [];
 	if (types.length === 0) return findings;
@@ -119,6 +176,7 @@ export function lintComposition(types: readonly CompositionNode[]): CompositionF
 	checkFanout(types, ids, findings);
 	checkUnderDecomposition(types, ids, findings);
 	checkOrphans(types, ids, findings);
+	checkDischargeDeclared(types, findings);
 
 	return findings;
 }

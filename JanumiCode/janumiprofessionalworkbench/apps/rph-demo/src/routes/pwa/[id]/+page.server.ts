@@ -26,6 +26,7 @@ import {
 	readPolicyFields,
 	successorPolicyPayload
 } from './policy-fields';
+import { lintComposition } from '@janumipwb/rph-authoring';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 /** Clamp a form-supplied cardinality to a valid code (anything else -> M1, mandatory exactly one). */
@@ -203,7 +204,29 @@ export const load: PageServerLoad = async ({ params }) => {
 			: [],
 		isFloor: FLOOR_POLICY_IDS.has(p.id)
 	}));
+	// ⭑⭑ JAN-EXECGOV EG-07c — `lint.ts`'s own header says *"The agent runs this on itself (the
+	// review_composition tool) and fixes findings; A HUMAN CAN READ THE SAME LIST."* That last clause was
+	// FALSE: measured, its only production caller was `agent/tools.ts`, so the advisory was authored for a
+	// human and consumed only by the agent. That is `EG-06`'s dead help string with the arrow reversed — the
+	// third such inversion this programme has found in two days. This makes the sentence true.
+	//
+	// ⚠ SAME FUNCTION, NOT A SECOND OPINION. The professional and the agent must read the SAME findings, or
+	// the surface acquires a view of composition quality that the agent cannot see and cannot answer.
+	const composition = lintComposition(
+		types.map((t) => ({
+			id: t.id,
+			name: t.name,
+			isRoot: t.isRoot,
+			permittedChildTypeIds: t.permittedChildTypeIds,
+			...(t.executionBoundary ? { executionBoundary: t.executionBoundary } : {}),
+			...(t.requiredOutputs ? { requiredOutputs: t.requiredOutputs } : {}),
+			// ⛔ CONDITIONAL, like every other discharge site: absent must stay absent, or "never asked"
+			// becomes "asked and deferred" at the very surface that reports the difference.
+			...(t.workDischarge ? { workDischarge: t.workDischarge } : {})
+		}))
+	);
 	return {
+		composition,
 		pwa: {
 			id: params.id,
 			// The canonical revision this page was rendered from (JPWB-DOC-003 §9 PER-4). See the note at the
