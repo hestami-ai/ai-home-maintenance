@@ -100,6 +100,33 @@ async function agyPrint() {
 `
 });
 
+/**
+ * ⭑⭑ REG-F-382 — THE SHAPE PRODUCTION ACTUALLY HAS, which no fixture encoded until now.
+ *
+ * `RISKY_SOURCES` above calls `execFileAsync(...)` directly. The real `agy-cli.ts` has not done that since
+ * `95c71798` made the executor an INJECTABLE PARAMETER with a default — a refactor for testability with
+ * nothing wrong with it. The detector keyed on the literal call, found none, and the live projection went
+ * `SATISFIED` -> `UNSUPPORTED/LAYOUT_UNRECOGNIZED`.
+ *
+ * ⛔ AND EVERY UNIT TEST STAYED GREEN THROUGHOUT, because the fixtures encoded the OLD layout. The regression
+ * was visible only to the one test that reads the LIVE tree — which is why it sat unreported on `origin/main`.
+ * **A fixture that no longer resembles its subject is a test of the past.**
+ */
+const INJECTED_EXECUTOR_SOURCES = Object.freeze({
+	...RISKY_SOURCES,
+	[JPWB_HYBRID_STATIC_REQUIRED_PATHS[55]]: `
+async function agyPrint(exec: AgyExec = execFileAsync as unknown as AgyExec) {
+	const args = ['--print', 'prompt'];
+	const { stdout } = await exec(AGY_BIN, args, {
+		timeout: 240000,
+		maxBuffer: 1024,
+		windowsHide: true
+	});
+	return stdout;
+}
+`
+});
+
 const SAFE_SOURCES = Object.freeze({
 	'package.json': '{"name":"provider-fixture","private":true,"workspaces":["packages/*","apps/*"]}',
 	'apps/rph-demo/package.json': '{"name":"@fixture/rph-demo","private":true,"version":"0.0.0"}',
@@ -413,6 +440,21 @@ describe('source-bound JPWB hybrid static prerequisite projection', () => {
 		]);
 		expect(result.population).toMatchObject({ conclusive: 5, unsupported: 0 });
 		expect(result.rows.every((row) => row.prerequisite.evidenceIds.length === 1)).toBe(true);
+	});
+
+	it('⭑ REG-F-382 — reads an external-tool execution through an INJECTED executor parameter', () => {
+		// The default is what production runs, so the default is what the projection must read. Without this the
+		// detector reports UNSUPPORTED/LAYOUT_UNRECOGNIZED and a TAINT prerequisite silently stops being
+		// assessed — which is exactly what happened on `origin/main`, unnoticed, because every fixture here
+		// still described the pre-`95c71798` layout.
+		//
+		// ⛔ IF ADDING A PARAMETER COULD HIDE A RISK PATTERN, EVERY RISK PATTERN COULD BE HIDDEN THAT WAY.
+		const result = projection(providerFixture(INJECTED_EXECUTOR_SOURCES).subject);
+		const row = result.rows.find((candidate) => candidate.findingId === 55)!;
+		expect(row.prerequisite.state, 'the injected executor hid the execution from the detector').toBe(
+			'SATISFIED'
+		);
+		expect(result.population).toMatchObject({ unsupported: 0 });
 	});
 
 	it('composes projected prerequisites with supplied traces for every detected and non-detected row', () => {

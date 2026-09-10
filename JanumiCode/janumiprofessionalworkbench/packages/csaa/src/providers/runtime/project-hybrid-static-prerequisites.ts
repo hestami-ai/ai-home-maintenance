@@ -421,6 +421,37 @@ function callName(call: ts.CallExpression): string | null {
 	return path?.split('.').at(-1) ?? null;
 }
 
+/**
+ * ⭑⭑ REG-F-382 — THE IDENTIFIERS THAT DENOTE AN EXTERNAL-TOOL EXECUTION INSIDE `fn`.
+ *
+ * Always the symbol itself, PLUS any parameter of `fn` whose DEFAULT resolves to it —
+ * `exec: AgyExec = execFileAsync as unknown as AgyExec` binds a new name to the same channel.
+ *
+ * ⛔ WHY FOLLOW IT RATHER THAN REFUSE IT. `criticalAlias` rejects aliasing via imports, variable declarations
+ * and binding elements, and a parameter default fell between those cases: neither rejected nor followed. The
+ * live projection therefore went `SATISFIED` -> `UNSUPPORTED/LAYOUT_UNRECOGNIZED` when `95c71798` made `exec`
+ * injectable for testability — a refactor with nothing wrong with it, which silently blinded a TAINT detector.
+ * ⚠ IF ADDING A PARAMETER COULD HIDE A RISK PATTERN, EVERY RISK PATTERN CAN BE HIDDEN THAT WAY. The default is
+ * what production runs, so the default is what the projection must read.
+ *
+ * ⛔ THE DEFAULT ONLY — a caller passing something else is out of scope, and deliberately so: this projection
+ * declares `RULE_SPECIFIC_BOUNDED_SOURCE_LAYOUTS_ONLY` and `NO_GENERAL_PURPOSE_TAINT_CLAIM`. Resolving actual
+ * arguments would be an inter-procedural claim it does not make.
+ */
+function executionChannels(fn: NamedFunction, symbol: string): readonly string[] {
+	const names = [symbol];
+	for (const parameter of fn.parameters) {
+		if (
+			ts.isIdentifier(parameter.name) &&
+			parameter.initializer !== undefined &&
+			expressionPath(parameter.initializer) === symbol &&
+			parameter.name.text !== symbol
+		)
+			names.push(parameter.name.text);
+	}
+	return names;
+}
+
 function callsWithin(
 	region: ParsedRegion,
 	root: ts.Node,
@@ -920,9 +951,13 @@ function detectFinding55(region: ParsedRegion): DetectorResult {
 	if (functions.length > 1) return result('CONFLICTING', 'REQUIRED_ARTIFACT_AMBIGUOUS');
 	if (functions.length !== 1) return result('UNSUPPORTED', 'LAYOUT_UNRECOGNIZED');
 	const fn = functions[0]!;
-	const executions = callsWithin(region, fn, 'execFileAsync').filter(
+	// REG-F-382 — every identifier that denotes the channel, not just the symbol's own name.
+	const channels = executionChannels(fn, 'execFileAsync');
+	const executions = channels
+		.flatMap((channel) => callsWithin(region, fn, channel))
+		.filter(
 		(call) =>
-			expressionPath(call.expression) === 'execFileAsync' &&
+			channels.includes(expressionPath(call.expression) ?? '') &&
 			call.arguments.length === 3 &&
 			expressionPath(call.arguments[0]!) === 'AGY_BIN' &&
 			expressionPath(call.arguments[1]!) === 'args' &&

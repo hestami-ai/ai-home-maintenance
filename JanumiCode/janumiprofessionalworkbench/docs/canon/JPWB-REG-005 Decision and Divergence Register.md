@@ -34099,7 +34099,7 @@ pre-existing `REG-F-382` defect this programme did not cause and must not re-pin
 
 - **Date:** 2026-09-10 · **Type:** FINDING (surfaced by `JAN-CSAADEC`, owned by neither) ·
   **Class:** DEFECT — a live analysis prerequisite silently lost, disclosed rather than re-pinned ·
-  **Status:** ⛔ **OPEN. Deliberately NOT re-pinned.**
+  **Status:** ✅ **CLOSED 2026-09-10 by `REG-F-386`** — the cause was `95c71798` making the executor an injectable parameter with a default, not the `extractJson` refactor this entry hypothesised; the detector now follows the default, and **the pin was never moved**. Superseding ~~⛔ **OPEN. Deliberately NOT re-pinned.**~~
 
 **THE DEFECT.** `packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.test.ts:474` pins the
 projected prerequisite state of five findings against the CURRENT source bytes. Finding **55** —
@@ -34408,4 +34408,73 @@ session and must not be re-pinned. verif 62 files, 469 passed. The new spec: 2 p
 
 **Merge target:** Repository (`execution-agent-authored-binding.e2e.ts`, the EG roadmap, regenerated census and
 CSAA baselines).
+⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-386 — CLOSES `REG-F-382`: a testability refactor blinded a TAINT detector, and every unit test stayed green because the fixtures described a layout production had abandoned
+
+- **Date:** 2026-09-10 · **Type:** FINDING (closes `REG-F-382`) ·
+  **Class:** REMEDIATION — a static detector taught to see the shape its subject actually has ·
+  **Status:** ✅ **CLOSED. `gate:fast` is GREEN end to end.**
+
+**THE DIAGNOSIS, AND MY FILED HYPOTHESIS WAS WRONG IN ITS SPECIFIC.** `REG-F-382` recorded finding 55 —
+`apps/rph-demo/src/lib/server/assurance/agy-cli.ts`, capability **TAINT** — pinned `SATISFIED` and yielding
+`UNSUPPORTED/LAYOUT_UNRECOGNIZED`, and offered a remedy hypothesis: *"determine whether `0c79e6d3`'s
+`extractJson` refactor changed a symbol the layout matcher keys on."* ⛔ It was not `0c79e6d3`. It was
+`95c71798`, which made the executor an INJECTABLE PARAMETER WITH A DEFAULT:
+
+```
+async function agyPrint(exec: AgyExec = execFileAsync as unknown as AgyExec)
+```
+
+`detectFinding55` keys on a literal `execFileAsync(AGY_BIN, args, { timeout, maxBuffer, windowsHide })` call.
+After the refactor the call reads `exec(AGY_BIN, args, {…})`, no literal call exists, and the detector reports
+`LAYOUT_UNRECOGNIZED`. ⭑ **THE RISKY BEHAVIOUR NEVER CHANGED** — that function still executes an external tool
+with no attempt record. Only the analyser's ability to SEE it broke. Recording the hypothesis as a hypothesis is
+what made correcting it cheap.
+
+**WHY IT WAS FOLLOWED RATHER THAN REFUSED.** `criticalAlias` rejects aliasing through import specifiers,
+variable declarations and binding elements. A PARAMETER DEFAULT fell between those cases — neither rejected as
+an alias nor followed as the channel. `executionChannels(fn, symbol)` now resolves the symbol plus any parameter
+of `fn` whose default resolves to it. ⛔ **THE DEFAULT ONLY**: a caller passing something else is out of scope,
+deliberately, because this projection declares `RULE_SPECIFIC_BOUNDED_SOURCE_LAYOUTS_ONLY` and
+`NO_GENERAL_PURPOSE_TAINT_CLAIM`, and resolving actual arguments would be an inter-procedural claim it does not
+make.
+
+⭑ **THE ARGUMENT FOR FOLLOWING IT, IN ONE LINE: IF ADDING A PARAMETER CAN HIDE A RISK PATTERN, EVERY RISK
+PATTERN CAN BE HIDDEN THAT WAY.** The default is what production runs, so the default is what the projection
+must read.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING, AND IT IS BIGGER THAN THE DETECTOR: EVERY UNIT TEST STAYED GREEN THROUGH THE WHOLE
+REGRESSION, BECAUSE THE FIXTURES DESCRIBED A LAYOUT PRODUCTION HAD ABANDONED.** `RISKY_SOURCES` and
+`SAFE_SOURCES` both encode a direct `execFileAsync(...)` call — the shape `agy-cli.ts` has NOT had since
+`95c71798`. Nine fixture tests passed throughout. The only instrument that noticed was the ONE test that reads
+the LIVE tree, and because nobody ran the unfiltered suite it sat unreported on `origin/main`.
+
+**THE GENERAL FORM:** *a fixture that no longer resembles its subject is a test of the past.* It keeps passing,
+it keeps reporting coverage, and it certifies a shape nothing produces any more. ⭑ This is the mirror image of
+`REG-F-381`'s finding: there, a live-tree pin was churn to be removed; here, the live-tree pin was **the only
+thing that saw a real regression**. Both are true, and the difference is whether the pinned fact is a POPULATION
+COUNT or a STRUCTURAL CLAIM.
+
+**REMEDIED, NOT JUST NOTED:** `INJECTED_EXECUTOR_SOURCES` — a fixture in the shape production actually has — and
+its test. **MUTANT:** stop following the injected parameter → BOTH the new fixture test and the live-tree test
+redden. ⭑ The fixture test catches it WITHOUT the live tree, so the guarantee no longer depends on the repository
+being in any particular state.
+
+**SEARCHED, FOR THE ATTRIBUTION.** `git log -S "exec: AgyExec"` over `agy-cli.ts` returns exactly one commit,
+`95c71798`. Across the unpushed range, commits touching any of the five tracked paths or the analyser: **zero**
+(recorded at `REG-F-382`), so the regression was already on `origin/main`. POSITIVE CONTROL: the same probe over
+`execFileAsync` returns the file's own import and the `promisify` binding, so it resolves symbols when they are
+there.
+
+**GATES (measured, then written):** `bun run gate:fast` — **EXIT 0, all thirteen steps, for the first time this
+session.** 541 files, 540 passed / 1 skipped. Coverage: statements 95.82 (≥95), branches 91.43 (≥83), functions
+98.76 (≥96.5), **lines 97.01 (≥97)**.
+
+**Merge target:** Repository (`project-hybrid-static-prerequisites.ts` + its test, regenerated CSAA baselines and
+census).
 ⚠ No ratified artifact was amended.
