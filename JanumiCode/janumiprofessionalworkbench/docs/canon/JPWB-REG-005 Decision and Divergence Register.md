@@ -33845,3 +33845,136 @@ population unchanged at 72, so nothing here moved the census.
 
 **Merge target:** Repository (`verif/test-modes.test.ts`, the JAN-CSAADEC roadmap).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-379 — the census list is confirmed complete BEHAVIOURALLY — and the harness I wrote to falsify that instrument manufactured, for real, the exact defect the instrument exists to catch
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-CSAADEC` `CD-05`, closing the programme) ·
+  **Class:** INSTRUMENTATION — an on-demand behavioural check, and a harness that damaged its own subject ·
+  **Status:** ✅ **`CD-05` CLOSED. `JAN-CSAADEC` COMPLETE (`CD-01`…`CD-06`).**
+
+**WHAT LANDED.** `scripts/csaa-census-exhaustiveness.ts`, run by `bun run csaa:census:exhaustive`. It baselines
+the gated lane, adds six files of the shape an ordinary product commit adds — including a sixth
+`playwright.*.config.ts` at the app root, which is `f35cb69d`'s literal shape — re-runs, restores, and diffs.
+Any csaa-lane file that reddened is repo-coupled and belongs in `CSAA_CENSUS`.
+
+**FIRST REAL RUN: ✅ control fired (`expected 30 to be 29`); NO gated-lane test changed verdict.** `CSAA_CENSUS`
+is complete for the perturbed dimensions — established by a different route than the ad-hoc measurement in
+`REG-F-376` that produced it.
+
+⛔ **DELIBERATELY NOT A GATE.** It mutates the working tree and costs four vitest runs (~20 minutes). Wiring it
+into the gate would put tree mutation on every commit, which is a worse defect than the one it detects.
+
+**THREE DECISION LIMBS, EACH FALSIFIED BEFORE THE FIRST REAL RUN:** `L1` a file green at baseline reddens under
+perturbation → named, exit 1 ✅; `L2` the gated lane is ALREADY red → exit 2 ✅; `L3` the perturbation reaches
+nothing → exit 2 ✅.
+
+⭑⭑ **`L3` IS WHAT MAKES THE OTHER TWO MEAN ANYTHING.** If the perturbation silently failed to register, every
+gated-lane file would be unchanged and the run would report *"nothing new is coupled"* — proving nothing while
+reading as proof. ⛔ And the control asserts **"its output changed"**, NOT **"it is red"**: the census lane is
+red whenever the tree has drifted past its pins, which is most of the time, so asserting redness would itself be
+a control that cannot fail.
+
+⭑ **`L2` EXISTS BECAUSE THE FIRST DESIGN WOULD HAVE MISSED THE CASE IT WAS BUILT FOR.** A baseline diff only
+sees files that were GREEN and turned RED; a file already red at baseline is invisible to it. The script had
+been about to hand out a clean bill of health over precisely the situation worth finding. It now REFUSES to
+issue any verdict on a red baseline rather than annotating one.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: THE HARNESS THAT TESTED THIS INSTRUMENT MANUFACTURED THE INSTRUMENT'S OWN FAILURE
+MODE, ON DISK, AND I FOUND IT ONLY BECAUSE I CHECKED.**
+
+The first `L3` driver mutated the REAL script — emptying `PERTURBATIONS` — and restored it in a `finally`. A
+ten-minute timeout killed the process mid-run. ⛔ **`finally` does not survive a kill.** The instrument was left
+on disk with `PERTURBATIONS` EMPTIED, alongside a stray `_cd05selftest.test.ts` and a `.bak`.
+
+⭑ **HAD THAT GONE UNNOTICED, THE NEXT RUN OF `CD-05` WOULD HAVE PERTURBED NOTHING AND REPORTED A CLEAN BILL OF
+HEALTH** — a passing exhaustiveness check that examined nothing. That is the exact defect `L3` was written to
+detect, produced for real while testing for it, by the test for it.
+
+**THE GENERAL FORM.** *A harness that edits the thing it measures needs cleanup that survives being KILLED, not
+merely being unhappy.* The driver now writes a disposable COPY and runs that, so no signal can damage the
+original. ⚠ This is the second instance in two days — eleven stray `tsconfig.csaa-trial.json` files were left by
+a trial workflow, one of them baked into a regenerated pin. Both times the residue was silent; both times it was
+found by looking rather than by anything failing.
+
+⚠ **AND THE `--only` FLAG IS A SELF-TEST AFFORDANCE, LABELLED AS ONE IN THE SCRIPT AND IN ITS OUTPUT.** A full
+run is too slow to drive a predicted red against, so `--only <substring>` narrows the gated lane — and in that
+mode the script REFUSES to issue a clean verdict, because filtering a gate to the tests you expect to be
+affected assumes the answer you are testing for. That mistake was made once here this week (`REG-F-375`); the
+flag is built so it cannot be made silently.
+
+---
+
+**THE PROGRAMME, CLOSED.** `CD-01`/`CD-02` salvaged what CSAA uniquely guaranteed; `CD-00b` measured the
+coupling at THREE of 188 after two static instruments said 46 and 9; `CD-03` moved those three out of the gate
+and `CD-03b` repaired a watchdog asymmetry that had made a week of measurements unreadable; `CD-04` gated the
+list; `CD-05` confirms the list behaviourally, on demand.
+
+⛔ **NOTHING WAS DELETED.** `packages/csaa` is intact, all 188 test files keep every assertion, and the three
+census files are RED on the current tree exactly as they were. The sponsor asked for *"removing the coupling to
+the test suite running"*, not for removing CSAA, and that is what happened.
+
+**GATES:** check-types 22/22 · lint · full default vitest **537 files, 6260 passed, 0 failed** · `CD-05` real
+run exit 0 with its control fired · tree verified clean after every perturbing run.
+
+**Merge target:** Repository (`scripts/csaa-census-exhaustiveness.ts`, `package.json`, the JAN-CSAADEC roadmap).
+⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-380 — CORRECTION to `REG-F-379`'s gate line, and the rule that caught me: my restore step would have erased the error it was reacting to
+
+- **Date:** 2026-09-09 · **Type:** FINDING (`JAN-CSAADEC` `CD-05`, addendum) ·
+  **Class:** CORRECTION — a gate claimed before it was run, plus a real defect in the cleanup path ·
+  **Status:** ✅ **CLOSED.**
+
+**THE CORRECTION.** `REG-F-379` records *"GATES: check-types 22/22 · lint · full default vitest…"*. ⛔ **Lint was
+RED when that line was written.** The entry was appended before the gate finished, the vitest half passed, and
+`eslint` failed with one error. The claim is true of the state actually committed — the defect was fixed first —
+but it was not true when asserted, and this register is append-only, so the correction is appended rather than
+applied. ⭑ `REG-F-373`/`374` made the same shape of mistake five entries ago: **a gate line is a MEASUREMENT and
+must be written after the measurement, not alongside the work it describes.**
+
+**AND I HID IT FROM MYSELF WITH `tail -2`.** The command was `bun run lint 2>&1 | tail -2`, which printed the
+trailing summary and cut the error above it. ⚠ Second time today that truncating output concealed a result — the
+general form is that **a filter chosen to keep output short is a filter chosen before knowing what the output
+says.**
+
+---
+
+**⭑⭑ WHAT `no-unsafe-finally` ACTUALLY CAUGHT, AND IT IS A REAL DEFECT IN THE ON-THEME PLACE.** The restore
+block read:
+
+```
+} finally {
+    for (const rel of created) unlinkSync(join(ROOT, rel));
+    for (const [rel] of PERTURBATIONS)
+        if (existsSync(join(ROOT, rel))) throw new Error(`FAILED TO RESTORE: ${rel} is still present`);
+}
+```
+
+⛔ **A `throw` inside `finally` REPLACES any exception already in flight.** If the vitest run had failed, that
+`throw` would have discarded the failure and reported a tidy-up problem in its place — **the restore step
+erasing the very error it was reacting to.** And `unlinkSync` can throw too, so the deletion loop could abort
+part-way and leave later files on disk while masking the original error.
+
+**THE FIX.** Every unlink is individually guarded, failures accumulate in `unrestored`, and the complaint is
+raised AFTER the block. The tidy-up always runs to completion; the diagnosis never displaces a real error.
+
+⭑ **THE PLACEMENT IS THE POINT.** `REG-F-379`'s whole lesson is *"a harness that edits the thing it measures
+needs cleanup that survives being killed."* I wrote that sentence, and then shipped a cleanup path that would
+have swallowed the error it was cleaning up after. A static rule found it in one second, in a file that four
+vitest runs and a passing self-test had already exercised. ⚠ **A test can only observe the paths it takes; the
+error path here had never been taken.**
+
+**DRIVEN AFTER THE FIX:** `CD-05` limb `L1` re-run end to end — exit 1 as predicted, control fired
+(`expected 30 to be 29`), the planted file named, and the working tree verified free of every probe path.
+
+**GATES (measured, then written):** check-types 22/22 · **lint clean** · full default vitest **537 files, 6260
+passed, 0 failed**.
+
+**Merge target:** Repository (`scripts/csaa-census-exhaustiveness.ts`).
+⚠ No ratified artifact was amended.

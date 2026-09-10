@@ -32,7 +32,7 @@ consumer recovers static names and the static prefix of dynamic ones as AST data
 
 ## CD-00b — measure which CSAA tests are actually repo-coupled
 
-**Status:** ✅ COMPLETE — 2026-09-09. Recorded in `§3` of the design; register entry owed (`CD-06`).
+**Status:** ✅ COMPLETE — 2026-09-09. Recorded in `§3` of the design and in `REG-F-376`.
 
 **Answer: 3 of 188.** Two earlier instruments gave 46 and 9; both were refuted, in opposite directions, by a
 behavioural perturbation replicated across two rounds and three tree dimensions. See the design for the full
@@ -161,21 +161,59 @@ exists; it just does not live where I first looked for it.
 
 ## CD-05 — the behavioural exhaustiveness check, on demand
 
-**Status:** ⬜ PLANNED
+**Status:** ✅ LANDED — 2026-09-09 · `scripts/csaa-census-exhaustiveness.ts` · `bun run csaa:census:exhaustive`
 
-A script that performs the `§3` perturbation (add a playwright config, an app source file, a `verif` asset,
-package sources), runs all 188, restores, and asserts that exactly `CSAA_CENSUS` changed verdict.
+Baseline the gated lane, add six files of the shape an ordinary product commit adds, re-run, restore, diff. Any
+csaa-lane file that reddened is repo-coupled and belongs in `CSAA_CENSUS`.
 
-⛔ **DELIBERATELY NOT A GATE.** It mutates the working tree and costs two full CSAA runs (~12 minutes). It is the
-instrument to run when the split is doubted, and the one that produced this programme's central number.
+**FIRST REAL RUN:** ✅ control fired (`expected 30 to be 29`); **no gated-lane test changed verdict.**
+`CSAA_CENSUS` is complete for the perturbed dimensions — confirmed by a different route than the ad-hoc
+measurement that produced it.
 
-## CD-06 — the register entry
+⛔ **DELIBERATELY NOT A GATE.** It mutates the working tree and costs four vitest runs (~20 minutes). Wiring it
+into the gate would put tree mutation on every commit — a worse defect than the one it detects.
 
-**Status:** ⬜ OWED
+**THREE DECISION LIMBS, EACH FALSIFIED BEFORE THE FIRST REAL RUN.**
 
-`CD-01`/`CD-02` landed with no register entry. One entry covers the salvage, the measurement, and the
-three-instrument correction. **It must record that two of my three instruments were wrong**, since that is the
-transferable part.
+| limb | predicted | got |
+| --- | --- | --- |
+| `L1` a file green at baseline reddens under perturbation → named, exit 1 | 1 | ✅ 1, named the probe |
+| `L2` the gated lane is ALREADY red → the comparison is unsound, exit 2 | 2 | ✅ 2 |
+| `L3` the perturbation reaches nothing → verdict refused, exit 2 | 2 | ✅ 2 |
+
+⭑⭑ **`L3` IS THE ONE THAT MAKES THE OTHER TWO MEAN ANYTHING.** If the perturbation silently failed to register,
+every gated-lane file would be unchanged and the run would report *"nothing new is coupled"* — proving nothing
+while reading as proof. So the census lane must be SEEN to move. ⛔ And the control is **"its output changed"**,
+not **"it is red"**: the census lane is red whenever the tree has drifted past its pins, which is most of the
+time, so asserting redness would itself be a control that cannot fail.
+
+⭑ **`L2` EXISTS BECAUSE THE FIRST DESIGN WOULD HAVE MISSED THE CASE IT WAS BUILT FOR.** A baseline diff only
+sees files that were GREEN and turned RED. A file already red at baseline is invisible to it — so the script had
+been about to hand out a clean bill of health over precisely the situation worth finding. It now REFUSES to
+issue any verdict on a red baseline rather than annotating one.
+
+⚠ **AND THE `--only` FLAG IS A SELF-TEST AFFORDANCE, LABELLED AS ONE.** A full run is too slow to drive a
+predicted red against, so `--only <substring>` narrows the gated lane — and in that mode the script refuses to
+issue a clean verdict, because filtering a gate to the tests you expect to be affected assumes the answer you
+are testing for. That mistake was made once in this repository this week; the flag is built so it cannot be made
+silently.
+
+**⛔ AND THE HARNESS THAT TESTED THIS WAS ITSELF THE HAZARD — RECORDED BECAUSE IT ALMOST LANDED.** The first
+`L3` driver mutated the REAL script and restored it in a `finally`. A ten-minute timeout killed it mid-run, and
+`finally` does not survive a kill: the instrument was left on disk with `PERTURBATIONS` EMPTIED, plus a stray
+test file and a `.bak`. ⭑ Had that gone unnoticed, the next run of `CD-05` would have perturbed nothing and
+reported a clean bill of health — the exact defect `L3` exists to catch, manufactured while testing for it. The
+driver now runs a disposable COPY. **A harness that edits the thing it measures needs cleanup that survives
+being killed, not merely being unhappy** — the same lesson as the eleven stray `tsconfig.csaa-trial.json` files.
+
+## CD-06 — the register entries
+
+**Status:** ✅ DISCHARGED — `REG-F-376` (the measurement and the two wrong instruments), `REG-F-377` (`CD-03`
+plus the watchdog asymmetry), `REG-F-378` (`CD-04`), `REG-F-379` (`CD-05`).
+
+⭑ Four entries rather than the one planned, because the programme found three things it did not set out to
+find: that two of my three measuring instruments were wrong; that one of two sibling configs had been missing a
+correction the other documented; and that an equality assertion over two absences reads as agreement.
 
 ---
 
