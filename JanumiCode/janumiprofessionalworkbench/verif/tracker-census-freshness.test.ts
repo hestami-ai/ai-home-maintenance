@@ -119,6 +119,44 @@ describe('the derived W-3 census is current', () => {
 	});
 });
 
+describe('REG-F-383 — the census does not quote running totals it is not about', () => {
+	it('⛔ no evidence string embeds a raw source count', () => {
+		// ⭑⭑ THE DEFECT THIS CLOSES, OBSERVED FOUR TIMES IN ONE DAY. The absence evidence used to read *"'X' not
+		// found in 487 production or 525 test sources"*, so ADDING ONE TEST FILE ANYWHERE rewrote fifteen records
+		// of this committed, derived artifact — with EVERY VERDICT UNCHANGED. Three separate increments had to
+		// regenerate it for changes none of its records were about.
+		//
+		// ⛔ AND THE COUNTS WERE NEVER THE NON-VACUITY EVIDENCE. `measure.ts` GATES the emission on its positive
+		// control: a search whose control does not fire emits `SEARCH INVALID … no absence claims emitted`
+		// instead of a verdict. The control is the guarantee, structurally. The integers only made the artifact
+		// churn on changes it is not about.
+		//
+		// ⚠ THE RULE IS NARROW ON PURPOSE: a count of the SEARCHED POPULATION is what churns, because it moves
+		// whenever the repository does. A count that is itself the finding is not what this forbids.
+		const offenders = COMMITTED_RECORDS.filter((record) =>
+			/\d+\s+(production|test)\s+sources?\b/.test(JSON.stringify(record))
+		).map((record) => (record as { item_id?: string }).item_id ?? '(unnamed)');
+		expect(
+			offenders,
+			'this record quotes the size of the population it searched, so it is rewritten every time the ' +
+				'repository grows a file — a derived artifact must move when its VERDICT moves and not before'
+		).toEqual([]);
+	});
+
+	it('⭑ CONTROL — the census is non-empty and its absence evidence is still present', () => {
+		// Without this, deleting every absence record would satisfy the limb above. The population floor and the
+		// evidence probe together mean "no totals" cannot be achieved by having no evidence to check.
+		expect(
+			COMMITTED_RECORDS.length,
+			'the census is empty — the reader or the file broke'
+		).toBeGreaterThan(100);
+		const absence = COMMITTED_RECORDS.filter((record) =>
+			/not found in any production or test source/.test(JSON.stringify(record))
+		);
+		expect(absence.length, 'no absence evidence remains to check').toBeGreaterThanOrEqual(10);
+	});
+});
+
 describe('the drift reader is exercised against inputs whose answer is known', () => {
 	// ⚠ A CENSUS INSTRUMENT THAT UNDERCOUNTS SILENTLY IS WORSE THAN NO INSTRUMENT — this repository's own
 	// recurring lesson, and the reason the comparison is a tested function rather than an inline `toEqual`.

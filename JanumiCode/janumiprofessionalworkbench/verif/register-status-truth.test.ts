@@ -839,13 +839,21 @@ describe('P-5b — no entry advertises work a later entry has already discharged
 				'discharged by anything. Verified at source: REG-D-056’s Status reads “✅ CLOSED” and its ' +
 				'Owed line is a possession of it. ⭐ A RE-DISPOSITION IS INHERENTLY POSSESSIVE — it discharges ' +
 				'an obligation a ruling LEFT, never the ruling — so this arrival was predictable from the ' +
-				'entry kind, and a count-based pin would have hidden it.'
+				'entry kind, and a count-based pin would have hidden it. ' +
+				'⚠ THE SIXTH IS THE THIRD REPEAT OF THE SAME PATTERN, AND ITS KIND IS NOW NAMEABLE: REG-F-387 ' +
+				'closes REG-F-383’S FILED DEFECT — the census quoting a running total — while REG-F-383 itself ' +
+				'is not discharged by anything. Verified at source: REG-F-383’s Status reads “✅ EG-07d CLOSED” ' +
+				'and it carries a section headed “FILED, NOT FIXED”, which is a possession by construction. ' +
+				'⭐ AN ENTRY THAT FILES A DEFECT IT DOES NOT FIX CREATES AN OBLIGATION SEPARABLE FROM ITSELF, so ' +
+				'every later closure of one is possessive — the same structural reason a re-disposition is. Three ' +
+				'of the six now come from that one shape, which is an argument for keeping this list BY NAME.'
 		).toEqual([
 			'REG-D-022>REG-D-021',
 			'REG-F-121>REG-F-087',
 			'REG-F-122>REG-F-119',
 			'REG-F-285>REG-F-284',
-			'REG-F-346>REG-D-056'
+			'REG-F-346>REG-D-056',
+			'REG-F-387>REG-F-383'
 		]);
 		expect(
 			staleStatuses(text, { rawObjects: true })

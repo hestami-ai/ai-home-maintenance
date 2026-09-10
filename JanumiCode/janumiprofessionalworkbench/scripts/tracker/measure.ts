@@ -124,7 +124,14 @@ function consumerWalk(itemId: string, name: string, searchLabel: string): void {
 		emitVerdict(
 			itemId,
 			'ABSENT',
-			`'${name}' not found in ${production.length} production or ${tests.length} test sources under packages/+apps/ (${searchLabel}, identifier-boundary match); positive control '${CONTROL_NAME}' fires`,
+			// ⭑⭑ REG-F-383 — NO RUNNING TOTALS IN THE EVIDENCE PROSE. This string used to read *"not found in
+			// 487 production or 525 test sources"*, so ADDING ONE TEST FILE ANYWHERE rewrote fifteen records of a
+			// committed, derived artifact — with every VERDICT unchanged. Observed four times in one day.
+			// ⛔ THE COUNTS WERE NEVER THE NON-VACUITY EVIDENCE. `controlFires` GATES this emission: a search whose
+			// positive control does not fire emits `SEARCH INVALID … no absence claims emitted` instead of a
+			// verdict. The control is the guarantee, structurally; the integers only made the record churn on
+			// changes it is not about. A derived artifact should move when its VERDICT moves and not before.
+			`'${name}' not found in any production or test source under packages/+apps/ (${searchLabel}, identifier-boundary match); positive control '${CONTROL_NAME}' fires`,
 			'consumer-walk:w3'
 		);
 	else

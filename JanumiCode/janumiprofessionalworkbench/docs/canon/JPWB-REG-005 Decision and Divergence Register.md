@@ -34478,3 +34478,56 @@ session.** 541 files, 540 passed / 1 skipped. Coverage: statements 95.82 (≥95)
 **Merge target:** Repository (`project-hybrid-static-prerequisites.ts` + its test, regenerated CSAA baselines and
 census).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-387 — CLOSES `REG-F-383`'s filed defect: a derived census quoted the size of the population it searched, so every added file rewrote fifteen records whose verdicts had not moved
+
+- **Date:** 2026-09-10 · **Type:** FINDING (closes the defect filed in `REG-F-383`) ·
+  **Class:** REMEDIATION — self-inflicted churn removed from a derived artifact, and gated ·
+  **Status:** ✅ **CLOSED. `gate:fast` EXIT 0.**
+
+**THE DEFECT.** `scripts/tracker/measure.ts` emitted absence evidence reading *"'getBaseline' not found in 487
+production or **525** test sources under packages/+apps/"*. The integers are the SIZE OF THE SEARCHED
+POPULATION, so **adding one test file anywhere rewrote fifteen records** of a committed, derived artifact — with
+**every verdict unchanged**, all still `ABSENT`. Observed FOUR times in one day: `REG-F-383` filed it after
+`EG-07d`, and `EG-07e`, `EG-07f` and the `REG-F-386` fix each had to regenerate the census again for changes
+none of its records were about.
+
+**⭑⭑ THE COUNTS WERE NEVER THE NON-VACUITY EVIDENCE, WHICH IS THE WHOLE ARGUMENT.** `measure.ts` GATES the
+emission on its positive control: the `ABSENT` verdict is emitted only in an `else if (controlFires)` branch,
+and a search whose control does not fire emits `SEARCH INVALID: control '…' not found — no absence claims
+emitted` INSTEAD of a verdict. ⛔ The guarantee that the search actually ran is STRUCTURAL. The integers added
+nothing to it and made the artifact churn on changes it is not about.
+
+**THE FIX.** The evidence now reads *"not found in any production or test source under packages/+apps/ (…);
+positive control '…' fires"*. The control clause — the part that carries the guarantee — is untouched.
+
+**DRIVEN, BY THE SAME PERTURBATION THAT USED TO MOVE IT:**
+
+| check | result |
+| --- | --- |
+| verdict VALUES changed by the fix | **0** |
+| record ids added or removed | **0** |
+| census byte-identical with an extra test file present | ✅ **True** |
+
+⭑ The third row is the one that matters: the churn is gone, demonstrated rather than argued.
+
+**GATED, SO IT CANNOT RETURN.** Two limbs in `verif/tracker-census-freshness.test.ts`: no evidence string embeds
+a raw source count, and — ⛔ **its own control** — the census is non-empty and its absence evidence is still
+present. Without the second, **"no running totals" would be satisfied by having no absence records at all**,
+which is the same shape as a coverage gate satisfied by deleting the tests.
+
+**MUTANTS (2, each killed by its named victim):** one record regains a running total → the limb reddens;
+every absence record stripped → the CONTROL reddens.
+
+⚠ **THE RULE IS DELIBERATELY NARROW.** It forbids quoting the size of the SEARCHED POPULATION, because that is
+what moves whenever the repository does. A count that is ITSELF the finding is not forbidden — the distinction
+is between a number that is evidence and a number that is scenery.
+
+**GATES (measured, then written):** `bun run gate:fast` **EXIT 0** — 541 files, 540 passed / 1 skipped;
+statements 95.82, branches 91.43, functions 98.76, lines 97.01. verif: the census gate 11 passed.
+
+**Merge target:** Repository (`scripts/tracker/measure.ts`, `verif/tracker-census-freshness.test.ts`, the
+regenerated census, the CSAA inventory baseline).
+⚠ No ratified artifact was amended.

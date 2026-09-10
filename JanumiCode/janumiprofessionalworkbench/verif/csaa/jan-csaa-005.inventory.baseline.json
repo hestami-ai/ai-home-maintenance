@@ -11247,7 +11247,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "ed9125c3869ec3eb13655a21a856d46bd73d722a8b8cdc9fea91007195d0a057",
+    "fileManifestDigest": "a7e4d0b079efa51dae4185155c2720dbb725612631a4c8cd2031eeb7ed3d0235",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -20289,9 +20289,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 9680,
+        "bytes": 10375,
         "path": "scripts/tracker/measure.ts",
-        "sha256": "7c2db3cc90d1612d1bee30788096c60e7285f381cba005140ec79dae8aa7e605",
+        "sha256": "a1ef9804b707508e66f9ea0c63ce140ac49aa8a332f9a7ab4730dc5537d57991",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -20821,9 +20821,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 9188,
+        "bytes": 11428,
         "path": "verif/tracker-census-freshness.test.ts",
-        "sha256": "2c4620fe5d6d7e2571819f4185558cc75aaed9b79d28b4d09ce09cf17bacfb57",
+        "sha256": "a3f0d027e6503bc1c8a744f70ef7ea8ecb5473a34d1cb89fea39163ba3667dc6",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20925,7 +20925,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "acc859132c7ce422d2a4ebe7ee8c32b75f9b9c9076b41978a2078c4b84e32565",
+    "subjectId": "973da2039bad57d0a83d57ff6c8b3ac48f391ff18cebb62df5640342b170586e",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -25221,7 +25221,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/tracker/measure.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "7c2db3cc90d1612d1bee30788096c60e7285f381cba005140ec79dae8aa7e605",
+      "contentSha256": "a1ef9804b707508e66f9ea0c63ce140ac49aa8a332f9a7ab4730dc5537d57991",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -26323,7 +26323,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/tracker-census-freshness.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "2c4620fe5d6d7e2571819f4185558cc75aaed9b79d28b4d09ce09cf17bacfb57",
+      "contentSha256": "a3f0d027e6503bc1c8a744f70ef7ea8ecb5473a34d1cb89fea39163ba3667dc6",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
