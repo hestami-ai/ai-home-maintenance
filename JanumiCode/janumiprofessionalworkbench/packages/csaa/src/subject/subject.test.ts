@@ -2848,7 +2848,14 @@ describe('live JPWB and inventory projection', () => {
 		// failure. It is left undone because restructuring the assertion would displace the per-pin narrative
 		// above, which is the part of this test that has repeatedly done the teaching — that trade needs a CSAA
 		// decision, not a passing agent's.
-		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(130);
+		// 130 -> 131 (2026-09-10): `apps/rph-demo/src/lib/server/pwa-export.test.ts`, added by JAN-EXECGOV EG-07d
+		// because `buildPwaExport` — the canonical subject of the whole-PWA Reasoning Review — had NO test at all,
+		// so the roadmap's mutant ("leave the export at 8 fields") had nothing to redden.
+		// ⭑ ONE ORDINARY PRODUCT TEST FILE MOVED THIS PIN, which is the recurrent tax in one line. It also moved
+		// fifteen records of `docs/tracking/census/w3-verdicts.ndjson`, whose evidence PROSE quotes the raw test
+		// -source total ("...or 525 test sources" -> 526) while every verdict stayed ABSENT. Two derived artifacts
+		// rewritten by a change neither of them is about.
+		expect(counts.get('apps/rph-demo/tsconfig.json')).toBe(131);
 		for (const path of [
 			'package.json',
 			'packages/rph-contracts/package.json',

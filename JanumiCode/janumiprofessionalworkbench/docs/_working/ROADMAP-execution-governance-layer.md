@@ -207,6 +207,9 @@ after the review surface.** `G-5` (does discharge enter the reasoning review's s
 
 #### `EG-07d` — the whole-PWA reviewer sees it too  *(sponsor decision `G-5`)*
 
+**Status:** ✅ LANDED — 2026-09-10, `REG-F-383`. Five mutants, each killed by its named victim.
+⭑ The export had NO test at all, so the mutant below had nothing to redden until this increment wrote one.
+
 | Mutant | Must redden |
 |---|---|
 | leave `buildPwaExport` at 8 fields | the export test — the one assurance act that reviews the whole PWA could not assess how work is discharged |
@@ -243,4 +246,12 @@ the deferral for most of them.
 
 ## Gates
 
-**All five: check-types · lint · vitest · playwright · verif.**
+**`bun run gate:fast` — THIRTEEN steps, not five.**
+
+⛔ **THIS LINE USED TO READ *"All five: check-types · lint · vitest · playwright · verif"* AND THAT WAS WRONG.**
+The repository's gate is `gate:fast`: four `--check` scripts, `tracker:build`, `check-types`, `lint`, `boundary`,
+`build`, `test` (which contains `test:dist`, the ARTIFACT mode), `test:coverage` (the ratchet), `svelte-check`
+and `e2e` — and `bun run gate` adds `mutants`. ⭑ `JAN-CSAADEC` shipped three increments reporting "the gate is
+fully green" against three of those thirteen; run once properly, `gate:fast` failed at step 1 and all three had
+to be withdrawn (`REG-F-381`). **A gate you define for yourself is not a gate.** Corrected here rather than
+quietly, because this document is where the wrong definition was written down.

@@ -407,6 +407,26 @@ export function mintUiId(prefix: string): string {
 
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 
+/** EG-07d — WHO does the work, as a spread-ready fragment. Returns `{}` when the type was never asked.
+ *  ⚠ ABSENT ≠ `'UNDECLARED'`: one predates the question, the other is a deferral the author chose. */
+const dischargePart = (
+	state: Readonly<Record<string, unknown>>
+): { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED' } => {
+	const v = state.workDischarge;
+	return v === 'MODEL' || v === 'HUMAN' || v === 'UNDECLARED' ? { workDischarge: v } : {};
+};
+
+/** EG-07d — the prompt template's armed state, as a spread-ready fragment. `{}` when none was ever authored.
+ *  ⚠ THREE-WAY DELIBERATELY: absent ≠ `'DRAFT'`. A type with no template has not been written; a `'DRAFT'`
+ *  template has been written and NOT armed, and only `'ACTIVE'` renders an instruction. Reading a missing
+ *  template as `'DRAFT'` would report authored-but-unarmed work that does not exist. */
+const promptPart = (
+	state: Readonly<Record<string, unknown>>
+): { promptStatus?: 'ACTIVE' | 'DRAFT' } => {
+	const status = (state.promptTemplate as { status?: unknown } | undefined)?.status;
+	return status === 'ACTIVE' || status === 'DRAFT' ? { promptStatus: status } : {};
+};
+
 /** The current PWA's PWU-Type graph as the canonical export a judge reads (engine truth, not the render model).
  *  `pwaVersion` (optional) scopes the node set to ONE version of the PWA: `listPwuTypes` filters by pwaId only, but a
  *  PWU_TYPE binds to a VERSIONED PWA (RPH-CON-009), so a republished PWA has two versions' types under one pwaId —
@@ -431,7 +451,17 @@ export function buildPwaExport(
 		executionBoundary:
 			t.state.executionBoundary === 'DELEGATED_EXTERNAL'
 				? ('DELEGATED_EXTERNAL' as const)
-				: ('INTERNAL' as const)
+				: ('INTERNAL' as const),
+		// ⭑⭑ JAN-EXECGOV EG-07d (sponsor decision `G-5`: *"Add both to the export, no new criterion"*). The
+		// Reasoning Review is the ONE assurance act that reads the whole PWA, and until now its subject stopped
+		// at eight fields — so the reviewer approving a PWA could not see how any of its work would be
+		// discharged, while `undertakings/[id]/+page.server.ts` decides `isModelStep` from exactly that value.
+		//
+		// ⛔ CONDITIONAL SPREADS, NOT DEFAULTS, AND THAT IS THE WHOLE CARE IN THIS EDIT. `?? 'UNDECLARED'` here
+		// would tell every reviewer that a type PREDATING the question had been ASKED and DEFERRED — the exact
+		// collapse `workDischarge` was introduced to remove, re-created at the surface that reports it.
+		...dischargePart(t.state),
+		...promptPart(t.state)
 	}));
 	return buildPwaGraphExport(
 		{

@@ -2090,6 +2090,12 @@
     },
     {
       "artifactClass": "TEST_SOURCE",
+      "bytes": 7682,
+      "path": "apps/rph-demo/src/lib/server/pwa-export.test.ts",
+      "sha256": "5c76c5d9195d69079f0dde777740e1f32ca4df24a01e106796ea1acbb23974fc"
+    },
+    {
+      "artifactClass": "TEST_SOURCE",
       "bytes": 5298,
       "path": "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
       "sha256": "ae4a2a5ff0acdeebbb427349f6d42e1db746295a67a9330bf0f951689b6efcd0"
@@ -2156,9 +2162,9 @@
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 23677,
+      "bytes": 25638,
       "path": "apps/rph-demo/src/lib/server/workbench.ts",
-      "sha256": "d3a46ebf385bb7e533273883b6a3222566a6485712c49120a3f3bb66faa6fb7d"
+      "sha256": "030e92fb9b8018fcdb8ee051ac23286c92b55230baa53ce70edfeabc5f8b0934"
     },
     {
       "artifactClass": "OTHER",
@@ -2395,7 +2401,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
+  "inputManifestDigest": "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"

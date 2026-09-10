@@ -34160,3 +34160,85 @@ it is, the pin must move only with the reason stated — never to make a run gre
 
 **Merge target:** none — this entry files a defect it does not fix.
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-383 — the whole-PWA reviewer can finally see how work is discharged, the export had no test at all, and I caught my own control comparing the subject to itself
+
+- **Date:** 2026-09-10 · **Type:** FINDING (`JAN-EXECGOV` `EG-07d`, sponsor decision `G-5`) ·
+  **Class:** REMEDIATION — a reviewer's subject widened; two vacuous controls caught before running ·
+  **Status:** ✅ **`EG-07d` CLOSED. `EG-07e`/`EG-07f` remain.**
+
+**WHAT WAS INVISIBLE.** `buildPwaExport` is the canonical subject of the ONE assurance act that reads a whole PWA
+— the de minimis floor Reasoning Review. It projected EIGHT fields and `workDischarge` was not among them, while
+`undertakings/[id]/+page.server.ts` decides `isModelStep = pwuType?.workDischarge === 'MODEL'` from exactly that
+value and silently downgrades an undeclared type to a `TRANSFORMATION` step. ⛔ **The human approving a PWA for
+use could not see how any of its work would be discharged.**
+
+**WHAT LANDED.** `PwaGraphNode` gains `workDischarge` and `promptStatus`; `buildPwaExport` projects both.
+⭑ **SPONSOR DECISION `G-5`, ANSWERED VERBATIM — *"Add both to the export, no new criterion"* — AND BOTH HALVES
+ARE ASSERTED.** The fields are carried, and `REASONING_REVIEW_CRITERIA` is pinned UNCHANGED at its nine ids. A
+ratified floor policy is not edited by an implementer to carry a new rule.
+
+⛔ **CONDITIONAL SPREADS, NOT DEFAULTS.** `?? 'UNDECLARED'` would tell every reviewer that a type PREDATING the
+question had been ASKED AND DEFERRED — the exact collapse `workDischarge` exists to remove, re-created at the
+surface that reports it. `promptStatus` is three-way for the same reason: absent (never authored) ≠ `'DRAFT'`
+(authored, not armed) ≠ `'ACTIVE'` (renders).
+
+**⚠ AND THE EXPORT HAD NO TEST AT ALL**, which is why the roadmap's mutant — *"leave `buildPwaExport` at 8
+fields"* — had nothing to redden. The increment is a NEW file for that reason.
+
+**MUTANTS (5 of 5, each killed by its named victim):** export stays at 8 fields → the carriage tests; prompt half
+withheld → the prompt tests; absent defaults to `UNDECLARED` → the absent-stays-absent test; DRAFT reported as
+armed → the DRAFT test; a criterion legislated about the new field → the CONTROL.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: I WROTE TWO CONTROLS THAT COULD NOT FAIL AND CAUGHT BOTH BEFORE RUNNING THEM.**
+
+1. **The criteria pin compared the subject to itself.** It read
+   `toEqual([...seven literals, ...REASONING_REVIEW_CRITERIA.slice(7).map(c => c.id)])` — so every entry past the
+   seventh was asserted against ITSELF, and an APPENDED criterion, the precise thing `G-5` forbids, would have
+   satisfied it forever. ⭑ The nine ids are now written out in full.
+2. **A keyword probe fired on ratified prose.** A second assertion required that no criterion's text match
+   `/discharge|prompt/` — and `RR-01`'s RATIFIED label reads *"The result genuinely DISCHARGES its delegated
+   obligation…"*. It was ALSO redundant: `toEqual` over the full id list already fails on any addition. ⛔ Deleted,
+   with the reason kept in the file. **A keyword probe over ratified text is a worse instrument than an exact
+   pin, and it manufactures false positives the pin cannot** — the same shape as `REG-F-375`'s `no canon` trip.
+
+---
+
+**⭑⭑ AND THE INCREMENT MEASURED THE CSAA CHURN BETTER THAN THE PROGRAMME BUILT TO MEASURE IT DID.** EG-07d added
+ONE test file and TWO fields, and forced FOUR derived artifacts to move:
+
+| artifact | what moved | remedy |
+| --- | --- | --- |
+| `csaa:generated-context` baseline | a source file changed | its generator |
+| `csaa:inventory` baseline | same | its generator |
+| `subject.test.ts` root population | `130 → 131` | ⛔ **a human edits a number** |
+| `docs/tracking/census/w3-verdicts.ndjson` | 15 records | its generator |
+
+⭑ Three of four are mechanical. **Only the third is the tax `JAN-CSAADEC` was chartered to remove**, and
+`REG-F-381` measured it at four `it` blocks.
+
+**⛔ AND A NEW DEFECT IS FILED, NOT FIXED: THE CENSUS QUOTES A TOTAL IT DOES NOT NEED.** Every one of those 15
+records' VERDICTS was unchanged — all `ABSENT` before and after. What moved was a raw count inside the
+human-readable evidence PROSE: *"'getBaseline' not found in 487 production or 525 test sources"* → *"526"*.
+⭑ **Fifteen derived records rewritten because one test file exists, while nothing any of them asserts moved.**
+That is churn manufactured by an artifact quoting a running total. The remedy — a hypothesis, per this register's
+standing rule — is to state the evidence without the totals, or to bucket them, so the record moves when the
+VERDICT moves and not before. Owed to whoever owns `scripts/tracker/measure.ts`.
+
+**SEARCHED, FOR THAT CLAIM.** `grep -c "test sources" docs/tracking/census/w3-verdicts.ndjson` and the fresh
+measurement differ in exactly the embedded integer; the `verdict` field is byte-identical across all 15. POSITIVE
+CONTROL: records whose verdict genuinely differs between the two files: **zero**, so the probe distinguishes a
+verdict change from a prose change and reported only prose here.
+
+**GATES (measured, then written):** `bun run gate:fast` — steps 1–12 green, **541 files, 1 failed**, that one
+being `REG-F-382`, which predates this session and must not be re-pinned. Coverage passes. ⚠ The roadmap's own
+Gates line said *"All five: check-types · lint · vitest · playwright · verif"* and is corrected in the same
+commit — it is where the wrong definition `REG-F-381` records was written down.
+
+**Merge target:** Repository (`pwa-graph.ts`, `workbench.ts`, `pwa-export.test.ts`, the EG roadmap,
+`subject.test.ts`'s pin, the regenerated census and CSAA baselines).
+⚠ No ratified artifact was amended.

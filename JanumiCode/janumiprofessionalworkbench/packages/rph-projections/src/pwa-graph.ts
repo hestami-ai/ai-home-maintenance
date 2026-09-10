@@ -29,6 +29,17 @@ export interface PwaGraphNode {
 	readonly requiredOutputs: readonly string[];
 	/** JAN-PRPWA-DS-001 STD-2 — resolved boundary (absent ⇒ INTERNAL). Drives the delegated-assurance projection. */
 	readonly executionBoundary?: ExecutionBoundary;
+	/** ⭑ JAN-EXECGOV EG-07d (sponsor decision `G-5`) — WHO DOES THIS TYPE'S WORK, carried into the one assurance
+	 *  act that reviews the WHOLE PWA. `undertakings/[id]/+page.server.ts` decides `isModelStep` from exactly this
+	 *  value, so a reviewer that cannot see it cannot assess how the work will be discharged.
+	 *  ⚠ OPTIONAL, AND ABSENT MUST STAY ABSENT: a type that predates the question is not a type whose author
+	 *  DEFERRED (`'UNDECLARED'`). Collapsing the two is the conflation `workDischarge` exists to remove. */
+	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	/** ⭑ JAN-EXECGOV EG-07d — whether the type's prompt template is ARMED. Three-way for the same reason as
+	 *  `workDischarge`: absent means no template was ever authored, which is a different fact from an authored
+	 *  template still sitting in `'DRAFT'`. `'ACTIVE'` is the only value under which the instruction actually
+	 *  renders — see `renderPromptTemplate`. */
+	readonly promptStatus?: 'ACTIVE' | 'DRAFT';
 }
 
 export interface PwaMeta {

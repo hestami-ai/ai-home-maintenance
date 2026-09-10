@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 529,
+      "discovered": 530,
       "excluded": 0,
       "failed": 0,
-      "included": 529,
+      "included": 530,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 529
+      "successfullyInventoried": 530
     },
     {
       "artifactClass": "VERIFICATION",
@@ -175,10 +175,10 @@
         "configurationPaths": [
           "apps/rph-demo/playwright.config.ts"
         ],
-        "discovered": 92,
+        "discovered": 93,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 52,
+        "excluded": 53,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -223,6 +223,7 @@
           "apps/rph-demo/src/lib/server/floor.test.ts",
           "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
           "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+          "apps/rph-demo/src/lib/server/pwa-export.test.ts",
           "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
           "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
           "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -234,7 +235,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "ca1b1cc787a7f999bbc221ab2d941df28e35707f217cfb3783b570fe371dde3d",
+        "id": "7f03cf933ec89e601cb8ebaa2cd821f46d404f6e77f11169c8faa2e97dc1e78d",
         "includePatterns": [
           "apps/rph-demo/e2e/**/*.e2e.ts"
         ],
@@ -291,17 +292,17 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "472b81fb5b1820b2739a6564ec212348e5369d4d1ada598e7a7284e2bccd2ac6",
+        "selectionDigest": "7a8daec342a34c28f233a7152e695bff87a1078fd6770c7dc5f82a029d8dc9a3",
         "status": "COMPLETE"
       },
       {
         "configurationPaths": [
           "apps/rph-demo/playwright.live.config.ts"
         ],
-        "discovered": 92,
+        "discovered": 93,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 90,
+        "excluded": 91,
         "excludedPaths": [
           "apps/rph-demo/e2e/agent-retention.e2e.ts",
           "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -384,6 +385,7 @@
           "apps/rph-demo/src/lib/server/floor.test.ts",
           "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
           "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+          "apps/rph-demo/src/lib/server/pwa-export.test.ts",
           "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
           "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
           "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -395,7 +397,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "9bbc80d79c02219ec346d4a7379054cbf59f9521eca108820d1ebf7b10e7b05d",
+        "id": "3910c2633eddc0ea47c1e9792681f02bfa6eeacd8d7baf06778a578370d762d4",
         "includePatterns": [
           "apps/rph-demo/e2e-live/**/*.live.ts"
         ],
@@ -414,17 +416,17 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "68673ea010b08921f7140e5145998e06bd0473e5fb6fca18c010351adc9dc6eb",
+        "selectionDigest": "e5b1a72190e075637f9f836b3fd11dace8427b49fa21dde2696436744aa741cb",
         "status": "COMPLETE"
       },
       {
         "configurationPaths": [
           "apps/rph-demo/playwright.live-exec.config.ts"
         ],
-        "discovered": 93,
+        "discovered": 94,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 92,
+        "excluded": 93,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -509,6 +511,7 @@
           "apps/rph-demo/src/lib/server/floor.test.ts",
           "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
           "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+          "apps/rph-demo/src/lib/server/pwa-export.test.ts",
           "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
           "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
           "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -520,7 +523,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "7ce0900cfa88d6504e57c44608e443217fd0918929e4659bf7d17c2cb545aba0",
+        "id": "710b7d922aa2ba47bb2236e031d62438568d4db085ed7eff346423957c48b6c8",
         "includePatterns": [
           "apps/rph-demo/e2e-live-exec/**/*.live.ts"
         ],
@@ -538,7 +541,7 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "112a5db157802d8a49eb3e3f9b7e6ffbdb8025543f75fecf7ffa66520b57b57b",
+        "selectionDigest": "aee972ca13870ecb6fadf81a93459fbd618acad90831905917e6fade754d2962",
         "status": "COMPLETE"
       },
       {
@@ -546,7 +549,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 591,
+        "discovered": 592,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 51,
@@ -604,13 +607,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "7c1db7420916b0a2c731a97e431c68437595004fc65518b2fa024d1ebe1804c9",
+        "id": "3440d850deb33a8f18a90880ac27bd5f9abf359f5d4cb72b5fddca1889e44cca",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 540,
+        "included": 541,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -649,6 +652,7 @@
           "apps/rph-demo/src/lib/server/floor.test.ts",
           "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
           "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+          "apps/rph-demo/src/lib/server/pwa-export.test.ts",
           "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
           "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
           "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -1163,7 +1167,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "78c12756444dd855fef040f141ea6b7c3711bdcc184f9c9d6aaf88eea359de08",
+        "selectionDigest": "3b5cae15809ebb829d58a7e04a37cf1607012d701b4630240c2a7fc0653f8607",
         "status": "COMPLETE"
       },
       {
@@ -1171,7 +1175,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 591,
+        "discovered": 592,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 51,
@@ -1229,13 +1233,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "0c46e6979dc52c9c5dde08e0bd0773a8e10c3c9573fdc06591ae254981c9f785",
+        "id": "f067fb2678aead9c8cce6bce1af7207f3f10f84e2ede6bfd841b931dc6293396",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 540,
+        "included": 541,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1274,6 +1278,7 @@
           "apps/rph-demo/src/lib/server/floor.test.ts",
           "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
           "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+          "apps/rph-demo/src/lib/server/pwa-export.test.ts",
           "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
           "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
           "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -1788,7 +1793,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "8c85d48cd12a3e77f49ef5f18cb1ce002e951f944bd2e57e11fb29df5ce479c3",
+        "selectionDigest": "7a6e83bdc19a21251822e9ef831b71cdff67f023436b152092de9b5e868fcc7b",
         "status": "COMPLETE"
       }
     ],
@@ -1831,6 +1836,7 @@
         "apps/rph-demo/src/lib/server/floor.test.ts",
         "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+        "apps/rph-demo/src/lib/server/pwa-export.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
         "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
         "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -5613,7 +5619,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "b4b1accb82878adffd60858c2a6ed9332759ed3aa7a0ba47aa7debebb8655177",
+    "configurationDigest": "eea093f48a7d6fe940811aa08f0a06d51bb9d4c7bfd82e284f99bbf0607d9c6c",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -6231,7 +6237,7 @@
           "configPath": "apps/rph-demo/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "d42d3c97b73623ca2e9ad29f7f9ee5df5ec420929fbd964baff130e4621258d1",
+          "projectResolutionDigest": "fa25c994173259c37a613b54e8550b90f9bf0b6134c63557821d22adf8da8214",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -6331,6 +6337,7 @@
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -8891,10 +8898,10 @@
           "configurationPaths": [
             "apps/rph-demo/playwright.config.ts"
           ],
-          "discovered": 92,
+          "discovered": 93,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 52,
+          "excluded": 53,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -8939,6 +8946,7 @@
             "apps/rph-demo/src/lib/server/floor.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -8950,7 +8958,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "ca1b1cc787a7f999bbc221ab2d941df28e35707f217cfb3783b570fe371dde3d",
+          "id": "7f03cf933ec89e601cb8ebaa2cd821f46d404f6e77f11169c8faa2e97dc1e78d",
           "includePatterns": [
             "apps/rph-demo/e2e/**/*.e2e.ts"
           ],
@@ -9007,17 +9015,17 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "472b81fb5b1820b2739a6564ec212348e5369d4d1ada598e7a7284e2bccd2ac6",
+          "selectionDigest": "7a8daec342a34c28f233a7152e695bff87a1078fd6770c7dc5f82a029d8dc9a3",
           "status": "COMPLETE"
         },
         {
           "configurationPaths": [
             "apps/rph-demo/playwright.live.config.ts"
           ],
-          "discovered": 92,
+          "discovered": 93,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 90,
+          "excluded": 91,
           "excludedPaths": [
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -9100,6 +9108,7 @@
             "apps/rph-demo/src/lib/server/floor.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -9111,7 +9120,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "9bbc80d79c02219ec346d4a7379054cbf59f9521eca108820d1ebf7b10e7b05d",
+          "id": "3910c2633eddc0ea47c1e9792681f02bfa6eeacd8d7baf06778a578370d762d4",
           "includePatterns": [
             "apps/rph-demo/e2e-live/**/*.live.ts"
           ],
@@ -9130,17 +9139,17 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "68673ea010b08921f7140e5145998e06bd0473e5fb6fca18c010351adc9dc6eb",
+          "selectionDigest": "e5b1a72190e075637f9f836b3fd11dace8427b49fa21dde2696436744aa741cb",
           "status": "COMPLETE"
         },
         {
           "configurationPaths": [
             "apps/rph-demo/playwright.live-exec.config.ts"
           ],
-          "discovered": 93,
+          "discovered": 94,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 92,
+          "excluded": 93,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9225,6 +9234,7 @@
             "apps/rph-demo/src/lib/server/floor.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -9236,7 +9246,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "7ce0900cfa88d6504e57c44608e443217fd0918929e4659bf7d17c2cb545aba0",
+          "id": "710b7d922aa2ba47bb2236e031d62438568d4db085ed7eff346423957c48b6c8",
           "includePatterns": [
             "apps/rph-demo/e2e-live-exec/**/*.live.ts"
           ],
@@ -9254,7 +9264,7 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "112a5db157802d8a49eb3e3f9b7e6ffbdb8025543f75fecf7ffa66520b57b57b",
+          "selectionDigest": "aee972ca13870ecb6fadf81a93459fbd618acad90831905917e6fade754d2962",
           "status": "COMPLETE"
         },
         {
@@ -9262,7 +9272,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 591,
+          "discovered": 592,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 51,
@@ -9320,13 +9330,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "7c1db7420916b0a2c731a97e431c68437595004fc65518b2fa024d1ebe1804c9",
+          "id": "3440d850deb33a8f18a90880ac27bd5f9abf359f5d4cb72b5fddca1889e44cca",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 540,
+          "included": 541,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9365,6 +9375,7 @@
             "apps/rph-demo/src/lib/server/floor.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -9879,7 +9890,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "78c12756444dd855fef040f141ea6b7c3711bdcc184f9c9d6aaf88eea359de08",
+          "selectionDigest": "3b5cae15809ebb829d58a7e04a37cf1607012d701b4630240c2a7fc0653f8607",
           "status": "COMPLETE"
         },
         {
@@ -9887,7 +9898,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 591,
+          "discovered": 592,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 51,
@@ -9945,13 +9956,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "0c46e6979dc52c9c5dde08e0bd0773a8e10c3c9573fdc06591ae254981c9f785",
+          "id": "f067fb2678aead9c8cce6bce1af7207f3f10f84e2ede6bfd841b931dc6293396",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 540,
+          "included": 541,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9990,6 +10001,7 @@
             "apps/rph-demo/src/lib/server/floor.test.ts",
             "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
             "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+            "apps/rph-demo/src/lib/server/pwa-export.test.ts",
             "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
             "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
             "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -10504,7 +10516,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "8c85d48cd12a3e77f49ef5f18cb1ce002e951f944bd2e57e11fb29df5ce479c3",
+          "selectionDigest": "7a6e83bdc19a21251822e9ef831b71cdff67f023436b152092de9b5e868fcc7b",
           "status": "COMPLETE"
         }
       ],
@@ -11223,7 +11235,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "ce7edbe4da82a1366f8b62ffd088943fbad78c90af8880db20b258de0c32316e",
+    "fileManifestDigest": "198c6901fe93ee6fcfb676d869c8ba7a614724542702889ef8d521a9e47bb299",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11234,7 +11246,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
+          "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11272,7 +11284,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
+          "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11329,7 +11341,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1365,
+    "selectedFileCount": 1366,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -12425,6 +12437,13 @@
       },
       {
         "artifactClass": "TEST",
+        "bytes": 7682,
+        "path": "apps/rph-demo/src/lib/server/pwa-export.test.ts",
+        "sha256": "5c76c5d9195d69079f0dde777740e1f32ca4df24a01e106796ea1acbb23974fc",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
         "bytes": 5298,
         "path": "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
         "sha256": "ae4a2a5ff0acdeebbb427349f6d42e1db746295a67a9330bf0f951689b6efcd0",
@@ -12502,9 +12521,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 23677,
+        "bytes": 25638,
         "path": "apps/rph-demo/src/lib/server/workbench.ts",
-        "sha256": "d3a46ebf385bb7e533273883b6a3222566a6485712c49120a3f3bb66faa6fb7d",
+        "sha256": "030e92fb9b8018fcdb8ee051ac23286c92b55230baa53ce70edfeabc5f8b0934",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -16037,9 +16056,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 118361,
+        "bytes": 119050,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "31cd60b759f385e38eccafd404e31edbe48e82e50e7cfc9b1cfde752c2b409e6",
+        "sha256": "f00abef1bb1d66970a7da03b62a64df71f598a6d416d64e9f4060e1526fa4df3",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -19838,9 +19857,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 19358,
+        "bytes": 20373,
         "path": "packages/rph-projections/src/pwa-graph.ts",
-        "sha256": "4db9670e791edeeeb95bf1473023c7f1cb587c5efa38a82b8d92e6d7d2d67c42",
+        "sha256": "cbc0c21890c5cdfae6131c420211a82dfd2b55a7c46e6b4c58359e323827fde9",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -20482,9 +20501,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 87421,
+        "bytes": 87641,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "4afaf9afe317417e82f42aff74e2b963ba4966b8e08eb207ad9a735919a51d5f",
+        "sha256": "ff574cbf6e88495e2332f36f1b6248d0e6d4226c3e9bbac666bb808dc37ade06",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20887,7 +20906,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "68021479733ad8809cbebb8fae441db23c7c689fa71303212c857c789bf334cc",
+    "subjectId": "e1ec6246f76a35b2a7f29e93f35171ae6765c3f2b7ac79a76bff37849fe9cf8a",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -20915,7 +20934,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
+            "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -21021,7 +21040,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 141,
+      "candidateArtifactCount": 142,
       "compilerOptions": {
         "allowJs": true,
         "checkJs": true,
@@ -21061,7 +21080,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
+            "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -21205,6 +21224,7 @@
         "apps/rph-demo/src/lib/server/optimistic-concurrency.test.ts",
         "apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
         "apps/rph-demo/src/lib/server/policy-round-trip.test.ts",
+        "apps/rph-demo/src/lib/server/pwa-export.test.ts",
         "apps/rph-demo/src/lib/server/pwa-loader-revision-provenance.test.ts",
         "apps/rph-demo/src/lib/server/pwa-surface-object-type.test.ts",
         "apps/rph-demo/src/lib/server/tools/backing-tool.test.ts",
@@ -25606,7 +25626,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "4afaf9afe317417e82f42aff74e2b963ba4966b8e08eb207ad9a735919a51d5f",
+      "contentSha256": "ff574cbf6e88495e2332f36f1b6248d0e6d4226c3e9bbac666bb808dc37ade06",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
