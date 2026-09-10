@@ -11,49 +11,10 @@
 // literal it replaced was also already WRONG — it carried a comment claiming `rph-ports` had "none of consequence"
 // while `rph-ports` has a test file.
 import { readdirSync, existsSync, statSync } from 'node:fs';
-import { defaultExclude } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
-
-/**
- * ⭑⭑ JAN-CSAADEC CD-03 — THE THREE CSAA TESTS THAT MEASURE **US**, NOT CSAA.
- *
- * These assert over the LIVE WORKBENCH TREE: workspace-manifest and `verif/` populations, public TypeScript
- * root populations and their hashes, exact current JPWB source bytes. So they move when WE work, and an
- * ordinary product commit is obliged to re-pin them. `f35cb69d` — a fifth playwright config — reddened 28
- * tests; six consecutive programmes moved a pinned population and none of them noticed.
- *
- * ⭑ MEASURED, NOT GUESSED, AND MY FIRST TWO ANSWERS WERE WRONG. A regex for "the test names a repo path" said
- * 46 of 188 and over-counted fifteenfold — naming a path in a string fixture is not reading the tree. Transitive
- * imports of `collect-inventory.ts` said 9 and was wrong in BOTH directions at once. The number below comes from
- * perturbing the tree and diffing verdicts: add a sixth playwright config, an app source file, a `verif/` asset,
- * package sources; run all 188; restore. Two rounds, four dimensions, THE SAME THREE FILES BOTH TIMES — and the
- * perturbation reproduced `f35cb69d`'s original break on demand, so it was not merely observing.
- *
- * ⛔ AND THIS FILE'S HEADER FORBIDS EXACTLY THIS, WHICH HAS TO BE ANSWERED RATHER THAN STEPPED AROUND: *"a list
- * that must be edited when a package is added is a list that will silently rot, and this whole programme is
- * about that failure mode."* The answer is an ASYMMETRY between the two kinds of list:
- *
- *   - an enumerated INCLUSION list fails DANGEROUSLY — a new package omitted from it is silently unmeasured,
- *     which is `N-16` itself, and is why `packagesWithTests()` derives;
- *   - an enumerated EXCLUSION list fails SAFELY — a file absent from it RUNS. The worst outcome is that
- *     something executes which need not, and the gate says so out loud.
- *
- * ⚠ ONE LIST, TWO CONSUMERS, DELIBERATELY. `projectsFor()` EXCLUDES these from the `csaa` project and
- * `censusProjectsFor()` INCLUDES exactly them. Because both read this constant, every CSAA test file runs in
- * exactly one lane BY CONSTRUCTION — a file cannot fall out of both by being edited in one place.
- *
- * ⛔ NOTHING IS SKIPPED, WEAKENED OR DELETED. All three files are byte-identical and keep every assertion. They
- * are RED on the current tree and MUST BE: a census lane that goes green by leaving the gate would be a control
- * that cannot fail. What changed is the OBLIGATION — see `bun run test:csaa:census`.
- */
-export const CSAA_CENSUS = [
-	'src/inventory/inventory.test.ts',
-	'src/subject/subject.test.ts',
-	'src/providers/runtime/project-hybrid-static-prerequisites.test.ts'
-];
 
 /** REG-F-015's standing guard — see `verif/unread-refusal-guard.ts`. Absolute, because each project sets its own
  *  `root` and a repo-relative path would resolve inside the package. */
@@ -104,45 +65,6 @@ export function appsWithTests(): string[] {
 }
 
 /**
- * ⭑ THE CENSUS LANE — `JAN-CSAADEC` CD-03. Consumed ONLY by `vitest.census.config.ts`, never by the two gate
- * configs, which is what takes these three out of the default gate.
- *
- * ⛔ AND THAT IS WHY IT IS A SEPARATE FUNCTION RATHER THAN AN ENTRY IN `projectsFor()`. `vitest.config.ts` and
- * `vitest.dist.config.ts` must cover EXACTLY the same set — that identity is the whole content of the two-mode
- * cross-check DS §3-R1 buys, and `N-16` is what happens when it silently stops holding. Adding a project here
- * that only one mode should run would break it. Both modes lack the census lane identically, so the invariant
- * is untouched.
- *
- * ⚠ SOURCE MODE ONLY, AND THAT IS A REAL REDUCTION, DECLARED. These three ran under both modes before. They
- * assert over FILESYSTEM FACTS — file populations, source bytes, hashes — which the `@janumipwb/*` resolution
- * mode does not change; a dist-mode census would re-measure the same tree through a different specifier
- * resolution and learn nothing. That is an argument, not a proof, and it is recorded here so a reader who
- * disagrees knows exactly what was given up.
- */
-export function censusProjectsFor(extendsConfig: true): Array<Record<string, unknown>> {
-	return [
-		{
-			extends: extendsConfig,
-			test: {
-				name: 'csaa-census',
-				root: './packages/csaa',
-				include: CSAA_CENSUS,
-				// ⚠ KEPT, BUT **NOT** INDIVIDUALLY LOAD-BEARING — AND THE COMMENT THAT FIRST STOOD HERE SAID IT
-				// WAS, UNTIL A MUTANT REFUTED IT. Driven: emptying `CSAA_CENSUS` reddens this lane (good), but so
-				// does emptying it with this line flipped to `true`. Vitest's ROOT-level "no test files found"
-				// catches it first, and only removing BOTH guards produces the vacuous pass (exit 0 over zero
-				// tests). ⭑ It stays because the root behaviour is vitest's DEFAULT, not a thing this repository
-				// declares: the day someone sets `passWithNoTests: true` on the census config for an unrelated
-				// reason, this line is the only guard left standing. That is `N-16`'s shape, and `N-16` is what
-				// happens when the last guard turns out to have been the one nobody checked.
-				passWithNoTests: false,
-				setupFiles: [SETUP_UNREAD_REFUSAL, SETUP_EMITTED_EVENT]
-			}
-		}
-	];
-}
-
-/**
  * The project list for one resolution mode.
  *
  * `passWithNoTests: false` IS THE FIX FOR N-16, and it is the part that generalises. The defect was not that a
@@ -166,11 +88,6 @@ export function projectsFor(extendsConfig: true): Array<Record<string, unknown>>
 				name,
 				root: `./packages/${name}`,
 				include: ['src/**/*.test.ts'],
-				// JAN-CSAADEC CD-03 — the only per-package special case here, and `CSAA_CENSUS` carries the whole
-				// argument for why an exclusion is admissible where an inclusion is not. `defaultExclude` is spread
-				// back in because setting `exclude` REPLACES vitest's defaults rather than adding to them, and
-				// dropping `**/node_modules/**` here would be a far larger change than the one intended.
-				exclude: name === 'csaa' ? [...defaultExclude, ...CSAA_CENSUS] : [...defaultExclude],
 				passWithNoTests: false,
 				// REG-F-015's standing half. Fails any test that dispatches a command, has it REFUSED, and never
 				// reads the result — the shape that let `floor-waiver-scope.test.ts` pass for months while

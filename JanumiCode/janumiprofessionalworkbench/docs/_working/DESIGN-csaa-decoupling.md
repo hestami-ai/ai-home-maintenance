@@ -1,5 +1,22 @@
 # DESIGN — JAN-CSAADEC: decoupling CSAA from the gate
 
+> ⛔⛔ **WITHDRAWN 2026-09-10 — `CD-03`, `CD-04` and `CD-05` ARE REVERTED. See `REG-F-381`.**
+>
+> The census-split mechanism collided with `vitest.projects.ts`'s undocumented STATIC-ANALYSIS CONTRACT at four
+> depths, made a ledgered mutation victim uncollectable (`CSAA-M7`), broke a hand-pinned discovery digest, and
+> would have needed a fourth literal copy of the file list to silence an independent census. All three
+> increments reported "the gate is fully green" against `check-types` + `lint` + `vitest run` — **three of
+> `gate:fast`'s thirteen steps.** The real gate failed at step 1.
+>
+> ⭑ **WHAT SURVIVES AND IS TRUE:** the churn is **4 `it` blocks**, not 46 files, not 9, not 3 files. Those four
+> uniquely cover **94 lines** whose subject IS the live repository, against a line ratchet with ~6 lines of
+> headroom — so decoupling them costs a ratified coverage floor, and **that is a sponsor decision, filed in
+> `REG-F-381`, not an implementer's.**
+>
+> ⭑ `CD-03b` (the watchdog asymmetry) is KEPT — it is independent and explains a week of unreadable measurements.
+> Sections below are left standing as authored; read them as the record of a mechanism that was tried and
+> withdrawn, not as current design.
+
 **Programme:** `JAN-CSAADEC` · **Status:** DESIGN · **Opened:** 2026-09-09
 
 ⚠ **THIS DOCUMENT IS PARTLY RETROACTIVE AND SAYS SO.** `CD-01` and `CD-02` landed in `4e0df056` with **no design

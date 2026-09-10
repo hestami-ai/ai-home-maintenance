@@ -1424,9 +1424,9 @@
     },
     {
       "artifactClass": "TEST_SOURCE",
-      "bytes": 9133,
+      "bytes": 11484,
       "path": "apps/rph-demo/e2e/pwa-authoring.e2e.ts",
-      "sha256": "f659a6b3542c941500f3f822cc32170e2847f7353b48c7c4f8b17237e2115b91"
+      "sha256": "87deb803628ea3521119806d604dbb05dbe8749fc9d0db42d7aa5aea0f4b2528"
     },
     {
       "artifactClass": "TEST_SOURCE",
@@ -2240,15 +2240,15 @@
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 46611,
+      "bytes": 47980,
       "path": "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
-      "sha256": "d5b7c4be5eb5df93df63ae0de4e663242f7e164507bf690bf319f2438416f161"
+      "sha256": "9ee255331f6709b1444767aef8ab20db44b04a414a88f08aa6fe080b284e2f3f"
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
-      "bytes": 109514,
+      "bytes": 112996,
       "path": "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
-      "sha256": "c4e47385e0a9e4e01cc90ada736e1284219c1e58afc6379b74e487ff7d589c1b"
+      "sha256": "60937eb51f29771f1389678cc48f678a724a820369c1809303d81127ee9f68fa"
     },
     {
       "artifactClass": "PRODUCTION_SOURCE",
@@ -2378,9 +2378,9 @@
     },
     {
       "artifactClass": "TOOL_CONFIGURATION",
-      "bytes": 11641,
+      "bytes": 13661,
       "path": "vitest.config.ts",
-      "sha256": "ef983189b62b7ce3231f31cd93187f49f73717eafc62314e95e0fa3703a236a4"
+      "sha256": "4af21260bf0d5430abbbeb24b25907f78c1af04880196e5f8e1d5011db95e363"
     },
     {
       "artifactClass": "TOOL_CONFIGURATION",
@@ -2395,7 +2395,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "a71b434e50e6c5a5393847ec5b9d543e254e82d43b12cb47fd8c75882397ec33",
+  "inputManifestDigest": "42f9f2a10f6da301c63fc8e1a4bdfb162e88f0d74ce46dd9096ee5cd4c86376d",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"

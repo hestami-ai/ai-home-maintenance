@@ -33978,3 +33978,185 @@ passed, 0 failed**.
 
 **Merge target:** Repository (`scripts/csaa-census-exhaustiveness.ts`).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-381 — SUPERSEDES `REG-F-377`, `REG-F-378` and `REG-F-379`: the CSAA census split is WITHDRAWN, and all three entries claimed a green gate that had never been run
+
+- **Date:** 2026-09-10 · **Type:** FINDING (`JAN-CSAADEC`, closing the programme by withdrawal) ·
+  **Class:** CORRECTION — a mechanism withdrawn on measurement; three superseded entries; one sponsor decision filed ·
+  **Status:** ⛔ **`CD-03`/`CD-04`/`CD-05` WITHDRAWN. The decoupling is BLOCKED on a sponsor ruling recorded below.**
+
+**⚠⚠ THE CORRECTION THAT MATTERS MOST, AND IT INVALIDATES A CLAIM IN THREE COMMITS AND THREE REGISTER ENTRIES.**
+`REG-F-377`, `REG-F-378` and `REG-F-379` each carry a GATES line of the form *"check-types 22/22 · lint · full
+default vitest 537 files … 0 failed."* ⛔ **That is not this repository's gate.** `package.json` defines
+`gate:fast` as THIRTEEN steps — four `--check` scripts, `tracker:build`, `check-types`, `lint`, `boundary`,
+`build`, `test` (which contains `test:dist`, the ARTIFACT mode), `test:coverage` (the ratchet), `svelte-check`
+and `e2e` — and `gate` adds `mutants`. I ran three of the thirteen and called it the gate.
+
+⭑ **THE FIRST STEP WOULD HAVE CAUGHT EVERYTHING.** Run once, `gate:fast` failed at
+`csaa:generated-context:check` — step 1 of 13 — and behind it lay every defect below. Three increments shipped
+"green" against an instrument that could not see them. **A gate you defined for yourself is not a gate.**
+
+---
+
+**WHAT `CD-03` BROKE, MEASURED, ALL OF IT MINE.**
+
+1. **`VITEST/SOURCE` and `VITEST/DIST` fell from `COMPLETE` to `PARTIAL`.** The `exclude` I added was
+   `name === 'csaa' ? [...] : [...]`, and `staticPatterns` in `subject/test-populations.ts` accepts an array
+   literal of string literals and nothing else — a ternary, a spread or an identifier all yield
+   `VITEST_PROJECT_EXCLUSION_NOT_STATIC`. ⭑ **`vitest.projects.ts` is under a STATIC-ANALYSIS CONTRACT, which
+   nothing in it said.** CSAA went on reporting 540 included test files while 537 ran.
+2. **A hand-pinned discovery digest was broken and never re-pinned.** Editing that file moved
+   `JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST`, so `VITEST_PROJECT_DISCOVERY_IMPLEMENTATION_UNRECOGNIZED`
+   stood from `36601deb` onward.
+3. **A LEDGERED MUTANT BECAME UNMEASURABLE AND ITS GATE STAYED GREEN.** `scripts/mutants/ledger.ts` declares
+   `CSAA-M7-hybrid-projector-analyzes-an-inventory-only-artifact` with `expectRed` naming an excluded file.
+   Driven: `vitest run` on that path reports *"No test files found"*, so the mutant reads INCONCLUSIVE forever —
+   while `verif/mutant-ledger.test.ts` only checks the victim EXISTS. ⛔ This is the exact vacuity
+   `vitest.projects.ts`'s own `apps/` paragraph documents; **I recreated for three files the defect DR-002 W-2
+   fixed for a directory.**
+4. **The lane could not be resolved at all.** Discovery supports ONE shape — a factory imported as `projectsFor`
+   and called `projectsFor(true)`, selections as literal arrays. `censusProjectsFor` and `include: CSAA_CENSUS`
+   satisfy neither, so `VITEST/CENSUS` resolved to ZERO included files.
+5. **An independent census contradicted it.** `expectedUnit` requires the SOURCE population to equal every
+   `*.test.ts` under `verif/`, `packages/*/src/` and `apps/*/src/`. Silencing it needed a FOURTH literal copy of
+   the three paths. ⭑ Four copies of one list is the tell that the mechanism is wrong, not the guard.
+
+**⚠ AND I OVER-READ THAT LAST GUARD, WHICH AN ADVERSARIAL PANEL CORRECTED.** I reported it as a ratified
+invariant that *"every unit test file that exists is run by the gate."* It is not:
+`packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts` is a committed test file
+deliberately never collected, with a header reasoning about that very mechanism. `expectedUnit` is an
+ANTI-VACUITY CONTROL on CSAA's own discovery, not a repository policy. The mechanism was still wrong; my reason
+was not.
+
+---
+
+**⭑⭑ THE MEASUREMENT THAT SETTLES THE PROGRAMME: THE CHURN IS FOUR `it` BLOCKS, NOT THREE FILES.**
+`REG-F-376` measured three FILES. One level down, only **4 of 88 `it` blocks** in them read the live tree:
+`inventory.test.ts:5409`, `subject.test.ts:2680` and `:2896`, `project-hybrid-static-prerequisites.test.ts:450`.
+⛔ **`CD-03` shed 94 tests to relieve 4.**
+
+**AND THE DECOUPLING IS BLOCKED BY A CONSTRAINT NO DESIGN CAN ENGINEER AROUND — DRIVEN BOTH WAYS.** Those four
+uniquely cover **94 lines**, 73 of them in `collect-inventory.ts`, and their subject IS the live repository, so
+no fixture can substitute: they are the `assertJpwb*` block that executes only under
+`requireJpwbPopulations: true`.
+
+| | four gated OFF | four ON | delta |
+| --- | --- | --- | --- |
+| csaa lines covered | 55,020 / 56,840 | 55,114 / 56,840 | **+94** |
+| `collect-inventory.ts` | 444 / 532 | 517 / 532 | +73 |
+
+Global lines with them gated: **60,191 / 62,143 = 96.85%** against a floor of **97** with `autoUpdate: false`.
+Re-enabling them gives 60,285 = 97.008% — about **six lines** of headroom.
+
+⛔ **SO THE DECISION IS A RATIFICATION ACT AND IS FILED, NOT TAKEN.** Removing this churn costs a ratified
+coverage floor. `vitest.config.ts` says *"a threshold that rewrites itself downward is not a ratchet"*. An
+implementer lowering it to make their own increment fit is that failure exactly — the standard `EG-06` applied
+when it FILED two findings rather than inventing governance. **Sponsor decision owed:** accept the recurrent
+re-pinning, or lower the line floor (~96.5) on the recorded basis that 94 lines of live-tree assertion moved to a
+deliberate opt-in lane — a change in WHAT IS MEASURED, not in code quality.
+
+⚠ **AND THE RATCHET IS A TRIPWIRE INDEPENDENTLY OF THIS.** Six lines of headroom on a hard floor fires on almost
+any change — the failure `vitest.config.ts` itself warns about for the *branches* threshold, where it declined to
+tighten *"because the measurement does not support it with adequate slack."* The same reasoning now applies to
+lines, and it is owed the same treatment.
+
+---
+
+**WHAT IS KEPT, AND WHY IT IS INDEPENDENT.** `CD-03b` stands: `vitest.dist.config.ts` had carried
+`hookTimeout`/`testTimeout`/`maxWorkers` since it was written and `vitest.config.ts` — the SOURCE mode, the
+default, the basis for coverage and mutation — carried NONE of the three. `REG-F-024`'s shape, and it explains a
+week of unreadable measurements. Both configs now agree, and `verif/test-modes.test.ts` gates that they agree
+**and that they are actually set** — two configs declaring nothing compare equal.
+
+**WHAT IS WITHDRAWN.** `vitest.census.config.ts`, `CSAA_CENSUS`, `censusProjectsFor`, the project `exclude`, both
+new scripts, `scripts/csaa-census-exhaustiveness.ts` and `CD-04`'s five census limbs. `vitest.projects.ts` is
+byte-restored to its pre-`CD-03` shape, so the discovery digest returns to the committed `721a4948…` **with zero
+CSAA source edited** — which is itself the cleanest evidence the collision was mine.
+
+**RE-PINNED, DELIBERATELY:** `verif` roots 69 → 72, all three files from one commit (`4e0df056`), recorded in
+`subject.test.ts`'s history block per its own standing instruction. ⭑ The unfiltered gate caught this move on its
+FIRST run, where six preceding moves went unseen — the tripwire always worked; the habit of named `--project`
+filters was the defect.
+
+**SEARCHED, FOR THE ONE ABSENCE THIS ENTRY ASSERTS** — that `vitest.projects.ts` gave no notice of being
+statically parsed. `grep -icE "static|ast|csaa|parse|analys|digest"` over the pre-`CD-03` file returns **3**, and
+all three are SUBSTRING ARTIFACTS: `le`**`ast`**` `, `le`**`ast`**` ` and `infr`**`ast`**`ructure`. Real hits:
+**zero**. ⭑ POSITIVE CONTROL: the same probe style over the contracts the file DOES document —
+`N-16|passWithNoTests|derived|silently rot` — returns **9**, so the instrument finds a declared contract when
+one is there and reported none here. ⚠ Recorded because my first reading of the 3 hits was that the claim was
+FALSE; it is the naive-substring shape this register has filed before, and the finding survived it.
+
+**GATES (measured, then written):** `gate:fast` — steps 1–12 green, **540 files, 1 failed**, that one being the
+pre-existing `REG-F-382` defect this programme did not cause and must not re-pin. Coverage passes.
+
+**Merge target:** Repository. ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-382 — a TAINT-capability static prerequisite over a security-relevant file went `UNSUPPORTED` in PUSHED history, and nothing reported it because nobody runs the unfiltered gate
+
+- **Date:** 2026-09-10 · **Type:** FINDING (surfaced by `JAN-CSAADEC`, owned by neither) ·
+  **Class:** DEFECT — a live analysis prerequisite silently lost, disclosed rather than re-pinned ·
+  **Status:** ⛔ **OPEN. Deliberately NOT re-pinned.**
+
+**THE DEFECT.** `packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.test.ts:474` pins the
+projected prerequisite state of five findings against the CURRENT source bytes. Finding **55** —
+`apps/rph-demo/src/lib/server/assurance/agy-cli.ts`, capability **`TAINT`** — is pinned `SATISFIED` and the tree
+yields **`UNSUPPORTED`**:
+
+```
+[45, 'SATISFIED'], [54, 'SATISFIED'], [55, 'SATISFIED']      ← pinned
+[45, 'SATISFIED'], [54, 'SATISFIED'], [55, 'UNSUPPORTED']    ← actual
+```
+
+`UNSUPPORTED` is raised by `result('UNSUPPORTED', 'LAYOUT_UNRECOGNIZED')` / `'CRITICAL_SYMBOL_ALIASED'` — the
+analyser no longer recognises the file's shape. ⚠ It is a DIFFERENT CLASS from `NOT_SATISFIED`: not "the
+property does not hold" but **"the instrument can no longer tell."**
+
+**⛔ IT IS NOT RE-PINNED, AND THAT IS THE POINT OF FILING IT.** Editing the expectation to `UNSUPPORTED` would
+turn a live finding about a taint-analysis prerequisite over a security-relevant file into a green line. That is
+"weakening an assertion to make a test pass" in the one place it is least affordable. The gate stays RED here
+until someone who owns this decides whether the layout should be restored or the prerequisite retired.
+
+**ATTRIBUTION, MEASURED, AND IT IS NOT `JAN-CSAADEC`'s.** Across the 19 commits on `main` not yet on
+`origin/main`, the count of commits touching each input is **ZERO**:
+
+| input | commits in the unpushed range |
+| --- | --- |
+| `apps/rph-demo/src/lib/server/assurance/agy-cli.ts` (finding 55) | 0 |
+| `packages/csaa/src/providers/runtime/project-hybrid-static-prerequisites.ts` (the analyser) | 0 |
+| `workbench.ts` · `command-bus.ts` · `floor.ts` · `governance.ts` (findings 9/19/45/54) | 0 |
+
+`agy-cli.ts` was last changed by `0c79e6d3` (`REG-F-339`), which is already pushed. **The regression is on
+`origin/main` and predates this session entirely.**
+
+**⭑⭑ WHY NOTHING REPORTED IT, AND THIS IS THE TRANSFERABLE HALF.** `REG-F-376` recorded that six consecutive
+programmes moved a pinned CSAA population without noticing, because every author ran vitest with NAMED
+`--project` filters and never the unfiltered suite. ⛔ **That habit hides more than population counts.** It hid a
+TAINT prerequisite going `UNSUPPORTED` — a defect with nothing to do with file censuses, in an app file, found
+only because `gate:fast` was finally run end to end and reached `test:dist`, the ARTIFACT mode, which this
+repository's own header calls *"the only thing that tests what ships."*
+
+⚠ **AND IT IS INVISIBLE IN SOURCE MODE TOO.** The same test passes nowhere: the unfiltered source run reddens it
+as well. What made it undiscoverable was not the resolution mode but the FILTER — a scoped run cannot fail on a
+file it never collects.
+
+**THE GENERAL FORM.** *A test that nobody's chosen scope includes is a test that has stopped existing, and it
+reports nothing while it does so.* `passWithNoTests: false` catches a project that observes nothing; it cannot
+catch a HUMAN who observes only some projects.
+
+**SEARCHED.** `docs/canon/JPWB-REG-005` for `agy-cli`: `REG-F-326` (the stderr hatch, closed by non-use) and
+`REG-F-339` (the retention boundary) — **neither concerns the hybrid static prerequisite or finding 55**, so this
+is not a re-filing. `docs/tracking/` records no verdict for it.
+
+**REMEDY — a hypothesis, not an instruction, per this register's standing rule that a recorded remedy is a
+claim:** determine whether `0c79e6d3`'s `extractJson` refactor changed a symbol the layout matcher keys on. If
+so, either restore the recognised layout or retire finding 55's prerequisite with the loss recorded. ⛔ Whichever
+it is, the pin must move only with the reason stated — never to make a run green.
+
+**GATES:** `gate:fast` steps 1–12 green; **540 files, 1 failed**, and this is that one.
+
+**Merge target:** none — this entry files a defect it does not fix.
+⚠ No ratified artifact was amended.

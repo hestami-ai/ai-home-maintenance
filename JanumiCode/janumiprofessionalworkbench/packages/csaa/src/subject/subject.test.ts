@@ -2738,6 +2738,13 @@ describe('live JPWB and inventory projection', () => {
 		//   +1 `verif/form-key-emitter-census.test.ts`                9ac93165  2026-09-08  JAN-EXECGOV EG-04
 		//   +1 `verif/authoring-field-disposition.test.ts`            39f4a905  2026-09-08  JAN-EXECGOV EG-05
 		//   +1 `verif/tracker-census-freshness.test.ts`               2b236b08  2026-09-08  REG-F-370
+		// 69 -> 72 (2026-09-10), all three from ONE commit, `4e0df056` (JAN-CSAADEC CD-01/CD-02):
+		//   +1 `verif/dependency-boundary-rules.test.ts`            4e0df056  2026-09-09  CD-01 boundary salvage
+		//   +1 `verif/svelte-name-projection.test.ts`               4e0df056  2026-09-09  CD-02 bridge
+		//   +1 `verif/svelte-name-projection.ts`                    4e0df056  2026-09-09  CD-02 bridge
+		// ⭑ AND THIS MOVE WAS CAUGHT BY THE UNFILTERED GATE ON ITS FIRST RUN, which is the whole point: the six
+		// preceding moves went unnoticed because every author ran NAMED `--project` filters and never `gate:fast`.
+		// The habit changed, not the tripwire.
 		// This file has already recorded the same detection route under JAN-SLICE-SWP-04, JAN-ICP-01, JAN-ICP-02
 		// and JAN-ICP-03: a scoped run hides CSAA population moves. What is new is that it happened SIX TIMES IN
 		// A ROW without anyone noticing. ⚠ THE MECHANISM FIRST WRITTEN HERE WAS WRONG AND A CONTROL FALSIFIED IT:
@@ -2752,7 +2759,7 @@ describe('live JPWB and inventory projection', () => {
 		// commits late, in a window belonging to none of the authors who moved it. Corrected here by the
 		// sponsor-directed CSAA investigation of 2026-09-09, and recorded rather than quietly folded into the new
 		// number, per this file's own standing instruction.
-		expect(counts.get('verif/tsconfig.json')).toBe(69);
+		expect(counts.get('verif/tsconfig.json')).toBe(72);
 		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
 		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
 		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands
