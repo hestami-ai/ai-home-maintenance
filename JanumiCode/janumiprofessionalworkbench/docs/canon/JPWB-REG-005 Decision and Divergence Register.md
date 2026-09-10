@@ -34531,3 +34531,111 @@ statements 95.82, branches 91.43, functions 98.76, lines 97.01. verif: the censu
 **Merge target:** Repository (`scripts/tracker/measure.ts`, `verif/tracker-census-freshness.test.ts`, the
 regenerated census, the CSAA inventory baseline).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-388 — the fixture-coverage route out of the CSAA churn is REFUTED by measurement, and I had recommended it to the sponsor as the best of three options
+
+- **Date:** 2026-09-10 · **Type:** FINDING (`JAN-CSAADEC`, closing the last open route) ·
+  **Class:** CORRECTION — a remedy I proposed, investigated, and disproved ·
+  **Status:** ⛔ **REFUTED. The decoupling remains blocked on the sponsor decision recorded at `REG-F-381`.**
+
+**WHAT I PROPOSED, AND TO WHOM.** `REG-F-381` measured the block: the four live-tree `it` blocks uniquely cover
+**94 lines**, against a line ratchet with ~6 lines of headroom, so removing them costs a ratified floor — a
+sponsor decision. I then told the sponsor there was a third option I had under-weighted: *"write new tests that
+exercise those 94 lines using synthetic data instead of the real repo… a few hours of real work rather than a
+ruling,"* and **recommended it over both earlier options**. ⛔ It does not work, and the reason is structural
+rather than a matter of effort.
+
+**WHY IT DOES NOT WORK.** The 94 lines sit behind `collectInventory`'s `requireJpwbPopulations` branch and are
+assertions whose SUBJECT IS DEFINITIONALLY THIS REPOSITORY: the root manifest identity, the required assurance
+commands, the required selected paths, the exact six-lane test-population profile set, the SOURCE/DIST
+population identity, an independent census of every `*.test.ts`, and the SvelteKit generated-context evidence.
+⭑ A synthetic root that satisfies them **would be a replica of JPWB**, and a maintained replica is strictly
+worse than the churn it removes.
+
+**AND THE PINNED DIGEST MAKES IT UNARGUABLE.** `JPWB_VITEST_PROJECT_DISCOVERY_SYNTAX_DIGEST` pins the TOKEN
+STREAM of the real `vitest.projects.ts`. Any synthetic copy has a different digest, raising
+`VITEST_PROJECT_DISCOVERY_IMPLEMENTATION_UNRECOGNIZED`, so its population is never `COMPLETE` and the guard
+throws. The only synthetic file that passes is a verbatim copy of the real one — which is not a fixture, it is a
+duplicate that rots.
+
+**DRIVEN, NOT REASONED.** The existing synthetic-root machinery (`fixture()` in `inventory.test.ts`,
+`mkdtempSync` + a minimal workbench) already exists, so the estimate was tested rather than guessed. Replicating
+its exact shape and calling `collectInventory({ repositoryRoot, requireJpwbPopulations: true })`:
+
+```
+STOPS AT -> JPWB inventory root manifest identity is absent or incompatible
+```
+
+⛔ **It stops at the FIRST guard**, and that is the general obstacle: **to reach guard N's body you must PASS
+guards 1..N-1**, each of which demands a JPWB-specific fact. ⚠ That obstacle is real for the SUCCESS paths and
+NOT for the failure paths — see the corrected search below, which found 95 existing fixture tests already driving
+every guard's throw. What cannot be reached from a synthetic root is a guard COMPLETING.
+
+⚠ **THE OBJECTION THAT KILLED THE FIRST VERSION CAME FROM `REG-F-386`, AN HOUR EARLIER.** That entry established
+that *"a fixture that no longer resembles its subject is a test of the past"* — nine fixture tests passed for
+days while the detector they guard was blind, because the fixtures described a layout production had abandoned.
+A synthetic subject built to SATISFY these guards would encode today's populations and drift exactly that way,
+except silently: it would not fail when the tree moved, it would simply stop resembling it. ⭑ The lesson arrived
+in time to stop me building the thing it warns about, which is the only reason it cost a probe rather than a day.
+
+---
+
+**⭑⭑ THE GENERAL FORM, AND IT IS ABOUT ADVICE RATHER THAN CODE.** *A remedy offered to a sponsor is a claim, and
+mine was published before it was tested.* I described the route as costed (*"a few hours"*) and recommended it
+over a decision that was legitimately theirs, on the strength of an analogy — that guard logic is ordinarily
+fixture-testable — without checking whether these guards are. Two probes settled it. ⛔ **The register's
+standing rule that a recorded REMEDY is a HYPOTHESIS applies to advice given to the sponsor, not only to
+findings filed against the code**, and this is the second time in two days a remedy of mine has been refuted by
+the first measurement anyone took of it.
+
+**WHAT THEREFORE REMAINS TRUE, AND UNCHANGED.** The churn is **one hand-edited number** per increment that moves
+a population; three of the four artifacts that move are mechanical regenerations, and one whole class of those
+was removed today by `REG-F-387` for nine lines of change. The last piece has exactly two dispositions and both
+belong to the sponsor: accept the re-pinning, or lower the line floor on the recorded basis that 94 lines of
+live-tree assertion moved to a deliberate opt-in lane. ⛔ **No implementer route exists**, which is now measured
+rather than assumed.
+
+**⚠⚠ AND THE FIRST VERSION OF THIS ENTRY CARRIED A FALSE SEARCH, WHICH IS RECORDED RATHER THAN QUIETLY FIXED.**
+It read: *"that grep returns **nothing** — no test drives that branch against a fixture today."* ⛔ **It returns
+101 occurrences, 95 of them `requireJpwbPopulations: true`.** I had run that grep earlier piped through `head`,
+seen six unrelated lines, and generalised the truncation into an absence — the exact shape this register files
+under *"an absence is a claim about MY SEARCH"*, and the second time today a `head` has hidden a result from me.
+
+**SEARCHED, CORRECTLY, AND IT SHARPENS THE FINDING RATHER THAN OVERTURNING IT.** The `true` variant returns
+**95**; the `false` variant **6**. So the guarded branch is ALREADY driven against fixture roots, ninety-five
+times, at `inventory.test.ts:3598` onward — `wrongIdentity`, `noWorkspaces`, `noVerification`, `noScripts`,
+`missingCommand` and their siblings. ⭑ **Those tests exercise every guard's FAILING direction, which is exactly
+the work I was proposing to add.** It already exists.
+
+⭑⭑ **WHICH MAKES THE REAL OBSTACLE SHARPER AND LEAVES THE CONCLUSION STANDING: A FIXTURE CAN MAKE A GUARD THROW;
+ONLY JPWB CAN MAKE ONE PASS.** The 73 lines of `collect-inventory.ts` that only the four live-tree tests cover
+are therefore the SUCCESS paths — the checks completing against a tree that genuinely satisfies them — and they
+are unreachable by construction from any root that is not this repository. Measured: `collect-inventory.ts`
+covers 444/532 lines with the four gated and 517/532 with them enabled, while those 95 fixture tests drive the
+failure paths throughout BOTH runs. ⛔ There is no fixture left to write: the ones that CAN exist are written,
+and the remainder cannot be.
+
+**⚠⚠ CARRY-FORWARD FOUND WHILE WRITING THIS ENTRY, FILED AND DELIBERATELY NOT FIXED: THE REGISTER ITSELF CARRIES
+FOUR INVISIBLE CONTROL BYTES.** My append guard refused three times on `0x08` and I assumed my own text; it was
+not. `JPWB-REG-005` holds **four 0x08 BACKSPACE characters**, all pre-existing, in two entries:
+
+- line 27665 — `` `<0x08>ENFORCED<0x08>`-inside-`UNENFORCED…` ``, plainly authored as `` `\bENFORCED\b` ``
+- line 27905 — `` `stakeholder|architecture element|<0x08>risk<0x08>` ``, authored as `` `\brisk\b` ``
+
+⭑ **BOTH ARE REGEX WORD-BOUNDARIES EATEN BY AN ESCAPE, WHICH IS THE EXACT TRAP THAT FIRED FOUR TIMES ON ME
+TODAY** (`REG-F-384`) — and here it has been sitting in ratified canon, unread, for weeks. The two entries
+DESCRIBE regexes; their prose now contains a character that is not the one the author typed, so a reader
+comparing the entry against the gate it documents is comparing against a corrupted quotation.
+
+⛔ **NOT REPAIRED HERE, AND THE RESTRAINT IS THE POINT.** These are in-place byte edits to COMMITTED entries of
+an append-only artifact — precisely what `REG-005`'s rule governs — and they are not this programme's defect.
+⚠ **AND THE GAP THEY REVEAL IS THE LARGER ITEM:** `verif/source-is-reviewable.test.ts` caught an identical byte
+in a `.ts` file within minutes today, because its population is AUTHORED SOURCE. **`docs/canon` is outside that
+population**, so canon — the artifact with the strongest integrity claims in this repository — has no gate
+against invisible characters at all. Owed: extend that population, or state why canon is excluded.
+
+**GATES:** no product code changed — this entry records a refutation.
+
+**Merge target:** none. ⚠ No ratified artifact was amended.
