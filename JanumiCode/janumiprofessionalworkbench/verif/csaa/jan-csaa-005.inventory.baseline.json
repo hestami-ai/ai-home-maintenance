@@ -11235,7 +11235,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "198c6901fe93ee6fcfb676d869c8ba7a614724542702889ef8d521a9e47bb299",
+    "fileManifestDigest": "5f3644e87cfc2c1f3de6fbfcba8ef1d9045f39c469120ef65bc03bf2738bf053",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11246,7 +11246,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
+          "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11284,7 +11284,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
+          "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -12080,9 +12080,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 30997,
+        "bytes": 31596,
         "path": "apps/rph-demo/src/lib/server/agent/tools.ts",
-        "sha256": "eaed9fb70e813b431175480adac9cdc6857ebffb1b38d23ca1286790de5154b4",
+        "sha256": "d6b5f77e102871fd1f7212477ccad64d9503b1725a0a47bd39d7ca532fae0a4e",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -12626,9 +12626,9 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 112996,
+        "bytes": 113507,
         "path": "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
-        "sha256": "60937eb51f29771f1389678cc48f678a724a820369c1809303d81127ee9f68fa",
+        "sha256": "03df5f80bfe7181ce7894a3a4cd67a4bb746535e3e9866cc9bb803fe6c87e0ae",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
@@ -20368,9 +20368,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 16671,
+        "bytes": 19531,
         "path": "verif/authoring-field-disposition.test.ts",
-        "sha256": "1174a4965eb0ce8b43d9900f15e00ea589da5e13416685b928d6985237e88569",
+        "sha256": "d23ebfdc8993e51a9f82b2c4f7d29e27330456f3f84eeac1637de8a3316295db",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20503,7 +20503,7 @@
         "artifactClass": "VERIFICATION",
         "bytes": 87641,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "ff574cbf6e88495e2332f36f1b6248d0e6d4226c3e9bbac666bb808dc37ade06",
+        "sha256": "e6a382fec54698652c00dc9cf404bf7b6c8b3d181603afb73ef69d315f060c57",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20906,7 +20906,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "e1ec6246f76a35b2a7f29e93f35171ae6765c3f2b7ac79a76bff37849fe9cf8a",
+    "subjectId": "9bcada073ca795ba8e1e389f557c04c3461dcf26f305f65b0f82c76281a06ba6",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -20934,7 +20934,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
+            "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -21080,7 +21080,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "ff575dea6ca04a8edba601feabe795d94ad567d483813fea83bb08c6495abeec",
+            "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -25357,7 +25357,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/authoring-field-disposition.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "1174a4965eb0ce8b43d9900f15e00ea589da5e13416685b928d6985237e88569",
+      "contentSha256": "d23ebfdc8993e51a9f82b2c4f7d29e27330456f3f84eeac1637de8a3316295db",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -25626,7 +25626,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "ff574cbf6e88495e2332f36f1b6248d0e6d4226c3e9bbac666bb808dc37ade06",
+      "contentSha256": "e6a382fec54698652c00dc9cf404bf7b6c8b3d181603afb73ef69d315f060c57",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [

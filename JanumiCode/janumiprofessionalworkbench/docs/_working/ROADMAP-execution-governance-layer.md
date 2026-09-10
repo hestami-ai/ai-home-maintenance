@@ -217,6 +217,10 @@ after the review surface.** `G-5` (does discharge enter the reasoning review's s
 
 #### `EG-07e` — the symmetry becomes checkable, with no exemption
 
+**Status:** ✅ LANDED — 2026-09-10, `REG-F-384`. Measured 17 keys / 15 both; the two asymmetric ones
+(`permittedChildren` form-only, `promptActive` agent-only) repaired in the same increment, NO exemption list.
+⭑ The mutant that justifies `!==`: a one-sided limb plus the agent-only defect goes GREEN.
+
 | Mutant | Must redden |
 |---|---|
 | add a help key one author can read and the other cannot | the symmetry limb, in EITHER direction |

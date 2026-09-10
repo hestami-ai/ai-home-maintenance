@@ -1602,6 +1602,12 @@
 									     refuses it, so this checkbox is the difference between writing and arming. -->
 									Ready to use — an unchecked prompt is saved but will not run
 								</label>
+								<!-- ⭑ JAN-EXECGOV EG-07e — the ONE help string the agent could read and the human could
+								     not. `tools.ts` has named `help.promptActive` since EG-07b; this form showed only
+								     the short label above, so the two authors of a PWU Type were told different things
+								     about the same checkbox. Rendered from the catalog, not restated, because a second
+								     wording is how the two drift apart again. -->
+								<span class="fhelp">{PWU_TYPE_HELP.promptActive}</span>
 							</div>
 							<div class="ffield">
 								{@render fhead(

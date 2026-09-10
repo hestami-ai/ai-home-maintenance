@@ -34242,3 +34242,92 @@ commit — it is where the wrong definition `REG-F-381` records was written down
 **Merge target:** Repository (`pwa-graph.ts`, `workbench.ts`, `pwa-export.test.ts`, the EG roadmap,
 `subject.test.ts`'s pin, the regenerated census and CSAA baselines).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-384 — a help string one author of a PWU Type can read and the other cannot is now a gate failure — and the one-sided version of that gate would have shipped green over the live defect
+
+- **Date:** 2026-09-10 · **Type:** FINDING (`JAN-EXECGOV` `EG-07e`) ·
+  **Class:** INSTRUMENTATION — an asymmetry the gate already computed and discarded, closed with NO exemption ·
+  **Status:** ✅ **`EG-07e` CLOSED. `EG-07f` remains.**
+
+**THE DEFECT.** A PWU Type has TWO authors: a human at the Designer form, and an agent holding a tool schema.
+`EG-06`'s gate asserted that no help string is read by NOBODY — the loud failure. It computed
+`renderedInForm(k)` and `usedByAgent(k)` and **threw the both-ness away**, so the quiet failure went unasserted:
+a field ONE author can read. That is the defect this entire `EG-07` series is about — two authors of one object
+being told different things about the same field.
+
+**MEASURED BEFORE TRUSTING THE DESIGN'S ACCOUNT OF IT.** 17 keys, **15 read by both**, and exactly two
+asymmetric — one in each direction:
+
+| key | disposition | repair |
+| --- | --- | --- |
+| `permittedChildren` | FORM only — `tools.ts` carried its own shorter sentence about cardinality | the `childCardinalities` schema now reads `help.permittedChildren`, keeping only the tool-specific half (which key entries attach to, and the M1 default) |
+| `promptActive` | AGENT only — the form showed a checkbox label, nothing more | the form renders `PWU_TYPE_HELP.promptActive` |
+
+⛔ **LANDED WITH NO EXEMPTION LIST.** Both offenders were repaired in the same increment rather than
+grandfathered. An exemption granted on a gate's first day is how a gate rots, and this repository already
+carries three by-name allowlists it may only ever shrink.
+
+⚠ **AND THE DESIGN'S ACCOUNT WAS STALE IN ONE PARTICULAR**, which is why it was measured: it said `promptActive`
+*"needs the help key it never had."* It HAS one — `EG-07b` added it. What was missing was the form RENDERING it.
+A design's statement of a defect is a claim with an expiry date; the increment that acts on it re-measures.
+
+---
+
+**⭑⭑ THE MUTANT THAT JUSTIFIES THE DESIGN, AND IT IS THE ONE PREDICTED TO SURVIVE.** A one-sided limb —
+`renderedInForm(k) && !usedByAgent(k)` — catches only the human-favouring direction. Driven together with the
+agent-only defect restored, the gate goes **GREEN**. ⛔ **The one-sided version ships green over a live defect,
+and `promptActive` had drifted in exactly that direction**, so the obvious formulation would have missed the
+real one. `!==` is load-bearing, not stylistic.
+
+**MUTANTS (5):** revert repair 1 → RED; revert repair 2 → RED; a new key given to the agent only → RED; the
+one-sided limb plus the agent-only defect → **GREEN as predicted**; the derivation's regex broken → the CONTROL
+reddens.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: THE TEMPLATE-LITERAL BACKSPACE TRAP FIRED A THIRD TIME, IN THE FILE THAT DOCUMENTS
+IT, WHILE I WAS WRITING THE TEST THAT WARNS ABOUT IT.** `` new RegExp(`\bhelp\.${k}\b`) `` — inside a TEMPLATE
+LITERAL, `\b` is a BACKSPACE CHARACTER, so the regex matches nothing, every key reads as form-only, and `both`
+collapses to zero. My first measurement of the asymmetry reported *"both: 0"* against a gate that passes
+asserting `both >= 10`; the contradiction is what exposed it. ⭑ **The positive control caught it a second time**
+— it exists precisely because the same mistake was made when this derivation was first written, and its comment
+says so.
+
+**THE GENERAL FORM:** *a probe whose result contradicts a passing gate is a broken probe until proven otherwise.*
+I nearly acted on "16 keys are form-only" — a conclusion that would have manufactured fifteen repairs nobody
+needed.
+
+**⚠ AND A SECOND CORRECTION, TO THE SHAPE RATHER THAN THE LOGIC.** The limb first lived INSIDE the NOBODY test,
+so all three reddening mutants reported the NOBODY limb's name. A failure message that points at the wrong
+defect costs more than the two file reads it saves. It is now its own named test, carrying its own positive
+control — and re-driven, each mutant names `EG-07e` itself.
+
+**SEARCHED, FOR THE ASYMMETRY CLAIM.** The derivation is `Object.keys(PWU_TYPE_HELP)` against a literal
+substring match in the markup and an identifier-boundary match in `tools.ts`; a direct
+`grep -oE "help\.[a-zA-Z]+" tools.ts | sort -u` independently returns the 16 keys the agent names, agreeing with
+the in-test derivation. POSITIVE CONTROL: 15 keys resolve on BOTH sides, so neither consumer's resolution is
+silently empty.
+
+**⚠⚠ AND THE TRAP FIRED A FOURTH TIME, PHYSICALLY, IN THE COMMENT EXPLAINING IT.** Writing the fix, my
+generator read `\b` in my PROSE as an escape and emitted a real **0x08 BACKSPACE BYTE** into the file. The line
+reads *"regex used `\b` inside a template literal — a BACKSPACE character"* and the byte between those backticks
+WAS one. ⛔ `verif/source-is-reviewable.test.ts` caught it — a gate whose whole subject is whether authored source
+is VISIBLE, written for supply-chain reasons (*"able to change what a pattern means"*) and earning its keep on an
+ordinary authoring mistake.
+
+⭑ **AND IT DEFEATED MY OWN VERIFICATION.** Printing the line to check it, the TERMINAL rendered the backspace and
+swallowed the preceding backtick, so my confirmation showed empty backticks — which I nearly read as correct.
+**A byte invisible in every view is invisible in the view you check it with.** Only a byte-level count settled it.
+
+⭑⭑ **THE TRANSFERABLE PART IS NOT ABOUT ESCAPING.** Three independent instruments each caught ONE layer and none
+could have caught another: a passing gate contradicting my probe; the positive control inside the derivation; and
+a gate asserting source holds no invisible bytes. Defence in depth is not redundancy — each instrument saw a
+different thing.
+
+**GATES (measured, then written):** `bun run gate:fast`.
+
+**Merge target:** Repository (`tools.ts`, the PWA Designer form, `authoring-field-disposition.test.ts`, the EG
+roadmap, regenerated CSAA baselines).
+⚠ No ratified artifact was amended.

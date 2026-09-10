@@ -262,4 +262,44 @@ describe('EG-06 — the PWU Type form admits what it does not enforce', () => {
 				'no reader is the shape this programme keeps recording — render it, give it to the agent, or delete it.'
 		).toEqual([]);
 	});
+
+	it('⛔⛔ EG-07e — no help string is read by ONE author and not the other', () => {
+		// Re-derived rather than shared with the limb above, so each failure names ITSELF. When both assertions
+		// lived in one `it`, every mutant reported the NOBODY test's name — a failure message that points at the
+		// wrong defect costs more than the two file reads it saves.
+		const tools = readFileSync('apps/rph-demo/src/lib/server/agent/tools.ts', 'utf8');
+		const usedByAgent = (k: string) => new RegExp(`\\bhelp\\.${k}\\b`).test(tools);
+		const renderedInForm = (k: string) => MARKUP.includes(`PWU_TYPE_HELP.${k}`);
+		const keys = Object.keys(HELP);
+
+		// ⭑ THE SAME POSITIVE CONTROL THE LIMB ABOVE CARRIES, and it is not ceremony: the first version of that
+		// regex used `\b` inside a template literal — a BACKSPACE character — and matched nothing, which would
+		// make every key look form-only and this assertion scream about all seventeen.
+		expect(
+			keys.filter((k) => renderedInForm(k) && usedByAgent(k)).length,
+			'CONTROL: neither consumer resolves, so the asymmetry below would be true of everything'
+		).toBeGreaterThanOrEqual(10);
+
+		// ⭑⭑ JAN-EXECGOV EG-07e — THE ASYMMETRY the NOBODY limb above already computed and threw away.
+		// "Read by nobody" is the loud failure; "read by ONE of the two authors" is the quiet one, and it is the
+		// defect this whole EG-07 series is about: a PWU Type has TWO authors, a human at this form and an agent
+		// holding a tool schema, and a field only one of them can read is a field they will describe differently
+		// to each other. Measured before this limb landed: 15 of 17 keys were read by both, and the two that were
+		// not are exactly the two the design named — `permittedChildren` (form only) and `promptActive` (agent
+		// only), one asymmetric in each direction.
+		//
+		// ⛔ SYMMETRIC ON PURPOSE, and `!==` is what makes it so. `renderedInForm && !usedByAgent` would catch
+		// only the human-favouring direction and go green forever on agent-only drift — which is the direction
+		// `promptActive` actually drifted, so a one-sided limb would have shipped green over a live defect.
+		//
+		// ⛔ AND IT LANDS WITH NO EXEMPTION LIST. Both offenders were repaired in the same increment rather than
+		// grandfathered: an exemption granted on a gate's first day is how a gate rots, and this repository has
+		// three by-name allowlists it can only ever shrink to prove the point.
+		expect(
+			keys.filter((k) => renderedInForm(k) !== usedByAgent(k)),
+			'one author of a PWU Type can read this help and the other cannot — the form renders it and the tool ' +
+				'schema does not, or the reverse. Give it to BOTH authors or to neither; two authors of one object ' +
+				'reading different words about the same field is the defect EG-07 exists to close.'
+		).toEqual([]);
+	});
 });

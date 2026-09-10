@@ -350,8 +350,13 @@ export function buildAuthoringTools(
 						},
 						childCardinalities: {
 							type: 'object[]',
-							description:
-								'Optional per-child cardinality for childTempKeys. Children with no entry default to M1.',
+							// ⭑ JAN-EXECGOV EG-07e — SINGLE-SOURCED FROM THE CATALOG, not restated here. This was the
+							// last help string the human could read and the agent could not: the form renders
+							// `PWU_TYPE_HELP.permittedChildren` (what a cardinality MEANS, and the two things it does
+							// NOT do), while this schema carried its own shorter sentence. Two authors of one object,
+							// reading different words about the same field. The tool-specific half — which key the
+							// entries attach to, and the default — stays, because the catalog cannot know it.
+							description: `${help.permittedChildren} In THIS tool the entries attach to childTempKeys, and a child with no entry defaults to M1.`,
 							items: {
 								tempKey: {
 									type: 'string',
