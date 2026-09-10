@@ -1352,6 +1352,12 @@
     },
     {
       "artifactClass": "TEST_SOURCE",
+      "bytes": 10052,
+      "path": "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
+      "sha256": "2334e9d1e18f7547a85dfa4851c7d0d327c1ab44488acb404e8eecc1faceca5d"
+    },
+    {
+      "artifactClass": "TEST_SOURCE",
       "bytes": 16731,
       "path": "apps/rph-demo/e2e/execution-flow.e2e.ts",
       "sha256": "f7d0b3ea1c3e165011012b97c9e7b46bcc42be6a4c23377a386b501001ddda6a"
@@ -2401,7 +2407,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
+  "inputManifestDigest": "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"

@@ -62,15 +62,15 @@
     },
     {
       "artifactClass": "TEST",
-      "discovered": 530,
+      "discovered": 531,
       "excluded": 0,
       "failed": 0,
-      "included": 530,
+      "included": 531,
       "provenance": [
         "subject.selectedFiles#artifactClass=TEST",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 530
+      "successfullyInventoried": 531
     },
     {
       "artifactClass": "VERIFICATION",
@@ -121,6 +121,7 @@
         "apps/rph-demo/e2e/baselines.e2e.ts",
         "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
         "apps/rph-demo/e2e/decisions.e2e.ts",
+        "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
         "apps/rph-demo/e2e/execution-flow.e2e.ts",
         "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
         "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -175,7 +176,7 @@
         "configurationPaths": [
           "apps/rph-demo/playwright.config.ts"
         ],
-        "discovered": 93,
+        "discovered": 94,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 53,
@@ -235,11 +236,11 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "7f03cf933ec89e601cb8ebaa2cd821f46d404f6e77f11169c8faa2e97dc1e78d",
+        "id": "ff796dda0a599bf2567b916472880b33045d2e3842abd4412958d91f2e9fa724",
         "includePatterns": [
           "apps/rph-demo/e2e/**/*.e2e.ts"
         ],
-        "included": 40,
+        "included": 41,
         "includedPaths": [
           "apps/rph-demo/e2e/agent-retention.e2e.ts",
           "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -249,6 +250,7 @@
           "apps/rph-demo/e2e/baselines.e2e.ts",
           "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
           "apps/rph-demo/e2e/decisions.e2e.ts",
+          "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
           "apps/rph-demo/e2e/execution-flow.e2e.ts",
           "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
           "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -292,17 +294,17 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "7a8daec342a34c28f233a7152e695bff87a1078fd6770c7dc5f82a029d8dc9a3",
+        "selectionDigest": "2cc535172274138e425de07c6396da4f43a24e790f309845f28bd3499a03a0c2",
         "status": "COMPLETE"
       },
       {
         "configurationPaths": [
           "apps/rph-demo/playwright.live.config.ts"
         ],
-        "discovered": 93,
+        "discovered": 94,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 91,
+        "excluded": 92,
         "excludedPaths": [
           "apps/rph-demo/e2e/agent-retention.e2e.ts",
           "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -312,6 +314,7 @@
           "apps/rph-demo/e2e/baselines.e2e.ts",
           "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
           "apps/rph-demo/e2e/decisions.e2e.ts",
+          "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
           "apps/rph-demo/e2e/execution-flow.e2e.ts",
           "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
           "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -397,7 +400,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "3910c2633eddc0ea47c1e9792681f02bfa6eeacd8d7baf06778a578370d762d4",
+        "id": "447e5417c108366edad52838b3997bd211f3b7a685a7fcf1cab7b37a291fff54",
         "includePatterns": [
           "apps/rph-demo/e2e-live/**/*.live.ts"
         ],
@@ -416,17 +419,17 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "e5b1a72190e075637f9f836b3fd11dace8427b49fa21dde2696436744aa741cb",
+        "selectionDigest": "e7402b4c6cfb02fd9f16e5f15abba7aa10198b18e9e89bc98dee13b552584c98",
         "status": "COMPLETE"
       },
       {
         "configurationPaths": [
           "apps/rph-demo/playwright.live-exec.config.ts"
         ],
-        "discovered": 94,
+        "discovered": 95,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 93,
+        "excluded": 94,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -438,6 +441,7 @@
           "apps/rph-demo/e2e/baselines.e2e.ts",
           "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
           "apps/rph-demo/e2e/decisions.e2e.ts",
+          "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
           "apps/rph-demo/e2e/execution-flow.e2e.ts",
           "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
           "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -523,7 +527,7 @@
           "apps/rph-demo/src/lib/walkthrough.test.ts"
         ],
         "failed": 0,
-        "id": "710b7d922aa2ba47bb2236e031d62438568d4db085ed7eff346423957c48b6c8",
+        "id": "81211c58ae2aaffbea66215f1a10c2efa52ad49897afd8956b8801ef9b401aa9",
         "includePatterns": [
           "apps/rph-demo/e2e-live-exec/**/*.live.ts"
         ],
@@ -541,7 +545,7 @@
         ],
         "provider": "PLAYWRIGHT",
         "reconciles": true,
-        "selectionDigest": "aee972ca13870ecb6fadf81a93459fbd618acad90831905917e6fade754d2962",
+        "selectionDigest": "935589a1ecacd992a5fa6f935c93be2da3e6629024faaf69f1eef7fa04f292b4",
         "status": "COMPLETE"
       },
       {
@@ -549,10 +553,10 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 592,
+        "discovered": 593,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 51,
+        "excluded": 52,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -564,6 +568,7 @@
           "apps/rph-demo/e2e/baselines.e2e.ts",
           "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
           "apps/rph-demo/e2e/decisions.e2e.ts",
+          "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
           "apps/rph-demo/e2e/execution-flow.e2e.ts",
           "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
           "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -607,7 +612,7 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "3440d850deb33a8f18a90880ac27bd5f9abf359f5d4cb72b5fddca1889e44cca",
+        "id": "814febdc82a5bb9f275fac49f43a552ecba01dc7655c564a901d83f0d618100e",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
@@ -1167,7 +1172,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "3b5cae15809ebb829d58a7e04a37cf1607012d701b4630240c2a7fc0653f8607",
+        "selectionDigest": "1161cc6f13939186acda579fe46388a34e57685f8853e470602395cfc0941a1f",
         "status": "COMPLETE"
       },
       {
@@ -1175,10 +1180,10 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 592,
+        "discovered": 593,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
-        "excluded": 51,
+        "excluded": 52,
         "excludedPaths": [
           "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
           "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -1190,6 +1195,7 @@
           "apps/rph-demo/e2e/baselines.e2e.ts",
           "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
           "apps/rph-demo/e2e/decisions.e2e.ts",
+          "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
           "apps/rph-demo/e2e/execution-flow.e2e.ts",
           "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
           "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -1233,7 +1239,7 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "f067fb2678aead9c8cce6bce1af7207f3f10f84e2ede6bfd841b931dc6293396",
+        "id": "958654762866a5ba18328380b2851e33b982ce785d67032d8e796479b677d094",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
@@ -1793,7 +1799,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "7a6e83bdc19a21251822e9ef831b71cdff67f023436b152092de9b5e868fcc7b",
+        "selectionDigest": "e29e7446560ddb719536ea4fb5ef3828b1968224a96844c06441d1f1204e522c",
         "status": "COMPLETE"
       }
     ],
@@ -5619,7 +5625,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "eea093f48a7d6fe940811aa08f0a06d51bb9d4c7bfd82e284f99bbf0607d9c6c",
+    "configurationDigest": "706fcd31a920eff2af5423f3b790dc04a1883280ed406258f90c79efb41dae51",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -6136,7 +6142,7 @@
           "configPath": "apps/rph-demo/e2e/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "64be7bad1ffa3ca1035444bd83806a35925f050a6693ad372abb1373a6a1466d",
+          "projectResolutionDigest": "aac30fe45db5d6e7aabd7401190deacd4518d7e204d4c5fe692505f05d07b4bf",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -6153,6 +6159,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -8898,7 +8905,7 @@
           "configurationPaths": [
             "apps/rph-demo/playwright.config.ts"
           ],
-          "discovered": 93,
+          "discovered": 94,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 53,
@@ -8958,11 +8965,11 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "7f03cf933ec89e601cb8ebaa2cd821f46d404f6e77f11169c8faa2e97dc1e78d",
+          "id": "ff796dda0a599bf2567b916472880b33045d2e3842abd4412958d91f2e9fa724",
           "includePatterns": [
             "apps/rph-demo/e2e/**/*.e2e.ts"
           ],
-          "included": 40,
+          "included": 41,
           "includedPaths": [
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -8972,6 +8979,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -9015,17 +9023,17 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "7a8daec342a34c28f233a7152e695bff87a1078fd6770c7dc5f82a029d8dc9a3",
+          "selectionDigest": "2cc535172274138e425de07c6396da4f43a24e790f309845f28bd3499a03a0c2",
           "status": "COMPLETE"
         },
         {
           "configurationPaths": [
             "apps/rph-demo/playwright.live.config.ts"
           ],
-          "discovered": 93,
+          "discovered": 94,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 91,
+          "excluded": 92,
           "excludedPaths": [
             "apps/rph-demo/e2e/agent-retention.e2e.ts",
             "apps/rph-demo/e2e/agent-sse.e2e.ts",
@@ -9035,6 +9043,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -9120,7 +9129,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "3910c2633eddc0ea47c1e9792681f02bfa6eeacd8d7baf06778a578370d762d4",
+          "id": "447e5417c108366edad52838b3997bd211f3b7a685a7fcf1cab7b37a291fff54",
           "includePatterns": [
             "apps/rph-demo/e2e-live/**/*.live.ts"
           ],
@@ -9139,17 +9148,17 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "e5b1a72190e075637f9f836b3fd11dace8427b49fa21dde2696436744aa741cb",
+          "selectionDigest": "e7402b4c6cfb02fd9f16e5f15abba7aa10198b18e9e89bc98dee13b552584c98",
           "status": "COMPLETE"
         },
         {
           "configurationPaths": [
             "apps/rph-demo/playwright.live-exec.config.ts"
           ],
-          "discovered": 94,
+          "discovered": 95,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 93,
+          "excluded": 94,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9161,6 +9170,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -9246,7 +9256,7 @@
             "apps/rph-demo/src/lib/walkthrough.test.ts"
           ],
           "failed": 0,
-          "id": "710b7d922aa2ba47bb2236e031d62438568d4db085ed7eff346423957c48b6c8",
+          "id": "81211c58ae2aaffbea66215f1a10c2efa52ad49897afd8956b8801ef9b401aa9",
           "includePatterns": [
             "apps/rph-demo/e2e-live-exec/**/*.live.ts"
           ],
@@ -9264,7 +9274,7 @@
           ],
           "provider": "PLAYWRIGHT",
           "reconciles": true,
-          "selectionDigest": "aee972ca13870ecb6fadf81a93459fbd618acad90831905917e6fade754d2962",
+          "selectionDigest": "935589a1ecacd992a5fa6f935c93be2da3e6629024faaf69f1eef7fa04f292b4",
           "status": "COMPLETE"
         },
         {
@@ -9272,10 +9282,10 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 592,
+          "discovered": 593,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 51,
+          "excluded": 52,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9287,6 +9297,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -9330,7 +9341,7 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "3440d850deb33a8f18a90880ac27bd5f9abf359f5d4cb72b5fddca1889e44cca",
+          "id": "814febdc82a5bb9f275fac49f43a552ecba01dc7655c564a901d83f0d618100e",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
@@ -9890,7 +9901,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "3b5cae15809ebb829d58a7e04a37cf1607012d701b4630240c2a7fc0653f8607",
+          "selectionDigest": "1161cc6f13939186acda579fe46388a34e57685f8853e470602395cfc0941a1f",
           "status": "COMPLETE"
         },
         {
@@ -9898,10 +9909,10 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 592,
+          "discovered": 593,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
-          "excluded": 51,
+          "excluded": 52,
           "excludedPaths": [
             "apps/rph-demo/e2e-live/ashrae-datacenter-pwa.live.ts",
             "apps/rph-demo/e2e-live/sdlc-pwa.live.ts",
@@ -9913,6 +9924,7 @@
             "apps/rph-demo/e2e/baselines.e2e.ts",
             "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
             "apps/rph-demo/e2e/decisions.e2e.ts",
+            "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
             "apps/rph-demo/e2e/execution-flow.e2e.ts",
             "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
             "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -9956,7 +9968,7 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "f067fb2678aead9c8cce6bce1af7207f3f10f84e2ede6bfd841b931dc6293396",
+          "id": "958654762866a5ba18328380b2851e33b982ce785d67032d8e796479b677d094",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
@@ -10516,7 +10528,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "7a6e83bdc19a21251822e9ef831b71cdff67f023436b152092de9b5e868fcc7b",
+          "selectionDigest": "e29e7446560ddb719536ea4fb5ef3828b1968224a96844c06441d1f1204e522c",
           "status": "COMPLETE"
         }
       ],
@@ -11235,7 +11247,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "5f3644e87cfc2c1f3de6fbfcba8ef1d9045f39c469120ef65bc03bf2738bf053",
+    "fileManifestDigest": "f35d0e86bd3e993cafcd7af6212a4883b27b8c4fedbfa5c2c79da5738756925a",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11246,7 +11258,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
+          "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11284,7 +11296,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
+          "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11341,7 +11353,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1366,
+    "selectedFileCount": 1367,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -11572,6 +11584,13 @@
         "bytes": 10089,
         "path": "apps/rph-demo/e2e/decisions.e2e.ts",
         "sha256": "97abd78b8fbb8eade88606cf26209ad27239a000b50b51e6e133e157a103bb54",
+        "subjectArtifactClass": "TEST_SOURCE"
+      },
+      {
+        "artifactClass": "TEST",
+        "bytes": 10052,
+        "path": "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
+        "sha256": "2334e9d1e18f7547a85dfa4851c7d0d327c1ab44488acb404e8eecc1faceca5d",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -20501,9 +20520,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 87641,
+        "bytes": 87872,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "e6a382fec54698652c00dc9cf404bf7b6c8b3d181603afb73ef69d315f060c57",
+        "sha256": "0663ab1169a5292bea628b9791edda770f7d0bcebad4eaf431c95c3b2cd0e54c",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20906,12 +20925,12 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "9bcada073ca795ba8e1e389f557c04c3461dcf26f305f65b0f82c76281a06ba6",
+    "subjectId": "50299d0d906975fc98f8e70a7c2029dba2a0704255fcc8da85591a867d90d603",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
     {
-      "candidateArtifactCount": 50,
+      "candidateArtifactCount": 51,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -20934,7 +20953,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
+            "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -20994,6 +21013,7 @@
         "apps/rph-demo/e2e/baselines.e2e.ts",
         "apps/rph-demo/e2e/cardinality-rail.e2e.ts",
         "apps/rph-demo/e2e/decisions.e2e.ts",
+        "apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts",
         "apps/rph-demo/e2e/execution-flow.e2e.ts",
         "apps/rph-demo/e2e/execution-model-invocation.e2e.ts",
         "apps/rph-demo/e2e/execution-plan.e2e.ts",
@@ -21080,7 +21100,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "d3c466602f678e567070f3ab1561da8d424c776f43780e2dc99d35838e051736",
+            "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -25626,7 +25646,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "e6a382fec54698652c00dc9cf404bf7b6c8b3d181603afb73ef69d315f060c57",
+      "contentSha256": "0663ab1169a5292bea628b9791edda770f7d0bcebad4eaf431c95c3b2cd0e54c",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [

@@ -34331,3 +34331,81 @@ different thing.
 **Merge target:** Repository (`tools.ts`, the PWA Designer form, `authoring-field-disposition.test.ts`, the EG
 roadmap, regenerated CSAA baselines).
 ⚠ No ratified artifact was amended.
+
+---
+
+### REG-F-385 — `STA-8` closes for the AGENT path, and the two mutants that did NOT redden were both mine being wrong rather than the gate being weak
+
+- **Date:** 2026-09-10 · **Type:** FINDING (`JAN-EXECGOV` `EG-07f`, closing the programme) ·
+  **Class:** REMEDIATION — an invariant proved on the second of two authoring paths ·
+  **Status:** ✅ **`EG-07f` CLOSED. `JAN-EXECGOV` COMPLETE (`EG-01`…`EG-07f`).**
+
+**WHAT WAS OPEN.** `EG-02`/`EG-03` proved `STA-8` — *"Execution requires an approved plan and AUTHORIZED Runtime
+Bindings"* — on a real execution. But that type was authored BY A HUMAN, at the form. `REG-F-371` recorded the
+boundary AFTER the fact: **those increments closed `STA-8` for the HUMAN path only, and the limit was not stated
+when they landed.** A PWU Type has two authors; the agent's half carried none of the discharge fields, so
+`workDischarge: 'MODEL'` was reachable only by a person and an agent-authored type produced a step taking
+`bindingAuthorityVerdict`'s `OUT_OF_SCOPE` limb — `REG-F-365`'s measured breach, reached by a different road.
+
+**WHAT LANDED.** `apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts`. It drives the DETERMINISTIC MOCK
+AGENT with a JSON plan — the same road a real model takes, with the model's non-determinism removed — to author
+a type carrying `workDischarge: 'MODEL'`, a prompt and `promptActive: true`; then publishes, instantiates,
+executes, and asserts against ENGINE STATE that a `RUNTIME_BINDING` exists and is `AUTHORIZED`.
+
+⭑ **IT NEVER TOUCHES THE PWU TYPE FORM**, which is the whole point: if the fields were still human-only, the
+spec could not express its own setup.
+
+**TWO CONTROLS, EACH DOING DIFFERENT WORK.** An AUTHORING control immediately after the agent's write asserts
+the discharge survived into canonical state — so a dropped field fails as an AUTHORING failure instead of
+surfacing three layers later as a binding one, sending the next reader to the wrong layer. And a NEGATIVE
+control: an agent-authored type declaring NO discharge must mint NO binding, so the positive case means
+*"because the agent declared MODEL"* rather than *"because a step ran"*.
+
+---
+
+**⚠⚠ THE PART WORTH KEEPING: TWO OF THREE MUTANTS DID NOT REDDEN, AND NEITHER WAS A HOLE.**
+
+| mutant | result | its actual killer |
+| --- | --- | --- |
+| `MA` — the agent's write drops `workDischarge` (`dischargeInput`) | ✅ RED in the e2e | this spec |
+| `MB` — remove the field from `DefineTypeInput` | INERT | ⛔ nothing — the mutant was wrong twice over |
+| `MC` — drop the `workDischarge` conjunct in `stepBindingFor` | survives the e2e | ✅ `step-binding.test.ts` |
+
+⛔ **`MB` WAS MIS-AIMED TWICE.** Removing a field from a TypeScript INTERFACE has **no runtime effect**, so no
+e2e can ever observe it — and there are FOUR identical `workDischarge?:` declarations in `broker.ts`, so I
+removed an arbitrary one that is not on the agent's path. Driven: the e2e passes AND `check-types` passes. `MA`
+is the roadmap's mutant (*"revert `DefineTypeInput` to its 12 fields"*) expressed at the point where it bites.
+
+⭑⭑ **`MC` IS THE INSTRUCTIVE ONE, AND IT IS CORRECT LAYERING RATHER THAN A GAP.** `stepBindingFor` requires
+`stepType === 'MODEL_INVOCATION' && workDischarge === 'MODEL'` and its comment says *"BOTH CONDITIONS, NOT
+EITHER"*. But the call site passes
+`stepBindingFor(isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION', pwuType?.workDischarge, …)` and
+`isModelStep` IS `workDischarge === 'MODEL'` — **both arguments are derived from ONE fact, so they cannot
+disagree in production.** The second conjunct is defensive against a caller that does not exist; no end-to-end
+path can falsify it. Driven: the unit test kills it directly, reddening *"⚠ BOTH conditions are required — a
+MODEL_INVOCATION on a non-MODEL type is not bound"*.
+
+**THE GENERAL FORM:** *a surviving mutant is a question about WHICH instrument owns the guarantee before it is a
+claim that none does.* Two of three survivals here were my aim, not the suite's coverage — and the register has
+recorded the opposite mistake (declaring a hole that was covered elsewhere) often enough that the reflex to file
+first needed resisting.
+
+---
+
+**⚠ AND A PROCESS ERROR OF MINE, TWICE, IN THE SAME SHAPE.** Driving mutants by hand I ran `cd apps/rph-demo`
+and then restored via a REPO-RELATIVE path, so `cp` failed and the mutated source stayed on disk — once for
+`step-binding.ts`, once for `tools.ts`. Both were caught by CHECKING `git status`, not by anything failing.
+⛔ **A harness that mutates source must VERIFY its restore, not assume it** — the same lesson as `finally` not
+surviving a kill, arriving by a different route on the same day.
+
+**⭑ AND THE CENSUS MOVED A FOURTH TIME FOR THE FILED REASON.** Adding this one e2e file changed
+`docs/tracking/census/w3-verdicts.ndjson` again — *"or 526 test sources"* → *"527"* — with **every verdict
+unchanged**. That is `REG-F-383`'s filed defect observed a fourth time in one session: an artifact that quotes a
+running total in its evidence prose is rewritten by changes it is not about.
+
+**GATES (measured, then written):** `bun run gate:fast` — the only failure is `REG-F-382`, which predates this
+session and must not be re-pinned. verif 62 files, 469 passed. The new spec: 2 passed.
+
+**Merge target:** Repository (`execution-agent-authored-binding.e2e.ts`, the EG roadmap, regenerated census and
+CSAA baselines).
+⚠ No ratified artifact was amended.

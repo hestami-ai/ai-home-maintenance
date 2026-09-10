@@ -228,6 +228,13 @@ after the review surface.** `G-5` (does discharge enter the reasoning review's s
 
 #### `EG-07f` — `STA-8` closes for the AGENT path, proved end to end
 
+**Status:** ✅ LANDED — 2026-09-10, `REG-F-385`. `execution-agent-authored-binding.e2e.ts`, driving the
+deterministic mock agent and never touching the form. ⭑ Two of three mutants survived and NEITHER was a hole:
+`DefineTypeInput` is a TS interface (no runtime effect), and `stepBindingFor`'s second conjunct is unreachable
+from production because the call site derives both arguments from one fact — its killer is the unit test.
+
+**⭑⭑ `JAN-EXECGOV` IS COMPLETE — `EG-01` through `EG-07f`.**
+
 ⭑ `REG-F-371` recorded that `EG-02`/`EG-03` closed `STA-8` for the HUMAN path only. This is the other half.
 
 | Mutant | Must redden |
