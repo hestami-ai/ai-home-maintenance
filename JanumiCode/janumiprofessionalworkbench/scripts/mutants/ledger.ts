@@ -3529,5 +3529,70 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/pwu-recomposition.test.ts'],
 		why: "THE OMISSION THIS FILE RECORDS SHIPPING THREE TIMES — W-1 latent, W-4.5 found by accident, W-5 shipped DEAD with 1203 tests green. Without these labels both events fall to `default: return axes` and a replay carries the OLD workLifecycleState forward, diverging the rebuild from the object. ⚠ THE SEED CANNOT CATCH THIS: the §26 reference undertaking never occupies RECOMPOSING or RECOMPOSED, which is exactly why `pwu-fold-drive-sites.test.ts` demands a NAMED drive site and why the victim below is a test that calls `expectPwuReplayEquivalence` after EACH hop rather than only at the end.",
 		source: 'REG-F-084 / JAN-PWUWP B-4'
+	},
+	// ── JAN-CSAAEXT S3 — THE SALVAGED GUARDS EARN THEIR OWN MUTANTS ─────────────────────────────────────────────
+	//
+	// S1 and S2 reproduced, as JPWB-owned code, two guarantees `csaa:inventory:check` and
+	// `scripts/csaa-product-boundary.ts` hold over JPWB today. ⛔ THE DISCRIMINATION PROOF DOES NOT TRAVEL WITH
+	// THEM: the incumbent's red-proving corpus is ~1,813 lines written against the ENGINE entry point and leaves
+	// with the engine at S6. A guard whose mutants no longer redden is not the same guarantee, so the
+	// replacements earn their own here rather than inheriting the incumbent's reputation.
+	//
+	// ⚠ MUTATING TEST FILES IS DELIBERATE AND HAS PRECEDENT IN THIS LEDGER — see
+	// `F096-control-asks-for-the-production-shape`, whose `why` records the reason exactly: *"the guarantee under
+	// test is the probe can see the other outcome, and that guarantee lives in the probe."* These guards assert
+	// over the repository's OWN STRUCTURE — a file population, a manifest — so there is no production module to
+	// mutate. The reader and the predicate ARE the guard.
+	//
+	// ⛔ ONE ARM IS NOT PROVEN HERE AND SAYING SO IS THE POINT. `targetsCsaa`'s RELATIVE-PATH arm cannot be
+	// killed by any mutant against the live tree, because nothing in the tree violates it — that is the guarantee
+	// holding. It was proven instead by a probe at `apps/rph-demo/src/lib/__boundary-probe.ts`, driven by hand,
+	// recorded in the S2 commit, and never committed. Declaring a mutant for it would produce a SURVIVED verdict
+	// that looks like a defect and is not; declaring it `expectSurvive` would be worse, because that field means
+	// "behaviour cannot depend on this" and behaviour very much does.
+	{
+		id: 'CSAAEXT-S1-floor-reader-blinded',
+		file: 'verif/assurance-surface.test.ts',
+		find: "entry.isFile() && entry.name.endsWith('.test.ts')",
+		replace: "entry.isFile() && entry.name.endsWith('.spec.ts')",
+		expectRed: ['verif/assurance-surface.test.ts'],
+		why: "THE FLOOR'S READER IS WHAT MAKES IT A MEASUREMENT RATHER THAN A CONSTANT. This repository uses `.test.ts` throughout, so blinding the suffix returns ZERO files and the floor must redden — proving the check counts the live population rather than asserting a number against itself. ⚠ NOTE WHICH DIRECTION IS TESTABLE: lowering `VERIF_TEST_FLOOR` silently WEAKENS the guard and reddens nothing, which is a property of every floor and is disclosed in that constant's own comment. A mutant can prove the reader is live; only a reader can prove the floor is current.",
+		source: 'JAN-CSAAEXT S1; REG-D-061 D-2'
+	},
+	{
+		id: 'CSAAEXT-S1-command-predicate-inverted',
+		file: 'verif/assurance-surface.test.ts',
+		find: "typeof scripts[name] !== 'string'",
+		replace: "typeof scripts[name] === 'string'",
+		expectRed: ['verif/assurance-surface.test.ts'],
+		why: 'Inverting the presence predicate reports all seven root commands as missing. Proves the check EVALUATES each name against the parsed manifest rather than returning an empty list by construction — the distinction between a guard that passed and a guard that never ran.',
+		source: 'JAN-CSAAEXT S1; salvaged from assertJpwbRequiredRootCommands'
+	},
+	{
+		id: 'CSAAEXT-S1-required-list-emptied',
+		file: 'verif/assurance-surface.test.ts',
+		find: "] as const;\n\n/** Counted from DISK",
+		replace: "].slice(0, 0) as unknown as readonly string[];\n\n/** Counted from DISK",
+		expectRed: ['verif/assurance-surface.test.ts'],
+		why: "THE HOLE THIS MUTANT WAS WRITTEN TO EXPOSE WAS REAL, AND DECLARING IT IS WHAT FOUND IT. Before S3 the command check computed `missing` and asserted it empty — which is satisfied BOTH when every command is present AND when the required list is empty. A satisfied guard and an absent one were the same observation. The length pin added in the same increment closes it, and this mutant is its proof: emptying the list reddens the PIN while leaving the presence check green. ⭑ The two limbs are independent in both directions — removing a command from `package.json` reddens the presence check and leaves the pin green.",
+		source: 'JAN-CSAAEXT S3; feedback: a control that cannot fail'
+	},
+	{
+		id: 'CSAAEXT-S2-specifier-arm-deleted',
+		file: 'verif/product-boundary.test.ts',
+		find: "\tif (specifier === '@janumipwb/csaa' || specifier.startsWith('@janumipwb/csaa/')) return true;\n",
+		replace: '',
+		expectRed: ['verif/product-boundary.test.ts'],
+		why: "THE ARM THAT OUTLIVES THE MOVE, AND THE ONLY ONE THAT CAN BE KILLED TODAY. `targetsCsaa` has two arms: the npm specifier (`@janumipwb/csaa`) and a relative path resolving inside `packages/csaa`. At S6 the directory leaves and the PATH arm goes permanently dead, making this arm the whole guard. Nothing in the live tree imports CSAA by package name, so this arm could break in total silence — and the third test in that file exists precisely to notice. ⭑ OBSERVED BY HAND BEFORE DECLARING: reddens the third test ALONE, `1 failed | 2 passed`, with the boundary check and the inspected-floor both green. A control that only reddens alongside its subject proves nothing about the subject; this one reddens while its subject stays green.",
+		source: 'JAN-CSAAEXT S2; REG-F-389'
+	},
+	{
+		id: 'CSAAEXT-S2-walk-blinded',
+		file: 'verif/product-boundary.test.ts',
+		find: 'const SOURCE = /\\.[cm]?[jt]sx?$|\\.svelte$/;',
+		replace: 'const SOURCE = /\\.never-matches-any-real-source-file$/;',
+		expectRed: ['verif/product-boundary.test.ts'],
+		why: "A WALK THAT INSPECTS NOTHING FINDS NO VIOLATIONS, AND THAT IS THE FAILURE THIS PERIMETER WAS BUILT AGAINST. `REG-F-389` is exactly this shape one level up: `depcruise packages` reported no violations because it never scanned `apps/`, and the absence of a violation and the absence of a scan were the same observation. Blinding the source pattern drops the inspected count from 548 to 0, which must redden the INSPECTED_FLOOR while the boundary check stays green — because with no files walked there is genuinely nothing to violate. ⭑ That asymmetry is the proof: the floor is the only limb that can tell an empty perimeter from a clean one.",
+		source: 'JAN-CSAAEXT S2; REG-F-389'
 	}
 ];

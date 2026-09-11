@@ -11259,7 +11259,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "b0d2d6f53da46ad5c1d02353d4591c6084179e5ea1e1480ad62bd6445e4bda3c",
+    "fileManifestDigest": "17c639a18ea3b6cad273e4075099c17519f4c6d2f146ac956a82d01ce92c25ff",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -20203,9 +20203,9 @@
       },
       {
         "artifactClass": "SCRIPT",
-        "bytes": 303182,
+        "bytes": 309449,
         "path": "scripts/mutants/ledger.ts",
-        "sha256": "cd68b8372b42c37fc4662ec05ecc8db4bdd2a30040b98c07afe379880c283786",
+        "sha256": "f4ee9ebdf692e852c371a32201918a32ed2cceab46870a69de2ef264464871ad",
         "subjectArtifactClass": "SCRIPT"
       },
       {
@@ -20399,9 +20399,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 10260,
+        "bytes": 11250,
         "path": "verif/assurance-surface.test.ts",
-        "sha256": "16ce3c2c41d4c8cd392d48a689b504fac74993281feaf93306da9626d834f878",
+        "sha256": "84e3908d8f25a18b8281669fbb554f21c81159db00e6bc9fee3a941cef79d155",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20951,7 +20951,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "8e47f05bdd2c6fb2974767d26d03c0b02413d1d8829f68da8af2257e39883a65",
+    "subjectId": "8aa5d271e5322fff0314006277944fb8232e6711440af49e7539bf3e6f75760b",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -25018,7 +25018,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by scripts/mutants/ledger.ts at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "cd68b8372b42c37fc4662ec05ecc8db4bdd2a30040b98c07afe379880c283786",
+      "contentSha256": "f4ee9ebdf692e852c371a32201918a32ed2cceab46870a69de2ef264464871ad",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
@@ -25410,7 +25410,7 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "16ce3c2c41d4c8cd392d48a689b504fac74993281feaf93306da9626d834f878",
+      "contentSha256": "84e3908d8f25a18b8281669fbb554f21c81159db00e6bc9fee3a941cef79d155",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

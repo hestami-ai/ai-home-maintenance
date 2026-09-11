@@ -114,7 +114,12 @@ control is independent rather than a restatement of the check above it.
 
 ### S3 · Mutants for everything S1 and S2 created
 
-**PRE:** S1, S2.
+**PRE:** S1, S2. ⚠ **AND THE WORK MUST BE STAGED — an unstated precondition this step discovered by hitting it.**
+`bun run mutants` refuses a dirty tree outright: `ABORT: tracked worktree does not match a stable staged index
+baseline — refusing to mutate.` ⭑ The harness is right and the reason is worth carrying: a mutation run against
+an unstaged worktree attributes the tree's own drift to the mutation, which is verdicts dressed as evidence.
+`git add` is enough; a commit is not required. ⛔ So mutants CANNOT be driven before the work is at least staged,
+which inverts the usual "prove it before you stage it" habit and is why it is written here.
 
 **WHAT:** entries in `scripts/mutants/ledger.ts` for each salvaged limb, each naming its `expectRed` victim.
 
@@ -122,7 +127,21 @@ control is independent rather than a restatement of the check above it.
 corpus is written against the engine entry point and leaves with it. ⭑ *A guard whose mutants no longer redden
 is not the same guarantee.*
 
-**VERIFIER:** `bun run mutants` kills every new mutant and each kill NAMES its intended victim.
+⚠ **AND DECLARING THEM IS A CHECK ON THE GUARDS, NOT A FORMALITY — IT FOUND A HOLE IN S1.** The command check
+computed `missing` and asserted it empty, which is satisfied BOTH when every command is present AND when
+`REQUIRED_ROOT_COMMANDS` is empty: a satisfied guard and an absent one were the same observation. Closed with a
+length pin whose mutant (`CSAAEXT-S1-required-list-emptied`) proves the two limbs independent in both directions.
+⭐ **Writing down what would falsify a guard is what exposed that one limb could not be falsified at all.**
+
+⛔ **ONE ARM IS DELIBERATELY NOT DECLARED, AND THE ABSENCE IS RECORDED IN THE LEDGER ITSELF.**
+`targetsCsaa`'s RELATIVE-PATH arm cannot be killed by any mutant against the live tree, because nothing in the
+tree violates it — that is the guarantee holding, not a gap. A mutant would report SURVIVED and read as a defect;
+`expectSurvive` would be worse, since that field means *behaviour cannot depend on this* and behaviour does. It
+is proven instead by the hand-driven probe recorded in S2.
+
+**VERIFIER — observed:** `bun run mutants <the five ids>` →
+`KILLED 5 · SURVIVED 0 · UNANCHORED 0 · NO_COMPILE 0 · KILLED_UNNAMED 0 · INCONCLUSIVE 0`, each with
+`Failed Tests 1`. ⚠ `KILLED_UNNAMED` is not a kill, which is why it is quoted rather than summarised away.
 ⚠ `KILLED_UNNAMED` is not a kill.
 
 ---

@@ -136,4 +136,16 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// Named rather than counted: the point of the check is to say WHICH command left.
 		expect(missing).toEqual([]);
 	});
+
+	it('the required-command list is not empty, or the check above passes on nothing', () => {
+		// ⛔ THIS CLOSES A HOLE THE CHECK ABOVE CANNOT SEE, FOUND WHILE DECLARING ITS MUTANTS (S3). `missing` is
+		// `[]` both when every command is present AND when `REQUIRED_ROOT_COMMANDS` is empty — a satisfied guard
+		// and an absent one are the same observation, which is this repository's most-recorded defect shape.
+		// ⭑ AND IT IS INDEPENDENT, NOT A RESTATEMENT: emptying the list reddens THIS and leaves the check above
+		// green, while removing a command from `package.json` reddens the check above and leaves this green.
+		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
+		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
+		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(7);
+	});
 });
