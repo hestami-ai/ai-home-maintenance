@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+// `readFileSync` left with the two manifest assertions moved to JPWB in JAN-CSAAEXT S4 — see the note below.
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,17 +22,22 @@ afterEach(() => {
 });
 
 describe('CSAA product dependency boundary', () => {
-	it('wires both package and app subjects into the executing boundary command', () => {
-		const rootManifest = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as {
-			scripts: Record<string, string>;
-		};
-		expect(rootManifest.scripts.boundary).toMatch(
-			/^depcruise packages --config .* && bun run scripts\/csaa-product-boundary\.ts$/
-		);
-		expect(rootManifest.scripts['gate:fast']).toMatch(
-			/^bun run csaa:generated-context:check && bun run csaa:inventory:check && /
-		);
-	});
+	// ⛔ THE TWO WIRING ASSERTIONS THAT STOOD HERE HAVE MOVED TO JPWB — JAN-CSAAEXT S4, 2026-09-11. They read:
+	//     scripts.boundary      -> /^depcruise packages --config .* && bun run scripts\/csaa-product-boundary\.ts$/
+	//     scripts['gate:fast']  -> /^bun run csaa:generated-context:check && bun run csaa:inventory:check && /
+	// ⚠ MOVED, NOT DROPPED, AND BOTH REPLACEMENTS WERE GREEN BEFORE THESE WERE REMOVED — the programme's Rule 1,
+	// SALVAGE BEFORE DECOUPLE. Their subject was JPWB's `package.json`, never CSAA's behaviour, and under
+	// REG-D-061 `D-1` JPWB's gate no longer invokes CSAA, so both facts are false BY DESIGN.
+	//   · the `boundary` shape  -> `verif/assurance-surface.test.ts` pins its EXACT value, and
+	//     `verif/dependency-boundary-rules.test.ts:181-188` (JAN-CSAADEC `CD-01`) already pinned its prefix.
+	//     ⚠ Note what that prefix pin could NOT see: it stayed green straight through the detachment, because a
+	//     prefix match cannot notice a removed tail. The exact-value pin is what now owns the absence.
+	//   · the `gate:fast` order -> `verif/assurance-surface.test.ts` pins the FULL ordered step list AND asserts
+	//     no `csaa:` step appears anywhere in it. Strictly stronger: this one said CSAA came FIRST, the
+	//     replacement says CSAA is ABSENT, so a re-added step reddens.
+	// ⭑ `CD-02` deliberately declined to reproduce the `gate:fast` pin in JPWB because `CD-05` was going to make
+	// it false. `CD-05` was withdrawn and `D-1` changed the composition instead, so the reason for that gap
+	// expired and the pin was authored against the post-detachment shape rather than copied.
 
 	it('rejects representative package and app imports of CSAA', () => {
 		const config = require(`${ROOT}.dependency-cruiser.cjs`) as {

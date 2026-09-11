@@ -2830,14 +2830,21 @@ function assertJpwbGeneratedContext(
 		'csaa:generated-context:check',
 		'bun run scripts/csaa-generated-context.ts --check'
 	);
-	const gateFast = configuredCommands.find(
-		(command) => command.owner === '.' && command.name === 'gate:fast'
-	)?.command;
-	if (
-		gateFast === undefined ||
-		!gateFast.startsWith('bun run csaa:generated-context:check && bun run csaa:inventory:check && ')
-	)
-		throw new Error('Required JPWB generated-context and inventory gate order is incompatible.');
+	// ⛔ THE GATE-ORDER ASSERTION THAT STOOD HERE HAS MOVED TO JPWB — JAN-CSAAEXT S4, 2026-09-11. It read:
+	//     `!gateFast.startsWith('bun run csaa:generated-context:check && bun run csaa:inventory:check && ')`
+	//         -> 'Required JPWB generated-context and inventory gate order is incompatible.'
+	// ⚠ IT IS MOVED, NOT WEAKENED, AND THE DISTINCTION IS THE WHOLE OF THIS NOTE. Its subject was never CSAA: it
+	// asserted a fact about JPWB's `package.json`. Under the sponsor's ruling that CSAA is not part of JPWB
+	// (REG-D-061 D-1) the three `csaa:*` steps left `gate:fast` deliberately, so the fact it asserted is now
+	// false BY DESIGN — and an assertion kept against a deliberately-changed subject is a fixture that no longer
+	// resembles what it measures.
+	// ⭑ ITS REPLACEMENT IS STRICTLY STRONGER, WHICH IS WHY THE MOVE IS NOT A LOSS.
+	// `verif/assurance-surface.test.ts` now pins the FULL ordered step list of `gate:fast` and asserts no `csaa:`
+	// step appears anywhere in it. This one could only say CSAA came FIRST; the replacement says CSAA is ABSENT,
+	// so a re-added step reddens — a direction the incumbent could not express at all.
+	// ⚠ `CD-02` declined to reproduce this pin in JPWB because `CD-05` was going to invalidate it
+	// (`verif/dependency-boundary-rules.test.ts:177-180`). `CD-05` was withdrawn; `D-1` changed the composition
+	// instead. The reason for the gap expired, and the pin was authored against the post-detachment shape.
 }
 
 function assertJpwbNonVacuity(

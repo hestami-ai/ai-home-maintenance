@@ -148,4 +148,42 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
 		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(7);
 	});
+
+	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
+	// `packages/csaa/src/inventory/boundary-policy.test.ts:31-33` pinned `gate:fast` as OPENING with two CSAA
+	// steps. ⚠ `JAN-CSAADEC` `CD-02` deliberately declined to reproduce it, recording why in
+	// `verif/dependency-boundary-rules.test.ts:177-180`: *"`CD-05` makes that assertion false by design, and
+	// copying it here would be authoring a gate against the increment it belongs to."* `CD-05` was withdrawn and
+	// `JAN-CSAAEXT` `D-1` changes the composition instead — so the reason for the gap has expired, and the pin is
+	// authored here against the POST-DETACHMENT shape rather than salvaged verbatim.
+	//
+	// ⭑ IT PINS THE DETACHMENT ITSELF, WHICH THE INCUMBENT COULD NOT. CSAA asserted that its own steps came
+	// FIRST; this asserts they are ABSENT. A re-added `csaa:*` step reddens here — so the coupling this programme
+	// removed cannot return unnoticed, which is the guarantee `D-1` actually bought.
+	it('gate:fast runs JPWB steps only, in order, with no csaa step anywhere in it', () => {
+		const steps = (rootScripts()['gate:fast'] ?? '').split(' && ').map((step) => step.trim());
+		expect(steps).toEqual([
+			'bun run slices:ledger:check',
+			'bun run tracker:build',
+			'bun run check-types',
+			'bun run lint',
+			'bun run boundary',
+			'bun run build',
+			'bun run test',
+			'bun run test:coverage',
+			'cd apps/rph-demo',
+			'bun run check',
+			'bun run e2e'
+		]);
+	});
+
+	it('boundary cruises the packages perimeter and invokes no csaa script', () => {
+		// ⚠ ITS SIBLING IN JPWB ASSERTS THE PREFIX ONLY. `verif/dependency-boundary-rules.test.ts:181-188` pins
+		// that `boundary` STARTS with `depcruise packages --config …`, which stayed green through the detachment
+		// because a prefix match cannot see a removed tail. That is not a criticism of it — it was scoped to the
+		// cruise on purpose — but it does mean the disappearance of the CSAA half was watched by nothing until
+		// this line. The two are complementary: that one owns the cruise, this one owns the absence.
+		const boundary = rootScripts().boundary ?? '';
+		expect(boundary).toBe('depcruise packages --config .dependency-cruiser.cjs');
+	});
 });

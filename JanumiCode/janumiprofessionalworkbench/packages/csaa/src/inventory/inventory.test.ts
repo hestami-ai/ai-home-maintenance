@@ -5768,6 +5768,18 @@ describe('JPWB population non-vacuity', () => {
 			)
 		).toMatchObject({ extractionMethod: 'DECLARED_STATIC_DATA', role: 'SUPPORT_DATA' });
 		expect(inventory.dependencyBoundary.analyzedPerimeter).toEqual(['packages']);
-		expect(inventory.dependencyBoundary.enforcementPerimeter).toEqual(['apps', 'packages']);
+		// ⭑⭑ THESE TWO LINES RECORDED REG-F-389 FOR MONTHS AND NOBODY READ THEM AS A FINDING. `analyzed` is what
+		// dependency-cruiser actually SCANS; `enforcement` is what the boundary command CLAIMS to cover. Their
+		// disagreement — packages scanned, apps+packages claimed — IS the defect: `.dependency-cruiser.cjs`
+		// declares `from: '^(packages/rph-|apps/)'` while `boundary` passes one scan root, so the `apps/` arm
+		// could never fire. The inventory measured the gap correctly and reported it as two neutral fields. ⭑ A
+		// measurement is gate material only when something reads it.
+		//
+		// `['apps','packages']` -> `['packages']` (2026-09-11, JAN-CSAAEXT S4). `boundary` no longer invokes
+		// `scripts/csaa-product-boundary.ts`, whose own `perimeter` was the source of the `apps` entry. ⚠ THE
+		// APP-SIDE GUARANTEE DID NOT GO WITH IT: it moved to `verif/product-boundary.test.ts` (S2), which walks
+		// `apps/` + `packages/rph-*` and runs in `gate:fast`'s `test` step. What narrowed is this COMMAND's
+		// perimeter, not JPWB's coverage — and the two fields now agree, which is the honest state.
+		expect(inventory.dependencyBoundary.enforcementPerimeter).toEqual(['packages']);
 	});
 });

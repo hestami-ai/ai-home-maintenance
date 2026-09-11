@@ -3580,7 +3580,7 @@
       "categories": [
         "BOUNDARY"
       ],
-      "command": "depcruise packages --config .dependency-cruiser.cjs && bun run scripts/csaa-product-boundary.ts",
+      "command": "depcruise packages --config .dependency-cruiser.cjs",
       "name": "boundary",
       "owner": ".",
       "provenance": [
@@ -4290,7 +4290,7 @@
       "categories": [
         "TEST"
       ],
-      "command": "bun run csaa:generated-context:check && bun run csaa:inventory:check && bun run csaa:content-store-performance:check && bun run slices:ledger:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
+      "command": "bun run slices:ledger:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && cd apps/rph-demo && bun run check && bun run e2e",
       "name": "gate:fast",
       "owner": ".",
       "provenance": [
@@ -5111,14 +5111,12 @@
     "analyzedPerimeter": [
       "packages"
     ],
-    "command": "depcruise packages --config .dependency-cruiser.cjs && bun run scripts/csaa-product-boundary.ts",
+    "command": "depcruise packages --config .dependency-cruiser.cjs",
     "configurationPath": ".dependency-cruiser.cjs",
     "enforcementCarriers": [
-      ".dependency-cruiser.cjs",
-      "scripts/csaa-product-boundary.ts"
+      ".dependency-cruiser.cjs"
     ],
     "enforcementPerimeter": [
-      "apps",
       "packages"
     ],
     "provenance": [
@@ -5631,7 +5629,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "f7fbaa7ed117d07674d33fba3964f845ed073e58361f89df5360dfac529aac83",
+    "configurationDigest": "d3206f5e68a878bcb1789477844ce8bd8018557f921a2ddd138de14d2d622ae3",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -5738,9 +5736,9 @@
         },
         {
           "artifactClass": "MANIFEST",
-          "bytes": 9432,
+          "bytes": 9268,
           "path": "package.json",
-          "sha256": "858de9ceb69c691c3f820477b80293ba67b21e94a62ef6e56f711bf6fd94ecde"
+          "sha256": "66a4362833491b52ccfa39e80aee59b8347b361794227671f910658053ecd412"
         },
         {
           "artifactClass": "PROJECT_CONFIGURATION",
@@ -8700,11 +8698,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "368afc20a236700590d33fff380f05e997ccf7b23bf317c6fd383d2ffcc7d2f6",
+          "configClosureDigest": "115fc6aaf308c46606804e7a3e97c40fffedc30d135b6e5b209926116ad79da4",
           "configPath": "scripts/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "ab348ae479766778422e6c1b723098c17c43fdff0feb56034df3d7085ac03c52",
+          "projectResolutionDigest": "fe09b916c3e845ceaeccedd786ed0f3bf5755b9f6bad362004252c056a4ee173",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8783,11 +8781,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "67af6702e5827e236d9bd65320ce4aa6db0cbd498fd6894edf63440acfac6509",
+          "configClosureDigest": "2fdd2add9609fc12fb3472c9c75b928fd74e078f45ef2255a8a42a5bcb1896d6",
           "configPath": "tsconfig.json",
           "kind": "SOLUTION",
           "projectReferences": [],
-          "projectResolutionDigest": "599cc85aad9e5888c5b0e1ff13dd71a22516fd17c88f00d0f757db3065e80bec",
+          "projectResolutionDigest": "7b7fb3ae3dec65427dd8de45a852ae1285710f6e45c19277a6f599ddf011113b",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8821,11 +8819,11 @@
               "node"
             ]
           },
-          "configClosureDigest": "1d7a41a07610843ecb3389f67c54e1e38829de1f1d90c437b72739e4a9d4d242",
+          "configClosureDigest": "c2cc1969d644113bf71ea2a8cd9d5d4fc2f90652faa760e4b7b164c7e253458b",
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "189bfd9af16186cf31c50ecb128d1946ad8bba6cdc0390a371221cf8e1c58155",
+          "projectResolutionDigest": "7dd0d1cb54faca095496fd00e93776f9e27ebc8913ee45d3864c5414b6417d1f",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -11259,7 +11257,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "17c639a18ea3b6cad273e4075099c17519f4c6d2f146ac956a82d01ce92c25ff",
+    "fileManifestDigest": "5c52e860ffc868cae391db9e4b00113f163cd0085b5a003f145a315650a7187d",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11270,7 +11268,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
+          "1bdc1f09c8628d6cafb36f02fbed303850b443d63ce26681afe7cbeb6ec80c75",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -11308,7 +11306,7 @@
           "@sveltejs/kit:svelte-kit-sync",
           "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
           "2.69.2",
-          "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
+          "1bdc1f09c8628d6cafb36f02fbed303850b443d63ce26681afe7cbeb6ec80c75",
           "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
         ],
         "generator": {
@@ -12783,9 +12781,9 @@
       },
       {
         "artifactClass": "CONFIGURATION",
-        "bytes": 9432,
+        "bytes": 9268,
         "path": "package.json",
-        "sha256": "858de9ceb69c691c3f820477b80293ba67b21e94a62ef6e56f711bf6fd94ecde",
+        "sha256": "66a4362833491b52ccfa39e80aee59b8347b361794227671f910658053ecd412",
         "subjectArtifactClass": "MANIFEST"
       },
       {
@@ -14764,9 +14762,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 4894,
+        "bytes": 6152,
         "path": "packages/csaa/src/inventory/boundary-policy.test.ts",
-        "sha256": "4a53c36b7bf7438a49717da85eb963adcb20614c2f4d7af2658b99d82b3986d4",
+        "sha256": "238f5625f0f717c17f391b108d4f8eecf592a53f05ad76f040b77d416d36e42e",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -14785,16 +14783,16 @@
       },
       {
         "artifactClass": "SOURCE",
-        "bytes": 264380,
+        "bytes": 265506,
         "path": "packages/csaa/src/inventory/collect-inventory.ts",
-        "sha256": "83210d35d7b0d537304ac08707a1dcb11a03538e1e43f247095552a401fc7805",
+        "sha256": "a5104c755c6d8d25bf9ae37b30d9985f3857e42f6b2cd27aedbfe000c003adcb",
         "subjectArtifactClass": "PRODUCTION_SOURCE"
       },
       {
         "artifactClass": "TEST",
-        "bytes": 272529,
+        "bytes": 273647,
         "path": "packages/csaa/src/inventory/inventory.test.ts",
-        "sha256": "5debcacb2fe5277ecbc0fc95eb804e14cbd4b7328723ec74352001844750236f",
+        "sha256": "a7fe672b822f860aaf541e6a183d88e73f5034ac9fd0f4a3c38e315926e34dd6",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -20399,9 +20397,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 11250,
+        "bytes": 13573,
         "path": "verif/assurance-surface.test.ts",
-        "sha256": "84e3908d8f25a18b8281669fbb554f21c81159db00e6bc9fee3a941cef79d155",
+        "sha256": "22981692e55b2aa7c06e8ec412ae94ddf6ae236349f559424267106b17942110",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20541,7 +20539,7 @@
         "artifactClass": "VERIFICATION",
         "bytes": 87872,
         "path": "verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json",
-        "sha256": "0663ab1169a5292bea628b9791edda770f7d0bcebad4eaf431c95c3b2cd0e54c",
+        "sha256": "38393382026ff8dd006266d1557ef168c25f05774667d7bb7a9b5767cf1f0ffe",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20951,7 +20949,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "8aa5d271e5322fff0314006277944fb8232e6711440af49e7539bf3e6f75760b",
+    "subjectId": "3602ed19a0038ec03de93f0398e72df5a8edd0ddc8f6b2d1025cb5b99b8060c6",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -20979,7 +20977,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
+            "1bdc1f09c8628d6cafb36f02fbed303850b443d63ce26681afe7cbeb6ec80c75",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -21126,7 +21124,7 @@
             "@sveltejs/kit:svelte-kit-sync",
             "336b937dfa86652d9b091326257488624e158f55bd5f1f79d28d3b769ea263f6",
             "2.69.2",
-            "4e6706b89667cf6399e0be268f600609808791e62d3f3c9ce39491ce55605457",
+            "1bdc1f09c8628d6cafb36f02fbed303850b443d63ce26681afe7cbeb6ec80c75",
             "86febb777269d7f13635b2c7023c05550ee76fcc9e7a534e2f402fec7ef2f9f6"
           ],
           "generator": {
@@ -24855,7 +24853,6 @@
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
-        "package.json#/scripts/boundary",
         "verif/product-boundary.test.ts"
       ],
       "path": "scripts/csaa-product-boundary.ts",
@@ -25410,7 +25407,7 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "84e3908d8f25a18b8281669fbb554f21c81159db00e6bc9fee3a941cef79d155",
+      "contentSha256": "22981692e55b2aa7c06e8ec412ae94ddf6ae236349f559424267106b17942110",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -25695,7 +25692,7 @@
     {
       "assertedPopulation": "Repository files, exports, or runtime events selected by verif/csaa/rph-demo.svelte-kit.generated-context.evidence.json at execution time.",
       "associatedBaselines": [],
-      "contentSha256": "0663ab1169a5292bea628b9791edda770f7d0bcebad4eaf431c95c3b2cd0e54c",
+      "contentSha256": "38393382026ff8dd006266d1557ef168c25f05774667d7bb7a9b5767cf1f0ffe",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
