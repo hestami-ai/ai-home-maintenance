@@ -2759,7 +2759,19 @@ describe('live JPWB and inventory projection', () => {
 		// commits late, in a window belonging to none of the authors who moved it. Corrected here by the
 		// sponsor-directed CSAA investigation of 2026-09-09, and recorded rather than quietly folded into the new
 		// number, per this file's own standing instruction.
-		expect(counts.get('verif/tsconfig.json')).toBe(72);
+		// 72 -> 73 (2026-09-11), JAN-CSAAEXT S1 — recorded, not folded, per this file's standing instruction:
+		//   +1 `verif/assurance-surface.test.ts`                   (this commit)  2026-09-11  S1 surface salvage
+		// ⭑ CAUGHT BY THE UNFILTERED GATE ON ITS FIRST RUN, which is the SEVENTH time this block records that
+		// route and the second consecutive one. The habit the entry above describes as corrected has stayed
+		// corrected.
+		// ⚠ AND THE INCREMENT THAT MOVED IT EXISTS TO END THIS PIN. `verif/assurance-surface.test.ts` is the
+		// JPWB-side salvage of the two guarantees `csaa:inventory:check` uniquely holds over JPWB — a verif test
+		// file disappearing, and a root gate command disappearing. Under JAN-CSAAEXT S4 the three `csaa:*` steps
+		// leave `gate:fast` and this pin stops being consulted by JPWB; under S6 the file leaves JPWB's tree
+		// entirely. Until then the pin is live and is maintained here, which is the recurring toll DESIGN §4A
+		// measured across 69 commits and which this increment paid twice — once for the inventory baseline and
+		// once for this count, for a 63-line test.
+		expect(counts.get('verif/tsconfig.json')).toBe(73);
 		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
 		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
 		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands

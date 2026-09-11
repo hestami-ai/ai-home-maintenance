@@ -74,15 +74,15 @@
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 77,
+      "discovered": 78,
       "excluded": 0,
       "failed": 0,
-      "included": 77,
+      "included": 78,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 77
+      "successfullyInventoried": 78
     }
   ],
   "assuranceSurfaces": {
@@ -553,7 +553,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 593,
+        "discovered": 594,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 52,
@@ -612,13 +612,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "814febdc82a5bb9f275fac49f43a552ecba01dc7655c564a901d83f0d618100e",
+        "id": "121f34398baae05e3ffa04731055b3cc79af7c2052336b768e05c5835124e985",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 541,
+        "included": 542,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1105,6 +1105,7 @@
           "verif/arrow-census-coverage.test.ts",
           "verif/arrow-command-census.test.ts",
           "verif/assessment-lifecycle-contracts.test.ts",
+          "verif/assurance-surface.test.ts",
           "verif/authoring-field-disposition.test.ts",
           "verif/authority-resolution-census.test.ts",
           "verif/axis-influence.test.ts",
@@ -1172,7 +1173,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "1161cc6f13939186acda579fe46388a34e57685f8853e470602395cfc0941a1f",
+        "selectionDigest": "5f7127368117d79db74611280d7baf2128db4e4b36d48095e125f5a184b49d61",
         "status": "COMPLETE"
       },
       {
@@ -1180,7 +1181,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 593,
+        "discovered": 594,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 52,
@@ -1239,13 +1240,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "958654762866a5ba18328380b2851e33b982ce785d67032d8e796479b677d094",
+        "id": "ee6d586533a5e61b8ef16d8536a3d42152e4999ceb0e91b057d08b7cdbe53714",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 541,
+        "included": 542,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1732,6 +1733,7 @@
           "verif/arrow-census-coverage.test.ts",
           "verif/arrow-command-census.test.ts",
           "verif/assessment-lifecycle-contracts.test.ts",
+          "verif/assurance-surface.test.ts",
           "verif/authoring-field-disposition.test.ts",
           "verif/authority-resolution-census.test.ts",
           "verif/axis-influence.test.ts",
@@ -1799,7 +1801,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "e29e7446560ddb719536ea4fb5ef3828b1968224a96844c06441d1f1204e522c",
+        "selectionDigest": "a95db965d799978f221ee42665504aadf021ccb66a1331c524b6310cd3f545c9",
         "status": "COMPLETE"
       }
     ],
@@ -2290,6 +2292,7 @@
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.test.ts",
         "verif/assessment-lifecycle-contracts.test.ts",
+        "verif/assurance-surface.test.ts",
         "verif/authoring-field-disposition.test.ts",
         "verif/authority-resolution-census.test.ts",
         "verif/axis-influence.test.ts",
@@ -5625,7 +5628,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "706fcd31a920eff2af5423f3b790dc04a1883280ed406258f90c79efb41dae51",
+    "configurationDigest": "7f6edc075b8eb485f744ae3818a9631ce9af49943110593cb3e0c6182a7966e3",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -8819,7 +8822,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "0594b187cc7222798b97757265a5966398e0aa93de79de39edb578b5c7f00bfa",
+          "projectResolutionDigest": "67bf82e99c76c96d54696b4fc3a2940ed2761eba25f37b7c4d7440c143d186d7",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8832,6 +8835,7 @@
             "verif/arrow-command-census.test.ts",
             "verif/arrow-command-census.ts",
             "verif/assessment-lifecycle-contracts.test.ts",
+            "verif/assurance-surface.test.ts",
             "verif/authoring-field-disposition.test.ts",
             "verif/authority-resolution-census.test.ts",
             "verif/axis-influence.test.ts",
@@ -9282,7 +9286,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 593,
+          "discovered": 594,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 52,
@@ -9341,13 +9345,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "814febdc82a5bb9f275fac49f43a552ecba01dc7655c564a901d83f0d618100e",
+          "id": "121f34398baae05e3ffa04731055b3cc79af7c2052336b768e05c5835124e985",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 541,
+          "included": 542,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9834,6 +9838,7 @@
             "verif/arrow-census-coverage.test.ts",
             "verif/arrow-command-census.test.ts",
             "verif/assessment-lifecycle-contracts.test.ts",
+            "verif/assurance-surface.test.ts",
             "verif/authoring-field-disposition.test.ts",
             "verif/authority-resolution-census.test.ts",
             "verif/axis-influence.test.ts",
@@ -9901,7 +9906,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "1161cc6f13939186acda579fe46388a34e57685f8853e470602395cfc0941a1f",
+          "selectionDigest": "5f7127368117d79db74611280d7baf2128db4e4b36d48095e125f5a184b49d61",
           "status": "COMPLETE"
         },
         {
@@ -9909,7 +9914,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 593,
+          "discovered": 594,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 52,
@@ -9968,13 +9973,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "958654762866a5ba18328380b2851e33b982ce785d67032d8e796479b677d094",
+          "id": "ee6d586533a5e61b8ef16d8536a3d42152e4999ceb0e91b057d08b7cdbe53714",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 541,
+          "included": 542,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -10461,6 +10466,7 @@
             "verif/arrow-census-coverage.test.ts",
             "verif/arrow-command-census.test.ts",
             "verif/assessment-lifecycle-contracts.test.ts",
+            "verif/assurance-surface.test.ts",
             "verif/authoring-field-disposition.test.ts",
             "verif/authority-resolution-census.test.ts",
             "verif/axis-influence.test.ts",
@@ -10528,7 +10534,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "e29e7446560ddb719536ea4fb5ef3828b1968224a96844c06441d1f1204e522c",
+          "selectionDigest": "a95db965d799978f221ee42665504aadf021ccb66a1331c524b6310cd3f545c9",
           "status": "COMPLETE"
         }
       ],
@@ -11247,7 +11253,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "19ed1bbc76790c23c8bd94ae4b3e845204ce0687a27fc85ca752cd96baa8263b",
+    "fileManifestDigest": "a1c47c66fdc644ce41b3c08ff114f1beeecc8e74c0853706bfc8a4631e45e143",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11353,7 +11359,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1367,
+    "selectedFileCount": 1368,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -16075,9 +16081,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 119050,
+        "bytes": 120179,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "f00abef1bb1d66970a7da03b62a64df71f598a6d416d64e9f4060e1526fa4df3",
+        "sha256": "9e32a2edd603bb4456c542cf5f91de744e2bb4ef6dda19731aca67e7591e76e5",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -20387,6 +20393,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 9917,
+        "path": "verif/assurance-surface.test.ts",
+        "sha256": "744d940dd4d49890f42a641d47be584bff7ef170977c719118860e9c3a0a93cf",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 19531,
         "path": "verif/authoring-field-disposition.test.ts",
         "sha256": "d23ebfdc8993e51a9f82b2c4f7d29e27330456f3f84eeac1637de8a3316295db",
@@ -20765,9 +20778,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 31978,
+        "bytes": 33253,
         "path": "verif/slice-subsumption.test.ts",
-        "sha256": "145adb2004b8d7e3a7127dad498a75899f308c5c0376e5ab1fd10c8e2ed0ee13",
+        "sha256": "4b6116c3688221b4ccaa3b3546cac77d4289af3d529d7c679e06edc3b0fd6ad4",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20925,7 +20938,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "d9cdd081e70b8ff99ea7c5721163d6ca4485348fc3fbb16c650d8d5312848e1b",
+    "subjectId": "4c02f2e44beec38a883f021a6704f1957c09bd0eab4518d6e2c1856e25e28fef",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -23652,7 +23665,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 72,
+      "candidateArtifactCount": 73,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -23688,6 +23701,7 @@
         "verif/arrow-command-census.test.ts",
         "verif/arrow-command-census.ts",
         "verif/assessment-lifecycle-contracts.test.ts",
+        "verif/assurance-surface.test.ts",
         "verif/authoring-field-disposition.test.ts",
         "verif/authority-resolution-census.test.ts",
         "verif/axis-influence.test.ts",
@@ -24994,6 +25008,7 @@
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
+        "verif/assurance-surface.test.ts",
         "verif/mutant-ledger.test.ts",
         "verif/slice-presupposition.test.ts",
         "verif/slice-scenario-coverage.test.ts",
@@ -25346,6 +25361,7 @@
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
         "verif/arrow-command-census.test.ts",
+        "verif/assurance-surface.test.ts",
         "verif/binding-row-truth.test.ts",
         "verif/births-outside-the-census.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
@@ -25371,6 +25387,24 @@
       "path": "verif/assessment-lifecycle-contracts.test.ts",
       "provenance": [
         "verif/assessment-lifecycle-contracts.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/assurance-surface.test.ts.",
+      "associatedBaselines": [
+        "verif/arrow-command-census.baseline.json"
+      ],
+      "contentSha256": "744d940dd4d49890f42a641d47be584bff7ef170977c719118860e9c3a0a93cf",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/assurance-surface.test.ts"
+      ],
+      "path": "verif/assurance-surface.test.ts",
+      "provenance": [
+        "verif/assurance-surface.test.ts"
       ],
       "role": "TEST"
     },
@@ -25812,6 +25846,7 @@
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "DECLARED_STATIC_DATA",
       "gateCarriers": [
+        "verif/assurance-surface.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/unreachability-grounds.test.ts"
@@ -25846,6 +25881,7 @@
       "extractionMethod": "FILESYSTEM_OR_TEXT",
       "gateCarriers": [
         "verif/arrow-census-coverage.test.ts",
+        "verif/assurance-surface.test.ts",
         "verif/guard-enforcement-ledger.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/unreachability-grounds.test.ts"
@@ -26212,7 +26248,7 @@
     {
       "assertedPopulation": "Executable assertions and imported surfaces declared by verif/slice-subsumption.test.ts.",
       "associatedBaselines": [],
-      "contentSha256": "145adb2004b8d7e3a7127dad498a75899f308c5c0376e5ab1fd10c8e2ed0ee13",
+      "contentSha256": "4b6116c3688221b4ccaa3b3546cac77d4289af3d529d7c679e06edc3b0fd6ad4",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [

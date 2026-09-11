@@ -34646,7 +34646,11 @@ against invisible characters at all. Owed: extend that population, or state why 
 
 - **Date:** 2026-09-11 · **Type:** DECISION (delegated ruling; `JAN-CSAAEXT` DESIGN + ROADMAP landed, `1b025623`) ·
   **Class:** RULING + FINDING — a sponsor ruling met a measurement that refuted it, and the sponsor delegated
-  the resolution · **Status:** ⚠ **OPEN — RATIFICATION OWED on all six.**
+  the resolution · **Status:** ~~⚠ **OPEN — RATIFICATION OWED on all six.**~~ ⚠ **PARTIALLY DISCHARGED by
+  `REG-D-062`** — `D-2` and `D-4` are amended there; `D-1`, `D-3`, `D-5` and `D-6` stand unchanged and
+  ratification remains owed on those four. ⭐ The discharge is PARTIAL, so this status SAYS SO rather than being
+  struck outright — which is the remedy `verif/register-status-truth.test.ts` P-5b named when it caught this,
+  and the strike-plus-replacement idiom `verif/register-append-only.test.ts` MUTANT B declares PERMITTED.
 
 **THE SPONSOR'S WORDS, VERBATIM:** *"You will have to use your delegated authority and your vast intelligence
 and deep and broad knowledge of the document corpus to author solutions because I can no longer distinguish the

@@ -392,7 +392,21 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// The difference is not the shape, it is the reliance — this one caught the addition on the first run
 			// and its message named the remedy, while the CSAA pins drifted through six consecutive programmes
 			// unnoticed. A pin is gate material when someone reads it; `CD-00b` measured that nobody read those.
-		).toBe(38);
+			//
+			// 38 -> 39 (2026-09-11): `ROADMAP-csaa-extraction.md`, `JAN-CSAAEXT`. RECORDED, NOT FOLDED, because
+			// this assertion's whole point is that adding a roadmap must be argued for rather than absorbed.
+			// ⭑ IT IS SUBSUMPTION, NOT ACCUMULATION, AND THE TEST IS THAT SOMETHING IS RETIRED BY IT.
+			// `ROADMAP-csaa-decoupling.md` — one entry above it in this very list — already carries a WITHDRAWN
+			// banner (`REG-F-381`, commit `1e626500`): its mechanism excluded three CSAA test files into a
+			// separate vitest config and was reverted whole. `JAN-CSAAEXT` is not a second attempt at that
+			// programme; it is the programme that DISSOLVES it, because the sponsor's ruling that CSAA is not
+			// part of JPWB retires the premise `JAN-CSAADEC` was fighting on. The withdrawn roadmap stays on
+			// disk per the repository's retire-by-striking rule, so the COUNT rises while the live population
+			// does not — which is exactly the case this comment block exists to distinguish.
+			// ⚠ AND THE NOTE ABOVE NOW HAS A SECOND CONFIRMATION, WHICH IS WHY IT IS WORTH KEEPING. This
+			// addition was ALSO caught on the first unfiltered run, and its message named the remedy again. Two
+			// for two on reliance; the CSAA pins are still nought for six.
+		).toBe(39);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
