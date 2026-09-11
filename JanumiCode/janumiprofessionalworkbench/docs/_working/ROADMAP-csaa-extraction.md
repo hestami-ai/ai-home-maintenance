@@ -82,18 +82,33 @@ names it. ⛔ **Both, or only one limb is instrumented.**
 1. ⛔ **RED FIRST — and here the red is a PASS.** Add a fixture where an `apps/` file imports CSAA. Confirm
    `bun run boundary` **PASSES**, demonstrating the live defect: `boundary` runs `depcruise packages`, one
    positional scan root, so the `apps/` arm of `product-does-not-import-csaa` has never been able to fire.
-2. Widen to `depcruise packages apps`. The fixture must now FAIL.
-3. Retarget the rule's `to:` from the path `^packages/csaa/` to the npm specifier, and re-home the
-   `csaa-product-boundary.ts` logic in JPWB against that specifier — so `§13D.1`'s hard-coded
-   `resolve(repositoryRoot,'packages','csaa')` cannot become a check that silently always passes.
+2. ~~Widen to `depcruise packages apps`. The fixture must now FAIL.~~ ⛔ **REFUTED BY MEASUREMENT, 2026-09-11.**
+   `depcruise packages apps` yields **69 errors — 1 real and 68 `not-to-unresolvable`**, because SvelteKit's
+   `$lib/…` and `./$types` specifiers resolve only through `apps/rph-demo/.svelte-kit/tsconfig.json`, which
+   `.dependency-cruiser.cjs:74-76` excludes and `:77` does not reference. Widening alone trades a silent gap for
+   an unusable gate. ⚠ This was the THIRD recorded remedy this programme has had die on contact with a probe.
+3. ✅ **DONE INSTEAD: `verif/product-boundary.test.ts`** — the incumbent's WALK salvaged into JPWB, reading
+   specifiers with `ts.preProcessFile`, which **scans rather than resolves** and therefore sees `.svelte` and
+   alias-bearing imports that dependency-cruiser cannot. Its two helpers (`compareText`, `isInsideRoot`, four
+   lines each) are inlined, so nothing depends on the departing package. It targets BOTH the npm specifier
+   (survives S6) and the relative path (dies at S6, kept until then because it is what catches a violation
+   today) — and its third test exercises the surviving arm directly, so the arm that outlives the move is proven
+   to discriminate now rather than found inert after.
+   ⚠ **The `apps/` arm of the cruiser rule REMAINS VACUOUS — now KNOWN-vacuous with a named owner**, which is a
+   different disposition from a silent one. `§13D.1`'s hard-coded `resolve(repositoryRoot,'packages','csaa')`
+   therefore cannot become a check that silently always passes, because JPWB no longer relies on it.
 
-⭑ Step 1 is not ceremony. It is the only thing that proves the widening changed anything — and its absence is
-precisely how this defect survived. ⚠ `verif/dependency-boundary-rules.test.ts:125` pins the rule NAME, which is
-why the defect stayed invisible: **a name-pinning test is not a test that the named thing works.**
+⭑ Step 1 is not ceremony. It is the only thing that proves the change did anything — and its absence is precisely
+how this defect survived. ⚠ `verif/dependency-boundary-rules.test.ts:125` pins the rule NAME, which is why the
+defect stayed invisible: **a name-pinning test is not a test that the named thing works.**
 
-**CONSUMER:** `boundary`, a `gate:fast` step. What breaks if wrong: product code can import the analyzer.
+**CONSUMER:** `gate:fast` step 10 (`test`), where the salvaged walk runs. What breaks if wrong: product code can
+import the analyzer with nothing to say so.
 
-**VERIFIER:** the fixture, PASS → FAIL across step 2, both states observed.
+**VERIFIER — observed:** the probe PASSES `depcruise packages` (*"no dependency violations found (867 modules,
+4705 dependencies cruised)"*, EXIT 0) and FAILS the salvaged walk, naming file and specifier. ⭐ **And the
+specifier arm has its OWN mutant**: deleting it reddens the third test ALONE (`1 failed | 2 passed`), proving the
+control is independent rather than a restatement of the check above it.
 
 ---
 

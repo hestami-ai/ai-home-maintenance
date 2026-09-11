@@ -74,15 +74,15 @@
     },
     {
       "artifactClass": "VERIFICATION",
-      "discovered": 78,
+      "discovered": 79,
       "excluded": 0,
       "failed": 0,
-      "included": 78,
+      "included": 79,
       "provenance": [
         "subject.selectedFiles#artifactClass=VERIFICATION",
         "subject.excludedArtifacts[*].physicalFileCount"
       ],
-      "successfullyInventoried": 78
+      "successfullyInventoried": 79
     }
   ],
   "assuranceSurfaces": {
@@ -553,7 +553,7 @@
           "vitest.dist.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 594,
+        "discovered": 595,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 52,
@@ -612,13 +612,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "121f34398baae05e3ffa04731055b3cc79af7c2052336b768e05c5835124e985",
+        "id": "56a434c03b499cc9f0c932f4cba844a33acf8bd6daf3d465ea2e8e789558d6e4",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 542,
+        "included": 543,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1137,6 +1137,7 @@
           "verif/optimistic-concurrency-surface.test.ts",
           "verif/policy-evidence-requirement-census.test.ts",
           "verif/product-behavior-plane.test.ts",
+          "verif/product-boundary.test.ts",
           "verif/recomposition-ungoverned.test.ts",
           "verif/register-append-only.test.ts",
           "verif/register-citations.test.ts",
@@ -1173,7 +1174,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "5f7127368117d79db74611280d7baf2128db4e4b36d48095e125f5a184b49d61",
+        "selectionDigest": "d61674c4a8e9fced3b646cf0ade2849d1367fbd9da877ffccc12ee6f12f2a6d8",
         "status": "COMPLETE"
       },
       {
@@ -1181,7 +1182,7 @@
           "vitest.config.ts",
           "vitest.projects.ts"
         ],
-        "discovered": 594,
+        "discovered": 595,
         "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
         "excludePatterns": [],
         "excluded": 52,
@@ -1240,13 +1241,13 @@
           "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
         ],
         "failed": 0,
-        "id": "ee6d586533a5e61b8ef16d8536a3d42152e4999ceb0e91b057d08b7cdbe53714",
+        "id": "c5f31ecc6eb7bacad6f7ac7da9e529de831af6c050b2aa2611a3d9e605b256c0",
         "includePatterns": [
           "apps/*/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
           "verif/**/*.test.ts"
         ],
-        "included": 542,
+        "included": 543,
         "includedPaths": [
           "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
           "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -1765,6 +1766,7 @@
           "verif/optimistic-concurrency-surface.test.ts",
           "verif/policy-evidence-requirement-census.test.ts",
           "verif/product-behavior-plane.test.ts",
+          "verif/product-boundary.test.ts",
           "verif/recomposition-ungoverned.test.ts",
           "verif/register-append-only.test.ts",
           "verif/register-citations.test.ts",
@@ -1801,7 +1803,7 @@
         ],
         "provider": "VITEST",
         "reconciles": true,
-        "selectionDigest": "a95db965d799978f221ee42665504aadf021ccb66a1331c524b6310cd3f545c9",
+        "selectionDigest": "162a7f6732446b6114a23334834c2a4088af94891eb5adf803ad278f5aa0b7ef",
         "status": "COMPLETE"
       }
     ],
@@ -2324,6 +2326,7 @@
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/product-behavior-plane.test.ts",
+        "verif/product-boundary.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/register-append-only.test.ts",
         "verif/register-citations.test.ts",
@@ -5628,7 +5631,7 @@
   ],
   "schemaVersion": "jan-csaa-005.inventory/3.0.0",
   "subject": {
-    "configurationDigest": "7f6edc075b8eb485f744ae3818a9631ce9af49943110593cb3e0c6182a7966e3",
+    "configurationDigest": "f7fbaa7ed117d07674d33fba3964f845ed073e58361f89df5360dfac529aac83",
     "configurationPreimage": {
       "artifacts": [
         {
@@ -8822,7 +8825,7 @@
           "configPath": "verif/tsconfig.json",
           "kind": "PROJECT",
           "projectReferences": [],
-          "projectResolutionDigest": "67bf82e99c76c96d54696b4fc3a2940ed2761eba25f37b7c4d7440c143d186d7",
+          "projectResolutionDigest": "189bfd9af16186cf31c50ecb128d1946ad8bba6cdc0390a371221cf8e1c58155",
           "provider": {
             "id": "typescript",
             "version": "5.9.3"
@@ -8872,6 +8875,7 @@
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
             "verif/product-behavior-plane.test.ts",
+            "verif/product-boundary.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -9286,7 +9290,7 @@
             "vitest.dist.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 594,
+          "discovered": 595,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 52,
@@ -9345,13 +9349,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "121f34398baae05e3ffa04731055b3cc79af7c2052336b768e05c5835124e985",
+          "id": "56a434c03b499cc9f0c932f4cba844a33acf8bd6daf3d465ea2e8e789558d6e4",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 542,
+          "included": 543,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -9870,6 +9874,7 @@
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
             "verif/product-behavior-plane.test.ts",
+            "verif/product-boundary.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -9906,7 +9911,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "5f7127368117d79db74611280d7baf2128db4e4b36d48095e125f5a184b49d61",
+          "selectionDigest": "d61674c4a8e9fced3b646cf0ade2849d1367fbd9da877ffccc12ee6f12f2a6d8",
           "status": "COMPLETE"
         },
         {
@@ -9914,7 +9919,7 @@
             "vitest.config.ts",
             "vitest.projects.ts"
           ],
-          "discovered": 594,
+          "discovered": 595,
           "discoveryMethod": "captured-config-ast-and-captured-test-artifact-reconciliation/1.0.0",
           "excludePatterns": [],
           "excluded": 52,
@@ -9973,13 +9978,13 @@
             "packages/rph-engine/test-fixtures/slice-predicate-canary/CANARY.slice.test.ts"
           ],
           "failed": 0,
-          "id": "ee6d586533a5e61b8ef16d8536a3d42152e4999ceb0e91b057d08b7cdbe53714",
+          "id": "c5f31ecc6eb7bacad6f7ac7da9e529de831af6c050b2aa2611a3d9e605b256c0",
           "includePatterns": [
             "apps/*/src/**/*.test.ts",
             "packages/*/src/**/*.test.ts",
             "verif/**/*.test.ts"
           ],
-          "included": 542,
+          "included": 543,
           "includedPaths": [
             "apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.test.ts",
             "apps/rph-demo/src/lib/canvasHistory.test.ts",
@@ -10498,6 +10503,7 @@
             "verif/optimistic-concurrency-surface.test.ts",
             "verif/policy-evidence-requirement-census.test.ts",
             "verif/product-behavior-plane.test.ts",
+            "verif/product-boundary.test.ts",
             "verif/recomposition-ungoverned.test.ts",
             "verif/register-append-only.test.ts",
             "verif/register-citations.test.ts",
@@ -10534,7 +10540,7 @@
           ],
           "provider": "VITEST",
           "reconciles": true,
-          "selectionDigest": "a95db965d799978f221ee42665504aadf021ccb66a1331c524b6310cd3f545c9",
+          "selectionDigest": "162a7f6732446b6114a23334834c2a4088af94891eb5adf803ad278f5aa0b7ef",
           "status": "COMPLETE"
         }
       ],
@@ -11253,7 +11259,7 @@
       "jan-csaa-exclude-vcs/1",
       "jan-csaa-filter/1:8c316d09590173f1b83938dd2a0213696dc09ab3c16c031d4f84fecf8c314ece"
     ],
-    "fileManifestDigest": "a1c47c66fdc644ce41b3c08ff114f1beeecc8e74c0853706bfc8a4631e45e143",
+    "fileManifestDigest": "b0d2d6f53da46ad5c1d02353d4591c6084179e5ea1e1480ad62bd6445e4bda3c",
     "generatedContexts": [
       {
         "consumerProject": "apps/rph-demo/e2e/tsconfig.json",
@@ -11359,7 +11365,7 @@
     "resolutionDiagnostics": [],
     "revision": null,
     "schemaVersion": "jan-csaa-subject/2.0.0",
-    "selectedFileCount": 1368,
+    "selectedFileCount": 1369,
     "selectedFiles": [
       {
         "artifactClass": "CONFIGURATION",
@@ -16081,9 +16087,9 @@
       },
       {
         "artifactClass": "TEST",
-        "bytes": 120179,
+        "bytes": 120332,
         "path": "packages/csaa/src/subject/subject.test.ts",
-        "sha256": "9e32a2edd603bb4456c542cf5f91de744e2bb4ef6dda19731aca67e7591e76e5",
+        "sha256": "dbdd2448650ad139e1c31a199606744348fc29c6cf0f77ddff291dc985352d44",
         "subjectArtifactClass": "TEST_SOURCE"
       },
       {
@@ -20393,9 +20399,9 @@
       },
       {
         "artifactClass": "VERIFICATION",
-        "bytes": 9917,
+        "bytes": 10260,
         "path": "verif/assurance-surface.test.ts",
-        "sha256": "744d940dd4d49890f42a641d47be584bff7ef170977c719118860e9c3a0a93cf",
+        "sha256": "16ce3c2c41d4c8cd392d48a689b504fac74993281feaf93306da9626d834f878",
         "subjectArtifactClass": "VERIFICATION"
       },
       {
@@ -20701,6 +20707,13 @@
       },
       {
         "artifactClass": "VERIFICATION",
+        "bytes": 10825,
+        "path": "verif/product-boundary.test.ts",
+        "sha256": "47a2cca403eeca901830d124196c545904b55e17999d4f13ad28a319c2dc2640",
+        "subjectArtifactClass": "VERIFICATION"
+      },
+      {
+        "artifactClass": "VERIFICATION",
         "bytes": 8439,
         "path": "verif/recomposition-ungoverned.test.ts",
         "sha256": "f5acb0437fea658df37552318441853be034c9bd4050efe53ae2c47f2b74014a",
@@ -20938,7 +20951,7 @@
         "subjectArtifactClass": "TOOL_CONFIGURATION"
       }
     ],
-    "subjectId": "4c02f2e44beec38a883f021a6704f1957c09bd0eab4518d6e2c1856e25e28fef",
+    "subjectId": "8e47f05bdd2c6fb2974767d26d03c0b02413d1d8829f68da8af2257e39883a65",
     "subjectKind": "WORKTREE"
   },
   "typescriptProjects": [
@@ -23665,7 +23678,7 @@
       "status": "COMPLETE"
     },
     {
-      "candidateArtifactCount": 73,
+      "candidateArtifactCount": 74,
       "compilerOptions": {
         "noEmit": true,
         "types": [
@@ -23738,6 +23751,7 @@
         "verif/optimistic-concurrency-surface.test.ts",
         "verif/policy-evidence-requirement-census.test.ts",
         "verif/product-behavior-plane.test.ts",
+        "verif/product-boundary.test.ts",
         "verif/recomposition-ungoverned.test.ts",
         "verif/register-append-only.test.ts",
         "verif/register-citations.test.ts",
@@ -24841,7 +24855,8 @@
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "IMPORTED_EXECUTABLE_LOGIC",
       "gateCarriers": [
-        "package.json#/scripts/boundary"
+        "package.json#/scripts/boundary",
+        "verif/product-boundary.test.ts"
       ],
       "path": "scripts/csaa-product-boundary.ts",
       "provenance": [
@@ -25395,7 +25410,7 @@
       "associatedBaselines": [
         "verif/arrow-command-census.baseline.json"
       ],
-      "contentSha256": "744d940dd4d49890f42a641d47be584bff7ef170977c719118860e9c3a0a93cf",
+      "contentSha256": "16ce3c2c41d4c8cd392d48a689b504fac74993281feaf93306da9626d834f878",
       "disposition": "RETAIN_DELEGATED",
       "extractionMethod": "VITEST_EXECUTABLE_ASSERTION",
       "gateCarriers": [
@@ -26065,6 +26080,22 @@
       "path": "verif/product-behavior-plane.test.ts",
       "provenance": [
         "verif/product-behavior-plane.test.ts"
+      ],
+      "role": "TEST"
+    },
+    {
+      "assertedPopulation": "Executable assertions and imported surfaces declared by verif/product-boundary.test.ts.",
+      "associatedBaselines": [],
+      "contentSha256": "47a2cca403eeca901830d124196c545904b55e17999d4f13ad28a319c2dc2640",
+      "disposition": "RETAIN_DELEGATED",
+      "extractionMethod": "TYPESCRIPT_AST",
+      "gateCarriers": [
+        "bun run test:src -> verif",
+        "verif/product-boundary.test.ts"
+      ],
+      "path": "verif/product-boundary.test.ts",
+      "provenance": [
+        "verif/product-boundary.test.ts"
       ],
       "role": "TEST"
     },

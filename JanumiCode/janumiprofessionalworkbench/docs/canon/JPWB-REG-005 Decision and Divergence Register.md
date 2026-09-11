@@ -34729,7 +34729,18 @@ and nobody ran it"*, not *"no check existed"* — and it argues FOR D-1, not aga
 
 - **Date:** 2026-09-11 · **Type:** FINDING (`JAN-CSAAEXT`, found while costing `§8.2`) ·
   **Class:** A CONTROL THAT CANNOT FAIL — live on `main`, and independent of the programme that found it ·
-  **Status:** ⚠ **OPEN.** Remedy is `ROADMAP` S6.
+  **Status:** ~~⚠ **OPEN.** Remedy is `ROADMAP` S6.~~ ⚠ **PARTIALLY DISCHARGED 2026-09-11 by `JAN-CSAAEXT` S2**
+  (`verif/product-boundary.test.ts`). ⭑ **THE GUARANTEE IS RESTORED AND JPWB-OWNED; THE VACUOUS DECLARATION
+  REMAINS.** Product code under `apps/` can no longer import the analyzer unnoticed — that is now watched by a
+  JPWB walk in `gate:fast` step 10, proven by a probe that reddens it. ⛔ But the `apps/` arm of
+  `product-does-not-import-csaa` in `.dependency-cruiser.cjs` STILL cannot fire, and is left that way
+  deliberately: the only fix that reaches it needs SvelteKit alias resolution the cruiser config does not have
+  (struck remedy below). So the rule keeps declaring a perimeter it does not enforce — now KNOWN-vacuous with a
+  named owner, which is a different disposition from silently vacuous, and the difference is the whole finding.
+  ⚠ **AND THE CITATION STRUCK ABOVE WAS ALREADY ROTTEN:** `ROADMAP` rev 2 renumbered that step S6 -> S2, so this
+  entry pointed at the wrong step within a day of being written — the `enforcingAnchor` failure
+  `verif/guard-enforcement-ledger.ts` names in its own doctrine, *"a line number rots on the next edit and rots
+  SILENTLY"*, reproduced here on a step number.
 
 **THE RULE, BYTE-EXACT** (`.dependency-cruiser.cjs:64-70`):
 
@@ -34752,7 +34763,27 @@ delivers packages.
 ⚠ **THE ONLY THING ENFORCING THE APP-SIDE PROHIBITION IS A CSAA SCRIPT** — `scripts/csaa-product-boundary.ts`,
 whose `perimeter` is `['apps','packages']`. ⛔ So the recorded remedy *"retarget `to:` to the npm specifier, a
 one-line fix"* is **necessary but NOT sufficient**: extraction would delete the only live app-side guard and
-replace it with one that was already vacuous. The perimeter must also widen to `depcruise packages apps`.
+replace it with one that was already vacuous. ~~The perimeter must also widen to `depcruise packages apps`.~~
+
+⛔ **THAT REMEDY WAS TESTED AND IS REFUTED — struck above, 2026-09-11, by `JAN-CSAAEXT` S2 (this entry's own
+discharger).** Measured with a probe at `apps/rph-demo/src/lib/__boundary-probe.ts` (created, measured, never
+committed): `depcruise packages apps` yields **69 errors — ONE real `product-does-not-import-csaa` and 68
+`not-to-unresolvable`**. The 68 are SvelteKit's `$lib/...` and `./$types` specifiers, which resolve only through
+`apps/rph-demo/.svelte-kit/tsconfig.json` — a generated file `.dependency-cruiser.cjs:74-76` EXCLUDES and `:77`
+does not reference, since `tsConfig` names the root `tsconfig.json`. Widening alone trades a silent gap for an
+unusable gate. ⭐ **Third recorded remedy this session to die on contact with a probe**, which is the standing
+rule paying out again: a remedy is a HYPOTHESIS until driven.
+
+✅ **WHAT WAS DONE INSTEAD — `verif/product-boundary.test.ts`.** The incumbent's walk is salvaged into JPWB
+rather than reproduced as a cruiser rule, because it reads specifiers with `ts.preProcessFile`, which **SCANS
+rather than RESOLVES** — so it sees `.svelte` files and alias-bearing imports without needing to resolve them,
+which is exactly the capability dependency-cruiser lacks here. That is why the incumbent was written that way,
+and the reason is recorded now rather than rediscovered later. ⭐ The demonstration ran in the required order:
+the probe was shown PASSING `depcruise packages` (*"no dependency violations found (867 modules, 4705
+dependencies cruised)"*, EXIT 0) before anything was changed. ⚠ **The `apps/` arm of the cruiser rule REMAINS
+VACUOUS and is now KNOWN-vacuous with a named owner**, which is a different disposition from a silent one — the
+`packages/rph-` arm still works under `depcruise packages` and is still pinned by
+`verif/dependency-boundary-rules.test.ts:125`.
 
 ⭑ **AND THE FIX ORDER IS THE FINDING'S REAL LESSON.** `ROADMAP` S6 requires a fixture where an `apps/` file
 imports CSAA to be shown **PASSING** the boundary first, then failing after the widening. Without that observed

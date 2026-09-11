@@ -5,7 +5,7 @@
 // thing in this repository that notices two kinds of silent loss:
 //   · a `verif/` TEST FILE disappearing — vitest collects what is on disk, so a deleted file is simply not
 //     collected. `passWithNoTests: false` (verif/test-modes.test.ts) fires only when a whole PROJECT observes
-//     nothing; it cannot see one file of sixty-three go missing. This is N-16's shape one level down.
+//     nothing; it cannot see one file of sixty-four go missing. This is N-16's shape one level down.
 //   · a ROOT GATE COMMAND disappearing from `package.json` — `gate:fast` would simply run a shorter gate.
 // JAN-CSAAEXT moves CSAA out of JPWB, so that pin stops being consulted. Per the programme's Rule 1 —
 // SALVAGE BEFORE DECOUPLE, the rule under which JAN-CSAADEC CD-01/CD-02 survived that programme's withdrawal —
@@ -44,7 +44,7 @@
 // PINNED COUNT, so said out loud rather than left to look like an oversight. That file has TWO detectors — a
 // floor owning collapse and a VANISHED check owning individual loss — so a floor at the population would make
 // one deletion trip both, and an arrangement that trips two guards proves neither. THIS file has exactly ONE
-// detector. A floor below 63 would not redden on a deletion at all, which is the only failure it is here to
+// detector. A floor below 64 would not redden on a deletion at all, which is the only failure it is here to
 // catch. So the floor IS the population, and it is raised deliberately when the population grows.
 //
 // ── WHAT THIS DELIBERATELY DOES NOT CLOSE ─────────────────────────────────────────────────────────────────────
@@ -82,8 +82,12 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * ⚠ IT WAS 62 WHEN FIRST WRITTEN, AND THIS FILE MADE IT 63. Recorded because it is the first instance of the
  * very failure the sentence above warns about, committed in the act of writing that warning: the population was
  * measured before the measuring file existed. A floor is a claim about a population the claimant is inside.
+ *
+ * 63 -> 64 (2026-09-11, JAN-CSAAEXT S2): `verif/product-boundary.test.ts`. ⭑ RAISED BY THE VERY NEXT INCREMENT,
+ * which is the discipline this comment asks for working rather than the warning repeating: the addition did NOT
+ * redden anything — a floor never does — so nothing would have prompted the raise except reading this note.
  */
-const VERIF_TEST_FLOOR = 63;
+const VERIF_TEST_FLOOR = 64;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
