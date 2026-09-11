@@ -2763,6 +2763,16 @@ describe('live JPWB and inventory projection', () => {
 		//   +1 `verif/assurance-surface.test.ts`                   (this commit)  2026-09-11  S1 surface salvage
 		// 73 -> 74 (2026-09-11), JAN-CSAAEXT S2:
 		//   +1 `verif/product-boundary.test.ts`                    (this commit)  2026-09-11  S2 boundary salvage
+		// ⛔ 74 -> 72 (2026-09-11), JAN-CSAAEXT S5 — the FIRST DECREASE this block has ever recorded:
+		//   -1 `verif/svelte-name-projection.test.ts`              (this commit)  2026-09-11  moved into csaa
+		//   -1 `verif/svelte-name-projection.ts`                   (this commit)  2026-09-11  moved into csaa
+		// ⭑ MOVED, NOT DELETED — both now sit at `packages/csaa/src/providers/svelte/name-projection*.ts`, beside
+		// the 612-line provider they consume. Measured before moving: the module had ZERO consumers across every
+		// tracked file, and its one JPWB-subject limb (every application file projects with zero parse
+		// diagnostics) is owned by `svelte-check`, which `apps/rph-demo`'s `check` runs as a `gate:fast` step.
+		// ⚠ EVERY PRIOR ENTRY HERE IS AN INCREASE, AND THAT ASYMMETRY IS WORTH NOTING: a pin that has only ever
+		// been raised has never had its LOWERING discipline tested. This is that test, and the number was lowered
+		// only after the move was checked against this block rather than to quiet the red.
 		// ⭑ CAUGHT BY THE UNFILTERED GATE ON ITS FIRST RUN, which is the SEVENTH time this block records that
 		// route and the second consecutive one. The habit the entry above describes as corrected has stayed
 		// corrected.
@@ -2773,7 +2783,7 @@ describe('live JPWB and inventory projection', () => {
 		// entirely. Until then the pin is live and is maintained here, which is the recurring toll DESIGN §4A
 		// measured across 69 commits and which this increment paid twice — once for the inventory baseline and
 		// once for this count, for a 63-line test.
-		expect(counts.get('verif/tsconfig.json')).toBe(74);
+		expect(counts.get('verif/tsconfig.json')).toBe(72);
 		// 95 -> 97 (JAN-ICP-01): `materialized-input.ts` and its test — the recorder that makes PER-9's E-1
 		// ("the exact materialized input presented to the model") OBTAINABLE. It installs on Pi's documented
 		// `onPayload` seam, which is the only point at which the composed prompt exists: everything JPWB hands

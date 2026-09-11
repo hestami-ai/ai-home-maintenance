@@ -51,7 +51,7 @@ import {
 	UNSCOPED_PROJECTION_POLICY,
 	UNSCOPED_REFUTED_POLICY,
 	type ProjectedSvelte
-} from './svelte-name-projection.js';
+} from './name-projection.js';
 
 /** The one route that carries both dynamic emitters, named once so the two tests that need it cannot drift. */
 const DYNAMIC_ROUTE = 'apps/rph-demo/src/routes/pwa/[id]/+page.svelte';

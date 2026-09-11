@@ -40,7 +40,7 @@ import {
 	SVELTE_TYPESCRIPT_PROVIDER_VERSION,
 	SVELTE_VIRTUAL_SOURCE_IMPLEMENTATION_LIMITS,
 	transformSvelteVirtualSource
-} from '../packages/csaa/src/providers/svelte/svelte-virtual-source.js';
+} from './svelte-virtual-source.js';
 
 /**
  * The provider versions the projection contract is pinned to.

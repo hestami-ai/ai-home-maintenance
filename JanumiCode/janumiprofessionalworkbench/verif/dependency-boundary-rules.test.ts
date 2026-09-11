@@ -1,7 +1,14 @@
-// THE EIGHT DEPENDENCY-CRUISER BOUNDARY RULES ARE WATCHED FROM `verif/` — JAN-CSAADEC CD-01.
+// THE SEVEN DEPENDENCY-CRUISER BOUNDARY RULES ARE WATCHED FROM `verif/` — JAN-CSAADEC CD-01.
+//
+// ⚠ 8 -> 7 (2026-09-11, JAN-CSAAEXT S5): `product-does-not-import-csaa` is REMOVED, not lost. Its `to` was the
+// PATH `^packages/csaa/`, which ceases to exist at S6 — so the rule would become permanently unmatchable while
+// this file's name pin stayed green, which is the control-that-cannot-fail this programme keeps removing. Its
+// guarantee is owned by `verif/product-boundary.test.ts` (S2), which walks `apps/` AND `packages/rph-*` and
+// targets the npm specifier, so it SUBSUMES the rule rather than replacing half of it. The prose below that
+// still says "eight" is historical — the searches and mutants it records were run against eight.
 //
 // ── WHY THIS EXISTS ───────────────────────────────────────────────────────────────────────────────────────────
-// `.dependency-cruiser.cjs` declares the package DAG: eight `forbidden` rules, every one `severity: 'error'`.
+// `.dependency-cruiser.cjs` declares the package DAG: seven `forbidden` rules, every one `severity: 'error'`.
 // depcruise ENFORCES the rules it is handed, so a rule that is WRONG is caught by the cruise itself. What no
 // cruise can see is a rule that has silently STOPPED BEING A RULE — deleted, renamed, downgraded to a warning,
 // or relocated out of `forbidden`. depcruise then exits 0 and reports nothing, because there is nothing left
@@ -37,7 +44,7 @@
 // will not. That is a real subtraction and it is disclosed here rather than omitted.
 //
 // ── THE ANTI-VACUITY FLOOR IS DELIBERATELY NOT `>= PINNED.length` ─────────────────────────────────────────────
-// The obvious floor is `rules.length >= PINNED.length`, i.e. `>= 8` against 8 rules. It is a trap. Deleting one
+// The obvious floor is `rules.length >= PINNED.length`, i.e. `>= 7` against 7 rules. It is a trap. Deleting one
 // rule leaves 7, which reddens the FLOOR and the VANISHED check together — an arrangement that trips two guards
 // proves neither, and the control becomes indistinguishable from its subject on the single mutant that matters
 // most. So the floor is a LOWER constant with its own stated job: it owns POPULATION COLLAPSE and READER
@@ -122,7 +129,6 @@ const PINNED = [
 	'no-circular',
 	'not-to-unresolvable',
 	'ports-purity',
-	'product-does-not-import-csaa',
 	'projections-browser-safe'
 ] as const;
 

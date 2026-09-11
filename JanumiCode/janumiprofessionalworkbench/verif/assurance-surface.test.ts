@@ -86,8 +86,20 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * 63 -> 64 (2026-09-11, JAN-CSAAEXT S2): `verif/product-boundary.test.ts`. ⭑ RAISED BY THE VERY NEXT INCREMENT,
  * which is the discipline this comment asks for working rather than the warning repeating: the addition did NOT
  * redden anything — a floor never does — so nothing would have prompted the raise except reading this note.
+ *
+ * ⛔ 64 -> 63 (2026-09-11, JAN-CSAAEXT S5): `verif/svelte-name-projection.test.ts` MOVED to
+ * `packages/csaa/src/providers/svelte/name-projection.test.ts`, with its module. ⚠ THIS IS THE ONE DIRECTION THE
+ * FLOOR ACTUALLY GUARDS, so lowering it is the one edit that must never be made casually — it is made here
+ * because the population genuinely shrank by a deliberate, recorded move, and NOT because the check complained.
+ * ⭑ The distinction is the whole value of the floor: it reddened (63 against a floor of 64), the move was
+ * checked against this note, and only then was the number lowered. A floor lowered to silence a red is the
+ * failure this guard exists to prevent; a floor lowered to record a move is its intended use.
+ * WHY THE MOVE: measured, `verif/svelte-name-projection.ts` had ZERO consumers across every tracked file, and
+ * its one JPWB-subject limb — that every application file projects with zero parse diagnostics — is owned by
+ * `svelte-check`, which `apps/rph-demo`'s `check` runs as a `gate:fast` step. Its instrument is CSAA's 612-line
+ * svelte provider, so it follows its instrument rather than being vendored into JPWB.
  */
-const VERIF_TEST_FLOOR = 64;
+const VERIF_TEST_FLOOR = 63;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and

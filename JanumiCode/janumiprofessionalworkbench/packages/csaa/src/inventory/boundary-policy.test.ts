@@ -39,25 +39,19 @@ describe('CSAA product dependency boundary', () => {
 	// it false. `CD-05` was withdrawn and `D-1` changed the composition instead, so the reason for that gap
 	// expired and the pin was authored against the post-detachment shape rather than copied.
 
-	it('rejects representative package and app imports of CSAA', () => {
-		const config = require(`${ROOT}.dependency-cruiser.cjs`) as {
-			forbidden: Array<{
-				name: string;
-				from: { path?: string };
-				to: { path?: string };
-			}>;
-		};
-		const rule = config.forbidden.find(
-			(candidate) => candidate.name === 'product-does-not-import-csaa'
-		);
-		expect(rule).toBeDefined();
-		const from = new RegExp(rule!.from.path!);
-		const to = new RegExp(rule!.to.path!);
-		expect(from.test('packages/rph-domain/src/index.ts')).toBe(true);
-		expect(from.test('apps/rph-demo/src/lib/index.ts')).toBe(true);
-		expect(to.test('packages/csaa/src/index.ts')).toBe(true);
-		expect(from.test('packages/csaa/src/index.ts')).toBe(false);
-	});
+	// ⛔ 'rejects representative package and app imports of CSAA' RETIRED — JAN-CSAAEXT S5, 2026-09-11. It looked
+	// up `product-does-not-import-csaa` in `.dependency-cruiser.cjs` and exercised its two regexes against four
+	// representative paths. THE RULE ITSELF IS GONE: its `to` was the PATH `^packages/csaa/`, which ceases to
+	// exist at S6, so the rule would have become permanently unmatchable — a control that cannot fail, which is
+	// worse than none.
+	// ⭑ ITS GUARANTEE IS OWNED STRUCTURALLY RATHER THAN BY REGEX, which is stronger. `verif/product-boundary.test.ts`
+	// WALKS `apps/*` and `packages/rph-*` and reads every module specifier, so:
+	//   · the two `from` limbs (a package path and an app path are both in the perimeter) are the walk's ROOTS;
+	//   · the `to` limb (a csaa path is a violation target) is `targetsCsaa`, exercised by its own third test;
+	//   · ⚠ the fourth limb — `from.test('packages/csaa/…') === false`, i.e. CSAA importing CSAA is NOT a
+	//     violation — holds because `packages/csaa` is never one of the walk's roots. Named explicitly because it
+	//     is the limb most easily lost in a move, being the only NEGATIVE one.
+	// ⚠ AND THE REPLACEMENT WAS GREEN BEFORE THIS WAS REMOVED (S2), per the programme's Rule 1.
 
 	it('excludes generated and ignored output trees from dependency observations', () => {
 		const config = require(`${ROOT}.dependency-cruiser.cjs`) as {

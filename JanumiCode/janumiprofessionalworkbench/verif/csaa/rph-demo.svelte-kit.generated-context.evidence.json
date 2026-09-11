@@ -1244,9 +1244,9 @@
   "inputManifest": [
     {
       "artifactClass": "TOOL_CONFIGURATION",
-      "bytes": 3253,
+      "bytes": 2989,
       "path": ".dependency-cruiser.cjs",
-      "sha256": "40cb8cc68ac40d0bb5f6ffaecc2c07998a87d3fc392c0cc98deaed43c0dcba88"
+      "sha256": "dce3e45c8e8e8a1a368c69b44af23a203f4f24d1302c62238947a4f6355cac6d"
     },
     {
       "artifactClass": "TOOL_CONFIGURATION",
@@ -2407,7 +2407,7 @@
       "sha256": "6b6d5d2c96690409a69387dad19c1589cfba690289bd6500ccf1c54f194b3a74"
     }
   ],
-  "inputManifestDigest": "1bdc1f09c8628d6cafb36f02fbed303850b443d63ce26681afe7cbeb6ec80c75",
+  "inputManifestDigest": "4b82006ae8af50a13247fe82b2ae2c388926a8b381a2c042ca00056d401dd3aa",
   "inputSelectionMethod": "workspace-non-output-artifacts-plus-root-repository-context/1.0.0",
   "outputSelectionMethod": "captured-consumed-generated-configuration-and-declarations/1.0.0",
   "schemaVersion": "jan-csaa-generated-context-evidence/1.0.0"
