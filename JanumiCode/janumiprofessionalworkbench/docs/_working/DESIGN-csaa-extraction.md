@@ -239,7 +239,14 @@ the chosen destination, and it was not in `§8.3`'s costing.
 repository root — which HAS a `scripts/` directory, and it does NOT contain that file. Those five break on the
 move. The coupling was never one-way at the script level; `§3` measured it only at the package-dependency level.
 
-**C · ⚠ DISCLOSURE — JPWB'S CI HAS NEVER RUN, AND IT REFRAMES `§8.2`.**
+**C · ⏸ CI/CD IS A STAGE NOT YET REACHED — ⭐ AND THIS SECTION'S ORIGINAL FRAMING WAS WRONG.**
+
+⚠ **WITHDRAWN: this was first written as a DISCLOSURE that "JPWB's CI has never run"**, which implies a control
+regressed or is being missed. **Sponsor, 2026-09-11:** *"there is no configured CI or CD pipeline or environment
+established so that will have to be deferred until that becomes a more pertinent issue and priority."* ⭐ There is
+nothing to regress. The measurements below are accurate and are retained because ONE CONSEQUENCE SURVIVES the
+correction — **every verifier in this programme is a developer-machine obligation** — but they describe
+scaffolding for a stage not yet reached, not a defect.
 `JanumiCode/janumiprofessionalworkbench/.github/workflows/ci.yml` is tracked, but GitHub Actions executes only
 workflows in the **repository-root** `.github/workflows/`. The root workflow is named `JanumiCode CI` and is
 path-filtered on both triggers to `paths: ['JanumiCode/janumicode/**']` with
@@ -511,8 +518,11 @@ pins conflicting versions; **C** is circular, since the baseline it would read i
 
 ### ⭑ D-2 — the non-vacuity control is DERIVED, never enumerated
 
-**RULED:** JPWB's control is **per-population floors computed from `git ls-files`**, plus exact pins only for
-genuinely singular artifacts. ⛔ **JPWB does NOT re-author a hand-listed path census.**
+**RULED:** ⛔ **JPWB does NOT re-author a hand-listed path census.** ⭐ **AMENDED 2026-09-11 — the original
+form of this ruling was a derived per-population floor over `git ls-files`, and it is WITHDRAWN.** The floors were
+invented to carry the anti-vacuity role of the 303-path census. The **9 SALVAGED path assertions already carry
+it**: they name specific files, so they cannot be satisfied vacuously, and no derived floor is needed to prop
+them up. ⚠ The withdrawn form also failed `ROADMAP` Rule 2 — I could not name what read it.
 
 ⭑ **BECAUSE HAND-LISTING IS WHAT BROKE THE ONE WE ARE REPLACING.** 303 hand-listed paths went 97% stale the
 moment their subject moved, and nothing could have told anyone — the list had no way to notice its own
@@ -551,9 +561,12 @@ asserts the substance:
 - *"lets no package re-introduce a `--passWithNoTests` script, which is how the gate went silent"*
 
 ⭑ This retires the 790-line AST recognizer priced as Tier 2. ⚠ **ONE THING IT DOES NOT COVER, AND THE
-REPLACEMENT IS STRONGER:** the token-stream digest pin on `vitest.projects.ts`. That becomes a **content hash in
-the new baseline** — no AST, no parse ambiguity, and it reddens on any edit rather than only on edits the
-recognizer understands.
+REPLACEMENT IS STRONGER:** the token-stream digest pin on `vitest.projects.ts`. ⭐ **AMENDED 2026-09-11: NOTHING
+REPLACES IT, and the earlier answer here — "a content hash in the new baseline" — is WITHDRAWN.** The digest
+existed so CSAA's STATIC PARSER could trust the file's syntax; that need leaves with the parser. What JPWB needs
+is the file's SEMANTICS, and `verif/test-modes.test.ts` already asserts them — the project set, `passWithNoTests:
+false` on every project, both modes agreeing. ⚠ A content hash would have added only *"someone reformatted it"*,
+which is a finding for no one.
 
 ---
 

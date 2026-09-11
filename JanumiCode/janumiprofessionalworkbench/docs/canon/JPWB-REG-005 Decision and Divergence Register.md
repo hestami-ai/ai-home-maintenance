@@ -34760,3 +34760,68 @@ first place.
 and a name-pinning test is not a test that the named thing works.
 
 **Merge target:** none. ⚠ No ratified artifact was amended.
+
+---
+
+### REG-D-062 — AMENDS `REG-D-061`: the sponsor asked what one of my own inventions was, and answering it deleted four roadmap steps — a replacement built from the SHAPE of what it replaces inherits the justification without the consumers
+
+- **Date:** 2026-09-11 · **Type:** DECISION (amendment; `JAN-CSAAEXT` ROADMAP rev 2) ·
+  **Class:** SELF-REFUTATION — a design I authored one turn earlier, killed by a question I had not asked of it ·
+  **Status:** ⚠ **OPEN.** Supersedes `REG-D-061` `D-2` and `D-4` in part. `D-1`, `D-3`, `D-5`, `D-6` stand unchanged.
+
+**THE SPONSOR'S QUESTION, VERBATIM:** *"Where did Roadmap S1 come from? Or perhaps more pointedly what is the
+JPWB-side manifest gate?"*
+
+⛔ **THE HONEST ANSWER IS THAT I COINED IT.** *"JPWB-side manifest gate"* appears nowhere in the corpus, the
+register, or the code. I introduced it in `REG-D-061` `D-1` and then authored a 13-step roadmap on top of it as
+though it were an established artifact class. ⚠ **This is the exact failure the standing rule names — grep the
+OBLIGATION, never a noun I coined this session — applied not to a search but to a DESIGN.**
+
+**WHAT THE QUESTION EXPOSED.** The proposed gate hashed every JPWB file, committed the list, and re-checked on
+every gate run. ⛔ **It has no consumer.** You satisfy it by regenerating it: edit code → check fails → run the
+writer → check passes. Nothing downstream reads the file, so *"stale"* has no consequence.
+
+⭑⭑ **AND I HAD THE COUNTER-EXAMPLE IN HAND AND MISREAD IT.** I cited `slices:ledger:check` as my model. It works
+because its machine-generated baseline is checked against `docs/tracking/slices/LEDGER.md` — a **HUMAN-AUTHORED
+claim**. The machine disagreeing with the human IS the finding. Mine would have been checked against the tree it
+was generated from. ⛔ `scripts/slice-ledger.ts:4-10` warns about precisely this in its own header, describing
+`tracker:build` as a thing that *"cannot detect staleness at all."* **I built the thing the worked example tells
+you not to build, while citing that worked example as my authority.**
+
+**THE GENERAL FORM — this is the transferable half.** ⭑ *A replacement designed from the SHAPE of the thing it
+replaces inherits that thing's justification without inheriting its consumers.* The incumbent's manifest had a
+real consumer: CSAA's published analysis of JPWB. My copy took the manifest and left the consumer behind. ⛔ The
+test that catches it is one question, now `ROADMAP` Rule 2: **what reads this, and what breaks if it is wrong?**
+
+**WHAT THE RULE DELETED** — four of rev 1's steps:
+
+| deleted | why |
+|---|---|
+| whole-tree sha256 manifest + baseline | no consumer (above) |
+| derived per-population floors | invented to carry the 303-path census's anti-vacuity role; the **9 salvaged path assertions already carry it** — they name specific files and cannot be satisfied vacuously. **AMENDS `D-2`** |
+| `vitest.projects.ts` content pin | the token digest served CSAA's STATIC PARSER, which leaves. JPWB needs the file's SEMANTICS and `verif/test-modes.test.ts` already asserts them. ⭑ **Nothing replaces the digest. AMENDS `D-4`**, whose text said it *"becomes a content hash"* |
+| the equivalence differential | under salvage the replacement IS the incumbent's assertion reproduced, so *"does it catch the same things"* collapses into *"does each salvaged limb redden"* |
+
+**WHAT REPLACES IT — and it was already in the repository.** `verif/dependency-boundary-rules.test.ts:181-188`
+reproduces, as a JPWB-owned test, the assertion CSAA makes about JPWB's `boundary` command — `JAN-CSAADEC`
+`CD-01`/`CD-02`, the two increments that survived that programme's withdrawal. **Continue that salvage.**
+Measured, the complete JPWB-subject residue of `csaa:inventory:check` is:
+
+- **9 required paths** — JPWB's arrow-command-census family (4), its guard-enforcement-ledger family (3),
+  `verif/command-dispatch-census.test.ts`, and `package.json`.
+- **7 root commands** — `boundary`, `check-types`, `gate`, `gate:fast`, `lint`, `test`, `test:coverage`. ⚠ Of the
+  35-entry required-root-command list, **27 are `csaa:*` and leave.**
+- ⛔ **ZERO exact-command pins.** All **27** `assertJpwbAssuranceCommandExact` calls name a `csaa:*` command.
+  **Nothing is salvaged there and nothing should be invented** — inventing one would author a gate against a
+  failure nobody has seen.
+- **1 pin authored fresh:** `gate:fast`'s composition, against the POST-detachment shape.
+  ⭑ `CD-02` declined to reproduce this deliberately (`verif/dependency-boundary-rules.test.ts:177-180`: *"`CD-05`
+  makes that assertion false by design"*). `CD-05` was withdrawn and `D-1` changes the composition anyway, so
+  the reason for the gap has expired.
+
+**ALSO WITHDRAWN HERE — a framing, not a measurement.** `DESIGN §9C` was written as a DISCLOSURE that *"JPWB's CI
+has never run"*, which implies a control regressed. **Sponsor:** *"there is no configured CI or CD pipeline or
+environment established."* ⭐ There is nothing to regress. The measurements stand and one consequence survives —
+**every verifier in this programme is a developer-machine obligation** — but the finding framing is withdrawn.
+
+**Merge target:** none. ⚠ `REG-D-061` `D-2`/`D-4` are amended in place by this entry, not rewritten there.
