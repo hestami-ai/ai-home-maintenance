@@ -34639,3 +34639,124 @@ against invisible characters at all. Owed: extend that population, or state why 
 **GATES:** no product code changed — this entry records a refutation.
 
 **Merge target:** none. ⚠ No ratified artifact was amended.
+
+---
+
+### REG-D-061 — SPONSOR DELEGATION: the check the sponsor ruled we KEEP is 97% a census of the tool that LEAVES, so I kept the guarantee and dropped the coupling — six rulings taken under delegated authority
+
+- **Date:** 2026-09-11 · **Type:** DECISION (delegated ruling; `JAN-CSAAEXT` DESIGN + ROADMAP landed, `1b025623`) ·
+  **Class:** RULING + FINDING — a sponsor ruling met a measurement that refuted it, and the sponsor delegated
+  the resolution · **Status:** ⚠ **OPEN — RATIFICATION OWED on all six.**
+
+**THE SPONSOR'S WORDS, VERBATIM:** *"You will have to use your delegated authority and your vast intelligence
+and deep and broad knowledge of the document corpus to author solutions because I can no longer distinguish the
+tradeoffs you're describing."*
+
+**AND THE RULING IT DELEGATES AWAY FROM, ALSO VERBATIM, ONE MESSAGE EARLIER:** *"Section 8.2 - keep today's
+check."*
+
+⛔ **WHAT MADE THE RULING UNEXECUTABLE.** `csaa:inventory:check` carries 37 `assertRequiredSelectedPaths` call
+sites. Resolving all 37 arguments — **33 bare identifiers and 4 INLINE SPREAD ARRAYS** — and following every
+`...SPREAD` to closure (44 of 44 identifiers resolved, 0 unresolved) yields **303 distinct asserted paths**:
+
+| bucket | distinct | share |
+|---|---|---|
+| `packages/csaa/` | **275** | 90.8% |
+| `scripts/csaa-*` | 19 | 6.3% |
+| `verif/` (JPWB's own) | 8 | 2.6% |
+| `package.json` | 1 | 0.3% |
+
+⭑ **294 of 303 — 97% — are CSAA's OWN FILES. NINE survive the move**, and they are a coherent set: the root
+manifest, JPWB's arrow-command-census family (4) and its guard-enforcement-ledger family (3).
+
+⚠ **TWO EARLIER COUNTS SAID 268, AND BOTH FAILED THE SAME WAY.** A literal-only extractor never expanded `...`
+spreads, so `TYPESCRIPT_SEMANTIC_PROVENANCE` (`collect-inventory.ts:1032-1036`) — which holds **zero direct
+literals and is nothing but three spreads** — contributed **0** to its own guard's count. ⭑ **The general form:
+an extractor that reads only leaves under-reports exactly the constants that were factored for reuse, which are
+the ones most likely to be load-bearing.**
+
+⛔ **AND IT IS MECHANICALLY IMPOSSIBLE, NOT MERELY EXPENSIVE.** The obvious remedy — keep the guards in JPWB and
+repoint them at `../csaa/` — is refused by the engine's own path layer, byte-exact:
+`subject/paths.ts:50-51` `throw new Error(\`Path escapes repository root: ${candidate}\`)`; `:86` rejects any
+segment equal to `..`; `:67` `Symlink or path escapes repository root`. Re-rooting at `JanumiCode/` fails
+independently — no `package.json` there, and `collect-inventory.ts:2654` demands the root manifest be named
+`janumi-professional-workbench`. **So the 275 become permanently unsatisfiable wherever the guard CODE lives.**
+
+**THE SIX RULINGS** (full text at `docs/_working/DESIGN-csaa-extraction.md` §14):
+
+| | ruling | note |
+|---|---|---|
+| **D-1** | Route B — JPWB owns its own manifest gate; the three `csaa:*` steps LEAVE `gate:fast` | ⛔ **AMENDS the sponsor's own §8.2 ruling** |
+| **D-2** | the non-vacuity control is DERIVED from `git ls-files`, never enumerated | independence is mandatory, not stylistic |
+| **D-3** | `assertJpwbGeneratedContext` RETIRED as redundant | retires a 2,410-line closure |
+| **D-4** | `assertJpwbTestPopulations` NOT rebuilt — `verif/test-modes.test.ts` already has it | retires a 790-line AST recognizer |
+| **D-5** | the 275 CSAA paths follow their subject | ⚠ CSAA has no self-directed check today; FILED |
+| **D-6** | controls-that-cannot-fail are fixed in the increment that creates them | each with a named red test |
+
+⭑⭑ **WHY D-1 OVERTURNS A RULING THE SPONSOR MADE THE DAY BEFORE.** *"Keep today's check"* and *"CSAA is not part
+of JPWB"* cannot both hold literally. Keeping the check means `gate:fast` keeps invoking CSAA — now across a
+directory boundary, needing it installed, built and version-matched — which leaves the design's own diagnosis
+true and adds a boundary to it: ⛔ *"JPWB's definition of 'done' starts with a tool that is not JPWB."* The
+sponsor's INTENT (JPWB keeps the assurance it has) is met in full. What changes is who runs it.
+
+⭐ **AND THE COST COLLAPSED ONCE THE QUESTION WAS ASKED CORRECTLY.** Closure analysis priced 1,900–3,600 lines
+of re-homed engine. **That was the price of PORTING CSAA, and we are not porting CSAA.** Every primitive already
+exists in JPWB: `workingSet()` (`verif/slice-ledger.ts:63-70`), the committed-baseline `:check` idiom
+(`slices:ledger:check`), the anti-vacuity controls (`verif/test-modes.test.ts`), and a worked example that names
+its model in its own header (`scripts/slice-ledger.ts:4-10`, *"MODELLED ON `csaa:inventory:check`"*). What is new
+is a whole-tree sha256 manifest plus a baseline compare.
+
+⚠ **RULING 2'S ONE CLEAN WIN, WHICH SURVIVES THE AMENDMENT.** It dissolved a sequencing trap: `collect-inventory.ts:2833-2840`
+asserts `gate:fast` literally BEGINS with the two CSAA steps, so removing them would redden the check that
+removing them was meant to retire. Under D-1 the edit is harmless **only because the complaining check is
+removed in the same commit** — which is why `ROADMAP` S8 forbids splitting it across two.
+
+**SEARCHED.** `REG-F-376` was MIS-CITED in the design's first draft as *"the failure measured across six
+programmes"*; it is titled *"CSAA's suite needs the workbench for THREE of its 188 files"* — the opposite
+coupling. The real record is register line 34135: six consecutive programmes moved a pinned CSAA population
+without noticing **because every author ran vitest with named `--project` filters**. ⭑ That is *"a check existed
+and nobody ran it"*, not *"no check existed"* — and it argues FOR D-1, not against it.
+
+**Merge target:** none yet. ⚠ Ratification of D-1..D-6 is owed before `ROADMAP` S1 is authored.
+
+---
+
+### REG-F-389 — a boundary rule's `apps/` arm has never been able to fire, because the gate hands the scanner one root and the rule names two
+
+- **Date:** 2026-09-11 · **Type:** FINDING (`JAN-CSAAEXT`, found while costing `§8.2`) ·
+  **Class:** A CONTROL THAT CANNOT FAIL — live on `main`, and independent of the programme that found it ·
+  **Status:** ⚠ **OPEN.** Remedy is `ROADMAP` S6.
+
+**THE RULE, BYTE-EXACT** (`.dependency-cruiser.cjs:64-70`):
+
+```
+name: 'product-does-not-import-csaa',
+comment: 'CSAA observes product source as data; product packages and apps must not depend on the analyzer.',
+severity: 'error',
+from: { path: '^(packages/rph-|apps/)' },
+to: { path: '^packages/csaa/' }
+```
+
+**THE GATE THAT RUNS IT** (`package.json:18`):
+`"boundary": "depcruise packages --config .dependency-cruiser.cjs && bun run scripts/csaa-product-boundary.ts"`
+
+⛔ **`depcruise packages` IS A SINGLE POSITIONAL SCAN ROOT.** No file under `apps/` ever enters the cruised
+graph, and dependency-cruiser can only report violations on files it scanned. **So the `apps/` arm of `from:`
+has never been able to fire** — the rule's own comment promises *"packages and apps"* and the invocation
+delivers packages.
+
+⚠ **THE ONLY THING ENFORCING THE APP-SIDE PROHIBITION IS A CSAA SCRIPT** — `scripts/csaa-product-boundary.ts`,
+whose `perimeter` is `['apps','packages']`. ⛔ So the recorded remedy *"retarget `to:` to the npm specifier, a
+one-line fix"* is **necessary but NOT sufficient**: extraction would delete the only live app-side guard and
+replace it with one that was already vacuous. The perimeter must also widen to `depcruise packages apps`.
+
+⭑ **AND THE FIX ORDER IS THE FINDING'S REAL LESSON.** `ROADMAP` S6 requires a fixture where an `apps/` file
+imports CSAA to be shown **PASSING** the boundary first, then failing after the widening. Without that observed
+red, widening the perimeter is a change nobody can prove did anything — which is how this defect survived in the
+first place.
+
+**SEARCHED.** `verif/dependency-boundary-rules.test.ts:125` pins the rule NAME in an 8-name list with
+`COLLAPSE_FLOOR = 4`. ⚠ **It asserts the rule is DECLARED, not that it FIRES** — so the pin was green throughout,
+and a name-pinning test is not a test that the named thing works.
+
+**Merge target:** none. ⚠ No ratified artifact was amended.
