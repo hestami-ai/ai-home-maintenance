@@ -11,7 +11,20 @@
 export interface GuardEntry {
 	/** Exported VALUES imported by at least one non-test, non-tooling module. Sorted, so the diff is readable. */
 	readonly consumedExports: readonly string[];
-	/** Declared, measurable mutants whose `file` is this file. */
+	/**
+	 * Declared, measurable mutants whose `file` is this file.
+	 *
+	 * ⚠⚠ **DISCLOSED WEAKNESS: THIS IS A PER-FILE COUNT, AND THE UNIT OF OBLIGATION IS THE PER-EXPORT PROMISE.**
+	 * Nothing here attributes a mutant to the export it actually attacks, so `outstandingObligation` treats
+	 * guards as FUNGIBLE WITHIN A FILE — six mutants piled on one export discharge a six-export file completely.
+	 * Measured instance: `assurance-rules.ts` reports 6 exports and 2 guards, i.e. "owes 4", and BOTH guards sit
+	 * on `BLOCKING_SEVERITIES`; five of its exports are bare, not four.
+	 *
+	 * ⭑ IT IS STATED RATHER THAN LEFT TO BE DISCOVERED, and it is FIXABLE with machinery that already exists:
+	 * every mutant's anchor resolves to a line range (`scope-core.ts#anchorRange`) and every exported
+	 * declaration has a span, so attribution is an intersection rather than a new record. Until that lands, the
+	 * obligation figure is a LOWER BOUND on the work and the ratchet is weaker than its name suggests.
+	 */
 	readonly mutants: number;
 }
 

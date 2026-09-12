@@ -374,8 +374,31 @@ surfaced.
   move together.
 
   ⚠ **ZERO SURVIVORS HERE DOES NOT REFUTE THE <10% PROJECTION.** These were the three SMALLEST packages, and
-  `S3.0` already established that size predicts nothing about guardedness. 195 guards remain across seven
-  packages, `rph-application` alone holding 89.
+  `S3.0` already established that size predicts nothing about guardedness.
+
+  **INCREMENT 2a LANDED (2026-09-12): `rph-assurance` and `rph-contracts` at ZERO.** 11 files, 39 owed exports,
+  **41 guards declared, 41 KILLED, 0 surviving.** Obligation **195 → 156**; unguarded files **49 → 40**.
+  ⭐ **SIX of ten packages are now at zero.** 41 guards for 39 exports, because two exports got BOTH a refusing
+  and an admitting half — the discipline holding under delegation rather than only when done by hand.
+
+  ⭐ **THE ANCHOR INSTRUCTION WAS MADE STRUCTURAL AND THE REJECTION RATE WENT 1 → 0.** Increment 1's failure was
+  not carelessness, so "be careful" was not the fix. Agents are now told to prefer SHORT, SINGLE-LINE, PURELY
+  ASCII anchors, to report `anchorHasEscapes`, and to DERIVE the anchor from file bytes. They reported back in
+  those terms — *"extracted programmatically by line-slicing… I never typed an anchor"*, and one found its target
+  held 29 non-ASCII bytes and chose an ASCII-only slice deliberately. **The failure mode was anticipated instead
+  of hit.**
+
+  ⚠ **ONE `NO_COMPILE`, AND IT WAS TRAP (b) AGAIN** — an agent mutated `f.severity === 'BLOCKING'` into
+  `f.severity === 'CONDITIONALLY_SATISFIED'`, comparing a `Severity` against a `Disposition` (TS2367). It
+  mutated the COMPARISON rather than the CONSEQUENCE, which is the trap named in the instruction it was given.
+  Reformulated to downgrade the returned disposition, which leaves every type intact and attacks the same
+  promise. ⭑ Caught by PREFLIGHT before any test ran, which is what preflight is for.
+
+  ⚠ **AND AN OPERATIONAL HAZARD WORTH THE RECORD: a subagent wrote into the orchestrator's scratch directory and
+  OVERWROTE a file in use.** Harmless here, but parallel agents sharing one scratch directory will collide with
+  each other and with their caller. At this fan-out they need private scratch.
+
+  **156 guards remain across four packages**, `rph-application` alone holding 89.
 - ⚠ **S3.4 the dead-surface audit: still filed, not done.**
 
 ---

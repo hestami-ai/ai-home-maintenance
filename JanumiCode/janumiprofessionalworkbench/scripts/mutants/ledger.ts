@@ -3701,5 +3701,379 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-persistence/src/sqlite-artifact-store.test.ts'],
 		why: 'THE LIMB THE OBVIOUS ASSERTION CANNOT REACH. Comparing the ref against the constant passes whenever BOTH SIDES MOVE TOGETHER, so aliasing the constant to the in-memory store\'s identifier leaves that check green while making the two stores indistinguishable to every consumer of a ref. Distinctness is a separate claim from consistency and needs its own limb.',
 		source: 'JAN-PFA R3 S3.3 burn-down increment 1'
+	},
+	{
+		id: "MU-PFA-BD2-09-risk-ladder-inverted",
+		file: "packages/rph-assurance/src/applicability.ts",
+		find: "\t\t\treturn actualIdx >= 0 && requiredIdx >= 0 && actualIdx >= requiredIdx;",
+		replace: "\t\t\treturn actualIdx >= 0 && requiredIdx >= 0 && actualIdx <= requiredIdx;",
+		expectRed: ["packages/rph-assurance/src/applicability.test.ts"],
+		why: "RISK_AT_LEAST promises a monotone LOWER bound on the subject's risk profile - true exactly when the subject's actual risk sits at or above the declared level. Inverting the ladder comparison turns it into an upper bound, so the risk-gated applicability that rph-engine/src/governing-policies.ts and rph-application/src/handlers/assurance.ts resolve policies, disposition conditions, waiver revalidation and escalation triggers with would fire on the lowest-risk subjects and silently NOT apply to CRITICAL ones.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-11-category-ignores-code-mapping",
+		file: "packages/rph-contracts/src/errors.ts",
+		find: "\t\tcategory: ERROR_CODE_CATEGORY[code],",
+		replace: "\t\tcategory: 'VALIDATION',",
+		expectRed: ["packages/rph-contracts/src/errors.test.ts"],
+		why: "makeRphError's whole contract is that `category` is DERIVED from the canonical code->category mapping, so the coarse bucket on every RphError in CommandResult.error, events and observations always agrees with the code. The file's own comment records that hosts route on category (the RPH_IDEMPOTENCY_CONFLICT note deliberately moves a refusal from VALIDATION to CONCURRENCY); pinning the field to a constant makes every code report the same bucket, so any consumer routing on category mis-routes while the payload still parses as a valid RphError.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-11-thrown-message-drops-code",
+		file: "packages/rph-contracts/src/errors.ts",
+		find: "\t\tsuper(`${error.code}: ${error.message}`);",
+		replace: "\t\tsuper(error.message);",
+		expectRed: ["packages/rph-contracts/src/errors.test.ts"],
+		why: "RphErrorException is the fail-loud throw for invariant breaches, and its promise is that the Error.message a catch-all handler or log line sees is self-classifying — it names the RphErrorCode, not just prose. Dropping the code from the super() message leaves every caller that only has the Error (rph-domain/src/stateMachine.ts throws it; generic handlers log err.message) unable to tell an invariant violation from any other throw without reaching into the structured payload.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-07-schema-id-version-segment-drifts",
+		file: "packages/rph-contracts/src/validate.ts",
+		find: "\treturn `${SCHEMA_URI_PREFIX}:${category}:${name}:${version}`;",
+		replace: "\treturn `${SCHEMA_URI_PREFIX}:${category}:${name}:${version + 1}`;",
+		expectRed: ["packages/rph-contracts/src/json-schema.test.ts"],
+		why: "schemaId promises a STABLE id whose last segment is the schema version; the 107+ committed artifacts under packages/rph-contracts/schemas/ bake that exact string into their `$id` (e.g. `urn:janumi:rph:schema:object:ObjectEnvelope:1`) and external client generators resolve schemas by it. Emitting a different version segment for the same schema silently desynchronizes every published `$id` from what consumers pin.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-07-json-schema-wrong-dialect",
+		file: "packages/rph-contracts/src/validate.ts",
+		find: "{ target: 'draft-2020-12' }",
+		replace: "{ target: 'draft-07' }",
+		expectRed: ["packages/rph-contracts/src/json-schema.test.ts"],
+		why: "jsonSchemaFor promises a Draft 2020-12 document as the single source for the committed schemas/ artifacts (docs D4). Zod sets `$schema` (and `$defs` vs `definitions`, and `$ref` handling) from that target, so the emitted contract would declare a dialect the Ajv2020 validator and any `schemas/`-driven client generator do not compile as 2020-12.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-07-validation-issues-dropped",
+		file: "packages/rph-contracts/src/validate.ts",
+		find: "\t\t\t\tissues: parsed.error.issues.map((i) => ({",
+		replace: "\t\t\t\tissues: parsed.error.issues.slice(0, 0).map((i) => ({",
+		expectRed: ["packages/rph-contracts/src/validate.test.ts"],
+		why: "validateAgainst promises that a boundary refusal carries STRUCTURED issues, not just a code: the command bus propagates `details.issues` unchanged (rph-application/src/command-bus.ts:320) and the enforcement register resolves a SCHEMA row's `<issueCode>@<dottedPath>` marker by equality against `error.details.issues` (rph-domain/src/enforcement-register.ts:4067). Emptying the array still refuses, but no consumer can say WHICH field failed.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-10-boundary-pseudo-disposition-recorded-as-satisfied",
+		file: "packages/rph-assurance/src/recording.ts",
+		find: "return 'INCONCLUSIVE';",
+		replace: "return 'SATISFIED';",
+		expectRed: ["packages/rph-assurance/src/recording.test.ts"],
+		why: "assuranceRecordingPlan promises that the boundary-only pseudo-dispositions (VALIDATOR_FAILED / BOUNDARY_REJECTED, §8.13) are folded into the recordable INCONCLUSIVE that blocks the gate, never into an authoritative admission; the mutant makes a malformed or non-independent Validator result record as SATISFIED. packages/rph-engine/src/record-assurance.ts relies on exactly this (its own header: \"Boundary pseudo-dispositions were already folded to INCONCLUSIVE by assuranceRecordingPlan\") and completes the governed ASSURANCE_ASSESSMENT to the plan's `disposition` verbatim, so the governed stream would assert that AI-produced work passed assurance when no authoritative finding was ever made.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-05-blocking-finding-no-longer-rejects",
+		file: "packages/rph-assurance/src/assurance-rules.ts",
+		find: "\tif (open.some((f) => f.severity === 'BLOCKING')) return 'REJECTED';",
+		// ⚠ REFORMULATED AFTER A NO_COMPILE. The authored form compared `f.severity` against
+		// `'CONDITIONALLY_SATISFIED'`, which is a Disposition and not a Severity — TS2367, so the mutant never
+		// reached a test. That is trap (b) in this header: it mutated the COMPARISON rather than the
+		// CONSEQUENCE. Downgrading the returned disposition leaves every type intact and attacks the same
+		// promise: an open BLOCKING finding must REJECT, not conditionally satisfy.
+		replace: "\tif (open.some((f) => f.severity === 'BLOCKING')) return 'CONDITIONALLY_SATISFIED';",
+		expectRed: ["packages/rph-assurance/src/assurance-rules.test.ts"],
+		why: "The §10.3 ladder promises that an OPEN BLOCKING finding forces REJECTED and can never be downgraded to a conditional pass — the Assurance Service overrides a validator's SATISFIED recommendation on exactly this rung, and BLOCKING_SEVERITIES is exported so callers asking 'does this block?' get the ladder's own answer. The mutant keeps the check but turns its refusal into CONDITIONALLY_SATISFIED, so work proceeds with conditions on a blocking finding and the exported set now disagrees with the ladder it mirrors.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-05-aggregate-needs-unanimous-rejection",
+		file: "packages/rph-assurance/src/assurance-rules.ts",
+		find: "\tif (required.some((a) => a.disposition === 'REJECTED')) return 'REJECTED';",
+		replace: "\tif (required.every((a) => a.disposition === 'REJECTED')) return 'REJECTED';",
+		expectRed: ["packages/rph-assurance/src/assurance-rules.test.ts"],
+		why: "The aggregate promises the STRICTEST UNRESOLVED disposition among required policies, never an average or a vote (§28.2 / Inv-17): one rejected required policy dominates however many satisfied ones surround it. Requiring unanimity makes rejection dilutable by adding satisfied required policies, which is precisely the averaging the rule forbids; every consumer that reads an aggregate to gate release relies on one REJECTED being enough.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-05-inadmissible-evidence-reported-admissible",
+		file: "packages/rph-assurance/src/assurance-rules.ts",
+		find: "\treturn { admissible: failed.length === 0, failed };",
+		replace: "\treturn { admissible: failed.length >= 0, failed };",
+		expectRed: ["packages/rph-assurance/src/assurance-rules.test.ts"],
+		why: "The promise is that absence of ANY of the 8 conditions makes the evidence inadmissible (§6.2), and `admissible` is the single boolean the Evidence admission path reads before a claim may be SATISFIED (Inv-3) — packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts asserts on `verdict.admissible` directly. The mutant still collects every failure but reports success alongside it, which is the cannot-fail-guard shape REG-F-008 recorded in this very function, now moved to the verdict itself.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-05-independence-violation-reports-independent",
+		file: "packages/rph-assurance/src/assurance-rules.ts",
+		find: "\tconst fail = (reason: string) => ({ independent: false, reason });",
+		replace: "\tconst fail = (reason: string) => ({ independent: true, reason });",
+		expectRed: ["packages/rph-assurance/src/assurance-rules.test.ts"],
+		why: "checkIndependence promises that an unmet independence requirement yields independent:false, because §8 / Inv-8 makes independence a precondition for SATISFIED and classifyValidatorResult boundary-rejects a result whose independence is unsatisfied. The mutant leaves every dimension's test and diagnostic reason intact while flipping the verdict to satisfied, so a producer evaluating its own output on the same model, org or a non-human evaluator is admitted as independent and still carries the word 'same model' as its reason.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-05-crashed-validator-classified-valid",
+		file: "packages/rph-assurance/src/assurance-rules.ts",
+		find: "\t\treturn { klass: 'VALIDATOR_FAILED', reason: 'validator execution failed' };",
+		replace: "\t\treturn { klass: 'VALID', reason: 'validator execution failed' };",
+		expectRed: ["packages/rph-assurance/src/assurance-rules.test.ts"],
+		why: "The classifier's promise to the Assurance Service (§34, Inv-9/10) is that ONLY a VALID result may be turned into an authoritative disposition, and a validator execution failure is VALIDATOR_FAILED — a statement about the validator, never about the subject. Classifying a crashed validator's output VALID hands the recommendation of a run that did not complete straight into authoritative state, collapsing the distinction the whole boundary exists to hold.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-06-floor-drops-the-mandatory-reasoning-review",
+		file: "packages/rph-assurance/src/floor-policies.ts",
+		find: "\tIDENTITY_PROVENANCE,\n\tREASONING_REVIEW\n];",
+		replace: "\tIDENTITY_PROVENANCE\n];",
+		expectRed: ["packages/rph-authoring/src/catalog.floor-consistency.test.ts"],
+		why: "FLOOR_POLICY_DEFINITIONS promises the COMPLETE de minimis floor — §8.4 mandates all three and §8.10 makes Reasoning Review the non-suppressible floor for AI-produced work. It is the single list both production seeders read (seed-workbench.seedFloorPolicies and reference-undertaking both `for (const def of FLOOR_POLICY_DEFINITIONS)`), plus floor-fixtures and two verif censuses, so dropping the AI-work floor silently un-seeds its ASSURANCE_POLICY object everywhere at once and leaves the browser catalog's F-13 label map with an id the server store cannot name.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-06-finding-out-claims-its-policy-action",
+		file: "packages/rph-assurance/src/floor-policies.ts",
+		find: "\t\t\t...policy.permittedControlActions",
+		replace: "\t\t\t'RETRY', ...policy.permittedControlActions",
+		expectRed: ["packages/rph-engine/src/seed-finding-definitions.test.ts"],
+		why: "findingsFor promises that a finding CANNOT out-claim its own policy: `defaultControlActions` is DERIVED from the policy's `permittedControlActions` at construction rather than repeated per finding, which is what the floorPolicy doc calls the structural guarantee that makes it 'impossible for a finding to claim an action its own policy does not permit'. Nothing else enforces that subset — the handler's §11 subset gate (assurance.ts rejectUnpermittedControlActions / the create-time check) covers remediationRules and validator recommendations, never findingDefinitions — so this derivation is the only thing standing between a seeded finding and an action its policy forbids.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-06-humanized-name-loses-sentence-case",
+		file: "packages/rph-assurance/src/floor-policies.ts",
+		find: "\treturn words.charAt(0).toUpperCase() + words.slice(1);",
+		replace: "\treturn words;",
+		expectRed: ["packages/rph-engine/src/seed-finding-definitions.test.ts"],
+		why: "humanizeCode promises §9.1's `name` is a MECHANICAL sentence-casing of an existing finding code (SOLUTION_SUBSTITUTION -> 'Solution substitution') — the claim that licenses calling all 99 seeded FindingDefinition names transcribed rather than authored, and the property seed-workbench.ts records as load-bearing ('humanizeCode sentence-cases' is why it is deliberately NOT used for published type names). Every seeded finding name, floor and additive, reaches the store through it via findingsFor, so dropping the casing silently re-authors all of them.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-08-rphid-schema-accepts-any-string",
+		file: "packages/rph-contracts/src/ids.ts",
+		find: "export const RphIdSchema = z.string().regex(RPH_ID_REGEX);",
+		replace: "export const RphIdSchema = z.string();",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "RphIdSchema's whole promise is STRUCTURAL: an id is `<lowercase-prefix>_<ULID>` (docs §5), and line 2 of this file states that human-readable display labels like \"FSM-ARCH-001\" are NEVER ids. Its one consumer, `envelopes.ts:50`, installs it as `objectEnvelopeShape.id` — the shape every concrete PWO schema spreads — so without the regex any arbitrary string is accepted as an object's persisted identity and a display label validates as an id.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-08-mintid-prefix-not-from-registry",
+		file: "packages/rph-contracts/src/ids.ts",
+		find: "ID_PREFIXES[entity]",
+		replace: "entity.toLowerCase()",
+		expectRed: ["packages/rph-contracts/src/ids.test.ts"],
+		why: "mintId promises an id for a REGISTERED entity: the prefix is the one the ratified registry assigns, and `ids.test.ts` holds ID_PREFIXES equal to `canonical-vocabulary.json`'s `idPrefixRegistry` precisely so that binding cannot drift. Deriving the prefix from the entity NAME instead still satisfies RPH_ID_REGEX and RphIdSchema, so every structural guard stays green while `command-bus.ts:147` begins stamping domain events `event_…` instead of `evt_…` and prefix-selecting consumers (`startsWith('pwu_')`, `startsWith('mex_')`) silently match nothing.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-04-rename-the-canonical-floor-policy-id",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\tREASONING_REVIEW: 'floor.reasoning-review'",
+		replace: "\tREASONING_REVIEW: 'floor.reasoning-review-v2'",
+		expectRed: ["packages/rph-authoring/src/catalog.floor-consistency.test.ts"],
+		why: "FLOOR_POLICY_IDS is the single canonical IDENTITY of the three de minimis floor policies, and three authorities are pinned to it rather than to each other: floor-policies.ts mints FLOOR_POLICY_DEFINITIONS[].policyId from it (the values seeded as the ASSURANCE_POLICY objects), rph-application's floor-gate.ts builds FLOOR_POLICY_IDS_REQUIRED from it, and the browser-safe rph-authoring catalog CANNOT import it (node:crypto) so it duplicates the three ids as literals by design. Renaming one splits the store identity from the display identity, which is exactly the silent drift the F-13 guard exists to refuse.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-04-drop-reasoning-review-model-independence",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\t\t\tindependence: 'DIFFERENT_MODEL'",
+		replace: "\t\t\tindependence: 'NONE'",
+		expectRed: ["packages/rph-assurance/src/floor.test.ts"],
+		why: "The plan's documented guarantee is that an AI-produced subject's Reasoning Review requires MODEL-LEVEL independence from the producer (exec != assurance, Inv-8). 'NONE' makes checkIndependence return independent for every evaluator, so composeAssuranceOutcome stops boundary-rejecting a self-review and the producing model can satisfy the floor on its own output — the one thing the step exists to prevent.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-04-downgrade-a-schema-failure-below-blocking",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\t\t\tseverity: 'CRITICAL',",
+		replace: "\t\t\tseverity: 'MATERIAL',",
+		expectRed: ["packages/rph-assurance/src/floor.test.ts"],
+		why: "The validator promises in terms that a schema failure is CRITICAL, and the severity is not decoration: recording.ts:106 persists it verbatim onto the canonical ASSURANCE_OBSERVATION, and the gates that read the recorded object ask severity membership of BLOCKING_SEVERITIES = {BLOCKING, CRITICAL} (reject-authorization.ts, governance.ts's baseline gate) rather than re-deriving the disposition. MATERIAL only CONDITIONALLY satisfies in the §10.3 ladder, so a recorded schema failure stops blocking for every consumer that asks the severity.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-04-observe-the-met-elements-instead-of-the-missing",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\t\t.filter((c) => c.outcome === 'NOT_MET')",
+		replace: "\t\t.filter((c) => c.outcome === 'MET')",
+		expectRed: ["packages/rph-assurance/src/floor.test.ts"],
+		why: "The validator promises that ANY missing identity/version/provenance/producer/trace element surfaces as an OPEN BLOCKING observation — the finding-type record recording.ts writes and the open-blocking-observation gates downstream read. Inverted, a subject with no provenance emits NO observation at all (the gate sees a clean result) while the five satisfied elements are reported as open BLOCKING findings: the instrument reports the exact complement of what it measured.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-04-open-the-gate-on-anything-but-rejected",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\t\tgatePermitsTransition: aggregate === 'SATISFIED'",
+		replace: "\t\tgatePermitsTransition: aggregate !== 'REJECTED'",
+		expectRed: ["packages/rph-assurance/src/floor.test.ts"],
+		why: "composeAssuranceOutcome's stated contract is that the protected downstream transition opens on a SATISFIED aggregate ONLY, and the blocked cases are precisely the ones that are NOT REJECTED: a MISSING floor result aggregates to UNASSESSED, and VALIDATOR_FAILED / BOUNDARY_REJECTED deliberately map to INCONCLUSIVE rather than REJECTED (§8.13, Inv-9/10) so that a failed control can never be read as an authoritative finding. This mutation converts that careful distinction into permission — 'assurance never completed' becomes a pass for the rph-application floor gate that consumes this boolean.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-timestamp-admits-offset",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "export const RfcTimestampSchema = z.iso.datetime();",
+		replace: "export const RfcTimestampSchema = z.iso.datetime({ offset: true });",
+		expectRed: ["packages/rph-contracts/src/json-schema.test.ts"],
+		why: "The promise is an RFC-3339 instant in UTC with offsets and local times REFUSED (DOC-007 §4), and it is the promise behind every createdAt/updatedAt/issuedAt/occurredAt plus the committed schemas/ artifacts external clients generate from. Admitting '...T22:00:00+02:00' lets two records name the same instant with different bytes, so contentHash canonicalization and any string ordering of timestamps stop agreeing with each other.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-nonnegative-admits-negative",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "export const NonNegativeIntSchema = z.number().int().nonnegative();",
+		replace: "export const NonNegativeIntSchema = z.number().int();",
+		expectRed: ["packages/rph-contracts/src/json-schema.test.ts"],
+		why: "Its name IS its contract: the shared primitive behind schemaVersion/semanticVersion/revision and envelopes.ts's aggregateRevision guarantees a floor of 0. A negative revision is unreachable from the engine (newRevision = events.length) so it can only arrive from a caller, and the emitted schemas would stop telling external clients that 0 is the floor — the nonnegative conjunct is the half of this export that no behavioural test asserts.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-schema-version-unconstrained",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "export const SchemaVersionSchema = NonNegativeIntSchema;",
+		replace: "export const SchemaVersionSchema = z.number();",
+		expectRed: ["packages/rph-contracts/src/json-schema.test.ts"],
+		why: "The PAYLOAD schema version drives upcaster selection, and envelopes.ts stamps it on the object envelope, commandSchemaVersion, eventSchemaVersion and every extension record. De-linking the alias from the constrained primitive admits 1.5 or -1, which no upcaster can match and which contentHash then refuses after the contract has already accepted it.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-semantic-version-admits-fraction",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "export const SemanticVersionSchema = NonNegativeIntSchema;",
+		replace: "export const SemanticVersionSchema = z.number();",
+		expectRed: ["packages/rph-contracts/src/number-integrity.test.ts"],
+		why: "The MEANING version is relied on by handlers that compare it by exact equality (approvedSemanticVersion / policySemanticVersion) and by contentHash, which refuses a non-integer in hashed state. A fractional semanticVersion accepted here is accepted by the contract and then thrown out of Engine.dispatch as a CanonicalJsonError — the exact REG-F-018 drift this file's constraint exists to close.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-revision-rejects-zero",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "export const RevisionSchema = NonNegativeIntSchema;",
+		replace: "export const RevisionSchema = PositiveIntSchema;",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "The concurrency revision promises that 0 is a LEGITIMATE value: kit.ts commits newRevision = alsoEvents.length, so a freshly created aggregate sits at revision 0, and every object envelope plus every expectedRevision compare-and-swap depends on 0 being expressible. Tightening to positive makes every newly created object fail envelope validation and makes the first update to each one unvalidatable.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-03-extension-data-defaulted",
+		file: "packages/rph-contracts/src/common.ts",
+		find: "data: z.record(z.string(), z.unknown())",
+		replace: "data: z.record(z.string(), z.unknown()).default({})",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "This is declared the ONLY forward-compatible extensibility channel, so refusal is the whole mechanism by which a malformed extension is noticed — an extension must be namespaced, schema-versioned AND carry the data it claims. Substituting {} silently turns a producer's dropped or misnamed payload into an accepted, empty extension, so the one channel the corpus left open loses content with no reader ever learning.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-actor-reference-admits-an-anonymous-actor",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\tactorId: z.string().min(1),\n\tactorType: ActorTypeSchema,\n\tdisplayName: z.string().min(1),",
+		replace: "\tactorId: z.string(),\n\tactorType: ActorTypeSchema,\n\tdisplayName: z.string(),",
+		expectRed: ["packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts"],
+		why: "ActorReferenceSchema promises that every reference NAMES somebody — a non-empty actorId and a non-empty displayName — and the enforcement register leans on exactly that: RPH-EVD-003's producing-actor half is recorded as SCHEMA-FORECLOSED rather than handler-enforced, so ProposeEvidence.producedBy has no other guard, and objectEnvelopeShape.createdBy/updatedBy plus DomainEvent.actor have none either. BOTH limbs must be loosened in one mutation because the sole fixture asserting the refusal zeroes BOTH fields, so a single-field mutant would be killed by the other field's refusal and prove nothing.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-object-envelope-admits-undeclared-properties",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "export const ObjectEnvelopeSchema = z.strictObject(objectEnvelopeShape);",
+		replace: "export const ObjectEnvelopeSchema = z.object(objectEnvelopeShape);",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "RPH-CON-002: the object envelope is CLOSED — unknown properties are REFUSED and extensibility flows only through extensions[]. validateAgainst() at every write boundary depends on that refusal to raise RPH_VALIDATION_SCHEMA_FAILED, and schemas/objects/ObjectEnvelope.json publishes additionalProperties:false to clients who generate against it; widened to z.object the key is silently stripped, so untrusted fields vanish without a refusal and the published contract describes an enforcement that no longer happens.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-envelope-shape-admits-a-fractional-semantic-version",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\tsemanticVersion: SemanticVersionSchema,",
+		replace: "\tsemanticVersion: z.number(),",
+		expectRed: ["packages/rph-contracts/src/number-integrity.test.ts"],
+		why: "objectEnvelopeShape is the shape all 22 generated object schemas spread, so its field constraints are the ONLY place the version quartet is constrained for every Professional Work Object; REG-F-018 binds semanticVersion to contentHash's refusal of non-integers (\"a float in hashed content is a modeling smell and is rejected loudly\"). Loosening it to a bare z.number() re-opens the drift where the contract admits a value the store's canonicalizer throws on, which is the defect ArtifactObjectSchema.byteSize already exhibited in production dispatch.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-command-admits-a-malformed-issued-at",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\t\tissuedAt: RfcTimestampSchema,",
+		replace: "\t\tissuedAt: z.string(),",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "RPH-CON-004: a command carrying a non-RFC-3339 timestamp must fail schema validation, and command-bus.ts relies on DomainCommandSchema to catch it at the envelope — before idempotency and before the payload. kit.ts makeEvent copies command.issuedAt verbatim into every produced event's occurredAt, so admitting '2026-07-10' here writes a malformed timestamp into the event store that no downstream check re-examines.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-event-envelope-refuses-an-aggregates-first-event",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\t\taggregateRevision: NonNegativeIntSchema,",
+		replace: "\t\taggregateRevision: NonNegativeIntSchema.min(2),",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "DomainEventSchema's documented guarantee is over aggregateRevision — monotonic, equal to prior + 1 — which means it must ADMIT an aggregate's creation event at revision 1, the first thing every handler emits via kit.ts makeEvent and the first thing the StorageAdapter appends. A floor of 2 makes every aggregate's birth unrepresentable; this is the admitting-half direction (MU-PFA-S03-B's shape) and it is the only killable direction, because nothing in the repository asserts any REFUSAL by this schema.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-command-result-cannot-report-a-refusal",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\tproducedEventIds: z.array(z.string()),",
+		replace: "\tproducedEventIds: z.array(z.string()).min(1),",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "CommandResultSchema promises that a REFUSAL is a representable outcome — CONFLICT / VALIDATION_FAILED with producedEventIds EMPTY and an RphError attached — which is what every dispatch caller receives instead of a throw, and what schemas/objects/CommandResult.json publishes to clients. Requiring at least one produced event makes every refused command's result invalid, so the shape would only describe the happy path; this is the admitting half, the only killable direction since nothing asserts a refusal by this schema.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-01-provenance-forbids-a-root-object",
+		file: "packages/rph-contracts/src/envelopes.ts",
+		find: "\tsourceObjectIds: z.array(z.string()),",
+		replace: "\tsourceObjectIds: z.array(z.string()).min(1),",
+		expectRed: ["packages/rph-contracts/src/envelopes.test.ts"],
+		why: "ProvenanceRecordSchema promises that lineage is always DECLARED and may legitimately be EMPTY: a ROOT object — USER_INPUT or HUMAN_DECISION origin — cites no source object, which is why the arrays are required-but-unbounded rather than optional. Requiring at least one source makes every root object unrepresentable, so nothing could ever enter the object graph at all; objectEnvelopeShape.provenance carries this into all 22 object schemas and kit.ts commitState validates produced state against them.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-evidence-integrity-class-dropped",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t{\n\t\tid: 'RR-08-evidence-integrity',\n\t\tlabel: 'No omitted inconvenient evidence and no hidden/unacknowledged uncertainty.'\n\t},\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/pwa-export.test.ts"],
+		why: "The constant PROMISES it IS the nine §8.4/§11.7.5 derivational-integrity failure classes, and it is the SEED for the floor.reasoning-review ASSURANCE_POLICY from which both the judge's rubric and the scored criterion set are now read (floor-policies.ts REASONING_REVIEW.criteria + findingDefinitions). Dropping RR-08 deletes 'omitted inconvenient evidence / hidden unacknowledged uncertainty' from the seeded policy, so no rubric asks about it and no criterion can ever score it — §8.4's requirement that unacknowledged uncertainty be an OBSERVABLE failure class is left with no observer. Predicted red: the G-5 control in pwa-export.test.ts, `expect(REASONING_REVIEW_CRITERIA.map((c) => c.id)).toEqual([...nine ids...])`.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-registry-serves-no-validator",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\tget: (id) => map.get(id)",
+		replace: "\t\tget: () => undefined",
+		expectRed: ["packages/rph-assurance/src/validators.test.ts"],
+		why: "The registry's whole promise is that a Validator REGISTERED for a floor policy is the one the floor runner then executes for it — runFloorResults does `registry.get(p.policyId)` and treats undefined as MISSING. A get that never serves a registered Validator silently empties the floor for every composition root that staffed it (apps/rph-demo assurance/index.ts, floor.ts, work-product-floor.ts, agy-failure-sanitisation.test.ts). Predicted red: 'all floor validators present + clean → aggregate SATISFIED, gate OPEN' — `expect(out.aggregate).toBe('SATISFIED')` becomes UNASSESSED.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-identity-floor-ignores-supplied-facts",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\t\tctx.identityProvenance ?? {\n\t\t\t\t\thasStableId: false,\n\t\t\t\t\thasSemanticVersion: false,\n\t\t\t\t\thasProvenance: false,\n\t\t\t\t\thasProducer: false,\n\t\t\t\t\ttraceComplete: false\n\t\t\t\t}",
+		replace: "\t\t\t\t{\n\t\t\t\t\thasStableId: false,\n\t\t\t\t\thasSemanticVersion: false,\n\t\t\t\t\thasProvenance: false,\n\t\t\t\t\thasProducer: false,\n\t\t\t\t\ttraceComplete: false\n\t\t\t\t}",
+		expectRed: ["packages/rph-assurance/src/validators.test.ts"],
+		why: "This instance promises to judge §8.4 step 2 against the CALLER'S identity/provenance facts — and because the validators never inspect the subject (REG-F-354), those context facts ARE the assessment. Severing the ctx read discards every fact its consumers derive (apps/rph-demo floor.ts `identityProvenanceFactsOf`, work-product-floor.ts's store-measured `traceComplete`), so step 2 stops being a measurement of the subject at all. Predicted red: 'all floor validators present + clean → aggregate SATISFIED, gate OPEN' — identity/provenance returns five NOT_MET mandatory criteria against an all-true fact bag.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-found-failure-class-scores-met",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\toutcome: f?.failed ? 'NOT_MET' : 'MET',",
+		replace: "\t\t\toutcome: 'MET',",
+		expectRed: ["packages/rph-assurance/src/validators.test.ts"],
+		why: "The mapper's stated guarantee is that every policy criterion is scored MET IFF its failure class is ABSENT from the judgement. Pinning the outcome to MET means a judge that positively reports a derivational-integrity failure still yields an all-MET criterion set, so the `mandatoryCriterionUnmet` limb of composeAssuranceOutcome's §10.3 ladder can never fire — and this is the ONE mapping shared by the agy/Gemini adapter, the mock validator and any future backend. Predicted red: `expect(r.criteria.find((c) => c.criterionId === 'RR-05-no-premature-convergence')?.outcome).toBe('NOT_MET')`.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-recording-plan-truncates-the-floor",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\treturn assuranceRecordingPlan(subject, plan, results);",
+		replace: "\treturn assuranceRecordingPlan(subject, plan.slice(0, 1), results);",
+		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
+		why: "It promises the recording plan covers the WHOLE ordered de minimis floor with the same run and blocking semantics as runDeMinimisFloor — one canonical ASSURANCE_ASSESSMENT per planned policy. Truncating the plan records step 1 only and opens the gate on a floor where identity/provenance and the non-suppressible Reasoning Review were actually run but never assessed, aggregated or persisted: the §8.4 floor suppressed at the exact recording seam apps/rph-demo floor.ts and work-product-floor.ts gate on. Predicted red: `expect(assessments).toHaveLength(3)` (and the policyId-sort assertion beside it) in 'a fully-satisfied floor records one SATISFIED assessment per policy'.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	{
+		id: "MU-PFA-BD2-02-schema-floor-certifies-without-facts",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\t\tctx.schemaInvariant ?? {\n\t\t\t\t\tschemaValid: false,\n\t\t\t\t\tinvariantViolations: ['SCHEMA_FACTS_UNAVAILABLE']\n\t\t\t\t}",
+		replace: "\t\t\t\t{\n\t\t\t\t\tschemaValid: true,\n\t\t\t\t\tinvariantViolations: []\n\t\t\t\t}",
+		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
+		why: "This instance promises §8.4 step 1 is decided by the CALLER'S schema/invariant facts, and fails CLOSED when they are absent. Certifying schemaValid unconditionally admits a subject that is not parseable or violates a deterministic invariant — apps/rph-demo work-product-floor.ts derives exactly those facts (WORK_PRODUCT_NOT_PARSEABLE) and apps/rph-demo floor.ts supplies PWA_GRAPH_NOT_WELL_FORMED — so 'a candidate that fails its contract cannot be admitted' is enforced nowhere. Predicted red: 'a schema failure records a REJECTED assessment + an observation carrying the specific finding code' — `expect(plan.gatePermitsTransition).toBe(false)` flips to true.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
 	}
 ];

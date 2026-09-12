@@ -306,7 +306,7 @@
 			"consumedExports": [
 				"evaluateApplicability"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-assurance/src/assurance-rules.ts": {
 			"consumedExports": [
@@ -317,7 +317,7 @@
 				"dispositionFromFindings",
 				"evidenceAdmissibility"
 			],
-			"mutants": 2
+			"mutants": 7
 		},
 		"packages/rph-assurance/src/floor-policies.ts": {
 			"consumedExports": [
@@ -325,7 +325,7 @@
 				"findingsFor",
 				"humanizeCode"
 			],
-			"mutants": 0
+			"mutants": 3
 		},
 		"packages/rph-assurance/src/floor.ts": {
 			"consumedExports": [
@@ -335,13 +335,13 @@
 				"identityProvenanceValidator",
 				"schemaInvariantValidator"
 			],
-			"mutants": 0
+			"mutants": 5
 		},
 		"packages/rph-assurance/src/recording.ts": {
 			"consumedExports": [
 				"assuranceRecordingPlan"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-assurance/src/validators.ts": {
 			"consumedExports": [
@@ -352,7 +352,7 @@
 				"runFloorAndPlanRecording",
 				"schemaInvariantValidatorInstance"
 			],
-			"mutants": 0
+			"mutants": 6
 		},
 		"packages/rph-authoring/src/broker.ts": {
 			"consumedExports": [
@@ -383,7 +383,7 @@
 				"SchemaVersionSchema",
 				"SemanticVersionSchema"
 			],
-			"mutants": 0
+			"mutants": 6
 		},
 		"packages/rph-contracts/src/envelopes.ts": {
 			"consumedExports": [
@@ -395,7 +395,7 @@
 				"ProvenanceRecordSchema",
 				"objectEnvelopeShape"
 			],
-			"mutants": 0
+			"mutants": 7
 		},
 		"packages/rph-contracts/src/errors.ts": {
 			"consumedExports": [
@@ -403,7 +403,7 @@
 				"RphErrorSchema",
 				"makeRphError"
 			],
-			"mutants": 2
+			"mutants": 4
 		},
 		"packages/rph-contracts/src/gen/schema-manifest.ts": {
 			"consumedExports": [
@@ -416,7 +416,7 @@
 				"RphIdSchema",
 				"mintId"
 			],
-			"mutants": 0
+			"mutants": 2
 		},
 		"packages/rph-contracts/src/validate.ts": {
 			"consumedExports": [
@@ -424,7 +424,7 @@
 				"schemaId",
 				"validateAgainst"
 			],
-			"mutants": 0
+			"mutants": 3
 		},
 		"packages/rph-domain/src/aggregate-assurance.ts": {
 			"consumedExports": [
