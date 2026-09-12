@@ -749,14 +749,18 @@
 			"consumedExports": [
 				"driveAssessmentToAssessing"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"driveAssessmentToAssessing"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-engine/src/engine.ts": {
 			"consumedExports": [
 				"createEngine"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"createEngine"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-engine/src/governing-policies.ts": {
@@ -764,7 +768,10 @@
 				"requireGoverningPolicies",
 				"selectGoverningPolicies"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"requireGoverningPolicies",
+				"selectGoverningPolicies"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-engine/src/professional-work-graph.ts": {
@@ -796,7 +803,22 @@
 				"listUndertakings"
 			],
 			"guardedExports": [
-				"getObjectOfType"
+				"getConversation",
+				"getObject",
+				"getObjectOfType",
+				"listAssessments",
+				"listAssurancePolicies",
+				"listBaselines",
+				"listByType",
+				"listConversations",
+				"listDecisions",
+				"listExecutionPlans",
+				"listGovernedObjects",
+				"listObservations",
+				"listPwas",
+				"listPwus",
+				"listPwuTypes",
+				"listUndertakings"
 			],
 			"unattributedMutants": 2
 		},
@@ -814,7 +836,9 @@
 				"driveReferenceUndertaking",
 				"REFERENCE_OPEN_RESIDUALS"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"driveReferenceUndertaking"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-engine/src/seed-workbench.ts": {
@@ -823,7 +847,11 @@
 				"seedPolicyLibrary",
 				"seedWorkbench"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"SEED_UNDERTAKING",
+				"seedPolicyLibrary",
+				"seedWorkbench"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-persistence/src/schema.ts": {

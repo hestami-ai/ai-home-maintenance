@@ -419,7 +419,38 @@ surfaced.
   on the SAME contaminated numerator, so both agreed while both were wrong. A cross-check must vary the thing
   under suspicion; varying the summary statistic tests nothing about the quantity being summarised.
 
-  **220 guards remain across seven packages**, `rph-application` alone holding the largest share.
+  **INCREMENT 3a LANDED: `rph-engine` 24 → 1 bare export.** 23 authored, 23 KILLED, 0 survivors, 0 rejections.
+  Obligation **220 → 197**; exports guarded **111 → 134 of 331**.
+
+  ⭐ **THE VERIFIER NOW DERIVES THE CHECK THAT DECIDES WHETHER A GUARD COUNTS.** A mutation anchored outside its
+  export's declaration credits NOTHING — 58 of the repository's mutants sit there — so the verifier resolves each
+  declaration span with the TypeScript AST and rejects any entry whose anchor falls outside, naming the line, the
+  span, and whether the agent had claimed otherwise. 23 of 23 inside. The agents reasoned about it in place: one
+  reported `driveReferenceUndertaking` spans lines 226–1664 and placed its anchor accordingly; another found three
+  of its file's EXISTING mutants live in module-private helpers, leaving three exports bare that looked guarded.
+
+  ⛔ **ONE MUTANT RETURNED `INCONCLUSIVE — TIMED OUT`, AND THE CAUSE IS A FINDING ABOUT THE TEST.**
+  `listExecutionPlans` had NO vitest reader at all; its only assertion was an e2e. Pointed at the wrong aggregate
+  type, the page never reaches the state that spec waits for, so it **HANGS rather than fails** and Playwright's
+  timeout expires. ⭑ Neither KILLED nor SURVIVED is available — **worse than a red, because a red is evidence and
+  a timeout is an absence of evidence wearing a failure's clothes.** Fixed the runner's way (fix the test, do not
+  raise the timeout): a fast vitest assertion now lives in `query-scope.test.ts`, whose header already records
+  this exact rule. It asserts RELATIONALLY — a PWU id must not appear among the plans — because the mutation swapped
+  in a type the same workspace holds in quantity, so a count or non-emptiness check would have passed.
+
+  ⚠ **ONE EXPORT REFUSED, CORRECTLY, AND FILED RATHER THAN LEFT TO ROT.** `REFERENCE_OPEN_RESIDUALS` is a frozen
+  prose constant — a mutation on prose either changes nothing observable or reddens a test that asserts on prose,
+  which is the defect and not the guard. But it IS production-consumed, so the census holds it bare indefinitely.
+  **OPEN QUESTION:** either it belongs to an excluded class as generated files do, or its promise is "non-empty,
+  and lists the actual residuals" and a test can say so.
+
+  ⭐ **AND AN AGENT SURFACED A SEPARATE FINDING WHILE HUNTING FOR AN ANCHOR**, recorded because no verdict table
+  contains it: *"the engine's refusal of the late selection is swallowed by a helper that never inspects send
+  results… the governed record of WHO assessed has no live-engine assertion standing behind it."* An unguarded
+  governance record, owed independently of this phase.
+
+  **197 bare exports remain**: `rph-application` 124, `rph-domain` 45, `rph-projections` 23, `rph-contracts` 2,
+  and one each in `rph-assurance`, `rph-engine` and `rph-product-realization-pwa`.
 - ⚠ **S3.4 the dead-surface audit: still filed, not done.**
 
 ---

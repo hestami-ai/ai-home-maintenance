@@ -13,6 +13,7 @@ import {
 	listAssessments,
 	listBaselines,
 	listDecisions,
+	listExecutionPlans,
 	listObservations,
 	listPwus,
 	seedWorkbench,
@@ -111,5 +112,37 @@ describe('QueryScope — subject-bindable queries are bound to their subject', (
 		// Every scoped row must also be a workspace row — scoping filters, it never invents.
 		const workspaceIds = new Set(listAssessments(e, WORKSPACE).map((r) => r.id));
 		for (const r of listAssessments(e, UNDERTAKING)) expect(workspaceIds.has(r.id)).toBe(true);
+	});
+});
+
+// ── JAN-PFA R3 S3.3 — listExecutionPlans' TYPE promise, put where the ledger can reach it ──────────────────────
+//
+// WHY IT IS HERE AND NOT LEFT TO THE e2e. This file's header already records the rule: a guard proved ONLY end to
+// end is a guard the mutation gate cannot measure. `listExecutionPlans` had NO vitest reader at all — its only
+// assertion was `apps/rph-demo/e2e/execution-plan.e2e.ts`.
+//
+// ⛔ AND THE CONSEQUENCE WAS MEASURED RATHER THAN PREDICTED. A mutant pointing that export at the wrong aggregate
+// type was declared against the e2e, and the run came back **INCONCLUSIVE — TIMED OUT**: with no plans to render,
+// the page never reaches the state the spec waits for, so the spec HANGS instead of failing. ⭑ A test that hangs
+// when its subject is wrong cannot kill a mutant — neither KILLED nor SURVIVED is available, which is worse than
+// a red, because the harness has measured nothing and says so. The runner's own advice is "fix the slow test; do
+// not raise the timeout", and the fix is a victim that fails in milliseconds.
+describe('JAN-PFA R3 — listExecutionPlans returns EXECUTION_PLAN rows and nothing else', () => {
+	it('the seed has plans to get wrong, or the assertion below is vacuous', () => {
+		// ⛔ THE VACUITY CONTROL. An empty result satisfies "every row is an EXECUTION_PLAN" perfectly, so a query
+		// returning nothing would pass the type assertion while answering no question at all.
+		expect(listExecutionPlans(build()).length).toBeGreaterThan(0);
+	});
+
+	it('every row it returns is an EXECUTION_PLAN, and the PWUs it could have returned are excluded', () => {
+		const e = build();
+		const plans = listExecutionPlans(e);
+		// ⭑ ASSERTED RELATIONALLY, NOT BY COUNT. The mutation that occasioned this test swapped the aggregate type
+		// for PROFESSIONAL_WORK_UNIT — a type the same workspace holds in quantity — so a count or a non-emptiness
+		// check would have passed. What cannot pass is a PWU id appearing among the plans.
+		const pwuIds = new Set(listPwus(e, SEED_UNDERTAKING).map((r) => r.id));
+		expect(pwuIds.size, 'the seed has no PWUs, so the exclusion below is vacuous').toBeGreaterThan(0);
+		for (const row of plans)
+			expect(pwuIds.has(row.id), `listExecutionPlans returned the PWU ${row.id}`).toBe(false);
 	});
 });

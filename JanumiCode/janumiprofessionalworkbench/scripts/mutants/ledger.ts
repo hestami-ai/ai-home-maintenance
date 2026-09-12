@@ -4100,5 +4100,218 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/export-guard.test.ts'],
 		why: '`export const a = 1, b = 2;` is ONE statement, so both names own the same lines and both are equally entitled to a guard anchored there. Taking the first silently leaves the second bare while the census reports it guarded — a false credit, which is worse than a missing one because nothing will ever look again.',
 		source: 'JAN-PFA R3 S3.2 per-export attribution'
+	},
+	{
+		id: "MU-PFA-BD3-07-evaluator-selected-after-the-begin",
+		file: "packages/rph-engine/src/assessment-drive.ts",
+		find: "\tif (args.evaluator)\n\t\tsend('SelectAssuranceEvaluator', ASSESSMENT, args.assessmentId, { evaluator: args.evaluator });\n\tsend('BeginAssuranceAssessment', ASSESSMENT, args.assessmentId, {\n\t\t...(args.startedAt !== undefined ? { startedAt: args.startedAt } : {})\n\t});\n",
+		replace: "\tsend('BeginAssuranceAssessment', ASSESSMENT, args.assessmentId, {\n\t\t...(args.startedAt !== undefined ? { startedAt: args.startedAt } : {})\n\t});\n\tif (args.evaluator)\n\t\tsend('SelectAssuranceEvaluator', ASSESSMENT, args.assessmentId, { evaluator: args.evaluator });\n",
+		expectRed: ["packages/rph-engine/src/assessment-drive.test.ts"],
+		why: "The helper's whole reason to exist is that the three production drive sites cannot disagree about the §30 lifecycle, and the ordering it owns on the READY -> ASSESSING arrow is the one DOC-004 §32 names as 'selectAssuranceEvaluator (AssuranceEvaluatorSelected) then beginAssuranceAssessment' — the selection must be committed while the assessment is still READY. Moving the selection after the begin breaks that promise for its consumers (packages/rph-engine/src/record-assurance.ts de-minimis floor recorder, packages/rph-engine/src/reference-undertaking.ts, apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts), and it breaks it SILENTLY: selectAssuranceEvaluator enforces fromStates('READY') (packages/rph-application/src/handlers/assurance.ts:1630 — 'Selecting one for an assessment already ASSESSING would change the assessor mid-judgment'), so a live engine REFUSES the late command, and this helper deliberately never inspects a send result. The assessment still reaches ASSESSING, with no AssuranceEvaluatorSelected event, so 'who assessed' reverts to being read off the verdict — precisely the governance guarantee this increment was built to buy, lost with no error anywhere.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-05-absent-policy-counted-as-governing",
+		file: "packages/rph-engine/src/governing-policies.ts",
+		find: "if (!pol) {",
+		replace: "if (!pol) { selected.push(policyId);",
+		expectRed: ["packages/rph-engine/src/governing-policies.test.ts"],
+		why: "The doc comment's DETERMINED half promises that `selected` holds only the declared policies that EXIST as objects in the store, and that anything declared-but-absent is RETURNED in `excluded` with its reason rather than counted as governing. The mutant still records the exclusion but ALSO admits the phantom id into `selected`, so the same policy id is simultaneously reported as excluded and as governing. `requireGoverningPolicies` -> `driveReferenceUndertaking` requests one assurance assessment per selected policy and the §24 promotion gate cites that same set as `assuranceAssessmentIds`, so a policy id that is not an object in the store would be counted as governing a PWU and as backing its promotion — the exact 'declaration says four policies govern this work and the engine runs three' failure the extraction was made to expose, inverted into a phantom fourth.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-05-empty-selection-returns-quietly",
+		file: "packages/rph-engine/src/governing-policies.ts",
+		find: "if (selected.length === 0) {",
+		replace: "if (selected.length === -1) {",
+		expectRed: ["packages/rph-engine/src/governing-policies.test.ts"],
+		why: "This export's entire reason for existing on top of `selectGoverningPolicies` is the promise its doc comment states: an empty selection is NOT a quiet `[]` but a loud failure naming what was declared and why none of it survived. The mutant keeps the guard and its message but compares the length against a value it can never hold, so a PWU that nothing can assess is handed back an empty governing set instead of a throw. The drive (`driveReferenceUndertaking` / the PWU disposition path) relies on this refusal: RPH-PWU-006 requires an assessment behind a disposition, so the quiet `[]` resurfaces several layers away as a missing assessment, or as a PWU driven to SATISFIED with nothing backing it — which is precisely the diagnosis the comment gives for why empty must not be returned.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-08-fork-writes-straight-to-canonical",
+		file: "packages/rph-engine/src/engine.ts",
+		find: "store: new SnapshotOverlayStorageAdapter(store)",
+		replace: "store",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "createEngine is the sole place the facade's `fork()` promise is actually constructed: \"Create a point-in-time, isolated engine fork. Commands exercise the same handlers and invariants but write only to an overlay; closing or abandoning the fork cannot mutate this engine's canonical state.\" Interposing SnapshotOverlayStorageAdapter between the fork's Engine and the canonical adapter IS that guarantee — handing the fork the canonical store instead keeps every handler and invariant intact (so nothing looks wrong) while every candidate write lands directly in canonical's event log, objects and outbox. apps/rph-demo/src/lib/server/authoring-turn.ts:237 (`beginAuthoringTurn` -> `const isolated = canonical.fork()`) relies on exactly this: it records an agent's commands into the fork, snapshots base revisions from it, and only later replays them against canonical under expectedRevision / expectedContentHash guards. With the overlay gone, the staged candidate a human is still reviewing has already been committed to canonical, `snapshotRevisions` reads a state the turn itself just mutated, and the guarded replay then re-applies commands whose effects are already present — the candidate/canonical separation the authoring surface is built on disappears with no error anywhere.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-03-pwa-library-tombstone-filter",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "(r) => r.state.publicationStatus !== 'DISCARDED'",
+		replace: "(r) => r.state.publicationStatus !== 'PUBLISHED'",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "listPwas promises the PWA Library exactly the PWAs that have NOT been tombstoned: DeletePwa sets publicationStatus DISCARDED and the Library must treat that PWA as gone, while every live PWA must still be there. The home page (apps/rph-demo/src/routes/+page.server.ts), the Undertaking creation form's pwaOptions (routes/undertakings/+page.server.ts) and the introspection harness each render whatever this returns, and `enforcement-register.ts` cites listPwas as one of the two queries that DO filter tombstoned rows. Moving the excluded status from DISCARDED to PUBLISHED breaks the predicate in both directions at once: deleted PWAs reappear in the Library and the published PWA a new Undertaking must bind to vanishes. Probed on the seeded engine: listPwas returns 1 row, publicationStatus PUBLISHED, so the mutant returns 0 and the 'publishes one Product Realization PWA' case reddens on toHaveLength(1).",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-03-pwu-type-pwa-scope-join-key",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "return pwaId ? byField(live, 'pwaId', pwaId) : live;",
+		replace: "return pwaId ? byField(live, 'pwuKind', pwaId) : live;",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "listPwuTypes promises that, given a pwaId, the rows are the live PWU Types belonging to THAT PWA — and the thing that makes a type belong to a PWA is its own `pwaId` field (confirmed present on PWU_TYPE state). Every authoring and read surface depends on that join: the PWA Designer's type list and root lookup (routes/pwa/[id]/+page.server.ts), PwaAuthoringBroker.listTypes, workbench.ts's graph nodes, and the Undertaking's pwuTypeOptions. Re-keying the scope onto `pwuKind` silently degrades every scoped read to EMPTY — the precise wrong-field failure recorded in apps/rph-demo/src/lib/server/undertaking-loader-object-type.test.ts, where a read keyed on the wrong field 'degraded to empty' and 'the page did not even look broken'. Probed: pwuTypes(SEED_PWA) = 14 and pwuKind values are kind codes (never 'pwa_...'), so the mutant returns 0 and toBeGreaterThanOrEqual(8) / toHaveLength(14) redden.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-03-undertaking-portfolio-reads-wrong-type",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "listUndertakings = (h: EngineHandle): ObjectRow[] => listByType(h, 'UNDERTAKING');",
+		replace: "listUndertakings = (h: EngineHandle): ObjectRow[] => listByType(h, 'PROFESSIONAL_WORK_UNIT');",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "listUndertakings' whole guarantee is the identity of the rows it serves the RPH-DOC-010 Undertaking Portfolio: they ARE the UNDERTAKING aggregates, which is what lets routes/undertakings/+page.server.ts read `u.pwaId` for the PWA column and use `u.id` as the undertakingId for its per-row listPwus count, and what lets routes/pwa/[id]/+page.server.ts list the fixtures bound to a PWA. Reading a different aggregate type returns objects that are not undertakings at all — probed: 13 PROFESSIONAL_WORK_UNIT rows, none carrying pwaId — so the portfolio would list PWUs as undertakings and every pwaId read would be undefined. Victim: 'instantiates one Undertaking bound to the published PWA' asserts toHaveLength(1) and unds[0].state.pwaId === SEED_PWA; the mutant gives 13.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-03-pwu-undertaking-ownership-filter",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "? byField(listByType(h, 'PROFESSIONAL_WORK_UNIT'), 'undertakingId', undertakingId)",
+		replace: "? byField(listByType(h, 'PROFESSIONAL_WORK_UNIT'), 'pwuTypeId', undertakingId)",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "listPwus promises that, given an undertakingId, the rows are exactly the PWUs that Undertaking OWNS (CON-009) — decided by the PWU's own `undertakingId` field, which is why this query takes a bare id rather than a QueryScope (stated in governed-object-catalog.test.ts: 'PWUs carry undertakingId directly'). That set is the seed of the Undertaking Workbench's two-hop execution scope (pwuIdSet in routes/undertakings/[id]/+page.server.ts, cited again in rph-projections' execution-view), the Professional Work Graph's node set, and the portfolio's pwuCount. Re-keying ownership onto `pwuTypeId` (a real PWU field holding 'pwut_...', never 'und_...') makes an Undertaking own nothing: graph empty, lifecycle rollups empty, every execution plan judged out of scope. Probed: pwus(SEED_UNDERTAKING) = 13 and the mutant returns 0, so toHaveLength(13) reddens.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-03-observation-scope-widened-to-workspace",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "withinScope(h, listByType(h, 'ASSURANCE_OBSERVATION'), scope, 'subjectObjectIds');",
+		replace: "withinScope(h, listByType(h, 'ASSURANCE_OBSERVATION'), scope.kind === 'UNDERTAKING' ? { kind: 'WORKSPACE' } : scope, 'subjectObjectIds');",
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "listObservations promises JPWB-SPEC-001 SPEC-001-INV-02: an assurance observation is presented ONLY inside the declared QueryScope, an UNDERTAKING scope admitting only observations whose subjectObjectIds intersect that Undertaking's own object closure. The Undertaking Workbench's assurance tab consumes it with `undertakingScope` (routes/undertakings/[id]/+page.server.ts:377), and this is one of the four queries whose unscoped form rendered the SEEDED Undertaking's findings on a brand-new Undertaking (F-6 / FORK-9) — the defect the required-scope signature exists to make impossible. The mutation keeps the parameter and the check and turns its refusal into an admission: a declared UNDERTAKING scope is silently widened back to WORKSPACE, which is the leak itself rather than a near-miss. Probed on the seeded engine: 1 observation workspace-wide, 0 for the stranger Undertaking, so `expect(listObservations(e, OTHER)).toEqual([])` goes 0 -> 1 and reddens.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-06-drive-evaluator-not-independent",
+		file: "packages/rph-engine/src/reference-undertaking.ts",
+		find: "executionProvenance: { evaluator: EVALUATOR }",
+		replace: "executionProvenance: { evaluator: ACTOR }",
+		expectRed: ["packages/rph-engine/src/reference-undertaking.test.ts"],
+		why: "The drive's central promise is that the canonical fixture's assurance facts are EARNED by a party INDEPENDENT of the one that produced the work — the module states it at the EVALUATOR declaration (\"the assurance EVALUATOR is a DISTINCT party from the work producer (ACTOR) — the whole point of independence (DOC-004 §39 invariant 8, §8.4)\"), and the fitness policy the drive creates declares independenceRequirement DIFFERENT_AGENT. The verdict's executionProvenance.evaluator is the operand that makes that real: completeAssuranceAssessment reads the evaluator off validatorResult.executionProvenance.evaluator (assurance.ts:2050), compares it with the supplied producer (here `producer: ACTOR`) via checkIndependence, and WRITES it onto the assessment object (assurance.ts:2388, and 2270 on the violation path). Stamping ACTOR there makes producer and evaluator the same identity, so every fitness assessment the reference undertaking records is self-assessed. Relied on by: (1) reference-undertaking.test.ts's \"Increment I1\" guarantee, which reads each completed assessment's recorded evaluator and asserts it is evaluator-1/reviewer-agent-1 and never a producer identity — the test written so the later enforcement increment would have honest operands; (2) the §38 assurance view's independenceStatus (assurance-view.test.ts asserts VERIFIED for the Mobile & Offline fitness assessment and that nothing is VIOLATED); (3) every downstream consumer of the seed graph, since an INDEPENDENCE_VIOLATION assessment can no longer back the controller's SATISFIED hop that rejectUnbackedDisposition guards.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-02-row-revision-off-by-one",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\t\t\t\trevision: loaded.revision",
+		replace: "\t\t\t\trevision: loaded.revision + 1",
+		expectRed: ["packages/rph-engine/src/queries-revision.test.ts"],
+		why: "ObjectRow.revision promises THE aggregate revision this row was read at - the value PER-4 (JPWB-DOC-003 s9; JPWB-SPEC-001 s11.4.22 item 2) requires a caller to round-trip as `expectedRevision`. listByType is the SOLE constructor of every ObjectRow on this read surface, so every typed wrapper (listPwas/listPwus/listExecutionPlans/...) and every rph-demo loader that derives a page's expectedRevision inherits whatever it supplies, and `loadOrReject` then honours it. An off-by-one keeps the field PRESENT and typed - so the weaker presence assertion still passes - while making every governed write dispatched from a page contest a revision that was never current. It is killed only by the assertion that the value is the TRUE one, which is the discrimination the file's own comment says it spent a commit learning to demand.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-02-decisions-ignore-the-declared-scope",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\twithinScope(h, listByType(h, 'DECISION'), scope, 'subjectObjectIds');",
+		replace: "\twithinScope(h, listByType(h, 'DECISION'), { kind: 'WORKSPACE' }, 'subjectObjectIds');",
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "listDecisions promises JPWB-SPEC-001 SPEC-001-INV-02 / FORK-9: a subject-bindable read returns nothing outside the QueryScope its caller DECLARED, and WORKSPACE is never a default. The Undertaking Workbench's decisions tab relies on it - this is the shipped defect that rendered the seeded Undertaking's 2 decisions inside a brand-new Undertaking that owns nothing. Answering WORKSPACE regardless re-opens that leak while the repaired signature still advertises the fix, which is worse than the original because the compile-time enforcement the file argues for is now satisfied and meaningless.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-02-governed-catalog-scopes-on-the-type-not-the-id",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\t\t\tif (owned && !owned.has(id)) continue;",
+		replace: "\t\t\tif (owned && !owned.has(objectType)) continue;",
+		expectRed: ["packages/rph-engine/src/governed-object-catalog.test.ts"],
+		why: "listGovernedObjects promises that under an UNDERTAKING scope every candidate Decision subject is OWNED by that Undertaking - membership by the object's OWN id in the undertaking's production closure, not by the subject-field intersection withinScope performs (REG-F-106 / REG-D-041, ASR-15, INV-02). The /decisions subject picker relies on it: each row it offers becomes `subjectObjectIds` on a proposed Decision, so a leaked row is authority claimed over an object this Undertaking does not own. Keying the membership test on the aggregate TYPE makes the guard structurally un-fireable (owned holds ids, never type names), so the scoped catalog silently equals the whole workspace.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-02-execution-plans-read-the-wrong-aggregate-type",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "listExecutionPlans = (h: EngineHandle): ObjectRow[] => listByType(h, 'EXECUTION_PLAN')",
+		replace: "listExecutionPlans = (h: EngineHandle): ObjectRow[] => listByType(h, 'PROFESSIONAL_WORK_UNIT')",
+		// ⚠ RE-POINTED FROM AN e2e VICTIM. Declared first against `apps/rph-demo/e2e/execution-plan.e2e.ts`, the
+		// run came back INCONCLUSIVE — TIMED OUT: with no plans to render the page never reaches the state the
+		// spec waits for, so the spec HANGS rather than failing. ⛔ A test that hangs when its subject is wrong
+		// cannot kill a mutant — neither KILLED nor SURVIVED is available — and that is WORSE than a red, because
+		// the harness has measured nothing. A fast vitest assertion of the same promise was added to
+		// `query-scope.test.ts`, whose own header records why such rules belong where the ledger can reach them.
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "listExecutionPlans promises every EXECUTION_PLAN aggregate in the engine, deliberately UNSCOPED - its one filter is the aggregate type. Two consumers depend on the rows actually being plans: the Undertaking Workbench's execution tab, which is scoped by filtering this global list on `workUnitId` into this Undertaking's PWUs (the F-6 fix, undertakings/[id]/+page.server.ts), and /test-api/introspect, which publishes it as the e2e harness's GROUND TRUTH for 'this Undertaking has a plan'. Rows of another type carry no `workUnitId`, so the scoped panel renders zero plan cards and the harness's in-scope plan set is empty - while the page still returns 200 and the endpoint still reports a populated field.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-02-conversations-read-the-wrong-aggregate-type",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\tlistByType(h, 'AUTHORING_CONVERSATION');",
+		replace: "\tlistByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE');",
+		expectRed: ["apps/rph-demo/e2e/agent-retention.e2e.ts"],
+		why: "listConversations promises the DURABLE, event-sourced AUTHORING_CONVERSATION aggregates and nothing else - it is the line the authoring-retention contract is drawn on. Before acceptance the transcript lives only in the in-process candidate, and /test-api/introspect deliberately publishes `conversations` (canonical) apart from `authoringCandidates[].conversations` (preview) so a spec cannot conflate staged with committed. Pointing the single filter this query has at another aggregateType makes canonical conversations appear for a PWA that has committed none, i.e. the read surface asserts the chat history is durable domain state before any ConversationEntriesAppended event exists.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-04-seed-undertaking-id-not-a-wellformed-rphid",
+		file: "packages/rph-engine/src/seed-workbench.ts",
+		find: "export const SEED_UNDERTAKING = 'und_01ARZ3NDEKTSV4RRFFQ69G5Z10';",
+		replace: "export const SEED_UNDERTAKING = 'und_01ARZ3NDEKTSV4RRFFQ69G5Z1O';",
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "SEED_UNDERTAKING promises a WELL-FORMED RphId — `<lowercase-prefix>_<ULID>`, Crockford base32 excluding I/L/O/U — and that this exact value IS the aggregate identity the seeded Undertaking is persisted under. The guarantee is enforced at runtime: `createUndertaking` builds the state via `newEnvelope(command, UNDERTAKING, p.undertakingId, …)` and `createObject` -> `commitState` validates that state against `UndertakingSchema`, which spreads `objectEnvelopeShape` whose `id` is `RphIdSchema` (`^([a-z]+)_([0-9A-HJKMNP-TV-Z]{26})$`). Swapping the trailing `0` for `O` — the exact confusion Crockford base32 exists to exclude — keeps the id 26 chars and plausible while making it unstorable: the command is REJECTED and the seed's fail-loud `sender` throws. Who relies on it: every consumer that resolves the Undertaking BY this value — the UNDERTAKING `QueryScope` subject in query-scope.test.ts (`listAssessments`/`listBaselines`/`listPwus`), the demo's `/undertakings/<id>` route loader, and the hardcoded copy in apps/rph-demo/e2e/undertaking-atomicity.e2e.ts — all get no Undertaking at all.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-04-policy-library-omits-the-ratified-catalog",
+		file: "packages/rph-engine/src/seed-workbench.ts",
+		find: "seedAdditivePolicies(handle);",
+		replace: "seedFloorPolicies(handle);",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "seedPolicyLibrary promises the FULL workbench policy library — the 3 locked de minimis floor policies PLUS the additive DOC-004 Product Realization catalog — seeded in EVERY engine (reference AND empty) so the PWA Designer's policy manager and picker are always populated. The mutation seeds the floor twice (the repeat returns DUPLICATE on the same idempotency keys) and the ratified catalog never, reproducing exactly the state the victim test's own comment records: 9 policies where there should be 15, with six ratified DOC-004 policies existing as ontology data and as NO object — invisible to `list_assurance_policies`, which is an instruction to the authoring agent to fabricate duplicates of ratified policies. Who relies on it: the PWA Designer's policy manager/picker, the authoring agent's reuse-before-create rule, and seedWorkbench itself, which hands `pol_fitness_for_purpose` to the reference drive on the assumption the catalog is present.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-04-pwu-type-join-names-an-unpublished-type",
+		file: "packages/rph-engine/src/seed-workbench.ts",
+		find: "for (const t of derivedTypes(handle)) pwuTypeByKind[t.kind] = t.id;",
+		replace: "for (const t of derivedTypes(handle)) pwuTypeByKind[t.kind] = PT_BY_KIND['ARCHITECTURE_DECISION']!;",
+		expectRed: ["packages/rph-engine/src/seed-workbench.test.ts"],
+		why: "seedWorkbench promises that the Undertaking side and the PWA side AGREE: its kind->PWU-Type map is built from the SAME `derivedTypes` the publish loop used, so — in the code's own words — \"the instance-side kind->type map cannot name a type the PWA did not publish\". That `pwuTypeId` is the join key the Assurance View follows from a PWU to its type's `requiredAssurancePolicyIds` (and the seeded path deliberately leaves the PWU's own `assurancePolicyIds` empty, so the type IS the whole declaration). `ARCHITECTURE_DECISION` is described by the ontology but named in no `candidateChildren` list, so `derivedTypes` drops it as unreachable and `pwut_01ARZ3NDEKTSV4RRFFQ69G5ZF0` is never published — pointing every kind at it makes every proposed PWU cite a type the PWA does not contain, so the type join dangles and the governing-policy declaration resolves to nothing.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-01-assessments-ignore-the-declared-scope",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\twithinScope(h, listByType(h, 'ASSURANCE_ASSESSMENT'), scope, 'subjectObjectIds');",
+		replace: "\twithinScope(h, listByType(h, 'ASSURANCE_ASSESSMENT'), { kind: 'WORKSPACE' }, 'subjectObjectIds');",
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "PROMISE: JPWB-SPEC-001 SPEC-001-INV-02 / FORK-9 — a subject-bindable query presents only objects INSIDE the declared scope, and the scope is a required parameter precisely so it cannot be forgotten. The Undertaking Workbench's Assurance tab relies on it (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:336 and :445 pass `undertakingScope`); floor.ts:482 and the baselines route are the callers that legitimately say WORKSPACE, and the whole point of the signature repair is that those two statements must stay distinguishable. Substituting WORKSPACE here re-ships the measured defect verbatim: a brand-new Undertaking with zero PWUs renders the seeded Undertaking's 65 assessments. It reddens the LEAK case only (`listAssessments(e, OTHER)).toEqual([])`), leaving the CONTROL green — the opposite polarity from the listBaselines mutant below, so the pair tells the two halves apart rather than pushing the same assertion twice.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-01-baseline-subjects-read-from-the-wrong-field",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\twithinScope(h, listByType(h, 'BASELINE'), scope, 'itemObjectVersions');",
+		replace: "\twithinScope(h, listByType(h, 'BASELINE'), scope, 'subjectObjectIds');",
+		expectRed: ["packages/rph-engine/src/query-scope.test.ts"],
+		why: "PROMISE: a BASELINE is subject-bound through `itemObjectVersions[].objectId` and through nothing else — `BaselineObjectSchema` is a z.strictObject (packages/rph-contracts/src/objects.ts:774) with no `subjectObjectIds` at all — so the field name this declaration passes IS the binding, and it is the one thing that differs from its three sibling queries. The Undertaking Workbench's Baselines tab relies on it (+page.server.ts:465). Naming the assessment/observation/decision field instead makes subjectIdsOf read an absent field, fail CLOSED, and admit every Baseline to no Undertaking: the owning Undertaking's Baselines tab empties. That is the direction that LOOKS like a successful scope fix, so it reddens the CONTROL (`listBaselines(e, UNDERTAKING).length > 0`) and leaves the leak case green — the mirror of the listAssessments mutant.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-01-policy-library-hides-every-non-active",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\tlistByType(h, 'ASSURANCE_POLICY');",
+		replace: "\tlistByType(h, 'ASSURANCE_POLICY').filter((r) => r.state.status === 'ACTIVE');",
+		expectRed: ["packages/rph-authoring/src/broker.test.ts"],
+		why: "PROMISE (stated in its own doc comment): EVERY ASSURANCE_POLICY definition, ANY status — the library is the complete list and STATUS is the consumer's to interpret, not this query's to apply. broker.listPolicies() (packages/rph-authoring/src/broker.ts:348) surfaces `status` and `isFloor` so the picker can offer only ACTIVE ones and show the three de minimis floor policies locked (§8.4); apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:159 renders the manager from the same rows. Pre-filtering to ACTIVE makes a policy invisible to the author who just created it — a newly authored policy is born DRAFT (DOC-002 §18) — and degrades defineType's diagnostic from 'is DRAFT' to 'does not exist', i.e. a governance state becomes indistinguishable from a missing object.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-01-conversation-bound-to-the-wrong-pwa",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\treturn byField(listByType(h, 'AUTHORING_CONVERSATION'), 'pwaId', pwaId)[0];",
+		replace: "\treturn listByType(h, 'AUTHORING_CONVERSATION').find((r) => r.state.pwaId !== pwaId);",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: the durable authoring conversation FOR THIS PWA, keyed on pwaId, one per PWA. Two consumers rest on different halves of it: workbench.ts:349 uses the result as `existing` to decide append-vs-create, so a wrong answer mints a SECOND conversation for a PWA and breaks the one-per-PWA cardinality; workbench.ts:372 and authoring-turn.ts:140 read `.state.entries` as the transcript the authoring surface renders. Inverting the key makes the lookup return some OTHER PWA's conversation when one exists and never its own — a cross-PWA transcript leak and a permanently 'absent' conversation for the PWA being authored.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD3-01-type-blind-read-answers-one-type-only",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "\treturn handle.loadObject(id)?.state as Record<string, unknown> | undefined;",
+		replace: "\treturn handle.loadObject(id)?.objectType === 'UNDERTAKING' ? (handle.loadObject(id)?.state as Record<string, unknown>) : undefined;",
+		expectRed: ["packages/rph-engine/src/assessment-startedat-contract.test.ts"],
+		why: "PROMISE: this is the deliberately TYPE-BLIND by-id read — it hands back whatever object carries the id, asserting nothing about what it is, and stands in for the four ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion). Its blindness is load-bearing, which is exactly why `getObjectOfType` was added as a SEPARATE seam for ids arriving from a URL instead of narrowing this one. Every internal-id read depends on it: the assessment state read (assessment-startedat-contract.test.ts:78, :136), the floor policy reads (floor-declared-scope.test.ts:104, :162), the PWU/policy censuses, seed-policy-arrays' accessor. Narrowing it to a single objectType returns undefined for every non-Undertaking object, and each caller's optional-chain / `?? ''` fallback then degrades to empty without throwing — the 'did not even look broken' failure its own neighbouring docblock records. Victim is deliberately NOT queries-object-type.test.ts: that file's header declares it is intentionally not a declared mutant's victim.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
 	}
 ];
