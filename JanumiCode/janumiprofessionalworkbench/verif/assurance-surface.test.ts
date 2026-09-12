@@ -104,8 +104,13 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * `JanumiCode/csaa/scripts/` with the wrapper it imports. Its subject was CSAA's own completion steps, so it
  * follows CSAA out of the repository subtree entirely — the second recorded DECREASE, and the last one this
  * programme expects.
+ *
+ * 62 -> 63 (2026-09-12, JAN-PFA R1): `verif/coverage-floor.test.ts`. ⭑ IT IS HERE BECAUSE THE THING IT DRIVES
+ * IS A GATE STEP, and because the per-file ratchet's two limbs must be shown to fail SEPARATELY — which the
+ * gate step itself, a single pass/fail over 106 files, structurally cannot show. Its fixtures are private temp
+ * dirs, so it asserts over the mechanism rather than over today's coverage numbers.
  */
-const VERIF_TEST_FLOOR = 62;
+const VERIF_TEST_FLOOR = 63;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
@@ -116,6 +121,11 @@ const VERIF_TEST_FLOOR = 62;
 const REQUIRED_ROOT_COMMANDS = [
 	'boundary',
 	'check-types',
+	// JAN-PFA R1 (2026-09-12): 7 -> 8. The per-file coverage ratchet's CHECK arm is gate material and is named
+	// here so it cannot vanish from `package.json` the way this file exists to prevent. ⚠ Its WRITER
+	// (`coverage:floor`) is deliberately NOT listed: a writer that regenerates the artifact is not a guarantee,
+	// and requiring it would invite someone to satisfy the gate by rewriting the baseline.
+	'coverage:floor:check',
 	'gate',
 	'gate:fast',
 	'lint',
@@ -164,7 +174,7 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
 		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
-		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(7);
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(8);
 	});
 
 	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
@@ -189,6 +199,10 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 			'bun run build',
 			'bun run test',
 			'bun run test:coverage',
+			// JAN-PFA R1 (2026-09-12): the per-file coverage ratchet. It sits HERE and nowhere else because it
+			// reads `test:coverage`'s output and nothing else — one JSON comparison, no second measurement — and
+			// because placing it before its producer would make it a checker that blames the wrong step.
+			'bun run coverage:floor:check',
 			'cd apps/rph-demo',
 			'bun run check',
 			'bun run e2e'

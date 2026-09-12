@@ -1,0 +1,642 @@
+{
+	"note": "DERIVED — never hand-edited. Regenerate with `bun run coverage:floor` in the same commit as the change that moved it. Values are UNCOVERED COUNTS per metric, not percentages.",
+	"generator": "scripts/coverage-floor.ts --write",
+	"files": {
+		"packages/rph-application/src/command-bus.ts": {
+			"statements": 6,
+			"branches": 11,
+			"functions": 0,
+			"lines": 3
+		},
+		"packages/rph-application/src/context-assembly.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/exchange-resolution.ts": {
+			"statements": 2,
+			"branches": 6,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-application/src/execution-invocation.ts": {
+			"statements": 0,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/abandon-authorization.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/artifact.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/assurance.ts": {
+			"statements": 6,
+			"branches": 52,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/command-precondition.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/context-assembly-policy.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/decomposition.ts": {
+			"statements": 16,
+			"branches": 45,
+			"functions": 0,
+			"lines": 5
+		},
+		"packages/rph-application/src/handlers/deferral.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/execution.ts": {
+			"statements": 2,
+			"branches": 46,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/floor-gate.ts": {
+			"statements": 1,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/governance.ts": {
+			"statements": 5,
+			"branches": 30,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/harness.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/intent.ts": {
+			"statements": 1,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/kit.ts": {
+			"statements": 6,
+			"branches": 10,
+			"functions": 0,
+			"lines": 4
+		},
+		"packages/rph-application/src/handlers/model-exchange.ts": {
+			"statements": 8,
+			"branches": 8,
+			"functions": 0,
+			"lines": 8
+		},
+		"packages/rph-application/src/handlers/obligation-constraint.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/product-behavior.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/pwa-authoring.ts": {
+			"statements": 1,
+			"branches": 19,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/pwu.ts": {
+			"statements": 4,
+			"branches": 27,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-application/src/handlers/registry.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/reject-authorization.ts": {
+			"statements": 4,
+			"branches": 7,
+			"functions": 0,
+			"lines": 3
+		},
+		"packages/rph-application/src/handlers/runtime-binding.ts": {
+			"statements": 0,
+			"branches": 2,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/skip-authorization.ts": {
+			"statements": 1,
+			"branches": 2,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/validator-registry.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/waiver-authorization.ts": {
+			"statements": 1,
+			"branches": 2,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/prompt-render.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-assurance/src/applicability.ts": {
+			"statements": 3,
+			"branches": 3,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-assurance/src/assurance-rules.ts": {
+			"statements": 13,
+			"branches": 17,
+			"functions": 0,
+			"lines": 7
+		},
+		"packages/rph-assurance/src/floor-policies.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-assurance/src/floor.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-assurance/src/recording.ts": {
+			"statements": 0,
+			"branches": 11,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-assurance/src/validators.ts": {
+			"statements": 0,
+			"branches": 2,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-authoring/src/broker.ts": {
+			"statements": 0,
+			"branches": 18,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-authoring/src/catalog.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-authoring/src/lint.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/common.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/envelopes.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/errors.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/hash.ts": {
+			"statements": 2,
+			"branches": 3,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-contracts/src/ids.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/slice.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-contracts/src/validate.ts": {
+			"statements": 2,
+			"branches": 3,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-domain/src/aggregate-assurance.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/condition-grammar.ts": {
+			"statements": 4,
+			"branches": 11,
+			"functions": 1,
+			"lines": 4
+		},
+		"packages/rph-domain/src/conformance-manifest.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/decomposition.ts": {
+			"statements": 2,
+			"branches": 1,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-domain/src/enforcement-register.ts": {
+			"statements": 3,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/execution-failure-taxonomy.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/execution.ts": {
+			"statements": 1,
+			"branches": 6,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-domain/src/governance.ts": {
+			"statements": 3,
+			"branches": 6,
+			"functions": 0,
+			"lines": 2
+		},
+		"packages/rph-domain/src/machine-exclusions.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/plan-proposal.ts": {
+			"statements": 1,
+			"branches": 5,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/presentation.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/pwu-lifecycle-command-spec.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/pwuGuards.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/stateMachine.ts": {
+			"statements": 4,
+			"branches": 3,
+			"functions": 2,
+			"lines": 2
+		},
+		"packages/rph-domain/src/step-command-spec.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-domain/src/traceability.ts": {
+			"statements": 7,
+			"branches": 9,
+			"functions": 3,
+			"lines": 4
+		},
+		"packages/rph-domain/src/transition-gate.ts": {
+			"statements": 11,
+			"branches": 25,
+			"functions": 1,
+			"lines": 2
+		},
+		"packages/rph-engine/src/assessment-drive.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-engine/src/engine.ts": {
+			"statements": 6,
+			"branches": 2,
+			"functions": 3,
+			"lines": 5
+		},
+		"packages/rph-engine/src/governing-policies.ts": {
+			"statements": 4,
+			"branches": 3,
+			"functions": 2,
+			"lines": 3
+		},
+		"packages/rph-engine/src/graph-conformance.ts": {
+			"statements": 0,
+			"branches": 2,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-engine/src/professional-work-graph.ts": {
+			"statements": 0,
+			"branches": 12,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-engine/src/pwa-ontology.ts": {
+			"statements": 1,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-engine/src/queries.ts": {
+			"statements": 4,
+			"branches": 9,
+			"functions": 1,
+			"lines": 1
+		},
+		"packages/rph-engine/src/record-assurance.ts": {
+			"statements": 0,
+			"branches": 3,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-engine/src/reference-undertaking.ts": {
+			"statements": 9,
+			"branches": 12,
+			"functions": 2,
+			"lines": 7
+		},
+		"packages/rph-engine/src/replay.ts": {
+			"statements": 2,
+			"branches": 4,
+			"functions": 1,
+			"lines": 0
+		},
+		"packages/rph-engine/src/seed-workbench.ts": {
+			"statements": 4,
+			"branches": 13,
+			"functions": 0,
+			"lines": 4
+		},
+		"packages/rph-persistence/src/schema.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts": {
+			"statements": 19,
+			"branches": 7,
+			"functions": 6,
+			"lines": 15
+		},
+		"packages/rph-persistence/src/sql-driver.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-persistence/src/sqlite-artifact-store.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-persistence/src/sqlite-storage-adapter.ts": {
+			"statements": 1,
+			"branches": 2,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/artifact-store-contract.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/defaults/artifact-store.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/defaults/logger.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/ports/artifact-store.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/ports/authentication.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/ports/logger.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/ports/storage.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/testing.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-product-realization-pwa/src/ontology.data.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-product-realization-pwa/src/ontology.ts": {
+			"statements": 2,
+			"branches": 2,
+			"functions": 2,
+			"lines": 1
+		},
+		"packages/rph-product-realization-pwa/src/ontology.types.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/assurance-view.ts": {
+			"statements": 10,
+			"branches": 20,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/calibration.ts": {
+			"statements": 1,
+			"branches": 1,
+			"functions": 1,
+			"lines": 0
+		},
+		"packages/rph-projections/src/compatibility-view.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/composition-plan.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/execution-attempts.ts": {
+			"statements": 1,
+			"branches": 5,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/execution-view.ts": {
+			"statements": 0,
+			"branches": 10,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/graph-view.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/handoff-order.ts": {
+			"statements": 0,
+			"branches": 6,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/leaf.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/projector.ts": {
+			"statements": 1,
+			"branches": 0,
+			"functions": 1,
+			"lines": 1
+		},
+		"packages/rph-projections/src/pwa-graph-report.ts": {
+			"statements": 2,
+			"branches": 8,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/pwa-graph.ts": {
+			"statements": 3,
+			"branches": 12,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/pwu-behavior.ts": {
+			"statements": 7,
+			"branches": 8,
+			"functions": 0,
+			"lines": 7
+		},
+		"packages/rph-projections/src/pwu-replay.ts": {
+			"statements": 5,
+			"branches": 12,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-projections/src/traceability-view.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/uncertainty-disclosure.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/work-projection.ts": {
+			"statements": 4,
+			"branches": 11,
+			"functions": 0,
+			"lines": 0
+		}
+	}
+}

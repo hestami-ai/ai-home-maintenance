@@ -3386,5 +3386,54 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-contracts/src/errors.test.ts'],
 		why: 'THE ADMITTING HALF — a schema that refused EVERY object would satisfy the unknown-key rejection completely (MU-FRESH-18-B\'s recorded shape). Requiring a 500-character correlationId makes the shape reject an error this package itself constructs, so A proves the test notices a shape gone too LOOSE and B proves it notices one gone too TIGHT. ⚠ THE OBVIOUS FORM WAS WITHDRAWN AFTER MEASUREMENT: adding a required FIELD reported NO_COMPILE, because the inferred type is consumed by makeRphError — this ledger header\'s own trap 1, mutate the CONSEQUENCE rather than the declaration. Tightening an existing field at runtime leaves every static type identical.',
 		source: 'JAN-PFA S0.3; REG-F-391'
+	},
+	// ── JAN-PFA R1 — the per-file coverage ratchet, one mutant per limb ─────────────────────────────────────
+	// FIVE limbs, FIVE mutants, and each was observed reddening EXACTLY ONE test with the other four green.
+	// That separation is the entire claim: a per-file mechanism whose limbs fail together is one check wearing
+	// several names, and it cannot tell a regressed file from a new one — the distinction it exists to make.
+	{
+		id: 'MU-PFA-R1-A-neutralise-the-ratchet-limb',
+		file: 'scripts/coverage-floor.ts',
+		find: '\t\tif (now > then)',
+		replace: '\t\tif (now > then + 1000)',
+		expectRed: ['verif/coverage-floor.test.ts'],
+		why: 'The RATCHET limb is the whole guarantee that a file may not add uncovered code. Slackening the comparison by 1000 lets any realistic regression through while the check still reports success. Observed: reddens ONLY the FLOOR_REGRESSED test; both population limbs and the blinded-reader limb stay green.',
+		source: 'JAN-PFA R1 S1.2'
+	},
+	{
+		id: 'MU-PFA-R1-B-blind-the-population-limb-to-new-files',
+		file: 'scripts/coverage-floor.ts',
+		find: 'const added = Object.keys(measured).filter((f) => !(f in recorded)).sort();',
+		replace: 'const added = Object.keys(measured).filter(() => false).sort();',
+		expectRed: ['verif/coverage-floor.test.ts'],
+		why: 'A BRAND-NEW FILE FULL OF UNCOVERED CODE CANNOT REGRESS AGAINST A BASELINE THAT HAS NEVER HEARD OF IT, so the ratchet limb has nothing to say about it and this limb is the only thing standing between the mechanism and its own largest hole. Observed: reddens ONLY the new-file test; the ratchet limb stays green, which is exactly the point.',
+		source: 'JAN-PFA R1 S1.2'
+	},
+	{
+		id: 'MU-PFA-R1-C-blind-the-population-limb-to-vanished-files',
+		file: 'scripts/coverage-floor.ts',
+		find: 'const removed = Object.keys(recorded).filter((f) => !(f in measured)).sort();',
+		replace: 'const removed = Object.keys(recorded).filter(() => false).sort();',
+		expectRed: ['verif/coverage-floor.test.ts'],
+		why: 'A file silently dropping OUT of the measured population is how a weak file stops being counted without anyone deleting it — the coverage analogue of the CSAA denominator defect this whole programme began with. Declared separately from B because the two halves of POPULATION_CHANGED are independent and were observed failing independently.',
+		source: 'JAN-PFA R1 S1.2'
+	},
+	{
+		id: 'MU-PFA-R1-D-blind-the-reader-to-a-missing-summary',
+		file: 'scripts/coverage-floor.ts',
+		find: '\tif (!existsSync(summaryPath))',
+		replace: '\tif (false && !existsSync(summaryPath))',
+		expectRed: ['verif/coverage-floor.test.ts'],
+		why: 'THE CONTROL-THAT-CANNOT-FAIL, DECLARED RATHER THAN HOPED FOR. This check runs immediately after `test:coverage`, so "the coverage run did not happen" is a live possibility, and a checker that reads an absent summary as "no regressions" passes precisely when it has measured nothing. This repository has shipped that shape more than once; here it is a named mutant.',
+		source: 'JAN-PFA R1 S1.2'
+	},
+	{
+		id: 'MU-PFA-R1-E-accept-an-empty-population',
+		file: 'scripts/coverage-floor.ts',
+		find: '\tif (Object.keys(out).length === 0)',
+		replace: '\tif (Object.keys(out).length < 0)',
+		expectRed: ['verif/coverage-floor.test.ts'],
+		why: 'A summary reporting ZERO files makes every per-file assertion vacuously true — the same vacuity as a blinded reader, arriving through a summary that exists and is empty rather than one that is absent. Both doors are guarded because closing only the obvious one is how the shape survives.',
+		source: 'JAN-PFA R1 S1.2'
 	}
 ];

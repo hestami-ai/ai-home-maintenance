@@ -115,7 +115,38 @@ AUTHORITATIVE.
 
 ---
 
-## 2. PHASE 1 (R1) — THE PER-FILE COVERAGE RATCHET
+## 2. ✅ PHASE 1 (R1) — COMPLETE. The per-file coverage ratchet
+
+**LANDED 2026-09-12. Five limbs, five mutants, FIVE KILLED — each observed reddening EXACTLY ONE test with the
+other four green.** That separation is the whole claim: a per-file mechanism whose limbs fail together cannot
+tell a regressed file from a new one, which is the distinction it exists to make.
+
+| limb | mutant | what it alone catches |
+| --- | --- | --- |
+| RATCHET | `R1-A` slackens the comparison | a file adding uncovered code |
+| POPULATION (added) | `R1-B` blinds it to new files | ⭐ a NEW file full of uncovered code — which CANNOT regress against a baseline that never heard of it, so the ratchet limb is structurally silent |
+| POPULATION (removed) | `R1-C` blinds it to vanished files | a weak file dropping out of the denominator — the CSAA defect this programme began with |
+| BLINDED READER | `R1-D` treats a missing summary as nothing to check | the gate passing precisely when it measured nothing |
+| EMPTY POPULATION | `R1-E` accepts a zero-file summary | the same vacuity through a summary that exists and is empty |
+
+⭐ **`gate:fast` IS NOW 12 STEPS**, with `coverage:floor:check` immediately after `test:coverage`. The composition
+pin, `REQUIRED_ROOT_COMMANDS` (7 → 8) and `VERIF_TEST_FLOOR` (62 → 63) all moved in the same commit, each argued
+on its face. ⚠ The WRITER is deliberately absent from `REQUIRED_ROOT_COMMANDS`: a command that regenerates the
+artifact is not a guarantee, and requiring it would invite satisfying the gate by rewriting the baseline.
+
+**⛔ ONE DEFECT WORTH THE RECORD: THE BASELINE WAS FIRST WRITTEN TO A PATH GIT WOULD NEVER KEEP.**
+`verif/coverage/` looked like the obvious home — and `.gitignore:6` is `coverage/`, which matches a directory of
+that name at ANY depth. ⭑ **A committed-baseline mechanism whose baseline cannot be committed is not a weaker
+guarantee, it is none at all**: the check would have passed locally for whoever generated it and failed, or
+silently regenerated, for everyone else. Caught by `git add` refusing the path. It now lives at
+`verif/floors/`, beside the `verif/slices/` precedent.
+
+**S1.5 — the baseline is TODAY'S measurement, unchanged.** 106 files, **580 uncovered branches**, no file's
+figure tightened as part of introducing the mechanism, **no exemption list**.
+
+---
+
+### The steps, as planned
 
 ⭑ Carried verbatim from `JAN-PFCOV`, which was superseded for being incomplete, not for being wrong.
 
