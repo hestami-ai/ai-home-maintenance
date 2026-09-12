@@ -194,7 +194,40 @@ frozen. ⛔ **No exemption list** — an exemption is where a weak file lives pe
 
 ---
 
-## 3. PHASE 2 (R2) — CHANGE-SCOPED MUTATION
+## 3. ✅ PHASE 2 (R2) — COMPLETE. Change-scoped mutation
+
+**LANDED 2026-09-12.** `bun run mutants:changed [--run] [--strict] [--range=A..B]`. Five limbs, five mutants,
+five KILLED. The intersector's pure core lives in `scripts/mutants/scope-core.ts` precisely so the limbs can be
+driven without git, a staged index, or ~4s per mutant.
+
+**THREE OUTCOMES, THREE EXIT CODES, AND THEY ARE NOT ALLOWED TO MERGE:**
+
+| exit | signal | what it means |
+| --- | --- | --- |
+| 1 | ⛔ BROKEN GUARANTEE | a guard over the changed region SURVIVED — the suite is green and the protection is gone |
+| 3 | ⛔ UNGUARDED CHANGE (`--strict`) | nothing has ever tried to break this line |
+| 2 | ⛔ INSTRUMENT DID NOT RUN | nothing was measured, so nothing is claimed |
+
+⭐ **THE THIRD OUTCOME WAS NOT IN THE DESIGN. IT WAS FORCED BY RUNNING THE THING.** `run.ts` refuses to mutate a
+tree that does not match a stable staged index baseline — which is exactly the state a change-scoped tool is
+invoked in. The first implementation read `status !== 0` and announced **BROKEN GUARANTEE about a mutation that
+was never applied.** The fix then matched `ABORTED_DIRTY` as a bare substring — and the runner's summary prints
+one row per verdict kind, so every HEALTHY run contains the literal `ABORTED_DIRTY 0`, which classified a
+genuinely SURVIVED mutant as *"the instrument did not run"* and **suppressed the finding the command exists to
+raise.** ⚠ A false positive gets investigated; that false negative is silent. Both are now regression mutants
+(`R2-D`, `R2-E`) rather than remembered.
+
+**WHY THE ABSENCE SIGNAL IS ADVISORY BY DEFAULT, AND WHAT FLIPS IT.** 75 of 106 production files carry no guard;
+blocking on "you touched an unguarded line" today would demand the whole `R3` obligation before anyone could
+land an edit. ⛔ The trigger is NAMED rather than left to drift: when `R3`'s burn-down reaches zero unguarded
+production-consumed exports, `--strict` becomes the default.
+
+⛔ **IT IS NOT A `gate:fast` STEP.** The gate runs on a tree whose changes are committed, where `git diff HEAD`
+is empty and this command has nothing to say. It belongs in the EDIT loop. `gate:fast` stays at 12 steps.
+
+---
+
+### The steps, as planned
 
 **The basis the sponsor asked for:** for the region a diff touches, *is there a declared guard over it, and does
 that guard still discriminate after the change?* ⭑ Enabled by a measured fact: **all 238 measurable ledger

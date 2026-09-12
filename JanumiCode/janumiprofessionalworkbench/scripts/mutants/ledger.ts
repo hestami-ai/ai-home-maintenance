@@ -3435,5 +3435,55 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/coverage-floor.test.ts'],
 		why: 'A summary reporting ZERO files makes every per-file assertion vacuously true — the same vacuity as a blinded reader, arriving through a summary that exists and is empty rather than one that is absent. Both doors are guarded because closing only the obvious one is how the shape survives.',
 		source: 'JAN-PFA R1 S1.2'
+	},
+	// ── JAN-PFA R2 — change-scoped mutation's pure core ─────────────────────────────────────────────────────
+	// The last two entries are REGRESSION mutants for defects this feature actually shipped and then had
+	// removed, both found by RUNNING it rather than reading it, and both in the classifier that decides whether
+	// a finding is being claimed at all. They are declared because a defect found that way returns the moment
+	// the reasoning that produced it is repeated.
+	{
+		id: 'MU-PFA-R2-A-drop-pure-deletion-hunks',
+		file: 'scripts/mutants/scope-core.ts',
+		find: 'hunks.push({ file, startLine: start, endLine: count === 0 ? start : start + count - 1 });',
+		replace: 'hunks.push({ file, startLine: start, endLine: start + count - 1 });',
+		expectRed: ['verif/mutants-scope.test.ts'],
+		why: 'A `+0` hunk is a PURE DELETION and has no lines on the new side; the arithmetic yields an end BEFORE the start, so the region can never overlap a guard and the edit becomes invisible. Deleting a guarded block is the edit most likely to remove a guarantee, so it is the last shape this reader may be blind to.',
+		source: 'JAN-PFA R2 S2.1'
+	},
+	{
+		id: 'MU-PFA-R2-B-accept-an-ambiguous-anchor',
+		file: 'scripts/mutants/scope-core.ts',
+		find: '\tif (hits !== 1) return `anchor occurs ${hits} times (expected exactly 1)`;',
+		replace: '\tif (hits < 1) return `anchor occurs ${hits} times (expected exactly 1)`;',
+		expectRed: ['verif/mutants-scope.test.ts'],
+		why: 'An anchor matching twice means the ledger cannot say WHERE the guard is. Taking the first match invents a location, and the intersection then reports a diff as guarded or unguarded on the strength of a guess. Absent and ambiguous are both "cannot decide" and must both be refused.',
+		source: 'JAN-PFA R2 S2.1'
+	},
+	{
+		id: 'MU-PFA-R2-C-miss-boundary-line-touches',
+		file: 'scripts/mutants/scope-core.ts',
+		find: '\tfile === hunk.file && range.startLine <= hunk.endLine && hunk.startLine <= range.endLine;',
+		replace: '\tfile === hunk.file && range.startLine < hunk.endLine && hunk.startLine < range.endLine;',
+		expectRed: ['verif/mutants-scope.test.ts'],
+		why: 'The first and last lines of an anchor are part of the guard. An off-by-one at the boundary silently reclassifies an edit to the first line of a guarded region as UNGUARDED — the false all-clear, which is worse than no signal because it is reported as reassurance.',
+		source: 'JAN-PFA R2 S2.1'
+	},
+	{
+		id: 'MU-PFA-R2-D-claim-a-verdict-from-a-run-that-produced-none',
+		file: 'scripts/mutants/scope-core.ts',
+		find: "\tconst reachedAVerdict = transcript.includes('MUTATION LEDGER SUMMARY');",
+		replace: '\tconst reachedAVerdict = true;',
+		expectRed: ['verif/mutants-scope.test.ts'],
+		why: 'REGRESSION MUTANT FOR A DEFECT THIS FEATURE SHIPPED. The classifier first read `status !== 0` alone and announced BROKEN GUARANTEE when the runner had ABORTED on a dirty tree — a finding about a mutation that was never applied. The rule that survived is that a verdict is claimed only when the runner demonstrably reached one.',
+		source: 'JAN-PFA R2 S2.3'
+	},
+	{
+		id: 'MU-PFA-R2-E-match-aborted-dirty-as-a-bare-substring',
+		file: 'scripts/mutants/scope-core.ts',
+		find: '/ABORTED_DIRTY\\s+[1-9]/.test(transcript)',
+		replace: '/ABORTED_DIRTY/.test(transcript)',
+		expectRed: ['verif/mutants-scope.test.ts'],
+		why: 'REGRESSION MUTANT FOR THE FIX TO THE DEFECT ABOVE, WHICH WAS ITSELF A DEFECT AND A WORSE ONE. The runner\'s summary prints one row per verdict kind, so every HEALTHY run contains the literal `ABORTED_DIRTY 0`; matching it as a substring classified a genuinely SURVIVED mutant as "the instrument did not run", suppressing the exact finding this command exists to raise. A false positive gets investigated; this false negative is silent.',
+		source: 'JAN-PFA R2 S2.3'
 	}
 ];

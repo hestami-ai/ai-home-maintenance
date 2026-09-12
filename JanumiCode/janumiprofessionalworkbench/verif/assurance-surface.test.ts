@@ -105,12 +105,17 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * follows CSAA out of the repository subtree entirely — the second recorded DECREASE, and the last one this
  * programme expects.
  *
+ * 63 -> 64 (2026-09-12, JAN-PFA R2): `verif/mutants-scope.test.ts`. ⭑ IT CARRIES TWO REGRESSION CASES FOR
+ * DEFECTS THE FEATURE SHIPPED AND HAD REMOVED, in opposite directions, both in the classifier that decides
+ * whether a finding is being claimed at all. A defect found by running rather than reading returns the moment
+ * the reasoning that produced it is repeated, so it is pinned rather than remembered.
+ *
  * 62 -> 63 (2026-09-12, JAN-PFA R1): `verif/coverage-floor.test.ts`. ⭑ IT IS HERE BECAUSE THE THING IT DRIVES
  * IS A GATE STEP, and because the per-file ratchet's two limbs must be shown to fail SEPARATELY — which the
  * gate step itself, a single pass/fail over 106 files, structurally cannot show. Its fixtures are private temp
  * dirs, so it asserts over the mechanism rather than over today's coverage numbers.
  */
-const VERIF_TEST_FLOOR = 63;
+const VERIF_TEST_FLOOR = 64;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and

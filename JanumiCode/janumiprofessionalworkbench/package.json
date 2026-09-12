@@ -31,7 +31,8 @@
 		"slices:ledger": "bun run scripts/slice-ledger.ts --write",
 		"slices:ledger:check": "bun run scripts/slice-ledger.ts --check",
 		"coverage:floor": "bun run scripts/coverage-floor.ts --write",
-		"coverage:floor:check": "bun run scripts/coverage-floor.ts --check"
+		"coverage:floor:check": "bun run scripts/coverage-floor.ts --check",
+		"mutants:changed": "bun run scripts/mutants/scope.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.37.0",
