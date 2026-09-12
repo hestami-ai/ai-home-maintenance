@@ -366,13 +366,13 @@
 				"PWU_TYPE_HELP",
 				"catalogTemplate"
 			],
-			"mutants": 0
+			"mutants": 3
 		},
 		"packages/rph-authoring/src/lint.ts": {
 			"consumedExports": [
 				"lintComposition"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-contracts/src/common.ts": {
 			"consumedExports": [
@@ -636,62 +636,62 @@
 				"SCHEMA_VERSION",
 				"planMigration"
 			],
-			"mutants": 0
+			"mutants": 3
 		},
 		"packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts": {
 			"consumedExports": [
 				"SnapshotOverlayStorageAdapter"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-persistence/src/sql-driver.ts": {
 			"consumedExports": [
 				"createSqliteDriver"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-persistence/src/sqlite-artifact-store.ts": {
 			"consumedExports": [
 				"SQLITE_STORAGE_PROVIDER",
 				"SqliteArtifactStore"
 			],
-			"mutants": 0
+			"mutants": 3
 		},
 		"packages/rph-persistence/src/sqlite-storage-adapter.ts": {
 			"consumedExports": [
 				"SqliteStorageAdapter"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-ports/src/artifact-store-contract.ts": {
 			"consumedExports": [
 				"artifactStoreContract"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-ports/src/defaults/artifact-store.ts": {
 			"consumedExports": [
 				"createInMemoryArtifactStore"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-ports/src/defaults/logger.ts": {
 			"consumedExports": [
 				"NoopLogger"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-ports/src/ports/authentication.ts": {
 			"consumedExports": [
 				"asCredential"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-ports/src/ports/logger.ts": {
 			"consumedExports": [
 				"LOG_LEVEL_ORDER"
 			],
-			"mutants": 0
+			"mutants": 1
 		},
 		"packages/rph-product-realization-pwa/src/ontology.ts": {
 			"consumedExports": [

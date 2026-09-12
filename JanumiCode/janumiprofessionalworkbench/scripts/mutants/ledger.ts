@@ -3534,5 +3534,172 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/export-guard.test.ts'],
 		why: 'A file carrying extra guards does not discharge another file\'s promise. Summing signed shortfalls lets a heavily-guarded file conceal an unguarded one — THE AVERAGING DEFECT THIS ENTIRE PROGRAMME EXISTS TO REMOVE, reappearing inside the instrument that measures it.',
 		source: 'JAN-PFA R3 S3.2'
+	},
+	{
+		id: "MU-PFA-BD1-10-noop-child-picks-a-sink",
+		file: "packages/rph-ports/src/defaults/logger.ts",
+		find: "\toverride child(_bindings: LogFields): Logger {\n\t\treturn this;\n\t}",
+		replace: "\toverride child(_bindings: LogFields): Logger {\n\t\treturn consoleLogger();\n\t}",
+		expectRed: ["packages/rph-ports/src/defaults/logger.test.ts"],
+		why: "NoopLogger is the library's silent default: the Logger port states \"Default is a no-op - the library never picks a sink\", and the class doc promises it \"discards everything\". child() returning `this` is the seam that makes that silence hereditary - every logger derived from the default must still discard. CommandBus takes `deps.logger ?? new NoopLogger()` and hands that logger to every command handler via HandlerContext, so a NoopLogger whose child picks the console sink makes the engine write diagnostic JSON to the host's stdout/stderr with no host opt-in, the exact thing the port forbids.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-07-stale-revision-commit-reports-success",
+		file: "packages/rph-persistence/src/sqlite-storage-adapter.ts",
+		find: "\t\t\t} else if (actualRevision !== input.expectedRevision) {\n\t\t\t\treturn { ok: false, reason: 'REVISION_CONFLICT', actualRevision };\n\t\t\t}",
+		replace: "\t\t\t} else if (actualRevision !== input.expectedRevision) {\n\t\t\t\treturn { ok: true };\n\t\t\t}",
+		expectRed: ["packages/rph-persistence/src/sqlite-storage-adapter.test.ts"],
+		why: "Breaks the optimistic-concurrency contract `StorageAdapter.commit` publishes to its single caller (the command bus): when `expectedRevision` does not match the stored revision the store SHALL refuse with `{ok:false, reason:'REVISION_CONFLICT'}`. The mutant keeps the detection but converts the refusal into an admission — the adapter still writes nothing (no state, no version row, no event, no outbox row, no receipt) yet reports `ok:true`, so the engine treats a lost update as a durable commit and the conflict is never surfaced.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-02-empty-guard-swallows-one-type-graph",
+		file: "packages/rph-authoring/src/lint.ts",
+		find: "\tif (types.length === 0) return findings;",
+		replace: "\tif (types.length <= 1) return findings;",
+		expectRed: ["packages/rph-authoring/src/lint.test.ts"],
+		why: "lintComposition promises its consumers that an empty result means the graph WAS examined and is structurally clean (\"empty = clean\"); the agent's review_composition tool reports \"No structural issues — the decomposition looks clean\" and stops the moment findings.length === 0, and apps/rph-demo/src/routes/pwa/[id]/+page.server.ts renders that same list to the professional. Widening the nothing-to-lint guard past the genuinely empty graph makes an unexamined one-type graph (missing root, undeclared workDischarge) report clean to both, so the instrument's silence stops meaning \"I looked\".",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-05-transaction-does-not-roll-back",
+		file: "packages/rph-persistence/src/sql-driver.ts",
+		find: "\t\ttransaction: <T>(fn: () => T): T => db.transaction(fn)(),",
+		replace: "\t\ttransaction: <T>(fn: () => T): T => fn(),",
+		expectRed: ["packages/rph-persistence/src/sqlite-storage-adapter.test.ts"],
+		why: "createSqliteDriver is the production SqlDriver, and the guarantee its interface states in so many words is `Run fn inside a single transaction; commit on return, roll back on throw`. Running fn bare in autocommit keeps every statement that succeeded before the throw, so SqliteStorageAdapter.commit is no longer all-or-nothing — the exact atomicity CommandBus.dispatchBatch, the replay guard, pwa-authoring's two-aggregate version bump, and the schema-migration ladder all rely on to never leave a half-written store.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-08-retention-class-key-identity",
+		file: "packages/rph-ports/src/artifact-store-contract.ts",
+		find: "expect(volunteered.storageKey).not.toBe(participating.storageKey);",
+		replace: "expect(volunteered.storageKey).toBe(participating.storageKey);",
+		expectRed: ["packages/rph-ports/src/defaults/artifact-store.test.ts"],
+		why: "The suite's promise to every adapter that runs it is that it REJECTS a key derivation which omits retention class — the REG-F-337 PER-8 hard-delete vector the file's own header names as its reason for being shared rather than copied ('that defect is a property of the KEY DERIVATION, so every adapter can reproduce it independently'). Inverted, the contract instead DEMANDS that a PURGEABLE re-put of participating bytes address the same entry, so it would certify exactly the downgrade-then-purge vector and reject a correct adapter; both createInMemoryArtifactStore and SqliteArtifactStore rely on this single assertion as their only proof that retention class is part of storage identity.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-04-overlay-reads-canonical-after-the-fork",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "\t\tconst object = this.stagedObjects.get(id) ?? this.baseObjects.get(id);",
+		replace: "\t\tconst object =\n\t\t\tthis.stagedObjects.get(id) ?? this.baseObjects.get(id) ?? this.source.loadObject(id);",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "The class's first documented promise — \"the canonical adapter is consulted ONLY during construction to capture the base snapshot\" — is what makes a fork POINT-IN-TIME, and it is the whole reason `EngineHandle.fork()` can hand an authoring turn (apps/rph-demo/src/lib/server/authoring-turn.ts, the /pwa/[id] candidate page) a candidate it may reason about as an exact, frozen fork. Falling `loadObject` through to the live source lets a canonical write made AFTER the fork appear inside the candidate, so the agent authors against — and the human reviews — a state the candidate never actually contains, and the replay's expectedRevision/contentHash guards are then computed off canonical's moving revision rather than off the snapshot they were taken from. (This is the same fall-through the sibling `getReceipt` carries an explicit comment refusing.)",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-12-error-ranks-below-warn",
+		file: "packages/rph-ports/src/ports/logger.ts",
+		find: "\terror: 40,",
+		replace: "\terror: 5,",
+		expectRed: ["packages/rph-ports/src/defaults/logger.test.ts"],
+		why: "LOG_LEVEL_ORDER promises a single MONOTONIC severity ranking (debug<info<warn<error<fatal) that is the only thing any level-threshold filter compares against; StructuredLogger.log encodes that promise as `LOG_LEVEL_ORDER[level] < LOG_LEVEL_ORDER[this.minLevel] -> drop`, so a host configuring minLevel 'warn' or 'info' relies on error/fatal records always clearing the gate. Ranking error below warn inverts the order and makes the filter silently discard the highest-severity diagnostics while still emitting the noise beneath them.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-03-schema-sql-recreates-existing-tables",
+		file: "packages/rph-persistence/src/schema.ts",
+		find: "CREATE TABLE IF NOT EXISTS command_receipts (",
+		replace: "CREATE TABLE command_receipts (",
+		expectRed: ["packages/rph-persistence/src/durability.test.ts"],
+		why: "SCHEMA_SQL promises every statement is CREATE … IF NOT EXISTS, so running it against an ALREADY-POPULATED store is a no-op — the guarantee that lets SqliteStorageAdapter exec it unconditionally in its constructor on every open and lets a migration only ever ALTER. Any durable store (apps/rph-demo opens one by filename) then fails to reopen at all.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-03-version-understates-the-shape-it-stamps",
+		file: "packages/rph-persistence/src/schema.ts",
+		find: "export const SCHEMA_VERSION = 2;",
+		replace: "export const SCHEMA_VERSION = 1;",
+		expectRed: ["packages/rph-persistence/src/schema-migration.test.ts"],
+		why: "SCHEMA_VERSION promises to name the shape SCHEMA_SQL actually builds, so that the adapter's version gate can tell an out-of-date store from a current one; understating it declares every v1 store already current, the v1→v2 ladder becomes unreachable, and the engine reads a store missing payload_hash while believing it understands it — the exact silent misread user_version exists to prevent.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-03-ladder-skips-a-missing-step",
+		file: "packages/rph-persistence/src/schema.ts",
+		find: "\t\t\tthrow new Error(\n\t\t\t\t`RPH persistence: no forward migration registered from schema version ${v} to ${v + 1} ` +\n\t\t\t\t\t`(migrating ${from} → ${to}). Refusing to open — an engine must not read a store whose shape ` +\n\t\t\t\t\t`it cannot account for.`\n\t\t\t);",
+		replace: "\t\t\tcontinue;",
+		expectRed: ["packages/rph-persistence/src/schema-migration.test.ts"],
+		why: "planMigration promises to REFUSE a gap in the ladder rather than skip it; turning the refusal into a silent skip lets SqliteStorageAdapter stamp a store at SCHEMA_VERSION having never run the step that would have given it that shape, which is the unknown-schema misread the version gate exists to stop.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-09-per8-purge-guard-inverted",
+		file: "packages/rph-ports/src/defaults/artifact-store.ts",
+		find: "\t\t\tif (entry.meta.purgeability === 'RETAINED_BY_PARTICIPATION')",
+		replace: "\t\t\tif (entry.meta.purgeability === 'PURGEABLE_AT_EXPIRY')",
+		expectRed: ["packages/rph-ports/src/defaults/artifact-store.test.ts"],
+		why: "The store's reason for existing is the PARTICIPATION-GUARDED purge: PER-8 holds that content that has participated in execution, assurance, governance, a baseline or traceability is never hard-deleted, so purge() must REFUSE for RETAINED_BY_PARTICIPATION and succeed only for PURGEABLE_AT_EXPIRY. Inverting which class the guard recognises turns the default ArtifactStore into the hard-delete vector it was written to prevent — the exchange-capture and work-product-floor callers that store participating evidence behind this seam rely on that refusal, and the durable adapter is specified against it.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-01-architecture-blueprint-skips-the-behavior-handoff",
+		file: "packages/rph-authoring/src/catalog.ts",
+		find: "\t\tpurpose: 'A coherent technical structure realizing approved behavior.',\n\t\trequiredInputs: ['approved-behavior'],",
+		replace: "\t\tpurpose: 'A coherent technical structure realizing approved behavior.',\n\t\trequiredInputs: ['product-definition'],",
+		expectRed: ["packages/rph-authoring/src/broker.test.ts"],
+		why: "The catalog's stated promise to its consumers is that the requiredInputs/requiredOutputs of its blueprints line up into the canonical §7 hand-off chain, so a scaffolded graph shows the right data-flow edges out of the box. Re-pointing Architecture Definition's input at the artifact Intent & Product Definition produces silently routes it around Product Behavior Definition entirely: every copy-on-use graph still draws a plausible edge, but one that skips a whole work area's approved behavior.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-01-lookup-returns-a-blueprint-it-was-not-asked-for",
+		file: "packages/rph-authoring/src/catalog.ts",
+		find: "\treturn PWU_TYPE_CATALOG.find((t) => t.key === key);",
+		replace: "\treturn PWU_TYPE_CATALOG.find((t) => t.key !== key);",
+		expectRed: ["packages/rph-authoring/src/broker.test.ts"],
+		why: "catalogTemplate's whole promise is key-to-blueprint identity: a key a consumer obtained from the catalog itself (the form's `<option value={t.key}>`, the agent tool's templateKey) resolves to THAT blueprint, and to nothing at all if no entry carries it. The mutant hands back a neighbouring blueprint instead of refusing, so defineFromTemplate reports success while instantiating a PWU Type — kind, purpose and hand-offs — that the professional or agent never chose.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-06-durable-store-is-silently-process-local",
+		file: "packages/rph-persistence/src/sqlite-artifact-store.ts",
+		find: "\t\tthis.db = opts.driver ?? createSqliteDriver(opts.filename);",
+		replace: "\t\tthis.db = opts.driver ?? createSqliteDriver();",
+		expectRed: ["packages/rph-persistence/src/sqlite-artifact-store.test.ts"],
+		why: "SqliteArtifactStore's whole reason for existing over the in-memory default is that the bytes it stores survive a process restart, which is why it declares durability = 'DURABLE'. Dropping the caller's filename silently backs every instance with a private ':memory:' database, so the class keeps CLAIMING DURABLE while behaving PROCESS_LOCAL — exactly REG-F-342's inverse orphan, where a permanent ARTIFACT record names a storageKey whose content a restart erased and the record still looks intact. getArtifactStore() in apps/rph-demo passes `{ filename: `${DB_PATH}.content.sqlite` }` and relies on that argument being honoured.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-11-credential-narrowing-collapses-distinct-sessions",
+		file: "packages/rph-ports/src/ports/authentication.ts",
+		find: "\treturn raw as Credential;",
+		replace: "\treturn raw.slice(0, 4) as Credential;",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-recording.test.ts"],
+		why: "asCredential is the trust boundary's ONE narrowing point and its runtime guarantee is that the branded value IS the host's bearer string verbatim — so two different host sessions remain two different credentials. apps/rph-demo/src/lib/server/identity.ts relies on exactly that: it keys the PRINCIPALS directory with the results and hands the same values to engine.as(), so a narrowing point that normalises the string collapses the human session, the authoring agent, the seeder and the reference owner onto one key and every recorded act names the same principal — the 'who did what' loss REG-F-054/REG-F-056 exist to prevent.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	{
+		id: "MU-PFA-BD1-01-completion-rule-reclaims-a-guarantee-nothing-makes",
+		file: "packages/rph-authoring/src/catalog.ts",
+		find: "\tcompletionRule:\n\t\t'Your statement of when work of this type is DONE. RECORDED AND SHOWN, not evaluated — no gate reads it, ' +\n\t\t'and editing it changes no outcome. What actually holds a PWU back is its assurance: the locked floor plus ' +\n\t\t'the policies selected by this type\\u2019s kind and declared policy ids.',",
+		replace: "\tcompletionRule:\n\t\t'When an Instance of this type is DONE. ENFORCED AT COMPLETION: an Instance cannot be marked DONE ' +\n\t\t'until the completion gate evaluates this rule and finds it met.',",
+		expectRed: ["verif/authoring-field-disposition.test.ts"],
+		why: "PWU_TYPE_HELP is the text BOTH authors of a PWU Type read — the professional at the inspector form and the agent holding the tool schema — and its EG-06 guarantee is that a field measured as UNENFORCED admits so in the words the reader sees. completionRule is evaluated by nothing; re-attaching the real \"no green without assurance\" guarantee to that inert textbox leaves both readers confident and wrong, which is worse than leaving them uninformed. ⚠ ITS ANCHOR IS EXTRACTED FROM THE FILE, NOT RETYPED: the source carries the literal escape sequence backslash-u2019, and an author reproducing the RENDERED apostrophe produces an anchor that matches nothing.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 1"
+	},
+	// ── JAN-PFA R3 S3.3 — the provider stamp, which NOTHING asserted until this increment ───────────────────
+	// The burn-down could not declare a mutant for SQLITE_STORAGE_PROVIDER: no test in the repository touched
+	// it, so every mutation would have SURVIVED. The agent authoring this file said so rather than inventing a
+	// token, which is the honest answer and is itself the finding. These two entries exist because a test was
+	// written first. ⭑ B is the mutation A CANNOT catch — both sides of A's comparison move together.
+	{
+		id: 'MU-PFA-BD1-06-ref-carries-a-provider-that-is-not-this-store',
+		file: 'packages/rph-persistence/src/sqlite-artifact-store.ts',
+		find: 'return { storageProvider: SQLITE_STORAGE_PROVIDER, storageKey, contentHash, byteSize };',
+		replace: "return { storageProvider: 'jpwb:in-memory', storageKey, contentHash, byteSize };",
+		expectRed: ['packages/rph-persistence/src/sqlite-artifact-store.test.ts'],
+		why: 'The provider on a StoredArtifactRef is how the ref says WHICH store holds its bytes, so a later get or purge can be routed to it. Stamping another store\'s identifier makes every durable ref claim to live in a process-local store, and REG-F-342 records that a durable RECORD naming process-local CONTENT is the inverse-orphan defect.',
+		source: 'JAN-PFA R3 S3.3 burn-down increment 1'
+	},
+	{
+		id: 'MU-PFA-BD1-06-durable-and-in-memory-providers-collide',
+		file: 'packages/rph-persistence/src/sqlite-artifact-store.ts',
+		find: "export const SQLITE_STORAGE_PROVIDER = 'jpwb:sqlite';",
+		replace: "export const SQLITE_STORAGE_PROVIDER = 'jpwb:in-memory';",
+		expectRed: ['packages/rph-persistence/src/sqlite-artifact-store.test.ts'],
+		why: 'THE LIMB THE OBVIOUS ASSERTION CANNOT REACH. Comparing the ref against the constant passes whenever BOTH SIDES MOVE TOGETHER, so aliasing the constant to the in-memory store\'s identifier leaves that check green while making the two stores indistinguishable to every consumer of a ref. Distinctness is a separate claim from consistency and needs its own limb.',
+		source: 'JAN-PFA R3 S3.3 burn-down increment 1'
 	}
 ];

@@ -2,13 +2,14 @@
 //
 // ⭑ THE SUITE IS SHARED, NOT COPIED. REG-F-337's PER-8 hard-delete vector lived in the KEY DERIVATION, so a
 // second adapter can reproduce it independently; a duplicated suite would drift until one of them does.
+import { IN_MEMORY_STORAGE_PROVIDER } from '@janumipwb/rph-ports';
 import { artifactStoreContract } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { SqliteArtifactStore } from './sqlite-artifact-store.js';
+import { SQLITE_STORAGE_PROVIDER, SqliteArtifactStore } from './sqlite-artifact-store.js';
 
 describe('SqliteArtifactStore — the ArtifactStore contract', () => {
 	artifactStoreContract(() => new SqliteArtifactStore());
@@ -68,5 +69,43 @@ describe('SqliteArtifactStore — what makes it DURABLE', () => {
 			'a durable store can say never-written and mean it'
 		).toMatch(/never written/i);
 		reopened.close();
+	});
+});
+
+// ── JAN-PFA R3 S3.3 — THE PROVIDER STAMP, WHICH NOTHING ASSERTED ────────────────────────────────────────────
+//
+// WHY THIS EXISTS. `SQLITE_STORAGE_PROVIDER` is stamped onto EVERY `StoredArtifactRef` this adapter returns,
+// and it is how a ref says WHICH store holds its bytes. The burn-down could not declare a mutant for it,
+// because no test in the repository asserted it at all — so any mutation of the constant would have SURVIVED,
+// and a surviving mutant is a finding rather than an entry. This is the test that turns it into one.
+//
+// ⭑ IT ASSERTS THE RELATIONSHIP, NOT THE LITERAL. Writing `expect(SQLITE_STORAGE_PROVIDER).toBe('jpwb:sqlite')`
+// would restate the code and be satisfied by any edit that changed both sides. What matters to a consumer is
+// that the value on the ref IS this store's identifier, and that it cannot be confused with another store's.
+describe('JAN-PFA R3 — SQLITE_STORAGE_PROVIDER identifies the store a ref belongs to', () => {
+	it('stamps its own provider on every ref, and that provider is DISTINCT from the in-memory store’s', async () => {
+		const store = new SqliteArtifactStore();
+		const ref = await store.put({
+			tenantPrefix: 'tnt-1',
+			bytes: 'provider identity',
+			mediaType: 'text/plain',
+			purgeability: 'RETAINED_BY_PARTICIPATION'
+		});
+
+		// LIMB 1 — the ref carries THIS store's identifier, whatever that identifier happens to be.
+		expect(
+			ref.storageProvider,
+			'a ref from the sqlite store does not carry the sqlite provider, so nothing can route a later get or purge to the store that actually holds the bytes'
+		).toBe(SQLITE_STORAGE_PROVIDER);
+
+		// LIMB 2 — and it is DISTINGUISHABLE from the only other store in the repository. ⛔ Without this, the
+		// constant could be blanked or aliased to the in-memory provider and limb 1 would still pass: both
+		// sides would move together, and every durable ref would claim to live in a process-local store.
+		expect(
+			SQLITE_STORAGE_PROVIDER,
+			'the durable and in-memory stores share a provider identifier, so a ref no longer says which one holds it'
+		).not.toBe(IN_MEMORY_STORAGE_PROVIDER);
+
+		store.close();
 	});
 });
