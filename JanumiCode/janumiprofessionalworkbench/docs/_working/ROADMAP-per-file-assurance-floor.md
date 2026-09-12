@@ -449,8 +449,32 @@ surfaced.
   results… the governed record of WHO assessed has no live-engine assertion standing behind it."* An unguarded
   governance record, owed independently of this phase.
 
-  **197 bare exports remain**: `rph-application` 124, `rph-domain` 45, `rph-projections` 23, `rph-contracts` 2,
-  and one each in `rph-assurance`, `rph-engine` and `rph-product-realization-pwa`.
+  **INCREMENT 3b LANDED: `rph-projections` 23 → 0.** 23 authored, 23 KILLED, 0 survivors, 0 rejections, 0
+  inconclusive. Obligation **197 → 174**; exports guarded **134 → 157 of 331**; files with no guarded export
+  **40 → 28**. ⭐ **FOUR packages now at zero** (`rph-authoring`, `rph-ports`, `rph-persistence`,
+  `rph-projections`), three hold a single bare export, `rph-contracts` holds two.
+
+  ⭐ **THE DISCIPLINE ARRIVED IN DELEGATED WORK WITHOUT BEING ASKED FOR.** Several authors drove the built code
+  and reported their predicted red as an OBSERVED TRANSITION with both values named — *"Measured on the built
+  gate: `startableStepIds` goes `['s3']` → `['s2','s3']`"*, *"`plansForPwus` goes `['plan_in']` →
+  `['plan_other','plan_orphan']`"*, *"layers go `[[0,['i_p']],[1,['i_c']]]` → `[[0,['i_c']],[1,['i_p']]]`"*. A
+  predicted red stated as a measured transition is the standard this programme has been holding itself to.
+
+  ⭑ **AND ONE ENTRY SHOWS WHY THE PER-EXPORT UNIT EARNS ITS KEEP.** `buildAssuranceView`'s author reasoned that
+  the accumulator threaded in log order is *"the ONLY thing buildAssuranceView adds over the already-exported
+  `applyAssuranceEvent`, so it is the only thing a mutant on this export can honestly attack"* — then mutated
+  exactly that, traversing the log backwards so every update lands before the creation it depends on and a
+  COMPLETED assessment reads as still ASSESSING. ⛔ A per-FILE count would have accepted a mutant anywhere in
+  that file; the per-export unit forced the question of what THIS export uniquely promises.
+
+  ⚠ **NO NEW HOLES IN THIS INCREMENT, AND THAT IS REPORTED AS-IS** rather than as vindication. Three consecutive
+  increments have now returned zero survivors across 87 guards. The projected sub-10% real-gap rate was measured
+  on two samples drawn from `governance.ts`/`assurance-rules.ts` and six peripheral files; it has not been
+  observed since, and `rph-domain` + `rph-application` — which hold 169 of the remaining 174 and where all three
+  Phase 0 holes lived — are the population that would test it.
+
+  **174 bare exports remain**: `rph-application` 124, `rph-domain` 45, `rph-contracts` 2, and one each in
+  `rph-assurance`, `rph-engine` and `rph-product-realization-pwa`.
 - ⚠ **S3.4 the dead-surface audit: still filed, not done.**
 
 ---

@@ -963,21 +963,29 @@
 				"buildApplicablePolicies",
 				"buildAssuranceView"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"aggregateDispositionFor",
+				"buildApplicablePolicies",
+				"buildAssuranceView"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/composition-plan.ts": {
 			"consumedExports": [
 				"planComposition"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"planComposition"
+			],
 			"unattributedMutants": 2
 		},
 		"packages/rph-projections/src/execution-attempts.ts": {
 			"consumedExports": [
 				"executionAttempts"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"executionAttempts"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/execution-view.ts": {
@@ -990,7 +998,12 @@
 				"transitionRows"
 			],
 			"guardedExports": [
-				"prunableStepIds"
+				"conditionEvaluatorFor",
+				"plansForPwus",
+				"prunableStepIds",
+				"sequenceView",
+				"startableStepIds",
+				"transitionRows"
 			],
 			"unattributedMutants": 7
 		},
@@ -998,7 +1011,9 @@
 			"consumedExports": [
 				"pwuGraphNode"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"pwuGraphNode"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/handoff-order.ts": {
@@ -1006,7 +1021,10 @@
 				"handoffFindings",
 				"layerHandoff"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"handoffFindings",
+				"layerHandoff"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/leaf.ts": {
@@ -1014,21 +1032,28 @@
 				"leafKind",
 				"leafKindLabel"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"leafKind",
+				"leafKindLabel"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/projector.ts": {
 			"consumedExports": [
 				"rebuildProjection"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"rebuildProjection"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/pwa-graph-report.ts": {
 			"consumedExports": [
 				"formatPwaCoherenceReport"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"formatPwaCoherenceReport"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/pwa-graph.ts": {
@@ -1036,14 +1061,19 @@
 				"analyzePwaGraph",
 				"buildPwaGraphExport"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"analyzePwaGraph",
+				"buildPwaGraphExport"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/pwu-behavior.ts": {
 			"consumedExports": [
 				"buildPwuBehaviorProjection"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"buildPwuBehaviorProjection"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/pwu-replay.ts": {
@@ -1052,7 +1082,8 @@
 				"replayPwuAxes"
 			],
 			"guardedExports": [
-				"applyPwuAxisEvent"
+				"applyPwuAxisEvent",
+				"replayPwuAxes"
 			],
 			"unattributedMutants": 0
 		},
@@ -1060,7 +1091,9 @@
 			"consumedExports": [
 				"traceabilityProjector"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"traceabilityProjector"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/uncertainty-disclosure.ts": {
@@ -1076,7 +1109,9 @@
 			"consumedExports": [
 				"isQualifiedSuccess"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"isQualifiedSuccess"
+			],
 			"unattributedMutants": 0
 		}
 	}

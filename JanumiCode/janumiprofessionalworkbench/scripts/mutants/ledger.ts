@@ -4313,5 +4313,212 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-engine/src/assessment-startedat-contract.test.ts"],
 		why: "PROMISE: this is the deliberately TYPE-BLIND by-id read — it hands back whatever object carries the id, asserting nothing about what it is, and stands in for the four ratified typed queries (getUndertaking, getPwu, getBaseline, getPwaVersion). Its blindness is load-bearing, which is exactly why `getObjectOfType` was added as a SEPARATE seam for ids arriving from a URL instead of narrowing this one. Every internal-id read depends on it: the assessment state read (assessment-startedat-contract.test.ts:78, :136), the floor policy reads (floor-declared-scope.test.ts:104, :162), the PWU/policy censuses, seed-policy-arrays' accessor. Narrowing it to a single objectType returns undefined for every non-Undertaking object, and each caller's optional-chain / `?? ''` fallback then degrades to empty without throwing — the 'did not even look broken' failure its own neighbouring docblock records. Victim is deliberately NOT queries-object-type.test.ts: that file's header declares it is intentionally not a declared mutant's victim.",
 		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
+	},
+	{
+		id: "MU-PFA-BD4-03-unordered-swallows-participants",
+		file: "packages/rph-projections/src/handoff-order.ts",
+		find: ".filter((id) => !participants.has(id))",
+		replace: ".filter((id) => participants.has(id))",
+		expectRed: ["packages/rph-projections/src/handoff-order.test.ts"],
+		why: "layerHandoff promises a STRICT 4-WAY PARTITION in which `unordered` is exactly the nodes with NO hand-off edge at all, and every node of `ex.nodes` appears in EXACTLY ONE bucket (interface doc lines 21-35, function doc 163-167). Inverting the participant test makes `unordered` the set of nodes that DO carry a hand-off edge, so every layered producer/consumer is simultaneously reported in its Kahn layer and as 'outside the dependency order' — the partition becomes a double-count and the one bucket that means 'no hand-off' now means 'has a hand-off'. Relied on by the walkthrough UI, which renders this bucket verbatim as the 'N no hand-off' count and the empty-step fallback (apps/rph-demo/src/routes/pwa/[id]/+page.svelte:1209, :1332), and by execution-view.ts classifyInstance (line 998), which treats absence from the layer index as 'no-dependency-position' for an Undertaking's instances. Predicted red: handoff-order.test.ts:56 `expect(o.unordered).toEqual([])` (first test, fails fast) and :79 `expect(o.unordered).toEqual(['X'])`, plus the strict-partition property test at :202.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-03-incycle-reports-blocked",
+		file: "packages/rph-projections/src/handoff-order.ts",
+		find: "inCycle: cycleSet.has(n.id),",
+		replace: "inCycle: blockedSet.has(n.id),",
+		expectRed: ["packages/rph-projections/src/handoff-order.test.ts"],
+		why: "handoffFindings promises per-node facts in which `inCycle` ('in a mutually-dependent hand-off cycle, SCC > 1') and `blocked` ('downstream of a hand-off cycle — dependency-unresolvable') are DISTINCT node-keyed flags drawn from the two distinct buckets of `layerHandoff` (NodeHandoffFinding doc lines 45-48). Keeping that distinction is the module's load-bearing guarantee — conflating a cycle member with an innocent downstream descendant is the JAN-PWADESIGNER-DR-001 §19 dim-2 BLOCKER the classifier exists to avoid. Sourcing `inCycle` from `blockedSet` hands the per-node panel the exact inversion: true cycle members are cleared of the cycle and their blameless descendants are accused of being in one. Relied on by the walkthrough per-node panel, which keys these findings by nodeId (apps/rph-demo/src/routes/pwa/[id]/+page.svelte:258-259, :296) to tell a professional whether a leaf is itself deadlocked or merely starved by an upstream deadlock. Predicted red: handoff-order.test.ts:241 `expect(byNode.get('a1')!.inCycle).toBe(true)` (mutant yields false, since blocked = ['F']) and :244 `expect(byNode.get('F')!.inCycle).toBe(false)` (mutant yields true).",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-08-node-green-ignores-its-assurance-axis",
+		file: "packages/rph-projections/src/graph-view.ts",
+		find: "axes.assuranceState,",
+		replace: "'SATISFIED',",
+		expectRed: ["packages/rph-projections/src/graph-view.test.ts"],
+		why: "BREAKS THE PROMISE THAT A NODE'S GREEN IS COMPUTED FROM ITS OWN ASSURANCE AXIS. pwuGraphNode is the single seam that turns PWU state into a renderable node, and its whole reason to exist is deriving qualifiedSuccess (no-green-without-assurance / INV-5, DOC-004 section 38) from the execution AND assurance axes it was handed. Substituting a hardcoded 'SATISFIED' for axes.assuranceState keeps the rule call intact but feeds it a fiction, so green is decided by execution alone -- the exact exec-equals-assurance collapse INV-5 forbids. Relied on by packages/rph-engine/src/professional-work-graph.ts:151, which builds EVERY node of the professional-work graph through this seam, and by apps/rph-demo/src/lib/toFlow.ts:46,54,69, which paints a node green and appends its check mark from nothing but this boolean -- so a reviewer would see a green node for work whose assurance was only CONDITIONALLY_SATISFIED or outright REJECTED.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-09-rebuild-skips-first-event",
+		file: "packages/rph-projections/src/projector.ts",
+		find: "for (const event of events) view = projector.apply(view, event);",
+		replace: "for (const event of events.slice(1)) view = projector.apply(view, event);",
+		expectRed: ["packages/rph-projections/src/work-projection.test.ts"],
+		why: "rebuildProjection promises a COMPLETE fold of the supplied stream from empty: 'Deterministically rebuild a view by folding events from empty. Rebuild-from-empty reproduces the view exactly (RPH-PER-007) -- projections are disposable.' Silently discarding the first event keeps the function total, pure and deterministic (so determinism-only assertions stay green) while destroying the only thing the promise is for: that the rebuilt view equals the view the stream actually produced. Reliers: every caller that treats a rebuild as authoritative for rendering -- apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts line 308 folds engine.readAllEvents() through traceabilityProjector to render the traceability links for an undertaking, and would quietly lose whatever the first event established; packages/rph-projections/src/work-projection.test.ts asserts IncrementalProjection.apply/rebuild equivalence AGAINST rebuildProjection (lines 101, 109), so a lossy rebuild makes the idempotency/rebuild oracle itself lie; packages/rph-engine/src/projection-rebuild.test.ts uses it as the RPH-PER-007 oracle against the 251-event reference undertaking and the materialized objects. The mutation is in the consequence (what is folded), not the declaration: the loop and its check survive, no block becomes statically dead, and no exported type or schema field changes.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-05-roots-inverted",
+		file: "packages/rph-projections/src/pwa-graph.ts",
+		find: "roots: nodes.filter((n) => n.isRoot).map((n) => n.id)",
+		replace: "roots: nodes.filter((n) => !n.isRoot).map((n) => n.id)",
+		expectRed: ["packages/rph-projections/src/pwa-graph.test.ts"],
+		why: "The export's promise is that `roots` names EXACTLY the types that declare themselves root — it is the entry set every downstream structural pass reads, and nothing else in the export carries that fact. analyzePwaGraph's `single-root` invariant keys on `ex.roots.length` (pwa-graph.ts:398) and metrics.rootCount on the same (468); `reachable()` seeds its BFS frontier from it (210-211), so `connected`/orphanCount are computed relative to it; `maxDepth()` measures from it (263); analyzeConservation's rootSet — which decides what counts as a cross-subtree spray — is built from it (352); and pwa-graph-report.ts:67 builds its own rootSet from it for the rendered roster. Inverting the predicate hands all of them the NON-root types as roots, so a well-formed single-root PWA reports 3 roots and the ValidatePwa/floor gate that keys on `valid` inverts: well-formed graphs are refused and a rootless graph passes single-root. Predicted red: pwa-graph.test.ts:42 `expect(r.valid).toBe(true)` in 'a clean single-root hierarchy is valid with no findings' (roots become ['a','b','c'] ⇒ single-root ok=false ⇒ valid=false); independently also :49 (two declared roots now yield roots=[] ⇒ length!==1 still false, while :48's rootless graph yields roots=['a'] ⇒ ok=true, falsifying that assertion) and :44 maxDepth 2→0.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-05-coherent-ignores-conservation",
+		file: "packages/rph-projections/src/pwa-graph.ts",
+		find: "coherent: valid && cons.ungroundedBranches === 0,",
+		replace: "coherent: valid,",
+		expectRed: ["packages/rph-projections/src/pwa-graph.test.ts"],
+		why: "`coherent` is the one field that promises to be STRICTLY STRONGER than `valid`: the type doc (pwa-graph.ts:122-127) and the function doc (381-387) both state it is `valid` AND artifact-flow conservation holding — the verdict a proof-harness asserts on, kept deliberately distinct from the purely structural `valid` so the ValidatePwa gate is unchanged. Collapsing it to `valid` makes the entire permits×dataFlow conservation layer INERT at the only place consumers read its verdict — pwa-graph-report.ts:14 renders `**coherent:**` as 'the proof-harness gate', and apps/rph-demo's coherence harness and live harness report on report.coherent — while `conservation[]` and metrics.ungroundedBranches stay populated, so an ungrounded branch is still described in prose yet PASSES the verdict: the stricter gate silently degrades to the weaker one it exists to exceed. Predicted red: pwa-graph.test.ts:112 `expect(r.coherent).toBe(false)` in 'an ungrounded branch is valid but NOT coherent (children feed the parent nothing)', where valid=true and ungroundedBranches=1 ⇒ mutant returns coherent=true.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-06-conditional-children-instantiated",
+		file: "packages/rph-projections/src/composition-plan.ts",
+		find: "if (mandatoryMinimum(rule.cardinality) === 0) {",
+		replace: "if (mandatoryMinimum(rule.cardinality) === 1) {",
+		expectRed: ["packages/rph-projections/src/composition-plan.test.ts"],
+		why: "planComposition's promise to its consumers is the MANDATORY MINIMUM rule: for every permitted child it creates the mandatory minimum (1 for M1/M+) and NEVER creates a conditional child (C1/C+, minimum 0) — those are returned in `offered` so a professional decides, because the vocabulary defers the applicability predicate to a free-text note. Inverting the branch at the one decision point inside the export makes the planner do both halves of the thing the file exists to prevent: it skips every MANDATORY PWU the architecture requires (so an Undertaking binds a PWA and realizes a tree smaller than the architecture declares, the exact W-3 defect), and it CREATES the conditional children, which is the surface making a professional judgement on the professional's behalf — the fabricated-risk-profile defect class W-4 removed. The route that binds a PWA to an Undertaking, apps/rph-demo/src/routes/undertakings/+page.server.ts, dispatches the plan verbatim (it creates exactly what `instances`/`decompositions` say and only surfaces `offered` as affordances), so it has no independent way to notice either error.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-10-conservation-violations-never-reach-the-report",
+		file: "packages/rph-projections/src/pwa-graph-report.ts",
+		find: "report.conservation,",
+		replace: "[],",
+		expectRed: ["packages/rph-projections/src/pwa-graph-report.test.ts"],
+		why: "The report promises its reader the EXPLANATION of its own verdict: the module header says it renders \"the conservation advisories (the permits x dataFlow cross-check)\", and `coherent` is false precisely when `ungroundedBranches > 0` (pwa-graph.ts:483). The only path from `report.conservation` into the markdown is this one argument inside the export's own body, and `listSection` substitutes the empty-state prose when the list is empty. So the mutant prints `**coherent:** X` directly above `_no conservation violations - every branch is grounded by its subtree._`: the artifact actively denies the violation that produced its failing verdict. Relied on by apps/rph-demo/e2e/support/gallery.ts:97, which writes this markdown as `<slug>.report.md` for the ashrae-datacenter live harness, and by any reviewer/debugging agent who reads the report instead of raw JSON. Measured, not assumed: for the victim's second fixture `report.conservation` holds exactly one entry, `report.findings` is empty, and the asserted substring `ungrounded branch: \"pa\"` occurs on exactly ONE rendered line, which is the conservation row - nothing else in the output (the metrics line says `ungrounded branches:`, plural, with a count) can satisfy the assertion once this argument is emptied.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-04-delegated-precedence-yields-to-child-count",
+		file: "packages/rph-projections/src/leaf.ts",
+		find: "if (node.executionBoundary === 'DELEGATED_EXTERNAL') return 'DELEGATED';",
+		replace: "if (node.executionBoundary === 'DELEGATED_EXTERNAL' && (node.permittedChildTypeIds?.length ?? 0) === 0) return 'DELEGATED';",
+		expectRed: ["packages/rph-projections/src/leaf.test.ts"],
+		why: "The declaration's own doc comment promises DELEGATED WINS OVER CHILD-COUNT: a DELEGATED_EXTERNAL node is terminal by contract (INV-1), so its leaf status may never be decided by a child list -- the ordering is explicitly called belt-and-suspenders, 'never contradictory'. The mutant keeps the boundary check but conditions it on the child list being empty, so child-count now wins and a delegated node that does declare children is classified NON_LEAF. Everything downstream reads this one classifier to avoid F-13 divergence -- isLeaf (same module), the DWP-05 inspector, the SS11.7.4 assurance rail (DWP-06), apps/rph-demo pwaFlow/PwuTypeCard/pwa route, and pwa-graph -- so all of them would invite decomposition of work that belongs to another organization. Discriminating: every other assertion in the victim still passes under this mutant; only the precedence claim dies.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-04-irreducible-leaf-labeled-as-decomposition-node",
+		file: "packages/rph-projections/src/leaf.ts",
+		find: "case 'IRREDUCIBLE':",
+		replace: "case 'NON_LEAF':",
+		expectRed: ["packages/rph-projections/src/leaf.test.ts"],
+		why: "leafKindLabel's whole behaviour IS the kind->label mapping, and its promise is one distinct label per kind so a professional can tell the two legitimate STD-1 leaf kinds (irreducible-within-scope vs delegated-across-a-boundary) from a decomposition node. Re-labelling the case arm routes IRREDUCIBLE into the default arm, so an irreducible leaf is presented as 'Decomposition node' (and NON_LEAF inherits the irreducible label) in the inspector (DWP-05) and the node rail (DWP-06) that the module header names as its consumers -- exactly the leaf/non-leaf conflation F-13 exists to prevent, telling the reader an in-scope terminal node can still be decomposed. Control-flow mutation, not a cosmetic literal; 'NON_LEAF' is a valid member of LeafKind and noFallthroughCasesInSwitch is unaffected because every arm returns.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-07-ai-no-binding-advisory-inverted",
+		file: "packages/rph-projections/src/execution-attempts.ts",
+		find: "&& a.runtimeBindingId === undefined",
+		replace: "&& a.runtimeBindingId !== undefined",
+		expectRed: ["packages/rph-projections/src/execution-attempts.test.ts"],
+		why: "Breaks the one promise `executionAttempts` makes that is not a transcription of the event stream. Everything else it returns is READ off the events (runtimeBindingId, provenance, timestamps) or derived arithmetically (attemptNumber, idempotencyKey); `aiNoBinding` is the single field the fold COMPUTES, and its published meaning is stated on the type it returns (ExecutionAttemptView L44: \"an AI step opened this attempt with no recorded runtime_binding_id\") and in this file's own header (L27-29: the ATTEMPT-advisory set {MODEL_INVOCATION, TOOL_INVOCATION}, deliberately broader than floor-gate's). The ABSENCE of a binding is what raises it. Who relies on it: apps/rph-demo/src/routes/undertakings/[id]/+page.svelte L479 renders the `attempt-ai-nobinding` badge on exactly the attempts whose flag is true - the only surface on which an unbound AI try is visible to the professional - and apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts L259-262 exists to build `stepTypeById` from the plan aggregate solely so this advisory can fire (the events do not carry stepType). Two further sites cite it as the standing, display-only signal for unbound AI execution: packages/rph-application/src/handlers/execution.ts L1068 and exebind-wp1-binding-authority.test.ts L297 both reason \"that residual is covered by executionAttempts' aiNoBinding advisory\". The mutant keeps the advisory firing and points it at precisely the wrong attempts: an AI attempt that DID record a runtime binding is badged incoherent, and an AI attempt opened UNBOUND - the only condition the advisory exists to surface - is reported clean. The cited residual signal becomes an inverted one, which is worse than an absent one because three places argue from its silence.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-13-trace-link-history-dropped",
+		file: "packages/rph-projections/src/traceability-view.ts",
+		find: "[...view.links, ...newLinks]",
+		replace: "[...newLinks]",
+		expectRed: ["packages/rph-projections/src/traceability-compatibility.test.ts"],
+		why: "The projector's promise to its consumers is that apply() is an ACCUMULATING fold: the returned view carries every typed link declared by every event folded so far, so rebuildProjection from empty reproduces the whole link graph (WP-2-006 / RPH-PER-007 - \"derived, idempotent, and rebuildable\"). The mutant keeps the accumulation guard but returns only the CURRENT event's links, so the view retains at most the last link-bearing event and silently discards the graph's history. Everything that reads TraceView.links relies on this: the file's own outboundLinks() query helper, rph-engine's projection-trace-compat and graph-conformance checks, and the rph-demo traceability surface - each would render or assert over a one-edge graph while the projector reports success.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-11-simulation-event-type-collides-per-source-state",
+		file: "packages/rph-projections/src/pwu-behavior.ts",
+		find: "${PWU_BEHAVIOR_SIMULATION_EVENT_PREFIX}.${from}.${to}",
+		replace: "${PWU_BEHAVIOR_SIMULATION_EVENT_PREFIX}.${from}.${from}",
+		expectRed: ["packages/rph-projections/src/pwu-behavior.test.ts"],
+		why: "The projection promises that every transition carries a DISTINCT simulation-only address: `simulationEventType` is the one handle a consumer has for \"this transition and no other\". apps/rph-demo/src/lib/behavior/pwuBehaviorMachine.ts builds each non-terminal state's XState `on` map with Object.fromEntries keyed by simulationEventType and targeting transition.to, so two transitions out of one state sharing an event type do not error there — the later entry silently OVERWRITES the earlier and a simulated send lands on the WRONG target state, while the per-state transition list still shows both arrows. Dropping `to` from the event address makes the identity a function of the source state alone, which is exactly that collision: measured against the generated table, 61 transitions collapse to 17 distinct event types (EXECUTING and UNDER_ASSURANCE each have 6 outgoing arrows). Relied on by: the browser PWU simulator's event routing (compilePwuBehaviorMachine) and its duplicate-event-type validator, and the PWA detail route that dispatches these events.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-02-assurance-fold-reads-the-log-backwards",
+		file: "packages/rph-projections/src/assurance-view.ts",
+		find: "\tfor (const event of events) view = applyAssuranceEvent(view, event);",
+		replace: "\tfor (const event of [...events].reverse()) view = applyAssuranceEvent(view, event);",
+		expectRed: ["packages/rph-projections/src/assurance-view.test.ts"],
+		why: "THE PROMISE IS THE ACCUMULATOR THREADED IN LOG ORDER — it is the ONLY thing buildAssuranceView adds over the already-exported applyAssuranceEvent, so it is the only thing a mutant on this export can honestly attack. An assessment row is CREATED by Requested/Started and then OVERWRITTEN in place by the later events about it (foldEvidenceRequired, foldStarted, foldEvidenceReceived, foldCompleted, foldViolated), every one of which returns the view UNTOUCHED when the row does not exist yet ('an observation with no started assessment has nothing to attach to'). Traversing the log backwards therefore still applies every event but delivers each update before the creation it depends on: a COMPLETED assessment is reported as ASSESSING with disposition/evidenceConsideredIds/validator identity/independenceStatus/controlActions all absent, i.e. unconcluded. That is the false-negative the file header calls load-bearing, inverted — work that was judged reads as still in progress. Relied on by apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:325, which folds engine.readAllEvents() once and renders every assessment's disposition, open conditions, waiver status and invalidations from it; by buildApplicablePolicies and aggregateDispositionFor, which sit downstream of the same view (a disposition-less row drops the subject's aggregate from REJECTED/SATISFIED to EVIDENCE_REQUIRED); and by the live-log tests packages/rph-engine/src/assurance-view.test.ts and waiver-attachment-live.test.ts.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-02-policy-coverage-ignores-the-subject",
+		file: "packages/rph-projections/src/assurance-view.ts",
+		find: "\t\t\t(a) => a.policyId === policyId && a.subjectObjectIds.includes(args.pwuId)",
+		replace: "\t\t\t(a) => a.policyId === policyId",
+		expectRed: ["packages/rph-projections/src/assurance-view.test.ts"],
+		why: "THE JOIN IS (POLICY, SUBJECT) — the row's own doc states assessed is 'True when at least one assessment names this policy AND this PWU as a subject', and the whole reason the function exists is the other half: `assessed: false` is the required-but-unassessed gap that §38's green-node rule and §39 invariant 20 ('a baseline cannot be promoted solely because all execution steps completed') forbid ignoring. Dropping the subject conjunct makes ANY assessment of the same policy over ANY OTHER subject count as coverage here, so a sibling PWU's SATISFIED assessment marks this PWU assessed-and-satisfied and its `assessmentId`/`disposition` cite a verdict about different work — a vacuous green on a node nobody assessed, plus a fabricated provenance trail. Relied on by apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:141, which calls it once PER PWU against the SAME workspace-wide view of every assessment (so cross-subject bleed is the live arrangement, not a hypothetical one), and by aggregateDispositionFor, which folds these rows into the subject's §28.2 aggregate — an unassessed policy that now reports SATISFIED removes rung 3 ('any required assessment missing') from the ladder entirely.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-02-aggregate-laundered-to-satisfied",
+		file: "packages/rph-projections/src/assurance-view.ts",
+		find: "\t\t\t...(p.disposition === undefined ? {} : { disposition: p.disposition }),",
+		replace: "\t\t\t...(p.disposition === undefined ? {} : { disposition: 'SATISFIED' }),",
+		expectRed: ["packages/rph-engine/src/slices/e2e-005-contested-assurance.slice.test.ts"],
+		why: "THIS EXPORT'S WHOLE PROMISE IS FAITHFUL OPERANDS: 'this layer supplies facts, the kernel supplies the rule, and there is no second copy', so §28.1's 'an aggregate must preserve the STRICTEST UNRESOLVED disposition' holds only if each row's REAL verdict reaches the kernel's rung ladder. Substituting a constant for the row's disposition keeps every row voting and keeps rung 3 ('assessment missing') untouched, so nothing looks absent — it simply launders each verdict into a pass: a REJECTED policy can no longer reach rung 1+2, and a subject with one approval and one rejection reports SATISFIED while the per-policy table beside it still shows the rejection. That is §28.2's 'must not be reduced to a numerical average' failing in its worst direction, a majority-of-one green. Relied on by apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:155, the only place a reader is told what N per-policy verdicts add up to (the page's own comment records that the reader was previously left to compute it by eye), and by RPH-E2E-005 clause (d), whose single expressible disjunct is that a rejection among two applicable policies carries the aggregate to REJECTED.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-14-open-blocking-finding-admits-green",
+		file: "packages/rph-projections/src/work-projection.ts",
+		find: "\t\tif ((openObservationCounts[severity] ?? 0) > 0) return false;",
+		replace: "\t\tif ((openObservationCounts[severity] ?? 0) > 0) return true;",
+		expectRed: ["packages/rph-projections/src/work-projection.test.ts"],
+		why: "THE PROMISE IS \"NO FALSE GREEN\" — DOC-004 §38 limb 2, \"no blocking finding remains\". isQualifiedSuccess is the single decision procedure for that rule and its own doc comment records the defect it was written to close: the function once implemented limb 1 alone, so a PWU carrying an OPEN BLOCKING observation rendered GREEN whenever its assurance axis said SATISFIED. The consumers that rely on it are `node()` in this same file, which stamps `qualifiedSuccess` onto EVERY WorkNode the Work view publishes, and `buildGraphView` in graph-view.ts:72, which imports this function precisely so the surface graph cannot disagree with the Work view about what is green; through those two the rph-demo surfaces render the badge a professional reads as \"this is done and assured\". Turning limb 2's refusal into an admission keeps the check, the loop and the severity lookup exactly as written — the count is still consulted, it is still compared, and it is still over the blocking-severity set — and only the verdict flips, so an open BLOCKING or CRITICAL finding now CONFERS green instead of denying it. That is the one output the file says this system must never produce, reached by the narrowest possible edit: nothing about the shape of the code reveals it, only an assertion on the decision can.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-12-fold-runs-the-stream-backwards",
+		file: "packages/rph-projections/src/pwu-replay.ts",
+		find: "for (const event of events) axes = applyPwuAxisEvent(axes, event);",
+		replace: "for (const event of [...events].reverse()) axes = applyPwuAxisEvent(axes, event);",
+		expectRed: ["packages/rph-engine/src/replay-equivalence.test.ts"],
+		why: "BREAKS RPH-PER-006 ITSELF: the promise of this export (and the only thing it adds over the shared `applyPwuAxisEvent` it delegates to) is that ONE aggregate's own stream is folded IN aggregateRevision ORDER, so what comes back is the state after the LAST event — 'when the aggregate is reconstructed, its state matches the materialized current state'. Events are FACTS about transitions, not a commutative set, and reversed every non-creation event meets `axes === undefined` and returns it unchanged, so the fold lands on `PwuProposed`'s SEEDED axes and reports every PWU as freshly proposed while the objects are BASELINED / CONDITIONALLY_SATISFIED — the event log becomes the diary kept beside the truth that this file's header says the property exists to prevent. RELIED ON BY: `packages/rph-engine/src/replay-equivalence.test.ts`, the live RPH-PER-006 proof over the 13-PWU reference undertaking, and `packages/rph-application/src/handlers/__tests__/pwu-fixtures.ts`'s replay-equivalence helper, which every PWU lifecycle handler test calls after each hop. MEASURED, not argued: a dist probe driving the reference undertaking and folding each PWU's stream both ways gives 0/52 axis mismatches forward and 35/52 reversed. ⚠ ONE VICTIM DELIBERATELY — the reference-seed test, because its fixture is the part that is load-bearing: a two-event hand fixture cannot tell the two folds apart, so naming more files would have been a LOWER bar. It also leaves `replayPwuAxes([])` still undefined, so the kill comes from the equivalence claim and not from the unrelated no-creation-event assertion. NOTE this file's only existing mutant (MU-F085B-the-fold-forgets-both-new-events) anchors at the case labels on lines 140-141, inside `applyPwuAxisEvent`'s declaration — `replayPwuAxes` had no guard credited to its own span until this entry.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-01-guard-verdict-inverted",
+		file: "packages/rph-projections/src/execution-view.ts",
+		find: "\treturn (edge) => evaluateGuardExpression(edge.conditionExpression, subject);",
+		replace: "\treturn (edge) => !evaluateGuardExpression(edge.conditionExpression, subject);",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "The promise is that a read-side guard verdict IS the authority's verdict: ONE evaluation rule shared with rph-application's guardEvaluatorFor (WP-7/SM-5), which is the whole reason the read-model and the engine cannot diverge on which arm is live. Consumers: startableStepIds / prunableStepIds / transitionRows, and apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, which hand this closure to the domain gate as the ONLY interpreter of a CONDITIONAL edge off a settled non-BRANCH source (transition-gate rung 8). Inverting the verdict makes the UI call a dead guarded arm live and a live one dead, so it offers Start on the step the engine refuses (F-29) and NEUTRALIZES the arm the engine would take. Measured on the built gate: startableStepIds for the unparseable-guard fixture goes ['s3'] -> ['s2','s3'], so the 'malformed conditionExpression evaluates FALSE' assertion reddens.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-01-pwu-scope-inverted",
+		file: "packages/rph-projections/src/execution-view.ts",
+		find: "\t\t.filter((r) => scope.has(r.workUnitId))",
+		replace: "\t\t.filter((r) => !scope.has(r.workUnitId))",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "The promise to the Undertaking route load() is the F-6 fix itself: a plan is included IFF its workUnitId is in the caller's two-hop PWU set, and because a plan carries no undertakingId (F-1) that membership test is the ONLY correct scope — the original bug was rendering the global list. Inverting the predicate leaks exactly the rows the scope exists to exclude: every OTHER Undertaking's plans (and the orphan PWU's) appear on the page while the in-scope plan vanishes. Measured: plansForPwus over the three-row fixture goes ['plan_in'] -> ['plan_other','plan_orphan'], reddening the 'includes a plan whose PWU is in the Undertaking; excludes one whose PWU is in a different Undertaking' assertion.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-01-handoff-layers-reversed",
+		file: "packages/rph-projections/src/execution-view.ts",
+		find: "\torder.layers.forEach((layer, i) => layer.forEach((id) => layerOf.set(id, i)));",
+		replace: "\torder.layers.forEach((layer, i) => layer.forEach((id) => layerOf.set(id, order.layers.length - 1 - i)));",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "The promise the sequence panel renders is 'instances placed by their TYPE's Kahn dependency layer', reusing layerHandoff rather than re-deriving an order (the F-10 discipline) — producers before the consumers that need their artifacts. Reversing the index assignment keeps the same layer count and the same membership while asserting the EXACT OPPOSITE dependency order, so the Undertaking's execution sequence tells the controller to run the consumer first, and the advisory beside it ('consumer has begun but no producer instance has produced') now contradicts the ordering the same function printed. Measured: layers go [[0,['i_p']],[1,['i_c']]] -> [[0,['i_c']],[1,['i_p']]], reddening 'places instances at their TYPE's Kahn layer (P before C)'.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-01-graph-frontier-collapsed-to-linear",
+		file: "packages/rph-projections/src/execution-view.ts",
+		find: "\treturn gateStartableStepIds(plan, evaluateGuard);",
+		replace: "\treturn gateStartableStepIds({ ...plan, transitions: [] }, evaluateGuard);",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "The promise is the DWP-05 generalization: an empty transitions[] yields the single linear frontier (byte-identical to Tier-3C) but a GRAPH yields every step whose in-edge barrier is satisfied, so a fan-out yields SEVERAL — that is the whole PARALLEL_GROUP mechanism the execution tab's Start affordance reads. Discarding the graph before delegating collapses every plan to the array-index frontier: a parallel fan-out offers Start on one arm only, the sibling arm is unstartable from the UI although the engine's own precheck would accept it, and the plan stalls with no visible reason. Measured on the built gate: ['s2','s3'] -> ['s2'], reddening 'surfaces the SET of startable steps for a PARALLEL fan-out (not a scalar)'.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD4-01-edge-label-off-first-step",
+		file: "packages/rph-projections/src/execution-view.ts",
+		find: "\t\tconst step = plan.steps.find((s) => s.id === stepId);",
+		replace: "\t\tconst step = plan.steps[0];",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "TransitionRow promises human labels that are the purpose of THAT row's own endpoints, else an honest marker — 'Never a fabricated name' — because the edge plane is the only rendering of an immutable graph the operator cannot otherwise inspect. Resolving the label off plan.steps[0] instead of the endpoint id labels every edge with the same step's purpose, and worse, presents a DANGLING target (a step id that resolves to nothing) as a real, named step: an incoherent graph renders as a valid one, with no marker anywhere. Measured: the dangling-target row's targetLabel goes 'unknown step ghost' -> 'purpose s1' (reddening 'names an unresolvable step id rather than rendering a blank row'), and the resolved pair's targetLabel goes 'purpose s2' -> 'purpose s1'.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
 	}
 ];
