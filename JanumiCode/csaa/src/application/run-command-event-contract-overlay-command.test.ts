@@ -24,7 +24,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-command-event-contract-overlay.ts', import.meta.url)
+	new URL('../../scripts/csaa-command-event-contract-overlay.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:command-event-contract-overlay';
 

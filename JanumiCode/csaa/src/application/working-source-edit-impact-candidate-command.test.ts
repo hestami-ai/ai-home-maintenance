@@ -12,7 +12,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-working-source-edit-impact-candidates.ts', import.meta.url)
+	new URL('../../scripts/csaa-working-source-edit-impact-candidates.ts', import.meta.url)
 );
 
 function run(args: readonly string[], input?: string | Uint8Array) {

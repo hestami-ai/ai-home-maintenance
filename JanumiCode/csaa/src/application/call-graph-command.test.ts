@@ -16,7 +16,7 @@ import { CALL_GRAPH_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './call-graph-progr
 import { CALL_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION } from './run-call-graph-report.js';
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
-const SCRIPT = fileURLToPath(new URL('../../../../scripts/csaa-call-graph.ts', import.meta.url));
+const SCRIPT = fileURLToPath(new URL('../../scripts/csaa-call-graph.ts', import.meta.url));
 const PACKAGE_SCRIPT = 'csaa:analyze:call-graph';
 const temporaryRoots: string[] = [];
 

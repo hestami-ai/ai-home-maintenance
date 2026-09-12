@@ -22,7 +22,7 @@ import { SEMANTIC_SOURCE_QUERY_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './seman
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-semantic-source-query.ts', import.meta.url)
+	new URL('../../scripts/csaa-semantic-source-query.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:semantic-source-query';
 const EXPECTED_PACKAGE_COMMAND = 'bun scripts/csaa-semantic-source-query.ts';

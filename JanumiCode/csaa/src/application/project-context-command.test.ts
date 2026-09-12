@@ -17,7 +17,7 @@ import { PROJECT_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './project-con
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-project-context.ts', import.meta.url)
+	new URL('../../scripts/csaa-project-context.ts', import.meta.url)
 );
 
 interface ProjectContextTerminalProbe {

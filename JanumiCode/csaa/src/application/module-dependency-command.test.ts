@@ -16,7 +16,7 @@ import { MODULE_DEPENDENCY_REPORT_PROGRESS_SCHEMA_VERSION } from './run-module-d
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-module-dependency.ts', import.meta.url)
+	new URL('../../scripts/csaa-module-dependency.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:module-dependency';
 const temporaryRoots: string[] = [];

@@ -17,7 +17,7 @@ import { STRUCTURAL_MODULE_REACHABILITY_PROGRESS_TRANSPORT_SCHEMA_VERSION } from
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-static-module-impact-candidates.ts', import.meta.url)
+	new URL('../../scripts/csaa-static-module-impact-candidates.ts', import.meta.url)
 );
 
 function run(args: readonly string[], input?: string | Uint8Array) {

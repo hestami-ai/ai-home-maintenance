@@ -17,7 +17,7 @@ import { STATE_MACHINE_GRAPH_REPORT_PROGRESS_SCHEMA_VERSION } from './run-state-
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-state-machine-graph.ts', import.meta.url)
+	new URL('../../scripts/csaa-state-machine-graph.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:state-machine-graph';
 const temporaryRoots: string[] = [];

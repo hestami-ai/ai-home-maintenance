@@ -29,7 +29,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-logical-graph-composition.ts', import.meta.url)
+	new URL('../../scripts/csaa-logical-graph-composition.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:logical-graph-composition';
 const EXPECTED_PACKAGE_COMMAND = 'bun scripts/csaa-logical-graph-composition.ts';

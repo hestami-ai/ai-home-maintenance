@@ -17,7 +17,7 @@ import { STRUCTURAL_SCC_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './structural-s
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-structural-scc.ts', import.meta.url)
+	new URL('../../scripts/csaa-structural-scc.ts', import.meta.url)
 );
 
 function run(args: readonly string[], input?: string) {

@@ -19,7 +19,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-read-write-access.ts', import.meta.url)
+	new URL('../../scripts/csaa-read-write-access.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:read-write-access';
 

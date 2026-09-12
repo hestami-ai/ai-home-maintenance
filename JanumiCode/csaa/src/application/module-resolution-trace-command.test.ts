@@ -25,7 +25,7 @@ import { MODULE_RESOLUTION_TRACE_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './mod
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-module-resolution-trace.ts', import.meta.url)
+	new URL('../../scripts/csaa-module-resolution-trace.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:module-resolution-trace';
 

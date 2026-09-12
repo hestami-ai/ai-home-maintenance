@@ -22,7 +22,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-command-dispatch-topology.ts', import.meta.url)
+	new URL('../../scripts/csaa-command-dispatch-topology.ts', import.meta.url)
 );
 
 function progressEvent(): CommandDispatchTopologyReportProgressEvent {

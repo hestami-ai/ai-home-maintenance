@@ -18,7 +18,7 @@ import {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-arrow-command-census.ts', import.meta.url)
+	new URL('../../scripts/csaa-arrow-command-census.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:arrow-command-census';
 

@@ -26,7 +26,7 @@ import { DECLARATION_CONTEXT_PROGRESS_TRANSPORT_SCHEMA_VERSION } from './declara
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = fileURLToPath(
-	new URL('../../../../scripts/csaa-declaration-context.ts', import.meta.url)
+	new URL('../../scripts/csaa-declaration-context.ts', import.meta.url)
 );
 const PACKAGE_SCRIPT = 'csaa:analyze:declaration-context';
 
