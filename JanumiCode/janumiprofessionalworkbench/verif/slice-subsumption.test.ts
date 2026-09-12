@@ -406,7 +406,25 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⚠ AND THE NOTE ABOVE NOW HAS A SECOND CONFIRMATION, WHICH IS WHY IT IS WORTH KEEPING. This
 			// addition was ALSO caught on the first unfiltered run, and its message named the remedy again. Two
 			// for two on reliance; the CSAA pins are still nought for six.
-		).toBe(39);
+			//
+			// 39 -> 40 (2026-09-12): `ROADMAP-per-file-coverage-floor.md` (`JAN-PFCOV`). ⛔ IT IS ADDED ALREADY
+			// STRUCK, AND THAT IS THE WHOLE WARRANT. It was superseded before a single step was built, and it is
+			// retained rather than deleted for the reason `ROADMAP-csaa-decoupling.md` was: the repository retires
+			// by striking, so **the COUNT rises while the live population does not** — the exact case the comment
+			// block above exists to distinguish. Its `S1`-`S5` are carried into `JAN-PFA` Phase 1 unchanged, so
+			// nothing it planned is lost and nothing it planned is pending twice.
+			//
+			// 40 -> 41 (2026-09-12): `ROADMAP-per-file-assurance-floor.md` (`JAN-PFA`). ⭑ IT SUBSUMES ITS OWN
+			// PREDECESSOR, which is why the pair lands together rather than the first being quietly dropped.
+			// `JAN-PFCOV` ratcheted ONE instrument; measurement then established that coverage and the mutation
+			// ledger are aimed at NEARLY DISJOINT populations — 1,439 of the 1,663 branches in unmutated files are
+			// COVERED — so a coverage-only roadmap could never have reached them. One design, three phases, so the
+			// mutation half cannot quietly drop once the coverage half lands and the headline number improves.
+			// ⚠ THE RELIANCE NOTE IS NOW THREE FOR THREE, AND THE THIRD CATCH WAS THE AUTHOR'S OWN. This pin
+			// reddened on an untracked working draft that no commit had ever seen — i.e. it caught an addition
+			// during the drafting of the very programme that is arguing about assurance floors. A pin is gate
+			// material when someone reads it; this one keeps being read because it keeps being right.
+		).toBe(41);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
