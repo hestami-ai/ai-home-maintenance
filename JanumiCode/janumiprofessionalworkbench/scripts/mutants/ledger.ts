@@ -3185,16 +3185,6 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	// ── JAN-CSAA total-capability completion: load-bearing fail-closed seams ───────────────────────────────────
 	{
-		id: 'CSAA-M13-technical-completion-skips-the-full-repository-gate',
-		file: 'scripts/csaa-technical-completion.ts',
-		find: '\tfor (const step of CSAA_TECHNICAL_COMPLETION_STEPS) executeStep(step);',
-		replace:
-			"\tfor (const step of CSAA_TECHNICAL_COMPLETION_STEPS.filter((step) => step.label !== 'FULL_REPOSITORY_GATE')) executeStep(step);",
-		expectRed: ['verif/csaa-technical-completion.test.ts'],
-		why: 'Technical completion is the exact serialized conjunction of every retained evidence check, the current workflow, and the repository gate. Skipping the last step must not yield the same completion record.',
-		source: 'JAN-CSAA completion review 2026-08-25'
-	},
-	{
 		id: 'CSAA-M14-mutation-baseline-admits-an-unstaged-edit',
 		file: 'scripts/mutants/tree-baseline.ts',
 		find: '\tif (!completedSuccessfully(worktree)) return null;',

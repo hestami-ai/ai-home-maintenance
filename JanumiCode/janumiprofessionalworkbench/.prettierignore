@@ -2,8 +2,6 @@ node_modules
 dist
 build
 coverage
-!packages/csaa/src/providers/coverage
-!packages/csaa/src/providers/coverage/**
 .turbo
 .svelte-kit
 # Do NOT format the authoritative spec docs or generated schema artifacts.

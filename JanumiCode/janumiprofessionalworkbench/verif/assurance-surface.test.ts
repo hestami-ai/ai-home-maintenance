@@ -5,7 +5,7 @@
 // thing in this repository that notices two kinds of silent loss:
 //   · a `verif/` TEST FILE disappearing — vitest collects what is on disk, so a deleted file is simply not
 //     collected. `passWithNoTests: false` (verif/test-modes.test.ts) fires only when a whole PROJECT observes
-//     nothing; it cannot see one file of sixty-four go missing. This is N-16's shape one level down.
+//     nothing; it cannot see ONE file of the population go missing. This is N-16's shape one level down.
 //   · a ROOT GATE COMMAND disappearing from `package.json` — `gate:fast` would simply run a shorter gate.
 // JAN-CSAAEXT moves CSAA out of JPWB, so that pin stops being consulted. Per the programme's Rule 1 —
 // SALVAGE BEFORE DECOUPLE, the rule under which JAN-CSAADEC CD-01/CD-02 survived that programme's withdrawal —
@@ -44,8 +44,9 @@
 // PINNED COUNT, so said out loud rather than left to look like an oversight. That file has TWO detectors — a
 // floor owning collapse and a VANISHED check owning individual loss — so a floor at the population would make
 // one deletion trip both, and an arrangement that trips two guards proves neither. THIS file has exactly ONE
-// detector. A floor below 64 would not redden on a deletion at all, which is the only failure it is here to
-// catch. So the floor IS the population, and it is raised deliberately when the population grows.
+// detector. A floor BELOW the population would not redden on a deletion at all, which is the only failure it
+// is here to catch. So the floor IS the population. ⭑ Stated without a number on purpose: a rationale that
+// repeats the constant has to be maintained in two places, and the copy that rots is never the one under test.
 //
 // ── WHAT THIS DELIBERATELY DOES NOT CLOSE ─────────────────────────────────────────────────────────────────────
 // ⛔ A DELETION PAIRED WITH AN ADDITION NETS TO ZERO AND PASSES. Stated rather than netted out of a stronger-
@@ -98,8 +99,13 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * its one JPWB-subject limb — that every application file projects with zero parse diagnostics — is owned by
  * `svelte-check`, which `apps/rph-demo`'s `check` runs as a `gate:fast` step. Its instrument is CSAA's 612-line
  * svelte provider, so it follows its instrument rather than being vendored into JPWB.
+ *
+ * ⛔ 63 -> 62 (2026-09-12, JAN-CSAAEXT S6): `verif/csaa-technical-completion.test.ts` MOVED to
+ * `JanumiCode/csaa/scripts/` with the wrapper it imports. Its subject was CSAA's own completion steps, so it
+ * follows CSAA out of the repository subtree entirely — the second recorded DECREASE, and the last one this
+ * programme expects.
  */
-const VERIF_TEST_FLOOR = 63;
+const VERIF_TEST_FLOOR = 62;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
