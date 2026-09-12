@@ -225,6 +225,52 @@ describe('M10 baseline promotion gate (RPH-BAS-001..004, RPH-GOV-006; §24.2, §
 		expect(r.findings.map((f) => f.code)).toContain('NO_EFFECTIVE_PROMOTION_DECISION');
 	});
 
+	// ── JAN-PFA S0.2 — THE AUTHORITY CONJUNCT, WHICH NOTHING ASSERTED UNTIL 2026-09-12 ────────────────────
+	//
+	// WHY THIS EXISTS. The pilot deleted `d.authorityHeld &&` from `canPromoteBaseline`'s `decisionOk` and the
+	// mutation survived the ENTIRE suite — 358 files, 3,614 tests, zero failures, in a file at 95.31% branch
+	// coverage. The test above covers the STATUS limb of the same conjunction and the happy path covers
+	// admission, so between them every OTHER limb was proved and this one was not.
+	//
+	// ⚠ IT IS WRITTEN AS A DIFFERENTIAL, AND THAT IS FORCED BY THE CODE. All four limbs of `decisionOk` push the
+	// SAME code with the SAME detail string, so asserting either one cannot say WHICH limb fired — the
+	// arrangement-that-trips-two-guards shape. Flipping exactly one field on an otherwise identical input makes
+	// the authority conjunct the only possible difference between the two results.
+	it('RPH-BAS-006: an EFFECTIVE PROMOTE_BASELINE decision WITHOUT authority cannot promote', () => {
+		const withAuthority = canPromoteBaseline(
+			base({
+				promotionDecision: decision({
+					decisionType: 'PROMOTE_BASELINE',
+					subjectObjectIds: ['pwu_fsm_arch', 'art_fsm_architecture_002', BASE_ID],
+					authorityHeld: true
+				})
+			})
+		);
+		const withoutAuthority = canPromoteBaseline(
+			base({
+				promotionDecision: decision({
+					decisionType: 'PROMOTE_BASELINE',
+					subjectObjectIds: ['pwu_fsm_arch', 'art_fsm_architecture_002', BASE_ID],
+					authorityHeld: false
+				})
+			})
+		);
+
+		// ⭑ THE ADMITTING HALF. A gate that refused every promotion would satisfy the refusal below completely,
+		// so the authorized case must be shown to still pass — otherwise this is a control that cannot fail.
+		expect(
+			withAuthority.ok,
+			`an authority-backed promotion was refused: ${withAuthority.findings.map((f) => f.code).join(',')}`
+		).toBe(true);
+
+		// THE REFUSING HALF — and it names the difference, not just the outcome.
+		expect(
+			withoutAuthority.findings.map((f) => f.code),
+			'promotion on a decision whose actor held no authority was not refused (RPH-BAS-006)'
+		).toContain('NO_EFFECTIVE_PROMOTION_DECISION');
+		expect(withoutAuthority.ok).toBe(false);
+	});
+
 	it('RPH-BAS-002: a promoted item hash that differs from the reviewed hash => BASELINE_VERSION_MISMATCH', () => {
 		const r = canPromoteBaseline(
 			base({ candidateItems: [{ ...items[0]!, contentHash: 'DIFFERENT' }, items[1]!] })

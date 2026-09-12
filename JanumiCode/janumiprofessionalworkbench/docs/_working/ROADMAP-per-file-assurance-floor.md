@@ -25,7 +25,37 @@ Carried from `JAN-CSAAEXT`, where they deleted four of thirteen planned steps be
 
 ---
 
-## 1. ⛔ PHASE 0 — THE THREE LIVE DEFECTS THE PILOT FOUND. THESE COME FIRST
+## 1. ✅ PHASE 0 — COMPLETE. The three live defects the pilot found, closed
+
+**LANDED 2026-09-12. Six mutants declared, SIX KILLED, zero survived.** The three `A` mutants are byte-identical
+to the pilot mutations that survived the entire suite, so the closure is measured rather than asserted:
+
+| | the hole | branch cov. | A (the hole) | B (the admitting half) |
+| --- | --- | --- | --- | --- |
+| `S0.1` | `BLOCKING_SEVERITIES` loses `CRITICAL` | 85.34% | KILLED | KILLED |
+| `S0.2` | `canPromoteBaseline` drops authority | 95.31% | KILLED | KILLED |
+| `S0.3` | `RphErrorSchema` widened | **100%** | KILLED | KILLED |
+
+⚠ **EACH LIMB WAS PROVEN BY AN OBSERVED RED BEFORE THE LEDGER ENTRY WAS WRITTEN**, and each red was checked for
+what STAYED GREEN as well as what reddened. Two designs were withdrawn on that evidence rather than shipped:
+
+- `S0.1`'s admitting limb was first written as *"every severity NOT in the set is not rejected"* — the
+  **contrapositive of limb 2**, which duly reddened with it on the same mutation. Two assertions that always
+  fail together are one check wearing two names. It now asserts only what the limbs cannot see: that the set does
+  not swallow the whole vocabulary.
+- `S0.3`'s admitting mutant first added a REQUIRED FIELD and reported **NO_COMPILE** — this ledger's own trap 1,
+  *mutate the consequence, not the declaration*. Reformulated as a runtime tightening of an existing field, which
+  leaves every static type identical.
+
+⛔ **AND THE HARNESS THAT MEASURED THE FIRST REDS DESTROYED THE WORK IT WAS MEASURING.** Its `restore()` ran
+`git checkout -- packages/`, which cannot tell a mutation it applied from UNCOMMITTED work in the same file, and
+it silently deleted the new tests — after which the baseline ran the pre-change file and every case reported
+*"did not redden"*. ⭐ The tell was the baseline's own count: **22 passed where 26 were expected.** It now
+snapshots every file it will touch and restores from that, never from git.
+
+---
+
+### The three defects, as found
 
 **These are not programme work. They are holes, found, confirmed, and currently open in governed behaviour.**
 Each was confirmed against the ENTIRE suite under SOURCE resolution — `bunx vitest run` on the root config, the
@@ -276,7 +306,7 @@ what the export PROMISES, or the count is satisfied while the promise stays unte
 
 ### S3.4 · The dead-surface audit (filed, not done here)
 
-**45 exported values on unguarded files that nothing imports at all.** Either they are dead and should go, or
+~~**45 exported values**~~ **23 exported values on unguarded files that nothing imports at all** (corrected: the first count came from an extractor that did not follow a package’s own barrel on a RELATIVE import). Either they are dead and should go, or
 they have a consumer the extractor cannot see — and the extractor being wrong is itself the finding. ⚠ Not
 folded into Phase 3: it is a deletion question, and deletions need their own design.
 

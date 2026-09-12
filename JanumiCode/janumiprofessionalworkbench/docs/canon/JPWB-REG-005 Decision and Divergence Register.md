@@ -35159,8 +35159,14 @@ population does not, and one for the roadmap that subsumes it.
   `packages/rph-contracts/schemas/` can diverge from its source unnoticed. Surfaced by `S0.3`; scoped, not built.
 - ⚠ **194 export guards** owed across 76 unguarded files and 10 guarded ones; projected real-gap rate under 10%,
   i.e. roughly **18 genuine untested guarantees** still unfound.
-- ⚠ **45 exported values on unguarded files that NOTHING imports** — dead surface, or an extractor defect, and the
-  extractor being wrong would itself be the finding. Filed, not investigated.
+- ⚠ ~~**45 exported values on unguarded files that NOTHING imports**~~ → **23.** ⬛ **THE EXTRACTOR WAS WRONG, AND
+  THE ENTRY ABOVE SAID IT WOULD BE THE FINDING IF IT WERE** — corrected 2026-09-12 during `S0.1`. It followed
+  barrels only for bare `@janumipwb/*` specifiers; a RELATIVE import of a package's own `./index.js` had its
+  named imports attributed to `index.ts` instead of the defining file. Found because `governance.test.ts` imports
+  `canPromoteBaseline` **14 times** while the census reported it had no test importer. ⭐ Effect: dead surface
+  **45 → 23**, test-only **50 → 71**; the obligation headline is unmoved. ⚠ The three holes are UNAFFECTED — each
+  was confirmed by a whole-suite source-resolved run, not by the census — but `PILOT-10`'s *VICTIM INFERRED* label
+  was wrong in its premise. Still filed, not investigated.
 - ⚠ `R2`'s REMOTE case: diff-intersection catches *changed `A`, broke `A`'s guard*, never *changed `A`, broke
   `B`'s guard*. That needs per-test coverage attribution JPWB does not collect.
 - ⚠ `REG-F-390`'s three debts — ~580 uncovered branches, CSAA's 74 structural failures, the cruiser's vacuous

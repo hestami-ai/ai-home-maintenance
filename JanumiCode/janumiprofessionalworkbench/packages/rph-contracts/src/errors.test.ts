@@ -45,4 +45,34 @@ describe('errors', () => {
 		expect(ex.message).toContain('RPH_INVARIANT_VIOLATION');
 		expect(ex).toBeInstanceOf(Error);
 	});
+
+	// ── JAN-PFA S0.3 — THE SHAPE IS CLOSED, AND NOTHING ASSERTED IT UNTIL 2026-09-12 ──────────────────────
+	//
+	// WHY THIS EXISTS. The pilot widened `z.strictObject` to `z.object` and the mutation survived the ENTIRE
+	// suite — 358 files, 3,614 tests, zero failures — in a file at 100% BRANCH COVERAGE. Every existing
+	// assertion above checks what the schema ACCEPTS; strictness is only observable in what it REFUSES, and
+	// nothing asked. ⭑ A cleaner demonstration that coverage counts execution rather than assertion is hard to
+	// construct: the line was fully covered and its guarantee was entirely untested.
+	//
+	// WHAT IT PROTECTS. `RphError` is the serialized error carried in `CommandResult.error` and in event and
+	// observation payloads, and it is PUBLISHED to clients as `schemas/objects/RphError.json`. Closed-to-unknown
+	// -keys is the contract; widening it silently accepts untrusted extra fields at a boundary declared shut.
+	//
+	// ⚠ IT IS A DIFFERENTIAL — the SAME object, parsed twice, with one unknown key added. Asserting only the
+	// rejection would also pass if the schema had become incapable of accepting anything at all.
+	it('JAN-PFA S0.3: the error shape is CLOSED — an unknown key is refused, the same object without it is not', () => {
+		const valid = makeRphError('RPH_REVISION_CONFLICT', { message: 'stale', correlationId: 'c1' });
+
+		// ⭑ THE ADMITTING HALF. Without it, a schema that rejected everything would satisfy the refusal below.
+		expect(
+			RphErrorSchema.safeParse(valid).success,
+			'the declared shape no longer parses an error this package itself constructed'
+		).toBe(true);
+
+		const withUnknownKey = { ...valid, attackerControlledField: 'smuggled' };
+		expect(
+			RphErrorSchema.safeParse(withUnknownKey).success,
+			'RphErrorSchema accepted an unknown key — the published contract declares additionalProperties:false, so a boundary stated as closed is open'
+		).toBe(false);
+	});
 });

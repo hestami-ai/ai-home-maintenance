@@ -3316,5 +3316,75 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/product-boundary.test.ts'],
 		why: "A WALK THAT INSPECTS NOTHING FINDS NO VIOLATIONS, AND THAT IS THE FAILURE THIS PERIMETER WAS BUILT AGAINST. `REG-F-389` is exactly this shape one level up: `depcruise packages` reported no violations because it never scanned `apps/`, and the absence of a violation and the absence of a scan were the same observation. Blinding the source pattern drops the inspected count from 548 to 0, which must redden the INSPECTED_FLOOR while the boundary check stays green — because with no files walked there is genuinely nothing to violate. ⭑ That asymmetry is the proof: the floor is the only limb that can tell an empty perimeter from a clean one.",
 		source: 'JAN-CSAAEXT S2; REG-F-389'
+	},
+	// ── JAN-PFA S0.1 — the two halves of BLOCKING_SEVERITIES, which nothing asserted until 2026-09-12 ────────
+	// The pilot's PILOT-01 mutation (A below) survived the ENTIRE suite: 358 files, 3,614 tests, zero failures,
+	// in a file at 85.34% branch coverage. A and B redden DIFFERENT limbs of the same round-trip and were
+	// observed doing so — that separation is the evidence the pair is two checks rather than one wearing two
+	// names, which is what the first draft of the admitting limb actually was.
+	{
+		id: 'MU-PFA-S01-A-drop-critical-from-the-blocking-set',
+		file: 'packages/rph-assurance/src/assurance-rules.ts',
+		find: "\t'BLOCKING',\n\t'CRITICAL'\n]);",
+		replace: "\t'BLOCKING'\n]);",
+		expectRed: ['packages/rph-assurance/src/assurance-rules.test.ts'],
+		why: 'BLOCKING_SEVERITIES exists so a ratified severityIfNotMet is answered the SAME way the §10.3 ladder answers it. Dropping CRITICAL makes an open critical finding non-blocking for every caller that asks the set instead of re-deciding — handlers/assurance.ts, handlers/reject-authorization.ts, validators.ts. Observed: reddens ONLY "every severity the ladder rejects on IS in the set"; the other three limbs stay green.',
+		source: 'JAN-PFA S0.1; REG-F-391'
+	},
+	{
+		id: 'MU-PFA-S01-B-widen-the-blocking-set-with-material',
+		file: 'packages/rph-assurance/src/assurance-rules.ts',
+		find: "\t'BLOCKING',\n\t'CRITICAL'\n]);",
+		replace: "\t'BLOCKING',\n\t'CRITICAL',\n\t'MATERIAL'\n]);",
+		expectRed: ['packages/rph-assurance/src/assurance-rules.test.ts'],
+		why: 'THE ADMITTING HALF — a guard that only ever refuses is not a guard (MU-FRESH-18-B\'s recorded shape). A set that blocked MATERIAL, which the ladder only CONDITIONALLY_SATISFIES, would satisfy the "nothing is missing" limb completely while quietly hardening assurance. Observed: reddens ONLY "every severity IN the set genuinely forces REJECTED"; the missing-member limb stays green.',
+		source: 'JAN-PFA S0.1; REG-F-391'
+	},
+	// ── JAN-PFA S0.2 — canPromoteBaseline's AUTHORITY conjunct ──────────────────────────────────────────────
+	// A survived the ENTIRE suite (358 files, 3,614 tests, zero failures) in a file at 95.31% branch coverage.
+	// Its three sibling conjuncts were all proved — the STATUS limb by the test directly above the new one, the
+	// KIND and SCOPE limbs elsewhere — so the gap was a single unasserted limb inside a well-tested predicate.
+	// ⚠ ALL FOUR LIMBS PUSH THE SAME CODE AND THE SAME DETAIL, so no assertion on the finding can say which one
+	// fired. The victim test is therefore a DIFFERENTIAL — one field flipped on an otherwise identical input —
+	// and these two mutants are what prove it discriminates on the authority field specifically.
+	{
+		id: 'MU-PFA-S02-A-promotion-drops-the-authority-requirement',
+		file: 'packages/rph-domain/src/governance.ts',
+		find: "d.authorityHeld &&\n\t\t(d.decisionType === 'PROMOTE_BASELINE'",
+		replace: "(d.decisionType === 'PROMOTE_BASELINE'",
+		expectRed: ['packages/rph-domain/src/governance.test.ts'],
+		why: 'RPH-BAS-006 requires an effective, AUTHORITY-BACKED PROMOTE_BASELINE/APPROVAL decision — a commit is not a baseline, and neither is an unbacked decision. Dropping the conjunct promotes a baseline to AUTHORITATIVE on a decision whose actor held no authority, which also silently re-arms REG-F-073 downstream because rejectUnbackedBaselining gates on exactly that status. Observed: reddens ONLY the new differential test; the STATUS-limb test and the happy path stay green.',
+		source: 'JAN-PFA S0.2; REG-F-391'
+	},
+	{
+		id: 'MU-PFA-S02-B-invert-the-authority-conjunct',
+		file: 'packages/rph-domain/src/governance.ts',
+		find: "d.authorityHeld &&\n\t\t(d.decisionType === 'PROMOTE_BASELINE'",
+		replace: "!d.authorityHeld &&\n\t\t(d.decisionType === 'PROMOTE_BASELINE'",
+		expectRed: ['packages/rph-domain/src/governance.test.ts'],
+		why: 'THE ADMITTING HALF — a gate that refused every promotion would satisfy the refusal assertion completely (MU-FRESH-18-B\'s recorded shape). Inverting the conjunct refuses the authority-backed promotion and admits the unbacked one, so it attacks the differential from the opposite side: A proves the test notices a MISSING refusal, B proves it notices a WRONGLY WITHHELD admission.',
+		source: 'JAN-PFA S0.2; REG-F-391'
+	},
+	// ── JAN-PFA S0.3 — RphErrorSchema is CLOSED, in a file at 100% BRANCH COVERAGE ──────────────────────────
+	// A survived the ENTIRE suite (358 files, 3,614 tests, zero failures). The file was FULLY covered: every
+	// existing assertion checked what the schema ACCEPTS, and strictness is only observable in what it REFUSES.
+	// ⭐ It is the cleanest exhibit this programme produced for "coverage counts execution, not assertion".
+	{
+		id: 'MU-PFA-S03-A-widen-the-error-shape-to-accept-unknown-keys',
+		file: 'packages/rph-contracts/src/errors.ts',
+		find: 'export const RphErrorSchema = z.strictObject({',
+		replace: 'export const RphErrorSchema = z.object({',
+		expectRed: ['packages/rph-contracts/src/errors.test.ts'],
+		why: 'RphError is the serialized error carried in CommandResult.error and in event/observation payloads, and is PUBLISHED to clients as schemas/objects/RphError.json with additionalProperties:false. Widening strictObject to object accepts untrusted extra fields at a boundary the contract declares shut, and leaves the published schema describing an enforcement that no longer happens. Observed: reddens ONLY the new closed-shape test.',
+		source: 'JAN-PFA S0.3; REG-F-391'
+	},
+	{
+		id: 'MU-PFA-S03-B-make-the-error-shape-refuse-every-real-error',
+		file: 'packages/rph-contracts/src/errors.ts',
+		find: '\tcorrelationId: z.string()\n});',
+		replace: '\tcorrelationId: z.string().min(500)\n});',
+		expectRed: ['packages/rph-contracts/src/errors.test.ts'],
+		why: 'THE ADMITTING HALF — a schema that refused EVERY object would satisfy the unknown-key rejection completely (MU-FRESH-18-B\'s recorded shape). Requiring a 500-character correlationId makes the shape reject an error this package itself constructs, so A proves the test notices a shape gone too LOOSE and B proves it notices one gone too TIGHT. ⚠ THE OBVIOUS FORM WAS WITHDRAWN AFTER MEASUREMENT: adding a required FIELD reported NO_COMPILE, because the inferred type is consumed by makeRphError — this ledger header\'s own trap 1, mutate the CONSEQUENCE rather than the declaration. Tightening an existing field at runtime leaves every static type identical.',
+		source: 'JAN-PFA S0.3; REG-F-391'
 	}
 ];

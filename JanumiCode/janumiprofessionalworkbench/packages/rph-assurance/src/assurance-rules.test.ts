@@ -1,6 +1,8 @@
+import { AssuranceSeveritySchema } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import {
 	aggregateDisposition,
+	BLOCKING_SEVERITIES,
 	checkIndependence,
 	classifyValidatorResult,
 	dispositionFromFindings,
@@ -184,5 +186,79 @@ describe('classifyValidatorResult (§34 / Inv-9/10)', () => {
 	});
 	it('a coherent result is VALID (then subject to disposition on its merits)', () => {
 		expect(classifyValidatorResult(valid).klass).toBe('VALID');
+	});
+});
+
+// ── JAN-PFA S0.1 — BLOCKING_SEVERITIES AGREES WITH THE LADDER, IN BOTH DIRECTIONS ──────────────────────────
+//
+// WHY THIS EXISTS. The pilot mutated `BLOCKING_SEVERITIES` to drop `'CRITICAL'` and NOTHING in the repository
+// reddened — 358 test files, 3,614 tests, zero failures, in a file at 85.34% branch coverage. The set is
+// exported precisely so a criterion's ratified `severityIfNotMet` is answered the SAME way the disposition
+// ladder answers it instead of each caller re-deciding, and that promise was asserted nowhere.
+//
+// IT IS A ROUND-TRIP, NOT A COPY OF THE SET. Asserting the literal members would restate the code and would be
+// satisfied by any edit that changed both sides. These limbs compare the set against what
+// `dispositionFromFindings` ACTUALLY DOES, so the two cannot drift apart in either direction.
+describe('JAN-PFA S0.1 — BLOCKING_SEVERITIES is exactly the set the §10.3 ladder rejects on', () => {
+	// DERIVED FROM THE RATIFIED VOCABULARY, never hand-listed here: `Severity` in assurance-rules.ts is a TS
+	// union with no runtime form, so the enum it mirrors (DOC-007 §21 / DOC-002 §19 / DOC-004 §7) is the source.
+	const ALL_SEVERITIES = AssuranceSeveritySchema.options;
+	const met = { mandatory: true, outcome: 'MET' as const };
+	/** What the ladder actually does with one open finding of this severity, everything else satisfied. */
+	const ladderRejectsOn = (severity: (typeof ALL_SEVERITIES)[number]): boolean =>
+		dispositionFromFindings({ findings: [{ severity, open: true }], criteria: [met] }) === 'REJECTED';
+
+	// ⛔ THE VACUITY CONTROL, AND IT IS NOT DECORATION. Both limbs below iterate this vocabulary. If it were
+	// ever empty — a bad import, a renamed export, a zod version whose `.options` differs — every loop body
+	// would run zero times and BOTH limbs would pass while asserting nothing. That is the
+	// control-that-cannot-fail shape this repository keeps recording, so the population is pinned.
+	// ⚠ IF A SIXTH SEVERITY IS RATIFIED THIS REDDENS, AND THAT IS THE POINT: a new severity must be
+	// deliberately classified as blocking or not, not inherited by whichever side of the ladder it lands on.
+	it('the severity vocabulary it iterates is the ratified five', () => {
+		expect(ALL_SEVERITIES).toHaveLength(5);
+	});
+
+	// LIMB 1 — nothing in the set is inert. Widening the set (say, adding 'MATERIAL', which the ladder
+	// CONDITIONALLY_SATISFIES) reddens here and leaves limb 2 green.
+	it('every severity IN the set genuinely forces REJECTED through the ladder', () => {
+		for (const severity of ALL_SEVERITIES) {
+			if (!BLOCKING_SEVERITIES.has(severity)) continue;
+			expect(
+				ladderRejectsOn(severity),
+				`${severity} is in BLOCKING_SEVERITIES but the ladder does not reject on it`
+			).toBe(true);
+		}
+	});
+
+	// LIMB 2 — nothing that rejects is missing. Dropping 'CRITICAL' reddens here and leaves limb 1 green.
+	// This is the limb the pilot mutation defeated.
+	it('every severity the ladder rejects on IS in the set', () => {
+		for (const severity of ALL_SEVERITIES) {
+			if (!ladderRejectsOn(severity)) continue;
+			expect(
+				BLOCKING_SEVERITIES.has(severity),
+				`the ladder rejects on ${severity} but BLOCKING_SEVERITIES omits it, so a caller asking the set gets a different answer from the ladder`
+			).toBe(true);
+		}
+	});
+
+	// ⭑ THE ADMITTING HALF — AND IT ASSERTS ONLY WHAT THE TWO LIMBS CANNOT.
+	//
+	// ⚠ THE OBVIOUS FORMULATION WAS WRONG AND WAS WITHDRAWN, observed rather than reasoned. Writing this as
+	// *"every severity NOT in the set is not rejected by the ladder"* is the CONTRAPOSITIVE of limb 2, i.e. the
+	// same claim spelled backwards — and the drop-CRITICAL mutation duly reddened both at once. Two assertions
+	// that always fail together are one check wearing two names (`REG-F-099`'s shape), and the pair is weaker
+	// than it looks because neither can localise the defect.
+	//
+	// What survives is the part limbs 1 and 2 genuinely cannot see: they are BOTH satisfied by a set that
+	// blocks the entire vocabulary, provided the ladder was widened to reject on all of it in the same edit.
+	// That co-ordinated widening is a real failure — assurance that refuses everything — and this is the only
+	// limb that refuses it.
+	it('the set does not swallow the whole vocabulary — some severity is still admitted', () => {
+		const admitted = ALL_SEVERITIES.filter((s) => !BLOCKING_SEVERITIES.has(s));
+		expect(
+			admitted.length,
+			'BLOCKING_SEVERITIES covers every ratified severity, so nothing can ever be assessed as anything but REJECTED'
+		).toBeGreaterThan(0);
 	});
 });
