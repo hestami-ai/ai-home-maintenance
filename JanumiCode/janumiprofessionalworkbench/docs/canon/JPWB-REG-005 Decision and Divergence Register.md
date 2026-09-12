@@ -34648,7 +34648,10 @@ against invisible characters at all. Owed: extend that population, or state why 
   **Class:** RULING + FINDING — a sponsor ruling met a measurement that refuted it, and the sponsor delegated
   the resolution · **Status:** ~~⚠ **OPEN — RATIFICATION OWED on all six.**~~ ⚠ **PARTIALLY DISCHARGED by
   `REG-D-062`** — `D-2` and `D-4` are amended there; `D-1`, `D-3`, `D-5` and `D-6` stand unchanged and
-  ratification remains owed on those four. ⭐ The discharge is PARTIAL, so this status SAYS SO rather than being
+  ~~ratification remains owed on those four.~~ ✅ **ALL SIX RATIFIED 2026-09-12 by `REG-D-063`**, a
+  WHOLESALE conferral with the itemised sheet declined — including `D-1`, which reverses the sponsor's own
+  `§8.2` ruling of the previous day. That reversal is written on the face of `REG-D-063` rather than
+  absorbed by it. ⭐ The discharge is PARTIAL, so this status SAYS SO rather than being
   struck outright — which is the remedy `verif/register-status-truth.test.ts` P-5b named when it caught this,
   and the strike-plus-replacement idiom `verif/register-append-only.test.ts` MUTANT B declares PERMITTED.
 
@@ -34802,7 +34805,8 @@ and a name-pinning test is not a test that the named thing works.
 
 - **Date:** 2026-09-11 · **Type:** DECISION (amendment; `JAN-CSAAEXT` ROADMAP rev 2) ·
   **Class:** SELF-REFUTATION — a design I authored one turn earlier, killed by a question I had not asked of it ·
-  **Status:** ⚠ **OPEN.** Supersedes `REG-D-061` `D-2` and `D-4` in part. `D-1`, `D-3`, `D-5`, `D-6` stand unchanged.
+  **Status:** ~~⚠ **OPEN.**~~ ✅ **RATIFIED 2026-09-12 by `REG-D-063`** (wholesale sponsor conferral).
+  Supersedes `REG-D-061` `D-2` and `D-4` in part. `D-1`, `D-3`, `D-5`, `D-6` stand unchanged.
 
 **THE SPONSOR'S QUESTION, VERBATIM:** *"Where did Roadmap S1 come from? Or perhaps more pointedly what is the
 JPWB-side manifest gate?"*
@@ -34867,8 +34871,9 @@ environment established."* ⭐ There is nothing to regress. The measurements sta
 
 - **Date:** 2026-09-12 · **Type:** FINDING (programme completion record; `JAN-CSAAEXT` S1–S9) ·
   **Class:** SELF-REFUTATION AT SCALE — a design that survived its own implementation only by being corrected
-  nine times · **Status:** ✅ **PROGRAMME COMPLETE.** ⚠ Ratification of `REG-D-061` `D-1`/`D-3`/`D-5`/`D-6` and
-  `REG-D-062`'s amendments remains OWED; the residuals below are OPEN.
+  nine times · **Status:** ✅ **PROGRAMME COMPLETE.** ~~⚠ Ratification of `REG-D-061` `D-1`/`D-3`/`D-5`/`D-6` and
+  `REG-D-062`'s amendments remains OWED;~~ ✅ **RATIFIED 2026-09-12 (`REG-D-063`).** The residuals below
+  remain OPEN — a finding is discharged, not conferred.
 
 **WHAT LANDED.** CSAA is out of JPWB. `packages/csaa` → `JanumiCode/csaa/`, the fifth sibling beside
 `janumicode`, `janumicode_v2`, `janumilegal` and `janumiprofessionalworkbench`. 539 renames, history preserved
@@ -34971,3 +34976,73 @@ previously-unpinned behaviour. Mis-labelled is not worthless.
 
 **Merge target:** none. ⚠ `REG-D-061` and `REG-D-062` carry the rulings; this entry records their execution and
 does not amend them.
+
+---
+
+### REG-D-063 — SPONSOR RATIFICATION of `REG-D-061` `D-1`–`D-6` and `REG-D-062`'s amendments — conferred WHOLESALE, with the itemised sheet declined, and `D-1` reverses a ruling the sponsor made the day before
+
+- **Date:** 2026-09-12 · **Type:** DECISION (sponsor ratification act; `JAN-CSAAEXT`) ·
+  **Class:** CONFERRAL — converts six delegated best-judgment rulings from proposals into ratified decisions ·
+  **Status:** ✅ **EFFECTIVE.**
+
+**THE SPONSOR'S WORDS, VERBATIM AND IN FULL.** Asked what ratification meant, then offered a per-ruling decision
+sheet (*"each ruling, what it decided, what it cost, and a confirm/amend/overturn slot"*), the sponsor replied:
+
+> *"No, we can proceed to ratifying those items."*
+
+⭑ **THE FORM OF THE ACT IS RECORDED BECAUSE IT IS PART OF THE ACT.** This is a WHOLESALE conferral with the
+itemised review explicitly declined — the same form as `REG-D-010`, the founding *"ratified as drafted (wholesale
+interim)"*. It is not six separate confirmations, and this entry does not dress it as one.
+
+---
+
+**WHAT BECOMES EFFECTIVE.** `JPWB-CON-000` B2 holds that *"an agent's best-judgment resolution is a proposal
+logged for confirmation, not a conferral"*, and the register's front matter permits DECISION entries on
+*"explicitly recorded delegated best judgment, flagged for sponsor confirmation"*. `REG-D-061` was flagged that
+way from the moment it was written. This entry supplies the confirmation:
+
+| | ruling | now |
+| --- | --- | --- |
+| `D-1` | Route B — JPWB owns its manifest gate; the three `csaa:*` steps leave `gate:fast` | ✅ RATIFIED |
+| `D-2` | the non-vacuity control is DERIVED, never enumerated *(as amended by `REG-D-062`)* | ✅ RATIFIED |
+| `D-3` | `assertJpwbGeneratedContext` retired as redundant *(reason corrected at S4)* | ✅ RATIFIED |
+| `D-4` | `assertJpwbTestPopulations` not rebuilt *(amended: NOTHING replaces the digest)* | ✅ RATIFIED |
+| `D-5` | the 275 CSAA paths follow their subject; CSAA's debt filed | ✅ RATIFIED |
+| `D-6` | controls-that-cannot-fail fixed in the increment that creates them | ✅ RATIFIED |
+
+`REG-D-062`'s amendments to `D-2` and `D-4` are ratified with them.
+
+---
+
+**⛔ THE ONE THING A WHOLESALE CONFERRAL SWEEPS IN, STATED HERE SO IT IS NOT CONFERRED BY OMISSION.**
+
+**`D-1` REVERSES THE SPONSOR'S OWN RULING OF 2026-09-11.** That day the sponsor ruled, verbatim: *"Section 8.2 -
+keep today's check."* `D-1` does not keep it. It keeps the GUARANTEE and drops the COUPLING, because measurement
+established that *"keep today's check"* and *"CSAA is not part of JPWB"* cannot both hold literally: **294 of the
+303 paths that check asserts are CSAA's own files**, and `subject/paths.ts:50` makes the obvious remedy
+impossible rather than merely costly.
+
+⭑ **A ratification that quietly absorbed a reversal of the ratifier's own ruling would be the exact defect
+`REG-E-025` records** — *"a mis-cited ratification is how an authored claim acquires borrowed authority, because
+the reader checks §36.2 of the document they were pointed at, finds a §36.2, and stops."* So it is written on the
+face of the conferral: **the sponsor is ratifying, among other things, the overturning of their own instruction**,
+and the delegation that authorised it was itself explicit — *"you will have to use your delegated authority … to
+author solutions because I can no longer distinguish the tradeoffs you're describing."*
+
+⚠ **AND THE IMPLEMENTATION PRECEDED THE CONFERRAL.** Nine increments (`1b025623`…`d8be71d0`) were built on these
+rulings while they were still proposals. The register provides for that — delegated best judgment is effective
+subject to confirmation — but the sequence is recorded rather than smoothed: the code was in before the authority
+was conferred, and had any ruling been overturned here, working code would have had to come out.
+
+---
+
+**WHAT THIS ENTRY DOES NOT DO.**
+- ⛔ It does not ratify `REG-F-390`'s residuals. Those are OPEN findings, not decisions: CSAA's 74 structural test
+  failures, ~580 uncovered branches across 62 files, CSAA's absent mutation harness, and the cruiser's
+  KNOWN-vacuous `apps/` arm. A finding is not conferred; it is discharged.
+- ⛔ It does not confer anything on CSAA as a product. `REG-D-017`/`REG-D-018`'s Stage A/B grants are untouched,
+  and CSAA's standing as a general-purpose tool is not addressed by this programme.
+- ⚠ It does not close `REG-F-389`, which remains PARTIALLY DISCHARGED by its own terms.
+
+**Merge target:** the status blocks of `REG-D-061` and `REG-D-062`, struck and updated in place by this entry per
+the sanctioned strike idiom (`verif/register-append-only.test.ts` MUTANT B).
