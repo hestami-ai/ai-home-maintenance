@@ -159,3 +159,45 @@ describe('§28.2 aggregate assurance disposition', () => {
 		);
 	});
 });
+
+// ── JAN-PFA R3 S3.3 — RUNG 1 BEATS RUNG 3: a pending assessment cannot hide a recorded rejection ──────────────
+//
+// ⛔ SURVIVING MUTANT CLOSED: rung 1 left in place but made to WAIT for every required assessment to conclude —
+// `required.every((i) => dispositionOf(i) !== undefined) && required.some(... === 'REJECTED')`.
+//
+// ⭐ THIS FILE'S HEADER ALREADY NAMES THE EXACT DEFECT IT MISSED: "get the rungs right individually and the ORDER
+// wrong, and every single-case test still passes while a rejection loses to an inconclusive." The order WAS tested
+// between adjacent rungs — and not for this pair. The mutant does not remove rung 1; it makes rung 3 overtake it,
+// so ONE applicable policy with no concluded assessment suppresses a REJECTION that has already been recorded and
+// the aggregate reports UNASSESSED or EVIDENCE_REQUIRED instead.
+//
+// ⚠ THAT IS THE WORST DIRECTION AVAILABLE: §28.1 requires the STRICTEST unresolved disposition to be preserved,
+// and this reports a LESS strict one — work with a recorded rejection reads as merely unfinished, which is the
+// state a promotion gate treats as "not yet" rather than "no".
+describe('JAN-PFA R3 — a REJECTION outranks an unconcluded assessment (§28.1 strictness order)', () => {
+	const rejected = { policyId: 'pol_rejected', disposition: 'REJECTED', assessed: true } as const;
+
+	it('a recorded REJECTED survives alongside a policy whose assessment has NOT concluded', () => {
+		// The unconcluded companion is the whole arrangement: `disposition: undefined` with `assessed: true` is
+		// the EVIDENCE_REQUIRED rung's own input, so rung 3 is genuinely live and losing to rung 1 on purpose.
+		expect(
+			aggregateAssuranceDisposition([rejected, { policyId: 'pol_pending', assessed: true }]),
+			'an unconcluded assessment suppressed a recorded REJECTION — rung 3 overtook rung 1'
+		).toBe('REJECTED');
+	});
+
+	it('and alongside a policy with NO assessment at all, which is the UNASSESSED rung', () => {
+		expect(
+			aggregateAssuranceDisposition([rejected, { policyId: 'pol_none', assessed: false }]),
+			'a missing assessment suppressed a recorded REJECTION'
+		).toBe('REJECTED');
+	});
+
+	it('CONTROL: without the rejection those same companions DO reach the lower rungs', () => {
+		// ⛔ Without this the two assertions above would pass against a fold that simply always says REJECTED.
+		expect(aggregateAssuranceDisposition([{ policyId: 'pol_pending', assessed: true }])).not.toBe(
+			'REJECTED'
+		);
+		expect(aggregateAssuranceDisposition([{ policyId: 'pol_none', assessed: false }])).not.toBe('REJECTED');
+	});
+});

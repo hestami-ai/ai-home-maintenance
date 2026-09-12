@@ -14,6 +14,7 @@ import {
 	canStartStep,
 	canStartStepUnderPlan,
 	capabilityAuthorized,
+	capabilityIdentities,
 	classifyInterruptedAttempt,
 	executionAloneSatisfiesAssurance,
 	executionSuccessOutcome,
@@ -364,5 +365,64 @@ describe('M11 restart recovery & idempotency (RPH-PER-012, RPH-PER-002 / Propert
 		const committed = new Set(['attempt-commit-abc']); // an attempt that already made a source-control commit
 		expect(attemptWouldDuplicateSideEffect('attempt-commit-abc', committed)).toBe(true); // retry => suppress the duplicate
 		expect(attemptWouldDuplicateSideEffect('attempt-commit-xyz', committed)).toBe(false); // fresh attempt key => new effect ok
+	});
+});
+
+// ── JAN-PFA R3 S3.3 — TWO CAPABILITY GUARANTEES THE SUITE PROVED ONLY LOOSELY ──────────────────────────────────
+//
+// BOTH OF THESE CLOSE A SURVIVING MUTANT, and both survivors share one shape: the suite asserted that a REFUSAL
+// HAPPENS and never that the refusal is PRECISE. The cheap inverse mutants — always-ok — were killed by the
+// assertions already here, which is exactly what made the gap invisible: a guard that refuses the obvious case
+// looks tested.
+describe('JAN-PFA R3 — capability authorization is EXACT membership, not a resemblance', () => {
+	// ⛔ SURVIVING MUTANT CLOSED: `includes(required)` -> `some((c) => required.startsWith(c))`.
+	// RPH-EXE-004 / §22.1 turns on the word EXPLICITLY: an operation is authorized only when its required
+	// capability is IN the granted set. Under prefix matching, granted ['file'] authorizes 'file-system' and
+	// granted [''] authorizes everything. Every granted/required pair the suite drove shared no prefix, so all
+	// eight verdicts were unchanged and the mutant survived.
+	it('a granted capability that is a PREFIX of the required one does NOT authorize it', () => {
+		expect(
+			capabilityAuthorized({ grantedCapabilities: ['file'], requiredCapability: 'file-system' }).ok,
+			"granted 'file' authorized 'file-system' — membership has become resemblance"
+		).toBe(false);
+		// ⭑ THE EMPTY STRING IS THE LIMIT CASE: a prefix of EVERY capability. If it authorizes anything, the
+		// granted set has stopped constraining at all.
+		expect(
+			capabilityAuthorized({ grantedCapabilities: [''], requiredCapability: 'network' }).ok
+		).toBe(false);
+	});
+
+	it('CONTROL: exact membership still authorizes, so the assertion above is not refusing everything', () => {
+		expect(
+			capabilityAuthorized({ grantedCapabilities: ['file-system'], requiredCapability: 'file-system' }).ok
+		).toBe(true);
+	});
+});
+
+describe('JAN-PFA R3 — an UNREADABLE capability grant grants nothing (fail-CLOSED)', () => {
+	// ⛔ SURVIVING MUTANT CLOSED: `.filter((c): c is string => typeof c === 'string')` ->
+	// `.filter((c): c is string => c !== undefined)`. The export's own docblock promises that an element carrying
+	// no readable `capability` "cannot be laundered into a match either, because `undefined` is filtered out
+	// rather than compared… an unreadable grant grants nothing." Comparing against undefined does the one thing
+	// that sentence forbids.
+	//
+	// ⚠ WHY THE EXISTING KILL TEST WAS BLIND TO IT, recorded because the shape recurs: the test that covers this
+	// limb arranges `granted = []` — a RESOLVED EMPTY array, which BOTH predicates map to `[]`. It pins the
+	// EMPTY case and cannot see the MALFORMED one. An absent value and an unreadable value are different inputs.
+	it('a present-but-non-string capability yields NO identity', () => {
+		expect(capabilityIdentities([{ capability: 7 }])).toEqual([]);
+		expect(capabilityIdentities([{ capability: null }])).toEqual([]);
+		expect(capabilityIdentities([{ capability: {} }])).toEqual([]);
+		// ⭑ AND THE MIXED ROW IS THE ONE THAT MATTERS AT THE NOTHING_GRANTED LIMB: one readable grant beside one
+		// malformed one must yield exactly one identity, not two. Two would make `grantedCapabilities.length === 0`
+		// false for a binding that confers one thing, which is fail-OPEN by arithmetic.
+		expect(capabilityIdentities([{ capability: 'network' }, { capability: 7 }])).toEqual(['network']);
+	});
+
+	it('CONTROL: readable grants still yield their identities', () => {
+		expect(capabilityIdentities([{ capability: 'network' }, { capability: 'file-system' }])).toEqual([
+			'network',
+			'file-system'
+		]);
 	});
 });

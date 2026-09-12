@@ -576,7 +576,9 @@
 			"consumedExports": [
 				"aggregateAssuranceDisposition"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"aggregateAssuranceDisposition"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/condition-grammar.ts": {
@@ -586,7 +588,12 @@
 				"conditionStepRefs",
 				"evaluateGuardExpression"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"buildConditionSubject",
+				"ConditionExpressionSchema",
+				"conditionStepRefs",
+				"evaluateGuardExpression"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/conformance-manifest.ts": {
@@ -602,7 +609,13 @@
 				"validateConstraintPropagation",
 				"validateObligationConservation"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"assessFalsification",
+				"canAuthorizeNewWork",
+				"evaluateRecomposition",
+				"validateConstraintPropagation",
+				"validateObligationConservation"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/enforcement-register.ts": {
@@ -615,7 +628,10 @@
 				"isPermittedForFailure",
 				"permittedControlActionsForFailure"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"isPermittedForFailure",
+				"permittedControlActionsForFailure"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/execution.ts": {
@@ -642,11 +658,19 @@
 				"attemptsMadeFrom",
 				"authorizationOutcome",
 				"bindingAuthorityVerdict",
+				"canActivatePlan",
 				"canResumeExecutionOnPwu",
+				"canSkipStep",
+				"capabilityAuthorized",
+				"capabilityIdentities",
 				"grantedWithinRequest",
 				"grantIsMonotone",
+				"lastFailureClassFrom",
 				"planEvidencesExecutionSuccess",
+				"RETRY_EXHAUSTION_ACTIONS",
 				"retryCapFrom",
+				"retryDecision",
+				"stepMayBecomeReady",
 				"validateStepCompletion"
 			],
 			"unattributedMutants": 0
@@ -662,7 +686,13 @@
 				"policyApplicability"
 			],
 			"guardedExports": [
-				"canPromoteBaseline"
+				"applicabilityPermitsAssessment",
+				"applicabilitySubjectFrom",
+				"assessmentHasConcluded",
+				"authorizeDecisionEffective",
+				"canPromoteBaseline",
+				"decisionAuthorizesVersions",
+				"policyApplicability"
 			],
 			"unattributedMutants": 0
 		},
@@ -675,7 +705,9 @@
 			"consumedExports": [
 				"validateProposedPlan"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"validateProposedPlan"
+			],
 			"unattributedMutants": 2
 		},
 		"packages/rph-domain/src/pwu-lifecycle-command-spec.ts": {
@@ -687,8 +719,11 @@
 				"PWU_RECOVERY_COMMAND_SPECS"
 			],
 			"guardedExports": [
+				"checkDeclaredSource",
+				"declaredRecoveryTargets",
 				"ownerOfArrow",
-				"PWU_LIFECYCLE_COMMAND_SPECS"
+				"PWU_LIFECYCLE_COMMAND_SPECS",
+				"PWU_RECOVERY_COMMAND_SPECS"
 			],
 			"unattributedMutants": 0
 		},
@@ -698,7 +733,11 @@
 				"checkPwuShapeReadiness",
 				"satisfiesP1"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"canAdvanceWorkLifecycle",
+				"checkPwuShapeReadiness",
+				"satisfiesP1"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/stateMachine.ts": {
@@ -708,7 +747,12 @@
 				"getMachine",
 				"isTerminalState"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"canTransition",
+				"classifyTransition",
+				"getMachine",
+				"isTerminalState"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/step-command-spec.ts": {
@@ -725,7 +769,10 @@
 				"classifyEvidenceInvalidation",
 				"TraceGraph"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"classifyEvidenceInvalidation",
+				"TraceGraph"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-domain/src/transition-gate.ts": {
@@ -740,8 +787,14 @@
 				"validateTransitionGraph"
 			],
 			"guardedExports": [
+				"inEdgeDisposition",
+				"isTerminalSuccessStepState",
+				"prunableStepIds",
 				"pruneProvenance",
-				"startableStepIds"
+				"resolveBranchSelection",
+				"startableStepIds",
+				"startStepGate",
+				"validateTransitionGraph"
 			],
 			"unattributedMutants": 8
 		},

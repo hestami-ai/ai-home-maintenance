@@ -4520,5 +4520,415 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
 		why: "TransitionRow promises human labels that are the purpose of THAT row's own endpoints, else an honest marker — 'Never a fabricated name' — because the edge plane is the only rendering of an immutable graph the operator cannot otherwise inspect. Resolving the label off plan.steps[0] instead of the endpoint id labels every edge with the same step's purpose, and worse, presents a DANGLING target (a step id that resolves to nothing) as a real, named step: an incoherent graph renders as a valid one, with no marker anywhere. Measured: the dangling-target row's targetLabel goes 'unknown step ghost' -> 'purpose s1' (reddening 'names an unresolvable step id rather than rendering a blank row'), and the resolved pair's targetLabel goes 'purpose s2' -> 'purpose s1'.",
 		source: "JAN-PFA R3 S3.3 burn-down increment 3b"
+	},
+	{
+		id: "MU-PFA-BD5-09-unknown-failure-class-gets-a-default-action-set",
+		file: "packages/rph-domain/src/execution-failure-taxonomy.ts",
+		find: "return parsed.success ? EXECUTION_FAILURE_CONTROL_ACTIONS[parsed.data] : undefined;",
+		replace: "return parsed.success ? EXECUTION_FAILURE_CONTROL_ACTIONS[parsed.data] : EXECUTION_FAILURE_CONTROL_ACTIONS.TOOL_FAILURE;",
+		expectRed: ["packages/rph-domain/src/execution-failure-taxonomy.test.ts"],
+		why: "BREAKS THE FAIL-CLOSED PROMISE THE DOC COMMENT MAKES IN TERMS: \"FAILS CLOSED, and deliberately does not fall back to a default set: a class this map does not know is a class §36's rule has not been met for, and returning 'the usual actions' would report a mapping that does not exist.\" The mutant keeps the schema check and turns its refusal into an admission — an unratified class (and TRANSIENT, per the file header, is the ONLY value production ever passed) silently inherits TOOL_FAILURE's remedy set. Two consumers publish that set as an operator instruction, so the invented mapping becomes user-visible governance text: packages/rph-application/src/handlers/execution.ts:1541-1548 interpolates permittedControlActionsForFailure(lastClass) into its RPH_INVARIANT_VIOLATION rejection (\"— select one of: …\"), and packages/rph-projections/src/execution-view.ts (failureBlock, ~line 631) puts the same set in the read-model notice beside the withheld retry affordance, with the comment \"Present ONLY when the class genuinely forbids RETRY\". Both would then quote a §36 mapping that does not exist for that class — the borrowed-authority failure this file's header was written to prevent.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-09-permission-ignores-the-failure-class",
+		file: "packages/rph-domain/src/execution-failure-taxonomy.ts",
+		find: "return parsed.success && permitted.includes(parsed.data);",
+		replace: "return parsed.success;",
+		expectRed: ["packages/rph-domain/src/execution-failure-taxonomy.test.ts"],
+		why: "isPermittedForFailure is a thin wrapper, so this attacks THE ONE THING IT ADDS over permittedControlActionsForFailure: the CLASS-SPECIFIC membership decision its doc comment promises — \"Is `action` a permitted response to `failureClass`?\". The mutant leaves the unknown-class guard and the schema parse intact and collapses the answer to \"is `action` a ControlAction at all\", so the mapping still compiles and stops saying anything — precisely the vacuity the companion test's header names (\"a table mapping all seven classes to [] would pass\"). Both callers are refusals and both fail OPEN: packages/rph-application/src/handlers/execution.ts:1541 (`!isPermittedForFailure(lastClass, 'RETRY')` — the engine's refusal to retry a step whose last failure class forbids it) and packages/rph-projections/src/execution-view.ts:423 retryBudgetPermits (the read-model withholding the retry affordance, which the comment says is asked FIRST, before the cap). RPH-EXE-008's ratified exclusion — \"the controller must not issue a fourth retry\", the reason RETRY is absent from the one RATIFIED row — is then enforced at neither layer, while the table it is read from is unchanged.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-05-foreign-aggregate-folds-into-subject",
+		file: "packages/rph-domain/src/condition-grammar.ts",
+		find: "if (e.aggregateId !== planId) continue;",
+		replace: "if (e.aggregateId === '') continue;",
+		expectRed: ["packages/rph-domain/src/condition-grammar.test.ts"],
+		why: "PROMISE BROKEN: \"Single-aggregate + committed-only => replay-pure; no cross-aggregate read\" (its own doc comment). The fold itself lives in foldExecutionEventInto; the ONE thing buildConditionSubject adds over its delegate is the planId gate deciding WHICH events are admitted. RELIED ON BY: guardEvaluatorFor (rph-application, the authority) and conditionEvaluatorFor (rph-projections, the read-model) both fold their subject here before every CONDITIONAL-edge guard evaluation. The mutant keeps a check in place but admits every event with a non-empty aggregateId, so another plan's ExecutionStepStarted/Succeeded history raises attemptsMade and overwrites outputArtifactIds/structuredResult — a guard verdict then depends on a foreign aggregate, which destroys the replay identity the header claims and makes the same plan re-evaluate differently depending on what else is in the event store.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-05-empty-all-accepted-again",
+		file: "packages/rph-domain/src/condition-grammar.ts",
+		find: "op: z.literal('ALL'),\n\t\t\toperands: z.array(ConditionExpressionSchema).min(1)",
+		replace: "op: z.literal('ALL'),\n\t\t\toperands: z.array(ConditionExpressionSchema).min(0)",
+		expectRed: ["packages/rph-domain/src/condition-grammar-hardening.test.ts"],
+		why: "PROMISE BROKEN: the schema exists to \"REJECT a malformed conditionExpression\" at propose time, and `.min(1)` is specifically the closure of F-41/F-43/F-44 — an empty ALL is vacuously TRUE (`[].every` is true), i.e. a fail-OPEN guard inside a grammar whose every other default is fail-closed. RELIED ON BY: plan-proposal.ts:206 (the only propose-time validation of a CONDITIONAL edge's expression) and evaluateGuardExpression's parse gate, which is what makes unrepresentability the enforcement mechanism. With min(0) an `ALL[]` parses again, so a stored or newly proposed CONDITIONAL edge carrying no operands conducts unconditionally while reading as a deliberately authored guard.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-05-not-operand-refs-unreported",
+		file: "packages/rph-domain/src/condition-grammar.ts",
+		find: "return conditionStepRefs(expr.operand);",
+		replace: "return [];",
+		expectRed: ["packages/rph-domain/src/condition-grammar.test.ts"],
+		why: "PROMISE BROKEN: \"Every stepId a condition references\" — across the recursion, not just the arms someone remembered. TWO CONSUMERS rely on completeness as a safety property, not a convenience: plan-proposal.ts:211 rejects a plan whose condition names an undeclared step, and evaluateGuardExpression refuses the WHOLE expression when any referenced step is absent from the subject. Dropping the NOT arm's refs makes a ghost reference under NOT invisible to both — propose accepts the dangling plan, and at runtime the ghost check finds nothing to refuse, so the leaf's conservative false is inverted by NOT to TRUE and a guard is SATISFIED by a step that does not exist. That is exactly the fail-open WP-7 closed.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-05-dangling-ref-skipped-not-refused",
+		file: "packages/rph-domain/src/condition-grammar.ts",
+		find: "if (!Object.hasOwn(subject.steps, id)) return false;",
+		replace: "if (!Object.hasOwn(subject.steps, id)) continue;",
+		expectRed: ["packages/rph-domain/src/condition-grammar-hardening.test.ts"],
+		why: "PROMISE BROKEN: fail-closed way #2, the ONLY thing this wrapper adds over evaluateCondition (way #1, the parse gate, was already in both copies it replaced). Its doc states it: a referenced step absent from the subject is false \"for the WHOLE expression\", because a leaf's conservative false gets inverted to TRUE by NOT, so a dangling reference could SATISFY a guard — and a STORED plan predates the propose-time ref check, so the runtime must not depend on the author having been validated. RELIED ON BY: guardEvaluatorFor (rph-application, the authority that lets a CONDITIONAL edge conduct) and conditionEvaluatorFor (rph-projections, the read-model) — this function is THE single entry point precisely so the two cannot disagree. Turning the refusal into `continue` keeps the check and discards its consequence: the ghost is skipped and the pure evaluation proceeds, restoring the pre-WP-7 fail-open in the direction of satisfying guards.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-06-getmachine-fabricates-an-empty-machine-instead-of-failing-loud",
+		file: "packages/rph-domain/src/stateMachine.ts",
+		find: "\tif (!m) throw new Error(`Unknown state machine: ${name}`);",
+		replace: "\tif (!m) return { name, states: [], initialState: undefined, terminalStates: [], transitions: [], illegal: [], guarded: [] };",
+		expectRed: ["packages/rph-domain/src/transitions.test.ts"],
+		why: "PROMISE BROKEN: getMachine is a thin wrapper over `STATE_MACHINES[name]`, and the ONE thing it adds over that raw lookup is the loud refusal — an unrecognised machine name is a programming error that must THROW, never resolve to something. The file header states the rule it is there to keep: \"Illegal transitions fail LOUD ... never silently repair state.\" WHO RELIES ON IT: every other export in this module reaches the tables only through getMachine — isValidState, initialStateOf, isTerminalState and classifyTransition (and therefore canTransition, assertTransition, and all eight guard call sites: canActivatePlan, canStartStep, canPromoteBaseline, canSupersedeBaseline, authorizeDecisionEffective, canAdvanceWorkLifecycle, and decomposition's two assumption arms). A fabricated empty machine turns a mistyped machine name from a crash into a silent verdict: every state becomes UNKNOWN_STATE, so canTransition returns false for everything (a guard that refuses every arrow, indistinguishable from a correctly-refused one) and isTerminalState returns false for everything (canResumeExecutionOnPwu fails OPEN on a closed unit of work). ⭐ I PREDICT THIS SURVIVES, AND THAT IS THE FINDING. Nothing in the repo calls getMachine with an unregistered name: `grep -rn \"Unknown state machine\"` over all non-dist .ts files returns exactly ONE hit — line 12 itself, the throw — and no test anywhere expects it. Every consumer outside this module guards the lookup itself before asking (binding.test.ts gates on `b.machine in STATE_MACHINES` before calling getMachine; enforcement-register.ts, step-command-spec.test.ts, transition-row-landing.test.ts and verif/arrow-command-census.ts all index STATE_MACHINES directly with their own `?.`/`!`), so the throw is reachable only from a typo that no fixture contains. transitions.test.ts is named as the victim because it is the file that owns getMachine's contract (its `it.each` over the ratified machine list is the only direct assertion about what getMachine returns) — it is where the missing assertion belongs, and I expect it to stay GREEN.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-06-isterminalstate-narrows-to-the-baselined-literal",
+		file: "packages/rph-domain/src/stateMachine.ts",
+		find: "\treturn getMachine(machine).terminalStates.includes(state);",
+		replace: "\treturn getMachine(machine).terminalStates.includes(state) && state === 'BASELINED';",
+		expectRed: ["packages/rph-application/src/handlers/execrem-wp12-authority.test.ts"],
+		why: "PROMISE BROKEN: isTerminalState is a thin wrapper whose one contribution is WHICH table it reads — the machine's own DECLARED `terminalStates`, derived from the vocab rather than from a remembered list. WHO RELIES ON IT: `canResumeExecutionOnPwu` (rph-domain/src/execution.ts:164), its only production consumer, whose comment says it was GENERALISED to \"the machine's OWN terminal set (JAN-EXECREM WP-12 / F-28), not to a hardcoded list\" because \"Opening execution on an ABANDONED or SUPERSEDED unit of work is at least as wrong as on a baselined one\"; through it, StartExecutionStep / CompleteExecutionStep / ActivateExecutionPlan's RPH-PWU-010 openness gate (rph-application/src/handlers/execution.ts:833 pwuOpennessRefusal) and rph-projections/src/execution-view.ts:376. The mutation is not invented: it is the remedy the repo's own enforcement register names at enforcement-register.ts:800 — \"narrow canResumeExecutionOnPwu back to the BASELINED literal (dropping the derived terminal set)\" — but sited INSIDE isTerminalState's declaration rather than at the call site, so the census credits the kernel export that actually holds the derivation. It is the BASELINED arm of canResumeExecutionOnPwu, which runs FIRST and returns its own ratified RPH_BASELINED_PWU_NO_RESUME code, that makes this mutant a precise instrument: it is invisible to every BASELINED fixture and can only be caught by a test that closes a unit of work some OTHER way. I predict KILLED: execrem-wp12-authority.test.ts closes the PWU via AbandonPwu specifically to exercise \"the GENERALISED limb (RPH_CLOSED_PWU_NO_NEW_EXECUTION), which is the authored extension and therefore the part most in need of a live test\", and three of its tests (openness/start-, complete-, activate-under-closed-pwu-REJECTS) assert status REJECTED + code RPH_INVARIANT_VIOLATION + a message containing 'RPH-PWU-010', all of which vanish when the openness refusal returns null.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-06-classifytransition-lets-a-declared-illegal-self-edge-read-noop",
+		file: "packages/rph-domain/src/stateMachine.ts",
+		find: "\tconst explicit = m.illegal.find((i) => i.from === from && i.to === to);",
+		replace: "\tconst explicit = m.illegal.find((i) => i.from === from && i.to === to && from !== to);",
+		expectRed: ["packages/rph-domain/src/transitions.test.ts"],
+		why: "PROMISE BROKEN: the ORDERING guarantee this export documents in its own body — \"the `illegal` table is consulted BEFORE the from === to shortcut, so a machine that DECLARES a self-edge illegal ... classifies ILLEGAL_EXPLICIT, not NOOP ... Ordering these the other way silently downgraded a declared prohibition to a permitted no-op\" (JAN-CMDPRE DWP-07, D2/D6). Rather than reorder the statements (which would also change undeclared self-edges and so prove less), the mutant makes the explicit lookup SKIP self-edges, which reproduces the pre-DWP-07 behaviour on exactly the declared ones. WHO RELIES ON IT: §24.2's immutability of an AUTHORITATIVE baseline — promoteBaseline (via canPromoteBaseline's ILLEGAL_PROMOTION_TRANSITION arm) and assertTransition, which must THROW RPH_ILLEGAL_STATE_TRANSITION on AUTHORITATIVE -> AUTHORITATIVE rather than permit it as a no-op; also binding.test.ts's M3<->M2 consistency sweep, which treats NOOP as acceptable and would therefore wave the forbidden in-place re-promotion through. I predict KILLED: transitions.test.ts asserts the klass AND the reason AND the throw on that one edge (the DWP-07 describe block) and re-asserts it in the 'rejects every explicitly-illegal transition' sweep. ⚠ THE DISCRIMINATION TRAP IS REAL HERE AND IS WHY THE REASON ASSERTION MATTERS: canTransition stays false either way (NOOP is not LEGAL), so a test that only checked canTransition would read as agreement; the klass/reason/assertTransition assertions are the only ones that can tell ILLEGAL_EXPLICIT from NOOP.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-06-cantransition-admits-a-noop-as-a-transition",
+		file: "packages/rph-domain/src/stateMachine.ts",
+		find: "\treturn classifyTransition(machine, from, to).klass === 'LEGAL';",
+		replace: "\tconst k = classifyTransition(machine, from, to).klass;\n\treturn k === 'LEGAL' || k === 'NOOP';",
+		expectRed: ["packages/rph-domain/src/transitions.test.ts"],
+		why: "PROMISE BROKEN: STRICTNESS — the single thing canTransition adds over classifyTransition, stated in its own doc comment as \"LEGAL ONLY (a NOOP is NOT a transition)\" and \"The split is deliberate and load-bearing (JAN-CMDPRE DWP-07 / D2)\". The mutant makes it identical to the application layer's permissive `checkTransition` (kit.ts:166), erasing the split. WHO RELIES ON IT: the guards the comment names by hand — canActivatePlan, canPromoteBaseline, canAdvanceWorkLifecycle — plus canStartStep, canSupersedeBaseline, authorizeDecisionEffective and decomposition's accept/falsify arms: eight call sites that \"must REFUSE a same-state re-issue, so a NOOP reads as 'cannot'\". ⭐ I PREDICT THIS SURVIVES, AND IT IS THE MOST VALUABLE OF THE FOUR. 201 boolean verdicts flip false->true and I can find no assertion anywhere that sees one. Derived, not guessed: a regex sweep for `canTransition(<machine>, 'X', 'X')` over every *.test.ts in the repo returns exactly ONE hit — transitions.test.ts:95, the Baseline DECLARED-illegal self-edge, which classifies ILLEGAL_EXPLICIT and so stays false under the mutant. The test whose NAME states this very promise, 'permits a same-state NOOP but never counts it LEGAL', never calls canTransition — it asserts classifyTransition's klass and assertTransition's silence, and so does the 'every self-edge NOT declared illegal still classifies NOOP' sweep. The command layer cannot see it either, and the repo says why: kit.ts:747 sites the re-issue precondition AHEAD of the guard, so dwp05-precondition-coverage.test.ts's ACTIVE->ACTIVE re-issue is refused with RPH_ILLEGAL_STATE_TRANSITION by the precondition and its own comment notes the guard's canTransition would have produced RPH_INVARIANT_VIOLATION instead — which means the precondition masks this mutant on every command path. transitions.test.ts is named as the victim because it is where the missing assertion belongs (its NOOP test already claims it); I expect it to stay GREEN.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-08-cross-axis-guard-yields-to-execution-success",
+		file: "packages/rph-domain/src/pwuGuards.ts",
+		find: "\tif (guard && !guard(axes)) {",
+		replace: "\tif (guard && !guard(axes) && axes.executionState !== 'SUCCEEDED') {",
+		expectRed: ["packages/rph-domain/src/pwuGuards.test.ts"],
+		why: "PROMISE BROKEN: `canAdvanceWorkLifecycle` delegates LEGALITY to `canTransition`; the ONE thing it adds is that it APPLIES the cross-axis guard it looked up, and the doc comment on the guard table states what that buys — \"the only legal route into SATISFIED requires assuranceState === 'SATISFIED' — a SUCCEEDED execution is never enough\" (property P1 / INV-5, the file header's \"execution success NEVER implies assurance\"). The mutant keeps the lookup and keeps the predicate call, and makes the REFUSAL yield whenever executionState is SUCCEEDED — i.e. it re-creates exactly the collapse P1 exists to forbid, in the shape this programme keeps finding: a refusal condition silently gaining a widening conjunct (cf. canPromoteBaseline dropping its authority conjunct). WHO RELIES ON IT: `advancePwuLifecycle` (packages/rph-application/src/handlers/pwu.ts:671) and `rejectIllegalWorkLifecycleMove` inside `changePwuState` (pwu.ts:1613), which turn `!advance.ok` into RPH_ILLEGAL_STATE_TRANSITION \"Cannot advance PWU … : cross-axis guard failed for …\"; under the mutant both commit UNDER_ASSURANCE -> SATISFIED on a REJECTED assurance. ANCHOR NOTE: the guard PREDICATES live in WORK_LIFECYCLE_CROSS_AXIS_GUARDS at module level (lines 26-30) — anchoring there would credit NOTHING to this export, so the anchor is the application site inside the declaration.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-08-p1-predicate-accepts-succeeded-execution",
+		file: "packages/rph-domain/src/pwuGuards.ts",
+		find: "\tif (axes.workLifecycleState === 'SATISFIED') return axes.assuranceState === 'SATISFIED';",
+		replace: "\tif (axes.workLifecycleState === 'SATISFIED') return axes.assuranceState === 'SATISFIED' || axes.executionState === 'SUCCEEDED';",
+		expectRed: ["packages/rph-domain/src/pwuGuards.test.ts"],
+		why: "PROMISE BROKEN: the doc comment states it exactly — \"reaching workLifecycleState = SATISFIED is permitted ONLY when assuranceState = SATISFIED. Returns true when the combination is consistent with P1 (i.e. NOT a 'satisfied-without-assurance' state)\". The ONLY is the whole promise: the permission is a biconditional on the assurance axis alone, and executionState must be IRRELEVANT to it. The mutant keeps the check and widens the admission with the one disjunct INV-5 forbids — execution success standing in for assurance — so every 'satisfied-without-assurance' state that also happens to have SUCCEEDED execution becomes P1-consistent. This is a predicate, so the attack has to be on what is RETURNED, not on a refusal: the return expression is the consequence here. WHO RELIES ON IT: `changePwuState`'s hold-in-place guard at packages/rph-application/src/handlers/pwu.ts:1604 — `if (!satisfiesP1(nextAxes))` -> RPH_INVARIANT_VIOLATION \"PWU … would hold in SATISFIED without assuranceState=SATISFIED (P1/INV-5)\"; plus the conformance layer (conformance-manifest.ts cites it for RPH-PWU-007) and the fast-check property in packages/rph-domain/src/properties.test.ts:58, which asserts satisfiesP1(axes) === (assuranceState === 'SATISFIED') across generated axis tuples.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-08-unmet-limbs-abridged-to-first",
+		file: "packages/rph-domain/src/pwuGuards.ts",
+		find: "\treturn { ok: unmet.length === 0, unmet };",
+		replace: "\treturn { ok: unmet.length === 0, unmet: unmet.slice(0, 1) };",
+		expectRed: ["packages/rph-domain/src/pwuGuards.test.ts"],
+		why: "PROMISE BROKEN: not the boolean — the COMPLETENESS of the refusal. The doc comment: \"Returns the FULL set of unmet limbs rather than the first, so a caller can report every gap at once\"; the ReadinessCheck field comment: \"Every unmet limb, each carrying its own citation. Never abridged — §8.4 L856 'gaps are never silent'\". The mutant leaves `ok` exactly correct, so the fail-closed direction is untouched and every single-limb it.each case still passes — it abridges only the REPORT, which is the half of this export's contract that makes it more than a predicate, and the half a plausible refactor (first-failure short-circuit) destroys. WHO RELIES ON IT: `markPwuReady`, packages/rph-application/src/handlers/pwu.ts:817-823 — `checkPwuShapeReadiness(readinessFactsOf(...))` then RPH_VALIDATION_SEMANTIC_FAILED whose message IS `readiness.unmet.join('; ')`. Under the mutant a professional whose PWU is missing four §9.1 limbs is told about one, fixes it, and is refused again for gaps the kernel already knew — the silent-gap failure §8.4 L856 forbids, and the same shape as a closed schema quietly widening: the answer is still 'no' but the information the consumer is promised has gone.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-10-first-supported-claim-only",
+		file: "packages/rph-domain/src/traceability.ts",
+		find: "graph.outgoing(evidenceId, 'SUPPORTS').map",
+		replace: "graph.outgoing(evidenceId, 'SUPPORTS').slice(0, 1).map",
+		expectRed: ["packages/rph-domain/src/properties.test.ts"],
+		why: "THE PROMISE IS UNIVERSALITY, not merely non-silence. The export's own doc comment (traceability.ts:191-194) reads: \"when an Evidence object is invalidated, every Claim it SUPPORTS must be re-examined -- classified REVALIDATION, never left silently SUPPORTED\" (CT-10 / property P4). Truncating the SUPPORTS set to its first link leaves the classification, the relation filter, the from-filter and the honest-empty case all intact, so the function still looks like it is doing its job -- and every claim after the first is left exactly as silently supported as before the kernel existed. WHO RELIES ON IT: `invalidateEvidence` (packages/rph-application/src/handlers/assurance.ts:629-647) is the only production caller and maps this output straight into `EvidenceInvalidated.affectedClaimIds` -- by design nothing re-contests the claim, so this list IS the entire disclosure that a claim's support was withdrawn. The defect shape is named verbatim by the test that closed WIRE #4 (packages/rph-application/src/handlers/evidence-invalidation-impact.test.ts:144-145): \"A wiring that took the first SUPPORTS link would satisfy 'not silently supported' while leaving the second claim exactly as silently supported as before.\" This mutant commits that defect in the KERNEL rather than at the call site. It mutates the consequence, not a declaration: nothing becomes statically dead, no narrowing is lost, no exported type or field changes. NOTE THE DISCRIMINATION IT BUYS: the module's own unit test (traceability.test.ts) stays GREEN under it (measured), because evd_1 supports exactly one claim there -- the universality guarantee is held by properties.test.ts's P4 alone.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-10-superseded-links-traversed",
+		file: "packages/rph-domain/src/traceability.ts",
+		find: "(l) => l.from === id && !l.superseded && (relation === undefined || l.relation === relation)",
+		replace: "(l) => l.from === id && (relation === undefined || l.relation === relation)",
+		expectRed: ["packages/rph-domain/src/traceability.test.ts"],
+		why: "THE PROMISE IS THE ONE THING TraceGraph ADDS THAT NOTHING ELSE IN THE REPO PROVIDES: links are IMMUTABLE, and a correction adds a SUPERSEDES link and marks the prior link superseded rather than mutating it (file header: \"TraceLinks are IMMUTABLE typed edges; corrections create a SUPERSEDES link, never mutate (25.1)\"; TraceLink.superseded's own comment at :131). Therefore every query must return ONLY ACTIVE links. Dropping the `!l.superseded` conjunct from `outgoing` resurrects retracted and corrected edges for every consumer, because `outgoing` is the single seam through which the whole module reads the graph: `classifyEvidenceInvalidation` (:196) and `impactedObjects` (:214) traverse nothing else, `findPath` (:175) walks it, and in production `invalidateEvidence` (packages/rph-application/src/handlers/assurance.ts:643) reaches it through `classifyEvidenceInvalidation`. So a WITHDRAWN SUPPORTS edge re-enters the P4 / CT-10 cascade as though it had never been corrected, and a traceability audit reports a path over links the record says are dead -- the precise failure the immutable-plus-supersede model exists to forbid. Mutation is of the consequence, not the declaration: the filter survives, its from-limb and relation-limb survive, no block becomes statically dead, no exported type or schema field moves.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-07-declared-source-check-stops-reading-the-state",
+		file: "packages/rph-domain/src/pwu-lifecycle-command-spec.ts",
+		find: "\tif (spec.sourceStates.includes(current as WorkLifecycleState)) return { ok: true };",
+		replace: "\tif (spec.sourceStates.length > 0) return { ok: true };",
+		expectRed: ["packages/rph-domain/src/pwu-lifecycle-command-spec.test.ts"],
+		why: "PROMISE: a state the spec does not CLAIM is refused as an UNDECLARED ARROW — the caller reached for the wrong command — distinctly from the machine's ILLEGAL TRANSITION. That distinction is REG-F-114's whole settlement and the reason this runs BEFORE canAdvanceWorkLifecycle. RELIED ON BY advancePwuLifecycle (packages/rph-application/src/handlers/pwu.ts:669), for which this boolean is the ONLY signal, since both refusals return RPH_ILLEGAL_STATE_TRANSITION and only the sentence differs; and by the kernel test's synthetic NARROW fixture, which the docblock argues is the only honest way to prove discrimination because no production spec is narrower than its machine. The guard, the call site, the table and the census all stay intact; the predicate simply stops reading `current`, so all 13 commands accept every state. That is verbatim the pre-REG-F-114 condition this file's own header records — 'the command accepted whatever canAdvanceWorkLifecycle happened to allow' — i.e. the declaration becomes decoration.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-07-recovery-cardinality-collapses-to-one",
+		file: "packages/rph-domain/src/pwu-lifecycle-command-spec.ts",
+		find: "\t\t.map((a) => a.to);",
+		replace: "\t\t.map((a) => a.to).slice(0, 1);",
+		expectRed: ["packages/rph-application/src/handlers/block-escalate.test.ts"],
+		why: "PROMISE: the CARDINALITY of the returned list is what decides whether a RECORDED origin is owed — one target means the origin is DERIVABLE from the declaration (which is why PwuEscalated deliberately carries no escalatedFrom), more than one means it must have been RECORDED in PwuBlocked.blockedFrom, and a block that recorded none FAILS CLOSED rather than guessing, because reconstructing it would infer professional meaning from ORDERING and CON-000 AX-6 forbids that in terms. RELIED ON BY unblockPwu (handlers/pwu.ts:1067-1110), which branches on candidates.length and then checks the recorded origin for membership. Truncating the list leaves the filter in place and makes BLOCKED look single-valued, so recovery resumes EVERY blocked PWU at SHAPING whatever its record says — skipping PLANNED and EXECUTING — and the AX-8 refusal ceases to exist. Exactly the 'quietly picking one of two' the docblock says the degradation must be loud about.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-07-recovery-table-resumes-at-ready",
+		file: "packages/rph-domain/src/pwu-lifecycle-command-spec.ts",
+		find: "\t\t\t{ from: 'BLOCKED', to: 'PLANNED' },",
+		replace: "\t\t\t{ from: 'BLOCKED', to: 'READY' },",
+		expectRed: ["verif/lifecycle-arrow-declarations.test.ts"],
+		why: "PROMISE: these four arrows are DOC-002 §8.2's in-arrows to BLOCKED and ESCALATED traversed the other way AND NOTHING ELSE, with BLOCKED -> READY as the table's own named DISCRIMINATING ABSENCE — READY is the state a caller would most naturally want to resume at, so it is precisely what creeps in when an arrow set is chosen for convenience instead of derived; the arrows field doc claims it is 'held equal to the machine by verif/, both ways'. RELIED ON BY declaredRecoveryTargets and ownerOfArrow in this file, by unblockPwu for its target and event, and by verif/arrow-command-census.ts, which reads this table as DATA and reports its arrows as COVERED. Substituting READY for PLANNED makes the table claim an arrow the machine never ratified — fabricated coverage, the failure REG-F-114 forbade, arriving through a declaration rather than an inference — while a PWU blocked out of PLANNED becomes unrecoverable, because its recorded origin no longer matches the declaration.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-effective-disposition-drops-structural-deadness",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\treturn gateContext(plan, evaluateGuard).dispositionOf(edge);",
+		replace: "\treturn gateContext(plan, evaluateGuard).localOf(edge);",
+		expectRed: ["packages/rph-domain/src/transition-gate-disposition.test.ts"],
+		why: "THE PROMISE: this export answers with the EFFECTIVE disposition (stage 2) — the local ladder OVERRIDDEN to NEUTRALIZED when the source is STRUCTURALLY DEAD. That override is the entire F-06 fix: SKIPPED is in TERMINAL_SUCCESS, so a step on a not-taken arm is terminal-SUCCESS whether it was PRUNED or WAIVED away, and without the override a waiver-skip on a dead arm reads 'done, carry on' and RESURRECTS the arm. This export is a thin wrapper, and the ONE thing it adds over the delegate is choosing dispositionOf (stage 2) over localOf (stage 1) — so that choice is what is attacked here; nothing else in the module routes through this function, which makes the kill attributable to the export alone. WHO RELIES: rph-projections transitionRows (packages/rph-projections/src/execution-view.ts:845) is the sole production caller and puts this value straight into the UI's `disposition` column, documented as 'SATISFIED (this edge is live/taken)', rendered per plan by apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts (transitionRowsByPlan). With the override gone the demo labels the edge out of a waiver-skipped step on a dead arm as TAKEN — the F-06 harm surfaced in the read model, with no type error.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-satisfied-predecessor-widens-to-any-terminal",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\treturn TERMINAL_SUCCESS.has(stepState);",
+		replace: "\treturn TERMINAL.has(stepState);",
+		expectRed: ["packages/rph-projections/src/execution-view.test.ts"],
+		why: "THE PROMISE: 'a satisfied predecessor' is terminal-SUCCESS ONLY (SUCCEEDED/SKIPPED). The other three terminal states are deliberately NOT success, and WP-4/F-16 is the reason the distinction exists: FAILED is the machine's only REOPENABLE terminal (FAILED -> QUEUED), CANCELLED/SUPERSEDED are irrecoverable, and collapsing the two classes is precisely what let a JOIN release on a failed arm so a plan reached COMPLETED with a step that never succeeded. This mutation widens the SATISFIED-predecessor set from 2 states to all 5 terminals — the same shape as BLOCKING_SEVERITIES losing CRITICAL, run the other way. WHO RELIES: rph-projections re-exports it verbatim as isTerminalSuccessStep (packages/rph-projections/src/execution-view.ts:695, 'Delegates to the shared rph-domain gate so the definition lives in exactly one place'), which is the read-model's own 'is this predecessor satisfied' predicate. NOTE FOR THE CENSUS: the only assertion of this export anywhere in the repo is cross-package (that projections test) — rph-domain itself never asserts it, so under the dist-resolving mode this mutation would be invisible; it is measurable only because the runner resolves @janumipwb/* to src.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-incoherent-graph-becomes-blanket-prune",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\tif (graphIsIncoherent(plan)) return [];\n\tconst live = gateContext(plan, evaluateGuard).live();",
+		replace: "\tconst live = gateContext(plan, evaluateGuard).live();",
+		expectRed: ["packages/rph-domain/src/transition-gate-entry.test.ts"],
+		why: "THE PROMISE: this export FAILS CLOSED on a graph with no entry. With no entry the live set is empty, so EVERY step reads unreachable and therefore prunable — which turns Prune into a blanket bypass of the §21.1 mandatory-skip WAIVER rule on a plan the gate cannot reason about. That is F-03/F-04's exact damage shape (a contract-legal plan made the whole graph waiver-free prunable), and the floor is the remedy. WHO RELIES: the authority pruneExecutionStep admits exactly what this returns — its precheck is `!prunableStepIds(gatePlan, ...).includes(stepId)` (packages/rph-application/src/handlers/execution.ts:1763) — so the floor is not cosmetic: removing it makes the ENGINE accept a prune of every step of an incoherent plan, each one a skip that never faced the waiver rule. The demo UI renders a Prune affordance per returned id (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, prunableStepByPlan). Distinct from existing ledger mutant F1-remove-incoherence-floor, which removes the sibling floor inside startableStepIds (a different declaration, a different victim, and the benign direction: offering no Start vs authorising a plan-wide prune).",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-branch-first-match-runs-last-match",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\tfor (const e of outEdgesOf(ctx, stepId)) {",
+		replace: "\tfor (const e of [...outEdgesOf(ctx, stepId)].reverse()) {",
+		expectRed: ["packages/rph-domain/src/transition-gate-branch-verdict.test.ts"],
+		why: "THE PROMISE: FIRST-match in AUTHORED edge order — the first CONDITIONAL arm whose guard holds, else the single unconditional SEQUENTIAL default — and after WP-10 this function IS the act of deciding, the ONLY site in the whole system that evaluates the condition grammar for a BRANCH. Its answer is written to ExecutionStep.selectedTransitionId and thereafter read as HISTORY and never re-derived (branchVerdict refuses to invent one), so a wrong answer here is not transient: it becomes the permanent record of what the plan chose. Reversing the scan makes the LAST authored arm win, and because checkBranchDefaults REQUIRES the unconditional default to be the LAST out-edge, the default now always matches first and every guarded arm is dead — the precise failure mode that validation limb exists to forbid ('an earlier default makes every conditional arm after it unreachable'), relocated from authoring into the decider. WHO RELIES: advanceStep on the write path (packages/rph-application/src/handlers/execution.ts:991) records what this returns at settlement, and every test fixture's settled() helper derives the decision through it; the read plane then trusts it by id.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-unreachable-step-authorized-to-start",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\tif (!b.anySatisfied)\n\t\treturn {\n\t\t\tok: false,",
+		replace: "\tif (!b.anySatisfied)\n\t\treturn {\n\t\t\tok: true,",
+		expectRed: ["packages/rph-domain/src/transition-gate.test.ts"],
+		why: "THE PROMISE: the AUTHORITY refuses a non-entry step whose in-edges are ALL neutralized — it is unreachable, and the remedy is a prune, never a start — and it must mirror startableStepIds so the UI affordance and the engine gate cannot diverge (DR-004 §19-M2, the F-11/F-29 invariant). This mutation keeps the check and the diagnosis and turns only the VERDICT from refusal into admission, so the gate now returns ok:true while still saying 'the step is unreachable'. WHO RELIES: startExecutionStep's precheck is this function (packages/rph-application/src/handlers/execution.ts:1270), so it is the last gate before work is OPENED on a step — and the steps it admits here are exactly the ones a BRANCH decision excluded, or the downstream of a CANCELLED/SUPERSEDED predecessor, or an arm already waiver-skipped dead. The read-model half still offers nothing, so the divergence runs in the dangerous direction: the engine authorises an arm the plan cut, and the step it runs is one the prune read-model is simultaneously offering for deletion (the startable/prunable DISJOINTNESS the disposition matrix pins).",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-03-single-edge-graph-skips-all-validation",
+		file: "packages/rph-domain/src/transition-gate.ts",
+		find: "\tif (transitions.length === 0) return { ok: true };",
+		replace: "\tif (transitions.length <= 1) return { ok: true };",
+		expectRed: ["packages/rph-domain/src/transition-gate.test.ts"],
+		why: "THE PROMISE: a malformed transition graph must NEVER reach ACTIVE, and the no-op applies to the LINEAR degenerate ONLY — empty transitions[]. Every one of the five limbs (dangling ids, the half-edge refusal, exactly-one-entry, reachability, acyclicity, the BRANCH default rules) hangs off that one boundary. Widening the short-circuit by a single character makes EVERY single-transition graph bypass all of them, which is the same defect shape as a closed error schema quietly widening: the gate still exists, still runs, and is simply no longer asked. WHO RELIES: plan-proposal.ts:222 calls this as proposeExecutionPlan's semantic check — it is the only gate between an authored graph and a plan that can be APPROVED and ACTIVATED — and plan-proposal.ts's own header notes that the graph validator SHORT-CIRCUITS on transitions.length === 0, i.e. that boundary is already load-bearing in a second file. Downstream, the runtime gate cannot repair what propose admits: a half-edge or dangling target reaching ACTIVE is exactly the two-planes-disagree deadlock the half-edge refusal was minted for.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-second-active-plan-admitted",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\tif (input.otherActivePlanExists)",
+		replace: "\tif (input.otherActivePlanExists && (false as boolean))",
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "THE PROMISE: RPH-EXE-001 / §20.2 — a PWU may have only ONE active plan at a time, so activating a second without superseding the first is refused with RPH_ACTIVE_PLAN_CONFLICT. This is the ONE thing canActivatePlan adds over what it delegates: the APPROVED->ACTIVE legality limb is canTransition's, and the sibling-plan limb is the export's own. WHO RELIES ON IT: activateExecutionPlan's guard (packages/rph-application/src/handlers/execution.ts:487), which resolves the fact from the store via otherActivePlanExistsForPwu rather than trusting a flag — and, downstream, planEvidencesExecutionSuccess, whose whole reading of 'the PWU's active plan' presumes there is at most one; two concurrently ACTIVE plans means a PWU's execution-success claim can be backed by whichever plan happens to look best. The mutant keeps the check and turns its refusal into an admission (`false as boolean`, so the block stays reachable and nothing loses narrowing), which is exactly the shape of the canPromoteBaseline hole: a conjunct that is still written and no longer decides. The same file records that this limb was ONCE DEAD FOR REAL (handlers/execution.ts:399: 'canActivatePlan was called, but its one-active-plan limb was unreachable'), which is why a re-runnable mutant on it is worth more than a comment.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-capability-prefix-authorizes",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\tif (input.grantedCapabilities.includes(input.requiredCapability)) return { ok: true };",
+		replace: "\tif (input.grantedCapabilities.some((c) => input.requiredCapability.startsWith(c)))\n\t\treturn { ok: true };",
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "⭐ I EXPECT THIS ONE TO SURVIVE, AND THAT IS THE FINDING — stated plainly rather than swapped for an easier mutant. THE PROMISE: RPH-EXE-004 / §22.1 — an operation is authorized only when its required capability is in the binding's EXPLICITLY granted set. 'Explicitly' is the word the rule turns on, and it is the word this mutant deletes: scope-prefix matching instead of membership. WHO RELIES ON IT: stepCapabilityRefusal (apps/rph-demo/src/lib/server/execution/step-binding.ts:104), which asks it before every model invocation — note the kernel docblock's claim 'It has NO production caller, deliberately' is STALE, refuted by verif/dead-kernel-census.test.ts:158 ('It ACQUIRED A PRODUCTION CALLER', 2026-09-08, EG-03). WHY IT SURVIVES, DERIVED NOT GUESSED: every granted/required pair driven anywhere in the repo shares no prefix — execution.test.ts pins only (['file-system'],'file-system')->ok and (['file-system'],'network')->refused, and the production caller's suite (apps/rph-demo/src/lib/server/execution/run-model-step.test.ts:469-520) pins granted [] , ['file-system'], ['network'], ['network','file-system'] against required 'network'. All eight verdicts are unchanged under prefix matching. So both suites assert that a refusal HAPPENS, and neither asserts that membership is EXACT: granted ['net'] would authorize 'network', and granted [''] would authorize everything. The cheap inverse mutant (always-ok) IS killed by the same file — which is precisely the asymmetry worth recording. WHAT WOULD KILL IT: one case in execution.test.ts asserting capabilityAuthorized({grantedCapabilities:['file'],requiredCapability:'file-system'}).ok === false.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-unreadable-grant-counts-as-granted",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\t\t.filter((c): c is string => typeof c === 'string');",
+		replace: "\t\t.filter((c): c is string => c !== undefined);",
+		// ⚠ RE-POINTED TO THE KERNEL'S OWN SUITE. The authored victim was the APPLICATION-layer
+		// `partauth-derived-outcome.test.ts`, whose NOTHING_GRANTED case arranges `granted = []` — a RESOLVED
+		// EMPTY array that BOTH predicates map to `[]`, so it pins the EMPTY case and is blind to the MALFORMED
+		// one. That blindness is why this mutant SURVIVED. The closing assertion belongs where the promise is
+		// made, so it was written in `rph-domain`'s own `execution.test.ts` and the victim follows it.
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "⭐ I EXPECT THIS ONE TO SURVIVE TOO, AND IT IS THE SHARPER OF THE TWO FINDINGS. THE PROMISE, quoted from the export's own docblock: 'An element carrying no `capability` contributes NO identity rather than throwing — and it cannot be laundered into a match either, because `undefined` is filtered out rather than compared. The effect at the N-18 limb is fail-CLOSED: an unreadable grant grants nothing.' The mutant does the one thing that sentence forbids: it COMPARES against undefined instead of filtering by type, so any present-but-non-string capability becomes an identity. WHO RELIES ON IT: the Start-time NOTHING_GRANTED limb, whose caller states the same claim at packages/rph-application/src/handlers/execution.ts:1126-1129 ('an unreadable or malformed array yields no identities, which the verdict then reads as \"grants nothing\" and refuses. That is the fail-CLOSED direction'); requestRuntimeBinding's N-20 empty-request guard (runtime-binding.ts:48); grantedWithinRequest / grantIsMonotone / authorizationOutcome through the capabilityIds alias (runtime-binding.ts:130,189,191,202,241,244); and the demo read-model (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:508). Under the mutant a stored row like {capability:null} yields one identity, grantedCapabilities.length===0 is false, the NOTHING_GRANTED limb never fires, and a binding that confers nothing readable authorizes a start — fail-OPEN exactly where the comment promises fail-CLOSED. WHY IT SURVIVES, DERIVED FROM THE FILESYSTEM NOT ASSUMED: `grep` for every `capability:` value across all .ts/.json/.svelte outside node_modules/dist returns string literals, a `cap = (c: string) => ({capability: c})` helper, and zod's `z.string()` — NOTHING anywhere constructs a non-string capability, so no test can distinguish the two predicates. The kill test that ought to cover it (partauth-derived-outcome.test.ts:356 'THE KILL TEST: a PARTIALLY_AUTHORIZED binding granting NOTHING refuses the start') arranges granted = [] — a RESOLVED EMPTY array, which both predicates map to [] — so it pins the empty case and is blind to the malformed one. CAVEAT STATED RATHER THAN HIDDEN: CapabilityGrantSchema (packages/rph-contracts/src/objects.ts:168,172) declares capability: z.string(), so the command path cannot deliver a malformed row today; the docblock's own justification is legacy STORE rows written 'when the contract emitted an opaque record and any object was legal', and the demo reads raw store state. WHAT WOULD KILL IT: one rph-domain case asserting capabilityIdentities([{capability: 7}]) and capabilityIdentities([{capability: null}]) both equal [].",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-precondition-gate-never-refuses",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\tif (preconditionsSatisfied) return { ok: true };",
+		replace: "\tif (preconditionsSatisfied || (true as boolean)) return { ok: true };",
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "THE PROMISE: RPH-EXE-005 / §21.1 — a step may become READY only when ALL preconditions hold, and a step with an absent required input stays NOT_READY with NO model/tool invocation occurring. The export is the refusal itself, so the mutation keeps the check and makes it incapable of refusing (`true as boolean`, so the refusal below stays reachable to the compiler and nothing loses narrowing — the NO_COMPILE trap the ledger header records for `if (false)`). WHO RELIES ON IT: inputReadinessRefusal (packages/rph-application/src/handlers/execution.ts:801), which is the ONLY live enforcement of this §21.1 substance — verif/guard-enforcement-ledger.data.ts:41 records that the NOT_READY->READY arrow is itself unoccupiable and that 'the same §21.1 substance IS enforced on a DIFFERENT arrow ... gating REQUIRES_PRESENT_INPUTS commands into RUNNING'. So this one predicate is the whole of RPH-EXE-005 in the running engine. canStartStep (same file, :526) delegates to it too, so the composite start gate fail-opens with it. Under the mutant a step with a missing required input is invoked against a model — the precise harm the rule names.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-mandatory-skip-needs-no-waiver",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\tif (!input.mandatory || input.hasAuthorizedWaiverOrRevision) return { ok: true };",
+		replace: "\tif (!input.mandatory || (true as boolean)) return { ok: true };",
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "THE PROMISE: §21.1 — a MANDATORY step may be SKIPPED only under an AUTHORIZED plan revision or waiver; an optional step may be skipped freely. The mutant deletes the AUTHORITY conjunct and leaves the mandatoriness term in place, so the guard still reads as if authority were required and no longer requires any: verbatim the shape of the canPromoteBaseline hole this programme already found in this package. WHO RELIES ON IT: skipExecutionStep (packages/rph-application/src/handlers/execution.ts:1642), whose mandatoriness is read fail-CLOSED from ExecutionStep.strength declared by the plan author (:1575) and whose waiver/revision fact is resolved by packages/rph-application/src/handlers/skip-authorization.ts — a file that exists because 'canSkipStep is the ratified kernel and it is correct; the CALLER supplied' the wrong fact. It is also the backstop the prune path is authorised against (:1721-1725: 'canSkipStep exists to refuse. The prunability check below closes that back door'). Under the mutant a mandatory step is skipped with no revision and no waiver — what step-strength-authority.test.ts calls 'laundered de-scoping' — and the PWU can still reach execution success, because planEvidencesExecutionSuccess admits SKIPPED as terminal success.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-retry-admitted-as-exhaustion-remedy",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\t'ABANDON'",
+		replace: "\t'ABANDON',\n\t'RETRY'",
+		expectRed: ["packages/rph-domain/src/execution-failure-taxonomy.test.ts"],
+		why: "THE PROMISE: this constant IS RPH-EXE-008's ratified exhaustion remedy set — and the rule states an EXCLUSION as well as a list ('the controller must not issue a fourth retry'). The excluded member is the one thing a list of five cannot say by being five members long, so the mutant attacks the exclusion rather than the membership: it admits RETRY as a permitted response to retry exhaustion, which converts 'retrying is precisely what has already been established not to work' into the engine's own advice. WHO RELIES ON IT: retryDecision (same file, :703) publishes it as permittedControlActions, which the engine's refusal message interpolates (handlers/execution.ts:1564) and the read-model re-emits as retryExhaustion.permittedControlActions (packages/rph-projections/src/execution-view.ts:626,653) for the operator-facing 'select {…}' line in the demo; and EXECUTION_FAILURE_MAPPING.RETRY_EXHAUSTION (packages/rph-domain/src/execution-failure-taxonomy.ts:139) REFERENCES it rather than copying it, which is how isPermittedForFailure then decides the §36 retry refusal at handlers/execution.ts:1540. So admitting RETRY here does not merely misprint a list — it flips the guard that refuses a retry after RETRY_EXHAUSTION. DELIBERATELY NOT THE REJECT-DROP MUTATION: that one already exists as CLS-SYSTEM-FAILURE-M3 (packages/rph-engine/src/slices/class-system-failure.slice.test.ts:168) and would be a DUPLICATE; this attacks the other half of the clause. 'RETRY' is a real ControlAction (TOOL_FAILURE and four other rows use it), so the tuple still satisfies `readonly ControlAction[]` and the mutant compiles.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-cap-permits-one-more-attempt",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\tconst mayRetry = input.attemptsMade < input.maxAttempts;",
+		replace: "\tconst mayRetry = input.attemptsMade <= input.maxAttempts;",
+		expectRed: ["packages/rph-domain/src/execution.test.ts"],
+		why: "THE PROMISE: RPH-EXE-008 / §36.2 clause (a) — the RetryPolicy cap bounds TOTAL ATTEMPTS, so at the cap the controller MUST NOT retry again and MUST instead select an alternate control action. The cap is one comparison and this is the only way to get it wrong while still looking right: the off-by-one buys exactly ONE extra attempt, which is the 'fourth retry' the rule names by name. The docblock itself flags that 'the docs conflate attempts and retries', so the boundary is the term this export had to CHOOSE — a mutant on the chosen reading is worth more than one on the surrounding shape. WHO RELIES ON IT: retryExecutionStep's precheck (packages/rph-application/src/handlers/execution.ts:1557) refuses the attempt, and the read-model makes THE SAME kernel call (packages/rph-projections/src/execution-view.ts:626) to decide whether to offer the affordance — N-12/F-29's fourth instance was precisely the engine and the read-model disagreeing about this number, so a drift here moves both planes together and silently. Note mustSelectAlternateAction and permittedControlActions are derived from mayRetry, so the mutant also empties the remedy set at the boundary: the controller is neither allowed to stop nor told what else to do.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-01-first-failure-class-governs",
+		file: "packages/rph-domain/src/execution.ts",
+		find: "\t\t\tif (typeof c === 'string') last = c;",
+		replace: "\t\t\tif (typeof c === 'string' && last === undefined) last = c;",
+		expectRed: ["packages/rph-application/src/handlers/execution-failure-class-retry.test.ts"],
+		why: "THE PROMISE, in the export's own words: 'THE LATEST, not any: a step that failed, was legitimately retried, and failed again is judged on the failure being retried now. `.at(-1)` rather than `.some()`.' The mutant makes the fold keep the FIRST classified failure — the `.some()`-equivalent reading — while leaving the event type, the plan scope and the step scope intact, so it attacks the one thing the export chose rather than the scaffolding around it. WHO RELIES ON IT: the §36 control-action refusal in retryExecutionStep's precheck (packages/rph-application/src/handlers/execution.ts:1536), which refuses a retry when the last failure's class does not permit RETRY, and the read-model's retryForbiddenByFailureClass limb (packages/rph-projections/src/execution-view.ts:116 / :619-637) which withholds the affordance — ONE fold in the kernel precisely so the two cannot disagree (the docblock names this as RPH-EXE-008 F-29's fourth instance). Under the mutant a step whose first failure was TOOL_FAILURE (which permits RETRY) and whose latest was RETRY_EXHAUSTION (which does not) is retried: the class guard never fires, and the refusal — if any — comes from the cap instead, naming the wrong defect. I CHOSE THIS VICTIM BECAUSE IT WAS BUILT FOR THIS MUTANT: execution-failure-class-retry.test.ts:179 is 'the check reads the LAST failure, not any failure — retryable first, exhausted second', and its own comment states the discrimination — 'if the handler read the FIRST failure (or `.some()`), the retry below would be ACCEPTED, because the first failure was TOOL_FAILURE and TOOL_FAILURE permits RETRY'. Its control asserts two ExecutionStepFailed events were genuinely recorded, so the red cannot come from a fixture that never reached the second failure.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-12-step-id-uniqueness-becomes-transition-gated",
+		file: "packages/rph-domain/src/plan-proposal.ts",
+		find: "checkStepIdUniqueness(input) ??",
+		replace: "(input.transitions.length === 0 ? undefined : checkStepIdUniqueness(input)) ??",
+		expectRed: ["packages/rph-domain/src/plan-proposal.test.ts"],
+		why: "The export's OWN contribution over the eight helpers it delegates to is that the rules are UNCONDITIONAL: its header states \"The rules are therefore UNCONDITIONAL (L1-L7 run for every plan)\", and the whole module exists because the previous arrangement ran step validation only inside a transition-scoped validator that short-circuits on `transitions.length === 0`, so a LINEAR plan — the shape the reference seed and most suites use — got no step validation at all. This mutant restores that exact historical defect at the composition point: L3 (step-id uniqueness, F-10, BLOCKER) still exists, still runs for a graph plan, and is silently skipped for every linear plan. `ProposeExecutionPlan` (packages/rph-application/src/handlers/execution.ts:179 `rejectInadmissiblePlan`) treats `verdict.ok` as \"this plan is structurally executable\" and is the ONLY writer of `steps[]`; `advanceStep` then resolves a step by `findIndex`, so the second of two same-id steps is unaddressable by any command — it can never start, be skipped or pruned, and blocks plan completion forever, with no command able to rewrite `steps[]` afterwards. The existing ledger entries for this file (N1, N2) both anchor inside `checkBindingExclusivity`, a module-level helper, so `validateProposedPlan`'s own declaration had no declared mutant at all.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-04-obligation-conservation-reports-ok-while-an-obligation-is-lost",
+		file: "packages/rph-domain/src/decomposition.ts",
+		find: "return { ok: findings.length === 0, findings, dispositions };",
+		replace: "return { ok: true, findings, dispositions };",
+		expectRed: ["packages/rph-domain/src/decomposition.test.ts"],
+		why: "THE PROMISE: §35.1 \"No obligation disappears\" / RPH-DEC-002 / RPH-DEC-007 / Property P2 — the kernel's VERDICT, not merely its finding list, must refuse a decomposition in which a MANDATORY parent obligation holds none of the four dispositions. WHO RELIES ON IT: the production gate reads the verdict and nothing else — checkDecompositionConservation at packages/rph-application/src/handlers/decomposition.ts:279 is `if (oblResult.ok && conResult.ok) return null;`, so ValidateDecomposition and ReviseDecomposition both stop refusing and mark a contract VALID while the kernel is still naming the lost obligation in `findings`. ⚠ THE ASYMMETRY IS THE POINT AND IS WHY `ok` IS THE LOAD-BEARING FIELD: the sibling composer in this same file, validateDecomposition (:528), iterates `.findings` and would still answer INVALID — so under this mutant the two consumers of one result disagree, and the only one that fails open is the one that refuses commands. This keeps the check, the loop and the finding exactly as written and turns the refusal into an admission (the ledger's own prescribed operator for refusal-shaped code).",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-04-only-the-first-parent-constraint-is-gated",
+		file: "packages/rph-domain/src/decomposition.ts",
+		find: "for (const c of input.parentConstraints) {",
+		replace: "for (const c of input.parentConstraints.slice(0, 1)) {",
+		expectRed: ["packages/rph-domain/src/decomposition.test.ts"],
+		why: "THE PROMISE: RPH-DEC-003 / RPH-CNS-001..004 / §11.2 / Property P3 quantify over EVERY mandatory applicable parent constraint — \"for every MANDATORY applicable parent constraint, EVERY relevant child must be dispositioned\". THIS EXPORT IS A THIN WRAPPER and that quantification is one of only two things it adds over the per-constraint helper it delegates to (collectConstraintFindings is module-level, so an anchor there would credit the export nothing); the per-constraint rules are untouched by this mutation, which is what makes it a clean test of the quantifier alone. WHO RELIES ON IT: checkDecompositionConservation (packages/rph-application/src/handlers/decomposition.ts:251-279) builds ONE dispositions list for the whole contract from state.constraintPropagations and reads only `conResult.ok` — so with the quantifier truncated, a contract that silently drops a constraint, waives one without authority, supersedes one without a replacement, or weakens one without authority passes ValidateDecomposition for every constraint but the first.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-04-a-conflict-is-ignored-when-every-child-is-acceptable",
+		file: "packages/rph-domain/src/decomposition.ts",
+		find: "if (input.detectedConflicts.length > 0) {",
+		replace: "if (input.detectedConflicts.length > 0 && unsatisfied.length > 0) {",
+		expectRed: ["packages/rph-domain/src/decomposition.test.ts"],
+		why: "THE PROMISE: §14.1 / RPH-DEC-006 — recomposition is NOT concatenation. Precedence 1 of this function's own contract is that ANY detected conflict yields CONFLICTED with the parent NOT satisfied, \"EVEN IF every required child is individually acceptable … the recomposition analog of property P1\". The mutant concedes exactly and only that case — the all-children-fine-so-the-whole-is-fine inference the law exists to forbid — while leaving the conflict honoured whenever a child is independently unacceptable, so it cannot be killed by a test that merely happens to have a bad child. WHO RELIES ON IT: completeRecomposition (packages/rph-application/src/handlers/decomposition.ts:839-846) derives the RecompositionContract's next state from this status (SATISFIED -> COMPOSABLE, :647), and its own docblock records the regression this reinstates: \"before it, the handler unconditionally advanced to COMPOSABLE, so a recomposition with a detected conflict … was still marked composable — the §19-prohibited 'recomposition = concatenation' shortcut\". A CONFLICTED contract also loses its appliedResolutions, so the §14 resolution action (default REJECT_RECOMPOSITION) is never emitted.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-04-falsification-requires-impact-analysis-over-nothing",
+		file: "packages/rph-domain/src/decomposition.ts",
+		find: "impactedObjectIds: [...a.affectedObjectIds],",
+		replace: "impactedObjectIds: [],",
+		expectRed: ["packages/rph-domain/src/decomposition.test.ts"],
+		why: "THE PROMISE: RPH-ASM-004 / §12.2 / §29.1 — contradicting evidence falsifies an assumption and impact analysis is REQUIRED over the objects whose validity must be re-examined. The flag and its SCOPE are one promise: `impactAnalysisRequired` is typed as the literal `true` and cannot be falsified without a type error, so emptying the scope is the only expressible way to hollow the guarantee out — and it leaves every other field of the outcome intact. WHO RELIES ON IT: falsifyAssumption (packages/rph-application/src/handlers/assurance.ts:1119-1134) writes `outcome.impactedObjectIds` verbatim onto the RATIFIED AssumptionFalsified event's `affectedObjectIds`, and that event IS the entire discharge canon allows — assurance.ts:1068-1074 records STA-7's ceiling (\"flag for review rather than cascade destructively\") and ASR-15's purpose, that dependent work \"cannot keep standing on it silently\". An event that flags review over nothing still validates, still emits, and tells no dependent claim it is standing on a falsified assumption.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-04-a-falsified-assumption-authorizes-new-work",
+		file: "packages/rph-domain/src/decomposition.ts",
+		find: "a.status !== 'EXPIRED' && a.status !== 'FALSIFIED' && a.status !== 'SUPERSEDED'",
+		replace: "a.status !== 'EXPIRED' && a.status !== 'SUPERSEDED'",
+		expectRed: ["packages/rph-domain/src/decomposition.test.ts"],
+		why: "THE PROMISE: RPH-ASM-006 / §12.2 — only a LIVE assumption may authorize new work; a dead one (EXPIRED / FALSIFIED / SUPERSEDED) cannot, and a new execution plan depending on it is rejected at plan approval. WHO RELIES ON IT: approveExecutionPlan's guard, via assumptionsAuthorizeNewWork (packages/rph-application/src/handlers/execution.ts:339-358), which walks the plan's PWU's assumptionIds and refuses RPH_INVARIANT_VIOLATION on the first dead one — so this mutant approves work standing on an assumption that contradicting evidence has already falsified, which is the one thing FalsifyAssumption was built to stop (registry.ts:220-222 names this kernel predicate as that command's consumer). WHY THE FALSIFIED LIMB SPECIFICALLY: the three conjuncts are not equally guarded. EXPIRED already has a declared probe on the record (enforcement-register.ts:3893, \"widen canAuthorizeNewWork to accept EXPIRED — the probe reports ADMITTED\") and is additionally covered through the live pipeline by execution-assumption-guard.test.ts, and SUPERSEDED is asserted NOWHERE (see notes). FALSIFIED is therefore the limb whose only assertion anywhere is the unit test named here, which makes this the conjunct whose guard is worth proving re-runnable.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-11-rejection-suppressed-by-a-pending-assessment",
+		file: "packages/rph-domain/src/aggregate-assurance.ts",
+		find: "if (required.some((i) => dispositionOf(i) === 'REJECTED')) return 'REJECTED';",
+		replace: "if (required.every((i) => dispositionOf(i) !== undefined) && required.some((i) => dispositionOf(i) === 'REJECTED')) return 'REJECTED';",
+		expectRed: ["packages/rph-domain/src/aggregate-assurance.test.ts"],
+		why: "THE PROMISE IS THE ORDER, NOT THE RUNGS — the file states it itself: \"THE DOCUMENT ORDER IS THE STRICTNESS ORDER. That is the whole design: first match wins, and the rungs descend\", which is how it makes §28.1's \"An aggregate assurance state must preserve the STRICTEST UNRESOLVED disposition\" executable. This mutant leaves rung 1 in place and makes it WAIT for every required assessment to conclude, so rung 3 (\"any required assessment missing\") overtakes rung 1 (\"any critical/blocking rejection\"): a single applicable policy with no concluded assessment hides a RECORDED REJECTION, and the aggregate reports UNASSESSED or EVIDENCE_REQUIRED instead. That inverts the two most consequential rungs in §28.2 — it is the §28.1 worked example (\"a satisfied advisory policy does not override a rejected blocking policy\") generalised to a PENDING policy, and it is the realistic defect: \"don't call it REJECTED until all the assessments are in\" is a sentence someone would write on purpose. Who relies on it: `aggregateDispositionFor` (packages/rph-projections/src/assurance-view.ts) is the only consumer and is the §38 read model's sole source of this verdict — it feeds `aggregate` on apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, the undertaking page's assurance rail, and is the fold `e2e-005-contested-assurance.slice.test.ts` calls \"the only half of clause (d) this engine can express\". Under the mutant a blocking rejection reads as \"not yet assessed\" exactly when other policies are still pending, which is the normal state of a live subject — the false-negative the view's own header calls \"the false-negative that lets a node look assured when it was never checked\". ⛔ MEASURED SURVIVED, AND THAT IS THE FINDING, NOT A FAILED ATTACK: the named victim is 11/11 GREEN with the mutant applied, and so is every other test in the repository that touches the fold. The suite proves REJECTED-dominance only against CONCLUDED policies — its property test enumerates exactly four concluded dispositions, its precedence case surrounds the rejection with five SATISFIED rows, and the e2e-005 slice asserts REJECTED over two policies that have both concluded — so no arrangement anywhere puts a rejection and a pending assessment in the same set.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-authority-limb-scoped-to-one-decision-type",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "if (!d.authorityHeld)",
+		replace: "if (!d.authorityHeld && d.decisionType === 'REVOKE')",
+		expectRed: ["packages/rph-domain/src/governance.test.ts"],
+		why: "RPH-GOV-001's promise is that NO decision reaches EFFECTIVE without sufficient authority, and that the refusal is RPH_AUTHORITY_INSUFFICIENT BEFORE any DecisionEffective exists. `makeDecisionEffective` (rph-application/src/handlers/governance.ts:333) is the single guard shared by ApproveDecision and GrantWaiver: it computes `authorityHeld = authority?.actorType === 'HUMAN'` and delegates the entire refusal to this kernel, and enforcement-register RPH-GOV-001 names this function as the DECISION site with refusalMarker 'actor lacks sufficient authority to make this decision effective'. Scoping the refusal to one decisionType leaves every APPROVAL and WAIVER effective without authority while the check still appears to be there — the dropped-authority-conjunct shape this programme already found in canPromoteBaseline.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-newer-version-no-longer-stale",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "currentVersion !== undefined && currentVersion !== approvedVersion",
+		replace: "currentVersion !== undefined && currentVersion < approvedVersion",
+		expectRed: ["packages/rph-domain/src/governance.test.ts"],
+		why: "RPH-GOV-003 / Property P5 is stated in this file's own header as 'an approval of version n NEVER authorizes version n+1' — the bound subject becomes re-review-required. handlers/governance.ts:957 is the live promotion write-path: it reads each bound subject's current semanticVersion from the store and refuses with STALE_DECISION_VERSION on `!binding.ok`. Comparing `<` instead of `!==` keeps only DOWNGRADES stale, so the exact direction the law names — the subject moved FORWARD under an older approval — promotes to AUTHORITATIVE, which is also the defect the W1 WIRE-4 comment at that call site says wiring this kernel fixed.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-concluded-list-flipped-to-negative",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "ASSESSMENT_CONCLUDED_STATES.includes(assessmentState)",
+		replace: "!ASSESSMENT_IN_FLIGHT_STATES.includes(assessmentState)",
+		expectRed: ["packages/rph-domain/src/assessment-conclusion.test.ts"],
+		why: "The promise is 'Unknown state => NOT concluded' — a POSITIVE list that fails CLOSED, and the doc comment says in terms that the DIRECTION of the list is the fix, not just its contents, because a negative list fails OPEN on a state added later. Two consumers rest on it: handlers/governance.ts:912 computes `complete` for canPromoteBaseline's requiredAssessments (so 'no green without assurance' turns on this predicate), and handlers/decomposition.ts:734 gates recomposition's parent-claim coverage, whose comment cites the positive-list property by name. Re-expressing it as the negation of the in-flight list restores exactly the ad-hoc-exclusion defect REG-F-021 increment 0 replaced: a baseline promoted over an assessment in a state nobody classified.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-riskprofile-dropped-from-projection",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "? { riskProfile: state.riskProfile }",
+		replace: "? {}",
+		expectRed: ["packages/rph-domain/src/applicability-subject.test.ts"],
+		why: "This projector exists for ONE field. `RISK_AT_LEAST` resolves `$.riskProfile` on the subject it builds (rph-assurance/src/applicability.ts:72), and both production call sites — handlers/assurance.ts:1304 and rph-engine/src/governing-policies.ts:69 — had dropped that field independently, so the operator read false for every subject including PWUs where the profile is REQUIRED and stored. Emptying the projected branch restores that measured defect while the guard, the interface field and both call sites still look correct: the first risk-gated policy authored would be NOT_APPLICABLE forever with nothing saying why.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-kindless-subject-escapes-kind-scope",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "subject.pwuKind === undefined || !kinds.includes(subject.pwuKind)",
+		replace: "subject.pwuKind !== undefined && !kinds.includes(subject.pwuKind)",
+		expectRed: ["packages/rph-domain/src/policy-applicability.test.ts"],
+		why: "DOC-004 §5.1's pwuKindConditions is an ALLOW-LIST, and this kernel's stated reading is that a subject with NO kind (a PWA) cannot satisfy a kind restriction — the inline comment names the alternative as the fail-open reading ('the restriction does not apply so let it through'). Flipping the disjunct into a conjunct implements exactly that guess, so a kind-scoped policy governs every kindless subject. Both consumers act on the outcome: handlers/assurance.ts:1308-1315 turns it into the RequestAssuranceAssessment refusal that exists so a verdict is not recorded 'against criteria written for something else', and rph-engine/src/governing-policies.ts:62 uses it to SELECT the policies that govern a PWU.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
+	},
+	{
+		id: "MU-PFA-BD5-02-not-applicable-permits-assessment",
+		file: "packages/rph-domain/src/governance.ts",
+		find: "return outcome !== 'NOT_APPLICABLE';",
+		replace: "return outcome !== 'RECOMMENDED';",
+		expectRed: ["packages/rph-domain/src/policy-applicability.test.ts"],
+		why: "The promise is that exactly ONE §5.2 outcome forbids assessing — NOT_APPLICABLE, the decided negative — while an undecidable outcome is permitted and disclosed. Two consumers use it as their gate: handlers/assurance.ts:1315 refuses RequestAssuranceAssessment when it returns false, and rph-engine/src/governing-policies.ts:72 partitions policies into `selected` vs `excluded` on it. Comparing a different member of the same union makes NOT_APPLICABLE PERMIT assessment, so a policy the kernel just decided does not govern the subject is both selected as governing and assessed against — the fail-open direction of the only judgement this one-line export makes.",
+		source: "JAN-PFA R3 S3.3 burn-down increment 4 (rph-domain)"
 	}
 ];

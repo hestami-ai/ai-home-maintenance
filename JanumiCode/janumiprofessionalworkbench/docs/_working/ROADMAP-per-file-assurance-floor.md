@@ -473,8 +473,43 @@ surfaced.
   observed since, and `rph-domain` + `rph-application` — which hold 169 of the remaining 174 and where all three
   Phase 0 holes lived — are the population that would test it.
 
-  **174 bare exports remain**: `rph-application` 124, `rph-domain` 45, `rph-contracts` 2, and one each in
-  `rph-assurance`, `rph-engine` and `rph-product-realization-pwa`.
+  ### ⭐⭐ INCREMENT 4 — `rph-domain` 45 → 0, AND THE PROJECTION IS FINALLY TESTED
+
+  45 authored, 45 verified, 0 rejected. **First run: 40 KILLED, 5 SURVIVED. After remediation: 45 KILLED.**
+  Obligation **174 → 129**; exports guarded **157 → 202 of 331**. **Real-gap rate 11%** — the three prior
+  increments' zero-survivor runs were recorded as a fact about where I had looked, and this is the population
+  that tests it: the kernel where all three Phase 0 holes lived.
+
+  | | the promise broken |
+  | --- | --- |
+  | `capabilityAuthorized` | RPH-EXE-004 turns on **explicitly** granted; prefix matching makes `['file']` authorize `'file-system'` and `['']` authorize everything |
+  | `capabilityIdentities` | its docblock promises *"an unreadable grant grants nothing"* — fail-CLOSED; comparing `!== undefined` does what that forbids, so NOTHING_GRANTED never fires |
+  | `getMachine` | fabricates an empty machine instead of throwing; every export reaches the tables only through it, so **eight guards refuse every legal act while reporting a SHAPE rather than an error** |
+  | `canTransition` | its comment calls the LEGAL-only split *"deliberate and load-bearing"*; the mutant makes it the permissive application-layer variant, admitting every same-state re-issue |
+  | `aggregateAssuranceDisposition` | a pending assessment **suppresses a recorded REJECTION** — rung 3 overtakes rung 1, so rejected work reads as merely unfinished |
+
+  ⭐ **WHAT THEY SHARE IS THE FINDING: every one is a guard whose OBVIOUS failure was tested and whose PRECISION
+  was not.** In each case the cheap inverse mutant — always-refuse, always-ok — **is** killed by the assertions
+  already present. That is what made them invisible: *a guard that catches the blatant case looks tested.*
+
+  **TWO WERE PREDICTED**, argued from the filesystem with the killing assertion named — one derived that all eight
+  granted/required pairs in the repo share no prefix, so both suites assert a refusal HAPPENS and neither asserts
+  membership is EXACT; the other found the covering test arranges `granted = []`, a RESOLVED EMPTY array both
+  predicates map to `[]`, so it pins the EMPTY case and is blind to the MALFORMED one.
+
+  ⚠ **THREE WERE NOT — AND ONE IS THE SHARPEST RECORD HERE.** `aggregate-assurance.test.ts`'s OWN HEADER warns:
+  *"get the rungs right individually and the ORDER wrong, and every single-case test still passes while a
+  rejection loses to an inconclusive."* The order WAS tested — between adjacent rungs, and not for this pair.
+  ⭑ **A file can name its own failure mode and still contain an instance of it.**
+
+  **REMEDIATION: five assertions, each with its own CONTROL** so none is satisfiable by a guard that refuses
+  everything — including a MIXED capability row, which is the case that matters at the NOTHING_GRANTED limb
+  (one readable grant beside one malformed must yield ONE identity, not two), and a vacuity control counting the
+  NOOP pairs actually found. One victim was re-pointed: the closing assertion belongs where the promise is made.
+
+  **129 bare exports remain**: `rph-application` **124**, `rph-contracts` 2, and one each in `rph-assurance`,
+  `rph-engine` and `rph-product-realization-pwa`. ⚠ On this evidence `rph-application` should be expected to
+  surface more.
 - ⚠ **S3.4 the dead-surface audit: still filed, not done.**
 
 ---
