@@ -1,6 +1,13 @@
 # ROADMAP — JAN-CSAAEXT: moving CSAA out of JPWB
 
-**Programme:** `JAN-CSAAEXT` · **Status:** ROADMAP (rev 2) · **Opened:** 2026-09-11 ·
+> ✅✅ **COMPLETE 2026-09-12 — S1 through S9 LANDED, gate EXIT 0 at every one.** `1b025623`…`2c7c92d6`.
+> Completion record and the nine refutations: `REG-F-390`. ⚠ Ratification of `REG-D-061` `D-1`/`D-3`/`D-5`/`D-6`
+> and `REG-D-062`'s amendments remains OWED, and the residuals are listed in `REG-F-390` — CSAA's 74 structural
+> test failures, ~580 uncovered branches across 62 files, CSAA's absent mutation harness, and the cruiser's
+> KNOWN-vacuous `apps/` arm. ⛔ Read every step below as EXECUTED, not as planned; where a step's recorded
+> remedy was refuted in flight, the strike is in place beside it.
+
+**Programme:** `JAN-CSAAEXT` · **Status:** ✅ COMPLETE (rev 2) · **Opened:** 2026-09-11 · **Closed:** 2026-09-12 ·
 **Design:** `docs/_working/DESIGN-csaa-extraction.md` · **Rulings:** `REG-D-061` · **Finding:** `REG-F-389`
 
 ---

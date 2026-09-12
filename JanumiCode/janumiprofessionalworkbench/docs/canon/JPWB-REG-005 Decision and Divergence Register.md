@@ -34860,3 +34860,114 @@ environment established."* ⭐ There is nothing to regress. The measurements sta
 **every verifier in this programme is a developer-machine obligation** — but the finding framing is withdrawn.
 
 **Merge target:** none. ⚠ `REG-D-061` `D-2`/`D-4` are amended in place by this entry, not rewritten there.
+
+---
+
+### REG-F-390 — `JAN-CSAAEXT` IS COMPLETE, and the transferable half is that NINE of this programme's own conclusions were refuted by trying to carry them out — every one by a measurement the design could have taken and did not
+
+- **Date:** 2026-09-12 · **Type:** FINDING (programme completion record; `JAN-CSAAEXT` S1–S9) ·
+  **Class:** SELF-REFUTATION AT SCALE — a design that survived its own implementation only by being corrected
+  nine times · **Status:** ✅ **PROGRAMME COMPLETE.** ⚠ Ratification of `REG-D-061` `D-1`/`D-3`/`D-5`/`D-6` and
+  `REG-D-062`'s amendments remains OWED; the residuals below are OPEN.
+
+**WHAT LANDED.** CSAA is out of JPWB. `packages/csaa` → `JanumiCode/csaa/`, the fifth sibling beside
+`janumicode`, `janumicode_v2`, `janumilegal` and `janumiprofessionalworkbench`. 539 renames, history preserved
+natively — same repository, no `filter-repo`. `gate:fast` went from 14 steps opening with three `csaa:*` checks
+to 11 steps invoking CSAA **zero** times, measured across the whole gate log. JPWB shed 53 of 75 npm scripts,
+26 wrapper scripts, 20 mutant-ledger entries and 190 test files. Nine increments, `1b025623`…`2c7c92d6`, gate
+EXIT 0 at every one.
+
+**COVERAGE — THE SIDE EFFECT THE SPONSOR NAMED, RESOLVED AS INSTRUCTED.**
+
+| | at S0 (CSAA inside) | after the move | after S9 | floor |
+| --- | --- | --- | --- | --- |
+| statements | 95.82% | 95.67% | **96.55%** | 95 |
+| branches | 91.43% | **84.92%** | **87.61%** | 83 |
+| functions | 98.76% | 97.91% | **98.12%** | 96.5 |
+| lines | 97.01% | 97.58% | **97.96%** | 97 |
+
+⛔ **NO FLOOR MOVED**, which was the hard constraint. ⭑ And `DESIGN §6A` predicted the middle column —
+`95.67 / 84.92 / 97.91 / 97.58` — by partitioning a coverage summary; the first run against a genuinely reduced
+population confirmed **all four to two decimals**. The 91.43% JPWB believed it held was CSAA's contribution.
+
+---
+
+**⭑⭑ THE TRANSFERABLE HALF: NINE REFUTATIONS, AND WHAT THEY HAVE IN COMMON.**
+
+| # | the design said | the measurement said |
+| --- | --- | --- |
+| 1 | the sponsor's *"keep today's check"* is executable | ⛔ 294 of its 303 asserted paths are CSAA's own; `subject/paths.ts:50` makes the remedy **impossible**, not costly |
+| 2 | a whole-tree manifest gate replaces it | ⛔ **no consumer** — satisfied by regenerating it. I cited `slices:ledger:check` as my model while building the thing its own header warns against |
+| 3 | `D-2` derived population floors | superseded — the 9 salvaged path assertions already carry anti-vacuity |
+| 4 | `D-4` a content hash replaces the token digest | ⛔ **nothing** replaces it; the digest served CSAA's parser, which leaves |
+| 5 | `REG-F-389`'s fix is `depcruise packages apps` | ⛔ 68 false positives against 1 real catch |
+| 6 | `§4C` the CD-02 svelte salvage *"stays, loses nothing"* | its module has **zero consumers**; its instrument is 612 lines of CSAA |
+| 7 | `§5` `collect-inventory.ts` is the expensive split | inverted — it is the cheap part; the `jpwb-*` providers are the expensive one |
+| 8 | `D-3` *"the freshness property holds without one line of new code"* | ⛔ `package.json` is one of that evidence file's 194 inputs — the ruling stands, the reason was wrong |
+| 9 | `§12` six artifacts MUST-LEAVE *"at zero cost"* | three are cited BY PATH in append-only ratified canon; one of them `§12` marked for moving |
+
+⭑ **THEY ARE ONE DEFECT WEARING NINE FACES: EVERY ONE CLASSIFIED A THING BY ITS OWN PROPERTIES AND NEVER ASKED
+WHAT RELATES TO IT.** What reads this? What cites this? What resolves this? What is this an instrument FOR? The
+design measured subjects, sizes and counts — all intrinsic — and was wrong nine times at the joins. The rule the
+roadmap ended up carrying is the general form: **what reads this, and what breaks if it is wrong?**
+
+**⚠ AND THE SAME SHAPE APPEARED IN THE EXTRACTORS, TWICE, WHICH IS THE HARDER LESSON.** A literal-only parser
+missed `TYPESCRIPT_SEMANTIC_PROVENANCE` — a constant that is *nothing but three spreads* — so it contributed **0**
+to its own guard's count. A prefix filter on `file: 'packages/csaa/'` missed `CSAA-M13`, whose subject is CSAA and
+whose paths are JPWB's. ⭑ **An instrument that reads only leaves under-reports exactly the entries that were
+factored for reuse — which are the load-bearing ones.** Both were caught by printing a count and refusing to
+shrug at a discrepancy of one.
+
+---
+
+**⭐ WHAT THE EXTRACTION MADE VISIBLE, WHICH IS THE ARGUMENT FOR IT ARRIVING AS EVIDENCE.** Three facts were
+true before the move and unobservable from inside it:
+
+- **branch coverage read 91.43%** and was really 84.92% — CSAA inflating its own subject's score by 6.5 points;
+- **`enforcementPerimeter: ['apps','packages']` disagreed with `analyzedPerimeter: ['packages']`** in CSAA's own
+  inventory, recorded faithfully as two neutral fields for months. ⛔ That disagreement **IS** `REG-F-389`, and
+  nobody read it as a finding. *A measurement is gate material only when something reads it;*
+- **CSAA silently borrowed three things from its host** — `@types/node` and `vitest` by hoisting, and an entire
+  test harness by being a workspace. Hoisting makes a borrowed dependency indistinguishable from a declared one.
+
+⭑ **A measurement taken inside the thing it measures reads differently from outside it.** The programme's own
+thesis, delivered three separate ways by the act of carrying it out.
+
+---
+
+**⭐ AND ONE FINDING NO COVERAGE NUMBER COULD HAVE STATED.** S9's tests moved
+`cap:event:event-doc002-claimrejected` from `DECLARED` to `TESTED`. Its census evidence, measured 2026-08-20:
+*"'ClaimRejected' in production (`handlers/assurance.ts`); no test names it."* A governed DOC-002 event emitted
+by production for three weeks with nothing asserting anything about it. ⭑ **Two instruments found it
+independently and neither knew of the other** — the covering agent reported the payload arm
+*"statement-uncovered repo-wide"*; the census had it declared-not-tested since August.
+
+**⚠ AND A GUARD THAT CANNOT FAIL, FOUND ONLY BY TRYING TO TEST IT.** `assurance.ts:1299`
+(`if (!subjectId) return null;`) is behaviourally indistinguishable from `:1306`: falling through binds
+`undefined` into `loadObject`, and better-sqlite3's `.get(undefined)` returns `undefined` without throwing
+(probed under node — the native bindings do not load under bun). ⛔ **Filed, not removed.** Deleting production
+code was outside the increment, and the test that exposed it was KEPT and re-labelled, because it pins a real
+previously-unpinned behaviour. Mis-labelled is not worthless.
+
+---
+
+**OPEN, AND DELIBERATELY NOT CLOSED HERE:**
+
+- ⛔ **CSAA's 74 remaining test failures**, one structural cause: it assumes it sits at the root of the
+  repository it analyses. `resolveRepositoryRoot` is fine — the TESTS hardcode the assumption. That is
+  `§13B` from the other side, it is the parameterisation that would make CSAA the general-purpose tool the
+  sponsor described, and it needs a DESIGN before code. Not blocking: JPWB's gate never runs CSAA.
+- ⛔ **~580 uncovered branches across 62 files.** S9 closed 126 across 5. `rph-application` is no longer the
+  whole story — `broker.ts` was in that batch precisely because it is not in that package.
+- ⛔ **CSAA has no self-directed non-vacuity check and no mutation harness.** Its 20 declared mutants are a
+  PRESERVED RECORD at `JanumiCode/csaa/src/mutants/csaa-mutants.ts`; nothing runs them. `REG-D-061` `D-5`.
+- ⏸ **CI/CD deferred by the sponsor** — *"there is no configured CI or CD pipeline or environment established."*
+  ⚠ So every verifier in this programme was a developer-machine obligation, and that is stated rather than
+  hidden.
+- ⚠ **`.dependency-cruiser.cjs`'s `apps/` perimeter remains unenforced by the cruiser.** `REG-F-389` is
+  PARTIALLY discharged: the guarantee moved to `verif/product-boundary.test.ts`; the cruiser's own arm is
+  KNOWN-vacuous rather than silently so, because the only fix reaching it needs SvelteKit alias resolution the
+  config does not have.
+
+**Merge target:** none. ⚠ `REG-D-061` and `REG-D-062` carry the rulings; this entry records their execution and
+does not amend them.
