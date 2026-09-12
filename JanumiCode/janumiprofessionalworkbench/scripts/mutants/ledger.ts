@@ -3511,8 +3511,11 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'MU-PFA-R3-C-neutralise-the-guard-lost-limb',
 		file: 'scripts/export-guard-core.ts',
-		find: '\t\tif (now.mutants < before.mutants)',
-		replace: '\t\tif (now.mutants < before.mutants - 100)',
+		// ⚠ RE-ANCHORED 2026-09-12 when the limb became PER-EXPORT. The old anchor compared per-FILE mutant
+		// COUNTS; that comparison no longer exists, and re-anchoring in the same commit as the move is this
+		// repository's rule precisely because an UNANCHORED mutant is a claim nobody can perform any more.
+		find: '\t\t\tif (stillPresent.has(exported) && !nowGuarded.has(exported))',
+		replace: '\t\t\tif (!stillPresent.has(exported) && !nowGuarded.has(exported))',
 		expectRed: ['verif/export-guard.test.ts'],
 		why: 'The ratchet limb is the whole guarantee that a file may not SHED a guard it earned. Slackening it by 100 lets any realistic loss through while the check still reports success — and a guard silently removed is worse than one never written, because the census still claims it.',
 		source: 'JAN-PFA R3 S3.2'
@@ -3520,7 +3523,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'MU-PFA-R3-D-compare-the-export-set-by-length',
 		file: 'scripts/export-guard-core.ts',
-		find: '\t\tif (wasExports !== nowExports)',
+		find: '\t\tif (was !== is)',
 		replace: '\t\tif (before.consumedExports.length !== now.consumedExports.length)',
 		expectRed: ['verif/export-guard.test.ts'],
 		why: 'A RENAME AT EQUAL COUNT IS STILL A MOVE. Comparing lengths lets a guarded export be swapped for an unguarded one with the obligation unchanged and nothing said — the census would go on asserting a promise about a name that no longer exists.',
@@ -3529,8 +3532,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'MU-PFA-R3-E-let-a-surplus-offset-a-deficit',
 		file: 'scripts/export-guard-core.ts',
-		find: '\t\towed += Math.max(0, entry.consumedExports.length - entry.mutants);',
-		replace: '\t\towed += entry.consumedExports.length - entry.mutants;',
+		find: '\t\towed += bare;',
+		replace: '\t\towed += bare - entry.unattributedMutants;',
 		expectRed: ['verif/export-guard.test.ts'],
 		why: 'A file carrying extra guards does not discharge another file\'s promise. Summing signed shortfalls lets a heavily-guarded file conceal an unguarded one — THE AVERAGING DEFECT THIS ENTIRE PROGRAMME EXISTS TO REMOVE, reappearing inside the instrument that measures it.',
 		source: 'JAN-PFA R3 S3.2'
@@ -4075,5 +4078,27 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
 		why: "This instance promises §8.4 step 1 is decided by the CALLER'S schema/invariant facts, and fails CLOSED when they are absent. Certifying schemaValid unconditionally admits a subject that is not parseable or violates a deterministic invariant — apps/rph-demo work-product-floor.ts derives exactly those facts (WORK_PRODUCT_NOT_PARSEABLE) and apps/rph-demo floor.ts supplies PWA_GRAPH_NOT_WELL_FORMED — so 'a candidate that fails its contract cannot be admitted' is enforced nowhere. Predicted red: 'a schema failure records a REJECTED assessment + an observation carrying the specific finding code' — `expect(plan.gatePermitsTransition).toBe(false)` flips to true.",
 		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
+	},
+	// ── JAN-PFA R3 — ATTRIBUTION, the function that ended fungibility ───────────────────────────────────────
+	// Added 2026-09-12 when the census moved from a per-FILE mutant COUNT to a per-EXPORT credit. The count made
+	// guards fungible within a file — six mutants on one export discharged a six-export file — and it understated
+	// the obligation by 41% (156 -> 220). These two entries guard the credit decision itself.
+	{
+		id: 'MU-PFA-R3-F-credit-the-nearest-export-not-the-containing-one',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t\t.filter((e) => e.startLine <= anchorStartLine && anchorStartLine <= e.endLine)',
+		replace: '\t\t.filter((e) => e.startLine <= anchorStartLine)',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'Dropping the upper bound turns CONTAINMENT into "any declaration that starts earlier", so a mutant anchored in a private helper is credited to every export above it. That is the fungibility defect restored by a missing comparison: 58 of this repository\'s existing mutants anchor outside every export, and crediting them would discharge obligations nothing defends.',
+		source: 'JAN-PFA R3 S3.2 per-export attribution'
+	},
+	{
+		id: 'MU-PFA-R3-G-credit-only-the-first-owner-of-a-shared-line',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t\t.map((e) => e.name);',
+		replace: '\t\t.map((e) => e.name)\n\t\t.slice(0, 1);',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: '`export const a = 1, b = 2;` is ONE statement, so both names own the same lines and both are equally entitled to a guard anchored there. Taking the first silently leaves the second bare while the census reports it guarded — a false credit, which is worse than a missing one because nothing will ever look again.',
+		source: 'JAN-PFA R3 S3.2 per-export attribution'
 	}
 ];

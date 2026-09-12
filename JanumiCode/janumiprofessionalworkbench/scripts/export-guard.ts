@@ -6,11 +6,20 @@
  * INSTRUMENTATION, not consequence. A file is not owed a guard because it is a file; it is owed one because
  * other production code imports something from it and therefore relies on a promise.
  *
- * ⭑ AND IT IS A DERIVED STANDARD, NOT AN INVENTED TARGET. Measured across the 30 files that already carried
- * guards: 0.97 mutants per production-consumed export, with a MEDIAN PER-FILE RATIO OF 1.00. Mean and median
- * agreeing is the warrant — this is what good practice in this repository already looks like, stated as a rule.
- * ⚠ A ratio that lands that close to 1.00 right after a definitional change deserves suspicion, which is why it
- * was disaggregated before being used rather than quoted.
+ * ⛔ ~~AND IT IS A DERIVED STANDARD, NOT AN INVENTED TARGET: 0.97 mutants per production-consumed export, MEDIAN
+ * PER-FILE RATIO 1.00 — what good practice here already looks like, stated as a rule.~~ **THAT CLAIM IS REFUTED,
+ * BY THE ATTRIBUTION THIS SCRIPT NOW PERFORMS.** Those figures divided a per-FILE mutant COUNT by a per-EXPORT
+ * denominator, so a file with six mutants on one export scored 1.00. Measured with guards actually ATTRIBUTED to
+ * the export they anchor in: **111 of 331 consumed exports are guarded — 0.34 aggregate, and a MEDIAN PER-FILE
+ * FRACTION OF 0.06.**
+ *
+ * ⚠ SO "ONE GUARD PER PRODUCTION-CONSUMED EXPORT" IS AN ASPIRATION, NOT A DESCRIPTION OF CURRENT PRACTICE, and
+ * this header says so because the earlier wording was the design's central warrant for the unit. ⭑ The UNIT
+ * survives — it is relational, and what a file owes the system still flows through what other modules import
+ * from it. What does not survive is the claim that the repository was already meeting it.
+ * ⭐ And the suspicion recorded against the old figure was right for the wrong reason: a ratio landing on 1.00
+ * straight after a definitional change deserved distrust, it was disaggregated — and the disaggregation used the
+ * SAME contaminated numerator, so mean and median agreed with each other while both were wrong.
  *
  * ── WHY NOT THE OBVIOUS PROXIES, EACH REFUTED BY MEASUREMENT ────────────────────────────────────────────────
  *   · "one per file"        — a token. `governance.ts` has 794 lines and 128 branches; one mutant proves one
@@ -33,6 +42,8 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
+	attributeGuard,
+	type ExportSpan,
 	compareGuardCensus,
 	isGeneratedSource,
 	isProductionConsumer,
@@ -41,6 +52,7 @@ import {
 	type GuardEntry
 } from './export-guard-core.js';
 import { DECLARED_MUTANTS } from './mutants/ledger.js';
+import { anchorRange } from './mutants/scope-core.js';
 
 // ⛔ FORWARD SLASHES, EVERYWHERE, FROM THE ROOT DOWN. `fileURLToPath` yields backslashes on Windows, and the
 // walk normalises its results — so a barrel path built from a backslash ROOT and a file path from the walk are
@@ -90,31 +102,45 @@ function sourceOf(file: string): ts.SourceFile {
 const isExported = (n: ts.Node) =>
 	(ts.getCombinedModifierFlags(n as ts.Declaration) & ts.ModifierFlags.Export) !== 0;
 
-/** Exported VALUES only. A type makes no runtime promise a mutant can attack. */
-function exportedValues(file: string): string[] {
-	const names: string[] = [];
-	for (const st of sourceOf(file).statements) {
-		if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) names.push(st.name.text);
-		else if (ts.isClassDeclaration(st) && isExported(st) && st.name) names.push(st.name.text);
-		else if (ts.isEnumDeclaration(st) && isExported(st)) names.push(st.name.text);
-		// ⛔ THE BRACES ARE LOAD-BEARING. Without them the `for`/`if` below swallowed the NEXT `else if`, so the
-		// export-declaration branch was nested inside this one and `st` narrowed to `never` — a dangling-else
-		// that made `export { a, b }` re-export lists uncollectable. tsc caught it; the gate had not yet run.
+/**
+ * Exported VALUES and their declaration spans. A type makes no runtime promise a mutant can attack, so types
+ * are excluded.
+ *
+ * ⭑ THE SPANS ARE WHAT MAKE ATTRIBUTION POSSIBLE. A mutant's anchor resolves to a line range; an export owns a
+ * line range; a guard belongs to the export whose range CONTAINS it. Without this the census could only count
+ * mutants per file, which made guards fungible within a file.
+ */
+function exportedValueSpans(file: string): ExportSpan[] {
+	const sf = sourceOf(file);
+	const spans: ExportSpan[] = [];
+	const lineOf = (pos: number) => sf.getLineAndCharacterOfPosition(pos).line + 1;
+	const push = (name: string, node: ts.Node) => {
+		spans.push({ name, startLine: lineOf(node.getStart(sf)), endLine: lineOf(node.getEnd()) });
+	};
+	for (const st of sf.statements) {
+		if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
+		else if (ts.isClassDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
+		else if (ts.isEnumDeclaration(st) && isExported(st)) push(st.name.text, st);
 		else if (ts.isVariableStatement(st) && isExported(st)) {
+			// Several names can share one statement (`export const a = 1, b = 2`); each owns the whole span.
 			for (const d of st.declarationList.declarations) {
-				if (ts.isIdentifier(d.name)) names.push(d.name.text);
+				if (ts.isIdentifier(d.name)) push(d.name.text, st);
 			}
 		} else if (
 			ts.isExportDeclaration(st) &&
 			!st.moduleSpecifier &&
 			st.exportClause &&
 			ts.isNamedExports(st.exportClause)
-		)
-			for (const el of st.exportClause.elements)
-				if (!el.isTypeOnly && !st.isTypeOnly) names.push(el.name.text);
+		) {
+			for (const el of st.exportClause.elements) {
+				if (!el.isTypeOnly && !st.isTypeOnly) push(el.name.text, st);
+			}
+		}
 	}
-	return names;
+	return spans;
 }
+
+const exportedValues = (file: string): string[] => exportedValueSpans(file).map((e) => e.name);
 
 function resolveRelative(fromFile: string, spec: string): string | undefined {
 	if (!spec.startsWith('.')) return undefined;
@@ -207,21 +233,50 @@ for (const file of [`${ROOT}packages`, `${ROOT}apps`, `${ROOT}verif`, `${ROOT}sc
 const MEASURABLE = DECLARED_MUTANTS.filter(
 	(m) => m.supersededBy === undefined && m.duplicateOf === undefined
 );
-const mutantsPerFile = new Map<string, number>();
-for (const m of MEASURABLE) mutantsPerFile.set(m.file, (mutantsPerFile.get(m.file) ?? 0) + 1);
+/** file -> the measurable mutants declared against it, so each can be attributed to an export by line. */
+const mutantsByFile = new Map<string, typeof MEASURABLE>();
+for (const m of MEASURABLE) {
+	const list = mutantsByFile.get(m.file) ?? [];
+	list.push(m);
+	mutantsByFile.set(m.file, list);
+}
 
 const census: GuardCensus = {};
 for (const file of walk(`${ROOT}packages`)) {
 	if (!/\/src\//.test(file) || /[.](test|spec)[.]ts$/.test(file) || file.endsWith('/index.ts')) continue;
-	if (isGeneratedSource(readFileSync(file, 'utf8'))) continue;
+	const text = readFileSync(file, 'utf8');
+	if (isGeneratedSource(text)) continue;
+
+	const spans = exportedValueSpans(file);
 	const map = consumers.get(file) ?? new Map<string, Set<string>>();
-	const consumed = exportedValues(file)
-		.filter((n) => [...(map.get(n) ?? [])].some((c) => isProductionConsumer(c)))
-		.sort();
+	const consumed = spans
+		.filter((e) => [...(map.get(e.name) ?? [])].some((c) => isProductionConsumer(c)))
+		.map((e) => e.name);
 	const key = rel(file);
-	const mutants = mutantsPerFile.get(key) ?? 0;
-	if (consumed.length === 0 && mutants === 0) continue; // nothing promised, nothing guarded
-	census[key] = { consumedExports: consumed, mutants } satisfies GuardEntry;
+	const declared = mutantsByFile.get(key) ?? [];
+
+	// ── ATTRIBUTION: a guard belongs to the export whose declaration CONTAINS its anchor ─────────────────
+	const guarded = new Set<string>();
+	let unattributed = 0;
+	for (const m of declared) {
+		const at = anchorRange(text, m.find);
+		if (typeof at === 'string') {
+			// An anchor that no longer lands cannot be attributed. `verif/mutant-ledger.test.ts` owns reporting
+			// ledger rot; here it simply credits nothing, which is the conservative reading.
+			unattributed += 1;
+			continue;
+		}
+		const owner = attributeGuard(spans, at.startLine);
+		if (owner.length === 0) unattributed += 1;
+		else for (const name of owner) guarded.add(name);
+	}
+
+	if (consumed.length === 0 && declared.length === 0) continue; // nothing promised, nothing guarded
+	census[key] = {
+		consumedExports: [...consumed].sort((a, b) => a.localeCompare(b)),
+		guardedExports: [...guarded].filter((n) => consumed.includes(n)).sort((a, b) => a.localeCompare(b)),
+		unattributedMutants: unattributed
+	} satisfies GuardEntry;
 }
 
 const sorted: GuardCensus = Object.fromEntries(
@@ -245,10 +300,11 @@ if (mode[0] === '--write') {
 	const o = outstandingObligation(sorted);
 	process.stdout.write(
 		`guards:export — wrote ${o.files} files to ${rel(BASELINE)}\n` +
-			`  production-consumed exports: ${o.consumedExports}\n` +
-			`  declared guards on them:     ${o.mutants}\n` +
-			`  files with NO guard at all:  ${o.filesWithNoGuard}\n` +
-			`  OUTSTANDING OBLIGATION:      ${o.owed}\n`
+			`  production-consumed exports:   ${o.consumedExports}\n` +
+			`  of those GUARDED (attributed): ${o.guardedExports}\n` +
+			`  mutants crediting no export:   ${o.unattributedMutants}\n` +
+			`  files with NO guarded export:  ${o.filesWithNoGuard}\n` +
+			`  OUTSTANDING OBLIGATION:        ${o.owed}\n`
 	);
 	process.exit(0);
 }
@@ -276,7 +332,7 @@ const { guardLost, populationChanged } = compareGuardCensus(recorded, sorted);
 const problems: string[] = [];
 if (guardLost.length > 0)
 	problems.push(
-		`guards:export — GUARD_LOST: ${guardLost.length} file(s) carry fewer declared guards than recorded.`,
+		`guards:export — GUARD_LOST: ${guardLost.length} export(s) lost the guard they had.`,
 		...guardLost.map((g) => `  GUARD_LOST  ${g}`)
 	);
 if (populationChanged.length > 0)
@@ -293,6 +349,10 @@ if (problems.length > 0) {
 
 const o = outstandingObligation(sorted);
 process.stdout.write(
-	`guards:export — ${o.files} files, no guard lost, surface unchanged. ` +
-		`Outstanding obligation: ${o.owed} guard(s) across ${o.filesWithNoGuard} unguarded file(s).\n`
+	// ⚠ THE WORDING IS PART OF THE GUARANTEE. "no guard lost" described the per-FILE count this check no longer
+	// performs; what it now verifies is that no EXPORT lost the guard it had. A message that outlives the
+	// semantics it described is how a reader comes to believe a weaker claim than the one being made.
+	`guards:export — ${o.files} files, no export lost its guard, surface unchanged. ` +
+		`Outstanding obligation: ${o.owed} bare export(s); ${o.guardedExports} of ${o.consumedExports} guarded; ` +
+		`${o.filesWithNoGuard} file(s) with no guarded export; ${o.unattributedMutants} mutant(s) crediting none.\n`
 );

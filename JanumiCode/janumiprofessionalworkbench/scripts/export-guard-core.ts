@@ -5,27 +5,34 @@
  * ⭑ SEPARATE FROM THE IO FOR THE REASON `scope-core.ts` IS: the CLI's answer is one pass/fail over the whole
  * repository, which cannot show that the two limbs — *a guard was LOST* and *the population MOVED* — fail
  * independently. Two limbs that always fail together are one check wearing two names.
+ *
+ * ── ⭐ THE UNIT IS THE EXPORT, AND IT TOOK A SECOND PASS TO ACTUALLY BE THE EXPORT ──────────────────────────
+ * The first version recorded a per-FILE mutant COUNT and computed the obligation as
+ * `consumedExports.length - mutants`. ⛔ That made guards FUNGIBLE WITHIN A FILE: six mutants piled on one
+ * export discharged a six-export file completely. Measured instance: `assurance-rules.ts` reported 6 exports
+ * and 2 guards — "owes 4" — with BOTH guards sitting on `BLOCKING_SEVERITIES`, so five of its exports were bare
+ * and the figure understated the work. A ratchet satisfiable without meaning anything is not a ratchet.
+ *
+ * Guards are now ATTRIBUTED: every mutant anchor resolves to a line range and every exported declaration has a
+ * span, so attribution is an INTERSECTION of machinery that already existed rather than a new record to keep.
  */
 
-/** Per production file: the exports that make a promise to other production code, and the guards on it. */
+/** Per production file: which exports promise something to production code, and which of them are guarded. */
 export interface GuardEntry {
 	/** Exported VALUES imported by at least one non-test, non-tooling module. Sorted, so the diff is readable. */
 	readonly consumedExports: readonly string[];
+	/** The subset carrying at least one declared mutant ANCHORED INSIDE that export's own declaration. */
+	readonly guardedExports: readonly string[];
 	/**
-	 * Declared, measurable mutants whose `file` is this file.
+	 * Mutants on this file whose anchor fell OUTSIDE every exported declaration — module-level code, a private
+	 * helper, a shared constant.
 	 *
-	 * ⚠⚠ **DISCLOSED WEAKNESS: THIS IS A PER-FILE COUNT, AND THE UNIT OF OBLIGATION IS THE PER-EXPORT PROMISE.**
-	 * Nothing here attributes a mutant to the export it actually attacks, so `outstandingObligation` treats
-	 * guards as FUNGIBLE WITHIN A FILE — six mutants piled on one export discharge a six-export file completely.
-	 * Measured instance: `assurance-rules.ts` reports 6 exports and 2 guards, i.e. "owes 4", and BOTH guards sit
-	 * on `BLOCKING_SEVERITIES`; five of its exports are bare, not four.
-	 *
-	 * ⭑ IT IS STATED RATHER THAN LEFT TO BE DISCOVERED, and it is FIXABLE with machinery that already exists:
-	 * every mutant's anchor resolves to a line range (`scope-core.ts#anchorRange`) and every exported
-	 * declaration has a span, so attribution is an intersection rather than a new record. Until that lands, the
-	 * obligation figure is a LOWER BOUND on the work and the ratchet is weaker than its name suggests.
+	 * ⚠ THEY DISCHARGE NOTHING, AND THAT IS DELIBERATE RATHER THAN AN OVERSIGHT. Such a mutant is a real guard
+	 * over real behaviour, but nothing says WHICH promise it defends, and crediting it to an arbitrary export
+	 * would re-open exactly the fungibility this field exists to end. They are RECORDED so the work is not
+	 * invisible, and excluded from the credit so the obligation stays honest.
 	 */
-	readonly mutants: number;
+	readonly unattributedMutants: number;
 }
 
 export type GuardCensus = Record<string, GuardEntry>;
@@ -43,7 +50,7 @@ export const isProductionConsumer = (path: string): boolean =>
 	!/[.](test|spec)[.](ts|tsx)$/.test(path) && !path.includes('/verif/') && !path.includes('/scripts/');
 
 export interface GuardComparison {
-	/** Files whose guard count FELL. The ratchet limb. */
+	/** Exports that HAD a guard and no longer do. The ratchet limb. */
 	readonly guardLost: readonly string[];
 	/** Files added, removed, or whose consumed-export set moved without the baseline being regenerated. */
 	readonly populationChanged: readonly string[];
@@ -53,13 +60,13 @@ export interface GuardComparison {
  * Compare a recorded census against a measured one.
  *
  * ⛔ THE TWO LIMBS ARE COMPUTED OVER DIFFERENT QUESTIONS ON PURPOSE. `guardLost` asks only about files BOTH
- * sides know about, so an added or removed file cannot trip it; `populationChanged` asks only about membership
- * and shape, so a dropped mutant cannot trip it. Without that separation a new file would report as a lost
- * guard and nobody could tell which had happened.
+ * sides know about and only about exports BOTH sides still have, so an added or removed file — or a renamed
+ * export — cannot trip it; `populationChanged` asks only about membership and shape, so a dropped guard cannot
+ * trip it. Without that separation a new file would report as a lost guard and nobody could tell which happened.
  *
- * ⚠ AND A RISING EXPORT COUNT IS A POPULATION CHANGE, NOT A FAILURE OF THE AUTHOR. Adding an export is normal
- * work; what is refused is adding it WITHOUT regenerating the census, because an obligation nobody recorded is
- * one nobody can discharge.
+ * ⭑ IT NAMES THE EXPORT, NOT JUST THE FILE. "This file has one fewer mutant" does not say what stopped being
+ * defended; "`governance.ts#canPromoteBaseline` lost its guard" does, and it is the difference between a number
+ * and a finding.
  */
 export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus): GuardComparison {
 	const guardLost: string[] = [];
@@ -72,13 +79,15 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 			continue;
 		}
 		const now = measured[file]!;
-		if (now.mutants < before.mutants)
-			guardLost.push(
-				`${file}: ${before.mutants} declared guard(s) at baseline, ${now.mutants} now (-${before.mutants - now.mutants})`
-			);
-		const wasExports = [...before.consumedExports].sort().join(',');
-		const nowExports = [...now.consumedExports].sort().join(',');
-		if (wasExports !== nowExports)
+		const nowGuarded = new Set(now.guardedExports);
+		const stillPresent = new Set(now.consumedExports);
+		for (const exported of [...before.guardedExports].sort())
+			if (stillPresent.has(exported) && !nowGuarded.has(exported))
+				guardLost.push(`${file}#${exported} was guarded at baseline and is not guarded now`);
+
+		const was = [...before.consumedExports].sort().join(',');
+		const is = [...now.consumedExports].sort().join(',');
+		if (was !== is)
 			populationChanged.push(
 				`${file}: its production-consumed exports moved (${before.consumedExports.length} -> ${now.consumedExports.length})`
 			);
@@ -95,21 +104,36 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 export function outstandingObligation(census: GuardCensus): {
 	files: number;
 	consumedExports: number;
-	mutants: number;
+	guardedExports: number;
+	unattributedMutants: number;
 	filesWithNoGuard: number;
 	owed: number;
 } {
 	let consumedExports = 0;
-	let mutants = 0;
+	let guardedExports = 0;
+	let unattributedMutants = 0;
 	let filesWithNoGuard = 0;
 	let owed = 0;
 	for (const entry of Object.values(census)) {
+		const guarded = new Set(entry.guardedExports);
+		const bare = entry.consumedExports.filter((n) => !guarded.has(n)).length;
 		consumedExports += entry.consumedExports.length;
-		mutants += entry.mutants;
-		if (entry.mutants === 0 && entry.consumedExports.length > 0) filesWithNoGuard += 1;
-		owed += Math.max(0, entry.consumedExports.length - entry.mutants);
+		guardedExports += entry.guardedExports.length;
+		unattributedMutants += entry.unattributedMutants;
+		// ⛔ PER-EXPORT, SO A SURPLUS CANNOT OFFSET A DEFICIT. Summing signed differences would let a heavily
+		// guarded export conceal a bare one — the averaging defect this whole programme exists to remove,
+		// reappearing inside the instrument that measures it.
+		owed += bare;
+		if (entry.guardedExports.length === 0 && entry.consumedExports.length > 0) filesWithNoGuard += 1;
 	}
-	return { files: Object.keys(census).length, consumedExports, mutants, filesWithNoGuard, owed };
+	return {
+		files: Object.keys(census).length,
+		consumedExports,
+		guardedExports,
+		unattributedMutants,
+		filesWithNoGuard,
+		owed
+	};
 }
 
 /**
@@ -131,3 +155,27 @@ export function outstandingObligation(census: GuardCensus): {
  */
 export const isGeneratedSource = (text: string): boolean =>
 	/^\/\/ GENERATED FILE\b/m.test(text.slice(0, 400));
+
+/** The line span of one exported declaration. */
+export interface ExportSpan {
+	readonly name: string;
+	readonly startLine: number;
+	readonly endLine: number;
+}
+
+/**
+ * Which exports own the declaration a guard's anchor sits in.
+ *
+ * ⭐ THIS IS THE FUNCTION THAT ENDED FUNGIBILITY, so it is pure and it is tested. An empty result is the HONEST
+ * answer for a mutant anchored in module-level code or a private helper — such a guard defends real behaviour,
+ * but nothing says WHICH promise, and crediting it to a nearby export would restore exactly the defect
+ * attribution was introduced to remove. Measured: 58 of the repository's existing mutants land there.
+ *
+ * ⚠ SEVERAL NAMES CAN OWN ONE LINE — `export const a = 1, b = 2;` is one statement — so this returns a LIST
+ * rather than a first match. Returning the first would silently pick one of two equally-entitled owners.
+ */
+export function attributeGuard(spans: readonly ExportSpan[], anchorStartLine: number): string[] {
+	return spans
+		.filter((e) => e.startLine <= anchorStartLine && anchorStartLine <= e.endLine)
+		.map((e) => e.name);
+}

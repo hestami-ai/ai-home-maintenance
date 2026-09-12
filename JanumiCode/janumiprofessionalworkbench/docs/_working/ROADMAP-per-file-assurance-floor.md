@@ -398,7 +398,28 @@ surfaced.
   OVERWROTE a file in use.** Harmless here, but parallel agents sharing one scratch directory will collide with
   each other and with their caller. At this fan-out they need private scratch.
 
-  **156 guards remain across four packages**, `rph-application` alone holding 89.
+  ⛔ **AND BOTH FIGURES ABOVE ARE SUPERSEDED BY THE PER-EXPORT ATTRIBUTION LANDED IMMEDIATELY AFTER.** The
+  census counted guards PER FILE while the obligation is PER EXPORT, so guards were fungible within a file.
+  Re-measured with each guard attributed to the export whose declaration its anchor sits in:
+
+  | | fungible (as reported) | ⭐ attributed |
+  | --- | --- | --- |
+  | outstanding obligation | 156 | **220** |
+  | consumed exports guarded | — | **111 of 331 (0.34)** |
+  | median per-file fraction guarded | "1.00" | ⛔ **0.06** |
+  | mutants crediting NO export | — | **58** |
+  | packages truly at zero | "6 of 10" | **3 of 10** — `rph-assurance` owes 1, `rph-contracts` 2, `rph-product-realization-pwa` 1 |
+
+  ⭐ **THE LANDED WORK IS REAL — every declared guard was KILLED — but the COVERAGE claimed for it was
+  overstated.** `DESIGN §9` carries the full retraction, including the refutation of the unit's central
+  justification: *"a standard the repository already meets"* was an artefact of dividing a per-file count by a
+  per-export denominator.
+
+  ⚠ **AND THE CROSS-CHECK THAT WAS MEANT TO CATCH IT FAILED FOR A NAMEABLE REASON:** median-versus-mean was run
+  on the SAME contaminated numerator, so both agreed while both were wrong. A cross-check must vary the thing
+  under suspicion; varying the summary statistic tests nothing about the quantity being summarised.
+
+  **220 guards remain across seven packages**, `rph-application` alone holding the largest share.
 - ⚠ **S3.4 the dead-surface audit: still filed, not done.**
 
 ---

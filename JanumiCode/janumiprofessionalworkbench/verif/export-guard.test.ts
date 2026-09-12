@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+	attributeGuard,
 	compareGuardCensus,
 	isGeneratedSource,
 	isProductionConsumer,
@@ -59,36 +60,66 @@ describe('JAN-PFA R3 — isGeneratedSource reads the file’s own banner', () =>
 
 describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVED POPULATION', () => {
 	const BASE: GuardCensus = {
-		'packages/a/src/x.ts': { consumedExports: ['alpha', 'beta'], mutants: 2 },
-		'packages/b/src/y.ts': { consumedExports: ['gamma'], mutants: 0 }
+		'packages/a/src/x.ts': {
+			consumedExports: ['alpha', 'beta'],
+			guardedExports: ['alpha', 'beta'],
+			unattributedMutants: 0
+		},
+		'packages/b/src/y.ts': { consumedExports: ['gamma'], guardedExports: [], unattributedMutants: 1 }
 	};
 
 	it('passes when nothing moved', () => {
 		expect(compareGuardCensus(BASE, BASE)).toEqual({ guardLost: [], populationChanged: [] });
 	});
 
-	it('passes when a file GAINS a guard — it is a ratchet, not an equality', () => {
-		const better: GuardCensus = { ...BASE, 'packages/b/src/y.ts': { consumedExports: ['gamma'], mutants: 1 } };
+	it('passes when an export GAINS a guard — it is a ratchet, not an equality', () => {
+		const better: GuardCensus = {
+			...BASE,
+			'packages/b/src/y.ts': { consumedExports: ['gamma'], guardedExports: ['gamma'], unattributedMutants: 0 }
+		};
 		expect(compareGuardCensus(BASE, better).guardLost).toEqual([]);
 	});
 
-	// ── LIMB 1, ALONE ───────────────────────────────────────────────────────────────────────────────────────
-	it('GUARD_LOST fires alone when a file sheds a declared guard, and NAMES the numbers', () => {
-		const worse: GuardCensus = { ...BASE, 'packages/a/src/x.ts': { consumedExports: ['alpha', 'beta'], mutants: 1 } };
+	// ── LIMB 1, ALONE — AND IT NAMES THE EXPORT ─────────────────────────────────────────────────────────────
+	// ⭐ "this file has one fewer mutant" does not say what stopped being defended. This does.
+	it('GUARD_LOST fires alone when ONE export loses its guard, and NAMES that export', () => {
+		const worse: GuardCensus = {
+			...BASE,
+			'packages/a/src/x.ts': {
+				consumedExports: ['alpha', 'beta'],
+				guardedExports: ['alpha'],
+				unattributedMutants: 0
+			}
+		};
 		const r = compareGuardCensus(BASE, worse);
 		expect(r.guardLost).toHaveLength(1);
-		expect(r.guardLost[0]).toContain('packages/a/src/x.ts');
-		expect(r.guardLost[0]).toContain('2 declared guard(s) at baseline, 1 now');
+		expect(r.guardLost[0]).toContain('packages/a/src/x.ts#beta');
 		expect(r.populationChanged, 'a lost guard must not also report as a moved population').toEqual([]);
 	});
 
-	// ── LIMB 2, ALONE, IN ALL THREE OF ITS SHAPES ───────────────────────────────────────────────────────────
+	// ⛔ THE DEFECT THIS WHOLE REWORK EXISTS TO CATCH. Under the old per-FILE count, moving a guard from `beta`
+	// onto `alpha` left the count at 2 and passed silently. Attribution makes it a named finding.
+	it('GUARD_LOST fires when a guard MOVES between exports, which a per-file count could not see', () => {
+		const moved: GuardCensus = {
+			...BASE,
+			'packages/a/src/x.ts': {
+				consumedExports: ['alpha', 'beta'],
+				guardedExports: ['alpha'],
+				unattributedMutants: 1
+			}
+		};
+		const r = compareGuardCensus(BASE, moved);
+		expect(r.guardLost[0]).toContain('#beta');
+	});
+
+	// ── LIMB 2, ALONE, IN ITS THREE SHAPES ─────────────────────────────────────────────────────────────────
 	it('POPULATION_CHANGED fires alone for a NEW file', () => {
-		const added: GuardCensus = { ...BASE, 'packages/c/src/z.ts': { consumedExports: ['delta'], mutants: 0 } };
+		const added: GuardCensus = {
+			...BASE,
+			'packages/c/src/z.ts': { consumedExports: ['delta'], guardedExports: [], unattributedMutants: 0 }
+		};
 		const r = compareGuardCensus(BASE, added);
 		expect(r.populationChanged.join(' ')).toContain('packages/c/src/z.ts');
-		// ⭑ A NEW FILE HAS NO RECORDED GUARD COUNT TO FALL BELOW, so limb 1 is structurally silent and this is
-		// the only limb that can see it — the same hole the coverage ratchet's population limb exists to close.
 		expect(r.guardLost).toEqual([]);
 	});
 
@@ -100,33 +131,79 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 	});
 
 	it('POPULATION_CHANGED fires alone when a file’s consumed-export SET moves', () => {
-		const moved: GuardCensus = { ...BASE, 'packages/a/src/x.ts': { consumedExports: ['alpha', 'epsilon'], mutants: 2 } };
-		const r = compareGuardCensus(BASE, moved);
+		const renamed: GuardCensus = {
+			...BASE,
+			'packages/a/src/x.ts': {
+				consumedExports: ['alpha', 'epsilon'],
+				guardedExports: ['alpha', 'epsilon'],
+				unattributedMutants: 0
+			}
+		};
+		const r = compareGuardCensus(BASE, renamed);
 		expect(r.populationChanged.join(' ')).toContain('production-consumed exports moved');
+		// ⭑ A RENAMED EXPORT IS NOT A LOST GUARD. `beta` no longer exists, so claiming its guard was lost would
+		// report a defect where there is only a rename — which is why limb 1 only considers exports still present.
 		expect(r.guardLost).toEqual([]);
-	});
-
-	// ⚠ A RENAME AT EQUAL COUNT IS STILL A MOVE. Comparing only lengths would let a guarded export be swapped
-	// for an unguarded one with the obligation unchanged and nothing said.
-	it('detects a RENAME that leaves the count identical', () => {
-		const renamed: GuardCensus = { ...BASE, 'packages/a/src/x.ts': { consumedExports: ['alpha', 'renamed'], mutants: 2 } };
-		expect(compareGuardCensus(BASE, renamed).populationChanged).toHaveLength(1);
 	});
 });
 
-describe('JAN-PFA R3 — outstandingObligation is DERIVED, never quoted', () => {
-	it('counts the shortfall per file and never lets a surplus offset a deficit', () => {
+describe('JAN-PFA R3 — outstandingObligation counts BARE EXPORTS, never a signed difference', () => {
+	it('a surplus on one export cannot offset a bare one in the same file', () => {
 		const census: GuardCensus = {
-			'a.ts': { consumedExports: ['one'], mutants: 5 }, // surplus of 4
-			'b.ts': { consumedExports: ['one', 'two', 'three'], mutants: 0 } // owes 3
+			'a.ts': { consumedExports: ['one', 'two', 'three'], guardedExports: ['one'], unattributedMutants: 9 }
 		};
 		const o = outstandingObligation(census);
-		// ⛔ 3, NOT -1. A file carrying extra guards does not discharge another file's promise — that is the
-		// averaging defect this entire programme exists to remove, and it would reappear here as a sum.
-		expect(o.owed).toBe(3);
-		expect(o.filesWithNoGuard).toBe(1);
-		expect(o.consumedExports).toBe(4);
-		expect(o.mutants).toBe(5);
+		// ⛔ 2, NOT -7. Nine mutants piled anywhere in the file discharge exactly the ONE export they anchor in.
+		// Under the previous per-file count this file reported "owes 0" — the averaging defect this entire
+		// programme exists to remove, reappearing inside the instrument that measures it.
+		expect(o.owed).toBe(2);
+		expect(o.guardedExports).toBe(1);
+		expect(o.unattributedMutants).toBe(9);
+	});
+
+	it('counts a file with no guarded export, even when it carries unattributed mutants', () => {
+		const census: GuardCensus = {
+			'a.ts': { consumedExports: ['one'], guardedExports: [], unattributedMutants: 4 }
+		};
+		// ⚠ FOUR GUARDS AND STILL WHOLLY UNGUARDED: they defend internal logic, and nothing says which promise.
+		expect(outstandingObligation(census).filesWithNoGuard).toBe(1);
+		expect(outstandingObligation(census).owed).toBe(1);
+	});
+});
+
+describe('JAN-PFA R3 — attributeGuard is the function that ended fungibility', () => {
+	const SPANS = [
+		{ name: 'first', startLine: 10, endLine: 20 },
+		{ name: 'second', startLine: 30, endLine: 40 }
+	];
+
+	it('credits the export whose declaration CONTAINS the anchor', () => {
+		expect(attributeGuard(SPANS, 15)).toEqual(['first']);
+		expect(attributeGuard(SPANS, 35)).toEqual(['second']);
+	});
+
+	it('credits on either boundary — a declaration’s first and last lines are part of it', () => {
+		expect(attributeGuard(SPANS, 10)).toEqual(['first']);
+		expect(attributeGuard(SPANS, 20)).toEqual(['first']);
+	});
+
+	// ⛔ THE HONEST EMPTY ANSWER. A mutant anchored in module-level code or a private helper defends real
+	// behaviour, but nothing says WHICH promise — and crediting it to a nearby export would restore exactly the
+	// fungibility attribution exists to remove. Measured: 58 of the repository's mutants land here.
+	it('credits NOTHING for an anchor between declarations, rather than guessing the nearest', () => {
+		expect(attributeGuard(SPANS, 25)).toEqual([]);
+		expect(attributeGuard(SPANS, 5)).toEqual([]);
+		expect(attributeGuard(SPANS, 99)).toEqual([]);
+	});
+
+	// ⚠ `export const a = 1, b = 2;` is ONE statement, so both names own the same lines. Returning the FIRST
+	// match would silently pick one of two equally-entitled owners.
+	it('credits EVERY export that owns the line, not the first one found', () => {
+		const shared = [
+			{ name: 'a', startLine: 7, endLine: 7 },
+			{ name: 'b', startLine: 7, endLine: 7 }
+		];
+		expect(attributeGuard(shared, 7)).toEqual(['a', 'b']);
 	});
 });
 

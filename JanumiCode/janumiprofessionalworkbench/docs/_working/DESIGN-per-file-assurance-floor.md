@@ -403,3 +403,48 @@ the rate holds at both ends of the size distribution rather than only at the wel
 rate across 32 authored mutations is **3 in 32, under 10%**, projecting **roughly 18 genuine untested guarantees
 across the full 194**. ⚠ That projection is now supported at both ends of the population instead of one, which is
 the only reason it is offered as an estimate at all.
+
+---
+
+## 9. ⛔ THE UNIT'S CENTRAL JUSTIFICATION IS REFUTED — by the attribution the programme built to enforce it
+
+`§4`'s `R3` rested on one claim: that *"one guard per production-consumed export"* is a **DERIVED standard the
+guarded population already meets**, evidenced by 0.97 mutants per consumed export with a **median per-file ratio
+of 1.00**. Mean and median agreeing was stated as the warrant.
+
+⛔ **THAT EVIDENCE WAS AN ARTEFACT OF ITS OWN ARITHMETIC.** It divided a per-FILE mutant COUNT by a per-EXPORT
+denominator, so a file carrying six mutants on ONE export scored 1.00 across six promises. Re-measured with every
+guard ATTRIBUTED to the export whose declaration its anchor sits in:
+
+| | as claimed | ⭐ attributed |
+| --- | --- | --- |
+| consumed exports guarded | 0.97 per export | **111 of 331 — 0.34** |
+| MEDIAN per-file fraction guarded | 1.00 | ⛔ **0.06** |
+| files fully guarded | — | **29 of 91** |
+| files with NO guarded export | — | **45** |
+| ⛔ mutants crediting NO export at all | — | **58** |
+| outstanding obligation | 156 | ⭐ **220** |
+
+⚠ **SO THE UNIT IS AN ASPIRATION, NOT A DESCRIPTION OF CURRENT PRACTICE.** ⭑ The unit itself SURVIVES — it is
+relational, and what a file owes the system still flows through what other modules import from it. What does not
+survive is the sentence claiming the repository was already there. `scripts/export-guard.ts`'s header carries the
+correction struck in place, so a reader cannot meet the old warrant without meeting its retraction.
+
+**⛔ AND THE DISAGGREGATION THAT WAS SUPPOSED TO CATCH THIS FAILED FOR A NAMEABLE REASON.** `§8` recorded
+suspicion of a ratio landing on 1.00 immediately after a definitional change, and answered it by comparing the
+MEDIAN against the MEAN. ⭐ **Both were computed from the same contaminated numerator, so they agreed with each
+other while both were wrong.** A median only tests whether an aggregate hides its members; it cannot test whether
+the quantity being aggregated is the right quantity. ⚠ The lesson is narrower and sharper than "disaggregate":
+**a cross-check must vary the thing under suspicion.** Varying the summary statistic while holding the numerator
+fixed tests nothing about the numerator.
+
+**THE 58 THAT CREDIT NOTHING ARE A FINDING OF THEIR OWN.** They are real mutants over real behaviour, anchored in
+module-level code and private helpers rather than inside any exported declaration — `handlers/execution.ts` alone
+has 17, verified by intersecting their anchors against its 17 export spans. ⭑ They are RECORDED and they credit
+nothing, because nothing says which promise they defend and crediting them to a neighbour would restore the
+fungibility this correction removed.
+
+**⚠ AND TWO PUBLISHED CLAIMS ARE CORRECTED WITH IT.** "Six of ten packages at zero" was computed on the fungible
+basis. On the attributed one: `rph-authoring`, `rph-ports` and `rph-persistence` are **truly at zero**;
+`rph-assurance` owes **1**, `rph-contracts` **2**, `rph-product-realization-pwa` **1**. The burn-down's landed
+work is real — every declared guard was KILLED — but the *coverage* it achieved was overstated.
