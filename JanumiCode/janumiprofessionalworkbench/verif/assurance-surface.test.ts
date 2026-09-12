@@ -105,6 +105,10 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * follows CSAA out of the repository subtree entirely — the second recorded DECREASE, and the last one this
  * programme expects.
  *
+ * 64 -> 65 (2026-09-12, JAN-PFA R3): `verif/export-guard.test.ts`. ⭑ IT TESTS THREE JUDGMENTS, not an
+ * arithmetic — what counts as a CONSUMER, what counts as a FILE, and what counts as a FINDING — each of which
+ * was wrong once and between them moved the measured obligation by hundreds of exports.
+ *
  * 63 -> 64 (2026-09-12, JAN-PFA R2): `verif/mutants-scope.test.ts`. ⭑ IT CARRIES TWO REGRESSION CASES FOR
  * DEFECTS THE FEATURE SHIPPED AND HAD REMOVED, in opposite directions, both in the classifier that decides
  * whether a finding is being claimed at all. A defect found by running rather than reading returns the moment
@@ -115,7 +119,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * gate step itself, a single pass/fail over 106 files, structurally cannot show. Its fixtures are private temp
  * dirs, so it asserts over the mechanism rather than over today's coverage numbers.
  */
-const VERIF_TEST_FLOOR = 64;
+const VERIF_TEST_FLOOR = 65;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
@@ -132,6 +136,7 @@ const REQUIRED_ROOT_COMMANDS = [
 	// and requiring it would invite someone to satisfy the gate by rewriting the baseline.
 	'coverage:floor:check',
 	'gate',
+	'guards:export:check',
 	'gate:fast',
 	'lint',
 	'test',
@@ -179,7 +184,7 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
 		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
-		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(8);
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(9);
 	});
 
 	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
@@ -197,6 +202,10 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		const steps = (rootScripts()['gate:fast'] ?? '').split(' && ').map((step) => step.trim());
 		expect(steps).toEqual([
 			'bun run slices:ledger:check',
+			// JAN-PFA R3 (2026-09-12): the export-guard ratchet. It sits SECOND because it is a static census
+			// over source and the ledger — it needs no build, no tests and no coverage — so a lost guard fails
+			// the gate in seconds rather than after the twelve minutes the rest of the run costs.
+			'bun run guards:export:check',
 			'bun run tracker:build',
 			'bun run check-types',
 			'bun run lint',

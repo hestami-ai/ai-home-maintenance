@@ -3485,5 +3485,54 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['verif/mutants-scope.test.ts'],
 		why: 'REGRESSION MUTANT FOR THE FIX TO THE DEFECT ABOVE, WHICH WAS ITSELF A DEFECT AND A WORSE ONE. The runner\'s summary prints one row per verdict kind, so every HEALTHY run contains the literal `ABORTED_DIRTY 0`; matching it as a substring classified a genuinely SURVIVED mutant as "the instrument did not run", suppressing the exact finding this command exists to raise. A false positive gets investigated; this false negative is silent.',
 		source: 'JAN-PFA R2 S2.3'
+	},
+	// ── JAN-PFA R3 — the export-guard census and ratchet ────────────────────────────────────────────────────
+	// Three JUDGMENTS decide this census, and each was wrong once before it was measured: what counts as a
+	// CONSUMER, what counts as a FILE, and what counts as a FINDING. Between them they moved the obligation by
+	// hundreds of exports. A census whose predicates carry no mutant is a number nobody can defend.
+	{
+		id: 'MU-PFA-R3-A-count-colocated-tests-as-production',
+		file: 'scripts/export-guard-core.ts',
+		find: "\t!/[.](test|spec)[.](ts|tsx)$/.test(path) && !path.includes('/verif/') && !path.includes('/scripts/');",
+		replace: "\t!path.includes('/verif/') && !path.includes('/scripts/');",
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'REGRESSION MUTANT FOR THE DEFECT THIS PREDICATE SHIPPED. It first asked "is this path under packages/?" — an INTRINSIC property — and so counted a colocated foo.test.ts as a production consumer, inflating the obligation by ~50 exports. The question is RELATIONAL: is this consumer a test? An export whose only importer is its own test makes no promise to the system.',
+		source: 'JAN-PFA R3 S3.1; REG-F-391'
+	},
+	{
+		id: 'MU-PFA-R3-B-read-the-generated-banner-from-anywhere',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t/^\\/\\/ GENERATED FILE\\b/m.test(text.slice(0, 400));',
+		replace: '\t/^\\/\\/ GENERATED FILE\\b/m.test(text);',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'Generated files are excused the obligation because a declared mutant is an anchored hand-edit that rots on the next regeneration, and because the guarantee lives in the GENERATOR rather than the emitted constant. Reading the banner from anywhere lets a passing mention deep inside a hand-written file excuse it silently — an exemption granted by a substring.',
+		source: 'JAN-PFA R3 S3.1'
+	},
+	{
+		id: 'MU-PFA-R3-C-neutralise-the-guard-lost-limb',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t\tif (now.mutants < before.mutants)',
+		replace: '\t\tif (now.mutants < before.mutants - 100)',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'The ratchet limb is the whole guarantee that a file may not SHED a guard it earned. Slackening it by 100 lets any realistic loss through while the check still reports success — and a guard silently removed is worse than one never written, because the census still claims it.',
+		source: 'JAN-PFA R3 S3.2'
+	},
+	{
+		id: 'MU-PFA-R3-D-compare-the-export-set-by-length',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t\tif (wasExports !== nowExports)',
+		replace: '\t\tif (before.consumedExports.length !== now.consumedExports.length)',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'A RENAME AT EQUAL COUNT IS STILL A MOVE. Comparing lengths lets a guarded export be swapped for an unguarded one with the obligation unchanged and nothing said — the census would go on asserting a promise about a name that no longer exists.',
+		source: 'JAN-PFA R3 S3.2'
+	},
+	{
+		id: 'MU-PFA-R3-E-let-a-surplus-offset-a-deficit',
+		file: 'scripts/export-guard-core.ts',
+		find: '\t\towed += Math.max(0, entry.consumedExports.length - entry.mutants);',
+		replace: '\t\towed += entry.consumedExports.length - entry.mutants;',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: 'A file carrying extra guards does not discharge another file\'s promise. Summing signed shortfalls lets a heavily-guarded file conceal an unguarded one — THE AVERAGING DEFECT THIS ENTIRE PROGRAMME EXISTS TO REMOVE, reappearing inside the instrument that measures it.',
+		source: 'JAN-PFA R3 S3.2'
 	}
 ];

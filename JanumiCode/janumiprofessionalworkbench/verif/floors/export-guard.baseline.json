@@ -1,0 +1,804 @@
+{
+	"note": "DERIVED — never hand-edited. Regenerate with `bun run guards:export` in the same commit as the change that moved it. The unit is the PRODUCTION-CONSUMED VALUE EXPORT.",
+	"generator": "scripts/export-guard.ts --write",
+	"files": {
+		"packages/rph-application/src/command-bus.ts": {
+			"consumedExports": [
+				"Engine"
+			],
+			"mutants": 1
+		},
+		"packages/rph-application/src/context-assembly.ts": {
+			"consumedExports": [
+				"DEFAULT_CONTEXT_ASSEMBLY_POLICY",
+				"DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID",
+				"permits",
+				"resolveContextAssemblyPolicy"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/exchange-resolution.ts": {
+			"consumedExports": [
+				"readAnswerSpan",
+				"verifyExchangeContent"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/execution-invocation.ts": {
+			"consumedExports": [
+				"assembleStepContext",
+				"prepareModelInvocation"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/abandon-authorization.ts": {
+			"consumedExports": [
+				"resolveAbandonAuthorization"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/artifact.ts": {
+			"consumedExports": [
+				"recordArtifact"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/assurance.ts": {
+			"consumedExports": [
+				"activateAssurancePolicy",
+				"admitEvidence",
+				"assertClaim",
+				"beginAssuranceAssessment",
+				"cancelAssuranceAssessment",
+				"completeAssuranceAssessment",
+				"createAssurancePolicy",
+				"detectAssumption",
+				"discloseAssumption",
+				"editAssurancePolicy",
+				"expireAssumption",
+				"falsifyAssumption",
+				"invalidateEvidence",
+				"proposeEvidence",
+				"recordAssuranceObservation",
+				"recordClaimAssessment",
+				"requestAssuranceAssessment",
+				"selectAssuranceEvaluator",
+				"submitEvidenceForAssessment",
+				"supersedeAssurancePolicy",
+				"suspendAssurancePolicy"
+			],
+			"mutants": 8
+		},
+		"packages/rph-application/src/handlers/command-precondition.ts": {
+			"consumedExports": [
+				"allOf",
+				"evaluatePrecondition",
+				"fromStates",
+				"noOpEditPrecondition",
+				"predicate"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/context-assembly-policy.ts": {
+			"consumedExports": [
+				"createContextAssemblyPolicy"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/decomposition.ts": {
+			"consumedExports": [
+				"acceptRecomposition",
+				"beginRecomposition",
+				"completeRecomposition",
+				"proposeDecomposition",
+				"proposeRecomposition",
+				"reviseDecomposition",
+				"validateDecomposition"
+			],
+			"mutants": 7
+		},
+		"packages/rph-application/src/handlers/deferral.ts": {
+			"consumedExports": [
+				"deferScope"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/execution.ts": {
+			"consumedExports": [
+				"activateExecutionPlan",
+				"applyTacticalChange",
+				"approveExecutionPlan",
+				"cancelExecutionPlan",
+				"cancelExecutionStep",
+				"completeExecutionPlan",
+				"completeExecutionStep",
+				"enterExecutionStepWait",
+				"failExecutionPlan",
+				"failExecutionStep",
+				"proposeExecutionPlan",
+				"pruneExecutionStep",
+				"resolveExecutionStepWait",
+				"retryExecutionStep",
+				"skipExecutionStep",
+				"startExecutionStep",
+				"supersedeExecutionPlan"
+			],
+			"mutants": 30
+		},
+		"packages/rph-application/src/handlers/floor-gate.ts": {
+			"consumedExports": [
+				"AI_ACTOR_TYPES",
+				"FLOOR_POLICY_IDS_REQUIRED",
+				"floorGateBlock",
+				"stepOutputIsAiProduced",
+				"stepResultSubjects",
+				"structuredResultHasContent",
+				"unassessableAiContentBlock"
+			],
+			"mutants": 5
+		},
+		"packages/rph-application/src/handlers/governance.ts": {
+			"consumedExports": [
+				"approveBaseline",
+				"approveDecision",
+				"createBaseline",
+				"denyWaiver",
+				"grantWaiver",
+				"promoteBaseline",
+				"proposeDecision",
+				"requestWaiver",
+				"revokeDecision",
+				"submitBaselineForReview",
+				"supersedeBaseline"
+			],
+			"mutants": 2
+		},
+		"packages/rph-application/src/handlers/harness.ts": {
+			"consumedExports": [
+				"proposeHarness"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/intent.ts": {
+			"consumedExports": [
+				"approveIntent",
+				"beginIntentDiscovery",
+				"captureIntent",
+				"formalizeIntent",
+				"provisionIntent",
+				"reviseIntent",
+				"supersedeIntent"
+			],
+			"mutants": 6
+		},
+		"packages/rph-application/src/handlers/kit.ts": {
+			"consumedExports": [
+				"advanceStatus",
+				"checkPrecondition",
+				"checkTransition",
+				"commitState",
+				"createObject",
+				"loadOrReject",
+				"makeEvent",
+				"newEnvelope",
+				"nextEnvelope",
+				"preconditionReader",
+				"reject"
+			],
+			"mutants": 4
+		},
+		"packages/rph-application/src/handlers/model-exchange.ts": {
+			"consumedExports": [
+				"recordModelExchange"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/obligation-constraint.ts": {
+			"consumedExports": [
+				"assertConstraint",
+				"assertObligation"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/product-behavior.ts": {
+			"consumedExports": [
+				"defineActor",
+				"defineCapability",
+				"defineRequirement",
+				"defineScenario",
+				"defineUserJourney"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/pwa-authoring.ts": {
+			"consumedExports": [
+				"appendConversationEntries",
+				"createPwa",
+				"createUndertaking",
+				"definePwuType",
+				"deletePwa",
+				"deprecatePwa",
+				"editPwa",
+				"editPwuType",
+				"publishPwa",
+				"removePwuType",
+				"retirePwa",
+				"submitPwaForReview",
+				"validatePwa"
+			],
+			"mutants": 1
+		},
+		"packages/rph-application/src/handlers/pwu.ts": {
+			"consumedExports": [
+				"PWU_SEMANTIC_LIFECYCLE_COMMANDS",
+				"abandonPwu",
+				"baselinePwu",
+				"beginPwuRecomposition",
+				"beginPwuShaping",
+				"blockPwu",
+				"challengePwu",
+				"changePwuState",
+				"completePwuRecomposition",
+				"escalatePwu",
+				"invalidatePwu",
+				"markPwuReady",
+				"proposePwu",
+				"rejectPwu",
+				"reshapePwu",
+				"supersedePwu",
+				"unblockPwu"
+			],
+			"mutants": 10
+		},
+		"packages/rph-application/src/handlers/registry.ts": {
+			"consumedExports": [
+				"HANDLERS"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/reject-authorization.ts": {
+			"consumedExports": [
+				"hasBlockingObservationFor",
+				"resolveRejectAuthorization"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/runtime-binding.ts": {
+			"consumedExports": [
+				"authorizeRuntimeBinding",
+				"denyRuntimeBinding",
+				"requestRuntimeBinding",
+				"revokeRuntimeCapability"
+			],
+			"mutants": 5
+		},
+		"packages/rph-application/src/handlers/skip-authorization.ts": {
+			"consumedExports": [
+				"resolveSkipAuthorization"
+			],
+			"mutants": 10
+		},
+		"packages/rph-application/src/handlers/validator-registry.ts": {
+			"consumedExports": [
+				"disableValidator",
+				"enableValidator",
+				"markValidatorDegraded",
+				"registerValidator",
+				"restoreValidator"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/handlers/waiver-authorization.ts": {
+			"consumedExports": [
+				"resolveWaiverAuthorization"
+			],
+			"mutants": 0
+		},
+		"packages/rph-application/src/prompt-render.ts": {
+			"consumedExports": [
+				"markersIn",
+				"promptTemplateFingerprint",
+				"renderPromptTemplate"
+			],
+			"mutants": 0
+		},
+		"packages/rph-assurance/src/applicability.ts": {
+			"consumedExports": [
+				"evaluateApplicability"
+			],
+			"mutants": 0
+		},
+		"packages/rph-assurance/src/assurance-rules.ts": {
+			"consumedExports": [
+				"BLOCKING_SEVERITIES",
+				"aggregateDisposition",
+				"checkIndependence",
+				"classifyValidatorResult",
+				"dispositionFromFindings",
+				"evidenceAdmissibility"
+			],
+			"mutants": 2
+		},
+		"packages/rph-assurance/src/floor-policies.ts": {
+			"consumedExports": [
+				"FLOOR_POLICY_DEFINITIONS",
+				"findingsFor",
+				"humanizeCode"
+			],
+			"mutants": 0
+		},
+		"packages/rph-assurance/src/floor.ts": {
+			"consumedExports": [
+				"FLOOR_POLICY_IDS",
+				"composeAssuranceOutcome",
+				"deMinimisFloorPlan",
+				"identityProvenanceValidator",
+				"schemaInvariantValidator"
+			],
+			"mutants": 0
+		},
+		"packages/rph-assurance/src/recording.ts": {
+			"consumedExports": [
+				"assuranceRecordingPlan"
+			],
+			"mutants": 0
+		},
+		"packages/rph-assurance/src/validators.ts": {
+			"consumedExports": [
+				"REASONING_REVIEW_CRITERIA",
+				"createValidatorRegistry",
+				"identityProvenanceValidatorInstance",
+				"reasoningReviewResultFromJudgement",
+				"runFloorAndPlanRecording",
+				"schemaInvariantValidatorInstance"
+			],
+			"mutants": 0
+		},
+		"packages/rph-authoring/src/broker.ts": {
+			"consumedExports": [
+				"PwaAuthoringBroker"
+			],
+			"mutants": 2
+		},
+		"packages/rph-authoring/src/catalog.ts": {
+			"consumedExports": [
+				"PWU_TYPE_CATALOG",
+				"PWU_TYPE_HELP",
+				"catalogTemplate"
+			],
+			"mutants": 0
+		},
+		"packages/rph-authoring/src/lint.ts": {
+			"consumedExports": [
+				"lintComposition"
+			],
+			"mutants": 0
+		},
+		"packages/rph-contracts/src/common.ts": {
+			"consumedExports": [
+				"ExtensionPayloadSchema",
+				"NonNegativeIntSchema",
+				"RevisionSchema",
+				"RfcTimestampSchema",
+				"SchemaVersionSchema",
+				"SemanticVersionSchema"
+			],
+			"mutants": 0
+		},
+		"packages/rph-contracts/src/envelopes.ts": {
+			"consumedExports": [
+				"ActorReferenceSchema",
+				"CommandResultSchema",
+				"DomainCommandSchema",
+				"DomainEventSchema",
+				"ObjectEnvelopeSchema",
+				"ProvenanceRecordSchema",
+				"objectEnvelopeShape"
+			],
+			"mutants": 0
+		},
+		"packages/rph-contracts/src/errors.ts": {
+			"consumedExports": [
+				"RphErrorException",
+				"RphErrorSchema",
+				"makeRphError"
+			],
+			"mutants": 2
+		},
+		"packages/rph-contracts/src/gen/schema-manifest.ts": {
+			"consumedExports": [
+				"emittedSchemas"
+			],
+			"mutants": 1
+		},
+		"packages/rph-contracts/src/ids.ts": {
+			"consumedExports": [
+				"RphIdSchema",
+				"mintId"
+			],
+			"mutants": 0
+		},
+		"packages/rph-contracts/src/validate.ts": {
+			"consumedExports": [
+				"jsonSchemaFor",
+				"schemaId",
+				"validateAgainst"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/aggregate-assurance.ts": {
+			"consumedExports": [
+				"aggregateAssuranceDisposition"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/condition-grammar.ts": {
+			"consumedExports": [
+				"ConditionExpressionSchema",
+				"buildConditionSubject",
+				"conditionStepRefs",
+				"evaluateGuardExpression"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/conformance-manifest.ts": {
+			"consumedExports": [],
+			"mutants": 2
+		},
+		"packages/rph-domain/src/decomposition.ts": {
+			"consumedExports": [
+				"assessFalsification",
+				"canAuthorizeNewWork",
+				"evaluateRecomposition",
+				"validateConstraintPropagation",
+				"validateObligationConservation"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/enforcement-register.ts": {
+			"consumedExports": [],
+			"mutants": 8
+		},
+		"packages/rph-domain/src/execution-failure-taxonomy.ts": {
+			"consumedExports": [
+				"isPermittedForFailure",
+				"permittedControlActionsForFailure"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/execution.ts": {
+			"consumedExports": [
+				"RETRY_EXHAUSTION_ACTIONS",
+				"attemptsMadeFrom",
+				"authorizationOutcome",
+				"bindingAuthorityVerdict",
+				"canActivatePlan",
+				"canResumeExecutionOnPwu",
+				"canSkipStep",
+				"capabilityAuthorized",
+				"capabilityIdentities",
+				"grantIsMonotone",
+				"grantedWithinRequest",
+				"lastFailureClassFrom",
+				"planEvidencesExecutionSuccess",
+				"retryCapFrom",
+				"retryDecision",
+				"stepMayBecomeReady",
+				"validateStepCompletion"
+			],
+			"mutants": 23
+		},
+		"packages/rph-domain/src/governance.ts": {
+			"consumedExports": [
+				"applicabilityPermitsAssessment",
+				"applicabilitySubjectFrom",
+				"assessmentHasConcluded",
+				"authorizeDecisionEffective",
+				"canPromoteBaseline",
+				"decisionAuthorizesVersions",
+				"policyApplicability"
+			],
+			"mutants": 2
+		},
+		"packages/rph-domain/src/machine-exclusions.ts": {
+			"consumedExports": [],
+			"mutants": 1
+		},
+		"packages/rph-domain/src/plan-proposal.ts": {
+			"consumedExports": [
+				"validateProposedPlan"
+			],
+			"mutants": 2
+		},
+		"packages/rph-domain/src/pwu-lifecycle-command-spec.ts": {
+			"consumedExports": [
+				"PWU_LIFECYCLE_COMMAND_SPECS",
+				"PWU_RECOVERY_COMMAND_SPECS",
+				"checkDeclaredSource",
+				"declaredRecoveryTargets",
+				"ownerOfArrow"
+			],
+			"mutants": 3
+		},
+		"packages/rph-domain/src/pwuGuards.ts": {
+			"consumedExports": [
+				"canAdvanceWorkLifecycle",
+				"checkPwuShapeReadiness",
+				"satisfiesP1"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/stateMachine.ts": {
+			"consumedExports": [
+				"canTransition",
+				"classifyTransition",
+				"getMachine",
+				"isTerminalState"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/step-command-spec.ts": {
+			"consumedExports": [
+				"STEP_COMMAND_SPECS"
+			],
+			"mutants": 15
+		},
+		"packages/rph-domain/src/traceability.ts": {
+			"consumedExports": [
+				"TraceGraph",
+				"classifyEvidenceInvalidation"
+			],
+			"mutants": 0
+		},
+		"packages/rph-domain/src/transition-gate.ts": {
+			"consumedExports": [
+				"inEdgeDisposition",
+				"isTerminalSuccessStepState",
+				"prunableStepIds",
+				"pruneProvenance",
+				"resolveBranchSelection",
+				"startStepGate",
+				"startableStepIds",
+				"validateTransitionGraph"
+			],
+			"mutants": 10
+		},
+		"packages/rph-engine/src/assessment-drive.ts": {
+			"consumedExports": [
+				"driveAssessmentToAssessing"
+			],
+			"mutants": 0
+		},
+		"packages/rph-engine/src/engine.ts": {
+			"consumedExports": [
+				"createEngine"
+			],
+			"mutants": 0
+		},
+		"packages/rph-engine/src/governing-policies.ts": {
+			"consumedExports": [
+				"requireGoverningPolicies",
+				"selectGoverningPolicies"
+			],
+			"mutants": 0
+		},
+		"packages/rph-engine/src/professional-work-graph.ts": {
+			"consumedExports": [
+				"professionalWorkGraph"
+			],
+			"mutants": 2
+		},
+		"packages/rph-engine/src/queries.ts": {
+			"consumedExports": [
+				"getConversation",
+				"getObject",
+				"getObjectOfType",
+				"listAssessments",
+				"listAssurancePolicies",
+				"listBaselines",
+				"listByType",
+				"listConversations",
+				"listDecisions",
+				"listExecutionPlans",
+				"listGovernedObjects",
+				"listObservations",
+				"listPwas",
+				"listPwuTypes",
+				"listPwus",
+				"listUndertakings"
+			],
+			"mutants": 3
+		},
+		"packages/rph-engine/src/record-assurance.ts": {
+			"consumedExports": [
+				"recordAssuranceRecordingPlan"
+			],
+			"mutants": 1
+		},
+		"packages/rph-engine/src/reference-undertaking.ts": {
+			"consumedExports": [
+				"REFERENCE_OPEN_RESIDUALS",
+				"driveReferenceUndertaking"
+			],
+			"mutants": 0
+		},
+		"packages/rph-engine/src/seed-workbench.ts": {
+			"consumedExports": [
+				"SEED_UNDERTAKING",
+				"seedPolicyLibrary",
+				"seedWorkbench"
+			],
+			"mutants": 0
+		},
+		"packages/rph-persistence/src/schema.ts": {
+			"consumedExports": [
+				"SCHEMA_SQL",
+				"SCHEMA_VERSION",
+				"planMigration"
+			],
+			"mutants": 0
+		},
+		"packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts": {
+			"consumedExports": [
+				"SnapshotOverlayStorageAdapter"
+			],
+			"mutants": 0
+		},
+		"packages/rph-persistence/src/sql-driver.ts": {
+			"consumedExports": [
+				"createSqliteDriver"
+			],
+			"mutants": 0
+		},
+		"packages/rph-persistence/src/sqlite-artifact-store.ts": {
+			"consumedExports": [
+				"SQLITE_STORAGE_PROVIDER",
+				"SqliteArtifactStore"
+			],
+			"mutants": 0
+		},
+		"packages/rph-persistence/src/sqlite-storage-adapter.ts": {
+			"consumedExports": [
+				"SqliteStorageAdapter"
+			],
+			"mutants": 0
+		},
+		"packages/rph-ports/src/artifact-store-contract.ts": {
+			"consumedExports": [
+				"artifactStoreContract"
+			],
+			"mutants": 0
+		},
+		"packages/rph-ports/src/defaults/artifact-store.ts": {
+			"consumedExports": [
+				"createInMemoryArtifactStore"
+			],
+			"mutants": 0
+		},
+		"packages/rph-ports/src/defaults/logger.ts": {
+			"consumedExports": [
+				"NoopLogger"
+			],
+			"mutants": 0
+		},
+		"packages/rph-ports/src/ports/authentication.ts": {
+			"consumedExports": [
+				"asCredential"
+			],
+			"mutants": 0
+		},
+		"packages/rph-ports/src/ports/logger.ts": {
+			"consumedExports": [
+				"LOG_LEVEL_ORDER"
+			],
+			"mutants": 0
+		},
+		"packages/rph-product-realization-pwa/src/ontology.ts": {
+			"consumedExports": [
+				"validateOntology"
+			],
+			"mutants": 1
+		},
+		"packages/rph-projections/src/assurance-view.ts": {
+			"consumedExports": [
+				"aggregateDispositionFor",
+				"buildApplicablePolicies",
+				"buildAssuranceView"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/composition-plan.ts": {
+			"consumedExports": [
+				"planComposition"
+			],
+			"mutants": 2
+		},
+		"packages/rph-projections/src/execution-attempts.ts": {
+			"consumedExports": [
+				"executionAttempts"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/execution-view.ts": {
+			"consumedExports": [
+				"conditionEvaluatorFor",
+				"plansForPwus",
+				"prunableStepIds",
+				"sequenceView",
+				"startableStepIds",
+				"transitionRows"
+			],
+			"mutants": 10
+		},
+		"packages/rph-projections/src/graph-view.ts": {
+			"consumedExports": [
+				"pwuGraphNode"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/handoff-order.ts": {
+			"consumedExports": [
+				"handoffFindings",
+				"layerHandoff"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/leaf.ts": {
+			"consumedExports": [
+				"leafKind",
+				"leafKindLabel"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/projector.ts": {
+			"consumedExports": [
+				"rebuildProjection"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/pwa-graph-report.ts": {
+			"consumedExports": [
+				"formatPwaCoherenceReport"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/pwa-graph.ts": {
+			"consumedExports": [
+				"analyzePwaGraph",
+				"buildPwaGraphExport"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/pwu-behavior.ts": {
+			"consumedExports": [
+				"buildPwuBehaviorProjection"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/pwu-replay.ts": {
+			"consumedExports": [
+				"applyPwuAxisEvent",
+				"replayPwuAxes"
+			],
+			"mutants": 1
+		},
+		"packages/rph-projections/src/traceability-view.ts": {
+			"consumedExports": [
+				"traceabilityProjector"
+			],
+			"mutants": 0
+		},
+		"packages/rph-projections/src/uncertainty-disclosure.ts": {
+			"consumedExports": [
+				"uncertaintyDisclosures"
+			],
+			"mutants": 2
+		},
+		"packages/rph-projections/src/work-projection.ts": {
+			"consumedExports": [
+				"isQualifiedSuccess"
+			],
+			"mutants": 0
+		}
+	}
+}
