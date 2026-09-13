@@ -587,4 +587,117 @@ describe('PWA authoring — what a write leaves behind', () => {
 		store.fault = undefined;
 		expect(store.loadObject(ROOT)).toBeUndefined();
 	});
+
+	// ── 6. A DeletePwa refusal answers with the RIGHT code, across the whole refusal set ─────────────────────
+
+	it('DeletePwa answers each of its three refusals with the code its condition earns — tombstone and in-use are INVARIANT, absent is VALIDATION', () => {
+		// THE PROMISE IS ABOUT THE CODE, NOT THE SENTENCE. The ratified taxonomy (DOC-007 §25.1, rendered by
+		// JPWB-SPEC-001's fifteen-row table) attaches a DISPOSITION to each code, and the Surface shows it:
+		// `RPH_VALIDATION_SEMANTIC_FAILED` (row 2, category VALIDATION) means "correct the input and re-derive
+		// before re-issuing"; `RPH_INVARIANT_VIOLATION` (row 6, category INVARIANT) means "satisfy the
+		// invariant's precondition; do not re-issue unchanged". `makeRphError` derives `category` from the code,
+		// so the code alone decides what the professional is told to DO about the refusal. A DELIBERATE
+		// TOMBSTONE reported as VALIDATION would say "what you addressed is not admissible input" — the same
+		// answer as a PWA that never existed — and would invite the one retry that can never succeed. The
+		// handler's docblock makes this branch load-bearing on purpose: "a second delete of an already-DISCARDED
+		// PWA is rejected by the EXPLICIT already-DISCARDED guard". Reachable from the Library card: the demo's
+		// `delete` action (apps/rph-demo/src/routes/+page.server.ts) dispatches DeletePwa with an id read off
+		// the submitted form, so a re-submit of a page rendered before the delete issues exactly this command,
+		// and its `error.message`/code is what the card then shows.
+		//
+		// ⚠ ASSERTED OVER THE WHOLE REFUSAL SET, NOT ONE MEMBER. DeletePwa refuses in three ways and TWO of them
+		// are domain-invariant; a test pinning only the tombstone would let a narrowing of the in-use refusal
+		// through unseen. Every row names itself in the failure message.
+		createDraftPwa();
+
+		// CONTROL — the guard still ADMITS the legitimate act. An unused DRAFT PWA is deleted, with no error at
+		// all. A guard that refused every DeletePwa would satisfy all three refusal rows below and fail HERE,
+		// which is the only reason those rows mean anything.
+		const legitimate = d('DeletePwa', { pwaId: PWA }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(legitimate.status, JSON.stringify(legitimate.error)).toBe('ACCEPTED');
+		expect(legitimate.error).toBeUndefined();
+		expect(pubStatus()).toBe('DISCARDED');
+
+		// OTHER_PWA is published with one Undertaking instantiated from it — the second invariant refusal.
+		createDraftPwa(OTHER_PWA);
+		defineType(FOREIGN_ROOT, { isRoot: true }, OTHER_PWA);
+		expect(d('SubmitPwaForReview', {}, OTHER_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status).toBe(
+			'ACCEPTED'
+		);
+		expect(d('ValidatePwa', {}, OTHER_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status).toBe(
+			'ACCEPTED'
+		);
+		expect(
+			d('PublishPwa', { rootPwuTypeId: FOREIGN_ROOT }, OTHER_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE')
+				.status
+		).toBe('ACCEPTED');
+		expect(
+			d(
+				'CreateUndertaking',
+				{
+					undertakingId: UND,
+					name: 'U',
+					description: 'd',
+					pwaId: OTHER_PWA,
+					pwaVersion: '1.0.0',
+					instantiationProfile: 'Standard',
+					objective: 'o',
+					intendedOutputProduct: 'p'
+				},
+				UND,
+				'UNDERTAKING'
+			).status
+		).toBe('ACCEPTED');
+
+		const tombstone = d('DeletePwa', { pwaId: PWA }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		const inUse = d('DeletePwa', { pwaId: OTHER_PWA }, OTHER_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		const absent = d(
+			'DeletePwa',
+			{ pwaId: ABSENT_PWA },
+			ABSENT_PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		const refusals = [
+			{
+				member: 'already-deleted (a deliberate tombstone the professional created)',
+				result: tombstone,
+				code: 'RPH_INVARIANT_VIOLATION',
+				category: 'INVARIANT',
+				message: `PWA ${PWA} is already deleted`
+			},
+			{
+				member: 'in use (an Undertaking was instantiated from it)',
+				result: inUse,
+				code: 'RPH_INVARIANT_VIOLATION',
+				category: 'INVARIANT',
+				message: `Cannot delete PWA ${OTHER_PWA}: 1 Undertaking(s) were instantiated from it (it is in use). Deprecate/retire it instead.`
+			},
+			{
+				member: 'absent (no such PWA was ever created)',
+				result: absent,
+				code: 'RPH_VALIDATION_SEMANTIC_FAILED',
+				category: 'VALIDATION',
+				message: `Aggregate ${ABSENT_PWA} does not exist`
+			}
+		];
+		// Every row's STATUS is read before any row's CODE is judged, so that a code failure leaves no dispatch
+		// unread — otherwise this test's own red would arrive wearing REG-F-015's "fix the arrangement" coat.
+		for (const row of refusals)
+			expect(row.result.status, `DeletePwa refusal — ${row.member}`).toBe('REJECTED');
+		for (const row of refusals) {
+			const where = `DeletePwa refusal — ${row.member}`;
+			expect(row.result.error?.code, where).toBe(row.code);
+			expect(row.result.error?.category, where).toBe(row.category);
+			expect(row.result.error?.message, where).toBe(row.message);
+		}
+		// And the discrimination stated as itself: a state the professional PRODUCED and a target that never
+		// existed must not come back as the same kind of answer.
+		expect(tombstone.error?.code, 'a tombstone must not report as an absent aggregate').not.toBe(
+			absent.error?.code
+		);
+		// The refusal is the whole effect: no second tombstone was appended for PWA (the docblock's
+		// "idempotent-safe" is a REFUSAL, not a second write), and the in-use PWA is exactly as it was.
+		expect(store.readAllEvents().filter((e) => e.eventType === 'PwaDeleted')).toHaveLength(1);
+		expect(pubStatus(OTHER_PWA)).toBe('PUBLISHED');
+	});
 });

@@ -294,7 +294,21 @@
 				"submitPwaForReview",
 				"validatePwa"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"appendConversationEntries",
+				"createPwa",
+				"createUndertaking",
+				"definePwuType",
+				"deletePwa",
+				"deprecatePwa",
+				"editPwa",
+				"editPwuType",
+				"publishPwa",
+				"removePwuType",
+				"retirePwa",
+				"submitPwaForReview",
+				"validatePwa"
+			],
 			"unattributedMutants": 1
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
@@ -318,10 +332,22 @@
 				"unblockPwu"
 			],
 			"guardedExports": [
+				"abandonPwu",
+				"baselinePwu",
 				"beginPwuRecomposition",
+				"beginPwuShaping",
+				"blockPwu",
+				"challengePwu",
+				"changePwuState",
 				"completePwuRecomposition",
+				"escalatePwu",
+				"invalidatePwu",
+				"markPwuReady",
 				"proposePwu",
 				"PWU_SEMANTIC_LIFECYCLE_COMMANDS",
+				"rejectPwu",
+				"reshapePwu",
+				"supersedePwu",
 				"unblockPwu"
 			],
 			"unattributedMutants": 3

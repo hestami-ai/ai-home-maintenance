@@ -4,8 +4,9 @@
 // a stale previousState, and an illegal sub-axis jump (executionState NOT_PLANNED -> RUNNING skipping QUEUED).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
-import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { TEST_CRED, testAuthenticator, testPrincipal } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { getMachine } from '@janumipwb/rph-domain';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { seedPolicy } from './__tests__/floor-fixtures.js';
@@ -1093,5 +1094,388 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			(emitted[0]!.payload as { triggeringObjectId?: string }).triggeringObjectId,
 			'the governed event records a trigger that exists'
 		).toBe('asm_01ARZ3NDEKTSV4RRFFQ69G5X50');
+	});
+
+	// ══ JAN-PFA S3.3 — THE ASSERTIONS THE FORTY SURVIVORS NAMED ═══════════════════════════════════════════════
+	//
+	// Each block below closes ONE precision gap: a promise this file drove but never asserted, so a mutant that
+	// broke the promise and left the drive green SURVIVED. They are assertions, not more mutants — and every one
+	// carries a CONTROL, because the shape that produced these gaps is a suite that proved a refusal HAPPENS and
+	// never that it was PRECISE. A guard that refused everything would satisfy the refusal half alone.
+
+	/** The shape-integrity axis as committed — read live, so no assertion below pins a value the fixture chose. */
+	function shapeIntegrity(): string {
+		return (store.loadObject(PWU_ID)?.state as { shapeIntegrityState: string }).shapeIntegrityState;
+	}
+
+	// ── markPwuReady: THE VERSION PRECONDITION IS TWO-SIDED ──────────────────────────────────────────────────
+	//
+	// The shipped staleness test states version 2 against a PWU at 1 — ONE member of the set "every version this
+	// PWU is not at", and the member on the HIGH side. A guard narrowed from `!==` to `>` keeps that refusal and
+	// admits every version BELOW, which is exactly the direction the handler's own docblock calls this check's
+	// purpose ("the STALE-attestation guard in waiting"). `expectedSemanticVersion` is `z.number().int()`, so a
+	// caller can state 0 or -1 through the ordinary command bus; nothing had ever asked what happens then.
+	it('MarkPwuReady refuses EVERY semantic version this PWU is not at — BELOW as well as above', () => {
+		seedIntent();
+		expect(engine.dispatch(cmd('ProposePwu', proposePayload())).status).toBe('ACCEPTED');
+		expect(engine.dispatch(cmd('BeginPwuShaping', {})).status).toBe('ACCEPTED');
+		// DERIVED from the live object, never hard-coded: the wrong versions are the neighbours on BOTH sides of
+		// whatever version this PWU is actually at.
+		const actual = store.loadObject(PWU_ID)!.semanticVersion;
+		const wrong = [actual - 2, actual - 1, actual + 1, actual + 2];
+		for (const v of wrong) {
+			const r = engine.dispatch(
+				cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: v })
+			);
+			expect(
+				r.status,
+				`expectedSemanticVersion ${v} states a version this PWU (at ${actual}) is not at, and was admitted`
+			).toBe('CONFLICT');
+			expect(r.error?.code, `expectedSemanticVersion ${v}`).toBe('RPH_REVISION_CONFLICT');
+			expect(r.error?.message, `expectedSemanticVersion ${v}`).toContain(
+				`is at semantic version ${actual}`
+			);
+			expect(lifecycle(), `expectedSemanticVersion ${v} advanced the PWU`).toBe('SHAPING');
+		}
+		// CONTROL — the precondition still ADMITS the caller who states the version the PWU is at. Without it a
+		// guard that refused every MarkPwuReady would satisfy the loop above.
+		const ok = engine.dispatch(
+			cmd('MarkPwuReady', {
+				shapeReadinessAssessmentId: 'assess_x',
+				expectedSemanticVersion: actual
+			})
+		);
+		expect(ok.status, ok.error?.message).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('READY');
+	});
+
+	// ── changePwuState: EACH SUB-AXIS IS CHECKED ON ITS OWN MACHINE ──────────────────────────────────────────
+	//
+	// The handler's own line: "Each sub-axis must move legally on its own machine." Three entries, three machines.
+	// This file drove an illegal `executionState` jump and an illegal workLifecycle jump and never once asked the
+	// shapeIntegrity axis anything — so a mutant that rewrites the third entry to check `assuranceState` a SECOND
+	// time (same array length, same call count, the REG-F-159 count-based-pin shape) leaves `PWU.shapeIntegrityState`
+	// validated by NOTHING and the suite green. `checkTransition` on that machine has exactly one call site.
+	//
+	// The illegal target set is DERIVED from the machine, not listed: pinning one target would let a mutant
+	// narrow the check to that one pair and survive.
+	it('ChangePwuState validates the shapeIntegrity axis on ITS OWN machine, for every illegal target', () => {
+		const a = readyAxes();
+		const machine = getMachine('PWU.shapeIntegrityState');
+		const from = a.shapeIntegrityState;
+		const legal = new Set(machine.transitions.filter((t) => t.from === from).map((t) => t.to));
+		const illegalTargets = machine.states.filter((s) => s !== from && !legal.has(s));
+		expect(
+			illegalTargets.length,
+			`fixture: PWU.shapeIntegrityState must offer more than one illegal target out of ${from}, or this loop pins a single member`
+		).toBeGreaterThan(1);
+		for (const to of illegalTargets) {
+			const r = engine.dispatch(
+				change({
+					previousState: a.workLifecycleState,
+					newState: a.workLifecycleState,
+					executionState: a.executionState,
+					assuranceState: a.assuranceState,
+					shapeIntegrityState: to
+				})
+			);
+			expect(
+				r.status,
+				`${from} -> ${to} is not an arrow on PWU.shapeIntegrityState and was admitted`
+			).toBe('REJECTED');
+			expect(r.error?.code, `${from} -> ${to}`).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			// THE MESSAGE, NOT THE CODE. Three machines and the workLifecycle guard all return the same code; only
+			// the message says which machine decided, and naming the wrong one is the whole of the mutation.
+			expect(
+				r.error?.message,
+				`the refusal of ${from} -> ${to} must name PWU.shapeIntegrityState as the machine it was decided on`
+			).toContain(`Illegal transition on PWU.shapeIntegrityState: ${from} -> ${to}`);
+			expect(shapeIntegrity(), `${from} -> ${to} moved the axis`).toBe(from);
+		}
+	});
+
+	// CONTROL for the block above — the shapeIntegrity check still ADMITS the arrow the machine declares. A guard
+	// that refused every shapeIntegrity move would pass the loop above and fail here.
+	it('CONTROL: ChangePwuState ADMITS the shapeIntegrity arrow the machine DOES declare', () => {
+		const a = readyAxes();
+		const machine = getMachine('PWU.shapeIntegrityState');
+		const from = a.shapeIntegrityState;
+		const legal = machine.transitions.filter((t) => t.from === from).map((t) => t.to);
+		expect(
+			legal.length,
+			`this control drives ONE arrow; PWU.shapeIntegrityState now declares ${legal.length} out of ${from} — split it rather than leaving the others undriven`
+		).toBe(1);
+		const r = engine.dispatch(
+			change({
+				previousState: a.workLifecycleState,
+				newState: a.workLifecycleState,
+				executionState: a.executionState,
+				assuranceState: a.assuranceState,
+				shapeIntegrityState: legal[0]!
+			})
+		);
+		expect(r.status, r.error?.message).toBe('ACCEPTED');
+		expect(shapeIntegrity()).toBe(legal[0]);
+	});
+
+	// ── invalidatePwu: THE EVENT IS THE WHOLE DELTA, SO EVERY FIELD OF IT IS THE PROMISE ─────────────────────
+	//
+	// "An invalidation records WHY work stopped being valid." The existing CONTROL drives the command and asserts
+	// `triggeringObjectId` — ONE member of the payload — so a mutant emitting `invalidationReason: p.triggeringObjectId`
+	// ships an invalidation whose recorded reason is an object id, and the suite stays green. The event gate cannot
+	// help: a cross-wired string satisfies `z.string()`, so malformation checks are structurally blind to it, and
+	// `rph-projections/assurance-view.ts` folds this exact field into `reason`.
+	it('PwuInvalidated carries each field the caller supplied — the whole payload, not one member of it', () => {
+		const triggerId = 'asm_01ARZ3NDEKTSV4RRFFQ69G5XA0';
+		satisfiedPwu('A0', triggerId);
+		const reason = 'the evidence supporting the architecture was withdrawn';
+		// Guard the fixture: two arguments that happened to be equal would make a cross-wire invisible.
+		expect(reason, 'the reason and the trigger id must be DISTINCT').not.toBe(triggerId);
+		const r = engine.dispatch(
+			cmd('InvalidatePwu', { invalidationReason: reason, triggeringObjectId: triggerId })
+		);
+		// This ACCEPTANCE is also the control for the two refusals above it in this file: they could both be
+		// unconditional rejects and this is the run that says otherwise.
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('INVALIDATED');
+		const emitted = eventsOfType('PwuInvalidated');
+		expect(emitted).toHaveLength(1);
+		expect(
+			emitted[0]!.payload,
+			'the governed record of an invalidation must carry the reason and the trigger the caller gave, each in its own field'
+		).toEqual({
+			invalidationReason: reason,
+			triggeringObjectId: triggerId,
+			workLifecycleState: 'INVALIDATED'
+		});
+	});
+
+	// ── supersedePwu: THE SUCCESSOR IS THE ENTIRE SUBSTANCE OF THE ACT ───────────────────────────────────────
+	//
+	// NO INVENTORY ENTRY — the promise and the mutation are identified here. `supersedePwu` adds no precondition
+	// over the shared `advancePwuLifecycle`; pwu.ts:1545-1552 states outright that its delta IS the event, and
+	// names `supersedingWorkUnitId` as one of the four fields `ChangePwuStatePayload` cannot express — the sole
+	// justification for minting this command rather than using the generic setter. The shipped drive asserts
+	// `lifecycle()` and replay-equivalence only, and replay is blind here: `pwu-replay.ts` folds PwuSuperseded for
+	// `workLifecycleState` alone, so the successor id is never compared. A mutant writing `command.targetAggregateId`
+	// records a PWU superseded BY ITSELF — a well-formed string, invisible to the event gate, and the chain of
+	// replacement an auditor follows now loops.
+	//
+	// TWO SUBJECTS WITH TWO SUCCESSORS, not one: a single dispatch cannot tell `p.supersedingWorkUnitId` apart
+	// from a constant, from the target's own id, or from any other string equal to the one value a test chose.
+	it('PwuSuperseded records the successor THIS dispatch named, not a fixed id', () => {
+		seedIntent();
+		expect(engine.dispatch(cmd('ProposePwu', proposePayload())).status).toBe('ACCEPTED');
+		const second = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S00';
+		expect(
+			engine.dispatch(
+				cmd(
+					'ProposePwu',
+					{ ...proposePayload(), pwuId: second, title: 'Second Unit' },
+					{ targetAggregateId: second }
+				)
+			).status
+		).toBe('ACCEPTED');
+		const successorOf: Readonly<Record<string, string>> = {
+			[PWU_ID]: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S10',
+			[second]: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S11'
+		};
+		for (const [subject, successor] of Object.entries(successorOf)) {
+			const r = engine.dispatch(
+				cmd('SupersedePwu', { supersedingWorkUnitId: successor }, { targetAggregateId: subject })
+			);
+			// The CONTROL half: the command is still ADMITTED from a declared source state, so an assertion that
+			// passed because supersession had stopped working would be caught here.
+			expect(r.status, `SupersedePwu ${subject}: ${r.error?.message}`).toBe('ACCEPTED');
+			const emitted = store
+				.readAggregateEvents('PROFESSIONAL_WORK_UNIT', subject)
+				.filter((e) => e.eventType === 'PwuSuperseded');
+			expect(emitted, `${subject} emitted no PwuSuperseded`).toHaveLength(1);
+			expect(
+				emitted[0]!.payload,
+				`the successor recorded for ${subject} must be ${successor} — the id this dispatch named`
+			).toEqual({ supersedingWorkUnitId: successor, workLifecycleState: 'SUPERSEDED' });
+		}
+	});
+
+	// ── baselinePwu: THE CITATION MUST CLEAR ALL THREE LIMBS, NOT ONE ────────────────────────────────────────
+	//
+	// `baselineBacksPwu` is a CONJUNCTION — the cited object must (1) be a BASELINE, (2) be AUTHORITATIVE, and
+	// (3) have frozen THIS PWU in its `itemObjectVersions`. The handler's sentence is about limbs 2 and 3: "the
+	// baseline must already have been PROMOTED, which is what makes this citation an AUTHORIZATION rather than an
+	// ASSERTION" (DOC-002 §8.1 "Authorized promotion decision"; RPH-BAS-004). The shipped test cites an
+	// ASSESSMENT id, which fails limb 1 — so a mutant that admits anything merely of KIND BASELINE keeps that
+	// refusal and hands BASELINED to a CANDIDATE baseline, or to somebody else's authoritative one.
+
+	/** The issuing principal as an ActorReference — derived, because ProposeDecision refuses an authority that is
+	 *  not the actor issuing it (REG-F-014), and hard-coding the directory's answer is how that drifts. */
+	function issuingAuthority(): { actorId: string; actorType: 'HUMAN'; displayName: string } {
+		const p = testPrincipal(TEST_CRED.human);
+		return { actorId: p.actorId, actorType: 'HUMAN', displayName: p.displayName };
+	}
+
+	/** Drive a Baseline over `itemObjectIds` along the ratified chain and STOP at `to`, asserting it got there. */
+	function driveBaseline(args: {
+		readonly baselineId: string;
+		readonly decisionId: string;
+		readonly itemObjectIds: readonly string[];
+		readonly requiredAssessmentIds?: readonly string[];
+		readonly to: 'CANDIDATE' | 'APPROVED' | 'AUTHORITATIVE';
+	}): string {
+		const { baselineId, decisionId, itemObjectIds, to } = args;
+		const ok = (r: { status: string; error?: { message?: string } }, what: string): void => {
+			expect(r.status, `${what}: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		const onBaseline = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, { targetAggregateId: baselineId, targetAggregateType: 'BASELINE' });
+		const onDecision = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, { targetAggregateId: decisionId, targetAggregateType: 'DECISION' });
+		const versionsOf = (ids: readonly string[]): Record<string, number> =>
+			Object.fromEntries(ids.map((o) => [o, store.loadObject(o)!.semanticVersion]));
+
+		ok(
+			engine.dispatch(
+				onBaseline('CreateBaseline', {
+					baselineType: 'ARCHITECTURE',
+					itemObjectIds: [...itemObjectIds],
+					assuranceAssessmentIds: [...(args.requiredAssessmentIds ?? [])]
+				})
+			),
+			'CreateBaseline'
+		);
+		if (to !== 'CANDIDATE') {
+			ok(engine.dispatch(onBaseline('SubmitBaselineForReview', {})), 'SubmitBaselineForReview');
+			const option = `Promote ${baselineId}`;
+			ok(
+				engine.dispatch(
+					onDecision('ProposeDecision', {
+						decisionType: 'PROMOTE_BASELINE',
+						// REG-F-073: the decision must NAME the baseline, or an authorization bleeds to another object.
+						subjectObjectIds: [...itemObjectIds, baselineId],
+						selectedOption: option,
+						rationale: 'the items are assured; promotion freezes them as authoritative',
+						authority: issuingAuthority(),
+						consideredObservationIds: []
+					})
+				),
+				'ProposeDecision'
+			);
+			ok(
+				engine.dispatch(
+					onDecision('ApproveDecision', {
+						selectedOption: option,
+						rationale: 'the items are assured; promotion freezes them as authoritative',
+						consideredEvidenceIds: [],
+						consideredObservationIds: [],
+						subjectSemanticVersions: versionsOf([...itemObjectIds, baselineId])
+					})
+				),
+				'ApproveDecision'
+			);
+			ok(
+				engine.dispatch(onBaseline('ApproveBaseline', { approvalDecisionId: decisionId })),
+				'ApproveBaseline'
+			);
+		}
+		if (to === 'AUTHORITATIVE') {
+			ok(
+				engine.dispatch(
+					onBaseline('PromoteBaseline', {
+						promotionDecisionId: decisionId,
+						expectedItemObjectVersions: itemObjectIds.map((o) => ({
+							objectId: o,
+							semanticVersion: store.loadObject(o)!.semanticVersion
+						})),
+						requiredAssessmentIds: [...(args.requiredAssessmentIds ?? [])]
+					})
+				),
+				'PromoteBaseline'
+			);
+		}
+		// ASSERTED POSITIVELY — "the state those dispatches exist to produce is here", not "each dispatch was
+		// ACCEPTED". A refusal below caused by a baseline that never reached `to` would look identical.
+		expect(
+			(store.loadObject(baselineId)?.state as { status?: string } | undefined)?.status,
+			`the fixture baseline ${baselineId} must be ${to}, or the refusal under test is about something else`
+		).toBe(to);
+		return baselineId;
+	}
+
+	it('BaselinePwu refuses a citation failing ANY limb of "an AUTHORITATIVE baseline that froze THIS PWU"', () => {
+		const asm = 'asm_01ARZ3NDEKTSV4RRFFQ69G5XB0';
+		satisfiedPwu('A1', asm);
+
+		// A second PWU, and an AUTHORITATIVE baseline that froze IT rather than this one. Limb 3 is the only limb
+		// that citation fails: it is a BASELINE, and it is AUTHORITATIVE.
+		const other = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5XB4';
+		expect(
+			engine.dispatch(
+				cmd(
+					'ProposePwu',
+					{ ...proposePayload(), pwuId: other, title: 'Someone Else' },
+					{ targetAggregateId: other }
+				)
+			).status
+		).toBe('ACCEPTED');
+
+		const citations: ReadonlyArray<readonly [string, string]> = [
+			['a real object that is not a BASELINE at all (limb 1)', asm],
+			[
+				'a BASELINE over THIS PWU that is still CANDIDATE — created, never promoted (limb 2)',
+				driveBaseline({
+					baselineId: 'bsl_01ARZ3NDEKTSV4RRFFQ69G5XB1',
+					decisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69G5XB2',
+					itemObjectIds: [PWU_ID],
+					requiredAssessmentIds: [asm],
+					to: 'CANDIDATE'
+				})
+			],
+			[
+				'a BASELINE over THIS PWU that is APPROVED and awaiting promotion (limb 2)',
+				driveBaseline({
+					baselineId: 'bsl_01ARZ3NDEKTSV4RRFFQ69G5XB3',
+					decisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69G5XB4',
+					itemObjectIds: [PWU_ID],
+					requiredAssessmentIds: [asm],
+					to: 'APPROVED'
+				})
+			],
+			[
+				'an AUTHORITATIVE BASELINE whose itemObjectVersions freeze ANOTHER PWU (limb 3)',
+				driveBaseline({
+					baselineId: 'bsl_01ARZ3NDEKTSV4RRFFQ69G5XB5',
+					decisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69G5XB6',
+					itemObjectIds: [other],
+					to: 'AUTHORITATIVE'
+				})
+			]
+		];
+
+		for (const [what, baselineId] of citations) {
+			const r = engine.dispatch(cmd('BaselinePwu', { baselineId }));
+			expect(r.status, `BaselinePwu accepted ${what}`).toBe('REJECTED');
+			expect(r.error?.code, what).toBe('RPH_EVIDENCE_MISSING');
+			expect(r.error?.message, what).toContain('is not an AUTHORITATIVE BASELINE');
+			expect(lifecycle(), `the PWU moved on ${what}`).toBe('SATISFIED');
+		}
+	});
+
+	// CONTROL — and it is the half the gap turns on. Every refusal above would also be produced by a guard that
+	// refuses EVERY citation, which is a guard nobody could use. This drives the citation the handler exists to
+	// admit: an AUTHORITATIVE baseline, promoted through the governance chain, whose itemObjectVersions freeze
+	// THIS PWU at the version it is at.
+	it('CONTROL: BaselinePwu ACCEPTS an AUTHORITATIVE baseline whose itemObjectVersions freeze THIS PWU', () => {
+		const asm = 'asm_01ARZ3NDEKTSV4RRFFQ69G5XC0';
+		satisfiedPwu('A2', asm);
+		const baselineId = driveBaseline({
+			baselineId: 'bsl_01ARZ3NDEKTSV4RRFFQ69G5XC1',
+			decisionId: 'dec_01ARZ3NDEKTSV4RRFFQ69G5XC2',
+			itemObjectIds: [PWU_ID],
+			requiredAssessmentIds: [asm],
+			to: 'AUTHORITATIVE'
+		});
+		const r = engine.dispatch(cmd('BaselinePwu', { baselineId }));
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('BASELINED');
 	});
 });

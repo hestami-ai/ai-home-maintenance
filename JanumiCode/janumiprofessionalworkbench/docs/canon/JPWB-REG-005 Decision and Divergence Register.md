@@ -35247,3 +35247,135 @@ forty, and for a handler export the named victim is the strongest available read
 increment 4's five gaps are closed by assertions that did not exist before it. The obligation figure in
 `verif/floors/export-guard.baseline.json` is derived by its own writer and is unaffected — `rph-application`'s 124
 bare exports were already counted as bare and remain so.
+
+---
+
+### REG-F-393 — `JAN-PFA` `S3.3`: I gave eleven parallel agents an exclusive VICTIM and forgot they all had to write the same PRODUCTION file — three of them caught the consequence, and one of the catches overturns a restore rule I have been carrying all programme
+
+- **Date:** 2026-09-13 · **Type:** FINDING (`JAN-PFA` `S3.3`, assertion-first increment 2) ·
+  **Class:** ORCHESTRATION DEFECT, caught by the agents rather than by me · **Status:** ✅ **CLOSED** for this
+  increment (all 25 gaps closed, 25/25 KILLED, production byte-identical to `HEAD`); ⚠ **OPEN** as a rule for
+  every future mutation fan-out.
+
+**THE PARTITION WAS ON THE WRONG FILE.** The fan-out gave each of eleven agents one exclusive victim test file,
+so no two would write the same test. That removed the conflict I had thought about. But a proof-by-mutation
+writes TWO files — the victim AND the production source it mutates — and **seven agents shared
+`handlers/pwa-authoring.ts` while five shared `handlers/pwu.ts`.** ⭐ The general form: **exclusive ownership must
+cover every file the task WRITES, not merely the file it DELIVERS.**
+
+**THREE AGENTS HIT IT INDEPENDENTLY, AND ALL THREE REPORTED IT RATHER THAN ABSORBING IT.**
+
+- One's byte snapshot of `pwa-authoring.ts` **captured a sibling's live mutant** (`editPwa`'s guard widened to
+  admit `VALIDATED`), which vanished seconds later. Writing that snapshot back would have silently
+  **RE-INTRODUCED another agent's mutation into the shared tree.** It rebased its restore baseline onto
+  `git show HEAD:<path>` bytes and fenced every run: refuse to apply unless the file is byte-identical to `HEAD`,
+  verify afterwards that only its own change was present, restore `HEAD` bytes, re-verify.
+- One found its snapshot was **94779 bytes where the file was 94781** at the moment it mutated. The two-byte delta
+  was a sibling's in-flight `supersedePwu` mutant. Writing the snapshot back would have silently **DELETED that
+  agent's work.** It restored by **inverting its own edit** — replace the mutant line with the original, aborting
+  unless it occurs exactly once.
+- One's mutation driver in the **shared scratch directory was overwritten by a sibling's script**, so its next
+  `restore` executed the OTHER agent's program, which aborted without writing and left `pwu.ts` carrying a live
+  mutant. Caught by comparing the file to its snapshot. It moved to a private subdirectory and added a pre-flight
+  snapshot-integrity hash and a post-run file hash to every measurement.
+
+⛔ **AND THIS OVERTURNS A RULE I HAVE BEEN STATING ALL PROGRAMME.** The rule was *"snapshot the production bytes
+before mutating and write them back — never `git checkout`, which cannot tell a harness mutation from other
+uncommitted work."* The second half stands. ⭐ **The first half is false under concurrency: the snapshot
+write-back is destructive in exactly the way `git checkout` is** — it cannot tell the caller's own mutation from a
+sibling's, so it reverts both. The corrected rule: **restore by INVERTING YOUR OWN EDIT, or fence every apply on
+`HEAD` bytes.** A whole-file write-back is safe only when the writer owns the whole file.
+
+⚠ **THIS IS A RECURRENCE, ONE LAYER DEEPER.** `feedback_shared_scratch_across_parallel_agents.md` already records
+that parallel agents must get private scratch directories. I gave them private VICTIMS and thought I had solved
+the sharing problem; the scratch directory and the mutation target were both still shared. **Remedy for the next
+fan-out:** `isolation: 'worktree'` for any agent that must mutate shared production source, or serialize agents
+per production file — the partition must be over the mutated file, not the delivered one.
+
+**WHAT HELD ANYWAY.** `git diff HEAD` over every non-test path under `packages/*/src` is EMPTY: production
+finished byte-identical to `HEAD`. The increment's 25 mutants were then re-applied by the repository's own runner
+against that clean tree and all 25 came back KILLED, so no verdict in this increment rests on an agent's
+self-report of its own restore.
+
+---
+
+### REG-F-394 — `JAN-PFA` `S3.3`: two verdicts that look like SURVIVED and are not — a promise the persistence boundary makes UNOBSERVABLE, and a guard whose RATIONALE is dead while its ARM is live
+
+- **Date:** 2026-09-13 · **Type:** FINDING (`JAN-PFA` `S3.3`, assertion-first increment 2) ·
+  **Class:** MEASURED · **Status:** ✅ **RECORDED** — neither is a gap to be chased; both are distinctions the
+  triage step exists to draw.
+
+**BACKGROUND.** `REG-F-392` established that a surviving mutant means one of two opposite things — an untested
+LIVE promise, or an arm no command can reach — and that the runner prints the same word for both. The previous
+increment found the second kind once (`activateAssurancePolicy`, correctly refused). This increment triaged 25
+gaps and found **25 reachable, none dead** — but two threw up a THIRD and a FOURTH shape.
+
+**⭐ ONE: A PROMISE THE PERSISTENCE BOUNDARY MAKES UNOBSERVABLE.** `editPwuType`'s emitter carries
+`.filter(([, v]) => v !== undefined)`, whose stated promise is that the event *"records what the edit changed
+rather than asserting `undefined` for what it did not"*. Removing that filter leaves the suite **green**, and the
+mechanism is derived rather than guessed: **the event payload is JSON-persisted, and `JSON.stringify` drops
+undefined-valued keys before any test can read them.** So the undefined-HALF of that promise cannot be guarded by
+any store-reading test at this boundary. Only OVER-emission of real values is observable, and that is what the
+landed control catches. ⛔ **A mutation operator that only removes that filter is UNTESTABLE HERE, not a survivor
+to be remediated** — chasing it would produce an assertion that cannot discriminate, which is worse than an open
+gap because it reads as coverage.
+
+- **THE SEARCH BEHIND THAT ABSENCE (CON-000 B3).** The filter was removed from the real source and the whole
+  victim suite run under source resolution: `bunx vitest run packages/rph-application/src/handlers/pwa-authoring.test.ts`
+  → **49 passed, 0 failed.**
+- **THE POSITIVE CONTROL IS THE SAME INSTRUMENT, SAME FILE, SAME RUN, RETURNING THE OPPOSITE ANSWER.** The
+  over-emission mutant `ctl-editPwuType-emit-whole-payload` reddens exactly one test in that same suite, and the
+  landed `MU-PFA-AF2-editPwuType` (dropping `'permittedChildTypeIds'` from the declared field list) is KILLED by
+  it. The suite is therefore **not blind to this payload** — it is blind only to the half the persistence layer
+  erases.
+
+**⭐ TWO: A GUARD WHOSE RATIONALE IS DEAD WHILE ITS ARM IS LIVE — THE EXACT INVERSE OF THE PREVIOUS INCREMENT'S
+FINDING.** `REG-F-109` records `markPwuReady`'s `expectedSemanticVersion` check as a dead guard, on the ground
+that a PWU's `semanticVersion` cannot move, so it can never catch the stale reshape its docblock describes.
+⚠ **That is true of the RATIONALE and false of the GUARD.** `expectedSemanticVersion` is `z.number().int()`, so
+the BELOW-version arm is reachable by an ordinary dispatch: under the `!==` → `>` mutant, a caller attesting
+version `-1` drives `SHAPING → READY`. **The unreachable thing is the reason the docblock gives, not the arm.**
+⭑ `activateAssurancePolicy` was the opposite verdict — a live-looking reason over an arm no command can reach —
+and holding the two side by side is what the triage question is actually for: *reachable* is a property of the
+ARM, and a dead reason does not make one.
+
+**A THIRD THING, RECORDED AS A STATED LIMIT RATHER THAN A CLAIM.** `changePwuState`'s control could not be given
+its own control-only mutant sited in `pwu.ts`: every over-refusal of the `shapeIntegrityState` axis also changes
+the refusal MESSAGE, which the main test pins, so both tests redden together and the control cannot be shown to
+fail INDEPENDENTLY. The clean control-only mutant would delete the `UNKNOWN → PRESERVED` row from
+`rph-domain/src/transitions.data.ts`, outside that agent's ownership and possibly under another agent's mutation
+at the time. Per `feedback_a_control_that_cannot_fail.md` the control is therefore **not** claimed as proven; it
+is recorded as capable of failing (it asserts `ACCEPTED` plus a committed axis move and fails loudly if the
+machine gains or loses an arrow out of `UNKNOWN`) with the demonstration OWED.
+
+---
+
+### REG-F-395 — `JAN-PFA` `S3.3`: I handed an agent a victim path I had glossed rather than copied, and the path I invented would have reddened step ONE of the gate for the whole batch
+
+- **Date:** 2026-09-13 · **Type:** FINDING (`JAN-PFA` `S3.3`, assertion-first increment 2) ·
+  **Class:** MY DEFECT, caught by the agent · **Status:** ✅ **CLOSED** — the assertion landed at a corrected path.
+
+**WHAT I DID.** The gap inventory names `blockPwu`'s victim as
+`packages/rph-engine/src/slices/class-data-unavailable.slice.test.ts`. Building the fan-out I stripped its package
+and directory and re-prefixed the handlers directory I was using for the other ten groups, producing
+`packages/rph-application/src/handlers/class-data-unavailable.slice.test.ts` — **a path that does not exist.**
+
+⛔ **AND THE INVENTED PATH WAS NOT MERELY WRONG, IT WAS BOOBY-TRAPPED.** `verif/slice-ledger.ts` RECOGNITION limb 1
+is `^packages/[^/]+/src/(?:.+/)?[^/]+\.slice\.test\.ts$`, so ANY file at that path is parsed as a Journey Slice and
+must carry a `SLICE` declaration. The agent drove it rather than inferring it: `bun run scripts/slice-ledger.ts
+--check` exits 0 before; with a one-line stub at that exact path it exits 1 with *"slice-ledger:
+packages/rph-application/src/handlers/class-data-unavailable.slice.test.ts — no exported const named SLICE"*; after
+removing the stub it exits 0 again. ⚠ **`slices:ledger:check` is the FIRST step of `gate:fast`**, so my path would
+have reddened the gate for this agent and every sibling in the batch.
+
+**THE AGENT DECLINED THE DODGE.** Satisfying the parser would have required a `SLICE` declaration with a ratified
+`scenarioClass`, non-empty `citedRules` and non-empty `mutants`, plus regenerating two derived artifacts outside
+its ownership — **and would have put a false record in a derived ledger,** since the file asserts one promise of
+one handler and is not a journey. It delivered to `class-data-unavailable-precision.test.ts` instead, dropping only
+the `.slice.` infix, and recorded the deviation and its evidence in the file's own header.
+
+⭐ **THE GENERAL FORM IS ONE THIS REGISTER ALREADY HOLDS.** `feedback_pass_verbatim_tool_output.md` records that a
+tool's message must be passed VERBATIM and never reconstructed from its id. **A file path is the same kind of
+object.** I reconstructed one from its basename plus a directory I had in hand, and the reconstruction was both
+non-existent and gate-breaking. For the remaining burn-down the victim path is to be copied byte-exact out of the
+inventory, and the fan-out is to fail loudly on a victim that is not on disk rather than delegate the discovery.

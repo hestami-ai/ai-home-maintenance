@@ -41,7 +41,11 @@
 //     cross-axis guards refuses NONE of them. They are fail-closed backstops against a divergence between the
 //     declarations and the machine that does not exist today.
 import type { ActorReference, DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
-import { ProfessionalWorkUnitSchema } from '@janumipwb/rph-contracts';
+import {
+	ChallengePwuPayloadSchema,
+	ProfessionalWorkUnitSchema,
+	ReshapePwuPayloadSchema
+} from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -56,6 +60,7 @@ const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 
 
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69J0000';
 const BARE_INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69J0001';
+const INTENT_B = 'int_01ARZ3NDEKTSV4RRFFQ69J0002';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69J0010';
 const PWU_B = 'pwu_01ARZ3NDEKTSV4RRFFQ69J0011';
 /** Never proposed. The whole point of this id is that nothing is stored under it. */
@@ -715,6 +720,224 @@ describe('CON-000 AX-6 at the PWU write path — an unreadable premise is refuse
 			payloadOfLast('PwuEscalated').unobtainableEvidenceIds,
 			'PwuEscalated must carry the evidence it declared unobtainable'
 		).toEqual(unobtainableEvidenceIds);
+	});
+
+	// ────────────────────────────────────────────────────────────────────────────────────────────────────────
+	// D2. THE DELTA IS THE EVENT — A COMMAND MINTED TO RECORD A REASON MUST RECORD THE REASON IT WAS GIVEN
+	// ────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * `challengePwu` and `reshapePwu` add NOTHING to the shared lifecycle move except the words they write down,
+	 * and `pwu.ts` says exactly that where it argues why the generic setter may not perform their arrows: they
+	 * *"add NO precondition at all over the shared `advancePwuLifecycle`. Their delta is the EVENT:
+	 * `PwuChallenged`, `PwuReshapingStarted`, `PwuSuperseded`, `PwuInvalidated` each carry fields
+	 * (`challengeReason`, `reason`, `supersedingWorkUnitId`, `triggeringObjectId`) that `ChangePwuStatePayload`
+	 * cannot express"*. Those fields are therefore THE WHOLE OF WHAT EITHER COMMAND ADDS, and the required ones —
+	 * `challengeReason`, `reason` — were asserted by NOTHING in this repository.
+	 *
+	 * ⚠ EVERYTHING AROUND THEM WAS ALREADY PINNED, WHICH IS WHY THE HOLE LOOKED CLOSED. The arrow is driven and
+	 * asserted (`pwu.test.ts` :: 'ChallengePwu drives READY -> CHALLENGED', 'ReshapePwu drives UNDER_ASSURANCE ->
+	 * RESHAPING'); the event's EXISTENCE is pinned there too (`toHaveLength(1)`); the OPTIONAL citations are
+	 * pinned immediately above. A handler that moved the axis, emitted the event, carried the optional citation
+	 * and wrote a justification OF ITS OWN CHOOSING satisfied all of it — and left the governed record saying
+	 * something no professional ever said.
+	 *
+	 * ⚠ AND NO SCHEMA GATE CAN OBJECT, for the reason `invalidatePwu`'s own struck comment gives about `''`: a
+	 * substituted string is well formed by construction. `PwuChallengedPayloadSchema.challengeReason` and
+	 * `PwuReshapingStartedPayloadSchema.reason` are both `z.string()`, so the (d2) event gate accepts an invented
+	 * sentence exactly as readily as a carried one. Only a comparison against the COMMAND can tell them apart.
+	 *
+	 * THE FIELD LIST IS DERIVED, NOT WRITTEN DOWN. `expectEveryDeclaredFieldCarried` reads the ratified command
+	 * schema's own keys and first requires the case to have SUPPLIED every one of them, so the promise is asserted
+	 * over the WHOLE set each command declares rather than over whichever member an author happened to think of.
+	 * A field added to either command tomorrow reddens this the moment it is declared, instead of arriving
+	 * uncarried and unnoticed. (`markPwuReady` renames its field on the way through — `shapeReadinessAssessmentId`
+	 * becomes `shapeReadinessAttestationId`, per the vocab's recorded drift — so same-name carriage is NOT a
+	 * universal rule of this file; it is what these two commands promise, and that is what is asserted.)
+	 */
+	const expectEveryDeclaredFieldCarried = (
+		commandType: string,
+		declaredBy: { shape: Record<string, unknown> },
+		eventType: string,
+		supplied: Record<string, unknown>,
+		pwuId: string
+	) => {
+		const declared = Object.keys(declaredBy.shape).sort();
+		expect(
+			Object.keys(supplied).sort(),
+			`${commandType}: this case must supply EVERY field the ratified command schema declares — a field it ` +
+				`leaves out is a field the comparison below cannot see, and the promise is over all of them`
+		).toEqual(declared);
+		const event = payloadOfLast(eventType, pwuId);
+		for (const field of declared) {
+			expect(
+				event[field],
+				`${eventType}.${field} must carry what the ${commandType} SAID — this field is the entire delta ` +
+					`this command adds over the generic setter, so a value the handler chose for itself is a ` +
+					`governed record of something nobody stated`
+			).toEqual(supplied[field]);
+		}
+	};
+
+	/** PROPOSED -> SHAPING -> READY by COMMAND alone — no seeded state, so the arrangement is one a professional
+	 *  can actually perform. */
+	const readyByCommand = (pwuId: string, intentId: string) => {
+		ok(proposePwu(pwuId, intentId), `ProposePwu ${pwuId}`);
+		ok(dispatch('BeginPwuShaping', {}, pwuId), `BeginPwuShaping ${pwuId}`);
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{
+					shapeReadinessAssessmentId: 'asr_01ARZ3NDEKTSV4RRFFQ69J0070',
+					expectedSemanticVersion: 1
+				},
+				pwuId
+			),
+			`MarkPwuReady ${pwuId}`
+		);
+		expect(axis('workLifecycleState', pwuId), `${pwuId} must reach READY by command`).toBe('READY');
+	};
+
+	/** ... then READY -> PLANNED -> EXECUTING, which the GENERIC SETTER owns — no semantic command claims either
+	 *  arrow, so `rejectArrowOwnedBySemanticCommand` lets both through and `ReshapePwu`'s first declared source is
+	 *  reached without writing the store. (Its second, UNDER_ASSURANCE, is driven by command in `pwu.test.ts` ::
+	 *  'ReshapePwu drives UNDER_ASSURANCE -> RESHAPING'.) */
+	const executingByCommand = (pwuId: string, intentId: string) => {
+		readyByCommand(pwuId, intentId);
+		ok(
+			change({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' }, pwuId),
+			`${pwuId} READY -> PLANNED`
+		);
+		ok(
+			change({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' }, pwuId),
+			`${pwuId} PLANNED -> EXECUTING`
+		);
+		expect(axis('workLifecycleState', pwuId), `${pwuId} must reach EXECUTING by command`).toBe(
+			'EXECUTING'
+		);
+	};
+
+	/**
+	 * THE MUTANT: `challengeReason: p.challengeReason` becomes any constant. Every assertion that existed before
+	 * this case stayed green under it.
+	 *
+	 * TWO CONTROLS, EACH WITH ITS OWN VICTIM.
+	 *   * ADMISSION — the challenge is ACCEPTED and the work actually arrives at CHALLENGED. A handler that
+	 *     refused challenges, or emitted the event without committing the move, reddens here and cannot buy the
+	 *     rows above by emitting nothing.
+	 *   * DISCRIMINATION — a SECOND challenge, on a SECOND PWU, differing in every declared field. A constant
+	 *     fails both rows; a handler that echoed the FIRST challenge's words (a captured or shared value) would
+	 *     satisfy the first row and redden only this one, which is the failure a single-case pin cannot see.
+	 */
+	it('records what the challenger actually said — PwuChallenged carries every field ChallengePwu declares, and a second challenge records its own words', () => {
+		provisionedIntent(INTENT, 'product-realization-pwa', '1.3.0');
+		provisionedIntent(INTENT_B, 'product-realization-pwa', '1.3.0');
+		readyByCommand(PWU, INTENT);
+		readyByCommand(PWU_B, INTENT_B);
+
+		const raised = {
+			challengeReason: 'the boundary excludes the integration surface the obligation names',
+			observationIds: ['aob_01ARZ3NDEKTSV4RRFFQ69J0071', 'aob_01ARZ3NDEKTSV4RRFFQ69J0072']
+		};
+		ok(dispatch('ChallengePwu', raised, PWU), 'ChallengePwu');
+		expectEveryDeclaredFieldCarried(
+			'ChallengePwu',
+			ChallengePwuPayloadSchema,
+			'PwuChallenged',
+			raised,
+			PWU
+		);
+		// CONTROL (admission): the legitimate challenge is admitted and the work moves.
+		expect(axis('workLifecycleState', PWU), 'the challenge must actually have been performed').toBe(
+			'CHALLENGED'
+		);
+
+		// CONTROL (discrimination): a different challenge, and the record must differ with it.
+		const raisedAgain = {
+			challengeReason:
+				'the expected output cannot be produced within the prohibited changes stated',
+			observationIds: ['aob_01ARZ3NDEKTSV4RRFFQ69J0073']
+		};
+		ok(dispatch('ChallengePwu', raisedAgain, PWU_B), 'ChallengePwu on a second PWU');
+		expectEveryDeclaredFieldCarried(
+			'ChallengePwu',
+			ChallengePwuPayloadSchema,
+			'PwuChallenged',
+			raisedAgain,
+			PWU_B
+		);
+		expect(
+			axis('workLifecycleState', PWU_B),
+			'the second challenge must also have been performed'
+		).toBe('CHALLENGED');
+		expect(
+			payloadOfLast('PwuChallenged', PWU_B).challengeReason,
+			'two different challenges must not share one reason — a value identical for both is a value the ' +
+				'handler chose rather than one either challenger stated'
+		).not.toBe(raised.challengeReason);
+	});
+
+	/**
+	 * The same promise on the other command this file owns, and it is a SEPARATE line in a SEPARATE handler:
+	 * `reason: p.reason` in `reshapePwu`. No inventory entry proposed it; it is the sibling of `challengePwu`'s,
+	 * and nothing anywhere asserted it either — `pwu.test.ts`'s drive asserts the arrow and the event count, and
+	 * the passthrough case above asserts only the OPTIONAL `triggeringObjectId`.
+	 *
+	 * THE MUTANT: `reason: p.reason` becomes any constant.
+	 *
+	 * ⚠ THE ARRANGEMENT IS DRIVEN, NOT SEEDED, and that is the difference between this case and its neighbour
+	 * above: `RESHAPING` is entered here from an `EXECUTING` that ProposePwu -> BeginPwuShaping -> MarkPwuReady ->
+	 * ChangePwuState -> ChangePwuState actually produced, so the promise guarded here is one a professional can
+	 * reach.
+	 *
+	 * CONTROLS as above — admission (accepted, and the work arrives at RESHAPING) and discrimination (a second
+	 * reshape, on a second PWU, differing in every declared field).
+	 */
+	it('records why the reshape was started — PwuReshapingStarted carries every field ReshapePwu declares, and a second reshape records its own reason', () => {
+		provisionedIntent(INTENT, 'product-realization-pwa', '1.3.0');
+		provisionedIntent(INTENT_B, 'product-realization-pwa', '1.3.0');
+		executingByCommand(PWU, INTENT);
+		executingByCommand(PWU_B, INTENT_B);
+
+		const falsified = {
+			reason: 'the latency assumption this shape depends on was falsified by the load trial',
+			triggeringObjectId: 'asm_01ARZ3NDEKTSV4RRFFQ69J0074'
+		};
+		ok(dispatch('ReshapePwu', falsified, PWU), 'ReshapePwu');
+		expectEveryDeclaredFieldCarried(
+			'ReshapePwu',
+			ReshapePwuPayloadSchema,
+			'PwuReshapingStarted',
+			falsified,
+			PWU
+		);
+		// CONTROL (admission): the legitimate reshape is admitted and the work moves.
+		expect(axis('workLifecycleState', PWU), 'the reshape must actually have been performed').toBe(
+			'RESHAPING'
+		);
+
+		// CONTROL (discrimination): a different reshape, and the record must differ with it.
+		const blockingFinding = {
+			reason: 'a blocking finding showed the boundary cannot hold with the constraint in force',
+			triggeringObjectId: 'aob_01ARZ3NDEKTSV4RRFFQ69J0075'
+		};
+		ok(dispatch('ReshapePwu', blockingFinding, PWU_B), 'ReshapePwu on a second PWU');
+		expectEveryDeclaredFieldCarried(
+			'ReshapePwu',
+			ReshapePwuPayloadSchema,
+			'PwuReshapingStarted',
+			blockingFinding,
+			PWU_B
+		);
+		expect(
+			axis('workLifecycleState', PWU_B),
+			'the second reshape must also have been performed'
+		).toBe('RESHAPING');
+		expect(
+			payloadOfLast('PwuReshapingStarted', PWU_B).reason,
+			'two different reshapes must not share one reason — a value identical for both is a value the ' +
+				'handler chose rather than one either professional stated'
+		).not.toBe(falsified.reason);
 	});
 
 	// ────────────────────────────────────────────────────────────────────────────────────────────────────────

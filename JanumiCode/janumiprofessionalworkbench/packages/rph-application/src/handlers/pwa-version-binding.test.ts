@@ -17,6 +17,7 @@
 // versions AT ONCE, so `PwaVersionReference`'s one-pwaId-many-versions addressing genuinely has no
 // representation. The correction is to the "cannot fail" claim, not to the successor-version gap.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { ProfessionalWorkArchitectureSchema } from '@janumipwb/rph-contracts';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
@@ -199,5 +200,93 @@ describe('RPH-CON-009 version limb (driven, not argued)', () => {
 		expect(refused.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(refused.error?.message).toContain('DRAFT');
 		expect(stateOf(PWA).version).toBe('1.0.0');
+	});
+});
+// ── JAN-PFA: the DRAFT-only edit window, asserted over the WHOLE machine ─────────────────────────────────────────
+// The third test above pins the refusal at exactly ONE non-DRAFT status (PUBLISHED), which is the shape that let a
+// batch of mutants live: a guard narrowed to refuse only PUBLISHED — `publicationStatus !== 'DRAFT' && … !==
+// 'VALIDATED'`, say — passes it untouched, and every downstream reader of the "frozen after creation" promise
+// (RPH-CON-009's pwaVersion stamp, §10.1 L1379's version-bound records) is then reading a version that a
+// professional CAN still move. The promise editPwa's own docblock states is universal — "A PUBLISHED version is
+// immutable (§11), so this rejects unless publicationStatus is DRAFT" — so it is asserted universally here, over
+// the ratified enum rather than a hand-written list, and each failure names the offending status.
+const NON_DRAFT_STATUSES = [...ProfessionalWorkArchitectureSchema.shape.publicationStatus.options]
+	.filter((s) => s !== 'DRAFT')
+	.sort();
+
+/** An EditPwa that is never a no-op: each attempt asks for a DIFFERENT version, so a refusal can only ever be the
+ *  lifecycle guard (the no-op precondition runs after it) and an acceptance is a real, observable write. */
+function attemptVersionEdit(d: ReturnType<typeof harness>['d'], n: number) {
+	return d('EditPwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', { pwaId: PWA, version: `9.0.${n}` });
+}
+
+describe('EditPwa is DRAFT-only across the whole publication machine', () => {
+	it('REFUSES the version edit in EVERY non-DRAFT status, and ADMITS it in DRAFT', () => {
+		const { d, stateOf } = harness();
+
+		expect(
+			d('CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
+				pwaId: PWA,
+				name: 'Version Binding PWA',
+				description: 'walks the publication machine with an EditPwa at every stop',
+				domain: 'software',
+				version: '1.0.0'
+			}).status
+		).toBe('ACCEPTED');
+		expect(
+			d('DefinePwuType', TYPE_EARLY, 'PWU_TYPE', {
+				pwuTypeId: TYPE_EARLY,
+				pwaId: PWA,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'Root',
+				purpose: 'root type so the PWA can be validated and published',
+				isRoot: true
+			}).status
+		).toBe('ACCEPTED');
+
+		// ⭐ THE CONTROL, AND IT RUNS FIRST. A guard that refused EditPwa unconditionally would satisfy every
+		// refusal below while protecting nothing and forbidding the one thing authoring exists for. So: while
+		// DRAFT the edit is ADMITTED and the version genuinely moves.
+		const admitted = attemptVersionEdit(d, 0);
+		expect(admitted.status, JSON.stringify(admitted.error)).toBe('ACCEPTED');
+		expect(stateOf(PWA).publicationStatus).toBe('DRAFT');
+		expect(stateOf(PWA).version, 'the DRAFT edit did not actually write').toBe('9.0.0');
+
+		// From here the version is FROZEN — that is the claim, and it is checked after every single hop.
+		const FROZEN = '9.0.0';
+		const visited: string[] = [];
+		const hop = (commandType: string, payload: unknown, reached: string, n: number): void => {
+			const moved = d(commandType, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', payload);
+			expect(moved.status, `${commandType} ${JSON.stringify(moved.error)}`).toBe('ACCEPTED');
+			expect(stateOf(PWA).publicationStatus, `${commandType} did not reach ${reached}`).toBe(
+				reached
+			);
+			visited.push(reached);
+
+			const refused = attemptVersionEdit(d, n);
+			expect(refused.status, `EditPwa was ADMITTED while ${reached}`).toBe('REJECTED');
+			expect(refused.error?.code, `EditPwa refused while ${reached} with the wrong code`).toBe(
+				'RPH_INVARIANT_VIOLATION'
+			);
+			expect(
+				refused.error?.message,
+				`the refusal while ${reached} does not cite the DRAFT-only rule`
+			).toContain('DRAFT');
+			expect(stateOf(PWA).version, `EditPwa moved \`version\` while ${reached}`).toBe(FROZEN);
+		};
+
+		hop('SubmitPwaForReview', {}, 'UNDER_REVIEW', 1);
+		hop('ValidatePwa', {}, 'VALIDATED', 2);
+		hop('PublishPwa', { rootPwuTypeId: TYPE_EARLY }, 'PUBLISHED', 3);
+		hop('DeprecatePwa', {}, 'DEPRECATED', 4);
+		hop('RetirePwa', {}, 'RETIRED', 5);
+		hop('DeletePwa', { pwaId: PWA }, 'DISCARDED', 6);
+
+		// ⭐ UNIVERSALITY, DERIVED NOT ENUMERATED. The walk must have stood in EVERY non-DRAFT member of
+		// PWA.publicationStatus; a guard narrowed to any one of them has nowhere unvisited to hide, and a status
+		// added to the ratified enum reddens this line instead of silently escaping the promise.
+		expect([...visited].sort(), 'a non-DRAFT status was never stood in').toEqual(
+			NON_DRAFT_STATUSES
+		);
 	});
 });

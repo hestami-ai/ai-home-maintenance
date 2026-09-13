@@ -25,9 +25,13 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { getMachine } from '@janumipwb/rph-domain';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { expectPwuReplayEquivalence } from './__tests__/pwu-fixtures.js';
+import {
+	expectPwuReplayEquivalence,
+	seedPwuWorkLifecycleState_FIXTURE
+} from './__tests__/pwu-fixtures.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import type { HandlerContext } from './kit.js';
 
@@ -406,5 +410,118 @@ describe('REG-F-070 — abandoning governed work requires an authorized decision
 			'Dispatch AbandonPwu instead'
 		);
 		expect(pwuState(), 'and must not have moved the PWU').toBe('READY');
+	});
+
+	// ── §8.2'S "ANY ACTIVE" UMBRELLA — THE WHOLE SOURCE SET, NOT ONE MEMBER OF IT (JAN-PFA) ──────────────────
+	//
+	// ⚠ THE GAP THESE CASES CLOSE. Every case above abandons from READY, so the command's RATIFIED BREADTH was
+	// asserted by nothing: a mutant that kept `AbandonPwu` in every other respect and removed exactly ONE state
+	// from the `sourceStates` it declares at its call site SURVIVED this suite, and survived the repository.
+	// Breadth is not a detail of this command — DOC-002 §8.2 declares SEVENTEEN `-> ABANDONED` in-edges under the
+	// umbrella *"Any active"*, kept verbatim in `transitions.data.ts` rather than enumerated per state, and
+	// `AbandonPwu` is the only command that may perform any of them (REG-F-072 ownership).
+	//
+	// AND THE MEMBER THAT MUTANT REMOVED WAS `BLOCKED`, WHICH IS THE ONE THE ENGINE ITSELF PRESCRIBES: a PWU whose
+	// `PwuBlocked` recorded no origin cannot be unblocked, and `unblockPwu` fails closed naming the way out —
+	// *"Blocks recorded before JAN-PWUWP W-5.5 fail closed here by design (AX-8); abandon or supersede this PWU
+	// instead"*. Narrow the source set there and the engine's own stated remedy becomes unperformable, with
+	// `AbandonPwu` answering that it does not claim the arrow.
+	//
+	// ⭐ DERIVED FROM THE MACHINE, NOT FROM THE TABLE THE HANDLER READS. `PWU_LIFECYCLE_COMMAND_SPECS` is what
+	// `abandonPwu` hands to `advancePwuLifecycle`; reading it here would make any narrowing invisible, because the
+	// expected list would shrink with the very thing it is meant to police. `transitions.data.ts` is the
+	// independently authored artifact (that spec table's own docblock forbids computing one from the other, and
+	// `verif/lifecycle-arrow-declarations.test.ts` holds the two in agreement), so the machine is the honest
+	// source for what this command must reach.
+	const ABANDON_MACHINE = getMachine('PWU.workLifecycleState');
+	const declaresAbandonFrom = (state: string) =>
+		ABANDON_MACHINE.transitions.some((t) => t.from === state && t.to === 'ABANDONED');
+
+	it('ACCEPTS an abandonment from BLOCKED, reached by COMMANDS — the remedy the engine itself names', () => {
+		// ⭐ REACHABILITY, DRIVEN RATHER THAN ASSERTED. The parameterised case below seeds its from-state; this one
+		// does not touch the store at all. `READY -> PLANNED` is the generic setter's own arrow and `BlockPwu` owns
+		// `PLANNED -> BLOCKED`, both dispatched through the bus — so a professional holding blocked work really can
+		// reach this, and the arrow under test is a LIVE promise rather than a dead arm.
+		ok(chgOn(PWU, 'READY', 'PLANNED'), 'planned');
+		ok(
+			dispatch(
+				'BlockPwu',
+				{ blockReason: 'the upstream interface contract is not published' },
+				PWU,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			'block'
+		);
+		expect(pwuState(), 'the arrangement must really be BLOCKED, not merely attempted').toBe(
+			'BLOCKED'
+		);
+		const dec = decision('ABANDON', [PWU], true, { [PWU]: 1 });
+		ok(abandon(dec), 'abandonment of BLOCKED work');
+		expect(pwuState()).toBe('ABANDONED');
+		expectPwuReplayEquivalence(store, PWU);
+	});
+
+	// ⚠ ONE `it.each` OVER ALL TWENTY STATES, NOT SEVENTEEN ACCEPT CASES. Pinning only the members that must be
+	// ADMITTED would be satisfied by a command that admits EVERYTHING — the declared-source check deleted, or its
+	// list widened — so the same parameterisation carries the refusals too, and the two halves together pin the
+	// set EXACTLY: the machine's seventeen active states are performed, its three terminal states are not.
+	//
+	// ⚠ AND THE REFUSED HALF ASSERTS THE MESSAGE, BECAUSE TWO GUARDS REFUSE IT. A terminal from-state trips the
+	// declared-source check AND `canAdvanceWorkLifecycle` (the machine has no `BASELINED -> ABANDONED` edge), and
+	// both answer `RPH_ILLEGAL_STATE_TRANSITION`, so the code alone tells them apart in neither direction. Only
+	// `does not declare … as a source state` says the DECLARATION was consulted.
+	//
+	// THE ARRANGEMENT IS SEEDED AND THE ACT IS DRIVEN — the split `block-escalate.test.ts` already uses for
+	// ESCALATED, for the same stated reason: the route into `SATISFIED` or `REJECTED` is eight governance commands
+	// long and would fail for eight reasons that are not this rule. The named helper validates the state against
+	// the ratified machine and re-parses the aggregate before writing, so nothing rehearses against a shape the
+	// contract forbids; and every state seeded here is one the machine declares an owning command for
+	// (REG-F-192's total partition), not an arm invented so that something could be reached.
+	it.each(ABANDON_MACHINE.states.map((from) => ({ from, declared: declaresAbandonFrom(from) })))(
+		'$from -> ABANDONED is performed iff the machine declares that arrow (declared=$declared)',
+		({ from, declared }) => {
+			seedPwuWorkLifecycleState_FIXTURE(store, PWU, from);
+			const dec = decision('ABANDON', [PWU], true, { [PWU]: 1 });
+			const r = abandon(dec);
+			if (declared) {
+				expect(
+					r.status,
+					`${from} -> ABANDONED is a ratified §8.2 in-edge and AbandonPwu is the only command that ` +
+						`performs it, so an authorized abandonment from ${from} must be ACCEPTED: ${r.error?.message}`
+				).toBe('ACCEPTED');
+				expect(pwuState(), `and the PWU must have closed out of ${from}`).toBe('ABANDONED');
+			} else {
+				expect(
+					r.status,
+					`${from} is terminal — the machine declares no ${from} -> ABANDONED, so AbandonPwu must not ` +
+						`claim it`
+				).toBe('REJECTED');
+				expect(
+					r.error?.message,
+					`and the refusal must come from the DECLARED-SOURCE check for ${from}, not from the machine ` +
+						`legality check that would refuse it anyway`
+				).toContain(`AbandonPwu does not declare ${from} as a source state`);
+				expect(pwuState(), `a refused abandonment must not have moved the PWU off ${from}`).toBe(
+					from
+				);
+			}
+		}
+	);
+
+	// INSTRUMENT CHECK, and it is not a claim about the handler. If `ABANDONED` were renamed or its in-edges
+	// removed, `declaresAbandonFrom` would answer false for every state and the case above would degrade into
+	// twenty refusal expectations that cannot fail — coverage asserting the opposite of its own name. This pins
+	// what the derivation actually yielded. (`verif/lifecycle-arrow-declarations.test.ts` holds the machine and
+	// the spec table in agreement; this holds THIS FILE's reading of the machine to §8.2's own words.)
+	it('INSTRUMENT — the derived source set is §8.2 "Any active": every non-terminal state, no terminal one', () => {
+		const sources = ABANDON_MACHINE.states.filter(declaresAbandonFrom);
+		const active = ABANDON_MACHINE.states.filter(
+			(s) => !ABANDON_MACHINE.terminalStates.includes(s)
+		);
+		expect(
+			sources,
+			'the parameterised case must be asserting over a non-empty set'
+		).not.toHaveLength(0);
+		expect(sources).toEqual(active);
 	});
 });

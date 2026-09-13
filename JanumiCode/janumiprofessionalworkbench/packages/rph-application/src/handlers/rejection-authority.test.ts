@@ -38,6 +38,10 @@ const OTHER_PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H8120';
 const POLICY = 'pol_01ARZ3NDEKTSV4RRFFQ69H8130';
 const ASSESSMENT = 'assess_01ARZ3NDEKTSV4RRFFQ69H8140';
 const OBS = 'obs_01ARZ3NDEKTSV4RRFFQ69H8150';
+const OBS_B = 'obs_01ARZ3NDEKTSV4RRFFQ69H8160';
+const OBS_ADVISORY = 'obs_01ARZ3NDEKTSV4RRFFQ69H8170';
+const OBS_ELSEWHERE = 'obs_01ARZ3NDEKTSV4RRFFQ69H8180';
+const OBS_UNRECORDED = 'obs_01ARZ3NDEKTSV4RRFFQ69H8190';
 
 describe('REG-F-078 — rejecting governed work requires an authorized decision AND the finding', () => {
 	let store: SqliteStorageAdapter;
@@ -104,6 +108,33 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 			{
 				rejectionDecisionId: decisionId,
 				blockingObservationIds: observationIds,
+				reasonCode: 'CONTROLLER'
+			},
+			id,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
+	/**
+	 * The same act, with the OPTIONAL generic bag ALSO supplied.
+	 *
+	 * `supportingObjectIds` is a declared field of `RejectPwuPayloadSchema` — `z.array(z.string()).optional()`
+	 * on a `strictObject` — so every dispatch below is a contract-valid command any caller can issue. That is
+	 * what makes the substitution under test a LIVE hole and not a dead arm: nothing upstream of the handler has
+	 * to be forced, and the rows below assert `RPH_INVARIANT_VIOLATION` rather than `VALIDATION_FAILED`, which
+	 * is the contract admitting the field inside the assertion itself.
+	 */
+	const rejectWorkAlsoCiting = (
+		decisionId: string,
+		blockingObservationIds: string[],
+		supportingObjectIds: string[],
+		id = PWU
+	) =>
+		dispatch(
+			'RejectPwu',
+			{
+				rejectionDecisionId: decisionId,
+				blockingObservationIds,
+				supportingObjectIds,
 				reasonCode: 'CONTROLLER'
 			},
 			id,
@@ -387,5 +418,112 @@ describe('REG-F-078 — rejecting governed work requires an authorized decision 
 		const dec = decision('REJECTION', [PWU]);
 		ok(rejectWork(dec, [obs]), 'the same dispatch, now authorized and evidenced');
 		expect(lifecycle()).toBe('REJECTED');
+	});
+
+	// ── JAN-PFA S3.3 — THE DEDICATED CITATION DISCHARGES THE FACT LIMB; THE GENERIC BAG NEVER STANDS IN ──────
+	//
+	// THE PROMISE. The arrow's own VERBATIM trigger is "Blocking finding", and DOC-001 §6 requires a governance
+	// disposition to be "version-bound, evidence-backed". `rejectPwu` discharges that against ONE field —
+	// `blockingObservationIds`, which `RejectPwuPayloadSchema` makes REQUIRED. `supportingObjectIds` is an
+	// OPTIONAL field of the same payload that THIS handler reads nowhere, and the two are not interchangeable:
+	// the required one is the citation an auditor reads back off `PwuRejected`, the optional one is the §37
+	// controller's free-form bag that four OTHER guards in `pwu.ts` read for their own, different purposes.
+	//
+	// ⚠ WHAT THE ROWS ABOVE ASSERT AND WHAT THEY DO NOT. Every one of them proves the fact limb REFUSES — no
+	// finding, an ADVISORY finding, a finding about another PWU. Not one supplies `supportingObjectIds` at all,
+	// so the suite is blind to WHICH field the guard read: widen the read to
+	// `p.supportingObjectIds ?? p.blockingObservationIds` and every row above stays green, because in every one
+	// of them the bag is `undefined` and the `??` falls through to the field the guard was supposed to read
+	// anyway. The hole that opens is exact: a caller who leaves the required citation empty — or fills it with
+	// anything at all — and drops a real blocking finding into the generic bag rejects governed work, and
+	// `PwuRejected` then records a `blockingObservationIds` that nothing ever checked.
+	//
+	// SO THE PROMISE IS ASSERTED OVER THE WHOLE SET of ways the dedicated field can fail, not over one member of
+	// it: the previous increment's floor-lock test pinned ONE of three ids and a mutant narrowing the lock to
+	// exactly that id passed it. Here a substitution has to survive FIVE dedicated-field failures.
+	it('REJECTS however the DEDICATED citation fails, even when the bag names a real blocking finding', () => {
+		// The genuine article — a BLOCKING observation whose subjectObjectIds include THIS PWU. It is the only
+		// thing that can discharge the fact limb, and it is put ONLY in the bag.
+		const real = observation(OBS, PWU, 'BLOCKING');
+		const advisory = observation(OBS_ADVISORY, PWU, 'ADVISORY');
+		const elsewhere = observation(OBS_ELSEWHERE, OTHER_PWU, 'BLOCKING');
+		const dec = decision('REJECTION', [PWU]);
+
+		// Every way the REQUIRED field can fail to name a blocking finding about this PWU.
+		const failsTheFactLimb: ReadonlyArray<readonly [string, readonly string[]]> = [
+			['naming nothing at all', []],
+			['naming an ADVISORY observation about this PWU', [advisory]],
+			['naming a BLOCKING observation about a DIFFERENT PWU', [elsewhere]],
+			['naming an id that records no object', [OBS_UNRECORDED]],
+			['naming an object that is not an observation at all', [OTHER_PWU]]
+		];
+
+		for (const [how, cited] of failsTheFactLimb) {
+			const r = rejectWorkAlsoCiting(dec, [...cited], [real]);
+			expect(
+				r.status,
+				`blockingObservationIds ${how}, with ${real} sitting in supportingObjectIds: the generic bag ` +
+					`discharged the fact limb, so governed work was REJECTED on a citation the guard never read`
+			).toBe('REJECTED');
+			expect(
+				r.error?.code,
+				`blockingObservationIds ${how}: the CONTRACT must admit supportingObjectIds and the GUARD must be ` +
+					`what refuses — a VALIDATION_FAILED here would mean this arrangement is unreachable, not refused`
+			).toBe('RPH_INVARIANT_VIOLATION');
+			expect(
+				r.error?.message,
+				`blockingObservationIds ${how}: the refusal must come from the fact limb`
+			).toContain('is a BLOCKING or CRITICAL AssuranceObservation');
+			// The refusal ENUMERATES what the caller put in the DEDICATED field. Were `real` to appear here, the
+			// guard would be reporting the bag it read — the message is the only place the two are told apart.
+			expect(
+				r.error?.message,
+				`blockingObservationIds ${how}: the refusal enumerates the bag, so the guard read the bag`
+			).not.toContain(real);
+			expect(
+				lifecycle(),
+				`blockingObservationIds ${how}: a refused rejection must not have moved the PWU`
+			).toBe('UNDER_ASSURANCE');
+		}
+	});
+
+	// ── CONTROL 3: THE BAG IS INERT, IN BOTH DIRECTIONS ─────────────────────────────────────────────────────
+	// Without this, the row above is satisfiable by a guard that refuses EVERY rejection carrying a
+	// `supportingObjectIds` key at all — which would read as precision and be a denial of service. Two arms,
+	// because the promise is that the optional field changes NOTHING: absent, and present-but-worthless, must
+	// both be ACCEPTED on the strength of the dedicated citation alone.
+	it('CONTROL — the dedicated citation ADMITS whether the bag is absent or present and worthless', () => {
+		const obsA = observation(OBS, PWU, 'BLOCKING');
+		const obsB = observation(OBS_B, OTHER_PWU, 'BLOCKING');
+		const decA = decision('REJECTION', [PWU]);
+		const decB = decision('REJECTION', [OTHER_PWU]);
+
+		// ARM 1 — no bag at all. The plain, legitimate act.
+		ok(rejectWork(decA, [obsA], PWU), 'the dedicated citation alone rejects the work');
+		expect(lifecycle(PWU)).toBe('REJECTED');
+
+		// ARM 2 — a bag naming real recorded objects that are NOT blocking observations about this PWU, plus an
+		// id recording nothing. The dedicated citation is identical in substance to ARM 1's, and the act must be
+		// ACCEPTED all the same.
+		ok(
+			rejectWorkAlsoCiting(decB, [obsB], [PWU, OBS_UNRECORDED], OTHER_PWU),
+			'a worthless supportingObjectIds bag must not defeat a valid dedicated citation'
+		);
+		expect(lifecycle(OTHER_PWU)).toBe('REJECTED');
+
+		// AND THE EVENT RECORDS THE DEDICATED CITATION. `PwuRejected.blockingObservationIds` is what an auditor
+		// reads back as the evidence-backing of the §5.2 act, so it must be the field the guard actually checked
+		// and not the bag that sat beside it.
+		const recorded = store
+			.readAllEvents()
+			.filter((e) => e.eventType === 'PwuRejected')
+			.map((e) => [
+				e.aggregateId,
+				(e.payload as { blockingObservationIds?: string[] }).blockingObservationIds
+			]);
+		expect(recorded, 'both rejections are recorded, each citing its own dedicated finding').toEqual([
+			[PWU, [obsA]],
+			[OTHER_PWU, [obsB]]
+		]);
 	});
 });

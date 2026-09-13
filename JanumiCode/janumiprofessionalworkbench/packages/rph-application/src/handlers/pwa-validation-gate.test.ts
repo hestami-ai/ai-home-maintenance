@@ -47,7 +47,12 @@ describe('ValidatePwa gate (live pipeline)', () => {
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
-		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
 	});
 
 	function d(commandType: string, payload: unknown, id: string, type: string) {
@@ -178,4 +183,126 @@ describe('ValidatePwa gate (live pipeline)', () => {
 		expect(r.status).toBe('REJECTED');
 		expect(pubStatus()).toBe('UNDER_REVIEW');
 	});
+
+	// ── The gate must be PRECISE: each HARD limb refuses on its OWN ───────────────────────────────────────────────
+	// The two cases above prove a refusal HAPPENS. Neither proves WHICH limb produced it, and the composition
+	// verdict has THREE (`analyzePwaGraph`, pwa-graph.ts:382 — "exactly one root, permits acyclic, every node
+	// reachable from the root"), all three demanded by §11.6 L1639 ("no missing/disallowed/cyclic child rules …
+	// every type reachable from that root") and by §16 item 9's "never reduce a PWA to a flat node list". A gate
+	// wired to two of the three is INDISTINGUISHABLE from one wired to all three for as long as every arrangement
+	// trips more than one limb: the cycle case trips acyclic-permits alone, but the two-roots-plus-orphan case
+	// trips single-root AND connected together (as its own comment says), so `connected` has never been the SOLE
+	// reason a ValidatePwa was refused here — drop that limb and both cases above stay green.
+	//
+	// Each arrangement below fails EXACTLY ONE limb, and the row asserts that: the refusal must NAME its limb and
+	// must NOT name either other. That is what makes the set drivable one member at a time — pinning one member
+	// (which is how this gap arose) proves nothing about the rest, so the promise is asserted over the whole set
+	// and the failure message names the offending member.
+	const HARD_LIMBS = ['single-root', 'acyclic-permits', 'connected'] as const;
+	type HardLimb = (typeof HARD_LIMBS)[number];
+
+	const ISOLATING: ReadonlyArray<{ limb: HardLimb; shape: string; arrange: () => void }> = [
+		{
+			limb: 'single-root',
+			shape: 'two lone roots, nothing cyclic and nothing unreachable',
+			arrange: () => {
+				defineType(ROOT_TYPE, { isRoot: true });
+				defineType(SECOND_ROOT, { isRoot: true });
+			}
+		},
+		{
+			limb: 'acyclic-permits',
+			shape: 'one root whose only child permits the root back, so every type is still reachable',
+			arrange: () => {
+				defineType(ROOT_TYPE, { isRoot: true, children: [CHILD_TYPE] });
+				defineType(CHILD_TYPE, { isRoot: false, children: [ROOT_TYPE] });
+			}
+		},
+		{
+			limb: 'connected',
+			shape: 'one root over one leaf, plus a non-root type no type permits',
+			arrange: () => {
+				defineType(ROOT_TYPE, { isRoot: true, children: [CHILD_TYPE] });
+				defineType(CHILD_TYPE, { isRoot: false });
+				defineType(ORPHAN_TYPE, { isRoot: false });
+			}
+		}
+	];
+
+	it.each(ISOLATING)(
+		'refuses a Draft that fails ONLY the $limb limb — $shape',
+		({ limb, arrange }) => {
+			createDraftPwa();
+			arrange();
+			submit();
+
+			const r = d('ValidatePwa', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			const message = r.error?.message ?? '';
+
+			// The arrangement is an isolating probe only if this limb is the sole failure reported, so check that
+			// FIRST: otherwise a green row could be another limb's refusal wearing this row's name.
+			expect(
+				message,
+				`the refusal does not name the ${limb} limb, so nothing here is evidence that ${limb} was consulted`
+			).toContain(`${limb}:`);
+			for (const other of HARD_LIMBS.filter((l) => l !== limb))
+				expect(
+					message,
+					`this arrangement must fail ${limb} ALONE, but the refusal also names ${other} — it cannot tell a gate that consults ${limb} from one that ignores it`
+				).not.toContain(`${other}:`);
+
+			expect(
+				r.status,
+				`a PWA failing the ${limb} limb was not refused (${limb} is unenforced): ${message}`
+			).toBe('REJECTED');
+			expect(r.error?.code, `the ${limb} refusal is not a structural-invariant refusal`).toBe(
+				'RPH_INVARIANT_VIOLATION'
+			);
+			expect(
+				pubStatus(),
+				`a PWA failing the ${limb} limb reached VALIDATED and can walk on to PUBLISHED`
+			).toBe('UNDER_REVIEW');
+			expect(r.producedEventIds, `the ${limb} refusal still appended events`).toEqual([]);
+		}
+	);
+
+	// ── CONTROL: the gate ADMITS composition that holds ───────────────────────────────────────────────────────────
+	// Without this, a gate that refused EVERY ValidatePwa — including the legitimate one — would satisfy every
+	// assertion above, and "VALIDATED is unreachable" would read as "the gate is precise". Two legitimate shapes,
+	// not one: a gate narrowed to "must have a child" and a gate narrowed to "must be a lone root" are each a real
+	// over-refusal, and a single-shape control would admit one of them.
+	const LEGITIMATE: ReadonlyArray<{ shape: string; arrange: () => void }> = [
+		{
+			shape: 'a lone root',
+			arrange: () => {
+				defineType(ROOT_TYPE, { isRoot: true });
+			}
+		},
+		{
+			shape: 'a root over one reachable leaf',
+			arrange: () => {
+				defineType(ROOT_TYPE, { isRoot: true, children: [CHILD_TYPE] });
+				defineType(CHILD_TYPE, { isRoot: false });
+			}
+		}
+	];
+
+	it.each(LEGITIMATE)(
+		'CONTROL: admits a Draft whose composition holds — $shape',
+		({ shape, arrange }) => {
+			createDraftPwa();
+			arrange();
+			submit();
+
+			const r = d('ValidatePwa', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+
+			expect(
+				r.status,
+				`${shape} satisfies all three HARD invariants and was still refused: ${r.error?.message ?? ''}`
+			).toBe('ACCEPTED');
+			expect(pubStatus(), `${shape} was accepted but the PWA did not reach VALIDATED`).toBe(
+				'VALIDATED'
+			);
+		}
+	);
 });

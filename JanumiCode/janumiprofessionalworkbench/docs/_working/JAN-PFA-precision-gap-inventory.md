@@ -1,5 +1,19 @@
 # JAN-PFA — PRECISION-GAP INVENTORY: 40 unguarded promises in `rph-application`
-**Status:** ⚠ **FINDINGS, NOT GUARDS.** Opened 2026-09-12 · Programme `JAN-PFA` `S3.3` · see `REG-F-392`.
+**Status:** ~~⚠ FINDINGS, NOT GUARDS.~~ → ✅ **DISCHARGED 2026-09-13. ALL FORTY ARE CLOSED.** Opened 2026-09-12 ·
+Programme `JAN-PFA` `S3.3` · see `REG-F-392` (the finding), `REG-F-393`/`394`/`395` (what closing them found).
+
+⭐ **HOW THEY WERE DISCHARGED, AND IT WAS NOT BY DECLARING FORTY MUTANTS.** Two assertion-first increments worked
+the whole list off: **increment 1** took the eighteen in `handlers/assurance.ts` — 17 closed, and
+`activateAssurancePolicy` **correctly REFUSED** because its arm is unreachable by any command, which is a
+different finding wearing the same `SURVIVED` verdict; **increment 2** took the remaining twenty-two across
+`handlers/pwa-authoring.ts` and `handlers/pwu.ts`, plus three exports this inventory never held
+(`escalatePwu`, `reshapePwu`, `supersedePwu` — rejected during authoring for naming two victims, and therefore
+invisible here). **42 mutants declared across the two increments, 42 KILLED, zero survivors.**
+
+⚠ **THE ENTRIES BELOW ARE LEFT EXACTLY AS MEASURED** — including the bias this document records against itself,
+and including each gap's suggested remedy, several of which the closing agents did NOT follow. Where a remedy was
+declined the reason is in the landed test's own header and in the register; `activateAssurancePolicy`'s proposed
+fix — write the store directly to reach the arm — is the clearest case, and declining it was correct.
 
 ## Why this is a document and not forty ledger entries
 

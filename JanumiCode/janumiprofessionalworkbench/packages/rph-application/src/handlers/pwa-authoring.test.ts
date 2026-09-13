@@ -7,7 +7,13 @@ import { TEST_CRED, testAuthenticator, testDirectory } from '@janumipwb/rph-port
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
+import { floorValidatorResult, seedFloorPolicies, seedPolicy } from './__tests__/floor-fixtures.js';
+import {
+	BINDINGS,
+	ProfessionalWorkArchitectureSchema,
+	PwaCreatedPayloadSchema,
+	PwuTypeRedefinedPayloadSchema
+} from '@janumipwb/rph-contracts';
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 // Three of the four suites below act as ONE human and never assert who that is, so they take the shared
@@ -1322,5 +1328,553 @@ describe('PWU-Type assurance-policy references — handler write-boundary gate (
 			'PWU_TYPE'
 		);
 		expect(e2.status).toBe('REJECTED');
+	});
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// JAN-PFA / REG-F-392 — PRECISION CLOSURES.
+//
+// Each `it` below closes ONE inventoried gap: a promise this module makes that the suite already proved HAPPENS
+// but never proved was PRECISE. Forty mutants against these handlers all SURVIVED, and every one of them attacked
+// a promise nothing asserted — so the remedy is assertions, and they share one shape:
+//
+//   ⭑ ASSERT THE PROMISE OVER THE WHOLE SET IT QUANTIFIES OVER, DERIVED FROM THE RATIFIED CONTRACT. Pinning one
+//     member of a set proves nothing about the others: the previous increment found a floor-lock test hard-coding
+//     one of three ids, and a mutant narrowing the lock to exactly that id passed it. The status sweeps below take
+//     their set from `ProfessionalWorkArchitectureSchema`, the event assertions from the event payload schemas,
+//     and the arrow sweep from `BINDINGS` — so a status, field or arrow added to the contract joins the sweep
+//     rather than slipping past it, and the driver throws where it cannot keep up.
+//   ⭑ AND GIVE IT A CONTROL. Every gap in the inventory exists because a suite proved a refusal HAPPENS and never
+//     that it was PRECISE. Each test below also exercises the legitimate case, so a guard that refuses everything
+//     (or an emitter that emits everything) cannot satisfy it.
+describe('JAN-PFA precision closures — pwa-authoring promises asserted over their whole set', () => {
+	let store: SqliteStorageAdapter;
+	let engine: AuthedEngine;
+	let seq = 0;
+	const PWA_T = 'PROFESSIONAL_WORK_ARCHITECTURE';
+	const TYPE_T = 'PWU_TYPE';
+
+	/** Every publicationStatus a PWA can hold — DERIVED from the ratified object contract rather than hand-listed,
+	 *  so a status added to the enum joins the sweeps below automatically (and `pwaAt` throws until it is taught
+	 *  the command that reaches it) instead of being silently excluded from a promise that quantifies over all. */
+	const PUBLICATION_STATUSES = ProfessionalWorkArchitectureSchema.shape.publicationStatus.options;
+
+	/** The PWA.publicationStatus arrows a command performs, DERIVED from the ratified command→transition table.
+	 *  Hand-listing them is what these tests exist to stop doing: an arrow added to the contract joins the sweep. */
+	const PWA_ARROWS = BINDINGS.filter(
+		(b) => b.machine === 'PWA.publicationStatus' && b.from !== undefined && b.from !== '(initial)'
+	);
+
+	beforeEach(() => {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
+	});
+
+	function d(commandType: string, payload: unknown, id: string, type: string) {
+		const n = ++seq;
+		const command: DomainCommand = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			correlationId: 'corr',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+		return engine.dispatch(command);
+	}
+	const stateOf = (id: string) =>
+		store.loadObject(id)?.state as Record<string, unknown> | undefined;
+	const statusOf = (pwaId: string) => stateOf(pwaId)?.publicationStatus as string | undefined;
+	const semverOf = (pwaId: string) => Number(stateOf(pwaId)?.semanticVersion);
+	const eventsOf = (eventType: string) =>
+		store.readAllEvents().filter((e) => e.eventType === eventType);
+	const payloadOf = (eventType: string, nth = 0) =>
+		eventsOf(eventType)[nth]!.payload as Record<string, unknown>;
+	/** A ULID-shaped id (prefix_ + 26 Crockford digits) keyed by `n`, so every fixture in a sweep gets its own. */
+	const uid = (prefix: string, n: number) =>
+		`${prefix}_01ARZ3NDEKTSV4RRFFQ69G5${String(n).padStart(3, '0')}`;
+
+	/** The publication arrows ORDERED by walking the machine forward from its initial state. */
+	function arrowPath(): ReadonlyArray<{ commandType: string; from: string; to: string }> {
+		const path: { commandType: string; from: string; to: string }[] = [];
+		let at = 'DRAFT';
+		for (;;) {
+			const next = PWA_ARROWS.find((a) => a.from === at);
+			if (!next) return path;
+			path.push({ commandType: next.commandType, from: String(next.from), to: String(next.to) });
+			at = String(next.to);
+		}
+	}
+
+	/** Drive a FRESH PWA (plus its root type) to `status` through real commands, and prove it landed there — no
+	 *  test below writes a status into the store, because a state no command sequence produces is not a promise
+	 *  anyone can break. Unknown statuses THROW: the set comes from the contract, and the driver must keep up. */
+	function pwaAt(status: string, n: number): { pwaId: string; rootId: string } {
+		const pwaId = uid('pwa', n);
+		const rootId = uid('pwut', n);
+		const created = d(
+			'CreatePwa',
+			{ pwaId, name: `PWA ${n}`, description: 'd', domain: 'software', version: '1.0.0' },
+			pwaId,
+			PWA_T
+		);
+		expect(created.status, JSON.stringify(created.error)).toBe('ACCEPTED');
+		const root = d(
+			'DefinePwuType',
+			{
+				pwuTypeId: rootId,
+				pwaId,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'R',
+				purpose: 'root',
+				isRoot: true
+			},
+			rootId,
+			TYPE_T
+		);
+		expect(root.status, JSON.stringify(root.error)).toBe('ACCEPTED');
+		if (status === 'DISCARDED') {
+			// DISCARDED is the one status the ratified enum declares that the PWA.publicationStatus MACHINE does
+			// not: `deletePwa` writes the tombstone directly rather than through an arrow, so there is no binding
+			// to derive it from and the driver has to know the command.
+			const del = d('DeletePwa', { pwaId }, pwaId, PWA_T);
+			expect(del.status, JSON.stringify(del.error)).toBe('ACCEPTED');
+		} else if (status !== 'DRAFT') {
+			const path = arrowPath();
+			const upTo = path.findIndex((a) => a.to === status);
+			if (upTo < 0)
+				throw new Error(
+					`pwaAt: no command sequence reaches publicationStatus ${status}. The ratified enum declares it and this driver does not know how to get there — teach it the command, or the sweeps below silently stop quantifying over the whole set.`
+				);
+			for (const arrow of path.slice(0, upTo + 1)) {
+				const r = d(
+					arrow.commandType,
+					arrow.commandType === 'PublishPwa' ? { rootPwuTypeId: rootId } : {},
+					pwaId,
+					PWA_T
+				);
+				expect(r.status, `${arrow.commandType}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			}
+		}
+		expect(statusOf(pwaId), `pwaAt(${status}) did not actually land the PWA there`).toBe(status);
+		return { pwaId, rootId };
+	}
+
+	// ── createPwa ────────────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: `eventPayload: { pwaId, name: p.name, version }` → `{ …, name: p.domain, … }` survived. The PWA's
+	// STATE name/version are asserted elsewhere; the recorded EVENT's were not, and the event log is "the audit
+	// record, the replay source, the only durable account of why the system did what it did", with no retraction
+	// mechanism — a PwaCreated naming the wrong thing is not a bad request, it is a permanently wrong history.
+	it('PwaCreated records the CreatePwa facts BY NAME — every field the ratified event declares', () => {
+		const pwaId = uid('pwa', 40);
+		// ⚠ THE VALUES ARE PAIRWISE DISTINCT ON PURPOSE. A fixture that reuses one string cannot see a mutant
+		// that binds one declared field to a different command field; the assertion below would pass while the
+		// history was wrong. So the distinctness is itself asserted rather than left to the reader's care.
+		const cmd: Record<string, string> = {
+			pwaId,
+			name: 'Product Realization',
+			description: 'how this organisation realizes a product',
+			domain: 'software',
+			version: '1.4.2'
+		};
+		expect(
+			new Set(Object.values(cmd)).size,
+			'the fixture values must be pairwise distinct or a field-swap mutation is undetectable'
+		).toBe(Object.keys(cmd).length);
+		const r = d('CreatePwa', cmd, pwaId, PWA_T);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+
+		const declared = Object.keys(PwaCreatedPayloadSchema.shape);
+		expect(eventsOf('PwaCreated')).toHaveLength(1);
+		const recorded = payloadOf('PwaCreated');
+		expect(
+			[...Object.keys(recorded)].sort(),
+			'PwaCreated carries EXACTLY the fields its ratified strictObject declares'
+		).toEqual([...declared].sort());
+		for (const key of declared) {
+			expect(
+				Object.prototype.hasOwnProperty.call(cmd, key),
+				`the ratified PwaCreated declares '${key}' and this fixture cannot source it from the CreatePwa payload — teach the fixture rather than dropping the field from the check`
+			).toBe(true);
+			expect(
+				recorded[key],
+				`PwaCreated.${key} must record the CreatePwa payload's '${key}' — a declared field bound to any OTHER fact is a permanently wrong history (REG-F-020)`
+			).toBe(cmd[key]);
+		}
+		// CONTROL — the event's narrowness is a DECLARED shape, not data loss: the fields it does not carry are
+		// on the PWA's own state. Without this, an event that recorded nothing at all would look acceptable.
+		const s = stateOf(pwaId)!;
+		expect(s.description, 'the PWA state still carries what the event does not').toBe(
+			cmd.description
+		);
+		expect(s.domain).toBe(cmd.domain);
+	});
+
+	// ── appendConversationEntries ────────────────────────────────────────────────────────────────────────────────
+	// GAP: `entries: [...prior, ...p.entries]` → `[...p.entries, ...prior]` survived. The suite proved the
+	// transcript GREW (length 1 → 3) and never that it was a transcript: in an audit trail the SEQUENCE of a tool
+	// call and its result is the whole content of the record, and a tool_result rendered before the message that
+	// asked for it is a false account of what happened.
+	it('AppendConversationEntries EXTENDS the transcript — every turn lands after the turn before it', () => {
+		const conv = uid('conv', 50);
+		const pwaId = uid('pwa', 50);
+		// Four DISTINCT turns across three appends, the middle append carrying two: that covers order ACROSS
+		// appends and WITHIN one batch, which a one-entry-per-append fixture cannot tell apart.
+		const TURNS = [
+			'turn 1 — user: build it',
+			'turn 2 — agent: calling define_pwu_type',
+			'turn 3 — agent: define_pwu_type returned ok',
+			'turn 4 — user: now publish it'
+		];
+		const append = (...texts: string[]) =>
+			d(
+				'AppendConversationEntries',
+				{
+					conversationId: conv,
+					pwaId,
+					entries: texts.map((text) => ({ role: 'AGENT', kind: 'message', text }))
+				},
+				conv,
+				'AUTHORING_CONVERSATION'
+			);
+		expect(append(TURNS[0]!).status).toBe('ACCEPTED');
+		expect(append(TURNS[1]!, TURNS[2]!).status).toBe('ACCEPTED');
+		expect(append(TURNS[3]!).status).toBe('ACCEPTED');
+
+		const entries = stateOf(conv)!.entries as { text: string }[];
+		// CONTROL — nothing was dropped. An order assertion over a truncated transcript proves nothing, and an
+		// append that kept only the newest batch would otherwise satisfy a first-element check.
+		expect(entries, 'every appended entry must still be in the transcript').toHaveLength(
+			TURNS.length
+		);
+		expect(
+			entries.map((e) => e.text),
+			'the transcript is a SEQUENCE, not a set: turn N+1 lands after turn N, across appends and within a batch'
+		).toEqual(TURNS);
+	});
+
+	// ── definePwuType ────────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: `publicationStatus !== 'DRAFT'` → `!== 'DRAFT' && !== 'UNDER_REVIEW'` survived, because the only
+	// non-DRAFT case the suite drove was PUBLISHED. UNDER_REVIEW is the dangerous member: a reviewer approves a
+	// graph and a type is smuggled into it before publication — the very defect bumpPwaSemanticVersion exists for.
+	it('DefinePwuType is admitted in DRAFT and refused in EVERY other publication status (the graph freezes at submission)', () => {
+		const admitted: string[] = [];
+		PUBLICATION_STATUSES.forEach((status, i) => {
+			const { pwaId } = pwaAt(status, 100 + i);
+			const newType = uid('pwut', 130 + i);
+			const r = d(
+				'DefinePwuType',
+				{
+					pwuTypeId: newType,
+					pwaId,
+					pwuKind: 'X',
+					name: 'Late Addition',
+					purpose: 'p',
+					isRoot: false
+				},
+				newType,
+				TYPE_T
+			);
+			if (r.status === 'ACCEPTED') {
+				admitted.push(status);
+				expect(
+					stateOf(newType),
+					`an ACCEPTED define on a ${status} PWA must persist the type`
+				).toBeDefined();
+				return;
+			}
+			expect(r.error?.code, `DefinePwuType on a ${status} PWA`).toBe('RPH_INVARIANT_VIOLATION');
+			expect(
+				r.error?.message,
+				`the refusal on a ${status} PWA must be the DRAFT-only rule itself and must name the offending status`
+			).toContain(`PWU Types can only be defined on a DRAFT PWA (${pwaId} is ${status})`);
+			expect(
+				stateOf(newType),
+				`nothing may be persisted for a type refused on a ${status} PWA`
+			).toBeUndefined();
+		});
+		// The promise is UNIVERSAL — exactly ONE status admits a new type — and the DRAFT member of this
+		// assertion is the CONTROL: a guard that refused every status would fail here, not pass quietly.
+		expect(
+			admitted,
+			'DefinePwuType must be admitted in DRAFT and in no other publication status'
+		).toEqual(['DRAFT']);
+	});
+
+	// ── createUndertaking ────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: `publicationStatus !== 'PUBLISHED'` → `!== 'PUBLISHED' && !== 'DEPRECATED'` survived, because the only
+	// non-PUBLISHED case the suite drove was DRAFT. DEPRECATED is the member whose entire operational meaning is
+	// "existing Undertakings continue, no NEW work starts here" — and deletePwa's docblock prescribes deprecation
+	// as the remedy for a PWA in use, which is only a remedy if deprecating actually stops new instantiation.
+	it('CreateUndertaking is admitted from a PUBLISHED PWA and refused from EVERY other publication status', () => {
+		const admitted: string[] = [];
+		PUBLICATION_STATUSES.forEach((status, i) => {
+			const { pwaId } = pwaAt(status, 160 + i);
+			const undertakingId = uid('und', 190 + i);
+			const r = d(
+				'CreateUndertaking',
+				{
+					undertakingId,
+					name: 'U',
+					description: 'd',
+					pwaId,
+					pwaVersion: '1.0.0',
+					instantiationProfile: 'Standard',
+					objective: 'o',
+					intendedOutputProduct: 'p'
+				},
+				undertakingId,
+				'UNDERTAKING'
+			);
+			if (r.status === 'ACCEPTED') {
+				admitted.push(status);
+				expect(
+					stateOf(undertakingId)?.pwaId,
+					`an ACCEPTED CreateUndertaking against a ${status} PWA must bind it`
+				).toBe(pwaId);
+				return;
+			}
+			expect(r.error?.code, `CreateUndertaking from a ${status} PWA`).toBe(
+				'RPH_INVARIANT_VIOLATION'
+			);
+			expect(
+				r.error?.message,
+				`the refusal from a ${status} PWA must be the PUBLISHED-only rule itself and must name the offending status`
+			).toContain(`An Undertaking can only instantiate a PUBLISHED PWA (${pwaId} is ${status})`);
+			expect(
+				stateOf(undertakingId),
+				`nothing may be persisted for an Undertaking refused against a ${status} PWA`
+			).toBeUndefined();
+		});
+		// Universal, and the PUBLISHED member is the CONTROL: §42's rule is "instantiated from a PUBLISHED PWA
+		// version", so exactly one status admits — a gate that refused all of them would fail here.
+		expect(
+			admitted,
+			'CreateUndertaking must be admitted from PUBLISHED and from no other publication status'
+		).toEqual(['PUBLISHED']);
+	});
+
+	// ── editPwuType ──────────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: deleting `'permittedChildTypeIds'` from the emitted-payload whitelist survived. The edit that sets the
+	// child edge list is driven twice in this file and only its resulting STATE is asserted, so the event — whose
+	// own comment promises it "records what the edit changed" — could silently stop carrying the graph edge the
+	// edit was FOR. The assertion is therefore over the whole DECLARED field set, derived from the event schema.
+	it('PwuTypeRedefined carries EVERY declared field the edit supplied — and only the fields it changed (control)', () => {
+		const pwaId = uid('pwa', 210);
+		const typeId = uid('pwut', 211);
+		const POLICY = 'pol_pfa_active';
+		seedPolicy(engine, POLICY);
+		expect(
+			d(
+				'CreatePwa',
+				{ pwaId, name: 'Redefine', description: 'd', domain: 'software', version: '1.0.0' },
+				pwaId,
+				PWA_T
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			d(
+				'DefinePwuType',
+				{
+					pwuTypeId: typeId,
+					pwaId,
+					pwuKind: 'ANALYSIS',
+					name: 'Before',
+					purpose: 'before',
+					isRoot: false
+				},
+				typeId,
+				TYPE_T
+			).status
+		).toBe('ACCEPTED');
+
+		const declared = Object.keys(PwuTypeRedefinedPayloadSchema.shape);
+		// Every DECLARED field, supplied in one edit and each with a value different from the one it replaces.
+		const patch: Record<string, unknown> = {
+			pwuTypeId: typeId,
+			name: 'After',
+			purpose: 'the revised purpose',
+			pwuKind: 'SYNTHESIS',
+			isRoot: true,
+			completionRule: 'a custom completion rule',
+			permittedChildTypeIds: ['pwut_child_x'],
+			requiredAssurancePolicyIds: [POLICY]
+		};
+		expect(
+			[...Object.keys(patch)].sort(),
+			'this test must SUPPLY every field the ratified event declares, or it cannot prove they are all recorded — a field added to PwuTypeRedefined belongs here, never dropped from the check'
+		).toEqual([...declared].sort());
+		const e = d('EditPwuType', patch, typeId, TYPE_T);
+		expect(e.status, JSON.stringify(e.error)).toBe('ACCEPTED');
+
+		const recorded = payloadOf('PwuTypeRedefined');
+		expect(
+			[...Object.keys(recorded)].sort(),
+			'an edit that supplied every declared field must emit every declared field — a field silently missing from the whitelist is an event that does not carry what the act did (the twenty-one REG-F-020 defects)'
+		).toEqual([...declared].sort());
+		for (const key of declared) {
+			expect(
+				recorded[key],
+				`PwuTypeRedefined.${key} must record what the edit changed, not a stale or absent value`
+			).toEqual(patch[key]);
+		}
+
+		// CONTROL — the emitter is PRECISE, not exhaustive. A second edit changes only `purpose` while also
+		// carrying fields the ratified event does NOT declare (requiredInputs, permittedChildren): the payload
+		// must be exactly { pwuTypeId, purpose }. Without this, an emitter that dumped the whole command payload
+		// would satisfy the assertion above while asserting `undefined` for everything the edit did not touch.
+		const e2 = d(
+			'EditPwuType',
+			{
+				pwuTypeId: typeId,
+				purpose: 'a later clarification',
+				requiredInputs: ['an input the ratified event does not declare']
+			},
+			typeId,
+			TYPE_T
+		);
+		expect(e2.status, JSON.stringify(e2.error)).toBe('ACCEPTED');
+		expect(
+			[...Object.keys(payloadOf('PwuTypeRedefined', 1))].sort(),
+			'only the fields actually PRESENT in the patch are emitted — the event records what the edit changed'
+		).toEqual(['purpose', 'pwuTypeId']);
+	});
+
+	// ── publishPwa ───────────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: adding `bumpSemanticVersion: true` to publishPwa's advanceStatus survived. semanticVersion is the
+	// MATERIAL-CHANGE counter every version-bound assurance record binds (§10.1 L1379), and the floor gate's
+	// `versionOk` check compares it — so a publication ARROW that moves it staleness-invalidates a floor that is
+	// still true. The converse is asserted one door down for a REFUSED edit; nowhere for an ACCEPTED publish.
+	// Swept over EVERY arrow, because the identical mutation applies to each of them.
+	it('no publication-status ARROW moves the PWA semanticVersion — only a material graph edit does (control)', () => {
+		const pwaId = uid('pwa', 60);
+		const rootId = uid('pwut', 61);
+		expect(
+			d(
+				'CreatePwa',
+				{ pwaId, name: 'Versioned', description: 'd', domain: 'software', version: '1.0.0' },
+				pwaId,
+				PWA_T
+			).status
+		).toBe('ACCEPTED');
+		const atBirth = semverOf(pwaId);
+		// CONTROL — the counter CAN move, and this is what moves it: a material edit to the PWA's graph. Without
+		// it, every assertion below is satisfied by a semanticVersion that is simply frozen forever, which is the
+		// original defect (a floor satisfied over a 1-type graph authorizing a graph a type was smuggled into).
+		expect(
+			d(
+				'DefinePwuType',
+				{
+					pwuTypeId: rootId,
+					pwaId,
+					pwuKind: 'PRODUCT_REALIZATION',
+					name: 'R',
+					purpose: 'root',
+					isRoot: true
+				},
+				rootId,
+				TYPE_T
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			semverOf(pwaId),
+			'adding a PWU Type materially edits the graph, so the version every assurance record binds must rise'
+		).toBe(atBirth + 1);
+
+		const judged = semverOf(pwaId); // the version an assurance floor would have been judged against
+		const path = arrowPath();
+		expect(
+			path.map((a) => a.commandType).sort(),
+			'the walked path must cover EVERY ratified PWA.publicationStatus arrow — a branch in the machine would otherwise drop arrows out of this sweep'
+		).toEqual(PWA_ARROWS.map((a) => a.commandType).sort());
+		for (const arrow of path) {
+			const r = d(
+				arrow.commandType,
+				arrow.commandType === 'PublishPwa' ? { rootPwuTypeId: rootId } : {},
+				pwaId,
+				PWA_T
+			);
+			expect(r.status, `${arrow.commandType}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			expect(statusOf(pwaId), `${arrow.commandType} must land the PWA in ${arrow.to}`).toBe(
+				arrow.to
+			);
+			expect(
+				semverOf(pwaId),
+				`${arrow.commandType} (${arrow.from} -> ${arrow.to}) MOVED the PWA's semanticVersion. A publication arrow edits no graph; moving the material-change counter there invalidates an assurance floor that is still true of the graph it was judged against.`
+			).toBe(judged);
+		}
+	});
+
+	// ── removePwuType ────────────────────────────────────────────────────────────────────────────────────────────
+	// GAP: `referencingSiblings(ctx, pwaId, id)` → `…, command.payload.pwuTypeId)` survived, because all three
+	// RemovePwuType dispatches in this file pass payload.pwuTypeId === targetAggregateId, so the mutated census
+	// reads the same id and the suite cannot tell the two apart. The subject of the integrity census must be the
+	// aggregate the command TARGETS — the one about to be tombstoned — or the rule is steerable by the caller.
+	it('RemovePwuType — the referential-integrity census is about the TARGET aggregate, not the id in the payload', () => {
+		const pwaId = uid('pwa', 70);
+		const rootId = uid('pwut', 71);
+		const childId = uid('pwut', 72);
+		expect(
+			d(
+				'CreatePwa',
+				{ pwaId, name: 'Integrity', description: 'd', domain: 'software', version: '1.0.0' },
+				pwaId,
+				PWA_T
+			).status
+		).toBe('ACCEPTED');
+		for (const [id, isRoot] of [
+			[rootId, true],
+			[childId, false]
+		] as const)
+			expect(
+				d(
+					'DefinePwuType',
+					{ pwuTypeId: id, pwaId, pwuKind: 'X', name: id, purpose: 'p', isRoot },
+					id,
+					TYPE_T
+				).status
+			).toBe('ACCEPTED');
+		expect(
+			d('EditPwuType', { pwuTypeId: rootId, permittedChildTypeIds: [childId] }, rootId, TYPE_T)
+				.status
+		).toBe('ACCEPTED');
+
+		// A DIRECT command may disagree with itself: the bus performs no payload/target coherence check, and the
+		// domain is the authoritative gate (C-5), so the payload names ROOT — which nothing references — while
+		// the command TARGETS, and would tombstone, the CHILD that ROOT still points at.
+		const blocked = d('RemovePwuType', { pwuTypeId: rootId }, childId, TYPE_T);
+		expect(
+			blocked.status,
+			'the TARGET is referenced by another type; naming an unreferenced id in the payload must not buy its removal'
+		).toBe('REJECTED');
+		expect(blocked.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(
+			blocked.error?.message,
+			'the refusal must be about the target aggregate, and must name it'
+		).toContain(`Cannot remove PWU Type ${childId}`);
+		expect(stateOf(childId)?.status, 'the referenced target must still be live').toBe('DRAFT');
+
+		// CONTROL — the SAME divergent-payload command is ADMITTED once the reference is cleared. Without it a
+		// handler that simply refused every payload/target mismatch would satisfy the assertion above, and the
+		// census would be proven to fire rather than proven to be about the right aggregate.
+		expect(
+			d('EditPwuType', { pwuTypeId: rootId, permittedChildTypeIds: [] }, rootId, TYPE_T).status
+		).toBe('ACCEPTED');
+		const ok = d('RemovePwuType', { pwuTypeId: rootId }, childId, TYPE_T);
+		expect(ok.status, JSON.stringify(ok.error)).toBe('ACCEPTED');
+		expect(stateOf(childId)?.status, 'the TARGET is what gets tombstoned').toBe('REMOVED');
+		expect(
+			stateOf(rootId)?.status,
+			'the id in the PAYLOAD is not the aggregate this command removes'
+		).toBe('DRAFT');
 	});
 });

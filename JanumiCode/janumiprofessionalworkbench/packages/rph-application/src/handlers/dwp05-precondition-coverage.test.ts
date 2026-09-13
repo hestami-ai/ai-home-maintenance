@@ -442,4 +442,167 @@ describe('DWP-05 pwa-authoring publication — per-site precondition on PWA.publ
 		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 		expect(h.eventsOfType('PwaRetired')).toHaveLength(1);
 	});
+
+	// ── JAN-PFA S3.3 — the three PRECISION gaps this file is the NAMED VICTIM for ───────────────────────────────
+	// ⭐ ASSERTION FIRST, THEN THE MUTANT. The four lifecycle tests above prove that each arrow's REFUSAL happens;
+	// none of them says what an ACCEPTED arrow must leave alone or must carry. Three such promises live at these
+	// sites and nothing in the repository asserts them:
+	//   (1) a publication hop moves NO semanticVersion — deprecatePwa; §10.1 L1379's staleness signal.
+	//   (2) a publication hop MIRRORS publicationStatus onto the envelope lifecycleStatus — submitPwaForReview.
+	//   (3) a publication hop HONOURS a client `expectedRevision` — retirePwa; RPH-CON-003.
+	// ⚠ EACH IS ASSERTED OVER THE WHOLE FIVE-ARROW SET, NOT ONE MEMBER, and the failure message names the offending
+	// arrow. All three are properties of the single `advanceStatus` contract that all five of these calls share, so
+	// the promise is universal; and the shape that produced this whole inventory is a test pinning ONE member,
+	// which a mutant narrowing the rule to exactly that member then passes.
+
+	/** The PWA's semanticVersion — §10.1 L1379's MATERIAL-CHANGE counter, off the envelope (not the `version` string). */
+	const semverOf = (id = PWA) => h.store.loadObject(id)?.semanticVersion;
+	/** The envelope's platform-level lifecycle mirror — REQUIRED on every governed object (envelopes.ts:55). */
+	const lifecycle = (id = PWA) => h.statusOf(id, 'lifecycleStatus');
+	/** The five PWA.publicationStatus arrows in machine order: [commandType, drive, the state it lands]. */
+	const publicationArrows = (): readonly (readonly [string, () => ReturnType<typeof submit>, string])[] => [
+		['SubmitPwaForReview', () => submit(), 'UNDER_REVIEW'],
+		['ValidatePwa', () => validate(), 'VALIDATED'],
+		['PublishPwa', () => publish(), 'PUBLISHED'],
+		['DeprecatePwa', () => deprecate(), 'DEPRECATED'],
+		['RetirePwa', () => retire(), 'RETIRED']
+	];
+
+	it('JAN-PFA: no publication-status arrow moves the PWA semanticVersion — the material-change counter is not a lifecycle counter (CONTROL: a real graph edit DOES move it)', () => {
+		// ── CONTROL FIRST, because without it this test cannot fail honestly. Every assertion below would also hold
+		// against an engine that had simply frozen the counter, so the converse has to be shown live in the same
+		// arrangement: DefinePwuType materially edits the PWA's graph and therefore MUST raise it
+		// (withPwaVersionBump). Together they say WHEN AND ONLY WHEN. ⚠ The control has its own mutant — delete the
+		// withPwaVersionBump wrapper from definePwuType and this line reddens while the loop below stays green.
+		expect(
+			h.d('CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
+				pwaId: PWA,
+				name: 'Human-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			}).status
+		).toBe('ACCEPTED');
+		const born = semverOf() ?? 0;
+		expect(born, 'a PWA is born at semanticVersion 1').toBe(1);
+		expect(
+			h.d('DefinePwuType', ROOT, 'PWU_TYPE', {
+				pwuTypeId: ROOT,
+				pwaId: PWA,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'R',
+				purpose: 'root',
+				isRoot: true
+			}).status
+		).toBe('ACCEPTED');
+		expect(
+			semverOf(),
+			'CONTROL: DefinePwuType materially edits the PWA graph and must RAISE its semanticVersion. If this is equal, the counter is inert in this arrangement and every assertion below proves nothing.'
+		).toBe(born + 1);
+
+		// ── THE PROMISE, over the whole set.
+		const frozen = semverOf();
+		for (const [name, drive, lands] of publicationArrows()) {
+			const r = drive();
+			expect(r.status, `${name} should be ACCEPTED: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			expect(pub()).toBe(lands);
+			expect(
+				semverOf(),
+				`${name} is a PUBLICATION-STATUS arrow, not a material graph edit, so it must leave the PWA's semanticVersion at ${frozen}. Claims, Assessments, Decisions and waivers bind the exact subject semantic version (§10.1 L1379), and the publish floor is judged against it — so a lifecycle hop that moves the number silently stales every one of them.`
+			).toBe(frozen);
+		}
+	});
+
+	it('JAN-PFA: every publication arrow mirrors publicationStatus onto the envelope lifecycleStatus (CONTROLS: the mirror is per-aggregate stored state, and it takes a distinct value at all six stops — so neither a constant nor an alias satisfies this)', () => {
+		createDraftWithRoot();
+		expect(lifecycle(), 'a PWA is born with the mirror already in agreement').toBe('DRAFT');
+		// CONTROL 1 baseline — the root PWU Type born alongside this PWA carries its OWN mirror, also at DRAFT.
+		expect(h.statusOf(ROOT, 'lifecycleStatus')).toBe('DRAFT');
+		const observed: string[] = [lifecycle()];
+		for (const [name, drive, lands] of publicationArrows()) {
+			const r = drive();
+			expect(r.status, `${name} should be ACCEPTED: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+			expect(pub(), `${name} must advance publicationStatus`).toBe(lands);
+			expect(
+				lifecycle(),
+				`${name} advanced publicationStatus to ${lands} and left the envelope lifecycleStatus at ${lifecycle()}. lifecycleStatus is the platform-level lifecycle a reader who does not know this aggregate's private publicationStatus machine has to use; the legality check, the status field and the mirror must never disagree about where the aggregate went (kit.ts advanceStatus).`
+			).toBe(lands);
+			observed.push(lifecycle());
+		}
+		// ── CONTROL 1: `lifecycleStatus` is PER-AGGREGATE STORED STATE, not an alias the reader resolves to whatever
+		// status field the subject happens to expose. The root PWU Type is still where its own birth left it after
+		// all five PWA arrows — so `lifecycle()` above read a real, separately-written field on the PWA, and an
+		// implementation in which the mirror could never disagree with anything would fail HERE, not in the loop.
+		// (Its own mutant: birth a PWU Type at a different lifecycleStatus — this line reddens, the loop does not.)
+		expect(
+			h.statusOf(ROOT, 'lifecycleStatus'),
+			'CONTROL: the PWA lifecycle must not have moved the PWU Type sibling — each governed object carries its own mirror'
+		).toBe('DRAFT');
+		// ── CONTROL 2: the mirror is a LIVE value, not a constant this arrangement happened to agree with. It took a
+		// different value at every one of the six stops, so an implementation that pinned lifecycleStatus to any
+		// single string — including the one it is born with — cannot satisfy the loop above.
+		expect(
+			new Set(observed).size,
+			`CONTROL: the mirror must discriminate across the lifecycle; observed ${observed.join(' -> ')}`
+		).toBe(6);
+	});
+
+	it('JAN-PFA: every publication arrow honours a client expectedRevision (RPH-CON-003) — a stale one CONFLICTS and commits nothing (CONTROL: the exact one is ACCEPTED)', () => {
+		createDraftWithRoot();
+		let n = 0;
+		/** The harness dispatch plus the RPH-CON-003 `expectedRevision` the Command envelope carries for exactly this. */
+		const at = (commandType: string, expectedRevision: number) => {
+			const i = ++n;
+			const command: DomainCommand = {
+				commandId: `c-rev-${i}`,
+				commandType,
+				commandSchemaVersion: 1,
+				targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+				targetAggregateId: PWA,
+				expectedRevision,
+				issuedAt: TS,
+				correlationId: 'dwp05',
+				idempotencyKey: `k-rev-${i}`,
+				payload: commandType === 'PublishPwa' ? { rootPwuTypeId: ROOT } : {}
+			};
+			return h.engine.dispatch(command);
+		};
+
+		for (const [name, , lands] of publicationArrows()) {
+			const actual = h.revisionOf(PWA) ?? 0;
+			expect(
+				actual,
+				`${name}: the arrangement must hold a revision a client could already be stale against`
+			).toBeGreaterThan(0);
+			const before = pub();
+
+			const stale = at(name, actual - 1);
+			expect(
+				stale.status,
+				`${name} issued against revision ${actual - 1} when the PWA is at ${actual} must be refused as a CONFLICT: ${JSON.stringify(stale.error)}`
+			).toBe('CONFLICT');
+			expect(
+				stale.error?.code,
+				`${name}: a client that acted on a stale read is a revision conflict, not any other refusal`
+			).toBe('RPH_REVISION_CONFLICT');
+			expect(stale.error?.message, `${name}: the refusal must name both revisions`).toBe(
+				`Revision conflict on ${PWA}: command expected revision ${actual - 1}, actual is ${actual}`
+			);
+			expect(
+				pub(),
+				`${name} refused on a stale revision must have committed nothing — applying it would be the silent last-write-wins RPH-CON-003 exists to stop`
+			).toBe(before);
+			expect(h.revisionOf(PWA), `${name} refused on a stale revision must not bump`).toBe(actual);
+
+			// ── CONTROL: the SAME command in the SAME arrangement, carrying the revision the client actually read.
+			// Without it, a handler that refused every expectedRevision it was sent — or an arrow unreachable from
+			// this state at all — would satisfy the refusal above just as well.
+			const fresh = at(name, actual);
+			expect(
+				fresh.status,
+				`CONTROL ${name} with the EXACT current revision ${actual} must be ACCEPTED: ${JSON.stringify(fresh.error)}`
+			).toBe('ACCEPTED');
+			expect(pub(), `CONTROL ${name} must have advanced the PWA`).toBe(lands);
+		}
+	});
 });

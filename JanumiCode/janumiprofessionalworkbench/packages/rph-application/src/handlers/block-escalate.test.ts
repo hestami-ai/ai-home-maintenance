@@ -10,6 +10,7 @@
 // report than progress, which this repository names in terms as worse than checking neither.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
+import { getMachine } from '@janumipwb/rph-domain';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -22,6 +23,11 @@ import {
 const TS = '2026-08-09T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69H9100';
 const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69H9110';
+// JAN-PFA S3.4. Three evidence ids, because `unobtainableEvidenceIds` is PLURAL and a list is only
+// observably a list above length one.
+const EVD_A = 'evd_01ARZ3NDEKTSV4RRFFQ69H91A0';
+const EVD_B = 'evd_01ARZ3NDEKTSV4RRFFQ69H91B0';
+const EVD_C = 'evd_01ARZ3NDEKTSV4RRFFQ69H91C0';
 
 describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 	let store: SqliteStorageAdapter;
@@ -51,6 +57,15 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 		(store.loadObject(PWU)!.state as { workLifecycleState: string }).workLifecycleState;
 	const emitted = () =>
 		store.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU).map((e) => e.eventType);
+	/** The payload of this PWU's most recent `eventType`, and it FAILS rather than returning nothing when the
+	 * event was never emitted — an assertion on `undefined.foo` reports the wrong defect. */
+	const lastPayload = (eventType: string): Record<string, unknown> => {
+		const matching = store
+			.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU)
+			.filter((e) => e.eventType === eventType);
+		expect(matching.length, `no ${eventType} was emitted at all`).toBeGreaterThan(0);
+		return matching.at(-1)!.payload as Record<string, unknown>;
+	};
 
 
 	const replayMatchesMaterialized = () => expectPwuReplayEquivalence(store, PWU);
@@ -414,5 +429,169 @@ describe('JAN-PWUWP W-5 — BlockPwu and EscalatePwu', () => {
 			'a LEGAL arrow to an OWNED target must refuse as OWNED and redirect — the value CONTROL 4 never sees'
 		).toEqual({ status: 'REJECTED', code: 'RPH_INVARIANT_VIOLATION', redirected: true });
 		expect(lifecycle()).toBe('BLOCKED');
+	});
+
+	// ══ JAN-PFA S3.4 — TWO PRECISION GAPS, CLOSED BY ASSERTION ════════════════════════════════════════════════
+	//
+	// Both were found by mutants that SURVIVED this whole suite, and both share one shape: the suite proved a
+	// refusal HAPPENS (or that an event was emitted) and never that it was PRECISE. Nothing below changes
+	// behaviour; the production handlers are untouched.
+
+	// ── GAP 1 — `BeginPwuShaping` IS NOT A SECOND WAY OUT OF `BLOCKED` ───────────────────────────────────────
+	// ⚠ AND THE PROMISE BEING BROKEN IS `UnblockPwu`'S, WHICH THE MUTANT NEVER TOUCHES. `UnblockPwu` TAKES NO
+	// TARGET, and that absence is the guarantee it offers: the state a PWU resumes at is READ from the
+	// `blockedFrom` its own `PwuBlocked` recorded, never supplied by the caller — because a caller-chosen target
+	// would permit `SHAPING -> BLOCKED -> EXECUTING`, silently skipping PLANNED, which is the exact failure
+	// REG-D-043 identified. Widening `BeginPwuShaping.sourceStates` to `['PROPOSED', 'BLOCKED']` hands a
+	// CALLER-CHOSEN way out of BLOCKED to a SECOND command: a PWU blocked out of EXECUTING resumes at SHAPING
+	// because the caller picked the command, not because any record said so. `BLOCKED -> SHAPING` is machine-legal
+	// (it is one of W-5.5's four recovery arrows) and `advancePwuLifecycle` runs no ownership check, so the
+	// declared source set is the ONLY thing between that mutant and an ACCEPTED command. Nothing asserted it:
+	// CONTROL 1 and CONTROL 4 above both ask this question of the GENERIC SETTER and of no named command.
+	//
+	// ARRANGED BY COMMANDS ALONE — no fixture — because the reachability of BLOCKED is the whole point: a
+	// professional reaches it with ProposePwu -> BeginPwuShaping -> BlockPwu, which is this suite's `beforeEach`
+	// plus one dispatch.
+	it('BeginPwuShaping is refused from BLOCKED — the way back is UnblockPwu alone, and it is not a second one', () => {
+		ok(dispatch('BlockPwu', { blockReason: 'the upstream interface contract is not published' }), 'block');
+		expect(lifecycle(), 'reached by commands only: ProposePwu -> BeginPwuShaping -> BlockPwu').toBe('BLOCKED');
+
+		const r = dispatch('BeginPwuShaping', {});
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(
+			r.error?.message ?? '',
+			'the caller reached for the wrong command, which is a different mistake from an illegal arrow'
+		).toContain('UNDECLARED ARROW');
+		expect(r.error?.message ?? '').toContain('BeginPwuShaping does not declare BLOCKED as a source state');
+		expect(lifecycle(), 'a refused command moves nothing').toBe('BLOCKED');
+
+		// CONTROL — BLOCKED IS NOT THEREBY SEALED. The refusal above must be about WHICH COMMAND OWNS THE ARROW,
+		// not about there being no way back at all; a BLOCKED PWU that nothing could recover would satisfy the
+		// assertion above and would be a worse defect than the one it is written to catch. The legitimate route
+		// still works, and it lands where the RECORD says rather than where a caller asked.
+		ok(dispatch('UnblockPwu', { recoveryReason: 'the contract was published' }), 'unblock');
+		expect(lifecycle(), 'SHAPING is what PwuBlocked.blockedFrom recorded — read, not chosen').toBe('SHAPING');
+	});
+
+	// ── GAP 1, UNIVERSAL FORM — the declaration says PROPOSED and NOTHING ELSE ───────────────────────────────
+	// ⚠ THE CASE ABOVE ALONE WOULD BE THE DEFECT THIS PROGRAMME KEEPS FINDING: a test that pins ONE member of a
+	// set proves nothing about the others, and the previous increment caught exactly that — a floor-lock test
+	// hard-coding one of three ids, so a mutant narrowing the lock to that id PASSED it. A mutant widening
+	// `sourceStates` to `['PROPOSED', 'PLANNED']` walks straight past the BLOCKED case above. So the promise is
+	// asserted over EVERY state of the ratified machine, DERIVED from the machine rather than transcribed, with
+	// the offending state named in the failure message.
+	//
+	// The fixture is ARRANGEMENT, not the subject — it forces the axis to each state in turn so the same
+	// question can be put to the command from all of them.
+	it('BeginPwuShaping declares PROPOSED and NOTHING else — every other state is an UNDECLARED ARROW', () => {
+		const states = getMachine('PWU.workLifecycleState').states;
+		expect(states, 'the sweep is worthless if the machine list does not contain the declared source').toContain(
+			'PROPOSED'
+		);
+		expect(states.length, 'nor if it is a singleton').toBeGreaterThan(1);
+
+		const outcomes = states.map((from) => {
+			seedPwuWorkLifecycleState_FIXTURE(store, PWU, from);
+			const r = dispatch('BeginPwuShaping', {});
+			return {
+				from,
+				status: r.status,
+				landed: lifecycle(),
+				undeclared: (r.error?.message ?? '').includes('UNDECLARED ARROW')
+			};
+		});
+
+		for (const o of outcomes) {
+			if (o.from === 'PROPOSED') continue;
+			expect(
+				{ status: o.status, landed: o.landed, undeclared: o.undeclared },
+				`BeginPwuShaping from ${o.from}: the declaration claims [PROPOSED] alone, so ${o.from} must be ` +
+					`refused as an UNDECLARED ARROW and the PWU must not move`
+			).toEqual({ status: 'REJECTED', landed: o.from, undeclared: true });
+		}
+
+		// CONTROL — the ONE declared source is still ADMITTED, and it lands. Without this, a `sourceStates: []`
+		// refusing every state in the machine would satisfy the loop above completely.
+		expect(
+			outcomes.find((o) => o.from === 'PROPOSED'),
+			'CONTROL: a command that refuses everything is not a command that declares PROPOSED'
+		).toEqual({ from: 'PROPOSED', status: 'ACCEPTED', landed: 'SHAPING', undeclared: false });
+		expect(
+			outcomes.filter((o) => o.status === 'ACCEPTED').map((o) => o.from),
+			'exactly one state is declared; a widened declaration puts the widened state in this list'
+		).toEqual(['PROPOSED']);
+	});
+
+	// ── GAP 2 — `PwuEscalated` RECORDS WHAT THE ESCALATOR SAID ───────────────────────────────────────────────
+	// ⚠ THE EVENT IS THE WHOLE OF THIS COMMAND'S DELTA, and nothing asserted a single field of it. The handler
+	// states the promise itself: *"`escalationReason` is required for AX-8's reason: a transfer of responsibility
+	// with no stated reason transfers nothing"* — CON-000 AX-8 calling escalation *"the responsible transfer of
+	// unresolved professional responsibility"*. This suite proved the refusal HAPPENS (an escalation with no
+	// reason is VALIDATION_FAILED) and that `PwuEscalated` was EMITTED, and stopped there: a handler recording a
+	// constant reason, or one professional's words under another's escalation, passes every assertion in this
+	// file. The transfer would be logged; WHAT was transferred would not be.
+	//
+	// AND THE EVIDENCE LIST IS DRIVEN AT LENGTH THREE ON PURPOSE. `unobtainableEvidenceIds` is `z.array` —
+	// PLURAL — because an impossibility usually spans several artifacts. The only assertion on it anywhere
+	// (`pwu-nothing-inferred.test.ts`) supplies a ONE-element list, which a handler truncating with
+	// `.slice(0, 1)` round-trips perfectly: the precision of a list is unobservable at length one.
+	it('PwuEscalated carries the reason verbatim and EVERY id declared unobtainable, not the first', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'EVIDENCE_PENDING');
+		const escalationReason = 'the custodian system was decommissioned and its archive was not retained';
+		ok(
+			dispatch('EscalatePwu', { escalationReason, unobtainableEvidenceIds: [EVD_A, EVD_B, EVD_C] }),
+			'escalate'
+		);
+		expect(
+			lastPayload('PwuEscalated'),
+			'the event is this command delta in its entirety — a field it drops is a fact nobody transferred'
+		).toEqual({
+			escalationReason,
+			unobtainableEvidenceIds: [EVD_A, EVD_B, EVD_C],
+			workLifecycleState: 'ESCALATED'
+		});
+
+		// CONTROL — THE FIELDS ARE VARIABLES, NOT CONSTANTS WEARING THEIR NAMES. A single case is satisfied by a
+		// handler hardcoding the values that case happens to use, which is a shape this file already records
+		// once. The second escalation is driven entirely by commands — de-escalate, escalate again — and must
+		// record ITS OWN words and ITS OWN shorter list.
+		ok(dispatch('UnblockPwu', { recoveryReason: 'one of the three turned up' }), 'de-escalate');
+		expect(lifecycle()).toBe('EVIDENCE_PENDING');
+		const second = 'the remaining two are held by a counterparty that will not release them';
+		expect(second, 'the control is inert unless the two escalations actually differ').not.toBe(
+			escalationReason
+		);
+		ok(
+			dispatch('EscalatePwu', { escalationReason: second, unobtainableEvidenceIds: [EVD_B, EVD_C] }),
+			're-escalate'
+		);
+		expect(lastPayload('PwuEscalated'), 'the second transfer records the SECOND reason').toEqual({
+			escalationReason: second,
+			unobtainableEvidenceIds: [EVD_B, EVD_C],
+			workLifecycleState: 'ESCALATED'
+		});
+	});
+
+	// ── GAP 2, THE ADMITTING CONTROL — the honest un-itemisable escalation is STILL ACCEPTED ─────────────────
+	// ⚠ WITHOUT THIS, THE ASSERTION ABOVE IS SATISFIED BY A HANDLER THAT REQUIRED THE LIST. The trigger is
+	// *"Evidence impossible to obtain"*, and the handler defends the optionality in terms — impossibility "is
+	// often not itemisable" — so a rule demanding the enumeration would make the honest case UNREPORTABLE,
+	// which this repository names as the same failure one level down. And the key must be ABSENT rather than an
+	// empty array, because `unobtainableEvidenceIds: []` is a positive claim that nothing was unobtainable,
+	// which is not what an escalation with nothing citable means (CON-000 AX-6).
+	it('CONTROL — an escalation that cannot itemise the evidence is admitted, and records NO list rather than an empty one', () => {
+		seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'EVIDENCE_PENDING');
+		const escalationReason = 'we cannot establish what the decommissioned system held, only that it is gone';
+		ok(dispatch('EscalatePwu', { escalationReason }), 'escalate with nothing citable');
+		const payload = lastPayload('PwuEscalated');
+		expect(payload, 'the reason is still carried when the citation cannot be').toEqual({
+			escalationReason,
+			workLifecycleState: 'ESCALATED'
+		});
+		expect(
+			'unobtainableEvidenceIds' in payload,
+			'an ABSENT list is an absence; an empty list would assert that nothing was unobtainable'
+		).toBe(false);
 	});
 });
