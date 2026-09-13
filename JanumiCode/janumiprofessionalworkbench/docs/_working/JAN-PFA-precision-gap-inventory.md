@@ -4,7 +4,9 @@ Programme `JAN-PFA` `S3.3` · see `REG-F-392` (the finding), `REG-F-393`/`394`/`
 
 ⭐ **HOW THEY WERE DISCHARGED, AND IT WAS NOT BY DECLARING FORTY MUTANTS.** Two assertion-first increments worked
 the whole list off: **increment 1** took the eighteen in `handlers/assurance.ts` — 17 closed, and
-`activateAssurancePolicy` **correctly REFUSED** because its arm is unreachable by any command, which is a
+`activateAssurancePolicy` **correctly REFUSED** because ~~its arm is~~ **the ARM THAT MUTANT ATTACKED (the floor
+lock) is** unreachable by any command — ⚠ the EXPORT itself is reachable and is guarded in a later increment
+(`REG-F-396`) — which is a
 different finding wearing the same `SURVIVED` verdict; **increment 2** took the remaining twenty-two across
 `handlers/pwa-authoring.ts` and `handlers/pwu.ts`, plus three exports this inventory never held
 (`escalatePwu`, `reshapePwu`, `supersedePwu` — rejected during authoring for naming two victims, and therefore

@@ -35307,7 +35307,8 @@ self-report of its own restore.
 
 **BACKGROUND.** `REG-F-392` established that a surviving mutant means one of two opposite things — an untested
 LIVE promise, or an arm no command can reach — and that the runner prints the same word for both. The previous
-increment found the second kind once (`activateAssurancePolicy`, correctly refused). This increment triaged 25
+increment found the second kind once (~~`activateAssurancePolicy`, correctly refused~~ — ⚠ **that export is
+reachable and precisely asserted; the dead thing was its FLOOR-LOCK ARM, see `REG-F-396`**). This increment triaged 25
 gaps and found **25 reachable, none dead** — but two threw up a THIRD and a FOURTH shape.
 
 **⭐ ONE: A PROMISE THE PERSISTENCE BOUNDARY MAKES UNOBSERVABLE.** `editPwuType`'s emitter carries
@@ -35335,7 +35336,8 @@ that a PWU's `semanticVersion` cannot move, so it can never catch the stale resh
 ⚠ **That is true of the RATIONALE and false of the GUARD.** `expectedSemanticVersion` is `z.number().int()`, so
 the BELOW-version arm is reachable by an ordinary dispatch: under the `!==` → `>` mutant, a caller attesting
 version `-1` drives `SHAPING → READY`. **The unreachable thing is the reason the docblock gives, not the arm.**
-⭑ `activateAssurancePolicy` was the opposite verdict — a live-looking reason over an arm no command can reach —
+⭑ `activateAssurancePolicy`'s FLOOR-LOCK ARM was the opposite verdict — a live-looking reason over an arm no
+command can reach (⚠ the EXPORT is reachable; `REG-F-396` corrects my overclaim) —
 and holding the two side by side is what the triage question is actually for: *reachable* is a property of the
 ARM, and a dead reason does not make one.
 
@@ -35387,3 +35389,54 @@ tool's message must be passed VERBATIM and never reconstructed from its id. **A 
 object.** I reconstructed one from its basename plus a directory I had in hand, and the reconstruction was both
 non-existent and gate-breaking. For the remaining burn-down the victim path is to be copied byte-exact out of the
 inventory, and the fan-out is to fail loudly on a victim that is not on disk rather than delegate the discovery.
+
+---
+
+### REG-F-396 — `JAN-PFA` `S3.3`: I took a finding about ONE ARM and restated it about the whole EXPORT — and it was my own register entry, one day old, that carried the overclaim
+
+- **Date:** 2026-09-13 · **Type:** CORRECTION of `REG-F-394` and of the commit message for the assertion-first
+  increment on `handlers/assurance.ts` · **Class:** MEASURED, both directions · **Status:** ✅ **CORRECTED.**
+
+**THE CLAIM I MADE.** `REG-F-394` says the previous increment found *"an arm no command can reach
+(`activateAssurancePolicy` — correctly refused, no test written)"*, and that increment's commit message says the
+export *"came back reachable=false"*. The roadmap repeats it. ⛔ **The export is reachable, is driven by tests
+today, and is precisely asserted.**
+
+**WHAT IS ACTUALLY TRUE, DRIVEN NOT ARGUED.** `createAssurancePolicy` births a policy
+`const bornStatus = FLOOR_POLICY_ID_SET.has(p.policyId) ? 'ACTIVE' : 'DRAFT'` (`assurance.ts:195`), so a NON-floor
+policy is born **DRAFT** — the first source state `fromStates('DRAFT','SUSPENDED')` admits.
+`dwp04-precondition-coverage.test.ts` drives both sources through the live bus and asserts the outcomes:
+`POSITIVE ... from DRAFT (first source) activates to ACTIVE`, `POSITIVE ... from SUSPENDED (second source)`, and a
+`NEGATIVE (kill) ... a re-issue from ACTIVE is refused` pinning `RPH_ILLEGAL_STATE_TRANSITION`, one
+`AssurancePolicyActivated`, and no silent revision bump.
+
+⭐ **AND THE ORIGINAL FINDING WAS NOT WRONG — IT WAS ABOUT SOMETHING NARROWER THAN WHAT I WROTE.** Re-read, every
+one of its four grounds concerns **floor** policies: the writer census, the born-status/aggregate-id derivation
+from `FLOOR_POLICY_ID_SET`, `status` being absent from `EDITABLE_PATCH_FIELDS` so Suspend cannot move a floor
+policy, and *"an empirical drive of ALL THREE CANONICAL FLOOR IDS"*. Together they establish that the
+`rejectIfFloorLocked` **GUARD ARM at this site is dead** — a floor policy is born ACTIVE, and the precondition
+refuses ACTIVE before the lock is ever consulted. ⭑ That is a finding about the ARM the inventory's mutant
+attacked, not about the export, and the agent's refusal to reach it by writing the store directly remains
+correct.
+
+⛔ **THE DEFECT IS THE GENERALISATION, AND IT IS ONE THIS REGISTER ALREADY NAMES.**
+`feedback_ask_the_general_form` records that on CLOSING a finding I should ask its general form. Here I did the
+opposite and asked it too broadly: a measured fact about one guard arm became a published claim about a
+production-consumed export. ⚠ The tell was available and I did not use it — **the export has seventeen dispatch
+sites across the repository, two of them in PRODUCTION** (`reference-undertaking.ts:322`,
+`seed-workbench.ts:342`). An export that production seeds twice is not one no command can reach.
+
+**WHAT THIS CHANGES, AND IT IS NOT SMALL.** I was sizing a DESIGN AMENDMENT on the strength of this single
+instance: a way for the census to record an obligation **discharged by a finding rather than a guard**, because
+`outstandingObligation` counts `activateAssurancePolicy` bare and would do so forever. ⭐ **With the instance
+withdrawn there is no motivating case, and the mechanism is NOT being built.** The triage of all 87 remaining bare
+exports returned **zero** in that class. If a real one appears, the design question reopens with a measured
+instance behind it, which is the only basis it should ever have been built on.
+
+⚠ **AND A SECOND CLAIM OF MINE IS CORRECTED WITH IT, IN THE OPPOSITE DIRECTION.** I said the census gap meant
+*"R3's burn-down cannot reach zero by construction"*. `compareGuardCensus` fails on exactly two conditions —
+`GUARD_LOST` and `POPULATION_CHANGED` — and `outstandingObligation` is printed on the **success** path. The
+obligation figure is REPORTED, never ENFORCED, so an unguardable export costs nothing at the gate. What such an
+export would corrupt is the FIGURE, which is quoted into commit messages and paces the programme — an accounting
+defect, not a gate defect. ⭑ Had I designed from the assumption instead of reading the checker, I would have built
+a gate mechanism for a reporting problem.

@@ -542,7 +542,9 @@ surfaced.
 
   ⭐ **THE TRIAGE IS WHY THIS BEATS THE INCREMENT IT REPLACES.** A surviving mutant means one of two opposite
   things — an untested LIVE promise, or an arm no command can reach — and the runner prints the same word for
-  both. `activateAssurancePolicy` came back **reachable = false** on evidence assembled from a writer census, an
+  both. ~~`activateAssurancePolicy` came back **reachable = false**~~ → ⚠ **its FLOOR-LOCK ARM did; the EXPORT is
+reachable, driven by `dwp04-precondition-coverage.test.ts` and seeded twice in production (`REG-F-396`).** The
+evidence below is sound and is about that ARM: it was assembled from a writer census, an
   aggregate-id/birth-status derivation, `EDITABLE_PATCH_FIELDS`, and an empirical drive of all three floor ids.
   The inventory's own remedy proposed reaching the arm by writing the store directly; the agent declined, because
   *"a green test built that way would read as coverage of a live promise while guarding nothing a professional
@@ -574,7 +576,7 @@ surfaced.
   keys before any test can read them, so that operator is untestable rather than a survivor to chase.
   `markPwuReady`'s version check is recorded by `REG-F-109` as dead; that is true of its RATIONALE and false of
   its ARM, which an ordinary dispatch reaches with a negative attested version. ⭑ *Reachable* is a property of
-  the arm; a dead reason does not make one — the exact inverse of `activateAssurancePolicy`.
+  the arm; a dead reason does not make one — the exact inverse of `activateAssurancePolicy`'s floor-lock arm.
 
   ⚠ **AND AN AGENT CAUGHT A DEFECT IN MY BRIEF (`REG-F-395`).** I reconstructed `blockPwu`'s victim path from its
   basename rather than copying it, producing a path that does not exist AND that `verif/slice-ledger.ts` parses as
