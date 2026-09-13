@@ -17,7 +17,7 @@
 // registered without `DiscloseAssumption` would have been scored COVERED by the C-0 arrow census and been
 // unable to fire. `it('the source state is occupiable')` below is the test that pins that, and it is the one
 // that would have caught the mistake.
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { AssumptionDisclosedPayloadSchema, type DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -31,6 +31,9 @@ const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5K10';
 const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5K20';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5K30';
 const EV = 'ev_01ARZ3NDEKTSV4RRFFQ69G5K40';
+// A SECOND piece of contradicting evidence, and its id sorts ABOVE EV on purpose — see the arity test below.
+const EV2 = 'ev_01ARZ3NDEKTSV4RRFFQ69G5K50';
+const ABSENT_EV = 'ev_01ARZ3NDEKTSV4RRFFQ69G5K99';
 
 describe('FalsifyAssumption — the join between OBJ-4, the ratified event, the kernel, and the guard', () => {
 	let store: SqliteStorageAdapter;
@@ -55,6 +58,24 @@ describe('FalsifyAssumption — the join between OBJ-4, the ratified event, the 
 
 	const statusOf = (id: string) =>
 		(store.loadObject(id)?.state as { status?: string } | undefined)?.status;
+
+	const proposeEvidence = (evidenceId: string, uri: string) =>
+		dispatch(
+			'ProposeEvidence',
+			{
+				evidenceId,
+				evidenceType: 'OBSERVATION',
+				contentReference: { uri },
+				producedBy: actor,
+				supportsClaimIds: [],
+				contradictsClaimIds: [],
+				scope: 'architecture',
+				limitations: [],
+				capturedAt: TS
+			},
+			evidenceId,
+			'EVIDENCE'
+		);
 
 	const disclose = () => dispatch('DiscloseAssumption', {}, ASM, 'ASSUMPTION');
 	const falsify = (ids: string[] = [EV]) =>
@@ -88,22 +109,7 @@ describe('FalsifyAssumption — the join between OBJ-4, the ratified event, the 
 			ASM,
 			'ASSUMPTION'
 		);
-		dispatch(
-			'ProposeEvidence',
-			{
-				evidenceId: EV,
-				evidenceType: 'OBSERVATION',
-				contentReference: { uri: 'file://tenant-model-changed' },
-				producedBy: actor,
-				supportsClaimIds: [],
-				contradictsClaimIds: [],
-				scope: 'architecture',
-				limitations: [],
-				capturedAt: TS
-			},
-			EV,
-			'EVIDENCE'
-		);
+		proposeEvidence(EV, 'file://tenant-model-changed');
 		dispatch(
 			'ProposePwu',
 			{
@@ -253,5 +259,112 @@ describe('FalsifyAssumption — the join between OBJ-4, the ratified event, the 
 		const r = falsify();
 		expect(r.status).not.toBe('ACCEPTED');
 		expect(statusOf(ASM)).toBe('PROPOSED');
+	});
+
+	// ── JAN-PFA S3.3 — TWO PRECISION GAPS CLOSED HERE, ASSERTION FIRST ───────────────────────────────────────
+	// Forty mutants were authored against this layer and ALL FORTY SURVIVED, because each attacked a promise
+	// nothing asserted. Two of them name promises THIS file was the named victim of and did not hold:
+	//   (1) `discloseAssumption` — the AssumptionDisclosed payload was never read at all; `:142` above drives the
+	//       command and asserts only the OBJECT's status, which the mutant leaves untouched.
+	//   (2) `falsifyAssumption` — the citation's ARITY was never exercised; `:148` cites exactly ONE id, where
+	//       HEAD and a head-only mutant are byte-identical.
+	// Each assertion below is paired with a CONTROL, because the gap these close is precisely the shape "the
+	// refusal was proven to HAPPEN and never proven to be PRECISE", and an assertion with no control repeats it.
+
+	// CLOSES MUTANT `disclose-event-reports-pre-state`:
+	//   `eventPayload: () => ({ status: 'DISCLOSED' })` -> `eventPayload: () => ({ status: 'PROPOSED' })`
+	// THE PROMISE, in this handler file's own convention (stated at `proposeEvidence`): "The event records the
+	// RESULTING state". `AssumptionDisclosedPayloadSchema` is a strictObject with exactly ONE field, so that one
+	// field is the entire content of the event: an AssumptionDisclosed reporting PROPOSED asserts the assumption
+	// is still undisclosed and conveys zero correct information about the transition it exists to record. The
+	// mutant is the copy-paste the sibling handler's value would produce, not an exotic edge.
+	it('the AssumptionDisclosed event reports the RESULTING state, not the PROPOSED state it left', () => {
+		// The pre-state is pinned FIRST so the mutant's value is a LIVE alternative and not a nonsense one:
+		// PROPOSED is exactly what this object held one instant before the event was written.
+		expect(statusOf(ASM)).toBe('PROPOSED');
+		expect(disclose().status).toBe('ACCEPTED');
+
+		const disclosed = store.readAllEvents().filter((e) => e.eventType === 'AssumptionDisclosed');
+		expect(disclosed).toHaveLength(1);
+		// `toEqual` on the WHOLE payload rather than a field probe: the ratified schema has exactly one field, so
+		// this is the strongest available statement about what the governed record says.
+		expect(
+			disclosed[0]?.payload,
+			'the single ratified field must carry the POST-state DISCLOSED'
+		).toEqual({ status: 'DISCLOSED' });
+	});
+
+	// CONTROL for the test above — WHAT ELSE WOULD HAVE CAUGHT THAT MUTANT? Nothing. The ratified event gate
+	// ADMITS the pre-state in this field, because the schema types it as the AssumptionStatus ENUM and PROPOSED
+	// is a member of it. This control exists so the assertion above cannot be mistaken for a restatement of a
+	// gate that was already refusing: it shows the gate is not the instrument, the assertion is.
+	it('CONTROL — the ratified event gate ADMITS the pre-state, so only the assertion above refuses it', () => {
+		expect(AssumptionDisclosedPayloadSchema.safeParse({ status: 'DISCLOSED' }).success).toBe(true);
+		expect(
+			AssumptionDisclosedPayloadSchema.safeParse({ status: 'PROPOSED' }).success,
+			'if this is false the schema was the guard all along and the assertion above is decoration'
+		).toBe(true);
+	});
+
+	// CONTROL for the same test, on the other side — the assertion must not be satisfiable by a handler that
+	// refused every disclosure or emitted nothing. The LEGITIMATE disclosure from PROPOSED is admitted and
+	// recorded EXACTLY ONCE, while the re-issue against an already-DISCLOSED assumption is refused and appends
+	// NO second AssumptionDisclosed — the precondition's own stated reason for being `fromStates('PROPOSED')`.
+	it('CONTROL — disclosure is admitted exactly once; a re-issue from DISCLOSED appends no second event', () => {
+		expect(disclose().status).toBe('ACCEPTED');
+		const again = disclose();
+		expect(again.status, 'a second disclosure of an already-disclosed assumption').not.toBe(
+			'ACCEPTED'
+		);
+		expect(statusOf(ASM)).toBe('DISCLOSED');
+		expect(store.readAllEvents().filter((e) => e.eventType === 'AssumptionDisclosed')).toHaveLength(
+			1
+		);
+	});
+
+	// CLOSES MUTANT `falsify-first-evidence-only`:
+	//   `p.contradictingEvidenceIds` -> `p.contradictingEvidenceIds.slice(0, 1)` at the assessFalsification call
+	// THE PROMISE: contradicting evidence is CONSTITUTIVE of falsification (RPH-ASM-004 / §12.2 / §29.1) — "it is
+	// not a note attached to the act, it is the act's basis" — and the handler's docblock records that the EVENT
+	// is its only ratified home (the Assumption object has no such field, which the test at :183 pins). So
+	// `AssumptionFalsified.contradictingEvidenceIds` is the ENTIRE record of what falsified the premise, and a
+	// record that keeps the FIRST citation and silently drops the rest is the same defect its sibling already
+	// pins for claims (evidence-invalidation-impact.test.ts:144, "a wiring that took the first SUPPORTS link").
+	// `:168` above cannot see it: one cited id makes HEAD and the mutant byte-identical.
+	it('every cited contradicting evidence id reaches the ratified event, in the order cited', () => {
+		expect(proposeEvidence(EV2, 'file://tenant-model-split').status).toBe('ACCEPTED');
+		expect(disclose().status).toBe('ACCEPTED');
+		// CITED IN DESCENDING ID ORDER DELIBERATELY (EV2 > EV): this refuses a head-only record AND any
+		// implementation that sorted or de-duplicated the citation instead of carrying it as given.
+		const r = falsify([EV2, EV]);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(statusOf(ASM)).toBe('FALSIFIED');
+
+		const ev = store.readAllEvents().find((e) => e.eventType === 'AssumptionFalsified');
+		const cited = (ev?.payload as { contradictingEvidenceIds: string[] }).contradictingEvidenceIds;
+		expect(cited, 'the basis of a falsification is the whole citation, not its head').toEqual([
+			EV2,
+			EV
+		]);
+	});
+
+	// CONTROL for the test above — it must not be satisfiable by a guard that simply refuses multi-id citations
+	// (the two-id falsification IS accepted above), nor by an existence check that resolves only the HEAD of the
+	// citation. Here the SECOND id is the absent one, so the refusal must NAME IT and must name nothing else: a
+	// reason a reader cannot act on is the silent omission (PER-9), and a check reading
+	// `contradictingEvidenceIds[0]` would have admitted this falsification outright.
+	it('CONTROL — the existence check resolves EVERY cited id, and the refusal names only what failed', () => {
+		expect(proposeEvidence(EV2, 'file://tenant-model-split').status).toBe('ACCEPTED');
+		expect(disclose().status).toBe('ACCEPTED');
+		const r = falsify([EV, ABSENT_EV]);
+		expect(r.status).not.toBe('ACCEPTED');
+		expect(r.error?.message).toContain('does not exist as EVIDENCE');
+		expect(r.error?.message, 'a refusal naming only the head lets the tail through').toContain(
+			ABSENT_EV
+		);
+		expect(r.error?.message, 'the PRESENT evidence must not be named as missing').not.toContain(EV);
+		expect(statusOf(ASM), 'a refused falsification leaves the assumption untouched').toBe(
+			'DISCLOSED'
+		);
 	});
 });

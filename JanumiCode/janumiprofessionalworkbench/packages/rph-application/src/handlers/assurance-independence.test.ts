@@ -1233,4 +1233,284 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.message).toContain('does not exist');
 	});
+
+	// ══ JAN-PFA S3.3 — THREE PRECISION GAPS, CLOSED ASSERTION-FIRST ══════════════════════════════════════════
+	// Forty mutants were authored against this layer and all forty SURVIVED, because each attacked a promise
+	// nothing asserted. The three below are the ones sited in THIS file. Each test states the promise, then gives
+	// it a CONTROL — because every gap in that inventory has the same shape: the suite proved a refusal HAPPENS
+	// and never that it was PRECISE, so an assertion without a control would repeat the mistake it is closing.
+
+	// ── (1) `completeAssuranceAssessment`: THE GOVERNING POLICY IS THE ONE THE ASSESSMENT PINS ────────────────
+	// MUTATION CLOSED:
+	//   `? (ctx.store.loadObject(assessmentState.assurancePolicyId)?.state as`
+	//     ->
+	//   `? (ctx.store.loadObject((command.payload as { validatorResult?: { policyId?: string } } | undefined)
+	//        ?.validatorResult?.policyId ?? assessmentState.assurancePolicyId)?.state as`
+	//
+	// THE PROMISE: the policy whose rules govern a completion is the one the ASSESSMENT pins (§18's version/policy
+	// pin), read from committed state — NOT the one the validator reports about itself. §20's ValidatorResult
+	// declares `policyId: z.string()` as a REQUIRED field, so every completion already carries a second,
+	// caller-chosen policy id that type-checks and resolves against the store. The whole completion path hangs off
+	// that ONE load: independenceRequirement (§39 inv-8), permittedControlActions (Gate B), requiredEvidence
+	// (Gate A), dispositionRules (Gate C), escalationRules (Gate D). Let the verdict choose it and a validator
+	// picks the rules it is judged by.
+	//
+	// WHY THE SUITE COULD NOT SEE IT: every existing arrangement in this file has ONE policy, whose id the
+	// `verdict()` helper also writes into `validatorResult.policyId` — so the pinned policy and the named policy
+	// are the same object and the two loads are byte-identical. TWO policies is the arrangement that separates them.
+	it('completeAssuranceAssessment is governed by the policy the ASSESSMENT PINS, not the one validatorResult names (§18 pin)', () => {
+		const STRICT = POLICY; // permits CONTINUE only
+		const PERMISSIVE = 'pol_01ARZ3NDEKTSV4RRFFQ69G5PRM'; // permits CONTINUE and ESCALATE
+
+		const createPolicyPermitting = (policyId: string, permitted: readonly string[]): void => {
+			dispatchOk(
+				cmd(
+					'CreateAssurancePolicy',
+					policyId,
+					'ASSURANCE_POLICY',
+					basePolicy({
+						policyId,
+						permittedControlActions: [...permitted],
+						// A finding definition may not default to an action its own policy does not permit, so the
+						// default follows the permitted set rather than `basePolicy`'s RESHAPE_PWU.
+						findingDefinitions: [
+							{
+								code: 'UNFIT',
+								name: 'Unfit',
+								description: 'd',
+								defaultSeverity: 'MATERIAL',
+								affectedClaimTypes: ['FITNESS'],
+								defaultControlActions: ['CONTINUE']
+							}
+						]
+					})
+				)
+			);
+			dispatchOk(cmd('ActivateAssurancePolicy', policyId, 'ASSURANCE_POLICY', { policyId }));
+		};
+		/** Drive a new assessment PINNED to `policyId` all the way to ASSESSING through the real §30 arrows. */
+		const assessingUnder = (assessmentId: string, policyId: string): void => {
+			dispatchOk(
+				cmd('RequestAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {
+					assessmentId,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [SUBJECT],
+					subjectSemanticVersions: { [SUBJECT]: 1 },
+					claimIds: []
+				})
+			);
+			dispatchOk(cmd('BeginAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {}));
+		};
+		/** A §20 verdict that NAMES `namedPolicyId` as the policy it was produced under. */
+		const verdictNaming = (assessmentId: string, namedPolicyId: string, action: string) => ({
+			...verdict(assessmentId, 'evaluator-1'),
+			policyId: namedPolicyId,
+			recommendedControlActions: [{ action }]
+		});
+
+		createPolicyPermitting(STRICT, ['CONTINUE']);
+		createPolicyPermitting(PERMISSIVE, ['CONTINUE', 'ESCALATE']);
+
+		// THE KILL. The assessment is pinned to STRICT; the verdict names PERMISSIVE as its own policy and
+		// recommends ESCALATE, which STRICT does not permit and PERMISSIVE does. The pinned policy must decide.
+		const pinnedStrict = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A80';
+		assessingUnder(pinnedStrict, STRICT);
+		const r = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', pinnedStrict, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdictNaming(pinnedStrict, PERMISSIVE, 'ESCALATE')
+			})
+		);
+		expect(
+			r.status,
+			'a validator naming a permissive policy in its own result must not choose the rules it is judged by'
+		).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		// THE MESSAGE, not merely the code: it enumerates the permitted set of the policy that was ACTUALLY
+		// consulted, so it is the one observable that says WHOSE rules refused. `Permitted: [CONTINUE]` is STRICT's.
+		expect(r.error?.message).toContain('Permitted: [CONTINUE]');
+		expect(stateOf(pinnedStrict)?.assessmentState).toBe('ASSESSING'); // no verdict was recorded
+
+		// CONTROL 1 — THE DISCRIMINATING ONE. The very same ESCALATE recommendation is ADMITTED when the
+		// assessment is genuinely pinned to PERMISSIVE. So the refusal above was about WHICH policy was consulted,
+		// not about ESCALATE being barred everywhere; and it proves the mutant's load really is the more permissive
+		// one, which is what makes the mutation observable rather than accidentally blocked by something else.
+		const pinnedPermissive = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A81';
+		assessingUnder(pinnedPermissive, PERMISSIVE);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', pinnedPermissive, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdictNaming(pinnedPermissive, PERMISSIVE, 'ESCALATE')
+			})
+		);
+		expect(stateOf(pinnedPermissive)?.assessmentState).toBe('SATISFIED');
+
+		// CONTROL 2 — the STRICT policy still ADMITS its own legitimate case, so a Gate B that refused every
+		// recommendation could not satisfy this test.
+		const pinnedStrictOk = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A82';
+		assessingUnder(pinnedStrictOk, STRICT);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', pinnedStrictOk, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdictNaming(pinnedStrictOk, STRICT, 'CONTINUE')
+			})
+		);
+		expect(stateOf(pinnedStrictOk)?.assessmentState).toBe('SATISFIED');
+	});
+
+	// ── (2) `submitEvidenceForAssessment`: THE ARROW NEEDS *ALL* BLOCKING REQUIREMENTS, NOT ALL BUT ONE ───────
+	// MUTATION CLOSED:
+	//   `const advancesToReady = assessmentState === 'EVIDENCE_PENDING' && stillOutstanding.length === 0;`
+	//     ->
+	//   `const advancesToReady = assessmentState === 'EVIDENCE_PENDING' && stillOutstanding.length <= 1;`
+	//
+	// THE PROMISE: §30's guard on the EVIDENCE_PENDING -> READY arrow is "all required evidence present" and §32
+	// names THIS command as the trigger — "the arrow is taken HERE, at the moment the LAST outstanding requirement
+	// is satisfied". Off by one and the arrow fires with a mandatory requirement still outstanding, which then
+	// admits BeginAssuranceAssessment and a verdict over evidence that never arrived.
+	//
+	// WHY THE SUITE COULD NOT SEE IT: the two-requirement arrangement existed (the §32 receipt test above declares
+	// EV-01 + EV-02 and submits only EV-01) and never asserted the resulting `assessmentState`; the one test that
+	// does assert the arrow has a SINGLE requirement, where "all but one" and "none" are the same number.
+	it('§30/§32 the EVIDENCE_PENDING -> READY arrow waits for EVERY blocking requirement: one of two does not take it', () => {
+		const ev = (id: string) => ({
+			id,
+			evidenceType: 'TEST_RESULT',
+			description: 'd',
+			purpose: 'p',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL', // both requirements GATE ASSESSING, so both hold the arrow
+			mayBeWaived: false
+		});
+		dispatchOk(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({
+					permittedControlActions: ['CONTINUE'],
+					requiredEvidence: [ev('EV-01'), ev('EV-02')],
+					findingDefinitions: [
+						{
+							code: 'UNFIT',
+							name: 'Unfit',
+							description: 'd',
+							defaultSeverity: 'MATERIAL',
+							affectedClaimTypes: ['FITNESS'],
+							defaultControlActions: ['CONTINUE']
+						}
+					]
+				})
+			)
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A90';
+		requestAssessment(A); // two blocking requirements outstanding -> lands EVIDENCE_PENDING, stays there
+		expect(stateOf(A)?.assessmentState).toBe('EVIDENCE_PENDING');
+
+		// THE KILL. One of two satisfied is not "all required evidence present".
+		dispatchOk(
+			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5E91',
+				satisfiesRequirementId: 'EV-01'
+			})
+		);
+		expect(
+			stateOf(A)?.assessmentState,
+			'EV-02 is still outstanding — required MINUS received is not empty, so the arrow is not taken'
+		).toBe('EVIDENCE_PENDING');
+		// And the consequence the arrow exists to prevent is still prevented: assessing cannot begin.
+		expect(
+			engine.dispatch(cmd('BeginAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {})).status
+		).toBe('REJECTED');
+
+		// THE CONTROL. Satisfying the LAST outstanding requirement DOES take the arrow — so an arrow that never
+		// fired (the opposite failure) could not satisfy this test, and the refusal above is precision, not refusal
+		// of everything.
+		dispatchOk(
+			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5E92',
+				satisfiesRequirementId: 'EV-02'
+			})
+		);
+		expect(stateOf(A)?.assessmentState).toBe('READY');
+		dispatchOk(cmd('BeginAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {}));
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
+	});
+
+	// ── (3) `editAssurancePolicy`: THE EFFECTIVE PERMITTED SET HAS TWO HALVES, AND ONLY ONE WAS TESTED ────────
+	// MUTATION CLOSED:
+	//   `(p.permittedControlActions ?? loaded.state.permittedControlActions) as readonly string[] | undefined`
+	//     ->
+	//   `p.permittedControlActions as readonly string[] | undefined`
+	//
+	// THE PROMISE, in the handler's own words: "the effective remediationRules (new or existing) must keep
+	// remediationActions subset of the effective permitted set, so an edit that narrows permittedControlActions OR
+	// REVISES remediationRules cannot leave an ungoverned remediation action behind" (§11). The merge is effective
+	// on BOTH sides. The sibling test above covers one direction — narrowing `permittedControlActions` against
+	// EXISTING rules — so dropping the `?? loaded.state` fallback leaves that one green while the mirror direction
+	// (NEW rules against the EXISTING permitted set) stops being checked at all: with no permitted set on the
+	// payload the guard takes its `undefined` early-out and the edit commits an ungoverned remediation action.
+	it('#5 remediationRules EDIT-PATH (the mirror direction): NEW rules are checked against the EXISTING permitted set', () => {
+		dispatchOk(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({ permittedControlActions: ['RESHAPE_PWU'] })
+			)
+		);
+		const read = () =>
+			store.loadObject(POLICY)?.state as {
+				permittedControlActions?: string[];
+				remediationRules?: Array<{ remediationActions?: string[] }>;
+			};
+
+		// THE KILL. A rule naming ABANDON, with NO permittedControlActions on the edit — so the set it must be a
+		// subset of can only come from committed state. ABANDON is not in it.
+		const r = engine.dispatch(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				remediationRules: [{ trigger: 't', remediationActions: ['ABANDON'] }]
+			})
+		);
+		expect(
+			r.status,
+			'an edit that resupplies remediationRules and no permitted set must still be checked against the EFFECTIVE one'
+		).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.message).toContain('ABANDON');
+		// The ungoverned rule did not land: state is exactly as created.
+		expect(read()?.remediationRules).toEqual([]);
+		expect(read()?.permittedControlActions).toEqual(['RESHAPE_PWU']);
+
+		// CONTROL 1 — the guard still ADMITS a legitimate edit of the same shape: new rules, no permitted set
+		// supplied, naming an action the EXISTING set does contain.
+		dispatchOk(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				remediationRules: [{ trigger: 't', remediationActions: ['RESHAPE_PWU'] }]
+			})
+		);
+		expect(read()?.remediationRules?.[0]?.remediationActions).toEqual(['RESHAPE_PWU']);
+
+		// CONTROL 2 — THE DISCRIMINATING ONE. The very same ABANDON rule is ADMITTED when the edit widens the
+		// permitted set to include it, which is the other half of "effective". So the refusal above was about the
+		// EFFECTIVE SET and not about ABANDON being blacklisted.
+		dispatchOk(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				permittedControlActions: ['RESHAPE_PWU', 'ABANDON'],
+				remediationRules: [{ trigger: 't', remediationActions: ['ABANDON'] }]
+			})
+		);
+		// THE PROMISE ITSELF, stated over the committed result rather than over the branch: every remediation
+		// action a policy carries is one the same policy permits.
+		const after = read()!;
+		expect(after.remediationRules?.[0]?.remediationActions).toEqual(['ABANDON']);
+		expect(
+			(after.remediationRules ?? [])
+				.flatMap((rule) => rule.remediationActions ?? [])
+				.filter((a) => !(after.permittedControlActions ?? []).includes(a))
+		).toEqual([]);
+	});
 });

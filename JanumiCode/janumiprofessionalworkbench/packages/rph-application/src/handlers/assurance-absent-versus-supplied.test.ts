@@ -350,6 +350,45 @@ describe('assurance handlers — an absent input and a supplied one must not col
 		expect(payload.sourceExecutionAttemptId).toBe('exa_01ARZ3NDEKTSV4RRFFQ69K0042');
 	});
 
+	// ── A creation event reports the status the object was BORN in, not the spec text’s literal ─────────────────
+	it('AssumptionDetected reports PROPOSED — the status the object HAS, not §12.2’s DISCLOSED literal', () => {
+		// ⭐ CLOSES the JAN-PFA precision gap inventoried for `detectAssumption`: the mutation
+		// `status: state.status` → `status: 'DISCLOSED'`. Nothing asserted this field and nothing would have
+		// noticed — `AssumptionStatusSchema` accepts DISCLOSED so the event gate passes the mutant, the OBJECT's
+		// PROPOSED (pinned in assumption-falsification.test.ts) is left untouched, replay-conformance compares
+		// event TYPES, and the test directly above reads this very payload while saying nothing about `status`.
+		//
+		// THE PROMISE, which the handler argues rather than assumes: §12.2 writes the literal
+		// `status: 'DISCLOSED'` into this payload, and DOC-002 §26.3 makes DISCLOSED a SEPARATE
+		// AssumptionDisclosed transition — so the event reports the status the object ACTUALLY has, because
+		// "emitting DISCLOSED would make the event contradict the object it describes". Under the mutant a
+		// reader folding detection events sees every assumption disclosed to the professional at the instant it
+		// was found, and the disclosure act that follows is the second disclosure of something already disclosed.
+		const id = 'asu_01ARZ3NDEKTSV4RRFFQ69K0043';
+		arrange('DetectAssumption', id, 'ASSUMPTION', {
+			assumptionId: id,
+			statement: 'connectivity is available when the job starts',
+			introducedBy: ACTOR,
+			affectedObjectIds: [SUBJECT],
+			materiality: 'MATERIAL'
+		});
+		expect(payloadOf('AssumptionDetected', id).status).toBe('PROPOSED');
+		// The event and the object agree, which is the whole of what the handler promises here.
+		expect(stateOf(id)?.status).toBe('PROPOSED');
+
+		// ⛔ THE CONTROL. "status is PROPOSED" would also hold for a vocabulary in which DISCLOSED is unsayable,
+		// or for a reader of mine that can only ever return the birth value — either would make the assertion
+		// above green without discriminating anything. DiscloseAssumption drives the SAME aggregate one arrow on
+		// and the SAME reader returns DISCLOSED off the governed event: the value the mutant emits is real,
+		// schema-valid and observable right here; it simply belongs to a different act.
+		arrange('DiscloseAssumption', id, 'ASSUMPTION', {});
+		expect(payloadOf('AssumptionDisclosed', id).status).toBe('DISCLOSED');
+		expect(stateOf(id)?.status).toBe('DISCLOSED');
+		// And the detection event still says PROPOSED once the assumption IS disclosed — it records the status
+		// at DETECTION, so the two events remain distinguishable acts rather than one fact written twice.
+		expect(payloadOf('AssumptionDetected', id).status).toBe('PROPOSED');
+	});
+
 	// ── An absent TARGET refuses, and says which target ───────────────────────────────────────────────────────
 
 	it('RecordAssuranceObservation refuses a finding against an assessment that does not exist, and names it', () => {
@@ -373,6 +412,97 @@ describe('assurance handlers — an absent input and a supplied one must not col
 			'RecordAssuranceObservation requires an existing assessment asm_01ARZ3NDEKTSV4RRFFQ69K0051'
 		);
 		expect(store.loadObject('obs_01ARZ3NDEKTSV4RRFFQ69K0050')).toBeUndefined();
+	});
+
+	// ── And when the target IS there, the new record inherits what the target holds ─────────────────────────────
+	it('an observation inherits the policy and subjects OF THE ASSESSMENT IT NAMES — two assessments, two policies', () => {
+		// ⭐ CLOSES the JAN-PFA precision gap inventoried for `recordAssuranceObservation`: the mutation
+		// `policyId: assessment.assurancePolicyId ?? p.assessmentId` → `policyId: p.assessmentId`. The test
+		// directly above asserts only the NEGATIVE half of the inheritance sentence — a missing assessment
+		// refuses, by exact message — and the inherited VALUE was asserted nowhere in the repo. So an
+		// observation could be persisted AND emitted carrying its own assessment's id in §21.1's REQUIRED
+		// `policyId` — a finding filed against a policy that does not exist — with every test still green.
+		//
+		// THE PROMISE: §21.1 makes `policyId` required on AssuranceObservationRecorded and the observation
+		// INHERITS it from the assessment. It cannot come from anywhere else: the command payload is
+		// assessmentId / observationType / findingCode / severity / statement / evidenceIds and nothing more, so
+		// the assessment is the only source of the policy this finding is raised under. `subjectObjectIds` is
+		// the other half of the same inheritance and was equally unasserted, so it is pinned here too.
+		//
+		// ⛔ AND THE CONTROL IS THE PAIR. Two assessments, under DIFFERENT policies and over DIFFERENT subjects,
+		// each taking one observation. A single assessment would stay green for a handler that hard-coded this
+		// policy, or that read "the" policy from anywhere at all; only the pair forces each observation to track
+		// the assessment it was actually recorded against. The positive case is also the admitting control for
+		// the refusal above — a guard that rejected every RecordAssuranceObservation satisfies that test alone.
+		//
+		// NOTE the arm that is NOT tested, and why it needs none: `?? p.assessmentId` fires only for a named
+		// object carrying no assurancePolicyId (RequestAssuranceAssessment makes assurancePolicyId REQUIRED), and
+		// on that arm HEAD and the mutant emit the SAME value. The fallback is not what the mutation changes.
+		const otherPolicy = 'pol_01ARZ3NDEKTSV4RRFFQ69K0131';
+		const otherSubject = 'pwu_01ARZ3NDEKTSV4RRFFQ69K0132';
+		createPolicy(POLICY);
+		createPolicy(otherPolicy);
+
+		const first = 'asm_01ARZ3NDEKTSV4RRFFQ69K0133';
+		driveToAssessing(first, POLICY);
+		const second = 'asm_01ARZ3NDEKTSV4RRFFQ69K0134';
+		const requested = requestAssessment(second, otherPolicy, [otherSubject]);
+		expect(requested.status, JSON.stringify(requested.error)).toBe('ACCEPTED');
+		arrange('BeginAssuranceAssessment', second, 'ASSURANCE_ASSESSMENT', {});
+
+		// The arrangement itself, asserted: each assessment holds its own policy, and — the condition that makes
+		// everything below discriminating — a policy id is never equal to the id of the assessment citing it.
+		expect(stateOf(first)?.assurancePolicyId).toBe(POLICY);
+		expect(stateOf(second)?.assurancePolicyId).toBe(otherPolicy);
+		expect(POLICY, 'the mutant emits the ASSESSMENT id, so the two must differ').not.toBe(first);
+		expect(otherPolicy, 'the mutant emits the ASSESSMENT id, so the two must differ').not.toBe(
+			second
+		);
+
+		const observe = (observationId: string, assessmentId: string): void =>
+			arrange('RecordAssuranceObservation', observationId, 'ASSURANCE_OBSERVATION', {
+				assessmentId,
+				observationType: 'FINDING',
+				findingCode: 'UNFIT',
+				severity: 'MATERIAL',
+				statement: 'the boundary is not demonstrated'
+			});
+		const firstObservation = 'obs_01ARZ3NDEKTSV4RRFFQ69K0135';
+		const secondObservation = 'obs_01ARZ3NDEKTSV4RRFFQ69K0136';
+		observe(firstObservation, first);
+		observe(secondObservation, second);
+
+		expect(payloadOf('AssuranceObservationRecorded', firstObservation)).toEqual({
+			observationId: firstObservation,
+			assessmentId: first,
+			policyId: POLICY,
+			subjectObjectIds: [SUBJECT],
+			findingCode: 'UNFIT',
+			severity: 'MATERIAL',
+			statement: 'the boundary is not demonstrated',
+			implication: 'the boundary is not demonstrated',
+			evidenceIds: [],
+			disposition: 'OPEN'
+		});
+		expect(stateOf(firstObservation)?.policyId).toBe(POLICY);
+		expect(stateOf(firstObservation)?.subjectObjectIds).toEqual([SUBJECT]);
+
+		// The control half: the same command shape against the OTHER assessment inherits the OTHER policy and
+		// the OTHER subject, so neither value can be a constant this handler happens to carry.
+		expect(payloadOf('AssuranceObservationRecorded', secondObservation)).toEqual({
+			observationId: secondObservation,
+			assessmentId: second,
+			policyId: otherPolicy,
+			subjectObjectIds: [otherSubject],
+			findingCode: 'UNFIT',
+			severity: 'MATERIAL',
+			statement: 'the boundary is not demonstrated',
+			implication: 'the boundary is not demonstrated',
+			evidenceIds: [],
+			disposition: 'OPEN'
+		});
+		expect(stateOf(secondObservation)?.policyId).toBe(otherPolicy);
+		expect(stateOf(secondObservation)?.subjectObjectIds).toEqual([otherSubject]);
 	});
 
 	it('the three §32 assessment commands each fail closed on an assessment that was never created', () => {

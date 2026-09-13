@@ -347,6 +347,15 @@ describe('DWP-04 AssurancePolicy — the three lifecycle preconditions (UNRATIFI
 	let h: ReturnType<typeof harness>;
 	const statusOf = (id: string) => (h.stateOf(id) as { status?: string })?.status ?? '';
 	const tagsOf = (id: string) => ((h.stateOf(id) as { tags?: string[] })?.tags ?? []) as string[];
+	/** The ONE `AssurancePolicySuperseded` event on `id`, as the governed payload a stream reader sees.
+ *  Scoped by aggregateId (not just type) so a test that supersedes TWO policies cannot read the wrong one. */
+	const supersededPayloadOf = (id: string) => {
+		const found = h.store
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssurancePolicySuperseded' && e.aggregateId === id);
+		expect(found, `expected exactly one AssurancePolicySuperseded on ${id}`).toHaveLength(1);
+		return found[0]!.payload as { policyId?: string; supersededByPolicyId?: string };
+	};
 
 	beforeEach(() => {
 		h = harness();
@@ -512,5 +521,68 @@ describe('DWP-04 AssurancePolicy — the three lifecycle preconditions (UNRATIFI
 		// tags unchanged: still exactly one superseded-by, and NOT the second successor.
 		expect(tagsOf(P)).toEqual(tagsAfterFirst);
 		expect(tagsOf(P).some((t) => t.includes('succ_two'))).toBe(false);
+	});
+
+	// ── JAN-PFA: the GOVERNED EVENT's successor field — the three tests above assert only the OBJECT ──
+	// WHY THESE TWO TESTS EXIST. They close the `supersedeAssurancePolicy` entry of
+	// docs/_working/JAN-PFA-precision-gap-inventory.md, whose mutant keeps the object's `superseded-by:<id>`
+	// tag and DROPS the successor from the emitted event (an `eventPayload: () => ({ policyId: p.policyId })`
+	// override where the handler today has none, so the event carries the raw command payload).
+	// WHY IT SURVIVED EVERYTHING: `AssurancePolicySupersededPayloadSchema` declares `supersededByPolicyId`
+	// OPTIONAL, so the mutilated event still validates and the event gate admits it; the assertions above this
+	// line read the STATE's tag, the event COUNT and the refusal code, and — measured across the repo —
+	// `supersededByPolicyId` appears in no assertion anywhere, only in command payloads being dispatched.
+	// WHAT IT COSTS: DOC-002 §27 makes the append-only stream the only durable account of an accepted change
+	// (kit.ts's event gate: 'A malformed event is not a bad request; it is a permanently wrong history'), and
+	// §18 pins every assessment to a policy version — so a reader reconstructing policy succession FROM THE
+	// STREAM has this field and nothing else, and there is no retraction for a history that omits it.
+	it('POSITIVE SupersedeAssurancePolicy — the emitted AssurancePolicySuperseded NAMES THE SUCCESSOR, and the stream and the object cannot disagree about which one', () => {
+		const P1 = 'pol_dwp04_sup_evt_a';
+		const P2 = 'pol_dwp04_sup_evt_b';
+		const S1 = 'pol_dwp04_sup_evt_a_v2';
+		const S2 = 'pol_dwp04_sup_evt_b_v2';
+		for (const P of [P1, P2]) {
+			expect(createPolicy(P).status).toBe('ACCEPTED');
+			expect(activate(P).status).toBe('ACCEPTED');
+		}
+		expect(supersede(P1, S1).status).toBe('ACCEPTED');
+		expect(supersede(P2, S2).status).toBe('ACCEPTED');
+
+		// The single fact that says WHICH version replaced this one.
+		expect(supersededPayloadOf(P1).policyId).toBe(P1);
+		expect(supersededPayloadOf(P1).supersededByPolicyId).toBe(S1);
+		// CONTROL (discrimination): TWO supersessions live in this store and they name DIFFERENT successors, so
+		// neither a constant nor the adjacent always-present string (the policy's own id, the `?? policyId`
+		// self-succession dodge) can satisfy the assertion above — it has to read the value the command carried.
+		expect(supersededPayloadOf(P2).supersededByPolicyId).toBe(S2);
+		expect(supersededPayloadOf(P2).supersededByPolicyId).not.toBe(
+			supersededPayloadOf(P1).supersededByPolicyId
+		);
+		expect(supersededPayloadOf(P1).supersededByPolicyId).not.toBe(P1);
+
+		// The two durable records of the SAME accepted change agree. Asserted IN ADDITION to the literal ids
+		// above, never instead of them: agreement alone is also satisfied by both records losing the successor.
+		expect(tagsOf(P1)).toContain(`superseded-by:${S1}`);
+		expect(tagsOf(P2)).toContain(`superseded-by:${S2}`);
+	});
+
+	it('CONTROL SupersedeAssurancePolicy — a supersession that names NO successor is still ACCEPTED, and the event invents none', () => {
+		// CONTROL (admission). `supersededByPolicyId` is OPTIONAL in BOTH ratified schemas, so retiring a policy
+		// without naming a replacement is a legitimate command: this pins that the event-payload assertion above
+		// cannot be satisfied by refusing the unnamed case, or by making the field mandatory. The other half is
+		// fabrication — an event that defaults the successor to the policy's own id would report a policy as its
+		// own replacement, and a stream reader cannot tell an invented successor from a real one.
+		const P = 'pol_dwp04_sup_evt_none';
+		expect(createPolicy(P).status).toBe('ACCEPTED');
+		expect(activate(P).status).toBe('ACCEPTED');
+		const r = supersede(P);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(statusOf(P)).toBe('SUPERSEDED');
+
+		const payload = supersededPayloadOf(P);
+		expect(payload.policyId).toBe(P);
+		expect(payload.supersededByPolicyId).toBeUndefined();
+		// and the object does not invent one either — no `superseded-by:` tag was pushed.
+		expect(tagsOf(P).filter((t) => t.startsWith('superseded-by:'))).toHaveLength(0);
 	});
 });

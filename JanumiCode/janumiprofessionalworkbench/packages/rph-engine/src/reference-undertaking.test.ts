@@ -181,6 +181,92 @@ describe('Reference Undertaking driven live', () => {
 		).toEqual([started!.aggregateId]);
 	});
 
+	// ── JAN-PFA S3.3 — THE PINNED POLICY VERSION: WHAT THIS CLOSES, AND WHY NOTHING CLOSED IT ────────────
+	// It closes the surviving mutant on `beginAssuranceAssessment` (rph-application/src/handlers/assurance.ts):
+	//     policyVersion: next.policyVersion   ->   policyVersion: String(next.semanticVersion as Stringifiable)
+	// one of forty authored against that layer, ALL FORTY of which SURVIVED. This one survived because not one
+	// test in the repo read this field's VALUE — step 3 of the Increment 25 block above reads `assurancePolicyId`
+	// off this very payload and stops there.
+	//
+	// THE PROMISE. `AssuranceAssessmentStarted` names the POLICY VERSION the assessment is judged under — DOC-004
+	// §18's pin ("assessments pin policySemanticVersion") — so a reader of the governed stream can say WHICH
+	// edition of the policy produced the verdict. That pin is recorded TWICE, independently: onto the assessment
+	// object at the REQUEST, and onto this event at the START. This test joins the two, which is why it is not a
+	// restatement of the handler's own expression: a start that reports a version other than the one its own
+	// aggregate committed leaves two governed records of a single fact disagreeing, and §18's pin unreadable.
+	//
+	// WHY THE MUTANT IS INVISIBLE TO EVERYTHING ELSE. It substitutes the ASSESSMENT's OWN envelope
+	// `semanticVersion`: adjacent, always present, and stringifying to a schema-valid `z.string()`. So the (d2)
+	// event gate, replay-conformance's event-TYPE compare and every existing assessment assertion stay green
+	// while the event reports a policy version the policy never had. assessment-ready-arrow.test.ts could not
+	// catch it at ANY strength: its fixture pins policyVersion '1', which is ALSO the assessment's
+	// semanticVersion, so there the true value and the substitute COINCIDE.
+	//
+	// TWO CONTROLS, because every gap in this inventory sits where something was proved to HAPPEN and never
+	// proved PRECISE — and an assertion with no control repeats exactly that mistake:
+	//   (C1) THE POPULATION IS PLURAL AND NON-EMPTY. A per-event join over zero events passes while measuring
+	//        nothing, which is the one way the assertion below could look like coverage without being exercised.
+	//   (C2) THE SUBSTITUTE IS A REAL, SAME-SHAPED, DISTINCT VALUE. The control asserts the field the mutant
+	//        reaches for is actually PRESENT and a number (so the mutant emits plausible output, not a blank
+	//        anything would catch) AND that its stringification DIFFERS from the pin. If (C2) ever reddens, the
+	//        fixture has drifted into assessment-ready-arrow's coincidence and the join has silently stopped
+	//        discriminating — an instrument failure, which must not be read as a defect in the handler.
+	// The join runs over EVERY assessment the canonical drive begins, so the legitimate case is ADMITTED right
+	// across the population and an assertion satisfied by one lucky payload cannot pass.
+	it('JAN-PFA S3.3: the started event pins the POLICY version, not the envelope version', () => {
+		const { engine } = build();
+		const startedEvents = engine
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssuranceAssessmentStarted');
+
+		// (C1) CONTROL.
+		expect(
+			startedEvents.length,
+			'no assessment was begun, so the per-event join below would pass over an empty population'
+		).toBeGreaterThan(10);
+
+		for (const e of startedEvents) {
+			const state = engine.loadObject(e.aggregateId)?.state as
+				{ policyVersion?: unknown; semanticVersion?: unknown } | undefined;
+			const pinned = state?.policyVersion;
+
+			// (C2) CONTROL, first half: the substitute exists and is the same-shaped number the mutant relies on.
+			expect(
+				typeof state?.semanticVersion,
+				`${e.aggregateId}: the envelope version is absent, so the substitute is not a plausible value`
+			).toBe('number');
+			const substitute = String(state?.semanticVersion);
+
+			// (C2) CONTROL, second half: the two candidate values are DISTINCT, so the join can discriminate.
+			expect(typeof pinned, `${e.aggregateId}: the assessment committed no policy version`).toBe(
+				'string'
+			);
+			expect(
+				pinned,
+				`${e.aggregateId}: pin and envelope version coincide — this test no longer discriminates`
+			).not.toBe(substitute);
+
+			// THE KILL: the event reports the POLICY edition this assessment pinned, not its own envelope version.
+			expect(
+				(e.payload as { policyVersion?: unknown }).policyVersion,
+				`${e.aggregateId}: the start reports a policy version its own aggregate never pinned`
+			).toBe(pinned);
+		}
+
+		// AND A THIRD, INDEPENDENT RECORD of the same pin: reference-undertaking.ts supplies '1.0.0' at every
+		// request. The join above compares two fields a single edit could in principle make agree on the wrong
+		// value; this states the pinned edition outright, for the subject the Increment 25 block names.
+		const subject = REFERENCE_UNDERTAKING.mobileOffline;
+		const forSubject = startedEvents.find((e) =>
+			(e.payload as { subjectObjectIds?: string[] }).subjectObjectIds?.includes(subject)
+		);
+		expect(forSubject, 'no assessment was started for the subject').toBeDefined();
+		expect(
+			(forSubject!.payload as { policyVersion?: unknown }).policyVersion,
+			"the subject's assessment is judged under policy edition 1.0.0, the version the request pinned"
+		).toBe('1.0.0');
+	});
+
 	it('freezes the Architecture PWU into an authoritative baseline', () => {
 		const { graph } = build();
 		const arch = graph.nodes.find((n) => n.id === REFERENCE_UNDERTAKING.architecture);

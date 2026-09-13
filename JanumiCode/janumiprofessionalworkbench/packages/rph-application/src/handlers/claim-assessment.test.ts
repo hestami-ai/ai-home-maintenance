@@ -39,6 +39,9 @@ const ACTOR: ActorReference = { actorId: 'assessor', actorType: 'HUMAN', display
 const CLAIM = 'clm_01ARZ3NDEKTSV4RRFFQ69J8001';
 const SUBJECT = 'pwu_01ARZ3NDEKTSV4RRFFQ69J8002';
 const EV = 'evd_01ARZ3NDEKTSV4RRFFQ69J8003';
+// The SIGN fixtures (#8 below): evidence pointing AGAINST the claim, and a second claim to point away at.
+const AGAINST = 'evd_01ARZ3NDEKTSV4RRFFQ69J8011';
+const OTHER_CLAIM = 'clm_01ARZ3NDEKTSV4RRFFQ69J8012';
 
 describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH-EVD-002 becomes real', () => {
 	let store: SqliteStorageAdapter;
@@ -79,8 +82,16 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 			'CLAIM'
 		);
 
-	/** Propose evidence supporting the claim. `admit` = also drive it to ADMISSIBLE. */
-	const proposeEvidence = (admit: boolean, evidenceId = EV) => {
+	/** Propose evidence supporting the claim. `admit` = also drive it to ADMISSIBLE.
+	 *  `links` overrides the SIGN of the claim links — `ProposeEvidence`'s two ratified, opposite-signed
+	 *  fields. The default is the supporting case every test arranged before #8, so those fixtures are
+	 *  byte-identical to what they were; #8 needs the other sign. */
+	const proposeEvidence = (
+		admit: boolean,
+		evidenceId = EV,
+		links: { supports?: readonly string[]; contradicts?: readonly string[] } = {}
+	) => {
+		const supports = links.supports ?? [CLAIM];
 		const r = dispatch(
 			'ProposeEvidence',
 			{
@@ -90,8 +101,8 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 				capturedAt: TS,
 				scope: 'tenant isolation',
 				limitations: [],
-				supportsClaimIds: [CLAIM],
-				contradictsClaimIds: [],
+				supportsClaimIds: supports,
+				contradictsClaimIds: links.contradicts ?? [],
 				evidenceId
 			},
 			evidenceId,
@@ -101,7 +112,13 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 		if (admit) {
 			const a = dispatch(
 				'AdmitEvidence',
-				{ admissibilityAssessmentId: 'asm-1', admittedScope: 'tenant isolation', admittedClaimIds: [CLAIM] },
+				// `admittedClaimIds` rides the event and is read by NO production code: an admission cannot
+				// assert support, which is exactly why the support decision is folded from committed state.
+				{
+					admissibilityAssessmentId: 'asm-1',
+					admittedScope: 'tenant isolation',
+					admittedClaimIds: supports
+				},
 				evidenceId,
 				'EVIDENCE'
 			);
@@ -114,6 +131,19 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 		dispatch('RecordClaimAssessment', { targetStatus, ...extra }, CLAIM, 'CLAIM');
 
 	const claimStatus = () => (store.loadObject(CLAIM)?.state as { status?: string })?.status;
+
+	/** COMMITTED Evidence state — the copy `claimsWithAdmissibleEvidence` folds, not the emitted payload. */
+	const evidenceState = (id: string) =>
+		(store.loadObject(id)?.state ?? {}) as {
+			status?: string;
+			supportsClaimIds?: readonly string[];
+			contradictsClaimIds?: readonly string[];
+		};
+
+	/** The DERIVED supporting set `recordClaimAssessment` writes onto the claim when it reaches SUPPORTED. */
+	const supportingEvidenceIds = () =>
+		(store.loadObject(CLAIM)?.state as { supportingEvidenceIds?: readonly string[] } | undefined)
+			?.supportingEvidenceIds;
 
 	const eventTypes = () =>
 		store
@@ -296,5 +326,105 @@ describe('RecordClaimAssessment — the claim machine becomes reachable, and RPH
 			record('CONTESTED', { rationale: 'inconclusive' }).status,
 			'CONTESTED -> CONTESTED with nothing new'
 		).not.toBe('ACCEPTED');
+	});
+
+	// ── 8. THE SIGN OF THE CLAIM LINK IS LOAD-BEARING (JAN-PFA S3.3) ─────────────────────────────────────────
+	//
+	// WHICH MUTANT THIS CLOSES, and why nothing above could see it. `proposeEvidence` (assurance.ts) writes
+	// `ProposeEvidence`'s two ratified, OPPOSITE-SIGNED fields onto committed Evidence state, and
+	// `claimsWithAdmissibleEvidence` folds the SUPPORTING one — and only that one — to answer RPH-EVD-002 in
+	// test 1. The inventoried mutation merges the other sign into it:
+	//
+	//     supportsClaimIds: p.supportsClaimIds,
+	//  -> supportsClaimIds: [...p.supportsClaimIds, ...p.contradictsClaimIds],
+	//
+	// It contaminates COMMITTED STATE only; the emitted `EvidenceProposed` payload stays honest, so
+	// `supportsGraph`, the SUPPORTS trace links and the invalidation cascade are untouched and every
+	// event-level assertion in the repo stays green. What changes is the one answer that matters: the claim
+	// reaches SUPPORTED on the strength of evidence that REFUTES it — Inv-3 / RPH-EVD-002 inverted, with the
+	// guard still firing and simply asking the wrong set.
+	//
+	// Tests 1-4 proved the refusal HAPPENS (no evidence / PROPOSED-only / another claim's evidence) and every
+	// one of them arranges `contradictsClaimIds: []`, where HEAD and the mutant are byte-identical. Test 4 is
+	// the adjacent control on the OBJECT of the link; this is its missing twin on the SIGN.
+	it('admissible evidence that CONTRADICTS this claim does not support it', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		proposeEvidence(true, AGAINST, { supports: [], contradicts: [CLAIM] });
+
+		// The arrangement's own precondition, so the refusal below cannot be the cheaper one — evidence that
+		// never became admissible at all. `admitEvidence` deliberately passes no `claimId` to
+		// `evidenceAdmissibility`, which is the only input that scores RELEVANT, so evidence that merely
+		// contradicts IS genuinely ADMISSIBLE and the refusal can only be about the sign.
+		expect(evidenceState(AGAINST).status, 'the contradicting evidence IS admissible').toBe('ADMISSIBLE');
+
+		// THE PROMISE, asserted BEFORE the field shapes below on purpose: the mutation must be caught by what
+		// the engine DECIDES, not only by how it filed the link. A test whose first red is a field comparison
+		// would be satisfied by any edit that moved both sides.
+		expect(record('UNDER_ASSESSMENT').status).toBe('ACCEPTED');
+		const r = record('SUPPORTED');
+		expect(r.status, 'evidence against a claim is not evidence for it').not.toBe('ACCEPTED');
+		expect(r.error?.message, 'and RPH-EVD-002 is what refuses, not an earlier gate').toContain(
+			'no ADMISSIBLE evidence supports it'
+		);
+		expect(claimStatus(), 'and the claim did not move').toBe('UNDER_ASSESSMENT');
+
+		// THE MECHANISM, corroborating the decision above rather than standing in for it.
+		expect(evidenceState(AGAINST).contradictsClaimIds, 'it is filed AGAINST this claim').toEqual([CLAIM]);
+		expect(
+			evidenceState(AGAINST).supportsClaimIds,
+			'and was not ALSO filed as support — the two fields keep opposite signs in committed state'
+		).not.toContain(CLAIM);
+	});
+
+	// THE CONTROL. Without it the assertion above is satisfied by a guard that disqualifies a claim the moment
+	// ANY contradicting evidence exists — an over-refusal that would strand the ordinary professional case of a
+	// claim supported by one admissible artifact and questioned by another. The claim must still reach
+	// SUPPORTED, and the DERIVED record must name what supports it and not what opposes it.
+	it('CONTROL — real support still reaches SUPPORTED with a contradiction sitting in the store', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		proposeEvidence(true, AGAINST, { supports: [], contradicts: [CLAIM] });
+		const forClaim = proposeEvidence(true); // the default sign: supports [CLAIM]
+		expect(record('UNDER_ASSESSMENT').status).toBe('ACCEPTED');
+
+		const r = record('SUPPORTED', { assessmentId: 'asm-1' });
+		expect(r.status, `a contradiction must not disqualify real support: ${r.error?.message}`).toBe(
+			'ACCEPTED'
+		);
+		expect(claimStatus()).toBe('SUPPORTED');
+		expect(
+			supportingEvidenceIds(),
+			'the claim records the evidence FOR it, not every admissible artifact that names it'
+		).toEqual([forClaim]);
+	});
+
+	// THE SECOND CONTROL, on the other direction of the same precision: carrying a contradiction about SOME
+	// OTHER claim must not cost an artifact its voice on this one. A guard that ignored every piece of evidence
+	// with a non-empty `contradictsClaimIds` would pass both tests above and fail here.
+	it('CONTROL — evidence may support this claim and contradict a different one at once', () => {
+		expect(assertClaim().status).toBe('ACCEPTED');
+		expect(
+			dispatch(
+				'AssertClaim',
+				{
+					statement: 'the cache is coherent',
+					claimType: 'COMPLETENESS',
+					subjectObjectIds: [SUBJECT]
+				},
+				OTHER_CLAIM,
+				'CLAIM'
+			).status
+		).toBe('ACCEPTED');
+		const both = proposeEvidence(true, EV, { supports: [CLAIM], contradicts: [OTHER_CLAIM] });
+		expect(evidenceState(both).contradictsClaimIds, 'it really does contradict the other').toEqual([
+			OTHER_CLAIM
+		]);
+
+		expect(record('UNDER_ASSESSMENT').status).toBe('ACCEPTED');
+		const r = record('SUPPORTED', { assessmentId: 'asm-1' });
+		expect(r.status, `a contradiction elsewhere is not a defect here: ${r.error?.message}`).toBe(
+			'ACCEPTED'
+		);
+		expect(claimStatus()).toBe('SUPPORTED');
+		expect(supportingEvidenceIds()).toEqual([both]);
 	});
 });

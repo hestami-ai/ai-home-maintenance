@@ -243,6 +243,89 @@ describe('DWP-03 evidence/assumption — re-issue refused on Evidence.status / A
 		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 		expect(h.eventsOfType('AssumptionExpired')).toHaveLength(1);
 	});
+
+	// ── JAN-PFA S3.3 — the PRECISION of the ExpireAssumption event, not merely that the expiry fires ─────────────
+	//
+	// CLOSES the inventoried survivor at assurance.ts:1161:
+	//   `...(p.expirationCondition ? { expirationCondition: p.expirationCondition } : {})`
+	//   → `...(p.expirationCondition ? {} : {})`
+	// Under that mutant EVERYTHING ABOVE STILL PASSES — the command is still ACCEPTED, the status still reads
+	// EXPIRED, exactly one AssumptionExpired is still appended, and RPH-ASM-006 still refuses to authorize new
+	// work — because the suite asserted that the expiry HAPPENED and never that the event SAID WHY.
+	//
+	// WHY THE EVENT IS THE ONLY PLACE THIS CAN BE CHECKED. All four in-arrows to EXPIRED carry the guard
+	// 'expirationCondition met; expired assumptions cannot continue authorizing work (§12.2)'
+	// (transitions.data.ts:1161/1169/1177/1185) and `AssumptionExpiredPayloadSchema` declares the field, but this
+	// handler writes it onto NO object field. `AssumptionObjectSchema` does declare `expirationCondition`
+	// (objects.ts:573) and nothing in the production tree ever assigns it — DetectAssumption's payload has no such
+	// field and `advanceStatus` only spreads the loaded state forward — so the append-only event is the entire
+	// record of why the premise lapsed, and an assertion on the object could never see this.
+	function detectAssumption(id: string, statement: string) {
+		expect(
+			h.d('DetectAssumption', id, 'ASSUMPTION', {
+				assumptionId: id,
+				statement,
+				introducedBy: HUMAN,
+				affectedObjectIds: [],
+				materiality: 'MATERIAL'
+			}).status
+		).toBe('ACCEPTED');
+	}
+	const expiredPayloadsFor = (id: string) =>
+		h
+			.eventsOfType('AssumptionExpired')
+			.filter((e) => e.aggregateId === id)
+			.map((e) => e.payload as { status?: string; expirationCondition?: string });
+
+	it('ExpireAssumption carries the supplied expirationCondition onto AssumptionExpired — and carries THIS command’s value', () => {
+		const ASM_A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5W21';
+		const ASM_B = 'asm_01ARZ3NDEKTSV4RRFFQ69G5W22';
+		detectAssumption(ASM_A, 'the network is reliable');
+		detectAssumption(ASM_B, 'the vendor SLA holds');
+
+		expect(
+			h.d('ExpireAssumption', ASM_A, 'ASSUMPTION', {
+				expirationCondition: 'the 90-day architecture review window closed'
+			}).status
+		).toBe('ACCEPTED');
+		// THE KILLING LINE: the reason rides the event or it exists nowhere at all.
+		expect(expiredPayloadsFor(ASM_A)).toEqual([
+			{ status: 'EXPIRED', expirationCondition: 'the 90-day architecture review window closed' }
+		]);
+
+		// CONTROL (provenance of the value): a SECOND assumption expired for a DIFFERENT reason must report ITS
+		// OWN reason. A handler that wrote any constant, or echoed the first expiry's condition, would satisfy the
+		// line above and fail here — so the pair measures that the command's value arrived, not that some string
+		// is present. It is also why the assertion cannot be met by restating the implementation: both halves of
+		// the conditional spread would have to lie in opposite directions at once.
+		expect(
+			h.d('ExpireAssumption', ASM_B, 'ASSUMPTION', {
+				expirationCondition: 'the vendor withdrew the SLA'
+			}).status
+		).toBe('ACCEPTED');
+		expect(expiredPayloadsFor(ASM_B)).toEqual([
+			{ status: 'EXPIRED', expirationCondition: 'the vendor withdrew the SLA' }
+		]);
+	});
+
+	it('CONTROL — ExpireAssumption with NO expirationCondition still expires, and the event invents no reason', () => {
+		const ASM_C = 'asm_01ARZ3NDEKTSV4RRFFQ69G5W23';
+		detectAssumption(ASM_C, 'the migration window is free');
+		// THE CONTROL THE INVENTORY DEMANDS, in the shape this site can have one. The field is OPTIONAL in the
+		// ratified command payload (`ExpireAssumptionPayloadSchema`: `expirationCondition: z.string().optional()`),
+		// so §12.2's expiry must not become conditional on supplying a reason. This case stays GREEN under the
+		// mutant above, which is precisely what makes the pair discriminating: the first test cannot be satisfied
+		// by a handler that refuses the absent case, nor by one that always writes a reason, because this one
+		// requires the absent case to be ADMITTED and to stay absent.
+		const res = h.d('ExpireAssumption', ASM_C, 'ASSUMPTION', {});
+		expect(res.status, JSON.stringify(res.error)).toBe('ACCEPTED');
+		expect((h.stateOf(ASM_C) as { status: string }).status).toBe('EXPIRED');
+		expect(expiredPayloadsFor(ASM_C)).toEqual([{ status: 'EXPIRED' }]);
+		// ABSENT, not present-and-empty: a reader asking 'why did this premise lapse' must be able to tell 'no
+		// condition was recorded' from 'the condition was the empty string'. `toEqual` alone cannot say this —
+		// it treats an undefined-valued key as equal to a missing one — so the keys are named explicitly.
+		expect(Object.keys(expiredPayloadsFor(ASM_C)[0] ?? {})).toEqual(['status']);
+	});
 });
 
 // ─────────────────────────────────── Decomposition + Recomposition (advanceStatus) ──────────────────────────────

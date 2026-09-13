@@ -168,6 +168,100 @@ describe('CancelAssuranceAssessment (REG-F-021 residual R-1)', () => {
 		);
 	});
 
+	// ── THE PRECISION OF `cancelledFromState` (JAN-PFA S3.3) ─────────────────────────────────────────────────────
+	// THIS CLOSES THE MUTANT `const cancelledFromState = String(loaded.state.assessmentState);` ->
+	// `const cancelledFromState = 'EVIDENCE_PENDING';`, which SURVIVED this entire suite. Nothing above could see
+	// it. The one engine-driven cancel in the repository abandons the stalled EVIDENCE_PENDING assessment — the
+	// single from-state where a hardcoded literal and an honest read AGREE — and the test that establishes the
+	// ratified BREADTH establishes it against `classifyTransition`, which reads the transition DATA and never runs
+	// the handler at all. So the claim two tests up ("only the event will ever hold the difference") was asserted
+	// for ONE value, and the DIFFERENCE itself had never once been observed.
+	//
+	// WHY THE ASSERTION IS A SET AND NOT A SECOND LITERAL. The promise is discriminating, not arithmetic: the event
+	// has to tell an assessment abandoned because its evidence never arrived (EVIDENCE_PENDING) from one abandoned
+	// before anybody began it (READY) from one the assessor withdrew from (ASSESSING). A single extra
+	// `toBe('ASSESSING')` would kill this particular mutant and leave the NEXT constant alive; three abandonments
+	// in one store, compared as a set, cannot be satisfied by any constant at all.
+	//
+	// ⛔ REQUESTED IS DELIBERATELY ABSENT, AND THAT IS NOT AN OVERSIGHT. The precondition admits four states, but
+	// nothing in the system ever writes `assessmentState: 'REQUESTED'` — `requestAssuranceAssessment` declares
+	// `births: ['EVIDENCE_PENDING', 'READY']` and says so in its own words ("Neither value is the machine's
+	// declared initialState (REQUESTED), which nothing writes"). A cancel FROM REQUESTED is unreachable by any
+	// command sequence, so forcing one by writing the state into the store would assert over an arm no
+	// professional can reach. Three reachable active states, three drives.
+	it('records the from-state it ACTUALLY left, so the three reachable active states are told apart', () => {
+		// Each cancel needs its OWN aggregate: CANCELLED is terminal, so an assessment can only be abandoned once.
+		const FROM_READY = 'assess_01ARZ3NDEKTSV4RRFFQ69G5N03';
+		const FROM_ASSESSING = 'assess_01ARZ3NDEKTSV4RRFFQ69G5N04';
+		const assessmentStateOf = (id: string) =>
+			(store.loadObject(id)?.state as Record<string, unknown> | undefined)?.assessmentState;
+		const send = (commandType: string, payload: unknown, id: string) => {
+			const r = dispatch(commandType, payload, { targetAggregateId: id });
+			expect(r.status, `${commandType} on ${id}: ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+		};
+		const requestOver = (id: string) => ({
+			assessmentId: id,
+			assurancePolicyId: POLICY,
+			policyVersion: '1.0.0',
+			subjectObjectIds: [PWU],
+			subjectSemanticVersions: { [PWU]: 1 },
+			claimIds: []
+		});
+		// READY — the required evidence arrived and nobody ever began the assessment.
+		send('RequestAssuranceAssessment', requestOver(FROM_READY), FROM_READY);
+		send(
+			'SubmitEvidenceForAssessment',
+			{ evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5N10', satisfiesRequirementId: 'EV-01' },
+			FROM_READY
+		);
+		// ASSESSING — the evidence arrived, the assessor began, and then withdrew.
+		send('RequestAssuranceAssessment', requestOver(FROM_ASSESSING), FROM_ASSESSING);
+		send(
+			'SubmitEvidenceForAssessment',
+			{ evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5N11', satisfiesRequirementId: 'EV-01' },
+			FROM_ASSESSING
+		);
+		send('BeginAssuranceAssessment', {}, FROM_ASSESSING);
+
+		const recorded: Record<string, unknown> = {};
+		for (const [from, id] of [
+			['EVIDENCE_PENDING', ASSESS],
+			['READY', FROM_READY],
+			['ASSESSING', FROM_ASSESSING]
+		] as const) {
+			// The arrangement is what it claims to be BEFORE the handler reads it, so a drive that silently landed
+			// somewhere else cannot be mistaken for the handler reporting the wrong state.
+			expect(assessmentStateOf(id), `${id} was supposed to be sitting in ${from}`).toBe(from);
+			// ⭐ CONTROL — the one this gap was missing. `send` asserts ACCEPTED, so the cancel is proven ADMITTED
+			// from every active state THROUGH THE ENGINE rather than through the transition table. A guard that
+			// refused two of the three fails here instead of quietly leaving the comparison below with nothing to
+			// disagree about; and the refusing side has its own control in the next test, which proves this same
+			// command is REFUSED from a concluded state. Neither an admit-everything nor a refuse-everything
+			// handler can satisfy both.
+			send('CancelAssuranceAssessment', { reason: `abandoned in ${from}` }, id);
+			expect(assessmentStateOf(id)).toBe('CANCELLED');
+			const evt = store
+				.readAggregateEvents('ASSURANCE_ASSESSMENT', id)
+				.find((e) => e.eventType === 'AssuranceAssessmentCancelled');
+			recorded[from] = (evt?.payload as { cancelledFromState?: string } | undefined)
+				?.cancelledFromState;
+		}
+		// THE PROMISE: each event reports the state ITS OWN assessment was abandoned in — not a constant, and not
+		// the terminal CANCELLED that all three of them now read.
+		expect(recorded).toEqual({
+			EVIDENCE_PENDING: 'EVIDENCE_PENDING',
+			READY: 'READY',
+			ASSESSING: 'ASSESSING'
+		});
+		// The same thing said as the property that actually matters: the three abandonments are DISTINGUISHABLE
+		// from the event log alone. Any constant — including the 'EVIDENCE_PENDING' the real code legitimately
+		// produces for the first of them — collapses this to a single value.
+		expect(
+			new Set(Object.values(recorded)).size,
+			'a constant from-state cannot tell three abandonments apart'
+		).toBe(3);
+	});
+
 	it('is REFUSED once the assessment has concluded — a verdict is invalidated, never cancelled', () => {
 		// Drive to a real disposition first, then try to cancel it.
 		expect(

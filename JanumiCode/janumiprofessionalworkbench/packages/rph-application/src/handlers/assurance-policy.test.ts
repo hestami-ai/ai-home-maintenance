@@ -4,6 +4,7 @@
 import { AssurancePolicyCreatedPayloadSchema, type DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -286,5 +287,97 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		// The DECLARED event schema now ACCEPTS what the event CARRIES. Before Inc D the strict schema omitted these
 		// four fields, so this passthrough payload's extra keys would have failed the parse: declared < carried.
 		expect(AssurancePolicyCreatedPayloadSchema.safeParse(created!.payload).success).toBe(true);
+	});
+	// ---- JAN-PFA S3.3: the PRECISION of the two floor-set promises, not merely that a refusal happens ----
+
+	// CLOSES the `createAssurancePolicy` mutation `FLOOR_POLICY_ID_SET.has(p.policyId)` ->
+	// `[...FLOOR_POLICY_ID_SET].some((f) => p.policyId.startsWith(f))`, which survived because both existing birth
+	// assertions use EXACT ids (the catalog DRAFT at the top of this file, the floor ACTIVE just above) and so
+	// nothing distinguished SET MEMBERSHIP from any looser string test. Under that mutant a policy whose id merely
+	// BEGINS with a floor id is born ACTIVE -- and ACTIVE is what lets a policy GOVERN (requestAssuranceAssessment
+	// requires it), so such a policy governs having never been activated, and its own ActivateAssurancePolicy
+	// becomes exactly the ACTIVE->ACTIVE no-op that restoring DOC-002 §18's DRAFT initial state existed to remove.
+	// ⭐ The assertion is on the PROMISE -- ONLY the canonical floor ids are born ACTIVE -- not on the comparison
+	// operator, so the near-miss set below also closes an `includes` or case-insensitive variant of the same edit.
+	it('births ACTIVE for the EXACT de minimis floor ids only: a near-miss id is born DRAFT', () => {
+		// DERIVED from the same canonical export the handler builds FLOOR_POLICY_ID_SET from (no literal copy), so a
+		// fourth floor id is covered the day it is added. The cardinality check is a vacuity guard: an empty set
+		// would make the loop below assert nothing at all while still reporting green.
+		const floors = Object.values(FLOOR_POLICY_IDS);
+		expect(
+			floors.length,
+			'the canonical floor set must be non-empty or this test asserts nothing'
+		).toBeGreaterThanOrEqual(3);
+
+		for (const floor of floors) {
+			// ⛔ CONTROL -- the genuine floor id is STILL born ACTIVE. Without it, an implementation that births
+			// EVERY policy DRAFT (withdrawing the floor's exemption, so the locked floor could never be in force)
+			// would satisfy every DRAFT expectation below. The control must fail for that edit, and it does.
+			expect(create(floor, `Floor ${floor}`).status).toBe('ACCEPTED');
+			expect(status(floor), `${floor} is a canonical floor id: it must be born ACTIVE`).toBe(
+				'ACTIVE'
+			);
+
+			// Each of these is a DIFFERENT policy from the floor policy and must therefore take the ordinary DRAFT
+			// birth: a strict prefix extension (the named mutation), a string merely CONTAINING a floor id, and a
+			// case-shifted copy.
+			for (const nearMiss of [`${floor}-v2`, `${floor}.2`, `pol_${floor}`, floor.toUpperCase()]) {
+				expect(create(nearMiss, `Near miss ${nearMiss}`).status).toBe('ACCEPTED');
+				expect(
+					status(nearMiss),
+					`${nearMiss} is not a de minimis floor policy: it must be born DRAFT and activated deliberately`
+				).toBe('DRAFT');
+			}
+		}
+	});
+
+	// CLOSES the `suspendAssurancePolicy` mutation that narrows `guard: rejectIfFloorLocked(command)` to lock ONLY
+	// floor.reasoning-review. It survived because 'locks the de minimis floor policies' above hard-codes
+	// FLOOR = 'floor.reasoning-review' -- the only floor id any test in this repo ever passes -- so the suite proved
+	// the lock EXISTS and never that it COVERS THE SET the file states it over (FLOOR_POLICY_ID_SET is built from
+	// every value of FLOOR_POLICY_IDS precisely so no literal copy can drift). Under the mutant a professional can
+	// SUSPEND floor.schema-invariant and floor.identity-provenance -- two thirds of a floor §8.4 / INV-5 declares
+	// always-applies and non-waivable -- and the de minimis floor stops being de minimis.
+	// ⭐ The refusal is asserted in the floor lock's OWN VOICE (code + verbatim message naming the policy), because
+	// a floor Suspend could also be refused by `fromStates('ACTIVE')` on state; a bare `not.toBe('ACCEPTED')` would
+	// accept that substitute and report the lock as covered when only the precondition had fired.
+	it("locks Suspend for EVERY de minimis floor policy, in the floor lock's own voice", () => {
+		const floors = Object.values(FLOOR_POLICY_IDS);
+		expect(
+			floors.length,
+			'the canonical floor set must be non-empty or this test asserts nothing'
+		).toBeGreaterThanOrEqual(3);
+
+		for (const floor of floors) {
+			expect(create(floor, `Floor ${floor}`).status).toBe('ACCEPTED');
+			// ACTIVE, so `fromStates('ACTIVE')` ADMITS this command: the floor lock is the only thing left that can
+			// refuse it, which is what makes the refusal below attributable to the lock.
+			expect(status(floor)).toBe('ACTIVE');
+
+			const refusal = d('SuspendAssurancePolicy', { policyId: floor }, floor);
+			expect(refusal.status, `${floor} is locked and must not be suspendable`).not.toBe('ACCEPTED');
+			expect(
+				refusal.error?.code,
+				`${floor} must be refused by the floor lock (an invariant), not on state`
+			).toBe('RPH_INVARIANT_VIOLATION');
+			expect(refusal.error?.message, `the refusal must name ${floor} itself`).toBe(
+				`The de minimis floor policy ${floor} is locked (always-applies, non-waivable) and cannot be edited, suspended, or superseded`
+			);
+			// And the lock is EFFECTIVE, not merely noisy: the policy is still in force afterwards.
+			expect(status(floor), `${floor} must still be ACTIVE after the refused Suspend`).toBe(
+				'ACTIVE'
+			);
+		}
+
+		// ⛔ CONTROL -- the lock refuses THE FLOOR, not every Suspend. A guard rewritten to reject unconditionally
+		// would satisfy the whole loop above; this reddens for it, so "refuses everything" cannot pass for "locks
+		// the floor".
+		const ORDINARY = 'pol_suspendable_01';
+		expect(create(ORDINARY, 'Ordinary Policy').status).toBe('ACCEPTED');
+		expect(d('ActivateAssurancePolicy', { policyId: ORDINARY }, ORDINARY).status).toBe('ACCEPTED');
+		expect(d('SuspendAssurancePolicy', { policyId: ORDINARY }, ORDINARY).status).toBe('ACCEPTED');
+		expect(status(ORDINARY), 'an ordinary ACTIVE policy must still be suspendable').toBe(
+			'SUSPENDED'
+		);
 	});
 });

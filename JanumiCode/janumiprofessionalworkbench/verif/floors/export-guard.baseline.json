@@ -76,9 +76,26 @@
 				"suspendAssurancePolicy"
 			],
 			"guardedExports": [
+				"admitEvidence",
+				"assertClaim",
+				"beginAssuranceAssessment",
+				"cancelAssuranceAssessment",
+				"completeAssuranceAssessment",
+				"createAssurancePolicy",
+				"detectAssumption",
+				"discloseAssumption",
+				"editAssurancePolicy",
+				"expireAssumption",
+				"falsifyAssumption",
 				"invalidateEvidence",
+				"proposeEvidence",
+				"recordAssuranceObservation",
 				"recordClaimAssessment",
-				"requestAssuranceAssessment"
+				"requestAssuranceAssessment",
+				"selectAssuranceEvaluator",
+				"submitEvidenceForAssessment",
+				"supersedeAssurancePolicy",
+				"suspendAssurancePolicy"
 			],
 			"unattributedMutants": 4
 		},
