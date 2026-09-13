@@ -35440,3 +35440,108 @@ obligation figure is REPORTED, never ENFORCED, so an unguardable export costs no
 export would corrupt is the FIGURE, which is quoted into commit messages and paces the programme — an accounting
 defect, not a gate defect. ⭑ Had I designed from the assumption instead of reading the checker, I would have built
 a gate mechanism for a reporting problem.
+
+---
+
+### REG-F-397 — `JAN-PFA` `S3.3`: I fixed `REG-F-393` by partitioning over the file each agent WRITES, and the next layer appeared immediately — a sibling's live mutant corrupts a baseline with no write conflict at all
+
+- **Date:** 2026-09-13 · **Type:** FINDING (`JAN-PFA` `S3.3`, increment 3) · **Class:** MEASURED by four agents
+  independently · **Status:** ✅ **CONTAINED for this increment** (every verdict re-run by me on a quiet tree);
+  ⚠ **OPEN as a rule for every future mutation fan-out.**
+
+**WHAT I FIXED, AND WHY IT WAS NOT ENOUGH.** `REG-F-393` recorded that eleven agents had shared two production
+files and concluded: *exclusive ownership must cover every file the task WRITES, not merely the file it
+DELIVERS.* This increment applied that — twelve agents, a partition **disjoint by production file**, verified by
+a splitter that throws on overlap. ⭐ **It worked for what it was aimed at: production finished byte-identical to
+`HEAD` across all twelve, with no snapshot collisions, no foreign mutants written back, and no driver
+overwrites.**
+
+⛔ **BUT VICTIM TEST FILES ARE NOT PARTITIONED, AND A VICTIM THAT DRIVES THE ENGINE SEES EVERY SIBLING'S LIVE
+MUTANT.** `dwp03-precondition-coverage.test.ts` covers intent, evidence/assumption AND decomposition across three
+production files owned by three different agents; `lifecycle.test.ts` spans execution, assurance, governance and
+decomposition. Measured, not inferred:
+
+- Foreign live mutants were observed in **nine** production files — `command-precondition.ts`,
+  `decomposition.ts`, `execution.ts`, `floor-gate.ts`, `governance.ts`, `assurance.ts`, `product-behavior.ts`,
+  `exchange-resolution.ts`, `validator-registry.ts`.
+- ⛔ **A FALSE KILL WAS NARROWLY AVOIDED.** One agent's `allOf` arity mutant reported *"2 failed | 8 passed"*
+  with both failures inside a `preconditionReader` block — failures that mutation cannot cause. The identical
+  mutant on identical bytes reported **10/10 GREEN** minutes later, twice. Its author: *"Had I reported the first
+  run I would have filed a false kill."*
+- ⛔ **AND A FALSE `COULD_NOT_CLOSE` IN THE OTHER DIRECTION.** Two agents took CLEAN baselines that read RED
+  because a sibling held a mutant in a file they did not own. A brief that says *"if the baseline is already red,
+  stop"* turns that into a wrongly-abandoned export.
+- Whole-suite runs swung `5 failed` → `13 failed` → clean with no change in between, so a full-suite run was
+  uninterpretable **in both directions** — it could neither establish a defect nor clear one.
+
+⭐ **THE GENERAL FORM, AND IT CORRECTS THE RULE I WROTE TWO COMMITS AGO.** `REG-F-393`'s *"every file the task
+WRITES"* is still too narrow. **Exclusive ownership must cover everything the task READS AS EVIDENCE.** A
+baseline is evidence; a sibling corrupts it without ever touching a file this agent writes, so no write-conflict
+discipline can catch it. ⭑ **Remedy for the next fan-out: `isolation: 'worktree'` per agent** — the only
+partition that covers the import closure — **or partition by victim as well as by production file.**
+
+**WHY THIS INCREMENT'S VERDICTS SURVIVE IT ANYWAY, AND THIS IS THE DESIGN POINT.** No verdict here rests on an
+agent's self-reported transition. All 87 mutants were re-declared from re-derived anchors and **re-run by the
+repository's own runner against a STAGED, QUIET tree after every agent had finished** — 87 applicable, 0 rotted,
+**87 KILLED, 0 SURVIVED**. ⭑ The contamination could only have produced false verdicts in reports I did not
+rely on. Several agents also defended themselves: one ran three clean baselines while two foreign mutants were
+live to show its victim was insensitive to both; another recorded the foreign-dirty set at **both ends** of every
+run and discarded any window it could not attribute.
+
+**⚠ AND A RESTORE TRAP, FOUND BY HITTING IT — a refinement to `REG-F-393`'s own corrected rule.** Restore-by-
+inversion swaps the mutant text back for the original, guarded by an exactly-once check **on the FIND string**.
+For `kit.ts`'s `reject`, the natural replacement `\t\tstatus: 'REJECTED',` is a **SUBSTRING** of
+`\t\t\tstatus: 'REJECTED',` elsewhere in the file: the FIND is unique so the ledger accepts it, but the REPLACE
+is not, so the inversion can match the wrong site. ⭑ **The exactly-once guard must be applied to BOTH directions
+of the swap, not only to the one the ledger validates.**
+
+---
+
+### REG-F-398 — `JAN-PFA` `S3.3`: the obligation reaches ZERO, and the same increment measures six promises that are still unguarded — "every export has a guard" was never "every promise is guarded"
+
+- **Date:** 2026-09-13 · **Type:** FINDING (`JAN-PFA` `S3.3`, increment 3) · **Class:** MEASURED, disclosed by
+  the closing agents themselves · **Status:** ⚠ **OPEN** — six named residuals, none of them a regression, none
+  of them visible to `guards:export`.
+
+**THE MILESTONE, MEASURED BY ITS OWN WRITER.** `bun run guards:export`:
+**331 of 331 production-consumed exports guarded · 0 bare · 0 files with no guarded export.** `gate:fast` green
+at exit 0. The `S3.3` burn-down that opened at **212 across 61 files** is discharged.
+
+⛔ **AND THE SAME RUN IS WHY THAT FIGURE MUST NOT BE READ AS "FULLY GUARDED".** The census asks one question per
+export — *does a declared mutant attributed to this export discriminate?* It does not ask whether **every
+promise** the export makes is guarded, and this increment's agents measured six places where it is not. ⭑ These
+are **not** failures of the increment: each is a driven survivor or a disclosed half-guard that the author
+reported rather than let the census absorb.
+
+| what is unguarded | measured |
+| --- | --- |
+| `readAnswerSpan` reading retention off the RECORD instead of the STORE | **SURVIVES 1501 tests.** Verbatim the defect the guard's own comment forbids — *"this module's whole job is to be the thing that does not take the record's word for it"*. Cause: the fixture helper builds the ref's `purgeability` from the same `store.put()` that sets the store's, so **no fixture in the repository can make the two copies disagree.** |
+| `ExecutionPlanFailed.failureReason` | pinned by value by **nothing**, across all 10 files naming the event — and `execution-plan-completion.test.ts:189` is **titled** *"FAILS an ACTIVE plan (records the failureReason)"* while its body never reads the event. 89 passed → 89 passed. |
+| `permits` source limb | the declared guard discriminates SCOPE; the inverse mutant dropping `r.source === source` leaves the victim fully green. A ceiling permitting the WRONG SOURCE at a permitted scope would pass. |
+| 4 of 5 `product-behavior` guards | pin EXISTENCE, not PRECISION. Four `.trim()`-removal probes, each anchored and typecheck-clean, **all SURVIVED** — the fixtures send `''`, which a trimming and a non-trimming guard refuse identically. `defineActor` (fixture `'   '`) is the only one that discriminates the trim limb. |
+| `applyTacticalChange`'s *"never an explicit `undefined`"* | **UNGUARDABLE at this boundary.** Events are persisted by `JSON.stringify` and read back by `JSON.parse`, which erases an undefined-valued key, so `'stepId' in payload` is false either way. ⭑ **Second instance of the class** `REG-F-394` recorded for `editPwuType` — this is a repeatable shape, not a one-off. |
+| `allOf` arity | SURVIVES its own victim and is KILLED by `decision-kind-guard.test.ts` — the guard exists, but not where the census credits it. |
+
+⭐ **THIS IS THE DESIGN DOCUMENT'S OWN TITLE, RECURRING ONE LEVEL DOWN.** `DESIGN-per-file-assurance-floor.md` is
+subtitled *"three ratchets that guard an average, and the members they are silent about"*. The per-export unit was
+adopted to stop a per-FILE count hiding unguarded exports — `REG-F-…`'s fungibility correction. ⛔ **It now hides
+unguarded PROMISES inside a guarded export, which is the same defect one level finer.** The unit is not therefore
+wrong: it moved the silence from 220 exports to a handful of named clauses, and the clauses are named because the
+unit forced somebody to look at each export. But **"obligation 0" states that every export is guarded, and states
+nothing about sufficiency.**
+
+**⚠ WHAT MUST NOT HAPPEN NEXT.** Declaring `S3.3` closed and the assurance question answered. The obligation is
+discharged; **the assurance is not complete**, and the six rows above are the measured, named start of whatever
+follows. ⭑ A seventh item belongs with them: **58 mutants still credit no export**, sited in shared private
+helpers (21 in `handlers/execution.ts` alone, 23–372 lines from the nearest export declaration). They are real
+guards over real behaviour that the attribution rule cannot see, and re-anchoring them was **refuted as a cheap
+path** — the behaviour they defend genuinely lives in the helper, so re-anchoring would be authoring a different
+mutation, not relabelling one.
+
+**A SMALL CORRECTION TO MY OWN INSTRUMENT, RECORDED BECAUSE AN AGENT CAUGHT IT.** The result enum offered
+`TRIAGE_WAS_WRONG_ASSERTION_WRITTEN`, which conflates two different things: *the triage misclassified this* and
+*an assertion had to be written*. For `REFERENCE_OPEN_RESIDUALS` the triage had **correctly** forecast the
+survival (it classified it shape B), so the label overstates. The agent used the enum as specified and flagged
+the mismatch rather than quietly choosing another value. ⭑ **The true count: of 85 `A` claims, exactly ONE
+(`beginRecomposition`) was wrong** — so my suspicion that the 85/87 uniformity was a biased brief was itself
+mostly wrong, and the run is what settled it in both directions.

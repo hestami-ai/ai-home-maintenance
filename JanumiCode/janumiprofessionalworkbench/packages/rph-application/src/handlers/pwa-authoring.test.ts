@@ -7,6 +7,7 @@ import { TEST_CRED, testAuthenticator, testDirectory } from '@janumipwb/rph-port
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import { floorValidatorResult, seedFloorPolicies, seedPolicy } from './__tests__/floor-fixtures.js';
 import {
 	BINDINGS,
@@ -875,6 +876,89 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		const r = publish();
 		expect(r.status).toBe('REJECTED');
 		expect(pub()).toBe('VALIDATED');
+	});
+
+	// ── JAN-PFA S3.3 — EVERY REQUIRED FLOOR POLICY IS INDEPENDENTLY REQUIRED, NOT JUST THE ONE THE SUITE PICKED ──
+	//
+	// THE PROMISE. floor-gate.ts states it at `floorGateBlock` (:292-293) — the transition is permitted only when
+	// *"every required policy is SATISFIED at the bound version"* — resting on ASR-3 as quoted in that file's own
+	// header: *"The de minimis assurance floor is UNCONDITIONAL. Risk proportionality governs assurance above a
+	// mandatory floor; it never makes the floor optional."* The promise is over the SET: all three, each one on its
+	// own sufficient to block.
+	//
+	// ⚠ MEASURED, NOT ARGUED — AND THE OBVIOUS INVERSE HID IT. `FLOOR_POLICY_IDS_REQUIRED` narrowed to
+	// `[FLOOR_POLICY_IDS.REASONING_REVIEW]` SURVIVED this entire file (49/49 green): every floor arranged anywhere
+	// in this suite either has all three SATISFIED, or fails on REASONING_REVIEW. Not one test made
+	// schema-invariant or identity-provenance the SOLE non-SATISFIED member, so two of the three required policies
+	// had no assertion of their requiredness at all — an AI-produced PWA could have published with neither
+	// recorded. (Widening the set is the mutant that IS killed — replace a member with a bogus id and the gate
+	// refuses everything — which is exactly why the narrowing went unseen.)
+	//
+	// ⛔ THE SWEEP IS DERIVED FROM `FLOOR_POLICY_IDS`, THE CANONICAL SOURCE IN rph-assurance, AND NOT FROM
+	// `FLOOR_POLICY_IDS_REQUIRED`. Deriving it from the list under test would shrink the sweep along with any
+	// narrowing of it and pass every one of them.
+	//
+	// ⭑ AND THE ASSERTION IS ON THE MESSAGE, because the message is the only place the members are told apart: the
+	// status and the code are identical however the floor fails, so a row asserting only those cannot tell "the
+	// omitted policy blocked" from "some other policy blocked".
+	it.each(Object.values(FLOOR_POLICY_IDS))(
+		'blocks publish when %s is the ONLY required floor policy not recorded SATISFIED',
+		(omitted) => {
+			authorValidatedAiPwa();
+			const others: Record<string, AssuranceDispositionRecommendation> = {};
+			for (const policyId of Object.values(FLOOR_POLICY_IDS))
+				if (policyId !== omitted) others[policyId] = 'SATISFIED';
+			expect(
+				Object.keys(others).length,
+				'the row is vacuous unless some OTHER floor policy is satisfied alongside the omitted one'
+			).toBeGreaterThan(0);
+			recordFloor(others);
+
+			const r = publish();
+			expect(
+				r.status,
+				`${omitted} was the only required floor policy not recorded SATISFIED and PublishPwa was PERMITTED ` +
+					`— that policy is not independently required, so an AI-produced PWA publishes without it`
+			).toBe('REJECTED');
+			expect(
+				r.error?.code,
+				`${omitted}: the refusal must come from the floor gate, not from the state machine or the schema`
+			).toBe('RPH_INVARIANT_VIOLATION');
+			expect(
+				r.error?.message,
+				`${omitted}: the refusal must NAME this policy as the one that is missing — every floor refusal ` +
+					`carries the same status and code, so the message is the only thing that tells the members apart`
+			).toContain(`${omitted}=MISSING`);
+			expect(pub(), `${omitted}: a blocked publish must not have moved the PWA`).toBe('VALIDATED');
+		}
+	);
+
+	// ── CONTROL: THE GATE STILL ADMITS THE LEGITIMATE PUBLISH ────────────────────────────────────────────────
+	// Without this the sweep above is satisfied by a gate that refuses EVERY publish — which would read as
+	// precision and would be a denial of the whole authoring plane. Same PWA, same commands, differing only in
+	// whether the omitted policy is recorded.
+	//
+	// ⭑ ITS OWN MUTANT IS SITED AND MEASURED, because a control that cannot fail proves nothing. In
+	// `floorGateBlock` (floor-gate.ts), `.filter((r) => r.disposition !== 'SATISFIED')` -> `.filter(() => true)`
+	// reddens THIS test and leaves every row of the sweep above GREEN — under it the refusal still enumerates
+	// `${omitted}=MISSING`, so the sweep cannot tell a working gate from one that blocks everything, and this
+	// control is the only thing that can.
+	it('CONTROL — the identical publish is ADMITTED once every required floor policy is SATISFIED', () => {
+		authorValidatedAiPwa();
+		const all: Record<string, AssuranceDispositionRecommendation> = {};
+		for (const policyId of Object.values(FLOOR_POLICY_IDS)) all[policyId] = 'SATISFIED';
+		expect(
+			Object.keys(all).length,
+			'the sweep above is not a set promise unless the canonical source declares more than one floor policy'
+		).toBeGreaterThan(1);
+		recordFloor(all);
+
+		const r = publish();
+		expect(
+			r.status,
+			`a floor with every canonical policy SATISFIED at the current version must PERMIT publish: ${JSON.stringify(r.error)}`
+		).toBe('ACCEPTED');
+		expect(pub(), 'and the PWA must actually have been published').toBe('PUBLISHED');
 	});
 
 	it('a floor recorded against a STALE PWA version does not authorize publish (version-binding)', () => {

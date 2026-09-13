@@ -339,4 +339,92 @@ describe('Reference Undertaking driven live', () => {
 		const producers = new Set(producerIds);
 		expect(evaluatorIds.every((id) => !producers.has(id))).toBe(true);
 	});
+
+	// ── THE OPEN RESIDUAL, READ OFF A GOVERNED OBJECT (JAN-PFA S3.3) ──────────────────────────────────────────
+	//
+	// ⚠ WHY THE TEST AT :277 IS NOT ENOUGH, MEASURED RATHER THAN ARGUED. That test reads
+	// `expect(graph.openResiduals).toContain(REFERENCE_OPEN_RESIDUALS[0])` — but the constant is what `build()`
+	// HANDS the projection at :58, and professional-work-graph.ts returns `opts.openResiduals ?? []` verbatim.
+	// Both sides of that assertion move together, so no value can falsify it. Rewriting the constant's single
+	// entry to 'Offline behaviour is fine and nothing was deferred' left all eight tests in this file GREEN.
+	//
+	// So the corpus sentence is pinned HERE as a string literal and checked against what the DRIVE durably
+	// minted. m13-replay.json:209 ratifies the promise: "An OPEN residual condition remains VISIBLE ...
+	// Conditional satisfaction is not shown as unconditional success." ASR-9 limb 10 gives the mechanism —
+	// deferred scope "stays represented ... never silently deleted".
+	const CORPUS_RESIDUAL = 'Offline behavior deferred from the first implementation increment';
+
+	/** Every `statement` carried by a DURABLE governed object — read back out of the store, not off the event. */
+	function durablyCarriedStatements(
+		engine: ReturnType<typeof build>['engine']
+	): { id: string; objectType: string; statement: string }[] {
+		const out: { id: string; objectType: string; statement: string }[] = [];
+		const seen = new Set<string>();
+		for (const e of engine.readAllEvents()) {
+			if (seen.has(e.aggregateId)) continue;
+			seen.add(e.aggregateId);
+			const obj = engine.loadObject(e.aggregateId);
+			const statement = (obj?.state as { statement?: unknown } | undefined)?.statement;
+			if (typeof statement === 'string')
+				out.push({ id: e.aggregateId, objectType: obj!.objectType, statement });
+		}
+		return out;
+	}
+
+	it('every declared open residual is carried by a DURABLE governed object, in the corpus words', () => {
+		const { engine } = build();
+		const carried = durablyCarriedStatements(engine);
+
+		// LIMB 1 — FIDELITY. The exported constant is the corpus's sentence, not a paraphrase of it. This is the
+		// limb the projection-side assertion cannot reach, because there the constant is compared to itself.
+		expect(
+			REFERENCE_OPEN_RESIDUALS as readonly string[],
+			'REFERENCE_OPEN_RESIDUALS must state the residual in the corpus words (m13-replay.json:209)'
+		).toContain(CORPUS_RESIDUAL);
+
+		// LIMB 2 — REPRESENTATION, UNIVERSAL OVER THE DECLARED SET. Derived from the export itself rather than
+		// hand-listed, so a residual added to the constant and minted by nothing reddens here and names itself.
+		for (const residual of REFERENCE_OPEN_RESIDUALS) {
+			const carriers = carried.filter((c) => c.statement === residual);
+			expect(
+				carriers.length,
+				`declared open residual is represented by NO governed object, so it is visible only in prose ` +
+					`(ASR-9 limb 10 — deferred scope "stays represented ... never silently deleted"): ${residual}`
+			).toBeGreaterThan(0);
+		}
+
+		// And the corpus sentence specifically survives as durable governed state.
+		expect(
+			carried.map((c) => c.statement),
+			'no governed object the drive minted carries the corpus residual sentence'
+		).toContain(CORPUS_RESIDUAL);
+	});
+
+	// CONTROL for the test above. The instrument is "statement X is among the statements durably carried by the
+	// drive's governed objects". A collector that scooped up the whole store, or matched loosely, would make the
+	// membership check true of anything and the test above would pass while discriminating nothing. This fixes
+	// the other side: a sentence the undertaking never deferred must NOT be found.
+	//
+	// ⚠ THE CONTROL'S OWN MUTANT, SITED. Rewrite reference-undertaking.ts:1595 (`DeferScope`'s `statement`) from
+	// `REFERENCE_OPEN_RESIDUALS[0]` to NOTHING_WAS_DEFERRED. This control reddens; the test above stays GREEN,
+	// because the Assumption at :1570 and the MATERIAL observation at :1275 still carry the corpus sentence. So
+	// the two tests fail apart, which is what makes this a control and not a second copy of the same assertion.
+	const NOTHING_WAS_DEFERRED = 'Offline behaviour is fine and nothing was deferred';
+
+	it('CONTROL: the carrier lookup discriminates — a sentence nothing deferred is not carried', () => {
+		const { engine } = build();
+		const carried = durablyCarriedStatements(engine);
+
+		// The lookup must be looking at something. A collector that found nothing would satisfy the negative
+		// below vacuously, which is the failure mode this control exists to exclude.
+		expect(
+			carried.length,
+			'the carrier lookup found no governed statements at all — it is not measuring the drive'
+		).toBeGreaterThan(0);
+
+		expect(
+			carried.map((c) => c.statement),
+			'a sentence the Reference Undertaking never deferred is being carried as if it were a residual'
+		).not.toContain(NOTHING_WAS_DEFERRED);
+	});
 });

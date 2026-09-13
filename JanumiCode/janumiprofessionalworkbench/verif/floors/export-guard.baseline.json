@@ -18,7 +18,12 @@
 				"permits",
 				"resolveContextAssemblyPolicy"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"DEFAULT_CONTEXT_ASSEMBLY_POLICY",
+				"DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID",
+				"permits",
+				"resolveContextAssemblyPolicy"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/exchange-resolution.ts": {
@@ -26,7 +31,10 @@
 				"readAnswerSpan",
 				"verifyExchangeContent"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"readAnswerSpan",
+				"verifyExchangeContent"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/execution-invocation.ts": {
@@ -34,21 +42,28 @@
 				"assembleStepContext",
 				"prepareModelInvocation"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"assembleStepContext",
+				"prepareModelInvocation"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/abandon-authorization.ts": {
 			"consumedExports": [
 				"resolveAbandonAuthorization"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"resolveAbandonAuthorization"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/artifact.ts": {
 			"consumedExports": [
 				"recordArtifact"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"recordArtifact"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/assurance.ts": {
@@ -76,6 +91,7 @@
 				"suspendAssurancePolicy"
 			],
 			"guardedExports": [
+				"activateAssurancePolicy",
 				"admitEvidence",
 				"assertClaim",
 				"beginAssuranceAssessment",
@@ -107,14 +123,22 @@
 				"noOpEditPrecondition",
 				"predicate"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"allOf",
+				"evaluatePrecondition",
+				"fromStates",
+				"noOpEditPrecondition",
+				"predicate"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/context-assembly-policy.ts": {
 			"consumedExports": [
 				"createContextAssemblyPolicy"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"createContextAssemblyPolicy"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/decomposition.ts": {
@@ -128,8 +152,13 @@
 				"validateDecomposition"
 			],
 			"guardedExports": [
+				"acceptRecomposition",
+				"beginRecomposition",
+				"completeRecomposition",
+				"proposeDecomposition",
 				"proposeRecomposition",
-				"reviseDecomposition"
+				"reviseDecomposition",
+				"validateDecomposition"
 			],
 			"unattributedMutants": 3
 		},
@@ -137,7 +166,9 @@
 			"consumedExports": [
 				"deferScope"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"deferScope"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/execution.ts": {
@@ -162,11 +193,22 @@
 			],
 			"guardedExports": [
 				"activateExecutionPlan",
+				"applyTacticalChange",
+				"approveExecutionPlan",
+				"cancelExecutionPlan",
+				"cancelExecutionStep",
+				"completeExecutionPlan",
 				"completeExecutionStep",
+				"enterExecutionStepWait",
+				"failExecutionPlan",
+				"failExecutionStep",
 				"proposeExecutionPlan",
 				"pruneExecutionStep",
+				"resolveExecutionStepWait",
+				"retryExecutionStep",
 				"skipExecutionStep",
-				"startExecutionStep"
+				"startExecutionStep",
+				"supersedeExecutionPlan"
 			],
 			"unattributedMutants": 17
 		},
@@ -181,7 +223,11 @@
 				"unassessableAiContentBlock"
 			],
 			"guardedExports": [
+				"AI_ACTOR_TYPES",
+				"FLOOR_POLICY_IDS_REQUIRED",
 				"floorGateBlock",
+				"stepOutputIsAiProduced",
+				"stepResultSubjects",
 				"structuredResultHasContent",
 				"unassessableAiContentBlock"
 			],
@@ -202,7 +248,17 @@
 				"supersedeBaseline"
 			],
 			"guardedExports": [
-				"proposeDecision"
+				"approveBaseline",
+				"approveDecision",
+				"createBaseline",
+				"denyWaiver",
+				"grantWaiver",
+				"promoteBaseline",
+				"proposeDecision",
+				"requestWaiver",
+				"revokeDecision",
+				"submitBaselineForReview",
+				"supersedeBaseline"
 			],
 			"unattributedMutants": 1
 		},
@@ -210,7 +266,9 @@
 			"consumedExports": [
 				"proposeHarness"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"proposeHarness"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/intent.ts": {
@@ -227,6 +285,8 @@
 				"approveIntent",
 				"beginIntentDiscovery",
 				"captureIntent",
+				"formalizeIntent",
+				"provisionIntent",
 				"reviseIntent",
 				"supersedeIntent"
 			],
@@ -248,7 +308,16 @@
 			],
 			"guardedExports": [
 				"advanceStatus",
-				"loadOrReject"
+				"checkPrecondition",
+				"checkTransition",
+				"commitState",
+				"createObject",
+				"loadOrReject",
+				"makeEvent",
+				"newEnvelope",
+				"nextEnvelope",
+				"preconditionReader",
+				"reject"
 			],
 			"unattributedMutants": 0
 		},
@@ -256,7 +325,9 @@
 			"consumedExports": [
 				"recordModelExchange"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"recordModelExchange"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/obligation-constraint.ts": {
@@ -264,7 +335,10 @@
 				"assertConstraint",
 				"assertObligation"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"assertConstraint",
+				"assertObligation"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/product-behavior.ts": {
@@ -275,7 +349,13 @@
 				"defineScenario",
 				"defineUserJourney"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"defineActor",
+				"defineCapability",
+				"defineRequirement",
+				"defineScenario",
+				"defineUserJourney"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/pwa-authoring.ts": {
@@ -356,7 +436,9 @@
 			"consumedExports": [
 				"HANDLERS"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"HANDLERS"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/reject-authorization.ts": {
@@ -364,7 +446,10 @@
 				"hasBlockingObservationFor",
 				"resolveRejectAuthorization"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"hasBlockingObservationFor",
+				"resolveRejectAuthorization"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/runtime-binding.ts": {
@@ -376,7 +461,9 @@
 			],
 			"guardedExports": [
 				"authorizeRuntimeBinding",
-				"requestRuntimeBinding"
+				"denyRuntimeBinding",
+				"requestRuntimeBinding",
+				"revokeRuntimeCapability"
 			],
 			"unattributedMutants": 0
 		},
@@ -397,14 +484,22 @@
 				"registerValidator",
 				"restoreValidator"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"disableValidator",
+				"enableValidator",
+				"markValidatorDegraded",
+				"registerValidator",
+				"restoreValidator"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/waiver-authorization.ts": {
 			"consumedExports": [
 				"resolveWaiverAuthorization"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"resolveWaiverAuthorization"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/prompt-render.ts": {
@@ -413,7 +508,11 @@
 				"promptTemplateFingerprint",
 				"renderPromptTemplate"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"markersIn",
+				"promptTemplateFingerprint",
+				"renderPromptTemplate"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-assurance/src/applicability.ts": {
@@ -478,7 +577,9 @@
 			"consumedExports": [
 				"assuranceRecordingPlan"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"assuranceRecordingPlan"
+			],
 			"unattributedMutants": 1
 		},
 		"packages/rph-assurance/src/validators.ts": {
@@ -563,6 +664,8 @@
 			"guardedExports": [
 				"ActorReferenceSchema",
 				"CommandResultSchema",
+				"DomainCommandSchema",
+				"DomainEventSchema",
 				"ObjectEnvelopeSchema",
 				"objectEnvelopeShape",
 				"ProvenanceRecordSchema"
@@ -933,7 +1036,8 @@
 				"REFERENCE_OPEN_RESIDUALS"
 			],
 			"guardedExports": [
-				"driveReferenceUndertaking"
+				"driveReferenceUndertaking",
+				"REFERENCE_OPEN_RESIDUALS"
 			],
 			"unattributedMutants": 0
 		},
@@ -1050,7 +1154,9 @@
 			"consumedExports": [
 				"validateOntology"
 			],
-			"guardedExports": [],
+			"guardedExports": [
+				"validateOntology"
+			],
 			"unattributedMutants": 1
 		},
 		"packages/rph-projections/src/assurance-view.ts": {
