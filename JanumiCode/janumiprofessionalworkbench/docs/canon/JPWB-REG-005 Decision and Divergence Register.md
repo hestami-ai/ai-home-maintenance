@@ -35171,3 +35171,79 @@ population does not, and one for the roadmap that subsumes it.
   `B`'s guard*. That needs per-test coverage attribution JPWB does not collect.
 - ⚠ `REG-F-390`'s three debts — ~580 uncovered branches, CSAA's 74 structural failures, the cruiser's vacuous
   `apps/` arm — are untouched by this programme, and none substitutes for another.
+
+
+### REG-F-392 — `JAN-PFA` `S3.3`: forty mutants over three command handlers ALL SURVIVED — and the batch was biased by a brief I wrote, which is the finding that matters more than the forty
+
+- **Date:** 2026-09-12 · **Type:** FINDING (`JAN-PFA` `S3.3`, burn-down increment 5a) ·
+  **Class:** MEASURED, then WITHDRAWN FROM THE LEDGER · **Status:** ⚠ **OPEN** —
+  `docs/_working/JAN-PFA-precision-gap-inventory.md` holds the forty; none is guarded.
+
+**WHAT HAPPENED.** 43 mutants were authored against `handlers/assurance.ts`, `handlers/pwa-authoring.ts` and
+`handlers/pwu.ts`; 40 passed verification; **all 40 SURVIVED.** Two were re-confirmed BY HAND — apply the
+mutation, run the named victim directly, restore from snapshot — and the victim passes in both states, so the
+runner's verdict is sound and each names a promise nothing asserts.
+
+⛔ **THEY WERE REMOVED FROM THE LEDGER RATHER THAN LANDED.** `SURVIVED` is blocking, and the ledger records guards
+PROVEN to discriminate; forty surviving entries would assert the opposite of what the ledger means. The inventory
+is a document, and each gap carries the assertion that would close it.
+
+---
+
+**⭐ THE FINDING THAT MATTERS IS THE BRIEF, NOT THE FORTY.** Increment 4 had found five real gaps sharing one
+shape — *the guard's obvious failure was tested and its PRECISION was not* — so this batch's authors were told, in
+my words, that **"a survivor is the most valuable outcome available."** They complied: **37 of 37 predicted their
+own survival before anything ran.**
+
+⚠ That instruction rewards SELECTING FOR expected survival. It biases toward the most obscure edge of a promise
+rather than the most load-bearing one, and it inverts the question from *"what does this export promise?"* to
+*"what can I break without being caught?"* ⭑ One author demonstrated it against his own entry, honestly:
+`activate-floor-lock-inert` attacks an arm the same author had just proved UNREACHABLE, so its survival reports a
+**DEAD GUARD, not an exploitable hole** — a different finding wearing the same verdict.
+
+⛔ **SO THE FORTY ARE NOT A SEVERITY RANKING AND MUST NOT BE READ AS ONE.** They are precision edges, ordered by
+nothing. An unknown number are unreachable arms rather than live exposure, and separating those is work nobody has
+done yet.
+
+---
+
+**⚠ AND IT EXPOSED A METHOD DEFECT IN THE BURN-DOWN ITSELF.** `S3.3` has been running **author-the-mutant, then
+remediate the survivors**, which worked while survivors were a minority (increment 4: 5 of 45). ⛔ **It breaks when
+they are the majority**: remediation stops being a correction and becomes the whole programme, and the ledger
+cannot hold the intermediate state at all. ⭑ For a layer with pervasive precision gaps the correct order is the
+one `Phase 0` and `S0.3` already used — **write the assertion first, then declare the mutant that proves it
+discriminates.** The remaining `rph-application` work is re-planned on that basis.
+
+---
+
+**⚠ A SECOND, SMALLER CORRECTION, RECORDED BECAUSE IT IS A REPEAT.** The commit messages for increments `3a`, `3b`
+and `4` each overstate the running LEDGER TOTAL by 7 — 366/389/434 where the measured values are 359/382/427. The
+per-increment ADDITIONS (23, 23, 45) are correct; only the totals are wrong, because a base of 343 was carried
+where the measurement was 334 and every later figure was derived by arithmetic from it. ⭐ **This is the same
+defect this register already records against a commit count earlier in the same session** — a figure carried and
+incremented rather than re-measured. True progression, measured from the commits:
+**260 → 265 → 270 → 275 → 293 → 334 → 359 → 382 → 427.**
+
+---
+
+**⭐ THE SEARCH BEHIND THE ABSENCE CLAIM, STATED BECAUSE CON-000 B3 REQUIRES IT AND BECAUSE A FALSE ZERO HERE
+WOULD LOOK EXACTLY LIKE A FINDING.** The claim is *"each of the forty names a promise nothing asserts"*, and the
+search that establishes it is the mutation run itself: each mutation was APPLIED to the real source and its named
+victim RUN under source resolution — `bun run mutants MU-PFA-BD6` — and all 40 victims passed.
+
+⚠ **THE POSITIVE CONTROL IS THE SAME INSTRUMENT RETURNING THE OPPOSITE ANSWER.** That runner has returned KILLED
+**157 times** across increments 1–4 of this very burn-down, and 45 times in increment 4 alone against the same
+ledger, the same resolution and the same invocation — so a SURVIVED verdict from it is not an instrument that
+cannot say otherwise. ⭑ A SECOND, INDEPENDENT CONTROL was then run by hand on two of the forty
+(`floor-birth-exactness`, `challenge-forgets-why`): apply the mutation, run the named victim DIRECTLY with
+`bunx vitest run <victim>`, restore from snapshot. Both victims passed in BOTH states — clean and mutated — which
+is the transition a genuine survival must show and a blind instrument cannot.
+
+⚠ **AND THE LIMIT OF THE SEARCH IS STATED WITH IT:** it establishes only that THE NAMED VICTIM does not catch the
+mutation. It does NOT establish that no test anywhere would; the whole-suite question was not asked for these
+forty, and for a handler export the named victim is the strongest available reader but not the only one.
+
+**WHAT IS STILL TRUE.** Nothing in increments 1–4 is retracted: 157 guards landed there, every one KILLED, and
+increment 4's five gaps are closed by assertions that did not exist before it. The obligation figure in
+`verif/floors/export-guard.baseline.json` is derived by its own writer and is unaffected — `rph-application`'s 124
+bare exports were already counted as bare and remain so.
