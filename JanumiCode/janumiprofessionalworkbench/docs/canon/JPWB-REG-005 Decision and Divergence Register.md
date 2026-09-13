@@ -35346,7 +35346,15 @@ fail INDEPENDENTLY. The clean control-only mutant would delete the `UNKNOWN → 
 `rph-domain/src/transitions.data.ts`, outside that agent's ownership and possibly under another agent's mutation
 at the time. Per `feedback_a_control_that_cannot_fail.md` the control is therefore **not** claimed as proven; it
 is recorded as capable of failing (it asserts `ACCEPTED` plus a committed axis move and fails loudly if the
-machine gains or loses an arrow out of `UNKNOWN`) with the demonstration OWED.
+machine gains or loses an arrow out of `UNKNOWN`) with ~~the demonstration OWED~~ → ✅ **THE DEMONSTRATION WAS
+RUN AND THE CONTROL FAILS INDEPENDENTLY (2026-09-13, same day).** Deleting the `UNKNOWN → PRESERVED` row from
+`packages/rph-domain/src/transitions.data.ts` moved `pwu.test.ts` from **31 passed** to **1 failed | 30
+passed**, and the single red is *"CONTROL: ChangePwuState ADMITS the shapeIntegrity arrow the machine DOES
+declare"* — nothing else reddened, so the control discriminates on its own and is not satisfied by the main
+test's arrangement. ⭐ **The agent's stated limit was PRECISE, not pessimistic:** no control-only mutant can be
+sited *in `pwu.ts`*, because every over-refusal of that axis also changes the refusal MESSAGE the main test
+pins. Sited in the machine DATA it is surgical. ⚠ The restore was by **inverting the edit**, not by writing a
+snapshot back — the rule `REG-F-393` corrected, applied to its first case since.
 
 ---
 
