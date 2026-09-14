@@ -322,6 +322,59 @@ tightening it here would attribute other work to this commit.
 
 ---
 
+## 4b. Phase 2 · ⛔ CONTAINMENT — eight breaches an adversary DROVE through the landed seam
+
+⭐ **EVERY ONE WAS DEMONSTRATED, NOT ARGUED, AND EVERY FIX WAS PROVED BY AN OBSERVED RED USING THE ATTACKER'S
+OWN VECTOR.** The sixteen mutants §4 lists are all still KILLED; what they did not cover is the gap between what
+a PATH STRING says and what the FILESYSTEM does with it. Three of the eight were reachable through a guard that
+was visibly present and comparing the wrong thing, two were reachable because a derivation was trusted without
+being bounded, and one — `B3` — is `NO DEFAULT THAT FABRICATES` violated by the adapter itself.
+
+| # | what was driven | where it was fixed | its mutant |
+| --- | --- | --- | --- |
+| B1 | `.JPWB-WORKSPACE-TOMBSTONES.JSON` was written and OVERWROTE the retention record on NTFS | the reservation is case-folded on both sides | `P2-q` |
+| B2 | a `mklink /J` junction inside the workspace read, overwrote and LISTED files outside it | `locate` resolves the deepest existing ancestor with `realpath`; `livePaths` walks with `lstat` | `P2-r`, `P2-s` |
+| B3 | `writeFile('NUL', …)` returned `written: true, byteSize: 18` for bytes that went to the null device | the predicate refuses Win32 device stems; a failed write is a REFUSAL, never a throw | `P2-u`, `P2-t` |
+| B4 | `writeFile('report.md:stolen', …)` hid a payload in an NTFS alternate data stream | a colon anywhere in a workspace path is refused | `P2-v` |
+| B5 | `UND-ALPHA` and `und-alpha` were two ids, two strings and ONE directory | the derivation carries a fingerprint of the EXACT id, so it is INJECTIVE under the filesystem's equality | `P2-y` |
+| B6 | `'.. '`, `'...'`, `' ..'`, `'UND-1 '` and `'UND-1.'` resolved to the ROOTS directory or to ANOTHER Undertaking's | a component whose trailing dots/spaces Win32 strips is refused, never normalized | `P2-w` |
+| B7 | a RELATIVE `JPWB_DEMO_DB` put every workspace inside the server's own tree | the root must resolve identically against any base, or it is refused | `P2-x` |
+| B8 | `vitest run` with `JPWB_DEMO_DB` set produced real directories and a durable 2.7 MB `demo.sqlite` | durability requires an AFFIRMATIVE `RPH_DEMO_MODE=server`, in BOTH planes | `P2-e` (re-pointed), `P2-z` |
+
+⛔ **THE TWO THAT ARE NOT FIXES BUT NARROWED, ACCURATE DISCLOSURES — and the old disclosure was worse than
+absent because it UNDERSTATED ITS OWN PRECONDITION.** `filesystem-workspace.ts` said *"SYMLINKS ARE NOT RESOLVED
+… Nothing in this host creates one"*, and the vector that was driven needed no symlink and no privilege at all:
+`mklink /J` is an ordinary user's command. The replacement states what is CLOSED and what is not.
+- The remaining junction exposure is a RACE, not a hole: a directory swapped for a junction BETWEEN the check
+  and the write. One Undertaking drives its steps in sequence; a host that parallelises them needs more.
+- `list()` still cannot ENUMERATE alternate data streams — no adapter on `node:fs` can. What is closed is the
+  VECTOR: nothing a step writes through this workspace can reach one. A stream attached by something else
+  (Phase 3's child processes) would hold bytes the inventory does not name.
+
+⭐ **THE ONE SHAPE SEEN FOUR TIMES.** B1 and B5 are the same defect at two layers — a case-insensitive
+filesystem under a case-sensitive comparison — and B6 and B3 are its generalisation: the operating system
+REWRITES a name (strips a trailing dot, resolves a device) and every guard that compares strings sees a name
+that no longer exists. The predicate now asks what Win32 RESOLVES rather than what the string spells, and it
+does so ON EVERY PLATFORM, for the reason it already refused both separator spellings everywhere.
+
+⚠ **AND THE FIX FOR B5 IS INJECTIVITY RATHER THAN REFUSAL, DELIBERATELY.** Refusing the second of two ids that
+differ only by case would deny a lawful Undertaking its workspace forever. Two Undertakings are two
+Undertakings; the host's job is to give each one a directory the filesystem can tell apart.
+
+**PROOF:** each limb was watched FAILING first — 16 observed reds across four suites, including
+`readFile('escape/.env')` returning `SECRET=1` from outside the workspace, `written: true` for `NUL` and for the
+case-variant record, an uncaught `EISDIR` out of `writeFile`, one owner reading another's `src/index.ts`, and
+`FILESYSTEM` where `IN_MEMORY` was required under this repository's own test runner. `bun run mutants:changed
+--run` over the changed regions then selected 13 declared guards and reported **13 KILLED, 0 SURVIVED, 0
+UNANCHORED, 0 NO_COMPILE**.
+
+**BASELINE:** `guards:export:check` and `coverage:floor:check` are both clean and NEITHER was regenerated — no
+export was added or lost and no uncovered count rose, so there is nothing for either writer to record. ⛔ **NO
+REAL `ProcessRunner` STILL**, for the reason §4 gives: it reopens `REG-Q-066`, and rule 8 forbids answering that
+later.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
@@ -339,9 +392,12 @@ tree is **five `let` declarations, all in `workbench.ts`**. Every shared resourc
 content plane already sets that precedent by derivation (`${DB_PATH}.content.sqlite`), and the artifact store
 already puts the owner in the key rather than in the object.
 
-- ⛔ **TEST MODE IGNORES THE ROOT UNCONDITIONALLY**, as `JPWB_DEMO_DB`'s own docblock requires: *"a durable store
-  shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to
-  prevent."*
+- ~~⛔ **TEST MODE IGNORES THE ROOT UNCONDITIONALLY**, as `JPWB_DEMO_DB`'s own docblock requires: *"a durable
+  store shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to
+  prevent."*~~ ⛔ **SUPERSEDED BY §4b (B8): THAT INSTRUCTION WAS FOLLOWED AND DID NOT HOLD.** It was built as
+  `RPH_DEMO_MODE === 'test'`, which only the Playwright configs set — so the runner that reads this repository's
+  unit suites was never test mode by that predicate, and a durable store reached it. The rule is now
+  AFFIRMATIVE: a process gets a durable root only by DECLARING `RPH_DEMO_MODE=server`.
 - ⚠ **Read it in the DEFAULT-PARAMETER shape, not the frozen module const.** The frozen shape has a named
   in-repo hazard (`floor-recording.test.ts:19-21`: a plain assignment below the imports is read *after* the const
   froze).

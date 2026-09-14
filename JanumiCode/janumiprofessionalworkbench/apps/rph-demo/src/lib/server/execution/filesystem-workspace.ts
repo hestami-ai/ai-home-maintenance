@@ -24,18 +24,47 @@
 // delete vector wearing a filename. The refusal for it is DISTINCT from the containment refusal on purpose: a
 // caller naming the record has not tried to escape the workspace, and telling it that it did would be false.
 //
-// ── ⚠ TWO BOUNDS, DISCLOSED RATHER THAN IMPLIED ─────────────────────────────────────────────────────────────
-// 1. SYMLINKS ARE NOT RESOLVED. Containment here is a PATH property, checked twice (see `locate`); a symlink
-//    already inside the directory and pointing outside it would not be caught. Nothing in this host creates
-//    one, and the sandbox that will is Phase 3's — stated so a reader does not take a stronger guarantee than
-//    the one written.
-// 2. LAST WRITE WINS. The retention record is read and rewritten per call with no lock, so two concurrent
+// ⛔ AND THE RESERVATION IS COMPARED THE WAY THE FILESYSTEM COMPARES, WHICH IS CASE-INSENSITIVELY. An `===`
+// comparison admitted `.JPWB-WORKSPACE-TOMBSTONES.JSON`, and on NTFS that IS the record: driven, the write
+// returned `written: true`, the directory kept its one lower-case entry, and the forged bytes replaced the real
+// ones — so `list()` reported a path that was never written and stopped reporting the path actually purged,
+// which is exactly the distinction this record exists to keep. ⚠ On a case-SENSITIVE filesystem this refuses a
+// name that is genuinely distinct, and that cost is paid on purpose for the reason `containedWorkspacePath`
+// gives about separators: a guard that held on one platform and silently not on the other is not a guard.
+//
+// ── ⚠ THREE BOUNDS, DISCLOSED RATHER THAN IMPLIED — AND THE FIRST REPLACES A DISCLOSURE THAT WAS FALSE ─────
+// 1. ⛔ CONTAINMENT IS A FILESYSTEM PROPERTY HERE, NOT ONLY A PATH ONE. This bound used to read: *"SYMLINKS
+//    ARE NOT RESOLVED … a symlink already inside the directory and pointing outside it would not be caught.
+//    Nothing in this host creates one, and the sandbox that will is Phase 3's."* THAT UNDERSTATED ITS OWN
+//    PRECONDITION IN BOTH HALVES. The vector that was driven is not a symlink and needs no privilege at all:
+//    `mklink /J` creates a DIRECTORY JUNCTION as an ordinary user, with neither administrator rights nor
+//    Developer Mode, and through one placed inside the workspace `readFile('escape/.env')` returned a file from
+//    OUTSIDE it, `writeFile` OVERWROTE that file, and `list()` reported it as an in-workspace entry. So
+//    `locate` now resolves the deepest EXISTING ancestor with `realpath` — which resolves junctions, measured —
+//    and requires it to be inside the resolved root, and `livePaths` walks with `lstat` and neither descends
+//    into nor reports a link. ⚠ WHAT REMAINS IS A RACE, NOT A HOLE: a directory swapped for a junction BETWEEN
+//    the check and the write would not be caught. One Undertaking drives its steps in sequence; a host that
+//    parallelises them needs more than this.
+// 2. ⚠ `list()` CANNOT ENUMERATE NTFS ALTERNATE DATA STREAMS, and no adapter written on `node:fs` can — there
+//    is no API for it. What is CLOSED is the vector rather than the blind spot: a colon can no longer reach the
+//    disk through this workspace (`containedWorkspacePath` refuses it), so nothing a STEP writes here can hide
+//    in a stream. A stream attached by something else — Phase 3's child processes, or a tool run outside this
+//    seam — would hold bytes this inventory does not name, and the retention record describes exactly what
+//    `list()` can see and nothing more. ⚠ THE INVERSE IS BOUNDED TOO, AND IN THE OTHER DIRECTION: `list()`
+//    reports what is UNDER the root, so on a case-sensitive host a foreign process could leave a name this
+//    workspace's own predicate refuses (`a:b`, or a file actually called `NUL`) — reported by `list()`, and
+//    neither readable nor purgeable THROUGH the workspace. Reporting it is still the honest answer: the
+//    inventory says what is THERE, and the refusal says what this seam will ADDRESS. Suppressing it would
+//    make the inventory lie to protect the symmetry.
+// 3. LAST WRITE WINS. The retention record is read and rewritten per call with no lock, so two concurrent
 //    purges in one workspace can lose one entry. The owner is ONE Undertaking and this host drives its steps in
 //    sequence; a host that parallelises them needs more than this.
 import {
+	lstat,
 	mkdir,
 	readFile as fsReadFile,
 	readdir,
+	realpath,
 	rm,
 	stat,
 	writeFile as fsWriteFile
@@ -54,7 +83,8 @@ import {
 /**
  * The retention record, beside the files it describes.
  *
- * ⛔ RESERVED: `writeFile` and `purge` refuse it by name, and `list` never reports it. See the header.
+ * ⛔ RESERVED: `writeFile` and `purge` refuse it by name — CASE-INSENSITIVELY, because the filesystem compares
+ * that way — and `list` never reports it under any spelling. See the header.
  */
 export const WORKSPACE_TOMBSTONE_RECORD = '.jpwb-workspace-tombstones.json';
 
@@ -75,25 +105,65 @@ interface Tombstone {
 export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Workspace {
 	const root = resolvePath(input.directoryPath);
 	const recordPath = join(root, WORKSPACE_TOMBSTONE_RECORD);
-	const reserved = (rel: string) => rel === WORKSPACE_TOMBSTONE_RECORD;
+	// ⛔ CASE-FOLDED ON BOTH SIDES. `.JPWB-WORKSPACE-TOMBSTONES.JSON` IS this file on NTFS — see the header.
+	const reserved = (rel: string) => rel.toLowerCase() === WORKSPACE_TOMBSTONE_RECORD.toLowerCase();
 
 	/**
 	 * Resolve a caller-supplied path to an absolute location inside this workspace, or refuse.
 	 *
-	 * ⭑ THE CONTAINMENT CHECK RUNS TWICE, BY THE PORT'S OWN INSTRUCTION: "A workspace-relative path supplied by
-	 * a model is resolved against it and re-checked for containment — never concatenated."
-	 * `containedWorkspacePath` is the primary and it is the one carrying declared guards; the prefix re-check
-	 * below is DEFENCE IN DEPTH over the join, and it is honestly redundant today — no input the predicate
-	 * admits escapes the root once resolved. It is written anyway because the predicate lives in another
-	 * package, and a future weakening of it would otherwise reach this host's real filesystem with nothing in
-	 * between.
+	 * ⭑ THE CONTAINMENT CHECK RUNS THREE TIMES, AND ONLY THE THIRD ASKS THE FILESYSTEM. The port's instruction
+	 * is the first two: "A workspace-relative path supplied by a model is resolved against it and re-checked for
+	 * containment — never concatenated." `containedWorkspacePath` is the primary and it is the one carrying
+	 * declared guards; the prefix re-check below is DEFENCE IN DEPTH over the join, and it is honestly redundant
+	 * today — no input the predicate admits escapes the root once resolved. It is written anyway because the
+	 * predicate lives in another package, and a future weakening of it would otherwise reach this host's real
+	 * filesystem with nothing in between.
+	 *
+	 * ⛔ BOTH OF THOSE ARE PROPERTIES OF THE PATH TEXT, AND A JUNCTION DEFEATS BOTH — which is what
+	 * `insideResolvedRoot` is for, and why this function is async. `escape/.env` is a tidy relative path under
+	 * the root no matter what `escape` actually is on disk.
 	 */
-	function locate(path: string): { readonly rel: string; readonly abs: string } | undefined {
+	async function locate(
+		path: string
+	): Promise<{ readonly rel: string; readonly abs: string } | undefined> {
 		const rel = containedWorkspacePath(path);
 		if (rel === undefined) return undefined;
 		const abs = resolvePath(root, rel);
 		if (abs !== root && !abs.startsWith(root + sep)) return undefined;
-		return { rel, abs };
+		return (await insideResolvedRoot(abs)) ? { rel, abs } : undefined;
+	}
+
+	/**
+	 * The THIRD check, and the only one a JUNCTION cannot walk past — see bound 1 in the header.
+	 *
+	 * ⛔ IT ASKS THE FILESYSTEM, NOT THE STRING. Both checks above are properties of the path text, and
+	 * `<workspace>/escape/.env` is a tidy relative path under the root no matter what `escape` actually is.
+	 * `realpath` resolves reparse points — measured on a `mklink /J` junction: `<ws>/escape/.env` resolved to
+	 * `<container>/outside/.env`, outside the root — so resolving the deepest ancestor that EXISTS and requiring
+	 * IT to be inside the resolved root decides containment for a path that does not exist yet as well. The root
+	 * is resolved too, because a short (8.3) or linked root would otherwise never prefix-match its own children.
+	 */
+	async function insideResolvedRoot(abs: string): Promise<boolean> {
+		let resolvedRoot: string;
+		try {
+			resolvedRoot = await realpath(root);
+		} catch {
+			// The workspace directory does not exist yet, so nothing exists under it to be traversed THROUGH. An
+			// empty workspace is a fact, not a failure — the same posture `livePaths` takes.
+			return true;
+		}
+		let probe = abs;
+		for (;;) {
+			try {
+				const real = await realpath(probe);
+				return real === resolvedRoot || real.startsWith(resolvedRoot + sep);
+			} catch {
+				const parent = dirname(probe);
+				// A fixed point is the volume root: nothing on the way to `abs` exists, and it is not under ours.
+				if (parent === probe) return false;
+				probe = parent;
+			}
+		}
 	}
 
 	async function readTombstones(): Promise<Record<string, Tombstone>> {
@@ -127,9 +197,14 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 		for (const name of names.sort()) {
 			const rel = prefix === '' ? name : `${prefix}/${name}`;
 			if (reserved(rel)) continue;
-			const info = await stat(join(dir, name));
+			// ⛔ `lstat`, NEVER `stat`, AND A LINK IS NOT PART OF THE DELIVERABLE. `stat` follows a junction, so the
+			// walk descended THROUGH one and reported files from outside the workspace as in-workspace entries — the
+			// escape and its concealment in one line. A link is skipped rather than reported because reporting it
+			// with a `byteSize` would state that this workspace holds bytes that live somewhere else entirely.
+			const info = await lstat(join(dir, name));
+			if (info.isSymbolicLink()) continue;
 			if (info.isDirectory()) await livePaths(join(dir, name), rel, out);
-			else out.push(rel);
+			else if (info.isFile()) out.push(rel);
 		}
 	}
 
@@ -144,19 +219,32 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 		directoryPath: root,
 
 		async writeFile(path: string, contents: string): Promise<WorkspaceWriteOutcome> {
-			const at = locate(path);
+			const at = await locate(path);
 			if (at === undefined)
 				return {
 					written: false,
-					refusedBecause: `'${path}' does not name a location inside this workspace. A workspace path is relative, carries no drive letter, and may not resolve above the workspace root.`
+					refusedBecause: `'${path}' does not name a location inside this workspace. A workspace path is relative, carries no drive letter and no colon, names no reserved device, has no component ending in a dot or a space, may not resolve above the workspace root, and may not reach outside it through a link or a junction.`
 				};
 			if (reserved(at.rel))
 				return {
 					written: false,
 					refusedBecause: `'${path}' is this workspace's own retention record and is not writable. It states which paths were purged and what they held, and a caller that could rewrite it could make a purge look like a file that was never written — the one distinction the record exists to keep.`
 				};
-			await mkdir(dirname(at.abs), { recursive: true });
-			await fsWriteFile(at.abs, contents, 'utf8');
+			try {
+				await mkdir(dirname(at.abs), { recursive: true });
+				await fsWriteFile(at.abs, contents, 'utf8');
+			} catch (cause) {
+				// ⛔ THE PORT REQUIRES A REFUSAL HERE, NOT A THROW: "a throw becomes a stack trace in a record that was
+				// supposed to say what the step was not allowed to do." Every other refusal in this adapter is decided
+				// from the path; this is the one that cannot be — writing over an existing DIRECTORY raised `EISDIR`
+				// straight out of the promise — and it must reach the same shape. ⚠ THE CODE, NOT THE MESSAGE: the
+				// message carries the host's absolute path, which belongs in nothing a step records.
+				const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+				return {
+					written: false,
+					refusedBecause: `'${at.rel}' could not be written: the filesystem refused it (${code ?? 'unknown cause'}). Nothing was written, and nothing about the rest of the workspace changed.`
+				};
+			}
 			// ⚠ A REWRITE CLEARS THE TOMBSTONE, DELIBERATELY — the in-memory default's rule restated on disk: a
 			// path that was purged and is then written again holds bytes, and reporting it as still purged would
 			// state an absence that is no longer true.
@@ -170,7 +258,7 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 		},
 
 		async readFile(path: string): Promise<string | undefined> {
-			const at = locate(path);
+			const at = await locate(path);
 			if (at === undefined || reserved(at.rel)) return undefined;
 			try {
 				return await fsReadFile(at.abs, 'utf8');
@@ -196,11 +284,11 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 		},
 
 		async purge(path: string): Promise<PurgeOutcome> {
-			const at = locate(path);
+			const at = await locate(path);
 			if (at === undefined)
 				return {
 					purged: false,
-					refusedBecause: `'${path}' does not name a location inside this workspace, so nothing was purged. A purge that silently succeeded on an out-of-workspace path would be a delete vector wearing a retention label.`
+					refusedBecause: `'${path}' does not name a location inside this workspace, so nothing was purged. A workspace path is relative, carries no drive letter and no colon, names no reserved device, has no component ending in a dot or a space, may not resolve above the workspace root, and may not reach outside it through a link or a junction. A purge that silently succeeded on an out-of-workspace path would be a delete vector wearing a retention label.`
 				};
 			if (reserved(at.rel))
 				return {

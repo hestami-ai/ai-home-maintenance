@@ -21,6 +21,17 @@ import { resolveUndertakingSandbox } from './workspace-host.js';
 const UND = 'und_01ARZ3NDEKTSV4RRFFQ69G5PAA';
 const OTHER = 'und_01ARZ3NDEKTSV4RRFFQ69G5PBB';
 
+/**
+ * The DIRECTORY NAME `UND` derives to, written out rather than recomputed.
+ *
+ * ⛔ THE LITERAL IS THE POINT. Deriving it here with the same `createHash` call the host makes would assert
+ * that the host agrees with itself, which it cannot fail to do; the 16 hex characters are what pin the
+ * derivation, and a change to them is a change that strands every workspace already on disk. They are the
+ * fingerprint that makes the map INJECTIVE on a case-insensitive filesystem — without it `UND-ALPHA` and
+ * `und-alpha` are two ids, two strings and ONE directory.
+ */
+const UND_DIRECTORY = `${UND}-7b80f362d9256e03`;
+
 // ⛔ THE DURABLE ROOT IS ONE LEVEL BELOW THE DIRECTORY THIS SPEC OWNS. The escape cases assert that nothing was
 // created ABOVE the root, and with the root at the mkdtemp directory itself that assertion reaches into the
 // system temp directory — which `afterEach` does not own and cannot clean. A mutation run that genuinely
@@ -42,13 +53,18 @@ afterEach(async () => {
 	if (SAVED.db === undefined) delete process.env.JPWB_DEMO_DB;
 	else process.env.JPWB_DEMO_DB = SAVED.db;
 	await rm(container, { recursive: true, force: true });
+	// ⛔ AND THE ONE DIRECTORY THIS SUITE CAN PROVOKE OUTSIDE ITS OWN CONTAINER. The relative-root case
+	// below resolves against `process.cwd()` BY CONSTRUCTION — that is the defect it exists to catch — so on
+	// the run that reddens it, the escape lands in the checkout. The same reasoning as the container above:
+	// every escape this suite provokes must land inside something it deletes.
+	await rm(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`), { recursive: true, force: true });
 });
 
 describe('the working directory is the OWNER\u2019S and NEVER the server\u2019s', () => {
 	it('\u2b50 resolves to a SUBDIRECTORY of the durable root, named by the owner', async () => {
 		const { workspace } = resolveUndertakingSandbox(UND, root);
 		expect(workspace.materialization).toBe('FILESYSTEM');
-		expect(workspace.directoryPath).toBe(resolvePath(join(root, UND)));
+		expect(workspace.directoryPath).toBe(resolvePath(join(root, UND_DIRECTORY)));
 		// ⛔ A SUBDIRECTORY, not the root itself. One Undertaking owning the whole root would mean every
 		// Undertaking on this host shares one directory, which is `R8`'s owner ruling silently discarded.
 		expect(workspace.directoryPath?.startsWith(resolvePath(root) + sep)).toBe(true);
@@ -160,18 +176,22 @@ describe('the durable root comes from ONE env key, and TEST MODE ignores it unco
 		expect(workspace.materialization).toBe('IN_MEMORY');
 		expect(workspace.directoryPath).toBeUndefined();
 		// And nothing was created on disk to be shared between specs.
-		expect(existsSync(join(`${join(root, 'demo.sqlite')}.workspaces`, UND))).toBe(false);
+		expect(existsSync(`${join(root, 'demo.sqlite')}.workspaces`)).toBe(false);
 	});
 
 	it('\u2b50 outside test mode the root is DERIVED from JPWB_DEMO_DB, so one key configures all three planes', () => {
 		// ⭑ `getArtifactStore()` derives the CONTENT plane from the RECORD plane's key the same way
 		// (`${DB_PATH}.content.sqlite`). A second env key would let an operator configure a durable record whose
 		// deliverable evaporates at restart — the inverse orphan `ArtifactStore.durability` exists to prevent.
+		// ⛔ THE SERVING DECLARATION IS PART OF THE ARRANGEMENT NOW, and this test is where the change is visible:
+		// the key still decides WHERE all three planes live, and the declaration decides WHETHER this process may
+		// have a durable one at all. Setting the key alone is what a test runner does by accident.
+		process.env.RPH_DEMO_MODE = 'server';
 		const db = join(root, 'demo.sqlite');
 		process.env.JPWB_DEMO_DB = db;
 		const { workspace } = resolveUndertakingSandbox(UND);
 		expect(workspace.materialization).toBe('FILESYSTEM');
-		expect(workspace.directoryPath).toBe(resolvePath(join(`${db}.workspaces`, UND)));
+		expect(workspace.directoryPath).toBe(resolvePath(join(`${db}.workspaces`, UND_DIRECTORY)));
 	});
 
 	it('\u26a0 with NO database configured the workspace is IN_MEMORY and DECLARES it', () => {
@@ -222,7 +242,7 @@ describe('\u2b50 the ProcessRunner seam is WIRED, and provably INERT', () => {
 			timeoutMs: 5_000
 		});
 		expect(plan.planned).toBe(true);
-		expect(plan.planned === true && plan.request.cwd).toBe(resolvePath(join(root, UND)));
+		expect(plan.planned === true && plan.request.cwd).toBe(resolvePath(join(root, UND_DIRECTORY)));
 		expect(plan.planned === true && plan.request.cwd).not.toBe(process.cwd());
 	});
 
@@ -243,5 +263,130 @@ describe('\u2b50 the ProcessRunner seam is WIRED, and provably INERT', () => {
 		expect(out.ran).toBe(false);
 		expect(Object.hasOwn(out, 'exitCode')).toBe(false);
 		expect(out.ran === false && out.refusedBecause).toMatch(/was not run/);
+	});
+});
+
+// ── ⛔ THE BREACHES AN ADVERSARY DROVE THROUGH THE HOST ──────────────────────────────────────────────────────
+//
+// ⭐ THREE OF THE EIGHT ARE HOST DEFECTS RATHER THAN ADAPTER ONES, and all three are about a DERIVATION that
+// was trusted without being bounded: an owner id the FILESYSTEM cannot tell apart from another one, a root
+// that is not absolute, and a test-mode predicate only one runner sets.
+
+/** The one value that BUYS durability. Everything else, named or not, is in-memory by construction. */
+const SERVER_MODE = 'server';
+/** The attacker's configuration, verbatim: a database key that carries no root of its own. */
+const RELATIVE_DB = 'jpwb-relative-root-probe.sqlite';
+
+/**
+ * What one owner id can READ at `path`, or `undefined`.
+ *
+ * ⚠ A REFUSAL COUNTS AS UNREACHABLE, because refusing the second id and giving it its own directory are both
+ * lawful answers to a collision and only the BYTES distinguish a breach. The control below is what stops this
+ * from passing because resolution refuses everything.
+ */
+async function reachableThroughOwner(ownerId: string, path: string): Promise<string | undefined> {
+	try {
+		return await resolveUndertakingSandbox(ownerId, root).workspace.readFile(path);
+	} catch {
+		return undefined;
+	}
+}
+
+describe('⛔ two owner ids the FILESYSTEM cannot tell apart are still two Undertakings', () => {
+	it('⛔ a CASE VARIANT of an owner id does not reach the first owner’s deliverable', async () => {
+		// ⭑⭑ MEASURED, AND THE SUITE'S OWN DISTINCTNESS ASSERTION PASSED THROUGHOUT. `UND-ALPHA` and `und-alpha`
+		// produced two DIFFERENT `directoryPath` STRINGS — so "two Undertakings get two directories" was green —
+		// while NTFS gave them ONE DIRECTORY: `mkdir` of the second returned EEXIST, and a file written through
+		// the first was read back through the second. The existing control cannot catch it because its two ids
+		// differ by more than case.
+		const first = resolveUndertakingSandbox('UND-ALPHA', root);
+		await first.workspace.writeFile('src/index.ts', 'the first owner’s product\n');
+
+		// ⛔ ASSERTED ON WHAT THE FILESYSTEM DOES, NOT ON THE STRINGS. A host that refused the second id and one
+		// that gave it its own directory are both lawful answers; a host that hands it the FIRST OWNER'S BYTES
+		// is not, and that is the only thing this asserts — so it holds on a case-insensitive filesystem and on
+		// a case-sensitive one alike.
+		expect(await reachableThroughOwner('und-alpha', 'src/index.ts')).toBeUndefined();
+	});
+
+	it('⛔ and the two directories differ UNDER THE FILESYSTEM’S OWN EQUALITY, not merely as strings', () => {
+		// ⭑ THE STRING COMPARISON IS THE DEFECT ONE LEVEL UP: `'…/UND-ALPHA' !== '…/und-alpha'` is true and says
+		// nothing about which directory each one opens. Case-folding both sides is what asks the question the
+		// filesystem answers.
+		const a = resolveUndertakingSandbox('UND-ALPHA', root).workspace.directoryPath ?? '';
+		const b = resolveUndertakingSandbox('und-alpha', root).workspace.directoryPath ?? '';
+		expect(a.toLowerCase()).not.toBe(b.toLowerCase());
+	});
+
+	it('⭐ CONTROL — the SAME id still resolves to the SAME directory, and reads back what it wrote', async () => {
+		// ⛔ WITHOUT THIS, THE TWO ABOVE ARE SATISFIABLE BY A DERIVATION THAT NEVER REPEATS — which is `P2-g`,
+		// the mutant that builds seven fragments instead of one product.
+		const first = resolveUndertakingSandbox(UND, root);
+		await first.workspace.writeFile('src/index.ts', 'stable\n');
+		const later = resolveUndertakingSandbox(UND, root);
+		expect(later.workspace.directoryPath).toBe(first.workspace.directoryPath);
+		expect(await later.workspace.readFile('src/index.ts')).toBe('stable\n');
+	});
+});
+
+describe('⛔ the durable root must be ABSOLUTE, or the deliverable lands in the server’s own tree', () => {
+	it('⛔ a RELATIVE JPWB_DEMO_DB is REFUSED — resolved against `process.cwd()` it IS the defect this phase removes', () => {
+		// ⭑⭑ THE EXACT DEFECT THIS PHASE EXISTS TO CLOSE, REACHED THROUGH CONFIGURATION RATHER THAN THROUGH AN
+		// OWNER ID. `resolvePath(join(root, segment))` resolves a RELATIVE root against the process's working
+		// directory, so with `JPWB_DEMO_DB=demo.sqlite` every Undertaking's workspace is a directory INSIDE THE
+		// SVELTEKIT SERVER'S OWN SOURCE TREE — and `workspace-host.test.ts`'s own predicate
+		// ("NOT anywhere INSIDE `process.cwd()`") required FALSE and evaluated TRUE. The suite held only
+		// because every case injected an absolute root under `tmpdir()`; nothing required the DERIVED one to be
+		// absolute at all.
+		process.env.RPH_DEMO_MODE = SERVER_MODE;
+		process.env.JPWB_DEMO_DB = RELATIVE_DB;
+		expect(() => resolveUndertakingSandbox(UND)).toThrow(/absolute/);
+		expect(existsSync(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`))).toBe(false);
+	});
+
+	it('⛔ and so is a relative root handed in directly, including the Win32 spellings that only LOOK rooted', () => {
+		// ⚠ `\\workspaces` AND `C:workspaces` ARE NOT ABSOLUTE ON WINDOWS. The first resolves against the
+		// process's CURRENT DRIVE and the second against that drive's CURRENT DIRECTORY, so both depend on
+		// exactly the state a derived root may not depend on — and `path.isAbsolute` answers TRUE for the first.
+		for (const relative of ['workspaces', './workspaces', '..\\workspaces', '\\workspaces', 'C:workspaces'])
+			expect(() => resolveUndertakingSandbox(UND, relative), relative).toThrow(/absolute/);
+	});
+
+	it('⭐ CONTROL — an absolute root is accepted and still lands under it', () => {
+		// Without this, every refusal above is satisfiable by "refuses every root".
+		const { workspace } = resolveUndertakingSandbox(UND, root);
+		expect(workspace.materialization).toBe('FILESYSTEM');
+		expect(workspace.directoryPath?.startsWith(resolvePath(root) + sep)).toBe(true);
+	});
+});
+
+describe('⛔ durability is DECLARED by the process, not assumed from the absence of a test marker', () => {
+	it('⛔ THIS RUNNER gets no durable root, and it is the runner that had never been considered', () => {
+		// ⭑⭑ THE ATTACKER'S VECTOR IS THE COMMAND THAT RUNS THIS FILE. `durableWorkspaceRoot`'s arm was written
+		// "TEST MODE FIRST AND UNCONDITIONALLY" and keys on `RPH_DEMO_MODE === 'test'` — which ONLY the
+		// Playwright configs set. `vitest.config.ts` does not, so `vitest run --project app:rph-demo` with
+		// `JPWB_DEMO_DB` set was NOT test mode by this predicate: it produced real directories on disk and a
+		// durable 2,719,744-byte `demo.sqlite`, and `undertaking-loader-object-type.test.ts`'s CONTROL went red.
+		// That is precisely the order-dependence `resetEngine` exists to prevent, arriving through the one
+		// runner the predicate did not name.
+		//
+		// ⛔ THE FIX IS NOT A SECOND ENV CHECK — the next runner will not set that one either. Durability is
+		// granted only to a process that AFFIRMS it is serving; everything else, named or not, is in-memory by
+		// construction. This spec sets nothing, which is exactly the arrangement that broke it.
+		process.env.JPWB_DEMO_DB = join(root, 'demo.sqlite');
+		const { workspace } = resolveUndertakingSandbox(UND);
+		expect(workspace.materialization).toBe('IN_MEMORY');
+		expect(workspace.directoryPath).toBeUndefined();
+		expect(existsSync(`${join(root, 'demo.sqlite')}.workspaces`)).toBe(false);
+	});
+
+	it('⛔ and an unrecognised declaration is not a server either — the arm is affirmative, not a blocklist', () => {
+		// A blocklist of runners is a list that rots; this is the same rule stated from the other side, and it
+		// is what makes "the next runner" safe without knowing its name.
+		process.env.JPWB_DEMO_DB = join(root, 'demo.sqlite');
+		for (const mode of ['', 'dev', 'production', 'TEST', 'Server', 'test']) {
+			process.env.RPH_DEMO_MODE = mode;
+			expect(resolveUndertakingSandbox(UND).workspace.materialization, mode).toBe('IN_MEMORY');
+		}
 	});
 });

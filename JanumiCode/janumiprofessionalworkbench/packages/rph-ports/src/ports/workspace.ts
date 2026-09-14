@@ -120,6 +120,12 @@ export interface Workspace {
 }
 
 /**
+ * The Win32 reserved device names — the stems that name a DEVICE from inside any directory rather than a file
+ * in one. Derived as a pattern rather than enumerated, so `com0`, `lpt0`, `com10` and `console` stay lawful.
+ */
+const WIN32_DEVICE_STEM = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/**
  * The containment predicate BOTH implementations must honour, expressed once.
  *
  * ⭑ EXPORTED FROM THE PORT ON PURPOSE. `artifact-store.ts` records the same lesson about `purge`: the invariant
@@ -128,6 +134,29 @@ export interface Workspace {
  *
  * ⚠ IT REFUSES BEFORE IT NORMALIZES, for the absolute cases. Normalizing an absolute path yields an absolute
  * path that still looks tidy, so the same check applied afterwards reads as passing.
+ *
+ * ── ⛔ AND IT ASKS WHAT THE FILESYSTEM RESOLVES, NOT WHAT THE STRING SPELLS ───────────────────────
+ * Three shapes pass every check above and still name a DIFFERENT location than they spell. All three were
+ * DRIVEN before this paragraph was written:
+ *   1. TRAILING DOTS AND SPACES ARE STRIPPED BY WIN32 AND KEPT BY `node:path`, so the two disagree about which
+ *      directory a name means. `mkdirSync` created literal entries `'.. '`, `'...'`, `'....'`, `' ..'`,
+ *      `'UND-1 '` and `'UND-1.'` in ONE directory, and a real child process launched with each of them as its
+ *      `cwd` reported the first four as the PARENT directory and the last two as `UND-1` — an existing,
+ *      DIFFERENT directory. Seven distinct names to a string comparison; two directories to the operating
+ *      system. ⚠ LEADING spaces are PRESERVED and are therefore not refused: `' foo'` stayed `' foo'`.
+ *   2. A COLON INSIDE A COMPONENT NAMES AN NTFS ALTERNATE DATA STREAM. `report.md:stolen` wrote bytes that
+ *      `readdir` does not name and `stat` does not size — so any inventory built from a directory walk is
+ *      incomplete BY CONSTRUCTION. The drive-letter check above only ever sees a colon in position two.
+ *   3. A WIN32 DEVICE NAME IS NOT A LOCATION. Under bun, `writeFileSync(<dir>/NUL, …)` returned normally and
+ *      the path did not exist afterwards (`existsSync` false, `readdir` empty, read-back ENOENT); under node
+ *      the same call created a real file, because libuv reaches the filesystem through the long-path prefix
+ *      that bypasses device translation. This repository runs BOTH runtimes — vitest under bun, the SvelteKit
+ *      server under node — so a predicate that was right on one would be silently wrong on the other.
+ *
+ * ⛔ ALL THREE ARE REFUSED ON EVERY PLATFORM, AND THE OVER-REFUSAL ON POSIX IS DELIBERATE: it is the rule this
+ * predicate already follows for separators — "BOTH separator spellings are refused: a Windows host accepts
+ * either, so a guard that knew only one would hold on one platform and silently not on the other." A path that
+ * named a file on Linux and a device on Windows would make ONE workspace path mean two things.
  */
 export function containedWorkspacePath(path: string): string | undefined {
 	if (path.length === 0) return undefined;
@@ -136,6 +165,10 @@ export function containedWorkspacePath(path: string): string | undefined {
 	// silently not on the other.
 	if (/^[A-Za-z]:/.test(path)) return undefined;
 	if (path.startsWith('/') || path.startsWith('\\')) return undefined;
+	// ⛔ A COLON ANYWHERE NAMES A STREAM OR A VOLUME, NEVER A FILE IN THIS WORKSPACE. The drive check above sees
+	// only position two, and `report.md:stolen` carries its colon further along — into an NTFS alternate data
+	// stream that `readdir` cannot name and `list()` therefore cannot report.
+	if (path.includes(':')) return undefined;
 	const out: string[] = [];
 	for (const part of path.split(/[\\/]+/)) {
 		if (part === '' || part === '.') continue;
@@ -148,6 +181,14 @@ export function containedWorkspacePath(path: string): string | undefined {
 			out.pop();
 			continue;
 		}
+		// ⛔ A COMPONENT THE FILESYSTEM REWRITES IS REFUSED, NEVER NORMALIZED. `'UND-1 '` and `'UND-1.'` both OPEN
+		// `UND-1` and `'...'` opens the parent (measured — see the header), so stripping the suffix here would hand
+		// the caller a normalized path that means a DIFFERENT directory than the one it asked for; the caller has
+		// to learn that, not be rerouted.
+		if (part !== part.replace(/[. ]+$/, '')) return undefined;
+		// ⛔ AND A DEVICE IS NOT A LOCATION. The STEM decides, because Win32 resolves `NUL.txt` to the null device
+		// just as it resolves `NUL`.
+		if (WIN32_DEVICE_STEM.test(part.replace(/\.[\s\S]*$/, ''))) return undefined;
 		out.push(part);
 	}
 	// `a/..` normalizes to the workspace ROOT, which is a directory and not a file location.

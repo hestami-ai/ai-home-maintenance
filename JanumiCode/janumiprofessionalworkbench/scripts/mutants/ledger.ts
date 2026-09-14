@@ -6357,11 +6357,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P2-e-test-mode-honours-the-durable-root",
 		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
-		// `JPWB_DEMO_DB`'s OWN DOCBLOCK IS THE RULE: "a durable store shared across specs would make them
-		// order-dependent, which is the failure mode `resetEngine` exists to prevent." The mutation makes test mode
-		// a matter of configuration rather than of construction.
-		find: "\tif (env.RPH_DEMO_MODE === 'test') return undefined;",
-		replace: "\t// MUTANT: test mode no longer ignores the durable root",
+		// ⛔ RE-POINTED, AND THE MUTATION IS NOW THE OLD SOURCE VERBATIM. This entry used to delete
+		// `if (env.RPH_DEMO_MODE === 'test') return undefined;` \u2014 and an adversary then demonstrated that the
+		// line it defended never covered the runner that mattered: only the Playwright configs set that variable,
+		// so `vitest run --project app:rph-demo` with `JPWB_DEMO_DB` set produced real directories on disk. The
+		// arm is now AFFIRMATIVE, and restoring the negative form is exactly the defect that was driven.
+		find: "\tif (env.RPH_DEMO_MODE !== SERVING_DECLARATION) return undefined;",
+		replace: "\tif (env.RPH_DEMO_MODE === 'test') return undefined; // MUTANT: durability is the default and only the ONE named runner is excluded",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: \"TEST MODE IGNORES THE ROOT UNCONDITIONALLY\" - stated in this file's header and carried verbatim from the precedent it follows. WHO RELIES: the E2E harness, which resets the engine between specs and depends on each spec starting from a known state. WHAT THE MUTATION DOES TO THEM: any CI environment that also sets `JPWB_DEMO_DB` gives every spec a real directory on disk that SURVIVES the reset - so one spec's files are another spec's starting state, specs become order-dependent, and the failure appears as an unrelated flake in whichever spec happens to run second. \u26a0 The read is a DEFAULT PARAMETER rather than a frozen module const precisely so this branch is reachable by calling the function; `floor-recording.test.ts:19-21` records what the frozen shape costs.",
 		source: "JAN-EXEC Phase 2 - the test-mode limb of `resolveUndertakingSandbox`"
@@ -6372,7 +6374,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// THE OWNER SUBDIRECTORY IS THE WHOLE DERIVATION. `getArtifactStore()` gets away with a bare process
 		// singleton because it is content-addressed and puts the tenant in the KEY; a path-named workspace has only
 		// this one expression to do the same job.
-		find: "\tconst directoryPath = resolvePath(join(root, segment));",
+		find: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
 		replace: "\tconst directoryPath = resolvePath(root); // MUTANT: the root itself is every Undertaking's workspace",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: \"one durable root from one env key, one subdirectory DERIVED from the owner id, RESOLVED PER REQUEST\" - the pattern this file follows rather than invents. WHO RELIES: every Undertaking on the host, and the isolation between them. WHAT THE MUTATION DOES TO THEM: two Undertakings executing on one workbench write into the same directory, so one product's `src/index.ts` is silently overwritten by another's - and because both READ successfully, nothing anywhere reports a fault. The victim asserts the resolved directory is strictly BELOW the root and that two owners get two directories; a control asserts the second owner cannot read the first's file, which is what makes 'they share a directory' distinguishable from 'they each have one'.",
@@ -6385,8 +6387,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// undertaking - the producer session is disposed per work unit, `beginExecute` mints a fresh plan and step
 		// per click, and the only pre-existing filesystem scratch is a `mkdtemp` created and removed inside ONE
 		// call - so per-invocation is exactly the default that emerges when nobody rules otherwise.
-		find: "\tconst directoryPath = resolvePath(join(root, segment));",
-		replace: "\tconst directoryPath = resolvePath(join(root, segment, Math.random().toString(36).slice(2))); // MUTANT: a fresh directory per invocation",
+		find: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
+		replace: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`, Math.random().toString(36).slice(2))); // MUTANT: a fresh directory per invocation",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: `R8` - \"the workspace is the DELIVERABLE and must persist\", owned by the UNDERTAKING. The spike measured the consequence directly: with one UNDERTAKING-owned directory a SECOND step, in a NEW session with a NEW plan, ran against a file the FIRST step wrote. WHO RELIES: every multi-phase PWA - which is the target this whole programme exists to reach. WHAT THE MUTATION DOES TO THEM: each `beginExecute` click resolves a directory nothing else will ever resolve again, so a seven-phase realization lens builds SEVEN FRAGMENTS instead of one product, and every individual step still reports success. Nothing in the record says the phases were disconnected. The victim is the cross-session read; a resolution that is not STABLE cannot satisfy it, and stability is the only property that makes 'resolved per request rather than held' safe.",
 		source: "JAN-EXEC Phase 2 - the R8 lifecycle limb of `resolveUndertakingSandbox`"
@@ -6503,5 +6505,122 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: the retention class is a statement about what the CONTENT IS, not about where it happens to live - `PER-8` says a thing that has participated in execution, assurance, governance, a baseline or traceability is never hard-deleted, and nothing about that turns on whether `JPWB_DEMO_DB` is set. WHO RELIES: every developer and every CI run of the demo, which is the unconfigured path; and `R8`, which would otherwise hold only for hosts that had opted into durability. WHAT THE MUTATION DOES TO THEM: the two arms of one function disagree about the same content, so a workspace's purgeability becomes a property of an operator's environment rather than of the material - and the sibling mutant `P2-k` proves the configured arm needs the same assertion, because on this suite's first run it SURVIVED.",
 		source: "JAN-EXEC Phase 2 - the PER-8 declaration on the unconfigured workspace"
+	},
+	// -- JAN-EXEC PHASE 2 CONTAINMENT: the eight breaches an adversary DROVE through the seam ------
+	//
+	// ⭐ EVERY ONE OF THESE WAS DEMONSTRATED BEFORE IT WAS GUARDED, and each victim below was watched FAILING
+	// against the code as it then stood. They divide by LAYER rather than by breach: the predicate decides what a
+	// NAME may be, the adapter decides what the DISK may be asked for, and the host decides where a root and an
+	// owner may LAND.
+	{
+		id: "P2-q-the-retention-record-is-writable-under-a-case-variant",
+		file: "apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts",
+		// THE FILESYSTEM COMPARES CASE-INSENSITIVELY AND THE GUARD COMPARED WITH `===`. This is the sibling of
+		// `P2-o`, which is declared KILLED and does not cover it: `P2-o` proves the reservation is CONSULTED,
+		// this one proves it is consulted the way the filesystem resolves.
+		find: "\tconst reserved = (rel: string) => rel.toLowerCase() === WORKSPACE_TOMBSTONE_RECORD.toLowerCase();",
+		replace: "\tconst reserved = (rel: string) => rel === WORKSPACE_TOMBSTONE_RECORD; // MUTANT: the reservation is compared case-sensitively",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts"],
+		why: "PROMISE, in the adapter's header: the record is \"a RESERVED PATH, REFUSED TO CALLERS ... a delete vector wearing a filename.\" WHO RELIES: every purge this workspace has performed and the audit that reads them. WHAT THE MUTATION DOES TO THEM: `.JPWB-WORKSPACE-TOMBSTONES.JSON` returns `written: true` and, NTFS being case-insensitive, OVERWRITES the record \u2014 driven, the directory kept its one lower-case entry holding the FORGED bytes, so `list()` reported a path that was never written and stopped reporting the path actually purged. That is the \"purged on schedule vs never written\" distinction the record exists to keep, destroyed through the one name the adapter believed it was refusing.",
+		source: "JAN-EXEC Phase 2 containment (breach B1) - the case limb of the reserved record"
+	},
+	{
+		id: "P2-r-a-junction-inside-the-workspace-reads-and-writes-outside-it",
+		file: "apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts",
+		// THE CONSEQUENCE IS MUTATED, NOT THE CONDITION - the V-2c lesson. The comparison still runs and still
+		// resolves the real path; it simply answers YES for every one of them.
+		find: "\t\t\t\treturn real === resolvedRoot || real.startsWith(resolvedRoot + sep);",
+		replace: "\t\t\t\treturn real.length >= 0; // MUTANT: the RESOLVED location is never compared with the resolved root",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts"],
+		why: "PROMISE, in the port: \"MUST REFUSE, NEVER THROW, on a path that escapes the workspace\", and the adapter's first disclosed bound, which now states that containment here is a FILESYSTEM property. WHO RELIES: every step that writes a work product, and everything outside the workspace on the same volume. WHAT THE MUTATION DOES TO THEM: both remaining checks are properties of the path TEXT, and `escape/.env` is a tidy relative path under the root no matter what `escape` is \u2014 so a DIRECTORY JUNCTION (`mklink /J`, which needs neither administrator rights nor Developer Mode, driven unprivileged on this host) makes `readFile` return a file from OUTSIDE the workspace and `writeFile` overwrite it. \u26a0 The disclosure this replaced said \"symlinks are not resolved\", which understated its own precondition: the vector is not a symlink and costs nothing.",
+		source: "JAN-EXEC Phase 2 containment (breach B2) - the resolved-path limb of `locate`"
+	},
+	{
+		id: "P2-s-a-link-is-walked-and-reported-as-an-in-workspace-entry",
+		file: "apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts",
+		// THE INVENTORY HALF OF THE SAME BREACH, AND IT NEEDS ITS OWN ENTRY: `P2-r` guards what a caller may
+		// ADDRESS, this guards what `list()` may CLAIM. `stat` follows a junction; `lstat` is what sees one.
+		find: "\t\t\tconst info = await lstat(join(dir, name));\n\t\t\tif (info.isSymbolicLink()) continue;\n\t\t\tif (info.isDirectory()) await livePaths(join(dir, name), rel, out);\n\t\t\telse if (info.isFile()) out.push(rel);",
+		replace: "\t\t\tconst info = await stat(join(dir, name)); // MUTANT: the walk follows a junction out of the workspace\n\t\t\tif (info.isDirectory()) await livePaths(join(dir, name), rel, out);\n\t\t\telse out.push(rel);",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts"],
+		why: "PROMISE: `list` reports \"every path the workspace knows about\", and `WorkspaceEntry.byteSize` states what that path HELD. WHO RELIES: the retention record, which is only as honest as the inventory beside it, and any reader asking what an Undertaking produced. WHAT THE MUTATION DOES TO THEM: files that live OUTSIDE the workspace are reported as in-workspace entries with sizes, so the escape and its concealment are the same line \u2014 the shape `P2-l` exists for, arriving through a reparse point instead of through a `..`. Driven: `list()` reported `escape/.env` as an entry of a workspace that holds no such file.",
+		source: "JAN-EXEC Phase 2 containment (breach B2) - the inventory limb of `livePaths`"
+	},
+	{
+		id: "P2-t-a-write-the-filesystem-refused-is-reported-as-done",
+		file: "apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts",
+		// ⛔ RULE 5 AT ITS SHARPEST: NO DEFAULT THAT FABRICATES. The union exists so a caller cannot read `path`
+		// off a write that never happened, and this mutation makes the adapter itself do exactly that.
+		find: "\t\t\t\tconst code = (cause as NodeJS.ErrnoException | undefined)?.code;\n\t\t\t\treturn {\n\t\t\t\t\twritten: false,",
+		replace: "\t\t\t\tconst code = (cause as NodeJS.ErrnoException | undefined)?.code;\n\t\t\t\tif (code !== undefined)\n\t\t\t\t\treturn { written: true, path: at.rel, byteSize: Buffer.byteLength(contents, 'utf8') }; // MUTANT: a write the filesystem refused is reported as done\n\t\t\t\treturn {\n\t\t\t\t\twritten: false,",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts"],
+		why: "PROMISE, in the port: `WorkspaceWriteOutcome` is \"A UNION, SO A REFUSAL CANNOT BE READ AS A NARROWED WRITE ... a caller cannot read `path` off a write that never happened\", and `writeFile` \"MUST REFUSE, NEVER THROW\". WHO RELIES: every step that records what it produced, and every reader of that record. WHAT THE MUTATION DOES TO THEM: a write the filesystem REJECTED (`EISDIR` on an existing directory is the case driven here) reports `written: true` with a `byteSize` computed from the input rather than from anything on disk \u2014 the same fabrication an adversary produced by writing to `NUL`, where bun returned success for bytes that went to the null device. The record then names a path holding bytes that are not there.",
+		source: "JAN-EXEC Phase 2 containment (breach B3) - the honest-outcome limb of `writeFile`"
+	},
+	{
+		id: "P2-u-a-win32-device-name-is-a-workspace-location",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// THE PREDICATE IS WHERE THIS BELONGS: both implementations must honour it, and the in-memory default
+		// would otherwise ACCEPT a name the filesystem adapter cannot store.
+		find: "\t\tif (WIN32_DEVICE_STEM.test(part.replace(/\\.[\\s\\S]*$/, ''))) return undefined;",
+		replace: "\t\t// MUTANT: a Win32 device name is admitted as a workspace location",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE: the predicate returns a path a caller may WRITE TO, READ FROM and PURGE. WHO RELIES: `createFilesystemWorkspace`, which resolves the result against a real directory. WHAT THE MUTATION DOES TO THEM: `NUL` is admitted, and under bun \u2014 the runtime this repository's own suites run on \u2014 `writeFileSync(<dir>/NUL, \u2026)` returned normally while the bytes went to the null device: `existsSync` false, `readdir` empty, read-back ENOENT, and the adapter answering `{written: true, byteSize: 18}`. \u26a0 UNDER NODE THE SAME CALL CREATES A REAL FILE, because libuv reaches the filesystem through the long-path prefix that bypasses device translation \u2014 so the defect is invisible to half the runtimes this source runs on, and refusing the NAME is the only form that holds on both.",
+		source: "JAN-EXEC Phase 2 containment (breach B3) - the device limb of `containedWorkspacePath`"
+	},
+	{
+		id: "P2-v-an-alternate-data-stream-is-a-workspace-path",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// THE DRIVE-LETTER CHECK ONLY EVER SEES A COLON IN POSITION TWO, which is why this needs its own conjunct
+		// and its own entry: `P1-a` proves the absolute forms are refused and says nothing about this one.
+		find: "\tif (path.includes(':')) return undefined;",
+		replace: "\t// MUTANT: a colon further along the path reaches an NTFS alternate data stream",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE: the predicate returns the path a workspace is ADDRESSED by, and `list` must report every path the workspace knows about. WHO RELIES: the retention record, which rests on an inventory built from a directory walk. WHAT THE MUTATION DOES TO THEM: `report.md:stolen` is admitted and writes bytes into an NTFS ALTERNATE DATA STREAM \u2014 driven: the write succeeded, `readdir` showed only `report.md`, and `stat` reported the visible file's size alone. The inventory is then incomplete BY CONSTRUCTION, and no adapter written on `node:fs` can enumerate what is hiding there.",
+		source: "JAN-EXEC Phase 2 containment (breach B4) - the stream limb of `containedWorkspacePath`"
+	},
+	{
+		id: "P2-w-a-component-win32-rewrites-is-admitted",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// HALF THE RULE, WHICH IS THE PLAUSIBLE FORM OF THIS DEFECT: trailing SPACES are refused and trailing DOTS
+		// are admitted. Win32 strips both, so half a rule is no rule.
+		find: "\t\tif (part !== part.replace(/[. ]+$/, '')) return undefined;",
+		replace: "\t\tif (part !== part.replace(/[ ]+$/, '')) return undefined; // MUTANT: a trailing DOT is admitted, and Win32 strips it",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE: the predicate is \"the only thing standing between a model-supplied path and the host's filesystem\", and the host splices its result into a directory name. WHO RELIES: `resolveUndertakingSandbox`, whose whole guarantee is that an owner id becomes ONE path segment UNDER the root. WHAT THE MUTATION DOES TO THEM: `'...'` and `'UND-1.'` pass, and Win32 resolves them to the PARENT and to `UND-1` respectively \u2014 driven with a real child process, the first gave `cwd` = the ROOTS directory containing EVERY Undertaking's workspace and the second gave a DIFFERENT Undertaking's directory. `node:path` keeps the characters and the operating system strips them, so a string comparison sees distinct names where the filesystem sees one.",
+		source: "JAN-EXEC Phase 2 containment (breach B6) - the Win32-rewrite limb of `containedWorkspacePath`"
+	},
+	{
+		id: "P2-x-a-relative-durable-root-resolves-against-the-servers-own-directory",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		// A CONJUNCT THAT IS NEVER TRUE, so the refusal stays visibly present and fires for nothing - the same
+		// operator `P2-o` uses and for the same reason.
+		find: "\tif (!rootedIndependentlyOfTheProcess(root))",
+		replace: "\tif (!rootedIndependentlyOfTheProcess(root) && root.length < 0) // MUTANT: a relative root is resolved against process.cwd()",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE: \"the resolved working directory is the OWNER'S SUBDIRECTORY and NEVER the server's\" \u2014 the assertion this whole phase exists for. WHO RELIES: every execution step, and the repository the server runs from. WHAT THE MUTATION DOES TO THEM: `resolvePath(join(root, segment))` resolves a RELATIVE root against `process.cwd()`, so `JPWB_DEMO_DB=demo.sqlite` puts every Undertaking's workspace INSIDE THE SERVER'S OWN SOURCE TREE and `mkdirSync` CREATES it there \u2014 the exact defect this phase removes, reached through configuration rather than through an owner id. The suite held only because every case injected an absolute root under `tmpdir()`; nothing required the DERIVED one to be absolute.",
+		source: "JAN-EXEC Phase 2 containment (breach B7) - the rooted-root limb of `resolveUndertakingSandbox`"
+	},
+	{
+		id: "P2-y-the-owner-fingerprint-is-taken-over-a-case-folded-id",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		// THE TIDY-LOOKING FORM OF THE DEFECT: normalising the id before fingerprinting it. The fingerprint is
+		// still there, still derived, still per-owner - and no longer INJECTIVE under the filesystem's equality.
+		find: "ownerFingerprint(undertakingId)}`));",
+		replace: "ownerFingerprint(undertakingId.toLowerCase())}`)); // MUTANT: the fingerprint is case-folded, so two ids that differ only by case collapse to one directory",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE: \"two Undertakings get two directories\", and the isolation every other guarantee in this host rests on. WHO RELIES: every Undertaking on the workbench. WHAT THE MUTATION DOES TO THEM: `UND-ALPHA` and `und-alpha` fingerprint identically, so their directory names differ only by case and NTFS gives them ONE DIRECTORY \u2014 driven before the fingerprint existed: one wrote `src/index.ts`, the other read it back and overwrote it, while the suite's own distinctness assertion stayed GREEN because it compared the STRINGS. \u26a0 The pre-existing control cannot catch this: its two ids differ by more than case.",
+		source: "JAN-EXEC Phase 2 containment (breach B5) - the injectivity limb of `resolveUndertakingSandbox`"
+	},
+	{
+		id: "P2-z-the-durable-store-is-reached-by-a-process-that-never-declared-itself",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		// THE RECORD PLANE'S HALF OF `P2-e`, AND THE MUTATION IS THE OLD SOURCE VERBATIM. It needs its own entry
+		// because it is its own decision: `P2-e` governs the workspace plane and this one governs the database.
+		find: "const DB_PATH = SERVING ? process.env.JPWB_DEMO_DB : undefined;",
+		replace: "const DB_PATH = TEST_MODE ? undefined : process.env.JPWB_DEMO_DB; // MUTANT: every process that is not the Playwright harness gets a durable store",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-durable-store-declaration.test.ts"],
+		why: "PROMISE, in this const's own docblock: \"a durable store shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to prevent. So test mode is in-memory by construction, not by configuration.\" WHO RELIES: every spec in this repository, which is the population that predicate was written for. WHAT THE MUTATION DOES TO THEM: `TEST_MODE` keys on `RPH_DEMO_MODE === 'test'`, which ONLY the Playwright configs set \u2014 `vitest.config.ts` does not \u2014 so a vitest run with `JPWB_DEMO_DB` set is NOT test mode by that predicate. Driven: `vitest run --project app:rph-demo` produced a durable 2,719,744-byte `demo.sqlite` and reddened `undertaking-loader-object-type.test.ts`'s CONTROL. A second env check would have closed that runner and not the next one; the affirmative form needs no list of runners at all.",
+		source: "JAN-EXEC Phase 2 containment (breach B8) - the serving-declaration limb of `DB_PATH`"
 	}
 ];
