@@ -1159,13 +1159,21 @@
 			"unattributedMutants": 0
 		},
 		"packages/rph-ports/src/defaults/process-runner.ts": {
-			"consumedExports": [],
-			"guardedExports": [],
+			"consumedExports": [
+				"createRefusingProcessRunner"
+			],
+			"guardedExports": [
+				"createRefusingProcessRunner"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-ports/src/defaults/workspace.ts": {
-			"consumedExports": [],
-			"guardedExports": [],
+			"consumedExports": [
+				"createInMemoryWorkspace"
+			],
+			"guardedExports": [
+				"createInMemoryWorkspace"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-ports/src/ports/authentication.ts": {

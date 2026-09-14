@@ -20,7 +20,11 @@ import {
 import { executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { ToolInvocationResult } from './backing-tool.js';
-import type { ProducerSession } from '../execution/producer-session.js';
+import {
+	producerWorkingDirectory,
+	type ProducerSession,
+	type ProducerSessionContext
+} from '../execution/producer-session.js';
 import { createMaterializedInputRecorder, type PayloadHookHost } from '../agent/materialized-input.js';
 
 /**
@@ -74,15 +78,31 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
  *
  * ⛔ `thinkingLevel: 'off'` STILL. History is not chain-of-thought: it is the producer's record of its own
  * TURNS, which is what §9.7 says an account should rest on. `PER-12` is untouched by this change.
+ *
+ * ⭐⭐ JAN-EXEC PHASE 2 — IT RUNS IN THE UNDERTAKING'S WORKSPACE, AND IT USED TO RUN IN THIS REPOSITORY. Both
+ * `cwd` arguments below read `process.cwd()`, which for the SvelteKit server is its own source tree — so the
+ * executing model's notion of "here" was the workbench's own checkout. The opener now takes the Undertaking's
+ * sandbox and `producerWorkingDirectory` is the only thing that may answer the question; there is no fallback
+ * arm, so an unresolvable workspace REFUSES the session rather than quietly restoring the defect.
+ *
+ * ⚠ IT THROWS, MATCHING `resolveExecutingModel` DIRECTLY ABOVE, and for the same reason `REG-D-052` gives for
+ * the model: a producer identity — or here, a producer LOCATION — may not be a fiction. The caller records it
+ * as a failed step rather than letting it escape as a 500.
  */
-export async function openPiExecutionSession(): Promise<ProducerSession> {
+export async function openPiExecutionSession(
+	context: ProducerSessionContext
+): Promise<ProducerSession> {
+	const working = producerWorkingDirectory(context);
+	if (!working.resolved) throw new Error(working.refusedBecause);
+	const cwd = working.directoryPath;
+
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
-	const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
+	const settingsManager = SettingsManager.create(cwd, getAgentDir());
 	const model = resolveExecutingModel(modelRegistry);
 
 	const loader = new DefaultResourceLoader({
-		cwd: process.cwd(),
+		cwd,
 		agentDir: getAgentDir(),
 		settingsManager,
 		systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT

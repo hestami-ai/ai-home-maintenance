@@ -249,7 +249,80 @@ still explains the entry. ⛔ **Rule 7 applies: every exported value here lands 
 
 ---
 
-## 4. Phase 2 · The host lifecycle — and a `cwd` that currently points at the server
+## 4. Phase 2 · ⭐ LANDED 2026-09-14 — the host lifecycle, and the `cwd` that pointed at the server
+
+**WHAT LANDED.** `apps/rph-demo/src/lib/server/execution/workspace-host.ts` (the lifecycle),
+`filesystem-workspace.ts` (the durable adapter, `R3`: adapters in the demo), a widened
+`OpenProducerSession`, and the containment fix inside `openPiExecutionSession`. ⛔ **No real `ProcessRunner`** —
+the refusing default is WIRED and the seam is provably inert, because a real runner captures `stderr` and
+therefore reopens `REG-Q-066`, which rule 8 forbids answering later.
+
+⭐ **THE CONTAINMENT DEFECT IS CLOSED AT THE SIGNATURE, NOT AT THE CALL SITE.** `OpenProducerSession` now takes a
+`ProducerSessionContext` carrying the Undertaking's sandbox, and `producerWorkingDirectory` is the ONLY thing
+that may answer where a producer runs. **It has no fallback arm, and that absence is the guarantee** — every
+refusal has an obvious "reasonable" repair (use the server's directory) and that repair IS the defect. Both
+`process.cwd()` calls are gone from the execution plane.
+
+⭐ **THE ROOT IS DERIVED FROM `JPWB_DEMO_DB` RATHER THAN FROM A SECOND ENV KEY, AND THE REASON IS AN ORPHAN THE
+REPOSITORY HAS ALREADY MEASURED.** The roadmap said "one durable root from one env key"; taking that to mean a
+NEW key would let an operator configure a durable record plane whose deliverable evaporates at restart — exactly
+the inverse orphan `ArtifactStore.durability` exists to prevent (*"a permanent record names a `storageKey`
+whose store answer, after one restart, is byte-indistinguishable from a key that was never stored"*).
+`getArtifactStore()` already derives the content plane from the record plane's key; the workspace root derives
+the same way (`${DB_PATH}.workspaces/<undertakingId>`). One key configures all three planes or none.
+
+⭐ **`R8` IS CARRIED BY THREE DECLARATIONS, NOT ONE, AND TWO OF THEM ARE INVISIBLE TO BEHAVIOUR.**
+`ownerKind: 'UNDERTAKING'` and `purgeability: 'RETAINED_BY_PARTICIPATION'` change nothing a read can see — files
+are written, files are read — so each needed an assertion of its own. ⚠ **`P2-k` SURVIVED THE FIRST RUN**: the
+purgeability declaration was untested, and the only thing that exposed it was asking the workspace to DESTROY
+the product and requiring it to refuse. That is the instrument doing its job, recorded rather than quietly
+fixed.
+
+⚠ **THE FILESYSTEM ADAPTER NEEDED A TOMBSTONE RECORD, WHICH THE IN-MEMORY DEFAULT GETS FOR FREE.** `purge`
+promises *"Remove the BYTES and keep the ENTRY"*, and a path on a filesystem has only two states — present or
+absent — so neither truncating (which reads as an EMPTY FILE, a different fact) nor unlinking can carry "purged
+on schedule" as distinct from "never written" and from "lost". The entry therefore lives in a record beside the
+files, and that record is a RESERVED path: a step that could write it could rewrite the retention history of
+everything else in the workspace. ⭑ Its refusal is DISTINCT from the containment refusal, because a caller
+naming the record has not tried to escape and telling it that it did would be false.
+
+**PROOF — EVERY LIMB BY AN OBSERVED RED, 16 declared mutants, `bun run mutants P2-` → 17 of 17 KILLED (the
+seventeenth, `P2-branch-source-reported-as-dead-predecessor`, is pre-existing and merely shares the prefix).**
+
+| roadmap limb | mutants | victim |
+| --- | --- | --- |
+| the session runs in the Undertaking's directory, never the server's | `P2-a` | `server-directory-containment` |
+| an IN_MEMORY workspace is refused, and the two wirings differ | `P2-b`, `P2-c` | `producer-session` |
+| a FILESYSTEM declaration with no path refuses instead of inheriting | `P2-d` | `producer-session` |
+| test mode gets no durable root at all | `P2-e` | `workspace-host` |
+| the owner's SUBDIRECTORY, derived, and STABLE across requests | `P2-f`, `P2-g` | `workspace-host` |
+| an owner id may neither escape the root nor nest inside another | `P2-h`, `P2-i` | `workspace-host` |
+| `R8` as declarations: UNDERTAKING-owned, retained, both arms | `P2-j`, `P2-k`, `P2-p` | `workspace-host` |
+| a path escaping the workspace never reaches the disk | `P2-l` | `filesystem-workspace` |
+| the entry survives its purge; PER-8 read the right way round | `P2-m`, `P2-n` | `filesystem-workspace` |
+| the retention record is not writable by a step | `P2-o` | `filesystem-workspace` |
+
+⚠ **AND THE HARNESS TAUGHT THE SAME LESSON TWICE IN ONE ENTRY.** `P2-o` reported `NO_COMPILE` as `if (false &&
+…)` — the ledger header's own V-2c trap, dead code losing its narrowing — and then again as
+`&& at.rel === ''`, because TypeScript INFERS a type predicate for the `reserved` helper, so inside the branch
+the comparison is non-overlapping. A conjunct over `.length` is neither dead nor a literal comparison.
+
+⚠ **TWO SPECS WRITE OUTSIDE THEIR OWN TEMPORARY DIRECTORY WHEN A CONTAINMENT MUTANT IS APPLIED — WHICH IS WHAT
+PROVES THE GUARD, AND IT POISONED A LATER RUN.** `P2-l` genuinely creates `../escaped.txt`; with the workspace
+at the `mkdtemp` root that lands in the SYSTEM temp directory, which `afterEach` does not own. It survived into
+the next run and reddened an unrelated assertion in a sibling spec. Both specs now nest their subject one level
+inside a container they created, so every escape they provoke lands inside what they delete.
+
+**BASELINE:** `guards:export` regenerated with its own writer in this commit — **340 of 340 guarded, obligation
+0**, up from 338 because `createInMemoryWorkspace` and `createRefusingProcessRunner` became PRODUCTION-CONSUMED
+the moment the host wired them. Both already carried declared mutants (`P1-d`/`P1-e`, `P1-f`), which is exactly
+why Phase 1 declared them while the census still read `consumedExports: []`. `coverage:floor:check` is clean and
+was NOT regenerated: this phase added no file to `packages/`, so nothing it did moved that baseline, and
+tightening it here would attribute other work to this commit.
+
+---
+
+## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
 the executing model is **zero-argument** — `OpenProducerSession = () => Promise<ProducerSession>` — and
@@ -280,7 +353,8 @@ its own directory (seven fragments, not one product — `R8` violated), or a mod
 source tree.
 
 **PROOF:** a second step, in a new session with a new plan, reads a file the first step wrote — and a
-containment test proves the resolved `cwd` is the owner's subdirectory and never the server's.
+containment test proves the resolved `cwd` is the owner's subdirectory and never the server's. ⭐ **DELIVERED —
+see §4 for the mutants that carry each limb, and for the one that SURVIVED its first run.**
 
 ---
 

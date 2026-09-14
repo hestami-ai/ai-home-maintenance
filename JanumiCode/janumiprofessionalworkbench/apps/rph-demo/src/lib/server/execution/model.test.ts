@@ -5,6 +5,19 @@
 // A suite that cannot redden for a change is not evidence about that change.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deterministicExecutionPrint, getExecutionSession } from './model.js';
+import { createInMemoryWorkspace, createRefusingProcessRunner } from '@janumipwb/rph-ports';
+import type { ProducerSessionContext } from './producer-session.js';
+
+/** The sandbox an opener is handed. ⚠ IN_MEMORY + REFUSING is the hermetic pairing every spec runs under:
+ *  no spec gains a real filesystem or a real child process, which is why the defaults exist. */
+const SANDBOX: ProducerSessionContext = {
+	workspace: createInMemoryWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: 'und_model_test',
+		purgeability: 'RETAINED_BY_PARTICIPATION'
+	}),
+	runner: createRefusingProcessRunner()
+};
 
 const SAVED = process.env.JPWB_EXECUTOR;
 
@@ -99,7 +112,7 @@ describe('JAN-LIVEEXEC LE-01 — the executor no longer borrows the ASSURANCE sw
 		await inTestModeWith({ JPWB_EXECUTOR: undefined, JPWB_ASSESSOR: undefined }, async (m) => {
 			// ⚠ THE SEAM RETURNS AN OPENER NOW, so identity is asserted on the SESSION's behaviour rather than on
 			// the function object: a one-shot session declares `retainsHistory: false`.
-			expect((await m.getExecutionSession()()).retainsHistory).toBe(false);
+			expect((await m.getExecutionSession()(SANDBOX)).retainsHistory).toBe(false);
 		});
 	});
 
@@ -119,7 +132,7 @@ describe('JAN-LIVEEXEC LE-01 — the executor no longer borrows the ASSURANCE sw
 		await inTestModeWith({ JPWB_EXECUTOR: undefined, JPWB_ASSESSOR: 'agy' }, async (m) => {
 			// ⚠ THE SEAM RETURNS AN OPENER NOW, so identity is asserted on the SESSION's behaviour rather than on
 			// the function object: a one-shot session declares `retainsHistory: false`.
-			expect((await m.getExecutionSession()()).retainsHistory).toBe(false);
+			expect((await m.getExecutionSession()(SANDBOX)).retainsHistory).toBe(false);
 		});
 	});
 });

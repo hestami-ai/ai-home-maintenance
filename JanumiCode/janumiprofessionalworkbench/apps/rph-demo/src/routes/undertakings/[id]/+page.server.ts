@@ -68,6 +68,7 @@ import { reasoningReviewCriteria } from '$lib/server/floor';
 import { getExecutionSession } from '$lib/server/execution/model';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
+import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
 import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
 import type {
 	ActorReference,
@@ -1074,7 +1075,29 @@ export const actions: Actions = {
 						.find((b) => b.id === id)?.grantedCapabilities ?? []) as { capability?: unknown }[]
 				).map((c) => String(c.capability ?? ''));
 
-			const producer = await getExecutionSession()();
+			// ── ⭐⭐ JAN-EXEC PHASE 2 — THE PRODUCER IS OPENED IN THE UNDERTAKING'S WORKSPACE ────────
+			//
+			// ⛔ UNTIL THIS LINE IT WAS OPENED IN THE SERVER'S. `openPiExecutionSession` hardcoded `process.cwd()`
+			// twice because the opener was zero-argument and had nowhere else to get a directory — so an executing
+			// model's notion of "here" was the SvelteKit server's own source tree, i.e. this repository.
+			//
+			// ⭑ THE OWNER IS THE **UNDERTAKING**, READ OFF THE PWU (`R8`). This action takes no `params`, and it
+			// does not need to: `undertakingId` is on the flattened PWU, which is also the field `listPwus` keys on —
+			// so the workspace belongs to the same object the work unit does, and a second step in a new session lands
+			// in the same directory as the first.
+			let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
+			try {
+				producer = await getExecutionSession()(
+					resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string))
+				);
+			} catch (e) {
+				// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
+				// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
+				// is a failure with a reason, not an absence.
+				const why = e instanceof Error ? e.message : String(e);
+				runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+				return fail(400, { error: `The model invocation did not run: ${why}` });
+			}
 			try {
 				for (let attempt = 1; ; attempt++) {
 					const tryOutcome = await runModelInvocationStep({
