@@ -58,6 +58,7 @@ import {
 	canAdvanceWorkLifecycle,
 	checkDeclaredSource,
 	checkPwuShapeReadiness,
+	declaredAssurancePolicyIds,
 	declaredRecoveryTargets,
 	ownerOfArrow,
 	planEvidencesExecutionSuccess,
@@ -79,6 +80,12 @@ import {
 	type HandlerContext
 } from './kit.js';
 import { evaluatePrecondition, predicate } from './command-precondition.js';
+import { latestAssessmentByPolicy } from './assessment-index.js';
+import {
+	declaredPolicyVerdicts,
+	unsupportedSatisfaction,
+	unsupportedSatisfactionMessage
+} from './declared-assurance.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
@@ -1377,6 +1384,66 @@ function rejectUnbackedDisposition(
 }
 
 /**
+ * A DECLARED POLICY BINDS — the QUANTIFIER `rejectUnbackedDisposition` above does not have.
+ *
+ * That guard asks whether ONE cited assessment supports the asserted disposition. This one asks whether EVERY
+ * policy the PWU ITSELF declares supports it, by folding their own latest verdicts through the ratified §28.2
+ * kernel. The two are complementary and BOTH run: the first refuses a disposition with nothing behind it, the
+ * second refuses one whose backing was SELECTED — the controller citing the satisfied assessment and leaving the
+ * rejecting one, under a policy of its own declaring, unmentioned.
+ *
+ * Closes RPH-PWU-007 (work lifecycle) and RPH-ASR-012 (assurance axis), which the enforcement register carried as
+ * one absence recorded on two axes. See `declared-assurance.ts` for the rule, the three limbs it deliberately
+ * does NOT take, and why each belongs to a different row.
+ *
+ * ⚠ IT FIRES ON ARRIVAL, ON EITHER AXIS, AND THAT IS NOT BELT-AND-BRACES. Keying on the assurance axis alone
+ * would leave a reordering open: reach `assuranceState = SATISFIED` legitimately, have a declared policy
+ * re-assessed REJECTED, then move `workLifecycleState -> SATISFIED` in a command where the assurance axis does
+ * not change — and every check above short-circuits on `p.assuranceState === currentAssuranceState`. Keying on
+ * arrival at SATISFACTION on EITHER axis closes that, and closes nothing else: a PWU already at both keeps moving
+ * its other axes freely, so this is not a standing veto over a satisfied PWU.
+ */
+function rejectUnsupportedDeclaredSatisfaction(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	current: PwuAxes
+): CommandResult | undefined {
+	const arrivingOnAssurance = p.assuranceState !== current.assuranceState;
+	// THE WORK AXIS HAS ITS OWN TWO SATISFACTION STATES, and they are spelled here rather than imported because
+	// they are `WorkLifecycleState` values — a different vocabulary from the assurance axis's, which happens to
+	// share two spellings. `WORK_LIFECYCLE_CROSS_AXIS_GUARDS` (rph-domain/pwuGuards.ts) is the list they come from:
+	// UNDER_ASSURANCE -> SATISFIED and UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED are the arrivals it gates.
+	const arrivingOnWork =
+		(p.newState === 'SATISFIED' || p.newState === 'CONDITIONALLY_SATISFIED') &&
+		p.newState !== current.workLifecycleState;
+	if (!arrivingOnAssurance && !arrivingOnWork) return undefined;
+	const pwu = ctx.store.loadObject(id)?.state as
+		| { assurancePolicyIds?: string[]; pwuTypeId?: string }
+		| undefined;
+	const pwuType = pwu?.pwuTypeId
+		? (ctx.store.loadObject(pwu.pwuTypeId)?.state as
+				| { requiredAssurancePolicyIds?: string[] }
+				| undefined)
+		: undefined;
+	const declared = declaredAssurancePolicyIds(pwu, pwuType);
+	if (declared.length === 0) return undefined;
+	// ⭑ THE VERDICT INDEX IS PASSED LAZILY. It is an event-log walk and the rule governs two of eleven assurance
+	// values; `unsupportedSatisfaction` short-circuits on that test before calling this. See its docblock.
+	const unsupported = unsupportedSatisfaction(p.assuranceState, () =>
+		declaredPolicyVerdicts(declared, latestAssessmentByPolicy(ctx, id))
+	);
+	if (!unsupported) return undefined;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		unsupportedSatisfactionMessage(id, p.assuranceState, unsupported),
+		[id]
+	);
+}
+
+/**
  * ⚠ `rejectUnbackedBaselining` LIVED HERE AND HAS MOVED (JAN-PWUWP W-4.5) — relocated, not retired.
  *
  * Its predicate is `baselineBacksPwu` above and its refusal is inside `baselinePwu`. The DESIGN said this
@@ -1681,6 +1748,7 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// being asked for a decision the setter should never have been adjudicating.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
+		rejectUnsupportedDeclaredSatisfaction(ctx, command, id, p, current) ??
 		rejectUnauthorizedWaiver(ctx, command, id, p, current.assuranceState, loaded.semanticVersion) ??
 		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
 	if (unearned) return unearned;

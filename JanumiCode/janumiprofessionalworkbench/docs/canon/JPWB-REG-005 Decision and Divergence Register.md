@@ -35545,3 +35545,89 @@ survival (it classified it shape B), so the label overstates. The agent used the
 the mismatch rather than quietly choosing another value. ⭑ **The true count: of 85 `A` claims, exactly ONE
 (`beginRecomposition`) was wrong** — so my suspicion that the 85/87 uniformity was a biased brief was itself
 mostly wrong, and the run is what settled it in both directions.
+### REG-F-399 — `RPH-ASR-012`'s disclosure probe never arranged the word the rule turns on: five "REQUIRED" policies the subject declared nowhere
+
+- **Date:** 2026-09-14 · **Type:** FINDING · **Class:** INSTRUMENT — ⭑ **an OBSERVED_ADMISSION that observed a
+  real admission of something weaker than its row claimed** · **Status:** ✅ **CLOSED** — the row is now
+  `ENFORCED` and its probe, rewritten, declares the policies on the subject.
+
+**WHAT THE ROW SAID.** `RPH-ASR-012` (JPWB-DOC-003 §7, *"Aggregate assurance preserves the strictest unresolved
+required disposition"*) disclosed: *"with five **required** policies, four SATISFIED and one REJECTED, asserting
+the aggregate SATISFIED while citing the four satisfied assessments is accepted"*, and its own carriage note
+named the load-bearing word: *"'required' is the word that makes four-satisfied-one-rejected a rejection rather
+than a majority."*
+
+**WHAT THE PROBE ACTUALLY DID.** `disclosure-observed.test.ts` created two policies, requested and completed an
+assessment over `PARENT` under each, and **never put either id in `PARENT.assurancePolicyIds`** — it reused the
+file's shared fixture, which proposes every PWU with `assurancePolicyIds: []`. Under this engine's own
+determination — `selectGoverningPolicies`, DECLARED ∩ DETERMINED — **a policy a subject does not declare does not
+govern it**, so no part of the arrangement made either policy *required* of `PARENT`. The two were merely
+*assessed against* it.
+
+**THE SEARCH BEHIND THAT SENTENCE, because it is an absence claim (CON-000 B3 / P-3).** Corpus: the probe's own
+`run()` body and the `proposePwu` fixture it calls, both in
+`packages/rph-application/src/handlers/disclosure-observed.test.ts`. `grep -n "assurancePolicyIds"` over that
+file **at the commit before the wiring** returns **8 hits**, and the breakdown is the finding: **five are the
+literal `assurancePolicyIds: []`** (`:210` the shared `proposePwu` fixture, plus `:807`, `:1040`, `:1172`,
+`:1899` — four bespoke PWU builders inside other probes), **two are `RPH-PWU-007`'s** (`:1933` its `arrangement`
+prose and `:1963` `proposePwu(PWU7, { assurancePolicyIds: [POL_REJ], … })`, the only non-empty declaration in the
+file), and **one is a comment**. `RPH-ASR-012`'s probe contains **none** — its subject is `PARENT`, built by the
+`:210` fixture, which declares `[]`.
+
+⚠ **THE FIRST DRAFT OF THIS PARAGRAPH SAID "2 hits" AND WAS WRONG** — it stated the two hits that mattered as
+though they were the whole population, which is the same error as the finding it documents, one level up. The
+grep was re-run before the number was written down. ⭑ **POSITIVE CONTROL, and a DRIVEN one rather than a textual
+one:** the same grep shows `RPH-PWU-007`'s probe DOES declare its policy, and the wiring commit reddened that
+probe while leaving `RPH-ASR-012`'s GREEN. The instrument that reported the absence reported a presence for the
+sibling in the same pass, so the zero is not an artifact of the search.
+
+**⚠ THE ADMISSION IT OBSERVED WAS REAL.** The engine did accept the aggregate. The defect is not a false green;
+it is a **narrower green read as a wider one** — the same shape as `RPH-PWU-004`'s over-broad `canonAnchor`
+(three requirements quoted, one enforced), arriving from the instrument side instead of the register side. A
+probe whose arrangement omits the quantifier still refuses/admits *something*, and nothing downstream can tell
+that the something was not the rule.
+
+**HOW IT WAS FOUND, AND IT WAS NOT BY READING.** `JAN-PWU007` wired the missing quantifier
+(`rejectUnsupportedDeclaredSatisfaction`) and ran the suite. `RPH-PWU-007`'s disclosure probe went **RED** on the
+same commit, exactly as designed — *"the engine REFUSED what this row discloses as unenforced … Re-disposition it
+as ENFORCED"*. `RPH-ASR-012`'s probe **stayed GREEN**. Two rows the register itself called *"one underlying
+absence"*, one guard, and only one of them moved. Chasing that asymmetry is what read the fixture. ⭑ **A
+disagreement between two rows that describe the same absence is a measurement, and it was worth more than either
+row's prose.**
+
+**⛔ AND THE OBVIOUS REPAIR WAS THE WRONG ONE.** Declaring the policies and keeping the
+four-satisfied-**one-REJECTED** arrangement would have made the probe faithful and made it a **duplicate**:
+that arrangement is equally an instance of `RPH-PWU-007` (*"any rejected mandatory assessment blocks
+satisfaction"*), both are refused by one guard with one message, and two rows greened by one refusal is precisely
+what `duplicateRefusalMarkers` exists to catch. The enforced arrangement is therefore **four SATISFIED and one
+CONDITIONALLY_SATISFIED, with nothing rejected anywhere** — §28.2's rung 5, which `RPH-PWU-007`'s own words
+cannot reach and which only the strictest-unresolved FOLD finds short of satisfaction. The two markers now pin
+the COMPOSED disposition (`REJECTED` / `CONDITIONALLY_SATISFIED`) rather than the shared opening clause, and a
+mutant proves the separation: hard-coding `REJECTED` into the message leaves `RPH-PWU-007`'s probe GREEN and
+makes `RPH-ASR-012`'s report **MASKED** — the right code from a message that no longer discriminates.
+
+**THE GENERAL FORM — OWED, NOT CLOSED HERE, AND THE SEARCH FOR IT IS STATED.** The claim is: *no gate compares
+an `OBSERVED_ADMISSION` row's `arrangement` against what its probe actually builds, or against the row's own
+`why`.* **SEARCHED, three corpora, 2026-09-14:**
+
+1. `packages/rph-domain/src/enforcement-register.test.ts` — the register's own gate file. Every assertion that
+   touches an `OBSERVED_ADMISSION` row is in one `it` block (`:488-501`) and there are exactly **three**, all
+   LENGTH checks: `whyNoPredicate.length > 80`, `arrangement.length > 40`, `control.length > 40`. **No content
+   check of any kind.**
+2. `packages/rph-application/src/handlers/disclosure-observed.test.ts` — the behavioural instrument. Three `it`
+   blocks: TOTALITY (every disclosed row has a probe; no row without the guard is probed), the PER-ROW
+   observation (`admitted.status === 'ACCEPTED'`, `control.status === expectedControl`), and DISTINCTNESS
+   (`new Set(arrangements).size === arrangements.length`) — and that last one reads **`PROBES[id].arrangement`,
+   the probe's own label**, never the REGISTER row's. So even the distinctness check cannot notice a probe whose
+   label and whose dispatches disagree.
+3. `grep -rn "guard.arrangement" --include=*.ts packages verif scripts` — **1 hit outside the two files above**,
+   `verif/invariant-verdict-census.test.ts:420`, and it is **prose inside a comment**, not an assertion.
+
+⭑ **POSITIVE CONTROL:** the same grep for `duplicateRefusalMarkers` — the ENFORCED arm's content-level gate —
+returns **7 hits** across the same trees, including its definition (`enforcement-register.ts:4162`) and its live
+call (`enforcement-register.test.ts:392`). The search finds a content-level gate where one exists; it finds none
+for the disclosed arm. ⚠ And the asymmetry has a cause worth stating: an ENFORCED row's `refusalMarker` is
+matched against a **live refusal message**, so it cannot drift from behaviour without reddening; a DISCLOSED
+row's `arrangement` is prose compared against **nothing**. That is a second instance of the family this register
+keeps recording — a gate that checks the citation and not the claim — and it should be taken up as its own
+increment rather than asserted closed by this one.

@@ -20,6 +20,7 @@ import { evaluateApplicability } from '@janumipwb/rph-assurance';
 import {
 	applicabilityPermitsAssessment,
 	applicabilitySubjectFrom,
+	declaredAssurancePolicyIds,
 	policyApplicability
 } from '@janumipwb/rph-domain';
 import type { EngineHandle } from './engine.js';
@@ -38,13 +39,16 @@ export function selectGoverningPolicies(handle: EngineHandle, pwuId: string): Go
 	const pwu = handle.loadObject(pwuId)?.state as
 		| { pwuKind?: string; pwuTypeId?: string; assurancePolicyIds?: string[]; tags?: string[] }
 		| undefined;
-	const viaType = pwu?.pwuTypeId
-		? ((
-				handle.loadObject(pwu.pwuTypeId)?.state as
-					{ requiredAssurancePolicyIds?: string[] } | undefined
-			)?.requiredAssurancePolicyIds ?? [])
-		: [];
-	const declared = [...new Set([...(pwu?.assurancePolicyIds ?? []), ...viaType])];
+	// ⭑ THE DECLARED JOIN IS THE KERNEL'S, NOT A LOCAL COPY. It used to be spelled out here; the command-layer
+	// guard that refuses an unsupported satisfaction (rph-application/handlers/declared-assurance.ts) needs the
+	// SAME set, and two spellings of "which policies does this subject declare" is the drift that would let the
+	// drive and the gate disagree about what a PWU is required to satisfy.
+	const pwuType = pwu?.pwuTypeId
+		? (handle.loadObject(pwu.pwuTypeId)?.state as
+				| { requiredAssurancePolicyIds?: string[] }
+				| undefined)
+		: undefined;
+	const declared = declaredAssurancePolicyIds(pwu, pwuType);
 	const excluded: Array<{ policyId: string; reason: string }> = [];
 	const selected: string[] = [];
 

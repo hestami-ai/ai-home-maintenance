@@ -15,6 +15,7 @@
 // only contracts/domain/ports, so the edge is acyclic). The edge is taken (see assurance.ts), so the copy is gone.
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { ExecutionProvenance } from '@janumipwb/rph-contracts';
+import { latestAssessmentByPolicy } from './assessment-index.js';
 import type { HandlerContext } from './kit.js';
 
 export const FLOOR_POLICY_IDS_REQUIRED = [
@@ -209,46 +210,15 @@ export function unassessableAiContentBlock(input: FloorSubjectAdmissibility): st
 	return 'AI-produced content with no assessable subject';
 }
 
-interface FloorRecord {
-	readonly disposition: string;
-	readonly version: number | undefined;
-	readonly at: string;
-	/** The assessment's own id — the key its finding-type Observations link back to via `assessmentId`. */
-	readonly assessmentId: string;
-}
-
-/** Latest recorded assessment (state + the subject semanticVersion it was recorded against) per floor policy for
- *  `subjectId`, by updatedAt (ties: last seen). */
-function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<string, FloorRecord> {
-	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_ASSESSMENT') ids.add(e.aggregateId);
-	const latest = new Map<string, FloorRecord>();
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as
-			| {
-					assurancePolicyId?: string;
-					subjectObjectIds?: string[];
-					assessmentState?: string;
-					updatedAt?: string;
-					subjectSemanticVersions?: Record<string, number>;
-			  }
-			| undefined;
-		if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId))
-			continue;
-		const policyId = String(s.assurancePolicyId);
-		const at = String(s.updatedAt ?? '');
-		const prev = latest.get(policyId);
-		if (!prev || at >= prev.at)
-			latest.set(policyId, {
-				disposition: String(s.assessmentState),
-				version: s.subjectSemanticVersions?.[subjectId],
-				at,
-				assessmentId: id
-			});
-	}
-	return latest;
-}
+/**
+ * ⚠ `latestFloorDispositions` LIVED HERE AND HAS MOVED (JAN-PWU007) — generalised, not retired.
+ *
+ * It is now `latestAssessmentByPolicy` in `assessment-index.ts`, because nothing about the walk was
+ * floor-specific: it answers "what is the most recent assessment recorded under each policy for this subject",
+ * and the declared-policy satisfaction guard has to ask exactly that. The record's fields are renamed to say what
+ * they hold — `assessmentState` rather than `disposition`, because before completion the field carries a §30
+ * LIFECYCLE state and calling that a disposition is how a gate comes to read ASSESSING as a verdict.
+ */
 
 /**
  * ⚠ THE DISCHARGE APPARATUS WAS DELETED HERE (2026-08-20, REG-F-202 — sponsor ruling on ASR-3).
@@ -307,14 +277,15 @@ export function floorGateBlock(
 	subjectId: string,
 	opts: { readonly aiProduced: boolean; readonly subjectVersion?: number; readonly now: string }
 ): FloorBlock[] | null {
-	const latest = latestFloorDispositions(ctx, subjectId);
+	const latest = latestAssessmentByPolicy(ctx, subjectId);
 	if (!opts.aiProduced && latest.size === 0) return null;
 	const blocking = FLOOR_POLICY_IDS_REQUIRED.map((policyId) => {
 		const rec = latest.get(policyId);
-		const versionOk = opts.subjectVersion === undefined || rec?.version === opts.subjectVersion;
+		const versionOk =
+			opts.subjectVersion === undefined || rec?.subjectSemanticVersion === opts.subjectVersion;
 		return {
 			policyId,
-			disposition: rec && versionOk ? rec.disposition : 'MISSING',
+			disposition: rec && versionOk ? rec.assessmentState : 'MISSING',
 			assessmentId: rec && versionOk ? rec.assessmentId : undefined
 		};
 	})
