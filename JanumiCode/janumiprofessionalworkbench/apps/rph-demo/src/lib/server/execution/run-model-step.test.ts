@@ -522,3 +522,103 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 		expect((await runModelInvocationStep(input)).ran).toBe(true);
 	});
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+describe('JAN-EXEC P0 — the exchange record must not disclose an absence the STEP manufactured', () => {
+	// ⛔ SKIPPED, BLOCKED ON A RULING — NOT ON EFFORT, AND NOT BECAUSE IT IS WRONG.
+	//
+	// This test PASSES the moment `run-model-step.ts` hands `captureTry` the true raw reply instead of the
+	// already-reduced `answer`. That change was built and proved both ways (26 passed with it, 1 failed | 25
+	// passed without it) — and then WITHDRAWN, because it reddens a different ratified invariant in e2e:
+	//
+	//     Error: the artifact and the exchange must name ONE stored object
+	//       expected tnt-local/RETAINED_BY_PARTICIPATION/4ece133d…  (answerSpanRef)
+	//       received tnt-local/RETAINED_BY_PARTICIPATION/8044c907…  (the ARTIFACT)
+	//
+	// With the raw reply, `splitAnswerSpan` locates the JSON ENVELOPE, so `answerSpanRef` names the envelope
+	// while the artifact names `envelope.workProduct`. Different bytes, different content hash, two objects where
+	// `REG-F-345` requires one — *"a reader cannot tell which the assessment rested on"*.
+	//
+	// ⭐ TWO RATIFIED OBLIGATIONS PULL APART AND THE DECIDING QUESTION IS A RULING: for an execution step, is
+	// E-2's ANSWER HALF the WORK PRODUCT or the harness ENVELOPE that carries it? The step's own comment says the
+	// envelope is *"unwrapped and then forgotten"*, but the envelope also carries `rationale`, so retaining it
+	// whole classifies reasoning as participating (PER-8, permanent) when PER-12 wants it purgeable.
+	//
+	// ⚠ IT IS KEPT RATHER THAN DELETED because the defect it pins is real and currently LIVE: the record
+	// discloses *"No volunteered reasoning arrived with this answer … an observed absence, not an unretained
+	// presence"* for a reply that carried some. Deleting the test would delete the only statement of that.
+	// See `ROADMAP-undertaking-execution-sandbox.md` §2.
+	it.skip('⛔ volunteered reasoning that ARRIVED must be separated at retention, never recorded as absent', async () => {
+		// ⭑⭑ THE DEFECT THIS PINS IS IN THE RECORD PLANE, NOT IN A BYTE COUNT. `captureTry` already performs the
+		// lawful Guide §9.7 separation — answer span RETAINED_BY_PARTICIPATION, volunteered reasoning
+		// PURGEABLE_AT_EXPIRY, the mixed blob deliberately NOT stored, and `omittedRegions` carrying the byte
+		// offset so the two reassemble losslessly. It never runs for an execution step, because this step hands
+		// it a value from which the reasoning was ALREADY stripped upstream (`answer = returned.answerText`) and
+		// which has ALSO been envelope-split.
+		//
+		// ⛔ SO THE RECORD TAKES THE "nothing to separate" BRANCH AND ASSERTS TWO FALSE THINGS: that the whole
+		// output IS the answer, and — in `volunteeredReasoningRef`'s own words — that this is *"an observed
+		// absence, not an unretained presence"*. The reasoning demonstrably arrived. A record that manufactures
+		// the absence it then discloses is the shape this repository's register keeps catching.
+		const REASONING = 'First I considered the southern leg, then rejected it.';
+		// ⚠ THE ANSWER MUST BE LOCATABLE OR THE SPLIT IS BLOCKED, AND A BLOCKED SPLIT DEMONSTRATES NOTHING.
+		// `splitAnswerSpan` locates a JSON object (optionally fenced); undelimited prose yields `located: false`
+		// and every ref is refused — the behaviour this suite already pins at "an UNDELIMITED prose answer is NOT
+		// retained". A fixture built from prose would redden this test forever, for the wrong reason.
+		const ENVELOPE = `{"workProduct":"${ANSWER}","rationale":"Both legs were weighed."}`;
+		const { input, dispatched } = harness({
+			session: oneShotSession(async () => ({
+				answerText: ENVELOPE,
+				volunteeredReasoning: REASONING,
+				rawOutput: REASONING + ENVELOPE,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			}))
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+
+		const rec = dispatched.at(-1);
+		expect(rec, 'the try must be recorded at all').toBeTruthy();
+
+		expect(
+			rec!.volunteeredReasoningRef.status,
+			'reasoning ARRIVED, so it must be retained under its own PURGEABLE_AT_EXPIRY class — not disclosed as absent'
+		).toBe('STORED');
+		expect(rec!.volunteeredReasoningRef.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+
+		expect(
+			rec!.rawOutputBeforeCoercionRef.status,
+			'the blob is MIXED, so storing it whole would classify reasoning as participating (PER-8, permanent) when PER-12 requires it purgeable'
+		).toBe('PENDING_CONTENT_PLANE');
+
+		expect(
+			rec!.omittedRegions.length,
+			'REG-D-057: the split must DECLARE the omission it performs, with enough structure to undo it'
+		).toBeGreaterThan(0);
+	});
+
+	it('⭑ CONTROL — the REVIEWER still receives no reasoning, so the fix is not "record everything, leak everything"', async () => {
+		// Without this, passing the whole blob straight through as the answer would satisfy the test above while
+		// manufacturing the ASR-13 violation TS-05 exists to prevent. The two must hold together.
+		const REASONING = 'First I considered the southern leg, then rejected it.';
+		const ENVELOPE = `{"workProduct":"${ANSWER}","rationale":"Both legs were weighed."}`;
+		const { input, store } = harness({
+			session: oneShotSession(async () => ({
+				answerText: ENVELOPE,
+				volunteeredReasoning: REASONING,
+				rawOutput: REASONING + ENVELOPE,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			}))
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		expect(out.answer).toBe(ANSWER);
+		expect(out.answer).not.toContain(REASONING);
+		const stored = await store.get(out.storageKey);
+		expect(stored, 'the retained work product IS the answer').toContain(ANSWER);
+		expect(stored, 'and carries none of the interior').not.toContain(REASONING);
+	});
+});

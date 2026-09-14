@@ -424,7 +424,27 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// reddened on an untracked working draft that no commit had ever seen — i.e. it caught an addition
 			// during the drafting of the very programme that is arguing about assurance floors. A pin is gate
 			// material when someone reads it; this one keeps being read because it keeps being right.
-		).toBe(41);
+			//
+			// 41 -> 42 (2026-09-14): `ROADMAP-undertaking-execution-sandbox.md` (`JAN-EXEC`). ⭑ THE SUBSUMPTION
+			// QUESTION WAS ASKED OF FIVE CANDIDATES BEFORE THIS NUMBER MOVED, because four of them are execution
+			// roadmaps and the honest default was that one should absorb it.
+			//   · `JAN-EXECGOV` (execution governance layer) is the closest and the answer is COMPLEMENT, not
+			//     duplicate: it AUTHORIZES what a step may do (`RUNTIME_BINDING`, `STA-8`, the capability grant);
+			//     this AUTHORISES NOTHING and instead gives the step HANDS (a workspace port, a process runner,
+			//     the evidence join). Its `EG-01`-`EG-05` are landed, so folding new scope into a finished
+			//     roadmap would hide pending work inside a completed one - the failure this pin exists to catch,
+			//     wearing the opposite costume.
+			//   · `live-execution-lane`, `model-invocation-step`, `execution-feedback-loop` and
+			//     `backing-agent-tool-suite` brought the live lane into being - Pi produces, Devin reviews. NONE
+			//     gives the producer filesystem or process access. MEASURED, not assumed: the execution session
+			//     is opened `noTools: 'builtin', customTools: []`, and a live probe asking it to write a file and
+			//     run a command returned `NO_TOOLS_AVAILABLE` with the file absent from disk.
+			// ⭐ AND ONE THING THE CHECK ITSELF PRODUCED, WHICH IS THE ARGUMENT FOR KEEPING IT: asking the question
+			// found that `JAN-EXECGOV`'s `G-1` grant - *"one capability per step type that a model invocation
+			// actually needs, named in the vocabulary with its note"* - ALREADY COVERS naming the process-execution
+			// capability. The new roadmap had it filed as ratification OWED. It is instead an application of a
+			// grant already made, and only this pin's question surfaced that.
+		).toBe(42);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

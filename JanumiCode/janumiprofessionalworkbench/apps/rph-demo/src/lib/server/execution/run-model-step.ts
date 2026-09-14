@@ -231,6 +231,19 @@ export async function runModelInvocationStep(
 	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
 	let answer: string;
+	// ⛔ E-2 WHOLE IS NOT RECORDED HERE, AND THAT IS A BLOCKED OBLIGATION RATHER THAN AN OVERSIGHT — SEE
+	// `ROADMAP-undertaking-execution-sandbox.md` §2. `captureTry` derives BOTH the answer span and the
+	// volunteered-reasoning span from the single `rawOutput` it is given, so passing the true raw reply is what
+	// would let Guide §9.7's lawful separation run. Passing the already-reduced `answer` means it never does, and
+	// the record then discloses *"No volunteered reasoning arrived"* for a reply that carried some.
+	//
+	// ⚠ THE FIX WAS BUILT, PROVED, AND WITHDRAWN, because it breaks a different ratified invariant. With the raw
+	// reply, `splitAnswerSpan` locates the JSON ENVELOPE, so `answerSpanRef` names the envelope while the ARTIFACT
+	// names `envelope.workProduct` — different bytes, different content hash, and `REG-F-345`'s *"the artifact and
+	// the exchange must name ONE stored object"* reddens in e2e. Two ratified obligations pull apart and the
+	// deciding question is a RULING: for an execution step, is E-2's answer half the WORK PRODUCT or the harness
+	// ENVELOPE that carries it? The envelope also carries `rationale`, so retaining it whole classifies reasoning
+	// as participating.
 	// ⭑ SET ONLY WHEN THE TOOL REPORTED ITS OWN IDENTITY. `undefined` here is not "no producer" — it is "the tool
 	// told us only its answer", which is a different fact and grades the evidence weaker rather than absent.
 	let produced: ToolInvocationResult | undefined;
@@ -302,6 +315,8 @@ export async function runModelInvocationStep(
 		// while the model saw a CONVERSATION. `PER-9`: a template *"never substitutes for"* the record.
 		// ⚠ Falls back to the turn for one-shot tools, whose turn IS very nearly the whole input.
 		prompt: produced?.materializedInput ?? turnText,
+		// ⚠ POST-COERCION, UNDER A FIELD WHOSE PROMISE IS *BEFORE* COERCION. Disclosed, not hidden: see the block
+		// above and `ROADMAP-undertaking-execution-sandbox.md` §2. Blocked on a ruling, not on effort.
 		rawOutput: answer,
 		disposition: 'accepted',
 		attemptOrdinal: 1,
