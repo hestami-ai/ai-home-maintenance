@@ -87,7 +87,8 @@ export function getExecutionSession(): OpenProducerSession {
 		// ⚠ NO UNIT TEST COULD HAVE CAUGHT IT. Every test of `runModelInvocationStep` INJECTS its own `print`
 		// returning a rich result, so the one adapter that narrows it was never on any tested path. The LIVE
 		// lane found it on its second run — which is the argument for the lane, in one line.
-		return async () => (await import('../tools/pi-executor.js')).openPiExecutionSession();
+		return async (tools) =>
+			(await import('../tools/pi-executor.js')).openPiExecutionSession({ ...(tools ? { tools } : {}) });
 	// ⚠ `agy --print` is a fresh process per call: no memory, and the session says so.
 	if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));
 	throw new Error(

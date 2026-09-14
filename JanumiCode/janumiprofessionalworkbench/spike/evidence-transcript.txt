@@ -1,0 +1,66 @@
+
+================================================================================================
+A — HUMAN-produced step naming a TEST_RESULT (the shape already proven in the suite).
+================================================================================================
+ProposeExecutionPlan(stepType=TOOL_INVOCATION) -> ACCEPTED 
+StartExecutionStep -> ACCEPTED
+ProposeEvidence(TEST_RESULT) -> ACCEPTED 
+CompleteExecutionStep(stepType=TOOL_INVOCATION, aiProvenance=false, proposedEvidenceIds=[EVD])
+   -> status = ACCEPTED
+   -> step state = SUCCEEDED
+
+================================================================================================
+B — AI-PRODUCED step naming the SAME TEST_RESULT. This is what a tool-executing step is.
+================================================================================================
+ProposeExecutionPlan(stepType=TOOL_INVOCATION) -> ACCEPTED 
+StartExecutionStep -> ACCEPTED
+ProposeEvidence(TEST_RESULT) -> ACCEPTED 
+CompleteExecutionStep(stepType=TOOL_INVOCATION, aiProvenance=true, proposedEvidenceIds=[EVD])
+   -> status = REJECTED
+   -> code    = RPH_INVARIANT_VIOLATION
+   -> VERBATIM MESSAGE:
+   ---8<---
+CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result evd_01ARZ3NDEKTSV4RRFFQ69GX130 at v1, produced by step plan_01ARZ3NDEKTSV4RRFFQ69GX120-s1 (floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING). Satisfy the floor for that result before completing. The floor is unconditional: no governance waiver discharges it.
+   --->8---
+   -> step state = RUNNING
+
+================================================================================================
+C — ISOLATING SIGNAL 1. Identical HUMAN provenance, HUMAN issuer, NO runtime binding.
+================================================================================================
+Only stepType differs. floor-gate.ts:30 AI_STEP_TYPES = {MODEL_INVOCATION} — TOOL_INVOCATION is absent.
+
+-- stepType = MODEL_INVOCATION --
+ProposeExecutionPlan(stepType=MODEL_INVOCATION) -> ACCEPTED 
+StartExecutionStep -> ACCEPTED
+ProposeEvidence(TEST_RESULT) -> ACCEPTED 
+CompleteExecutionStep(stepType=MODEL_INVOCATION, aiProvenance=false, proposedEvidenceIds=[EVD])
+   -> status = REJECTED
+   -> code    = RPH_INVARIANT_VIOLATION
+   -> VERBATIM MESSAGE:
+   ---8<---
+CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result evd_01ARZ3NDEKTSV4RRFFQ69GX130 at v1, produced by step plan_01ARZ3NDEKTSV4RRFFQ69GX120-s1 (floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING). Satisfy the floor for that result before completing. The floor is unconditional: no governance waiver discharges it.
+   --->8---
+   -> step state = RUNNING
+
+-- stepType = TOOL_INVOCATION --
+ProposeExecutionPlan(stepType=TOOL_INVOCATION) -> ACCEPTED 
+StartExecutionStep -> ACCEPTED
+ProposeEvidence(TEST_RESULT) -> ACCEPTED 
+CompleteExecutionStep(stepType=TOOL_INVOCATION, aiProvenance=false, proposedEvidenceIds=[EVD])
+   -> status = ACCEPTED
+   -> step state = SUCCEEDED
+
+================================================================================================
+D — TOOL_OUTPUT provenance on a TOOL_INVOCATION step (AI_ORIGIN_TYPES includes TOOL_OUTPUT).
+================================================================================================
+ProposeExecutionPlan(stepType=TOOL_INVOCATION) -> ACCEPTED 
+StartExecutionStep -> ACCEPTED
+ProposeEvidence(TEST_RESULT) -> ACCEPTED 
+CompleteExecutionStep(stepType=TOOL_INVOCATION, aiProvenance=false, proposedEvidenceIds=[EVD])
+   -> status = REJECTED
+   -> code    = RPH_INVARIANT_VIOLATION
+   -> VERBATIM MESSAGE:
+   ---8<---
+CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result evd_01ARZ3NDEKTSV4RRFFQ69GX130 at v1, produced by step plan_01ARZ3NDEKTSV4RRFFQ69GX120-s1 (floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING). Satisfy the floor for that result before completing. The floor is unconditional: no governance waiver discharges it.
+   --->8---
+   -> step state = RUNNING

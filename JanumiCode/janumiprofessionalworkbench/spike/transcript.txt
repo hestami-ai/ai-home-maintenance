@@ -1,0 +1,70 @@
+UNDERTAKING WORKSPACE = C:\Users\mchen\AppData\Local\Temp\jpwb-undertaking-JHvZ0F
+WORKSPACE materialization = FILESYSTEM, ownerKind = UNDERTAKING
+RUNNER kind = REAL
+
+====================================================================================================
+CASE B — a step WITHOUT the capability. Granted: ["network"] only.
+====================================================================================================
+ran = false
+VERBATIM REFUSAL:
+---8<---
+Runtime binding bind_spike_1 does not grant 'file-system', which this step needs to invoke a model (RPH_CAPABILITY_NOT_GRANTED: capability 'file-system' is not in the granted scope). §22.1: requested capability is not granted capability, and a revoked binding cannot be used for new attempts. Authorize the capability on the binding, or do not run this step as a model invocation.
+--->8---
+model calls made = 0  (must be 0)
+exchange records written = 0  (must be 0 — refused before anything was built)
+tools that WOULD have been minted: []
+WITHHELD write_file: the runtime binding does not grant 'file-system' (RPH_CAPABILITY_NOT_GRANTED: capability 'file-system' is not in the granted scope), so the tool was not offered to the model at all. §22.1: requested capability is not granted capability.
+WITHHELD run_command: the runtime binding does not grant 'process-execution' (RPH_CAPABILITY_NOT_GRANTED: capability 'process-execution' is not in the granted scope), so the tool was not offered to the model at all. §22.1: requested capability is not granted capability.
+
+====================================================================================================
+CASE C — PRECISION. Granted: ["network","file-system"]. run_command must NOT exist.
+====================================================================================================
+minted tools = ["write_file"]
+WITHHELD run_command: the runtime binding does not grant 'process-execution' (RPH_CAPABILITY_NOT_GRANTED: capability 'process-execution' is not in the granted scope), so the tool was not offered to the model at all. §22.1: requested capability is not granted capability.
+ran = false
+refusedBecause = Runtime binding bind_spike_1 does not grant 'process-execution', which this step needs to invoke a model (RPH_CAPABILITY_NOT_GRANTED: capability 'process-execution' is not in the granted scope). §22.1: requested capability is not granted capability, and a revoked binding cannot be used for new attempts. Authorize the capability on the binding, or do not run this step as a model invocation.
+TOOL CALLS OBSERVED (0):
+run_command calls = 0  (must be 0)
+FILE CHECK precision.txt:
+  ABSENT: C:\Users\mchen\AppData\Local\Temp\jpwb-undertaking-JHvZ0F\precision.txt
+
+====================================================================================================
+CASE A — ADMITTED. Granted: ["network","file-system","process-execution"].
+====================================================================================================
+minted tools = ["write_file","run_command"]
+withheld = []
+ran = true
+producer = {"agentId":"execution.model-invocation","modelId":"gpt-5.6-sol","providerId":"openai-codex"}  identityEvidence = PROVIDER_REPORTED
+ANSWER (work product) = {"file":"greet.js","exitCode":0,"stdout":"SPIKE-GREETING-OK\n"}
+rationale declared = YES  shortfall = (none)
+exchange records written = 1
+
+TOOL CALLS OBSERVED BY THE ADAPTER (2) — not the model's report of them:
+  ---- write_file  ok=true
+       args = {"path":"greet.js","contents":"console.log('SPIKE-GREETING-OK');\n"}
+       data = {"path":"greet.js","byteSize":34}
+  ---- run_command  ok=true
+       args = {"argv":["node","greet.js"]}
+       data = {"exitCode":0,"timedOut":false,"durationMs":71,"stdout":"SPIKE-GREETING-OK\n","stderr":""}
+
+FILESYSTEM EVIDENCE — greet.js, stat()ed after the session closed:
+  PRESENT: C:\Users\mchen\AppData\Local\Temp\jpwb-undertaking-JHvZ0F\greet.js
+    size=34 bytes  mtime=2026-09-14T13:40:51.776Z
+    bytes="console.log('SPIKE-GREETING-OK');\n"
+
+WORKSPACE LISTING:
+  greet.js  34 bytes
+
+====================================================================================================
+CASE D — can a LATER step see what an EARLIER one wrote? Same workspace, new session.
+====================================================================================================
+ran = true
+TOOL CALLS (1):
+  run_command ok=true args={"argv":["node","greet.js"]}
+     data={"exitCode":0,"timedOut":false,"durationMs":73,"stdout":"SPIKE-GREETING-OK\n","stderr":""}
+ANSWER = {"stdout":"SPIKE-GREETING-OK\n","exitCode":0}
+
+====================================================================================================
+SUMMARY — case A produced a real command run: true
+====================================================================================================
+workspace retained at C:\Users\mchen\AppData\Local\Temp\jpwb-undertaking-JHvZ0F

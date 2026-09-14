@@ -14,13 +14,18 @@ import {
 	getAgentDir,
 	ModelRegistry,
 	resolveCliModel,
+	defineTool,
 	SessionManager,
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
+import { Type, type TSchema } from 'typebox';
 import { executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { ToolInvocationResult } from './backing-tool.js';
-import type { ProducerSession } from '../execution/producer-session.js';
+import type { ProducerSession, ProducerToolCall } from '../execution/producer-session.js';
+import type { ExecutionToolDescriptor } from '../sandbox/execution-tools.js';
+import { toPiToolResult } from '../agent/pi-tool-result.js';
+import type { ParamSpec } from '../agent/types.js';
 import { createMaterializedInputRecorder, type PayloadHookHost } from '../agent/materialized-input.js';
 
 /**
@@ -75,7 +80,40 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
  * ⛔ `thinkingLevel: 'off'` STILL. History is not chain-of-thought: it is the producer's record of its own
  * TURNS, which is what §9.7 says an account should rest on. `PER-12` is untouched by this change.
  */
-export async function openPiExecutionSession(): Promise<ProducerSession> {
+/**
+ * SPIKE (spike/tool-execution) — map our flat param spec onto TypeBox, as `pi-agent.ts:29` already does.
+ *
+ * ⚠ DUPLICATED FROM THE AUTHORING ADAPTER ON PURPOSE, FOR THE SPIKE ONLY. `toTypeBox` is module-private there;
+ * lifting it to a shared module is a real edit to a tested seam, and a probe should not make one. The report
+ * says so rather than leaving a reader to notice.
+ */
+function toTypeBox(spec: ParamSpec): TSchema {
+	const props: Record<string, TSchema> = {};
+	for (const [key, def] of Object.entries(spec)) {
+		let t: TSchema;
+		if (def.type === 'boolean') t = Type.Boolean({ description: def.description });
+		else if (def.type === 'string[]') t = Type.Array(Type.String(), { description: def.description });
+		else if (def.type === 'object[]' && def.items) t = Type.Array(toTypeBox(def.items), { description: def.description });
+		else t = Type.String({ description: def.description });
+		props[key] = def.required ? t : Type.Optional(t);
+	}
+	return Type.Object(props);
+}
+
+/** What the STEP hands its producer: the tools its runtime binding authorized, and nothing else. */
+export interface ExecutionSessionOptions {
+	/**
+	 * ⛔ ALREADY GATED BY THE CALLER. This adapter does NOT consult capabilities: it maps whatever it is
+	 * given. `grantedSandboxTools` is the single place the grant is read, so there is exactly one gate rather
+	 * than two that can disagree — the failure `capabilityAuthorized` vs `grantsWithinRequest` was split to
+	 * avoid one layer up.
+	 */
+	readonly tools?: readonly ExecutionToolDescriptor[];
+}
+
+export async function openPiExecutionSession(
+	options: ExecutionSessionOptions = {}
+): Promise<ProducerSession> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
 	const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
@@ -89,11 +127,37 @@ export async function openPiExecutionSession(): Promise<ProducerSession> {
 	});
 	await loader.reload();
 
+	// ⭑⭑ THE ONE LINE THE SPIKE EXISTS TO CHANGE. It read `customTools: []`, which is why an execution step
+	// could only ever return text: `noTools: 'builtin'` disables Pi's own read/write/bash tools, and an empty
+	// custom list then leaves the producer with none at all. The route is `pi-agent.ts:143`'s, unchanged in
+	// shape — descriptors in, `defineTool`s out, builtins still off.
+	//
+	// ⛔ AND AN EMPTY GRANT STILL YIELDS AN EMPTY LIST, WHICH IS THE POINT. A step whose binding grants nothing
+	// gets exactly the session this file used to hard-code. The old behaviour is now the floor of a range
+	// rather than the whole of it.
+	const toolCalls: ProducerToolCall[] = [];
+	const customTools = (options.tools ?? []).map((d) =>
+		defineTool({
+			name: d.name,
+			label: d.name,
+			description: d.description,
+			parameters: toTypeBox(d.parameters),
+			execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+				const args = params ?? {};
+				const result = await d.run(args);
+				// ⭑ RECORDED HERE, WHERE IT IS OBSERVED. See `ProducerToolCall`: the model's answer is its
+				// REPORT of what the tools did, and §22.1 treats model output as untrusted external input.
+				toolCalls.push({ tool: d.name, args, ok: result.ok, summary: result.summary, ...(result.data === undefined ? {} : { data: result.data }) });
+				return toPiToolResult(result);
+			}
+		})
+	);
+
 	const created = await createAgentSession({
 		model,
 		thinkingLevel: 'off',
 		noTools: 'builtin',
-		customTools: [],
+		customTools,
 		resourceLoader: loader,
 		// ⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
 		// so the memory this change adds is per-unit and process-local, which the design states rather than
@@ -117,6 +181,7 @@ export async function openPiExecutionSession(): Promise<ProducerSession> {
 	return {
 		retainsHistory: true,
 		dispose: () => session.dispose(),
+		toolCalls: () => toolCalls,
 		async turn(text: string): Promise<ToolInvocationResult> {
 			let answer = '';
 			let reasoning = '';

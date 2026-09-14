@@ -1,0 +1,53 @@
+workspace = C:\Users\mchen\AppData\Local\Temp\jpwb-prec-fRSesZ
+
+================================================================================================
+P1 — ADMITTED WITH A NARROWER GRANT. request = [network, file-system]; granted = the same.
+================================================================================================
+The step runs. write_file exists. run_command was never minted. A LIVE model is asked to do both.
+minted = ["write_file"]
+withheld = ["run_command"]
+ran = true  
+TOOL CALLS (1):
+  write_file ok=true args={"path":"narrow.txt","contents":"NARROW-OK\n"}
+⭑ run_command calls = 0  (MUST be 0)
+⭑ write_file calls  = 1  (MUST be >= 1)
+narrow.txt on disk = true
+ANSWER = {"file":"narrow.txt","contents":"NARROW-OK\n","commandRun":false,"exitCode":null,"missingTool":"shell/command-execution tool"}
+
+================================================================================================
+P2 — EXACT MEMBERSHIP. A granted PREFIX must not authorize the capability.
+================================================================================================
+granted=["file"]                 -> minted []
+granted=["file-syste"]           -> minted []
+granted=["file-system-extra"]    -> minted []
+granted=["FILE-SYSTEM"]          -> minted []
+granted=["file-system"]          -> minted ["write_file"]
+
+================================================================================================
+P3 — CONTAINMENT. The minted write_file must refuse a path outside the workspace.
+================================================================================================
+path="../escaped.txt"                   ok=false '../escaped.txt' does not name a location inside this workspace. A workspace path is relative, uses no drive l
+path="a/../../escaped.txt"              ok=false 'a/../../escaped.txt' does not name a location inside this workspace. A workspace path is relative, uses no dr
+path="C:/Windows/Temp/escaped.txt"      ok=false 'C:/Windows/Temp/escaped.txt' does not name a location inside this workspace. A workspace path is relative, us
+path="/etc/passwd"                      ok=false '/etc/passwd' does not name a location inside this workspace. A workspace path is relative, uses no drive lett
+path="ok/inside.txt"                    ok=true  Wrote 7 bytes to ok/inside.txt.
+⭑ escaped.txt beside the workspace exists = false  (MUST be false)  [C:\Users\mchen\AppData\Local\Temp\escaped.txt]
+
+================================================================================================
+P4 — THE LIBRARY DEFAULTS. In-memory workspace + refusing runner: no exit code is invented.
+================================================================================================
+workspace materialization = IN_MEMORY, directoryPath = undefined
+runner kind = REFUSING
+write_file -> ok=true Wrote 2 bytes to x.txt.
+readback   -> "hi"
+run_command -> ok=false
+  summary: This work unit's workspace is IN_MEMORY and has no directory on disk, so there is nowhere to run a command. Nothing was run. (A host that wires a real process runner must also wire a FILESYSTEM workspace; running in any other directory would put the command outside the sandbox.)
+  data (must carry NO exitCode): undefined
+refusing runner direct -> {"ran":false,"refusedBecause":"No process runner is wired on this host, so 'node' was not run. This is the library's default and it refuses on purpose: reporting exit code 0 for a command that never started would let a step, a test, or an assurance policy record a passing result nothing produced. Inject a ProcessRunner whose kind is REAL to execute commands."}
+
+================================================================================================
+P5 — TIMEOUT is OBSERVED, not inferred (§36.2 separates TIMEOUT from TOOL_FAILURE).
+================================================================================================
+slow command -> ok=true data={"exitCode":null,"timedOut":true,"durationMs":1533,"stdout":"","stderr":""}
+exit-3 command -> ok=true data={"exitCode":3,"timedOut":false,"durationMs":68,"stdout":"","stderr":""}
+missing program -> ok=false summary=The process could not be started: spawn definitely-not-a-program-xyz ENOENT

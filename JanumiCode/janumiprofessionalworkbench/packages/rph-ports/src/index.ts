@@ -13,3 +13,7 @@ export * from './ports/storage.js';
 export * from './ports/authentication.js';
 export * from './ports/artifact-store.js';
 export * from './defaults/artifact-store.js';
+export * from './ports/workspace.js';
+export * from './defaults/workspace.js';
+export * from './ports/process-runner.js';
+export * from './defaults/process-runner.js';

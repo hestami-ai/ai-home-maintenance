@@ -11,6 +11,23 @@
 // work again as though for the first time. A session can be told *"the reviewer said this about what you just
 // produced"*, because the producer's own history holds what it produced.
 import type { ToolInvocationResult } from '../tools/backing-tool.js';
+import type { ExecutionToolDescriptor } from '../sandbox/execution-tools.js';
+
+/**
+ * SPIKE (spike/tool-execution) — one tool call a producer made during this work unit.
+ *
+ * ⭑ THE SESSION HAS TO CARRY THIS, AND THAT IS A FINDING RATHER THAN A CONVENIENCE. A step's evidence is
+ * "a file was written, a command ran, it exited 0" — facts that exist only INSIDE the producer's turn. The
+ * answer text is the model's REPORT of them, which is exactly the untrusted external input §22.1 says model
+ * output is. So the seam that observed them must hand them back, or the record rests on the model's word.
+ */
+export interface ProducerToolCall {
+	readonly tool: string;
+	readonly args: Record<string, unknown>;
+	readonly ok: boolean;
+	readonly summary: string;
+	readonly data?: unknown;
+}
 
 export interface ProducerSession {
 	/** One turn. Turn 1 carries the rendered instruction; later turns carry review findings. */
@@ -25,9 +42,25 @@ export interface ProducerSession {
 	 * none. They implement this interface with INDEPENDENT turns and say so here.
 	 */
 	readonly retainsHistory: boolean;
+	/**
+	 * SPIKE — the tool calls this producer actually made, OBSERVED by the adapter that executed them.
+	 *
+	 * ⚠ OPTIONAL, because a producer with no tools genuinely made none and `[]` from an adapter that cannot
+	 * observe tool calls would assert an absence it did not measure.
+	 */
+	toolCalls?(): readonly ProducerToolCall[];
 }
 
-export type OpenProducerSession = () => Promise<ProducerSession>;
+/**
+ * SPIKE (spike/tool-execution) — opening a session now takes the tools the step's binding AUTHORIZED.
+ *
+ * ⭑ OPTIONAL, AND THAT IS NOT LAXITY. Two of the three adapters (the fixture and `agy --print`) have no tool
+ * surface at all, so a required parameter would force every caller to pretend otherwise. An adapter that
+ * cannot offer tools ignores the argument, and `toolCalls()` then reports `[]` as an OBSERVATION.
+ */
+export type OpenProducerSession = (
+	tools?: readonly ExecutionToolDescriptor[]
+) => Promise<ProducerSession>;
 
 /**
  * Wrap a one-shot call as a session whose turns are independent.
@@ -43,6 +76,8 @@ export function oneShotSession(
 	return {
 		turn: (text) => call(text),
 		dispose: () => undefined,
-		retainsHistory: false
+		retainsHistory: false,
+		// A one-shot text call has no tools at all, so the empty list is an observation, not a default.
+		toolCalls: () => []
 	};
 }
