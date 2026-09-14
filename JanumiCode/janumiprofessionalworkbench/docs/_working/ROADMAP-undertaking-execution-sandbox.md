@@ -163,7 +163,67 @@ locatable answer span.
 
 ---
 
-## 3. Phase 1 · The two ports, and defaults that cannot fabricate
+## 3. Phase 1 · ⭐ LANDED 2026-09-14 — the two ports, and defaults that cannot fabricate
+
+**WHAT LANDED.** `packages/rph-ports/src/ports/workspace.ts` and `ports/process-runner.ts`, with
+`defaults/workspace.ts` (in-memory) and `defaults/process-runner.ts` (refusing) beside them, all four wired
+through the barrel. ⛔ **Ports and defaults ONLY** — the host lifecycle, the sandbox adapters and the
+capability→tool minting are Phase 2 and are deliberately not here.
+
+- ⛔ `Purgeability` and `PurgeOutcome` are **imported** from `./artifact-store.js` as TYPES and NOT re-exported.
+  A second `export *` through the barrel would be a duplicate-export conflict, and a second two-member union is
+  precisely the drift `artifact-store-contract.ts` exists to prevent. Verified by typecheck rather than assumed.
+- ⭐ **`Workspace.purge` LANDED, WHICH THE SPIKE OMITTED.** The spike shipped `Workspace` with NO `purge`, and
+  `artifact-store.ts`'s own header says why that default is wrong for retained model content: *"a store with
+  `put` and no `purge` would not make retention lawful — it would move the unlawfulness behind an interface."*
+  Under `R7` a workspace holds a build's stdout and stderr, so the rule reaches it.
+- ⚠ **THE MIRROR IS PARTIAL BY CONSTRUCTION, EXACTLY AS §1 PREDICTED.** Same signature (one argument, no actor,
+  clock or reason) and same semantics (*"Remove the BYTES and keep the ENTRY"*); **different addressing** — the
+  store puts the class IN the key, a path-named workspace cannot, so `purgeability` is DECLARED on the
+  workspace. ⭐ **AND THE COST OF THAT IS STATED RATHER THAN SMOOTHED OVER:** one workspace cannot hold
+  participating and purgeable material side by side; a host needing both declares two. No third `Purgeability`
+  member was coined.
+- ⛔ **`planProcessRun` IS THE ONLY SANCTIONED WAY TO BUILD A REQUEST**, and that is what makes the cross-port
+  check unskippable. `cwd` is REQUIRED on `ProcessRunRequest`, so a caller assembling one by hand must put
+  *something* there — and the obvious something is `process.cwd()`, the server's own source tree, which
+  `openPiExecutionSession` already hardcodes twice. Deriving `cwd` from the workspace's own `directoryPath`
+  turns "the host should wire this correctly" into something a host cannot get wrong quietly.
+- ⭐ **A LIMB THE ROADMAP DID NOT NAME, ADDED BECAUSE IT IS THE SAME DEFECT THROUGH A DIFFERENT FIELD:** a
+  `timeoutMs` of `0`, a negative, `Infinity` or `NaN` is refused. §36.2 separates TIMEOUT from TOOL_FAILURE and
+  the port promises `timedOut` is OBSERVED; a bound of 0 reports a TIMEOUT for a command that never ran, and
+  `Infinity` makes the class unreachable. Both are rule 6 arriving through the timeout rather than the exit code.
+
+**PROOF — EVERY LIMB BY AN OBSERVED RED, each mutant named and KILLED (`bun run mutants P1-`, 10 of 10 KILLED;
+the tenth, `P1-dead-predecessor-arm-continues-again`, is pre-existing and merely shares the prefix).**
+
+| roadmap limb | mutants | reds |
+| --- | --- | --- |
+| refusing runner returns **no `exitCode` field at all** | `P1-f` | 2 |
+| in-memory workspace + real runner refused, naming the materialization | `P1-g`, `P1-h` | 4, 1 |
+| containment refuses `../`, `a/../../`, absolute, drive-qualified | `P1-a`, `P1-b`, `P1-c` | 1, 1, 1 |
+| a purged read is `undefined` while `list` still explains the entry | `P1-d`, `P1-e` | 1, 2 |
+
+⭐ **TWO OF THOSE MUTANTS SURVIVE A WEAKER SUITE, AND THAT IS WHY THEY ARE DECLARED.** `P1-g` inverts the
+materialization check and the plan is STILL refused — by the `directoryPath` arm, naming the wrong cause — so
+`planned === false` holds and only a victim asserting the MESSAGE kills it. `P1-h` collapses the two IN_MEMORY
+refusals into one message; `planned` is false either way, and the kill comes from asserting that the hermetic
+default does **not** announce itself as a WIRING ERROR.
+
+⚠ **AND ONE ASSERTION IS DELIBERATELY `Object.hasOwn` RATHER THAN `toBeUndefined`.** `out.exitCode === undefined`
+passes for a runner returning `{ran: true, exitCode: undefined}` — a shape claiming a command RAN while saying
+nothing about how it went. Only the presence of the FIELD discriminates, and this repository has the receipt for
+the weaker form (`stored?.bytes ?? ''`, green and proving nothing).
+
+**BASELINE:** `guards:export` regenerated with its own writer in this commit — **332 of 332 guarded, obligation
+0**, `containedWorkspacePath` attributed to `P1-a`/`P1-b`/`P1-c`. ⚠ The census measures PRODUCTION-CONSUMED
+exports, and of the four new files only `ports/workspace.ts` has one today (`defaults/workspace.ts` imports the
+predicate); `planProcessRun`, `createInMemoryWorkspace` and `createRefusingProcessRunner` are consumed by tests
+and the barrel alone until Phase 2 wires a host. **They carry declared mutants anyway** — waiting for the census
+to demand them would mean landing them bare.
+
+---
+
+## 3a. Phase 1 · the specification, as written before it was built
 
 **DO:** `packages/rph-ports/src/ports/workspace.ts` and `process-runner.ts`, plus in-memory / refusing defaults.
 
