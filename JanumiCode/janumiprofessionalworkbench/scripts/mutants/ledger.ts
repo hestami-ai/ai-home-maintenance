@@ -6091,5 +6091,51 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/handlers/assessment-ready-arrow.test.ts"],
 		why: "THE PROMISE (kit.ts:596, extended at :608-611): \"Create a NEW aggregate (revision 0): validate the produced state + commit it, emitting `eventType`\" plus \"FURTHER events this creation commits, in order — see `CommitArgs.alsoEvents`. A creating command may cross more than one arrow of its machine: the ratified §30 request evaluates evidence requirements in the same trigger that creates the assessment, and the required set it computes is a governed fact with its own event. Each gets the next contiguous aggregateRevision.\" WHO RELIES ON IT: `requestAssuranceAssessment` (assurance.ts:1395-1432) is the ONE production call site supplying alsoEvents (assurance.ts:1424 is the only non-kit occurrence in packages/ or apps/), and assurance.ts:1421-1423 states why the event is emitted even when the required set is empty. WHAT THE MUTATION DOES TO THEM: silently dropping the follow-on events reproduces the pre-increment-3 state — the requirement evaluation stops being a committed governed fact, so \"this assessment requires nothing\" becomes indistinguishable from \"nobody ever evaluated it\", and the §30 REQUESTED -> EVIDENCE_PENDING arrow is crossed without leaving a record that it was. The assertion is an exact-list `toEqual` over the committed stream (`store.readAggregateEvents`), so it pins ORDER as well as membership. ⚠ NOT CHOSEN, and the reason is worth the ledger's space: `newRevision: alsoEvents.length` -> `0` targets the docblock's sharpest claim (\"otherwise a follow-on event would carry a revision the aggregate never reaches, and replay would reconstruct a gap\") but no assertion for it could be found — every store-revision assertion after a create expects 0 (model-exchange.test.ts:129, model-exchange-durability.test.ts:144), which that mutant satisfies. That limb remains bare.\n\nOBSERVED: assessment-ready-arrow.test.ts 11/11 PASS -> 10 pass / 1 fail. Killing assertion :271-273 -> `AssertionError: the request emits the events of the arrows it actually crosses: expected [ 'AssuranceAssessmentRequested' ] to deeply equal [ Array(2) ]`. Exactly one of eleven reddens; the neighbouring assertions that count AssuranceAssessmentStarted occurrences (:267, :277) hold, so the kill is attributable to the alsoEvents limb and not to a broken fixture. Mutant compiles — `.slice(0, 0)` preserves the element type, which `[]` would not: the ledger records at F119 that `Object.values({})` widened an element type to `unknown` and reported NO_COMPILE. Anchor: 1 hit, line 655, OWNERS [\"createObject\"] (span 597-676).",
 		source: "JAN-PFA S3.3 increment 3 (the remaining 87 bare exports); triage claimed a precise assertion already existed and the RUN adjudicated that claim"
+	},
+	// ── ⭐ JAN-EXEC PHASE 0 — THE RECORD MUST NOT MANUFACTURE THE ABSENCE IT DISCLOSES ──────────────────
+	{
+		id: 'P0-a-the-recorder-is-handed-an-already-reduced-reply',
+		file: 'apps/rph-demo/src/lib/server/execution/run-model-step.ts',
+		// THE STATE THIS RESTORES IS THE ONE THAT SHIPPED FOR A FORTNIGHT. `captureTry` derives BOTH the answer
+		// span and the volunteered-reasoning span from the single `rawOutput` it is given, so handing it a value
+		// already stripped by `answerText` and already envelope-split means Guide §9.7's lawful separation NEVER
+		// RUNS for an execution step — the record then takes the "nothing to separate" branch and asserts, in
+		// `volunteeredReasoningRef`'s own words, that this is *"an observed absence, not an unretained presence"*
+		// for a reply that demonstrably carried reasoning.
+		find: '\t\trawOutput: rawReply,',
+		replace:
+			'\t\trawOutput: answer, // MUTANT: the recorder is handed the value AFTER two coercions',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: Guide §9.7 as `captureTry` implements it — *\"where it arrives inline with the answer, separate it at retention so that only the answer span binds under Section 8.4\"* — with `REG-D-050` classifying the halves (answer RETAINED_BY_PARTICIPATION, volunteered reasoning PURGEABLE_AT_EXPIRY) and `REG-D-057` requiring the omission be DECLARED with enough structure to undo. WHO RELIES: every consumer of `MODEL_EXCHANGE`, retention (a purge of the reasoning half is impossible if it was never separated out), and any future replay — `DESIGN-undertaking-execution-sandbox.md` B4 measured a replay of the unfixed path reproducing a DIFFERENT run. WHAT THE MUTATION DOES TO THEM: `splitAnswerSpan` sees a value with no reasoning left in it, so `volunteered` is empty, `volunteeredReasoningRef` goes PENDING with the *\"observed absence\"* reason, `rawOutputBeforeCoercionRef` aliases the answer span, and `omittedRegions` stays empty — a governed record stating as measured fact something the STEP itself destroyed one line earlier. ⚠ IT IS NOT A BYTE-COUNT DEFECT: the record is internally consistent and looks complete, which is why no existing assertion outside this suite notices.",
+		source: "JAN-EXEC Phase 0 (ROADMAP-undertaking-execution-sandbox.md §2), unblocked by the sponsor's ruling of 2026-09-14"
+	},
+	{
+		id: 'P0-b-the-declared-relation-resolves-to-nothing',
+		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
+		// ⛔ THE MUTATION SWAPS TWO FIELDS RATHER THAN DELETING THEM, DELIBERATELY. Deleting the address would leave
+		// the `workProduct` parameter unused and risk a NO_COMPILE that proves nothing (this ledger's own header
+		// records 21 such artifacts). Swapping `storageKey` and `contentHash` keeps every parameter used and every
+		// type intact, and produces exactly the failure the ruling exists to prevent: a declaration that is PRESENT,
+		// well-formed, parseable — and points a reader at bytes that are not the artifact's.
+		find: '\t\t\tstorageKey: workProduct.storageKey,\n\t\t\tcontentHash: workProduct.contentHash,',
+		replace:
+			'\t\t\tstorageKey: workProduct.contentHash, // MUTANT: the declaration resolves to nothing\n\t\t\tcontentHash: workProduct.storageKey,',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: the sponsor's JAN-EXEC Phase 0 ruling (2026-09-14) — *\"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED\"* — so a reader can still tell which bytes an assessment rested on. WHO RELIES: `run-model-step.ts` is the only producer, and the consumers are every reader of a `MODEL_EXCHANGE` on the EXECUTION plane — including the e2e assertion that replaced `REG-F-345`'s one-object rule. WHAT THE MUTATION DOES TO THEM: the record still carries a WORK_PRODUCT_DERIVATION, still names `answerSpanRef` and `workProduct`, and still parses — so every structural assertion about the declaration's PRESENCE holds. What breaks is the only thing that matters: the key it names addresses no stored object, so a reader following the record reaches nothing, and the two objects the ruling created are related by a statement that is false. ⭑ That is why the victim asserts a RESOLUTION (`store.get(declared.storageKey)` returns the work product) rather than the presence of a tag.",
+		source: 'JAN-EXEC Phase 0 — the guard for `declareWorkProductDerivation`, landed with the export'
+	},
+	{
+		id: 'P0-c-the-declaration-never-reaches-the-governed-record',
+		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
+		// THE SURFACE LIMB. `P0-b` proves the declaration is CORRECT where it is built; this proves it SURVIVES the
+		// whole path — capture, the recorder mapping, the `z.strictObject` dispatch boundary and the engine — and
+		// arrives on a durable MODEL_EXCHANGE a reader can actually query. Renaming the tag is the cheapest mutation
+		// that leaves the unit meaning intact while making the record unfindable.
+		find: "export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';",
+		replace:
+			"export const WORK_PRODUCT_DERIVATION_TAG = 'DERIVATION'; // MUTANT: the tag a reader greps for is renamed",
+		expectRed: ['apps/rph-demo/e2e/execution-model-invocation.e2e.ts'],
+		why: "PROMISE: the same ruling, asserted at the SURFACE rather than at the producer. The e2e reads the engine's own materialized `MODEL_EXCHANGE` state and requires that the declaration be findable there and resolve to the `ARTIFACT` the three floor assessments were recorded over. WHO RELIES: anyone auditing which bytes an assessment rested on — the exact reader `REG-F-345`'s *\"a reader cannot tell which the assessment rested on\"* was written for, whose free guarantee this ruling removed. WHAT THE MUTATION DOES TO THEM: every unit assertion still passes, because the unit test imports the same constant and therefore MOVES WITH IT — the mutation is invisible to it, which is precisely why this limb needs its own victim. On the surface the durable record then carries a tag nobody greps for, and the relation is once again undiscoverable.",
+		source: 'JAN-EXEC Phase 0 — the e2e limb of the declared relation'
 	}
 ];

@@ -111,7 +111,11 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 
 		// ⭑ THE MODEL SAW THE RENDERED TEMPLATE, not a generic instruction. The deterministic backend echoes
 		// what it was given, so this proves the authored prompt reached it with the work unit's facts in place.
-		const answerRef = mex.answerSpanRef as { status?: string; storageKey?: string };
+		const answerRef = mex.answerSpanRef as {
+			status?: string;
+			storageKey?: string;
+			byteSize?: number;
+		};
 		expect(answerRef.status, 'the work product was not retained').toBe('STORED');
 
 		// ⭑ AND IT IS A WORK PRODUCT, not just an audit record. THE MUTANT: complete the step with
@@ -119,9 +123,60 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		// work unit produced nothing a downstream step or an assurance policy could consume.
 		expect(snap.artifacts, 'the step recorded no work product').toHaveLength(1);
 		const art = snap.artifacts[0]!.state as Record<string, unknown>;
-		expect(art.storageKey, 'the artifact and the exchange must name ONE stored object').toBe(
-			answerRef.storageKey
+
+		// ── ⭐⭐ THE ASSERTION BELOW IS CHANGED BY A SPONSOR RULING, NOT BY A FAILING RUN ──────────────────
+		//
+		// ⚠ IT USED TO READ: `expect(art.storageKey, 'the artifact and the exchange must name ONE stored
+		// object').toBe(answerRef.storageKey)`. That was a TRUE invariant and it is recorded here rather than
+		// deleted, because editing a test to admit a change is the move this programme never makes — what
+		// changed is what the test SHOULD assert, and only a ruling may do that.
+		//
+		// ⭐ SPONSOR RULING (JAN-EXEC Phase 0, 2026-09-14): *"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps
+		// naming the WORK PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED"* — so a reader can still
+		// tell which bytes an assessment rested on.
+		//
+		// ⛔ WHY THE OLD ASSERTION CANNOT SURVIVE THE RULING, AND WHY THAT IS NOT A WEAKENING. Handing
+		// `captureTry` the TRUE raw reply is what lets Guide §9.7's lawful split run at all — without it the
+		// record disclosed *"No volunteered reasoning arrived … an observed absence, not an unretained
+		// presence"* for replies that carried some, which is a record manufacturing the absence it discloses.
+		// With it, `splitAnswerSpan` locates the ENVELOPE, and the envelope is not the work product: two objects,
+		// two hashes, and `art.storageKey === answerRef.storageKey` is arithmetically impossible. The property
+		// the old line PROTECTED — *"a reader cannot tell which the assessment rested on"* — is not abandoned; it
+		// is now carried explicitly, and the three assertions below are what carry it.
+		const parse = mex.parseOutcome as { outcome?: string; detail?: string };
+		// 1. THE ANSWER HALF IS THE ENVELOPE. `PARSED` is reachable on this path only when the reply was read AS
+		//    the execution contract's envelope. THE MUTANT: leave E-5 at `NOT_ATTEMPTED` as it was — the record
+		//    then says nothing was coerced while a work product was extracted and stored.
+		expect(parse.outcome, 'E-2’s answer half was not read as the execution ENVELOPE').toBe(
+			'PARSED'
 		);
+		// 2. THE RELATION IS DECLARED, AND IT RESOLVES TO THE ARTIFACT. The whole address, not just the key:
+		//    `contentHash` is what lets a reader re-hash the retained bytes and refuse a record that lied.
+		//    THE MUTANT: declare the ANSWER SPAN's own address instead. Every other assertion still passes and
+		//    the record points a reader at the envelope while every assessment was recorded over the artifact.
+		const tag = parse.detail!.indexOf('WORK_PRODUCT_DERIVATION');
+		expect(tag, 'the exchange record declares no relation to the artifact at all').toBeGreaterThan(
+			-1
+		);
+		const declared = JSON.parse(parse.detail!.slice(parse.detail!.indexOf('{', tag))) as Record<
+			string,
+			unknown
+		>;
+		expect(declared.derivedFrom).toBe('answerSpanRef');
+		expect(declared.storageKey, 'the declared relation does not reach the ARTIFACT').toBe(
+			art.storageKey
+		);
+		expect(declared.contentHash, 'the declaration names bytes other than the artifact’s').toBe(
+			art.contentHash
+		);
+		// 3. AND THE SPAN GENUINELY CARRIED IT. The envelope wraps the work product plus the rationale, so it is
+		//    strictly the larger object. THE MUTANT: store the work product as the answer span after all — the
+		//    declaration would still resolve, and the §9.7 split would again have nothing to separate.
+		expect(
+			Number(answerRef.byteSize),
+			'the answer span is not the envelope that carried the work product'
+		).toBeGreaterThan(Number(art.byteSize));
+
 		expect(art.producingPwuId, 'the artifact names the work unit that produced it').toBeTruthy();
 
 		// ⛔ THE EXECUTOR IS THE MODEL. Recording the human who clicked would be a fiction, and the assurance

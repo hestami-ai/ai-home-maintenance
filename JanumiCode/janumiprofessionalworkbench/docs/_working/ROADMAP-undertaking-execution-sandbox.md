@@ -54,7 +54,51 @@ and do not add a retention class here.**
 
 ---
 
-## 2. Phase 0 · ⛔ NOT LANDED — BLOCKED ON A RULING. Two ratified obligations pull apart
+## 2. Phase 0 · ⭐ LANDED 2026-09-14, UNBLOCKED BY A SPONSOR RULING
+
+⭐ **THE RULING THAT UNBLOCKED IT (sponsor, 2026-09-14): for an execution step the ANSWER HALF IS THE ENVELOPE;
+the ARTIFACT KEEPS NAMING THE WORK PRODUCT; and THE RELATIONSHIP BETWEEN THEM MUST BE DECLARED** — so a reader
+can still tell which bytes an assessment rested on. That is the third shape §10 item 7 recorded as an *"untested
+hypothesis, not a recommendation"*. It has now been tested.
+
+**WHAT LANDED.**
+- `run-model-step.ts` hands `captureTry` the TRUE raw reply (`rawReply`), so Guide §9.7's lawful separation runs
+  for an execution step for the first time. ⛔ `answer` is UNTOUCHED — `TS-05` records `answer =
+  returned.rawOutput` as the ASR-13 violation the split exists to PREVENT, and its control test still holds.
+- The work product is stored BEFORE the try is recorded, because a declaration cannot name an address that does
+  not exist yet.
+- `declareWorkProductDerivation` (`execution-contract.ts`) builds E-5 for an execution step: `PARSED` when the
+  envelope was read, `SCHEMA_COERCION_FAILED` with the producer's own shortfall quoted verbatim when it was not,
+  and in BOTH arms a `WORK_PRODUCT_DERIVATION` declaration carrying the work product's WHOLE address — provider,
+  key, content hash and byte size. ⭑ The hash is what lets a reader re-hash the retained bytes and REFUSE a
+  record that lied; a declaration carrying only a key can only be believed.
+- ⚠ `parseOutcome` stopped being `NOT_ATTEMPTED`, and that is the ruling's own consequence rather than a tidy-up.
+  Its detail read *"An execution step answer is a work product; no schema coercion applies"* — true while the
+  answer half WAS the work product, false the moment it became a structured envelope this step coerces.
+
+**THE E2E ASSERTION CHANGED, AND ONLY A RULING MAY DO THAT.** `execution-model-invocation.e2e.ts` no longer
+asserts `art.storageKey === answerSpanRef.storageKey`; under the ruling that equality is arithmetically
+impossible. ⛔ It was not weakened to stop failing: the old line is quoted in place, the ruling is quoted beside
+it, and THREE assertions now carry the property it protected — E-5 reports `PARSED` (the answer half was read AS
+the envelope), the declaration resolves to the ARTIFACT's own `storageKey` AND `contentHash`, and the answer
+span is strictly LARGER than the artifact (the envelope carried the work product rather than being it).
+
+**OBSERVED REDS, in order.** (1) un-skipping the pinned unit test: `1 failed | 25 passed`, the
+`volunteeredReasoningRef` limb. (2) the fix in place, e2e unchanged: `1 failed | 1 passed` with
+`expected …/4ece133d… received …/8044c907…` — the exact pair §2 recorded when the fix was first withdrawn.
+(3) the declared-relation assertions before the declaration existed. Mutants `P0-a`/`P0-b`/`P0-c` carry the
+three limbs.
+
+⚠ **WHAT IS STILL OWED HERE.** `PER-8`'s classification of the ENVELOPE — it carries `rationale`, so retaining
+it whole as the answer span classifies a CONTRACTED rationale as participating. ⭑ That is the correct class for
+a contracted rationale (`execution-contract.ts` draws the distinction: contracted ≠ volunteered,
+`RETAINED_BY_PARTICIPATION` ≠ `PURGEABLE_AT_EXPIRY`), so the hazard the withdrawal feared does not arise —
+**volunteered reasoning is still separated out under its own purgeable class, which is the whole point of the
+fix.** Recorded rather than assumed.
+
+---
+
+## 2a. ~~Phase 0 · ⛔ NOT LANDED — BLOCKED ON A RULING. Two ratified obligations pull apart~~ (SUPERSEDED BY §2; kept for the reasoning)
 
 ⚠ **THIS SECTION IS CORRECTED FROM ITS FIRST DRAFT.** I wrote it as *"one line, and a short recording"*. Reading
 the ratified field and the capture machinery before touching anything showed it was neither.
@@ -303,12 +347,15 @@ Phase 0** — a recording of the wrong bytes replays a different run.
    BLOCKING observation code verbatim.
 6. **`pol_test_adequacy`** (`R4`, second half), with its §17–§26 conformance rule amended **in the same act** —
    `doc004-conformance.test.ts:475` currently forbids the change, correctly.
-7. ⭐ **NEW, AND IT BLOCKS PHASE 0: for an execution step, is E-2's ANSWER HALF the WORK PRODUCT or the harness
-   ENVELOPE?** Measured consequence either way — **work product**: the record keeps saying no volunteered
-   reasoning arrived when some did; **envelope**: `answerSpanRef` and the ARTIFACT become two stored objects,
-   reddening `REG-F-345`'s one-object rule, and the envelope's `rationale` is retained as participating. ⚠ A
-   third shape may exist (record the envelope as E-2 whole while the ARTIFACT keeps naming the work product, with
-   the relationship declared) — **untested hypothesis, not a recommendation.**
+7. ~~⭐ **NEW, AND IT BLOCKS PHASE 0: for an execution step, is E-2's ANSWER HALF the WORK PRODUCT or the harness
+   ENVELOPE?**~~ → ⭐ **RULED 2026-09-14 AND LANDED (§2): the ANSWER HALF IS THE ENVELOPE, the ARTIFACT KEEPS
+   NAMING THE WORK PRODUCT, and THE RELATIONSHIP IS DECLARED.** ⭑ The sponsor chose the third shape this item
+   recorded as an *"untested hypothesis, not a recommendation"* — so the hypothesis was right AND the refusal to
+   recommend it was right, which is the distinction worth keeping. ⚠ The consequence this item predicted for the
+   envelope arm held exactly: the two became two stored objects, and `REG-F-345`'s one-object rule reddened in
+   e2e. What the item did not anticipate is that the rule's PROPERTY (*"a reader cannot tell which the assessment
+   rested on"*) is separable from its MECHANISM (equal bytes) — the declaration carries the property once the
+   mechanism is gone.
 
 ---
 
