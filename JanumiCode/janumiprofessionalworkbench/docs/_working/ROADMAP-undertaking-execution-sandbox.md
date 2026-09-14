@@ -375,6 +375,64 @@ later.
 
 ---
 
+## 4c. Phase 2 · ⭐ WHAT THIS CONTAINMENT IS — RULED, AND FOUR FIXES THAT FOLLOW FROM THE RULING
+
+⭐ **SPONSOR RULING R9 (2026-09-14): the workspace is an ORGANISATIONAL boundary now and a SECURITY boundary
+later, and the security tier belongs to the DEPLOYMENT ENVIRONMENT** — local (VS Code extension host), SaaS (the
+Janumi Platform, using OS-level sandboxing such as Alibaba's OpenSandbox and/or NVIDIA's OpenShell), Enterprise
+(container isolation). Recorded as `DESIGN-undertaking-execution-sandbox.md` §4.8, with the ratified vocabulary
+that already said so: `SandboxPolicy` is *"DEFERRED TO THE PLATFORM POLICY PLANE … the sandbox backend sits
+behind an abstracted runtime boundary precisely so the concrete tool (OpenSandbox / K8s Jobs+gVisor / a
+harness's own policy file) stays swappable."*
+
+⭑ **`Workspace` AND `ProcessRunner` ARE THE SEAM THAT SANDBOX SUPPLIES, WHICH IS WHY THEY ARE PORTS.** §4's
+`R3` said adapters belong in the demo; §4.8 says what the OTHER adapter will be.
+
+⛔ **AND §4b's DISCLOSURE WAS FALSE IN THREE PLACES, EACH MEASURED.** It said *"WHAT REMAINS IS A RACE, NOT A
+HOLE"*; two NON-race holes were open. Both refusals asserted a path *"may not reach outside it through a link or
+a junction"*, which a HARD LINK falsifies. And the reserved-record docblock said the reservation is compared
+*"CASE-INSENSITIVELY, because the filesystem compares that way"*, which is not how NTFS compares — the 8.3 alias
+is the proof.
+
+| # | what was driven | what changed |
+| --- | --- | --- |
+| F1 | the NTFS 8.3 ALIAS `JPWB-W~1.JSO` wrote over the retention record: `written: true`, one lower-case directory entry, genuine tombstone destroyed, `list()` empty | the record moved BESIDE the workspace directory. No contained path can reach a sibling, so the reserved name, the case-folding normaliser AND both breaches are gone together |
+| F2 | `purge('sub')` on a real subdirectory THREW — `ERR_FS_EISDIR` (node) / `EFAULT` (bun) — carrying the host's absolute path | the removal refuses with the errno CODE, and the ENTRY is now written BEFORE the bytes go so neither failure mode is indescribable |
+| F3 | `toLowerCase()` folds KELVIN SIGN (U+212A) to `k` and NTFS does not — two files, two contents, measured — so the guard refused a distinct file while claiming it *"is this workspace's own retention record"* | deleted by F1 rather than fixed twice |
+| F4 | `createRefusingProcessRunner` wrote the workspace's full `directoryPath` into a `refusedBecause` | the refusal names the workspace's DIRECTORY NAME. ⚠ The positive limb is kept, not traded |
+
+**THE FIVE VECTORS, NAMED, AS THE ADAPTER NOW DISCLOSES THEM.** ⛔ None needs a privilege: `mklink /H` and
+`mklink /J` both ran unprivileged here, Developer Mode off.
+
+| vector | status | what is true of it |
+| --- | --- | --- |
+| HARD LINK | ⛔ **OPEN, and reported as in-workspace** | `lstat` says plain file, `realpath` returns the link's OWN path; `nlink === 2` says a second name exists and nothing about where |
+| ROOT SWAP | ⛔ **OPEN, persistent, undetected** | a junction where the ROOT was redirects the whole workspace; containment then holds against the wrong root |
+| JUNCTION/SYMLINK INSIDE | ⭑ **REFUSED** | `locate` resolves the deepest existing ancestor; `livePaths` uses `lstat`. ⚠ a check-then-write RACE remains |
+| ALTERNATE DATA STREAM | ⭑ **vector refused, blind spot open** | a colon is refused; `list()` still cannot ENUMERATE streams and no `node:fs` adapter can |
+| 8.3 SHORT NAMES | ⭑ **no longer a containment vector** | still an intra-workspace aliasing fact between two long names |
+
+⭑ **AND THE TWO OPEN ONES ARE CARRIED BY DISCLOSURE PROBES, NOT BY PROSE.** The adapter's suite asserts that a
+hard link IS readable/overwritable/listed and that a root swap DOES redirect — so a later change that closes
+either REDDENS and whoever closed it must rewrite the disclosure. A disclosure nothing checks is a comment that
+rots; this repository has the receipts.
+
+⚠ **WHAT WOULD CHANGE IF THE SECURITY TIER IS TAKEN UP.** Nothing above the ports. Concretely:
+- a **new adapter** implements `Workspace` and `ProcessRunner` against the sandbox (OpenSandbox / OpenShell /
+  gVisor-isolated Job / the extension host), and `resolveUndertakingSandbox` returns it instead of the
+  `node:fs` pair. `planProcessRun`, `producerWorkingDirectory` and the retention record are untouched.
+- the **five disclosure lines above are re-measured against that adapter, not inherited.** A hard link means
+  something different inside a sandboxed mount namespace, and assuming it means the same thing is the exact
+  error §4b made about symlinks.
+- the **DISCLOSURE PROBES redden**, by design, and the disclosure is rewritten from the new measurements.
+- `RuntimeBinding.sandboxPolicy` stops being opaque and becomes a reference into the platform policy plane —
+  which is what the vocab note says it is waiting for, and is a RATIFICATION rather than a code change.
+
+⛔ **NO REAL `ProcessRunner` STILL**, for §4's reason: it reopens `REG-Q-066` and rule 8 forbids answering that
+later.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach

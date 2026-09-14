@@ -8,15 +8,21 @@
 // ⚠ EVERY DIRECTORY HERE IS UNDER `os.tmpdir()`, NEVER UNDER THE REPOSITORY. A spec that wrote into the
 // checkout would be the very containment defect the phase removes, committed by its own test.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath, sep } from 'node:path';
-import {
-	createFilesystemWorkspace,
-	WORKSPACE_TOMBSTONE_RECORD
-} from './filesystem-workspace.js';
+import { createFilesystemWorkspace } from './filesystem-workspace.js';
+
+/**
+ * The record's basename, SPELLED OUT rather than imported.
+ *
+ * ⛔ THE ASSERTION MUST NOT IMPORT WHAT IT IS CHECKING. If this came from the module, renaming the constant
+ * would move the test with it and every claim below would stay green against a record that had gone somewhere
+ * else entirely. It is also no longer exported, and for the same reason: nothing outside that module needs it.
+ */
+const RECORD_BASENAME = '.jpwb-workspace-tombstones.json';
 
 // ⛔ THE WORKSPACE IS ONE LEVEL BELOW THE DIRECTORY THIS SPEC OWNS, AND THAT IS NOT TIDINESS — IT IS A
 // MEASURED REPAIR. The escape cases below assert that `../escaped.txt` was NOT created; with the workspace AT
@@ -112,25 +118,25 @@ describe('containment — a path that escapes the workspace is REFUSED, never wr
 		expect(resolvePath(dir, 'src/nested/deep.txt').startsWith(resolvePath(dir) + sep)).toBe(true);
 	});
 
-	it("⛔ the workspace's own retention record is refused BY ITS OWN NAME, not as an escape", async () => {
-		// ⚠ THE TWO REFUSALS MUST STAY DISTINGUISHABLE. A caller naming the record has not tried to escape the
-		// workspace, and telling it that it did would be false — while a record a step could rewrite would let a
-		// purge be made to look like a file that was never written.
-		const ws = retained();
-		const out = await ws.writeFile(WORKSPACE_TOMBSTONE_RECORD, '{"forged":true}');
-		expect(out.written).toBe(false);
-		expect(out.written === false && out.refusedBecause).toMatch(/retention record/);
-		expect(out.written === false && out.refusedBecause).not.toMatch(/does not name a location inside this workspace/);
-		const purge = await ws.purge(WORKSPACE_TOMBSTONE_RECORD);
-		expect(purge.purged).toBe(false);
-		expect(purge.purged === false && purge.refusedBecause).toMatch(/retention record/);
-	});
+	// ── ⛔ RETIRED, NOT DELETED: TWO TESTS THAT GUARDED A RESERVED NAME THAT NO LONGER EXISTS ─────────────
+	//
+	// They asserted that `writeFile` and `purge` refuse `.jpwb-workspace-tombstones.json` *"BY ITS OWN NAME, not
+	// as an escape"* and that *"the record never appears in `list()`"*. ⭐ BOTH PROPERTIES SURVIVE AND ARE NOW
+	// STRUCTURAL RATHER THAN COMPARATIVE: the record is a SIBLING of the workspace directory, so no path this
+	// workspace admits can reach it, `list()` walks a directory it is not in, and there is no reserved name left
+	// to refuse. The successor is the describe block near the end of this file, which drives all four spellings
+	// that defeated or falsely tripped the guard — including the NTFS 8.3 alias that beat its last revision.
+	// ⚠ The distinction they protected — that a caller naming the record has not tried to ESCAPE, and telling
+	// it that it did would be false — is kept by removing the second refusal entirely rather than by wording.
 
-	it('⛔ and the record never appears in `list()`, so it cannot be mistaken for the work', async () => {
+	it('⛔ the inventory reports the work and nothing else, the record included', async () => {
+		// ⭑ THE SURVIVING HALF OF THE SECOND RETIRED TEST. It used to prove `list()` SKIPPED the record; it now
+		// proves `list()` never had to, because the record is not under the root it walks.
 		const ws = purgeable();
 		await ws.writeFile('a.txt', 'a');
 		await ws.purge('a.txt');
 		expect((await ws.list()).map((e) => e.path)).toEqual(['a.txt']);
+		expect(existsSync(join(dir, RECORD_BASENAME)), 'and it is not there to be skipped').toBe(false);
 	});
 });
 
@@ -189,12 +195,34 @@ describe('purge — the BYTES go and the ENTRY stays (PER-8, and the tombstone o
 		expect(out.purged === false && out.refusedBecause).toMatch(/never written here/);
 	});
 
+	it('a purge the filesystem REJECTS is a refusal, never a thrown stack trace', async () => {
+		// THE SIBLING OF `writeFile`'s SAME CASE, AND THE PREVIOUS COMMIT WRAPPED ONE AND LEFT THE OTHER BARE.
+		// Driven: `purge('sub')` on a real subdirectory threw straight out of the promise -- `ERR_FS_EISDIR`
+		// under node, `EFAULT` under bun -- and BOTH messages carried the HOST'S ABSOLUTE PATH. The port's rule
+		// is the same for both methods: "a refusal is a fact a step can record; a throw becomes a stack trace in
+		// a record that was supposed to say what the step was not allowed to do."
+		const ws = purgeable();
+		await ws.writeFile('sub/inner.txt', 'x');
+		const out = await ws.purge('sub');
+		expect(out.purged).toBe(false);
+		expect(out.purged === false && out.refusedBecause).toMatch(/could not be purged/);
+		// AND IT NAMES THE ERRNO CODE, NOT THE HOST'S FILESYSTEM. The absolute path of the workspace on this
+		// machine belongs in nothing a step records, and a wrapped cause is the one place it leaks by accident.
+		expect(
+			out.purged === false && out.refusedBecause,
+			'the host absolute path must not travel in a recorded refusal'
+		).not.toContain(resolvePath(dir));
+		expect(out.purged === false && out.refusedBecause).toContain("'sub'");
+		// AND THE DIRECTORY IS INTACT: a refusal that also deleted would satisfy every line above.
+		expect(await ws.readFile('sub/inner.txt')).toBe('x');
+	});
+
 	it('⚠ a corrupt retention record is treated as NO record rather than thrown over', async () => {
 		// The caller is a step that must be able to RECORD what it was refused; a parse error surfacing here
 		// would be a stack trace where a retention fact belongs. The files themselves are untouched.
 		const ws = purgeable();
 		await ws.writeFile('a.txt', 'a');
-		await writeFile(join(dir, WORKSPACE_TOMBSTONE_RECORD), 'not json at all', 'utf8');
+		await writeFile(resolvePath(dir) + RECORD_BASENAME, 'not json at all', 'utf8');
 		expect(await ws.list()).toEqual([{ path: 'a.txt', byteSize: 1, purged: false }]);
 		expect(await ws.readFile('a.txt')).toBe('a');
 	});
@@ -232,36 +260,15 @@ async function linkDirectory(at: string, target: string): Promise<void> {
 }
 
 describe('⛔ the filesystem realities, driven through the adapter that touches the disk', () => {
-	it('⛔ B1 — the retention record is refused under a CASE VARIANT, which on NTFS is the SAME FILE', async () => {
-		// ⭑⭑ THE RESERVED NAME WAS COMPARED WITH `===` AND THE FILESYSTEM COMPARES CASE-INSENSITIVELY. Measured
-		// on this host: writing `.JPWB-WORKSPACE-TOMBSTONES.JSON` beside an existing
-		// `.jpwb-workspace-tombstones.json` left ONE directory entry, still spelled in lower case, holding the
-		// SECOND write's bytes. A genuine tombstone is destroyed and replaced by a forgery; `list()` then
-		// reports the forged entry and no longer reports the path actually purged — the "purged on schedule vs
-		// never written" distinction the record exists to keep, destroyed through the one name the adapter
-		// believed it was refusing.
-		const ws = purgeable();
-		await ws.writeFile('logs/build.txt', 'twelve-bytes');
-		await ws.purge('logs/build.txt');
-		expect(await ws.list(), 'the genuine tombstone must exist before it can be forged over').toEqual([
-			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
-		]);
-
-		const out = await ws.writeFile(
-			'.JPWB-WORKSPACE-TOMBSTONES.JSON',
-			'{"forged/never-written.txt":{"byteSize":4096}}'
-		);
-		expect(out.written).toBe(false);
-		expect(out.written === false && out.refusedBecause).toMatch(/retention record/);
-		// ⚠ THE REFUSAL ALONE PROVES NOTHING — a refusal that ALSO wrote would satisfy it. The record is
-		// asserted through `list()`, the only surface that can tell the forgery from the fact.
-		expect(await ws.list()).toEqual([
-			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
-		]);
-		const purge = await ws.purge('.JPWB-WORKSPACE-TOMBSTONES.JSON');
-		expect(purge.purged).toBe(false);
-		expect(purge.purged === false && purge.refusedBecause).toMatch(/retention record/);
-	});
+	// ── ⛔ B1 IS RETIRED HERE AND RE-DRIVEN, HARDER, IN THE STRUCTURAL BLOCK BELOW ────────────────────
+	//
+	// It drove `.JPWB-WORKSPACE-TOMBSTONES.JSON` against a case-SENSITIVE `===` and required a refusal. ⛔ THE
+	// GUARD IT PROVED WAS THEN BEATEN BY THE NEXT SPELLING — the NTFS 8.3 ALIAS `JPWB-W~1.JSO`, which `dir /x`
+	// reports verbatim against the record on this host: driven, `writeFile` answered `written: true`, the
+	// directory kept its one lower-case entry, the genuine tombstone was destroyed, and `list()` went empty.
+	// ⭐ A TEST THAT REQUIRES A REFUSAL CANNOT OUTLIVE THE GUARD, AND THE GUARD IS THE THING THAT WAS WRONG. The
+	// successor asserts what the ARRANGEMENT makes true — all four spellings are ordinary work products and the
+	// record survives every one of them — which no spelling can defeat because no spelling reaches it.
 
 	it('⛔ B2 — a DIRECTORY JUNCTION inside the workspace reaches nothing outside it', async () => {
 		// ⭑⭑ `mklink /J` NEEDS NEITHER ADMIN RIGHTS NOR DEVELOPER MODE — it ran unprivileged on this host, which
@@ -348,5 +355,147 @@ describe('⛔ the filesystem realities, driven through the adapter that touches 
 		expect(await ws.readFile('src/report.md')).toBe('the report\n');
 		expect(await ws.list()).toEqual([{ path: 'src/report.md', byteSize: 11, purged: false }]);
 		expect((await ws.purge('src/report.md')).purged).toBe(true);
+	});
+});
+
+// -- THE RECORD MOVED OUT OF THE WORKSPACE, AND THAT IS WHAT DELETES THE BREACH CLASS ----------------------
+//
+// TWO ADVERSARIES DEFEATED THE RESERVED-PATH GUARD IN A ROW, AND BOTH WON THE SAME WAY: they spelled the
+// record's name differently from the guard while the FILESYSTEM read both spellings as the same file. First
+// `.JPWB-WORKSPACE-TOMBSTONES.JSON` (case), then -- after that was folded -- the NTFS 8.3 ALIAS `JPWB-W~1.JSO`,
+// which `dir /x` reports verbatim against `.jpwb-workspace-tombstones.json` on this host. PUTTING A RESERVED
+// PATH INSIDE A DIRECTORY THE MODEL WRITES TO IS WHAT CREATES THAT CLASS. The record is now a SIBLING of the
+// workspace directory, so there is no name a contained path can spell that reaches it -- and the guard, the
+// case-folding normaliser and both breaches are gone together rather than fixed one spelling at a time.
+describe('the retention record is BESIDE the workspace directory, not inside it', () => {
+	/** Purge one path so a GENUINE tombstone exists to be forged over. */
+	async function withGenuineTombstone() {
+		const ws = purgeable();
+		await ws.writeFile('logs/build.txt', 'twelve-bytes');
+		await ws.purge('logs/build.txt');
+		expect(await ws.list(), 'the genuine tombstone must exist before it can be forged over').toEqual([
+			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+		]);
+		return ws;
+	}
+
+	it('the record is NOT a file in the workspace, and IS a file beside it', async () => {
+		// THIS IS THE WHOLE FIX, AND IT IS STRUCTURAL RATHER THAN COMPARATIVE. `locate` admits only paths that
+		// resolve at or under the root; the record is a sibling of the root; therefore NO admitted path is the
+		// record, under any spelling, on any filesystem, without a comparison being right about anything.
+		await withGenuineTombstone();
+		expect(existsSync(join(dir, RECORD_BASENAME)), 'nothing inside the workspace is the record').toBe(
+			false
+		);
+		expect(
+			existsSync(resolvePath(dir) + RECORD_BASENAME),
+			'and the record is beside the directory it describes'
+		).toBe(true);
+	});
+
+	// THE THREE SPELLINGS THAT DEFEATED, OR FALSELY TRIPPED, THE GUARD THAT USED TO STAND HERE. Each is now an
+	// ORDINARY work product: written, listed, readable -- and the retention record is untouched by all of them.
+	for (const [label, spelling] of [
+		['the exact record name', '.jpwb-workspace-tombstones.json'],
+		['the CASE VARIANT that defeated `===` on NTFS', '.JPWB-WORKSPACE-TOMBSTONES.JSON'],
+		['the NTFS 8.3 ALIAS that defeated the case-folded guard', 'JPWB-W~1.JSO'],
+		// KELVIN SIGN (U+212A). `toLowerCase()` folds it to `k` and NTFS does NOT -- measured on this host: the
+		// two names coexist as two files holding different bytes. The folded guard therefore REFUSED this path
+		// while telling the caller it "is this workspace's own retention record", which was untrue of its input.
+		// A refusal that states something false about what it was given is worse than no refusal.
+		['the KELVIN SIGN spelling the normaliser over-folded', '.jpwb-wor\u212Aspace-tombstones.json']
+	] as const) {
+		it(`${label} is an ordinary work product, and the record survives it`, async () => {
+			const ws = await withGenuineTombstone();
+			const out = await ws.writeFile(spelling, 'A STEP WROTE THIS');
+			expect(out.written, 'it names a location inside the workspace, so it is written').toBe(true);
+			expect(await ws.readFile(spelling)).toBe('A STEP WROTE THIS');
+			// THE ASSERTION THAT MATTERS IS ON THE RECORD, NOT ON THE WRITE. Driven against the previous
+			// adapter, `JPWB-W~1.JSO` returned `written: true` and OVERWROTE the record: `list()` then reported
+			// `forged/never-written.txt` as purged and stopped reporting `logs/build.txt` -- the "purged on
+			// schedule vs never written" distinction destroyed through a name the guard could not see.
+			expect(await ws.list()).toEqual([
+				{ path: spelling, byteSize: 'A STEP WROTE THIS'.length, purged: false },
+				{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+			]);
+		});
+	}
+
+	it('a directoryPath with NO PARENT is refused at construction, because a sibling would be inside it', () => {
+		// THE ONE PRECONDITION THE SIBLING ARRANGEMENT HAS, MADE IMPOSSIBLE TO VIOLATE QUIETLY. At a volume
+		// root `dirname(root) === root`, so "beside the directory" and "inside the directory" are the same
+		// place and the whole guarantee above would be false. Refusing rather than falling back to a reserved
+		// name inside: a workspace that silently reinstated the breach class is worse than one that will not
+		// open at all.
+		expect(() =>
+			createFilesystemWorkspace({
+				ownerKind: 'UNDERTAKING',
+				ownerId: 'und_01ARZ3NDEKTSV4RRFFQ69G5PAA',
+				purgeability: 'RETAINED_BY_PARTICIPATION',
+				directoryPath: resolvePath(dir).slice(0, 2) + sep
+			})
+		).toThrow(/cannot be a workspace directory/);
+	});
+});
+
+// -- DISCLOSURE PROBES: THE VECTORS THIS BOUNDARY DOES **NOT** CLOSE, ASSERTED SO THE DISCLOSURE STAYS TRUE --
+//
+// THESE ARE NOT GUARDS AND THEY CARRY NO MUTANT. They assert the ABSENCE of a guarantee, which is exactly why
+// they exist: the adapter's header tells a reader that a HARD LINK and a ROOT SWAP are open, and a disclosure
+// nothing checks is a comment that rots. If a later change closes one of these, the probe REDDENS and whoever
+// closed it must come back and rewrite the disclosure -- which is the outcome this repository wants, and the
+// opposite of a disclosure quietly outliving the thing it described.
+//
+// AND THE CONTAINMENT RULING IS WHY THEY ARE DISCLOSED RATHER THAN PATCHED: this is an ORGANISATIONAL boundary
+// that keeps an undertaking's work in one place and catches accidents. The SECURITY boundary is the deployment
+// environment's -- see DESIGN-undertaking-execution-sandbox.md section 4.8.
+describe('DISCLOSURE PROBES -- what an organisational boundary does not close', () => {
+	it('a HARD LINK reads and OVERWRITES a file outside the workspace, and list() reports it as inside', async () => {
+		// MEASURED, UNPRIVILEGED, ON THIS HOST. `link()` and `mklink /H` create the SAME object -- one NTFS hard
+		// link, a second directory entry for one file -- and `mklink /H` needs neither administrator rights nor
+		// Developer Mode; it is spelled here through `node:fs` so the probe runs on every platform. `lstat` calls the result a plain file (`isSymbolicLink()` false, `isFile()` true) and `realpath`
+		// answers with THE LINK'S OWN PATH, inside the workspace -- so both filesystem questions this adapter
+		// knows how to ask answer "contained". The only signal is `nlink = 2`, which says the file has a second
+		// NAME and nothing at all about WHERE that name is: a lawful second link inside the workspace reports
+		// the same 2. There is no userspace path comparison that closes this.
+		const outside = join(container, 'outside');
+		await mkdir(outside, { recursive: true });
+		await writeFile(join(outside, 'secret.env'), 'SECRET=1\n', 'utf8');
+		await link(join(outside, 'secret.env'), join(dir, 'link.env'));
+
+		const ws = retained();
+		expect(await ws.readFile('link.env'), 'OPEN: bytes from outside the workspace are readable').toBe(
+			'SECRET=1\n'
+		);
+		const out = await ws.writeFile('link.env', 'OVERWRITTEN BY A STEP\n');
+		expect(out.written, 'OPEN: the write is not refused').toBe(true);
+		expect(
+			await readFile(join(outside, 'secret.env'), 'utf8'),
+			'OPEN: the file OUTSIDE the workspace now holds bytes a step wrote'
+		).toBe('OVERWRITTEN BY A STEP\n');
+		expect(
+			(await ws.list()).map((e) => e.path),
+			'UNREPORTED: the inventory names it as an ordinary in-workspace entry'
+		).toEqual(['link.env']);
+	});
+
+	it('a ROOT SWAP redirects the WHOLE workspace, persistently and undetected', async () => {
+		// THE JUNCTION STANDS WHERE THE WORKSPACE ROOT WAS, so `realpath(root)` resolves to the ATTACKER'S
+		// directory and every child resolves under it. Containment then holds -- against the wrong root. This is
+		// not the TOCTOU race the previous disclosure described: nothing is swapped mid-call, the redirection is
+		// durable across processes, and it is decided before this adapter is ever constructed.
+		const elsewhere = join(container, 'elsewhere');
+		await mkdir(elsewhere, { recursive: true });
+		await writeFile(join(elsewhere, 'planted.txt'), 'PLANTED\n', 'utf8');
+		await rm(dir, { recursive: true, force: true });
+		await linkDirectory(dir, elsewhere);
+
+		const ws = retained();
+		expect(await ws.readFile('planted.txt'), 'OPEN: a file nobody wrote through the workspace').toBe(
+			'PLANTED\n'
+		);
+		const out = await ws.writeFile('injected.txt', 'A STEP WROTE HERE\n');
+		expect(out.written, 'OPEN: the write is not refused').toBe(true);
+		expect(existsSync(join(elsewhere, 'injected.txt')), 'OPEN: and it landed outside').toBe(true);
 	});
 });
