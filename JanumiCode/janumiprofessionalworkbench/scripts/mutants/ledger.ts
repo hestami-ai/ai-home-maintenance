@@ -6134,7 +6134,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';",
 		replace:
 			"export const WORK_PRODUCT_DERIVATION_TAG = 'DERIVATION'; // MUTANT: the tag a reader greps for is renamed",
-		expectRed: ['apps/rph-demo/e2e/execution-model-invocation.e2e.ts'],
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
 		why: "PROMISE: the same ruling, asserted at the SURFACE rather than at the producer. The e2e reads the engine's own materialized `MODEL_EXCHANGE` state and requires that the declaration be findable there and resolve to the `ARTIFACT` the three floor assessments were recorded over. WHO RELIES: anyone auditing which bytes an assessment rested on — the exact reader `REG-F-345`'s *\"a reader cannot tell which the assessment rested on\"* was written for, whose free guarantee this ruling removed. WHAT THE MUTATION DOES TO THEM: every unit assertion still passes, because the unit test imports the same constant and therefore MOVES WITH IT — the mutation is invisible to it, which is precisely why this limb needs its own victim. On the surface the durable record then carries a tag nobody greps for, and the relation is once again undiscoverable.",
 		source: 'JAN-EXEC Phase 0 — the e2e limb of the declared relation'
 	},

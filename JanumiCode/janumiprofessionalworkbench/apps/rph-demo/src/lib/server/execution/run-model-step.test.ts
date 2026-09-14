@@ -658,6 +658,18 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		// is a structured envelope with a declared two-field shape, and this step coerces it.
 		expect(rec.parseOutcome.outcome).toBe('PARSED');
 
+		// ⭐ THE TAG IS PINNED AS A LITERAL, DELIBERATELY NOT VIA THE CONSTANT — this is the one assertion in the
+		// file that a rename of `WORK_PRODUCT_DERIVATION_TAG` cannot move with. Every other check here reaches the
+		// tag through `derivationIn`, which imports it, so both sides of those comparisons travel together and a
+		// rename is invisible to them: a control that cannot fail. The durable record is a WIRE FORMAT that
+		// external readers grep; renaming the constant silently changes what they must look for.
+		// ⚠ This is what lets the corresponding ledger entry name a UNIT victim instead of an e2e spec. An e2e
+		// victim can HANG rather than fail, and a timeout is INCONCLUSIVE — the absence of evidence, not evidence.
+		expect(
+			rec.parseOutcome.detail,
+			'the governed record must carry the derivation tag VERBATIM, as an external reader would grep for it'
+		).toContain('WORK_PRODUCT_DERIVATION');
+
 		const declared = derivationIn(rec.parseOutcome.detail);
 		expect(declared, 'the record declared no relation at all').toBeTruthy();
 		expect(declared!.derivedFrom).toBe('answerSpanRef');
