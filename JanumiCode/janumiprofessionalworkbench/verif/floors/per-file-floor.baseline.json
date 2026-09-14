@@ -500,6 +500,18 @@
 			"functions": 0,
 			"lines": 0
 		},
+		"packages/rph-ports/src/defaults/process-runner.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/defaults/workspace.ts": {
+			"statements": 0,
+			"branches": 2,
+			"functions": 0,
+			"lines": 0
+		},
 		"packages/rph-ports/src/ports/artifact-store.ts": {
 			"statements": 0,
 			"branches": 0,
@@ -518,7 +530,19 @@
 			"functions": 0,
 			"lines": 0
 		},
+		"packages/rph-ports/src/ports/process-runner.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
 		"packages/rph-ports/src/ports/storage.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-ports/src/ports/workspace.ts": {
 			"statements": 0,
 			"branches": 0,
 			"functions": 0,

@@ -13,3 +13,10 @@ export * from './ports/storage.js';
 export * from './ports/authentication.js';
 export * from './ports/artifact-store.js';
 export * from './defaults/artifact-store.js';
+// JAN-EXEC Phase 1 — the execution SANDBOX seam: the mutable working set a step builds up, and the ability to
+// run a command in it. ⛔ Both ship with their defaults, so neither is ever a bare interface and no test gains
+// a real filesystem or a real child process by importing them.
+export * from './ports/workspace.js';
+export * from './defaults/workspace.js';
+export * from './ports/process-runner.js';
+export * from './defaults/process-runner.js';

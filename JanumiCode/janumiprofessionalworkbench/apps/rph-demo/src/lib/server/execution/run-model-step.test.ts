@@ -9,6 +9,7 @@ import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-
 import { assembledSources, runModelInvocationStep } from './run-model-step.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
+import { WORK_PRODUCT_DERIVATION_TAG } from './execution-contract.js';
 
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
@@ -525,30 +526,30 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 describe('JAN-EXEC P0 — the exchange record must not disclose an absence the STEP manufactured', () => {
-	// ⛔ SKIPPED, BLOCKED ON A RULING — NOT ON EFFORT, AND NOT BECAUSE IT IS WRONG.
+	// ⭐ UNBLOCKED BY A SPONSOR RULING (2026-09-14), AND THE HISTORY IS KEPT RATHER THAN DELETED.
 	//
-	// This test PASSES the moment `run-model-step.ts` hands `captureTry` the true raw reply instead of the
-	// already-reduced `answer`. That change was built and proved both ways (26 passed with it, 1 failed | 25
-	// passed without it) — and then WITHDRAWN, because it reddens a different ratified invariant in e2e:
+	// ⛔ THIS BLOCK WAS `it.skip` FOR A FORTNIGHT — blocked on a ratification gap, not on effort. The fix it pins
+	// was built and proved both ways (`26 passed` with it, `1 failed | 25 passed` without) and then WITHDRAWN,
+	// because it reddened a DIFFERENT ratified invariant that the unit suite cannot see:
 	//
 	//     Error: the artifact and the exchange must name ONE stored object
 	//       expected tnt-local/RETAINED_BY_PARTICIPATION/4ece133d…  (answerSpanRef)
 	//       received tnt-local/RETAINED_BY_PARTICIPATION/8044c907…  (the ARTIFACT)
 	//
-	// With the raw reply, `splitAnswerSpan` locates the JSON ENVELOPE, so `answerSpanRef` names the envelope
-	// while the artifact names `envelope.workProduct`. Different bytes, different content hash, two objects where
-	// `REG-F-345` requires one — *"a reader cannot tell which the assessment rested on"*.
+	// With the raw reply `splitAnswerSpan` locates the JSON ENVELOPE, so `answerSpanRef` names the envelope while
+	// the artifact names `envelope.workProduct` — two objects where `REG-F-345` required one, *"and a reader
+	// cannot tell which the assessment rested on"*.
 	//
-	// ⭐ TWO RATIFIED OBLIGATIONS PULL APART AND THE DECIDING QUESTION IS A RULING: for an execution step, is
-	// E-2's ANSWER HALF the WORK PRODUCT or the harness ENVELOPE that carries it? The step's own comment says the
-	// envelope is *"unwrapped and then forgotten"*, but the envelope also carries `rationale`, so retaining it
-	// whole classifies reasoning as participating (PER-8, permanent) when PER-12 wants it purgeable.
+	// ⭐ THE SPONSOR RULED: *"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and the
+	// RELATIONSHIP BETWEEN THEM MUST BE DECLARED."* ⭑ WHAT THAT SETTLES IS NOT WHICH OBLIGATION WINS — it is that
+	// `REG-F-345`'s PROPERTY (a reader can tell which bytes the assessment rested on) is separable from its
+	// MECHANISM (the same bytes are the same content-addressed key). The mechanism is gone; the property is now
+	// carried by `declareWorkProductDerivation`, and the two tests below prove each half.
 	//
-	// ⚠ IT IS KEPT RATHER THAN DELETED because the defect it pins is real and currently LIVE: the record
-	// discloses *"No volunteered reasoning arrived with this answer … an observed absence, not an unretained
-	// presence"* for a reply that carried some. Deleting the test would delete the only statement of that.
-	// See `ROADMAP-undertaking-execution-sandbox.md` §2.
-	it.skip('⛔ volunteered reasoning that ARRIVED must be separated at retention, never recorded as absent', async () => {
+	// ⚠ THE FIRST RED OF THE ORIGINAL ATTEMPT WAS INVALID AND THE FIXTURE STILL CARRIES THE CORRECTION: an
+	// undelimited prose fixture makes `splitAnswerSpan` report `located: false`, §9.7 blocks every ref, and the
+	// test would have reddened forever for the wrong reason. Every fixture here carries a locatable answer span.
+	it('⛔ volunteered reasoning that ARRIVED must be separated at retention, never recorded as absent', async () => {
 		// ⭑⭑ THE DEFECT THIS PINS IS IN THE RECORD PLANE, NOT IN A BYTE COUNT. `captureTry` already performs the
 		// lawful Guide §9.7 separation — answer span RETAINED_BY_PARTICIPATION, volunteered reasoning
 		// PURGEABLE_AT_EXPIRY, the mixed blob deliberately NOT stored, and `omittedRegions` carrying the byte
@@ -596,6 +597,113 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 			rec!.omittedRegions.length,
 			'REG-D-057: the split must DECLARE the omission it performs, with enough structure to undo it'
 		).toBeGreaterThan(0);
+	});
+
+	// ── ⭐⭐ THE SPONSOR'S RULING, AND THE OBLIGATION IT CREATED ────────────────────────────────────────────
+	//
+	// ⭐ RULING (2026-09-14): *"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and
+	// the RELATIONSHIP BETWEEN THEM MUST BE DECLARED"* — so a reader can still tell which bytes an assessment
+	// rested on.
+	//
+	// ⛔ THE RULING TOOK A GUARANTEE AWAY AND THIS IS WHAT REPLACES IT. Until it, the artifact and the exchange
+	// named ONE content-addressed object and `art.storageKey === answerSpanRef.storageKey` held by arithmetic.
+	// Two objects means that relation is gone, and an UNDECLARED pair of objects is strictly worse than the
+	// single object it replaced. So the test below does not assert that the two differ — that is a consequence,
+	// not a guarantee — it asserts that the record RESOLVES: starting from the exchange alone, a reader reaches
+	// the exact bytes the assessment was recorded over.
+	/** The declaration E-5 carries, parsed back out of it. `undefined` when the record declared none. */
+	function derivationIn(detail: string) {
+		const at = detail.indexOf(WORK_PRODUCT_DERIVATION_TAG);
+		if (at < 0) return undefined;
+		const json = detail.slice(detail.indexOf('{', at));
+		return JSON.parse(json) as Record<string, unknown>;
+	}
+
+	it('⭐⭐ the ARTIFACT is REACHABLE from the exchange record — the relation is DECLARED, not inferred', async () => {
+		// ⭑ THE ASSERTION THAT MATTERS IS THE LAST ONE: the bytes are fetched USING ONLY WHAT THE RECORD SAYS.
+		// THE MUTANT: return the old `{outcome: 'NOT_ATTEMPTED', detail: 'An execution step answer is a work
+		// product; no schema coercion applies.'}`. Every other assertion in this file still passes, the run is
+		// green, and the governed record now holds two stored objects with nothing relating them — which is the
+		// ambiguity `REG-F-345` spent three attempts to remove, reintroduced by a ruling rather than by a bug.
+		const REASONING = 'First I considered the southern leg, then rejected it.';
+		// ⚠ A COMPLIANT ENVELOPE, WHICH THE SIBLING FIXTURE ABOVE DELIBERATELY IS NOT. That one carries
+		// `"rationale": "<string>"`, which `splitExecutionEnvelope` records as a SHORTFALL — correctly, since the
+		// execution contract asks for a rationale OBJECT. The compliant path is the one that must prove the
+		// relation is declared when nothing went wrong; the shortfall path gets its own control below.
+		const ENVELOPE =
+			`{"workProduct":"${ANSWER}","rationale":{"rationale":"Both legs were weighed.",` +
+			`"assumptions":[],"limitations":[],"residualUncertainty":[]}}`;
+		const { input, dispatched, store } = harness({
+			session: oneShotSession(async () => ({
+				answerText: ENVELOPE,
+				volunteeredReasoning: REASONING,
+				rawOutput: REASONING + ENVELOPE,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const
+			}))
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+
+		const rec = dispatched.at(-1)!;
+		// The answer half IS the envelope, per the ruling — so the span holds the envelope's bytes.
+		expect(rec.answerSpanRef.status).toBe('STORED');
+		expect(
+			await store.get((rec.answerSpanRef as { storageKey: string }).storageKey),
+			'the ANSWER HALF is the ENVELOPE'
+		).toBe(ENVELOPE);
+
+		// ⭑ E-5 IS NO LONGER `NOT_ATTEMPTED`, and that is the ruling's own consequence: under it the answer half
+		// is a structured envelope with a declared two-field shape, and this step coerces it.
+		expect(rec.parseOutcome.outcome).toBe('PARSED');
+
+		// ⭐ THE TAG IS PINNED AS A LITERAL, DELIBERATELY NOT VIA THE CONSTANT — this is the one assertion in the
+		// file that a rename of `WORK_PRODUCT_DERIVATION_TAG` cannot move with. Every other check here reaches the
+		// tag through `derivationIn`, which imports it, so both sides of those comparisons travel together and a
+		// rename is invisible to them: a control that cannot fail. The durable record is a WIRE FORMAT that
+		// external readers grep; renaming the constant silently changes what they must look for.
+		// ⚠ This is what lets the corresponding ledger entry name a UNIT victim instead of an e2e spec. An e2e
+		// victim can HANG rather than fail, and a timeout is INCONCLUSIVE — the absence of evidence, not evidence.
+		expect(
+			rec.parseOutcome.detail,
+			'the governed record must carry the derivation tag VERBATIM, as an external reader would grep for it'
+		).toContain('WORK_PRODUCT_DERIVATION');
+
+		const declared = derivationIn(rec.parseOutcome.detail);
+		expect(declared, 'the record declared no relation at all').toBeTruthy();
+		expect(declared!.derivedFrom).toBe('answerSpanRef');
+		expect(declared!.field).toBe('workProduct');
+		// ⛔ THE WHOLE ADDRESS, NOT JUST THE KEY — a reference that cannot be verified cannot be challenged.
+		expect(declared!.storageKey).toBe(out.storageKey);
+		expect(declared!.contentHash).toBe(out.contentHash);
+		expect(declared!.byteSize).toBe(out.byteSize);
+
+		// ⭐ AND IT RESOLVES. This is the property the one-object rule used to give for free: from the exchange
+		// record alone a reader reaches the exact bytes every assessment was recorded over.
+		expect(await store.get(String(declared!.storageKey))).toBe(ANSWER);
+	});
+
+	it('⭑ CONTROL — a reply that IGNORES the envelope still declares where its work product went', async () => {
+		// Without this, "declare the derivation" could be satisfied only on the compliant path — and the
+		// non-compliant path is the one where a reader most needs to know which bytes were kept. The shortfall
+		// is a RECORDED SHORTFALL, never a discarded work product: `splitExecutionEnvelope` treats the whole
+		// answer as the work product, so an address still exists and still has to be named.
+		const DELIMITED = '{"finding":"The route is viable."}';
+		const { input, dispatched, store } = harness({
+			session: oneShotSession(async () => DELIMITED)
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		const rec = dispatched.at(-1)!;
+		expect(rec.parseOutcome.outcome).toBe('SCHEMA_COERCION_FAILED');
+		expect(rec.parseOutcome.detail, 'the producer’s own shortfall, verbatim').toContain(
+			'no `workProduct` field'
+		);
+		const declared = derivationIn(rec.parseOutcome.detail);
+		expect(declared, 'a shortfall must not cost the reader the address').toBeTruthy();
+		expect(await store.get(String(declared!.storageKey))).toBe(DELIMITED);
 	});
 
 	it('⭑ CONTROL — the REVIEWER still receives no reasoning, so the fix is not "record everything, leak everything"', async () => {

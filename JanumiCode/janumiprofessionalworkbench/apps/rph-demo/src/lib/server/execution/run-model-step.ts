@@ -24,7 +24,7 @@ import type {
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
-import { splitExecutionEnvelope } from './execution-contract.js';
+import { declareWorkProductDerivation, splitExecutionEnvelope } from './execution-contract.js';
 import { stepCapabilityRefusal, type StepBindingRequest } from './step-binding.js';
 import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
@@ -177,12 +177,22 @@ export type RunModelStepOutcome =
 /**
  * Run one `MODEL_INVOCATION` step.
  *
- * ⭑ THE ANSWER IS STORED ONCE AND NAMED TWICE, and that is content-addressing paying for itself rather than a
- * shortcut. The exchange record retains the answer because `PER-9` requires the returned output kept per try;
- * an `ARTIFACT` names it because that is what a downstream step or an assurance policy consumes. Both point at
- * the same key, because the store keys on tenant + retention class + content hash — so the same bytes under
- * the same class ARE the same stored object. Writing them twice would produce two keys for one answer and a
- * reader could not tell which the assessment rested on.
+ * ⚠⚠ THIS DOCBLOCK IS REPLACED RATHER THAN EDITED, BECAUSE THE SPONSOR'S PHASE 0 RULING MADE IT FALSE. It read:
+ * *"THE ANSWER IS STORED ONCE AND NAMED TWICE … Both point at the same key, because the store keys on tenant +
+ * retention class + content hash — so the same bytes under the same class ARE the same stored object."* That
+ * held only while E-2's answer half WAS the work product, which is precisely the question the ruling settled
+ * the other way.
+ *
+ * ⭐ WHAT IS TRUE NOW. Three objects are retained per try, and each is retained for a stated reason:
+ *   · the ANSWER SPAN — the execution ENVELOPE the model returned, `RETAINED_BY_PARTICIPATION` (E-2, §9.7);
+ *   · the VOLUNTEERED REASONING, when any arrived — `PURGEABLE_AT_EXPIRY` (PER-12), separated at retention;
+ *   · the WORK PRODUCT — the envelope's `workProduct` field, which the `ARTIFACT` names and every assessment
+ *     is recorded over.
+ *
+ * ⛔ THE FIRST AND THIRD ARE NO LONGER ONE OBJECT, SO THE RELATION BETWEEN THEM IS DECLARED IN E-5 RATHER THAN
+ * INFERRED FROM EQUAL BYTES — `declareWorkProductDerivation`. The old arrangement's virtue was that *"a reader
+ * could not tell which the assessment rested on"* was answered by arithmetic; this one answers it by saying so,
+ * which is the only form available once the two halves genuinely differ.
  */
 export async function runModelInvocationStep(
 	input: RunModelStepInput
@@ -231,19 +241,20 @@ export async function runModelInvocationStep(
 	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
 	let answer: string;
-	// ⛔ E-2 WHOLE IS NOT RECORDED HERE, AND THAT IS A BLOCKED OBLIGATION RATHER THAN AN OVERSIGHT — SEE
-	// `ROADMAP-undertaking-execution-sandbox.md` §2. `captureTry` derives BOTH the answer span and the
-	// volunteered-reasoning span from the single `rawOutput` it is given, so passing the true raw reply is what
-	// would let Guide §9.7's lawful separation run. Passing the already-reduced `answer` means it never does, and
-	// the record then discloses *"No volunteered reasoning arrived"* for a reply that carried some.
+	// ⭐⭐ E-2 WHOLE, AS IT ARRIVED — THE ONE VALUE THE RECORDER MUST NOT BE HANDED ALREADY REDUCED.
 	//
-	// ⚠ THE FIX WAS BUILT, PROVED, AND WITHDRAWN, because it breaks a different ratified invariant. With the raw
-	// reply, `splitAnswerSpan` locates the JSON ENVELOPE, so `answerSpanRef` names the envelope while the ARTIFACT
-	// names `envelope.workProduct` — different bytes, different content hash, and `REG-F-345`'s *"the artifact and
-	// the exchange must name ONE stored object"* reddens in e2e. Two ratified obligations pull apart and the
-	// deciding question is a RULING: for an execution step, is E-2's answer half the WORK PRODUCT or the harness
-	// ENVELOPE that carries it? The envelope also carries `rationale`, so retaining it whole classifies reasoning
-	// as participating.
+	// `captureTry` derives BOTH the answer span and the volunteered-reasoning span from the single `rawOutput`
+	// it is given, so Guide §9.7's lawful separation can only run on the TRUE reply. This step used to hand it
+	// `answer` — stripped of reasoning by `answerText` and then envelope-split — so the split found nothing to
+	// separate, took the *"nothing to separate"* branch, and the record asserted in `volunteeredReasoningRef`'s
+	// own words that this was *"an observed absence, not an unretained presence"* for replies that carried some.
+	// ⛔ A record that manufactures the absence it then discloses is the defect; this variable is the fix.
+	//
+	// ⚠ `answer` IS UNTOUCHED BY THIS, AND THAT IS NOT AN OVERSIGHT. `TS-05` records `answer = returned.rawOutput`
+	// as the ASR-13 violation the split exists to PREVENT — the reviewer must never receive the producer's
+	// interior. The two values are separated here precisely so the RECORD can be complete while the REVIEWER
+	// stays cold.
+	let rawReply: string;
 	// ⭑ SET ONLY WHEN THE TOOL REPORTED ITS OWN IDENTITY. `undefined` here is not "no producer" — it is "the tool
 	// told us only its answer", which is a different fact and grades the evidence weaker rather than absent.
 	let produced: ToolInvocationResult | undefined;
@@ -252,7 +263,12 @@ export async function runModelInvocationStep(
 		if (isToolInvocationResult(returned)) {
 			produced = returned;
 			answer = returned.answerText;
-		} else answer = returned;
+			rawReply = returned.rawOutput;
+		} else {
+			answer = returned;
+			// A tool that told us only its answer told us the whole reply too — there is no interior it withheld.
+			rawReply = returned;
+		}
 	} catch (e) {
 		// ⚠ A FAILED CALL IS STILL A TRY THAT HAPPENED. `PER-9` wants the record; recording nothing here would
 		// make the one call that broke the run the one call with no evidence, which is the defect inverted.
@@ -292,6 +308,19 @@ export async function runModelInvocationStep(
 	const envelope = splitExecutionEnvelope(answer);
 	answer = envelope.workProduct;
 
+	// ⭐⭐ THE WORK PRODUCT IS STORED BEFORE THE TRY IS RECORDED, SO THE RECORD CAN NAME IT.
+	//
+	// ⛔ THE ORDER IS THE WHOLE POINT AND IT USED TO BE THE OTHER WAY ROUND. Under the Phase 0 ruling the answer
+	// span is the ENVELOPE and the artifact is the WORK PRODUCT, so they are no longer one content-addressed
+	// object and the relationship that was free — equal bytes, equal key — has to be DECLARED. A declaration
+	// cannot name an address that does not exist yet, so the `put` moves above the capture.
+	const stored = await input.store.put({
+		tenantPrefix: input.tenantPrefix,
+		bytes: answer,
+		mediaType: 'text/plain',
+		purgeability: 'RETAINED_BY_PARTICIPATION'
+	});
+
 	const respondedAt = input.now();
 	// ⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, because they can differ: a configured label may
 	// resolve to a different model, and `PER-9` E-3 wants the model ACTUALLY invoked. When the tool reported
@@ -315,31 +344,22 @@ export async function runModelInvocationStep(
 		// while the model saw a CONVERSATION. `PER-9`: a template *"never substitutes for"* the record.
 		// ⚠ Falls back to the turn for one-shot tools, whose turn IS very nearly the whole input.
 		prompt: produced?.materializedInput ?? turnText,
-		// ⚠ POST-COERCION, UNDER A FIELD WHOSE PROMISE IS *BEFORE* COERCION. Disclosed, not hidden: see the block
-		// above and `ROADMAP-undertaking-execution-sandbox.md` §2. Blocked on a ruling, not on effort.
-		rawOutput: answer,
+		// ⭐ THE TRUE REPLY, WHICH IS WHAT THE FIELD HAS ALWAYS PROMISED. It used to receive `answer` — already
+		// stripped and already envelope-split — so the field named "raw output BEFORE coercion" carried the value
+		// AFTER two coercions, and §9.7's separation could never run for an execution step.
+		rawOutput: rawReply,
 		disposition: 'accepted',
 		attemptOrdinal: 1,
 		requestedAt,
 		respondedAt,
-		// An execution step's answer is the WORK PRODUCT, not a structured judgement, so there is no schema to
-		// coerce it against and nothing was attempted. Saying PARSED would assert an outcome nobody observed.
-		parseOutcome: {
-			outcome: 'NOT_ATTEMPTED',
-			detail: 'An execution step answer is a work product; no schema coercion applies.'
-		},
+		// ⭐⭐ E-5 NOW CARRIES THE ARTIFACT→ANSWER-SPAN RELATION, because the ruling took away the one that was
+		// free. This read *"An execution step answer is a work product; no schema coercion applies"* — true while
+		// the answer half WAS the work product, false the moment it became the envelope.
+		parseOutcome: declareWorkProductDerivation(envelope, stored),
 		promptTemplateFingerprint: plan.fingerprint
 	});
 
 	const recording = record(input, sink);
-
-	// The same bytes, the same class — therefore the same key the exchange record already names.
-	const stored = await input.store.put({
-		tenantPrefix: input.tenantPrefix,
-		bytes: answer,
-		mediaType: 'text/plain',
-		purgeability: 'RETAINED_BY_PARTICIPATION'
-	});
 
 	return {
 		ran: true,

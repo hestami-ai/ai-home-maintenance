@@ -6154,5 +6154,157 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
 		why: "\u26d4 THIS ENTRY EXISTS BECAUSE A PREDICTION SURVIVED. `SATISFACTION_CLAIMS` has TWO members and the increment's first ten tests exercised only the SATISFIED one: narrowing the set to `['SATISFIED']` left ALL 45 checks GREEN, so the CONDITIONALLY_SATISFIED half of this guard's antecedent was carried by nothing. That is the control-that-cannot-fail shape found inside my own increment, by driving a `declaredMutations` line I had only PREDICTED. THE PROMISE (declared-assurance.ts): \"The two PWU `assuranceState` values that ARE a claim of satisfaction, and therefore the only two this rule governs.\" WHO RELIES ON IT: `rejectUnsupportedDeclaredSatisfaction` (pwu.ts) for BOTH arrival arrows; \u00a728.2 gives CONDITIONALLY_SATISFIED rung 5, ABOVE REJECTED, so a conditional disposition is still a claim that the work may proceed. WHAT THE MUTATION DOES TO THEM: a controller may reach assuranceState CONDITIONALLY_SATISFIED \u2014 and through the UNDER_ASSURANCE -> CONDITIONALLY_SATISFIED cross-axis guard, the work axis with it \u2014 over a required policy that REJECTED the subject. The SATISFIED half keeps refusing, so the guard looks alive and half of it is gone. \u2b51 THE ANCHOR IS THE USE, NOT THE SET: mutating the module-level `const SATISFACTION_CLAIMS` is behaviourally identical and `attributeGuard` credits NO export for a module-level statement (the trap `MU-PFA-AF3-reject` records), so it would have landed as an unattributedMutant and left `unsupportedSatisfaction` looking less guarded than it is.\n\nOBSERVED: declared-assurance-binds.test.ts + execrem-wp16-enforcement-observed.test.ts 46/46 PASS -> 45 pass / 1 fail. Killing assertion: \"REFUSES an aggregate CONDITIONALLY_SATISFIED while a declared policy reads REJECTED\" -> `AssertionError: expected a refusal, got : : expected 'ACCEPTED' to be 'REJECTED'`. EXACTLY ONE of forty-six, and it is the test that was WRITTEN FOR THIS MUTANT after the set-level version survived 45/45 \u2014 measured in that order: survived, test added, killed. Mutant compiles. Anchor: 1 hit, OWNERS [\"unsupportedSatisfaction\"].",
 		source: "JAN-PWU007 \u2014 driving the register rows' own `declaredMutations` rather than asserting them; this one SURVIVED and the gap it exposed was closed in the same commit"
+	},
+	// ── ⭐ JAN-EXEC PHASE 0 — THE RECORD MUST NOT MANUFACTURE THE ABSENCE IT DISCLOSES ──────────────────
+	{
+		id: 'P0-a-the-recorder-is-handed-an-already-reduced-reply',
+		file: 'apps/rph-demo/src/lib/server/execution/run-model-step.ts',
+		// THE STATE THIS RESTORES IS THE ONE THAT SHIPPED FOR A FORTNIGHT. `captureTry` derives BOTH the answer
+		// span and the volunteered-reasoning span from the single `rawOutput` it is given, so handing it a value
+		// already stripped by `answerText` and already envelope-split means Guide §9.7's lawful separation NEVER
+		// RUNS for an execution step — the record then takes the "nothing to separate" branch and asserts, in
+		// `volunteeredReasoningRef`'s own words, that this is *"an observed absence, not an unretained presence"*
+		// for a reply that demonstrably carried reasoning.
+		find: '\t\trawOutput: rawReply,',
+		replace:
+			'\t\trawOutput: answer, // MUTANT: the recorder is handed the value AFTER two coercions',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: Guide §9.7 as `captureTry` implements it — *\"where it arrives inline with the answer, separate it at retention so that only the answer span binds under Section 8.4\"* — with `REG-D-050` classifying the halves (answer RETAINED_BY_PARTICIPATION, volunteered reasoning PURGEABLE_AT_EXPIRY) and `REG-D-057` requiring the omission be DECLARED with enough structure to undo. WHO RELIES: every consumer of `MODEL_EXCHANGE`, retention (a purge of the reasoning half is impossible if it was never separated out), and any future replay — `DESIGN-undertaking-execution-sandbox.md` B4 measured a replay of the unfixed path reproducing a DIFFERENT run. WHAT THE MUTATION DOES TO THEM: `splitAnswerSpan` sees a value with no reasoning left in it, so `volunteered` is empty, `volunteeredReasoningRef` goes PENDING with the *\"observed absence\"* reason, `rawOutputBeforeCoercionRef` aliases the answer span, and `omittedRegions` stays empty — a governed record stating as measured fact something the STEP itself destroyed one line earlier. ⚠ IT IS NOT A BYTE-COUNT DEFECT: the record is internally consistent and looks complete, which is why no existing assertion outside this suite notices.",
+		source: "JAN-EXEC Phase 0 (ROADMAP-undertaking-execution-sandbox.md §2), unblocked by the sponsor's ruling of 2026-09-14"
+	},
+	{
+		id: 'P0-b-the-declared-relation-resolves-to-nothing',
+		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
+		// ⛔ THE MUTATION SWAPS TWO FIELDS RATHER THAN DELETING THEM, DELIBERATELY. Deleting the address would leave
+		// the `workProduct` parameter unused and risk a NO_COMPILE that proves nothing (this ledger's own header
+		// records 21 such artifacts). Swapping `storageKey` and `contentHash` keeps every parameter used and every
+		// type intact, and produces exactly the failure the ruling exists to prevent: a declaration that is PRESENT,
+		// well-formed, parseable — and points a reader at bytes that are not the artifact's.
+		find: '\t\t\tstorageKey: workProduct.storageKey,\n\t\t\tcontentHash: workProduct.contentHash,',
+		replace:
+			'\t\t\tstorageKey: workProduct.contentHash, // MUTANT: the declaration resolves to nothing\n\t\t\tcontentHash: workProduct.storageKey,',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: the sponsor's JAN-EXEC Phase 0 ruling (2026-09-14) — *\"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED\"* — so a reader can still tell which bytes an assessment rested on. WHO RELIES: `run-model-step.ts` is the only producer, and the consumers are every reader of a `MODEL_EXCHANGE` on the EXECUTION plane — including the e2e assertion that replaced `REG-F-345`'s one-object rule. WHAT THE MUTATION DOES TO THEM: the record still carries a WORK_PRODUCT_DERIVATION, still names `answerSpanRef` and `workProduct`, and still parses — so every structural assertion about the declaration's PRESENCE holds. What breaks is the only thing that matters: the key it names addresses no stored object, so a reader following the record reaches nothing, and the two objects the ruling created are related by a statement that is false. ⭑ That is why the victim asserts a RESOLUTION (`store.get(declared.storageKey)` returns the work product) rather than the presence of a tag.",
+		source: 'JAN-EXEC Phase 0 — the guard for `declareWorkProductDerivation`, landed with the export'
+	},
+	{
+		id: 'P0-c-the-declaration-never-reaches-the-governed-record',
+		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
+		// THE SURFACE LIMB. `P0-b` proves the declaration is CORRECT where it is built; this proves it SURVIVES the
+		// whole path — capture, the recorder mapping, the `z.strictObject` dispatch boundary and the engine — and
+		// arrives on a durable MODEL_EXCHANGE a reader can actually query. Renaming the tag is the cheapest mutation
+		// that leaves the unit meaning intact while making the record unfindable.
+		find: "export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';",
+		replace:
+			"export const WORK_PRODUCT_DERIVATION_TAG = 'DERIVATION'; // MUTANT: the tag a reader greps for is renamed",
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: the same ruling, asserted at the SURFACE rather than at the producer. The e2e reads the engine's own materialized `MODEL_EXCHANGE` state and requires that the declaration be findable there and resolve to the `ARTIFACT` the three floor assessments were recorded over. WHO RELIES: anyone auditing which bytes an assessment rested on — the exact reader `REG-F-345`'s *\"a reader cannot tell which the assessment rested on\"* was written for, whose free guarantee this ruling removed. WHAT THE MUTATION DOES TO THEM: every unit assertion still passes, because the unit test imports the same constant and therefore MOVES WITH IT — the mutation is invisible to it, which is precisely why this limb needs its own victim. On the surface the durable record then carries a tag nobody greps for, and the relation is once again undiscoverable.",
+		source: 'JAN-EXEC Phase 0 — the e2e limb of the declared relation'
+	},
+	// -- JAN-EXEC PHASE 1: the two ports, and the defaults that cannot fabricate --------------------
+	{
+		id: "P1-a-an-absolute-path-is-normalized-instead-of-refused",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// THE ORDER IS THE GUARD. Normalizing an absolute path yields an absolute path that still LOOKS tidy —
+		// `/etc/passwd` becomes `etc/passwd` and reads as contained — so a containment check applied AFTER
+		// normalization reports a pass on the exact input it exists to refuse.
+		find: "\tif (/^[A-Za-z]:/.test(path)) return undefined;\n\tif (path.startsWith('/') || path.startsWith('\\\\')) return undefined;",
+		replace: "\t// MUTANT: the absolute forms fall through to normalization instead of being refused",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE, in the export's own docblock: \"The containment predicate BOTH implementations must honour, expressed once ... Returns the normalized relative path, or `undefined` when the path escapes\", and \"IT REFUSES BEFORE IT NORMALIZES, for the absolute cases.\" WHO RELIES: createInMemoryWorkspace's writeFile, readFile and purge all route through it, and the filesystem adapter Phase 2 builds must reproduce it - it is the only thing standing between a model-supplied path and the host's filesystem. WHAT THE MUTATION DOES TO THEM: the posix-absolute, backslash-absolute, drive-qualified and drive-RELATIVE forms all normalize into tidy-looking relative paths and are reported CONTAINED, so a step could write outside its workspace with the guard still visibly present in the source. The drive-relative case is the one a reader is most likely to miss: `c:src` carries no separator at all, so every separator-based check passes it.",
+		source: "JAN-EXEC Phase 1 (ROADMAP-undertaking-execution-sandbox.md §3) - the guard for `containedWorkspacePath`"
+	},
+	{
+		id: "P1-b-an-underflowing-parent-segment-is-tolerated",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// `Array.prototype.pop()` ON AN EMPTY ARRAY IS A SILENT NO-OP, which is what makes this mutation so
+		// plausible: the code still reads as though it were tracking depth.
+		find: "\t\t\tif (out.length === 0) return undefined;\n\t\t\tout.pop();",
+		replace: "\t\t\tout.pop(); // MUTANT: an underflowing `..` is silently tolerated",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE: the same docblock - `undefined` when the path escapes - and the inline note that refusing on UNDERFLOW is the containment check, while refusing on every `..` would wrongly reject `a/../b`, which is inside. WHO RELIES: every workspace method, and the filesystem adapter Phase 2 builds. WHAT THE MUTATION DOES TO THEM: `../secrets` normalizes to `secrets` and `a/../../b` to `b`, both reported CONTAINED. A model that has learned to prefix a path with `../` escapes the workspace while `list()` shows a tidy relative entry - so the record of what the step wrote is ALSO wrong, and the escape and its concealment are the same line.",
+		source: "JAN-EXEC Phase 1 - the underflow limb of `containedWorkspacePath`"
+	},
+	{
+		id: "P1-c-the-workspace-root-is-treated-as-a-file",
+		file: "packages/rph-ports/src/ports/workspace.ts",
+		// THE QUIET ONE. Without this check `.` and `a/..` normalize to the EMPTY STRING, which is defined - so
+		// the predicate reports containment for a path that names a DIRECTORY rather than a file location.
+		find: "\t// `a/..` normalizes to the workspace ROOT, which is a directory and not a file location.\n\tif (out.length === 0) return undefined;",
+		replace: "\t// MUTANT: the workspace root is accepted as a file location",
+		expectRed: ["packages/rph-ports/src/ports/workspace.test.ts"],
+		why: "PROMISE: the predicate returns a path a caller may WRITE TO, READ FROM and PURGE. WHO RELIES: writeFile keys its map on the returned value and purge destroys what that key addresses. WHAT THE MUTATION DOES TO THEM: `.` and `a/..` both return the empty string, so a step could write a file whose path is empty and, on a filesystem adapter, resolve it to the workspace DIRECTORY itself - a write or a purge aimed at the root rather than at anything in it. The empty string is falsy but NOT undefined, so every caller written as `if (rel === undefined)` - which is all of them, deliberately, since an empty file's content must stay distinguishable - admits it.",
+		source: "JAN-EXEC Phase 1 - the root limb of `containedWorkspacePath`"
+	},
+	{
+		id: "P1-d-the-entry-does-not-survive-its-purge",
+		file: "packages/rph-ports/src/defaults/workspace.ts",
+		// THE READ-SIDE ASSERTION STAYS GREEN UNDER THIS MUTATION, which is the whole reason the victim also
+		// asserts `list()`. Deleting the entry makes `readFile` answer undefined exactly as a lawful purge
+		// does - so a test that checked only the read would pass while the tombstone was gone.
+		find: "\t\t\tfiles.set(rel, { byteSize: held.byteSize, purged: true });",
+		replace: "\t\t\tfiles.delete(rel); // MUTANT: the entry does not survive its purge",
+		expectRed: ["packages/rph-ports/src/defaults/workspace.test.ts"],
+		why: "PROMISE, carried from ArtifactStore.purge verbatim: \"Remove the BYTES and keep the ENTRY ... deleting the entry outright leaves a reference pointing at nothing, and a reader cannot then tell 'purged on schedule' from 'never stored' from 'lost'\" (JAN-CSAA-009 §20, tombstone-or-unavailable-record). WHO RELIES: any record that names a workspace path - under R7 that includes a build's retained stdout and stderr - and the retention audit that has to evidence a policy actually ran. WHAT THE MUTATION DOES TO THEM: the path vanishes from list(), so the three cases collapse into one indistinguishable absence and the purge leaves no evidence it happened. It also erases byteSize, which is the only surviving statement of WHAT was removed.",
+		source: "JAN-EXEC Phase 1 - the tombstone limb of `createInMemoryWorkspace`"
+	},
+	{
+		id: "P1-e-the-declared-retention-class-is-read-the-wrong-way-round",
+		file: "packages/rph-ports/src/defaults/workspace.ts",
+		// THE CLASS IS DECLARED ON THE WORKSPACE RATHER THAN ENCODED IN THE ADDRESS - a path-named store cannot
+		// carry it in the key the way the content-addressed one does - so this single read is the ONLY thing
+		// standing between `purge` and a PER-8 hard delete.
+		find: "\t\t\tif (input.purgeability === 'RETAINED_BY_PARTICIPATION')",
+		replace: "\t\t\tif (input.purgeability === 'PURGEABLE_AT_EXPIRY') // MUTANT: the declared class is read inverted",
+		expectRed: ["packages/rph-ports/src/defaults/workspace.test.ts"],
+		why: "PROMISE: PER-8 - a canonical object that has participated in execution, assurance, governance, a baseline or traceability is NEVER hard-deleted; content is purgeable precisely because it never participates (PER-12). The port header states the addressing consequence: purgeability is DECLARED here because a path-named workspace cannot put the class in its key. WHO RELIES: every host that declares a participating workspace, and REG-F-337 is the measured precedent one layer over - a class that was not part of the identity let a purge destroy bytes a recorded assessment rested on. WHAT THE MUTATION DOES TO THEM: a workspace declared RETAINED_BY_PARTICIPATION purges on demand - a hard-delete vector wearing a retention label - while a PURGEABLE_AT_EXPIRY one refuses, so PER-12's obligation that retained content CAN be purged also fails. Both directions redden in the named victim, which is what distinguishes an inverted read from a missing one.",
+		source: "JAN-EXEC Phase 1 - the PER-8 limb of `createInMemoryWorkspace`"
+	},
+	{
+		id: "P1-f-the-refusing-default-reports-a-passing-command",
+		file: "packages/rph-ports/src/defaults/process-runner.ts",
+		// THIS IS ROADMAP RULE 6 STATED AS CODE: "NO DEFAULT THAT FABRICATES. A no-op ProcessRunner returning
+		// {exitCode: 0} is indistinguishable downstream from a command that ran and passed." The mutation is
+		// the exact shape the rule forbids, and it TYPECHECKS - which is why the rule needs a test, not a norm.
+		find: "\t\tasync run(request: ProcessRunRequest): Promise<ProcessRunOutcome> {",
+		replace: "\t\tasync run(request: ProcessRunRequest): Promise<ProcessRunOutcome> {\n\t\t\t// MUTANT: the no-op reports a passing command\n\t\t\tif (request.argv.length >= 0)\n\t\t\t\treturn { ran: true, exitCode: 0, timedOut: false, stdout: '', stderr: '', durationMs: 0 };",
+		expectRed: ["packages/rph-ports/src/defaults/process-runner.test.ts"],
+		why: "PROMISE, in the module header: \"The library ships the SEAM, never a host's permission to execute\", and the union exists so the refusing arm is STRUCTURALLY unable to invent an exit code. WHO RELIES: every host that has not wired a runner - which today is all of them - plus any step, TEST_RESULT or assurance policy downstream of one. WHAT THE MUTATION DOES TO THEM: a governed record says a command ran and passed when no process was ever started. The victim asserts Object.hasOwn(out, 'exitCode') === false rather than out.exitCode === undefined, and only the first form catches this: a runner returning {ran: true, exitCode: undefined} satisfies the weaker assertion while claiming the command ran - and this repository has the receipt for exactly that shape of vacuous green.",
+		source: "JAN-EXEC Phase 1 - rule 6, the guard for `createRefusingProcessRunner`"
+	},
+	{
+		id: "P1-g-the-materialization-check-is-inverted",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		// IT STILL REFUSES AFTERWARDS, VIA THE directoryPath ARM, SO `planned === false` STAYS TRUE. That is
+		// what makes this mutant worth declaring: it can only be killed by a victim that asserts the MESSAGE,
+		// and a suite asserting the refusal alone would report it SURVIVED.
+		find: "\tif (input.workspace.materialization !== 'FILESYSTEM')",
+		replace: "\tif (input.workspace.materialization === 'FILESYSTEM') // MUTANT: the materialization check is inverted",
+		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
+		why: "PROMISE: DESIGN-undertaking-execution-sandbox.md §4.1 - \"A host wiring a REAL runner against an IN_MEMORY workspace must be caught BEFORE anything runs, or the command executes in some other directory - the one failure this seam must never have.\" WHO RELIES: Phase 2's host, and every sandboxed step after it. WHAT THE MUTATION DOES TO THEM: a FILESYSTEM workspace - the only lawful arrangement - is refused, so the seam cannot be used at all; while an IN_MEMORY one falls through to a refusal that names the WRONG CAUSE. A host debugging it is told its directoryPath is missing when the actual fact is that its workspace has no directory at all, and the WIRING ERROR wording that says whose mistake it is never appears.",
+		source: "JAN-EXEC Phase 1 - the cross-port limb of `planProcessRun`"
+	},
+	{
+		id: "P1-h-both-wirings-get-the-same-refusal",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		// THE TWO REFUSALS MUST STAY DISTINGUISHABLE. REFUSING + IN_MEMORY is the library's own hermetic default
+		// and every existing test is in it; REAL + IN_MEMORY is a host misconfiguration. One message for both
+		// makes the misconfiguration read exactly like the default.
+		find: "\t\t\t\tinput.runner.kind === 'REAL'",
+		replace: "\t\t\t\tinput.argv.length >= 0 // MUTANT: both wirings get the WIRING ERROR message",
+		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
+		why: "PROMISE, in the function's own docblock: \"IT REFUSES AN IN_MEMORY WORKSPACE FOR EITHER RUNNER KIND, AND THE MESSAGES DIFFER ON PURPOSE ... Collapsing the two into one message would make a misconfiguration read exactly like the default.\" WHO RELIES: whoever is debugging why nothing ran - the only reader this distinction exists for. WHAT THE MUTATION DOES TO THEM: the hermetic default now announces itself as a WIRING ERROR, so a host is sent to fix a correct configuration; and once that message is normal noise, the real misconfiguration is indistinguishable from it. `planned` is false either way, so this mutant is INVISIBLE to any assertion that stops at the refusal - the victim asserts that the default's message does NOT match /WIRING ERROR/, which is the only form that catches it.",
+		source: "JAN-EXEC Phase 1 - the message-discrimination limb of `planProcessRun`"
+	},
+	{
+		id: "P1-i-a-fabricating-timeout-bound-is-admitted",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		// OR -> AND. Both disjuncts remain in the source and the check still runs; it simply now requires BOTH,
+		// which no real input satisfies. A reviewer reading the line sees a bound being checked.
+		find: "\tif (!Number.isFinite(input.timeoutMs) || input.timeoutMs <= 0)",
+		replace: "\tif (!Number.isFinite(input.timeoutMs) && input.timeoutMs <= 0) // MUTANT: only a non-finite AND non-positive bound refuses",
+		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
+		why: "PROMISE: §36.2 separates a TIMEOUT failure class from TOOL_FAILURE, and the port header states that timedOut is OBSERVED and never inferred. A bound of 0 kills a process before it can do anything and reports TIMEOUT for a command that never ran; Infinity makes the TIMEOUT class unreachable. Both convert an observation into an artifact of configuration - this programme's rule 6 arriving through the timeout rather than through the exit code. WHO RELIES: whatever maps a run outcome onto ExecutionFailureClass, and the assurance policy that reads the result. WHAT THE MUTATION DOES TO THEM: all four fabricating bounds (0, -1, Infinity, NaN) plan and run, because no finite value is also non-finite. The guard is visibly present and fires for nothing.",
+		source: "JAN-EXEC Phase 1 - the timeout limb of `planProcessRun`"
 	}
 ];

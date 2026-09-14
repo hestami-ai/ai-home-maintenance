@@ -20,6 +20,8 @@
 // work-unit type and authored by a professional. The type says WHAT work; the harness says the EXECUTION
 // CONTRACT. Injecting this into the template would silently edit someone else's contract.
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { StoredArtifactRef } from '@janumipwb/rph-ports';
+import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 
 /**
  * The executor's system prompt.
@@ -84,7 +86,8 @@ export function splitExecutionEnvelope(answer: string): ExecutionEnvelope {
 	} catch {
 		return {
 			workProduct: answer,
-			shortfall: 'The answer is not a JSON object, so the execution contract’s envelope could not be read.'
+			shortfall:
+				'The answer is not a JSON object, so the execution contract’s envelope could not be read.'
 		};
 	}
 	if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
@@ -127,4 +130,79 @@ export function splitExecutionEnvelope(answer: string): ExecutionEnvelope {
 			residualUncertainty: list(ro.residualUncertainty)
 		}
 	};
+}
+
+// ── ⭐⭐ JAN-EXEC PHASE 0 — THE ANSWER HALF IS THE ENVELOPE, SO THE ARTIFACT MUST BE DECLARED ───────────
+//
+// ⭐ SPONSOR RULING (2026-09-14): *"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK
+// PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED"* — so a reader can still tell which bytes an
+// assessment rested on.
+//
+// ⛔ WHAT THAT RULING COSTS, AND WHY THIS FUNCTION IS THE PRICE. Until it, the artifact and the exchange named
+// ONE stored object and the relationship was IMPLICIT IN EQUAL BYTES: the same bytes under the same retention
+// class ARE the same content-addressed key, so `art.storageKey === answerSpanRef.storageKey` held for free and
+// `REG-F-345`'s one-object rule was satisfied by arithmetic. Passing the TRUE raw reply to `captureTry` — which
+// is what lets Guide §9.7's lawful separation run at all — makes `splitAnswerSpan` locate the ENVELOPE, and the
+// envelope is not the work product. Two objects, two hashes, and the free relationship is gone.
+//
+// ⚠ SO IT IS PAID FOR EXPLICITLY, IN THE RECORD, AND NOT LEFT TO THE READER TO INFER. `PER-9` permits a
+// DISCLOSED absence and forbids a silent one; the same standard applies to a disclosed RELATION. E-5 is the
+// element that carries *"what became of the bytes between the model and the judgement"*, and under this ruling
+// what became of them is exactly this: the envelope was read, its `workProduct` field was taken out, and THOSE
+// bytes — not the answer span's — are the ones every assessment is recorded over.
+//
+// ⛔ AND `NOT_ATTEMPTED` BECOMES FALSE HERE, WHICH IS A CONSEQUENCE OF THE RULING RATHER THAN A TIDY-UP. The
+// old detail said *"An execution step answer is a work product; no schema coercion applies."* That was true
+// while the answer half WAS the work product. Under the ruling the answer half is a structured envelope with a
+// declared two-field shape, `splitExecutionEnvelope` coerces it, and saying nothing was attempted would assert
+// an absence the step manufactured — the same defect one field over.
+
+/** The tag a reader greps for. Named once so the producer and every assertion about it cannot drift apart. */
+export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';
+
+/**
+ * Declare, in the exchange record's own E-5, where the work product an assessment rests on actually went.
+ *
+ * ⛔ IT NAMES THE WHOLE ADDRESS, NOT JUST THE KEY. `ContentRef`'s own docblock records why the short form was
+ * a defect: *"a reference that cannot be verified is a reference that cannot be challenged"*. A declaration
+ * carrying `contentHash` lets a reader re-hash the retained bytes and refuse this record if it lied; one
+ * carrying only a key can only be believed.
+ *
+ * ⚠ THE SHORTFALL ARM IS NOT A FAILURE ARM. When the envelope was not honoured, `splitExecutionEnvelope`
+ * treats the WHOLE ANSWER as the work product — the professional's work is not discarded because the harness's
+ * wrapper was ignored — so a work product still exists, still has an address, and still must be declared. What
+ * changes is the outcome member and that the producer's own shortfall is quoted verbatim rather than summarised.
+ */
+export function declareWorkProductDerivation(
+	envelope: ExecutionEnvelope,
+	workProduct: StoredArtifactRef
+): ExchangeParseOutcome {
+	const address =
+		`${WORK_PRODUCT_DERIVATION_TAG} ` +
+		JSON.stringify({
+			derivedFrom: 'answerSpanRef',
+			field: 'workProduct',
+			storageProvider: workProduct.storageProvider,
+			storageKey: workProduct.storageKey,
+			contentHash: workProduct.contentHash,
+			byteSize: workProduct.byteSize
+		});
+	return envelope.shortfall
+		? {
+				outcome: 'SCHEMA_COERCION_FAILED',
+				detail:
+					'E-2’s answer half is the execution ENVELOPE (JAN-EXEC Phase 0 ruling). This one did not honour ' +
+					`the execution contract — ${envelope.shortfall} — so the whole answer is treated as the work ` +
+					'product. It is retained SEPARATELY from the answer span, and the assessment rests on these bytes ' +
+					`and not on the span’s: ${address}`
+			}
+		: {
+				outcome: 'PARSED',
+				detail:
+					'E-2’s answer half is the execution ENVELOPE (JAN-EXEC Phase 0 ruling: the ANSWER HALF is the ' +
+					'ENVELOPE, the ARTIFACT keeps naming the WORK PRODUCT, and the relationship between them must be ' +
+					'DECLARED). The envelope was read and its `workProduct` field extracted and retained SEPARATELY, ' +
+					'so the artifact and the answer span are no longer the same stored object. The assessment rests ' +
+					`on these bytes: ${address}`
+			};
 }

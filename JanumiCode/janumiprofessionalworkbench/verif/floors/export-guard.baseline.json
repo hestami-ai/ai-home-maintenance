@@ -1158,6 +1158,16 @@
 			],
 			"unattributedMutants": 0
 		},
+		"packages/rph-ports/src/defaults/process-runner.ts": {
+			"consumedExports": [],
+			"guardedExports": [],
+			"unattributedMutants": 0
+		},
+		"packages/rph-ports/src/defaults/workspace.ts": {
+			"consumedExports": [],
+			"guardedExports": [],
+			"unattributedMutants": 0
+		},
 		"packages/rph-ports/src/ports/authentication.ts": {
 			"consumedExports": [
 				"asCredential"
@@ -1173,6 +1183,20 @@
 			],
 			"guardedExports": [
 				"LOG_LEVEL_ORDER"
+			],
+			"unattributedMutants": 0
+		},
+		"packages/rph-ports/src/ports/process-runner.ts": {
+			"consumedExports": [],
+			"guardedExports": [],
+			"unattributedMutants": 0
+		},
+		"packages/rph-ports/src/ports/workspace.ts": {
+			"consumedExports": [
+				"containedWorkspacePath"
+			],
+			"guardedExports": [
+				"containedWorkspacePath"
 			],
 			"unattributedMutants": 0
 		},
