@@ -57,6 +57,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// `rph-domain/src/execution.test.ts` — a pure-predicate call, for a rule enforced nowhere. PWU-009 is new: the
 	// same production site refuses it, and the register gives it its own marker so one arrangement cannot green both.
 	'RPH-PWU-009': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// ── RE-CITED 2026-09-14 (JAN-PWU007). The comment above records RPH-PWU-007's cite being REMOVED in 2026-08-02
+	// because `pwuGuards.test.ts` was PURE_KERNEL evidence for a rule the running engine never asked. It is cited
+	// again now, and to a DISPATCH: `rejectUnsupportedDeclaredSatisfaction` assembles the PWU's declared policy set
+	// and refuses an asserted satisfaction its own verdicts do not compose to. RPH-ASR-012 arrives with it, from
+	// the same guard — and is distinguished from it by the §28.2 rung each probe turns on, never by the site.
+	'RPH-PWU-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-ASR-012': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-010': 'packages/rph-application/src/handlers/execrem-wp12-authority.test.ts',
 	'RPH-EXE-001': 'packages/rph-application/src/handlers/execution-plan-activation-guard.test.ts',
 	'RPH-EXE-002': 'packages/rph-application/src/handlers/execution-plan-supersede.test.ts',

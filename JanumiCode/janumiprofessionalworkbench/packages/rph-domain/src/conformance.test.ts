@@ -193,10 +193,26 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                        on no refusal code or message anywhere, so what was "covered" was the rule's
 		//                        NON-ACCEPTANCE, never its identity. The cite is the enforcement probe, which
 		//                        checks code and marker.
+		//   2026-09-14  42 -> 44  RPH-PWU-007 and RPH-ASR-012 TOGETHER, and the pairing is the entry's content. Both
+		//                         were UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards, and both were closed by
+		//                         ONE guard — `rejectUnsupportedDeclaredSatisfaction` — because the register had
+		//                         recorded one absence on two axes and RPH-PWU-007's own disclosure said so in
+		//                         advance ("closing it would likely close both"). So this is +2 for ONE wiring, not
+		//                         two independent cites, and the risk it carries is the one the marker-distinctness
+		//                         gate exists for: two rows greened by one refusal. They are separated at the
+		//                         OBSERVATION POINT by the §28.2 rung each probe turns on — RPH-PWU-007 on a
+		//                         REJECTED required verdict (rung 1/2, the sentence canon states for it),
+		//                         RPH-ASR-012 on a CONDITIONALLY_SATISFIED one with nothing rejected anywhere
+		//                         (rung 5, which RPH-PWU-007's words cannot reach) — and neither marker occurs in
+		//                         the other's message.
+		//                         ⚠ RPH-PWU-007's cite was REMOVED from this manifest on 2026-08-02 as an
+		//                         overclaim (it pointed at `pwuGuards.test.ts`, PURE_KERNEL evidence for a rule
+		//                         the engine never asked). It returns to a DISPATCH, which is the only cite the
+		//                         layer gate now admits for it.
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(42);
+		).toBe(44);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

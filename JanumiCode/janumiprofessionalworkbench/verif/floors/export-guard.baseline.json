@@ -66,6 +66,15 @@
 			],
 			"unattributedMutants": 0
 		},
+		"packages/rph-application/src/handlers/assessment-index.ts": {
+			"consumedExports": [
+				"latestAssessmentByPolicy"
+			],
+			"guardedExports": [
+				"latestAssessmentByPolicy"
+			],
+			"unattributedMutants": 0
+		},
 		"packages/rph-application/src/handlers/assurance.ts": {
 			"consumedExports": [
 				"activateAssurancePolicy",
@@ -138,6 +147,19 @@
 			],
 			"guardedExports": [
 				"createContextAssemblyPolicy"
+			],
+			"unattributedMutants": 0
+		},
+		"packages/rph-application/src/handlers/declared-assurance.ts": {
+			"consumedExports": [
+				"declaredPolicyVerdicts",
+				"unsupportedSatisfaction",
+				"unsupportedSatisfactionMessage"
+			],
+			"guardedExports": [
+				"declaredPolicyVerdicts",
+				"unsupportedSatisfaction",
+				"unsupportedSatisfactionMessage"
 			],
 			"unattributedMutants": 0
 		},
@@ -720,10 +742,14 @@
 		},
 		"packages/rph-domain/src/aggregate-assurance.ts": {
 			"consumedExports": [
-				"aggregateAssuranceDisposition"
+				"AGGREGATE_STRICTNESS",
+				"aggregateAssuranceDisposition",
+				"declaredAssurancePolicyIds"
 			],
 			"guardedExports": [
-				"aggregateAssuranceDisposition"
+				"AGGREGATE_STRICTNESS",
+				"aggregateAssuranceDisposition",
+				"declaredAssurancePolicyIds"
 			],
 			"unattributedMutants": 0
 		},

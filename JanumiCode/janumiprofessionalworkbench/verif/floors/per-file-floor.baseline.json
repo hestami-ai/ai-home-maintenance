@@ -38,9 +38,15 @@
 			"functions": 0,
 			"lines": 0
 		},
+		"packages/rph-application/src/handlers/assessment-index.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
 		"packages/rph-application/src/handlers/assurance.ts": {
 			"statements": 6,
-			"branches": 52,
+			"branches": 51,
 			"functions": 0,
 			"lines": 1
 		},
@@ -53,6 +59,12 @@
 		"packages/rph-application/src/handlers/context-assembly-policy.ts": {
 			"statements": 0,
 			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-application/src/handlers/declared-assurance.ts": {
+			"statements": 1,
+			"branches": 2,
 			"functions": 0,
 			"lines": 0
 		},
@@ -76,7 +88,7 @@
 		},
 		"packages/rph-application/src/handlers/floor-gate.ts": {
 			"statements": 1,
-			"branches": 3,
+			"branches": 1,
 			"functions": 0,
 			"lines": 0
 		},
@@ -141,8 +153,8 @@
 			"lines": 0
 		},
 		"packages/rph-application/src/handlers/reject-authorization.ts": {
-			"statements": 4,
-			"branches": 7,
+			"statements": 3,
+			"branches": 6,
 			"functions": 0,
 			"lines": 3
 		},
@@ -351,8 +363,8 @@
 			"lines": 0
 		},
 		"packages/rph-domain/src/stateMachine.ts": {
-			"statements": 4,
-			"branches": 3,
+			"statements": 3,
+			"branches": 2,
 			"functions": 2,
 			"lines": 2
 		},
@@ -388,7 +400,7 @@
 		},
 		"packages/rph-engine/src/governing-policies.ts": {
 			"statements": 4,
-			"branches": 3,
+			"branches": 2,
 			"functions": 2,
 			"lines": 3
 		},

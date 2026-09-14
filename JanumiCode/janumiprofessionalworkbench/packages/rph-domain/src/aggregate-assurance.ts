@@ -128,3 +128,33 @@ export const AGGREGATE_STRICTNESS: readonly AggregateAssuranceDisposition[] = [
 	'CONDITIONALLY_SATISFIED',
 	'SATISFIED'
 ];
+
+/**
+ * WHICH POLICIES A SUBJECT'S OWN DECLARATION MAKES REQUIRED — the PWU's `assurancePolicyIds` UNION its PWU
+ * Type's `requiredAssurancePolicyIds`, de-duplicated, in declaration order.
+ *
+ * ── WHY IT IS HERE AND NOT BESIDE EITHER READER ─────────────────────────────────────────────────────────────
+ * This join had ONE implementation and TWO readers were about to exist. `selectGoverningPolicies`
+ * (rph-engine) computed it inline for the DECLARED half of DECLARED ∩ DETERMINED, and the command-layer guard
+ * that refuses an unsupported satisfaction needs exactly the same set. A second copy would be the drift this
+ * repository keeps finding: the drive and the gate would answer "which policies are required here" differently,
+ * and the disagreement would present as a PWU that the seed can satisfy and the engine cannot (or worse, the
+ * reverse). rph-domain is the only package BOTH readers already depend on, and the join is pure — it reads two
+ * plain object states and touches no store — so it belongs in the kernel by the same rule that put
+ * `aggregateAssuranceDisposition` here.
+ *
+ * ⚠ IT IS THE **DECLARED** HALF ONLY. It performs no §5.1 applicability determination, loads no policy, and
+ * does not ask whether the ids name objects that exist. `selectGoverningPolicies` layers DETERMINED on top of
+ * this; a caller that needs "which policies MAY assess this subject" must not stop here.
+ *
+ * `undefined` for either side means "no such object / no such field", which contributes nothing — never an
+ * error. A PWU with no type contributes only its own list, which is the shape every root-less instance has.
+ */
+export function declaredAssurancePolicyIds(
+	pwu: { readonly assurancePolicyIds?: readonly string[] } | undefined,
+	pwuType: { readonly requiredAssurancePolicyIds?: readonly string[] } | undefined
+): readonly string[] {
+	return [
+		...new Set([...(pwu?.assurancePolicyIds ?? []), ...(pwuType?.requiredAssurancePolicyIds ?? [])])
+	];
+}

@@ -75,12 +75,17 @@
 //   instrument" is a claim about the register, which does not license a claim about the repository.
 //
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
-// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 31 are
-// ENFORCED, 24 are UNENFORCED_DISCLOSED and 57 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
+// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 33 are
+// ENFORCED, 22 are UNENFORCED_DISCLOSED and 57 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
 // catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes
 // that do not exist.
 // ⭑ 25 -> 24 AND 56 -> 57 (2026-09-08, `JAN-EXECGOV` EG-03): `RPH-EXE-004` moved arms when its predicate
-// acquired a production caller. ⚠ THE NUMBERS ARE NOT STRUCK IN PLACE HERE, DELIBERATELY: a gate parses this
+// acquired a production caller.
+// ⭑ 31 -> 33 AND 24 -> 22 (2026-09-14, `JAN-PWU007`): `RPH-PWU-007` and `RPH-ASR-012` moved arms TOGETHER, both
+// closed by one guard — `rejectUnsupportedDeclaredSatisfaction` — because the register had recorded ONE absence
+// on two axes and RPH-PWU-007's own disclosure predicted that closing it would close both. Two rows moving on one
+// wiring is exactly the situation the marker-distinctness gate exists for; see either row for how they are told
+// apart at the observation point. ⚠ THE NUMBERS ARE NOT STRUCK IN PLACE HERE, DELIBERATELY: a gate parses this
 // exact sentence (`enforcement-register.test.ts:265`), and my first correction put `~~56~~ 57` between "and"
 // and the digit — which broke `and (\d+)` and turned a census check into a null match. The history belongs in
 // this note; the sentence has to stay machine-readable.
@@ -102,7 +107,7 @@
 // not a majority" — and this copy was never revisited. ⚠ AND THE GATE ADDED WITH THAT CORRECTION CANNOT
 // SEE IT: its regex stops at NOT_A_COMMAND_REFUSAL, four words short of the adjective, so it greened on a
 // sentence whose digits it had just verified and whose meaning it had just falsified. Including all fourteen read-model rules. The register's value is that those are now written down and
-// gated, not that they are closed; the honest headline is 31, not 112.
+// gated, not that they are closed; the honest headline is 33, not 112.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -1441,34 +1446,58 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'The rule is a constraint on how the aggregate is DERIVED, and the instrument that can hold it is a ' +
 			'kernel property test over `aggregateDisposition`, not a refusal observed at the bus.'
 	},
+	// ⚠ RE-DISPOSITIONED 2026-09-14 (JAN-PWU007), UNENFORCED_DISCLOSED -> ENFORCED, and TWO CORRECTIONS TRAVEL
+	// WITH IT.
+	//
+	// THE DISCLOSURE, struck rather than deleted because the wiring is only legible against it:
+	//   ~~The kernel composes correctly and the command surface never asks it to. `aggregateDisposition`
+	//   implements strictest-unresolved and is unit-proven, but a PWU's assuranceState is set by ChangePwuState,
+	//   whose backing check — `rejectUnbackedDisposition` — asks only whether the cited assessments SUPPORT the
+	//   asserted disposition. It never enumerates the PWU's REQUIRED policies, and never composes across them.~~
+	// It does now: `rejectUnsupportedDeclaredSatisfaction` assembles the required set and hands it to the SAME
+	// ratified kernel, so the composition rule and the backing rule both have a reader and there is no second
+	// copy of §28.2 anywhere.
+	//
+	// ⛔ CORRECTION 1 — THE OLD PROBE DID NOT ARRANGE WHAT THIS ROW DESCRIBES, found by driving the wiring against
+	// it. The disclosure says *"five REQUIRED policies on one PWU"*; the probe in `disclosure-observed.test.ts`
+	// created two policies, assessed the subject under both, and NEVER PUT EITHER IN THE SUBJECT'S
+	// `assurancePolicyIds` — it reused the shared PARENT fixture, which declares `[]`. Under this engine's own
+	// determination (`selectGoverningPolicies`: DECLARED ∩ DETERMINED) a policy the subject does not declare does
+	// not govern it, so the word carrying the whole rule — "required" — was absent from the arrangement. The
+	// admission it observed was real; it was an admission of something weaker than the row claimed. Recorded as
+	// REG-F-399 (⚠ NOT 371 — that id was taken; the register was grepped before the number was written down).
+	//
+	// ⛔ CORRECTION 2 — THE ENFORCED ARRANGEMENT IS DELIBERATELY NOT four-satisfied-one-REJECTED. That example is
+	// in the struck text above and it is a true instance of this rule, but it is ALSO an instance of
+	// RPH-PWU-007's ("any rejected mandatory assessment blocks satisfaction"), and both are now refused by one
+	// guard with one message. Proving two rows from one arrangement is the duplicate-marker failure. So this
+	// row's probe turns on §28.2's rung 5 — four SATISFIED and one CONDITIONALLY_SATISFIED, NOTHING REJECTED
+	// ANYWHERE — which RPH-PWU-007's own words cannot reach, and which only the strictest-unresolved FOLD finds
+	// short of satisfaction. The declared four-satisfied-one-rejected case is still driven, in
+	// `declared-assurance-binds.test.ts`, where it proves the guard rather than this register row.
 	'RPH-ASR-012': {
-		kind: 'UNENFORCED_DISCLOSED',
+		kind: 'ENFORCED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Aggregate assurance preserves the strictest unresolved required disposition',
 			note: 'JPWB-DOC-003 §7 states the composition rule directly, and "required" is the word that makes four-satisfied-one-rejected a rejection rather than a majority.'
 		},
-		why:
-			'The kernel composes correctly and the command surface never asks it to. `aggregateDisposition` ' +
-			"implements strictest-unresolved and is unit-proven, but a PWU's assuranceState is set by ChangePwuState, " +
-			'whose backing check — `rejectUnbackedDisposition` — asks only whether the cited assessments SUPPORT the ' +
-			"asserted disposition. It never enumerates the PWU's REQUIRED policies, and never composes across them. " +
-			'So with five required policies, four SATISFIED and one REJECTED, asserting the aggregate SATISFIED while ' +
-			'citing the four satisfied assessments is accepted: the controller selects its own evidence and the ' +
-			'strictest unresolved disposition is simply not consulted. The composition rule and the backing rule are ' +
-			'different questions, and only the second one has a reader.',
-		guard: {
-			kind: 'OBSERVED_ADMISSION',
-			arrangement:
-				'five required policies on one PWU, four assessments SATISFIED and one REJECTED, then ChangePwuState asserting assuranceState SATISFIED while citing only the four satisfied assessments — accepted',
-			control:
-				'the byte-identical ChangePwuState citing ONLY the REJECTED assessment, which `rejectUnbackedDisposition` refuses at the same site — the backing check is alive; it is the COMPOSITION across required policies that is absent',
-			whyNoPredicate:
-				'`aggregateDisposition` is not dead — it is unit-proven and reached on the floor path — so naming it ' +
-				"would fail `deadPredicate`'s first clause. What is missing is not a predicate but a CALLER: nothing " +
-				'on the command path assembles the required-policy set to compose over, so there is no symbol whose ' +
-				'census could witness the gap closing.'
-		}
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/aggregate-assurance.ts — `aggregateAssuranceDisposition`, the ratified §28.2 fold, reached through `unsupportedSatisfaction` in packages/rph-application/src/handlers/declared-assurance.ts, which supplies the declared policies and their own latest verdicts and supplies no rule of its own. ENFORCEMENT: packages/rph-application/src/handlers/pwu.ts — `rejectUnsupportedDeclaredSatisfaction`, chained in changePwuState after `rejectUnbackedDisposition`.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// THE RUNG IS THE MARKER. See RPH-PWU-007's note: the shared opening clause would let one refusal green
+		// both rows. `CONDITIONALLY_SATISFIED` as the COMPOSED disposition is reachable only through rung 5, and
+		// rung 5 is what distinguishes "preserve the strictest unresolved disposition" from "any rejection blocks".
+		refusalMarker: 'composed disposition CONDITIONALLY_SATISFIED, which does not support SATISFIED',
+		// ⛔ DRIVEN, NOT PREDICTED — see RPH-PWU-007's note. The third line below is the one worth reading: it
+		// SURVIVED, which is how the CONDITIONALLY_SATISFIED half of this guard's antecedent was found to be
+		// carried by nothing, and it is killed now only because a test was written FOR it in the same commit.
+		declaredMutations: [
+			'DRIVEN — delete the `rejectUnsupportedDeclaredSatisfaction(...)` link from the `unearned` chain in changePwuState: nothing composes, 45/45 -> 38 pass / 7 fail, this probe reporting ADMITTED',
+			"DRIVEN — replace the `aggregateAssuranceDisposition(...)` call in `unsupportedSatisfaction` with a hand-rolled `verdicts.some((v) => v.disposition === 'REJECTED') ? 'REJECTED' : 'SATISFIED'`: 45/45 -> 43 pass / 2 fail. ⭑ THIS ROW'S PROBE REDDENS AND RPH-PWU-007'S STAYS GREEN — a second, WEAKER copy of §28.2 satisfies the rejection rung and loses rung 5, which is exactly the distinction the two markers encode",
+			"⚠ SURVIVED WHEN FIRST DRIVEN, AND THAT WAS THE FINDING — removing 'CONDITIONALLY_SATISFIED' from `SATISFACTION_CLAIMS` left 45/45 GREEN, because every test then written exercised only the SATISFIED member. The limb is now held by 'REFUSES an aggregate CONDITIONALLY_SATISFIED while a declared policy reads REJECTED', and the mutation is re-runnable as `MU-PWU007-satisfaction-claims-both-members` (anchored at the USE, since a module-level const credits no export). Measured in that order: survived, test added, killed",
+			'DRIVEN — change the comparison in `unsupportedSatisfaction` to `<`: the control reddens and the observation does not. `MU-PWU007-unsupportedSatisfaction-admits-control`'
+		]
 	},
 
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -1865,39 +1894,50 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss at once.'
 		}
 	},
+	// ⚠ RE-DISPOSITIONED 2026-09-14 (JAN-PWU007), UNENFORCED_DISCLOSED -> ENFORCED. The disclosure is kept under
+	// `~~`, struck rather than deleted, because the wiring is only legible against what it names:
+	//   ~~THE ENGINE CHECKS THE ASSESSMENT IT WAS HANDED, NEVER THE SET … the controller supplies
+	//   `supportingObjectIds`, the guard validates THOSE, and a second assessment sitting in REJECTED against a
+	//   policy the PWU itself declares is never loaded. THE DECLARATION EXISTS AND IS INERT: `assurancePolicyIds`
+	//   is a REQUIRED field on ProposePwu and is written to the aggregate (pwu.ts), and — measured — it is read by
+	//   nothing anywhere for any decision. So the rule's word "required" has a home on the object and no reader.~~
+	// `assurancePolicyIds` NOW HAS A READER: `rejectUnsupportedDeclaredSatisfaction` assembles it (union the PWU
+	// Type's `requiredAssurancePolicyIds`, through the one kernel join `selectGoverningPolicies` also uses) and
+	// refuses an asserted satisfaction the declared policies' own verdicts do not compose to.
+	//
+	// ⭑ THE OLD ROW PREDICTED THIS AND WAS RIGHT: *"one underlying absence, and closing it would likely close
+	// both."* It did — RPH-ASR-012 is enforced by the SAME guard. Which is exactly why the two rows must be
+	// distinguishable AT THE OBSERVATION POINT, and they are, by the §28.2 RUNG each turns on: this row is rung
+	// 1/2 (a REJECTED verdict, the quantifier canon states) and ASR-012 is rung 5 (a CONDITIONALLY_SATISFIED
+	// verdict with nothing rejected anywhere, which this rule's own words do not reach). Neither marker occurs in
+	// the other's message, and the two probes share no fact that could green both.
 	'RPH-PWU-007': {
-		kind: 'UNENFORCED_DISCLOSED',
+		kind: 'ENFORCED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'Any rejected mandatory assessment blocks satisfaction.',
-			note: 'JPWB-DOC-003 §7 states it as an absolute over ANY rejected mandatory assessment — the quantifier is the whole rule, and it is the quantifier the engine does not have.'
+			note: 'JPWB-DOC-003 §7 states it as an absolute over ANY rejected mandatory assessment — the quantifier is the whole rule, and the quantifier is what the engine acquired.'
 		},
-		why:
-			'THE ENGINE CHECKS THE ASSESSMENT IT WAS HANDED, NEVER THE SET. Reaching workLifecycleState SATISFIED ' +
-			'does require a real backing assessment — `rejectUnbackedDisposition` refuses a controller asserting a ' +
-			'disposition with nothing behind it, and the UNDER_ASSURANCE->SATISFIED cross-axis guard refuses the ' +
-			'arrow unless assuranceState is SATISFIED. Both are live and both are probed. What neither does is ' +
-			"quantify over the PWU's REQUIRED assessments: the controller supplies `supportingObjectIds`, the guard " +
-			'validates THOSE, and a second assessment sitting in REJECTED against a policy the PWU itself declares is ' +
-			'never loaded. THE DECLARATION EXISTS AND IS INERT: `assurancePolicyIds` is a REQUIRED field on ' +
-			'ProposePwu and is written to the aggregate (pwu.ts), and — measured — it is read by nothing anywhere for ' +
-			'any decision. So the rule\'s word "required" has a home on the object and no reader. ADJACENT AND ' +
-			'DISTINCT, recorded so the two are not merged: RPH-ASR-012 discloses the same missing quantifier on the ' +
-			'ASSURANCE axis (aggregate disposition across required policies); this row is the WORK LIFECYCLE axis. ' +
-			'Different rules, different ratified statements, different arrangements — but one underlying absence, and ' +
-			'closing it would likely close both.',
-		guard: {
-			kind: 'OBSERVED_ADMISSION',
-			arrangement:
-				'a PWU whose own assurancePolicyIds names a policy whose required assessment came back REJECTED, moved to workLifecycleState SATISFIED by citing a second, satisfied assessment — accepted, with the rejected one still reading REJECTED',
-			control:
-				'the byte-identical ChangePwuState with ONE field changed — assuranceState left at ASSESSING — which the same site refuses via the UNDER_ASSURANCE->SATISFIED cross-axis guard, proving the arrow’s owner is alive and simply never looks past the assessment it was handed',
-			whyNoPredicate:
-				'`satisfiesP1` and the cross-axis guard are both asked on this path, so neither is dead. The missing ' +
-				'thing is not a predicate but a QUANTIFIER with nothing to quantify over at the call site: no handler ' +
-				"assembles the PWU's required-assessment set, so there is no symbol whose census could witness the " +
-				'gap closing — the RPH-ASR-012 shape exactly.'
-		}
+		enforcedAt:
+			"DECISION: packages/rph-application/src/handlers/declared-assurance.ts — `unsupportedSatisfaction`, which folds the declared policies' own latest verdicts through rph-domain's ratified `aggregateAssuranceDisposition` (DOC-004 §28.2) and compares the result against the asserted disposition on `AGGREGATE_STRICTNESS`. ENFORCEMENT: packages/rph-application/src/handlers/pwu.ts — `rejectUnsupportedDeclaredSatisfaction`, chained in changePwuState immediately after `rejectUnbackedDisposition`, firing on arrival at satisfaction on EITHER the assurance or the work-lifecycle axis.",
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// THE COMPOSED DISPOSITION IS PART OF THE MARKER, DELIBERATELY. The message's opening clause
+		// ("a policy this PWU itself declares has not been satisfied") is produced by EVERY refusal this guard
+		// makes, including RPH-ASR-012's — so a marker stopping there would let one arrangement green two rows,
+		// which is the exact failure `duplicateRefusalMarkers` exists to catch. Pinning the RUNG pins the rule:
+		// only a REJECTED required verdict composes to REJECTED, and that is the sentence canon states here.
+		refusalMarker: 'composed disposition REJECTED, which does not support SATISFIED',
+		// ⛔ EVERY ENTRY BELOW WAS DRIVEN, NOT PREDICTED, AND ONE OF THEM WAS REFUTED BY DRIVING IT. This field's
+		// contract is "what to break to make this row's probe go RED — data, so a reader can re-run the red
+		// proof", and this register's own header records that two of its first three declared mutations had
+		// silently become unperformable with nobody noticing. Each line therefore states its OBSERVED result and,
+		// where one exists, the `scripts/mutants/ledger.ts` id that re-runs it on every `bun run mutants`.
+		declaredMutations: [
+			'DRIVEN — delete the `rejectUnsupportedDeclaredSatisfaction(...)` link from the `unearned` chain in changePwuState: 45/45 -> 38 pass / 7 fail, both register probes among them, reporting ADMITTED',
+			'DRIVEN — `return []` from `declaredAssurancePolicyIds`: the guard still runs, finds nothing declared and short-circuits (the inert-field state this row used to record). Identical 7-test kill, which is the point — the field being inert and the guard being absent are indistinguishable downstream',
+			'⚠ REFUTED BY DRIVING IT — dropping the `CONCLUDED_ASSESSMENT_STATES.has(...)` limb from `declaredPolicyVerdicts` SURVIVES: 66/66 pass across all three probe files. The prediction was that lifecycle states would enter the fold and over-refuse; they cannot, because every assessment these fixtures create is COMPLETED, so the limb is never reached with a lifecycle value. It is a real limb guarded by nothing, and saying so beats implying a kill that did not happen',
+			"DRIVEN, and it is the CONTROL demonstration — change the comparison in `unsupportedSatisfaction` from `assertedRank <= strictnessOf(composed)` to `<`: 45/45 -> 36 pass / 9 fail, EVERY failure an admission, both this row’s and RPH-ASR-012's probe reddening at their CONTROL leg while the two refusal tests stay green. Re-runnable as `MU-PWU007-unsupportedSatisfaction-admits-control`"
+		]
 	},
 	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 	// THE FIRST SCHEMA-LAYER ROW (2026-08-02), and the reason `RefusalLayer` exists.

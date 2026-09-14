@@ -387,73 +387,18 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			'PROFESSIONAL_WORK_UNIT'
 		);
 
-	/**
-	 * REG-F-072 — SHAPING and READY are reached through the commands that OWN those arrows. This used two
-	 * `ChangePwuState` hops; the generic setter no longer performs an arrow a semantic command owns, and
-	 * `markPwuReady` enforces the eight-limb shape readiness contract the setter never checked.
-	 *
-	 * The intent is matured HERE rather than at each call site: a ROOT PWU may not reach READY under a RAW intent
-	 * (the eighth limb), and reading the PWU's own `intentId` keeps every caller correct without a second place to
-	 * remember. Idempotent — a non-RAW intent is left alone.
-	 */
-	const driveToReady = (pwuId: string): void => {
-		const intentId = (store.loadObject(pwuId)?.state as { intentId?: string } | undefined)?.intentId;
-		const intentStatus = intentId
-			? (store.loadObject(intentId)?.state as { intentStatus?: string } | undefined)?.intentStatus
-			: undefined;
-		if (intentId && intentStatus === 'RAW') {
-			ok(dispatch('BeginIntentDiscovery', {}, intentId, 'INTENT'), `${intentId} -> UNDER_DISCOVERY`);
-			ok(
-				dispatch('ProvisionIntent', { ambiguityIds: [] }, intentId, 'INTENT'),
-				`${intentId} -> PROVISIONAL`
-			);
-		}
-		ok(dispatch('BeginPwuShaping', {}, pwuId, 'PROFESSIONAL_WORK_UNIT'), `${pwuId} -> SHAPING`);
-		ok(
-			dispatch(
-				'MarkPwuReady',
-				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 },
-				pwuId,
-				'PROFESSIONAL_WORK_UNIT'
-			),
-			`${pwuId} -> READY`
-		);
-	};
-
-	/**
-	 * Walk the assurance axis to `ASSESSING` — the only state SATISFIED has an in-arrow from.
-	 *
-	 * The matrix is UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING -> SATISFIED, and a probe
-	 * that jumped straight to SATISFIED was refused by the MACHINE rather than by the backing check it exists to
-	 * measure. That is the masking hazard in its arranging half: the observation would have read as "the rule is
-	 * enforced" while the arrangement had never reached the guard.
-	 */
-	const driveAssuranceToAssessing = (pwuId: string): void => {
-		ok(
-			pwuState(pwuId, 'READY', 'READY', { assuranceState: 'EVIDENCE_REQUIRED', reasonCode: 'fx' }),
-			`${pwuId} assurance -> EVIDENCE_REQUIRED`
-		);
-		ok(
-			pwuState(pwuId, 'READY', 'READY', {
-				assuranceState: 'READY_FOR_ASSESSMENT',
-				reasonCode: 'fx'
-			}),
-			`${pwuId} assurance -> READY_FOR_ASSESSMENT`
-		);
-		ok(
-			pwuState(pwuId, 'READY', 'READY', { assuranceState: 'ASSESSING', reasonCode: 'fx' }),
-			`${pwuId} assurance -> ASSESSING`
-		);
-	};
-
-	/** Assert a terminal assurance disposition, citing `supporting` as its backing. */
-	const setAssurance = (pwuId: string, assuranceState: string, supporting: string[]): Outcome =>
-		pwuState(pwuId, 'READY', 'READY', {
-			assuranceState,
-			supportingObjectIds: supporting,
-			reasonCode: 'aggregate assurance'
-		});
-
+	// ⚠ `driveToReady`, `driveAssuranceToAssessing` AND `setAssurance` LIVED HERE AND ARE GONE (2026-09-14,
+	// JAN-PWU007) — because their last caller did. They existed for RPH-ASR-012's disclosure probe, which moved
+	// to `execrem-wp16-enforcement-observed.test.ts` when that row became ENFORCED, and `bun run lint` refuses a
+	// fixture nothing calls. They are not lost: the same three walks, with the same reasons attached, are in
+	// `declared-assurance-binds.test.ts` (`driveToReady` / `driveAssuranceToAssessing` / `setAssurance`) and in
+	// the enforcement file's `declaringPwu` / `assuranceToAssessing`.
+	//
+	// THE ONE PARAGRAPH WORTH CARRYING FORWARD, because it is about a MASKING HAZARD rather than a fixture:
+	// UNASSESSED -> SATISFIED is not an arrow. A probe that jumped straight to SATISFIED was refused by the
+	// MACHINE rather than by the backing check it exists to measure — so the observation would have read as "the
+	// rule is enforced" while the arrangement had never reached the guard. Every assurance walk in this
+	// repository goes UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING for that reason.
 	// ── baseline-promotion fixture (RPH-PWU-008) ─────────────────────────────────────────────────────────────
 	//
 	// Modelled on `baseline-invalidated-evidence.test.ts`, which already drives this whole chain green. `tag`
@@ -1928,163 +1873,12 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 
-		'RPH-PWU-007': {
-			arrangement:
-				'a PWU whose own assurancePolicyIds names a policy whose required assessment came back REJECTED, moved to workLifecycleState SATISFIED by citing a second, satisfied assessment',
-			run: () => {
-				const PWU7 = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5701';
-				const POL_REJ = 'pol_01ARZ3NDEKTSV4RRFFQ69G5702';
-				const POL_OK = 'pol_01ARZ3NDEKTSV4RRFFQ69G5703';
-				const ASM_REJ = 'asm_01ARZ3NDEKTSV4RRFFQ69G5704';
-				const ASM_OK = 'asm_01ARZ3NDEKTSV4RRFFQ69G5705';
-				const PLAN7 = 'pln_01ARZ3NDEKTSV4RRFFQ69G5706';
-
-				seedPolicy(POL_REJ, { criterionSeverity: 'MATERIAL' });
-				seedPolicy(POL_OK, { criterionSeverity: 'MATERIAL' });
-				// A DEDICATED PROVISIONAL INTENT: `checkPwuShapeReadiness` requires a root PWU's intent to be at
-				// least PROVISIONAL, and the shared fixture intent is left RAW on purpose (RPH-EVD-001's
-				// arrangement depends on it). Driving the shared one would couple two unrelated probes.
-				const INT7 = 'int_01ARZ3NDEKTSV4RRFFQ69G5708';
-				ok(
-					dispatch(
-						'CaptureIntent',
-						{ intentId: INT7, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
-						INT7,
-						'INTENT'
-					),
-					'capture intent 7'
-				);
-				ok(dispatch('BeginIntentDiscovery', {}, INT7, 'INTENT'), 'discover 7');
-				ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INT7, 'INTENT'), 'provision 7');
-				// THE PWU DECLARES THE REJECTING POLICY AS APPLICABLE TO ITSELF. `assurancePolicyIds` is a REQUIRED
-				// field on ProposePwu and is WRITTEN to the aggregate (pwu.ts) — and read by nothing, anywhere, for
-				// any decision. That is the gap this row records, and this field is where the rule's "required"
-				// lives.
-				proposePwu(PWU7, { assurancePolicyIds: [POL_REJ], intentId: INT7 });
-
-				// The REJECTED required assessment — the rule's antecedent.
-				ok(
-					dispatch(
-						'RequestAssuranceAssessment',
-						{
-							assessmentId: ASM_REJ,
-							assurancePolicyId: POL_REJ,
-							policyVersion: '1.0.0',
-							subjectObjectIds: [PWU7],
-							subjectSemanticVersions: { [PWU7]: 1 },
-							claimIds: []
-						},
-						ASM_REJ,
-						'ASSURANCE_ASSESSMENT'
-					),
-					'request the rejecting assessment'
-				);
-					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
-					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-					dispatch(
-						'BeginAssuranceAssessment',
-						{},
-						ASM_REJ,
-						'ASSURANCE_ASSESSMENT'
-					);
-				ok(
-					completeAssessmentFor(ASM_REJ, POL_REJ, PWU7, {
-						dispositionRecommendation: 'REJECTED'
-					}),
-					'complete it REJECTED'
-				);
-				expect(
-					(store.loadObject(ASM_REJ)?.state as Record<string, unknown>)?.assessmentState,
-					'the antecedent is only real while that assessment truly reads REJECTED'
-				).toBe('REJECTED');
-
-				// A second, satisfied assessment — the one the controller will cite.
-				ok(
-					dispatch(
-						'RequestAssuranceAssessment',
-						{
-							assessmentId: ASM_OK,
-							assurancePolicyId: POL_OK,
-							policyVersion: '1.0.0',
-							subjectObjectIds: [PWU7],
-							subjectSemanticVersions: { [PWU7]: 1 },
-							claimIds: []
-						},
-						ASM_OK,
-						'ASSURANCE_ASSESSMENT'
-					),
-					'request the satisfying assessment'
-				);
-					// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
-					// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-					dispatch(
-						'BeginAssuranceAssessment',
-						{},
-						ASM_OK,
-						'ASSURANCE_ASSESSMENT'
-					);
-				ok(completeAssessmentFor(ASM_OK, POL_OK, PWU7), 'complete it SATISFIED');
-
-				// Execution genuinely succeeds against a live plan — `rejectUnbackedExecutionSuccess` demands it.
-				succeededPlanFor(PWU7, PLAN7);
-				const hop = (over: Record<string, unknown>) =>
-					ok(pwuState(PWU7, String(over.previousState), String(over.newState), over), 'hop');
-				ok(dispatch('BeginPwuShaping', {}, PWU7, 'PROFESSIONAL_WORK_UNIT'), 'shape');
-				ok(
-					dispatch(
-						'MarkPwuReady',
-						{ shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5707', expectedSemanticVersion: 1 },
-						PWU7,
-						'PROFESSIONAL_WORK_UNIT'
-					),
-					'ready'
-				);
-				hop({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
-				hop({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
-				hop({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
-				hop({
-					previousState: 'EXECUTING',
-					newState: 'EVIDENCE_PENDING',
-					executionState: 'SUCCEEDED',
-					assuranceState: 'EVIDENCE_REQUIRED',
-					supportingObjectIds: [PLAN7]
-				});
-				hop({
-					previousState: 'EVIDENCE_PENDING',
-					newState: 'UNDER_ASSURANCE',
-					executionState: 'SUCCEEDED',
-					assuranceState: 'READY_FOR_ASSESSMENT'
-				});
-				hop({
-					previousState: 'UNDER_ASSURANCE',
-					newState: 'UNDER_ASSURANCE',
-					executionState: 'SUCCEEDED',
-					assuranceState: 'ASSESSING'
-				});
-
-				// THE ADMISSION: SATISFIED, citing only the satisfied assessment, while ASM_REJ still reads REJECTED
-				// against a policy this PWU itself declares.
-				const admitted = pwuState(PWU7, 'UNDER_ASSURANCE', 'SATISFIED', {
-					executionState: 'SUCCEEDED',
-					assuranceState: 'SATISFIED',
-					supportingObjectIds: [ASM_OK],
-					reasonCode: 'controller satisfies'
-				});
-
-				// CONTROL — the byte-identical command with ONE field changed: assuranceState left at ASSESSING,
-				// i.e. the controller declining to assert a disposition rather than cherry-picking one to back it.
-				// Refused by the very limb that decides "the PWU transitions to SATISFIED"
-				// (`rejectIllegalWorkLifecycleMove` -> the UNDER_ASSURANCE->SATISFIED cross-axis guard). So the site
-				// that owns this arrow IS alive; it just never looks past the assessment it was handed.
-				const control = pwuState(PWU7, 'UNDER_ASSURANCE', 'SATISFIED', {
-					executionState: 'SUCCEEDED',
-					assuranceState: 'ASSESSING',
-					supportingObjectIds: [],
-					reasonCode: 'controller satisfies'
-				});
-				return { admitted, control };
-			}
-		},
+		// ⚠ RE-DISPOSITIONED TO ENFORCED 2026-09-14 (JAN-PWU007) — and THIS FILE IS WHAT SAID SO. The probe that
+		// lived here went RED on the commit that wired `rejectUnsupportedDeclaredSatisfaction`, reporting "the
+		// engine REFUSED what this row discloses as unenforced … Re-disposition it as ENFORCED with a probe",
+		// which is the whole reason the disclosure was a behavioural observation rather than a sentence. Its
+		// arrangement now lives in `execrem-wp16-enforcement-observed.test.ts` as a refusal.
+		'RPH-PWU-007': null,
 
 		'RPH-PWU-008': {
 			arrangement:
@@ -2436,39 +2230,11 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 
-		'RPH-ASR-012': {
-			arrangement:
-				'a PWU assurance disposition asserted SATISFIED while citing only the satisfied assessments, with a REJECTED assessment against another required policy left uncomposed',
-			run: () => {
-				const POL_OK = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C01';
-				const POL_BAD = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C02';
-				const ASM_OK = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C01';
-				const ASM_BAD = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C02';
-				seedPolicy(POL_OK, { criterionSeverity: 'MATERIAL' });
-				seedPolicy(POL_BAD, { criterionSeverity: 'MATERIAL' });
-				requestAssessment(ASM_OK, POL_OK);
-				ok(completeAssessment(ASM_OK, POL_OK), 'complete the SATISFIED assessment');
-				requestAssessment(ASM_BAD, POL_BAD);
-				ok(
-					completeAssessment(ASM_BAD, POL_BAD, { dispositionRecommendation: 'REJECTED' }),
-					'complete the REJECTED assessment'
-				);
-
-				// Assert the aggregate SATISFIED citing ONLY the satisfied assessment. The REJECTED one is a real,
-				// valid assessment against another policy the subject is assessed under, and nothing composes it in.
-				driveToReady(PARENT);
-				driveAssuranceToAssessing(PARENT);
-				const admitted = setAssurance(PARENT, 'SATISFIED', [ASM_OK]);
-
-				// CONTROL — the byte-identical command citing ONLY the REJECTED assessment, refused by
-				// `rejectUnbackedDisposition` at the same site. The BACKING check is alive; the COMPOSITION across
-				// required policies is what is absent.
-				driveToReady(CHILD_A);
-				driveAssuranceToAssessing(CHILD_A);
-				const control = setAssurance(CHILD_A, 'SATISFIED', [ASM_BAD]);
-				return { admitted, control };
-			}
-		}
+		// ⚠ RE-DISPOSITIONED TO ENFORCED 2026-09-14 (JAN-PWU007). Its probe MOVED to
+		// `execrem-wp16-enforcement-observed.test.ts`, and the arrangement changed with it — see the register's
+		// CORRECTION 1: the probe that lived here never put either policy in the subject's `assurancePolicyIds`,
+		// so the "five REQUIRED policies" the row describes were required by nothing (REG-F-371).
+		'RPH-ASR-012': null
 	};
 
 	it('the probe map is TOTAL over the OBSERVED_ADMISSION rows — every disclosure has an observation', () => {

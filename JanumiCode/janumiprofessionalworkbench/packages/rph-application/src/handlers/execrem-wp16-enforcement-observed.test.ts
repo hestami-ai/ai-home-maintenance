@@ -928,6 +928,176 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		);
 	});
 
+	// ── THE DECLARED-POLICY FIXTURE (JAN-PWU007) — shared by RPH-PWU-007 and RPH-ASR-012 ──────────────────────
+	//
+	// ⚠ THE TWO ROWS SHARE A GUARD AND MUST NOT SHARE AN ARRANGEMENT, which is what this helper is shaped around.
+	// `rejectUnsupportedDeclaredSatisfaction` closes ONE absence that the register recorded on two axes, so the
+	// naive move — one arrangement, two rows — is precisely the duplicate-marker failure the register's
+	// distinctness gate exists to refuse. They are kept apart by the RUNG of §28.2 each turns on:
+	//   RPH-PWU-007  *"Any rejected mandatory assessment blocks satisfaction"* — rung 1/2, a REJECTED verdict,
+	//                observed on the WORK LIFECYCLE arrival (UNDER_ASSURANCE -> SATISFIED).
+	//   RPH-ASR-012  *"Aggregate assurance preserves the strictest unresolved required disposition"* — rung 5, a
+	//                CONDITIONALLY_SATISFIED verdict with NOTHING REJECTED anywhere, observed on the ASSURANCE
+	//                arrival. RPH-PWU-007's rule does not reach this arrangement at all: no assessment is
+	//                rejected, and only the FOLD makes four-satisfied-and-one-conditional fall short of SATISFIED.
+	// Their refusal messages therefore differ in the clause each row pins, and neither marker occurs in the
+	// other's message.
+
+	/** A PWU under its own intent, DECLARING `policyIds`, driven to READY. Each fixture is independent. */
+	const declaringPwu = (tag: string, policyIds: readonly string[]): string => {
+		const id = (prefix: string, n: string) => `${prefix}_01ARZ3NDEKTSV4RRFFQ69J5X${tag}${n}`;
+		const intentId = id('int', '0');
+		const pwuId = id('pwu', '1');
+		captureIntent(intentId);
+		ok(dispatch('BeginIntentDiscovery', {}, intentId, 'INTENT'), `discover ${intentId}`);
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, intentId, 'INTENT'), `provision ${intentId}`);
+		ok(
+			dispatch(
+				'ProposePwu',
+				{
+					pwuId,
+					pwuKind: 'ARCHITECTURE',
+					title: 'Arch',
+					description: 'd',
+					intentId,
+					boundaries: {
+						inScope: ['the governed work under test'],
+						outOfScope: ['not yet known'],
+						permittedChanges: [],
+						prohibitedChanges: []
+					},
+					obligationIds: [],
+					constraintIds: [],
+					assumptionIds: [],
+					expectedOutputs: [{ outputId: 'out_declared', kind: 'DOCUMENT' }],
+					// ⭑ THE FIELD THE WHOLE ROW IS ABOUT. Until JAN-PWU007 it was written to the aggregate and read
+					// by nothing, anywhere, for any decision.
+					assurancePolicyIds: [...policyIds],
+					riskProfile: {
+						consequence: 'HIGH',
+						uncertainty: 'MEDIUM',
+						irreversibility: 'MEDIUM',
+						securitySensitivity: 'HIGH',
+						regulatoryExposure: 'LOW'
+					}
+				},
+				pwuId,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			`propose ${pwuId}`
+		);
+		ok(dispatch('BeginPwuShaping', {}, pwuId, 'PROFESSIONAL_WORK_UNIT'), `${pwuId} -> SHAPING`);
+		ok(
+			dispatch(
+				'MarkPwuReady',
+				{ shapeReadinessAssessmentId: `asm_shape_${tag}`, expectedSemanticVersion: 1 },
+				pwuId,
+				'PROFESSIONAL_WORK_UNIT'
+			),
+			`${pwuId} -> READY`
+		);
+		return pwuId;
+	};
+
+	/** Request, begin and COMPLETE one assessment over `subject` under `policyId`, asserting every step. */
+	const completeAssessmentOver = (
+		assessmentId: string,
+		policyId: string,
+		subject: string,
+		disposition: string
+	): void => {
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [subject],
+					subjectSemanticVersions: { [subject]: 1 },
+					claimIds: []
+				},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			),
+			`request ${assessmentId}`
+		);
+		ok(
+			dispatch('BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT'),
+			`begin ${assessmentId}`
+		);
+		ok(
+			dispatch(
+				'CompleteAssuranceAssessment',
+				{
+					validatorResult: {
+						validatorId: 'reviewer',
+						validatorVersion: '1',
+						policyId,
+						policyVersion: '1.0.0',
+						assessmentId,
+						subjectObjectIds: [subject],
+						subjectSemanticVersions: { [subject]: 1 },
+						claimResults: [],
+						evidenceConsideredIds: [],
+						evidenceRejected: [],
+						observations: [],
+						dispositionRecommendation: disposition,
+						recommendedControlActions: [],
+						residualUncertainty: [],
+						limitations: [],
+						executionProvenance: {
+							evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
+						}
+					}
+				},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			),
+			`complete ${assessmentId} ${disposition}`
+		);
+		// THE ARRANGEMENT IS ONLY REAL WHILE THE VERDICT REALLY READS WHAT IT CLAIMS. A completion silently folded
+		// to a different disposition by one of completeAssuranceAssessment's own gates would leave both probes
+		// measuring something else entirely.
+		expect(
+			(store.loadObject(assessmentId)?.state as { assessmentState?: string } | undefined)
+				?.assessmentState,
+			`${assessmentId} must really read ${disposition}`
+		).toBe(disposition);
+	};
+
+	/** ChangePwuState, all four axes flat. */
+	const pwuAxes = (
+		pwuId: string,
+		previousState: string,
+		newState: string,
+		over: Record<string, unknown>
+	): Outcome =>
+		dispatch(
+			'ChangePwuState',
+			{
+				previousState,
+				newState,
+				executionState: 'NOT_PLANNED',
+				assuranceState: 'UNASSESSED',
+				shapeIntegrityState: 'PRESERVED',
+				reasonCode: 'fixture',
+				supportingObjectIds: [],
+				...over
+			},
+			pwuId,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
+	/** UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING, held at workLifecycle READY. */
+	const assuranceToAssessing = (pwuId: string): void => {
+		for (const s of ['EVIDENCE_REQUIRED', 'READY_FOR_ASSESSMENT', 'ASSESSING'])
+			ok(
+				pwuAxes(pwuId, 'READY', 'READY', { assuranceState: s, reasonCode: 'fx' }),
+				`${pwuId} assurance -> ${s}`
+			);
+	};
+
 	/**
 	 * TOTAL over the ENFORCED rows, by type. A row added to the register with no probe here does not compile.
 	 *
@@ -1369,8 +1539,15 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		},
 
 		// ── THE RPH-ASR FAMILY (2026-08-02) ────────────────────────────────────────────────────────────────────
-		// Nine of twelve are not ENFORCED and are `null` here by type; four of those nine are observed being
-		// ADMITTED in `disclosure-observed.test.ts`. RPH-ASR-010 is enforced on the PWA PUBLISH path rather than
+		// ⚠ RE-DERIVED 2026-09-14 (JAN-PWU007) BY RUNNING THE REGISTER, not adjusted by arithmetic — and the figure
+		// was found to have been STALE BY ONE before this change, then made true by it, which is the least
+		// trustworthy way for a number to become correct. Measured now: twelve rows; THREE ENFORCED (002, 007, 012);
+		// FOUR UNENFORCED_DISCLOSED (004, 005, 008, 010), every one OBSERVED_ADMISSION and every one probed in
+		// `disclosure-observed.test.ts`; FIVE NOT_A_COMMAND_REFUSAL. So NINE of twelve are not ENFORCED — which is
+		// what the sentence below has said since 2026-08-02, and which was FALSE on the morning of this change (it
+		// was then ten of twelve, RPH-ASR-012 being disclosed). EIGHT of the nine are `null` here; the ninth is
+		// RPH-ASR-010.
+		// RPH-ASR-010 is enforced on the PWA PUBLISH path rather than
 		// the assessment path, and its refusal is already driven end to end by `pwa-publish-stale-floor.test.ts`,
 		// which is what the manifest cites; it is probed here as well because this map is total over ENFORCED rows.
 		'RPH-ASR-001': null,
@@ -1381,7 +1558,45 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-ASR-008': null,
 		'RPH-ASR-009': null,
 		'RPH-ASR-011': null,
-		'RPH-ASR-012': null,
+		'RPH-ASR-012': {
+			arrangement:
+				'five policies the PWU itself declares, four assessed SATISFIED and the fifth CONDITIONALLY_SATISFIED, with assuranceState asserted SATISFIED citing one of the four',
+			run: () => {
+				// ⛔ NOTHING HERE IS REJECTED, AND THAT IS THE ENTIRE POINT OF THE ARRANGEMENT. RPH-PWU-007's rule —
+				// "any rejected mandatory assessment blocks satisfaction" — cannot reach this: there is no
+				// rejection to find. Only §28.2's FOLD, whose rung order IS §28.1's strictness order, makes
+				// four-satisfied-and-one-conditional fall short of SATISFIED. That is what separates this row's
+				// observation from RPH-PWU-007's, and why the two markers cannot be satisfied by one refusal.
+				const POLICIES = ['1', '2', '3', '4', '5'].map((n) => `pol_01ARZ3NDEKTSV4RRFFQ69J8BB${n}`);
+				for (const [i, pol] of POLICIES.entries()) ok(asrPolicy(pol, {}), `seed policy ${i}`);
+
+				const arrange = (tag: string, fifthVerdict: string): Outcome => {
+					const pwuId = declaringPwu(tag, POLICIES);
+					const assessments = POLICIES.map((_, i) => `asm_01ARZ3NDEKTSV4RRFFQ69J8${tag}0${i}`);
+					for (const [i, pol] of POLICIES.entries())
+						completeAssessmentOver(
+							assessments[i]!,
+							pol,
+							pwuId,
+							i === 4 ? fifthVerdict : 'SATISFIED'
+						);
+					assuranceToAssessing(pwuId);
+					// CITES ONE OF THE FOUR SATISFIED — which `rejectUnbackedDisposition` accepts, because it asks
+					// only whether SOME cited assessment carries the asserted disposition. The composition is the
+					// thing that was missing, and it is the thing under test.
+					return pwuAxes(pwuId, 'READY', 'READY', {
+						assuranceState: 'SATISFIED',
+						supportingObjectIds: [assessments[0]!],
+						reasonCode: 'aggregate assurance'
+					});
+				};
+
+				// The CONTROL is the same five-policy PWU with the fifth SATISFIED too — so the aggregate really is
+				// SATISFIED and the identical command lands. Without it, a guard that refused every multi-policy
+				// satisfaction would pass this row while composing nothing.
+				return { control: arrange('E', 'SATISFIED'), observed: arrange('F', 'CONDITIONALLY_SATISFIED') };
+			}
+		},
 		'RPH-ASR-002': {
 			arrangement:
 				'a completion recommending SATISFIED against a policy whose evidence requirement is required FOR that disposition, with nothing submitted for it',
@@ -1895,12 +2110,55 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			}
 		},
 
-		// ── THE RPH-PWU FAMILY, five of ten (2026-08-02) ───────────────────────────────────────────────────────
+		// ── THE RPH-PWU FAMILY, five of ten ────────────────────────────────────────────────────────────────────
+		// ⚠ THE SAME RE-DERIVATION, AND THE SAME RESULT (JAN-PWU007). "Five of ten" is the count of PROBES in this
+		// map, and it was STALE BY ONE until this change: at the previous commit exactly FOUR RPH-PWU rows carried
+		// a probe (009, 010, 002, 004) while this header claimed five. RPH-PWU-007's probe, added here, makes it
+		// true. ⛔ A PROSE NUMBER THAT BECOMES CORRECT BY ACCIDENT IS NOT EVIDENCE THAT IT WAS BEING MAINTAINED —
+		// it is the REG-F-140 shape (a number duplicated in prose with no checker), and it is recorded rather than
+		// quietly benefited from. Counted by grepping this file for lines matching a two-tab-indented
+		// `'RPH-PWU-NNN': {` at both commits (4 then, 5 now); the ten rows themselves come from
+		// `REGISTERED_RULE_IDS`.
 		'RPH-PWU-001': null,
 		'RPH-PWU-005': null,
 		'RPH-PWU-006': null,
 		'RPH-PWU-008': null,
-		'RPH-PWU-007': null,
+		'RPH-PWU-007': {
+			arrangement:
+				"the PWU's OWN declared policy assessed REJECTED, with a second assessment under an UNRELATED policy SATISFIED and cited as the whole backing for workLifecycleState -> SATISFIED",
+			run: () => {
+				// ⚠ THE ARRANGEMENT IS THE DECLARED POLICY'S VERDICT AND NOTHING ELSE. Control and observed are two
+				// PWUs identical in every respect — same declaration, same second policy, same cited assessment,
+				// same axis walk — except that the assessment under the policy THEY DECLARE reads SATISFIED in one
+				// and REJECTED in the other. A guard that refused the arrow generally, or that demanded the declared
+				// assessment be CITED rather than SATISFIED, would refuse the control too.
+				const POL_MINE = 'pol_01ARZ3NDEKTSV4RRFFQ69J7AA1';
+				const POL_OTHER = 'pol_01ARZ3NDEKTSV4RRFFQ69J7AA2';
+				ok(asrPolicy(POL_MINE, {}), 'seed the declared policy');
+				ok(asrPolicy(POL_OTHER, {}), 'seed the unrelated policy');
+
+				const arrange = (tag: string, declaredVerdict: string): Outcome => {
+					const pwuId = declaringPwu(tag, [POL_MINE]);
+					completeAssessmentOver(`asm_01ARZ3NDEKTSV4RRFFQ69J7${tag}01`, POL_MINE, pwuId, declaredVerdict);
+					const cited = `asm_01ARZ3NDEKTSV4RRFFQ69J7${tag}02`;
+					completeAssessmentOver(cited, POL_OTHER, pwuId, 'SATISFIED');
+					assuranceToAssessing(pwuId);
+					// SEEDED, NOT DRIVEN, and the split is RPH-PWU-008's: UNDER_ASSURANCE is reached through an
+					// execution chain that can fail for a dozen reasons unrelated to THIS rule, and each would
+					// present as "RPH-PWU-007 is enforced after all". The helper checks the state against the
+					// ratified machine's own list and re-parses the aggregate, so nothing rehearses against a PWU
+					// the contract forbids. The ADMISSION/REFUSAL itself is driven through the bus.
+					seedPwuWorkLifecycleState_FIXTURE(store, pwuId, 'UNDER_ASSURANCE');
+					return pwuAxes(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', {
+						assuranceState: 'SATISFIED',
+						supportingObjectIds: [cited],
+						reasonCode: 'controller satisfies'
+					});
+				};
+
+				return { control: arrange('C', 'SATISFIED'), observed: arrange('D', 'REJECTED') };
+			}
+		},
 		'RPH-PWU-003': null,
 		'RPH-PWU-002': {
 			arrangement: 'ProposePwu naming an intentId that resolves to no Intent aggregate',
