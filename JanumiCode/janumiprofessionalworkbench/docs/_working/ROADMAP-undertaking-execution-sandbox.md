@@ -249,7 +249,191 @@ still explains the entry. ⛔ **Rule 7 applies: every exported value here lands 
 
 ---
 
-## 4. Phase 2 · The host lifecycle — and a `cwd` that currently points at the server
+## 4. Phase 2 · ⭐ LANDED 2026-09-14 — the host lifecycle, and the `cwd` that pointed at the server
+
+**WHAT LANDED.** `apps/rph-demo/src/lib/server/execution/workspace-host.ts` (the lifecycle),
+`filesystem-workspace.ts` (the durable adapter, `R3`: adapters in the demo), a widened
+`OpenProducerSession`, and the containment fix inside `openPiExecutionSession`. ⛔ **No real `ProcessRunner`** —
+the refusing default is WIRED and the seam is provably inert, because a real runner captures `stderr` and
+therefore reopens `REG-Q-066`, which rule 8 forbids answering later.
+
+⭐ **THE CONTAINMENT DEFECT IS CLOSED AT THE SIGNATURE, NOT AT THE CALL SITE.** `OpenProducerSession` now takes a
+`ProducerSessionContext` carrying the Undertaking's sandbox, and `producerWorkingDirectory` is the ONLY thing
+that may answer where a producer runs. **It has no fallback arm, and that absence is the guarantee** — every
+refusal has an obvious "reasonable" repair (use the server's directory) and that repair IS the defect. Both
+`process.cwd()` calls are gone from the execution plane.
+
+⭐ **THE ROOT IS DERIVED FROM `JPWB_DEMO_DB` RATHER THAN FROM A SECOND ENV KEY, AND THE REASON IS AN ORPHAN THE
+REPOSITORY HAS ALREADY MEASURED.** The roadmap said "one durable root from one env key"; taking that to mean a
+NEW key would let an operator configure a durable record plane whose deliverable evaporates at restart — exactly
+the inverse orphan `ArtifactStore.durability` exists to prevent (*"a permanent record names a `storageKey`
+whose store answer, after one restart, is byte-indistinguishable from a key that was never stored"*).
+`getArtifactStore()` already derives the content plane from the record plane's key; the workspace root derives
+the same way (`${DB_PATH}.workspaces/<undertakingId>`). One key configures all three planes or none.
+
+⭐ **`R8` IS CARRIED BY THREE DECLARATIONS, NOT ONE, AND TWO OF THEM ARE INVISIBLE TO BEHAVIOUR.**
+`ownerKind: 'UNDERTAKING'` and `purgeability: 'RETAINED_BY_PARTICIPATION'` change nothing a read can see — files
+are written, files are read — so each needed an assertion of its own. ⚠ **`P2-k` SURVIVED THE FIRST RUN**: the
+purgeability declaration was untested, and the only thing that exposed it was asking the workspace to DESTROY
+the product and requiring it to refuse. That is the instrument doing its job, recorded rather than quietly
+fixed.
+
+⚠ **THE FILESYSTEM ADAPTER NEEDED A TOMBSTONE RECORD, WHICH THE IN-MEMORY DEFAULT GETS FOR FREE.** `purge`
+promises *"Remove the BYTES and keep the ENTRY"*, and a path on a filesystem has only two states — present or
+absent — so neither truncating (which reads as an EMPTY FILE, a different fact) nor unlinking can carry "purged
+on schedule" as distinct from "never written" and from "lost". The entry therefore lives in a record beside the
+files, and that record is a RESERVED path: a step that could write it could rewrite the retention history of
+everything else in the workspace. ⭑ Its refusal is DISTINCT from the containment refusal, because a caller
+naming the record has not tried to escape and telling it that it did would be false.
+
+**PROOF — EVERY LIMB BY AN OBSERVED RED, 16 declared mutants, `bun run mutants P2-` → 17 of 17 KILLED (the
+seventeenth, `P2-branch-source-reported-as-dead-predecessor`, is pre-existing and merely shares the prefix).**
+
+| roadmap limb | mutants | victim |
+| --- | --- | --- |
+| the session runs in the Undertaking's directory, never the server's | `P2-a` | `server-directory-containment` |
+| an IN_MEMORY workspace is refused, and the two wirings differ | `P2-b`, `P2-c` | `producer-session` |
+| a FILESYSTEM declaration with no path refuses instead of inheriting | `P2-d` | `producer-session` |
+| test mode gets no durable root at all | `P2-e` | `workspace-host` |
+| the owner's SUBDIRECTORY, derived, and STABLE across requests | `P2-f`, `P2-g` | `workspace-host` |
+| an owner id may neither escape the root nor nest inside another | `P2-h`, `P2-i` | `workspace-host` |
+| `R8` as declarations: UNDERTAKING-owned, retained, both arms | `P2-j`, `P2-k`, `P2-p` | `workspace-host` |
+| a path escaping the workspace never reaches the disk | `P2-l` | `filesystem-workspace` |
+| the entry survives its purge; PER-8 read the right way round | `P2-m`, `P2-n` | `filesystem-workspace` |
+| the retention record is not writable by a step | `P2-o` | `filesystem-workspace` |
+
+⚠ **AND THE HARNESS TAUGHT THE SAME LESSON TWICE IN ONE ENTRY.** `P2-o` reported `NO_COMPILE` as `if (false &&
+…)` — the ledger header's own V-2c trap, dead code losing its narrowing — and then again as
+`&& at.rel === ''`, because TypeScript INFERS a type predicate for the `reserved` helper, so inside the branch
+the comparison is non-overlapping. A conjunct over `.length` is neither dead nor a literal comparison.
+
+⚠ **TWO SPECS WRITE OUTSIDE THEIR OWN TEMPORARY DIRECTORY WHEN A CONTAINMENT MUTANT IS APPLIED — WHICH IS WHAT
+PROVES THE GUARD, AND IT POISONED A LATER RUN.** `P2-l` genuinely creates `../escaped.txt`; with the workspace
+at the `mkdtemp` root that lands in the SYSTEM temp directory, which `afterEach` does not own. It survived into
+the next run and reddened an unrelated assertion in a sibling spec. Both specs now nest their subject one level
+inside a container they created, so every escape they provoke lands inside what they delete.
+
+**BASELINE:** `guards:export` regenerated with its own writer in this commit — **340 of 340 guarded, obligation
+0**, up from 338 because `createInMemoryWorkspace` and `createRefusingProcessRunner` became PRODUCTION-CONSUMED
+the moment the host wired them. Both already carried declared mutants (`P1-d`/`P1-e`, `P1-f`), which is exactly
+why Phase 1 declared them while the census still read `consumedExports: []`. `coverage:floor:check` is clean and
+was NOT regenerated: this phase added no file to `packages/`, so nothing it did moved that baseline, and
+tightening it here would attribute other work to this commit.
+
+---
+
+## 4b. Phase 2 · ⛔ CONTAINMENT — eight breaches an adversary DROVE through the landed seam
+
+⭐ **EVERY ONE WAS DEMONSTRATED, NOT ARGUED, AND EVERY FIX WAS PROVED BY AN OBSERVED RED USING THE ATTACKER'S
+OWN VECTOR.** The sixteen mutants §4 lists are all still KILLED; what they did not cover is the gap between what
+a PATH STRING says and what the FILESYSTEM does with it. Three of the eight were reachable through a guard that
+was visibly present and comparing the wrong thing, two were reachable because a derivation was trusted without
+being bounded, and one — `B3` — is `NO DEFAULT THAT FABRICATES` violated by the adapter itself.
+
+| # | what was driven | where it was fixed | its mutant |
+| --- | --- | --- | --- |
+| B1 | `.JPWB-WORKSPACE-TOMBSTONES.JSON` was written and OVERWROTE the retention record on NTFS | the reservation is case-folded on both sides | `P2-q` |
+| B2 | a `mklink /J` junction inside the workspace read, overwrote and LISTED files outside it | `locate` resolves the deepest existing ancestor with `realpath`; `livePaths` walks with `lstat` | `P2-r`, `P2-s` |
+| B3 | `writeFile('NUL', …)` returned `written: true, byteSize: 18` for bytes that went to the null device | the predicate refuses Win32 device stems; a failed write is a REFUSAL, never a throw | `P2-u`, `P2-t` |
+| B4 | `writeFile('report.md:stolen', …)` hid a payload in an NTFS alternate data stream | a colon anywhere in a workspace path is refused | `P2-v` |
+| B5 | `UND-ALPHA` and `und-alpha` were two ids, two strings and ONE directory | the derivation carries a fingerprint of the EXACT id, so it is INJECTIVE under the filesystem's equality | `P2-y` |
+| B6 | `'.. '`, `'...'`, `' ..'`, `'UND-1 '` and `'UND-1.'` resolved to the ROOTS directory or to ANOTHER Undertaking's | a component whose trailing dots/spaces Win32 strips is refused, never normalized | `P2-w` |
+| B7 | a RELATIVE `JPWB_DEMO_DB` put every workspace inside the server's own tree | the root must resolve identically against any base, or it is refused | `P2-x` |
+| B8 | `vitest run` with `JPWB_DEMO_DB` set produced real directories and a durable 2.7 MB `demo.sqlite` | durability requires an AFFIRMATIVE `RPH_DEMO_MODE=server`, in BOTH planes | `P2-e` (re-pointed), `P2-z` |
+
+⛔ **THE TWO THAT ARE NOT FIXES BUT NARROWED, ACCURATE DISCLOSURES — and the old disclosure was worse than
+absent because it UNDERSTATED ITS OWN PRECONDITION.** `filesystem-workspace.ts` said *"SYMLINKS ARE NOT RESOLVED
+… Nothing in this host creates one"*, and the vector that was driven needed no symlink and no privilege at all:
+`mklink /J` is an ordinary user's command. The replacement states what is CLOSED and what is not.
+- The remaining junction exposure is a RACE, not a hole: a directory swapped for a junction BETWEEN the check
+  and the write. One Undertaking drives its steps in sequence; a host that parallelises them needs more.
+- `list()` still cannot ENUMERATE alternate data streams — no adapter on `node:fs` can. What is closed is the
+  VECTOR: nothing a step writes through this workspace can reach one. A stream attached by something else
+  (Phase 3's child processes) would hold bytes the inventory does not name.
+
+⭐ **THE ONE SHAPE SEEN FOUR TIMES.** B1 and B5 are the same defect at two layers — a case-insensitive
+filesystem under a case-sensitive comparison — and B6 and B3 are its generalisation: the operating system
+REWRITES a name (strips a trailing dot, resolves a device) and every guard that compares strings sees a name
+that no longer exists. The predicate now asks what Win32 RESOLVES rather than what the string spells, and it
+does so ON EVERY PLATFORM, for the reason it already refused both separator spellings everywhere.
+
+⚠ **AND THE FIX FOR B5 IS INJECTIVITY RATHER THAN REFUSAL, DELIBERATELY.** Refusing the second of two ids that
+differ only by case would deny a lawful Undertaking its workspace forever. Two Undertakings are two
+Undertakings; the host's job is to give each one a directory the filesystem can tell apart.
+
+**PROOF:** each limb was watched FAILING first — 16 observed reds across four suites, including
+`readFile('escape/.env')` returning `SECRET=1` from outside the workspace, `written: true` for `NUL` and for the
+case-variant record, an uncaught `EISDIR` out of `writeFile`, one owner reading another's `src/index.ts`, and
+`FILESYSTEM` where `IN_MEMORY` was required under this repository's own test runner. `bun run mutants:changed
+--run` over the changed regions then selected 13 declared guards and reported **13 KILLED, 0 SURVIVED, 0
+UNANCHORED, 0 NO_COMPILE**.
+
+**BASELINE:** `guards:export:check` and `coverage:floor:check` are both clean and NEITHER was regenerated — no
+export was added or lost and no uncovered count rose, so there is nothing for either writer to record. ⛔ **NO
+REAL `ProcessRunner` STILL**, for the reason §4 gives: it reopens `REG-Q-066`, and rule 8 forbids answering that
+later.
+
+---
+
+## 4c. Phase 2 · ⭐ WHAT THIS CONTAINMENT IS — RULED, AND FOUR FIXES THAT FOLLOW FROM THE RULING
+
+⭐ **SPONSOR RULING R9 (2026-09-14): the workspace is an ORGANISATIONAL boundary now and a SECURITY boundary
+later, and the security tier belongs to the DEPLOYMENT ENVIRONMENT** — local (VS Code extension host), SaaS (the
+Janumi Platform, using OS-level sandboxing such as Alibaba's OpenSandbox and/or NVIDIA's OpenShell), Enterprise
+(container isolation). Recorded as `DESIGN-undertaking-execution-sandbox.md` §4.8, with the ratified vocabulary
+that already said so: `SandboxPolicy` is *"DEFERRED TO THE PLATFORM POLICY PLANE … the sandbox backend sits
+behind an abstracted runtime boundary precisely so the concrete tool (OpenSandbox / K8s Jobs+gVisor / a
+harness's own policy file) stays swappable."*
+
+⭑ **`Workspace` AND `ProcessRunner` ARE THE SEAM THAT SANDBOX SUPPLIES, WHICH IS WHY THEY ARE PORTS.** §4's
+`R3` said adapters belong in the demo; §4.8 says what the OTHER adapter will be.
+
+⛔ **AND §4b's DISCLOSURE WAS FALSE IN THREE PLACES, EACH MEASURED.** It said *"WHAT REMAINS IS A RACE, NOT A
+HOLE"*; two NON-race holes were open. Both refusals asserted a path *"may not reach outside it through a link or
+a junction"*, which a HARD LINK falsifies. And the reserved-record docblock said the reservation is compared
+*"CASE-INSENSITIVELY, because the filesystem compares that way"*, which is not how NTFS compares — the 8.3 alias
+is the proof.
+
+| # | what was driven | what changed |
+| --- | --- | --- |
+| F1 | the NTFS 8.3 ALIAS `JPWB-W~1.JSO` wrote over the retention record: `written: true`, one lower-case directory entry, genuine tombstone destroyed, `list()` empty | the record moved BESIDE the workspace directory. No contained path can reach a sibling, so the reserved name, the case-folding normaliser AND both breaches are gone together |
+| F2 | `purge('sub')` on a real subdirectory THREW — `ERR_FS_EISDIR` (node) / `EFAULT` (bun) — carrying the host's absolute path | the removal refuses with the errno CODE, and the ENTRY is now written BEFORE the bytes go so neither failure mode is indescribable |
+| F3 | `toLowerCase()` folds KELVIN SIGN (U+212A) to `k` and NTFS does not — two files, two contents, measured — so the guard refused a distinct file while claiming it *"is this workspace's own retention record"* | deleted by F1 rather than fixed twice |
+| F4 | `createRefusingProcessRunner` wrote the workspace's full `directoryPath` into a `refusedBecause` | the refusal names the workspace's DIRECTORY NAME. ⚠ The positive limb is kept, not traded |
+
+**THE FIVE VECTORS, NAMED, AS THE ADAPTER NOW DISCLOSES THEM.** ⛔ None needs a privilege: `mklink /H` and
+`mklink /J` both ran unprivileged here, Developer Mode off.
+
+| vector | status | what is true of it |
+| --- | --- | --- |
+| HARD LINK | ⛔ **OPEN, and reported as in-workspace** | `lstat` says plain file, `realpath` returns the link's OWN path; `nlink === 2` says a second name exists and nothing about where |
+| ROOT SWAP | ⛔ **OPEN, persistent, undetected** | a junction where the ROOT was redirects the whole workspace; containment then holds against the wrong root |
+| JUNCTION/SYMLINK INSIDE | ⭑ **REFUSED** | `locate` resolves the deepest existing ancestor; `livePaths` uses `lstat`. ⚠ a check-then-write RACE remains |
+| ALTERNATE DATA STREAM | ⭑ **vector refused, blind spot open** | a colon is refused; `list()` still cannot ENUMERATE streams and no `node:fs` adapter can |
+| 8.3 SHORT NAMES | ⭑ **no longer a containment vector** | still an intra-workspace aliasing fact between two long names |
+
+⭑ **AND THE TWO OPEN ONES ARE CARRIED BY DISCLOSURE PROBES, NOT BY PROSE.** The adapter's suite asserts that a
+hard link IS readable/overwritable/listed and that a root swap DOES redirect — so a later change that closes
+either REDDENS and whoever closed it must rewrite the disclosure. A disclosure nothing checks is a comment that
+rots; this repository has the receipts.
+
+⚠ **WHAT WOULD CHANGE IF THE SECURITY TIER IS TAKEN UP.** Nothing above the ports. Concretely:
+- a **new adapter** implements `Workspace` and `ProcessRunner` against the sandbox (OpenSandbox / OpenShell /
+  gVisor-isolated Job / the extension host), and `resolveUndertakingSandbox` returns it instead of the
+  `node:fs` pair. `planProcessRun`, `producerWorkingDirectory` and the retention record are untouched.
+- the **five disclosure lines above are re-measured against that adapter, not inherited.** A hard link means
+  something different inside a sandboxed mount namespace, and assuming it means the same thing is the exact
+  error §4b made about symlinks.
+- the **DISCLOSURE PROBES redden**, by design, and the disclosure is rewritten from the new measurements.
+- `RuntimeBinding.sandboxPolicy` stops being opaque and becomes a reference into the platform policy plane —
+  which is what the vocab note says it is waiting for, and is a RATIFICATION rather than a code change.
+
+⛔ **NO REAL `ProcessRunner` STILL**, for §4's reason: it reopens `REG-Q-066` and rule 8 forbids answering that
+later.
+
+---
+
+## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
 the executing model is **zero-argument** — `OpenProducerSession = () => Promise<ProducerSession>` — and
@@ -266,9 +450,12 @@ tree is **five `let` declarations, all in `workbench.ts`**. Every shared resourc
 content plane already sets that precedent by derivation (`${DB_PATH}.content.sqlite`), and the artifact store
 already puts the owner in the key rather than in the object.
 
-- ⛔ **TEST MODE IGNORES THE ROOT UNCONDITIONALLY**, as `JPWB_DEMO_DB`'s own docblock requires: *"a durable store
-  shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to
-  prevent."*
+- ~~⛔ **TEST MODE IGNORES THE ROOT UNCONDITIONALLY**, as `JPWB_DEMO_DB`'s own docblock requires: *"a durable
+  store shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to
+  prevent."*~~ ⛔ **SUPERSEDED BY §4b (B8): THAT INSTRUCTION WAS FOLLOWED AND DID NOT HOLD.** It was built as
+  `RPH_DEMO_MODE === 'test'`, which only the Playwright configs set — so the runner that reads this repository's
+  unit suites was never test mode by that predicate, and a durable store reached it. The rule is now
+  AFFIRMATIVE: a process gets a durable root only by DECLARING `RPH_DEMO_MODE=server`.
 - ⚠ **Read it in the DEFAULT-PARAMETER shape, not the frozen module const.** The frozen shape has a named
   in-repo hazard (`floor-recording.test.ts:19-21`: a plain assignment below the imports is read *after* the const
   froze).
@@ -280,7 +467,8 @@ its own directory (seven fragments, not one product — `R8` violated), or a mod
 source tree.
 
 **PROOF:** a second step, in a new session with a new plan, reads a file the first step wrote — and a
-containment test proves the resolved `cwd` is the owner's subdirectory and never the server's.
+containment test proves the resolved `cwd` is the owner's subdirectory and never the server's. ⭐ **DELIVERED —
+see §4 for the mutants that carry each limb, and for the one that SURVIVED its first run.**
 
 ---
 

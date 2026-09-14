@@ -84,6 +84,7 @@ recording is worth committing.
 | R6 | **A reasoning review reviews THE STEP'S REASONING, not the result.** |
 | R7 | **stdout and stderr are both retained, and both come under purge.** |
 | R8 | **The workspace is the DELIVERABLE and must persist** — durable, survives a restart, inspectable after the undertaking ends. |
+| R9 | **The workspace boundary is ORGANISATIONAL now and SECURITY later** — the security tier belongs to the deployment environment, and the ports are the seam it supplies. Ruled 2026-09-14; see §4.8. |
 
 ---
 
@@ -216,6 +217,65 @@ where its exit codes came from. ⛔ **But it lives in memory and reaches no reco
 prompt and the raw output, and nothing carries tool calls onto the `MODEL_EXCHANGE` or the step. **Unbuilt, and
 required** — without it the governed record rests on the model's word.
 
+### 4.8 ⭐ RULED (R9, sponsor, 2026-09-14) — the containment tier, and why `Workspace`/`ProcessRunner` are PORTS
+
+**THE RULING, VERBATIM.** *"It's both organisational and security with organizational now and security later.
+Specifically with the security later, on the under-development Janumi Platform which will be one of the target
+deployment environments for JPWB, it will use technology like Alibaba's OpenSandbox and / or Nvidia's OpenShell.
+But JPWB can also run in a Visual Studio Code extension setup as well. So from local to SaaS to Enterprise."*
+
+⭐ **WHAT IT CHANGES IS WHAT THE CODE MAY CLAIM, NOT WHAT IT MUST DO.** Phase 2's containment is an
+**ORGANISATIONAL** boundary: one Undertaking's work lands in ONE place a person can inspect, a step cannot
+scatter it through the server's own source tree, and the ordinary mistakes — a stray `../`, an absolute path, a
+name Win32 rewrites, a device, a stream — are refused with a fact a step can record. ⛔ It is **NOT** a security
+boundary against an adversarial model, it cannot be made into one by comparing path strings in userspace, and
+this seam's own history is the evidence. The set of spellings the predicate has had to learn grew one adversary
+at a time — `..`, both separators and a drive letter (Phase 1); then a trailing dot, a Win32 device stem and a
+colon, and the retention record's CASE (§4b); then the record's NTFS 8.3 alias (§4c) — and each was the SAME
+location wearing a name the comparison did not recognise as that location. ⛔ Two more were then driven and are
+NOT closed at all: a HARD LINK and a ROOT SWAP.
+
+**THE THREE TIERS, AND THE ONE SEAM THAT SERVES ALL THREE.**
+
+| tier | where JPWB runs | who draws the security boundary |
+| --- | --- | --- |
+| **LOCAL** | a Visual Studio Code extension host | the extension host's own process and workspace-trust model |
+| **SaaS** | the Janumi Platform | **OS-level sandboxing** — Alibaba's **OpenSandbox** and/or NVIDIA's **OpenShell** are the named candidates |
+| **ENTERPRISE** | a customer's own deployment | container isolation (the corpus names K8s Jobs + gVisor as one shape) |
+
+⭑ **AND THIS IS WHY THEY ARE PORTS AT ALL.** `Workspace` and `ProcessRunner` are the seam a platform sandbox
+SUPPLIES: an adapter backed by OpenSandbox, by a gVisor-isolated Job, or by the extension host satisfies the
+same two interfaces, and every consumer — `planProcessRun`, `producerWorkingDirectory`, the retention record —
+is written against the interface rather than against `node:fs`. Replacing the adapter is how the security tier
+is taken up; nothing above it changes.
+
+⚠ **THE CORPUS ALREADY ANTICIPATED THIS, AND IT IS NOT AN INVENTION OF THIS RULING — VERIFIED BEFORE IT WAS
+CITED.** `packages/rph-contracts/vocab/m1-object-fields.json` records the object `SandboxPolicy` (referenced by
+`RuntimeBinding.sandboxPolicy`) with its single field `(undefined)` and the note:
+
+> *"DEFERRED TO THE PLATFORM POLICY PLANE — dispositioned 2026-07-26 (JAN-CAPBIND-DS-001 §6), not 'Source TBD'.
+> … the sandbox backend sits behind an abstracted runtime boundary precisely so the concrete tool (OpenSandbox /
+> K8s Jobs+gVisor / a harness's own policy file) stays swappable. Authoring a shape here would therefore either
+> encode one tool's model — the lock-in that boundary exists to prevent — or invent a scope algebra the corpus
+> does not define."*
+
+⭐ So the ruling and the ratified vocabulary agree: the sandbox POLICY is a reference into a policy plane that
+is not yet settled, and the sandbox MECHANISM is the deployment environment's. §6 item 1 of this design already
+leaned on the same note for the capability-name question.
+
+**THE CONSEQUENCE FOR WHAT THE ADAPTER DISCLOSES.** `filesystem-workspace.ts`'s header now names five vectors
+and says for each whether it is REFUSED, OPEN, or merely UNREPORTED, rather than asserting a guarantee it does
+not have. Two of them — a **hard link** and a **root swap** — are OPEN and need no privilege whatever; both were
+driven unprivileged on this host and both are carried by DISCLOSURE PROBES in the adapter's suite, so a later
+change that closes one reddens a test and forces the disclosure to be rewritten rather than quietly outliving
+it.
+
+⛔ **WHAT THIS RULING DOES NOT LICENSE.** It is not permission to stop refusing: the organisational boundary is
+the thing that makes an Undertaking's deliverable findable and its accidents legible, and every refusal in the
+adapter stays. It is permission to stop pretending — and to stop adding one more string comparison per
+adversary, which is what §4.8 exists to end.
+
+
 ---
 
 ## 5. What must NOT happen
@@ -234,6 +294,7 @@ required** — without it the governed record rests on the model's word.
 
 ## 6. Ratification owed
 
+0. ~~**Whether the workspace is a security boundary.**~~ ⭐ **RULED 2026-09-14 — R9, §4.8: organisational now, security later, and the security tier is the deployment environment's.**
 1. **The process-execution capability NAME.** `file-system` is verbatim in RPH-EXE-004; for running a process the
    corpus names nothing — `CapabilityRequest.capability` is bare `z.string()`, and `RuntimeBinding.sandboxPolicy`
    is recorded as DEFERRED TO THE PLATFORM POLICY PLANE. The spike coined `process-execution`. ⚠ Collapsing it

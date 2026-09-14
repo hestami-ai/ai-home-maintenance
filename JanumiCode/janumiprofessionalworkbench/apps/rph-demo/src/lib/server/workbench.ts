@@ -33,16 +33,33 @@ import {
 } from './identity.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
+/**
+ * ⛔ THE PROCESS DECLARES THAT IT IS SERVING, and only that declaration buys a durable store — see `DB_PATH`.
+ *
+ * It is deliberately NOT the negation of `TEST_MODE`: those two are different questions. `TEST_MODE` asks
+ * whether the harness endpoints exist, and a process that is neither a harness nor a server (a unit runner, a
+ * script, a future tool) must answer NO to both.
+ */
+const SERVING = process.env.RPH_DEMO_MODE === 'server';
 const productionUlid = monotonicFactory();
 
 /**
  * Where the durable store lives, or undefined for the in-memory one.
  *
- * TEST MODE IGNORES IT UNCONDITIONALLY. The E2E harness resets the engine between specs and depends on each spec
- * starting from a known state; a durable store shared across specs would make them order-dependent, which is the
- * failure mode `resetEngine` exists to prevent. So test mode is in-memory by construction, not by configuration.
+ * ⛔ A PROCESS THAT HAS NOT DECLARED ITSELF A SERVER GETS NO FILE, WHATEVER IT HAS CONFIGURED — and the
+ * inversion is the fix rather than a tightening. This read used to be `TEST_MODE ? undefined :
+ * process.env.JPWB_DEMO_DB`, i.e. durable for every process that was not the Playwright harness. `vitest.
+ * config.ts` sets no mode, so `vitest run --project app:rph-demo` with `JPWB_DEMO_DB` set was NOT test mode by
+ * that predicate: driven, it produced a durable 2,719,744-byte `demo.sqlite` and reddened
+ * `undertaking-loader-object-type.test.ts`'s CONTROL — exactly the order-dependence `resetEngine` exists to
+ * prevent, arriving through the one runner the predicate did not name.
+ *
+ * ⚠ A SECOND ENV CHECK WOULD HAVE CLOSED THAT RUNNER AND NOT THE NEXT ONE: a blocklist of runners is a list
+ * that rots. The affirmative form needs no list — it is what the original sentence here already claimed and
+ * could not deliver: "in-memory by construction, not by configuration". `workspace-host.ts` reads the same
+ * declaration for the workspace plane, and its header carries the full argument.
  */
-const DB_PATH = TEST_MODE ? undefined : process.env.JPWB_DEMO_DB;
+const DB_PATH = SERVING ? process.env.JPWB_DEMO_DB : undefined;
 
 let handle: EngineHandle | null = null;
 let cmdSeq = 0;

@@ -66,6 +66,11 @@ export function getExecutionSession(): OpenProducerSession {
 	if (TEST_MODE && !resolveExecutorToolId())
 		// ⚠ ONE-SHOT BY NATURE, AND IT SAYS SO. The fixture has no memory; wrapping it in a session that
 		// CLAIMED history would be the fabricated-capability defect.
+		//
+		// ⭑ AND IT TAKES NO SANDBOX, WHICH IS A STATEMENT RATHER THAN AN OMISSION. A fixture that echoes a
+		// fragment of its own prompt touches no filesystem and needs no working directory; accepting one and
+		// ignoring it would advertise a containment guarantee it does not provide. `OpenProducerSession` accepts
+		// a narrower function precisely so this stays honest.
 		return async () => oneShotSession(deterministicExecutionPrint);
 
 	// ⭑⭑ THE EXECUTOR NOW NAMES ITS OWN TOOL, WHICH IS THE WHOLE POINT OF `JAN-TOOLSUITE`. Until this line the
@@ -87,7 +92,13 @@ export function getExecutionSession(): OpenProducerSession {
 		// ⚠ NO UNIT TEST COULD HAVE CAUGHT IT. Every test of `runModelInvocationStep` INJECTS its own `print`
 		// returning a rich result, so the one adapter that narrows it was never on any tested path. The LIVE
 		// lane found it on its second run — which is the argument for the lane, in one line.
-		return async () => (await import('../tools/pi-executor.js')).openPiExecutionSession();
+		//
+		// ⭐ AND IT NOW HANDS THE ADAPTER THE UNDERTAKING'S SANDBOX (JAN-EXEC Phase 2). This was the ONLY seam
+		// through which a working directory could reach the executing model, and it was zero-argument — so the
+		// adapter had nowhere to get one and hardcoded the SERVER's. Threading the context is what makes the
+		// containment fix reachable from production at all.
+		return async (context) =>
+			(await import('../tools/pi-executor.js')).openPiExecutionSession(context);
 	// ⚠ `agy --print` is a fresh process per call: no memory, and the session says so.
 	if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));
 	throw new Error(
