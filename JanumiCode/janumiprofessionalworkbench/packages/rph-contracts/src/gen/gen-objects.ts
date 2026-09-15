@@ -31,6 +31,12 @@ interface Field {
 	required: boolean;
 	enumRef?: string;
 	note?: string;
+	/**
+	 * A NAMED STRUCTURAL BOUND from `BOUNDS` below — the field's Zod expression is constrained, or replaced, by
+	 * a constraint the CONTRACT owns rather than by one a handler applies after the fact. Set only where the
+	 * bound is a property of the SHAPE; `src/record-plane-bounds.ts` argues why the record plane needs any.
+	 */
+	bound?: string;
 }
 interface ObjSpec {
 	objectType: string;
@@ -187,8 +193,72 @@ function scalarZodExpr(t: string): string {
 	return 'z.unknown()';
 }
 
+/**
+ * ⭐⭐ NAMED STRUCTURAL BOUNDS — the constraints a field may declare in the vocab, emitted into the CONTRACT.
+ *
+ * ⛔ WHY THE CONTRACT AND NOT THE HANDLER, which is the whole `W1`/`W2` repair. A handler check governs ONE
+ * write path: the command payload. The schema governs three — `validateAgainst(spec.payload, …)` in
+ * `command-bus.ts`, the materialized object state in `kit.ts`, and the ratified event payload beside it. A
+ * bound that is a property of the SHAPE cannot be got around by a second producer or a direct dispatch, and
+ * "enforced at the producer, described as enforced at the boundary" is the error this mechanism exists to
+ * make unavailable.
+ *
+ * ⚠ `appliesTo` IS NOT DECORATION. A bound silently applied to the wrong base is a constraint that does not
+ * constrain — `.max()` on a `z.number()` means something entirely different from `.max()` on a `z.array()` —
+ * so a mismatch THROWS, on exactly the posture `gen-messages.ts` takes for an unresolvable `enumRef`: a loud
+ * generator failure beats a contract that quietly promises less than it says.
+ */
+interface Bound {
+	/** The Zod expression this bound is defined over. A mismatch is a generator failure, never a silent pass. */
+	readonly appliesTo: (base: string) => boolean;
+	/** Constrain — or, for a named schema, REPLACE — the base expression. */
+	readonly apply: (base: string) => string;
+	/** Identifiers the emitted expression needs imported from `./record-plane-bounds.js`. */
+	readonly needs: readonly string[];
+}
+const BOUNDS: Record<string, Bound> = {
+	RECORD_PLANE_NAME: {
+		appliesTo: (base) => base === 'z.string()',
+		apply: () => 'RecordPlaneNameSchema',
+		needs: ['RecordPlaneNameSchema']
+	},
+	RECORD_PLANE_PROSE: {
+		appliesTo: (base) => base === 'z.string()',
+		apply: () => 'RecordPlaneProseSchema',
+		needs: ['RecordPlaneProseSchema']
+	},
+	OBSERVED_TOOL_CALL_LIST: {
+		appliesTo: (base) => base.startsWith('z.array(') && base.endsWith(')'),
+		// ⭑ THE ITEM SCHEMA IS UNWRAPPED AND HANDED TO THE BOUND, rather than the bound being appended to the
+		//   array. `boundedObservedToolCallList` owns BOTH the cap and the sentence that explains it, so neither
+		//   can be edited without the other — and the emitted contract names the rule instead of restating it.
+		apply: (base) => `boundedObservedToolCallList(${base.slice('z.array('.length, -1)})`,
+		needs: ['boundedObservedToolCallList']
+	}
+};
+const usedBounds = new Set<string>();
+
+function applyBound(f: Field, base: string): string {
+	if (f.bound === undefined) return base;
+	const bound = BOUNDS[f.bound];
+	if (!bound)
+		throw new Error(
+			`gen-objects: field "${f.field}" declares bound "${f.bound}", which this generator does not emit. ` +
+				`A bound the emitter does not know would ship as an UNCONSTRAINED field while the vocabulary says ` +
+				`it is bounded — the exact "stated stronger than enforced" defect bounds exist to remove. ` +
+				`Add it to BOUNDS (and to src/record-plane-bounds.ts), or drop the declaration.`
+		);
+	if (!bound.appliesTo(base))
+		throw new Error(
+			`gen-objects: field "${f.field}" declares bound "${f.bound}" over \`${base}\`, which that bound is ` +
+				`not defined for. A bound applied to the wrong base constrains something other than what it names.`
+		);
+	for (const identifier of bound.needs) usedBounds.add(identifier);
+	return bound.apply(base);
+}
+
 function fieldLine(f: Field): string {
-	const base = zodExpr(f.type, f.enumRef);
+	const base = applyBound(f, zodExpr(f.type, f.enumRef));
 	return `\t${JSON.stringify(f.field)}: ${base}${f.required ? '' : '.optional()'}`;
 }
 
@@ -302,6 +372,14 @@ const header = [
 	"import { z } from 'zod';",
 	`import { ${['objectEnvelopeShape', ...[...usedExternal].sort((a, b) => Number(a > b) - Number(a < b))].join(', ')} } from './envelopes.js';`,
 	`import { ${enumImport} } from './enums.js';`,
+	// ⭑ EMITTED ONLY WHEN A BOUND IS ACTUALLY USED. An unconditional import would make a vocabulary that
+	//   declares no bound produce a file importing a module it never reads — which `lint` refuses, and which
+	//   would also make the import line say a bound is in force when none is.
+	...(usedBounds.size
+		? [
+				`import { ${[...usedBounds].sort((a, b) => Number(a > b) - Number(a < b)).join(', ')} } from './record-plane-bounds.js';`
+			]
+		: []),
 	''
 ];
 

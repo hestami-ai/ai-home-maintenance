@@ -6334,6 +6334,73 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "PROMISE: `parseGen` yields the generator entrypoints DERIVED from each package's own `gen` script, so a generator added there is compared with no edit to the gate. WHO RELIES: the same population as `R11-h`. WHAT THE MUTATION DOES TO THEM: `genPackages` returns three packages with zero generators each, the driver's own non-empty floor is satisfied (it counts PACKAGES, not generators), the scratch copy is therefore byte-identical to the source because nothing rewrote it, and the comparison passes over a tree that was never rebuilt. ⭑ A green light produced by doing no work at all — and the driver's summary line would read `3 package(s), 0 generator(s)`, which nobody reads. The victim asserts the parsed list ITEM BY ITEM.",
 		source: 'JAN-EXEC R11 — the gate the vocab change made necessary'
 	},
+	// -- JAN-EXEC R11 · THE INDEPENDENT REVIEW'S W1/W2/W3 — bounds that are properties of the SHAPE ---------
+	//
+	// ⭐⭐ ALL THREE FINDINGS HAD ONE SHAPE: a stated guarantee that read stronger than what was enforced, inside
+	// a PERMANENT contract (`PER-2`) governing a record `R10` has just confirmed is PERMANENT (`PER-8`). This
+	// programme has twice ruled that an inaccurate disclosure is WORSE than none, because it reads as a
+	// considered boundary. ⛔ EVERY MUTANT BELOW RESTORES THE EXACT ARRANGEMENT THE REVIEWER DROVE, so a KILLED
+	// here means the vector that once landed no longer can.
+	{
+		id: 'R11-W-a-a-host-path-is-recorded-as-a-minted-tool-name',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\tRECORD_PLANE_NAME_PATTERN,',
+		replace:
+			'\t\t/^[\\s\\S]*$/, // MUTANT: the character class admits everything, so a "name" is any string at all',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: `RecordPlaneNameSchema` bounds what a PERMANENT, unredactable record may hold in a NAME field — `ObservedToolCall.toolName` and `WorkProductDerivation.sourceField`. WHO RELIES: everyone, forever. `R10` confirmed a MODEL_EXCHANGE is PER-8 participating material, and PER-9 makes record-plane omission illegal, so nothing ever takes such a value back out. WHAT THE MUTATION DOES TO THEM: exactly the state R11 shipped in — a host absolute path, a username-bearing path, a credentials-shaped string and a NUL byte ALL fit inside 64 characters, so the surviving `.max` cannot see them and all four land as MINTED_BY_HOST while the handler's provenance conjunct stays green, because that conjunct asks only whether the discriminator and the field AGREE. ⭑ The victim is the DISPATCH suite rather than the schema's own unit suite, because the claim is about what reaches the record and not about what a predicate returns; and that suite asserts the MESSAGE, so the length limb cannot cover for the removal of this one.",
+		source: 'JAN-EXEC R11 independent review, W2 — driven with the reviewer’s own five vectors'
+	},
+	{
+		id: 'R11-W-b-a-nul-byte-is-recorded-in-an-unredactable-reason',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\tRECORD_PLANE_PROSE_PATTERN,',
+		replace: '\t\t/^[\\s\\S]*$/, // MUTANT: prose may carry any byte, control characters included',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: 'PROMISE: `RecordPlaneProseSchema` refuses control characters in the two free-text reasons — `ObservedToolCallReport.reason` and `WorkProductDerivation.reason`. WHO RELIES: the store and every later reader. ⭐ THE WHOLE POINT OF `ObservedToolCall` HAVING NO `arguments` FIELD was that untrusted content cannot reach a plane with no lawful way to remove it — PER-9 gives the CONTENT plane redaction and denies the RECORD plane omission — and three free-text strings re-opened that door, with a NUL byte driven through each. WHAT THE MUTATION DOES TO THEM: the `.max` still refuses the 200KB blob, so the blob case of the same driven pair stays GREEN and the record still looks defended; only the NUL case reddens. ⭑ That asymmetry is exactly why both vectors are driven rather than one.',
+		source: 'JAN-EXEC R11 independent review, W3 — the three free-text strings'
+	},
+	{
+		id: 'R11-W-c-the-permanent-list-loses-the-contracts-own-cap',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\t\tOBSERVED_TOOL_CALL_LIMIT,',
+		replace:
+			'\t\t\tNumber.MAX_SAFE_INTEGER, // MUTANT: the contract stops capping the list, leaving only what the caller declares',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: `boundedObservedToolCallList` caps the list AT THE CONTRACT, so the bound is a property of the shape and holds on the command payload, the materialized state and the event payload alike. WHO RELIES: the store, and any reader who takes `recordedLimit` to mean something. WHAT THE MUTATION DOES TO THEM: the state R11 shipped in — the cap becomes the producer's again, and `governedToolCallReport` still slices at 32, so the ENTIRE app-side suite stays green. ⚠ AND THE STATUS ALONE WOULD NOT CATCH IT: the handler's `recordedLimit > OBSERVED_TOOL_CALL_LIMIT` refusal (`R11-W-e`) also turns the reviewer's 64/64 arrangement away, so the victim asserts the REFUSAL MESSAGE — an arrangement that trips two guards proves neither, and this is the one that separates them.",
+		source: 'JAN-EXEC R11 independent review, W1 — the 32 cap, at the contract'
+	},
+	{
+		id: 'R11-W-d-the-shared-bound-is-not-the-number-the-record-declares',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: 'export const OBSERVED_TOOL_CALL_LIMIT = 32;',
+		replace:
+			'export const OBSERVED_TOOL_CALL_LIMIT = 1024; // MUTANT: the bound moves, consistently, and every declared limit moves with it',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: ONE number, shared — the contract's cap, the handler's ceiling on a declared `recordedLimit`, and the producer's own truncation point are the same object, so they cannot drift. WHO RELIES: `governedToolCallReport` (which imports it rather than declaring a second 32, as it used to) and every stored record whose `recordedLimit` is measured against it. WHAT THE MUTATION DOES TO THEM: nothing LOOKS wrong — the producer truncates at 1024, declares 1024, and the boundary agrees — which is precisely the hazard of a bound that is merely self-consistent. The reviewer's 64-call vector is ACCEPTED again. ⭑ A consistent move is what makes this different from `R11-W-c`: that one removes the cap, this one shows the cap is only worth what the number is, and that the number may not move without someone coming to the file that argues for it.",
+		source: 'JAN-EXEC R11 independent review, W1 — the number itself'
+	},
+	{
+		id: 'R11-W-e-a-declared-bound-may-exceed-the-enforced-one',
+		file: 'packages/rph-application/src/handlers/model-exchange.ts',
+		find: '\t\tif (tools.recordedLimit > OBSERVED_TOOL_CALL_LIMIT)',
+		replace:
+			'\t\tif (tools.recordedLimit < OBSERVED_TOOL_CALL_LIMIT) // MUTANT: the refusal inverts, so a looser declared bound passes',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: a producer may declare a TIGHTER bound than the contract enforces and say so; it may not declare a looser one. WHO RELIES: every reader who compares `recordedLimit` with `observedCount` to decide whether the list was truncated — the one mechanism keeping a truncated record from reading exactly like a complete one (REG-F-345's shape). WHAT THE MUTATION DOES TO THEM: a SHORT list declaring a limit of 64 is accepted, so the record asserts a bound this plane cannot apply and a reader is told about a record that cannot exist. ⭑ The long-list case stays GREEN because the SCHEMA catches that one — W1's two halves are guarded in two places and only this mutation separates them. Inverting rather than deleting keeps every type and branch live, per this ledger's operator rule.",
+		source: 'JAN-EXEC R11 independent review, W1 — the half the schema does not reach'
+	},
+	// ⚠ A SIXTH MUTANT WAS DECLARED HERE AND WITHDRAWN, AND THE REASON IS WORTH MORE THAN THE ENTRY WAS.
+	// `R11-W-f` mutated `applyBound` in `gen/gen-objects.ts` so that every declared bound was dropped on emission.
+	// ⛔ IT CANNOT BE MEASURED BY THIS HARNESS: the runner does not re-run `bun run gen`, so a mutation to a
+	// GENERATOR changes nothing any test observes — it would report SURVIVED while proving only that the harness
+	// never regenerated. (Its first form reported NO_COMPILE, which was flattering: the real verdict was worse.)
+	// ⭐ THE GUARD IS REAL AND LIVES ELSEWHERE, DRIVEN BY HAND: `"bound"` was removed from `toolName` in the vocab
+	// and `bun run gen` re-run. MEASURED: `gen:check` exited 0 with *"every generated artifact matches its
+	// source"* — the limit of a freshness gate — while ALL FIVE W2 cases in `model-exchange.test.ts` went RED. So the
+	// vocabulary is held to the contract by the DRIVEN cases, not by the freshness step, and that is recorded
+	// here because the absence of a ledger entry would otherwise read as an absence of a guard.
+
 	// -- JAN-EXEC PHASE 1: the two ports, and the defaults that cannot fabricate --------------------
 	{
 		id: "P1-a-an-absolute-path-is-normalized-instead-of-refused",

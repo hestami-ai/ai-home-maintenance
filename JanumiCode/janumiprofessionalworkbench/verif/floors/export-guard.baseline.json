@@ -727,6 +727,21 @@
 			],
 			"unattributedMutants": 0
 		},
+		"packages/rph-contracts/src/record-plane-bounds.ts": {
+			"consumedExports": [
+				"boundedObservedToolCallList",
+				"OBSERVED_TOOL_CALL_LIMIT",
+				"RecordPlaneNameSchema",
+				"RecordPlaneProseSchema"
+			],
+			"guardedExports": [
+				"boundedObservedToolCallList",
+				"OBSERVED_TOOL_CALL_LIMIT",
+				"RecordPlaneNameSchema",
+				"RecordPlaneProseSchema"
+			],
+			"unattributedMutants": 0
+		},
 		"packages/rph-contracts/src/validate.ts": {
 			"consumedExports": [
 				"jsonSchemaFor",

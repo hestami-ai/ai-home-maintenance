@@ -65,6 +65,11 @@ import {
 	ValidatorRegistryStatusSchema,
 	WorkLifecycleStateSchema
 } from './enums.js';
+import {
+	RecordPlaneNameSchema,
+	RecordPlaneProseSchema,
+	boundedObservedToolCallList
+} from './record-plane-bounds.js';
 
 // ---- Helper sub-types the specs reference but never fully define. Permissive structured
 // placeholders (any object) — tightened in the milestone that defines them (M7/M9/M11). ----
@@ -371,16 +376,16 @@ export type ObligationAllocation = z.infer<typeof ObligationAllocationSchema>;
 export const ObservedToolCallSchema = z.strictObject({
 	ordinal: z.number().int(),
 	nameProvenance: z.enum(['MINTED_BY_HOST', 'NOT_MINTED']),
-	toolName: z.string().optional(),
+	toolName: RecordPlaneNameSchema.optional(),
 	outcome: z.enum(['COMPLETED', 'REFUSED', 'FAILED', 'UNKNOWN'])
 });
 export type ObservedToolCall = z.infer<typeof ObservedToolCallSchema>;
 export const ObservedToolCallReportSchema = z.strictObject({
 	observation: z.enum(['OBSERVED', 'NONE_OBSERVED', 'NOT_OBSERVABLE']),
-	calls: z.array(ObservedToolCallSchema).optional(),
+	calls: boundedObservedToolCallList(ObservedToolCallSchema).optional(),
 	observedCount: z.number().int().optional(),
 	recordedLimit: z.number().int().optional(),
-	reason: z.string().optional()
+	reason: RecordPlaneProseSchema.optional()
 });
 export type ObservedToolCallReport = z.infer<typeof ObservedToolCallReportSchema>;
 export const OmittedRegionSchema = z.strictObject({
@@ -499,12 +504,12 @@ export const WorkProductDerivationSchema = z.strictObject({
 		'NO_WORK_PRODUCT_EXPECTED',
 		'EXPECTED_BUT_UNRETAINED'
 	]),
-	sourceField: z.string().optional(),
+	sourceField: RecordPlaneNameSchema.optional(),
 	storageProvider: z.string().optional(),
 	storageKey: z.string().optional(),
 	contentHash: z.string().optional(),
 	byteSize: z.number().int().optional(),
-	reason: z.string().optional()
+	reason: RecordPlaneProseSchema.optional()
 });
 export type WorkProductDerivation = z.infer<typeof WorkProductDerivationSchema>;
 export const WorkRiskProfileSchema = z.strictObject({

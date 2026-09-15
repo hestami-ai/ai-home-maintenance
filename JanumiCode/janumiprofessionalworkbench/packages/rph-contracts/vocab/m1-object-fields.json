@@ -3943,7 +3943,8 @@
 					"field": "sourceField",
 					"type": "string",
 					"required": false,
-					"note": "ENVELOPE_FIELD only, and REQUIRED there. WHICH field of the answer span became the work product. ⚠ It is a string because the field name belongs to the EXECUTION CONTRACT the harness authors, not to this vocabulary; it is NOT model-chosen, so the R11 retention ruling recorded on ObservedToolCall does not reach it. ⛔ It is refused on WHOLE_ANSWER_SPAN because there is no field there, and inventing a pseudo-name for one would be the fabricated value that arm exists to avoid."
+					"bound": "RECORD_PLANE_NAME",
+					"note": "ENVELOPE_FIELD only, and REQUIRED there. WHICH field of the answer span became the work product. ⚠ It is a string because the field name belongs to the EXECUTION CONTRACT the harness authors, not to this vocabulary; it is NOT model-chosen, so the R11 retention ruling recorded on ObservedToolCall does not reach it. ⛔ It is refused on WHOLE_ANSWER_SPAN because there is no field there, and inventing a pseudo-name for one would be the fabricated value that arm exists to avoid. ⭐⭐ R11 REVIEW W3 — AND 'NOT MODEL-CHOSEN' WAS A CLAIM ABOUT THE PRODUCER, NOT ABOUT THE FIELD: a host absolute path, a credentials string, a NUL byte and a 200KB blob were all DRIVEN into it and ACCEPTED. It is now BOUND to the record plane's NAME shape (RECORD_PLANE_NAME), which is what a JSON object's field name already is. ⚠ A CLOSED SET WAS CONSIDERED AND DECLINED: the only value any producer emits is 'workProduct', but the envelope that defines it is the HOST's execution contract (apps/rph-demo), a different host authors a different envelope, and PER-2 would make one host's wrapper permanent for every host — the same reason no ratified enum names a tool, agent, provider, CLI or vendor."
 				},
 				{
 					"field": "storageProvider",
@@ -3973,7 +3974,8 @@
 					"field": "reason",
 					"type": "string",
 					"required": false,
-					"note": "Required on NO_WORK_PRODUCT_EXPECTED and EXPECTED_BUT_UNRETAINED, refused on the two retaining arms. PER-9 permits a DISCLOSED absence and forbids a silent one, so an absence must say why in terms a reader can act on."
+					"bound": "RECORD_PLANE_PROSE",
+					"note": "Required on NO_WORK_PRODUCT_EXPECTED and EXPECTED_BUT_UNRETAINED, refused on the two retaining arms. PER-9 permits a DISCLOSED absence and forbids a silent one, so an absence must say why in terms a reader can act on. ⭐⭐ R11 REVIEW W3 — BOUNDED, because the whole point of having no arguments field was that untrusted content cannot reach a plane with no lawful way to remove it, and a free-text string re-opens that door: a host path, a credentials string, a NUL byte and a 200KB blob were all DRIVEN into this field and ACCEPTED. RECORD_PLANE_PROSE bounds the LENGTH and refuses CONTROL CHARACTERS. ⚠ IT DOES NOT ESTABLISH THAT THE PROSE CARRIES NO PATH AND NO SECRET — see src/record-plane-bounds.ts. What warrants the CONTENT is that every producer of this field writes a string literal authored in this repository and none interpolates model output; that is a PRODUCER property, and the boundary does not check it."
 				}
 			]
 		},
@@ -3991,13 +3993,14 @@
 					"field": "nameProvenance",
 					"type": "'MINTED_BY_HOST' | 'NOT_MINTED'",
 					"required": true,
-					"note": "⭐ WHETHER THE NAME IS THE HOST'S WORD OR THE MODEL'S, which is the whole reason a name may be recorded at all. A minted name is drawn from the closed set this host actually minted for the step (JAN-EXEC capability→tools, by absence), so it cannot carry model-chosen content. NOT_MINTED means the model called something that was never minted — which is the security-relevant fact, and the one worth keeping."
+					"note": "⭐ WHETHER THE NAME IS THE HOST'S WORD OR THE MODEL'S, which is the whole reason a name may be recorded at all. A minted name is drawn from the closed set this host actually minted for the step (JAN-EXEC capability→tools, by absence). NOT_MINTED means the model called something that was never minted — which is the security-relevant fact, and the one worth keeping. ⛔ R11 REVIEW W2 — THIS NOTE USED TO END 'so it cannot carry model-chosen content', AND THAT WAS FALSE OF THE BOUNDARY. This field is a DECLARATION BY THE CALLER and nothing here verifies it; the minted set is session-scoped and lives in the adapter. What the boundary can check, and now does, is the SHAPE of the name toolName carries (RECORD_PLANE_NAME) — which is a property of the value rather than of the caller's honesty."
 				},
 				{
 					"field": "toolName",
 					"type": "string",
 					"required": false,
-					"note": "MINTED_BY_HOST only, and REFUSED on NOT_MINTED. An unminted name is an arbitrary model-chosen string, which is the class W1 measured leaking a host path fragment through a model-chosen argv[0]. The FACT that an unminted call was attempted is recorded; the model's spelling of it is not. Determined by nameProvenance exactly as ExchangeIdentityFact.value is determined by availability."
+					"bound": "RECORD_PLANE_NAME",
+					"note": "MINTED_BY_HOST only, and REFUSED on NOT_MINTED. An unminted name is an arbitrary model-chosen string, which is the class W1 measured leaking a host path fragment through a model-chosen argv[0]. The FACT that an unminted call was attempted is recorded; the model's spelling of it is not. Determined by nameProvenance exactly as ExchangeIdentityFact.value is determined by availability. ⭐⭐ R11 REVIEW W2 — AND THE PROVENANCE ARM IS NOT ITSELF A CONTENT CHECK, which is what R11 said it was: the boundary checked only that the DISCRIMINATOR and the FIELD agreed, so a host absolute path, a username-bearing path, a credentials string, a NUL byte and a 200KB blob were all ACCEPTED as MINTED_BY_HOST. RECORD_PLANE_NAME now bounds the SHAPE — a bounded length and a name's character class — so none of those five can land whatever the caller declares. ⚠ IT DOES NOT ESTABLISH THAT THE NAME WAS MINTED: the host's minted set is session-scoped, lives in the adapter, and cannot reach this boundary without either inventing a kernel-to-app dependency or having the caller declare the set beside the name, which is self-consistency again. See src/record-plane-bounds.ts for the argument in full."
 				},
 				{
 					"field": "outcome",
@@ -4021,7 +4024,8 @@
 					"field": "calls",
 					"type": "ObservedToolCall[]",
 					"required": false,
-					"note": "OBSERVED only, and non-empty there — an OBSERVED report with no calls in it is NONE_OBSERVED wearing the wrong member, and the handler refuses it as such."
+					"bound": "OBSERVED_TOOL_CALL_LIST",
+					"note": "OBSERVED only, and non-empty there — an OBSERVED report with no calls in it is NONE_OBSERVED wearing the wrong member, and the handler refuses it as such. ⭐⭐ R11 REVIEW W1 — AND THE CAP IS NOW THE CONTRACT'S. R11 said 'BOUNDED: calls is capped at 32'; the cap was applied only by governedToolCallReport, and the boundary compared the list against the limit THE CALLER DECLARED — so 64 calls declaring a recordedLimit of 64 were ACCEPTED, and only the internally inconsistent case was refused. The bound is OBSERVED_TOOL_CALL_LIMIT, applied by the schema, so it holds on the command payload, on the materialized state and on the event payload alike, and a self-declared recordedLimit cannot raise it. ⚠ recordedLimit still says what the PRODUCER applied and may be lower; what it can no longer do is be higher."
 				},
 				{
 					"field": "observedCount",
@@ -4033,13 +4037,14 @@
 					"field": "recordedLimit",
 					"type": "number",
 					"required": false,
-					"note": "OBSERVED only. The per-exchange bound actually applied to `calls`. An UNTRUSTED party decides how many tool calls to make, and an unbounded array on a PERMANENT record is unbounded permanent storage driven by that party — so the list is capped, and the cap is DECLARED in the record rather than applied silently. ⚠ The NUMBER is AUTHORED, not derived: nothing measured says 32 is right, and it is recorded as authored so a later ruling can move it knowingly."
+					"note": "OBSERVED only. The per-exchange bound actually applied to `calls` BY THE PRODUCER, so a reader comparing it with observedCount can see that a truncation happened. ⛔ R11 REVIEW W1 — IT IS NOT THE BOUND THE CONTRACT ENFORCES, and the difference is exactly what was wrong: the handler compared calls.length against THIS number, which the caller writes, so 64 calls declaring 64 were accepted. The enforced cap is OBSERVED_TOOL_CALL_LIMIT on `calls` itself; this field may be lower than it (a producer that chose a tighter bound) and can no longer be higher. ⚠ The NUMBER is AUTHORED, not derived: nothing measured says 32 is right, and it is recorded as authored so a later ruling can move it knowingly."
 				},
 				{
 					"field": "reason",
 					"type": "string",
 					"required": false,
-					"note": "Required on NONE_OBSERVED and NOT_OBSERVABLE, refused on OBSERVED. On NOT_OBSERVABLE it must say WHY the adapter cannot see, because that is the fact a reader acts on when deciding what this record is worth."
+					"bound": "RECORD_PLANE_PROSE",
+					"note": "Required on NONE_OBSERVED and NOT_OBSERVABLE, refused on OBSERVED. On NOT_OBSERVABLE it must say WHY the adapter cannot see, because that is the fact a reader acts on when deciding what this record is worth. ⭐⭐ R11 REVIEW W3 — BOUNDED for the same reason as WorkProductDerivation.reason one helper up: this object has no arguments field precisely so that untrusted content cannot reach a plane with no lawful way to remove it, and a free-text string is a second door into it. A host path, a credentials string, a NUL byte and a 200KB blob were DRIVEN into this field and ACCEPTED. RECORD_PLANE_PROSE bounds the LENGTH and refuses CONTROL CHARACTERS; it does NOT establish that the prose carries no path and no secret, and the warrant for the content is that its author is the host."
 				}
 			]
 		}

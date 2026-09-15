@@ -12,6 +12,10 @@ export * from './ids.js';
 export * from './enums.js';
 export * from './errors.js';
 export * from './envelopes.js';
+// ⭑ AHEAD OF `objects.js`, WHICH IMPORTS IT. The barrel's order does not drive module evaluation — the
+//   importing module does — but keeping a dependency ahead of its dependent keeps this file readable as a
+//   layering rather than as an alphabet.
+export * from './record-plane-bounds.js';
 export * from './objects.js';
 export * from './messages.js';
 export * from './validate.js';

@@ -753,6 +753,145 @@ rewritten mutant is exactly where a claim quietly weakens.
 
 ---
 
+## 4g. `R11` · ⭐ THE INDEPENDENT REVIEW — no problems, six weaknesses, and three of them were one shape
+
+The review of the landed `R11` found **no problems and six weaknesses**. ⭐ **THREE SHARE ONE SHAPE: a stated
+guarantee that read stronger than what was enforced** — and those statements sit in a PERMANENT contract
+(`PER-2`) governing a record `R10` has just confirmed is PERMANENT (`PER-8`). This programme has ruled twice
+that an **inaccurate disclosure is worse than no disclosure**, because it reads as a considered boundary. So
+each one had to become true or stop being said.
+
+| # | the weakness | ruling |
+| --- | --- | --- |
+| `W1` | *"BOUNDED: `calls` is capped at 32"*. **DRIVEN:** 64 calls declaring their own `recordedLimit: 64` were **ACCEPTED**; only the internally inconsistent case (64 declaring 32) was refused. The cap was the PRODUCER's and the boundary checked self-consistency. | ⭐ **FIXED AT THE CONTRACT** — `boundedObservedToolCallList`, plus a handler refusal for a declared bound ABOVE the enforced one (`R11-W-c`, `R11-W-d`, `R11-W-e`) |
+| `W2` | *"a minted name is drawn from a closed set the HOST authored and cannot carry model-chosen content."* **DRIVEN:** a host absolute path, a username-bearing path, a credentials-shaped string, a NUL byte and a 200KB blob were ALL accepted as `toolName` with `nameProvenance: MINTED_BY_HOST`. | ⭐ **FIXED, OPTION (b)** — the boundary BOUNDS THE SHAPE (`RecordPlaneNameSchema`); the provenance claim is restated as what it is (`R11-W-a`) |
+| `W3` | three free-text strings into an unredactable record — `ObservedToolCallReport.reason`, `WorkProductDerivation.reason`, `sourceField`. All four vectors landed in each. | ⭐ **FIXED, WITH ONE HALF DISCLOSED** — `sourceField` takes the NAME bound; the two `reason`s take a PROSE bound (length + no control characters) and the argument for their content is made explicitly (`R11-W-a`, `R11-W-b`) |
+| `W4` | two REQUIRED fields added to `ModelExchangeRecorded` with no version bump | ⛔ **FILED, NOT FIXED** — repository-wide, and it REFUTES one limb of an already-recorded position. See below |
+| `W5` | the brief said `RecordModelExchange` dispatches on assurance, authoring and execution | ⛔ **THE RECORD IS CORRECTED, AND THE CORRECTION IS BIGGER THAN THE BRIEF'S.** See below |
+| `W6` | `OBSERVED` / `NONE_OBSERVED` have no producer until Phase 3 | ⚠ **LEFT DISCLOSED** — already stated in three places, and now in a fourth with its Phase 3 consequence |
+
+---
+
+### ⭐⭐ `W2` — WHY THE BOUND IS STRUCTURAL AND NOT A MEMBERSHIP TEST, WHICH IS THE PART THAT NEEDED DECIDING
+
+Three options were open, and **(a) had to be ruled out before (b) could be taken**.
+
+**(a) VALIDATE THE NAME AGAINST THE HOST'S ACTUAL MINTED SET — NOT AVAILABLE, and the reason is a ruling this
+repository already made.** The minted set is SESSION-SCOPED and known only to the adapter that opened the
+session (`AdapterToolObservation.mintedToolNames`); the kernel is host-agnostic and cannot reach into an app
+adapter. Minting the set into the wire vocabulary instead is refused by `backing-tool.ts`'s own recorded
+position — *"of the 100 closed enums in the ratified contracts NOT ONE names a tool, agent, provider, CLI or
+vendor, and `PER-2` would make a deployment fact permanent."* And carrying the set **in the payload beside the
+name** re-creates the defect exactly: the caller would declare both halves and the check would be
+self-consistency again, which is `W1`'s shape.
+
+**(b) BOUND THE SHAPE — TAKEN.** `RecordPlaneNameSchema`: at most 64 characters, and `^[A-Za-z][A-Za-z0-9_.-]*$`.
+⛔ The character class is chosen for what it EXCLUDES: no backslash, slash or colon (no path), no `=` (no
+`KEY=value`), no space, no control character (no NUL). ⚠ **AND IT IS SAID TO BE WEAKER THAN (a):** it does not
+establish that the name was minted, that the tool exists, or that the host and not the model chose it. Only
+that the value has the SHAPE of a name — which is a property of the VALUE rather than of a caller's honesty.
+
+⭐ **AND IT LIVES IN THE CONTRACT RATHER THAN IN THE HANDLER, WHICH IS WHAT MAKES IT A BOUNDARY AT ALL.** A
+handler check governs ONE write path — the command payload. A bound on the schema governs three:
+`validateAgainst(spec.payload, …)` in `command-bus.ts`, the materialized object state in `kit.ts`, and the
+ratified event payload beside it. `B8`'s verdict in this same programme was that *a convention with zero
+production call sites is not a control*; enforcing at the producer and calling it enforced at the boundary is
+that error one layer up, and the review named it as such.
+
+**MECHANISM.** The vocabulary gained a `bound` attribute; `gen-objects.ts` gained a small closed table of named
+bounds and **THROWS on one it does not know** (the posture `gen-messages.ts` already takes for an unresolvable
+`enumRef` — a loud generator failure beats a contract that quietly promises less than it says). Five vocab
+fields declare one. No generated artifact was hand-edited: vocab → `bun run gen` → wiring, and `gen:check` is
+gate step 3.
+
+### ⚠ `W3` — THE TWO `reason`s ARE A DIFFERENT ARGUMENT, AND BOTH HALVES OF IT ARE MADE
+
+`sourceField` took the NAME bound: a JSON object's field name IS a name. ⚠ **A CLOSED SET WAS CONSIDERED AND
+DECLINED** — the only value any producer emits is `workProduct`, but the envelope that defines it is the HOST's
+execution contract (`apps/rph-demo`), a different host authors a different envelope, and `PER-2` would make one
+host's wrapper permanent for every host. Same reason as `W2`(a), one field over.
+
+The two `reason`s are **host-authored prose**, and that claim is CHECKABLE: every producer of one in this
+repository writes a string LITERAL authored here — `run-model-step` (two), `reasoning-review-validator`,
+`pi-executor`, `devin-reviewer`, `governedToolCallReport` — and **not one interpolates model output**. The
+longest is 523 characters. ⛔ **BUT THE BOUNDARY CANNOT VERIFY THAT, WHICH IS THE WHOLE LESSON OF `W2`**, so
+they are bounded anyway: 4096 characters, and no control character.
+
+⚠ **AND WHAT IS NOT ENFORCED IS PINNED AS A PASSING TEST RATHER THAN LEFT AS PROSE**, the way `P2B-ar` pinned
+Phase 2b's own `W1`. **MEASURED:** of the four vectors driven at each `reason`, the NUL byte and the 200KB blob
+are now refused and **a host path and a credentials-shaped string are still ACCEPTED**. A predicate deciding
+whether prose *"looks like a path"* is a normaliser over an arbitrary string — the shape this programme refused
+in Phase 2b — and it would reject legitimate prose (`pi-executor`'s live reason quotes `noTools:'builtin'`).
+The disclosure now has a test that must be retired by whoever strengthens the bound.
+
+### ⛔ `W4` — FILED, AND IT REFUTES A LIMB OF `RPH-PER-010` RATHER THAN OPENING A NEW QUESTION
+
+**THE DRIVEN FACT.** `R11` added two REQUIRED fields to the `ModelExchangeRecorded` payload. `eventSchemaVersion`
+is written at exactly ONE site — `makeEvent` in `kit.ts`, as the hard-coded literal `1` — and is **read
+nowhere**. So a durable store can hold two structurally different `ModelExchangeRecorded` events both declaring
+version 1, and `ModelExchangeRecordedPayloadSchema` is a `z.strictObject` requiring both new fields.
+
+⭐ **THE REGISTER WAS SEARCHED FIRST AND IT ALREADY HOLDS THIS GROUND.** `RPH-PER-010` (`NOT_A_COMMAND_REFUSAL`)
+argues that `PER-2`'s upcaster obligation *"cannot arise in this engine"* because *"every event this engine can
+mint is version 1 … There is no version-2 event to upcast FROM."* ⛔ **THAT ARGUMENT IS NOW LOAD-BEARING IN THE
+WRONG DIRECTION.** The premise still holds — nothing bumps the version — and that is precisely the defect: the
+payload EVOLVED while the version did not, so the obligation can never be triggered and the divergence is
+invisible. The entry's own RESIDUE paragraph anticipates *"the day a version-2 event is minted"*; what actually
+happened is the case it did not name, which is strictly worse because no future read can detect it.
+
+⚠ **NOT CONCRETE IN THIS REPOSITORY:** no durable event store holding `ModelExchangeRecorded` is committed here,
+and the load path is `JSON.parse` plus an unchecked `as DomainEvent` with no re-validation, so nothing would
+even raise. The hazard belongs to any deployment that recorded exchanges before `R11`.
+
+**WHAT WOULD HAVE TO BE DECIDED — and it is repository-wide, not `R11`'s to settle alone:**
+
+1. Does adding a REQUIRED field to a ratified EVENT payload oblige an `eventSchemaVersion` bump? The contracts
+   generate `eventSchemaVersion` from the vocabulary; nothing derives it per event type.
+2. If yes, **what reads it?** Nothing does today, and `StorageAdapter` declares no hook where an upcaster could
+   be injected — `RPH-PER-010` records that too. A bump nothing reads is a second disclosure of the same kind
+   this section exists to remove.
+3. Or does the repository adopt **additive-and-always-OPTIONAL** for event payloads, which would have made
+   `R11`'s two fields optional on the EVENT while staying required on the COMMAND — and which conflicts with
+   `PER-2`'s *"the full field set, deliberately"* posture that `model-exchange.ts` argues for.
+
+### ⛔ `W5` — THE RECORD IS CORRECTED, AND THE CORRECT ANSWER IS BIGGER THAN THE CORRECTION
+
+The `R11` brief said `RecordModelExchange` dispatches on **assurance, authoring and execution**. ⛔ It does not.
+**DERIVED FROM THE PRODUCTION CALL SITES, not from the enum:** exactly three sites set the plane —
+`run-model-step.ts:449` (`EXECUTION`), `work-product-floor.ts:237` (`ASSURANCE`) and `floor.ts:425`
+(`ASSURANCE`). `exchange-recorder.ts:189` passes `ctx.plane` through and mints none of its own.
+
+⭐ **AND `AUTHORING` IS NOT THE ONLY PERMITTED PLANE NOTHING WRITES.** The field admits SIX members — `WORK`,
+`ASSURANCE`, `GOVERNANCE`, `BASELINE`, `EXECUTION`, `AUTHORING` — and **two have a producer**. Four do not:
+`AUTHORING`, `WORK`, `GOVERNANCE` and `BASELINE`. Naming only the one the brief happened to mention would have
+been the defect one level up — hand-listing where the answer is derivable.
+
+### ⚠ `W6` — LEFT DISCLOSED, AND THE DISCLOSURE GAINED ITS CONSEQUENCE
+
+No adapter mints a tool surface at HEAD, so `OBSERVED` and `NONE_OBSERVED` have no producer until Phase 3, and
+that is already stated in the vocabulary note, the producer's header and the `R11` commit. ⭐ **WHAT IS NEW IS
+THE CONSEQUENCE THE BOUNDS CREATE, and it is recorded on `governedToolCallReport` as owed to Phase 3:** when a
+surface IS minted, a host that mints a name the record plane cannot hold makes the WHOLE exchange record
+unwritable, and the three candidate answers — drop the spelling while keeping `MINTED_BY_HOST` (the handler
+refuses it), call it `NOT_MINTED` (false), or add a third provenance member (a contract change with no
+ratification and no producer) — belong to the increment that first HAS one. The same is true of
+`describeMinted`, whose output is the only term in a `reason` that grows with the host's own minted set.
+
+**PROOF.** Every limb was DRIVEN FALSE first, with the reviewer's own vectors, against the landed `R11`:
+17 arrangements dispatched, **17 ACCEPTED**. After the repair the same 17 give **13 REFUSED and 4 ACCEPTED** —
+the four being a host path and a credentials-shaped string in each of the two `reason`s, which is exactly the
+disclosure above and is now a pinned test rather than a sentence.
+
+**MUTANTS:** `bun run mutants R11-W-` — **5 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE.** ⚠ **A SIXTH WAS
+DECLARED AND WITHDRAWN, AND THE REASON IS IN THE LEDGER:** a mutant on the GENERATOR cannot be measured by this
+harness, because the runner never re-runs `bun run gen`. That guard was driven by hand instead — `"bound"`
+removed from `toolName` in the vocabulary, `bun run gen` re-run: **`gen:check` exited 0** (*"every generated
+artifact matches its source"* — the limit of a freshness gate, which cannot see a generator faithfully emitting
+the wrong thing) while **all five `W2` cases went RED**. The vocabulary is held to the contract by the DRIVEN
+cases, not by the freshness step.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach

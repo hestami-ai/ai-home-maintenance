@@ -22,7 +22,21 @@
 // is a claim that the list matches the shape, unverified — and a field added later would silently escape every
 // guard below. Deriving makes that impossible rather than unlikely. `model-exchange.test.ts` additionally pins
 // the derived sets, so a RENAME that empties one is a red rather than a silent no-op.
-import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
+//
+// ── ⛔ WHERE THIS HANDLER'S REFUSALS STOP, AND WHERE THE CONTRACT'S BEGIN (R11 REVIEW, W1–W3) ────────────────
+// Every check below is RELATIONAL — a field against its discriminator, a count against another count. ⛔ NONE
+// of them looks at a value's CONTENT, and R11's commit said one of them did: *"a minted name is drawn from a
+// closed set the HOST authored and cannot carry model-chosen content."* An independent review DROVE a host
+// absolute path, a credentials string, a NUL byte and a 200KB blob into `toolName` as `MINTED_BY_HOST` and all
+// four were ACCEPTED, because what this handler checks is that the discriminator and the field AGREE.
+//
+// ⭐ THE CONTENT BOUNDS THEREFORE LIVE IN THE CONTRACT, NOT HERE — `rph-contracts/src/record-plane-bounds.ts`,
+// reached through the generated `ObservedToolCallSchema` / `WorkProductDerivationSchema`. That is not tidiness:
+// a check in this file governs ONE write path (the command payload), while a bound on the schema governs three
+// — the command payload in `command-bus.ts`, the materialized object state in `kit.ts`, and the ratified event
+// payload beside it. `B8`'s verdict in this same programme was that a convention with no call site is not a
+// control; enforcing at the producer and calling it enforced at the boundary is the same error one layer up.
+import { OBSERVED_TOOL_CALL_LIMIT, type RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 
 import { createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
 
@@ -264,6 +278,17 @@ export const recordModelExchange: CommandHandler = (ctx, command, payload) => {
 			return bad(
 				`observedToolCalls names ${tools.calls.length} calls but declares a recordedLimit of ${tools.recordedLimit}. The declared bound must be the one actually applied, or it describes a record other than this one.`
 			);
+		// ⛔ AND THE DECLARED BOUND MAY NOT EXCEED THE ONE THE CONTRACT ENFORCES (R11 REVIEW, W1). The check
+		//    above compares the list against a number THE CALLER WROTE, so on its own it proves only internal
+		//    consistency: 64 calls declaring a recordedLimit of 64 satisfied it, and the cap R11 announced was a
+		//    producer guarantee wearing a contract's words. `calls` is now capped by the SCHEMA, which makes the
+		//    list itself unable to exceed 32 — and this refusal closes the remaining half, where a short list
+		//    declares a bound nothing ever applied. A reader uses `recordedLimit` to decide whether truncation
+		//    happened; a declared bound larger than the enforced one tells them about a record that cannot exist.
+		if (tools.recordedLimit > OBSERVED_TOOL_CALL_LIMIT)
+			return bad(
+				`observedToolCalls declares a recordedLimit of ${tools.recordedLimit}, above the ${OBSERVED_TOOL_CALL_LIMIT} this contract enforces on calls. A producer may apply a TIGHTER bound and say so; it may not declare a looser one, because the number a reader uses to judge whether the list was truncated would then describe a record this plane cannot hold.`
+			);
 		if (tools.observedCount < tools.calls.length)
 			return bad(
 				`observedToolCalls declares observedCount ${tools.observedCount} while naming ${tools.calls.length} calls. The count is the TOTAL observed, so it can only equal or exceed what was kept.`
@@ -273,12 +298,20 @@ export const recordModelExchange: CommandHandler = (ctx, command, payload) => {
 				return bad(
 					`observedToolCalls call at position ${index + 1} declares ordinal ${call.ordinal}. Ordinals are 1-based and in observation order; without that a BOUNDED list cannot say which calls it kept.`
 				);
-			// ⛔⛔ THE R11 RETENTION RULING, ENFORCED AT THE BOUNDARY AND NOT ONLY AT THE PRODUCER. A tool NAME
-			//    may be recorded only where the HOST MINTED it: a minted name comes from a closed set the host
-			//    itself authored, while an unminted one is an arbitrary MODEL-CHOSEN string heading for a record
-			//    that is PERMANENT under PER-8 (R10) and that no redaction can ever reach — PER-9 makes
-			//    record-plane omission illegal, which is exactly why the CONTENT plane may hold such text and
-			//    this plane may not.
+			// ⛔⛔ THE R11 RETENTION RULING'S *PROVENANCE* LIMB, AT THE BOUNDARY AND NOT ONLY AT THE PRODUCER.
+			//    A tool NAME may be recorded only where the caller declares the HOST MINTED it; an unminted one
+			//    is an arbitrary MODEL-CHOSEN string heading for a record that is PERMANENT under PER-8 (R10)
+			//    and that no redaction can ever reach — PER-9 makes record-plane omission illegal, which is
+			//    exactly why the CONTENT plane may hold such text and this plane may not.
+			//
+			// ⚠ THESE TWO CONJUNCTS CHECK THE DECLARATION, NOT THE NAME (R11 REVIEW, W2). `nameProvenance` is
+			//    the CALLER's word and nothing here verifies it: the host's minted set is session-scoped, lives
+			//    in the adapter, and cannot reach this boundary without either a kernel-to-app dependency or the
+			//    caller declaring the set beside the name — self-consistency again. What bounds the VALUE is
+			//    `RecordPlaneNameSchema` on the contract, one layer out, and it does so on every write path.
+			//    ⭑ THE TWO ARE NOT REDUNDANT: a shape-legal name on a NOT_MINTED call passes the schema and is
+			//    refused here, and an unnamed MINTED_BY_HOST call is invisible to a schema that only constrains
+			//    a value that is present.
 			if (call.nameProvenance === 'MINTED_BY_HOST' && (!call.toolName || call.toolName.trim() === ''))
 				return bad(
 					`observedToolCalls call ${call.ordinal} claims MINTED_BY_HOST but names no tool. The provenance is the whole warrant for recording a name at all.`

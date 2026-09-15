@@ -782,7 +782,9 @@
           ]
         },
         "sourceField": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$"
         },
         "storageProvider": {
           "type": "string"
@@ -799,7 +801,9 @@
           "maximum": 9007199254740991
         },
         "reason": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^(?:[^\\p{Cc}]|[\\t\\n\\r])*$"
         }
       },
       "required": [
@@ -819,6 +823,7 @@
           ]
         },
         "calls": {
+          "maxItems": 32,
           "type": "array",
           "items": {
             "type": "object",
@@ -836,7 +841,9 @@
                 ]
               },
               "toolName": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$"
               },
               "outcome": {
                 "type": "string",
@@ -867,7 +874,9 @@
           "maximum": 9007199254740991
         },
         "reason": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^(?:[^\\p{Cc}]|[\\t\\n\\r])*$"
         }
       },
       "required": [
