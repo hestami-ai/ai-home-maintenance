@@ -5,7 +5,7 @@
 // other directory, most likely the server's own source tree, while the record says it ran in the workspace.
 // `openPiExecutionSession` hardcodes `process.cwd()` twice today, so this is measured, not hypothetical.
 import { describe, expect, it } from 'vitest';
-import { planProcessRun } from './process-runner.js';
+import { planProcessRun, programFileName, workspaceDirectoryName } from './process-runner.js';
 import { createInMemoryWorkspace } from '../defaults/workspace.js';
 import { createRefusingProcessRunner } from '../defaults/process-runner.js';
 
@@ -119,5 +119,53 @@ describe('planProcessRun — the two ports are NOT independent', () => {
 			expect(plan.planned, `timeoutMs ${String(timeoutMs)} must not plan`).toBe(false);
 			expect(!plan.planned && plan.refusedBecause).toMatch(/§36\.2/);
 		}
+	});
+});
+
+describe('⚠ W1 — what a refusal may disclose about WHAT, and the residue that is DISCLOSED not fixed', () => {
+	/**
+	 * ⛔ THE RULE IS A BOUND, AND THIS IS THE BOUND DRIVEN RATHER THAN DESCRIBED. `B5` drove the unbounded
+	 * form: `argv.join(' ')` put an absolute program path and the operating user's name into a field this port
+	 * defines as travelling into a governed record AND a model's context. What replaced it discloses AT MOST
+	 * ONE SEGMENT — and a third adversarial pass named what that still costs, which is `W1`.
+	 */
+	const HOST_SHAPED: readonly string[] = [
+		'C:\\Program Files\\nodejs\\node.exe',
+		'/opt/toolchains/acme-14.2/bin/tsc',
+		'C:/Users/mchen/AppData/Local/Temp/build.exe'
+	];
+
+	it('⛔ AT MOST ONE SEGMENT TRAVELS — nothing above it does, from any spelling', () => {
+		// ⛔ THE MUTANT: return the last TWO segments, or the path itself. Either re-opens `B5` by degrees,
+		// and "by degrees" is how a bound that was once argued for quietly stops holding.
+		for (const program of HOST_SHAPED) {
+			const named = programFileName(program);
+			expect(named, `${program} discloses no separator`).not.toMatch(/[\\/]/);
+			for (const above of program.split(/[\\/]+/).slice(0, -1).filter((s) => s !== ''))
+				expect(named, `nor the segment '${above}' above it`).not.toContain(above);
+		}
+	});
+
+	it('⚠ AND THE RESIDUE IS PINNED, BECAUSE IT IS DISCLOSED RATHER THAN CLOSED (`W1`)', () => {
+		// ⭐ RULED 2026-09-15: DISCLOSED. A model-chosen `argv[0]` that is a host path fragment still leaks its
+		// DEEPEST name — and that is written down here, as a case, rather than left in prose where it cannot
+		// fail. What makes it the right trade is in `programFileName`'s own doc: something must name the failed
+		// program, every alternative is either unactionable or a normaliser, and the segment that survives is
+		// one the CALLER supplied rather than one the host disclosed.
+		// ⛔ IF THIS CASE EVER HAS TO CHANGE, THE DISCLOSURE HAS CHANGED WITH IT — which is the whole point of
+		// converting a disclosed weakness into a gated statement.
+		expect(programFileName('C:\\Users\\mchen'), 'W1, verbatim from the pass that named it').toBe(
+			'mchen'
+		);
+		// ⭑ AND THE SAME RULE, THE SAME BODY: the WHERE half discloses exactly as much as the WHAT half, which
+		// is why they share a private implementation and neither can drift.
+		expect(workspaceDirectoryName('C:\\Users\\mchen\\workspaces\\und_7')).toBe('und_7');
+	});
+
+	it('⭑ CONTROL — a name with nothing above it is returned whole, so the bound is not a truncation', () => {
+		// ⛔ WITHOUT THIS, "discloses at most one segment" is satisfied by returning `''` for everything — a
+		// guard that cannot fail, and `RULE 6`'s fabricated name in a governed record.
+		expect(programFileName('tsc')).toBe('tsc');
+		expect(programFileName('/'), 'a path with no nameable segment is itself, never empty').toBe('/');
 	});
 });

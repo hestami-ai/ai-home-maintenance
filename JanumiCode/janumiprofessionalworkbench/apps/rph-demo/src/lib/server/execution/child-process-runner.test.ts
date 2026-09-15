@@ -26,7 +26,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join } from 'node:path';
 import {
@@ -339,6 +339,76 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		});
 		expect(out.ran === true && out.exitCode).toBe(0);
 		expect(existsSync(join(cwd, 'landed.txt'))).toBe(true);
+	});
+
+	it('⛔⛔ B11 — THE DELIVERABLE DIRECTORY, SWAPPED FOR A JUNCTION AFTER CONSTRUCTION, IS REFUSED', async () => {
+		// ⭐ THE THIRD ADVERSARIAL PASS'S ONE BREACH, DRIVEN WITH ITS OWN VECTOR. The check was
+		// `resolvePath(request.cwd) !== deliverableRoot` — two path STRINGS, one of them fixed at construction
+		// — so an `mklink /J` junction standing where the workspace directory used to be matched EXACTLY, the
+		// operating system followed it, and the command wrote `PWNED_IN_SERVER_TREE.txt` INTO THE STAND-IN
+		// SERVER TREE while every path in the record still spelled the workspace. That is the one outcome this
+		// phase exists to prevent, reached without a single malformed field on the request.
+		// ⛔ THE MUTANT: compare the RESOLVED path on BOTH sides — `realpath(cwd) === realpath(root)`, the shape
+		// `insideResolvedRoot` uses one module over. MEASURED, under node AND under bun: it answers TRUE here,
+		// because both sides walk through the same junction. What closes this is comparing the resolved cwd
+		// with the DECLARED directory, which is the one name the swap cannot move.
+		// ⚠ A JUNCTION NEEDS NO ADMINISTRATOR RIGHT AND NO DEVELOPER MODE — measured on this host — which is
+		// why it is the vector and a symlink is not. `symlink(..., 'junction')` is `mklink /J` without a shell.
+		const standIn = join(container, 'server-tree');
+		await mkdir(standIn, { recursive: true });
+		// ⭑ CONSTRUCTED WHILE THE WORKSPACE IS A REAL DIRECTORY, which is the whole of the arrangement: a root
+		// resolved once, at construction, cannot notice what happens to it afterwards.
+		const subject = runner();
+		await rm(cwd, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
+		await symlink(standIn, cwd, 'junction');
+		const out = await subject.run({
+			// ⭑ LAWFUL: this IS the workspace's own `directoryPath`, derived exactly as `planProcessRun` derives
+			// it. Nothing about the REQUEST is wrong; the directory underneath it is.
+			argv: node('require("node:fs").writeFileSync("PWNED_IN_SERVER_TREE.txt","a step wrote here")'),
+			cwd,
+			timeoutMs: 30_000
+		});
+		expect(out.ran).toBe(false);
+		expect(
+			existsSync(join(standIn, 'PWNED_IN_SERVER_TREE.txt')),
+			'THE BREACH ITSELF: a command ran in the tree the junction pointed at'
+		).toBe(false);
+		const why = out.ran === false ? out.refusedBecause : '';
+		expect(why, 'it names the workspace it may run in').toContain(basename(cwd));
+		expect(why, 'and says the NAME no longer reaches the directory').toContain('REDIRECTS');
+		// ⛔ AND IT MUST NOT SAY WHAT THE OTHER ARM SAYS. The cwd spells the workspace exactly — a refusal
+		// reading "carries a cwd naming 'workspace' instead" would state something FALSE about its own input,
+		// which this adapter already has a recorded finding for (`B10`). THE MUTANT: one message for both arms.
+		expect(why, 'rather than the refusal for a cwd naming somewhere else').not.toContain(
+			'carries a cwd naming'
+		);
+		expect(why, 'and where it now leads is not disclosed').not.toContain(standIn);
+		expect(why, 'not even by its directory name').not.toContain(basename(standIn));
+	});
+
+	it('⛔ B11 — a cwd the filesystem cannot resolve AT ALL is REFUSED, never decided by the path text', async () => {
+		// ⭐ A CHECK THAT CANNOT BE ANSWERED REFUSES — §16 fail-closed, at the one place the fix could have
+		// reintroduced the defect it removes. The path TEXT is exactly what a directory that has been replaced
+		// or removed still spells correctly, so falling back to it when `realpath` raises would decide
+		// containment with the instrument the breach defeated.
+		// ⛔ THE MUTANT: treat an unresolvable cwd as contained (the `catch` returns the lexical answer) — the
+		// arrangement then reaches `spawn`, which refuses it for an entirely different reason, and the record
+		// carries a SPAWN failure where a containment refusal belongs. The two are different facts, which is why
+		// the message is asserted and `ran: false` is not enough.
+		await rm(cwd, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
+		const out = await runner().run({
+			argv: node('process.stdout.write("ok")'),
+			cwd,
+			timeoutMs: 30_000
+		});
+		expect(out.ran).toBe(false);
+		const why = out.ran === false ? out.refusedBecause : '';
+		expect(why, 'it says the CHECK could not be answered').toContain('could not resolve');
+		expect(why, 'and names the errno the platform gave').toContain('ENOENT');
+		expect(why, 'and it is a containment refusal, not a spawn failure').not.toContain(
+			'could not be started'
+		);
+		expect(why, 'the workspace is named by its directory name').toContain(basename(cwd));
 	});
 
 	it('⚠ `timedOut` is OBSERVED at the kill — and a SIGKILLed process reports a NULL exit code', async () => {
@@ -886,6 +956,52 @@ describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven on the REA
 			'every part that landed was swept — the declaration as well as the stream'
 		).toEqual(['omissions.json', 'stdout.txt']);
 		expect(written.size, 'so no bytes remain that nothing points at').toBe(0);
+	});
+
+	it('⚠ W2 — and a purge that RAISES leaves an orphan, so the record says there is one', async () => {
+		// ⭐ THE THIRD PASS DISCLOSED THIS AS ADAPTER-CONTINGENT AND IT WAS A REAL HOLE. `Workspace.purge` is
+		// promised to refuse rather than throw and both adapters in this repository do — but `retain` ALREADY
+		// declines to trust that same promise for `writeFile`, and the sweep did not. Driven with the stub
+		// below before the fix: the throw escaped to `retain`'s outer catch, which answered for a WRITE that
+		// never failed, dropped the part-by-part reasons, and said NOTHING about the `stdout.txt` it had just
+		// left on disk — `REG-F-336` C-2's orphan, through the one function written to prevent it, twice.
+		// ⛔ THE MUTANT: remove the try/catch and let the throw escape — the record then reports a workspace
+		// that "raised rather than refusing" and a reader auditing it concludes there is nothing to purge.
+		// ⚠ THE STUB IS THE SAME SHAPE AS THE PARTIAL-CAPTURE CASE ABOVE, and for the same reason: a real
+		// filesystem does not raise out of `purge` on demand. It SPREADS the real adapter, so the class, the
+		// materialization and the directory are real; only the two methods are arranged.
+		const written = new Map<string, string>();
+		const raised: string[] = [];
+		const raising: Workspace = {
+			...output,
+			async writeFile(path: string, contents: string): Promise<WorkspaceWriteOutcome> {
+				if (path.endsWith('stderr.txt'))
+					return { written: false, refusedBecause: 'the arranged refusal' };
+				written.set(path, contents);
+				return { written: true, path, byteSize: Buffer.byteLength(contents, 'utf8') };
+			},
+			purge(path: string): Promise<PurgeOutcome> {
+				raised.push(path);
+				const cause: NodeJS.ErrnoException = new Error('the arranged raise');
+				cause.code = 'EPERM';
+				throw cause;
+			}
+		};
+		const out = await createChildProcessRunner({
+			deliverableWorkspace: deliverable,
+			outputWorkspace: raising
+		}).run({ argv: node('process.stdout.write("half")'), cwd, timeoutMs: 30_000 });
+		expect(out.ran, 'the RUN still happened — a retention failure is not a run failure').toBe(true);
+		if (!out.ran) return;
+		expect(out.retention.retained).toBe(false);
+		const why = out.retention.retained === false ? out.retention.notRetainedBecause : '';
+		expect(raised.length, 'the sweep was attempted').toBeGreaterThan(0);
+		expect(why, 'the record NAMES the bytes nothing points at').toContain('orphan');
+		expect(why, 'and says why they are still there').toContain('EPERM');
+		expect(why, 'and still carries the write refusal that started it').toContain(
+			'the arranged refusal'
+		);
+		expect(written.size, 'and the bytes ARE still there — the record is not lying about it').toBe(2);
 	});
 
 	it('⛔ a run whose capture the REAL FILESYSTEM refuses still reports the exit code it observed', async () => {

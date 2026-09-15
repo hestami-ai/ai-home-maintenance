@@ -270,6 +270,28 @@ function finalPathSegment(path: string): string {
  * and there is no predicate over an arbitrary argument that keeps a host layout out of a record — which is
  * this seam's standing rule that a normaliser is itself attackable. The program's own name is what
  * identifies the failure — "there is no `tsc` on this host" — and it is what a reader acts on.
+ *
+ * ── ⚠ `W1`, RULED 2026-09-15: **DISCLOSED, NOT FIXED** — the residue, and why the alternatives are worse
+ * A third adversarial pass named what survives the reduction: this returns the LAST SEGMENT OF WHATEVER IT IS
+ * GIVEN, so a model-chosen `argv[0]` that is a host path fragment still leaks its deepest name —
+ * `programFileName('C:\\Users\\mchen')` is `'mchen'`. That is bounded to ONE segment and is not eliminated.
+ * ⭐ **WHAT MAKES IT THE RIGHT TRADE, STATED AS A PROPERTY RATHER THAN A PREFERENCE:** every path in a
+ * refusal that came FROM THE HOST — the workspace's own directory — is reduced by this same rule, and what
+ * remains here is one segment of a string THE CALLER SUPPLIED. A model that spelled `C:\Users\mchen` already
+ * holds it; the refusal discloses the model's own content back to it, not the host's layout to the model.
+ * ⛔ **AND THE ALTERNATIVES WERE MEASURED AGAINST THIS SEAM'S STANDING INSTRUCTION, WHICH IS THAT EVERY NEW
+ * NORMALISER IS ITSELF ATTACKABLE** (three rounds' worth of receipts on the adapter side):
+ *   · NAME NOTHING — then `'…' could not be started (ENOENT)` identifies no program, and the commonest
+ *     refusal in this whole seam becomes unactionable. Something must name the failed program.
+ *   · NAME IT ONLY WHEN IT CARRIES NO SEPARATOR — the ordinary case is an ABSOLUTE path to an executable, so
+ *     this drops the name exactly when it is most useful and keeps it when it is least.
+ *   · DECIDE WHETHER A SEGMENT "LOOKS LIKE A PROGRAM NAME" — a predicate over an arbitrary string, which is
+ *     a normaliser, which is the thing this seam has settled three times over not to write.
+ * ⭑ **WHAT A READER OF THE REFUSAL CAN STILL ACT ON:** the errno CODE (the platform's own answer), the
+ * workspace's DIRECTORY NAME, and the final segment of `argv[0]` AS THE CALLER SPELLED IT. What they cannot
+ * recover — and what the bound exists to withhold — is the DIRECTORY the program was sought in.
+ * ⛔ **AND THE BOUND CANNOT WIDEN WITHOUT AN EDIT A REVIEWER SEES:** `finalPathSegment` is the shared, private
+ * body of both rules, and `process-runner.test.ts` drives this residue by name so a second segment reddens it.
  */
 export function programFileName(program: string): string {
 	return finalPathSegment(program);

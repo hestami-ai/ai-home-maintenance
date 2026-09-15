@@ -299,6 +299,18 @@ driven unprivileged on this host and both are carried by DISCLOSURE PROBES in th
 change that closes one reddens a test and forces the disclosure to be rewritten rather than quietly outliving
 it.
 
+⛔ **AND THE ROOT SWAP WAS THEN DRIVEN THROUGH THE `ProcessRunner`, WHICH IS A DIFFERENT SEAM AND A DIFFERENT
+ANSWER (`B11`, §4f).** A junction standing where the deliverable directory was made a LAWFUL `cwd` execute a
+command in the tree it pointed at. ⭑ THE RUNNER CAN CLOSE THIS FOR ITS OWN ACT AND THE WORKSPACE CANNOT CLOSE IT
+FOR HERS, and the reason is worth stating because it is a property rather than an effort difference: the runner
+compares the RESOLVED `cwd` against the directory the host DECLARED — the one name a swap cannot move — while
+containment inside a workspace is necessarily *is this child path under that ROOT*, and a swapped root resolves
+consistently for every child under it. ⚠ **SO THE WORKSPACE'S DISCLOSURE IS UNCHANGED AND STILL TRUE:** a root
+swap still redirects every read, write and listing THROUGH the workspace, its disclosure probes still pass, and
+what is now refused is only the act of RUNNING A COMMAND in a directory the filesystem no longer agrees is the
+workspace. ⛔ The general lesson is the one this section already argues: the fix was available because a
+DECLARATION existed to compare against, not because one more string comparison was added.
+
 ⛔ **WHAT THIS RULING DOES NOT LICENSE.** It is not permission to stop refusing: the organisational boundary is
 the thing that makes an Undertaking's deliverable findable and its accidents legible, and every refusal in the
 adapter stays. It is permission to stop pretending — and to stop adding one more string comparison per

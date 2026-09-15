@@ -113,14 +113,103 @@ const DISPOSED_STDERR_SITES = ['lib/server/execution/child-process-runner.ts'];
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
 const THE_ORIGINAL_SUBJECT = 'lib/server/assurance/agy-cli.ts';
 
-/** Every .ts file under the demo's server-side source, derived from the filesystem. */
-function demoSources(dir: string, acc: string[] = []): string[] {
+/**
+ * The extensions this probe KNOWS HOW TO READ, and it reads every file that carries one.
+ *
+ * ⛔ `W3`: THE POPULATION WAS `‘.ts’` AND NOTHING ELSE, WHICH SILENTLY EXCLUDED ELEVEN `.svelte` FILES and
+ * every `.mts`, `.cts` and `.js` that might arrive. ⭑ THE PROBE ITSELF WAS NEVER THE DEFECT — it caught all
+ * five of `B9`'s evaded shapes, a type-only alias and an optional-chain element access. A binding in a
+ * `.svelte` server block would simply never have been LOOKED AT, while the positive control stayed green
+ * because a `.ts` file binds `stdout` — the exact shape of vacuous pass this repository records most often.
+ *
+ * ⭐ AND THE REPAIR IS THE GENERAL FORM RATHER THAN THE ELEVEN FILES: an allowlist of one extension with a
+ * SILENT remainder is replaced by a population DERIVED from the filesystem plus an exclusion that is
+ * DECLARED and GATED. Every extension present under the demo's source tree must appear in exactly one of
+ * these two lists, so the next one to arrive — `.mjs`, `.svelte.ts`, whatever a framework brings — reddens
+ * this gate and is DECIDED, instead of leaving the population without anybody noticing.
+ */
+const PARSED_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs', '.svelte'];
+
+/**
+ * Extensions that carry no code and are therefore not probed — named, so the exclusion is an act.
+ *
+ * ⚠ A FILE HERE IS A FILE NOBODY LOOKS AT. That is lawful for a stylesheet and unlawful for anything a
+ * bundler can execute, which is why the membership assertion below forbids a third category.
+ */
+const NOT_A_SOURCE_EXTENSION = ['.css', '.html'];
+
+/** The extension of a file name, lower-cased, or `''` when it has none. */
+function extensionOf(name: string): string {
+	const dot = name.lastIndexOf('.');
+	return dot <= 0 ? '' : name.slice(dot).toLowerCase();
+}
+
+/** Every file under `dir`, derived from the filesystem — no extension filter at all. */
+function everyFile(dir: string, acc: string[] = []): string[] {
 	for (const name of readdirSync(dir)) {
 		const p = `${dir}/${name}`;
-		if (statSync(p).isDirectory()) demoSources(p, acc);
-		else if (name.endsWith('.ts') && !name.endsWith('.test.ts')) acc.push(p);
+		if (statSync(p).isDirectory()) everyFile(p, acc);
+		else acc.push(p);
 	}
 	return acc;
+}
+
+/** Every source file under the demo's source tree the probe can read — tests excluded, as before. */
+function demoSources(dir: string): string[] {
+	return everyFile(dir).filter(
+		(p) =>
+			PARSED_EXTENSIONS.includes(extensionOf(p)) &&
+			!/[.](test|spec)[.][cm]?ts$/.test(p) &&
+			!/[.](test|spec)[.][cm]?js$/.test(p)
+	);
+}
+
+/**
+ * The TypeScript inside one file, as FRAGMENTS — because a `.svelte` file is not a TypeScript file.
+ *
+ * ⛔ A `.svelte` FILE PARSED WHOLE AS TS IS MARKUP FED TO A LANGUAGE PARSER, and parsed whole as TSX its
+ * `<script>` body is JSX CHILDREN rather than code. So the two halves are read as what they each are: every
+ * `<script>` BODY as TypeScript, and the remaining markup as TSX, which is what makes `{result.stderr}` in a
+ * template an element the walk can see. ⚠ The line numbers are offset back onto the real file, so a finding
+ * names a place a reader can open.
+ *
+ * ⛔⛔ AND THE ONE-PARSE SHORTCUT LOOKS LIKE IT WORKS, WHICH IS WHY THE CASE BELOW HAD TO BE REWRITTEN. The
+ * first version of it drove `const { stdout, stderr } = $props();` inside the script block, and the
+ * whole-file-TSX MUTANT **SURVIVED**: in JSX children, `{ … }` is an EXPRESSION container, so a DESTRUCTURE
+ * inside a script body is parsed as code by accident even when the parser thinks it is reading markup. What
+ * is genuinely invisible to that parse is a binding with no braces around it — `outcome.stderr` — and that
+ * is what the case drives now. ⭐ A control that passes for the wrong reason is this repository's most
+ * recorded instrument defect, and this one was caught by mutating the instrument rather than by reading it.
+ */
+function typescriptFragments(
+	file: string,
+	source: string
+): { readonly text: string; readonly line: number; readonly kind: ts.ScriptKind }[] {
+	if (extensionOf(file) !== '.svelte')
+		return [{ text: source, line: 0, kind: ts.ScriptKind.TS }];
+	const fragments: { text: string; line: number; kind: ts.ScriptKind }[] = [];
+	// ⚠ THE SCRIPT BLOCKS ARE LOCATED BY TAG, WHICH IS A LEXICAL ACT AND IS SAID SO. What is decided by a
+	// PARSER is what counts as a BINDING — `B9`'s finding — and that is unchanged. Finding the boundaries of
+	// an element is not identity resolution, and the markup half below is read whatever this half misses.
+	const openings = /<script\b[^>]*>/gi;
+	let markup = source;
+	for (let hit = openings.exec(source); hit !== null; hit = openings.exec(source)) {
+		const from = hit.index + hit[0].length;
+		const to = source.toLowerCase().indexOf('</script>', from);
+		const body = source.slice(from, to === -1 ? source.length : to);
+		fragments.push({
+			text: body,
+			line: source.slice(0, from).split('\n').length - 1,
+			kind: ts.ScriptKind.TS
+		});
+		// Blanked rather than removed, so the markup half keeps every line where it actually is.
+		markup =
+			markup.slice(0, from) +
+			body.replace(/[^\n]/g, ' ') +
+			markup.slice(to === -1 ? source.length : to);
+	}
+	fragments.push({ text: markup, line: 0, kind: ts.ScriptKind.TSX });
+	return fragments;
 }
 
 /**
@@ -167,8 +256,13 @@ interface Binding {
  * COMMENTS ARE NOT NODES, so documentation about the hazard cannot redden the gate that guards it, which is
  * what the regexes it replaces were bolted together to work around.
  */
-function bindingsInSource(file: string, source: string, token: string): Binding[] {
-	const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+function bindingsInSource(
+	file: string,
+	source: string,
+	token: string,
+	kind: ts.ScriptKind = ts.ScriptKind.TS
+): Binding[] {
+	const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, kind);
 	const found: Binding[] = [];
 	const lineOf = (node: ts.Node): number =>
 		sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
@@ -185,10 +279,20 @@ function bindingsInSource(file: string, source: string, token: string): Binding[
 	return found;
 }
 
+/** Every binding in ONE file, whatever kind of file it is — `W3`'s dispatcher. */
+function bindingsInFile(file: string, source: string, token: string): Binding[] {
+	return typescriptFragments(file, source).flatMap((fragment) =>
+		bindingsInSource(file, fragment.text, token, fragment.kind).map((found) => ({
+			...found,
+			line: found.line + fragment.line
+		}))
+	);
+}
+
 /** The same probe over the demo's own sources, which is the population every limb below is stated over. */
 function bindings(token: string): Binding[] {
 	return demoSources(DEMO_SRC).flatMap((file) =>
-		bindingsInSource(file.slice(ROOT.length), readFileSync(file, 'utf8'), token)
+		bindingsInFile(file.slice(ROOT.length), readFileSync(file, 'utf8'), token)
 	);
 }
 
@@ -243,6 +347,86 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 				'retained, both PURGEABLE_AT_EXPIRY, referenced by ProcessRunOutcome.retention, reachable by ' +
 				'Workspace.purge) and write the equivalent before adding a second.'
 		).toEqual([]);
+	});
+
+	it('⛔⛔ W3 — EVERY extension under the demo source tree is either PROBED or DECLARED not to be', () => {
+		// ⭐ THE POPULATION GAP, MADE UNREPEATABLE RATHER THAN PATCHED ELEVEN TIMES. The probe walked `.ts`
+		// alone, so eleven `.svelte` files — and any `.mts`, `.cts` or `.js` — were outside the question this
+		// gate asks, while its positive control stayed green on a `.ts` file that binds `stdout`.
+		// ⛔ THE MUTANT: drop `.svelte` from `PARSED_EXTENSIONS` — this case reddens naming the extension that
+		// is in the tree and in neither list, which is the finding the old shape could not produce at all.
+		const present = [...new Set(everyFile(DEMO_SRC).map((f) => extensionOf(f)))].sort();
+		const undecided = present.filter(
+			(ext) => !PARSED_EXTENSIONS.includes(ext) && !NOT_A_SOURCE_EXTENSION.includes(ext)
+		);
+		expect(
+			undecided,
+			'A file the probe does not read is a file `stderr` can be bound in without this gate ever ' +
+				'looking. Decide: add the extension to PARSED_EXTENSIONS (and teach `typescriptFragments` how ' +
+				'to read it, if it is not plain TypeScript), or to NOT_A_SOURCE_EXTENSION if nothing a bundler ' +
+				'can execute lives in it. Leaving it out of both is how REG-Q-066 comes to rest on a population ' +
+				'nobody stated.'
+		).toEqual([]);
+	});
+
+	it('⭑ CONTROL — the widened population is a SUPERSET: nothing the `.ts`-only probe saw is lost', () => {
+		// ⛔ A WIDENING THAT TRADED FILES WOULD BE A DIFFERENT INSTRUMENT, NOT A STRICTER ONE, and
+		// `REG-Q-066`'s answer would rest on the difference. The old population is RE-DERIVED here rather
+		// than quoted, so this compares two measurements rather than a measurement against a memory.
+		const widened = new Set(demoSources(DEMO_SRC));
+		const asItWas = everyFile(DEMO_SRC).filter(
+			(f) => f.endsWith('.ts') && !f.endsWith('.test.ts')
+		);
+		expect(asItWas.length, 'CONTROL: the old population was not empty either').toBeGreaterThan(0);
+		expect(asItWas.filter((f) => !widened.has(f))).toEqual([]);
+		expect(
+			[...widened].filter((f) => f.endsWith('.svelte')).length,
+			'and it now reaches the files W3 named'
+		).toBe(11);
+	});
+
+	it('⭐⭐ W3 — the SVELTE reader, driven: a binding in a script block and one in markup are both SEEN', () => {
+		// ⛔ WITHOUT THIS THE WIDENING IS A CLAIM. A `.svelte` file parsed whole as TS is markup handed to a
+		// language parser; parsed whole as TSX, the `<script>` BODY is JSX text — a string — so the binding
+		// `W3` is actually about would be missed by the instrument written to reach it. Both halves are
+		// driven, over a source shaped like this app's own pages.
+		// ⛔ THE MUTANT: read the script blocks only, or read the file as one TSX source — one of the two
+		// arrangements below then goes unseen while the gate stays green.
+		const page = [
+			'<script lang="ts">',
+			// ⭑ NO BRACES, DELIBERATELY — see `typescriptFragments`: a DESTRUCTURE here survives a whole-file
+			// TSX parse as a JSX expression, so it cannot tell the two arrangements apart. A property read can.
+			'\tconst failure = outcome.stderr;',
+			'</script>',
+			'',
+			'<pre>{stdout}</pre>',
+			'<pre>{diagnostics.stderr}</pre>'
+		].join('\n');
+		const lines = bindingsInFile('lib/Fake.svelte', page, 'stderr')
+			.map((h) => h.line)
+			.sort((a, b) => a - b);
+		expect(lines, 'the SCRIPT block (line 2) and the MARKUP expression (line 6), each by its own reader')
+			.toEqual([2, 6]);
+	});
+
+	it('⭑⭑ CONTROL — and PROSE in Svelte markup is not a binding, so the widening is not a matcher', () => {
+		// ⭐ THE HALF A "READ EVERY BYTE" WIDENING FAILS. Markup TEXT that mentions `stderr` — a heading, a
+		// label, a paragraph explaining the retention disposition — is not a binding, and a widened
+		// population that reddened on it would be the broken instrument `P2B-ai` exists to forbid, arriving
+		// through the population instead of through the predicate.
+		const page = [
+			'<script lang="ts">',
+			'\tconst { stdout } = $props();',
+			'</script>',
+			'',
+			'<h2>stderr is retained under R7</h2>',
+			'<p>This page shows stdout only; stderr is purgeable-at-expiry.</p>'
+		].join('\n');
+		expect(bindingsInFile('lib/Prose.svelte', page, 'stderr')).toEqual([]);
+		expect(
+			bindingsInFile('lib/Prose.svelte', page, 'stdout').length,
+			'CONTROL: the same file DOES bind stdout, so the reader is looking'
+		).toBeGreaterThan(0);
 	});
 
 	it('⛔ the disposed-site list is PINNED at ONE — widening it is a deliberate, visible act', () => {

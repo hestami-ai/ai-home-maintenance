@@ -81,8 +81,9 @@
 //     `shell: false` says nothing about a target the PLATFORM cannot load as a program image.
 //   · NO INHERITED STDIN. `stdio[0] = 'ignore'`, so a command that reads input gets EOF instead of blocking
 //     until the timeout — which would report a TIMEOUT for a command that was merely waiting on the server.
-//   · NO CWD THE CALLER CHOSE. The runner is constructed against the DELIVERABLE workspace and runs in that
-//     directory or in none — see `B8` below.
+//   · NO CWD THE CALLER CHOSE, AND NO DIRECTORY THE OPERATING SYSTEM DISAGREES ABOUT. The runner is
+//     constructed against the DELIVERABLE workspace and runs in the directory the FILESYSTEM resolves that
+//     workspace's declared path to, or in none — see `B8` / `B11` below.
 //   · NO THROW OUT OF `run`, AND NO SILENCE EITHER. Every failure is a `ran: false` refusal naming the errno
 //     CODE. Phase 2's rule, one port over: *"a refusal is a fact a step can record; a throw is a stack trace
 //     where a fact belongs."* ⛔ A PROMISE THAT NEVER SETTLES IS WORSE THAN EITHER, and this adapter had one.
@@ -91,7 +92,11 @@
 //   · NO HOST LAYOUT IN A REFUSAL. A refusal names the program's FILE NAME and the workspace's DIRECTORY NAME,
 //     and never the argv and never an absolute path.
 //
-// ══ ⛔⛔ TEN BREACHES WERE DRIVEN THROUGH THE VERSION THIS REPLACES. EACH FIX BELOW IS ONE OF THEM ════════════
+// ══ ⛔⛔ ELEVEN BREACHES WERE DRIVEN THROUGH THE VERSIONS THIS REPLACES. EACH FIX BELOW IS ONE OF THEM ══════
+//
+// ⚠ TEN CAME FROM ONE PASS AND THE ELEVENTH FROM THE NEXT ONE, WHICH RE-DROVE ALL TEN AND FOUND THEM CLOSED.
+// `B11` is `B8` again, one instrument down — which is why they are kept together below rather than listed as
+// two findings.
 //
 // ── ⛔ B1 / B10 — A `.bat` OR `.cmd` TARGET IS REFUSED, BECAUSE THE NO-SHELL GUARANTEE CANNOT COVER IT ───────
 // Win32 cannot load a batch file as a program image: the runtime hands it to `cmd.exe`, which re-parses the
@@ -127,10 +132,40 @@
 // WITH NO CALL SITES IS NOT A CONTROL. So the runner is CONSTRUCTED against the DELIVERABLE workspace — the one
 // directory it may run in — and refuses any other `cwd`. It could not check before because it was never given
 // the workspace; it has it now, so the check sits in the object a caller cannot go around.
-// ⚠ THE COMPARISON IS EXACT AFTER `resolve`, AND DELIBERATELY NOT CASE-INSENSITIVE OR ALIAS-AWARE. Phase 2's
-// `F1` records what it costs to compare two spellings of one Win32 path: case, and then the NTFS 8.3 alias,
-// each beat a guard that tried. A lawful caller takes its `cwd` from the workspace's own `directoryPath`, so it
-// matches exactly; everything else is refused, which is the safe side of a comparison nobody gets right.
+//
+// ── ⛔⛔ `B11` — AND THE STRUCTURAL FIX WAS STILL DECIDED BY TWO STRINGS, WHICH A JUNCTION MAKES EQUAL ─────
+// `B8`'s fix HELD — the check is in an object no caller can go around — and the check itself was
+// `resolvePath(request.cwd) !== deliverableRoot`: ARITHMETIC ON TEXT, with one side fixed at construction.
+// ⛔ DRIVEN, on a runner constructed while the workspace was a real directory: the directory was then REPLACED
+// by an `mklink /J` junction pointing at a stand-in server tree, a LAWFUL `cwd` — the workspace's own
+// `directoryPath` — was passed, the two strings matched EXACTLY, the operating system followed the junction,
+// and the command wrote `PWNED_IN_SERVER_TREE.txt` INTO THE STAND-IN TREE. Neither field of the request was
+// malformed; the directory underneath it was. ⚠ A junction needs no administrator right and no Developer Mode,
+// measured on this host — which is why it is the vector and a symlink is not.
+// ⭐ SO THE CHECK ASKS THE FILESYSTEM, PER CALL, AND COMPARES THE RESOLVED `cwd` AGAINST THE DECLARED DIRECTORY.
+// Two properties the old check lacked and this one has: it is resolved AT CHECK TIME (a root measured once
+// cannot notice a swap that happens afterwards, and the swap IS the attack), and a `cwd` that does not resolve
+// AT ALL is REFUSED rather than decided by the path text — §16 fail-closed, at the one place this fix could
+// have re-introduced the instrument it removes.
+// ⛔ AND THE SIBLING'S `insideResolvedRoot` WAS *NOT* LIFTED, WHICH IS A MEASUREMENT AND NOT A PREFERENCE.
+// `filesystem-workspace.ts` says of it, rightly, *"IT ASKS THE FILESYSTEM, NOT THE STRING"* — but it resolves
+// BOTH sides, and under this arrangement both walk through the same junction: measured on node 24.11.1 and bun
+// 1.3.14, `realpath(cwd) === realpath(root)` answers TRUE FOR THE BREACH. That is no defect in the sibling — it
+// is right for ITS question (*is this CHILD PATH inside that root*) and that module already discloses this very
+// arrangement as its bound 2, ROOT SWAP, OPEN. ⭑ WHAT THIS RUNNER HAS THAT A CONTAINMENT PREDICATE DOES NOT IS A
+// DECLARED NAME: the host STATES this directory, and a swap cannot move a statement. The mutant `P2B-al` IS the
+// lift, and it reddens — so the decision is re-runnable rather than remembered.
+// ⚠ THE PRICE, STATED RATHER THAN DISCOVERED: a host whose durable root legitimately lies under a symlink, a
+// junction or an 8.3 spelling has a deliverable directory that never resolves to its own declared name, and
+// this runner then refuses EVERY run — loudly, immediately, with the remedy in the refusal. Phase 2's `F1`
+// records what it costs to compare two spellings of one Win32 path (case, then the NTFS 8.3 alias, each beat a
+// guard that tried), and this is that lesson's other side: the comparison stays EXACT, and being wrong lands on
+// the refusing side. ⚠ MEASURED HERE: `realpath` equals `resolve` for this repository's root and for
+// `tmpdir()` under both runtimes, and `realpath` does NOT canonicalise case on Win32 — so the case-sensitivity
+// of this comparison is exactly what it already was.
+// ⚠ AND WHAT IS *NOT* CLAIMED: this refuses to RUN A COMMAND in a directory the filesystem no longer agrees is
+// the workspace. It does not close the ROOT SWAP for the workspace's own reads, writes and listings — that
+// disclosure stands, its probes still pass, and nothing here should be read as having closed it.
 //
 // ── ⛔ B2 / B3 — THE OUTCOME COMES FROM THE CHILD, NEVER FROM THE STDIO STREAMS ──────────────────────────────
 // These are ONE defect seen twice. `close` fires when the last pipe is released, and a pipe outlives its child:
@@ -206,6 +241,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { realpath } from 'node:fs/promises';
 import { delimiter, extname, resolve as resolvePath } from 'node:path';
 import {
 	namesABatchTarget,
@@ -213,6 +249,7 @@ import {
 	workspaceDirectoryName,
 	type ProcessOutputOmission,
 	type ProcessOutputRetention,
+	type PurgeOutcome,
 	type ProcessRunOutcome,
 	type ProcessRunRequest,
 	type ProcessRunner,
@@ -406,6 +443,31 @@ function present(path: string): boolean {
 		return existsSync(path);
 	} catch {
 		return false;
+	}
+}
+
+/**
+ * What directory the FILESYSTEM says this path is, or the errno code it refused to say it with.
+ *
+ * ⛔ `B11` — THE ONE QUESTION A PATH COMPARISON CANNOT ANSWER, AND THE WHOLE OF THE FIX. `resolve` is
+ * arithmetic on text: it collapses `..`, it picks a base, and it is finished. It cannot see a REPARSE POINT,
+ * so a junction planted where the workspace directory used to be spells the workspace exactly while the
+ * operating system opens somewhere else entirely — driven, and the command wrote into the stand-in server
+ * tree. `realpath` follows what the OS will follow, which is the only instrument that answers the question
+ * being asked.
+ *
+ * ⚠ IT RETURNS THE CODE RATHER THAN A BOOLEAN, because the two failures are different facts and the
+ * refusals that report them say different things: a directory that RESOLVES ELSEWHERE has been redirected,
+ * and a directory that does not resolve AT ALL is gone. A single `false` would force one refusal to cover
+ * both, and one of the two would then be false about its own input.
+ */
+async function resolvedDirectory(
+	path: string
+): Promise<{ readonly directory: string } | { readonly unresolvable: string }> {
+	try {
+		return { directory: await realpath(path) };
+	} catch (cause) {
+		return { unresolvable: (cause as NodeJS.ErrnoException | undefined)?.code ?? 'unknown cause' };
 	}
 }
 
@@ -704,6 +766,14 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 	 * are purged — which this workspace permits, because the whole point of its declared class is that it can be.
 	 * ⚠ A purge that itself refuses is REPORTED rather than swallowed: the bytes are then genuinely an orphan,
 	 * and a reader who is told so can act on it.
+	 *
+	 * ⛔ AND A PURGE THAT **RAISES** IS THE SAME FACT AS A PURGE THAT REFUSES, WHICH IS `W2` AND WAS A REAL HOLE.
+	 * The port promises `purge` refuses rather than throws and both adapters here do — but `retain`'s outer
+	 * `catch` already declines to trust that same promise for `writeFile`, and this arm did not. An adapter that
+	 * raised produced `retained: false` with the landed bytes STILL ON DISK and nothing in the record naming
+	 * them: `REG-F-336` C-2's orphan, arriving through the one function written to prevent it, for the second
+	 * time. ⭐ THE POSTURE IS THE ONE THE RUNNER ALREADY TAKES ONE FUNCTION DOWN — rely on the promise AND do
+	 * not trust it — and the reader is told the bytes are an orphan rather than left to infer it from silence.
 	 */
 	async function refuseAndSweep(
 		landed: readonly (readonly [boolean, string, string])[]
@@ -714,7 +784,19 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 		const swept: string[] = [];
 		for (const [written, path] of landed) {
 			if (!written) continue;
-			const outcome = await outputWorkspace.purge(path);
+			let outcome: PurgeOutcome;
+			try {
+				outcome = await outputWorkspace.purge(path);
+			} catch (cause) {
+				const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+				// ⚠ A THROW IS REPORTED AS THE REFUSAL IT AMOUNTS TO, rather than escaping to `retain`'s catch —
+				// which would answer for the WRITE that never failed, drop every part's own reason, and say
+				// nothing at all about the bytes it just left behind.
+				outcome = {
+					purged: false,
+					refusedBecause: `the output workspace raised rather than refusing (${code ?? 'unknown cause'})`
+				};
+			}
 			swept.push(
 				outcome.purged
 					? `the part that did land was purged, so no bytes remain that nothing points at`
@@ -790,30 +872,61 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 		// ⭑ DECLARED REAL, which is what `planProcessRun` and `producerWorkingDirectory` read to refuse an
 		// IN_MEMORY workspace as a WIRING ERROR rather than as the hermetic default.
 		kind: 'REAL',
-		run(request: ProcessRunRequest): Promise<ProcessRunOutcome> {
+		async run(request: ProcessRunRequest): Promise<ProcessRunOutcome> {
 			const startedAt = Date.now();
 			const workspaceName = workspaceDirectoryName(deliverableRoot);
 			const program = request.argv[0] ?? '';
 			const programName = programFileName(program);
 
-			// ⛔ B8 — THE ONE DIRECTORY THIS RUNNER MAY RUN IN, CHECKED AGAINST THE WORKSPACE IT WAS BUILT WITH.
+			// ⛔ B8 / B11 — THE ONE DIRECTORY THIS RUNNER MAY RUN IN, AND THE FILESYSTEM IS WHAT SAYS SO.
 			// `cwd` is a required field on a plain interface and `planProcessRun` has no production call site, so
-			// until this comparison existed a caller reached the host's filesystem by filling in a string. The
-			// refusal names DIRECTORY NAMES on both sides and no absolute path — `refusedBecause` travels.
-			if (resolvePath(request.cwd) !== deliverableRoot)
-				return Promise.resolve({
+			// until this check existed a caller reached the host's filesystem by filling in a string. ⛔ AND
+			// UNTIL `B11` IT WAS STILL TWO STRINGS: `resolvePath(request.cwd) !== deliverableRoot` compared the
+			// TEXT, so a junction standing where the workspace directory used to be matched EXACTLY and the OS
+			// followed it — driven, and the command wrote into the stand-in server tree. The question is not
+			// *does this spell the workspace* but *does the operating system OPEN the workspace when it is given
+			// this*, and `realpath` is the only instrument that answers that one.
+			// ⛔ IT IS RESOLVED PER CALL, NEVER AT CONSTRUCTION, because that is precisely how the breach worked:
+			// a root measured once cannot notice a swap that happens afterwards, and the swap IS the attack.
+			// ⚠ AND THE COMPARISON IS ASYMMETRIC ON PURPOSE — the RESOLVED cwd against the DECLARED directory,
+			// never resolved-against-resolved. Resolving BOTH sides is what `insideResolvedRoot` does one module
+			// over, and it is right for ITS question (is this child path inside that root); for THIS question it
+			// answers TRUE under the breach — MEASURED on node 24.11.1 and bun 1.3.14 — because both sides walk
+			// through the same junction. `filesystem-workspace.ts` discloses that same arrangement as its bound
+			// 2, OPEN, for exactly this reason. The DECLARED directory is the one name a swap cannot move, which
+			// is why this runner can close for its own act what the workspace beneath it cannot close for hers.
+			// ⚠ THE PRICE IS STATED RATHER THAN DISCOVERED: a host whose durable root legitimately lies under a
+			// symlink, a junction or an 8.3 spelling has a deliverable directory that never resolves to its own
+			// declared name, and this runner then refuses EVERY run with the second message below. That is loud,
+			// it is immediate, and the remedy is in the refusal — the safe side of a comparison nobody gets right.
+			const resolved = await resolvedDirectory(request.cwd);
+			if ('unresolvable' in resolved)
+				return {
 					ran: false,
-					refusedBecause: `a command may only be run in the workspace of ${deliverableWorkspace.ownerKind} '${deliverableWorkspace.ownerId}', whose directory is named '${workspaceName}'. This request carries a cwd naming '${workspaceDirectoryName(request.cwd)}' instead, and running there would execute '${programName}' somewhere the record does not describe. Derive the cwd from the workspace's own directoryPath — planProcessRun does — rather than assembling one.`
-				});
+					refusedBecause: `a command may only be run in the workspace of ${deliverableWorkspace.ownerKind} '${deliverableWorkspace.ownerId}', whose directory is named '${workspaceName}', and the filesystem could not resolve the requested cwd at all (${resolved.unresolvable}). A check that cannot be answered REFUSES rather than falling back to the path text: the text is exactly what a directory that has been removed or replaced still spells correctly, so deciding on it would use the very instrument this check exists to replace. ⛔ AND WHICH directory this was is NOT stated, deliberately: an unresolvable path has not been identified as anything — saying the workspace is gone would assert a fact about an input this runner could not read, which is the defect B10 recorded. The errno code above is the platform's own answer and is what a reader acts on.`
+				};
+			if (resolved.directory !== deliverableRoot)
+				// ⛔ TWO ARMS, BECAUSE THEY ARE TWO FACTS AND A REFUSAL MAY NOT STATE A FALSE ONE ABOUT ITS OWN
+				// INPUT — this adapter's `B10` finding, at a new field. A cwd naming somewhere else is a CALLER
+				// that assembled a path; a cwd naming this workspace that OPENS somewhere else is the workspace
+				// directory being gone, and telling that reader to "derive the cwd from directoryPath" would be
+				// advice that cannot help, about a mistake they did not make.
+				return {
+					ran: false,
+					refusedBecause:
+						resolvePath(request.cwd) === deliverableRoot
+							? `a command may only be run in the workspace of ${deliverableWorkspace.ownerKind} '${deliverableWorkspace.ownerId}', whose directory is named '${workspaceName}' — and the filesystem no longer resolves that name to that directory. Something other than the workspace now stands at the path and REDIRECTS it: a junction, a symlink or a mount point. Running '${programName}' here would execute it somewhere the record does not describe while every path in the record still spells the workspace, which is the one outcome this seam exists to prevent. Where it now leads is deliberately not named — that is a host path, and this refusal travels into a governed record and a model's context.`
+							: `a command may only be run in the workspace of ${deliverableWorkspace.ownerKind} '${deliverableWorkspace.ownerId}', whose directory is named '${workspaceName}'. This request carries a cwd naming '${workspaceDirectoryName(request.cwd)}' instead, and running there would execute '${programName}' somewhere the record does not describe. Derive the cwd from the workspace's own directoryPath — planProcessRun does — rather than assembling one.`
+				};
 
 			// ⛔ B1 — A TARGET WHOSE ARGUMENTS A COMMAND INTERPRETER WOULD RE-PARSE IS REFUSED, NOT QUOTED.
 			const environment = childEnvironment(process.env);
 			const batch = batchTargetReached(program, deliverableRoot, environment);
 			if (batch !== undefined)
-				return Promise.resolve({
+				return {
 					ran: false,
 					refusedBecause: `'${programName}' cannot be run: it reaches '${batch}', a .bat or .cmd target. Win32 cannot load one as a program image — the runtime hands the command line to cmd.exe, which re-parses '&', '|', '>' and '"' INSIDE ARGUMENTS — so this port's guarantee that an argv carries no quoting rules cannot be kept for it on this runtime. Driven under bun with shell:false, an argument containing '&' ran as a further command and wrote a file. The target is refused rather than the arguments escaped, because an escaping scheme for cmd.exe is a normaliser and every normaliser on this seam has been beaten. Name the executable the shim launches instead.`
-				});
+				};
 
 			let child: PipedChild;
 			// ⛔ `spawn` THROWS SYNCHRONOUSLY FOR SOME ARGV, AND A THROW OUT OF `run` IS THE ONE THING THIS
@@ -846,10 +959,10 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 				});
 			} catch (cause) {
 				const code = (cause as NodeJS.ErrnoException | undefined)?.code;
-				return Promise.resolve({
+				return {
 					ran: false,
 					refusedBecause: `a process could not be started in the workspace directory '${workspaceName}': the platform refused the argv itself (${code ?? 'unknown cause'}), before any process existed. The code above is the platform's own answer and is what a reader acts on; measured causes include an embedded NUL byte in the program name or an argument, and an empty program name, and that list is not closed. The argv is deliberately not quoted back here: an argv the platform refuses can carry bytes that belong in no record.`
-				});
+				};
 			}
 
 			return observeChildRun({

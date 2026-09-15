@@ -664,6 +664,95 @@ that cannot fail wearing the shape of defensiveness.
 
 ---
 
+## 4f. Phase 2b · ⭐ THIRD ADVERSARIAL PASS — the ten re-driven breaches held; the ELEVENTH was the same defect one instrument down
+
+A third pass re-drove all ten of §4e's vectors against the landed runner: **TEN CLOSED, ONE NEW BREACH DRIVEN.**
+
+| # | what was driven | where it is fixed | its mutant |
+| --- | --- | --- | --- |
+| B11 | the deliverable directory REPLACED by an `mklink /J` junction AFTER construction; a LAWFUL `cwd` then matched the check exactly, the OS followed the junction, and the command wrote `PWNED_IN_SERVER_TREE.txt` into the stand-in server tree | the check asks the FILESYSTEM, per call: `realpath(request.cwd)` must be the workspace's DECLARED directory, and a cwd that does not resolve at all REFUSES | `P2B-ak`, `P2B-al`, `P2B-am`, `P2B-an` |
+
+⛔ **`B11` IS `B8` AGAIN, AND THAT IS THE FINDING RATHER THAN A COINCIDENCE.** `B8`'s fix was structural and it
+held: the runner is constructed against the deliverable workspace, so the check sits in an object a caller
+cannot go around, and `P2B-v` still kills. What it could not fix is that the check was still
+`resolvePath(request.cwd) !== deliverableRoot` — **arithmetic on text, with one side fixed at construction.**
+`resolve` cannot see a reparse point, and a root measured once cannot notice a swap that happens afterwards.
+⭑ Both properties the fix needed were properties the old check LACKED: resolution at CHECK TIME, and a refusal
+when the path does not resolve at all.
+
+⛔⛔ **AND THE OBVIOUS REUSE — LIFT `insideResolvedRoot` FROM THE SIBLING MODULE — DOES NOT CLOSE IT. MEASURED,
+NOT ARGUED.** That helper says, in its own words, *"IT ASKS THE FILESYSTEM, NOT THE STRING … `realpath` resolves
+reparse points — measured on a `mklink /J` junction"*, which is exactly the instrument this breach needs. But it
+resolves **BOTH** sides, and under this arrangement both sides walk through the same junction: driven on
+**node 24.11.1 and bun 1.3.14**, `realpath(cwd) === realpath(root)` answers **TRUE for the breach**.
+- ⭑ THAT IS NOT A DEFECT IN THE SIBLING. It is right for ITS question — *is this CHILD PATH inside that root* —
+  and `filesystem-workspace.ts` already discloses this very arrangement as its **bound 2, ROOT SWAP, OPEN**.
+- ⭐ WHAT THE RUNNER HAS THAT THE WORKSPACE DOES NOT IS A **DECLARED NAME**: the host STATES the deliverable
+  directory, and the one thing a swap cannot move is that statement. So the comparison is ASYMMETRIC on purpose
+  — the RESOLVED cwd against the DECLARED directory — and it closes, for the act of RUNNING A COMMAND, a vector
+  that stays open for the workspace's own reads and writes. **The workspace disclosure is unchanged and its
+  disclosure probes still pass.**
+- ⚠ SO THE HELPER WAS NOT LIFTED, AND `P2B-al` IS THAT DECISION MADE RE-RUNNABLE: the mutant IS the lift, and
+  it reddens. Without it the next author reads the sibling's comment and weakens the check back to symmetry.
+
+⚠ **THE OVER-REFUSAL, STATED RATHER THAN DISCOVERED.** A host whose durable root legitimately lies under a
+symlink, a junction or an 8.3 spelling has a deliverable directory that never resolves to its own declared
+name, and this runner then refuses EVERY run — loudly, immediately, with the remedy in the refusal. That is the
+safe side of a comparison nobody gets right, and it is the same posture `B1` takes for batch targets.
+⭑ MEASURED on this host: `realpath` equals `resolve` for the repository root and for `tmpdir()` under both
+runtimes, and `realpath` does NOT canonicalise case on Win32 — so the case-sensitivity of the comparison is
+exactly what it already was.
+
+### The three DISCLOSED weaknesses, ruled — one disclosed, two fixed
+
+| # | the weakness | ruling |
+| --- | --- | --- |
+| `W1` | `programFileName` returns the LAST path segment, so a model-chosen `argv[0]` that is a host path fragment leaks its deepest name: `programFileName('C:\Users\mchen')` = `'mchen'` | ⚠ **DISCLOSED, NOT FIXED** — and converted from prose into a gated case (`P2B-ar`) |
+| `W2` | a `purge` that THROWS during `refuseAndSweep` left the landed bytes with `retained:false` and nothing naming them — `REG-F-336` C-2's orphan | ⭐ **FIXED** — a throw is reported as the refusal it amounts to, and the record NAMES the orphan (`P2B-ao`) |
+| `W3` | the `REG-Q-066` probe population walked `.ts` only, EXCLUDING 11 `.svelte` files and any `.mts`/`.cts`/`.js` | ⭐ **FIXED, IN ITS GENERAL FORM** — the population is derived and the EXCLUSION is declared and gated (`P2B-ap`, `P2B-aq`) |
+
+⚠ **`W1` — WHY DISCLOSING IS THE RULING AND NOT A DEFERRAL.** Something must name the failed program: the
+commonest refusal in this seam is *"'tsc' could not be started (ENOENT)"* and a refusal that names nothing is
+unactionable. Every alternative was measured against this seam's standing instruction that **every new
+normaliser is itself attackable**: naming nothing loses the one fact a reader acts on; naming only
+separator-free programs drops the name exactly in the ordinary case (an absolute path to an executable); and
+deciding whether a segment *"looks like a program name"* is a predicate over an arbitrary string — a normaliser.
+⭑ **AND THE PROPERTY THAT MAKES IT THE RIGHT TRADE:** every path in a refusal that came FROM THE HOST is reduced
+by this same rule, and what remains is ONE segment of a string **the caller supplied**. A model that spelled
+`C:\Users\mchen` already holds it. **What a reader can still act on:** the errno CODE, the workspace's
+DIRECTORY NAME, and the final segment of `argv[0]` as spelled. **What they cannot recover** — the point of the
+bound — is the DIRECTORY the program was sought in.
+
+⭐ **`W3` — THE REPAIR IS THE GENERAL FORM, BECAUSE HAND-LISTING ELEVEN FILES IS THE DEFECT ONE LEVEL UP.** An
+allowlist of one extension with a SILENT remainder is replaced by: the population is DERIVED from the
+filesystem, and every extension present must appear in `PARSED_EXTENSIONS` or in `NOT_A_SOURCE_EXTENSION`. An
+extension in neither reddens the gate and is DECIDED. ⚠ The probe itself was never the defect — it caught all
+five of `B9`'s evaded shapes — so this is a POPULATION repair, and it is a strict widening: a superset control
+re-derives the old `.ts` population and requires every member to survive.
+
+⛔ **AND THE INSTRUMENT FAILED BEFORE THE CODE DID, AGAIN.** The first version of the `.svelte` reader's case
+drove `const { stdout, stderr } = $props();` inside a `<script>` block — and the whole-file-TSX mutant
+**SURVIVED**: in JSX children `{ … }` is an EXPRESSION container, so a destructure inside a script body is
+parsed as code BY ACCIDENT even when the parser believes it is reading markup. The case now drives a property
+read (`outcome.stderr`), which has no braces to be rescued by, and `P2B-aq` kills. ⭐ A control that passes for
+the wrong reason is this repository's most-recorded instrument defect; this one was caught by mutating the
+instrument rather than by reading it, and the corrected claim is written into the reader's own docblock.
+
+**PROOF:** every fix was watched FAILING first with the attacker's own arrangement. The junction case escaped
+and `PWNED_IN_SERVER_TREE.txt` was observed ON DISK in the stand-in tree before the fix existed; the
+unresolvable-cwd case answered with a SPAWN failure where a containment refusal belongs; the `W2` case reported
+*"the output workspace raised rather than refusing (EPERM)"* and named no orphan; and each of the three `W3`
+mutants (`.svelte` out of the population, script-blocks-only, one-TSX-parse) reddened a named case.
+
+**MUTANTS:** `bun run mutants P2B-` — **44 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 INCONCLUSIVE**
+(36 → 44; eight new). ⚠ **AND FOUR ANCHORS MOVED WITH THE CODE THEY NAME, NONE RETIRED:** `P2B-v` (its lexical
+comparison is gone — re-anchored onto the filesystem check, and its victim GREW from one case to two), `P2B-r`
+(`run` became `async`, so the refusal arms stopped being `Promise.resolve({…})`), and `P2B-ah`/`P2B-ai`
+(`bindingsInSource` gained the script kind `W3` needs). Each rewrite is recorded IN its entry, because a
+rewritten mutant is exactly where a claim quietly weakens.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
