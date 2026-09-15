@@ -1212,11 +1212,13 @@
 		"packages/rph-ports/src/ports/process-runner.ts": {
 			"consumedExports": [
 				"namesABatchTarget",
+				"planProcessRun",
 				"programFileName",
 				"workspaceDirectoryName"
 			],
 			"guardedExports": [
 				"namesABatchTarget",
+				"planProcessRun",
 				"programFileName",
 				"workspaceDirectoryName"
 			],

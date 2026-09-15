@@ -667,7 +667,19 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'DERIVED by the harness rather than declared by the step. Engine-level enforcement waits on that ' +
 			'declaration being ratified, which is a minting act. ⛔ The refusal is therefore harness-sited, and ' +
 			'the input carrying it is REQUIRED with an explicit NONE so that skipping the check cannot be ' +
-			'expressed by omission - the dodge shape REG-F-364 records. EXIT for the remaining tier: the ' +
+			'expressed by omission - the dodge shape REG-F-364 records. ' +
+			'⭐⭐ AMENDED 2026-09-15 (JAN-EXEC Phase 3): THE OPERATION TIER IS NO LONGER WHOLLY UNBUILT, and the ' +
+			'part that IS built is discharged BY ABSENCE rather than by interception. A host adapter now mints a ' +
+			'model tool ONLY when the binding grants the capability that authorises it (mintExecutionTools): ' +
+			'file-system mints write_file, process-execution mints run_command, and an ungranted capability mints ' +
+			'nothing - so the operation is unavailable to the model with no call to intercept and no refusal path ' +
+			'to get wrong. That is operation-level DEGRADATION in the terms the ratified statement itself uses, ' +
+			'which is how its operation-level wording and the step-level refusal here are reconciled rather than ' +
+			'one being chosen: a capability the step REQUIRES refuses the step, one it merely USES withholds the ' +
+			'tool. ⛔ WHAT IS STILL NOT BUILT, AND IS THE PART THE ROW REMAINS OPEN FOR: intercepting an ' +
+			'operation the host DID authorise - this connect(), this path, this host - which belongs to the ' +
+			'Platform Runtime Authorization Service (§33.4). Granting by absence bounds WHICH KINDS of operation a ' +
+			'step may perform; it bounds nothing about the arguments of one it may. EXIT for that tier: the ' +
 			'Platform runtime authorization service, deferred to M5.'
 	},
 	'RPH-EXE-005': {

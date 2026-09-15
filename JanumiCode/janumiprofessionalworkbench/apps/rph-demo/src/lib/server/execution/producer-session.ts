@@ -36,19 +36,47 @@ export interface ProducerSession {
 }
 
 /**
- * What an opener is given: the two ports of the Undertaking's sandbox.
+ * What DECIDES WHERE a session may run: the two ports' own declarations, and nothing else.
  *
  * ⭑ `Pick`, NOT THE WHOLE PORT, AND IT MIRRORS `ProcessRunPlanInput` DELIBERATELY. What decides where a session
  * runs is the workspace's DECLARATIONS, not its ability to store bytes — so the type says which declarations
- * are read, and a test can arrange the case it means without standing up an implementation. An
- * `UndertakingSandbox` satisfies it as-is.
+ * are read, and a test can arrange the case it means without standing up an implementation.
+ *
+ * ⚠ SPLIT OUT OF `ProducerSessionContext` BY JAN-EXEC PHASE 3 rather than widened along with it. Phase 3 hands
+ * the opener the WHOLE ports, because minting `write_file` and `run_command` needs what a workspace can DO and
+ * not only what it declares — but `producerWorkingDirectory` still answers its question from the declarations
+ * alone, and saying so in the type is what keeps that true for the next reader.
  */
-export interface ProducerSessionContext {
+export interface ProducerSessionPorts {
 	readonly workspace: Pick<
 		Workspace,
 		'ownerId' | 'ownerKind' | 'materialization' | 'directoryPath'
 	>;
 	readonly runner: Pick<ProcessRunner, 'kind'>;
+}
+
+/**
+ * What an opener is given: the Undertaking's sandbox, and what the step's binding CURRENTLY grants.
+ *
+ * ── ⭐⭐ JAN-EXEC PHASE 3 — THE GRANT IS PART OF THE CONTEXT, AND IT IS REQUIRED ───────────────────────────────
+ *
+ * `grantedCapabilities` decides which tools are MINTED, and an ungranted tool is never minted at all — so this
+ * field is what stands between a model and a shell. ⛔ IT IS REQUIRED, WITH NO DEFAULT, for the reason
+ * `RunModelStepInput.binding` is: an optional grant makes *"open a session and skip the capability question"*
+ * expressible by OMISSION, which is the dodge shape `REG-F-364` records. And there is no honest default —
+ * `[]` would silently disarm every step whose caller merely forgot, while anything wider would silently arm
+ * one. A required field makes the caller say which case it is in.
+ *
+ * ⚠ AND IT IS THE STORED GRANT, NOT THE REQUEST. The caller reads it from the RUNTIME_BINDING at invocation
+ * time — §22.1's *"revoked bindings cannot be used for new attempts"* — so a revocation between tries changes
+ * which tools the next session is given. Passing the request back would be a check that cannot fail.
+ *
+ * ⭑ THE PORTS ARE WHOLE HERE, and an `UndertakingSandbox` still satisfies that half as-is.
+ */
+export interface ProducerSessionContext extends ProducerSessionPorts {
+	readonly workspace: Workspace;
+	readonly runner: ProcessRunner;
+	readonly grantedCapabilities: readonly string[];
 }
 
 /**
@@ -82,7 +110,10 @@ export type OpenProducerSession = (
  * default, and once that wording is normal noise the real misconfiguration is invisible.
  */
 export function producerWorkingDirectory(
-	context: ProducerSessionContext
+	// ⚠ THE DECLARATIONS, NOT THE WHOLE CONTEXT. Phase 3 widened `ProducerSessionContext` to carry the live
+	// ports and the grant; taking the narrower type here states that NONE of that may influence WHERE a session
+	// runs — and makes an attempt to read it a compile error rather than a review comment.
+	context: ProducerSessionPorts
 ): ProducerWorkingDirectory {
 	const named = `${context.workspace.ownerKind} '${context.workspace.ownerId}'`;
 	if (context.workspace.materialization !== 'FILESYSTEM')

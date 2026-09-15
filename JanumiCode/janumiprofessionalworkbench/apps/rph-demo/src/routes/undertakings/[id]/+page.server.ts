@@ -954,12 +954,21 @@ export const actions: Actions = {
 			// because `STA-8` says authorized, not merely requested.
 			...(binding
 				? ([
-						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding],
+						// ⭑ `binding.request` AND NOT `binding`. JAN-EXEC Phase 3 gave the binding a second field — the
+						// REQUIRES/USES needs the request was derived FROM — and `RequestRuntimeBindingPayloadSchema` is a
+						// `z.strictObject`, so dispatching the whole object is REFUSED by the command bus. The request half
+						// IS the payload, proved at compile time in `step-binding.ts`, so there is no projection to write.
+						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding.request],
 						[
 							'AuthorizeRuntimeBinding',
 							'RUNTIME_BINDING',
 							bindingId,
-							{ grantedCapabilities: [...binding.requestedCapabilities] }
+							// ⚠ THE DEMO GRANTS EVERYTHING THE STEP ASKED FOR, AND THAT IS A DEMO POSTURE RATHER THAN A RULE.
+							// `grantedWithinRequest` forbids granting MORE; nothing obliges granting ALL, and the precision
+							// control this phase turns on — `file-system` granted, `process-execution` withheld — is exactly a
+							// narrower grant. This surface has no authorizer UI to express one, so it authorizes the full
+							// request and the narrowing is driven at the seam instead.
+							{ grantedCapabilities: [...binding.request.requestedCapabilities] }
 						]
 					] satisfies Step[])
 				: []),
@@ -1085,11 +1094,27 @@ export const actions: Actions = {
 			// does not need to: `undertakingId` is on the flattened PWU, which is also the field `listPwus` keys on —
 			// so the workspace belongs to the same object the work unit does, and a second step in a new session lands
 			// in the same directory as the first.
+			//
+			// ── ⭐⭐ JAN-EXEC PHASE 3 — AND THE STEP'S GRANT DECIDES WHAT THE MODEL CAN DO IN IT ──────────────
+			//
+			// `grantedCapabilities` is read from the STORE, not from the request, exactly as the per-try refusal
+			// below reads it: the tools minted for this session are the ones the RUNTIME_BINDING currently
+			// grants, and an ungranted tool is never minted, so the model is never told it exists.
+			//
+			// ⚠ AND A BOUND IS DISCLOSED RATHER THAN LEFT TO BE DISCOVERED: the surface is minted ONCE, when the
+			// session opens, while the grant is re-read on EVERY try. So a capability revoked between tries
+			// refuses the next try when the step REQUIRES it (`stepCapabilityRefusal`, below) — but a revoked
+			// capability the step merely USES leaves its tool minted for the rest of this held session. The
+			// session is held on purpose (`JAN-EXECSESS`, sponsor), so the alternative is a session per try,
+			// which that ruling overturned. ⭑ Pi exposes `AgentSession.setActiveToolsByName`, which can only
+			// NARROW a registry this host already built from the grant — that is the seam a later increment
+			// would use, and naming it here is what keeps this a disclosed bound rather than an unknown one.
 			let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
 			try {
-				producer = await getExecutionSession()(
-					resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string))
-				);
+				producer = await getExecutionSession()({
+					...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
+					grantedCapabilities: binding ? grantsFor(bindingId) : []
+				});
 			} catch (e) {
 				// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
 				// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
@@ -1133,7 +1158,7 @@ export const actions: Actions = {
 						// between tries changes the answer, which is the whole reason this is the stored grant
 						// and not the request echoed back at itself.
 						binding: binding
-							? { kind: 'BOUND', request: binding, granted: grantsFor(bindingId) }
+							? { kind: 'BOUND', binding, granted: grantsFor(bindingId) }
 							: { kind: 'NONE' }
 					});
 

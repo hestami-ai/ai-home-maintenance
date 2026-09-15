@@ -30,7 +30,7 @@ import {
 	splitExecutionEnvelope
 } from './execution-contract.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
-import { stepCapabilityRefusal, type StepBindingRequest } from './step-binding.js';
+import { stepCapabilityRefusal, type StepBinding } from './step-binding.js';
 import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
@@ -99,12 +99,21 @@ export interface RunModelStepInput {
 	readonly binding: StepBindingFacts;
 }
 
-/** What the caller knows about this step's binding. ⛔ `NONE` must be SAID, never left out. */
+/**
+ * What the caller knows about this step's binding. ⛔ `NONE` must be SAID, never left out.
+ *
+ * ⛔ `binding` IS THE WHOLE `StepBinding` — the wire request AND the REQUIRES/USES needs it was derived from
+ * — rather than the request alone. JAN-EXEC Phase 3 made the difference load-bearing: the refusal must fire on
+ * an ungranted REQUIRES and must NOT fire on an ungranted USES, and `requestedCapabilities` cannot tell the two
+ * apart. A caller asked to supply the split separately would be asked to re-derive a fact the step type owns,
+ * and the plausible wrong answer (everything REQUIRES) silently turns the degradation this phase exists to
+ * provide back into a refusal.
+ */
 export type StepBindingFacts =
 	| { readonly kind: 'NONE' }
 	| {
 			readonly kind: 'BOUND';
-			readonly request: StepBindingRequest;
+			readonly binding: StepBinding;
 			readonly granted: readonly string[];
 	  };
 
@@ -212,7 +221,7 @@ export async function runModelInvocationStep(
 	// Platform's and stays deferred. This refuses to BEGIN an invocation the binding does not authorise, which
 	// is step governance and JPWB's.
 	if (input.binding.kind === 'BOUND') {
-		const refusal = stepCapabilityRefusal(input.binding.request, input.binding.granted);
+		const refusal = stepCapabilityRefusal(input.binding.binding, input.binding.granted);
 		if (refusal) return { ran: false, refusedBecause: refusal };
 	}
 

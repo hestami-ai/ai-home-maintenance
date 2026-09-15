@@ -16,7 +16,11 @@ const SANDBOX: ProducerSessionContext = {
 		ownerId: 'und_model_test',
 		purgeability: 'RETAINED_BY_PARTICIPATION'
 	}),
-	runner: createRefusingProcessRunner()
+	runner: createRefusingProcessRunner(),
+	// ⛔ JAN-EXEC PHASE 3 — AND THE GRANT IS EMPTY, WHICH IS THE HERMETIC DEFAULT FOR THE SAME REASON THE PORTS
+	// ARE. An empty grant mints NO tools, so no spec in this suite hands a model a filesystem seam or a child
+	// process by accident. A spec that means to exercise a minted surface says so by naming the capability.
+	grantedCapabilities: []
 };
 
 const SAVED = process.env.JPWB_EXECUTOR;

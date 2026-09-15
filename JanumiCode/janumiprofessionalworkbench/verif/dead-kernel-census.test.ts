@@ -269,7 +269,14 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 	},
 	assessModelOutput: {
 		kind: 'DEFERRED',
-		why: "Triage §4, W3. JPWB hosts no tool or model invocation — the boundary RPH-EXE-004's row argues at length — so nothing produces model output to assess."
+		// ⛔ ITS STATED GROUND WAS FALSE AND IS STRUCK RATHER THAN DELETED (the WP-17 standard). ~~"JPWB hosts no
+		// tool or model invocation"~~ — `runModelInvocationStep` has invoked models since `JAN-EXECRUN`, and
+		// `JAN-EXEC` Phase 3 mints TOOLS for those invocations and observes the calls. `RPH-EXE-004`'s own row
+		// records both corrections; this one quoted the sentence that row has since withdrawn.
+		// ⚠ THE ROW STAYS DEFERRED ON THE GROUND THAT IS ACTUALLY TRUE: nothing calls this function. A stale
+		// GROUND under a correct verdict is the shape this census exists to catch one level up, so correcting it
+		// here rather than leaving it to read as a survey finding.
+		why: "Triage §4, W3. ~~JPWB hosts no tool or model invocation~~ — FALSE since JAN-EXECRUN, and doubly so since JAN-EXEC Phase 3 (a step invokes a model AND mints it tools). The row survives on the other ground: nothing calls assessModelOutput. The assurance path assesses a recorded exchange through the floor, not through this predicate."
 	},
 	selectControlAction: {
 		kind: 'DEFERRED',

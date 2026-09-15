@@ -9,6 +9,7 @@ import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-
 import { assembledSources, runModelInvocationStep } from './run-model-step.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
+import { stepBindingFor } from './step-binding.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -475,12 +476,13 @@ describe('OC-02 — the reviewer is handed the contract as part of the instructi
 // grounds are now false — `runModelInvocationStep` IS the broker, and `execution-invocation.ts:3-8` already
 // refutes the first sentence against the Guide. ⛔ The OPERATION tier stays the Platform's and is NOT built.
 describe('EG-03 — the binding must still authorize the invocation', () => {
-	const BINDING = {
-		runtimeBindingId: 'bind_1',
-		executionStepId: 'step_1',
-		roleId: 'MODEL',
-		requestedCapabilities: [{ capability: 'network' }]
-	} as const;
+	// ⭐⭐ THE PRODUCTION TABLE, NOT A HAND-WRITTEN ONE, AND JAN-EXEC PHASE 3 IS WHY THAT CHANGED. This used to
+	// be a literal `[{capability:'network'}]`, which was the whole request at the time. The request is now
+	// derived from the step type's REQUIRES/USES needs, and a literal here would assert against a table this
+	// suite invented — so a needs table that drifted from the one production uses would still be green.
+	// ⛔ `!` IS SAFE AND IS THE POINT: a MODEL_INVOCATION on a MODEL type is exactly the case that IS bound, and
+	// `step-binding.test.ts` is where the `undefined` arms are driven.
+	const BINDING = stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_1', 'step_1')!;
 
 	it('⭑⭑ REFUSES when the stored grant no longer covers what the step needs — BEFORE any model call', async () => {
 		// ⚠ THE ASSERTION THAT MATTERS IS `calls === 0`. A refusal that fires after the model has answered has
@@ -492,7 +494,7 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 				calls += 1;
 				return ANSWER;
 			}),
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: [] }
+			binding: { kind: 'BOUND' as const, binding: BINDING, granted: [] }
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(false);
@@ -504,7 +506,7 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 		// A refusal a reader cannot act on is the silent omission `PER-9` forbids one layer up. THE MUTANT:
 		// return a bare boolean and let the caller invent a message.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['file-system'] }
+			binding: { kind: 'BOUND' as const, binding: BINDING, granted: ['file-system'] }
 		});
 		const out = await runModelInvocationStep(input);
 		expect(!out.ran && out.refusedBecause).toMatch(/RPH_CAPABILITY_NOT_GRANTED/);
@@ -516,7 +518,7 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 	it('⭑ CONTROL — a binding that DOES grant it proceeds, so this is not "refuse everything"', async () => {
 		// ⛔ Without this the check is satisfiable by refusing unconditionally, and `EG-02`'s whole path breaks.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network'] }
+			binding: { kind: 'BOUND' as const, binding: BINDING, granted: ['network'] }
 		});
 		expect((await runModelInvocationStep(input)).ran).toBe(true);
 	});
@@ -532,10 +534,54 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 		// `RPH-EXE-004`'s example grants a subset and fails the operation outside it; nothing says a grant may
 		// not exceed the request. THE MUTANT: compare the two sets for equality — a binding authorized for more
 		// than this step asked would refuse a step it plainly covers.
+		// ⚠ THE ARRANGEMENT HAD TO GROW WITH THE REQUEST. It read `['network','file-system']`, which WAS a
+		// superset of the one-capability request and is now a strict SUBSET of a three-capability one — so it
+		// would have gone on passing while testing a different thing entirely. Every requested capability plus
+		// one nobody asked for is what "superset" means against the table production actually uses.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network', 'file-system'] }
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network', 'file-system', 'process-execution', 'secrets']
+			}
 		});
 		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⭐⭐ an ungranted capability the step merely USES does NOT refuse the step — it narrows the tools', async () => {
+		// ⛔ THIS IS THE LIMB `RPH-EXE-004`'s OPERATION-LEVEL WORDING TURNS ON, and before Phase 3 it did not
+		// exist: every requested capability was REQUIRED, so an ungranted one could only ever refuse. The
+		// ratified rule degrades an OPERATION — *"network operations fail authorization"* — and grant-by-absence
+		// is how that is delivered: `process-execution` ungranted means `run_command` is never minted, and the
+		// invocation proceeds with a narrower surface.
+		// ⚠ THE MODEL IS CALLED, AND THAT IS THE ASSERTION. A refusal here would look like the check working
+		// while actually overturning the rule it claims to enforce. THE MUTANT: drop the `need !== 'REQUIRES'`
+		// guard in `stepCapabilityRefusal` — every USES capability becomes a step-killer and this goes red.
+		let calls = 0;
+		const { input } = harness({
+			session: oneShotSession(async () => {
+				calls += 1;
+				return ANSWER;
+			}),
+			binding: { kind: 'BOUND' as const, binding: BINDING, granted: ['network', 'file-system'] }
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran, 'an ungranted USES capability must not refuse the step').toBe(true);
+		expect(calls, 'the model must actually be invoked').toBe(1);
+	});
+
+	it('⛔ CONTROL — the very same grant, with the REQUIRED capability removed, DOES refuse', async () => {
+		// ⭐ THE CONTROL FOR THE CASE ABOVE, AND IT IS ITS OWN ARRANGEMENT RATHER THAN A RE-READING. Without it
+		// "a USES capability does not refuse" is satisfied by a `stepCapabilityRefusal` that refuses NOTHING —
+		// which is the shape this repository has shipped before and named *a control that cannot fail*. Same
+		// binding, same fixture, one capability moved; only the REQUIRES limb can explain the difference.
+		const { input } = harness({
+			binding: { kind: 'BOUND' as const, binding: BINDING, granted: ['file-system'] }
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/does not grant 'network'/);
+		expect(!out.ran && out.refusedBecause).toMatch(/REQUIRES/);
 	});
 });
 

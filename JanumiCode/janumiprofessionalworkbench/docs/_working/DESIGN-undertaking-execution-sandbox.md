@@ -164,7 +164,7 @@ path-named. It needs the same trick one level down: **one durable root, one subd
 id, resolved per request rather than held in process.** The spike held the object in memory, which is exactly what
 a SvelteKit form action cannot do across requests.
 
-### 4.3 Capability → tools: grant by ABSENCE
+### 4.3 Capability → tools: grant by ABSENCE · ⭐ LANDED 2026-09-15 (Phase 3)
 
 **A tool the grant does not authorize is never minted, so the model is never told it exists.** There is no call to
 intercept and no refusal path to get wrong. A capability check *inside* a tool handed to the model anyway is
@@ -173,11 +173,28 @@ strictly weaker: it depends on the check firing, and it advertises the privilege
 Proven live, with the precision half this repository has historically not tested:
 
 ```
-granted ["network"] only          -> step REFUSED · model calls 0 · exchange records 0
+~~granted ["network"] only        -> step REFUSED · model calls 0 · exchange records 0~~   ⛔ SEE BELOW
 granted ["network","file-system"] -> minted ["write_file"] withheld ["run_command"]
                                      run_command calls = 0 · write_file calls = 1 · file on disk
 granted ["file"] / ["file-syste"] / ["file-system-extra"] / ["FILE-SYSTEM"] -> minted []
 ```
+
+⛔ **THE FIRST ROW DID NOT SURVIVE THE RULING THIS VERY SECTION MAKES, AND IT IS STRUCK RATHER THAN QUIETLY
+CORRECTED.** The spike refused a `["network"]`-only grant because it treated EVERY requested capability as
+REQUIRED — which is exactly the step-level reading the paragraph below says must NOT be chosen. Landing the
+REQUIRES/USES split therefore had to change that row: with `network` granted, the step it REQUIRES is
+authorized, so it **RUNS** — with **no tools minted at all**, because the two capabilities that authorise tools
+were not granted. What refuses is a grant that omits `network` itself.
+
+```
+granted [] / any grant WITHOUT "network" -> step REFUSED · model calls 0 · exchange records 0
+granted ["network"] only                 -> step RUNS · minted [] · the model is given no hands
+```
+
+⚠ **AND THE SPIKE'S ROW WAS THE STRICTER ONE, WHICH IS WHY IT LOOKED RIGHT.** A table that refuses more is easy
+to read as the safer table; here it was the one that quietly overturned the ratified rule's own wording. Both
+arrangements are asserted in `step-binding.test.ts` and `run-model-step.test.ts`, and `P3-e` is the mutant that
+restores the spike's behaviour and reddens.
 
 Exact membership, not prefix — it reuses the kernel's own `capabilityAuthorized`, the export a prior programme
 proved exact. Containment refuses `../`, `a/../../`, absolute and drive-qualified paths.
@@ -189,6 +206,43 @@ keeps working with a narrower tool set and says so (`"commandRun":false,"missing
 ⚠ **Consequence for the plan:** `stepBindingFor` currently hardcodes `requestedCapabilities: [{capability:'network'}]`
 for every model step. It must request **per step type**, and the design must distinguish capabilities a step
 REQUIRES (ungranted ⇒ refuse the step) from those it can USE (ungranted ⇒ do not mint the tool).
+
+### 4.3a ⭐ AS LANDED — what the spike promised, measured against a real model
+
+⚠ **THE SPIKE'S TABLE HELD IN EVERY ROW BUT ITS FIRST, AND THAT ROW WAS STRUCK ABOVE** — it encoded the
+step-level reading this design rules against. What was re-driven through the PRODUCTION seam against
+`openai-codex/gpt-5.6-sol`:
+
+```
+granted ["network","file-system","process-execution"] -> minted ["write_file","run_command"]
+                                                         greet.js 38 bytes on disk AFTER close
+                                                         run_command: exit 0, stdout "hello from the sandbox"
+                                                         record: OBSERVED, 2 calls, both MINTED_BY_HOST
+granted ["network","file-system"]                     -> minted ["write_file"]  run_command WITHHELD
+                                                         run_command calls = 0 · file STILL written
+                                                         the model's own limitation: "No shell or Node
+                                                         execution tool was available."
+granted ["file"] / ["file-syste"] / ["file-system-extra"] / ["FILE-SYSTEM"] / [" file-system"] -> minted []
+```
+
+⭐ **THE SECOND ROW IS THE ONE THAT MATTERS, AND IT PRODUCED ITS OWN CORROBORATION.** The precision control's
+sibling `…​.process-output/captures/` is EMPTY on disk while the full grant's holds three capture directories —
+so *"no `run_command` call was observed"* is confirmed by *"no process output exists"*, a fact none of this
+phase's instruments produced.
+
+⛔ **AND THE RULING `R11` LEFT OPEN IS ANSWERED BY REMOVING ITS SUBJECT.** A host may not mint a name the record
+plane cannot hold; `mintExecutionTools` validates the WHOLE catalog against `RecordPlaneNameSchema` and REFUSES
+before a session exists. The three candidates `R11` recorded all act at RECORD time, after a model has been told
+the tool exists and a call has been made; this acts at the one moment when the only party involved is the host.
+Full reasoning, and the two disclosed bounds (a surface minted once per held session; the demo authorizing its
+full request), in ROADMAP §5a.
+
+⚠ **AND IT OPENED A RETENTION SURFACE THE REPOSITORY'S OWN GATE CAUGHT** — `run_command` hands both streams to
+the model, so `REG-Q-066`'s stderr gate reddened and the disposition had to be written in the same commit. The
+class follows `REG-D-050` (participation is a property of USE); the bytes land on the CONTENT plane, which
+`PER-9` gives a removal path; and no byte reaches the RECORD plane, because `ObservedToolCall` has no field that
+could hold one. The residual — a build echoing its environment, removable only by an E-6 redaction nothing here
+performs — is stated rather than filtered, because filtering is a normaliser over arbitrary bytes.
 
 ### 4.4 The evidence join — a second floor run, over the evidence
 
