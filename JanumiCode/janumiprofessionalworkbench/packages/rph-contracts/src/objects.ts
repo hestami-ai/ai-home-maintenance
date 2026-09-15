@@ -368,6 +368,21 @@ export const ObligationAllocationSchema = z.strictObject({
 	allocatedTo: z.array(z.string())
 });
 export type ObligationAllocation = z.infer<typeof ObligationAllocationSchema>;
+export const ObservedToolCallSchema = z.strictObject({
+	ordinal: z.number().int(),
+	nameProvenance: z.enum(['MINTED_BY_HOST', 'NOT_MINTED']),
+	toolName: z.string().optional(),
+	outcome: z.enum(['COMPLETED', 'REFUSED', 'FAILED', 'UNKNOWN'])
+});
+export type ObservedToolCall = z.infer<typeof ObservedToolCallSchema>;
+export const ObservedToolCallReportSchema = z.strictObject({
+	observation: z.enum(['OBSERVED', 'NONE_OBSERVED', 'NOT_OBSERVABLE']),
+	calls: z.array(ObservedToolCallSchema).optional(),
+	observedCount: z.number().int().optional(),
+	recordedLimit: z.number().int().optional(),
+	reason: z.string().optional()
+});
+export type ObservedToolCallReport = z.infer<typeof ObservedToolCallReportSchema>;
 export const OmittedRegionSchema = z.strictObject({
 	role: z.enum([
 		'SYSTEM_PREAMBLE',
@@ -477,6 +492,21 @@ export const WorkBoundarySchema = z.strictObject({
 	prohibitedChanges: z.array(z.string())
 });
 export type WorkBoundary = z.infer<typeof WorkBoundarySchema>;
+export const WorkProductDerivationSchema = z.strictObject({
+	relation: z.enum([
+		'ENVELOPE_FIELD',
+		'WHOLE_ANSWER_SPAN',
+		'NO_WORK_PRODUCT_EXPECTED',
+		'EXPECTED_BUT_UNRETAINED'
+	]),
+	sourceField: z.string().optional(),
+	storageProvider: z.string().optional(),
+	storageKey: z.string().optional(),
+	contentHash: z.string().optional(),
+	byteSize: z.number().int().optional(),
+	reason: z.string().optional()
+});
+export type WorkProductDerivation = z.infer<typeof WorkProductDerivationSchema>;
 export const WorkRiskProfileSchema = z.strictObject({
 	consequence: RiskConsequenceSchema,
 	uncertainty: RiskUncertaintySchema,
@@ -991,7 +1021,9 @@ export const ModelExchangeSchema = z.strictObject({
 	parseOutcome: ExchangeParseOutcomeSchema,
 	promptTemplateFingerprint: z.string().optional(),
 	requestedAt: z.string(),
-	respondedAt: z.string()
+	respondedAt: z.string(),
+	workProductDerivation: WorkProductDerivationSchema,
+	observedToolCalls: ObservedToolCallReportSchema
 });
 export type ModelExchange = z.infer<typeof ModelExchangeSchema>;
 

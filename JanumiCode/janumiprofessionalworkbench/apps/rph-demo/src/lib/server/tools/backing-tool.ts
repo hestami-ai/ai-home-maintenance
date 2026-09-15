@@ -169,7 +169,57 @@ export interface ToolInvocationResult {
 	 * for"* the record. Absent for one-shot tools, whose turn text IS very nearly the composite.
 	 */
 	readonly materializedInput?: string;
+	/**
+	 * ⭐⭐ R11 — WHAT THIS ADAPTER OBSERVED THE MODEL DO WITH THE TOOLS IT WAS GIVEN.
+	 *
+	 * ⛔ §22.1 MAKES MODEL OUTPUT UNTRUSTED EXTERNAL INPUT, so *"the model said it ran the tests"* is not
+	 * evidence that tests ran. The only party that can answer is the one that drove the session, which is this
+	 * adapter — so the fact is reported HERE, beside `identityEvidence`, which exists for exactly the same
+	 * reason one field up: what a tool CAN report is a catalog claim; what it DID report is this.
+	 *
+	 * ⛔ REQUIRED, NOT OPTIONAL. An absent field cannot distinguish *"this adapter minted tools and the model
+	 * called none"* from *"this adapter cannot see tool calls at all"*, and those are different facts with
+	 * opposite consequences for a reader: the first is a measurement they may rely on, the second is silence
+	 * that means nothing. That is the distinction `ResolvedModelIdentity`'s docblock calls *"this repository's
+	 * single most-recorded defect"*, and the union below costs one discriminator to avoid it.
+	 */
+	readonly observedToolCalls: AdapterToolObservation;
 }
+
+/**
+ * One tool call, as the ADAPTER saw it — the raw observation, BEFORE the R11 retention ruling is applied.
+ *
+ * ⚠ THIS IS AN IN-PROCESS SHAPE AND IT DELIBERATELY CARRIES MORE THAN THE RECORD WILL. `name` here is whatever
+ * the model asked for, un-checked; `governedToolCallReport` is the ONE place that decides what may be written
+ * to a PERMANENT record and what may not. Keeping the decision in one function rather than in each adapter is
+ * what makes the ruling testable, mutable and guardable instead of a convention three adapters each re-derive.
+ */
+export interface AdapterToolCall {
+	/** As the model asked for it. ⛔ May be an arbitrary model-chosen string — see `governedToolCallReport`. */
+	readonly name: string;
+	/** What the ADAPTER observed happen to the call, never what the model said happened. */
+	readonly outcome: 'COMPLETED' | 'REFUSED' | 'FAILED' | 'UNKNOWN';
+}
+
+/**
+ * Whether this adapter can see tool calls at all, and what it saw.
+ *
+ * ⭑ A UNION FOR THE REASON `ProducerWorkingDirectory` IS ONE: a shape with an optional list would let a caller
+ * read `calls` off an adapter that cannot observe, and the value it would read — the empty list — is the one
+ * that reads as a clean bill of health while asserting nothing at all.
+ *
+ * ⭑ `mintedToolNames` RIDES ON THE OBSERVING ARM BECAUSE THE ADAPTER IS THE ONLY THING THAT KNOWS IT. The tool
+ * surface is minted by whoever opens the session; a caller asked to supply the minted set separately would be
+ * asked to re-derive a fact it does not hold, and the plausible wrong answer (an empty list) silently downgrades
+ * every observed name to NOT_MINTED.
+ */
+export type AdapterToolObservation =
+	| { readonly canObserve: false; readonly reason: string }
+	| {
+			readonly canObserve: true;
+			readonly mintedToolNames: readonly string[];
+			readonly calls: readonly AdapterToolCall[];
+	  };
 
 /** Narrow a seam return that may be either shape. ⭑ A bare string is a tool that told us only its answer, so its
  *  identity can only ever be HOST_CONFIGURED — the caller supplies what it configured. */

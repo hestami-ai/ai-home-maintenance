@@ -12,7 +12,7 @@
 // the authoring fork: a try that was made, cost money and produced a bad answer is exactly the try PER-9 wants
 // recorded, and discarding the turn must not erase it. That property is why the record is its own aggregate —
 // neither of the rejected designs could deliver it (`REG-D-055`).
-import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
+import { OmittedRegionSchema, type RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 
 import type {
 	ContentRef,
@@ -29,7 +29,14 @@ export interface ExchangeRunContext {
 	readonly invokerId: string;
 	readonly assurancePolicyId?: string;
 	readonly subjectObjectId: string;
-	readonly subjectObjectType: string;
+	/**
+	 * ⭐ THE CONTRACT'S OWN TYPE, NOT `string`. It was `string`, and the widening was invisible because the
+	 * mapper below ended in `as RecordModelExchangePayload` — so the one cast that made a `string` assignable
+	 * ALSO made a newly REQUIRED payload field assignable by absence. `R11` added two required fields and
+	 * `check-types` stayed green; that is what a trailing cast on a return value buys, and it is why this is
+	 * typed from the payload rather than beside it.
+	 */
+	readonly subjectObjectType: RecordModelExchangePayload['subjectObjectType'];
 	readonly subjectSemanticVersion: number;
 	/** Mints the `mex_…` aggregate id for each try. */
 	readonly newId: (prefix: string) => string;
@@ -57,23 +64,22 @@ const DISPOSITION = {
 } as const;
 
 /**
- * The closed role vocabulary an omitted region may claim.
+ * The closed role vocabulary an omitted region may claim — DERIVED FROM THE CONTRACT, never re-listed.
  *
  * ⚠ THE FALLBACK IS `OTHER` AND IT IS NOT A CONVENIENCE. The app-local shape types `role` as a free string,
  * the contract does not, and inventing a member to fit an unrecognised value would put an untyped
  * discriminator inside a record whose whole warrant is typed relationships. `OTHER` says "a region was
  * omitted and its role is not one we name", which is true; a guessed member would not be.
+ *
+ * ⭐ IT WAS A HAND-WRITTEN LIST OF EIGHT STRINGS, AND THAT WAS A LATENT DRIFT. A ninth member added to the
+ * vocabulary would have been emitted by the generator, accepted by the contract, produced by a future splitter
+ * — and silently downgraded to `OTHER` right here, because this copy of the list would not have grown with it.
+ * Reading the members off `OmittedRegionSchema` makes the two the same list. ⛔ `find` rather than `has`,
+ * deliberately: it NARROWS, so the mapping needs no cast, and the cast is what hid `R11`'s required fields.
  */
-const REGION_ROLES = new Set([
-	'SYSTEM_PREAMBLE',
-	'SUBJECT_GRAPH',
-	'PRIOR_FINDINGS',
-	'CRITERIA',
-	'NARRATION',
-	'RATIONALE',
-	'MODEL_ANSWER',
-	'OTHER'
-]);
+function regionRole(role: string): RecordModelExchangePayload['omittedRegions'][number]['role'] {
+	return OmittedRegionSchema.shape.role.options.find((known) => known === role) ?? 'OTHER';
+}
 
 
 function contentRef(ref: ContentRef) {
@@ -208,7 +214,7 @@ export function toRecordModelExchange(
 		// producer would have silently recorded "0 bytes omitted" (`REG-F-345`). Both numbers are now real,
 		// measured in UTF-8 bytes at the split, and passed through rather than invented.
 		omittedRegions: rec.omittedRegions.map((r) => ({
-			role: REGION_ROLES.has(r.role) ? r.role : 'OTHER',
+			role: regionRole(r.role),
 			reason: r.reason,
 			byteSize: r.byteSize,
 			byteOffset: r.byteOffset
@@ -219,8 +225,21 @@ export function toRecordModelExchange(
 			? { promptTemplateFingerprint: rec.promptTemplateFingerprint }
 			: {}),
 		requestedAt: rec.requestedAt,
-		respondedAt: rec.respondedAt
-	} as RecordModelExchangePayload;
+		respondedAt: rec.respondedAt,
+		// ⭐ R11 — BOTH PASS THROUGH AS THE CAPTURE SET THEM. This mapper translates the app-local vocabulary
+		// into the contract's; these two ARE the contract's shape already, so translating them would be
+		// inventing a round trip for a value that never left.
+		workProductDerivation: rec.workProductDerivation,
+		observedToolCalls: rec.observedToolCalls
+	};
+	// ⛔⛔ THE TRAILING `as RecordModelExchangePayload` IS GONE, AND ITS REMOVAL IS HALF OF WHAT `R11` BOUGHT.
+	//
+	// The cast sat on the returned literal to paper over two genuine widenings — `subjectObjectType: string`
+	// and `omittedRegions[].role: string`, both now fixed at their source above. ⚠ WHAT IT ALSO DID, silently,
+	// was make a MISSING REQUIRED FIELD assignable: `R11` added two required fields to the payload and
+	// `bun run check-types` passed across all 21 projects with this function emitting neither. The ledger's own
+	// header names that mutation trap — *"adding a field to an exported type breaks callers"* — and a cast on
+	// the return value is precisely what disarms it. The compiler is the guard here; a cast is a waiver of it.
 }
 
 /** Mint one aggregate id per try, before mapping, so predecessor links resolve within the drain. */

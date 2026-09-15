@@ -83,6 +83,7 @@ import {
 	ModelSelectionPolicySchema,
 	NoOutputResultSchema,
 	ObligationAllocationSchema,
+	ObservedToolCallReportSchema,
 	OmittedRegionSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
@@ -98,6 +99,7 @@ import {
 	ValidatorResultSchema,
 	WaiverRuleSchema,
 	WorkBoundarySchema,
+	WorkProductDerivationSchema,
 	WorkRiskProfileSchema
 } from './objects.js';
 
@@ -905,7 +907,9 @@ export const RecordModelExchangePayloadSchema = z.strictObject({
 	parseOutcome: ExchangeParseOutcomeSchema,
 	promptTemplateFingerprint: z.string().optional(),
 	requestedAt: z.string(),
-	respondedAt: z.string()
+	respondedAt: z.string(),
+	workProductDerivation: WorkProductDerivationSchema,
+	observedToolCalls: ObservedToolCallReportSchema
 });
 export type RecordModelExchangePayload = z.infer<typeof RecordModelExchangePayloadSchema>;
 export const CreateContextAssemblyPolicyPayloadSchema = z.strictObject({
@@ -2063,7 +2067,9 @@ export const ModelExchangeRecordedPayloadSchema = z.strictObject({
 	parseOutcome: ExchangeParseOutcomeSchema,
 	promptTemplateFingerprint: z.string().optional(),
 	requestedAt: z.string(),
-	respondedAt: z.string()
+	respondedAt: z.string(),
+	workProductDerivation: WorkProductDerivationSchema,
+	observedToolCalls: ObservedToolCallReportSchema
 });
 export type ModelExchangeRecordedPayload = z.infer<typeof ModelExchangeRecordedPayloadSchema>;
 export const ContextAssemblyPolicyCreatedPayloadSchema = z.strictObject({

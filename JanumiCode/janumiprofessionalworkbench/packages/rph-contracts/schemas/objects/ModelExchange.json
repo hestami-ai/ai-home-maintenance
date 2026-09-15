@@ -768,6 +768,112 @@
     },
     "respondedAt": {
       "type": "string"
+    },
+    "workProductDerivation": {
+      "type": "object",
+      "properties": {
+        "relation": {
+          "type": "string",
+          "enum": [
+            "ENVELOPE_FIELD",
+            "WHOLE_ANSWER_SPAN",
+            "NO_WORK_PRODUCT_EXPECTED",
+            "EXPECTED_BUT_UNRETAINED"
+          ]
+        },
+        "sourceField": {
+          "type": "string"
+        },
+        "storageProvider": {
+          "type": "string"
+        },
+        "storageKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "byteSize": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "relation"
+      ],
+      "additionalProperties": false
+    },
+    "observedToolCalls": {
+      "type": "object",
+      "properties": {
+        "observation": {
+          "type": "string",
+          "enum": [
+            "OBSERVED",
+            "NONE_OBSERVED",
+            "NOT_OBSERVABLE"
+          ]
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ordinal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "nameProvenance": {
+                "type": "string",
+                "enum": [
+                  "MINTED_BY_HOST",
+                  "NOT_MINTED"
+                ]
+              },
+              "toolName": {
+                "type": "string"
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "COMPLETED",
+                  "REFUSED",
+                  "FAILED",
+                  "UNKNOWN"
+                ]
+              }
+            },
+            "required": [
+              "ordinal",
+              "nameProvenance",
+              "outcome"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "observedCount": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "recordedLimit": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -807,7 +913,9 @@
     "disposition",
     "parseOutcome",
     "requestedAt",
-    "respondedAt"
+    "respondedAt",
+    "workProductDerivation",
+    "observedToolCalls"
   ],
   "additionalProperties": false,
   "$id": "urn:janumi:rph:schema:object:ModelExchange:1"

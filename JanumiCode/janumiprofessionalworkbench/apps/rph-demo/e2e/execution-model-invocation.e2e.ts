@@ -154,21 +154,37 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		//    `contentHash` is what lets a reader re-hash the retained bytes and refuse a record that lied.
 		//    THE MUTANT: declare the ANSWER SPAN's own address instead. Every other assertion still passes and
 		//    the record points a reader at the envelope while every assessment was recorded over the artifact.
-		const tag = parse.detail!.indexOf('WORK_PRODUCT_DERIVATION');
-		expect(tag, 'the exchange record declares no relation to the artifact at all').toBeGreaterThan(
-			-1
-		);
-		const declared = JSON.parse(parse.detail!.slice(parse.detail!.indexOf('{', tag))) as Record<
-			string,
-			unknown
-		>;
-		expect(declared.derivedFrom).toBe('answerSpanRef');
+		//
+		// ⭐⭐ R11 (sponsor, 2026-09-15) — THIS READS A TYPED FIELD NOW, AND IT USED TO READ A SENTENCE. What
+		// stood here found the literal `WORK_PRODUCT_DERIVATION` inside `parseOutcome.detail`, sliced from the
+		// next `{`, and `JSON.parse`d the tail of a prose string. It worked; its existence was the finding. The
+		// ruling made the relation a typed `MODEL_EXCHANGE` field, so the durable record a reader queries now
+		// HAS a field to query. ⚠ Nothing is weakened: the same address is asserted, plus the discriminator that
+		// says WHICH of four relations this is — a distinction the prose could not carry at all.
+		const declared = mex.workProductDerivation as Record<string, unknown>;
+		expect(declared, 'the exchange record declares no relation to the artifact at all').toBeTruthy();
+		expect(
+			declared.relation,
+			'the envelope was honoured here, so the work product came out of a NAMED FIELD of the answer span'
+		).toBe('ENVELOPE_FIELD');
+		expect(declared.sourceField).toBe('workProduct');
 		expect(declared.storageKey, 'the declared relation does not reach the ARTIFACT').toBe(
 			art.storageKey
 		);
 		expect(declared.contentHash, 'the declaration names bytes other than the artifact’s').toBe(
 			art.contentHash
 		);
+		// ⭐⭐ R11 (b) — AND THE RECORD SAYS WHAT WAS OBSERVED, WHICH IS NOTHING, RATHER THAN STAYING SILENT.
+		//    §22.1 makes model output UNTRUSTED EXTERNAL INPUT. No adapter at HEAD mints a tool surface, so the
+		//    honest value is NOT_OBSERVABLE with a stated reason — NOT `NONE_OBSERVED`, which would claim an
+		//    instrument looked and found nothing, and which a reader is entitled to rely on.
+		//    THE MUTANT: report NONE_OBSERVED from the adapter. The run stays green everywhere else and the
+		//    governed record silently acquires a measurement nobody made.
+		const observed = mex.observedToolCalls as Record<string, unknown>;
+		expect(observed, 'the record says nothing about what the step was observed to do').toBeTruthy();
+		expect(observed.observation).toBe('NOT_OBSERVABLE');
+		expect(observed.reason, 'a disclosed absence must say why, or it is the silent one PER-9 forbids').toBeTruthy();
+		expect(observed.calls, 'an adapter that cannot see must not describe what it did not see').toBeUndefined();
 		// 3. AND THE SPAN GENUINELY CARRIED IT. The envelope wraps the work product plus the rationale, so it is
 		//    strictly the larger object. THE MUTANT: store the work product as the answer span after all — the
 		//    declaration would still resolve, and the §9.7 split would again have nothing to separate.

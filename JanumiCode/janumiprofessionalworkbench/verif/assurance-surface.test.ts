@@ -136,6 +136,13 @@ const REQUIRED_ROOT_COMMANDS = [
 	// and requiring it would invite someone to satisfy the gate by rewriting the baseline.
 	'coverage:floor:check',
 	'gate',
+	// JAN-EXEC R11 (2026-09-15): 9 -> 10. The generated-artifact freshness gate. It is named here for exactly
+	// the reason this list exists — a root command that VANISHES makes `gate:fast` run a shorter gate with no
+	// other symptom — and it is the command whose absence is hardest to notice, because a stale generated
+	// contract compiles, passes every type check and passes every test written against itself.
+	// ⚠ Its WRITER (`gen`) is deliberately NOT listed, on the same reasoning recorded for `coverage:floor`
+	// three lines up: requiring the regenerator would invite satisfying the gate by regenerating.
+	'gen:check',
 	'guards:export:check',
 	'gate:fast',
 	'lint',
@@ -184,7 +191,7 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
 		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
-		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(9);
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(10);
 	});
 
 	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
@@ -206,6 +213,18 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 			// over source and the ledger — it needs no build, no tests and no coverage — so a lost guard fails
 			// the gate in seconds rather than after the twelve minutes the rest of the run costs.
 			'bun run guards:export:check',
+			// ⭐⭐ JAN-EXEC R11 (2026-09-15): 13 STEPS -> 14, AND THE PIN IS UPDATED WITH ITS REASON RATHER THAN
+			// WORKED AROUND. `REG-005` carries *"no `gen` freshness gate exists"* as an open finding; R11 is a
+			// VOCAB change that regenerates three committed TypeScript contracts plus 119 JSON Schemas, which is
+			// exactly the drift that finding names, so the check arrives WITH the act rather than after it.
+			//
+			// ⛔ IT SITS THIRD, AND THE POSITION IS AN ARGUMENT. Like the two static censuses above it, it needs
+			// no build, no tests and no coverage — it copies three packages, runs six generators and compares
+			// bytes, in seconds. ⚠ AND IT MUST PRECEDE `check-types`, `build` AND `test`: every one of those
+			// measures the GENERATED source, so a stale contract does not make them fail — it makes them pass,
+			// against the wrong artifact. A freshness check placed after them would be reporting on a run that
+			// had already drawn its conclusions from the file it was about to condemn.
+			'bun run gen:check',
 			'bun run tracker:build',
 			'bun run check-types',
 			'bun run lint',

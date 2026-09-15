@@ -62,7 +62,18 @@ const PAYLOAD = {
 	disposition: 'ACCEPTED',
 	parseOutcome: { outcome: 'PARSED', detail: 'Coerced against the judgement schema without repair.' },
 	requestedAt: TS,
-	respondedAt: '2026-09-03T10:00:04Z'
+	respondedAt: '2026-09-03T10:00:04Z',
+	// ⭐ R11 — the two fields this record now owes; an ASSURANCE try owes no work product and agy observes
+	// nothing. ⚠ MXR-04 asserts that catalogueing this record leaks NO MODEL BYTES, and these two fields are
+	// precisely where model-derived content could newly appear — see the R11 limb added to that suite.
+	workProductDerivation: {
+		relation: 'NO_WORK_PRODUCT_EXPECTED',
+		reason: 'A Reasoning Review try: its answer is a judgement about someone else’s work.'
+	},
+	observedToolCalls: {
+		observation: 'NOT_OBSERVABLE',
+		reason: 'agy --print returns an answer string and reports nothing about tool calls.'
+	}
 };
 
 function dispatchInto(store: SqliteStorageAdapter) {

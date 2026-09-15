@@ -3924,6 +3924,18 @@
 					"required": true,
 					"type": "string",
 					"note": "PER-11 occurrence time."
+				},
+				{
+					"field": "workProductDerivation",
+					"required": true,
+					"type": "WorkProductDerivation",
+					"note": "R11 (sponsor, 2026-09-15) — the artifact→answer-span DERIVATION link as a TYPED field, replacing the WORK_PRODUCT_DERIVATION fragment that lived inside parseOutcome.detail's free text. REQUIRED, not optional: an optional field is omissible, and an omission is indistinguishable from every one of the three facts `relation` exists to separate (REG-F-364's dodge shape). Byte-identical to the object field of the same name by design."
+				},
+				{
+					"field": "observedToolCalls",
+					"required": true,
+					"type": "ObservedToolCallReport",
+					"note": "R11 (sponsor, 2026-09-15) — the OBSERVED tool-call record. Section 22.1 makes model output UNTRUSTED EXTERNAL INPUT, so \"the model said it ran the tests\" is not evidence that tests ran; this field carries what the ADAPTER observed. REQUIRED for the same reason redactionState is: a record unable to say whether tool calls were observed performs record-plane omission about the observation itself, which PER-9 forbids by name. Byte-identical to the object field of the same name by design."
 				}
 			]
 		},
@@ -8856,6 +8868,18 @@
 					"required": true,
 					"type": "string",
 					"note": "PER-11 occurrence time."
+				},
+				{
+					"field": "workProductDerivation",
+					"required": true,
+					"type": "WorkProductDerivation",
+					"note": "R11 (sponsor, 2026-09-15) — the artifact→answer-span DERIVATION link as a TYPED field, replacing the WORK_PRODUCT_DERIVATION fragment that lived inside parseOutcome.detail's free text. REQUIRED, not optional: an optional field is omissible, and an omission is indistinguishable from every one of the three facts `relation` exists to separate (REG-F-364's dodge shape). Byte-identical to the object field of the same name by design."
+				},
+				{
+					"field": "observedToolCalls",
+					"required": true,
+					"type": "ObservedToolCallReport",
+					"note": "R11 (sponsor, 2026-09-15) — the OBSERVED tool-call record. Section 22.1 makes model output UNTRUSTED EXTERNAL INPUT, so \"the model said it ran the tests\" is not evidence that tests ran; this field carries what the ADAPTER observed. REQUIRED for the same reason redactionState is: a record unable to say whether tool calls were observed performs record-plane omission about the observation itself, which PER-9 forbids by name. Byte-identical to the object field of the same name by design."
 				}
 			]
 		},

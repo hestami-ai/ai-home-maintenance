@@ -30,9 +30,11 @@ import { captureTry, type ExchangeSink } from './exchange-capture.js';
 import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
 import {
 	isToolInvocationResult,
+	type AdapterToolObservation,
 	type ToolIdentityEvidence,
 	type ToolInvocationResult
 } from '../tools/backing-tool.js';
+import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -283,6 +285,16 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// ⭑ `undefined` UNTIL A TOOL REPORTS ONE, and `identityFacts` then defaults to `HOST_CONFIGURED`.
 			// Seeding it with a grade here would assert confirmation before any tool had spoken.
 			let identityEvidence: ToolIdentityEvidence | undefined;
+			// ⭐ R11 — WHAT THE BACKING TOOL COULD SEE, tracked exactly as `identityEvidence` is and for the same
+			// reason: it is the TOOL's fact, it is only known once the tool has answered, and the honest value
+			// before then is the one that claims nothing. ⛔ The bare-string seam reports no observation at all,
+			// so its arm states THAT rather than an empty call list, which would read as a measurement.
+			let toolObservation: AdapterToolObservation = {
+				canObserve: false,
+				reason:
+					'The backing tool returned only an answer string, so it reported nothing about tool calls. This ' +
+					'record therefore says nothing about whether any ran — it is not evidence that none did.'
+			};
 			const prompt = judgePrompt(input, subject.objectType === 'ARTIFACT');
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
@@ -322,7 +334,20 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					attemptOrdinal: tryCounter,
 					requestedAt: times.requestedAt,
 					respondedAt: times.respondedAt,
-					parseOutcome
+					parseOutcome,
+					// ⭐ R11 — A REVIEWER'S CALL OWES NO WORK PRODUCT, AND SAYS SO RATHER THAN LEAVING IT BLANK.
+					// ⛔ This is the arm Q1 of the ruling is about: an absence here is a DIFFERENT FACT from an
+					// execution step whose work product went unretained, and a reader must be able to tell them
+					// apart. `NO_WORK_PRODUCT_EXPECTED` is a positive statement about what kind of try this was.
+					workProductDerivation: {
+						relation: 'NO_WORK_PRODUCT_EXPECTED',
+						reason:
+							'This try is a Reasoning Review — an ASSURANCE act whose answer is a judgement about ' +
+							'somebody else’s work, not a deliverable. Nothing was derived from the answer span and ' +
+							'nothing is missing; the assessment this call produced is recorded as an ' +
+							'ASSURANCE_ASSESSMENT, not as an ARTIFACT.'
+					},
+					observedToolCalls: governedToolCallReport(toolObservation)
 				});
 			};
 
@@ -334,6 +359,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					const returned = await print(p);
 					if (isToolInvocationResult(returned)) {
 						text = returned.answerText;
+						// ⚠ TAKEN OUTSIDE THE IDENTITY GUARD BELOW, DELIBERATELY. What a tool observed and whether
+						// it named a usable model are INDEPENDENT facts; nesting this inside the identity check
+						// would silently discard a real observation because an unrelated field was empty.
+						toolObservation = returned.observedToolCalls;
 						// ⭑⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, exactly as it does on the
 						// execution side (`run-model-step`). ⚠ ONLY WHEN NON-EMPTY: `checkIndependence` requires
 						// both sides defined and different, so an empty id overwriting a configured one would

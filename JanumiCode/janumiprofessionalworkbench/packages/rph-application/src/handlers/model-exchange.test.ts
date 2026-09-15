@@ -17,6 +17,10 @@ const TS = '2026-09-03T10:00:00Z';
 const LATER = '2026-09-03T10:00:04Z';
 const MEX = 'mex_01ARZ3NDEKTSV4RRFFQ69G0301';
 const PRIOR = 'mex_01ARZ3NDEKTSV4RRFFQ69G0300';
+// ⭐ R11 — a SECOND aggregate id, so the two ACCEPTED controls below do not collide with the ACCEPTED
+// record the first test in this file writes. A DUPLICATE status is not ACCEPTED, and a control that reported
+// DUPLICATE would fail for a reason that has nothing to do with what it claims to prove.
+const MEX2 = 'mex_01ARZ3NDEKTSV4RRFFQ69G0302';
 const SUBJECT = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5A80';
 
 /** The one region a separated exchange owes — REG-D-057. Sizes are the real ones from REG-F-345's drive. */
@@ -86,6 +90,17 @@ describe('RecordModelExchange — one bounded model try becomes a durable record
 		parseOutcome: { outcome: 'PARSED', detail: 'Coerced against the judgement schema without repair.' },
 		requestedAt: TS,
 		respondedAt: LATER,
+		// ⭐ R11 — the two fields this record now owes. ⚠ THE WELL-FORMED FIXTURE IS AN ASSURANCE TRY, so the
+		// honest derivation is `NO_WORK_PRODUCT_EXPECTED`: a reviewer's answer is a judgement, not a deliverable.
+		// Anything else here would make every unrelated test in this file assert against a fabricated execution.
+		workProductDerivation: {
+			relation: 'NO_WORK_PRODUCT_EXPECTED',
+			reason: 'A Reasoning Review try: its answer is a judgement about someone else’s work.'
+		},
+		observedToolCalls: {
+			observation: 'NOT_OBSERVABLE',
+			reason: 'agy --print returns an answer string and reports nothing about tool calls.'
+		},
 		...over
 	});
 
@@ -275,6 +290,293 @@ describe('RecordModelExchange — one bounded model try becomes a durable record
 		expect(
 			record(wellFormed({ plane: 'AUTHORING', invokerId: 'authoring-agent' })).status,
 			'assurancePolicyId is meaningful only on the assurance plane'
+		).not.toBe('ACCEPTED');
+	});
+
+	// ── ⭐⭐ R11 (a) — THE WORK-PRODUCT DERIVATION, AT THE BOUNDARY ─────────────────────────────────────────
+	//
+	// ⭐ THE POINT OF MAKING IT A TYPED FIELD IS THAT IT CAN BE REFUSED. Until `R11` the relation lived in
+	// `parseOutcome.detail`'s free text, where a declaration could be absent, malformed, duplicated or
+	// contradicted by the sentence around it and nothing would notice — a typed record's central relationship
+	// hidden in a string, which is `PER-9`'s own *"hide core relationships in one generic JSON document"* with a
+	// smaller container. These are the refusals the move bought.
+	const ADDRESS = {
+		storageProvider: 'jpwb:sqlite',
+		storageKey: 'tnt-local/RETAINED_BY_PARTICIPATION/aa11',
+		contentHash: 'sha256:aa11',
+		byteSize: 64
+	};
+
+	it('⭑ CONTROL — a RETAINING derivation with its whole address is ACCEPTED', () => {
+		// ⭐ THE CONTROL NEEDS ITS OWN MUTANT. Without it, "the handler refuses a bad derivation" is satisfied by
+		// a handler that refuses EVERY derivation — `MU-FRESH-18-B`'s recorded shape. THE MUTANT: make the
+		// `retains` branch refuse unconditionally; this reddens and every refusal below stays green.
+		expect(
+			record(
+				wellFormed({
+					exchangeId: MEX2,
+					plane: 'EXECUTION',
+					invokerId: 'execution.model-invocation:pwut-1',
+					assurancePolicyId: undefined,
+					workProductDerivation: { relation: 'ENVELOPE_FIELD', sourceField: 'workProduct', ...ADDRESS }
+				})
+			).status,
+			'an execution step that retained its work product and named the whole address is exactly what R11 admits'
+		).toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a RETAINING derivation that omits part of the address', () => {
+		// A reference that cannot be verified is a reference that cannot be challenged. THE MUTANT: compare
+		// `declared.length > 0` instead of `!== DERIVATION_ADDRESS.length` — a key alone would then satisfy it,
+		// and a reader could no longer re-hash the bytes and refuse a record that lied about them.
+		expect(
+			record(
+				wellFormed({
+					workProductDerivation: {
+						relation: 'WHOLE_ANSWER_SPAN',
+						storageKey: ADDRESS.storageKey,
+						storageProvider: ADDRESS.storageProvider
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES an ABSENT derivation that says nothing about why, and one that describes bytes it disclaims', () => {
+		// The two directions of the same rule. `PER-9` permits a DISCLOSED absence and forbids a silent one.
+		expect(
+			record(wellFormed({ workProductDerivation: { relation: 'NO_WORK_PRODUCT_EXPECTED' } })).status,
+			'an absence with no reason is the silent omission PER-9 calls illegal'
+		).not.toBe('ACCEPTED');
+		expect(
+			record(
+				wellFormed({
+					workProductDerivation: {
+						relation: 'EXPECTED_BUT_UNRETAINED',
+						reason: 'the call failed',
+						storageKey: ADDRESS.storageKey
+					}
+				})
+			).status,
+			'a derivation cannot both disclaim a retained work product and address one'
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES an ENVELOPE_FIELD that names no field, and any other arm that names one', () => {
+		// ⭐ `sourceField` IS NARROWER THAN THE ADDRESS, AND CONFLATING THEM WAS THE OLD FRAGMENT'S DEFECT: it
+		// wrote `field: 'workProduct'` on BOTH retaining paths, including the one where no envelope was honoured
+		// and there IS no field. The typed form makes the false half unrepresentable.
+		expect(
+			record(wellFormed({ workProductDerivation: { relation: 'ENVELOPE_FIELD', ...ADDRESS } })).status,
+			'a derivation giving an address but not what was taken out cannot be re-performed'
+		).not.toBe('ACCEPTED');
+		expect(
+			record(
+				wellFormed({
+					workProductDerivation: { relation: 'WHOLE_ANSWER_SPAN', sourceField: 'workProduct', ...ADDRESS }
+				})
+			).status,
+			'the envelope was not honoured, so naming a field asserts a structure the answer did not have'
+		).not.toBe('ACCEPTED');
+	});
+
+	// ── ⭐⭐ R11 (b) — THE OBSERVED TOOL-CALL RECORD, AT THE BOUNDARY ───────────────────────────────────────
+	//
+	// ⛔ §22.1 MAKES MODEL OUTPUT UNTRUSTED EXTERNAL INPUT. The producer applies the retention ruling
+	// (`governedToolCallReport`); this is the boundary refusing a payload that did not — because a rule enforced
+	// only at its producer is a rule one new producer away from silence.
+	const OBSERVED_CALL = {
+		ordinal: 1,
+		nameProvenance: 'MINTED_BY_HOST',
+		toolName: 'run_command',
+		outcome: 'COMPLETED'
+	};
+
+	it('⭑ CONTROL — a well-formed OBSERVED report is ACCEPTED', () => {
+		// Its own mutant: refuse the OBSERVED arm outright. Every refusal below stays green and this reddens.
+		expect(
+			record(
+				wellFormed({
+					exchangeId: MEX2,
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [OBSERVED_CALL],
+						observedCount: 1,
+						recordedLimit: 32
+					}
+				})
+			).status
+		).toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES an OBSERVED report that names no calls — that is NONE_OBSERVED wearing the wrong member', () => {
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: { observation: 'OBSERVED', calls: [], observedCount: 0, recordedLimit: 32 }
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a NOT_MINTED call that carries a toolName — the R11 retention ruling, at the boundary', () => {
+		// ⭐⭐ THE PERMANENT-RECORD LIMB. `R10` confirmed a MODEL_EXCHANGE is PER-8 participating material, so
+		// nothing ever deletes it, and `PER-9` makes record-plane omission illegal, so nothing can redact it
+		// either. An unminted tool name is an arbitrary MODEL-CHOSEN string — the class this programme twice
+		// found carrying a host absolute path and an operating username into a governed refusal.
+		//
+		// THE MUTANT: delete this conjunct in the handler. `governedToolCallReport` still drops the name, so the
+		// whole app-side suite stays green — and a SECOND producer, or a direct dispatch, writes the string
+		// straight through. That is precisely why the rule lives at the boundary as well as at the producer.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [
+							{
+								ordinal: 1,
+								nameProvenance: 'NOT_MINTED',
+								toolName: 'C:\\Users\\someone\\.aws\\credentials',
+								outcome: 'REFUSED'
+							}
+						],
+						observedCount: 1,
+						recordedLimit: 32
+					}
+				})
+			).status,
+			'an unminted name is the model’s word, and this record is permanent and unredactable'
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a truncated OBSERVED report that hides its own truncation', () => {
+		// `REG-F-345`'s shape: without a declared bound and a declared total, a truncated record reads exactly
+		// like a complete one. Both directions are refused.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: { observation: 'OBSERVED', calls: [OBSERVED_CALL] }
+				})
+			).status,
+			'an OBSERVED report must declare the bound it applied and the total it saw'
+		).not.toBe('ACCEPTED');
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [OBSERVED_CALL],
+						observedCount: 0,
+						recordedLimit: 32
+					}
+				})
+			).status,
+			'the total can only equal or exceed what was kept'
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a RETAINING derivation that carries a reason — a reason explains an ABSENCE', () => {
+		// The mirror of the rule two tests up, and it matters because a reason beside a present address is how a
+		// record acquires a narrative that contradicts its own data. Both directions are refused so the
+		// discriminator means exactly one thing.
+		expect(
+			record(
+				wellFormed({
+					workProductDerivation: {
+						relation: 'WHOLE_ANSWER_SPAN',
+						reason: 'the call failed',
+						...ADDRESS
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES an OBSERVED report that also carries a reason', () => {
+		// Same rule, one field over: `reason` explains why there is nothing to report, and this arm reports
+		// something. A record that both names calls and explains their absence says two incompatible things.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [OBSERVED_CALL],
+						observedCount: 1,
+						recordedLimit: 32,
+						reason: 'none observed'
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES an OBSERVED report whose declared bound is not the one applied', () => {
+		// ⭐ THE DECLARED BOUND MUST DESCRIBE THIS RECORD. A list longer than the limit it claims to have applied
+		// is a record describing a different run — and `recordedLimit` is the only thing that tells a reader a
+		// truncation happened at all, so a false one is worse than none.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [OBSERVED_CALL, { ...OBSERVED_CALL, ordinal: 2 }],
+						observedCount: 2,
+						recordedLimit: 1
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES calls whose ordinals are not 1-based observation order', () => {
+		// Without ordinals a BOUNDED list cannot say which calls it kept: a reader cannot tell a truncated head
+		// from a sampled middle, and the two are different accounts of what the model did.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [{ ...OBSERVED_CALL, ordinal: 4 }],
+						observedCount: 1,
+						recordedLimit: 32
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a MINTED_BY_HOST call that names no tool — the provenance is the warrant for the name', () => {
+		// ⭐ THE COMPLEMENT OF THE RETENTION RULING. `MINTED_BY_HOST` is the ONLY reason a name may be recorded
+		// at all; a call claiming that provenance and then naming nothing has spent the warrant and produced
+		// nothing with it, which makes the provenance field unfalsifiable.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: {
+						observation: 'OBSERVED',
+						calls: [{ ordinal: 1, nameProvenance: 'MINTED_BY_HOST', outcome: 'COMPLETED' }],
+						observedCount: 1,
+						recordedLimit: 32
+					}
+				})
+			).status
+		).not.toBe('ACCEPTED');
+	});
+
+	it('⛔ REFUSES a NOT_OBSERVABLE report that describes calls, and one that says nothing about why', () => {
+		// The pair that keeps NONE_OBSERVED and NOT_OBSERVABLE from collapsing into each other.
+		expect(
+			record(
+				wellFormed({
+					observedToolCalls: { observation: 'NOT_OBSERVABLE', reason: 'no surface', calls: [OBSERVED_CALL] }
+				})
+			).status,
+			'a report cannot both say it has nothing to name and then describe it'
+		).not.toBe('ACCEPTED');
+		expect(
+			record(wellFormed({ observedToolCalls: { observation: 'NONE_OBSERVED' } })).status,
+			'NONE_OBSERVED is a measurement and must say what surface went unused'
 		).not.toBe('ACCEPTED');
 	});
 });

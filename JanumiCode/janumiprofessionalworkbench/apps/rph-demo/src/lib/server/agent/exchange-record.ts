@@ -23,6 +23,12 @@
 // forbids ("record-plane omission is not") is what this module exists to avoid.
 
 import type { ContentDurability, Purgeability } from '@janumipwb/rph-ports';
+// ⭐ R11 — THE TWO NEW FIELDS CARRY THE CONTRACT TYPES DIRECTLY, WHICH IS A DEPARTURE WORTH STATING.
+// Every other field here has an app-local twin (`'initial'` beside `'INITIAL'`, `'none-declared'` beside
+// `NONE_DECLARED`) because this vocabulary PREDATED the contract and `exchange-recorder.ts` maps between them.
+// These two are BORN WITH the contract, so minting a second lower-case vocabulary for them — and a third
+// mapping table to keep in step — would be manufacturing exactly the drift those tables exist to absorb.
+import type { ObservedToolCallReport, WorkProductDerivation } from '@janumipwb/rph-contracts';
 
 /** PER-9-a's unit. Taken VERBATIM from `ModelExchangeRecord` — a narrower set would silently re-merge cases
  *  the corpus separates, which is the defect at `reasoning-review-validator.ts:180`. */
@@ -159,6 +165,25 @@ export interface ExchangeRecord {
 	readonly respondedAt: string;
 	/** E-5. PER-9 names "the parse/validation/repair outcome"; a bare disposition loses WHY it went that way. */
 	readonly parseOutcome: ExchangeParseOutcome;
+	/**
+	 * ⭐ R11 — WHICH BYTES THE ASSESSMENT RESTS ON, as a TYPED relation rather than a fragment in E-5's prose.
+	 *
+	 * ⛔ IT IS REQUIRED, AND THE REQUIREMENT IS THE GUARANTEE. JAN-EXEC Phase 0 split the ARTIFACT from the
+	 * ANSWER SPAN, so `art.storageKey === answerSpanRef.storageKey` stopped holding by arithmetic and the
+	 * relation had to be declared. An OPTIONAL field would make the declaration omissible, and an omission is
+	 * indistinguishable from all four facts `relation` exists to separate — which is the `REG-F-364` dodge
+	 * shape, *"skip the check by leaving it out"*, applied to the one relation this record exists to carry.
+	 */
+	readonly workProductDerivation: WorkProductDerivation;
+	/**
+	 * ⭐ R11 — WHAT THE ADAPTER OBSERVED THE MODEL DO, never what the model said it did.
+	 *
+	 * ⛔ §22.1 makes model output UNTRUSTED EXTERNAL INPUT, so *"the model said it ran the tests"* is not
+	 * evidence that tests ran. Required for the same reason `truncationState` and `redactionState` are: a
+	 * record unable to say whether tool calls were observed performs record-plane omission about its own
+	 * instrument, and `PER-9` forbids that by name.
+	 */
+	readonly observedToolCalls: ObservedToolCallReport;
 }
 
 /** E-5's detail — what became of the bytes between the model and the judgement. */
@@ -197,6 +222,19 @@ export interface BeginExchangeInput {
 	/** PER-11 occurrence times, bracketing the model call. Only the caller can know these. */
 	readonly requestedAt: string;
 	readonly respondedAt: string;
+	/**
+	 * ⭐ R11 — REQUIRED HERE TOO, AND THAT IS THE SAME DECISION APPLIED ONE LAYER DOWN.
+	 *
+	 * ⛔ THERE IS NO DEFAULT BECAUSE EVERY CANDIDATE DEFAULT FABRICATES. `beginExchange` cannot know whether
+	 * this try is an execution step that owes a work product or a reviewer's call that owes none — that is the
+	 * caller's fact, and the four members of `relation` are exactly the four answers. Picking one here would
+	 * assert a fact nobody established, which is the defect `truncationState: 'unknown'` and
+	 * `parseOutcome: NOT_ATTEMPTED` were introduced to avoid two fields over.
+	 */
+	readonly workProductDerivation: WorkProductDerivation;
+	/** ⭐ R11. Required for the same reason, and with the same refusal to default: whether an adapter CAN see
+	 *  tool calls is a fact about the adapter, and only the caller that drove it knows. */
+	readonly observedToolCalls: ObservedToolCallReport;
 }
 
 const PENDING_CONTENT: ContentRef = {
@@ -261,7 +299,10 @@ export function beginExchange(input: BeginExchangeInput): ExchangeRecord {
 		respondedAt: input.respondedAt,
 		// NOT_ATTEMPTED until the caller says otherwise — the same reasoning as `truncationState: 'unknown'`.
 		// A default of PARSED would assert an outcome nobody observed.
-		parseOutcome: { outcome: 'NOT_ATTEMPTED', detail: 'The try has not been dispositioned yet.' }
+		parseOutcome: { outcome: 'NOT_ATTEMPTED', detail: 'The try has not been dispositioned yet.' },
+		// ⭐ R11 — CARRIED THROUGH, NEVER SYNTHESIZED. Both are the caller's facts; see BeginExchangeInput.
+		workProductDerivation: input.workProductDerivation,
+		observedToolCalls: input.observedToolCalls
 	};
 }
 

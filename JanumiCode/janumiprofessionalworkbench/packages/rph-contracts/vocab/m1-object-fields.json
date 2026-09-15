@@ -2048,6 +2048,18 @@
 					"type": "string",
 					"required": true,
 					"note": "PER-11 occurrence time."
+				},
+				{
+					"field": "workProductDerivation",
+					"type": "WorkProductDerivation",
+					"required": true,
+					"note": "R11. REQUIRED, not optional — an optional field is omissible, and an omission is indistinguishable from every one of the four facts `relation` exists to separate. Appended rather than inserted beside parseOutcome so the vocabulary edit is append-only and every line of the generated diff is attributable to it."
+				},
+				{
+					"field": "observedToolCalls",
+					"type": "ObservedToolCallReport",
+					"required": true,
+					"note": "R11. REQUIRED for the same reason redactionState is: a record unable to say whether tool calls were observed performs record-plane omission about the observation itself, which PER-9 forbids by name. Its cost is a compile error at every dispatch site, which is the point — the compiler naming each caller is stronger than a convention that each caller ought to say something."
 				}
 			]
 		},
@@ -3914,6 +3926,120 @@
 					"field": "detail",
 					"type": "string",
 					"required": true
+				}
+			]
+		},
+		{
+			"name": "WorkProductDerivation",
+			"note": "R11 (sponsor, 2026-09-15) — the artifact→answer-span DERIVATION link, moved out of free text. JAN-EXEC Phase 0 ruled that E-2's ANSWER HALF is the execution ENVELOPE while the ARTIFACT keeps naming the WORK PRODUCT, so the two stopped being one content-addressed object and \"which bytes did the assessment rest on?\" stopped being answered by byte-equality. It was answered instead by a WORK_PRODUCT_DERIVATION fragment inside parseOutcome.detail — a typed record's central relationship living in a free-text string, which is PER-9's own \"hide core relationships in one generic JSON document\" one field over. ⭐ `relation` is the REQUIRED discriminator and every optional below is determined by it, exactly as ExchangeContentRef.status determines its own: an optional carrying \"absent or unknown?\" is this repository's most-recorded defect, and a bare optional field is the REG-F-364 dodge shape — skip the check by leaving it out.",
+			"fields": [
+				{
+					"field": "relation",
+					"type": "'ENVELOPE_FIELD' | 'WHOLE_ANSWER_SPAN' | 'NO_WORK_PRODUCT_EXPECTED' | 'EXPECTED_BUT_UNRETAINED'",
+					"required": true,
+					"note": "The required discriminator, and its four members are four DIFFERENT FACTS a reader must be able to tell apart — each with a producer, because a member nothing can emit is this repository's recorded defect (PROVIDER_REPORTED had none for as long as it existed). ENVELOPE_FIELD: the execution contract was honoured and the work product is a NAMED FIELD of the answer span, retained separately; `sourceField` says which, and the address says where. WHOLE_ANSWER_SPAN: the envelope was NOT honoured, so the whole answer is treated as the work product and retained separately — the professional's work is not discarded because the harness's wrapper was ignored — and there is no field to name. NO_WORK_PRODUCT_EXPECTED: this try is not an execution step at all; its answer is a judgement or an authoring reply, so nothing was derived and nothing is missing. EXPECTED_BUT_UNRETAINED: this try WAS meant to produce a work product and none was retained — the call failed, or no content store was supplied. ⛔ Collapsing the last two into one optional absence is exactly the conflation this contract already refuses for ExchangeIdentityFact: \"the provider said nothing\" is not \"nobody asked\"."
+				},
+				{
+					"field": "sourceField",
+					"type": "string",
+					"required": false,
+					"note": "ENVELOPE_FIELD only, and REQUIRED there. WHICH field of the answer span became the work product. ⚠ It is a string because the field name belongs to the EXECUTION CONTRACT the harness authors, not to this vocabulary; it is NOT model-chosen, so the R11 retention ruling recorded on ObservedToolCall does not reach it. ⛔ It is refused on WHOLE_ANSWER_SPAN because there is no field there, and inventing a pseudo-name for one would be the fabricated value that arm exists to avoid."
+				},
+				{
+					"field": "storageProvider",
+					"type": "string",
+					"required": false,
+					"note": "ENVELOPE_FIELD and WHOLE_ANSWER_SPAN only — the two arms where a work product was actually retained."
+				},
+				{
+					"field": "storageKey",
+					"type": "string",
+					"required": false,
+					"note": "ENVELOPE_FIELD and WHOLE_ANSWER_SPAN only."
+				},
+				{
+					"field": "contentHash",
+					"type": "string",
+					"required": false,
+					"note": "ENVELOPE_FIELD and WHOLE_ANSWER_SPAN only. Over the BYTES (section 31.3), never a canonicalized object. ⭐ THE WHOLE ADDRESS IS NAMED, NOT JUST THE KEY, for the reason ExchangeContentRef records: a reference that cannot be verified is a reference that cannot be challenged. With the hash a reader can re-hash the retained bytes and refuse this record if it lied; with only a key they can do nothing but believe it."
+				},
+				{
+					"field": "byteSize",
+					"type": "number",
+					"required": false,
+					"note": "ENVELOPE_FIELD and WHOLE_ANSWER_SPAN only. UTF-8 bytes, as the content store measured them."
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": false,
+					"note": "Required on NO_WORK_PRODUCT_EXPECTED and EXPECTED_BUT_UNRETAINED, refused on the two retaining arms. PER-9 permits a DISCLOSED absence and forbids a silent one, so an absence must say why in terms a reader can act on."
+				}
+			]
+		},
+		{
+			"name": "ObservedToolCall",
+			"note": "R11 — ONE tool call as the ADAPTER observed it. ⛔ WHAT IS NOT HERE IS THE DESIGN: there is no arguments field, and its absence is structural rather than disciplinary — the same move ExchangeContentRef makes by having no `bytes` field. Tool-call arguments are MODEL-CHOSEN STRINGS; section 22.1 makes model output UNTRUSTED EXTERNAL INPUT; and this record is PERMANENT under PER-8 (R10, 2026-09-15: nothing deletes it, ever). This programme has twice found a host absolute path and an operating username reaching a governed refusal, and rules that such a field carries the errno CODE and a directory NAME, never a path. ⭐ THE DECIDING ASYMMETRY IS BETWEEN THE TWO PLANES: the CONTENT plane has a redaction mechanism PER-9 names by name — retention there is \"subject to recorded redaction\" (E-6) — so untrusted bytes that land on it can later be removed lawfully; the RECORD plane has none, because PER-9 in the same breath says record-plane omission is not legal. Untrusted free text is therefore admissible to the content plane and inadmissible here, and that is an argument about the planes rather than a preference. ⚠ AND THE COMMAND A STEP RAN IS NOT LOST BY THIS: it remains observable through materializedInputRef and answerSpanRef. Only the permanent typed record refuses it.",
+			"fields": [
+				{
+					"field": "ordinal",
+					"type": "number",
+					"required": true,
+					"note": "1-based, in the order the adapter observed the calls. Without it a BOUNDED list cannot say which calls it kept, and a reader cannot tell a truncated head from a sampled middle."
+				},
+				{
+					"field": "nameProvenance",
+					"type": "'MINTED_BY_HOST' | 'NOT_MINTED'",
+					"required": true,
+					"note": "⭐ WHETHER THE NAME IS THE HOST'S WORD OR THE MODEL'S, which is the whole reason a name may be recorded at all. A minted name is drawn from the closed set this host actually minted for the step (JAN-EXEC capability→tools, by absence), so it cannot carry model-chosen content. NOT_MINTED means the model called something that was never minted — which is the security-relevant fact, and the one worth keeping."
+				},
+				{
+					"field": "toolName",
+					"type": "string",
+					"required": false,
+					"note": "MINTED_BY_HOST only, and REFUSED on NOT_MINTED. An unminted name is an arbitrary model-chosen string, which is the class W1 measured leaking a host path fragment through a model-chosen argv[0]. The FACT that an unminted call was attempted is recorded; the model's spelling of it is not. Determined by nameProvenance exactly as ExchangeIdentityFact.value is determined by availability."
+				},
+				{
+					"field": "outcome",
+					"type": "'COMPLETED' | 'REFUSED' | 'FAILED' | 'UNKNOWN'",
+					"required": true,
+					"note": "What the ADAPTER observed happened to the call — never what the model said happened. UNKNOWN is the member that must not be dropped: an adapter that saw a call begin and could not see it end states that rather than inventing an end."
+				}
+			]
+		},
+		{
+			"name": "ObservedToolCallReport",
+			"note": "R11 — the OBSERVED tool-call record. ⛔ Section 22.1 makes model output untrusted external input, so \"the model said it ran the tests\" is not evidence that tests ran; this field carries what the ADAPTER observed. `observation` is the REQUIRED discriminator and it separates the two facts a bare optional array cannot: NONE_OBSERVED — a tool surface existed and the model called nothing — is not NOT_OBSERVABLE, which says this adapter cannot see tool calls at all, so silence here means nothing. Same shape and same reason as redactionState one field over: a record unable to say whether it could have seen something performs record-plane omission about its own instrument. ⚠ DISCLOSED AT LANDING: no backing tool this host drives emits OBSERVED or NONE_OBSERVED today, because no adapter mints a tool surface — the executing session is opened noTools:'builtin' with customTools:[]. The members land with the FIELD because the schema is PERMANENT (PER-2), on exactly the reasoning rawOutputBeforeCoercionRef records for the same object, and JAN-EXEC Phase 3 (capability→tools) is the increment that produces them.",
+			"fields": [
+				{
+					"field": "observation",
+					"type": "'OBSERVED' | 'NONE_OBSERVED' | 'NOT_OBSERVABLE'",
+					"required": true,
+					"note": "OBSERVED: the adapter saw at least one call and `calls` carries them. NONE_OBSERVED: the adapter could see calls and saw none — a measurement, and a fact a reader may rely on. NOT_OBSERVABLE: the adapter cannot see them, so this record asserts nothing either way and says so rather than reading as a clean bill of health."
+				},
+				{
+					"field": "calls",
+					"type": "ObservedToolCall[]",
+					"required": false,
+					"note": "OBSERVED only, and non-empty there — an OBSERVED report with no calls in it is NONE_OBSERVED wearing the wrong member, and the handler refuses it as such."
+				},
+				{
+					"field": "observedCount",
+					"type": "number",
+					"required": false,
+					"note": "OBSERVED only, and never below calls.length. The TOTAL the adapter observed, which may EXCEED calls.length when the bound below truncated the list. ⛔ Without it a truncated record reads exactly like a complete one, which is REG-F-345's shape: two different realities producing byte-identical records."
+				},
+				{
+					"field": "recordedLimit",
+					"type": "number",
+					"required": false,
+					"note": "OBSERVED only. The per-exchange bound actually applied to `calls`. An UNTRUSTED party decides how many tool calls to make, and an unbounded array on a PERMANENT record is unbounded permanent storage driven by that party — so the list is capped, and the cap is DECLARED in the record rather than applied silently. ⚠ The NUMBER is AUTHORED, not derived: nothing measured says 32 is right, and it is recorded as authored so a later ruling can move it knowingly."
+				},
+				{
+					"field": "reason",
+					"type": "string",
+					"required": false,
+					"note": "Required on NONE_OBSERVED and NOT_OBSERVABLE, refused on OBSERVED. On NOT_OBSERVABLE it must say WHY the adapter cannot see, because that is the fact a reader acts on when deciding what this record is worth."
 				}
 			]
 		}
