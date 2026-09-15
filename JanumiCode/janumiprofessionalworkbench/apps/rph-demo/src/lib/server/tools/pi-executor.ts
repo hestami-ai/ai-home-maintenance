@@ -170,6 +170,32 @@ export async function openPiExecutionSession(
 					providerId: model.provider
 				},
 				identityEvidence: 'PROVIDER_REPORTED',
+				// ⭐⭐ R11 — AND THE ANSWER IS *NOT OBSERVABLE*, WHICH IS TWO MEASURED FACTS RATHER THAN A SHRUG.
+				//
+				//   (1) NO TOOL SURFACE EXISTS TO OBSERVE. `createAgentSession` above is called with
+				//       `noTools: 'builtin'` and `customTools: []` — readable twenty lines up, in this file —
+				//       so this host mints the executing model nothing to call.
+				//   (2) THIS ADAPTER DOES NOT SUBSCRIBE TO PI'S TOOL EVENTS. `session.subscribe` above handles
+				//       `text_delta` and `thinking_delta` and nothing else, so even a minted call would pass
+				//       unseen here.
+				//
+				// ⛔ `NONE_OBSERVED` WOULD BE A FABRICATED MEASUREMENT. It asserts that an instrument looked and
+				// saw nothing; (2) says no instrument looked. Grading an absence of looking as a clean result is
+				// the defect `ResolvedModelIdentity` exists to prevent one field over — and it is the reading a
+				// bare optional field would have produced for free.
+				//
+				// ⭑ JAN-EXEC PHASE 3 (capability → tools, by absence) IS THE INCREMENT THAT CHANGES BOTH, and
+				// when it does this arm becomes `{ canObserve: true, mintedToolNames, calls }`.
+				observedToolCalls: {
+					canObserve: false,
+					reason:
+						'The Pi execution adapter mints no tool surface and watches no tool events. This host opens ' +
+						"the executing session with noTools:'builtin' and customTools:[], so the model has nothing " +
+						'to call; and this adapter subscribes only to text and thinking deltas, so it could not ' +
+						'report a call even if one were minted. ⛔ This is NOT a statement that no tool ran — it is ' +
+						'a statement that nothing here was in a position to see one. JAN-EXEC Phase 3 mints the ' +
+						"step's granted capabilities as tools and is where this becomes an observation."
+				},
 				...(composite === undefined
 					? {}
 					: { materializedInput: JSON.stringify(composite) })

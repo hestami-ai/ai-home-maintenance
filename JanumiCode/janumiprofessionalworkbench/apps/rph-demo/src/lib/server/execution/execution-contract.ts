@@ -22,6 +22,7 @@
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { StoredArtifactRef } from '@janumipwb/rph-ports';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
+import type { WorkProductDerivation } from '@janumipwb/rph-contracts';
 
 /**
  * The executor's system prompt.
@@ -157,44 +158,70 @@ export function splitExecutionEnvelope(answer: string): ExecutionEnvelope {
 // declared two-field shape, `splitExecutionEnvelope` coerces it, and saying nothing was attempted would assert
 // an absence the step manufactured — the same defect one field over.
 
-/** The tag a reader greps for. Named once so the producer and every assertion about it cannot drift apart. */
-export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';
-
 /**
- * Declare, in the exchange record's own E-5, where the work product an assessment rests on actually went.
+ * ⭐⭐ R11 — DECLARE, AS A TYPED FIELD, WHERE THE WORK PRODUCT AN ASSESSMENT RESTS ON ACTUALLY WENT.
  *
- * ⛔ IT NAMES THE WHOLE ADDRESS, NOT JUST THE KEY. `ContentRef`'s own docblock records why the short form was
- * a defect: *"a reference that cannot be verified is a reference that cannot be challenged"*. A declaration
+ * ⚠⚠ THIS FUNCTION USED TO RETURN PROSE, AND THE MOVE IS THE SPONSOR'S RULING RATHER THAN A TIDY-UP. Phase 0
+ * left the relation declared as a `WORK_PRODUCT_DERIVATION ` tag followed by embedded JSON INSIDE
+ * `parseOutcome.detail` — a free-text string. That was the only carrier available: `MODEL_EXCHANGE` is a
+ * `z.strictObject`, its object/command/event payloads are generated from the vocabulary, and `extensions[]` is
+ * unreachable from the command surface (`REG-005`, driven). ⛔ But a typed record whose CENTRAL RELATIONSHIP
+ * lives in a prose field is `PER-9`'s own *"hide core relationships in one generic JSON document"* with a
+ * smaller container, and `R11` ruled it into the contract: vocab change, regeneration, ratification.
+ *
+ * ⭑ WHAT THE TYPED FORM BUYS THAT THE FRAGMENT COULD NOT. The fragment could be absent, malformed, duplicated
+ * or contradicted by the prose around it and nothing would notice; a reader had to locate a tag and `JSON.parse`
+ * a slice of a sentence. The field is validated at the dispatch boundary by `z.strictObject`, its optionals are
+ * determined by `relation` in the handler, and both arms below are REACHABLE — which is why there are two.
+ *
+ * ⛔ IT NAMES THE WHOLE ADDRESS, NOT JUST THE KEY. `ContentRef`'s own docblock records why the short form was a
+ * defect: *"a reference that cannot be verified is a reference that cannot be challenged"*. A declaration
  * carrying `contentHash` lets a reader re-hash the retained bytes and refuse this record if it lied; one
  * carrying only a key can only be believed.
  *
- * ⚠ THE SHORTFALL ARM IS NOT A FAILURE ARM. When the envelope was not honoured, `splitExecutionEnvelope`
- * treats the WHOLE ANSWER as the work product — the professional's work is not discarded because the harness's
- * wrapper was ignored — so a work product still exists, still has an address, and still must be declared. What
- * changes is the outcome member and that the producer's own shortfall is quoted verbatim rather than summarised.
+ * ⚠ THE SHORTFALL ARM IS NOT A FAILURE ARM. When the envelope was not honoured, `splitExecutionEnvelope` treats
+ * the WHOLE ANSWER as the work product — the professional's work is not discarded because the harness's wrapper
+ * was ignored — so a work product still exists, still has an address, and still must be declared. What changes
+ * is that there is NO FIELD TO NAME, and `WHOLE_ANSWER_SPAN` says exactly that instead of inventing a
+ * pseudo-field name for `sourceField` to hold.
  */
 export function declareWorkProductDerivation(
 	envelope: ExecutionEnvelope,
 	workProduct: StoredArtifactRef
-): ExchangeParseOutcome {
-	const address =
-		`${WORK_PRODUCT_DERIVATION_TAG} ` +
-		JSON.stringify({
-			derivedFrom: 'answerSpanRef',
-			field: 'workProduct',
-			storageProvider: workProduct.storageProvider,
-			storageKey: workProduct.storageKey,
-			contentHash: workProduct.contentHash,
-			byteSize: workProduct.byteSize
-		});
+): WorkProductDerivation {
+	const address = {
+		storageProvider: workProduct.storageProvider,
+		storageKey: workProduct.storageKey,
+		contentHash: workProduct.contentHash,
+		byteSize: workProduct.byteSize
+	};
+	return envelope.shortfall
+		? { relation: 'WHOLE_ANSWER_SPAN', ...address }
+		: { relation: 'ENVELOPE_FIELD', sourceField: 'workProduct', ...address };
+}
+
+/**
+ * E-5's own account — what became of the bytes between the model and the judgement.
+ *
+ * ⛔ IT NO LONGER CARRIES THE ADDRESS, AND THAT IS THE POINT OF `R11` RATHER THAN A SIDE EFFECT. Two copies of
+ * one relation drift; the typed field is the authority and this is the narrative beside it. What E-5 still owes
+ * is the OUTCOME member and the producer's own shortfall quoted verbatim, which no typed field replaces.
+ *
+ * ⛔ AND `NOT_ATTEMPTED` IS STILL FALSE HERE, which is a consequence of the Phase 0 ruling rather than a
+ * tidy-up. The old detail said *"An execution step answer is a work product; no schema coercion applies."* That
+ * was true while the answer half WAS the work product. Under the ruling the answer half is a structured
+ * envelope with a declared two-field shape, `splitExecutionEnvelope` coerces it, and saying nothing was
+ * attempted would assert an absence the step manufactured.
+ */
+export function describeWorkProductDerivation(envelope: ExecutionEnvelope): ExchangeParseOutcome {
 	return envelope.shortfall
 		? {
 				outcome: 'SCHEMA_COERCION_FAILED',
 				detail:
 					'E-2’s answer half is the execution ENVELOPE (JAN-EXEC Phase 0 ruling). This one did not honour ' +
 					`the execution contract — ${envelope.shortfall} — so the whole answer is treated as the work ` +
-					'product. It is retained SEPARATELY from the answer span, and the assessment rests on these bytes ' +
-					`and not on the span’s: ${address}`
+					'product. It is retained SEPARATELY from the answer span, and the typed `workProductDerivation` ' +
+					'field on this record addresses the bytes the assessment rests on (R11).'
 			}
 		: {
 				outcome: 'PARSED',
@@ -202,7 +229,7 @@ export function declareWorkProductDerivation(
 					'E-2’s answer half is the execution ENVELOPE (JAN-EXEC Phase 0 ruling: the ANSWER HALF is the ' +
 					'ENVELOPE, the ARTIFACT keeps naming the WORK PRODUCT, and the relationship between them must be ' +
 					'DECLARED). The envelope was read and its `workProduct` field extracted and retained SEPARATELY, ' +
-					'so the artifact and the answer span are no longer the same stored object. The assessment rests ' +
-					`on these bytes: ${address}`
+					'so the artifact and the answer span are no longer the same stored object. The typed ' +
+					'`workProductDerivation` field on this record addresses the bytes the assessment rests on (R11).'
 			};
 }

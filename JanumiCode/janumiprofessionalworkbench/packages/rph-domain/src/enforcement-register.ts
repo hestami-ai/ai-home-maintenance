@@ -2539,7 +2539,18 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'and none is registered yet". THE RESIDUE: the load path is `JSON.parse` plus an unchecked ' +
 			'`as DomainEvent` with no re-validation, and the `StorageAdapter` port declares no hook where an ' +
 			'upcaster could ever be injected — so the day a version-2 event is minted, this rule becomes live with ' +
-			'nowhere to implement it, and nothing in this register would notice.'
+			'nowhere to implement it, and nothing in this register would notice. ' +
+			'⛔ APPENDED 2026-09-15 (JAN-EXEC R11 independent review, W4) — THE CASE THIS ENTRY DID NOT NAME HAS ' +
+			'NOW OCCURRED, AND IT IS WORSE THAN THE RESIDUE ABOVE. R11 added TWO REQUIRED fields to the ' +
+			'ModelExchangeRecorded payload and did NOT bump eventSchemaVersion — because nothing bumps it. So the ' +
+			'premise "every event this engine can mint is version 1" still HOLDS and is exactly the defect: a ' +
+			'durable store can hold two STRUCTURALLY DIFFERENT ModelExchangeRecorded events both declaring ' +
+			'version 1, against a z.strictObject that requires both new fields, and the upcaster obligation can ' +
+			'never be TRIGGERED to notice. This entry’s argument is therefore sound about the antecedent and ' +
+			'misleading about the consequence. ⚠ NOT CONCRETE HERE — no durable store holding that event is ' +
+			'committed in this repository — and NOT R11’s to settle: it is a repository-wide convention ' +
+			'question, FILED with its driven evidence and its three candidate rulings at ' +
+			'docs/_working/ROADMAP-undertaking-execution-sandbox.md §4g.'
 	},
 	'RPH-PER-011': {
 		kind: 'NOT_A_COMMAND_REFUSAL',

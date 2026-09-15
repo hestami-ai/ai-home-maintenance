@@ -6180,9 +6180,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// records 21 such artifacts). Swapping `storageKey` and `contentHash` keeps every parameter used and every
 		// type intact, and produces exactly the failure the ruling exists to prevent: a declaration that is PRESENT,
 		// well-formed, parseable — and points a reader at bytes that are not the artifact's.
-		find: '\t\t\tstorageKey: workProduct.storageKey,\n\t\t\tcontentHash: workProduct.contentHash,',
+		// ⚠ RE-ANCHORED BY JAN-EXEC `R11` (2026-09-15), AND THE REWRITE IS RECORDED HERE BECAUSE A REWRITTEN
+		// MUTANT IS EXACTLY WHERE A CLAIM QUIETLY WEAKENS. `declareWorkProductDerivation` stopped returning prose
+		// and started returning a typed `WorkProductDerivation`, so the address moved out of a template literal
+		// and up one indentation level — three tabs to two. NOTHING ELSE CHANGED: the same two fields are
+		// swapped, the same parameter stays used, and the same victim still asserts a RESOLUTION rather than a
+		// presence. ⛔ It is NOT retired: the guard is in the same function, proving the same promise.
+		find: '\t\tstorageKey: workProduct.storageKey,\n\t\tcontentHash: workProduct.contentHash,',
 		replace:
-			'\t\t\tstorageKey: workProduct.contentHash, // MUTANT: the declaration resolves to nothing\n\t\t\tcontentHash: workProduct.storageKey,',
+			'\t\tstorageKey: workProduct.contentHash, // MUTANT: the declaration resolves to nothing\n\t\tcontentHash: workProduct.storageKey,',
 		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
 		why: "PROMISE: the sponsor's JAN-EXEC Phase 0 ruling (2026-09-14) — *\"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED\"* — so a reader can still tell which bytes an assessment rested on. WHO RELIES: `run-model-step.ts` is the only producer, and the consumers are every reader of a `MODEL_EXCHANGE` on the EXECUTION plane — including the e2e assertion that replaced `REG-F-345`'s one-object rule. WHAT THE MUTATION DOES TO THEM: the record still carries a WORK_PRODUCT_DERIVATION, still names `answerSpanRef` and `workProduct`, and still parses — so every structural assertion about the declaration's PRESENCE holds. What breaks is the only thing that matters: the key it names addresses no stored object, so a reader following the record reaches nothing, and the two objects the ruling created are related by a statement that is false. ⭑ That is why the victim asserts a RESOLUTION (`store.get(declared.storageKey)` returns the work product) rather than the presence of a tag.",
 		source: 'JAN-EXEC Phase 0 — the guard for `declareWorkProductDerivation`, landed with the export'
@@ -6194,6 +6200,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// whole path — capture, the recorder mapping, the `z.strictObject` dispatch boundary and the engine — and
 		// arrives on a durable MODEL_EXCHANGE a reader can actually query. Renaming the tag is the cheapest mutation
 		// that leaves the unit meaning intact while making the record unfindable.
+		// ⭐⭐ RETIRED BY JAN-EXEC `R11` (2026-09-15), NOT LOST — and the distinction is the one this ledger's own
+		// header draws. `WORK_PRODUCT_DERIVATION_TAG` existed because the relation had to live inside
+		// `parseOutcome.detail`'s FREE TEXT, so a reader had to grep a sentence for a tag. The sponsor ruled the
+		// relation into the contract as a typed `MODEL_EXCHANGE` field, so the tag was DELETED along with the
+		// prose-parsing it forced on every reader. ⛔ Its guarantee — *"the declaration SURVIVES the whole path
+		// and arrives on a durable MODEL_EXCHANGE a reader can query"* — is proved by `R11-a`, which is named
+		// here rather than left for someone to notice. Deleting this entry instead would erase the fact that the
+		// guard ever needed proving, which is what `supersededBy` exists to prevent.
+		supersededBy: 'R11-a-the-typed-relation-never-reaches-the-governed-record',
 		find: "export const WORK_PRODUCT_DERIVATION_TAG = 'WORK_PRODUCT_DERIVATION';",
 		replace:
 			"export const WORK_PRODUCT_DERIVATION_TAG = 'DERIVATION'; // MUTANT: the tag a reader greps for is renamed",
@@ -6201,6 +6216,191 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: "PROMISE: the same ruling, asserted at the SURFACE rather than at the producer. The e2e reads the engine's own materialized `MODEL_EXCHANGE` state and requires that the declaration be findable there and resolve to the `ARTIFACT` the three floor assessments were recorded over. WHO RELIES: anyone auditing which bytes an assessment rested on — the exact reader `REG-F-345`'s *\"a reader cannot tell which the assessment rested on\"* was written for, whose free guarantee this ruling removed. WHAT THE MUTATION DOES TO THEM: every unit assertion still passes, because the unit test imports the same constant and therefore MOVES WITH IT — the mutation is invisible to it, which is precisely why this limb needs its own victim. On the surface the durable record then carries a tag nobody greps for, and the relation is once again undiscoverable.",
 		source: 'JAN-EXEC Phase 0 — the e2e limb of the declared relation'
 	},
+	// -- JAN-EXEC R11: MODEL_EXCHANGE gains the DERIVATION LINK and the OBSERVED TOOL-CALL RECORD ---
+	//
+	// The sponsor ruled (2026-09-15) that both become TYPED fields on the generated, ratified contract. These
+	// nine mutants are the guards that ruling created, and they fall into three groups: the relation's SURVIVAL
+	// to the governed record, the tool-call RETENTION ruling, and the freshness gate the vocab change made
+	// necessary. Every one was watched failing before it was written down.
+	{
+		id: 'R11-a-the-typed-relation-never-reaches-the-governed-record',
+		file: 'apps/rph-demo/src/lib/server/execution/run-model-step.ts',
+		// ⭐ SUPERSEDES `P0-c`, WHICH RENAMED A TAG INSIDE A SENTENCE. With the relation typed there is no tag to
+		// rename, and the equivalent defect is stronger and more plausible: the step declares the WRONG MEMBER.
+		// This one type-checks, keeps the field present and well-formed, passes the handler's own refusals — an
+		// absent derivation with a reason is perfectly lawful — and silently files an EXECUTION step that
+		// retained a work product as though it were a reviewer's call that never owed one.
+		find: '\t\tworkProductDerivation: declareWorkProductDerivation(envelope, stored),',
+		replace:
+			"\t\tworkProductDerivation: { relation: 'NO_WORK_PRODUCT_EXPECTED', reason: 'MUTANT: the relation is discarded' },",
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE: the sponsor's Phase 0 ruling — *\"the ANSWER HALF is the ENVELOPE; the ARTIFACT keeps naming the WORK PRODUCT; and the RELATIONSHIP BETWEEN THEM MUST BE DECLARED\"* — carried by R11 into a typed field. WHO RELIES: every reader of a MODEL_EXCHANGE on the EXECUTION plane asking which bytes an assessment rested on, the question `art.storageKey === answerSpanRef.storageKey` used to answer by arithmetic. WHAT THE MUTATION DOES TO THEM: the record still carries `workProductDerivation`, still validates at the z.strictObject boundary, still passes every handler refusal — and states, in a member that reads as a positive fact, that this try owed no work product at all. The artifact is then unreachable from the exchange and the audit for steps that produced nothing finds a step that produced one. ⭑ The victim asserts the MEMBER and then RESOLVES the address through the store, not the presence of a field.",
+		source: 'JAN-EXEC R11 (DESIGN §4.10) — supersedes P0-c'
+	},
+	{
+		id: 'R11-b-the-shortfall-arm-reports-a-clean-parse',
+		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
+		// The E-5 half that `R11` did NOT move. The address left `parseOutcome.detail`; the OUTCOME MEMBER and
+		// the producer's verbatim shortfall stayed, because no typed field replaces them.
+		find: "\t\t\t\toutcome: 'SCHEMA_COERCION_FAILED',",
+		replace: "\t\t\t\toutcome: 'PARSED', // MUTANT: a reply that ignored the contract reads as a clean parse",
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: "PROMISE, in `describeWorkProductDerivation`'s own docblock: E-5 is *\"what became of the bytes between the model and the judgement\"*, and a reply that did not honour the execution contract is a coercion that FAILED. WHO RELIES: a reviewer deciding whether the producer met the harness contract, and `REG-D-058`'s owner deciding whether the type's template needs work. WHAT THE MUTATION DOES TO THEM: the work product is still retained, the derivation still resolves, and the record says the envelope parsed cleanly — so a contract shortfall that the shortfall arm was built to disclose becomes invisible while its own `detail` still quotes it. ⭑ The victim asserts the outcome MEMBER on the non-compliant path, which is the one a reader most needs.",
+		source: 'JAN-EXEC R11 — the guard for `describeWorkProductDerivation`, landed with the export'
+	},
+	{
+		id: 'R11-c-the-boundary-stops-refusing-an-incomplete-derivation',
+		file: 'packages/rph-application/src/handlers/model-exchange.ts',
+		// ⭑ THE MUTATION EDITS THE MEASUREMENT, NOT THE CONDITION — this ledger's own recorded repair for the 21
+		// NO_COMPILE artifacts. `filter(() => true)` keeps every type intact and every branch reachable, and
+		// makes the address look complete however little of it is there.
+		// ⚠ THE FIRST VERSION OF THIS MUTATION WAS `filter(() => true)`, AND IT WAS A DEFECTIVE MUTANT. It
+		// reddened NINE tests, because `declared` is read by BOTH arms: it simultaneously admitted a partial
+		// address AND made every ABSENT derivation look as though it described bytes. An arrangement that trips
+		// two conjuncts proves NEITHER — the kill could not be attributed to the guard this entry names. Gated
+		// on `retains`, it now moves the retaining arm alone and the absent arms are untouched.
+		find: '\tconst declared = DERIVATION_ADDRESS.filter((f) => address[f] !== undefined);',
+		replace:
+			'\tconst declared = retains ? [...DERIVATION_ADDRESS] : DERIVATION_ADDRESS.filter((f) => address[f] !== undefined); // MUTANT: a partial address reads as whole',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE, in `WorkProductDerivation`'s vocabulary note: the WHOLE address is named, not just the key, *\"for the reason ExchangeContentRef records: a reference that cannot be verified is a reference that cannot be challenged\"*. WHO RELIES: anyone re-hashing the retained bytes to decide whether this record lied about them — which is the only thing that distinguishes a declaration from an assertion. WHAT THE MUTATION DOES TO THEM: a derivation carrying a `storageKey` and nothing else is ACCEPTED, so the governed record names a location with no hash to check it against and the reader is back to believing it. ⭑ The CONTROL (a complete address is still accepted) stays green, which is what separates this from a handler that refuses everything.",
+		source: 'JAN-EXEC R11 — the derivation half of the boundary'
+	},
+	{
+		id: 'R11-d-an-unminted-tool-name-is-written-to-a-permanent-record',
+		file: 'apps/rph-demo/src/lib/server/tools/observed-tool-calls.ts',
+		find: "\t\t\t\t\t\tnameProvenance: 'NOT_MINTED' as const,",
+		replace:
+			"\t\t\t\t\t\tnameProvenance: 'NOT_MINTED' as const,\n\t\t\t\t\t\ttoolName: call.name, // MUTANT: the model's own string enters a permanent record",
+		expectRed: ['apps/rph-demo/src/lib/server/tools/observed-tool-calls.test.ts'],
+		why: "PROMISE: the R11 retention ruling in this module's header — a tool NAME is recorded only where the HOST MINTED it, because a minted name is drawn from a closed set the host authored and an unminted one is an arbitrary MODEL-CHOSEN string. WHO RELIES: everyone, permanently. `R10` (2026-09-15) confirmed a MODEL_EXCHANGE is PER-8 participating material — nothing deletes it, ever — and PER-9 makes record-plane omission illegal, so nothing redacts it either. WHAT THE MUTATION DOES TO THEM: the record looks RICHER, which is why it would survive review. This programme has twice measured this exact class — a host absolute path and an operating username reaching a governed refusal — so a model that names its tool `C:\\Users\\<someone>\\.ssh\\id_rsa` writes that into a record with no path back out. ⭑ The victim asserts over the SERIALIZED report, not over the one field I thought of.",
+		source: 'JAN-EXEC R11 (DESIGN §4.10, Q2) — the retention ruling'
+	},
+	{
+		id: 'R11-e-the-bound-on-a-permanent-record-is-removed',
+		file: 'apps/rph-demo/src/lib/server/tools/observed-tool-calls.ts',
+		find: '\t\t.slice(0, OBSERVED_TOOL_CALL_LIMIT)',
+		replace: '\t\t.slice(0) // MUTANT: an untrusted party decides how large a permanent record gets',
+		expectRed: ['apps/rph-demo/src/lib/server/tools/observed-tool-calls.test.ts'],
+		why: "PROMISE: the R11 ruling's BOUNDED limb — the number of calls written is capped, and the cap is declared. WHO RELIES: the store, and every later reader: an UNTRUSTED party (section 22.1) decides how many tool calls to make, and an unbounded array on a record nothing can ever delete is unbounded permanent storage under that party's control. WHAT THE MUTATION DOES TO THEM: `observedCount` and `recordedLimit` are still emitted and still correct, so the record still LOOKS bounded — the declaration survives the removal of the thing it declares. ⭑ That is why the victim asserts `calls.length` against the limit rather than asserting that the two numbers were written.",
+		source: 'JAN-EXEC R11 (DESIGN §4.10, Q2) — the bound'
+	},
+	{
+		id: 'R11-f-an-absent-instrument-is-reported-as-a-clean-measurement',
+		file: 'apps/rph-demo/src/lib/server/tools/observed-tool-calls.ts',
+		find: "\t\treturn { observation: 'NOT_OBSERVABLE', reason: observation.reason };",
+		replace:
+			"\t\treturn { observation: 'NONE_OBSERVED', reason: observation.reason }; // MUTANT: nobody looked, and the record says nothing was there",
+		// ⚠ ONE VICTIM, NOT TWO, AND THE SECOND WAS REMOVED DELIBERATELY. This entry first named both the ruling's
+		// own suite and `run-model-step.test.ts`. The ledger refuses that — *"a longer list is a LOWER bar"* —
+		// and it is right: a mutant that must redden EITHER of two suites is killed by whichever is looser.
+		// `observed-tool-calls.test.ts` is where the NONE_OBSERVED / NOT_OBSERVABLE distinction is itself
+		// asserted, so it is the suite whose failure means what this entry claims. (`run-model-step.test.ts`
+		// reddens too; that is a consequence of the defect, not the guarantee being proved.)
+		expectRed: ['apps/rph-demo/src/lib/server/tools/observed-tool-calls.test.ts'],
+		why: "PROMISE: Q1 of the ruling — *\"'No tool calls were made' and 'this adapter cannot observe tool calls' are DIFFERENT FACTS and a reader must be able to tell them apart.\"* WHO RELIES: anyone auditing whether a step actually ran a command. Section 22.1 makes the model's own claim inadmissible, so this field is the only admissible account, and NONE_OBSERVED is a MEASUREMENT a reader may act on. WHAT THE MUTATION DOES TO THEM: every adapter at HEAD mints no tool surface and watches no session, so EVERY execution record would assert that an instrument looked and found nothing — a clean bill of health manufactured out of an absence of instrument, which is the fabricated-measurement defect this repository records most often. ⭑ Two victims because the defect must be caught at the ruling AND at the step that files it.",
+		source: 'JAN-EXEC R11 (DESIGN §4.10, Q1) — the disclosed absence'
+	},
+	{
+		id: 'R11-g-the-boundary-admits-a-model-chosen-name',
+		file: 'packages/rph-application/src/handlers/model-exchange.ts',
+		find: "\t\t\tif (call.nameProvenance === 'NOT_MINTED' && call.toolName !== undefined)",
+		replace:
+			"\t\t\tif (call.nameProvenance === 'NOT_MINTED' && call.toolName === undefined) // MUTANT: the refusal inverts",
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: the same retention ruling as `R11-d`, enforced at the DISPATCH BOUNDARY rather than at the producer. WHO RELIES: every future producer of this payload, and any direct dispatch. WHAT THE MUTATION DOES TO THEM: `governedToolCallReport` still drops the name, so the ENTIRE app-side suite stays green and the defect is invisible from the side that currently produces the field — which is exactly why the rule needs a second home. A second producer, or a dispatch from anywhere else, then writes a model-chosen string into a permanent unredactable record with the boundary check still visibly present in the source. ⭑ Inverting the conjunct rather than deleting it keeps every type and every branch live, per this ledger's recorded operator rule.",
+		source: 'JAN-EXEC R11 (DESIGN §4.10, Q2) — the retention ruling, at the boundary'
+	},
+	{
+		id: 'R11-h-the-freshness-gate-compares-a-file-with-itself',
+		file: 'scripts/gen-freshness-core.ts',
+		// ⭐⭐ WHAT GATES THE CHECKER. This is the instrument-failure shape this register records more than any
+		// other: a broken instrument returns the SAME answer for the subject and the control, and that reads as
+		// agreement. A comparison that reads the committed file twice reports "every generated artifact matches
+		// its source" for a tree that was never regenerated at all.
+		find: '\t\tconst b = readFileSync(join(copy, rel));',
+		replace:
+			'\t\tconst b = readFileSync(join(source, rel)); // MUTANT: the copy is never read, so nothing can differ',
+		expectRed: ['verif/gen-freshness.test.ts'],
+		why: "PROMISE: `compareTrees` compares the REGENERATED tree against the COMMITTED one, byte-exactly. WHO RELIES: `gate:fast` step 3, and through it every generated contract in the repository — `enums.ts`, `objects.ts`, `messages.ts`, `transitions.data.ts`, `ontology.data.ts` and 119 JSON Schemas. WHAT THE MUTATION DOES TO THEM: the gate still copies three packages, still runs six generators, still walks both trees, still prints a confident pass — and compares every file with itself, so drift of any size is impossible to report. ⛔ Its failure mode is a GREEN one, which is the only kind a gate cannot survive. ⭑ The victim drives `compareTrees` over two trees that genuinely differ, which is the assertion the earlier drafts of that suite did NOT have: it checked the missing-file directions and would have stayed green under this.",
+		source: 'JAN-EXEC R11 — the gate the vocab change made necessary'
+	},
+	{
+		id: 'R11-i-the-freshness-gate-runs-no-generator',
+		file: 'scripts/gen-freshness-core.ts',
+		find: '\t\tgenerators.push(generator[1]!);',
+		replace: '\t\t// MUTANT: the generator is parsed and then dropped, so the copy is never regenerated',
+		expectRed: ['verif/gen-freshness.test.ts'],
+		why: "PROMISE: `parseGen` yields the generator entrypoints DERIVED from each package's own `gen` script, so a generator added there is compared with no edit to the gate. WHO RELIES: the same population as `R11-h`. WHAT THE MUTATION DOES TO THEM: `genPackages` returns three packages with zero generators each, the driver's own non-empty floor is satisfied (it counts PACKAGES, not generators), the scratch copy is therefore byte-identical to the source because nothing rewrote it, and the comparison passes over a tree that was never rebuilt. ⭑ A green light produced by doing no work at all — and the driver's summary line would read `3 package(s), 0 generator(s)`, which nobody reads. The victim asserts the parsed list ITEM BY ITEM.",
+		source: 'JAN-EXEC R11 — the gate the vocab change made necessary'
+	},
+	// -- JAN-EXEC R11 · THE INDEPENDENT REVIEW'S W1/W2/W3 — bounds that are properties of the SHAPE ---------
+	//
+	// ⭐⭐ ALL THREE FINDINGS HAD ONE SHAPE: a stated guarantee that read stronger than what was enforced, inside
+	// a PERMANENT contract (`PER-2`) governing a record `R10` has just confirmed is PERMANENT (`PER-8`). This
+	// programme has twice ruled that an inaccurate disclosure is WORSE than none, because it reads as a
+	// considered boundary. ⛔ EVERY MUTANT BELOW RESTORES THE EXACT ARRANGEMENT THE REVIEWER DROVE, so a KILLED
+	// here means the vector that once landed no longer can.
+	{
+		id: 'R11-W-a-a-host-path-is-recorded-as-a-minted-tool-name',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\tRECORD_PLANE_NAME_PATTERN,',
+		replace:
+			'\t\t/^[\\s\\S]*$/, // MUTANT: the character class admits everything, so a "name" is any string at all',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: `RecordPlaneNameSchema` bounds what a PERMANENT, unredactable record may hold in a NAME field — `ObservedToolCall.toolName` and `WorkProductDerivation.sourceField`. WHO RELIES: everyone, forever. `R10` confirmed a MODEL_EXCHANGE is PER-8 participating material, and PER-9 makes record-plane omission illegal, so nothing ever takes such a value back out. WHAT THE MUTATION DOES TO THEM: exactly the state R11 shipped in — a host absolute path, a username-bearing path, a credentials-shaped string and a NUL byte ALL fit inside 64 characters, so the surviving `.max` cannot see them and all four land as MINTED_BY_HOST while the handler's provenance conjunct stays green, because that conjunct asks only whether the discriminator and the field AGREE. ⭑ The victim is the DISPATCH suite rather than the schema's own unit suite, because the claim is about what reaches the record and not about what a predicate returns; and that suite asserts the MESSAGE, so the length limb cannot cover for the removal of this one.",
+		source: 'JAN-EXEC R11 independent review, W2 — driven with the reviewer’s own five vectors'
+	},
+	{
+		id: 'R11-W-b-a-nul-byte-is-recorded-in-an-unredactable-reason',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\tRECORD_PLANE_PROSE_PATTERN,',
+		replace: '\t\t/^[\\s\\S]*$/, // MUTANT: prose may carry any byte, control characters included',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: 'PROMISE: `RecordPlaneProseSchema` refuses control characters in the two free-text reasons — `ObservedToolCallReport.reason` and `WorkProductDerivation.reason`. WHO RELIES: the store and every later reader. ⭐ THE WHOLE POINT OF `ObservedToolCall` HAVING NO `arguments` FIELD was that untrusted content cannot reach a plane with no lawful way to remove it — PER-9 gives the CONTENT plane redaction and denies the RECORD plane omission — and three free-text strings re-opened that door, with a NUL byte driven through each. WHAT THE MUTATION DOES TO THEM: the `.max` still refuses the 200KB blob, so the blob case of the same driven pair stays GREEN and the record still looks defended; only the NUL case reddens. ⭑ That asymmetry is exactly why both vectors are driven rather than one.',
+		source: 'JAN-EXEC R11 independent review, W3 — the three free-text strings'
+	},
+	{
+		id: 'R11-W-c-the-permanent-list-loses-the-contracts-own-cap',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: '\t\t\tOBSERVED_TOOL_CALL_LIMIT,',
+		replace:
+			'\t\t\tNumber.MAX_SAFE_INTEGER, // MUTANT: the contract stops capping the list, leaving only what the caller declares',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: `boundedObservedToolCallList` caps the list AT THE CONTRACT, so the bound is a property of the shape and holds on the command payload, the materialized state and the event payload alike. WHO RELIES: the store, and any reader who takes `recordedLimit` to mean something. WHAT THE MUTATION DOES TO THEM: the state R11 shipped in — the cap becomes the producer's again, and `governedToolCallReport` still slices at 32, so the ENTIRE app-side suite stays green. ⚠ AND THE STATUS ALONE WOULD NOT CATCH IT: the handler's `recordedLimit > OBSERVED_TOOL_CALL_LIMIT` refusal (`R11-W-e`) also turns the reviewer's 64/64 arrangement away, so the victim asserts the REFUSAL MESSAGE — an arrangement that trips two guards proves neither, and this is the one that separates them.",
+		source: 'JAN-EXEC R11 independent review, W1 — the 32 cap, at the contract'
+	},
+	{
+		id: 'R11-W-d-the-shared-bound-is-not-the-number-the-record-declares',
+		file: 'packages/rph-contracts/src/record-plane-bounds.ts',
+		find: 'export const OBSERVED_TOOL_CALL_LIMIT = 32;',
+		replace:
+			'export const OBSERVED_TOOL_CALL_LIMIT = 1024; // MUTANT: the bound moves, consistently, and every declared limit moves with it',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: ONE number, shared — the contract's cap, the handler's ceiling on a declared `recordedLimit`, and the producer's own truncation point are the same object, so they cannot drift. WHO RELIES: `governedToolCallReport` (which imports it rather than declaring a second 32, as it used to) and every stored record whose `recordedLimit` is measured against it. WHAT THE MUTATION DOES TO THEM: nothing LOOKS wrong — the producer truncates at 1024, declares 1024, and the boundary agrees — which is precisely the hazard of a bound that is merely self-consistent. The reviewer's 64-call vector is ACCEPTED again. ⭑ A consistent move is what makes this different from `R11-W-c`: that one removes the cap, this one shows the cap is only worth what the number is, and that the number may not move without someone coming to the file that argues for it.",
+		source: 'JAN-EXEC R11 independent review, W1 — the number itself'
+	},
+	{
+		id: 'R11-W-e-a-declared-bound-may-exceed-the-enforced-one',
+		file: 'packages/rph-application/src/handlers/model-exchange.ts',
+		find: '\t\tif (tools.recordedLimit > OBSERVED_TOOL_CALL_LIMIT)',
+		replace:
+			'\t\tif (tools.recordedLimit < OBSERVED_TOOL_CALL_LIMIT) // MUTANT: the refusal inverts, so a looser declared bound passes',
+		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
+		why: "PROMISE: a producer may declare a TIGHTER bound than the contract enforces and say so; it may not declare a looser one. WHO RELIES: every reader who compares `recordedLimit` with `observedCount` to decide whether the list was truncated — the one mechanism keeping a truncated record from reading exactly like a complete one (REG-F-345's shape). WHAT THE MUTATION DOES TO THEM: a SHORT list declaring a limit of 64 is accepted, so the record asserts a bound this plane cannot apply and a reader is told about a record that cannot exist. ⭑ The long-list case stays GREEN because the SCHEMA catches that one — W1's two halves are guarded in two places and only this mutation separates them. Inverting rather than deleting keeps every type and branch live, per this ledger's operator rule.",
+		source: 'JAN-EXEC R11 independent review, W1 — the half the schema does not reach'
+	},
+	// ⚠ A SIXTH MUTANT WAS DECLARED HERE AND WITHDRAWN, AND THE REASON IS WORTH MORE THAN THE ENTRY WAS.
+	// `R11-W-f` mutated `applyBound` in `gen/gen-objects.ts` so that every declared bound was dropped on emission.
+	// ⛔ IT CANNOT BE MEASURED BY THIS HARNESS: the runner does not re-run `bun run gen`, so a mutation to a
+	// GENERATOR changes nothing any test observes — it would report SURVIVED while proving only that the harness
+	// never regenerated. (Its first form reported NO_COMPILE, which was flattering: the real verdict was worse.)
+	// ⭐ THE GUARD IS REAL AND LIVES ELSEWHERE, DRIVEN BY HAND: `"bound"` was removed from `toolName` in the vocab
+	// and `bun run gen` re-run. MEASURED: `gen:check` exited 0 with *"every generated artifact matches its
+	// source"* — the limit of a freshness gate — while ALL FIVE W2 cases in `model-exchange.test.ts` went RED. So the
+	// vocabulary is held to the contract by the DRIVEN cases, not by the freshness step, and that is recorded
+	// here because the absence of a ledger entry would otherwise read as an absence of a guard.
+
 	// -- JAN-EXEC PHASE 1: the two ports, and the defaults that cannot fabricate --------------------
 	{
 		id: "P1-a-an-absolute-path-is-normalized-instead-of-refused",

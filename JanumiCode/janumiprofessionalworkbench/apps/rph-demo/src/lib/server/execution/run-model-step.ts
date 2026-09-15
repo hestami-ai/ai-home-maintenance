@@ -24,7 +24,12 @@ import type {
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
 import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
-import { declareWorkProductDerivation, splitExecutionEnvelope } from './execution-contract.js';
+import {
+	declareWorkProductDerivation,
+	describeWorkProductDerivation,
+	splitExecutionEnvelope
+} from './execution-contract.js';
+import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import { stepCapabilityRefusal, type StepBindingRequest } from './step-binding.js';
 import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
@@ -290,6 +295,27 @@ export async function runModelInvocationStep(
 				outcome: 'NOT_ATTEMPTED',
 				detail: `The model call itself failed: ${e instanceof Error ? e.message : String(e)}`
 			},
+			// ⭐⭐ R11 — THE ARM THAT MAKES THE FOURTH MEMBER REAL, AND IT IS NOT THE SAME ABSENCE AS A REVIEWER'S.
+			// This step DOES owe a work product; the call failed before one existed. Recording that as
+			// `NO_WORK_PRODUCT_EXPECTED` would file an execution failure as though it were an assurance call,
+			// and a reader auditing which steps produced nothing would never find it.
+			// ⚠ THE REASON DOES NOT QUOTE THE ERROR. `parseOutcome.detail` one field up already carries it, and a
+			// second copy of an untrusted diagnostic is a second copy to redact and one that nothing will.
+			workProductDerivation: {
+				relation: 'EXPECTED_BUT_UNRETAINED',
+				reason:
+					'This MODEL_INVOCATION step owed a work product and none was retained: the model call itself ' +
+					'failed before any answer arrived, so there was nothing to separate out of an answer span and ' +
+					'nothing to store. The failure is quoted verbatim in this record’s parseOutcome detail.'
+			},
+			// ⛔ THE CALL FAILED, SO NO ADAPTER ANSWERED AND NOTHING OBSERVED ANYTHING. Reporting NONE_OBSERVED
+			// here would claim an instrument looked; there was no instrument.
+			observedToolCalls: governedToolCallReport({
+				canObserve: false,
+				reason:
+					'The model call failed, so no adapter returned a result and nothing was in a position to ' +
+					'observe tool calls. This record is not evidence that none ran.'
+			}),
 			promptTemplateFingerprint: plan.fingerprint
 		});
 		record(input, sink);
@@ -355,7 +381,24 @@ export async function runModelInvocationStep(
 		// ⭐⭐ E-5 NOW CARRIES THE ARTIFACT→ANSWER-SPAN RELATION, because the ruling took away the one that was
 		// free. This read *"An execution step answer is a work product; no schema coercion applies"* — true while
 		// the answer half WAS the work product, false the moment it became the envelope.
-		parseOutcome: declareWorkProductDerivation(envelope, stored),
+		// ⚠ E-5 NO LONGER CARRIES THE ADDRESS — `R11` MOVED IT TO A TYPED FIELD. What stays here is E-5's own
+		// job: the outcome member and, on the shortfall arm, the producer's own words for what went wrong.
+		parseOutcome: describeWorkProductDerivation(envelope),
+		// ⭐⭐ R11 — THE RELATION, TYPED. Phase 0 took away the guarantee that `art.storageKey ===
+		// answerSpanRef.storageKey`; this is what replaces it, and it is now a field a reader can query rather
+		// than a tag they must grep for inside a sentence.
+		workProductDerivation: declareWorkProductDerivation(envelope, stored),
+		// ⭐⭐ R11 — AND THE ADAPTER'S OWN OBSERVATION, WHICH IS THE HALF §22.1 IS ABOUT. `produced` is undefined
+		// when the seam returned a bare string; that is a tool which told us only its answer, so it reported
+		// nothing about tool calls and this record says exactly that instead of an empty list.
+		observedToolCalls: governedToolCallReport(
+			produced?.observedToolCalls ?? {
+				canObserve: false,
+				reason:
+					'The backing tool returned only an answer string, so it reported nothing about tool calls. ' +
+					'This record therefore says nothing about whether any ran — it is not evidence that none did.'
+			}
+		),
 		promptTemplateFingerprint: plan.fingerprint
 	});
 

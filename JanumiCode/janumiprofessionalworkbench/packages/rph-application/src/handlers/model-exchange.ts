@@ -22,7 +22,21 @@
 // is a claim that the list matches the shape, unverified — and a field added later would silently escape every
 // guard below. Deriving makes that impossible rather than unlikely. `model-exchange.test.ts` additionally pins
 // the derived sets, so a RENAME that empties one is a red rather than a silent no-op.
-import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
+//
+// ── ⛔ WHERE THIS HANDLER'S REFUSALS STOP, AND WHERE THE CONTRACT'S BEGIN (R11 REVIEW, W1–W3) ────────────────
+// Every check below is RELATIONAL — a field against its discriminator, a count against another count. ⛔ NONE
+// of them looks at a value's CONTENT, and R11's commit said one of them did: *"a minted name is drawn from a
+// closed set the HOST authored and cannot carry model-chosen content."* An independent review DROVE a host
+// absolute path, a credentials string, a NUL byte and a 200KB blob into `toolName` as `MINTED_BY_HOST` and all
+// four were ACCEPTED, because what this handler checks is that the discriminator and the field AGREE.
+//
+// ⭐ THE CONTENT BOUNDS THEREFORE LIVE IN THE CONTRACT, NOT HERE — `rph-contracts/src/record-plane-bounds.ts`,
+// reached through the generated `ObservedToolCallSchema` / `WorkProductDerivationSchema`. That is not tidiness:
+// a check in this file governs ONE write path (the command payload), while a bound on the schema governs three
+// — the command payload in `command-bus.ts`, the materialized object state in `kit.ts`, and the ratified event
+// payload beside it. `B8`'s verdict in this same programme was that a convention with no call site is not a
+// control; enforcing at the producer and calling it enforced at the boundary is the same error one layer up.
+import { OBSERVED_TOOL_CALL_LIMIT, type RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 
 import { createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
 
@@ -47,6 +61,34 @@ const FOLLOW_ON_ROLES = new Set(['RETRY', 'REFORMAT', 'REPAIR']);
 
 type Ref = { status: string; reason?: string } & Record<string, unknown>;
 type Fact = { availability: string; evidence: string; value?: string; rationale?: string };
+
+/**
+ * ⭐⭐ R11 — THE DERIVATION'S OPTIONALS, DETERMINED BY ITS DISCRIMINATOR, OFF ONE TABLE.
+ *
+ * Two arms RETAIN a work product and carry an address; two do not and carry a reason instead. ⛔ The refusals
+ * below are keyed on this ONE map rather than written out per arm, so a fifth member added to the vocabulary
+ * cannot quietly acquire "anything goes": it would be absent from the map and refused BY NAME.
+ */
+const DERIVATION_ADDRESS = ['storageProvider', 'storageKey', 'contentHash', 'byteSize'] as const;
+/**
+ * ⭐⭐ `Record<Union, boolean>` IS EXHAUSTIVE, AND THAT IS THE GUARD — not a runtime arm.
+ *
+ * The first version of this carried a `Record<string, boolean>` plus a runtime refusal for a member it did not
+ * classify. ⛔ That arm was UNREACHABLE: the payload is strict-parsed against `z.enum([...])` before the handler
+ * sees it, so no unclassified member can arrive — and an unreachable refusal is a guard that cannot fail, which
+ * this repository records as its own defect class. Keyed on the CONTRACT's union instead, a member added to the
+ * vocabulary makes this object a COMPILE ERROR, and a defect the compiler makes unexpressible is guarded more
+ * strongly than one a test catches.
+ */
+const DERIVATION_RETAINS: Record<
+	RecordModelExchangePayload['workProductDerivation']['relation'],
+	boolean
+> = {
+	ENVELOPE_FIELD: true,
+	WHOLE_ANSWER_SPAN: true,
+	NO_WORK_PRODUCT_EXPECTED: false,
+	EXPECTED_BUT_UNRETAINED: false
+};
 
 /** Field names ending `Ref` — the content-reference group, read off the payload rather than listed. */
 function refFields(p: RecordModelExchangePayload): string[] {
@@ -173,6 +215,124 @@ export const recordModelExchange: CommandHandler = (ctx, command, payload) => {
 			return bad(`${name} is REPORTED and must not carry a rationale.`);
 		if (reported && f.evidence === 'NONE')
 			return bad(`${name} is REPORTED but claims evidence NONE — a reported value came from somewhere.`);
+	}
+
+	// ── ⭐⭐ R11 (a) — THE DERIVATION. `relation` is the discriminator and every optional is determined by
+	//    it, on exactly the standard the content refs above are held to. ⛔ The point of a TYPED field is that
+	//    it can be REFUSED; a declaration nothing checks is the free-text fragment it replaced, with extra steps.
+	const derivation = p.workProductDerivation;
+	const retains = DERIVATION_RETAINS[derivation.relation];
+	const address = derivation as unknown as Record<string, unknown>;
+	const declared = DERIVATION_ADDRESS.filter((f) => address[f] !== undefined);
+	if (retains) {
+		if (declared.length !== DERIVATION_ADDRESS.length)
+			return bad(
+				`workProductDerivation is ${derivation.relation} but omits ${DERIVATION_ADDRESS.filter((f) => address[f] === undefined).join(', ')}. A work product was separated out of the answer span and retained, so the record must say WHERE — and the WHOLE address, not just the key: a reference that cannot be verified is a reference that cannot be challenged.`
+			);
+		if (derivation.reason !== undefined)
+			return bad(
+				`workProductDerivation is ${derivation.relation} and must not carry a reason — a reason explains an ABSENCE, and this arm declares a presence.`
+			);
+	} else {
+		if (!derivation.reason || derivation.reason.trim() === '')
+			return bad(
+				`workProductDerivation is ${derivation.relation} and must state why. PER-9 permits a DISCLOSED absence and forbids a silent one, and the two absent arms are different facts: one says this try owed no work product at all, the other that it owed one and none was retained.`
+			);
+		if (declared.length > 0)
+			return bad(
+				`workProductDerivation is ${derivation.relation} but carries ${declared.join(', ')} — a derivation cannot both disclaim a retained work product and address one.`
+			);
+	}
+	// ⛔ `sourceField` IS NARROWER THAN THE ADDRESS AND IS CHECKED SEPARATELY. Only ENVELOPE_FIELD has a field
+	//    to name; WHOLE_ANSWER_SPAN retains a work product and has none, because the envelope was not honoured
+	//    and the whole answer IS the product. A pseudo-name there is the fabricated value that arm exists to avoid.
+	const named = derivation.sourceField !== undefined && derivation.sourceField.trim() !== '';
+	if (derivation.relation === 'ENVELOPE_FIELD' && !named)
+		return bad(
+			`workProductDerivation is ENVELOPE_FIELD and must name the sourceField the work product was taken from. A derivation carrying an address but not what was taken out of the span cannot be re-performed by a reader.`
+		);
+	if (derivation.relation !== 'ENVELOPE_FIELD' && derivation.sourceField !== undefined)
+		return bad(
+			`workProductDerivation is ${derivation.relation} and must not name a sourceField — there is no envelope field to name, and inventing one asserts a structure the answer did not have.`
+		);
+
+	// ── ⭐⭐ R11 (b) — THE OBSERVED TOOL-CALL RECORD. Section 22.1 makes model output UNTRUSTED EXTERNAL
+	//    INPUT, so the ADAPTER's observation is the fact and the model's word is not. The three members are three
+	//    states of the INSTRUMENT, and this handler's job is to stop one being written while wearing another's
+	//    evidence — an OBSERVED report naming no calls would read as a measurement of nothing.
+	const tools = p.observedToolCalls;
+	if (tools.observation === 'OBSERVED') {
+		if (tools.reason !== undefined)
+			return bad(
+				`observedToolCalls is OBSERVED and must not carry a reason — a reason explains why there is nothing to report, and this arm reports something.`
+			);
+		if (!tools.calls || tools.calls.length === 0)
+			return bad(
+				`observedToolCalls is OBSERVED but names no calls. An OBSERVED report with an empty list is NONE_OBSERVED wearing the wrong member, and the two are different facts: one says a call was seen, the other that a watching adapter saw none.`
+			);
+		if (tools.recordedLimit === undefined || tools.observedCount === undefined)
+			return bad(
+				`observedToolCalls is OBSERVED and must declare observedCount and recordedLimit. The list is BOUNDED because an untrusted party decides how many calls to make, and a truncated list that does not say so reads exactly like a complete one.`
+			);
+		if (tools.calls.length > tools.recordedLimit)
+			return bad(
+				`observedToolCalls names ${tools.calls.length} calls but declares a recordedLimit of ${tools.recordedLimit}. The declared bound must be the one actually applied, or it describes a record other than this one.`
+			);
+		// ⛔ AND THE DECLARED BOUND MAY NOT EXCEED THE ONE THE CONTRACT ENFORCES (R11 REVIEW, W1). The check
+		//    above compares the list against a number THE CALLER WROTE, so on its own it proves only internal
+		//    consistency: 64 calls declaring a recordedLimit of 64 satisfied it, and the cap R11 announced was a
+		//    producer guarantee wearing a contract's words. `calls` is now capped by the SCHEMA, which makes the
+		//    list itself unable to exceed 32 — and this refusal closes the remaining half, where a short list
+		//    declares a bound nothing ever applied. A reader uses `recordedLimit` to decide whether truncation
+		//    happened; a declared bound larger than the enforced one tells them about a record that cannot exist.
+		if (tools.recordedLimit > OBSERVED_TOOL_CALL_LIMIT)
+			return bad(
+				`observedToolCalls declares a recordedLimit of ${tools.recordedLimit}, above the ${OBSERVED_TOOL_CALL_LIMIT} this contract enforces on calls. A producer may apply a TIGHTER bound and say so; it may not declare a looser one, because the number a reader uses to judge whether the list was truncated would then describe a record this plane cannot hold.`
+			);
+		if (tools.observedCount < tools.calls.length)
+			return bad(
+				`observedToolCalls declares observedCount ${tools.observedCount} while naming ${tools.calls.length} calls. The count is the TOTAL observed, so it can only equal or exceed what was kept.`
+			);
+		for (const [index, call] of tools.calls.entries()) {
+			if (call.ordinal !== index + 1)
+				return bad(
+					`observedToolCalls call at position ${index + 1} declares ordinal ${call.ordinal}. Ordinals are 1-based and in observation order; without that a BOUNDED list cannot say which calls it kept.`
+				);
+			// ⛔⛔ THE R11 RETENTION RULING'S *PROVENANCE* LIMB, AT THE BOUNDARY AND NOT ONLY AT THE PRODUCER.
+			//    A tool NAME may be recorded only where the caller declares the HOST MINTED it; an unminted one
+			//    is an arbitrary MODEL-CHOSEN string heading for a record that is PERMANENT under PER-8 (R10)
+			//    and that no redaction can ever reach — PER-9 makes record-plane omission illegal, which is
+			//    exactly why the CONTENT plane may hold such text and this plane may not.
+			//
+			// ⚠ THESE TWO CONJUNCTS CHECK THE DECLARATION, NOT THE NAME (R11 REVIEW, W2). `nameProvenance` is
+			//    the CALLER's word and nothing here verifies it: the host's minted set is session-scoped, lives
+			//    in the adapter, and cannot reach this boundary without either a kernel-to-app dependency or the
+			//    caller declaring the set beside the name — self-consistency again. What bounds the VALUE is
+			//    `RecordPlaneNameSchema` on the contract, one layer out, and it does so on every write path.
+			//    ⭑ THE TWO ARE NOT REDUNDANT: a shape-legal name on a NOT_MINTED call passes the schema and is
+			//    refused here, and an unnamed MINTED_BY_HOST call is invisible to a schema that only constrains
+			//    a value that is present.
+			if (call.nameProvenance === 'MINTED_BY_HOST' && (!call.toolName || call.toolName.trim() === ''))
+				return bad(
+					`observedToolCalls call ${call.ordinal} claims MINTED_BY_HOST but names no tool. The provenance is the whole warrant for recording a name at all.`
+				);
+			if (call.nameProvenance === 'NOT_MINTED' && call.toolName !== undefined)
+				return bad(
+					`observedToolCalls call ${call.ordinal} is NOT_MINTED and must not carry a toolName. An unminted name is an arbitrary model-chosen string, and this record is permanent and unredactable — the FACT that an unminted call was attempted is what is kept, never the model's spelling of it.`
+				);
+		}
+	} else {
+		if (!tools.reason || tools.reason.trim() === '')
+			return bad(
+				`observedToolCalls is ${tools.observation} and must state why. NONE_OBSERVED and NOT_OBSERVABLE are different facts — a measurement, against an absence of any instrument — and a reader deciding what this record is worth acts on the difference.`
+			);
+		const describes = (['calls', 'observedCount', 'recordedLimit'] as const).filter(
+			(f) => tools[f] !== undefined
+		);
+		if (describes.length > 0)
+			return bad(
+				`observedToolCalls is ${tools.observation} but carries ${describes.join(', ')} — a report cannot both say it has no calls to name and then describe them.`
+			);
 	}
 
 	// ── PER-11 TIME. Both are occurrence-time facts the drain cannot reconstruct: `makeEvent` stamps its own

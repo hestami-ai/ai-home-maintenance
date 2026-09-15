@@ -96,7 +96,19 @@ export async function devinPrint(prompt: string): Promise<string | ToolInvocatio
 			},
 			// ⭑ THE GRADE IS EARNED BY THE READ ABOVE, not by the tool's entry in `BACKING_TOOLS`. A catalog
 			// declaration says what a tool CAN report; this says what it DID.
-			identityEvidence: 'PROVIDER_REPORTED'
+			identityEvidence: 'PROVIDER_REPORTED',
+			// ⭐ R11 — `--print` IS A ONE-SHOT ANSWER, AND THAT IS THE WHOLE REASON. This adapter runs devin to
+			// completion and reads its stdout plus an ATIF export; it mints no tool surface of its own and
+			// watches no session, so anything devin did internally is devin's business and invisible here.
+			// ⛔ Saying NONE_OBSERVED would claim this adapter looked. It did not look.
+			observedToolCalls: {
+				canObserve: false,
+				reason:
+					'The devin adapter runs `devin --print` to completion and reads its stdout and ATIF export. It ' +
+					'mints no tool surface and watches no session, so it is not in a position to observe tool ' +
+					'calls at all — neither its own (it has none) nor any the tool made internally. A reader must ' +
+					'not read this record as evidence that no command ran.'
+			}
 		};
 	} catch (e) {
 		const raw = e instanceof Error ? e.message : String(e);

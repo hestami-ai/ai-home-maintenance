@@ -272,6 +272,12 @@
 			"functions": 0,
 			"lines": 0
 		},
+		"packages/rph-contracts/src/record-plane-bounds.ts": {
+			"statements": 0,
+			"branches": 0,
+			"functions": 0,
+			"lines": 0
+		},
 		"packages/rph-contracts/src/slice.ts": {
 			"statements": 0,
 			"branches": 0,

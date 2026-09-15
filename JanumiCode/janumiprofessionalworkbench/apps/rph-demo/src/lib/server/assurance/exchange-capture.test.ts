@@ -24,7 +24,19 @@ const CAPTURE_FACTS = {
 	requestedAt: '2026-09-03T10:00:00Z',
 	respondedAt: '2026-09-03T10:00:01Z',
 	// E-5's detail. NOT_ATTEMPTED would assert an outcome nobody observed; these fixtures do parse.
-	parseOutcome: { outcome: 'PARSED' as const, detail: 'Fixture: coerced without repair.' }
+	parseOutcome: { outcome: 'PARSED' as const, detail: 'Fixture: coerced without repair.' },
+	// ⭐ R11 — the two fields every try now owes. These fixtures are ASSURANCE-shaped calls (a reviewer's, not
+	// an executing step's), so the honest derivation is `NO_WORK_PRODUCT_EXPECTED`, and no adapter in this file
+	// observes tool calls. ⚠ Named as one constant rather than repeated per call so a future member added to
+	// either discriminator has ONE place to be considered, not eleven places to be forgotten in.
+	workProductDerivation: {
+		relation: 'NO_WORK_PRODUCT_EXPECTED' as const,
+		reason: 'Fixture: an assurance try, whose answer is a judgement rather than a deliverable.'
+	},
+	observedToolCalls: {
+		observation: 'NOT_OBSERVABLE' as const,
+		reason: 'Fixture: this harness drives no adapter that can observe tool calls.'
+	}
 };
 
 function harness() {

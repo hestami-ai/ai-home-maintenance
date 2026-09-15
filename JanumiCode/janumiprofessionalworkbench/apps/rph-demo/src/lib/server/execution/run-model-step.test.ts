@@ -9,7 +9,19 @@ import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-
 import { assembledSources, runModelInvocationStep } from './run-model-step.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
-import { WORK_PRODUCT_DERIVATION_TAG } from './execution-contract.js';
+
+/**
+ * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
+ *
+ * ⚠ `canObserve: false` IS THE HONEST FIXTURE DEFAULT, not a convenience. These stand-ins are functions that
+ * return an answer; they mint no tool surface and watch no session, so they are not in a position to observe
+ * anything. A fixture reporting `canObserve: true, calls: []` would be claiming a measurement no fixture made —
+ * which is the very conflation `governedToolCallReport` exists to keep out of the record.
+ */
+const UNOBSERVED = {
+	canObserve: false as const,
+	reason: 'Fixture: this stand-in returns an answer and observes nothing.'
+};
 
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
@@ -192,7 +204,8 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 					modelId: 'gpt-5.4-mini',
 					providerId: 'openai-codex'
 				},
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);
@@ -261,7 +274,8 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);
@@ -289,7 +303,8 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 				answerText: ANSWER,
 				rawOutput: ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);
@@ -573,7 +588,8 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);
@@ -611,13 +627,24 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 	// single object it replaced. So the test below does not assert that the two differ — that is a consequence,
 	// not a guarantee — it asserts that the record RESOLVES: starting from the exchange alone, a reader reaches
 	// the exact bytes the assessment was recorded over.
-	/** The declaration E-5 carries, parsed back out of it. `undefined` when the record declared none. */
-	function derivationIn(detail: string) {
-		const at = detail.indexOf(WORK_PRODUCT_DERIVATION_TAG);
-		if (at < 0) return undefined;
-		const json = detail.slice(detail.indexOf('{', at));
-		return JSON.parse(json) as Record<string, unknown>;
-	}
+	// ⭐⭐ R11 — THIS TEST USED TO PARSE A JSON FRAGMENT OUT OF A SENTENCE, AND THAT IS WHAT THE RULING ENDED.
+	//
+	// What stood here was `derivationIn(detail)`: find the literal `WORK_PRODUCT_DERIVATION` inside
+	// `parseOutcome.detail`, slice from the next `{`, and `JSON.parse` the remainder. It worked, and its
+	// existence WAS the finding — a typed record whose central relationship could only be read by scanning prose.
+	// `R11` (sponsor, 2026-09-15) made it a typed `MODEL_EXCHANGE` field, so the assertions below read a FIELD.
+	//
+	// ⚠ THE ASSERTIONS ARE NOT WEAKENED BY THE MOVE, AND THE PROOF IS THAT THEY GREW. What they asserted before
+	// — a tag is present, a parse succeeds, four values match, the key resolves — is now: the discriminator is
+	// the right MEMBER, `sourceField` names what was taken, the whole address matches, and the key resolves. The
+	// new limb is the one prose could never carry: a WRONG member (`NO_WORK_PRODUCT_EXPECTED`) is now a
+	// `z.strictObject` value the handler REFUSES, where a wrong sentence was simply a sentence.
+	//
+	// ⭐ AND THE LITERAL IS STILL PINNED AS A LITERAL. The old test pinned the tag string deliberately, *"the one
+	// assertion in the file that a rename of `WORK_PRODUCT_DERIVATION_TAG` cannot move with"* — because both
+	// sides of a comparison that travel together are a control that cannot fail. The same reasoning applies to a
+	// vocabulary field name, which is equally a WIRE FORMAT external readers grep: `'workProductDerivation'` and
+	// `'ENVELOPE_FIELD'` are written out below rather than reached through the generated type.
 
 	it('⭐⭐ the ARTIFACT is REACHABLE from the exchange record — the relation is DECLARED, not inferred', async () => {
 		// ⭑ THE ASSERTION THAT MATTERS IS THE LAST ONE: the bytes are fetched USING ONLY WHAT THE RECORD SAYS.
@@ -639,7 +666,8 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);
@@ -658,30 +686,32 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		// is a structured envelope with a declared two-field shape, and this step coerces it.
 		expect(rec.parseOutcome.outcome).toBe('PARSED');
 
-		// ⭐ THE TAG IS PINNED AS A LITERAL, DELIBERATELY NOT VIA THE CONSTANT — this is the one assertion in the
-		// file that a rename of `WORK_PRODUCT_DERIVATION_TAG` cannot move with. Every other check here reaches the
-		// tag through `derivationIn`, which imports it, so both sides of those comparisons travel together and a
-		// rename is invisible to them: a control that cannot fail. The durable record is a WIRE FORMAT that
-		// external readers grep; renaming the constant silently changes what they must look for.
-		// ⚠ This is what lets the corresponding ledger entry name a UNIT victim instead of an e2e spec. An e2e
-		// victim can HANG rather than fail, and a timeout is INCONCLUSIVE — the absence of evidence, not evidence.
+		// ⭐ THE FIELD NAME AND THE MEMBER ARE PINNED AS LITERALS, DELIBERATELY NOT THROUGH THE GENERATED TYPE.
+		// A durable `MODEL_EXCHANGE` is a WIRE FORMAT external readers query; a field renamed in the vocabulary
+		// silently changes what they must look for, and a test that reached the name through the type would
+		// travel with the rename — a control that cannot fail. This is the assertion that does not travel.
 		expect(
-			rec.parseOutcome.detail,
-			'the governed record must carry the derivation tag VERBATIM, as an external reader would grep for it'
-		).toContain('WORK_PRODUCT_DERIVATION');
+			Object.keys(rec),
+			'the governed record must carry the field under the name the vocabulary gives it'
+		).toContain('workProductDerivation');
 
-		const declared = derivationIn(rec.parseOutcome.detail);
-		expect(declared, 'the record declared no relation at all').toBeTruthy();
-		expect(declared!.derivedFrom).toBe('answerSpanRef');
-		expect(declared!.field).toBe('workProduct');
+		const declared = rec.workProductDerivation;
+		expect(
+			declared.relation,
+			'the envelope WAS honoured, so the work product came out of a named field of the answer span'
+		).toBe('ENVELOPE_FIELD');
+		expect(declared.sourceField, 'and the record must say WHICH field, or it cannot be re-performed').toBe(
+			'workProduct'
+		);
 		// ⛔ THE WHOLE ADDRESS, NOT JUST THE KEY — a reference that cannot be verified cannot be challenged.
-		expect(declared!.storageKey).toBe(out.storageKey);
-		expect(declared!.contentHash).toBe(out.contentHash);
-		expect(declared!.byteSize).toBe(out.byteSize);
+		expect(declared.storageProvider, 'the provider holding the bytes, not just the key').toBeTruthy();
+		expect(declared.storageKey).toBe(out.storageKey);
+		expect(declared.contentHash).toBe(out.contentHash);
+		expect(declared.byteSize).toBe(out.byteSize);
 
 		// ⭐ AND IT RESOLVES. This is the property the one-object rule used to give for free: from the exchange
 		// record alone a reader reaches the exact bytes every assessment was recorded over.
-		expect(await store.get(String(declared!.storageKey))).toBe(ANSWER);
+		expect(await store.get(declared.storageKey!)).toBe(ANSWER);
 	});
 
 	it('⭑ CONTROL — a reply that IGNORES the envelope still declares where its work product went', async () => {
@@ -701,9 +731,88 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		expect(rec.parseOutcome.detail, 'the producer’s own shortfall, verbatim').toContain(
 			'no `workProduct` field'
 		);
-		const declared = derivationIn(rec.parseOutcome.detail);
-		expect(declared, 'a shortfall must not cost the reader the address').toBeTruthy();
-		expect(await store.get(String(declared!.storageKey))).toBe(DELIMITED);
+		const declared = rec.workProductDerivation;
+		// ⭐ R11 — THE SHORTFALL ARM IS ITS OWN MEMBER, AND THAT IS STRICTLY MORE THAN THE PROSE SAID. The old
+		// fragment recorded `field: 'workProduct'` on BOTH paths, which was false here: no envelope was honoured
+		// and there is no field. `WHOLE_ANSWER_SPAN` says what actually happened, and the handler REFUSES a
+		// `sourceField` on it — so the pseudo-field the prose used to carry is now unrepresentable.
+		expect(
+			declared.relation,
+			'the envelope was NOT honoured, so the whole answer span is the work product'
+		).toBe('WHOLE_ANSWER_SPAN');
+		expect(
+			declared.sourceField,
+			'and there is no envelope field to name — inventing one would assert a structure the answer lacked'
+		).toBeUndefined();
+		expect(declared.storageKey, 'a shortfall must not cost the reader the address').toBeTruthy();
+		expect(await store.get(declared.storageKey!)).toBe(DELIMITED);
+	});
+
+	// ── ⭐⭐ R11 — THE OTHER HALF OF THE ACT: WHAT THE ADAPTER OBSERVED, NOT WHAT THE MODEL SAID ────────────
+	//
+	// ⛔ §22.1 MAKES MODEL OUTPUT UNTRUSTED EXTERNAL INPUT. Until this field the record's only account of what a
+	// step DID was the model's own answer, so *"the model said it ran the tests"* and *"the tests ran"* were the
+	// same record. This proves the governed record now distinguishes them — and, crucially, that an adapter
+	// which CANNOT see is not recorded as one that LOOKED AND SAW NOTHING.
+	it('⭐ a model that CLAIMS it ran a command is recorded as UNOBSERVED, not as evidence the command ran', async () => {
+		// The producer asserts, in its own work product, that it executed a test suite. Nothing observed it.
+		const CLAIM = 'I ran `npm test` and all 42 tests passed.';
+		const ENVELOPE =
+			`{"workProduct":"${CLAIM}","rationale":{"rationale":"Verified by running the suite.",` +
+			`"assumptions":[],"limitations":[],"residualUncertainty":[]}}`;
+		const { input, dispatched } = harness({
+			session: oneShotSession(async () => ({
+				answerText: ENVELOPE,
+				rawOutput: ENVELOPE,
+				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				// The adapter mints no tool surface and watches no session — the measured state of every adapter
+				// at HEAD, and the reason Phase 3 exists.
+				observedToolCalls: UNOBSERVED
+			}))
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+
+		const rec = dispatched.at(-1)!;
+		expect(Object.keys(rec), 'the field must exist under its vocabulary name').toContain(
+			'observedToolCalls'
+		);
+		// ⛔ THE ASSERTION THAT MATTERS. `NONE_OBSERVED` would say an instrument looked and saw nothing, which
+		// a reader may rely on. `NOT_OBSERVABLE` says nothing was in a position to look. The model's claim is
+		// still in the work product where it belongs, and the record refuses to corroborate it.
+		expect(rec.observedToolCalls.observation).toBe('NOT_OBSERVABLE');
+		expect(rec.observedToolCalls.reason, 'and a disclosed absence must say why').toBeTruthy();
+		expect(
+			rec.observedToolCalls.calls,
+			'an adapter that cannot see must not describe what it did not see'
+		).toBeUndefined();
+	});
+
+	it('⭑ CONTROL — a FAILED call records EXPECTED_BUT_UNRETAINED, which is not the reviewer’s absence', async () => {
+		// ⭐ THIS IS Q1 OF THE RULING, DRIVEN. Without it, "the derivation states its own absence" could be
+		// satisfied by one absent member doing duty for every kind of absence — which is the bare-optional dodge
+		// wearing an enum. An execution step that owed a work product and lost it must NOT be filed the same way
+		// as a reviewer's call that never owed one, or an audit for steps that produced nothing finds neither.
+		const { input, dispatched } = harness({
+			session: oneShotSession(async () => {
+				throw new Error('the backing tool exited 1');
+			})
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+
+		const rec = dispatched.at(-1)!;
+		expect(rec.workProductDerivation.relation).toBe('EXPECTED_BUT_UNRETAINED');
+		expect(rec.workProductDerivation.reason).toBeTruthy();
+		expect(
+			rec.workProductDerivation.storageKey,
+			'nothing was retained, so the record must not address anything'
+		).toBeUndefined();
+		// ⚠ AND THE DIAGNOSTIC IS NOT COPIED INTO IT. E-5 already carries the failure verbatim; a second copy of
+		// an untrusted diagnostic is a second copy nothing will ever redact.
+		expect(rec.parseOutcome.detail).toContain('the backing tool exited 1');
+		expect(rec.workProductDerivation.reason).not.toContain('exited 1');
 	});
 
 	it('⭑ CONTROL — the REVIEWER still receives no reasoning, so the fix is not "record everything, leak everything"', async () => {
@@ -717,7 +826,8 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
-				identityEvidence: 'PROVIDER_REPORTED' as const
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
 			}))
 		});
 		const out = await runModelInvocationStep(input);

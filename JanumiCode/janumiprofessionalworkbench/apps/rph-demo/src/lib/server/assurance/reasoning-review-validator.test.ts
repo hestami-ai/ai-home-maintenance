@@ -25,6 +25,19 @@ import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-re
 import { createExchangeSink } from './exchange-capture.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 
+/**
+ * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
+ *
+ * ⚠ `canObserve: false` IS THE HONEST FIXTURE DEFAULT, not a convenience. These stand-ins are functions that
+ * return an answer; they mint no tool surface and watch no session, so they are not in a position to observe
+ * anything. A fixture reporting `canObserve: true, calls: []` would be claiming a measurement no fixture made —
+ * which is the very conflation `governedToolCallReport` exists to keep out of the record.
+ */
+const UNOBSERVED = {
+	canObserve: false as const,
+	reason: 'Fixture: this stand-in returns an answer and observes nothing.'
+};
+
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwa_conformance',
 	objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
@@ -446,7 +459,8 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 			answerText: CLEAN,
 			rawOutput: CLEAN,
 			producer: { agentId: 'devin', modelId, providerId: 'devin' },
-			identityEvidence: 'PROVIDER_REPORTED' as const
+			identityEvidence: 'PROVIDER_REPORTED' as const,
+			observedToolCalls: UNOBSERVED
 		});
 
 	it('⭑⭑ the REPORTED model reaches the exchange record, and is graded PROVIDER_REPORTED', async () => {
@@ -502,7 +516,8 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 			answerText: CLEAN,
 			rawOutput: CLEAN,
 			producer: { agentId: 'devin', modelId: '', providerId: '' },
-			identityEvidence: 'PROVIDER_REPORTED' as const
+			identityEvidence: 'PROVIDER_REPORTED' as const,
+			observedToolCalls: UNOBSERVED
 		});
 		await createAgyReasoningReviewValidator({ print: blank, modelId: JUDGE, exchanges }).evaluate(
 			SUBJECT,

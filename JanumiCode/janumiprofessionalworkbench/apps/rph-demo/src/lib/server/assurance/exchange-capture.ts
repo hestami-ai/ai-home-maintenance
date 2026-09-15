@@ -26,6 +26,7 @@ import type {
 	Purgeability,
 	StoredArtifactRef
 } from '@janumipwb/rph-ports';
+import type { ObservedToolCallReport, WorkProductDerivation } from '@janumipwb/rph-contracts';
 import { splitAnswerSpan } from './agy-cli.js';
 import {
 	beginExchange,
@@ -89,6 +90,19 @@ export interface CaptureTryInput {
 	readonly respondedAt: string;
 	/** E-5's detail — what became of the bytes between the model and the judgement. */
 	readonly parseOutcome: ExchangeParseOutcome;
+	/**
+	 * ⭐ R11 — WHICH BYTES THE ASSESSMENT RESTS ON, and ⭐ WHAT THE ADAPTER OBSERVED THE MODEL DO.
+	 *
+	 * ⛔ BOTH REQUIRED, AND NEITHER DEFAULTED, WHICH IS THE SAME REFUSAL `store`/`sink` MAKE IMMEDIATELY ABOVE
+	 * IN THE OTHER DIRECTION. Those two are optional TOGETHER because "neither was supplied" is a lawful,
+	 * disclosed degradation. These two are required because there is no honest default: whether this try owed a
+	 * work product is the CALLER's fact — an execution step owes one, a reviewer's call does not — and whether
+	 * the adapter could see tool calls is a fact about the adapter the caller drove. Any value chosen here
+	 * would assert one of those on somebody else's behalf, which is the fabrication `truncationState: 'unknown'`
+	 * and `parseOutcome: NOT_ATTEMPTED` were introduced to avoid.
+	 */
+	readonly workProductDerivation: WorkProductDerivation;
+	readonly observedToolCalls: ObservedToolCallReport;
 }
 
 /** A disclosed absence, which PER-9 permits — as distinct from the silent one it forbids. */
@@ -145,7 +159,10 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		// vanished. It compiled because that call site cast its argument — the cast was the bug, not the shape.
 		...(input.promptTemplateFingerprint
 			? { promptTemplateFingerprint: input.promptTemplateFingerprint }
-			: {})
+			: {}),
+		// ⭐ R11 — forwarded, never synthesized. `beginExchange` requires both for the same reason this does.
+		workProductDerivation: input.workProductDerivation,
+		observedToolCalls: input.observedToolCalls
 	});
 
 	// ⛔ A STORE WITHOUT A SINK IS A MISCONFIGURATION, NOT A DEGRADED MODE — REFUSE IT.

@@ -403,3 +403,34 @@ and the `extensions[]` escape hatch is UNREACHABLE from the command surface, alr
 ⛔ **AND `bun run gen` IS IN NO GATE STEP**, which this programme has already recorded as an open finding. A vocab
 change that regenerates artifacts nothing compares against its source is exactly the drift that finding names, so
 the freshness question arrives WITH this act rather than after it.
+
+### ⭐⭐ `R11`, AS LANDED AND THEN REVIEWED — three stated guarantees that had to become true
+
+The independent review of the landed act found **no problems and six weaknesses**, and three were one shape: a
+**stated guarantee that read stronger than what was enforced**, inside a contract that is PERMANENT under
+`PER-2` and governs a record `R10` has just confirmed is PERMANENT under `PER-8`.
+
+⛔ **WHAT WAS SAID AND WHAT WAS TRUE.** *"A minted name is drawn from a closed set the HOST authored and cannot
+carry model-chosen content"* — a host path, a username-bearing path, a credentials string, a NUL byte and a 200KB
+blob were all ACCEPTED as `toolName` with `nameProvenance: MINTED_BY_HOST`, because the boundary checked whether
+the DISCRIMINATOR and the FIELD agreed and never the name's CONTENT. *"BOUNDED: `calls` is capped at 32"* — 64
+calls declaring their own `recordedLimit: 64` were ACCEPTED, because the cap was the producer's and the boundary
+compared the list against a number the CALLER wrote. And the three free-text strings (`ObservedToolCallReport
+.reason`, `WorkProductDerivation.reason`, `sourceField`) re-opened the door that having **no `arguments` field**
+was designed to close.
+
+⭐ **THE REPAIR IS A PROPERTY OF THE SHAPE, NOT OF A CALLER'S HONESTY**, and it lives in the CONTRACT rather than
+in the handler, because a handler check governs one write path and a schema bound governs three — command
+payload, materialized state, and event payload. Validating a name against the host's ACTUAL minted set was
+considered FIRST and ruled out: the set is session-scoped, lives in an app adapter the host-agnostic kernel
+cannot reach, and minting it into the wire vocabulary is refused by this repository's own position that no
+ratified enum may name a tool, agent, provider, CLI or vendor because `PER-2` would make a deployment fact
+permanent.
+
+⚠ **AND THE HALF THAT IS STILL NOT ENFORCED IS SAID PLAINLY AND PINNED AS A TEST:** a host path and a
+credentials-shaped string are still accepted inside a `reason`, because telling prose from a path is a
+normaliser over an arbitrary string — the shape this programme already refused in Phase 2b `W1`. What warrants
+that content is that its author is the HOST, which is a producer property the boundary does not check.
+
+The full ruling, the driven evidence, the `W4` filing against `RPH-PER-010` and the `W5` correction are in
+ROADMAP §4g.
