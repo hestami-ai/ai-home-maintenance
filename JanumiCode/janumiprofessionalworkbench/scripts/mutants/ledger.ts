@@ -6254,9 +6254,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// ⭑ THE MUTATION EDITS THE MEASUREMENT, NOT THE CONDITION — this ledger's own recorded repair for the 21
 		// NO_COMPILE artifacts. `filter(() => true)` keeps every type intact and every branch reachable, and
 		// makes the address look complete however little of it is there.
+		// ⚠ THE FIRST VERSION OF THIS MUTATION WAS `filter(() => true)`, AND IT WAS A DEFECTIVE MUTANT. It
+		// reddened NINE tests, because `declared` is read by BOTH arms: it simultaneously admitted a partial
+		// address AND made every ABSENT derivation look as though it described bytes. An arrangement that trips
+		// two conjuncts proves NEITHER — the kill could not be attributed to the guard this entry names. Gated
+		// on `retains`, it now moves the retaining arm alone and the absent arms are untouched.
 		find: '\tconst declared = DERIVATION_ADDRESS.filter((f) => address[f] !== undefined);',
 		replace:
-			'\tconst declared = DERIVATION_ADDRESS.filter(() => true); // MUTANT: a partial address reads as whole',
+			'\tconst declared = retains ? [...DERIVATION_ADDRESS] : DERIVATION_ADDRESS.filter((f) => address[f] !== undefined); // MUTANT: a partial address reads as whole',
 		expectRed: ['packages/rph-application/src/handlers/model-exchange.test.ts'],
 		why: "PROMISE, in `WorkProductDerivation`'s vocabulary note: the WHOLE address is named, not just the key, *\"for the reason ExchangeContentRef records: a reference that cannot be verified is a reference that cannot be challenged\"*. WHO RELIES: anyone re-hashing the retained bytes to decide whether this record lied about them — which is the only thing that distinguishes a declaration from an assertion. WHAT THE MUTATION DOES TO THEM: a derivation carrying a `storageKey` and nothing else is ACCEPTED, so the governed record names a location with no hash to check it against and the reader is back to believing it. ⭑ The CONTROL (a complete address is still accepted) stays green, which is what separates this from a handler that refuses everything.",
 		source: 'JAN-EXEC R11 — the derivation half of the boundary'
