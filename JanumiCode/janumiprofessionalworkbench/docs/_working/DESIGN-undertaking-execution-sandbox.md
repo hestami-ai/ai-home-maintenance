@@ -107,12 +107,36 @@ data (must carry NO exitCode): undefined
 ```
 
 `timedOut` is likewise its own field, never inferred from the exit code — §36.2 separates TIMEOUT from
-TOOL_FAILURE, and a SIGKILLed process on Windows reports `null`, not a distinguishable number.
+TOOL_FAILURE, and a SIGKILLed process on Windows reports `null`, not a distinguishable number. ⛔ **AND
+"OBSERVED" MEANS ONE PARTICULAR OBSERVATION, WHICH PHASE 2b's ADVERSARIAL PASS HAD TO CORRECT (`B2`):** whether
+the CHILD WAS STILL RUNNING when the budget ran out. Not what `child.kill()` returned — measured against one
+already-exited child, bun answered `true` and node answered `false`.
+
+⛔ **AND THE OUTCOME IS DERIVED FROM THE CHILD, NEVER FROM THE STDIO STREAMS (`B3`).** `close` waits on the last
+pipe and a pipe outlives its child; a detached grandchild inheriting stdio held one open and `run()` was still
+pending 9028ms after a 2000ms timeout. **A promise that never settles is worse than any wrong answer**, because
+the whole premise of the union above is that a refusal is a fact a step can record. `run` always settles; when
+the streams had not closed, `outputComplete: false` says so rather than letting a partial capture read as whole.
+
+⛔ **THE NO-SHELL GUARANTEE HAS A PLATFORM PRECONDITION, AND IT IS KEPT BY A REFUSAL (`B1`).** `argv` promises
+that no quoting rule applies — and Win32 cannot load a `.bat`/`.cmd` as a program image, so the runtime hands it
+to `cmd.exe`, which re-parses `&`, `|`, `>` and `"` INSIDE arguments. Node closed this as CVE-2024-27980; **bun,
+this repository's declared package manager, has no equivalent guard**, and the injection was DRIVEN under it —
+including through a bare `npm`, which is a `.cmd` shim. ⭐ The class of target is REFUSED rather than the
+argument escaped: this seam has already spent three rounds learning that every new normaliser is itself
+attackable, and there is no `cmd.exe` quoting scheme this repository should be maintaining.
 
 ⚠ **THE TWO PORTS ARE NOT INDEPENDENT.** A `ProcessRunner` needs a real `cwd`; an in-memory workspace has none.
 A host wiring a REAL runner against an IN_MEMORY workspace must be caught **before anything runs**, or the command
 executes in some other directory — the one failure this seam must never have. Hence `materialization` on the
 workspace, checked rather than trusted.
+
+⛔ **AND THE CHECK BELONGS IN THE RUNNER, NOT IN A HELPER (`B8`).** `planProcessRun` derives a lawful request and
+refuses the bad pairing early, and this design called it the sanctioned constructor — but `ProcessRunRequest` is
+a plain interface, the function had **zero production call sites**, and a caller who simply filled in `cwd` ran a
+command inside this repository. ⭐ **A CONVENTION WITH NO CALL SITES IS NOT A CONTROL.** The REAL runner is
+therefore CONSTRUCTED against the deliverable workspace — the one directory it may run in — and refuses any
+other `cwd`. Planning stays useful; nothing downstream may assume it was called.
 
 ⛔ **IN-MEMORY / REFUSING DEFAULTS SHIP BESIDE BOTH PORTS** so the repository gate stays hermetic: no existing
 test gains a real filesystem or a real child process.
@@ -189,8 +213,13 @@ model's context and into the step record.
 **R7: both streams retained, both brought under the same purge machinery as artifact content.** That is why
 `Workspace` gains `purge` — which the spike shipped WITHOUT, and the artifact-store's own header explains why
 that default is wrong: `purge` *"is the port's reason for existing, and `put` is what it enables."* Retention of
-model-participating content is unlawful rather than merely unbuilt without it. ⛔ **The guard stays RED until this
-lands; it is not to be silenced.**
+model-participating content is unlawful rather than merely unbuilt without it. ~~⛔ **The guard stays RED until this
+lands; it is not to be silenced.**~~ ⭐ **LANDED 2026-09-14 (Phase 2b).** The guard was never silenced: it was
+RE-POINTED from an ABSENCE onto the DISPOSITION, per its own message, and gained four limbs plus a driven
+refusal it could not previously make. `REG-Q-066`'s stated bound is now **CLOSED BY DISPOSITION** — both
+streams `PURGEABLE_AT_EXPIRY` in a SECOND workspace (the deliverable is `RETAINED_BY_PARTICIPATION` under
+`R8` and its `purge` refuses), referenced by `ProcessRunOutcome.retention` so nothing is `REG-F-336` C-2's
+orphan, and reachable by `Workspace.purge`. See `ROADMAP-undertaking-execution-sandbox.md` §4d.
 
 ### 4.6 Step type — MODEL_INVOCATION with tools
 
@@ -270,6 +299,18 @@ driven unprivileged on this host and both are carried by DISCLOSURE PROBES in th
 change that closes one reddens a test and forces the disclosure to be rewritten rather than quietly outliving
 it.
 
+⛔ **AND THE ROOT SWAP WAS THEN DRIVEN THROUGH THE `ProcessRunner`, WHICH IS A DIFFERENT SEAM AND A DIFFERENT
+ANSWER (`B11`, §4f).** A junction standing where the deliverable directory was made a LAWFUL `cwd` execute a
+command in the tree it pointed at. ⭑ THE RUNNER CAN CLOSE THIS FOR ITS OWN ACT AND THE WORKSPACE CANNOT CLOSE IT
+FOR HERS, and the reason is worth stating because it is a property rather than an effort difference: the runner
+compares the RESOLVED `cwd` against the directory the host DECLARED — the one name a swap cannot move — while
+containment inside a workspace is necessarily *is this child path under that ROOT*, and a swapped root resolves
+consistently for every child under it. ⚠ **SO THE WORKSPACE'S DISCLOSURE IS UNCHANGED AND STILL TRUE:** a root
+swap still redirects every read, write and listing THROUGH the workspace, its disclosure probes still pass, and
+what is now refused is only the act of RUNNING A COMMAND in a directory the filesystem no longer agrees is the
+workspace. ⛔ The general lesson is the one this section already argues: the fix was available because a
+DECLARATION existed to compare against, not because one more string comparison was added.
+
 ⛔ **WHAT THIS RULING DOES NOT LICENSE.** It is not permission to stop refusing: the organisational boundary is
 the thing that makes an Undertaking's deliverable findable and its accidents legible, and every refusal in the
 adapter stays. It is permission to stop pretending — and to stop adding one more string comparison per
@@ -282,7 +323,9 @@ adversary, which is what §4.8 exists to end.
 
 - ⛔ **No regression of the authoring plane.** It works live; it is the reference, not the subject.
 - ⛔ **No default that fabricates.** No exit code from a command that did not run; no `materialization` assumed.
-- ⛔ **No silencing of REG-Q-066.** Red until the retention disposition lands.
+- ~~⛔ **No silencing of REG-Q-066.** Red until the retention disposition lands.~~ ⭐ **HONOURED — the
+  disposition landed 2026-09-14 (Phase 2b) in the same commit as the binding, per roadmap rule 8, and the
+  gate now checks the disposition rather than the absence.**
 - ⛔ **No ratchet baseline regenerated to make a spike pass.** `POPULATION_CHANGED` on the new ports is honest
   bookkeeping and belongs in the commit that legitimately adds them, with their guards.
 - ⛔ **No merge of `spike/tool-execution`.** It proved the seam; it is not the implementation.
@@ -300,7 +343,8 @@ adversary, which is what §4.8 exists to end.
    is recorded as DEFERRED TO THE PLATFORM POLICY PLANE. The spike coined `process-execution`. ⚠ Collapsing it
    into `file-system` would be worse than coining: starting a process is strictly larger than writing a file, and
    merging them makes the grant unable to express the distinction the live precision control turned on.
-2. **REG-Q-066's retention disposition**, re-answered per R7.
+2. ~~**REG-Q-066's retention disposition**, re-answered per R7.~~ ⭐ **DELIVERED 2026-09-14 (Phase 2b).**
+   ⚠ `REG-Q-066`'s three readings of ASR-11's raw validator output stay OPEN and stay the sponsor's.
 3. **`pol_test_adequacy`** (R4, second half), with its conformance rule amended in the same act.
 4. **Whether workspace content is PER-8 participating material.** A test run that evidence cites certainly is.
 

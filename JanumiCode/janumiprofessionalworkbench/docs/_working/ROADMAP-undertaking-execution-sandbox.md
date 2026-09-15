@@ -433,6 +433,326 @@ later.
 
 ---
 
+## 4d. Phase 2b · ⭐ LANDED 2026-09-14 — the REAL `ProcessRunner`, and the question it was never allowed to land without
+
+⭐ **RULE 8 IS THE WHOLE SHAPE OF THIS COMMIT.** *"A disclosed question is answered in the commit that reopens
+it, never later."* Phases 1 and 2 shipped the port, the refusing default, the durable workspace and the
+containment fixes, and each one ends with the same line: ⛔ **no real runner, because a real runner captures
+`stderr` and that reopens `REG-Q-066`.** So the runner and the retention disposition land together or neither
+lands.
+
+**WHAT LANDED.** `apps/rph-demo/src/lib/server/execution/child-process-runner.ts` (the adapter — `R3`, beside
+`filesystem-workspace.ts`), a `retention` and an `omittedRegions` field on `ProcessRunOutcome`'s ran arm, a
+`workspaceDirectoryName` derivation promoted into the port, a SECOND workspace on `UndertakingSandbox`, and a
+rewritten `verif/agy-stderr-unbound.test.ts`.
+
+### `REG-Q-066`, re-answered — **CLOSED BY DISPOSITION**
+
+`REG-F-326` closed the stated bound as *"CLOSED BY NON-USE"* and said exactly why that was gated rather than
+noted: *"An answer that rests on the code NOT doing something rots the moment someone does it."* It has.
+
+⭑ **THE ANSWER IS GIVEN PER THE GATE'S OWN INSTRUCTION, NOT AGAINST IT.** Its message names what an author who
+ends the absence owes — *"it needs a retention disposition and REG-Q-066 needs re-answering; it must not arrive
+as a debugging convenience"* — and both are in this commit:
+
+| | |
+| --- | --- |
+| which class each stream carries | **`PURGEABLE_AT_EXPIRY`, both of them — FORCED, not chosen.** `R7` says both *"come under purge"*; `PER-8` makes `purge` REFUSE on `RETAINED_BY_PARTICIPATION`; `Purgeability` has exactly two members and `REG-Q-056` is OPEN, so no third is coined. One member survives the conjunction. ⭑ `REG-D-050` agrees on the merits — *"PARTICIPATION IS A PROPERTY OF USE, NOT OF KIND"* — and nothing cites a captured stream in a recorded judgement today. |
+| where they live | **A SECOND workspace**, sibling to the deliverable at `<dir>.process-output`. The port already ruled the consequence: *"one workspace cannot hold participating and purgeable material side by side. A host needing both declares two."* A sibling rather than a subdirectory is Phase 2's `F1` applied — a reserved area inside a directory a step writes to is a name a step can spell. |
+| what REFERENCES the bytes | **`ProcessRunOutcome.retention`**, REQUIRED on the ran arm, carrying the owner id, the class and both workspace-relative paths. `REG-F-336` C-2 forbids *"content on the content plane with no record on the record plane pointing at it"*, and an outcome returning only the strings would have minted that orphan on the first command that printed. |
+| how purge REACHES them | **`Workspace.purge(path)`** — same signature and semantics as `ArtifactStore.purge`, on a workspace declared purgeable so it does not refuse. Driven both ways: the deliverable REFUSES with `PER-8`, the capture SUCCEEDS and keeps its tombstone. |
+
+⛔ **AND ONE THING `R7` DOES NOT BUY, STATED SO IT IS NOT READ WIDER.** Nothing SCHEDULES a purge — retention
+expiry is a policy this repository does not have. What lands is that the bytes are addressable and destructible,
+which is the clause that makes retaining them lawful; a sweeper is not claimed.
+
+⛔ **A CONSTRAINT ON PHASE 5 FOLLOWS, RECORDED WHERE IT WILL BE BROKEN.** When a `TEST_RESULT` becomes evidence,
+the PARTICIPATING object must be **minted** — content-addressed into the `ArtifactStore` under
+`RETAINED_BY_PARTICIPATION` at the moment of participation — and must **not be this capture re-labelled**. That
+is §9.7's split for a model reply whose halves carry opposite obligations; re-labelling would make `R7` false
+for every run after it.
+
+### The guard is TIGHTENED where it is NARROWED
+
+One file leaves the absence population, so four limbs the previous gate was structurally unable to make are
+added: the disposed-site list is **PINNED at one**; every site must **EXIST**; every site must **ACTUALLY BIND**
+`stderr` (so an unused exemption cannot sit waiting for the next file that wants one); and `agy-cli.ts` —
+`REG-Q-066`'s ORIGINAL subject — is asserted **by name** to bind none, with its own control that it is in the
+population. ⭑ Plus the limb a source scan cannot make at all: `createChildProcessRunner` **REFUSES** to be
+constructed against a workspace whose bytes could never be purged, driven with a control, and `P2B-m` is the
+mutant that proves that gate checks a property rather than an absence.
+
+### Secrets in a captured stream — in scope, answered, and bounded rather than closed
+
+A command's stderr can echo the environment it ran in, and this server's holds model-provider credentials. The
+child therefore does **not** inherit `process.env`; it receives an allowlist by NAME. ⛔ **A reduction, not an
+elimination**, and the residue is stated: `PATH`- and `USERPROFILE`-shaped variables are allowlisted and
+themselves disclose host layout and the operating user; a secret placed IN an allowlisted variable passes
+through; and ⛔ **a secret the command reads from DISK is not covered at all** — a `.env` in the workspace, a
+cached token — which is finding `#60` from the other side and needs a redaction capability this repository does
+not have. What bounds it meanwhile is `R9`: the bytes sit in a purgeable workspace inside the Undertaking's own
+root, and the security tier belongs to the deployment environment.
+
+### The runner
+
+`shell: false` with an argv ARRAY (driven: a `>` argument creates no file); `stdio[0] = 'ignore'` so a command
+reading input is not recorded as a TIMEOUT for waiting on the server; a watchdog that actually kills, with
+`timedOut` OBSERVED at the kill; capture bounded at 64 KiB per stream with the cut DECLARED as an
+`OmittedRegion`-shaped omission and trimmed to a UTF-8 boundary so no character the process never emitted enters
+the record; every failure a `ran: false` refusal naming the errno CODE and the workspace DIRECTORY NAME. ⛔ A
+program that does not exist is `ran: false` — **never** `ran: true, exitCode: 127`, which is the plausible
+fabrication.
+
+**PROOF — 18 declared mutants, `bun run mutants P2B-` → 18 of 18 KILLED, 0 SURVIVED, 0 UNANCHORED, 0
+NO_COMPILE.** `P2-ae` is RETIRED onto `P2B-a` (the derivation MOVED into the port; verified RETIRED), and
+`P2-ad` still KILLED. ⭑ **AND THE FOUR LIMBS NO MUTANT CAN REACH — the ones that live inside the rewritten gate
+itself — were driven by hand instead**: seven arrangements, every one observed RED on the limb it targets. A
+second file binding `stderr`; a second list entry; an entry naming a file that does not exist; an entry naming a
+file that binds nothing; `agy-cli.ts` binding `stderr`; the original subject named by a path nothing has; and
+the walk pointed at a directory that does not exist, which reddens the positive control.
+
+⚠ **AND A THIRD CLAIM OF MINE WAS WRONG — one I wrote as a justification and then checked.** The new
+`ProcessOutputOmission` does not reuse `rph-contracts`' `OmittedRegion`, and the plausible reason I first gave
+— *"rph-ports cannot depend on rph-contracts"* — is **FALSE**: `rph-ports/package.json` declares that
+dependency and `.dependency-cruiser.cjs` says outright *"rph-ports declares interfaces only; it depends solely
+on rph-contracts."* The real reason is narrower and better: `OmittedRegionSchema.role` is a CLOSED, GENERATED
+enum of model-exchange roles with no member for a process stream, so reuse means recording every cut as `OTHER`
+— losing WHICH STREAM was truncated — or a vocab change plus a regeneration plus a ratification, which is
+Phase 4 Part B's act and not this one's. The SHAPE is adopted, the TYPE is not, and the debt is stated at the
+declaration instead of hidden behind an import.
+
+⚠ **ONE DEFECT WAS FOUND BY PROBING THE ADAPTER RATHER THAN BY READING IT, and it is the kind this seam exists
+to refuse.** `spawn` raises `ERR_INVALID_ARG_VALUE` **synchronously** for an embedded NUL in the program name,
+for a NUL in an argument, and for an empty program name — measured, all three — so none of them reaches the
+`error` event, and `run` was returning a REJECTED PROMISE: a stack trace where the port requires a fact a step
+can record. Fixed with its own arm, its own case and `P2B-r`. ⭑ That arm also refuses to quote the malformed
+argv back, because a NUL byte in a `refusedBecause` travels into a governed record and into a model's context.
+
+⚠ **TWO MUTANTS SURVIVED THEIR FIRST RUN AND BOTH ARE RECORDED RATHER THAN QUIETLY REPLACED**, because what they
+exposed was worth more than the entries were.
+- **`timedOut: exitCode === null` SURVIVED — and the port's stated rationale for the rule is WRONG ABOUT WHICH
+  PLATFORM IT BITES ON.** Four arrangements driven: this runner's own `child.kill('SIGKILL')` → `exitCode: null,
+  signal: 'SIGKILL'`; an EXTERNAL `process.kill(pid,'SIGKILL')` → `exitCode: 1, signal: null`; the child killing
+  itself → `exitCode: 1`; `process.abort()` → `exitCode: 134`. So on Windows a null exit code arises ONLY from
+  the kill this runner issued, the inference and the observation coincide, and no arrangement separates them.
+  ⭑ On POSIX an external SIGKILL delivers null and a process the OS killed is a `TOOL_FAILURE`, not a `TIMEOUT`
+  — so the rule stands and what is corrected is the claim that Windows is where it bites. The flag is pinned in
+  both DIRECTIONS instead (`P2B-d` never reported, `P2B-q` always reported), because declaring an
+  indistinguishable mutation as a guard would be a guard that cannot fail.
+- **`only stdout is bounded` SURVIVED because it mutated the wrong line.** The early `return` at the cap is an
+  ALLOCATION guard; the BOUND is `room`, which reaches 0 and makes every later slice empty. Re-pointed at both,
+  and the code now says which line does which — a redundancy a mutant found and a reading would not have.
+
+**BASELINES:** `guards:export` regenerated by its own writer in this commit — **341 of 341 guarded, obligation
+0**, up from 340 because `workspaceDirectoryName` became a production-consumed export the moment the refusing
+default read it. `coverage:floor:check` is clean and was NOT regenerated: no uncovered count rose and the
+population did not move. `bun run gate:fast` → **13 of 13 green** (374 test files, 93 e2e).
+
+---
+
+## 4e. Phase 2b · ⛔ ADVERSARIAL PASS — ten breaches DRIVEN through the runner §4d landed
+
+⭐ **EVERY ONE WAS DEMONSTRATED, NOT ARGUED, AND EVERY FIX IS PROVED BY AN OBSERVED RED USING THE ATTACKER'S OWN
+VECTOR.** The eighteen mutants §4d lists are all still declared; what none of them covered is the gap between a
+guarantee the port states UNCONDITIONALLY and a platform fact nobody had measured. Four of the ten live there —
+`shell: false` against a runtime with no CVE-2024-27980 guard, `timedOut` against a `kill` that answers
+differently on two runtimes, `close` against a pipe that outlives its child, and `planProcessRun` against a
+request shape any caller can fill in.
+
+| # | what was driven | where it was fixed | its mutant |
+| --- | --- | --- | --- |
+| B1 | a `.cmd` target under **bun** with `shell: false` ran an injected `&` and left `pwned.txt` on disk; a BARE `npm` did the same through PATH+PATHEXT | the batch-target CLASS is REFUSED — as spelled (`namesABatchTarget`, in the port) and as resolved (`batchTargetReached`, in the adapter) | `P2B-s`, `P2B-t`, `P2B-u` |
+| B2 | `timedOut: true` for a child that wrote its whole output and exited 0 in ~10ms | the deadline observes whether the CHILD WAS STILL RUNNING; `child.kill()`'s own answer is unusable (bun `true`, node `false`, same exited child) | `P2B-x` |
+| B3 | `run()` STILL PENDING 9028ms after a 2000ms timeout when a detached grandchild held the inherited pipes | settlement is on `exit` with a bounded drain, and a bounded grace follows the kill so `run` always produces a fact | `P2B-y`, `P2B-z`, `P2B-af` |
+| B4 | `{ran:false}` for `no-such-tool-zzz`, then `stdout.txt`/`stderr.txt` appeared 400ms later and `list()` reported them live | the outcome is CLAIMED first and retention happens inside the claim, so a run with no outcome retains nothing | `P2B-aa` |
+| B5 | `refusedBecause` carried `argv.join(' ')` raw — an absolute program path and, under bun, the operating user's name. ⛔ **AND AT BOTH ADAPTERS**, which the brief did not name and a grep for the site did | `programFileName` in the port, beside `workspaceDirectoryName`; arguments do not travel at all, from either adapter | `P2B-ab`, `P2B-ag`, `P2B-aj` |
+| B6 | 200 KiB of stdout declared its cut on the TRANSIENT outcome while `captures/<uuid>/stdout.txt` was a silent 65536-byte prefix | the cut travels WITH the durable copy — `retention.omittedRegions` in the record, `omissions.json` beside the bytes | `P2B-ac`, `P2B-ad` |
+| B7 | an IN_MEMORY workspace with the right class was accepted; `retained: true` with a `stdoutPath` for bytes in a `Map` | the construction guard checks `materialization` as well as `purgeability`, as a SEPARATE conjunct | `P2B-ae` |
+| B8 | `run({argv, cwd: <this repository's root>})` executed IN THE SERVER'S OWN TREE | the runner is CONSTRUCTED against the deliverable workspace and refuses any other `cwd` | `P2B-v`, `P2B-w` |
+| B9 | five realistic shapes walked past the `REG-Q-066` binding probe, each with a working control | a structural TypeScript AST walk with constant-key folding, replacing a line-at-a-time regex pair | `P2B-ah`, `P2B-ai` |
+| B10 | a `.bat` target under node raised EINVAL and the refusal answered *"an embedded NUL byte, or an empty program name"* — a CLOSED disjunction, neither limb true | the batch target never reaches that arm, and the arm no longer closes its list of causes | subsumed by `P2B-s` |
+
+⭐ **THE GOVERNING INSTRUCTION, AND IT IS WHY B1 IS A REFUSAL RATHER THAN AN ESCAPE.** Phase 2 spent three
+rounds discovering that each new normaliser is itself attackable and settled only when a guard was DELETED by
+moving the hazard out of reach. There is no quoting scheme for `cmd.exe` this repository should be maintaining,
+so a class of target whose guarantee cannot be kept on this runtime is refused instead. The same instruction
+governs B8: the honest fix is STRUCTURAL — give the runner the workspace so it CAN check — because
+`planProcessRun` was called *"the only sanctioned way to build a request"* and had **zero production call
+sites**. ⛔ **A CONVENTION WITH NO CALL SITES IS NOT A CONTROL**, and this roadmap said the opposite until now.
+
+⚠ **THE OVER-REFUSALS, STATED RATHER THAN DISCOVERED.** The batch check refuses on EVERY platform (the rule
+`containedWorkspacePath` already follows: one argv must not mean two things), and it refuses whenever ANY
+existing candidate on the search path is a batch file rather than reimplementing a resolution order that
+DIFFERS between the two runtimes — measured, for a bare name bun did not search the cwd and node did. What is
+NOT claimed: a model naming `cmd.exe` as the program gets a command interpreter, because it asked for one. That
+is an argv policy for Phase 3, not the no-shell guarantee, which is about what this code interposes.
+
+⚠ **B3's COST IS DECLARED RATHER THAN HIDDEN.** Settling on the child buys an outcome where there used to be
+none; what it spends is the guarantee that nothing more was coming. `ProcessRunOutcome.outputComplete` is that
+statement, and it is REQUIRED. ⛔ And the field had to be SNAPSHOT before the outcome is claimed — claiming
+destroys the pipes, which fires `close` — or it reported `true` for the very arrangement it exists to describe:
+a field answering about the instrument's own act rather than about the run.
+
+⛔ **AND `B5` WAS LIVE AT A SECOND SITE THE BRIEF DID NOT NAME — the shape this repository files most often.**
+`createRefusingProcessRunner` had the IDENTICAL `request.argv.join(' ')` interpolation, so the fix at one
+adapter would have left the rule stated generally and implemented once. ⚠ WORSE, ITS OWN SPEC ASSERTED THE
+LEAK: `expect(refusedBecause).toContain('node --test')` **required** the argv to be echoed, which is how a fix
+comes to look like a regression — and the comment three lines below it had already recorded the identical
+lesson about the `cwd` without anyone applying it to the argv standing beside it. Found by grepping the
+OBLIGATION (`argv.join`) across both packages rather than by reading the one file the breach named. `P2B-aj`
+guards it, and an empty argv now names **no command** rather than `''`, which is `RULE 6` at the fallback that
+fix could have introduced.
+
+⛔ **THE WEAKNESS THAT UNDERWROTE SEVERAL OF THESE, and it is an instrument defect rather than a code one.** The
+suite's ENTIRE retention half ran on `createInMemoryWorkspace` — so *"both streams are retained"*, *"both come
+under purge"* and the half-written-pair sweep each proved their property about a `Map` and never about
+`createFilesystemWorkspace`, the only adapter the host wires. B7 is precisely what got in through that gap. Both
+workspaces in the suite are real directories now, arranged as the host arranges them (`<deliverable>` and
+`<deliverable>.process-output`), the retention cases ask `existsSync` as well as the workspace, and the
+"capture refused" case is driven by planting a FILE where the capture directory has to go rather than by a stub.
+
+⚠ **ONE LIMB IS VACUOUS ON THE RUNTIME THE SUITE RUNS ON, AND THE SUITE SAYS SO.** Vitest's workers are NODE
+(`process.execPath` measured), and node raises EINVAL for a batch target, so `pwned.txt` cannot appear there
+even with the guard removed. That assertion is the artefact limb for BUN, where the breach was driven; the
+limbs that discriminate under node are the refusal's MESSAGE. A control that fails the same way as its subject
+reads as agreement, so it is written down instead of left to look like proof.
+
+⚠ **AND B9's PROBE CARRIES ITS OWN DISCLOSED LIMIT.** A key computed from a RUNTIME value is not decidable by
+any source probe. What the AST walk reaches is every constant spelling — including `r['std' + 'err']` and its
+template form, folded — and every `Identifier`, whatever syntax carries it. Its negative control is as
+load-bearing as its positive one: the probe it replaces matched the token ANYWHERE and therefore reddened on
+`agy-cli.ts`'s own comment explaining why `stderr` must not be bound, unnoticed for two days.
+
+**PROOF:** every fix was watched FAILING first, using the attacker's own arrangement — the real `.cmd` target
+and its argv, a `.cmd` shim reached by a bare name through PATH, the four trailing-dot spellings, the detached
+grandchild holding the pipes, `no-such-tool-zzz` with a 400ms wait, an absolute program path with a host path
+in its argument, 200 KiB of stdout, the IN_MEMORY workspace with the lawful class, a cwd outside the workspace,
+a real child whose `terminate` does nothing, each of B9's five shapes with two controls, and the refusing
+default's own absolute program path with a tenant path in its argument. **19 driven mutations, each reddening a
+named case.**
+
+⛔ **AND THE DECLARED-MUTANT RUN FOUND THREE MORE INSTRUMENT DEFECTS, WHICH IS THE WHOLE REASON IT IS RUN.**
+Not one was in the code; all three were in things that decide whether a defect gets reported.
+- **`P2B-z` came back INCONCLUSIVE, not KILLED.** Removing the post-kill grace makes the backstop case WAIT, so
+  vitest's own 60-second clock ran out and the mutation was never measured. ⭐ A case that demonstrates *"run
+  always settles"* by hanging when it does not hands the ledger an UNMEASURED verdict, which BLOCKS and says
+  nothing about the guard. The runner's own message is the instruction that was followed — *"Fix the slow test;
+  do not raise the timeout"* — so both pipe-holding cases now await under a BOUND and assert the property, and
+  silence is a named failure in seconds rather than a hang.
+- **`P2B-w` came back NO_COMPILE**, because `if (false)` over the deliverable-workspace guard makes everything
+  below it lose its narrowing. That is this ledger's recorded artifact and it is INDISTINGUISHABLE, in a verdict
+  table, from a real type-level guarantee. Re-formulated as the CONSEQUENCE — the fallback
+  `resolvePath(deliverableDirectory ?? '')`, which is the SERVER'S OWN directory — so the defect is expressible
+  and therefore measurable.
+- **`P2B-n` came back NO_COMPILE** because its mutation predates the parameter this pass adds. ⚠ It is rewritten
+  rather than retired, and the rewrite is recorded IN THE ENTRY, because a rewritten mutant is exactly where a
+  claim quietly weakens: the wiring it models is now REFUSED AT CONSTRUCTION (`B7` and `B8`) rather than merely
+  reported downstream by `planProcessRun`, which is a strengthening and would otherwise be invisible.
+
+⚠ **AND TWELVE ANCHORS MOVED WITH THE CODE THEY NAME** — ten in the runner and the port, plus `P2-j` and `P2-k`
+in `workspace-host.ts`, whose target moved when the deliverable workspace was hoisted out of the return so the
+runner could be constructed against it. All twelve were re-anchored IN THIS COMMIT and none was retired.
+
+**MUTANTS:** `bun run mutants P2B-` — **36 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 INCONCLUSIVE**, re-measured at HEAD rather than
+arithmetic-shifted from the first pass.
+
+**BASELINES:** `guards:export` regenerated by its own writer in this commit — **343 of 343 guarded, obligation
+0**, up from 341 because `programFileName` and `namesABatchTarget` became production-consumed exports.
+`coverage:floor:check` is clean and was NOT regenerated: the two branches the port gained were UNREACHABLE (an
+`?? ''` behind a refusal that has already returned), so they were DELETED rather than baselined over — a guard
+that cannot fail wearing the shape of defensiveness.
+
+---
+
+## 4f. Phase 2b · ⭐ THIRD ADVERSARIAL PASS — the ten re-driven breaches held; the ELEVENTH was the same defect one instrument down
+
+A third pass re-drove all ten of §4e's vectors against the landed runner: **TEN CLOSED, ONE NEW BREACH DRIVEN.**
+
+| # | what was driven | where it is fixed | its mutant |
+| --- | --- | --- | --- |
+| B11 | the deliverable directory REPLACED by an `mklink /J` junction AFTER construction; a LAWFUL `cwd` then matched the check exactly, the OS followed the junction, and the command wrote `PWNED_IN_SERVER_TREE.txt` into the stand-in server tree | the check asks the FILESYSTEM, per call: `realpath(request.cwd)` must be the workspace's DECLARED directory, and a cwd that does not resolve at all REFUSES | `P2B-ak`, `P2B-al`, `P2B-am`, `P2B-an` |
+
+⛔ **`B11` IS `B8` AGAIN, AND THAT IS THE FINDING RATHER THAN A COINCIDENCE.** `B8`'s fix was structural and it
+held: the runner is constructed against the deliverable workspace, so the check sits in an object a caller
+cannot go around, and `P2B-v` still kills. What it could not fix is that the check was still
+`resolvePath(request.cwd) !== deliverableRoot` — **arithmetic on text, with one side fixed at construction.**
+`resolve` cannot see a reparse point, and a root measured once cannot notice a swap that happens afterwards.
+⭑ Both properties the fix needed were properties the old check LACKED: resolution at CHECK TIME, and a refusal
+when the path does not resolve at all.
+
+⛔⛔ **AND THE OBVIOUS REUSE — LIFT `insideResolvedRoot` FROM THE SIBLING MODULE — DOES NOT CLOSE IT. MEASURED,
+NOT ARGUED.** That helper says, in its own words, *"IT ASKS THE FILESYSTEM, NOT THE STRING … `realpath` resolves
+reparse points — measured on a `mklink /J` junction"*, which is exactly the instrument this breach needs. But it
+resolves **BOTH** sides, and under this arrangement both sides walk through the same junction: driven on
+**node 24.11.1 and bun 1.3.14**, `realpath(cwd) === realpath(root)` answers **TRUE for the breach**.
+- ⭑ THAT IS NOT A DEFECT IN THE SIBLING. It is right for ITS question — *is this CHILD PATH inside that root* —
+  and `filesystem-workspace.ts` already discloses this very arrangement as its **bound 2, ROOT SWAP, OPEN**.
+- ⭐ WHAT THE RUNNER HAS THAT THE WORKSPACE DOES NOT IS A **DECLARED NAME**: the host STATES the deliverable
+  directory, and the one thing a swap cannot move is that statement. So the comparison is ASYMMETRIC on purpose
+  — the RESOLVED cwd against the DECLARED directory — and it closes, for the act of RUNNING A COMMAND, a vector
+  that stays open for the workspace's own reads and writes. **The workspace disclosure is unchanged and its
+  disclosure probes still pass.**
+- ⚠ SO THE HELPER WAS NOT LIFTED, AND `P2B-al` IS THAT DECISION MADE RE-RUNNABLE: the mutant IS the lift, and
+  it reddens. Without it the next author reads the sibling's comment and weakens the check back to symmetry.
+
+⚠ **THE OVER-REFUSAL, STATED RATHER THAN DISCOVERED.** A host whose durable root legitimately lies under a
+symlink, a junction or an 8.3 spelling has a deliverable directory that never resolves to its own declared
+name, and this runner then refuses EVERY run — loudly, immediately, with the remedy in the refusal. That is the
+safe side of a comparison nobody gets right, and it is the same posture `B1` takes for batch targets.
+⭑ MEASURED on this host: `realpath` equals `resolve` for the repository root and for `tmpdir()` under both
+runtimes, and `realpath` does NOT canonicalise case on Win32 — so the case-sensitivity of the comparison is
+exactly what it already was.
+
+### The three DISCLOSED weaknesses, ruled — one disclosed, two fixed
+
+| # | the weakness | ruling |
+| --- | --- | --- |
+| `W1` | `programFileName` returns the LAST path segment, so a model-chosen `argv[0]` that is a host path fragment leaks its deepest name: `programFileName('C:\Users\mchen')` = `'mchen'` | ⚠ **DISCLOSED, NOT FIXED** — and converted from prose into a gated case (`P2B-ar`) |
+| `W2` | a `purge` that THROWS during `refuseAndSweep` left the landed bytes with `retained:false` and nothing naming them — `REG-F-336` C-2's orphan | ⭐ **FIXED** — a throw is reported as the refusal it amounts to, and the record NAMES the orphan (`P2B-ao`) |
+| `W3` | the `REG-Q-066` probe population walked `.ts` only, EXCLUDING 11 `.svelte` files and any `.mts`/`.cts`/`.js` | ⭐ **FIXED, IN ITS GENERAL FORM** — the population is derived and the EXCLUSION is declared and gated (`P2B-ap`, `P2B-aq`) |
+
+⚠ **`W1` — WHY DISCLOSING IS THE RULING AND NOT A DEFERRAL.** Something must name the failed program: the
+commonest refusal in this seam is *"'tsc' could not be started (ENOENT)"* and a refusal that names nothing is
+unactionable. Every alternative was measured against this seam's standing instruction that **every new
+normaliser is itself attackable**: naming nothing loses the one fact a reader acts on; naming only
+separator-free programs drops the name exactly in the ordinary case (an absolute path to an executable); and
+deciding whether a segment *"looks like a program name"* is a predicate over an arbitrary string — a normaliser.
+⭑ **AND THE PROPERTY THAT MAKES IT THE RIGHT TRADE:** every path in a refusal that came FROM THE HOST is reduced
+by this same rule, and what remains is ONE segment of a string **the caller supplied**. A model that spelled
+`C:\Users\mchen` already holds it. **What a reader can still act on:** the errno CODE, the workspace's
+DIRECTORY NAME, and the final segment of `argv[0]` as spelled. **What they cannot recover** — the point of the
+bound — is the DIRECTORY the program was sought in.
+
+⭐ **`W3` — THE REPAIR IS THE GENERAL FORM, BECAUSE HAND-LISTING ELEVEN FILES IS THE DEFECT ONE LEVEL UP.** An
+allowlist of one extension with a SILENT remainder is replaced by: the population is DERIVED from the
+filesystem, and every extension present must appear in `PARSED_EXTENSIONS` or in `NOT_A_SOURCE_EXTENSION`. An
+extension in neither reddens the gate and is DECIDED. ⚠ The probe itself was never the defect — it caught all
+five of `B9`'s evaded shapes — so this is a POPULATION repair, and it is a strict widening: a superset control
+re-derives the old `.ts` population and requires every member to survive.
+
+⛔ **AND THE INSTRUMENT FAILED BEFORE THE CODE DID, AGAIN.** The first version of the `.svelte` reader's case
+drove `const { stdout, stderr } = $props();` inside a `<script>` block — and the whole-file-TSX mutant
+**SURVIVED**: in JSX children `{ … }` is an EXPRESSION container, so a destructure inside a script body is
+parsed as code BY ACCIDENT even when the parser believes it is reading markup. The case now drives a property
+read (`outcome.stderr`), which has no braces to be rescued by, and `P2B-aq` kills. ⭐ A control that passes for
+the wrong reason is this repository's most-recorded instrument defect; this one was caught by mutating the
+instrument rather than by reading it, and the corrected claim is written into the reader's own docblock.
+
+**PROOF:** every fix was watched FAILING first with the attacker's own arrangement. The junction case escaped
+and `PWNED_IN_SERVER_TREE.txt` was observed ON DISK in the stand-in tree before the fix existed; the
+unresolvable-cwd case answered with a SPAWN failure where a containment refusal belongs; the `W2` case reported
+*"the output workspace raised rather than refusing (EPERM)"* and named no orphan; and each of the three `W3`
+mutants (`.svelte` out of the population, script-blocks-only, one-TSX-parse) reddened a named case.
+
+**MUTANTS:** `bun run mutants P2B-` — **44 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 INCONCLUSIVE**
+(36 → 44; eight new). ⚠ **AND FOUR ANCHORS MOVED WITH THE CODE THEY NAME, NONE RETIRED:** `P2B-v` (its lexical
+comparison is gone — re-anchored onto the filesystem check, and its victim GREW from one case to two), `P2B-r`
+(`run` became `async`, so the refusal arms stopped being `Promise.resolve({…})`), and `P2B-ah`/`P2B-ai`
+(`bindingsInSource` gained the script kind `W3` needs). Each rewrite is recorded IN its entry, because a
+rewritten mutant is exactly where a claim quietly weakens.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
@@ -578,7 +898,13 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 
 1. ⭐ **RESHAPED (§1).** Not *"is workspace content participating material"* but: **which OBJECT, having done
    what past-tense act, carries a test run's files and output** — the form `PER-8` actually classifies in.
-2. **`REG-Q-066`'s retention disposition**, re-answered per `R7`, in the commit that binds `stderr` (rule 8).
+2. ~~**`REG-Q-066`'s retention disposition**, re-answered per `R7`, in the commit that binds `stderr` (rule 8).~~
+   → ⭐ **DELIVERED 2026-09-14 in Phase 2b (§4d), which is the commit that binds `stderr`.** Answered
+   **CLOSED BY DISPOSITION**: both streams `PURGEABLE_AT_EXPIRY` in a second workspace, referenced by
+   `ProcessRunOutcome.retention`, reachable by `Workspace.purge`, and gated by a rewritten
+   `verif/agy-stderr-unbound.test.ts` plus `P2B-m`. ⚠ **What is still owed is smaller and is NOT this item:**
+   `REG-Q-066`'s THREE READINGS of ASR-11's raw validator output remain OPEN and remain the sponsor's —
+   `REG-F-326` was explicit that closing the bound closes nothing else, and neither does this.
 3. ~~**The process-execution capability NAME** — ratification owed.~~ → ⭐ **NOT A NEW SPONSOR DECISION: it is an
    APPLICATION OF `JAN-EXECGOV`'s `G-1`, ALREADY GRANTED.** `G-1`'s recorded form is *"one capability per step
    type that a model invocation actually needs, named in the vocabulary with its note, exactly as `D-1` was

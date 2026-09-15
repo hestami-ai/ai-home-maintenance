@@ -6422,8 +6422,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
 		// `ownerKind` IS A DECLARATION, AND `R8` IS THE RULING IT CARRIES. It decides how long the directory lives
 		// and who else can see what a step wrote into it; nothing in this repository could infer it.
-		find: "\t\tworkspace: createFilesystemWorkspace({\n\t\t\townerKind: 'UNDERTAKING',",
-		replace: "\t\tworkspace: createFilesystemWorkspace({\n\t\t\townerKind: 'EXECUTION_STEP', // MUTANT: the deliverable is owned by the step",
+		find: "\tconst workspace = createFilesystemWorkspace({\n\t\townerKind: 'UNDERTAKING',",
+		replace: "\tconst workspace = createFilesystemWorkspace({\n\t\townerKind: 'EXECUTION_STEP', // MUTANT: the deliverable is owned by the step",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: `R8`, the sponsor ruling this phase is built on - the owner is the UNDERTAKING, so the workspace persists, survives a restart and is inspectable after the undertaking ends. WHO RELIES: every refusal that names the owner (`producerWorkingDirectory` and `planProcessRun` both interpolate `ownerKind` and `ownerId`), and any future retention or cleanup policy keyed on how long the directory should live. WHAT THE MUTATION DOES TO THEM: the directory's CONTENT is unchanged and every read still succeeds, so this is invisible to behaviour - it is a declaration that has become FALSE, and a cleanup policy honouring it would destroy a deliverable the ruling says must survive. That is why it is asserted directly rather than left to be inferred from where the files landed.",
 		source: "JAN-EXEC Phase 2 - the R8 ownership declaration"
@@ -6434,8 +6434,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// PURGEABILITY IS DECLARED ON THE WORKSPACE, NOT ENCODED IN ITS ADDRESS - the port header states why a
 		// path-named store cannot do what the content-addressed one does - so this single word is the only thing
 		// standing between `purge` and a PER-8 hard delete of the product.
-		find: "\t\t\tpurgeability: 'RETAINED_BY_PARTICIPATION',\n\t\t\tdirectoryPath",
-		replace: "\t\t\tpurgeability: 'PURGEABLE_AT_EXPIRY', // MUTANT: the deliverable may be destroyed on demand\n\t\t\tdirectoryPath",
+		find: "\t\tpurgeability: 'RETAINED_BY_PARTICIPATION',\n\t\tdirectoryPath\n\t});",
+		replace: "\t\tpurgeability: 'PURGEABLE_AT_EXPIRY', // MUTANT: the deliverable may be destroyed on demand\n\t\tdirectoryPath\n\t});",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
 		why: "PROMISE: `R8` stated as a retention class - the deliverable must survive the undertaking, so `purge` REFUSES on this workspace; and `PER-8`, which says a canonical object that has participated in execution, assurance, governance, a baseline or traceability is never hard-deleted. WHO RELIES: anything that ever calls `purge` on an Undertaking's workspace - under `R7` that will include the retention machinery for a build's stdout and stderr, which is why the port states the cost out loud: \"one workspace cannot hold participating and purgeable material side by side; a host needing both declares two.\" WHAT THE MUTATION DOES TO THEM: the product a professional's Undertaking produced becomes destroyable on demand, with the refusal that should have stopped it still present in the adapter and simply not reached.",
 		source: "JAN-EXEC Phase 2 - the PER-8 declaration on the durable workspace"
@@ -6687,8 +6687,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: "packages/rph-ports/src/defaults/process-runner.ts",
 		// THE MUTATION IS THE OLD SOURCE VERBATIM, which is the honest operator for a leak: the defect is not an
 		// invented shape, it is what this file said until this commit.
-		find: "\t\t\t\t\t`No process runner is wired on this host, so '${request.argv.join(' ')}' was not run in the ` +\n\t\t\t\t\t`workspace directory '${workspaceDirectory}'. This is the library's default and it refuses on ` +",
-		replace: "\t\t\t\t\t`No process runner is wired on this host, so '${request.argv.join(' ')}' was not run in ` +\n\t\t\t\t\t`'${request.cwd}'. This is the library's default and it refuses on ` + // MUTANT: the host's absolute path travels in a recorded refusal",
+		find: "\t\t\t\t\t`No process runner is wired on this host, so ${named} was not run in the ` +\n\t\t\t\t\t`workspace directory '${workspaceDirectory}'. This is the library's default and it refuses on ` +",
+		replace: "\t\t\t\t\t`No process runner is wired on this host, so ${named} was not run in ` +\n\t\t\t\t\t`'${request.cwd}'. This is the library's default and it refuses on ` + // MUTANT: the host's absolute path travels in a recorded refusal",
 		expectRed: ["packages/rph-ports/src/defaults/process-runner.test.ts"],
 		why: "PROMISE: `refusedBecause` is defined by this port as \"a fact a step can record\" — a string that reaches a governed record and a model's context — and `filesystem-workspace.ts` states the consequence one plane over: \"the message carries the host's absolute path, which belongs in nothing a step records.\" WHO RELIES: every host that has not wired a runner, which today is all of them, and every reader of a step that was refused one. WHAT THE MUTATION DOES TO THEM: the workspace's full `directoryPath` — the server's own filesystem layout, tenant root included — is written into the refusal verbatim. ⚠ THE VICTIM'S POSITIVE LIMB IS KEPT, NOT TRADED: it still asserts the refusal names WHERE, via the workspace's directory NAME, so \"say nothing at all\" does not satisfy the replacement.",
 		source: "JAN-EXEC Phase 2 containment second pass (F4) - the second place the host-path rule had to be applied"
@@ -6702,6 +6702,471 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace: "\t\t\t\trequest.cwd.split(/[\\\\/]+/).filter((segment) => segment !== '').at(-1) ?? ''; // MUTANT: a cwd with no final segment is reported as a directory with no name",
 		expectRed: ["packages/rph-ports/src/defaults/process-runner.test.ts"],
 		why: "PROMISE: roadmap rule 6, NO DEFAULT THAT FABRICATES - stated for an exit code and true of every other field a refusal carries. WHO RELIES: a reader of a step that was refused a runner, who has to act on the refusal. WHAT THE MUTATION DOES TO THEM: a filesystem root has no final segment, so the governed record reads \"was not run in the workspace directory ''\" - a name no directory has, presented as the workspace's. The path itself is the TRUE answer for a root and discloses nothing about a layout above it, because there is nothing above it. ⚠ This limb exists because `coverage:floor:check` reported the branch uncovered the moment the fallback was written; it was tested rather than baselined over.",
-		source: "JAN-EXEC Phase 2 containment second pass (F4) - the fallback limb of `createRefusingProcessRunner`"
+		source: "JAN-EXEC Phase 2 containment second pass (F4) - the fallback limb of `createRefusingProcessRunner`",
+		// ⭐ RETIRED BY JAN-EXEC PHASE 2b, AND THE GUARD DID NOT GO ANYWHERE — THE CODE DID. The derivation moved
+		// out of this default into `ports/process-runner.ts` as `workspaceDirectoryName`, because Phase 2b adds
+		// the SECOND implementation of this port and a rule stated in one adapter is a rule the other can quietly
+		// implement differently. `P2B-a` is the same mutation on the same expression at its new address, and
+		// `P2B-b` is the stronger one the move made possible: one mutation, both adapters' suites red.
+		// ⚠ RETIRED RATHER THAN DELETED. Deleting it would erase that this fallback ever needed proving, and
+		// RETIRED is how this ledger separates "somebody moved it and said where" from "a claim someone cited as
+		// evidence can no longer be performed and nobody noticed".
+		supersededBy: "P2B-a-the-shared-workspace-name-falls-back-to-a-nameless-one"
+	},
+	// -- JAN-EXEC PHASE 2b: the REAL ProcessRunner, and the REG-Q-066 disposition it cannot land without ------
+	//
+	// ⭐⭐ ROADMAP RULE 8 IS WHY THESE ARRIVE TOGETHER. `REG-Q-066`'s stated bound was CLOSED BY NON-USE, and a
+	// real runner captures `stderr`, which ends the absence the answer rested on. So the runner and the retention
+	// disposition are one commit, and three of the sixteen below (`P2B-m`, `P2B-o`, `P2B-p`) guard the
+	// DISPOSITION rather than the runner — because a disposition nothing checks is a comment, and this
+	// repository has the receipts.
+	//
+	// ⚠ `P2-ae` IS RETIRED ONTO `P2B-a`, NOT DELETED. Phase 2b moved the workspace-name derivation out of the
+	// refusing default and into the port, precisely so the SECOND adapter could not implement a weaker version of
+	// the host-path rule — and `P2B-b` names both adapters' suites as victims to prove that move bought
+	// something. A mutant whose target legitimately moved is history, not rot.
+	{
+		id: "P2B-a-the-shared-workspace-name-falls-back-to-a-nameless-one",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "\t\t\t.at(-1) ?? path\n",
+		replace: "\t\t\t.at(-1) ?? '' // MUTANT: a path with no final segment is reported as a directory with no name\n",
+		expectRed: ["packages/rph-ports/src/defaults/process-runner.test.ts"],
+		why: "PROMISE: roadmap rule 6, NO DEFAULT THAT FABRICATES — stated for an exit code and true of every other field a refusal carries. WHO RELIES: a reader of a step that was refused a runner, and now BOTH implementations of this port rather than one. WHAT THE MUTATION DOES TO THEM: a filesystem root has no final segment, so a governed record reads \"the workspace directory ''\" — a name no directory has, presented as the workspace's. The path itself is the TRUE answer for a root and discloses nothing about a layout above it, because there is nothing above it. ⭐ THE SUCCESSOR TO `P2-ae`: the derivation MOVED from the refusing default into the port in Phase 2b, so the guard moved with it rather than being lost.",
+		source: "JAN-EXEC Phase 2b - the fallback limb of `workspaceDirectoryName`, inherited from `P2-ae`"
+	},
+	{
+		id: "P2B-b-the-shared-derivation-returns-the-whole-host-path",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "export function workspaceDirectoryName(cwd: string): string {\n\treturn finalPathSegment(cwd);",
+		replace: "export function workspaceDirectoryName(cwd: string): string {\n\treturn cwd; // MUTANT: the shared derivation hands back the whole host path, so EVERY refusal in this seam leaks the server's filesystem layout",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `refusedBecause` is defined by this port as \"a fact a step can record\" — a string that reaches a governed record and a model's context — and `filesystem-workspace.ts` states the consequence: \"the message carries the host's absolute path, which belongs in nothing a step records.\" WHO RELIES: every reader of a refused step, under EITHER adapter. WHAT THE MUTATION DOES TO THEM: the workspace's full `directoryPath` — the server's filesystem layout, tenant root included — travels verbatim in the refusal. ⭐ WHY THIS IS THE VICTIM AND NOT THE DEFAULT'S SUITE: moving the derivation into the port is what makes the rule bind on the SECOND adapter, and the second adapter's suite is the only place that claim can be tested; the refusing default's leak is already guarded by `P2-ad` at its own site. ⚠ `packages/rph-ports/src/defaults/process-runner.test.ts` reddens on this mutation too and is DELIBERATELY NOT NAMED — `run.ts` fails if the single run fails, so a second name means \"any of these reddens\", which is a LOWER bar than naming the one whose assertions are about the guard.",
+		source: "JAN-EXEC Phase 2b - the host-path limb of `workspaceDirectoryName`, now shared by both adapters"
+	},
+	{
+		id: "P2B-c-the-child-is-launched-through-a-shell",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t\t\tshell: false,",
+		replace: "\t\t\t\t\tshell: true, // MUTANT: argv is re-parsed by a shell, so a model's chosen argument becomes an instruction to the host",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the port's own words — \"Program plus arguments. ⛔ NOT A SHELL STRING — no shell is involved, so no quoting rules apply.\" WHO RELIES: every sandboxed step from Phase 3 on, where the argv comes from a MODEL. WHAT THE MUTATION DOES TO THEM: every metacharacter in an argument becomes an instruction — driven here, `>` stops being an argument and redirects the child's stdout into `pwned.txt` in the workspace. ⚠ AND THE VICTIM ASSERTS THE REDIRECTION'S ABSENCE ON DISK RATHER THAN THE OPTION'S VALUE: reading `shell: false` back would prove nothing about what the operating system did.",
+		source: "JAN-EXEC Phase 2b - the no-shell limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-d-the-observed-timeout-is-never-reported",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		// ⚠ THIS ENTRY WAS FIRST DECLARED AS `timedOut: exitCode === null` AND IT SURVIVED, WHICH IS RECORDED
+		// RATHER THAN QUIETLY REPLACED. Four arrangements were then driven (see the adapter header): on Windows a
+		// `null` exit code arises ONLY from the kill this runner itself issues — an external `process.kill`, a
+		// self-kill and `process.abort()` all deliver a NUMBER — so the inference and the observation coincide on
+		// this host and no arrangement can separate them. A mutation nothing can distinguish is a guard that
+		// cannot fail, so the flag is pinned in both DIRECTIONS instead: this one, and `P2B-q`.
+		find: "\t\t\t\t\ttimedOut,\n",
+		replace: "\t\t\t\t\ttimedOut: false, // MUTANT: the watchdog still kills and the record never says the process was killed for taking too long\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: §36.2 separates a TIMEOUT failure class from TOOL_FAILURE, and the port states the rule — \"`timedOut` IS ITS OWN FIELD AND IS NEVER INFERRED FROM THE EXIT CODE\". WHO RELIES: the failure classification of every execution step that runs a command, and §36.2's two classes have different remedies. WHAT THE MUTATION DOES TO THEM: the watchdog still fires and still kills, and the outcome reports a process that died for no stated reason with `exitCode: null` — so a TIMEOUT is recorded as an unexplained TOOL_FAILURE and the caller has nothing to infer it back from. ⚠ THE MUTATION THIS REPLACES (`timedOut: exitCode === null`) SURVIVED, and why is in the adapter's header with the four measurements that establish it; declaring an unobservable mutation as a guard would be the fabricated-measurement defect.",
+		source: "JAN-EXEC Phase 2b - the observed-timeout limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-e-a-truncated-stream-is-reported-as-complete",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t\t\tomittedRegions,\n\t\t\t\t\toutputComplete,",
+		replace: "\t\t\t\t\tomittedRegions: [], // MUTANT: the capture is still bounded and the record no longer says so\n\t\t\t\t\toutputComplete,",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `REG-D-057` requires a declared omission to carry \"enough structure to undo it\", and this port's header states the consequence for a command's output: \"A test result read off a silently truncated stdout is a pass nothing produced.\" WHO RELIES: anything that reads a build or test result out of stdout — which is what Phase 5's evidence join will be. WHAT THE MUTATION DOES TO THEM: the bound still applies, so the outcome carries a PREFIX; with no declared omission that prefix reads as the whole output, and a failure message past 64 KiB becomes a clean-looking pass. ⚠ IT IS NOT A COUNT DEFECT: the record is internally consistent and looks complete, which is why nothing outside this limb notices.",
+		source: "JAN-EXEC Phase 2b - the declared-omission limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-f-the-bounded-cut-lands-mid-character",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tconst usable = completeUtf8PrefixLength(whole);",
+		replace: "\t\t\tconst usable = whole.length; // MUTANT: the cut is taken at the raw byte bound, so a split sequence decodes to a character the process never emitted",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `OmittedRegion`'s own rule, adopted verbatim by this port — \"BOTH NUMBERS ARE UTF-8 BYTES, NOT STRING LENGTHS … a reconstruction that mixes the two units silently corrupts every non-English reply.\" WHO RELIES: any reader of a truncated capture, and any future reconstruction from `byteOffset`. WHAT THE MUTATION DOES TO THEM: 64 KiB is not a multiple of three, so a stream of three-byte characters is cut mid-sequence; the decoder appends U+FFFD — a character the process did not emit — to a record whose entire claim is that it says what the process emitted, and `byteOffset` then names a position that is not a character boundary.",
+		source: "JAN-EXEC Phase 2b - the UTF-8 boundary limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-g-only-stdout-is-bounded",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		// ⚠ RE-POINTED AFTER ITS FIRST FORM SURVIVED, AND THE SURVIVAL WAS INFORMATIVE RATHER THAN A MISS. It
+		// mutated the early RETURN alone, which changed nothing observable: `room` reaches 0 and every later
+		// slice is empty, so the bound held without it. The early return is an ALLOCATION guard; `room` is the
+		// bound. This form moves both, which is what actually unbounds a stream.
+		find: "\t\t\tif (keptBytes >= CAPTURE_CAP_BYTES) return;\n\t\t\tconst room = CAPTURE_CAP_BYTES - keptBytes;",
+		replace: "\t\t\tconst cap = stream === 'STDERR' ? Number.MAX_SAFE_INTEGER : CAPTURE_CAP_BYTES; // MUTANT: only stdout is bounded\n\t\t\tif (keptBytes >= cap) return;\n\t\t\tconst room = cap - keptBytes;",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the bound is per STREAM, and `R7` is about BOTH of them. WHO RELIES: the host, whose memory a step can otherwise exhaust by printing, and every reader of a stderr capture. WHAT THE MUTATION DOES TO THEM: stderr grows without limit and declares no omission, which is the same fabricated-completeness defect as `P2B-e` plus an unbounded buffer — and stderr is the stream a failing build floods. ⭑ THE SHAPE IS THIS REPOSITORY'S MOST-RECORDED ONE: a rule stated generally and implemented once.",
+		source: "JAN-EXEC Phase 2b - the both-streams limb of the bounded capture"
+	},
+	{
+		id: "P2B-h-the-child-inherits-the-servers-environment",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t\t\tenv: environment,",
+		replace: "\t\t\t\t\tenv: process.env, // MUTANT: the child sees every variable this server holds, model-provider credentials included",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `REG-Q-066`'s disposition, stated in this file's header — a command's stderr can echo the environment it ran in, so the environment is an ALLOWLIST rather than an inheritance. WHO RELIES: everything in the server's environment, and every capture retained under `R7`. WHAT THE MUTATION DOES TO THEM: the argv comes from a model in Phase 3, so `env` is the difference between \"a model can run a command\" and \"a model can print this deployment's API keys into a retained build log\". ⚠ THE VICTIM CARRIES ITS OWN CONTROL, because an environment of `{}` passes the first assertion and breaks every real toolchain — at a distance, as \"the interpreter is not on PATH\".",
+		source: "JAN-EXEC Phase 2b - the environment-allowlist limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-i-a-program-that-does-not-exist-is-reported-as-a-failed-command",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tif (child.pid !== undefined) return;\n\t\t\tsettleRefused(",
+		replace: "\t\t\tif (child.pid !== undefined) return;\n\t\t\tif (claim())\n\t\t\t\treturn resolve({ ran: true, exitCode: 127, timedOut: false, stdout: '', stderr: `${cause.code ?? ''}`, omittedRegions: [], outputComplete: true, retention: { retained: false, notRetainedBecause: 'the process never started' }, durationMs: 0 }); // MUTANT: a spawn failure is reported as a command that ran and failed, in the shell's own convention\n\t\t\tsettleRefused(",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: roadmap `RULE 5` — never `ran: true` for a process that did not run — and the union that makes it structural. WHO RELIES: every step, test and assurance policy that reads an outcome, and any human debugging one. WHAT THE MUTATION DOES TO THEM: 127 is the shell's convention for \"command not found\", so the fabrication is the PLAUSIBLE one; a step then records a FAILED BUILD where there was no build tool on the host at all. Those are different facts with different remedies, and after this mutation nothing downstream can tell them apart. ⚠ ENOENT IS THE COMMONEST OUTCOME OF A MODEL NAMING A TOOL THE HOST DOES NOT HAVE, so this is the arm that will actually be taken.",
+		source: "JAN-EXEC Phase 2b - the RULE 5 limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-j-the-capture-is-written-and-nothing-points-at-it",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tif (landed.every(([written]) => written))\n\t\t\t\treturn {\n\t\t\t\t\tretained: true,",
+		replace: "\t\t\tif (landed.every(([written]) => written))\n\t\t\t\treturn { retained: false, notRetainedBecause: 'captured' }; // MUTANT: the bytes ARE on the content plane and the outcome names none of them\n\t\t\tif (false as boolean)\n\t\t\t\treturn {\n\t\t\t\t\tretained: true,",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `REG-F-336` C-2, which forbids \"content on the content plane with no record on the record plane pointing at it\". WHO RELIES: retention — a purge that cannot address the bytes cannot execute a policy over them — and `R7`, which requires both streams to come under purge. WHAT THE MUTATION DOES TO THEM: every run writes two files and returns an outcome that names neither, so the workspace accumulates captures no record references and no sweep can find. ⚠ IT IS THE ORPHAN PRODUCED BY THE FUNCTION WRITTEN TO PREVENT IT, and it reads as the CONSERVATIVE answer (\"we did not retain\"), which is why it needs a guard rather than a reviewer.",
+		source: "JAN-EXEC Phase 2b - the no-orphan limb of the retention path"
+	},
+	{
+		id: "P2B-k-the-half-that-landed-is-left-behind",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\tconst swept: string[] = [];",
+		replace: "\t\tconst swept: string[] = [];\n\t\tif (refusals.length > 0)\n\t\t\treturn { retained: false, notRetainedBecause: `the run's output could not be retained — ${refusals.join('; ')}` }; // MUTANT: the refusal is returned and the half that DID land stays on the content plane with nothing pointing at it",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the same `REG-F-336` C-2 rule as `P2B-j`, in the PARTIAL case — which is the case that actually happens, because two writes can disagree. WHO RELIES: retention, and any inventory of what a workspace holds. WHAT THE MUTATION DOES TO THEM: the outcome says `retained: false` — truthfully, of the pair — while `stdout.txt` sits on disk referenced by nothing at all. A reader auditing the record concludes there is nothing to purge, and is wrong. ⭐ THE TOTAL CASE AND THE PARTIAL CASE ARE SEPARATE MUTANTS DELIBERATELY: `P2B-j` is the arm a reviewer looks at, and this is the arm nobody writes a test for.",
+		source: "JAN-EXEC Phase 2b - the partial-retention sweep"
+	},
+	{
+		id: "P2B-l-a-retention-refusal-destroys-the-observed-exit-code",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tconst ran = (retention: ProcessOutputRetention): void => {\n\t\t\t\tresolve({\n\t\t\t\t\tran: true,",
+		replace: "\t\t\tconst ran = (retention: ProcessOutputRetention): void => {\n\t\t\t\tif (!retention.retained)\n\t\t\t\t\treturn resolve({ ran: false, refusedBecause: retention.notRetainedBecause }); // MUTANT: a retention failure is reported as \"no process ran\"\n\t\t\t\tresolve({\n\t\t\t\t\tran: true,",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `ran` is a fact about the PROCESS and `retention` is a fact about the BYTES, and collapsing the second into the first destroys an observation this runner actually made. WHO RELIES: every step that has to distinguish \"the build failed\" from \"the build log could not be kept\". WHAT THE MUTATION DOES TO THEM: `ran: false` states that no process ran, which is FALSE — it ran, it exited, and the exit code is now unrecoverable. ⚠ THIS IS THE OPPOSITE ERROR TO `P2B-i` AND IT IS THE ONE A CAREFUL AUTHOR MAKES: failing closed on a retention problem looks like rigour, and it fabricates an absence instead of an exit code.",
+		source: "JAN-EXEC Phase 2b - the separation of the run outcome from the retention outcome"
+	},
+	{
+		id: "P2B-m-the-runner-accepts-an-unpurgeable-output-workspace",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\tif (outputWorkspace.purgeability !== 'PURGEABLE_AT_EXPIRY')\n\t\tthrow new Error(\n\t\t\t`A real ProcessRunner cannot capture output into a workspace declared ${outputWorkspace.purgeability}. Sponsor ruling R7 requires stdout AND stderr to be retained and to come under purge, and PER-8 makes purge REFUSE on a workspace that declares its content has participated — so these captures could never be destroyed. Declare a second workspace with purgeability PURGEABLE_AT_EXPIRY for process output; the deliverable workspace stays RETAINED_BY_PARTICIPATION under R8.`\n\t\t);",
+		replace: "\t// MUTANT: the R7 disposition is documentary again — any workspace is accepted, including one whose purge REFUSES",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE: `SPONSOR RULING R7` — stdout and stderr are both retained and BOTH COME UNDER PURGE — made structural rather than documentary. WHO RELIES: `REG-Q-066`, whose bound is answered by this disposition and no longer by the absence it used to rest on. WHAT THE MUTATION DOES TO THEM: a host that passes the DELIVERABLE workspace (`RETAINED_BY_PARTICIPATION` under `R8`) gets a runner that captures `stderr` into bytes `PER-8` forbids anyone from ever destroying — exactly the retention surface the question is about, reached through a one-word wiring mistake rather than through a debugging convenience. ⭐ THE VICTIM IS THE `REG-Q-066` GATE ITSELF, DELIBERATELY: that gate used to check an ABSENCE, this commit narrows the absence by one file, and this mutant is the evidence that what replaced it checks a PROPERTY. A gate whose new limb no mutation reddens would be the narrowing without the compensation. ⚠ The adapter's own suite carries the same case and is NOT named, because a second name means \"any of these reddens\" and is a lower bar.",
+		source: "JAN-EXEC Phase 2b - the R7 construction refusal, and the REG-Q-066 re-answer it carries"
+	},
+	{
+		id: "P2B-n-a-real-runner-is-wired-where-there-is-no-directory",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\t\t\trunner: createRefusingProcessRunner()",
+		replace: "\t\t\trunner: createChildProcessRunner({\n\t\t\t\tdeliverableWorkspace: createInMemoryWorkspace({\n\t\t\t\t\townerKind: 'UNDERTAKING',\n\t\t\t\t\townerId: undertakingId,\n\t\t\t\t\tpurgeability: 'RETAINED_BY_PARTICIPATION'\n\t\t\t\t}),\n\t\t\t\toutputWorkspace: createInMemoryWorkspace({\n\t\t\t\t\townerKind: 'UNDERTAKING',\n\t\t\t\t\townerId: undertakingId,\n\t\t\t\t\tpurgeability: 'PURGEABLE_AT_EXPIRY'\n\t\t\t\t})\n\t\t\t}) // MUTANT: the real runner is wired on the arm whose workspace has no directory at all",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE: roadmap `RULE 5`, and the port's rule that the two seams are not independent \u2014 \"A `ProcessRunner` needs a real `cwd`; an IN_MEMORY `Workspace` has none.\" WHO RELIES: every process this host has not configured a durable root for, which is every test runner and every unconfigured deployment. WHAT THE MUTATION DOES TO THEM: the arm that was the library's lawful hermetic default stops being one. \u2b50 AND PHASE 2b's ADVERSARIAL PASS MADE THE CONSEQUENCE LOUDER RATHER THAN QUIETER \u2014 recorded here because this mutation had to be REWRITTEN for a signature that gained a parameter, and a rewritten mutant is exactly where a claim quietly weakens. It used to reach `planProcessRun`, which reported a HOST WIRING ERROR this host itself had committed; it now cannot get that far, because `createChildProcessRunner` REFUSES an output workspace holding its bytes in a Map (`B7`) and a deliverable workspace with no directory to run in (`B8`). The victim reddens either way; what changed is that the wiring became unreachable rather than merely detectable downstream.",
+		source: "JAN-EXEC Phase 2b - the RULE 5 wiring limb of `resolveUndertakingSandbox`"
+	},
+	{
+		id: "P2B-o-the-output-workspace-declares-that-its-content-participated",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\t\tpurgeability: 'PURGEABLE_AT_EXPIRY',\n\t\tdirectoryPath: outputDirectoryPath",
+		replace: "\t\tpurgeability: 'RETAINED_BY_PARTICIPATION', // MUTANT: the captures are declared unpurgeable, which is R7 inverted\n\t\tdirectoryPath: outputDirectoryPath",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE: `R7`'s second half — both streams \"come under purge\" — and the port's rule that a path-named store carries its class as a DECLARATION rather than in its address. WHO RELIES: `REG-Q-066`'s re-answer, which is this declaration; and `PER-12`, under which retained material that participates in nothing must stay purgeable. WHAT THE MUTATION DOES TO THEM: `Workspace.purge` refuses every capture by `PER-8`, so a build's stdout and stderr — including whatever a command echoed out of its environment — become permanent on the first run. ⭑ AND THE FAILURE IS LOUD RATHER THAN SILENT, WHICH IS THE POINT OF PUTTING THE SAME CONJUNCTION IN TWO PLACES: `createChildProcessRunner` refuses to be constructed at all, so the host cannot reach a state where the declaration and the capture disagree.",
+		source: "JAN-EXEC Phase 2b - the purgeability declaration of the second workspace"
+	},
+	{
+		id: "P2B-p-the-retained-output-is-nested-inside-the-deliverable",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\tconst outputDirectoryPath = `${directoryPath}${PROCESS_OUTPUT_DIRECTORY_SUFFIX}`;",
+		replace: "\tconst outputDirectoryPath = join(directoryPath, 'process-output'); // MUTANT: the retained output lives INSIDE the directory a step writes to",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE: Phase 2's `F1`, applied rather than re-learned — \"A sibling has no spelling a contained path can reach\", which is the arrangement that replaced two defeated reserved-name guards. WHO RELIES: the integrity of every retained capture, which is what a step must not be able to rewrite. WHAT THE MUTATION DOES TO THEM: `captures/…/stderr.txt` becomes a path the DELIVERABLE workspace will accept, so the executing step can overwrite, and — the deliverable being `RETAINED_BY_PARTICIPATION` — the record of what it printed is editable by the thing that printed it. ⚠ TWO ADVERSARIES BEAT THE RESERVED-NAME FORM OF THIS GUARD IN A ROW (case, then the NTFS 8.3 alias), so the answer is the arrangement and not a third comparison.",
+		source: "JAN-EXEC Phase 2b - the sibling arrangement of the process-output workspace"
+	},
+	{
+		id: "P2B-q-every-run-is-reported-as-having-timed-out",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		// THE OTHER DIRECTION OF `P2B-d`, AND IT NEEDS ITS OWN ENTRY BECAUSE IT IS ITS OWN DEFECT: a flag that is
+		// always true satisfies every assertion about the timeout case and is wrong about every other run.
+		find: "\t\tconst watchdog = setTimeout(() => {\n\t\t\tif (exited) {",
+		replace: "\t\ttimedOut = true; // MUTANT: every run is reported as a TIMEOUT, including one that exited on its own\n\t\tconst watchdog = setTimeout(() => {\n\t\t\tif (exited) {",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the same §36.2 separation as `P2B-d`, from the other side — a run that was NOT killed for taking too long must not be recorded as one. WHO RELIES: every step whose command exits non-zero on its own, which is the ordinary failing build. WHAT THE MUTATION DOES TO THEM: a compiler that exits 1 is filed as a TIMEOUT, so the remedy a reader reaches for is \"raise the budget\" for a build that will fail identically at any budget. ⭑ IT IS THE CONTROL CASE MADE INTO A MUTANT: without it, `P2B-d` alone is satisfied by a flag that is always true, and this repository has the receipt for a control that could not fail.",
+		source: "JAN-EXEC Phase 2b - the false-positive direction of the observed timeout"
+	},
+	{
+		id: "P2B-r-an-argv-the-platform-refuses-escapes-run-as-a-throw",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		// THE MUTATION IS THIS FILE AS IT STOOD BEFORE THE ARM WAS ADDED, which is the honest operator for an
+		// omission: the defect is not an invented shape, it is what the adapter did until it was probed.
+		// ⚠ RE-ANCHORED 2026-09-15 by the `B11` fix, which made `run` async: the arm's own `return` stopped
+		// being `Promise.resolve({…})`. The mutation and its victim are unchanged — only the anchor moved.
+		find: "\t\t\ttry {\n\t\t\t\tchild = spawn(program, request.argv.slice(1), {\n\t\t\t\t\tcwd: request.cwd,\n\t\t\t\t\t// \u26d4 NO SHELL. An argv array, interpreted by nobody \u2014 and see B1 for the target class that\n\t\t\t\t\t// makes this insufficient on its own.\n\t\t\t\t\tshell: false,\n\t\t\t\t\t// \u26d4 NO INHERITED ENVIRONMENT \u2014 see the header.\n\t\t\t\t\tenv: environment,\n\t\t\t\t\t// stdin is closed; stdout and stderr are piped so they can be BOUNDED rather than streamed to\n\t\t\t\t\t// wherever this server's own descriptors point.\n\t\t\t\t\tstdio: ['ignore', 'pipe', 'pipe'],\n\t\t\t\t\twindowsHide: true\n\t\t\t\t});\n\t\t\t} catch (cause) {\n\t\t\t\tconst code = (cause as NodeJS.ErrnoException | undefined)?.code;\n\t\t\t\treturn {\n\t\t\t\t\tran: false,\n\t\t\t\t\trefusedBecause: `a process could not be started in the workspace directory '${workspaceName}': the platform refused the argv itself (${code ?? 'unknown cause'}), before any process existed. The code above is the platform's own answer and is what a reader acts on; measured causes include an embedded NUL byte in the program name or an argument, and an empty program name, and that list is not closed. The argv is deliberately not quoted back here: an argv the platform refuses can carry bytes that belong in no record.`\n\t\t\t\t};\n\t\t\t}\n",
+		replace: "\t\t\tchild = spawn(program, request.argv.slice(1), {\n\t\t\t\tcwd: request.cwd,\n\t\t\t\tshell: false,\n\t\t\t\tenv: environment,\n\t\t\t\tstdio: ['ignore', 'pipe', 'pipe'],\n\t\t\t\twindowsHide: true\n\t\t\t}); // MUTANT: the platform's synchronous refusal of the argv escapes `run` as a rejected promise\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the port's rule, stated for the workspace one plane over and true of every method a step calls — \"a refusal is a fact a step can record; a throw is a stack trace in a record that was supposed to say what the step was not allowed to do.\" WHO RELIES: every caller of `run`, and every step that has to record why nothing ran. WHAT THE MUTATION DOES TO THEM: `spawn` raises `ERR_INVALID_ARG_VALUE` SYNCHRONOUSLY for an embedded NUL and for an empty program name — driven, all three arrangements — so those never reach the `error` event, and `run` returns a REJECTED PROMISE instead of an outcome. ⚠ FOUND BY PROBING THE ADAPTER RATHER THAN BY READING IT, and the arm carries a second limb the mutation also removes: the malformed argv is NOT quoted back, because a NUL byte in a `refusedBecause` travels into a governed record and a model's context.",
+		source: "JAN-EXEC Phase 2b - the synchronous-spawn-failure arm of `createChildProcessRunner`"
+	},
+	// -- JAN-EXEC PHASE 2b ADVERSARIAL PASS: ten breaches driven through the runner that landed above ------
+	//
+	// ⭐⭐ THE SIXTEEN ABOVE GUARDED WHAT THE ADAPTER CLAIMED. These guard what an adversary DID to it, and the
+	// distinction is the whole value: every entry below names an arrangement that was RUN, with the artefact it
+	// left behind. ⛔ THE COMMON SHAPE, recorded once here rather than sixteen times: each defect lived in the
+	// gap between a guarantee STATED UNCONDITIONALLY and a platform fact nobody had measured — `shell: false`
+	// against a runtime with no CVE-2024-27980 guard, `timedOut` against a `kill` that answers differently on
+	// two runtimes, `close` against a pipe that outlives its child, `planProcessRun` against a request shape any
+	// caller can fill in.
+	//
+	// ⚠ AND THE SUITE'S OWN WEAKNESS IS CLOSED IN THE SAME COMMIT: its ENTIRE retention half ran on an IN_MEMORY
+	// workspace, so "both streams are retained", "both come under purge" and the partial-capture sweep each
+	// proved their property about a `Map` and never about `createFilesystemWorkspace`, the only adapter the host
+	// wires. `P2B-ae` is the breach that got in through exactly that gap.
+	{
+		id: "P2B-s-a-batch-target-is-launched-and-its-arguments-re-parsed",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tconst batch = batchTargetReached(program, deliverableRoot, environment);",
+		replace: "\t\t\tconst batch: string | undefined = undefined; // MUTANT: a `.bat`/`.cmd` target is launched, and cmd.exe re-parses every metacharacter INSIDE its arguments",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `ProcessRunRequest.argv` \u2014 \"NOT A SHELL STRING \u2014 no shell is involved, so no quoting rules apply\" \u2014 stated UNCONDITIONALLY. WHO RELIES: every sandboxed step from Phase 3 on, where the argv comes from a MODEL, plus every host on Windows whose toolchain entry points are `.cmd` shims. WHAT THE MUTATION DOES TO THEM: Win32 cannot load a batch file as a program image, so the runtime hands the command line to `cmd.exe`. DRIVEN under bun 1.3.14 with `shell: false` and an absolute path to a `.cmd`: `argv[1] = 'x\" & echo INJECTED-VIA-ARGV & echo PWNED > pwned.txt & rem '` returned `ran: true`, `exitCode: 0`, `INJECTED-VIA-ARGV` on stdout and `pwned.txt` LEFT ON DISK. \u26a0 NODE CLOSED THIS AS CVE-2024-27980 AND BUN HAS NO EQUIVALENT GUARD \u2014 so on the runtime this repository declares as its package manager the guarantee is simply false without this check. \u2b50 THE FIX IS A REFUSAL RATHER THAN AN ESCAPE, which is this seam's standing instruction: Phase 2 spent three rounds discovering that each new normaliser is itself attackable.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B1) - the batch-target limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-t-only-the-spelled-extension-is-checked-so-a-bare-npm-reaches-npm-cmd",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\tif (extname(program) !== '') return undefined;",
+		replace: "\treturn undefined; // MUTANT: only the SPELLED extension is checked, so a bare `npm` still reaches `npm.cmd` through PATH and PATHEXT",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the same argv guarantee as `P2B-s`, for the shape it is actually reached by. WHO RELIES: every Windows host, because `npm`, `tsc` and `yarn` ARE `.cmd` shims and a model names them by their bare names. WHAT THE MUTATION DOES TO THEM: the spelled-extension half still refuses `build.cmd` while `npm` walks straight through \u2014 DRIVEN against the real `npm` under bun: `spawn('npm', ['--version', <the injection argument>])` printed the version, executed the injected command AND wrote `pwned.txt`. \u2b50 THE HALF A REVIEWER DOES NOT THINK OF: a check on the string the caller wrote is not a check on the file the platform opens, and this is the arm that will actually be taken.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B1) - the PATH/PATHEXT resolution limb of `batchTargetReached`"
+	},
+	{
+		id: "P2B-u-a-trailing-dot-spells-a-batch-target-past-the-port-predicate",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "\treturn WIN32_BATCH_EXTENSION.test(finalPathSegment(program).replace(/[. ]+$/, ''));",
+		replace: "\treturn WIN32_BATCH_EXTENSION.test(finalPathSegment(program)); // MUTANT: `build.cmd.` spells its way past the predicate, and Win32 strips the dot and opens `build.cmd`",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `namesABatchTarget` answers about the target Win32 will OPEN, not the string the caller spelled \u2014 Phase 2's `F1` (\"a component the filesystem rewrites is refused, never normalized\") arriving at a new field. WHO RELIES: the adapter, which asks this predicate before it spawns anything. WHAT THE MUTATION DOES TO THEM: `node:path` keeps trailing dots and spaces and Win32 strips them, so `x.cmd.`, `x.cmd ` and `x.cmd..` all name `x.cmd` to the operating system and none of them to the predicate. DRIVEN under bun: ALL FOUR spellings ran the batch file and ALL FOUR executed the injected `&`. \u26a0 AND THE VICTIM ASSERTS THE REFUSAL'S MESSAGE RATHER THAN `ran: false`, because under NODE every one of these spellings is ENOENT (libuv reaches the filesystem through the long-path prefix) \u2014 so a `ran: false` assertion would have passed against the defect by proving the OTHER guard.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B1) - the Win32-rewrite limb of `namesABatchTarget`"
+	},
+	{
+		id: "P2B-v-a-caller-supplied-cwd-is-executed-in",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		// ⚠ RE-ANCHORED 2026-09-15, AND THE REWRITE IS RECORDED IN THE ENTRY because a rewritten mutant is
+		// exactly where a claim quietly weakens (the `P2B-n` precedent). The mutation OPERATOR and its meaning are
+		// unchanged — the containment check decides nothing and the caller's cwd is run in. What moved is the
+		// check: `B11` replaced the lexical comparison with a filesystem one, so the line this named is gone.
+		// ⭐ AND THE VICTIM IS STRICTLY LARGER: the same mutation now reddens the `elsewhere` case AND the
+		// junction case, where before there was only the first.
+		find: "\t\t\tif (resolved.directory !== deliverableRoot)",
+		replace: "\t\t\tif (false as boolean) // MUTANT: the cwd a caller put on the request is executed in, wherever it points\n\t\t\t",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the outcome this entire phase exists to make impossible \u2014 `workspace.ts`: \"otherwise the command executes in SOME OTHER DIRECTORY, which is the one failure this seam must never have.\" WHO RELIES: every step, and the repository the server is running out of. WHAT THE MUTATION DOES TO THEM: DRIVEN \u2014 `run({ argv: [node, '-e', ...], cwd: <this repository's root> })` executed IN THE SERVER'S OWN TREE and wrote a file there. \u2b50 AND THE POINT IS WHERE THE CHECK LIVES: `planProcessRun` was called \"the only sanctioned way to build a request\" and has ZERO production call sites \u2014 a CONVENTION, not a control. The runner is constructed against the deliverable workspace so the comparison is in the object a caller cannot go around.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B8) - the cwd-containment limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-w-a-runner-is-constructed-with-no-directory-it-may-run-in",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\tconst deliverableDirectory = deliverableWorkspace.directoryPath;\n\tif (deliverableWorkspace.materialization !== 'FILESYSTEM' || deliverableDirectory === undefined)\n\t\tthrow new Error(\n\t\t\t`A real ProcessRunner cannot be constructed against a ${deliverableWorkspace.materialization} deliverable workspace. The runner runs commands in that workspace's own directory and in no other \u2014 it is what makes a request's cwd checkable rather than caller-supplied \u2014 and a workspace with no directoryPath names no directory to run in. Wire the REFUSING default on an arm with no directory (RULE 5).`\n\t\t);\n\tconst deliverableRoot = resolvePath(deliverableDirectory);",
+		replace: "\tconst deliverableDirectory = deliverableWorkspace.directoryPath;\n\t// MUTANT: a runner with no directory to run in is constructed anyway, and every cwd is then compared\n\t// against a directory nobody named \u2014 which `resolve('')` makes the SERVER'S OWN.\n\tconst deliverableRoot = resolvePath(deliverableDirectory ?? '');",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: roadmap `RULE 5` \u2014 the arm with no directory keeps the REFUSING default \u2014 and the structural half of `B8`: a runner that cannot NAME the one directory it may run in cannot check the `cwd` it is handed. WHO RELIES: `resolveUndertakingSandbox`'s in-memory arm, and every future host that wires the two ports together. WHAT THE MUTATION DOES TO THEM: the containment comparison is decided by an ABSENCE rather than by a directory \u2014 and `resolvePath('')` is the PARENT PROCESS'S OWN working directory, so the one `cwd` the mutated runner would accept is the server's source tree. \u26a0 AND THE OPERATOR IS THE CONSEQUENCE RATHER THAN THE CONDITION, WHICH IS THIS LEDGER'S RECORDED RULE AND WAS MEASURED AGAIN HERE: `if (false)` over this check reported NO_COMPILE, because the check IS the narrowing that makes `deliverableDirectory` a `string` \u2014 indistinguishable, in a verdict table, from a mutation that made code unreachable. Substituting the fallback keeps the defect EXPRESSIBLE and therefore measurable.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B8) - the construction limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-x-a-deadline-that-passes-over-an-exited-child-is-called-a-timeout",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tif (exited) {\n\t\t\t\t// The child is already gone and the deadline is merely late: a kill would accomplish nothing, and\n\t\t\t\t// calling this a timeout is the fabrication `B2` drove. Settle with what has arrived.\n\t\t\t\tsettleRan();\n\t\t\t\treturn;\n\t\t\t}\n\t\t\ttimedOut = true;",
+		replace: "\t\t\ttimedOut = true; // MUTANT: the deadline is reported as a timeout whether or not the child was still alive\n\t\t\tif (exited) {\n\t\t\t\tsettleRan();\n\t\t\t\treturn;\n\t\t\t}",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the port's own words \u2014 `timedOut` is OBSERVED, never inferred \u2014 and \u00a736.2's separation of TIMEOUT from TOOL_FAILURE. WHO RELIES: every reader who decides whether the remedy is \"raise the budget\". WHAT THE MUTATION DOES TO THEM: DRIVEN \u2014 `timedOut: true` for a child that wrote its whole output and EXITED 0 in about ten milliseconds, because the flag was set AT THE TIMER and never reconciled with whether the kill did anything. \u26a0 AND THE OBVIOUS RECONCILIATION IS ALSO WRONG: `child.kill()` on an already-exited child returned **true under bun** and **false under node** on this host, measured against a child that exited at 151ms with the kill at 2000ms \u2014 so the kill's return value cannot carry the field. What can is whether the CHILD was still running when the budget ran out.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B2) - the observation limb of the deadline"
+	},
+	{
+		id: "P2B-y-the-outcome-waits-on-the-stdio-streams-rather-than-on-the-child",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tdrain = setTimeout(settleRan, STREAM_DRAIN_GRACE_MS);",
+		replace: "\t\t\t// MUTANT: the outcome waits on `close`, which a descendant holding the inherited pipes never lets fire",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the port's entire premise \u2014 \"a refusal is a fact a step can record\" \u2014 which a promise that never settles does not satisfy at all. WHO RELIES: every caller of `run`, and the request thread behind it. WHAT THE MUTATION DOES TO THEM: `close` fires when the last PIPE is released and a pipe outlives its child. DRIVEN with a child that spawns a DETACHED grandchild inheriting stdio and exits immediately: `exit` at 151ms with code 0, `close` NEVER, and `run()` STILL PENDING 9028ms after a 2000ms timeout. \u2b50 `exit` IS THE CHILD'S OWN EVENT and arrives whatever a descendant is holding; the bounded drain is what keeps the capture honest afterwards.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B3) - the settle-on-the-child limb of `observeChildRun`"
+	},
+	{
+		id: "P2B-z-a-kill-that-accomplished-nothing-leaves-run-unsettled",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tabandon = setTimeout(settleAfterKill, KILL_GRACE_MS);",
+		replace: "\t\t\t// MUTANT: nothing follows the kill, so a child it did not reach produces no fact at all",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `run` ALWAYS produces a fact \u2014 a refusal is acceptable, silence is not. WHO RELIES: the step that has to record SOMETHING about a command that outlived its budget. WHAT THE MUTATION DOES TO THEM: the deadline kills and then waits forever on an `exit` that is not coming, which is `B3` reintroduced through the one path `B3`'s fix does not cover. \u26a0 `SIGKILL` CANNOT BE SURVIVED ON EITHER PLATFORM, so this arm is unreachable with a real kill \u2014 which is exactly why it is DRIVEN by handing the observer a `terminate` that does nothing, against a REAL child with real streams and real events. An unreachable-looking path that produces no fact is how a promise stops settling. \u2b50 AND IT MUST NOT FABRICATE EITHER: `exitCode: null` reads as \"terminated by a signal\", which is precisely what was not observed, so the arm carries no exit code at all.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B3) - the post-kill backstop of `observeChildRun`"
+	},
+	{
+		id: "P2B-aa-a-run-that-produced-no-outcome-retains-a-capture-anyway",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\tchild.on('close', () => {\n\t\t\tstreamsClosed = true;\n\t\t\tif (exited) settleRan();\n\t\t});",
+		replace: "\t\tchild.on('close', () => {\n\t\t\tstreamsClosed = true;\n\t\t\t// MUTANT: the capture is retained from the EVENT, which also follows `error`\n\t\t\tvoid input.retain(outSink.settle().text, errSink.settle().text, []);\n\t\t\tif (exited) settleRan();\n\t\t});",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `REG-F-336` C-2 \u2014 no \"content on the content plane with no record on the record plane pointing at it\". WHO RELIES: every inventory of what a workspace holds, and every purge that has to be able to reach the bytes. WHAT THE MUTATION DOES TO THEM: `close` fires AFTER `error`, so a REFUSED run writes a capture that its own outcome does not mention. DRIVEN with `argv: ['no-such-tool-zzz']`: `run` resolved `{ ran: false }` with no retention field and an EMPTY captures directory \u2014 and 400ms later `stdout.txt` and `stderr.txt` existed and `list()` reported them live. \u2b50 THE ORPHAN WAS MINTED BY THE FUNCTION WRITTEN TO PREVENT IT, on the arm the adapter itself calls the commonest outcome of a model naming a tool the host does not have. \u26a0 AND THE VICTIM WAITS BEFORE ASSERTING EMPTINESS: asserting it immediately passes against the defect.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B4) - the claim-before-retaining limb of `observeChildRun`"
+	},
+	{
+		id: "P2B-ab-the-program-name-in-a-refusal-is-the-whole-argv",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tconst programName = programFileName(program);",
+		replace: "\t\t\tconst programName = request.argv.join(' '); // MUTANT: the whole argv, host paths and all, travels into a governed record",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: this port defines `refusedBecause` as a fact a step RECORDS \u2014 so it travels into a governed record AND into a model's context \u2014 and `workspaceDirectoryName` already applies that rule to the `cwd` printed in the same sentence. WHO RELIES: every reader of a refused step, and the deployment whose layout must not leak into one. WHAT THE MUTATION DOES TO THEM: DRIVEN \u2014 an ABSOLUTE program path produced \"'C:\\\\Program Files\\\\nodejs\\\\nope-missing.exe --flag' could not be started\", and under bun a path carrying the OPERATING USER'S NAME. \u26a0 THE TEST THAT CERTIFIED THE OLD MESSAGE ARRANGED A RELATIVE ARGV AND COULD NOT SEE THIS, which is why the replacement case uses an absolute program AND an argument carrying a host path.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B5) - the disclosure limb of `run`'s refusals"
+	},
+	{
+		id: "P2B-ac-the-durable-capture-carries-no-declaration-of-its-cut",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t['omissions', omissionsPath, declaredOmissions(omittedRegions)]",
+		replace: "\t\t\t// MUTANT: the cut is declared on the transient outcome only, so the durable copy is a silent prefix",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the port's own hazard sentence \u2014 \"a bounded capture that does not declare its cut hands the caller a PREFIX which reads as the whole \u2026 a pass nothing produced\" \u2014 applied to the copy `retention` is documented as naming: \"the DURABLE copy and the only one a purge can reach\". WHO RELIES: whatever reads the retained bytes in a later phase, which is where a TEST_RESULT becomes evidence. WHAT THE MUTATION DOES TO THEM: DRIVEN \u2014 200 KiB of stdout declared `{ STDOUT, byteSize: 139264, byteOffset: 65536 }` on the TRANSIENT outcome while `captures/<uuid>/stdout.txt` was exactly 65536 bytes with NOTHING beside it saying so. \u2b50 THE DECLARATION TRAVELS TWICE BECAUSE THE HAZARD HAS TWO HALVES: `retention.omittedRegions` for a reader holding the record, `omissions.json` for one holding only the directory.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B6) - the on-disk declaration limb of `retain`"
+	},
+	{
+		id: "P2B-ad-the-record-naming-the-durable-bytes-declares-no-cut",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t\t\tomittedRegions,\n\t\t\t\t\tomissionsPath",
+		replace: "\t\t\t\t\tomittedRegions: [], // MUTANT: the record that POINTS AT the durable bytes says nothing was cut\n\t\t\t\t\tomissionsPath",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the same `B6` rule from the RECORD side rather than the disk side \u2014 `ProcessOutputRetention` declares `omittedRegions` REQUIRED, and \"empty means nothing was cut, never nobody looked\". WHO RELIES: a consumer that holds the outcome and never opens the directory, which is every programmatic reader. WHAT THE MUTATION DOES TO THEM: the transient `stdout` still declares its cut and the DURABLE copy the record points at declares none, so the two halves of one outcome disagree and the one a later phase persists is the one that lies. \u2b50 SEPARATE FROM `P2B-ac` DELIBERATELY: a fix that wrote the file and forgot the field, or the reverse, closes half the hazard and reads as closing all of it.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B6) - the record limb of `retain`"
+	},
+	{
+		id: "P2B-ae-bytes-in-a-map-are-accepted-as-the-durable-capture",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\tif (\n\t\toutputWorkspace.materialization !== 'FILESYSTEM' ||\n\t\toutputWorkspace.directoryPath === undefined\n\t)",
+		replace: "\tif (false as boolean) // MUTANT: a workspace holding the capture in a Map is accepted as the durable copy R7 requires\n\t",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `R7` requires a DURABLE copy of both streams that a purge can reach, and `ProcessOutputRetention.stdoutPath` is documented as naming it. WHO RELIES: `REG-Q-066`'s answer, which is that disposition. WHAT THE MUTATION DOES TO THEM: the guard checked `purgeability` and NOT `materialization`, so an IN_MEMORY workspace carrying the right class was ACCEPTED and the factory returned `kind: 'REAL'`. DRIVEN \u2014 a real child ran, `retention` reported `retained: true` with a `stdoutPath`, and `materialization === 'IN_MEMORY'` with `directoryPath === undefined`: bytes in a Map presented as the copy a purge reaches, which makes `R7` false at the moment it is asserted true. \u26a0 AND THE SUITE COULD NOT HAVE NOTICED: its ENTIRE retention half ran on an in-memory workspace, so every one of those cases proved its property about a Map. They are re-pointed onto `createFilesystemWorkspace` in the same commit.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B7) - the materialization limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-af-every-capture-declares-itself-the-whole-of-the-output",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tconst outputComplete = streamsClosed;",
+		replace: "\t\t\tconst outputComplete = true; // MUTANT: every capture declares itself complete, including one cut short by the drain",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `ProcessRunOutcome.outputComplete` \u2014 \"the alternative to stating it is silence\", and a reader treating an incomplete capture as the command's whole output makes the mistake `omittedRegions` exists to prevent, one cause over. WHO RELIES: anything that reads a build's output to decide whether it succeeded. WHAT THE MUTATION DOES TO THEM: settling on the CHILD buys an outcome where there used to be none, and what it costs is the guarantee that nothing more was coming; this mutation spends that and says nothing. \u26a0 THE FIELD IS ALSO SNAPSHOT BEFORE `claim` FOR A MEASURED REASON \u2014 `claim` destroys the pipes, which fires `close`, so reading it afterwards reported `true` for the very arrangement where a grandchild still held the descriptors: a field answering about the instrument's own act rather than about the run.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B3) - the completeness declaration of `observeChildRun`"
+	},
+	{
+		id: "P2B-ag-the-programs-whole-path-travels-into-every-refusal",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "export function programFileName(program: string): string {\n\treturn finalPathSegment(program);",
+		replace: "export function programFileName(program: string): string {\n\treturn program; // MUTANT: the program's whole path travels into every refusal this seam records",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the rule `workspaceDirectoryName` states for WHERE, stated for WHAT \u2014 a refusal names the final segment and nothing above it, because `refusedBecause` reaches a governed record and a model's context. WHO RELIES: both adapters of this port, which is why the derivation is here and not in one of them. WHAT THE MUTATION DOES TO THEM: every refusal naming a program discloses the host's filesystem layout, and under bun the operating user's own name with it \u2014 measured. \u2b50 THIS IS THE GUARD THE NEW EXPORT SHIPS WITH: `programFileName` became production-consumed in this commit, and an export with no mutant is a promise nobody has tested.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B5) - the `programFileName` export"
+	},
+	{
+		id: "P2B-ah-the-stderr-probe-goes-back-to-matching-one-line-at-a-time",
+		file: "verif/agy-stderr-unbound.test.ts",
+		// ⚠ RE-ANCHORED 2026-09-15 by `W3`, which gave `bindingsInSource` the SCRIPT KIND a `.svelte` file
+		// needs. The mutation, its victim and its meaning are unchanged — only the parameter it names.
+		find: "\tconst sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, kind);\n",
+		replace: "\t// MUTANT: the line-at-a-time regexes this probe replaces.\n\tif (token === 'stderr')\n\t\treturn source\n\t\t\t.split('\\n')\n\t\t\t.map((text, i) => ({ file, line: i + 1, shape: 'identifier' as const, t: text.trim() }))\n\t\t\t.filter((h) => /\\.stderr\\b/.test(h.t) || /\\{[^}]*\\bstderr\\b[^}]*\\}\\s*=/.test(h.t))\n\t\t\t.map((h) => ({ file: h.file, line: h.line, shape: h.shape }));\n\tconst sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, kind);\n",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE: `REG-Q-066`'s answer is CLOSED BY DISPOSITION, and that answer is contingent on this gate SEEING every binding of `stderr` the demo acquires. WHO RELIES: the question itself, and PER-9, which governs prompt content a model CLI's stderr can echo. WHAT THE MUTATION DOES TO THEM: the regexes this probe replaces matched `\\.stderr\\b` or a `{ \u2026 stderr \u2026 } =` ON ONE LINE, and FIVE realistic shapes walked past them \u2014 all driven, each with a working control: a MULTI-LINE destructure (what prettier produces at printWidth 100), `.then(({ stdout, stderr }) => \u2026)` (the idiomatic shape for the very `execFileAsync` call `agy-cli.ts` makes), `e['stderr']`, a destructured PARAMETER, and a computed key in both of its constant spellings. \u2b50 THE REPLACEMENT IS A STRUCTURAL AST WALK \u2014 this repository's standing rule \u2014 and it is a SUPERSET: every shape the regexes caught is an Identifier or a folded key too.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B9) - the binding probe of the REG-Q-066 gate"
+	},
+	{
+		id: "P2B-ai-the-stderr-probe-matches-prose-about-stderr-as-well-as-bindings",
+		file: "verif/agy-stderr-unbound.test.ts",
+		// ⚠ RE-ANCHORED 2026-09-15 by `W3`, which gave `bindingsInSource` the SCRIPT KIND a `.svelte` file
+		// needs. The mutation, its victim and its meaning are unchanged — only the parameter it names.
+		find: "\tconst sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, kind);\n",
+		replace: "\t// MUTANT: every OCCURRENCE of the token, comments and messages included.\n\tif (token === 'stderr')\n\t\treturn source\n\t\t\t.split('\\n')\n\t\t\t.map((text, i) => ({ file, line: i + 1, shape: 'identifier' as const, t: text }))\n\t\t\t.filter((h) => h.t.includes(token))\n\t\t\t.map((h) => ({ file: h.file, line: h.line, shape: h.shape }));\n\tconst sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true, kind);\n",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE: the gate probes the SHAPE and not the NAME \u2014 `REG-F-333`'s recorded defect, one layer over. WHO RELIES: anyone writing down WHY stderr must not be bound, which this repository requires them to do. WHAT THE MUTATION DOES TO THEM: a probe that matches the token anywhere reddens on its own documentation \u2014 which HAPPENED, and went unnoticed for two days (measured across the commits: dbe1a955 = 0 hits, df6019e8 = 1, 95c71798 = 3). \u2b50 THIS IS THE OTHER DIRECTION OF `P2B-ah` AND IT NEEDS ITS OWN ENTRY: without it, \"find every occurrence\" satisfies `P2B-ah` completely, and a probe that catches everything is not a stricter instrument, it is a broken one. The pair is what says the probe DISCRIMINATES.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B9) - the false-positive direction of the binding probe"
+	},
+	{
+		id: "P2B-aj-the-refusing-defaults-refusal-carries-the-whole-argv",
+		file: "packages/rph-ports/src/defaults/process-runner.ts",
+		find: "\t\t\tconst program = request.argv[0] ?? '';\n\t\t\tconst named = program === '' ? 'no command' : `'${programFileName(program)}'`;",
+		replace: "\t\t\tconst named = `'${request.argv.join(' ')}'`; // MUTANT: the whole argv \u2014 absolute program path, arguments and whatever they carry \u2014 travels into a governed record",
+		expectRed: ["packages/rph-ports/src/defaults/process-runner.test.ts"],
+		why: "PROMISE: `refusedBecause` is defined by this port as \u201ca fact a step can record\u201d \u2014 a string that reaches a governed record and a model's context \u2014 and `filesystem-workspace.ts` states the consequence: \u201cthe message carries the host's absolute path, which belongs in nothing a step records.\u201d WHO RELIES: every reader of a refused step, and the deployment whose layout must not leak into one. WHAT THE MUTATION DOES TO THEM: an absolute program path and every argument beside it travel verbatim \u2014 driven at the OTHER adapter as breach `B5`, where it produced \u201c'C:\\\\Program Files\\\\nodejs\\\\nope-missing.exe --flag' could not be started\u201d and, under bun, a path carrying the operating user's name. \u2b50 THIS ENTRY EXISTS BECAUSE THE ADVERSARIAL PASS NAMED ONE ADAPTER AND BOTH HAD THE DEFECT: the rule was stated generally, implemented once, and this file's own spec ASSERTED the leak (`toContain('node --test')`), which is how a fix comes to look like a regression.",
+		source: "JAN-EXEC Phase 2b adversarial pass (breach B5, second site) - the disclosure limb of `createRefusingProcessRunner`"
+	},
+	// ── ⛔⛔ THE THIRD ADVERSARIAL PASS: ONE BREACH (`B11`) AND THE THREE DISCLOSED WEAKNESSES, RULED ──────
+	//
+	// ⭐ `B11` IS `B8` AGAIN, ONE INSTRUMENT DOWN. `B8`'s fix put the check in the object a caller cannot go
+	// around; what it could not fix is that the check was still a comparison of two path STRINGS. A junction
+	// planted at the deliverable path after construction spells the workspace exactly, and the OS follows it.
+	// ⚠ THE SIBLING MODULE'S `insideResolvedRoot` DOES NOT CLOSE IT, WHICH IS THE MEASUREMENT `P2B-al` MAKES
+	// PERMANENT: resolving BOTH sides walks both of them through the same junction. Only the resolved cwd
+	// compared against the DECLARED directory — the one name a swap cannot move — answers this question.
+	{
+		id: "P2B-ak-the-containment-check-goes-back-to-comparing-path-text",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\treturn { directory: await realpath(path) };",
+		replace: "\t\treturn { directory: resolvePath(path) }; // MUTANT: the check goes back to arithmetic on the path TEXT, which is what B11 defeated",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: a command runs in the deliverable workspace's own directory or in none \u2014 `workspace.ts`: \"otherwise the command executes in SOME OTHER DIRECTORY, which is the one failure this seam must never have.\" WHO RELIES: every step, and the repository the server runs out of. WHAT THE MUTATION DOES TO THEM: `resolve` is arithmetic on text and cannot see a reparse point, so a junction standing where the workspace directory was matches EXACTLY. DRIVEN: the runner constructed against a real directory, the directory then replaced by `mklink /J` pointing at a stand-in server tree, a LAWFUL cwd passed \u2014 `ran: true`, and `PWNED_IN_SERVER_TREE.txt` written into the stand-in. \u2b50 THE FIX IS NOT A BIGGER COMPARISON BUT A DIFFERENT INSTRUMENT: `realpath` follows what the OS follows, per call rather than at construction, because a root measured once cannot notice a swap that happens afterwards \u2014 and the swap IS the attack.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (breach B11) - the resolved-cwd limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-al-both-sides-are-resolved-so-both-walk-through-the-junction",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tif (resolved.directory !== deliverableRoot)\n\t\t\t\t// \u26d4 TWO ARMS, BECAUSE THEY ARE TWO FACTS",
+		replace: "\t\t\tconst resolvedRoot = await resolvedDirectory(deliverableRoot); // MUTANT: BOTH sides resolved \u2014 `insideResolvedRoot`'s shape, which walks both of them through the same junction\n\t\t\tif (\n\t\t\t\tresolved.directory !==\n\t\t\t\t('directory' in resolvedRoot ? resolvedRoot.directory : deliverableRoot)\n\t\t\t)\n\t\t\t\t// \u26d4 TWO ARMS, BECAUSE THEY ARE TWO FACTS",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: the same one as `P2B-ak`, and this entry exists because THE OBVIOUS FIX FOR IT DOES NOT WORK. WHO RELIES: anyone reading `filesystem-workspace.ts`'s `insideResolvedRoot` \u2014 *\"IT ASKS THE FILESYSTEM, NOT THE STRING\"* \u2014 and concluding that lifting it here would close `B11`. WHAT THE MUTATION DOES TO THEM: it IS that lift, and it answers CONTAINED for the breach. MEASURED on node 24.11.1 and bun 1.3.14: with a junction at the deliverable path, `realpath(cwd)` and `realpath(root)` both return the attacker's directory, so the comparison is satisfied by the redirection itself. \u2b50 THAT IS NOT A DEFECT IN THE SIBLING \u2014 it is right for ITS question (is this CHILD PATH inside that root) and `filesystem-workspace.ts` discloses this very arrangement as its bound 2, OPEN. The runner can close for its own act what the workspace cannot close for hers, because it compares against a DECLARED name rather than a resolved root. \u26a0 THIS ENTRY IS THE MEASUREMENT MADE PERMANENT: without it, the next author reads the sibling's comment and weakens the check back to symmetry.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (breach B11) - why the sibling's containment predicate was not lifted"
+	},
+	{
+		id: "P2B-am-a-cwd-that-does-not-resolve-falls-back-to-the-path-text",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\treturn { unresolvable: (cause as NodeJS.ErrnoException | undefined)?.code ?? 'unknown cause' };",
+		replace: "\t\treturn { directory: resolvePath(path) }; // MUTANT: a cwd the filesystem cannot resolve is decided by its TEXT instead",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: \u00a716 fail-closed \u2014 a check that cannot be answered REFUSES, it does not admit. WHO RELIES: every caller of `run`, and the record, which must distinguish a CONTAINMENT refusal from a spawn failure. WHAT THE MUTATION DOES TO THEM: the one fallback available is the path TEXT, which is the instrument the breach above defeated \u2014 so the arm that handles a workspace directory that has been REMOVED decides containment with the instrument that cannot see whether it has been REPLACED. \u26a0 AND THE VICTIM ASSERTS THE MESSAGE RATHER THAN `ran: false`, because the mutated arm still refuses: it reaches `spawn`, which fails ENOENT for its own reason. A `ran: false` assertion would pass against the defect by proving the OTHER guard \u2014 the shape `P2B-u` already records at this seam.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (breach B11) - the unresolvable-cwd arm of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-an-one-refusal-covers-both-a-wrong-cwd-and-a-redirected-one",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\t\t\trefusedBecause:\n\t\t\t\t\t\tresolvePath(request.cwd) === deliverableRoot",
+		replace: "\t\t\t\t\trefusedBecause:\n\t\t\t\t\t\t(false as boolean) // MUTANT: one message for both arms \u2014 the redirected cwd is told to derive its cwd from directoryPath, which is what it DID",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: this adapter's own `B10` finding \u2014 *\"a refusal stating something FALSE about its input is worse than no refusal\"*. WHO RELIES: whoever reads the refused step; the two situations have different remedies and only one of them is the reader's mistake. WHAT THE MUTATION DOES TO THEM: a cwd that spells the workspace EXACTLY is answered *\"this request carries a cwd naming 'workspace' instead\"* \u2014 instead of itself \u2014 and then told to derive the cwd from `directoryPath`, which is precisely what it did. The real fact, that the DIRECTORY has been replaced, is never stated. \u2b50 SEPARATE FROM `P2B-ak` DELIBERATELY: that one is whether the run is refused, this one is whether the refusal is TRUE, and a fix for the first that got the second wrong would read as complete.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (breach B11) - the two-arm disclosure of the cwd refusal"
+	},
+	{
+		id: "P2B-ao-a-purge-that-raises-during-the-sweep-leaves-an-unreported-orphan",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t\t\tlet outcome: PurgeOutcome;\n\t\t\ttry {\n\t\t\t\toutcome = await outputWorkspace.purge(path);\n\t\t\t} catch (cause) {",
+		replace: "\t\t\tlet outcome: PurgeOutcome;\n\t\t\toutcome = await outputWorkspace.purge(path); // MUTANT: a purge that RAISES escapes the sweep\n\t\t\tif (false as boolean) try { throw new Error('unreachable'); } catch (cause) {",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/child-process-runner.test.ts"],
+		why: "PROMISE: `REG-F-336` C-2 \u2014 no content on the content plane with no record naming it \u2014 and this adapter's own posture of relying on a port's promise AND not trusting it (`retain` already wraps `writeFile` for exactly this). WHO RELIES: any reader auditing what a workspace holds. WHAT THE MUTATION DOES TO THEM: the throw escapes to `retain`'s outer catch, which answers for a WRITE that never failed \u2014 DRIVEN: `the run's output could not be retained: the output workspace raised rather than refusing (EPERM).` \u2014 while `stdout.txt` and `omissions.json` sit on disk referenced by nothing. \u26a0 DISCLOSED AS `W2` AND ADAPTER-CONTINGENT (the shipped adapters refuse rather than throw), and fixed rather than disclosed onward because the FIX IS THE POSTURE THE FUNCTION NEXT TO IT ALREADY TAKES: a throw is reported as the refusal it amounts to, and the record NAMES the orphan.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (W2) - the sweep limb of `createChildProcessRunner`"
+	},
+	{
+		id: "P2B-ap-the-stderr-probe-population-excludes-every-svelte-file",
+		file: "verif/agy-stderr-unbound.test.ts",
+		find: "const PARSED_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs', '.svelte'];",
+		replace: "const PARSED_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs']; // MUTANT: eleven .svelte files leave the population in silence",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE: `REG-Q-066` is answered CLOSED BY DISPOSITION over a stated POPULATION \u2014 an answer about files nobody looked at is not an answer. WHO RELIES: the question itself, and every author who reads a green gate as \"stderr is bound at one disposed site\". WHAT THE MUTATION DOES TO THEM: the probe walks `.ts` alone, so a stderr binding in a `.svelte` server block is never LOOKED AT while the positive control stays green on a `.ts` file that binds `stdout` \u2014 the vacuous pass this repository records most often. \u2b50 DISCLOSED AS `W3` AND IT IS A POPULATION GAP, NOT A PREDICATE GAP: the AST probe caught all five of `B9`'s evaded shapes. So the repair is the GENERAL form \u2014 the population is derived from the filesystem and the EXCLUSION is declared, so an extension in neither list reddens this gate and is DECIDED rather than silently left out.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (W3) - the population limb of the REG-Q-066 gate"
+	},
+	{
+		id: "P2B-aq-the-svelte-reader-parses-the-whole-file-as-one-tsx-source",
+		file: "verif/agy-stderr-unbound.test.ts",
+		find: "\tif (extensionOf(file) !== '.svelte')\n\t\treturn [{ text: source, line: 0, kind: ts.ScriptKind.TS }];",
+		replace: "\tif (true as boolean) return [{ text: source, line: 0, kind: ts.ScriptKind.TSX }]; // MUTANT: one parse for the whole .svelte file, so a script body is JSX children",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE: widening a population only helps if the instrument can READ what it now walks. WHO RELIES: `W3`'s repair, which is worthless if `.svelte` files enter the population and are then misread. WHAT THE MUTATION DOES TO THEM: a `<script>` body parsed as JSX children is TEXT, so `const failure = outcome.stderr;` is invisible \u2014 the gate would report 11 more files in its population and see nothing in any of them. \u26d4 AND THIS ENTRY EXISTS BECAUSE THE FIRST VERSION OF ITS VICTIM COULD NOT KILL IT: the case drove `const { stdout, stderr } = $props();`, and in JSX children `{ \u2026 }` is an EXPRESSION container, so the destructure was parsed as code BY ACCIDENT and the mutant SURVIVED. The case now drives a property read, which has no braces to be rescued by. \u2b50 A control that passes for the wrong reason is this repository's most-recorded instrument defect, and this one was found by mutating the instrument rather than by reading it.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (W3) - the .svelte reader of the REG-Q-066 gate"
+	},
+	{
+		id: "P2B-ar-the-program-name-in-a-refusal-grows-back-past-one-segment",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "export function programFileName(program: string): string {\n\treturn finalPathSegment(program);",
+		replace: "export function programFileName(program: string): string {\n\treturn program.split(/[\\\\/]+/).filter((s) => s !== '').slice(-2).join('/') || program; // MUTANT: the last TWO segments travel, so the directory a program sits in is disclosed again",
+		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
+		why: "PROMISE: a refusal discloses AT MOST ONE SEGMENT about WHAT was to be run \u2014 `B5`'s bound, after `argv.join(' ')` put an absolute program path and the operating user's name into a field this port defines as travelling into a governed record AND a model's context. WHO RELIES: every reader of a refused step, and the deployment whose layout must not leak into one. WHAT THE MUTATION DOES TO THEM: `B5` re-opens BY DEGREES \u2014 the directory a program sits in is exactly the fact the bound withholds, and one more segment is how a bound that was once argued for stops holding without anyone deciding to drop it. \u26a0 THIS IS THE GATED FORM OF `W1`, WHICH WAS RULED **DISCLOSED** rather than fixed on 2026-09-15: the residue (a model-chosen host path fragment still leaks its DEEPEST name) is written as a case rather than as prose, so the disclosure cannot widen without an edit a reviewer sees.",
+		source: "JAN-EXEC Phase 2b third adversarial pass (W1) - the disclosure bound of `programFileName`"
 	}
 ];

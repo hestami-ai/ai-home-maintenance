@@ -57,7 +57,10 @@ afterEach(async () => {
 	// below resolves against `process.cwd()` BY CONSTRUCTION — that is the defect it exists to catch — so on
 	// the run that reddens it, the escape lands in the checkout. The same reasoning as the container above:
 	// every escape this suite provokes must land inside something it deletes.
-	await rm(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`), { recursive: true, force: true });
+	await rm(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`), {
+		recursive: true,
+		force: true
+	});
 });
 
 describe('the working directory is the OWNER\u2019S and NEVER the server\u2019s', () => {
@@ -221,19 +224,40 @@ describe('\u26d4 an owner id that would escape the root is REFUSED, never substi
 	});
 });
 
-describe('\u2b50 the ProcessRunner seam is WIRED, and provably INERT', () => {
-	it('the host wires the REFUSING default \u2014 no real runner lands in this commit', () => {
-		// ⛔ A real runner captures stdout and stderr, which REOPENS `REG-Q-066`, and roadmap rule 8 requires a
-		// disclosed question to be answered in the commit that reopens it. `R7` has ruled the disposition; Phase
-		// 2b implements it. Until then the host declares what it is holding.
-		expect(resolveUndertakingSandbox(UND, root).runner.kind).toBe('REFUSING');
+describe('\u2b50 the ProcessRunner seam is WIRED \u2014 REAL where there is a directory, REFUSING where not', () => {
+	it('\u2b50 the durable arm wires a REAL runner \u2014 Phase 2b, with REG-Q-066 answered beside it', () => {
+		// ⭐ THIS ASSERTION USED TO READ `.toBe('REFUSING')` UNDER THE COMMENT *"no real runner lands in this
+		// commit"*, and it is REPLACED RATHER THAN DELETED because it was a PHASE PIN doing its job: Phase 2 pinned
+		// the seam inert precisely so a real runner could not land quietly, without the `REG-Q-066` disposition
+		// roadmap rule 8 requires in the SAME commit. That disposition is now `child-process-runner.ts`'s header,
+		// the SECOND workspace `resolveUndertakingSandbox` declares, and the cases below.
+		// ⛔ AND THE PIN IS SPLIT RATHER THAN WEAKENED: the old line could say nothing whatever about the arm with
+		// no directory, and the next case is an assertion it was structurally unable to make.
+		expect(resolveUndertakingSandbox(UND, root).runner.kind).toBe('REAL');
+	});
+
+	it('\u26d4 and the arm with NO DIRECTORY still wires the REFUSING default \u2014 RULE 5', () => {
+		// ⛔ A REAL RUNNER NEEDS A REAL `cwd`, AND AN IN_MEMORY WORKSPACE HAS NONE. Wiring one on this arm would
+		// mean either a command executing in the server's own tree or, at best, `planProcessRun` reporting a HOST
+		// WIRING ERROR that this host itself committed. THE MUTANT: wire the real runner unconditionally.
+		const sandbox = resolveUndertakingSandbox(UND, undefined);
+		expect(sandbox.workspace.materialization).toBe('IN_MEMORY');
+		expect(sandbox.runner.kind).toBe('REFUSING');
 	});
 
 	it('\u2b50 the seam is COMPLETE \u2014 a run PLANS against the owner\u2019s directory, never the server\u2019s', () => {
-		// ⭑ This is what "complete" means: `planProcessRun` is the only sanctioned way to build a request, `cwd`
-		// is required on one, and the only value it may carry is the workspace's OWN `directoryPath`. A host
+		// ⭑ This is what "complete" means: `cwd` is REQUIRED on a request, and `planProcessRun` derives it from
+		// the workspace's OWN `directoryPath`, so a lawful caller never has to name a directory at all. A host
 		// assembling a request by hand would have to put something there, and the obvious something is
 		// `process.cwd()`.
+		// ⛔ AND THIS COMMENT USED TO CALL THAT "THE ONLY SANCTIONED WAY TO BUILD A REQUEST", WHICH WAS FALSE AND
+		// IS CORRECTED RATHER THAN LEFT: `ProcessRunRequest` is a plain interface, this function had ZERO
+		// production call sites, and Phase 2b's adversarial pass drove `run({ argv, cwd: <the repository root> })`
+		// straight past it into the server's own tree (`B8`). A CONVENTION WITH NO CALL SITES IS NOT A CONTROL.
+		// What binds is that the REAL runner is CONSTRUCTED against the deliverable workspace and refuses any
+		// other `cwd` — driven in `child-process-runner.test.ts`. This case still earns its place: it is where
+		// the host's own wiring is checked end to end, and `plan.request.cwd` being the OWNER's directory rather
+		// than `process.cwd()` is the fact it proves.
 		const sandbox = resolveUndertakingSandbox(UND, root);
 		const plan = planProcessRun({
 			runner: sandbox.runner,
@@ -246,15 +270,25 @@ describe('\u2b50 the ProcessRunner seam is WIRED, and provably INERT', () => {
 		expect(plan.planned === true && plan.request.cwd).not.toBe(process.cwd());
 	});
 
-	it('\u26d4 and it is INERT \u2014 the wired runner refuses, and carries NO exitCode field at all', async () => {
+	it('\u26d4 the UNDURABLE arm is INERT \u2014 its runner refuses, and carries NO exitCode field at all', async () => {
 		// ⛔ `Object.hasOwn`, NOT `toBeUndefined`. `out.exitCode === undefined` passes for a runner returning
 		// `{ran: true, exitCode: undefined}` — a shape claiming a command RAN while saying nothing about how it
 		// went — and only the presence of the FIELD discriminates. This repository has the receipt for the
 		// weaker form.
-		const sandbox = resolveUndertakingSandbox(UND, root);
+		// ⭐ RE-POINTED IN PHASE 2b, NOT RELAXED. Every assertion is unchanged; what changed is which arm can
+		// still exhibit them. `root` now carries a REAL runner, so asserting inertness there would be asserting
+		// the opposite of what this phase landed — while the arm with NO durable root is exactly where `RULE 5`
+		// still requires the refusing default.
+		// ⚠ AND THE WORKSPACE IS OVERRIDDEN TO FILESYSTEM SO `planProcessRun` REACHES THE RUNNER AT ALL: on this
+		// arm it would otherwise refuse at PLAN time, and the case would then assert nothing about the runner.
+		const sandbox = resolveUndertakingSandbox(UND, undefined);
 		const plan = planProcessRun({
 			runner: sandbox.runner,
-			workspace: sandbox.workspace,
+			workspace: {
+				...sandbox.workspace,
+				materialization: 'FILESYSTEM',
+				directoryPath: '/work/und_2b'
+			},
 			argv: ['node', '--version'],
 			timeoutMs: 5_000
 		});
@@ -263,6 +297,63 @@ describe('\u2b50 the ProcessRunner seam is WIRED, and provably INERT', () => {
 		expect(out.ran).toBe(false);
 		expect(Object.hasOwn(out, 'exitCode')).toBe(false);
 		expect(out.ran === false && out.refusedBecause).toMatch(/was not run/);
+	});
+});
+
+// ── ⭐⭐ JAN-EXEC PHASE 2b — `R7`, AS A WIRING RATHER THAN AS A COMMENT ───────────────────
+//
+// ⭐ THE SPONSOR RULED *"stdout and stderr are BOTH retained, and BOTH come under purge"*, and the port states
+// the consequence: *"one workspace cannot hold participating and purgeable material side by side. A host
+// needing both declares two."* These three cases are the host's half of that — the declarations, the
+// arrangement, and the fact that the two classes actually BEHAVE differently rather than merely reading so.
+describe('\u2b50\u2b50 R7 \u2014 the SECOND workspace, where a run\u2019s output is retained', () => {
+	it('\u2b50 the deliverable is RETAINED_BY_PARTICIPATION and the output workspace is PURGEABLE_AT_EXPIRY', () => {
+		// ⛔ TWO DECLARATIONS, AND NEITHER IS INFERRED. `R8` makes the deliverable unpurgeable; `R7` requires the
+		// captured streams to come under purge; `Purgeability` has exactly two members and coining a third is
+		// forbidden while `REG-Q-056` is OPEN. THE MUTANT: declare the output workspace RETAINED_BY_PARTICIPATION.
+		const sandbox = resolveUndertakingSandbox(UND, root);
+		expect(sandbox.workspace.purgeability).toBe('RETAINED_BY_PARTICIPATION');
+		expect(sandbox.outputWorkspace.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		expect(sandbox.outputWorkspace.ownerId).toBe(UND);
+	});
+
+	it('\u26d4 and the two classes BEHAVE differently \u2014 one purge refuses, the other succeeds', async () => {
+		// ⭑ A DECLARATION NOTHING READS IS A DECLARATION NOTHING ENFORCES, and `P2-k` SURVIVED its first run for
+		// exactly that reason — the only thing that exposed it was asking the workspace to DESTROY the product and
+		// requiring it to refuse. Here is the same instrument, applied to the new declaration from both sides.
+		const sandbox = resolveUndertakingSandbox(UND, root);
+		await sandbox.workspace.writeFile('src/index.ts', 'export const x = 1;');
+		await sandbox.outputWorkspace.writeFile('captures/probe/stdout.txt', 'build log');
+		const deliverable = await sandbox.workspace.purge('src/index.ts');
+		expect(deliverable.purged, 'PER-8: the deliverable has participated').toBe(false);
+		expect(deliverable.purged === false && deliverable.refusedBecause).toMatch(/PER-8/);
+		const captured = await sandbox.outputWorkspace.purge('captures/probe/stdout.txt');
+		expect(captured.purged, 'R7: the capture comes under purge').toBe(true);
+	});
+
+	it('\u26d4 the output workspace is a SIBLING \u2014 no path a step can write reaches it', async () => {
+		// ⭐ PHASE 2's `F1`, APPLIED RATHER THAN RE-LEARNED. A reserved area INSIDE a directory a step writes to is
+		// a name a step can spell, and two adversaries in a row beat that arrangement by spelling it differently
+		// from the guard while the filesystem read both spellings as the same file. Retained output is precisely
+		// what a step must not be able to rewrite. THE MUTANT: nest the output directory inside the deliverable.
+		const sandbox = resolveUndertakingSandbox(UND, root);
+		const deliverable = sandbox.workspace.directoryPath ?? '';
+		const captures = sandbox.outputWorkspace.directoryPath ?? '';
+		expect(captures).not.toBe(deliverable);
+		expect(
+			captures.startsWith(deliverable + sep),
+			'INSIDE would make it a step-writable area'
+		).toBe(false);
+		expect(existsSync(captures), 'and it exists, so a capture has somewhere to land').toBe(true);
+		// ⛔ AND THE REACHABILITY IS DRIVEN, NOT ARGUED. `..` underflow is refused by the containment predicate, so
+		// there is no spelling of a sibling a contained path can carry — and this is the assertion that would
+		// redden the day the arrangement was nested.
+		const escape = await sandbox.workspace.writeFile(
+			`../${UND_DIRECTORY}.process-output/captures/forged.txt`,
+			'forged'
+		);
+		expect(escape.written).toBe(false);
+		expect(await sandbox.outputWorkspace.readFile('captures/forged.txt')).toBeUndefined();
 	});
 });
 
@@ -348,7 +439,13 @@ describe('⛔ the durable root must be ABSOLUTE, or the deliverable lands in the
 		// ⚠ `\\workspaces` AND `C:workspaces` ARE NOT ABSOLUTE ON WINDOWS. The first resolves against the
 		// process's CURRENT DRIVE and the second against that drive's CURRENT DIRECTORY, so both depend on
 		// exactly the state a derived root may not depend on — and `path.isAbsolute` answers TRUE for the first.
-		for (const relative of ['workspaces', './workspaces', '..\\workspaces', '\\workspaces', 'C:workspaces'])
+		for (const relative of [
+			'workspaces',
+			'./workspaces',
+			'..\\workspaces',
+			'\\workspaces',
+			'C:workspaces'
+		])
 			expect(() => resolveUndertakingSandbox(UND, relative), relative).toThrow(/absolute/);
 	});
 
