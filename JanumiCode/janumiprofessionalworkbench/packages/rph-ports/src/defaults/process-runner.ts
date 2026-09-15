@@ -11,6 +11,7 @@
 // guarantee than remembering not to. That is the whole argument for the union, made concrete in the one
 // implementation that would otherwise have to fill the field.
 import {
+	programFileName,
 	workspaceDirectoryName,
 	type ProcessRunOutcome,
 	type ProcessRunRequest,
@@ -33,12 +34,27 @@ export function createRefusingProcessRunner(): ProcessRunner {
 			// one implementation, and Phase 2b adds the second one. An invariant that makes the seam lawful
 			// belongs with the interface, so the other adapter cannot quietly implement a weaker one.
 			const workspaceDirectory = workspaceDirectoryName(request.cwd);
+			// ⛔⛔ THE PROGRAM'S FILE NAME, NEVER THE ARGV — AND THIS ADAPTER WAS STILL LEAKING IT AFTER THE OTHER
+			// ONE WAS FIXED, WHICH IS THE DEFECT THIS REPOSITORY FILES MOST OFTEN: A RULE STATED GENERALLY AND
+			// IMPLEMENTED ONCE. Phase 2b's adversarial pass drove `B5` through `child-process-runner.ts` — an
+			// absolute program path put *"'C:\Program Files\nodejs\nope-missing.exe --flag'"*, and under bun the
+			// operating user's name, into a `refusedBecause` the port defines as travelling into a governed record
+			// AND a model's context. The brief named that adapter. THIS one had the identical interpolation, and
+			// the comment three lines below had already recorded the identical lesson about the `cwd` without
+			// anyone applying it to the ARGV standing beside it.
+			// ⭑ `programFileName` IS THE PORT'S ANSWER, exported for exactly the reason `workspaceDirectoryName`
+			// is: an invariant that makes the seam lawful belongs with the interface, so neither adapter can
+			// quietly implement a weaker one. ⚠ AND AN EMPTY ARGV NAMES NO PROGRAM RATHER THAN AN EMPTY ONE —
+			// `RULE 6`, NO DEFAULT THAT FABRICATES, at the one place a fallback would have put `''` into a record
+			// as though it were a command's name.
+			const program = request.argv[0] ?? '';
+			const named = program === '' ? 'no command' : `'${programFileName(program)}'`;
 			return {
 				ran: false,
 				// The refusal NAMES what was not run and WHY, because a refusal a reader cannot act on is the
 				// silent omission `PER-9` forbids one layer up.
 				refusedBecause:
-					`No process runner is wired on this host, so '${request.argv.join(' ')}' was not run in the ` +
+					`No process runner is wired on this host, so ${named} was not run in the ` +
 					`workspace directory '${workspaceDirectory}'. This is the library's default and it refuses on ` +
 					`purpose: reporting exit code 0 for a command that never started would let a step, a test, or an ` +
 					`assurance policy record a passing result nothing produced. Inject a ProcessRunner whose kind is ` +

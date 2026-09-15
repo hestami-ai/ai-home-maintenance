@@ -57,7 +57,10 @@ afterEach(async () => {
 	// below resolves against `process.cwd()` BY CONSTRUCTION — that is the defect it exists to catch — so on
 	// the run that reddens it, the escape lands in the checkout. The same reasoning as the container above:
 	// every escape this suite provokes must land inside something it deletes.
-	await rm(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`), { recursive: true, force: true });
+	await rm(resolvePath(process.cwd(), `${RELATIVE_DB}.workspaces`), {
+		recursive: true,
+		force: true
+	});
 });
 
 describe('the working directory is the OWNER\u2019S and NEVER the server\u2019s', () => {
@@ -243,10 +246,18 @@ describe('\u2b50 the ProcessRunner seam is WIRED \u2014 REAL where there is a di
 	});
 
 	it('\u2b50 the seam is COMPLETE \u2014 a run PLANS against the owner\u2019s directory, never the server\u2019s', () => {
-		// ⭑ This is what "complete" means: `planProcessRun` is the only sanctioned way to build a request, `cwd`
-		// is required on one, and the only value it may carry is the workspace's OWN `directoryPath`. A host
+		// ⭑ This is what "complete" means: `cwd` is REQUIRED on a request, and `planProcessRun` derives it from
+		// the workspace's OWN `directoryPath`, so a lawful caller never has to name a directory at all. A host
 		// assembling a request by hand would have to put something there, and the obvious something is
 		// `process.cwd()`.
+		// ⛔ AND THIS COMMENT USED TO CALL THAT "THE ONLY SANCTIONED WAY TO BUILD A REQUEST", WHICH WAS FALSE AND
+		// IS CORRECTED RATHER THAN LEFT: `ProcessRunRequest` is a plain interface, this function had ZERO
+		// production call sites, and Phase 2b's adversarial pass drove `run({ argv, cwd: <the repository root> })`
+		// straight past it into the server's own tree (`B8`). A CONVENTION WITH NO CALL SITES IS NOT A CONTROL.
+		// What binds is that the REAL runner is CONSTRUCTED against the deliverable workspace and refuses any
+		// other `cwd` — driven in `child-process-runner.test.ts`. This case still earns its place: it is where
+		// the host's own wiring is checked end to end, and `plan.request.cwd` being the OWNER's directory rather
+		// than `process.cwd()` is the fact it proves.
 		const sandbox = resolveUndertakingSandbox(UND, root);
 		const plan = planProcessRun({
 			runner: sandbox.runner,
@@ -273,7 +284,11 @@ describe('\u2b50 the ProcessRunner seam is WIRED \u2014 REAL where there is a di
 		const sandbox = resolveUndertakingSandbox(UND, undefined);
 		const plan = planProcessRun({
 			runner: sandbox.runner,
-			workspace: { ...sandbox.workspace, materialization: 'FILESYSTEM', directoryPath: '/work/und_2b' },
+			workspace: {
+				...sandbox.workspace,
+				materialization: 'FILESYSTEM',
+				directoryPath: '/work/und_2b'
+			},
 			argv: ['node', '--version'],
 			timeoutMs: 5_000
 		});
@@ -325,7 +340,10 @@ describe('\u2b50\u2b50 R7 \u2014 the SECOND workspace, where a run\u2019s output
 		const deliverable = sandbox.workspace.directoryPath ?? '';
 		const captures = sandbox.outputWorkspace.directoryPath ?? '';
 		expect(captures).not.toBe(deliverable);
-		expect(captures.startsWith(deliverable + sep), 'INSIDE would make it a step-writable area').toBe(false);
+		expect(
+			captures.startsWith(deliverable + sep),
+			'INSIDE would make it a step-writable area'
+		).toBe(false);
 		expect(existsSync(captures), 'and it exists, so a capture has somewhere to land').toBe(true);
 		// ⛔ AND THE REACHABILITY IS DRIVEN, NOT ARGUED. `..` underflow is refused by the containment predicate, so
 		// there is no spelling of a sibling a contained path can carry — and this is the assertion that would
@@ -421,7 +439,13 @@ describe('⛔ the durable root must be ABSOLUTE, or the deliverable lands in the
 		// ⚠ `\\workspaces` AND `C:workspaces` ARE NOT ABSOLUTE ON WINDOWS. The first resolves against the
 		// process's CURRENT DRIVE and the second against that drive's CURRENT DIRECTORY, so both depend on
 		// exactly the state a derived root may not depend on — and `path.isAbsolute` answers TRUE for the first.
-		for (const relative of ['workspaces', './workspaces', '..\\workspaces', '\\workspaces', 'C:workspaces'])
+		for (const relative of [
+			'workspaces',
+			'./workspaces',
+			'..\\workspaces',
+			'\\workspaces',
+			'C:workspaces'
+		])
 			expect(() => resolveUndertakingSandbox(UND, relative), relative).toThrow(/absolute/);
 	});
 

@@ -107,12 +107,36 @@ data (must carry NO exitCode): undefined
 ```
 
 `timedOut` is likewise its own field, never inferred from the exit code — §36.2 separates TIMEOUT from
-TOOL_FAILURE, and a SIGKILLed process on Windows reports `null`, not a distinguishable number.
+TOOL_FAILURE, and a SIGKILLed process on Windows reports `null`, not a distinguishable number. ⛔ **AND
+"OBSERVED" MEANS ONE PARTICULAR OBSERVATION, WHICH PHASE 2b's ADVERSARIAL PASS HAD TO CORRECT (`B2`):** whether
+the CHILD WAS STILL RUNNING when the budget ran out. Not what `child.kill()` returned — measured against one
+already-exited child, bun answered `true` and node answered `false`.
+
+⛔ **AND THE OUTCOME IS DERIVED FROM THE CHILD, NEVER FROM THE STDIO STREAMS (`B3`).** `close` waits on the last
+pipe and a pipe outlives its child; a detached grandchild inheriting stdio held one open and `run()` was still
+pending 9028ms after a 2000ms timeout. **A promise that never settles is worse than any wrong answer**, because
+the whole premise of the union above is that a refusal is a fact a step can record. `run` always settles; when
+the streams had not closed, `outputComplete: false` says so rather than letting a partial capture read as whole.
+
+⛔ **THE NO-SHELL GUARANTEE HAS A PLATFORM PRECONDITION, AND IT IS KEPT BY A REFUSAL (`B1`).** `argv` promises
+that no quoting rule applies — and Win32 cannot load a `.bat`/`.cmd` as a program image, so the runtime hands it
+to `cmd.exe`, which re-parses `&`, `|`, `>` and `"` INSIDE arguments. Node closed this as CVE-2024-27980; **bun,
+this repository's declared package manager, has no equivalent guard**, and the injection was DRIVEN under it —
+including through a bare `npm`, which is a `.cmd` shim. ⭐ The class of target is REFUSED rather than the
+argument escaped: this seam has already spent three rounds learning that every new normaliser is itself
+attackable, and there is no `cmd.exe` quoting scheme this repository should be maintaining.
 
 ⚠ **THE TWO PORTS ARE NOT INDEPENDENT.** A `ProcessRunner` needs a real `cwd`; an in-memory workspace has none.
 A host wiring a REAL runner against an IN_MEMORY workspace must be caught **before anything runs**, or the command
 executes in some other directory — the one failure this seam must never have. Hence `materialization` on the
 workspace, checked rather than trusted.
+
+⛔ **AND THE CHECK BELONGS IN THE RUNNER, NOT IN A HELPER (`B8`).** `planProcessRun` derives a lawful request and
+refuses the bad pairing early, and this design called it the sanctioned constructor — but `ProcessRunRequest` is
+a plain interface, the function had **zero production call sites**, and a caller who simply filled in `cwd` ran a
+command inside this repository. ⭐ **A CONVENTION WITH NO CALL SITES IS NOT A CONTROL.** The REAL runner is
+therefore CONSTRUCTED against the deliverable workspace — the one directory it may run in — and refuses any
+other `cwd`. Planning stays useful; nothing downstream may assume it was called.
 
 ⛔ **IN-MEMORY / REFUSING DEFAULTS SHIP BESIDE BOTH PORTS** so the repository gate stays hermetic: no existing
 test gains a real filesystem or a real child process.

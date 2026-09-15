@@ -32,7 +32,7 @@ describe('createRefusingProcessRunner — the default that cannot invent a resul
 		// reader cannot act on — the silent omission `PER-9` forbids one layer up. THE MUTANT: return a bare
 		// `{ran: false, refusedBecause: 'no'}`.
 		const out = await createRefusingProcessRunner().run(REQUEST);
-		expect(out.ran === false && out.refusedBecause).toContain('node --test');
+		expect(out.ran === false && out.refusedBecause, 'it still says WHAT').toContain('node');
 		// ⚠ THE THIRD LINE USED TO READ `.toContain('/work/und_1')` — THE WHOLE `cwd` — AND IT IS REPLACED RATHER
 		// THAN DROPPED. The property it protected is that the refusal names WHERE, and the workspace's own
 		// DIRECTORY NAME carries that; what went with the absolute form was this host's filesystem layout, in a
@@ -46,6 +46,44 @@ describe('createRefusingProcessRunner — the default that cannot invent a resul
 			'and never by leaking the host absolute path into a recorded refusal'
 		).not.toContain('/work/und_1');
 		expect(out.ran === false && out.refusedBecause, 'and how to get a real one').toMatch(/REAL/);
+	});
+
+	it('⛔⛔ B5 AT THIS ADAPTER TOO — the ARGV does not travel, and the assertion that required it is gone', async () => {
+		// ⭐ THE ADVERSARIAL PASS NAMED `child-process-runner.ts`, AND THIS FILE HAD THE IDENTICAL DEFECT. Both
+		// adapters interpolated `request.argv.join(' ')` into a `refusedBecause` — which the port defines as a
+		// fact a step RECORDS, so it travels into a governed record and into a model's context — and an ABSOLUTE
+		// program path therefore put the host's filesystem layout, and under bun the operating user's name, into
+		// both. ⛔ THE CASE ABOVE USED TO ASSERT `.toContain('node --test')`, WHICH **REQUIRED** THE LEAK: an
+		// assertion that mandates a defect is worse than a missing one, because it makes the fix look like a
+		// regression. It now asserts the program's own name, and this case is what makes that a REPLACEMENT
+		// rather than a weakening — four limbs the old line could never have made.
+		// ⚠ THE SHAPE IS THE ONE THIS REPOSITORY FILES MOST OFTEN: a rule stated generally and implemented once.
+		// The comment in the case above had already recorded it about the `cwd`, three lines from the argv it did
+		// not apply it to. THE MUTANT: restore `request.argv.join(' ')`.
+		const out = await createRefusingProcessRunner().run({
+			argv: ['/opt/toolchains/acme-4.2/bin/tsc', '--outDir=/srv/tenants/acme/build'],
+			cwd: '/work/und_1',
+			timeoutMs: 30_000
+		});
+		const why = out.ran === false ? out.refusedBecause : '';
+		expect(why, 'it still says WHAT could not be run').toContain('tsc');
+		expect(why, 'and never the program’s absolute path').not.toContain('/opt/toolchains');
+		expect(why, 'nor the arguments, which a model chooses').not.toContain('--outDir');
+		expect(why, 'nor anything an argument carries').not.toContain('/srv/tenants/acme');
+	});
+
+	it('⭑ AN EMPTY ARGV NAMES NO COMMAND — never an empty one, which is RULE 6 at a fallback', async () => {
+		// ⛔ `NO DEFAULT THAT FABRICATES`, at the one place the argv fix could have introduced one. `argv[0]` is
+		// absent for an empty argv, and defaulting the NAME to `''` would put "so '' was not run" into a governed
+		// record — a name no program has, presented as one. ⚠ `planProcessRun` refuses an empty argv, but nothing
+		// obliges a caller to plan, and `run` is callable directly — which is precisely the lesson `B8` recorded
+		// about that function in this same pass.
+		for (const argv of [[], ['']]) {
+			const out = await createRefusingProcessRunner().run({ ...REQUEST, argv });
+			const why = out.ran === false ? out.refusedBecause : '';
+			expect(why, `argv ${JSON.stringify(argv)} names no command`).toContain('no command');
+			expect(why, 'and never an empty name in its place').not.toContain("so '' was not run");
+		}
 	});
 
 	it('⭑ a cwd with NO NAMEABLE SEGMENT falls back to the path itself, never to an empty name', async () => {

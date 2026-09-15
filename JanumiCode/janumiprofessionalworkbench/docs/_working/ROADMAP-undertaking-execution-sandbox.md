@@ -550,6 +550,120 @@ population did not move. `bun run gate:fast` → **13 of 13 green** (374 test fi
 
 ---
 
+## 4e. Phase 2b · ⛔ ADVERSARIAL PASS — ten breaches DRIVEN through the runner §4d landed
+
+⭐ **EVERY ONE WAS DEMONSTRATED, NOT ARGUED, AND EVERY FIX IS PROVED BY AN OBSERVED RED USING THE ATTACKER'S OWN
+VECTOR.** The eighteen mutants §4d lists are all still declared; what none of them covered is the gap between a
+guarantee the port states UNCONDITIONALLY and a platform fact nobody had measured. Four of the ten live there —
+`shell: false` against a runtime with no CVE-2024-27980 guard, `timedOut` against a `kill` that answers
+differently on two runtimes, `close` against a pipe that outlives its child, and `planProcessRun` against a
+request shape any caller can fill in.
+
+| # | what was driven | where it was fixed | its mutant |
+| --- | --- | --- | --- |
+| B1 | a `.cmd` target under **bun** with `shell: false` ran an injected `&` and left `pwned.txt` on disk; a BARE `npm` did the same through PATH+PATHEXT | the batch-target CLASS is REFUSED — as spelled (`namesABatchTarget`, in the port) and as resolved (`batchTargetReached`, in the adapter) | `P2B-s`, `P2B-t`, `P2B-u` |
+| B2 | `timedOut: true` for a child that wrote its whole output and exited 0 in ~10ms | the deadline observes whether the CHILD WAS STILL RUNNING; `child.kill()`'s own answer is unusable (bun `true`, node `false`, same exited child) | `P2B-x` |
+| B3 | `run()` STILL PENDING 9028ms after a 2000ms timeout when a detached grandchild held the inherited pipes | settlement is on `exit` with a bounded drain, and a bounded grace follows the kill so `run` always produces a fact | `P2B-y`, `P2B-z`, `P2B-af` |
+| B4 | `{ran:false}` for `no-such-tool-zzz`, then `stdout.txt`/`stderr.txt` appeared 400ms later and `list()` reported them live | the outcome is CLAIMED first and retention happens inside the claim, so a run with no outcome retains nothing | `P2B-aa` |
+| B5 | `refusedBecause` carried `argv.join(' ')` raw — an absolute program path and, under bun, the operating user's name. ⛔ **AND AT BOTH ADAPTERS**, which the brief did not name and a grep for the site did | `programFileName` in the port, beside `workspaceDirectoryName`; arguments do not travel at all, from either adapter | `P2B-ab`, `P2B-ag`, `P2B-aj` |
+| B6 | 200 KiB of stdout declared its cut on the TRANSIENT outcome while `captures/<uuid>/stdout.txt` was a silent 65536-byte prefix | the cut travels WITH the durable copy — `retention.omittedRegions` in the record, `omissions.json` beside the bytes | `P2B-ac`, `P2B-ad` |
+| B7 | an IN_MEMORY workspace with the right class was accepted; `retained: true` with a `stdoutPath` for bytes in a `Map` | the construction guard checks `materialization` as well as `purgeability`, as a SEPARATE conjunct | `P2B-ae` |
+| B8 | `run({argv, cwd: <this repository's root>})` executed IN THE SERVER'S OWN TREE | the runner is CONSTRUCTED against the deliverable workspace and refuses any other `cwd` | `P2B-v`, `P2B-w` |
+| B9 | five realistic shapes walked past the `REG-Q-066` binding probe, each with a working control | a structural TypeScript AST walk with constant-key folding, replacing a line-at-a-time regex pair | `P2B-ah`, `P2B-ai` |
+| B10 | a `.bat` target under node raised EINVAL and the refusal answered *"an embedded NUL byte, or an empty program name"* — a CLOSED disjunction, neither limb true | the batch target never reaches that arm, and the arm no longer closes its list of causes | subsumed by `P2B-s` |
+
+⭐ **THE GOVERNING INSTRUCTION, AND IT IS WHY B1 IS A REFUSAL RATHER THAN AN ESCAPE.** Phase 2 spent three
+rounds discovering that each new normaliser is itself attackable and settled only when a guard was DELETED by
+moving the hazard out of reach. There is no quoting scheme for `cmd.exe` this repository should be maintaining,
+so a class of target whose guarantee cannot be kept on this runtime is refused instead. The same instruction
+governs B8: the honest fix is STRUCTURAL — give the runner the workspace so it CAN check — because
+`planProcessRun` was called *"the only sanctioned way to build a request"* and had **zero production call
+sites**. ⛔ **A CONVENTION WITH NO CALL SITES IS NOT A CONTROL**, and this roadmap said the opposite until now.
+
+⚠ **THE OVER-REFUSALS, STATED RATHER THAN DISCOVERED.** The batch check refuses on EVERY platform (the rule
+`containedWorkspacePath` already follows: one argv must not mean two things), and it refuses whenever ANY
+existing candidate on the search path is a batch file rather than reimplementing a resolution order that
+DIFFERS between the two runtimes — measured, for a bare name bun did not search the cwd and node did. What is
+NOT claimed: a model naming `cmd.exe` as the program gets a command interpreter, because it asked for one. That
+is an argv policy for Phase 3, not the no-shell guarantee, which is about what this code interposes.
+
+⚠ **B3's COST IS DECLARED RATHER THAN HIDDEN.** Settling on the child buys an outcome where there used to be
+none; what it spends is the guarantee that nothing more was coming. `ProcessRunOutcome.outputComplete` is that
+statement, and it is REQUIRED. ⛔ And the field had to be SNAPSHOT before the outcome is claimed — claiming
+destroys the pipes, which fires `close` — or it reported `true` for the very arrangement it exists to describe:
+a field answering about the instrument's own act rather than about the run.
+
+⛔ **AND `B5` WAS LIVE AT A SECOND SITE THE BRIEF DID NOT NAME — the shape this repository files most often.**
+`createRefusingProcessRunner` had the IDENTICAL `request.argv.join(' ')` interpolation, so the fix at one
+adapter would have left the rule stated generally and implemented once. ⚠ WORSE, ITS OWN SPEC ASSERTED THE
+LEAK: `expect(refusedBecause).toContain('node --test')` **required** the argv to be echoed, which is how a fix
+comes to look like a regression — and the comment three lines below it had already recorded the identical
+lesson about the `cwd` without anyone applying it to the argv standing beside it. Found by grepping the
+OBLIGATION (`argv.join`) across both packages rather than by reading the one file the breach named. `P2B-aj`
+guards it, and an empty argv now names **no command** rather than `''`, which is `RULE 6` at the fallback that
+fix could have introduced.
+
+⛔ **THE WEAKNESS THAT UNDERWROTE SEVERAL OF THESE, and it is an instrument defect rather than a code one.** The
+suite's ENTIRE retention half ran on `createInMemoryWorkspace` — so *"both streams are retained"*, *"both come
+under purge"* and the half-written-pair sweep each proved their property about a `Map` and never about
+`createFilesystemWorkspace`, the only adapter the host wires. B7 is precisely what got in through that gap. Both
+workspaces in the suite are real directories now, arranged as the host arranges them (`<deliverable>` and
+`<deliverable>.process-output`), the retention cases ask `existsSync` as well as the workspace, and the
+"capture refused" case is driven by planting a FILE where the capture directory has to go rather than by a stub.
+
+⚠ **ONE LIMB IS VACUOUS ON THE RUNTIME THE SUITE RUNS ON, AND THE SUITE SAYS SO.** Vitest's workers are NODE
+(`process.execPath` measured), and node raises EINVAL for a batch target, so `pwned.txt` cannot appear there
+even with the guard removed. That assertion is the artefact limb for BUN, where the breach was driven; the
+limbs that discriminate under node are the refusal's MESSAGE. A control that fails the same way as its subject
+reads as agreement, so it is written down instead of left to look like proof.
+
+⚠ **AND B9's PROBE CARRIES ITS OWN DISCLOSED LIMIT.** A key computed from a RUNTIME value is not decidable by
+any source probe. What the AST walk reaches is every constant spelling — including `r['std' + 'err']` and its
+template form, folded — and every `Identifier`, whatever syntax carries it. Its negative control is as
+load-bearing as its positive one: the probe it replaces matched the token ANYWHERE and therefore reddened on
+`agy-cli.ts`'s own comment explaining why `stderr` must not be bound, unnoticed for two days.
+
+**PROOF:** every fix was watched FAILING first, using the attacker's own arrangement — the real `.cmd` target
+and its argv, a `.cmd` shim reached by a bare name through PATH, the four trailing-dot spellings, the detached
+grandchild holding the pipes, `no-such-tool-zzz` with a 400ms wait, an absolute program path with a host path
+in its argument, 200 KiB of stdout, the IN_MEMORY workspace with the lawful class, a cwd outside the workspace,
+a real child whose `terminate` does nothing, each of B9's five shapes with two controls, and the refusing
+default's own absolute program path with a tenant path in its argument. **19 driven mutations, each reddening a
+named case.**
+
+⛔ **AND THE DECLARED-MUTANT RUN FOUND THREE MORE INSTRUMENT DEFECTS, WHICH IS THE WHOLE REASON IT IS RUN.**
+Not one was in the code; all three were in things that decide whether a defect gets reported.
+- **`P2B-z` came back INCONCLUSIVE, not KILLED.** Removing the post-kill grace makes the backstop case WAIT, so
+  vitest's own 60-second clock ran out and the mutation was never measured. ⭐ A case that demonstrates *"run
+  always settles"* by hanging when it does not hands the ledger an UNMEASURED verdict, which BLOCKS and says
+  nothing about the guard. The runner's own message is the instruction that was followed — *"Fix the slow test;
+  do not raise the timeout"* — so both pipe-holding cases now await under a BOUND and assert the property, and
+  silence is a named failure in seconds rather than a hang.
+- **`P2B-w` came back NO_COMPILE**, because `if (false)` over the deliverable-workspace guard makes everything
+  below it lose its narrowing. That is this ledger's recorded artifact and it is INDISTINGUISHABLE, in a verdict
+  table, from a real type-level guarantee. Re-formulated as the CONSEQUENCE — the fallback
+  `resolvePath(deliverableDirectory ?? '')`, which is the SERVER'S OWN directory — so the defect is expressible
+  and therefore measurable.
+- **`P2B-n` came back NO_COMPILE** because its mutation predates the parameter this pass adds. ⚠ It is rewritten
+  rather than retired, and the rewrite is recorded IN THE ENTRY, because a rewritten mutant is exactly where a
+  claim quietly weakens: the wiring it models is now REFUSED AT CONSTRUCTION (`B7` and `B8`) rather than merely
+  reported downstream by `planProcessRun`, which is a strengthening and would otherwise be invisible.
+
+⚠ **AND TWELVE ANCHORS MOVED WITH THE CODE THEY NAME** — ten in the runner and the port, plus `P2-j` and `P2-k`
+in `workspace-host.ts`, whose target moved when the deliverable workspace was hoisted out of the return so the
+runner could be constructed against it. All twelve were re-anchored IN THIS COMMIT and none was retired.
+
+**MUTANTS:** `bun run mutants P2B-` — **36 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 INCONCLUSIVE**, re-measured at HEAD rather than
+arithmetic-shifted from the first pass.
+
+**BASELINES:** `guards:export` regenerated by its own writer in this commit — **343 of 343 guarded, obligation
+0**, up from 341 because `programFileName` and `namesABatchTarget` became production-consumed exports.
+`coverage:floor:check` is clean and was NOT regenerated: the two branches the port gained were UNREACHABLE (an
+`?? ''` behind a refusal that has already returned), so they were DELETED rather than baselined over — a guard
+that cannot fail wearing the shape of defensiveness.
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach

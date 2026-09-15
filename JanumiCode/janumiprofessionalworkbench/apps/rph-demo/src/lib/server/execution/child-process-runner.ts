@@ -75,18 +75,118 @@
 //     workspace inside the Undertaking's own root, and the security tier belongs to the deployment environment.
 //
 // ── ⛔ WHAT THIS RUNNER WILL NOT DO ──────────────────────────────────────────────────────────────────────────
-//   · NO SHELL. `shell: false` and an argv ARRAY, never a joined string, so no quoting rule and no metacharacter
-//     is ever interpreted: a model that names an argument `>` gets an argument, not a redirection.
+//   · NO SHELL. `shell: false` and an argv ARRAY, never a joined string, so this runner interposes no quoting
+//     rule and no metacharacter: a model that names an argument `>` gets an argument, not a redirection.
+//     ⛔ AND THAT IS NOT SUFFICIENT ON WINDOWS, WHICH IS THE CORRECTION THIS FILE CARRIES — see `B1` below.
+//     `shell: false` says nothing about a target the PLATFORM cannot load as a program image.
 //   · NO INHERITED STDIN. `stdio[0] = 'ignore'`, so a command that reads input gets EOF instead of blocking
 //     until the timeout — which would report a TIMEOUT for a command that was merely waiting on the server.
-//   · NO THROW OUT OF `run`. Every failure is a `ran: false` refusal naming the errno CODE. Phase 2's rule, one
-//     port over: *"a refusal is a fact a step can record; a throw is a stack trace where a fact belongs."*
+//   · NO CWD THE CALLER CHOSE. The runner is constructed against the DELIVERABLE workspace and runs in that
+//     directory or in none — see `B8` below.
+//   · NO THROW OUT OF `run`, AND NO SILENCE EITHER. Every failure is a `ran: false` refusal naming the errno
+//     CODE. Phase 2's rule, one port over: *"a refusal is a fact a step can record; a throw is a stack trace
+//     where a fact belongs."* ⛔ A PROMISE THAT NEVER SETTLES IS WORSE THAN EITHER, and this adapter had one.
 //   · NO EXIT CODE FOR A PROCESS THAT DID NOT START. A spawn failure is `ran: false`, never `ran: true` with an
 //     invented number (`RULE 5` / `RULE 6`).
+//   · NO HOST LAYOUT IN A REFUSAL. A refusal names the program's FILE NAME and the workspace's DIRECTORY NAME,
+//     and never the argv and never an absolute path.
+//
+// ══ ⛔⛔ TEN BREACHES WERE DRIVEN THROUGH THE VERSION THIS REPLACES. EACH FIX BELOW IS ONE OF THEM ════════════
+//
+// ── ⛔ B1 / B10 — A `.bat` OR `.cmd` TARGET IS REFUSED, BECAUSE THE NO-SHELL GUARANTEE CANNOT COVER IT ───────
+// Win32 cannot load a batch file as a program image: the runtime hands it to `cmd.exe`, which re-parses the
+// whole command line and interprets `&`, `|`, `>` and `"` INSIDE ARGUMENTS. Node closed this as CVE-2024-27980
+// by raising `EINVAL` for such a target unless `shell: true` is stated. ⛔ **BUN HAS NO EQUIVALENT GUARD, AND
+// BUN IS THE PRODUCTION RUNTIME HERE** — 29 `bun run` invocations in `package.json` and a declared
+// `devEngines.packageManager`. DRIVEN under bun 1.3.14 with `shell: false`:
+//   · an ABSOLUTE path to a `.cmd`, with `argv[1]` = `x" & echo INJECTED-VIA-ARGV & echo PWNED > pwned.txt & rem `
+//     → exit 0, `INJECTED-VIA-ARGV` on stdout, and `pwned.txt` LEFT ON DISK.
+//   · a BARE `npm` — no extension, resolved through PATH and PATHEXT to `npm.cmd` — → the same file written.
+// ⭐ SO THE TARGET IS REFUSED RATHER THAN THE ARGUMENT QUOTED, AND THAT IS THIS SEAM'S STANDING INSTRUCTION
+// RATHER THAN A PREFERENCE: Phase 2 spent three rounds discovering that every new normaliser is itself
+// attackable, and settled only when a guard was DELETED by moving the hazard out of reach. There is no quoting
+// scheme for `cmd.exe` this repository should be maintaining. `namesABatchTarget` lives in the PORT — the rule
+// that makes a seam lawful belongs with the interface — and answers about the program AS SPELLED; the
+// RESOLUTION half is here, because it needs a filesystem.
+// ⚠ IT IS AN OVER-REFUSAL AND THAT IS THE SAFE SIDE. If `foo.exe` and `foo.cmd` both exist, the platform would
+// run `foo.exe` and this refuses anyway, rather than reimplementing a resolution order that DIFFERS BETWEEN THE
+// TWO RUNTIMES THIS REPOSITORY RUNS — measured: for a bare name, bun did NOT search the cwd and node DID.
+// ⚠ AND THE SAME REFUSAL REPAIRS `B10`. Under real node a `.bat` target raises `EINVAL` SYNCHRONOUSLY, and the
+// arm that caught it answered *"an embedded NUL byte, or an empty program name"* — a CLOSED disjunction of two
+// causes, NEITHER of them true of an ordinary path to `build.cmd`. Phase 2 already recorded that a refusal
+// stating something FALSE about its input is worse than no refusal. A batch target no longer reaches that arm,
+// and that arm no longer closes its list of causes.
+// ⛔ WHAT IS NOT CLAIMED: a model naming `cmd.exe` or `powershell.exe` AS THE PROGRAM gets a command
+// interpreter, because it asked for one. That is an argv policy belonging to the phase that lets a model choose
+// an argv, not to the no-shell guarantee — which is about what THIS CODE interposes.
+//
+// ── ⛔ B8 — THE `cwd` IS NOT THE CALLER'S TO CHOOSE, AND THE FIX IS STRUCTURAL ────────────────────────────────
+// `ProcessRunRequest.cwd` is a required string, `planProcessRun` is a plain function with ZERO production call
+// sites, and `run({ argv: [...], cwd: <this repository's root> })` therefore executed IN THE SERVER'S OWN TREE
+// — the single outcome this whole phase exists to prevent, reached by not calling a helper. ⭐ A CONVENTION
+// WITH NO CALL SITES IS NOT A CONTROL. So the runner is CONSTRUCTED against the DELIVERABLE workspace — the one
+// directory it may run in — and refuses any other `cwd`. It could not check before because it was never given
+// the workspace; it has it now, so the check sits in the object a caller cannot go around.
+// ⚠ THE COMPARISON IS EXACT AFTER `resolve`, AND DELIBERATELY NOT CASE-INSENSITIVE OR ALIAS-AWARE. Phase 2's
+// `F1` records what it costs to compare two spellings of one Win32 path: case, and then the NTFS 8.3 alias,
+// each beat a guard that tried. A lawful caller takes its `cwd` from the workspace's own `directoryPath`, so it
+// matches exactly; everything else is refused, which is the safe side of a comparison nobody gets right.
+//
+// ── ⛔ B2 / B3 — THE OUTCOME COMES FROM THE CHILD, NEVER FROM THE STDIO STREAMS ──────────────────────────────
+// These are ONE defect seen twice. `close` fires when the last pipe is released, and a pipe outlives its child:
+// a grandchild that inherited the descriptors holds it open. DRIVEN — a child that spawns a DETACHED grandchild
+// with `stdio: 'inherit'` and exits immediately:
+//   · `exit` arrived at 151ms with code 0; `close` NEVER ARRIVED.
+//   · the old adapter, whose only settle path was `close`, was STILL PENDING 9028ms after a 2000ms timeout —
+//     `run()` produced NO FACT AT ALL, which is worse than any wrong one.
+//   · and its watchdog had meanwhile set `timedOut: true` for a process that wrote its whole output and exited 0.
+// ⭐ SO SETTLEMENT IS ON `exit`, with a BOUNDED drain for whatever is still in the pipes; `close` settles
+// immediately when it does arrive, which is the ordinary case, so nothing pays the drain. What is LOST when the
+// drain expires first is the guarantee that nothing more was coming — and that is DECLARED, as
+// `ProcessRunOutcome.outputComplete: false`, rather than left to be assumed.
+// ⛔ AND `timedOut` IS OBSERVED AS WHETHER THE CHILD WAS STILL RUNNING WHEN THE DEADLINE PASSED. The obvious
+// observation — what `child.kill()` returned — is WORTHLESS ACROSS RUNTIMES, measured on this host against a
+// child that exited at 151ms with the kill issued at 2000ms: **bun returned `true`, node returned `false`.** A
+// deadline that passes over an already-exited child is not a timeout, and this adapter now says so.
+// ⚠ AND `run` ALWAYS SETTLES, BY CONSTRUCTION: the deadline kills, and a second bounded grace follows the kill.
+// A child outliving BOTH is a `ran: false` refusal saying exactly that — there is no exit code to report, and
+// `exitCode: null` would assert a termination nobody observed.
+//
+// ── ⛔ B4 — RETENTION IS TIED TO THE OUTCOME, NOT TO AN EVENT ────────────────────────────────────────────────
+// `close` fires AFTER `error`, and the close handler called `retain()` UNCONDITIONALLY while only the OUTCOME
+// was guarded against settling twice. DRIVEN with `argv: ['no-such-tool-zzz']`: `run` resolved `{ ran: false }`
+// with no retention field and an EMPTY captures directory — and 400ms later `stdout.txt` and `stderr.txt`
+// existed and `list()` reported them live. That is `REG-F-336` C-2's orphan — content on the content plane with
+// no record naming it — MINTED BY THE FUNCTION WRITTEN TO PREVENT IT, on the arm this file itself names as the
+// commonest outcome of a model naming a tool the host does not have. ⭐ THE FIX IS THE GENERAL SHAPE: the single
+// outcome is CLAIMED FIRST and retention happens INSIDE the claim, so nothing can be written for a run that
+// produced no outcome.
+//
+// ── ⛔ B5 — A REFUSAL NAMES THE PROGRAM'S FILE NAME, NEVER THE ARGV ──────────────────────────────────────────
+// `refusedBecause` interpolated `request.argv.join(' ')` raw, so a refusal read *"'C:\Program Files\nodejs\
+// nope-missing.exe --flag' could not be started"* — and under bun, a path carrying the operating user's name —
+// in the field the port defines as travelling into a governed record AND a model's context. The commit that
+// landed it claimed the opposite rule and the test certifying it arranged a RELATIVE argv, so it could not see
+// this. `programFileName` is the port's answer, beside `workspaceDirectoryName`, which was already applying
+// exactly this rule to the `cwd` printed in the same sentence.
+//
+// ── ⛔ B6 — THE CUT TRAVELS WITH THE DURABLE COPY ────────────────────────────────────────────────────────────
+// 200 KiB of stdout declared `{ STDOUT, byteSize: 139264, byteOffset: 65536 }` on the TRANSIENT outcome, while
+// `captures/<uuid>/stdout.txt` was exactly 65536 bytes with NOTHING beside it saying so — and `retention` is
+// documented as naming *"the DURABLE copy and the only one a purge can reach"*. The port's own hazard sentence
+// names the consequence: a prefix that reads as the whole is a pass nothing produced. So a capture is THREE
+// files rather than two: the declaration is written BESIDE the bytes as `omissions.json`, and `retention`
+// carries both the regions and the path to it.
+//
+// ── ⛔ B7 — `retained: true` FOR BYTES IN A MAP ──────────────────────────────────────────────────────────────
+// The construction guard checked `purgeability` and NOT `materialization`, so an IN_MEMORY workspace with the
+// right class was ACCEPTED: a real child ran, retention claimed `retained: true` with a `stdoutPath`, and the
+// workspace's `directoryPath` was `undefined`. Both facts are required now, and SEPARATELY, so an arrangement
+// trips exactly one of them and each refusal proves its own limb rather than two at once.
 //
 // ⚠ AND TWO BOUNDS ON THE KILL, MEASURED ON THIS HOST RATHER THAN ASSUMED. `child.kill('SIGKILL')` terminates
 // the process this runner started; a GRANDCHILD it spawned is not in the signal's reach, so a build tool that
-// forks a daemon can outlive its own timeout.
+// forks a daemon can outlive its own timeout — which is the other reason `outputComplete` exists.
 //
 // ── ⚠ AND A CORRECTION TO WHAT THE PORT SAYS `timedOut` BUYS ON WINDOWS, BECAUSE A MUTANT FORCED THE MEASUREMENT
 // The port's rationale is that *"a SIGKILLed process reports `null` on Windows rather than a distinguishable
@@ -102,9 +202,14 @@
 // — the rule is right, and what is corrected is the claim that Windows is where it bites. ⚠ The declared
 // mutants consequently pin both DIRECTIONS of the flag (never reported / always reported) rather than the
 // inference, because a mutation nothing on this host can distinguish would be a guard that cannot fail.
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import type { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { delimiter, extname, resolve as resolvePath } from 'node:path';
 import {
+	namesABatchTarget,
+	programFileName,
 	workspaceDirectoryName,
 	type ProcessOutputOmission,
 	type ProcessOutputRetention,
@@ -125,6 +230,40 @@ const CAPTURE_CAP_BYTES = 64 * 1024;
 
 /** Where a run's captured streams are written inside the output workspace. */
 const CAPTURE_DIRECTORY = 'captures';
+
+/**
+ * How long the capture keeps draining after the CHILD has exited, while the pipes are still open.
+ *
+ * ⛔ A BOUND ON A WAIT, NOT A WAIT. `close` arrives within a tick of `exit` in the ordinary case and settles
+ * immediately, so nothing pays this; it is reached only when a DESCENDANT still holds the inherited descriptors,
+ * which is the arrangement that left the old adapter pending forever. ⚠ WHAT IT COSTS IS STATED RATHER THAN
+ * HIDDEN: when it expires, `outputComplete` is `false`.
+ *
+ * ⚠ AND ITS SIZE IS NOT ARBITRARY. It is the window in which a deadline can pass over an ALREADY-EXITED child,
+ * which is `B2`'s condition and is therefore the one thing a spec has to be able to arrange on purpose. A
+ * quarter-second left that arrangement racing this host's ~70ms process startup; a second gives it an order of
+ * magnitude of headroom, and costs a run nothing unless a descendant is holding the pipes.
+ */
+const STREAM_DRAIN_GRACE_MS = 1_000;
+
+/**
+ * How long the runner waits for the child to actually die after it issued `SIGKILL`.
+ *
+ * ⛔ THIS IS THE LAST THING STANDING BETWEEN `run` AND SILENCE. `SIGKILL` is uncatchable on POSIX and maps to
+ * `TerminateProcess` on Win32, so a child surviving it is not an arrangement this host can make — which is
+ * precisely why the arm needs driving rather than trusting: an unreachable-looking path that produces no fact is
+ * how a promise stops settling. It is driven by handing the observer a `terminate` that does nothing.
+ */
+const KILL_GRACE_MS = 2_000;
+
+/**
+ * What Win32 appends to an extensionless program name when it searches, if `PATHEXT` is unset.
+ *
+ * ⚠ THE DOCUMENTED DEFAULT, USED ONLY AS A FALLBACK. The child's own environment carries `PATHEXT` (it is on the
+ * allowlist below) and that is what the platform will actually resolve against; this is what to search when a
+ * host has unset it, because "unset" does not mean "no extensions are tried".
+ */
+const WIN32_DEFAULT_PATHEXT = '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC';
 
 /**
  * The environment variable names a child may see, by NAME — see the header for what this buys and what it does
@@ -169,9 +308,17 @@ const INHERITED_ENVIRONMENT_NAMES = [
 /** What a host must STATE to get a real runner. Every field is required — this seam's rule since Phase 1. */
 export interface ChildProcessRunnerInput {
 	/**
-	 * ⛔ WHERE THE CAPTURED STREAMS GO, AND IT IS NOT THE DELIVERABLE WORKSPACE. See the header, point 3: the
-	 * deliverable is `RETAINED_BY_PARTICIPATION` under `R8`, and a workspace whose `purge` refuses cannot hold
-	 * material `R7` requires to be purgeable.
+	 * ⛔ THE ONE DIRECTORY A COMMAND MAY RUN IN — `R8`'s deliverable workspace, and the whole of `B8`'s fix.
+	 *
+	 * The runner needs this in order to CHECK a request's `cwd`, which it previously could not do because it was
+	 * never given it. A `ProcessRunRequest` any caller can fill in is not made safe by a helper nobody has to
+	 * call.
+	 */
+	readonly deliverableWorkspace: Workspace;
+	/**
+	 * ⛔ WHERE THE CAPTURED STREAMS GO, AND IT IS NOT THE DELIVERABLE WORKSPACE. See the `REG-Q-066` section,
+	 * point 3: the deliverable is `RETAINED_BY_PARTICIPATION` under `R8`, and a workspace whose `purge` refuses
+	 * cannot hold material `R7` requires to be purgeable.
 	 */
 	readonly outputWorkspace: Workspace;
 }
@@ -253,6 +400,259 @@ function childEnvironment(parent: NodeJS.ProcessEnv): Record<string, string> {
 	return out;
 }
 
+/** `existsSync`, which may not become the thing that throws out of a guard. */
+function present(path: string): boolean {
+	try {
+		return existsSync(path);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * The FILE NAME of a batch target this program would reach, or `undefined` when it reaches none.
+ *
+ * ⛔ `B1`'s SECOND HALF — the RESOLUTION the port's pure predicate cannot perform. A bare `npm` names no
+ * extension and is `npm.cmd` once the platform has searched; driven, and injectable. So every directory and
+ * every `PATHEXT` extension the platform would search is put to the same predicate.
+ *
+ * ⚠ RESOLUTION IS DELIBERATELY OVER-APPROXIMATED RATHER THAN REPRODUCED. The real order differs between the two
+ * runtimes this repository runs — measured: for a bare name bun did NOT search the cwd and node DID — so an
+ * exact reimplementation would be right on one and silently wrong on the other, which is the shape of defect
+ * this seam keeps filing. ANY existing batch candidate refuses the run. ⭑ The cost is refusing an extensionless
+ * program that a batch file merely shadows somewhere on `PATH`; the benefit is that being wrong lands on the
+ * refusing side, and the refusal names the remedy.
+ */
+function batchTargetReached(
+	program: string,
+	cwd: string,
+	env: Record<string, string>
+): string | undefined {
+	// AS SPELLED, first, and without touching the filesystem — the port's rule applied before anything else.
+	if (namesABatchTarget(program)) return programFileName(program);
+	// ⛔ A PROGRAM THAT ALREADY NAMES AN EXTENSION IS NOT EXTENDED BY THE PLATFORM, so there is nothing more to
+	// search: the line above has already answered for it.
+	if (extname(program) !== '') return undefined;
+	const extensions = (env.PATHEXT ?? (process.platform === 'win32' ? WIN32_DEFAULT_PATHEXT : ''))
+		.split(';')
+		.map((extension) => extension.trim())
+		.filter((extension) => extension !== '');
+	// A platform that appends nothing leaves an extensionless program extensionless, and nothing here applies.
+	if (extensions.length === 0) return undefined;
+	// A program carrying a separator or a drive is a PATH, and `PATH` is not consulted for one.
+	const carriesAPath = /[\\/]/.test(program) || /^[A-Za-z]:/.test(program);
+	const directories = carriesAPath
+		? [cwd]
+		: [cwd, ...(env.PATH ?? '').split(delimiter).filter((directory) => directory !== '')];
+	for (const directory of directories)
+		for (const extension of extensions) {
+			let candidate: string;
+			try {
+				candidate = resolvePath(directory, `${program}${extension}`);
+			} catch {
+				// A `PATH` entry the platform cannot resolve is one the platform cannot search either.
+				continue;
+			}
+			if (!namesABatchTarget(candidate)) continue;
+			if (present(candidate)) return programFileName(candidate);
+		}
+	return undefined;
+}
+
+/** What `omissions.json` says, so a capture DIRECTORY declares its own cut — `B6`. */
+function declaredOmissions(regions: readonly ProcessOutputOmission[]): string {
+	return `${JSON.stringify(
+		{
+			note:
+				regions.length === 0
+					? 'COMPLETE. stdout.txt and stderr.txt hold every byte the process emitted on each stream.'
+					: 'INCOMPLETE — stdout.txt and stderr.txt are BOUNDED PREFIXES, and reading either as the whole output is a conclusion the process did not produce. Each region below says which stream was cut, why, how many UTF-8 BYTES were removed, and at what UTF-8 BYTE OFFSET the removal began; byteOffset + byteSize is what the process actually emitted on that stream.',
+			omittedRegions: regions
+		},
+		null,
+		'\t'
+	)}\n`;
+}
+
+/**
+ * A started child with stdin CLOSED and both output streams piped — exactly what `spawn` returns for the one
+ * `stdio` this adapter uses, and not the wider `ChildProcessWithoutNullStreams`, which promises a writable
+ * `stdin` this runner deliberately does not have.
+ */
+type PipedChild = ChildProcessByStdio<null, Readable, Readable>;
+
+/** What the observer needs, which is a started child and the facts about the run it cannot see. */
+export interface ChildRunObservation {
+	readonly child: PipedChild;
+	/** The program's FILE NAME, already derived — see `programFileName`. A refusal may say this and no more. */
+	readonly programName: string;
+	/**
+	 * How the deadline ends the child.
+	 *
+	 * ⭑ A PARAMETER RATHER THAN `child.kill('SIGKILL')` INLINE, AND IT IS NOT AN INJECTION POINT — nothing in
+	 * production passes anything else. It is the seam that makes the LAST arm below drivable: `SIGKILL` cannot be
+	 * survived on either platform, so the only way to observe what this runner does when a kill accomplishes
+	 * nothing is to hand it a kill that accomplishes nothing — against a REAL child, with real streams and real
+	 * events, so the arrangement differs from production in exactly the one fact being tested.
+	 */
+	readonly terminate: () => void;
+	readonly timeoutMs: number;
+	readonly startedAt: number;
+	readonly workspaceName: string;
+	readonly retain: (
+		stdout: string,
+		stderr: string,
+		omittedRegions: readonly ProcessOutputOmission[]
+	) => Promise<ProcessOutputRetention>;
+}
+
+/**
+ * Watch one started child and produce EXACTLY ONE outcome for it — `B2`, `B3` and `B4`, which are one seam.
+ *
+ * ⛔ EXPORTED FOR ITS SPEC AND FOR NOTHING ELSE. `run` below is the only production caller; what this buys is
+ * that the arm which cannot be arranged with a real kill is nevertheless driven against a real child.
+ */
+export function observeChildRun(input: ChildRunObservation): Promise<ProcessRunOutcome> {
+	return new Promise<ProcessRunOutcome>((resolve) => {
+		const child = input.child;
+		const outSink = captureSink('STDOUT');
+		const errSink = captureSink('STDERR');
+		let settled = false;
+		let exited = false;
+		let exitCode: number | null = null;
+		let streamsClosed = false;
+		let timedOut = false;
+		let drain: ReturnType<typeof setTimeout> | undefined;
+		let abandon: ReturnType<typeof setTimeout> | undefined;
+
+		// ⚠ OBSERVED AT THE MOMENT OF THE DEADLINE, NEVER INFERRED AFTERWARDS AND NEVER READ OFF THE KILL. §36.2
+		// separates TIMEOUT from TOOL_FAILURE; the fact that separates them is whether the CHILD WAS STILL RUNNING
+		// when the budget ran out. `child.kill()` on an exited child returned `true` under bun and `false` under
+		// node on this host — see the header — so its answer cannot carry this field.
+		// ⚠ AND IT IS STARTED HERE, ABOVE THE FUNCTION THAT CLEARS IT, so `claim` never reads a binding that has
+		// not been initialised. Every caller of `claim` is an event handler or a timer, so none of them can run
+		// before this line; putting the deadline below them relied on that rather than on anything structural.
+		const watchdog = setTimeout(() => {
+			if (exited) {
+				// The child is already gone and the deadline is merely late: a kill would accomplish nothing, and
+				// calling this a timeout is the fabrication `B2` drove. Settle with what has arrived.
+				settleRan();
+				return;
+			}
+			timedOut = true;
+			input.terminate();
+			abandon = setTimeout(settleAfterKill, KILL_GRACE_MS);
+		}, input.timeoutMs);
+
+		/**
+		 * ⛔ ONE OUTCOME, CLAIMED BEFORE ANYTHING IS DONE ON ITS BEHALF. `error` and `close` can both fire, and so
+		 * can a deadline; the second must not overwrite the first AND must not perform the first's side effects.
+		 * `B4` is what happens when only the RESOLUTION is guarded: `close` follows `error`, its handler retained
+		 * the capture unconditionally, `finish` swallowed only the outcome — and a refused run left bytes on disk
+		 * that no record named.
+		 */
+		function claim(): boolean {
+			if (settled) return false;
+			settled = true;
+			clearTimeout(watchdog);
+			if (drain !== undefined) clearTimeout(drain);
+			if (abandon !== undefined) clearTimeout(abandon);
+			// The outcome is decided, so this runner stops holding descriptors a descendant may still own.
+			child.stdout.destroy();
+			child.stderr.destroy();
+			return true;
+		}
+
+		function settleRefused(refusedBecause: string): void {
+			if (claim()) resolve({ ran: false, refusedBecause });
+		}
+
+		/** The ran arm — and the ONLY place a capture is retained, which is `B4`'s fix. */
+		function settleRan(): void {
+			// ⛔ READ BEFORE `claim`, WHICH DESTROYS THE PIPES AND WOULD THEREFORE MAKE THIS TRUE. Measured: read
+			// afterwards it reported `outputComplete: true` for the very arrangement where a grandchild still held
+			// the descriptors — a field that answers about the instrument's own act rather than about the run.
+			const outputComplete = streamsClosed;
+			if (!claim()) return;
+			const out = outSink.settle();
+			const err = errSink.settle();
+			const omittedRegions = [out.omission, err.omission].filter(
+				(region): region is ProcessOutputOmission => region !== undefined
+			);
+			const ran = (retention: ProcessOutputRetention): void => {
+				resolve({
+					ran: true,
+					exitCode,
+					timedOut,
+					stdout: out.text,
+					stderr: err.text,
+					omittedRegions,
+					outputComplete,
+					retention,
+					durationMs: Date.now() - input.startedAt
+				});
+			};
+			// ⚠ THE REJECTION ARM IS NOT DEFENSIVE NOISE: `retain` awaits a Workspace this module does not own, and
+			// an unhandled rejection here is a promise that never settles, which is the defect this whole function
+			// exists to remove. A run that happened is reported either way.
+			void input.retain(out.text, err.text, omittedRegions).then(ran, (cause: unknown) => {
+				const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+				ran({
+					retained: false,
+					notRetainedBecause: `the run's output could not be retained: the output workspace raised rather than refusing (${code ?? 'unknown cause'}).`
+				});
+			});
+		}
+
+		/** After the kill: the child died and is reported, or it did not and that is said outright. */
+		function settleAfterKill(): void {
+			if (exited) {
+				settleRan();
+				return;
+			}
+			settleRefused(
+				`the command in the workspace directory '${input.workspaceName}' exceeded its ${input.timeoutMs}ms budget, was sent SIGKILL, and had still not terminated ${KILL_GRACE_MS}ms later. No exit code was ever reported, so there is none to record: reporting one — including 'null', which states that the process was terminated by a signal — would assert a termination this runner did not observe. The process may still be running.`
+			);
+		}
+
+		child.stdout.on('data', (chunk: Buffer) => outSink.take(chunk));
+		child.stderr.on('data', (chunk: Buffer) => errSink.take(chunk));
+		// Destroying a pipe can emit on it, and an unhandled stream error would take down the process that was
+		// supposed to receive an outcome.
+		child.stdout.on('error', () => undefined);
+		child.stderr.on('error', () => undefined);
+
+		// ⛔ A PROCESS THAT NEVER STARTED DID NOT RUN, AND THIS IS `RULE 5` AT THE ONE PLACE IT IS TEMPTING TO
+		// BREAK. ENOENT is the commonest outcome of a model naming a tool the host does not have, and reporting it
+		// as `ran: true, exitCode: 127` — the shell's convention for exactly this — would let a step record a
+		// FAILED COMMAND where no command existed. The two are different facts.
+		// ⚠ AND THE ARM IS NARROWED TO A SPAWN FAILURE BY `pid`, measured undefined on BOTH runtimes for a spawn
+		// that failed and a number for one that did not. `error` also fires for a kill that could not be
+		// delivered, and treating THAT as "nothing ran" would erase a process this runner watched start.
+		child.on('error', (cause: NodeJS.ErrnoException) => {
+			if (child.pid !== undefined) return;
+			settleRefused(
+				`'${input.programName}' could not be started in the workspace directory '${input.workspaceName}' (${cause.code ?? 'unknown cause'}). No process ran, so there is no exit code and no output: this is a refusal, not a failed command. The program's own file name is named and its arguments are not — an argv is a model's to choose and a host's layout belongs in nothing a step records.`
+			);
+		});
+
+		// ⭐ THE CHILD, NOT THE PIPES — `B3`. `exit` is the child's own event and arrives whatever a descendant is
+		// holding; `close` waits on the last descriptor and may never come at all.
+		child.on('exit', (code: number | null) => {
+			exited = true;
+			exitCode = code;
+			drain = setTimeout(settleRan, STREAM_DRAIN_GRACE_MS);
+		});
+
+		// The ordinary case, and it costs nothing: both pipes are released a tick after the child goes, so the
+		// drain above is cancelled unused and `outputComplete` is true.
+		child.on('close', () => {
+			streamsClosed = true;
+			if (exited) settleRan();
+		});
+	});
+}
+
 /**
  * A `ProcessRunner` that actually starts processes, and retains what they print.
  *
@@ -263,6 +663,12 @@ function childEnvironment(parent: NodeJS.ProcessEnv): Record<string, string> {
  * at through a one-word host mistake. A comment saying "use a purgeable workspace" would be a convention; this
  * is a refusal.
  *
+ * ⛔ AND IT REFUSES THREE MORE WIRINGS, EACH SEPARATELY, BECAUSE AN ARRANGEMENT THAT TRIPS TWO GUARDS PROVES
+ * NEITHER. `B7` got in through the gap between two of them: the class was checked and the MATERIALIZATION was
+ * not, so an IN_MEMORY workspace carrying the right class was accepted, a real child ran, and `retention` said
+ * `retained: true` with a `stdoutPath` while `directoryPath` was `undefined` — bytes in a Map, reported as a
+ * durable copy a purge could reach. And `B8` got in through a workspace this runner was never given at all.
+ *
  * ⚠ IT THROWS, AND THAT IS NOT THE RULE THIS FILE OTHERWISE FOLLOWS — deliberately. The port's *"refuse, never
  * throw"* governs what a STEP records: an outcome a step must be able to write down. This is a HOST WIRING
  * error at CONSTRUCTION, before any step exists, and `createFilesystemWorkspace` sets the same precedent one
@@ -271,19 +677,33 @@ function childEnvironment(parent: NodeJS.ProcessEnv): Record<string, string> {
  */
 export function createChildProcessRunner(input: ChildProcessRunnerInput): ProcessRunner {
 	const outputWorkspace = input.outputWorkspace;
+	const deliverableWorkspace = input.deliverableWorkspace;
 	if (outputWorkspace.purgeability !== 'PURGEABLE_AT_EXPIRY')
 		throw new Error(
 			`A real ProcessRunner cannot capture output into a workspace declared ${outputWorkspace.purgeability}. Sponsor ruling R7 requires stdout AND stderr to be retained and to come under purge, and PER-8 makes purge REFUSE on a workspace that declares its content has participated — so these captures could never be destroyed. Declare a second workspace with purgeability PURGEABLE_AT_EXPIRY for process output; the deliverable workspace stays RETAINED_BY_PARTICIPATION under R8.`
 		);
+	if (
+		outputWorkspace.materialization !== 'FILESYSTEM' ||
+		outputWorkspace.directoryPath === undefined
+	)
+		throw new Error(
+			`A real ProcessRunner cannot capture output into a ${outputWorkspace.materialization} workspace. R7 requires a DURABLE copy of both streams that a purge can reach, and ProcessOutputRetention.stdoutPath is documented as naming it; a workspace with no directoryPath holds the bytes in a Map that dies with the process, so 'retained: true' would be a statement about memory dressed as a retention. Declare a FILESYSTEM workspace with purgeability PURGEABLE_AT_EXPIRY for process output.`
+		);
+	const deliverableDirectory = deliverableWorkspace.directoryPath;
+	if (deliverableWorkspace.materialization !== 'FILESYSTEM' || deliverableDirectory === undefined)
+		throw new Error(
+			`A real ProcessRunner cannot be constructed against a ${deliverableWorkspace.materialization} deliverable workspace. The runner runs commands in that workspace's own directory and in no other — it is what makes a request's cwd checkable rather than caller-supplied — and a workspace with no directoryPath names no directory to run in. Wire the REFUSING default on an arm with no directory (RULE 5).`
+		);
+	const deliverableRoot = resolvePath(deliverableDirectory);
 
 	/**
-	 * A pair that did not land in full, refused — and the half that DID land, swept.
+	 * A capture that did not land in full, refused — and whatever DID land, swept.
 	 *
-	 * ⛔ A HALF-WRITTEN PAIR IS NOT A RETENTION, AND LEAVING THE STRAY HALF IS `REG-F-336` C-2's ORPHAN PRODUCED
-	 * BY THE FUNCTION WRITTEN TO PREVENT IT: bytes on the content plane with no record naming them. The stray
-	 * half is purged — which this workspace permits, because the whole point of its declared class is that it
-	 * can be. ⚠ A purge that itself refuses is REPORTED rather than swallowed: the bytes are then genuinely an
-	 * orphan, and a reader who is told so can act on it.
+	 * ⛔ A PARTIAL CAPTURE IS NOT A RETENTION, AND LEAVING THE STRAY FILES IS `REG-F-336` C-2's ORPHAN PRODUCED
+	 * BY THE FUNCTION WRITTEN TO PREVENT IT: bytes on the content plane with no record naming them. The strays
+	 * are purged — which this workspace permits, because the whole point of its declared class is that it can be.
+	 * ⚠ A purge that itself refuses is REPORTED rather than swallowed: the bytes are then genuinely an orphan,
+	 * and a reader who is told so can act on it.
 	 */
 	async function refuseAndSweep(
 		landed: readonly (readonly [boolean, string, string])[]
@@ -297,8 +717,8 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 			const outcome = await outputWorkspace.purge(path);
 			swept.push(
 				outcome.purged
-					? `the half that did land was purged, so no bytes remain that nothing points at`
-					: `⚠ the half that did land could NOT be purged (${outcome.refusedBecause}), so those bytes are an orphan on the content plane`
+					? `the part that did land was purged, so no bytes remain that nothing points at`
+					: `⚠ the part that did land could NOT be purged (${outcome.refusedBecause}), so those bytes are an orphan on the content plane`
 			);
 		}
 		const sweepNote = swept.length === 0 ? '' : `. ${swept.join('; ')}`;
@@ -308,36 +728,53 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 		};
 	}
 
-	/** Write both streams into the output workspace, or state why they are not there. */
-	async function retain(stdout: string, stderr: string): Promise<ProcessOutputRetention> {
+	/**
+	 * Write the capture into the output workspace, or state why it is not there.
+	 *
+	 * ⛔ THREE FILES, NOT TWO, AND THE THIRD IS `B6`. `retention` names *"the DURABLE copy and the only one a
+	 * purge can reach"*, so a `stdout.txt` that is a bounded prefix with nothing beside it saying so hands the
+	 * next reader a PREFIX THAT READS AS THE WHOLE — the port's own hazard sentence, and a pass nothing produced.
+	 * The declaration travels twice: in the RECORD, as `retention.omittedRegions`, and ON DISK, as
+	 * `omissions.json` beside the bytes it is about.
+	 */
+	async function retain(
+		stdout: string,
+		stderr: string,
+		omittedRegions: readonly ProcessOutputOmission[]
+	): Promise<ProcessOutputRetention> {
 		const directory = `${CAPTURE_DIRECTORY}/${randomUUID()}`;
 		const stdoutPath = `${directory}/stdout.txt`;
 		const stderrPath = `${directory}/stderr.txt`;
+		const omissionsPath = `${directory}/omissions.json`;
+		// ⚠ ALL THREE ARE ALWAYS WRITTEN, INCLUDING AN EMPTY STREAM AND AN EMPTY CUT. An absent `stderr.txt` would
+		// be ambiguous between "the command printed nothing" and "nothing was retained", and an absent
+		// `omissions.json` between "nothing was cut" and "nobody looked". Those are different facts.
+		const parts: readonly (readonly [string, string, string])[] = [
+			['stdout', stdoutPath, stdout],
+			['stderr', stderrPath, stderr],
+			['omissions', omissionsPath, declaredOmissions(omittedRegions)]
+		];
 		try {
-			// ⚠ BOTH ARE ALWAYS WRITTEN, INCLUDING AN EMPTY ONE. An absent `stderr.txt` would be ambiguous between
-			// "the command printed nothing" and "nothing was retained", and those are different facts.
-			const wroteStdout = await outputWorkspace.writeFile(stdoutPath, stdout);
-			const wroteStderr = await outputWorkspace.writeFile(stderrPath, stderr);
-			if (wroteStdout.written && wroteStderr.written)
+			const landed: (readonly [boolean, string, string])[] = [];
+			for (const [name, path, contents] of parts) {
+				const outcome = await outputWorkspace.writeFile(path, contents);
+				landed.push([
+					outcome.written,
+					path,
+					outcome.written ? '' : `${name}: ${outcome.refusedBecause}`
+				]);
+			}
+			if (landed.every(([written]) => written))
 				return {
 					retained: true,
 					workspaceOwnerId: outputWorkspace.ownerId,
 					purgeability: outputWorkspace.purgeability,
 					stdoutPath,
-					stderrPath
-				};
-			return await refuseAndSweep([
-				[
-					wroteStdout.written,
-					stdoutPath,
-					wroteStdout.written ? '' : `stdout: ${wroteStdout.refusedBecause}`
-				],
-				[
-					wroteStderr.written,
 					stderrPath,
-					wroteStderr.written ? '' : `stderr: ${wroteStderr.refusedBecause}`
-				]
-			]);
+					omittedRegions,
+					omissionsPath
+				};
+			return await refuseAndSweep(landed);
 		} catch (cause) {
 			// The port promises `writeFile` refuses rather than throws, and both adapters in this repository do.
 			// A third might not, and `run` may not throw — so the promise is relied on and also not trusted.
@@ -354,99 +791,78 @@ export function createChildProcessRunner(input: ChildProcessRunnerInput): Proces
 		// IN_MEMORY workspace as a WIRING ERROR rather than as the hermetic default.
 		kind: 'REAL',
 		run(request: ProcessRunRequest): Promise<ProcessRunOutcome> {
-			return new Promise<ProcessRunOutcome>((resolve) => {
-				const startedAt = Date.now();
-				const outSink = captureSink('STDOUT');
-				const errSink = captureSink('STDERR');
-				let settled = false;
+			const startedAt = Date.now();
+			const workspaceName = workspaceDirectoryName(deliverableRoot);
+			const program = request.argv[0] ?? '';
+			const programName = programFileName(program);
 
-				const startChild = () =>
-					spawn(request.argv[0] ?? '', request.argv.slice(1), {
-						cwd: request.cwd,
-						// ⛔ NO SHELL. An argv array, interpreted by nobody — see the header.
-						shell: false,
-						// ⛔ NO INHERITED ENVIRONMENT — see the header.
-						env: childEnvironment(process.env),
-						// stdin is closed; stdout and stderr are piped so they can be BOUNDED rather than streamed to
-						// wherever this server's own descriptors point.
-						stdio: ['ignore', 'pipe', 'pipe'],
-						windowsHide: true
-					});
+			// ⛔ B8 — THE ONE DIRECTORY THIS RUNNER MAY RUN IN, CHECKED AGAINST THE WORKSPACE IT WAS BUILT WITH.
+			// `cwd` is a required field on a plain interface and `planProcessRun` has no production call site, so
+			// until this comparison existed a caller reached the host's filesystem by filling in a string. The
+			// refusal names DIRECTORY NAMES on both sides and no absolute path — `refusedBecause` travels.
+			if (resolvePath(request.cwd) !== deliverableRoot)
+				return Promise.resolve({
+					ran: false,
+					refusedBecause: `a command may only be run in the workspace of ${deliverableWorkspace.ownerKind} '${deliverableWorkspace.ownerId}', whose directory is named '${workspaceName}'. This request carries a cwd naming '${workspaceDirectoryName(request.cwd)}' instead, and running there would execute '${programName}' somewhere the record does not describe. Derive the cwd from the workspace's own directoryPath — planProcessRun does — rather than assembling one.`
+				});
 
-				// ⛔ `spawn` THROWS SYNCHRONOUSLY FOR SOME ARGV, AND A THROW OUT OF `run` IS THE ONE THING THIS
-				// ADAPTER MAY NOT DO. Driven: an embedded NUL in the program name, a NUL in an argument, and an
-				// EMPTY program name all raise `ERR_INVALID_ARG_VALUE` BEFORE any process exists — so they never
-				// reach the `error` event below, and without this they would leave `run` as a rejected promise.
-				// ⚠ AND `planProcessRun` DOES NOT COVER IT. It refuses an empty `argv[0]`, and nothing anywhere
-				// looks for a NUL in a program name or an argument — so a lawfully PLANNED request reaches this
-				// line and raises. The port's rule is about what a STEP can record, not about who built the
-				// request, so the arm belongs here rather than as a second check up there.
-				// ⚠ THE MALFORMED ARGV IS NOT ECHOED BACK. It is malformed precisely by containing bytes no record
-				// should carry — a NUL in a `refusedBecause` travels into a governed record and a model's context —
-				// so the refusal names the CODE and the shape of the fault instead, which is what a reader acts on.
-				let child: ReturnType<typeof startChild>;
-				try {
-					child = startChild();
-				} catch (cause) {
-					const code = (cause as NodeJS.ErrnoException | undefined)?.code;
-					resolve({
-						ran: false,
-						refusedBecause: `a process could not be started in the workspace directory '${workspaceDirectoryName(request.cwd)}': the platform refused the argv itself (${code ?? 'unknown cause'}), before any process existed. The program name or one of its arguments is not a value that can be passed to a process — an embedded NUL byte, or an empty program name. The argv is deliberately not quoted back here: it is malformed by carrying bytes that belong in no record.`
-					});
-					return;
-				}
+			// ⛔ B1 — A TARGET WHOSE ARGUMENTS A COMMAND INTERPRETER WOULD RE-PARSE IS REFUSED, NOT QUOTED.
+			const environment = childEnvironment(process.env);
+			const batch = batchTargetReached(program, deliverableRoot, environment);
+			if (batch !== undefined)
+				return Promise.resolve({
+					ran: false,
+					refusedBecause: `'${programName}' cannot be run: it reaches '${batch}', a .bat or .cmd target. Win32 cannot load one as a program image — the runtime hands the command line to cmd.exe, which re-parses '&', '|', '>' and '"' INSIDE ARGUMENTS — so this port's guarantee that an argv carries no quoting rules cannot be kept for it on this runtime. Driven under bun with shell:false, an argument containing '&' ran as a further command and wrote a file. The target is refused rather than the arguments escaped, because an escaping scheme for cmd.exe is a normaliser and every normaliser on this seam has been beaten. Name the executable the shim launches instead.`
+				});
 
-				// ⚠ OBSERVED AT THE MOMENT OF THE KILL, NEVER INFERRED AFTERWARDS. §36.2 separates TIMEOUT from
-				// TOOL_FAILURE, and on POSIX the exit code cannot tell them apart — an external SIGKILL delivers
-				// `null` there just as this one does. ⭑ On Windows they happen to coincide, which is measured in
-				// the header rather than assumed; the field is observed so the rule holds on both.
-				let timedOut = false;
-				const watchdog = setTimeout(() => {
-					timedOut = true;
+			let child: PipedChild;
+			// ⛔ `spawn` THROWS SYNCHRONOUSLY FOR SOME ARGV, AND A THROW OUT OF `run` IS THE ONE THING THIS
+			// ADAPTER MAY NOT DO. Driven: an embedded NUL in the program name, a NUL in an argument, and an
+			// EMPTY program name all raise `ERR_INVALID_ARG_VALUE` BEFORE any process exists — so they never
+			// reach the `error` event, and without this they would leave `run` as a rejected promise.
+			// ⚠ AND `planProcessRun` DOES NOT COVER IT. It refuses an empty `argv[0]`, and nothing anywhere
+			// looks for a NUL in a program name or an argument — so a lawfully PLANNED request reaches this
+			// line and raises. The port's rule is about what a STEP can record, not about who built the
+			// request, so the arm belongs here rather than as a second check up there.
+			// ⛔ AND THE CAUSE IS NOT CLOSED, WHICH IS `B10`. This arm used to answer "an embedded NUL byte, or an
+			// empty program name" — a disjunction of exactly two causes — and under real node a `.bat` target
+			// raises `EINVAL` here, so the refusal stated something FALSE about its own input. A batch target is
+			// refused above now and never reaches this line; the list below is named as EXAMPLES and the errno
+			// CODE is what a reader acts on.
+			// ⚠ THE MALFORMED ARGV IS NOT ECHOED BACK. It is malformed precisely by containing bytes no record
+			// should carry — a NUL in a `refusedBecause` travels into a governed record and a model's context.
+			try {
+				child = spawn(program, request.argv.slice(1), {
+					cwd: request.cwd,
+					// ⛔ NO SHELL. An argv array, interpreted by nobody — and see B1 for the target class that
+					// makes this insufficient on its own.
+					shell: false,
+					// ⛔ NO INHERITED ENVIRONMENT — see the header.
+					env: environment,
+					// stdin is closed; stdout and stderr are piped so they can be BOUNDED rather than streamed to
+					// wherever this server's own descriptors point.
+					stdio: ['ignore', 'pipe', 'pipe'],
+					windowsHide: true
+				});
+			} catch (cause) {
+				const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+				return Promise.resolve({
+					ran: false,
+					refusedBecause: `a process could not be started in the workspace directory '${workspaceName}': the platform refused the argv itself (${code ?? 'unknown cause'}), before any process existed. The code above is the platform's own answer and is what a reader acts on; measured causes include an embedded NUL byte in the program name or an argument, and an empty program name, and that list is not closed. The argv is deliberately not quoted back here: an argv the platform refuses can carry bytes that belong in no record.`
+				});
+			}
+
+			return observeChildRun({
+				child,
+				// ⭑ THE ONE KILL PRODUCTION USES. See `ChildRunObservation.terminate` for why it is a parameter.
+				terminate: () => {
 					child.kill('SIGKILL');
-				}, request.timeoutMs);
-
-				/** ⛔ ONE RESOLUTION. `error` and `close` can both fire, and the second must not overwrite the first. */
-				function finish(outcome: ProcessRunOutcome): void {
-					if (settled) return;
-					settled = true;
-					clearTimeout(watchdog);
-					resolve(outcome);
-				}
-
-				child.stdout.on('data', (chunk: Buffer) => outSink.take(chunk));
-				child.stderr.on('data', (chunk: Buffer) => errSink.take(chunk));
-
-				// ⛔ A PROCESS THAT NEVER STARTED DID NOT RUN, AND THIS IS `RULE 5` AT THE ONE PLACE IT IS TEMPTING
-				// TO BREAK. ENOENT is the commonest outcome of a model naming a tool the host does not have, and
-				// reporting it as `ran: true, exitCode: 127` — the shell's convention for exactly this — would let a
-				// step record a FAILED COMMAND where no command existed. The two are different facts.
-				child.on('error', (cause: NodeJS.ErrnoException) => {
-					finish({
-						ran: false,
-						refusedBecause: `'${request.argv.join(' ')}' could not be started in the workspace directory '${workspaceDirectoryName(request.cwd)}' (${cause.code ?? 'unknown cause'}). No process ran, so there is no exit code and no output: this is a refusal, not a failed command.`
-					});
-				});
-
-				child.on('close', (exitCode: number | null) => {
-					const out = outSink.settle();
-					const err = errSink.settle();
-					const omittedRegions = [out.omission, err.omission].filter(
-						(region): region is ProcessOutputOmission => region !== undefined
-					);
-					void retain(out.text, err.text).then((retention) => {
-						finish({
-							ran: true,
-							exitCode,
-							timedOut,
-							stdout: out.text,
-							stderr: err.text,
-							omittedRegions,
-							retention,
-							durationMs: Date.now() - startedAt
-						});
-					});
-				});
+				},
+				timeoutMs: request.timeoutMs,
+				startedAt,
+				workspaceName,
+				programName,
+				retain
 			});
 		}
 	};

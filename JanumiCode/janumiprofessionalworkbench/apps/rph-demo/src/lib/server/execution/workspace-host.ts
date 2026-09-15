@@ -252,22 +252,29 @@ export function resolveUndertakingSandbox(
 		purgeability: 'PURGEABLE_AT_EXPIRY',
 		directoryPath: outputDirectoryPath
 	});
+	// ⭐ THE DELIVERABLE, HOISTED OUT OF THE RETURN BECAUSE THE RUNNER IS NOW CONSTRUCTED AGAINST IT — `B8`.
+	// Until it was, the runner had no way to tell the workspace's directory from any other string a caller put
+	// in `ProcessRunRequest.cwd`, and an adversary ran a command in THIS REPOSITORY by supplying one.
+	const workspace = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: undertakingId,
+		// ⛔ `PER-8`, AND IT IS `R8` STATED AS A RETENTION CLASS. The deliverable must survive the
+		// undertaking, so `purge` REFUSES here. ⚠ THE COST IS REAL AND THE PORT NAMES IT: "one workspace
+		// cannot hold participating and purgeable material side by side; a host needing both declares two."
+		// `R7`'s retained stdout and stderr are purgeable-at-expiry and therefore live in the SECOND
+		// workspace declared just above — not under a third `Purgeability` member.
+		purgeability: 'RETAINED_BY_PARTICIPATION',
+		directoryPath
+	});
 	return {
-		workspace: createFilesystemWorkspace({
-			ownerKind: 'UNDERTAKING',
-			ownerId: undertakingId,
-			// ⛔ `PER-8`, AND IT IS `R8` STATED AS A RETENTION CLASS. The deliverable must survive the
-			// undertaking, so `purge` REFUSES here. ⚠ THE COST IS REAL AND THE PORT NAMES IT: "one workspace
-			// cannot hold participating and purgeable material side by side; a host needing both declares two."
-			// `R7`'s retained stdout and stderr are purgeable-at-expiry and therefore live in the SECOND
-			// workspace declared just above — not under a third `Purgeability` member.
-			purgeability: 'RETAINED_BY_PARTICIPATION',
-			directoryPath
-		}),
+		workspace,
 		outputWorkspace,
 		// ⭐ THE REAL RUNNER LANDS HERE AND ONLY HERE — the one arm with a real directory to run in. It is
-		// constructed against the OUTPUT workspace, and refuses to be constructed against a workspace whose
-		// bytes could never be purged, which is what makes `R7` structural rather than documentary.
-		runner: createChildProcessRunner({ outputWorkspace })
+		// constructed against BOTH workspaces, and refuses to be constructed against an output workspace whose
+		// bytes could never be purged or that has no directory at all — which is what makes `R7` structural
+		// rather than documentary. ⛔ AND IT TAKES THE DELIVERABLE BECAUSE A RUNNER THAT IS NOT GIVEN THE ONE
+		// DIRECTORY IT MAY RUN IN CANNOT CHECK THE `cwd` IT IS HANDED: `planProcessRun` is a convention with no
+		// production call site, and a convention is not a control.
+		runner: createChildProcessRunner({ deliverableWorkspace: workspace, outputWorkspace })
 	};
 }

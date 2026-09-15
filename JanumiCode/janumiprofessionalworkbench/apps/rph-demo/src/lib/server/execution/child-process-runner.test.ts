@@ -14,24 +14,82 @@
 // no-shell case deliberately provokes a redirection into the process's `cwd`, and a mutant that succeeds at it
 // writes a file: with the cwd AT the `mkdtemp` root that lands in the system temp directory, which `afterEach`
 // does not own, and it survived into a later run once already.
+//
+// ══ ⛔⛔ THE RETENTION HALF RUNS ON `createFilesystemWorkspace`, AND IT USED TO RUN ON A MAP ══════════════════
+// Every retention case here — "both streams are retained", "both come under purge", the partial-capture sweep —
+// was arranged against `createInMemoryWorkspace`, so each proved its property ABOUT A `Map` and none of them
+// about the only adapter `workspace-host.ts` actually wires. That is not a stylistic point: the guard those
+// cases were supposed to be defending checked `purgeability` and NOT `materialization`, and an adversary drove
+// `retained: true` with a `stdoutPath` out of a workspace whose `directoryPath` was `undefined` — bytes in a Map
+// reported as the durable copy a purge can reach. A suite that never used the real adapter could not have
+// noticed. Both workspaces below are real directories now, and the construction guard REFUSES the in-memory one.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import {
 	createInMemoryWorkspace,
+	type ProcessOutputRetention,
 	type PurgeOutcome,
 	type Workspace,
 	type WorkspaceWriteOutcome
 } from '@janumipwb/rph-ports';
-import { createChildProcessRunner } from './child-process-runner.js';
+import { createChildProcessRunner, observeChildRun } from './child-process-runner.js';
+import { createFilesystemWorkspace } from './filesystem-workspace.js';
 
 /** The cap `child-process-runner.ts` declares. ⚠ RESTATED, NOT IMPORTED — see the truncation case. */
 const CAP_BYTES = 64 * 1024;
 
+/**
+ * The argv the adversary used, verbatim, and it is the whole of `B1`.
+ *
+ * ⛔ IT IS AN ARGUMENT AND NOTHING ELSE. `spawn` with `shell: false` passes it as `argv[1]`; only a target the
+ * platform hands to `cmd.exe` turns the `&` into a further command. Driven under bun before the refusal existed:
+ * exit 0, `INJECTED-VIA-ARGV` on stdout, and `pwned.txt` on disk.
+ */
+const INJECTION_ARGUMENT = 'x" & echo INJECTED-VIA-ARGV & echo PWNED > pwned.txt & rem ';
+
+/** A batch file that echoes its first argument — a plausible `build.cmd`, not a contrivance. */
+const BATCH_BODY = '@echo off\r\necho building %1\r\n';
+
+/**
+ * What `settledWithin` reports when nothing arrived. ⚠ A SENTINEL RATHER THAN A REJECTION, so the assertion
+ * that follows names the property instead of surfacing as an unhandled error.
+ */
+const NO_OUTCOME = 'NO OUTCOME WAS PRODUCED' as const;
+
+/**
+ * Await an outcome under a BOUND, because `run` must ALWAYS produce a fact and a spec that proves that by
+ * HANGING measures nothing.
+ *
+ * ⛔ THIS EXISTS BECAUSE THE INSTRUMENT SAID SO, AND IT IS THE THIRD TIME IN THIS PROGRAMME THAT MY SCAFFOLDING
+ * WAS WEAKER THAN THE CODE. `P2B-z` removes the post-kill grace — the exact defect the last case below is
+ * written for — and the declared-mutant run reported **INCONCLUSIVE: the run TIMED OUT (Test timed out in
+ * 60000ms), no report**, not KILLED. A case that demonstrates "it always settles" by waiting forever when it
+ * does not hands the ledger an UNMEASURED verdict, which BLOCKS and says nothing about the guard. Bounded, the
+ * same mutation fails in seconds against an assertion that names the promise it broke.
+ *
+ * ⚠ THE UNDERLYING PROMISE IS LEFT PENDING, DELIBERATELY: cancelling it would be inventing a capability `run`
+ * does not have, and every caller here kills its own child afterwards.
+ */
+async function settledWithin<T>(ms: number, outcome: Promise<T>): Promise<T | typeof NO_OUTCOME> {
+	let lapse: ReturnType<typeof setTimeout> | undefined;
+	const nothing = new Promise<typeof NO_OUTCOME>((report) => {
+		lapse = setTimeout(() => report(NO_OUTCOME), ms);
+	});
+	try {
+		return await Promise.race([outcome, nothing]);
+	} finally {
+		if (lapse !== undefined) clearTimeout(lapse);
+	}
+}
+
 let container = '';
 let cwd = '';
+let outputDirectory = '';
+let deliverable: Workspace;
 let output: Workspace;
 
 /** A child that evaluates `script`. `process.execPath` is whichever runtime is running this spec. */
@@ -39,26 +97,44 @@ function node(script: string, ...args: string[]): string[] {
 	return [process.execPath, '-e', script, ...args];
 }
 
+/** The runner as the host wires it: both workspaces, both on disk. */
+function runner() {
+	return createChildProcessRunner({ deliverableWorkspace: deliverable, outputWorkspace: output });
+}
+
 beforeEach(async () => {
 	container = await mkdtemp(join(tmpdir(), 'jpwb-runner-'));
 	cwd = join(container, 'workspace');
+	// ⭑ THE SIBLING ARRANGEMENT `workspace-host.ts` PRODUCES, reproduced rather than approximated: the capture
+	// workspace is `<deliverable>.process-output`, so nothing a step can spell inside the deliverable reaches it.
+	outputDirectory = `${cwd}.process-output`;
 	await mkdir(cwd, { recursive: true });
-	output = createInMemoryWorkspace({
+	await mkdir(outputDirectory, { recursive: true });
+	deliverable = createFilesystemWorkspace({
 		ownerKind: 'UNDERTAKING',
 		ownerId: 'und_2b',
-		purgeability: 'PURGEABLE_AT_EXPIRY'
+		purgeability: 'RETAINED_BY_PARTICIPATION',
+		directoryPath: cwd
+	});
+	output = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: 'und_2b',
+		purgeability: 'PURGEABLE_AT_EXPIRY',
+		directoryPath: outputDirectory
 	});
 });
 
 afterEach(async () => {
-	await rm(container, { recursive: true, force: true });
+	// ⚠ `maxRetries` BECAUSE A CHILD THIS SPEC DELIBERATELY OUTLIVED MAY STILL HOLD THE DIRECTORY AS ITS `cwd`,
+	// and Win32 answers EBUSY for that. A cleanup that fails is a red that says nothing about the subject.
+	await rm(container, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
 });
 
 describe('createChildProcessRunner — a command actually runs, and every failure stays distinguishable', () => {
 	it('⭐ CONTROL — it RUNS: an exit code, and BOTH streams, observed from a real process', async () => {
 		// ⛔ WITHOUT THIS, EVERY REFUSAL BELOW IS SATISFIED BY "REFUSES EVERYTHING" — which is what the Phase 1
 		// default already does, and shipping it again under a new name would pass a suite made only of negatives.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('process.stdout.write("OUT");process.stderr.write("ERR");process.exit(7)'),
 			cwd,
 			timeoutMs: 30_000
@@ -70,7 +146,13 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		expect(out.stderr, 'stderr is BOUND — which is what reopens REG-Q-066').toBe('ERR');
 		expect(out.timedOut).toBe(false);
 		expect(out.durationMs).toBeGreaterThanOrEqual(0);
-		expect(out.omittedRegions, 'nothing was cut, and that is stated rather than left empty by accident').toEqual([]);
+		expect(
+			out.omittedRegions,
+			'nothing was cut, and that is stated rather than left empty by accident'
+		).toEqual([]);
+		expect(out.outputComplete, 'both pipes reached EOF, so the capture is the whole of it').toBe(
+			true
+		);
 	});
 
 	it('⛔ NO SHELL — a `>` in the argv is an ARGUMENT, never a redirection', async () => {
@@ -79,7 +161,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// distinguishes the two. THE MUTANT: `shell: true` — measured, it creates `pwned.txt` in the cwd.
 		// ⛔ AND THE STAKE IS THE WHOLE SEAM: argv comes from a model in Phase 3. A shell would make every
 		// metacharacter in a model's chosen argument an instruction to the host.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('process.stdout.write(JSON.stringify(process.argv.slice(1)))', '>', 'pwned.txt'),
 			cwd,
 			timeoutMs: 30_000
@@ -92,6 +174,173 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		).toBe(false);
 	});
 
+	it('⛔⛔ B1 — A `.cmd` TARGET IS REFUSED, BECAUSE `shell: false` DOES NOT STOP `cmd.exe` RE-PARSING ARGUMENTS', async () => {
+		// ⭐ THE ADVERSARY'S OWN VECTOR, UNCHANGED. Win32 cannot load a batch file as a program image, so the
+		// runtime hands the command line to `cmd.exe`, which interprets `&` INSIDE an argument. Node refuses this
+		// as CVE-2024-27980; **bun does not**, and bun is this repository's declared package manager and the
+		// runtime this very spec runs under. DRIVEN before the refusal existed: `ran: true`, `exitCode: 0`,
+		// `INJECTED-VIA-ARGV` on stdout and `pwned.txt` LEFT ON DISK.
+		// ⛔ THE MUTANT: drop the batch check. Under bun the file below appears; under node the refusal survives
+		// but says something FALSE about its input, which the last two assertions are `B10` and catch either way.
+		const target = join(cwd, 'jpwb-build.cmd');
+		await writeFile(target, BATCH_BODY, 'utf8');
+		const out = await runner().run({ argv: [target, INJECTION_ARGUMENT], cwd, timeoutMs: 30_000 });
+		expect(out.ran, 'a target whose arguments a command interpreter re-parses is REFUSED').toBe(
+			false
+		);
+		expect(out.ran === false && out.refusedBecause).toContain('jpwb-build.cmd');
+		expect(
+			out.ran === false && out.refusedBecause,
+			'and it says WHY, so a reader can act on it'
+		).toContain('cmd.exe');
+		// ⚠⚠ THIS LIMB IS VACUOUS UNDER THE RUNTIME THIS SUITE RUNS ON, AND SAYING SO IS THE POINT. Vitest's
+		// workers are NODE (`process.execPath` measured: `node.exe`), and node raises EINVAL for a batch target
+		// with `shell: false`, so the file cannot appear here even with the guard removed — measured. It is the
+		// artefact assertion for BUN, where the breach was actually driven and where nothing else stops it. The
+		// limbs that DISCRIMINATE on this runtime are the message ones above and the two below; a control that
+		// fails the same way as its subject reads as agreement, which is why this is written down rather than
+		// left to look like proof.
+		expect(
+			existsSync(join(cwd, 'pwned.txt')),
+			'THE BREACH ITSELF: an injected `&` wrote this file through a .cmd target under bun'
+		).toBe(false);
+		// ⛔ B10 — THE REFUSAL MAY NOT STATE A CLOSED DISJUNCTION OF CAUSES IT DID NOT ESTABLISH. Under real node
+		// this target raised EINVAL synchronously and the arm that caught it answered "an embedded NUL byte, or an
+		// empty program name" — neither true of an ordinary path to a `.cmd`. Phase 2 recorded that a refusal
+		// stating something false about its input is worse than no refusal.
+		expect(
+			out.ran === false && out.refusedBecause,
+			'B10: it does not invent a NUL byte'
+		).not.toMatch(/NUL/i);
+		expect(
+			out.ran === false && out.refusedBecause,
+			'B10: and it does not claim the program name was empty'
+		).not.toMatch(/empty program name/i);
+	});
+
+	it('⛔ B1 — a `.bat` is the same class, and a TRAILING DOT does not spell its way past the predicate', async () => {
+		// ⚠ `.bat` AND `.cmd` ARE ONE RULE AND THIS REPOSITORY'S MOST-RECORDED DEFECT IS A RULE IMPLEMENTED ONCE.
+		// ⭑ AND THE TRAILING DOT IS PHASE 2's `F1` ARRIVING AT A NEW FIELD: Win32 strips trailing dots and spaces
+		// and `node:path` keeps them, so `build.bat.` OPENS `build.bat` while spelling something else. DRIVEN
+		// under bun against a real `.cmd`: `x.cmd`, `x.cmd.`, `x.cmd ` and `x.cmd..` ALL ran the batch file and
+		// ALL executed the injected `&`. THE MUTANT: drop the `[. ]+$` strip from `namesABatchTarget`.
+		const target = join(cwd, 'jpwb-build.bat');
+		await writeFile(target, BATCH_BODY, 'utf8');
+		for (const spelling of [target, `${target}.`, `${target} `, `${target}..`]) {
+			const out = await runner().run({
+				argv: [spelling, INJECTION_ARGUMENT],
+				cwd,
+				timeoutMs: 30_000
+			});
+			expect(out.ran, `spelling ${JSON.stringify(spelling)} must be refused`).toBe(false);
+			// ⛔ THE MESSAGE, NOT MERELY `ran: false` — AND THAT DISTINCTION IS THIS CASE'S WHOLE VALUE. Measured
+			// with the trailing-dot strip removed: under NODE every one of these spellings still refused, because
+			// libuv reaches the filesystem through the long-path prefix and `build.bat.` is then simply ENOENT.
+			// The arrangement would have passed against the defect, proving the OTHER guard. Under BUN the same
+			// four spellings ALL executed the batch file and ALL wrote `pwned.txt` — driven. So the assertion is
+			// on the refusal this gate is about.
+			expect(
+				out.ran === false && out.refusedBecause,
+				`spelling ${JSON.stringify(spelling)} must be refused AS A BATCH TARGET, not by ENOENT`
+			).toContain('cmd.exe');
+		}
+		expect(existsSync(join(cwd, 'pwned.txt'))).toBe(false);
+	});
+
+	it('⛔⛔ B1 — and a BARE name that RESOLVES to a `.cmd` through PATH and PATHEXT is refused too', async () => {
+		// ⭐ THIS IS THE ONE THAT MATTERS IN PRACTICE, AND A SPELLED-EXTENSION CHECK ALONE MISSES IT ENTIRELY.
+		// `npm`, `tsc`, `yarn` and every other Node toolchain entry point on Windows IS a `.cmd` shim, reached by
+		// a bare name with no extension at all. DRIVEN under bun against the real `npm`: `spawn('npm', ['--version',
+		// <the argument above>])` printed the version AND executed the injected command AND wrote `pwned.txt`.
+		// A shim is planted here rather than depending on the host's `npm`, so the case asserts the mechanism.
+		// ⛔ THE MUTANT: check only the spelled extension and skip the resolution.
+		const binaries = join(container, 'bin');
+		await mkdir(binaries, { recursive: true });
+		await writeFile(join(binaries, 'jpwb-shim-2b.cmd'), BATCH_BODY, 'utf8');
+		const restore = process.env.PATH;
+		process.env.PATH = `${binaries}${delimiter}${restore ?? ''}`;
+		try {
+			const out = await runner().run({
+				argv: ['jpwb-shim-2b', INJECTION_ARGUMENT],
+				cwd,
+				timeoutMs: 30_000
+			});
+			expect(out.ran, 'the program named no extension, and still reaches a batch target').toBe(
+				false
+			);
+			// ⚠ CASE-INSENSITIVE, BECAUSE THE SPELLING THE PLATFORM SEARCHES IS `PATHEXT`'s AND THE FILE'S IS THE
+			// AUTHOR'S. Win32 opens one file for both; asserting the file's spelling would be asserting something
+			// about this fixture rather than about the search.
+			expect(out.ran === false && out.refusedBecause).toMatch(/jpwb-shim-2b\.cmd/i);
+			expect(existsSync(join(cwd, 'pwned.txt'))).toBe(false);
+		} finally {
+			process.env.PATH = restore;
+		}
+	});
+
+	it('⭑ CONTROL — the batch refusal DISCRIMINATES: an ordinary program with the same argument still runs', async () => {
+		// ⛔ WITHOUT THIS, "refuse everything whose argv looks alarming" satisfies every case above — and the
+		// repository has the receipt for a control that could not fail. The SAME argument, the same runner, an
+		// executable target: it runs, and the `&` arrives as one argument rather than as three commands.
+		const out = await runner().run({
+			argv: node('process.stdout.write(String(process.argv.slice(1).length))', INJECTION_ARGUMENT),
+			cwd,
+			timeoutMs: 30_000
+		});
+		expect(out.ran).toBe(true);
+		expect(out.ran === true && out.stdout, 'exactly ONE argument, not a command line').toBe('1');
+		expect(existsSync(join(cwd, 'pwned.txt'))).toBe(false);
+	});
+
+	it('⛔⛔ B8 — A `cwd` OUTSIDE THE DELIVERABLE WORKSPACE IS REFUSED, AND NOTHING RUNS THERE', async () => {
+		// ⭐ THE OUTCOME THIS WHOLE PHASE EXISTS TO PREVENT, DRIVEN: `run({ argv: [...], cwd: <the repository
+		// root> })` executed IN THE SERVER'S OWN TREE. `ProcessRunRequest.cwd` is a required field on a plain
+		// interface, `planProcessRun` has ZERO production call sites, and a convention with no call sites is not a
+		// control. The runner is CONSTRUCTED against the deliverable workspace now, so it can check.
+		// ⛔ THE MUTANT: drop the comparison — the write below then lands in a directory the record never names.
+		// ⚠ AND THE TARGET IS A SIBLING UNDER THIS SPEC'S OWN CONTAINER RATHER THAN THIS REPOSITORY, WHICH IS A
+		// DELIBERATE DIVERGENCE FROM THE DRIVEN VECTOR AND IS RECORDED SO IT DOES NOT READ AS A WEAKER
+		// ARRANGEMENT. The property under test is "a cwd that is not the deliverable workspace is REFUSED", and
+		// `elsewhere` has exactly that property; what the repository root adds is CONSEQUENCE, not
+		// discrimination. And the consequence is the reason not to use it: a mutant that defeats this check
+		// SUCCEEDS at the write, and this suite's own header records a file from a defeated case surviving into a
+		// later run once already. Phase 2's lesson is to point a proving write at something `afterEach` owns.
+		const elsewhere = join(container, 'elsewhere');
+		await mkdir(elsewhere, { recursive: true });
+		const out = await runner().run({
+			argv: node('require("node:fs").writeFileSync("escaped.txt","a step wrote here")'),
+			cwd: elsewhere,
+			timeoutMs: 30_000
+		});
+		expect(out.ran).toBe(false);
+		expect(
+			existsSync(join(elsewhere, 'escaped.txt')),
+			'THE BREACH ITSELF: a command executed in a directory the caller chose'
+		).toBe(false);
+		expect(
+			out.ran === false && out.refusedBecause,
+			'it names the workspace it may run in'
+		).toContain(basename(cwd));
+		expect(out.ran === false && out.refusedBecause, 'and the directory it was asked for').toContain(
+			'elsewhere'
+		);
+		expect(
+			out.ran === false && out.refusedBecause,
+			'by NAME on both sides — never the host path'
+		).not.toContain(elsewhere);
+	});
+
+	it('⭑ CONTROL — the SAME command in the workspace’s own directory runs and writes there', async () => {
+		// Without this, `B8` is satisfied by refusing every cwd, and the runner would be the Phase 1 default again.
+		const out = await runner().run({
+			argv: node('require("node:fs").writeFileSync("landed.txt","in the workspace")'),
+			cwd,
+			timeoutMs: 30_000
+		});
+		expect(out.ran === true && out.exitCode).toBe(0);
+		expect(existsSync(join(cwd, 'landed.txt'))).toBe(true);
+	});
+
 	it('⚠ `timedOut` is OBSERVED at the kill — and a SIGKILLed process reports a NULL exit code', async () => {
 		// ⛔ §36.2 SEPARATES TIMEOUT FROM TOOL_FAILURE, and the runner must report the kill it issued rather than
 		// leave the caller to guess it back out. THE MUTANT: `timedOut: false` — the watchdog still kills and the
@@ -100,7 +349,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// THE ADAPTER'S HEADER WITH THE FOUR MEASUREMENTS THAT EXPLAIN IT. On Windows a null exit code arises
 		// only from the kill this runner itself issued, so the inference and the observation coincide HERE; on
 		// POSIX an external SIGKILL delivers null and they do not. The flag is pinned in both directions instead.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('setTimeout(() => {}, 60000)'),
 			cwd,
 			timeoutMs: 400
@@ -114,7 +363,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 	it('⭑ CONTROL — a process that CHOSE to exit non-zero is NOT a timeout', async () => {
 		// Without this, `timedOut: true` always satisfies the case above. This is the arrangement that separates
 		// the two failure classes §36.2 requires to stay separate.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('process.exit(2)'),
 			cwd,
 			timeoutMs: 30_000
@@ -129,7 +378,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// ⛔ AND 127 IS THE TEMPTING FABRICATION. It is the shell's convention for "command not found", so a
 		// runner that reported it would let a step record a FAILED COMMAND where no command existed — and "the
 		// build failed" and "there is no build tool on this host" are different facts with different remedies.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: ['jpwb-no-such-program-2b', '--version'],
 			cwd,
 			timeoutMs: 30_000
@@ -139,7 +388,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		expect(Object.hasOwn(out, 'stdout')).toBe(false);
 		expect(Object.hasOwn(out, 'timedOut')).toBe(false);
 		expect(out.ran === false && out.refusedBecause).toContain('ENOENT');
-		expect(out.ran === false && out.refusedBecause).toContain('jpwb-no-such-program-2b --version');
+		expect(out.ran === false && out.refusedBecause).toContain('jpwb-no-such-program-2b');
 	});
 
 	it('⛔ an argv the PLATFORM refuses is a refusal too — `run` never throws, and never echoes it back', async () => {
@@ -150,7 +399,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// ⭑ AND THE ARGV IS NOT QUOTED BACK, WHICH IS THE SECOND LIMB. A NUL byte in a `refusedBecause` travels
 		// into a governed record and into a model's context; the code and the SHAPE of the fault are what a
 		// reader acts on.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: [`jpwb${String.fromCharCode(0)}nul`],
 			cwd,
 			timeoutMs: 30_000
@@ -164,21 +413,27 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		).not.toContain(String.fromCharCode(0));
 	});
 
-	it('⛔ and the refusal names the workspace DIRECTORY, never the host’s absolute path', async () => {
-		// ⚠ PHASE 2's `F4`, WHICH WAS FOUND IN THE REFUSING DEFAULT AND WOULD HAVE BEEN REINTRODUCED HERE. A
-		// `refusedBecause` is defined by the port as a fact a step RECORDS, so it travels into a governed record
-		// and into a model's context; the host's filesystem layout belongs in neither. THE MUTANT: interpolate
-		// `request.cwd`.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
-			argv: ['jpwb-no-such-program-2b'],
+	it('⛔⛔ B5 — THE REFUSAL NAMES THE PROGRAM’S FILE NAME, AND NEITHER THE HOST PATH NOR THE ARGUMENTS', async () => {
+		// ⭐ THE TEST THAT USED TO CERTIFY THIS ARRANGED A **RELATIVE** ARGV, SO IT COULD NOT SEE THE BREACH. The
+		// message interpolated `request.argv.join(' ')` raw, and an ABSOLUTE program path produced
+		// *"'C:\Program Files\nodejs\nope-missing.exe --flag' could not be started"* — under bun, a path carrying
+		// the operating user's own name — in the field the port defines as travelling into a governed record AND
+		// into a model's context. So the argv here is absolute AND its argument carries a host path.
+		// ⛔ THE MUTANT: interpolate `request.argv.join(' ')`, or `request.cwd`.
+		const absentProgram = join(container, 'nope-missing.exe');
+		const out = await runner().run({
+			argv: [absentProgram, `--out=${join(container, 'secret-directory')}`],
 			cwd,
 			timeoutMs: 30_000
 		});
-		expect(out.ran === false && out.refusedBecause, 'it still says WHERE').toContain(basename(cwd));
-		expect(
-			out.ran === false && out.refusedBecause,
-			'and never by leaking the host absolute path into a recorded refusal'
-		).not.toContain(cwd);
+		expect(out.ran).toBe(false);
+		const why = out.ran === false ? out.refusedBecause : '';
+		expect(why, 'it still says WHAT could not be started').toContain('nope-missing.exe');
+		expect(why, 'and WHERE, by directory NAME').toContain(basename(cwd));
+		expect(why, 'THE BREACH ITSELF: the host’s absolute path').not.toContain(container);
+		expect(why, 'and the arguments do not travel either').not.toContain('--out');
+		expect(why, 'nor anything they carry').not.toContain('secret-directory');
+		expect(why, 'and never the workspace’s absolute path').not.toContain(cwd);
 	});
 
 	it('⭐ TRUNCATION IS DECLARED, IN UTF-8 BYTES, AND THE CUT DOES NOT INVENT A CHARACTER', async () => {
@@ -191,7 +446,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// ⚠ `CAP_BYTES` IS RESTATED HERE RATHER THAN IMPORTED, deliberately: importing the bound from the subject
 		// would assert that the subject agrees with itself, which it cannot fail to do.
 		const emitted = 30_000 * 3;
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('process.stdout.write("\\u20AC".repeat(30000))'),
 			cwd,
 			timeoutMs: 30_000
@@ -203,10 +458,13 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		if (cut === undefined) return;
 		expect(cut.byteOffset, 'the last WHOLE character inside the bound').toBe(CAP_BYTES - 1);
 		expect(cut.byteSize, 'what was removed, in bytes').toBe(emitted - (CAP_BYTES - 1));
-		expect(cut.byteOffset + cut.byteSize, 'and the two reconstruct what the process emitted').toBe(emitted);
-		expect(Buffer.byteLength(out.stdout, 'utf8'), 'the retained half is what the offset says it is').toBe(
-			CAP_BYTES - 1
+		expect(cut.byteOffset + cut.byteSize, 'and the two reconstruct what the process emitted').toBe(
+			emitted
 		);
+		expect(
+			Buffer.byteLength(out.stdout, 'utf8'),
+			'the retained half is what the offset says it is'
+		).toBe(CAP_BYTES - 1);
 		expect(out.stdout, 'and no character the process never emitted').not.toContain('�');
 		expect(cut.reason).toMatch(/bounded/);
 	});
@@ -214,7 +472,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 	it('⚠ and stderr is bounded by the SAME rule — the hazard is not stdout-shaped', async () => {
 		// ⛔ `R7` IS ABOUT BOTH STREAMS, AND A BOUND APPLIED TO ONE OF THEM IS THE DEFECT THIS REPOSITORY KEEPS
 		// FILING: a rule stated generally and implemented once. THE MUTANT: bound stdout only.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		const out = await runner().run({
 			argv: node('process.stderr.write("z".repeat(100000))'),
 			cwd,
 			timeoutMs: 30_000
@@ -231,7 +489,7 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 		// real toolchain — and it would break it at a distance, as "the interpreter is not on PATH".
 		process.env.JPWB_PHASE2B_SECRET_PROBE = 'this-must-not-reach-a-child';
 		try {
-			const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+			const out = await runner().run({
 				argv: node(
 					'process.stdout.write(String(process.env.JPWB_PHASE2B_SECRET_PROBE) + "|" + String(process.env.PATH !== undefined))'
 				),
@@ -245,12 +503,174 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 	});
 });
 
-describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven rather than documented', () => {
+describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always produces one', () => {
+	/**
+	 * A child that hands its inherited stdout and stderr to a DETACHED grandchild and then exits immediately.
+	 *
+	 * ⭐ THIS IS THE ADVERSARY'S ARRANGEMENT AND IT IS NOT EXOTIC: any build tool that forks a watcher or a
+	 * daemon does exactly this. The grandchild keeps the PIPE open, so `close` never fires — measured, `exit` at
+	 * 151ms and `close` NEVER — and an adapter whose only settle path was `close` was still pending 9028ms after
+	 * a 2000ms timeout, having meanwhile set `timedOut: true` for a process that exited 0 in milliseconds.
+	 */
+	const HOLDS_THE_PIPES =
+		'const {spawn}=require("node:child_process");' +
+		// ⚠ THE GRANDCHILD'S `cwd` IS THE SYSTEM TEMP ROOT, NOT THE WORKSPACE. It outlives the run by design, and a
+		// live process holding the workspace as its working directory makes Win32 refuse to remove it — a teardown
+		// failure that would read as a finding about the subject.
+		'const g=spawn(process.execPath,["-e","setTimeout(()=>{},60000)"],{cwd:require("node:os").tmpdir(),stdio:["ignore","inherit","inherit"],detached:true});' +
+		'g.unref();process.stdout.write(String(g.pid));process.exit(0);';
+
+	/** Whatever the child reported as the grandchild's pid, killed so nothing outlives the spec. */
+	function reap(pid: string): void {
+		try {
+			process.kill(Number(pid), 'SIGKILL');
+		} catch {
+			// Already gone, or never started: the spec's cleanup is not a place to fail.
+		}
+	}
+
+	it('⛔⛔ B3 — a DESCENDANT HOLDING THE PIPES no longer costs the caller its outcome', async () => {
+		// ⛔ `run()` PRODUCING NO FACT AT ALL IS THE WORST OUTCOME THIS PORT CAN HAVE — its entire premise is that
+		// "a refusal is a fact a step can record", and silence is not a refusal. THE MUTANT: settle on `close`
+		// instead of `exit`, which this arrangement never lets fire.
+		// ⚠ THE WAIT IS BOUNDED, AND THE BOUND IS PART OF THE ASSERTION rather than a convenience — see
+		// `settledWithin`. A case that proved "it always settles" by waiting forever when it does not would hand
+		// the declared-mutant ledger an UNMEASURED verdict, and that is not a hypothetical: it happened to the
+		// backstop case below, which came back INCONCLUSIVE instead of KILLED.
+		// ⭑ `durationMs` BELOW THE BUDGET IS THE ASSERTION THAT BITES: it says the outcome came from the CHILD's
+		// exit and not from the deadline, which is the only thing that distinguishes the fix from a shorter hang.
+		const settled = await settledWithin(
+			25_000,
+			runner().run({ argv: node(HOLDS_THE_PIPES), cwd, timeoutMs: 8_000 })
+		);
+		expect(settled, 'run() must ALWAYS produce a fact — silence is not a refusal').not.toBe(
+			NO_OUTCOME
+		);
+		if (settled === NO_OUTCOME) return;
+		const out = settled;
+		expect(out.ran, 'a fact, and not silence').toBe(true);
+		if (!out.ran) return;
+		reap(out.stdout);
+		expect(out.exitCode, 'the child exited on its own').toBe(0);
+		expect(out.durationMs, 'settled on the CHILD, long before the deadline').toBeLessThan(8_000);
+		expect(
+			out.outputComplete,
+			'and the capture DECLARES that a pipe was still open rather than reading as the whole'
+		).toBe(false);
+	});
+
+	it('⛔⛔ B2 — and it is NOT a timeout: a child that exited 0 in milliseconds did not time out', async () => {
+		// ⭐ THE FABRICATION, DRIVEN: `timedOut` was set AT THE TIMER and never reconciled with whether the kill
+		// did anything — and `child.kill` on an exited process is a no-op that does not say so consistently
+		// (measured: bun returned `true`, node returned `false`, for the same already-exited child). §36.2's
+		// TIMEOUT class was therefore MINTED FOR A PASSING COMMAND.
+		// ⛔ THE BUDGET IS SHORTER THAN THE ARRANGEMENT'S DRAIN ON PURPOSE, so the deadline genuinely passes over
+		// an already-exited child — which is the condition the old code could not tell from a real timeout.
+		// THE MUTANT: set `timedOut = true` at the timer without asking whether the child was still running.
+		// ⭑ THE BUDGET IS PLACED INSIDE THE DRAIN WINDOW ON PURPOSE. The child exits in about 70ms on this host and
+		// the capture then drains for a second, so a 500ms deadline is one that genuinely PASSES OVER AN EXITED
+		// CHILD — the condition the old code could not tell from a real timeout. The window is an order of
+		// magnitude wider than the startup it has to clear.
+		const out = await runner().run({ argv: node(HOLDS_THE_PIPES), cwd, timeoutMs: 500 });
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		reap(out.stdout);
+		expect(out.exitCode).toBe(0);
+		expect(out.timedOut, 'a deadline that passes over an EXITED child is not a timeout').toBe(
+			false
+		);
+	});
+
+	it('⛔ and a child that outlives its deadline AND the kill is a REFUSAL, never silence and never a fake code', async () => {
+		// ⭐ THE LAST THING BETWEEN `run` AND A PROMISE THAT NEVER SETTLES. `SIGKILL` cannot be survived on either
+		// platform, so the only way to observe what this runner does when a kill accomplishes NOTHING is to hand
+		// it a kill that accomplishes nothing — against a REAL child, with real streams and real events, so the
+		// arrangement differs from production in exactly the one fact under test.
+		// ⛔ THE MUTANT: drop the post-kill grace; `run` then never settles for a child the kill did not reach.
+		// ⭑ AND IT MUST NOT FABRICATE: `exitCode: null` reads as "terminated by a signal", which is precisely what
+		// was NOT observed, so this arm carries no exit code at all.
+		const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
+			cwd,
+			shell: false,
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+		try {
+			// ⛔ BOUNDED, AND THE BOUND IS THE ASSERTION. The post-kill grace is 2s, so 10s is ample; what the
+			// bound buys is that removing that grace fails HERE, naming the broken promise, instead of running out
+			// the runner's own 60s clock and being recorded as UNMEASURED. Driven: it was.
+			const settled = await settledWithin(
+				10_000,
+				observeChildRun({
+					child,
+					terminate: () => undefined,
+					timeoutMs: 300,
+					startedAt: Date.now(),
+					workspaceName: basename(cwd),
+					programName: 'jpwb-unkillable',
+					retain: async (): Promise<ProcessOutputRetention> => ({
+						retained: false,
+						notRetainedBecause: 'not reached on this arm'
+					})
+				})
+			);
+			expect(settled, 'run() must ALWAYS produce a fact — silence is not a refusal').not.toBe(
+				NO_OUTCOME
+			);
+			if (settled === NO_OUTCOME) return;
+			const out = settled;
+			expect(out.ran, 'a fact, and not silence').toBe(false);
+			expect(Object.hasOwn(out, 'exitCode'), 'and no exit code was invented').toBe(false);
+			expect(out.ran === false && out.refusedBecause).toContain('SIGKILL');
+			expect(out.ran === false && out.refusedBecause).toContain(basename(cwd));
+			expect(
+				out.ran === false && out.refusedBecause,
+				'it says the process may still be alive'
+			).toMatch(/still be running/);
+		} finally {
+			child.kill('SIGKILL');
+		}
+	});
+
+	it('⭑ CONTROL — the SAME observer with a REAL kill reports a RAN outcome, so the refusal discriminates', async () => {
+		// ⛔ WITHOUT THIS, "always refuse after the deadline" satisfies the case above — and the receipt for a
+		// control that could not fail is already on this repository's record. One fact differs: the kill works.
+		const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
+			cwd,
+			shell: false,
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+		const out = await observeChildRun({
+			child,
+			terminate: () => {
+				child.kill('SIGKILL');
+			},
+			timeoutMs: 300,
+			startedAt: Date.now(),
+			workspaceName: basename(cwd),
+			programName: 'jpwb-killable',
+			retain: async (): Promise<ProcessOutputRetention> => ({
+				retained: false,
+				notRetainedBecause: 'not reached on this arm'
+			})
+		});
+		expect(out.ran, 'the kill worked, so there IS an outcome').toBe(true);
+		expect(
+			out.ran === true && out.timedOut,
+			'and the child WAS still running at the deadline'
+		).toBe(true);
+	});
+});
+
+describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven on the REAL workspace adapter', () => {
 	it('⭐ BOTH STREAMS ARE RETAINED, and the outcome POINTS AT THEM so nothing is an orphan', async () => {
 		// ⛔ `REG-F-336` C-2 FORBIDS *"content on the content plane with no record on the record plane pointing at
 		// it"*. THE MUTANT: retain the bytes and return `retained: false` (or drop the paths) — the bytes are
 		// still there and nothing names them, which is the orphan produced by the function written to prevent it.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		// ⭑ AND THE BYTES ARE NOW ON A REAL FILESYSTEM: `existsSync` is asked as well as the workspace, because
+		// the workspace answering about its own Map was how `B7` went unnoticed.
+		const out = await runner().run({
 			argv: node('process.stdout.write("built ok");process.stderr.write("warning: unused")'),
 			cwd,
 			timeoutMs: 30_000
@@ -264,6 +684,72 @@ describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven rather tha
 		expect(await output.readFile(out.retention.stderrPath), 'stderr too — not stdout only').toBe(
 			'warning: unused'
 		);
+		expect(
+			existsSync(join(outputDirectory, out.retention.stdoutPath)),
+			'and the durable copy is a FILE ON DISK, not an entry in a Map'
+		).toBe(true);
+		expect(existsSync(join(outputDirectory, out.retention.stderrPath)), 'both of them').toBe(true);
+	});
+
+	it('⛔⛔ B6 — THE CUT TRAVELS WITH THE DURABLE COPY, or the durable copy is a prefix that reads as the whole', async () => {
+		// ⭐ DRIVEN: 200 KiB of stdout declared `{ STDOUT, byteSize: 139264, byteOffset: 65536 }` on the TRANSIENT
+		// outcome, while `captures/<uuid>/stdout.txt` was EXACTLY 65536 bytes with NOTHING beside it saying so —
+		// and `retention` is documented as naming *"the DURABLE copy and the only one a purge can reach"*. The
+		// port's own hazard sentence names the consequence: a prefix that reads as the whole is a pass nothing
+		// produced. THE MUTANT: drop `omissions.json`, or drop `retention.omittedRegions`.
+		const emitted = 200 * 1024;
+		const out = await runner().run({
+			argv: node(`process.stdout.write("q".repeat(${emitted}))`),
+			cwd,
+			timeoutMs: 30_000
+		});
+		expect(out.ran).toBe(true);
+		if (!out.ran || !out.retention.retained)
+			throw new Error('the run did not retain, so B6 is untestable');
+		const stored = await output.readFile(out.retention.stdoutPath);
+		expect(Buffer.byteLength(stored ?? '', 'utf8'), 'the durable copy IS a bounded prefix').toBe(
+			CAP_BYTES
+		);
+		// ⭑ LIMB ONE — THE RECORD THAT NAMES THE BYTES CARRIES THE CUT.
+		expect(
+			out.retention.omittedRegions,
+			'the retention declares it, not only the transient outcome'
+		).toEqual(out.omittedRegions);
+		expect(out.retention.omittedRegions.length).toBe(1);
+		// ⭑ LIMB TWO — THE DIRECTORY HOLDING THE BYTES DECLARES IT, for a reader who never sees the record.
+		expect(
+			dirname(out.retention.omissionsPath),
+			'the declaration is a SIBLING of the bytes it is about'
+		).toBe(dirname(out.retention.stdoutPath));
+		const declaredText = await output.readFile(out.retention.omissionsPath);
+		expect(declaredText, 'and it is ON DISK beside them').toBeDefined();
+		const declared = JSON.parse(declaredText ?? '{}') as {
+			note: string;
+			omittedRegions: { stream: string; byteSize: number; byteOffset: number }[];
+		};
+		expect(declared.note, 'it says the capture is not the whole output').toMatch(/INCOMPLETE/);
+		expect(declared.omittedRegions[0]?.stream).toBe('STDOUT');
+		expect(
+			(declared.omittedRegions[0]?.byteOffset ?? 0) + (declared.omittedRegions[0]?.byteSize ?? 0),
+			'REG-D-057: enough structure to undo it — the two reconstruct what was emitted'
+		).toBe(emitted);
+	});
+
+	it('⭑ CONTROL — a capture with NOTHING cut says so, rather than saying nothing', async () => {
+		// ⛔ WITHOUT THIS, `omissions.json` could be written only when there IS a cut — and its ABSENCE would then
+		// be ambiguous between "complete" and "nobody looked", which is the exact ambiguity the port refuses for
+		// `omittedRegions`. The declaration is unconditional, and this is the arm that proves it.
+		const out = await runner().run({
+			argv: node('process.stdout.write("small")'),
+			cwd,
+			timeoutMs: 30_000
+		});
+		if (!out.ran || !out.retention.retained) throw new Error('the run did not retain');
+		expect(out.retention.omittedRegions).toEqual([]);
+		const declared = JSON.parse((await output.readFile(out.retention.omissionsPath)) ?? '{}') as {
+			note: string;
+		};
+		expect(declared.note).toMatch(/COMPLETE/);
 	});
 
 	it('⭐ AND BOTH COME UNDER PURGE — driven, because that is the clause that makes retaining them lawful', async () => {
@@ -273,17 +759,26 @@ describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven rather tha
 		// `workspace-host.ts` — `purge` then REFUSES and these bytes could never be destroyed.
 		// ⚠ AND THE ENTRY MUST SURVIVE ITS OWN PURGE, so *"purged on schedule"* stays distinguishable from
 		// *"never written"* and from *"lost"*.
-		const out = await createChildProcessRunner({ outputWorkspace: output }).run({
+		// ⭑ ON THE REAL ADAPTER: `existsSync` is asked too, because a Map that forgot a key and a file that was
+		// actually removed are the same answer from `readFile` and completely different facts on a host.
+		const out = await runner().run({
 			argv: node('process.stderr.write("secret-ish diagnostic")'),
 			cwd,
 			timeoutMs: 30_000
 		});
-		if (!out.ran || !out.retention.retained) throw new Error('the run did not retain, so purge is untestable');
+		if (!out.ran || !out.retention.retained)
+			throw new Error('the run did not retain, so purge is untestable');
 		const { stderrPath, purgeability } = out.retention;
-		expect(purgeability, 'the class R7 forces — see the adapter header').toBe('PURGEABLE_AT_EXPIRY');
+		expect(purgeability, 'the class R7 forces — see the adapter header').toBe(
+			'PURGEABLE_AT_EXPIRY'
+		);
 		const purged = await output.purge(stderrPath);
 		expect(purged.purged, 'R7: it comes under purge').toBe(true);
 		expect(await output.readFile(stderrPath), 'the bytes are gone').toBeUndefined();
+		expect(
+			existsSync(join(outputDirectory, stderrPath)),
+			'gone from the DISK, not from a Map'
+		).toBe(false);
 		const entry = (await output.list()).find((e) => e.path === stderrPath);
 		expect(entry?.purged, 'and the ENTRY survives, so the purge stays explicable').toBe(true);
 	});
@@ -293,21 +788,73 @@ describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven rather tha
 		// makes `purge` REFUSE on a workspace declared to have participated; so wiring one here would produce a
 		// runner that captures `stderr` into bytes nothing can ever destroy — the exact surface the question is
 		// about, reached through a one-word host mistake. THE MUTANT: drop the check.
+		// ⚠ THE ARRANGEMENT IS A **FILESYSTEM** WORKSPACE, DELIBERATELY. An arrangement that trips TWO conjuncts
+		// proves NEITHER, and the in-memory one this case used to use trips the materialization guard below too.
+		const participating = createFilesystemWorkspace({
+			ownerKind: 'UNDERTAKING',
+			ownerId: 'und_2b',
+			purgeability: 'RETAINED_BY_PARTICIPATION',
+			directoryPath: outputDirectory
+		});
 		expect(() =>
 			createChildProcessRunner({
-				outputWorkspace: createInMemoryWorkspace({
-					ownerKind: 'UNDERTAKING',
-					ownerId: 'und_2b',
-					purgeability: 'RETAINED_BY_PARTICIPATION'
-				})
+				deliverableWorkspace: deliverable,
+				outputWorkspace: participating
 			})
 		).toThrow(/R7/);
 	});
 
-	it('⚠ a HALF-written pair is not a retention — it is refused, and the half that landed is swept', async () => {
+	it('⛔⛔ B7 — and it REFUSES an IN_MEMORY output workspace, whatever class it declares', async () => {
+		// ⭐ THE GUARD CHECKED `purgeability` AND NOT `materialization`, so a workspace with the right class and NO
+		// DIRECTORY was ACCEPTED and returned `kind: 'REAL'`. DRIVEN: a real child ran, `retention` said
+		// `retained: true` and handed back a `stdoutPath`, while `materialization === 'IN_MEMORY'` and
+		// `directoryPath === undefined` — bytes in a Map presented as the durable copy a purge can reach, which is
+		// `R7` false at the moment it is asserted true. THE MUTANT: check only the class.
+		// ⚠ THE CLASS HERE IS THE LAWFUL ONE, so this arrangement trips THIS conjunct and no other.
+		expect(() =>
+			createChildProcessRunner({
+				deliverableWorkspace: deliverable,
+				outputWorkspace: createInMemoryWorkspace({
+					ownerKind: 'UNDERTAKING',
+					ownerId: 'und_2b',
+					purgeability: 'PURGEABLE_AT_EXPIRY'
+				})
+			})
+		).toThrow(/IN_MEMORY/);
+	});
+
+	it('⛔⛔ B8 — and it REFUSES to be constructed against a deliverable workspace with no directory at all', async () => {
+		// ⭑ THE STRUCTURAL HALF OF `B8`: a runner that cannot name the one directory it may run in cannot check a
+		// `cwd`, and `RULE 5` says the arm with no directory keeps the REFUSING default. THE MUTANT: accept it —
+		// every `cwd` then compares against `undefined` and the containment check is decided by an absence.
+		expect(() =>
+			createChildProcessRunner({
+				deliverableWorkspace: createInMemoryWorkspace({
+					ownerKind: 'UNDERTAKING',
+					ownerId: 'und_2b',
+					purgeability: 'RETAINED_BY_PARTICIPATION'
+				}),
+				outputWorkspace: output
+			})
+		).toThrow(/deliverable workspace/);
+	});
+
+	it('⭑ CONTROL — the lawful wiring is accepted, so all three refusals above DISCRIMINATE', async () => {
+		// ⛔ A FACTORY THAT THREW AT EVERYTHING WOULD SATISFY EVERY CASE ABOVE, and this repository has the
+		// receipt for exactly that shape of vacuous green.
+		expect(() =>
+			createChildProcessRunner({ deliverableWorkspace: deliverable, outputWorkspace: output })
+		).not.toThrow();
+	});
+
+	it('⚠ a PARTIALLY written capture is not a retention — it is refused, and whatever landed is swept', async () => {
 		// ⛔ THE ORPHAN ARRIVES THROUGH THE PARTIAL CASE, NOT THE TOTAL ONE. Reporting `retained: false` while
 		// leaving `stdout.txt` on disk is exactly `REG-F-336` C-2: bytes on the content plane that no record
 		// names. THE MUTANT: return the refusal without purging what landed.
+		// ⚠ THIS ONE IS STILL A STUB, AND THAT IS STATED RATHER THAN HIDDEN: a partial failure needs a write that
+		// refuses while its siblings succeed, and a real filesystem does not offer that on demand. It SPREADS the
+		// real adapter, so the class, the materialization and the directory are the real ones; only `writeFile`
+		// and `purge` are arranged. The TOTAL case below is driven on the real filesystem with no stub at all.
 		const purges: string[] = [];
 		const written = new Map<string, string>();
 		const refusing: Workspace = {
@@ -324,38 +871,60 @@ describe('⭐⭐ REG-Q-066 / R7 — the retention disposition, driven rather tha
 				return { purged: true };
 			}
 		};
-		const out = await createChildProcessRunner({ outputWorkspace: refusing }).run({
-			argv: node('process.stdout.write("half")'),
-			cwd,
-			timeoutMs: 30_000
-		});
+		const out = await createChildProcessRunner({
+			deliverableWorkspace: deliverable,
+			outputWorkspace: refusing
+		}).run({ argv: node('process.stdout.write("half")'), cwd, timeoutMs: 30_000 });
 		expect(out.ran, 'the RUN still happened — a retention failure is not a run failure').toBe(true);
 		if (!out.ran) return;
 		expect(out.retention.retained).toBe(false);
 		expect(out.retention.retained === false && out.retention.notRetainedBecause).toContain(
 			'the arranged refusal'
 		);
-		expect(purges.map((p) => p.endsWith('stdout.txt')), 'the half that landed was swept').toEqual([true]);
+		expect(
+			purges.map((p) => basename(p)).sort(),
+			'every part that landed was swept — the declaration as well as the stream'
+		).toEqual(['omissions.json', 'stdout.txt']);
 		expect(written.size, 'so no bytes remain that nothing points at').toBe(0);
 	});
 
-	it('⛔ a run whose capture is REFUSED still reports the exit code it observed', async () => {
+	it('⛔ a run whose capture the REAL FILESYSTEM refuses still reports the exit code it observed', async () => {
 		// ⚠ THE OPPOSITE FAILURE, AND IT IS THE ONE THAT WOULD BE TEMPTING TO GET WRONG THE OTHER WAY. Retention
 		// is a fact about the bytes; the exit code is a fact about the process. Collapsing a retention refusal
 		// into `ran: false` would DESTROY an observation this runner actually made — and `ran: false` says no
 		// process ran, which would be false. THE MUTANT: return `ran: false` when retention refuses.
-		const refusing: Workspace = {
-			...output,
-			writeFile: async () => ({ written: false, refusedBecause: 'nothing may be written' }),
-			purge: async () => ({ purged: true })
-		};
-		const out = await createChildProcessRunner({ outputWorkspace: refusing }).run({
-			argv: node('process.exit(5)'),
-			cwd,
-			timeoutMs: 30_000
-		});
+		// ⭐ AND THE REFUSAL IS THE FILESYSTEM'S OWN: a FILE is planted where the capture directory has to be, so
+		// `mkdir` under it cannot succeed. No stub is involved — this is `createFilesystemWorkspace` refusing.
+		await writeFile(join(outputDirectory, 'captures'), 'a file where a directory must go', 'utf8');
+		const out = await runner().run({ argv: node('process.exit(5)'), cwd, timeoutMs: 30_000 });
 		expect(out.ran).toBe(true);
 		expect(out.ran === true && out.exitCode).toBe(5);
 		expect(out.ran === true && out.retention.retained).toBe(false);
+		expect(
+			out.ran === true && out.retention.retained === false && out.retention.notRetainedBecause,
+			'and it says which part could not be kept'
+		).toContain('stdout');
+	});
+
+	it('⛔⛔ B4 — A RUN THAT PRODUCED NO OUTCOME RETAINS NOTHING, however late the events arrive', async () => {
+		// ⭐ THE ORPHAN MINTED BY THE FUNCTION WRITTEN TO PREVENT IT. `close` fires AFTER `error`, the close
+		// handler called `retain()` UNCONDITIONALLY, and only the OUTCOME was guarded against being settled twice.
+		// DRIVEN with a program that does not exist: `run` resolved `{ ran: false }` with no retention field and
+		// an EMPTY captures directory — and 400ms later `stdout.txt` and `stderr.txt` EXISTED and `list()`
+		// reported them live. Content on the content plane, no record naming it, on the arm the adapter itself
+		// calls the commonest outcome of a model naming a tool the host does not have.
+		// ⛔ THE MUTANT: call `retain` from the close handler rather than from inside the claimed outcome.
+		// ⚠ THE WAIT IS THE WHOLE CASE. Asserting emptiness immediately passes against the defect.
+		const out = await runner().run({ argv: ['no-such-tool-zzz'], cwd, timeoutMs: 30_000 });
+		expect(out.ran).toBe(false);
+		expect(Object.hasOwn(out, 'retention'), 'a refusal carries no retention at all').toBe(false);
+		await new Promise((settle) => setTimeout(settle, 400));
+		expect(await output.list(), 'THE BREACH ITSELF: bytes that appeared after the refusal').toEqual(
+			[]
+		);
+		expect(
+			existsSync(join(outputDirectory, 'captures')),
+			'and no capture directory was ever made'
+		).toBe(false);
 	});
 });
