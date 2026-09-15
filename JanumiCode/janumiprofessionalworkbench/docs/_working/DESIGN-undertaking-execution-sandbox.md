@@ -85,6 +85,8 @@ recording is worth committing.
 | R7 | **stdout and stderr are both retained, and both come under purge.** |
 | R8 | **The workspace is the DELIVERABLE and must persist** — durable, survives a restart, inspectable after the undertaking ends. |
 | R9 | **The workspace boundary is ORGANISATIONAL now and SECURITY later** — the security tier belongs to the deployment environment, and the ports are the seam it supplies. Ruled 2026-09-14; see §4.8. |
+| R10 | **A CONTRACTED rationale IS `PER-8` participating material — permanent.** Retaining the whole envelope as the answer half is therefore correct, and the permanence is CHOSEN rather than inherited. Volunteered reasoning stays separated under `PURGEABLE_AT_EXPIRY` (`PER-12`), which is the half that rule protects. Ruled 2026-09-15; see §4.9. |
+| R11 | **`MODEL_EXCHANGE` gains BOTH the derivation link and the observed tool-call record, in ONE ratification act.** Ruled 2026-09-15; see §4.10. |
 
 ---
 
@@ -358,3 +360,46 @@ adversary, which is what §4.8 exists to end.
   B4's fidelity fix, because a recording of the wrong bytes replays a different run.
 - **Whether `stepCapabilityRefusal`'s step-level refusal should become REQUIRES/USES** (§4.3).
 - **e2e status.** Playwright was not run against the spike. Unknown, not assumed green.
+
+
+---
+
+## 4.9 ⭐ `R10` — a contracted rationale is permanent, and that was ruled rather than assumed
+
+**THE QUESTION.** `R6`/Phase 0 made the retained answer half the whole ENVELOPE, which carries `rationale`. So the
+model's contracted reasoning is retained under `RETAINED_BY_PARTICIPATION` — permanent. Phase 0 recorded that as
+OWED because *"the agent believes the hazard does not arise, but the sponsor should confirm rather than take its
+reading."*
+
+**RULED (2026-09-15): CONFIRMED.** A rationale the system ASKED FOR is part of the answer that was judged, not the
+model's private thinking. ⭑ The distinction is one `execution-contract.ts` already draws — CONTRACTED ≠
+VOLUNTEERED — and it is exactly the line §9.7 splits on: volunteered reasoning is still separated out under
+`PURGEABLE_AT_EXPIRY`, which is the half `PER-12` exists to protect.
+
+⛔ **THE CONSEQUENCE, STATED BECAUSE IT IS PERMANENT.** Once a contracted rationale is written, **nothing deletes
+it** — no expiry, no retention policy, no erasure request reaches it. That is what the classification MEANS, and
+it is now true of every execution step. It was confirmed with that consequence in front of the sponsor rather
+than arrived at by the code being written that way first.
+
+## 4.10 ⭐ `R11` — the declared relation becomes a typed field, bundled with the tool-call record
+
+**THE QUESTION.** `R6` split the ARTIFACT (work product) from the exchange's ANSWER SPAN (envelope), so their
+byte-equality no longer answers *"which bytes did the assessment rest on?"* for free. The link is therefore
+DECLARED — today as a `WORK_PRODUCT_DERIVATION` fragment inside the free-text `parseOutcome.detail`.
+
+**RULED (2026-09-15): IT BECOMES A TYPED `MODEL_EXCHANGE` FIELD, IN ONE ACT WITH THE OBSERVED TOOL-CALL RECORD.**
+
+⭐ **WHY BUNDLED.** Two pending changes touch the SAME generated, ratified contract: this derivation link, and
+§4.7's tool-call record (so *"a command ran"* is the ADAPTER's observation and not the model's word — §22.1 makes
+model output untrusted external input). One deliberate ratification is cheaper and more reviewable than opening
+`MODEL_EXCHANGE` twice.
+
+⚠ **THERE IS NO BACK DOOR, AND IT WAS DRIVEN RATHER THAN ASSUMED.** `MODEL_EXCHANGE` is a `z.strictObject`; its
+object, command and event payloads are byte-identical by design; all three are GENERATED (*"do not edit by hand.
+Regenerate with `bun run gen:objects`"*) from `vocab/m1-object-fields.json` and `vocab/m3-commands-events.json`;
+and the `extensions[]` escape hatch is UNREACHABLE from the command surface, already driven and recorded in
+`REG-005`. So this is a vocab change, a regeneration and a ratification — in that order.
+
+⛔ **AND `bun run gen` IS IN NO GATE STEP**, which this programme has already recorded as an open finding. A vocab
+change that regenerates artifacts nothing compares against its source is exactly the drift that finding names, so
+the freshness question arrives WITH this act rather than after it.

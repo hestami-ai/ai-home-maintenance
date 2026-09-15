@@ -930,6 +930,20 @@ Phase 0** — a recording of the wrong bytes replays a different run.
    e2e. What the item did not anticipate is that the rule's PROPERTY (*"a reader cannot tell which the assessment
    rested on"*) is separable from its MECHANISM (equal bytes) — the declaration carries the property once the
    mechanism is gone.
+   ⭐ **AND ITS RESIDUE IS NOW RULED TOO.** `R10` (2026-09-15): a CONTRACTED rationale IS `PER-8` participating
+   material and therefore PERMANENT — nothing deletes it, ever. Confirmed with that consequence stated rather
+   than inherited from the code already doing it; volunteered reasoning stays separated under `PURGEABLE_AT_EXPIRY`,
+   which is the half `PER-12` protects. Design §4.9.
+
+8. ⭐ **`R11` (2026-09-15) — `MODEL_EXCHANGE` GAINS TWO TYPED FIELDS IN ONE RATIFICATION ACT.** The
+   artifact→answer-span DERIVATION link moves out of the free-text `parseOutcome.detail` fragment, and §4.7's
+   OBSERVED TOOL-CALL record lands with it — so *"a command ran"* becomes the ADAPTER's observation rather than
+   the model's word (§22.1: model output is untrusted external input). ⭐ Bundled because both touch the SAME
+   generated, ratified contract; one deliberate act is cheaper and more reviewable than opening it twice.
+   ⚠ Order: vocab change (`m1-object-fields.json`, `m3-commands-events.json`) → `gen:objects` / `gen:messages`
+   → ratification. There is no back door — `extensions[]` was DRIVEN and found unreachable from the command
+   surface (`REG-005`). ⛔ **`bun run gen` is in NO gate step**, an open finding this programme already carries,
+   so the freshness question arrives WITH this act rather than after it. Design §4.10.
 
 ---
 
