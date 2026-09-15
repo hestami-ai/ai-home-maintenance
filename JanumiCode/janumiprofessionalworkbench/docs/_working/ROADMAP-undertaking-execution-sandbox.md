@@ -433,6 +433,123 @@ later.
 
 ---
 
+## 4d. Phase 2b · ⭐ LANDED 2026-09-14 — the REAL `ProcessRunner`, and the question it was never allowed to land without
+
+⭐ **RULE 8 IS THE WHOLE SHAPE OF THIS COMMIT.** *"A disclosed question is answered in the commit that reopens
+it, never later."* Phases 1 and 2 shipped the port, the refusing default, the durable workspace and the
+containment fixes, and each one ends with the same line: ⛔ **no real runner, because a real runner captures
+`stderr` and that reopens `REG-Q-066`.** So the runner and the retention disposition land together or neither
+lands.
+
+**WHAT LANDED.** `apps/rph-demo/src/lib/server/execution/child-process-runner.ts` (the adapter — `R3`, beside
+`filesystem-workspace.ts`), a `retention` and an `omittedRegions` field on `ProcessRunOutcome`'s ran arm, a
+`workspaceDirectoryName` derivation promoted into the port, a SECOND workspace on `UndertakingSandbox`, and a
+rewritten `verif/agy-stderr-unbound.test.ts`.
+
+### `REG-Q-066`, re-answered — **CLOSED BY DISPOSITION**
+
+`REG-F-326` closed the stated bound as *"CLOSED BY NON-USE"* and said exactly why that was gated rather than
+noted: *"An answer that rests on the code NOT doing something rots the moment someone does it."* It has.
+
+⭑ **THE ANSWER IS GIVEN PER THE GATE'S OWN INSTRUCTION, NOT AGAINST IT.** Its message names what an author who
+ends the absence owes — *"it needs a retention disposition and REG-Q-066 needs re-answering; it must not arrive
+as a debugging convenience"* — and both are in this commit:
+
+| | |
+| --- | --- |
+| which class each stream carries | **`PURGEABLE_AT_EXPIRY`, both of them — FORCED, not chosen.** `R7` says both *"come under purge"*; `PER-8` makes `purge` REFUSE on `RETAINED_BY_PARTICIPATION`; `Purgeability` has exactly two members and `REG-Q-056` is OPEN, so no third is coined. One member survives the conjunction. ⭑ `REG-D-050` agrees on the merits — *"PARTICIPATION IS A PROPERTY OF USE, NOT OF KIND"* — and nothing cites a captured stream in a recorded judgement today. |
+| where they live | **A SECOND workspace**, sibling to the deliverable at `<dir>.process-output`. The port already ruled the consequence: *"one workspace cannot hold participating and purgeable material side by side. A host needing both declares two."* A sibling rather than a subdirectory is Phase 2's `F1` applied — a reserved area inside a directory a step writes to is a name a step can spell. |
+| what REFERENCES the bytes | **`ProcessRunOutcome.retention`**, REQUIRED on the ran arm, carrying the owner id, the class and both workspace-relative paths. `REG-F-336` C-2 forbids *"content on the content plane with no record on the record plane pointing at it"*, and an outcome returning only the strings would have minted that orphan on the first command that printed. |
+| how purge REACHES them | **`Workspace.purge(path)`** — same signature and semantics as `ArtifactStore.purge`, on a workspace declared purgeable so it does not refuse. Driven both ways: the deliverable REFUSES with `PER-8`, the capture SUCCEEDS and keeps its tombstone. |
+
+⛔ **AND ONE THING `R7` DOES NOT BUY, STATED SO IT IS NOT READ WIDER.** Nothing SCHEDULES a purge — retention
+expiry is a policy this repository does not have. What lands is that the bytes are addressable and destructible,
+which is the clause that makes retaining them lawful; a sweeper is not claimed.
+
+⛔ **A CONSTRAINT ON PHASE 5 FOLLOWS, RECORDED WHERE IT WILL BE BROKEN.** When a `TEST_RESULT` becomes evidence,
+the PARTICIPATING object must be **minted** — content-addressed into the `ArtifactStore` under
+`RETAINED_BY_PARTICIPATION` at the moment of participation — and must **not be this capture re-labelled**. That
+is §9.7's split for a model reply whose halves carry opposite obligations; re-labelling would make `R7` false
+for every run after it.
+
+### The guard is TIGHTENED where it is NARROWED
+
+One file leaves the absence population, so four limbs the previous gate was structurally unable to make are
+added: the disposed-site list is **PINNED at one**; every site must **EXIST**; every site must **ACTUALLY BIND**
+`stderr` (so an unused exemption cannot sit waiting for the next file that wants one); and `agy-cli.ts` —
+`REG-Q-066`'s ORIGINAL subject — is asserted **by name** to bind none, with its own control that it is in the
+population. ⭑ Plus the limb a source scan cannot make at all: `createChildProcessRunner` **REFUSES** to be
+constructed against a workspace whose bytes could never be purged, driven with a control, and `P2B-m` is the
+mutant that proves that gate checks a property rather than an absence.
+
+### Secrets in a captured stream — in scope, answered, and bounded rather than closed
+
+A command's stderr can echo the environment it ran in, and this server's holds model-provider credentials. The
+child therefore does **not** inherit `process.env`; it receives an allowlist by NAME. ⛔ **A reduction, not an
+elimination**, and the residue is stated: `PATH`- and `USERPROFILE`-shaped variables are allowlisted and
+themselves disclose host layout and the operating user; a secret placed IN an allowlisted variable passes
+through; and ⛔ **a secret the command reads from DISK is not covered at all** — a `.env` in the workspace, a
+cached token — which is finding `#60` from the other side and needs a redaction capability this repository does
+not have. What bounds it meanwhile is `R9`: the bytes sit in a purgeable workspace inside the Undertaking's own
+root, and the security tier belongs to the deployment environment.
+
+### The runner
+
+`shell: false` with an argv ARRAY (driven: a `>` argument creates no file); `stdio[0] = 'ignore'` so a command
+reading input is not recorded as a TIMEOUT for waiting on the server; a watchdog that actually kills, with
+`timedOut` OBSERVED at the kill; capture bounded at 64 KiB per stream with the cut DECLARED as an
+`OmittedRegion`-shaped omission and trimmed to a UTF-8 boundary so no character the process never emitted enters
+the record; every failure a `ran: false` refusal naming the errno CODE and the workspace DIRECTORY NAME. ⛔ A
+program that does not exist is `ran: false` — **never** `ran: true, exitCode: 127`, which is the plausible
+fabrication.
+
+**PROOF — 18 declared mutants, `bun run mutants P2B-` → 18 of 18 KILLED, 0 SURVIVED, 0 UNANCHORED, 0
+NO_COMPILE.** `P2-ae` is RETIRED onto `P2B-a` (the derivation MOVED into the port; verified RETIRED), and
+`P2-ad` still KILLED. ⭑ **AND THE FOUR LIMBS NO MUTANT CAN REACH — the ones that live inside the rewritten gate
+itself — were driven by hand instead**: seven arrangements, every one observed RED on the limb it targets. A
+second file binding `stderr`; a second list entry; an entry naming a file that does not exist; an entry naming a
+file that binds nothing; `agy-cli.ts` binding `stderr`; the original subject named by a path nothing has; and
+the walk pointed at a directory that does not exist, which reddens the positive control.
+
+⚠ **AND A THIRD CLAIM OF MINE WAS WRONG — one I wrote as a justification and then checked.** The new
+`ProcessOutputOmission` does not reuse `rph-contracts`' `OmittedRegion`, and the plausible reason I first gave
+— *"rph-ports cannot depend on rph-contracts"* — is **FALSE**: `rph-ports/package.json` declares that
+dependency and `.dependency-cruiser.cjs` says outright *"rph-ports declares interfaces only; it depends solely
+on rph-contracts."* The real reason is narrower and better: `OmittedRegionSchema.role` is a CLOSED, GENERATED
+enum of model-exchange roles with no member for a process stream, so reuse means recording every cut as `OTHER`
+— losing WHICH STREAM was truncated — or a vocab change plus a regeneration plus a ratification, which is
+Phase 4 Part B's act and not this one's. The SHAPE is adopted, the TYPE is not, and the debt is stated at the
+declaration instead of hidden behind an import.
+
+⚠ **ONE DEFECT WAS FOUND BY PROBING THE ADAPTER RATHER THAN BY READING IT, and it is the kind this seam exists
+to refuse.** `spawn` raises `ERR_INVALID_ARG_VALUE` **synchronously** for an embedded NUL in the program name,
+for a NUL in an argument, and for an empty program name — measured, all three — so none of them reaches the
+`error` event, and `run` was returning a REJECTED PROMISE: a stack trace where the port requires a fact a step
+can record. Fixed with its own arm, its own case and `P2B-r`. ⭑ That arm also refuses to quote the malformed
+argv back, because a NUL byte in a `refusedBecause` travels into a governed record and into a model's context.
+
+⚠ **TWO MUTANTS SURVIVED THEIR FIRST RUN AND BOTH ARE RECORDED RATHER THAN QUIETLY REPLACED**, because what they
+exposed was worth more than the entries were.
+- **`timedOut: exitCode === null` SURVIVED — and the port's stated rationale for the rule is WRONG ABOUT WHICH
+  PLATFORM IT BITES ON.** Four arrangements driven: this runner's own `child.kill('SIGKILL')` → `exitCode: null,
+  signal: 'SIGKILL'`; an EXTERNAL `process.kill(pid,'SIGKILL')` → `exitCode: 1, signal: null`; the child killing
+  itself → `exitCode: 1`; `process.abort()` → `exitCode: 134`. So on Windows a null exit code arises ONLY from
+  the kill this runner issued, the inference and the observation coincide, and no arrangement separates them.
+  ⭑ On POSIX an external SIGKILL delivers null and a process the OS killed is a `TOOL_FAILURE`, not a `TIMEOUT`
+  — so the rule stands and what is corrected is the claim that Windows is where it bites. The flag is pinned in
+  both DIRECTIONS instead (`P2B-d` never reported, `P2B-q` always reported), because declaring an
+  indistinguishable mutation as a guard would be a guard that cannot fail.
+- **`only stdout is bounded` SURVIVED because it mutated the wrong line.** The early `return` at the cap is an
+  ALLOCATION guard; the BOUND is `room`, which reaches 0 and makes every later slice empty. Re-pointed at both,
+  and the code now says which line does which — a redundancy a mutant found and a reading would not have.
+
+**BASELINES:** `guards:export` regenerated by its own writer in this commit — **341 of 341 guarded, obligation
+0**, up from 340 because `workspaceDirectoryName` became a production-consumed export the moment the refusing
+default read it. `coverage:floor:check` is clean and was NOT regenerated: no uncovered count rose and the
+population did not move. `bun run gate:fast` → **13 of 13 green** (374 test files, 93 e2e).
+
+---
+
 ## 4a. Phase 2 · the specification, as written before it was built
 
 ⭐ **THE MECHANICS PASS FOUND A HAZARD THE DESIGN DID NOT NAME.** The only seam through which a `cwd` could reach
@@ -578,7 +695,13 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 
 1. ⭐ **RESHAPED (§1).** Not *"is workspace content participating material"* but: **which OBJECT, having done
    what past-tense act, carries a test run's files and output** — the form `PER-8` actually classifies in.
-2. **`REG-Q-066`'s retention disposition**, re-answered per `R7`, in the commit that binds `stderr` (rule 8).
+2. ~~**`REG-Q-066`'s retention disposition**, re-answered per `R7`, in the commit that binds `stderr` (rule 8).~~
+   → ⭐ **DELIVERED 2026-09-14 in Phase 2b (§4d), which is the commit that binds `stderr`.** Answered
+   **CLOSED BY DISPOSITION**: both streams `PURGEABLE_AT_EXPIRY` in a second workspace, referenced by
+   `ProcessRunOutcome.retention`, reachable by `Workspace.purge`, and gated by a rewritten
+   `verif/agy-stderr-unbound.test.ts` plus `P2B-m`. ⚠ **What is still owed is smaller and is NOT this item:**
+   `REG-Q-066`'s THREE READINGS of ASR-11's raw validator output remain OPEN and remain the sponsor's —
+   `REG-F-326` was explicit that closing the bound closes nothing else, and neither does this.
 3. ~~**The process-execution capability NAME** — ratification owed.~~ → ⭐ **NOT A NEW SPONSOR DECISION: it is an
    APPLICATION OF `JAN-EXECGOV`'s `G-1`, ALREADY GRANTED.** `G-1`'s recorded form is *"one capability per step
    type that a model invocation actually needs, named in the vocabulary with its note, exactly as `D-1` was

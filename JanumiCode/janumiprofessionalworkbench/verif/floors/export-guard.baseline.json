@@ -1195,8 +1195,12 @@
 			"unattributedMutants": 0
 		},
 		"packages/rph-ports/src/ports/process-runner.ts": {
-			"consumedExports": [],
-			"guardedExports": [],
+			"consumedExports": [
+				"workspaceDirectoryName"
+			],
+			"guardedExports": [
+				"workspaceDirectoryName"
+			],
 			"unattributedMutants": 0
 		},
 		"packages/rph-ports/src/ports/workspace.ts": {

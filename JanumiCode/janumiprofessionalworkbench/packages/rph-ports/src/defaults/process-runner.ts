@@ -10,10 +10,11 @@
 // field at all, so this default could not report a passing command even by mistake — which is a stronger
 // guarantee than remembering not to. That is the whole argument for the union, made concrete in the one
 // implementation that would otherwise have to fill the field.
-import type {
-	ProcessRunOutcome,
-	ProcessRunRequest,
-	ProcessRunner
+import {
+	workspaceDirectoryName,
+	type ProcessRunOutcome,
+	type ProcessRunRequest,
+	type ProcessRunner
 } from '../ports/process-runner.js';
 
 export function createRefusingProcessRunner(): ProcessRunner {
@@ -27,13 +28,11 @@ export function createRefusingProcessRunner(): ProcessRunner {
 			// can record", i.e. a string that travels into a governed record and into a model's context. The
 			// host's filesystem layout belongs in neither. `filesystem-workspace.ts` states the same rule for its
 			// own wrapped errors ("the message carries the host's absolute path, which belongs in nothing a step
-			// records") and this is the one other place in the seam that was still leaking one.
-			// ⚠ THE LAST SEGMENT, NOT A TRUNCATION: it is the directory the host DERIVED from the owner id, so it
-			// names the workspace to anyone who has to act on this. A path with no segments at all (a filesystem
-			// root) has no name, so the refusal falls back to the path itself — which, being a root, discloses
-			// nothing about the layout above it.
-			const workspaceDirectory =
-				request.cwd.split(/[\\/]+/).filter((segment) => segment !== '').at(-1) ?? request.cwd;
+			// records") and this was the one other place in the seam that was still leaking one.
+			// ⭑ THE DERIVATION MOVED TO THE PORT IN PHASE 2b, and the move is the point: this rule was stated in
+			// one implementation, and Phase 2b adds the second one. An invariant that makes the seam lawful
+			// belongs with the interface, so the other adapter cannot quietly implement a weaker one.
+			const workspaceDirectory = workspaceDirectoryName(request.cwd);
 			return {
 				ran: false,
 				// The refusal NAMES what was not run and WHY, because a refusal a reader cannot act on is the

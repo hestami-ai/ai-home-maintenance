@@ -189,8 +189,13 @@ model's context and into the step record.
 **R7: both streams retained, both brought under the same purge machinery as artifact content.** That is why
 `Workspace` gains `purge` — which the spike shipped WITHOUT, and the artifact-store's own header explains why
 that default is wrong: `purge` *"is the port's reason for existing, and `put` is what it enables."* Retention of
-model-participating content is unlawful rather than merely unbuilt without it. ⛔ **The guard stays RED until this
-lands; it is not to be silenced.**
+model-participating content is unlawful rather than merely unbuilt without it. ~~⛔ **The guard stays RED until this
+lands; it is not to be silenced.**~~ ⭐ **LANDED 2026-09-14 (Phase 2b).** The guard was never silenced: it was
+RE-POINTED from an ABSENCE onto the DISPOSITION, per its own message, and gained four limbs plus a driven
+refusal it could not previously make. `REG-Q-066`'s stated bound is now **CLOSED BY DISPOSITION** — both
+streams `PURGEABLE_AT_EXPIRY` in a SECOND workspace (the deliverable is `RETAINED_BY_PARTICIPATION` under
+`R8` and its `purge` refuses), referenced by `ProcessRunOutcome.retention` so nothing is `REG-F-336` C-2's
+orphan, and reachable by `Workspace.purge`. See `ROADMAP-undertaking-execution-sandbox.md` §4d.
 
 ### 4.6 Step type — MODEL_INVOCATION with tools
 
@@ -282,7 +287,9 @@ adversary, which is what §4.8 exists to end.
 
 - ⛔ **No regression of the authoring plane.** It works live; it is the reference, not the subject.
 - ⛔ **No default that fabricates.** No exit code from a command that did not run; no `materialization` assumed.
-- ⛔ **No silencing of REG-Q-066.** Red until the retention disposition lands.
+- ~~⛔ **No silencing of REG-Q-066.** Red until the retention disposition lands.~~ ⭐ **HONOURED — the
+  disposition landed 2026-09-14 (Phase 2b) in the same commit as the binding, per roadmap rule 8, and the
+  gate now checks the disposition rather than the absence.**
 - ⛔ **No ratchet baseline regenerated to make a spike pass.** `POPULATION_CHANGED` on the new ports is honest
   bookkeeping and belongs in the commit that legitimately adds them, with their guards.
 - ⛔ **No merge of `spike/tool-execution`.** It proved the seam; it is not the implementation.
@@ -300,7 +307,8 @@ adversary, which is what §4.8 exists to end.
    is recorded as DEFERRED TO THE PLATFORM POLICY PLANE. The spike coined `process-execution`. ⚠ Collapsing it
    into `file-system` would be worse than coining: starting a process is strictly larger than writing a file, and
    merging them makes the grant unable to express the distinction the live precision control turned on.
-2. **REG-Q-066's retention disposition**, re-answered per R7.
+2. ~~**REG-Q-066's retention disposition**, re-answered per R7.~~ ⭐ **DELIVERED 2026-09-14 (Phase 2b).**
+   ⚠ `REG-Q-066`'s three readings of ASR-11's raw validator output stay OPEN and stay the sponsor's.
 3. **`pol_test_adequacy`** (R4, second half), with its conformance rule amended in the same act.
 4. **Whether workspace content is PER-8 participating material.** A test run that evidence cites certainly is.
 

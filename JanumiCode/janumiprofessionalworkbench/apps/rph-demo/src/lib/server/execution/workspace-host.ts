@@ -80,20 +80,51 @@ import {
 	type ProcessRunner,
 	type Workspace
 } from '@janumipwb/rph-ports';
+import { createChildProcessRunner } from './child-process-runner.js';
 import { createFilesystemWorkspace } from './filesystem-workspace.js';
 
 /**
- * The two ports an Undertaking's execution runs against, resolved together.
+ * The ports an Undertaking's execution runs against, resolved together.
  *
  * ⛔ TOGETHER RATHER THAN SEPARATELY, BECAUSE THE PORTS ARE NOT INDEPENDENT. `workspace.ts`'s header states it:
  * "A `ProcessRunner` needs a real `cwd`; an IN_MEMORY workspace has none … A host wiring a REAL runner against
  * an IN_MEMORY workspace has made an error that must be caught BEFORE anything runs." Handing a caller one
  * without the other is how that pairing stops being checkable at all.
+ *
+ * ⭐ AND PHASE 2b MAKES IT THREE, BECAUSE `R7` CANNOT BE SATISFIED BY TWO. A real runner captures both streams;
+ * `R7` says both are retained AND both come under purge; `purge` REFUSES on the deliverable workspace, which
+ * `R8` declares `RETAINED_BY_PARTICIPATION`. The port states the consequence rather than leaving it to be
+ * discovered: *"one workspace cannot hold participating and purgeable material side by side. A host needing
+ * both declares two."* This host needs both, so it declares two — which is the retention disposition
+ * `REG-Q-066` demanded, expressed as a wiring rather than as a comment.
  */
 export interface UndertakingSandbox {
 	readonly workspace: Workspace;
+	/**
+	 * ⛔ WHERE `R7`'s RETAINED STREAMS LIVE — `PURGEABLE_AT_EXPIRY`, and NOT the deliverable.
+	 *
+	 * ⚠ IT IS NOT HANDED TO THE PRODUCER. `ProducerSessionContext` takes `workspace` and `runner`; a model gets
+	 * no name for this one, and no path it can write through the deliverable workspace reaches a sibling.
+	 */
+	readonly outputWorkspace: Workspace;
 	readonly runner: ProcessRunner;
 }
+
+/**
+ * Appended to the deliverable directory's own path to name the process-output workspace BESIDE it.
+ *
+ * ⛔ A SIBLING, NOT A SUBDIRECTORY, AND PHASE 2's `F1` IS WHY. A reserved area INSIDE a directory a step writes
+ * to is a name a step can spell — and two adversaries in a row beat that arrangement by spelling it differently
+ * from the guard (case, then the NTFS 8.3 alias) while the filesystem read both spellings as the same file. The
+ * correction recorded there is the arrangement, not a third spelling: *"A sibling has no spelling a contained
+ * path can reach — `locate` admits only paths that resolve at or under the root."* Retained build output is
+ * exactly the kind of thing a step must not be able to rewrite, so it goes where the tombstone record went.
+ *
+ * ⚠ AND IT IS A DISTINCT SUFFIX FROM THE TOMBSTONE RECORD'S, DELIBERATELY. `filesystem-workspace.ts` names its
+ * record `<dir>.jpwb-workspace-tombstones.json`; this directory is `<dir>.process-output`, and its OWN record is
+ * therefore `<dir>.process-output.jpwb-workspace-tombstones.json`. Three siblings, three names, no collision.
+ */
+const PROCESS_OUTPUT_DIRECTORY_SUFFIX = '.process-output';
 
 /** The one declaration that BUYS durability. Nothing else does, and nothing is inferred — see the header. */
 const SERVING_DECLARATION = 'server';
@@ -161,26 +192,33 @@ export function resolveUndertakingSandbox(
 			`'${undertakingId}' cannot name an Undertaking workspace directory. The owner id becomes ONE path segment under the durable root: it may not be empty, may not contain a separator, and may not resolve above the root. Refusing rather than substituting a directory: a workspace nobody chose would hold a deliverable nobody could find.`
 		);
 
-	// ⛔ NO REAL RUNNER IN THIS COMMIT, AND THE REASON IS `REG-Q-066` RATHER THAN EFFORT. A real runner captures
-	// stdout and stderr, which reopens the question closed BY NON-USE, and roadmap rule 8 requires a disclosed
-	// question to be answered in the commit that reopens it. The sponsor has ruled on the disposition (`R7`:
-	// both streams retained, both under purge); implementing it is Phase 2b. Until then the seam is complete and
-	// provably inert — the refusing default is structurally unable to report an exit code for a command that
-	// never started.
-	const runner = createRefusingProcessRunner();
-
 	if (root === undefined || root === '')
 		// ⚠ LAWFUL, AND DISCLOSED RATHER THAN SILENT — the same posture `getArtifactStore()` takes without a
 		// configured database. An IN_MEMORY workspace DECLARES that it has no directory, so a producer session
 		// is refused a working directory instead of inheriting the server's, and `planProcessRun` refuses a run
 		// instead of executing somewhere else. What is lost is durability, which the declaration states.
+		//
+		// ⛔ AND THE RUNNER STAYS THE REFUSING DEFAULT ON THIS ARM — `RULE 5`, at the one place the two arms make
+		// it expressible. A REAL runner needs a real `cwd` and there is none here; wiring one would mean either
+		// a command executing in the server's own tree or, at best, `planProcessRun` reporting a HOST WIRING
+		// ERROR that this host itself committed. The real runner is wired where and only where the workspace
+		// materialization is FILESYSTEM.
 		return {
 			workspace: createInMemoryWorkspace({
 				ownerKind: 'UNDERTAKING',
 				ownerId: undertakingId,
 				purgeability: 'RETAINED_BY_PARTICIPATION'
 			}),
-			runner
+			// ⚠ DECLARED PURGEABLE ON THIS ARM TOO, THOUGH NOTHING CAN WRITE TO IT. The class is a statement
+			// about what the workspace HOLDS, not about whether anything is holding it yet, and an in-memory
+			// output workspace that declared itself participating would be a false statement waiting for the day
+			// someone wires a runner to it.
+			outputWorkspace: createInMemoryWorkspace({
+				ownerKind: 'UNDERTAKING',
+				ownerId: undertakingId,
+				purgeability: 'PURGEABLE_AT_EXPIRY'
+			}),
+			runner: createRefusingProcessRunner()
 		};
 
 	// ⛔ A ROOT THAT RESOLVES AGAINST THE PROCESS IS REFUSED, NEVER RESOLVED. The next line would otherwise
@@ -199,6 +237,21 @@ export function resolveUndertakingSandbox(
 	// Created eagerly so the deliverable is INSPECTABLE the moment the Undertaking starts executing (`R8`),
 	// rather than only once something has been written into it. `recursive` makes this idempotent per request.
 	mkdirSync(directoryPath, { recursive: true });
+	// ⭐ THE SECOND WORKSPACE — `R7`'s, and Phase 2b's answer to `REG-Q-066`. See `PROCESS_OUTPUT_DIRECTORY_SUFFIX`
+	// for why it is a SIBLING, and `child-process-runner.ts`'s header for the disposition in full.
+	const outputDirectoryPath = `${directoryPath}${PROCESS_OUTPUT_DIRECTORY_SUFFIX}`;
+	mkdirSync(outputDirectoryPath, { recursive: true });
+	const outputWorkspace = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: undertakingId,
+		// ⛔ PURGEABLE, AND FORCED RATHER THAN CHOSEN. `R7` says stdout and stderr *"both come under purge"*;
+		// `PER-8` makes `purge` refuse on anything declared to have participated; `Purgeability` has exactly two
+		// members and coining a third is forbidden (`REG-Q-056` is OPEN). One member survives that conjunction.
+		// ⭑ AND `REG-D-050` AGREES ON THE MERITS: *"PARTICIPATION IS A PROPERTY OF USE, NOT OF KIND"*, and
+		// nothing cites a captured stream in a recorded judgement today — the evidence join is Phase 5.
+		purgeability: 'PURGEABLE_AT_EXPIRY',
+		directoryPath: outputDirectoryPath
+	});
 	return {
 		workspace: createFilesystemWorkspace({
 			ownerKind: 'UNDERTAKING',
@@ -206,11 +259,15 @@ export function resolveUndertakingSandbox(
 			// ⛔ `PER-8`, AND IT IS `R8` STATED AS A RETENTION CLASS. The deliverable must survive the
 			// undertaking, so `purge` REFUSES here. ⚠ THE COST IS REAL AND THE PORT NAMES IT: "one workspace
 			// cannot hold participating and purgeable material side by side; a host needing both declares two."
-			// `R7`'s retained stdout and stderr are purgeable-at-expiry and therefore belong in a SECOND
-			// workspace, which is Phase 2b's to declare — not a third `Purgeability` member.
+			// `R7`'s retained stdout and stderr are purgeable-at-expiry and therefore live in the SECOND
+			// workspace declared just above — not under a third `Purgeability` member.
 			purgeability: 'RETAINED_BY_PARTICIPATION',
 			directoryPath
 		}),
-		runner
+		outputWorkspace,
+		// ⭐ THE REAL RUNNER LANDS HERE AND ONLY HERE — the one arm with a real directory to run in. It is
+		// constructed against the OUTPUT workspace, and refuses to be constructed against a workspace whose
+		// bytes could never be purged, which is what makes `R7` structural rather than documentary.
+		runner: createChildProcessRunner({ outputWorkspace })
 	};
 }

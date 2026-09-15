@@ -17,6 +17,39 @@
 // `cwd` must be a real directory, and an IN_MEMORY `Workspace` has none. `planProcessRun` below is the only
 // sanctioned way to build a request, precisely so that "wire a REAL runner against an IN_MEMORY workspace" is
 // refused BEFORE anything starts rather than silently executed somewhere else.
+//
+// ── ⭐⭐ JAN-EXEC PHASE 2b — CAPTURING OUTPUT IS A RETENTION ACT, SO THE OUTCOME DECLARES ITS DISPOSITION ─────
+// `stdout` and `stderr` have been on this union since Phase 1 as plain strings, and for one phase nothing could
+// produce them: the only runner was the refusing default, whose arm has no such field. The moment a REAL runner
+// exists those two fields are BYTES A COMMAND EMITTED, and `REG-Q-066`'s stated bound — *"out-of-band logging
+// (console/stderr from `agy-cli`) was not tested. It is outside canonical state and outside this census's
+// definition of retention, but it is an unexamined escape hatch and an answer should say whether it counts"* —
+// is about exactly this surface. `SPONSOR RULING R7`: **stdout and stderr are BOTH retained, and BOTH come
+// under purge.**
+//
+// ⛔ SO `retention` IS A REQUIRED FIELD ON THE RAN ARM, NOT AN OPTIONAL ONE, AND THAT IS THE WHOLE OF ITS
+// FORCE. `REG-F-336` C-2 forbids *"content on the content plane with no record on the record plane pointing at
+// it"*. A runner that wrote a build's output somewhere and returned only the strings would create precisely
+// that orphan — bytes on disk, nothing naming them, no purge able to reach them — and it would do so silently,
+// because an outcome carrying the strings LOOKS complete. The field makes the disposition something every
+// implementation must state and every reader can see, and its refusing arm makes "not retained" a declared fact
+// rather than an absence.
+//
+// ⚠ AND THE INLINE STRINGS ARE THE TRANSIENT COPY, SAID HERE BECAUSE IT BOUNDS WHAT `retention` PROMISES. What
+// `retention` names is the DURABLE copy and the only one a purge can reach; `stdout`/`stderr` are handed to the
+// caller for this step and nothing in this seam persists them. ⛔ A later phase that PERSISTS the outcome must
+// persist the REFERENCE and not the bytes, or it mints a second retention surface under no declared class —
+// which is this same defect one plane over.
+//
+// ── ⚠ AND A TRUNCATED STREAM MUST SAY SO, BECAUSE A SILENT ONE IS A FABRICATED PASS ──────────────────────────
+// Capture is bounded — an unbounded one is a step that exhausts the host by printing — and a bounded capture
+// that does not declare its cut hands the caller a PREFIX which reads as the whole. A test result read off a
+// silently truncated stdout is a pass nothing produced: `RULE 6` arriving through the output instead of through
+// the exit code. `omittedRegions` is therefore required too, and it is DELIBERATELY the shape this repository
+// already uses for a declared omission (`OmittedRegion` on the exchange record: what, why, how many UTF-8
+// bytes, at what byte offset) rather than a `truncated: boolean` — `REG-D-057` requires the omission be
+// declared *"with enough structure to undo it"*, and a flag has none.
+import type { Purgeability } from './artifact-store.js';
 import type { Workspace } from './workspace.js';
 
 export interface ProcessRunRequest {
@@ -27,6 +60,56 @@ export interface ProcessRunRequest {
 	readonly timeoutMs: number;
 }
 
+/**
+ * A span of a captured stream that was NOT retained, declared so the capture cannot read as complete.
+ *
+ * ⭑ FIELD FOR FIELD THE EXCHANGE RECORD'S `OmittedRegion`, deliberately: this repository already models a
+ * declared omission, and re-deriving a narrower set unaided is `REG-F-314`'s recorded defect.
+ *
+ * ⚠ AND THE TYPE ITSELF IS NOT REUSED, FOR A REASON I FIRST GOT WRONG AND THEN MEASURED. The plausible reason —
+ * "this package cannot depend on `rph-contracts`" — is FALSE: `rph-ports/package.json` declares that dependency
+ * and `.dependency-cruiser.cjs` says outright *"rph-ports declares interfaces only; it depends solely on
+ * rph-contracts."* The real reason is narrower and harder: `OmittedRegionSchema.role` is a CLOSED enum of
+ * model-exchange roles (`SYSTEM_PREAMBLE` … `MODEL_ANSWER`, `OTHER`) with no member for a process stream, and
+ * it is GENERATED from `vocab/m1-object-fields.json` — *"do not edit by hand"*. Reusing it would therefore mean
+ * either recording every cut as `OTHER`, losing WHICH STREAM was truncated, or a vocab change plus a
+ * regeneration plus a ratification, which is Phase 4 Part B's act and not this one's. So the SHAPE is adopted
+ * and the type is not, and that debt is stated here rather than hidden behind an import.
+ *
+ * ⚠ BOTH NUMBERS ARE UTF-8 BYTES, NOT STRING LENGTHS, for the reason `OmittedRegion` states: *"They differ the
+ * moment a reply is not ASCII, and a reconstruction that mixes the two units silently corrupts every
+ * non-English reply."* A bound expressed in bytes and reported in characters is a fabricated measurement.
+ */
+export interface ProcessOutputOmission {
+	readonly stream: 'STDOUT' | 'STDERR';
+	readonly reason: string;
+	/** UTF-8 bytes removed. */
+	readonly byteSize: number;
+	/** Where the removal began, as a UTF-8 byte offset into the stream the process actually emitted. */
+	readonly byteOffset: number;
+}
+
+/**
+ * Where a run's captured output was retained, or a stated reason it was not.
+ *
+ * ⛔ A UNION FOR THE THIRD TIME IN THIS FILE, AND FOR THE SAME REASON: a shape with optional paths would let a
+ * caller read `stdoutPath` off a capture that was never written, and the value it would read is the one field
+ * nobody could supply. ⚠ `purgeability` is carried rather than assumed because it is the fact `R7` turns on —
+ * a reader must be able to see that these bytes CAN be destroyed without going and finding the workspace.
+ */
+export type ProcessOutputRetention =
+	| {
+			readonly retained: true;
+			/** The `Workspace.ownerId` holding the bytes — half of what a purge needs to reach them. */
+			readonly workspaceOwnerId: string;
+			/** ⚠ `R7` REQUIRES THIS TO BE PURGEABLE. A workspace whose `purge` refuses cannot satisfy the ruling. */
+			readonly purgeability: Purgeability;
+			/** Workspace-relative, and the other half of what a purge needs. */
+			readonly stdoutPath: string;
+			readonly stderrPath: string;
+	  }
+	| { readonly retained: false; readonly notRetainedBecause: string };
+
 export type ProcessRunOutcome =
 	| {
 			readonly ran: true;
@@ -34,11 +117,34 @@ export type ProcessRunOutcome =
 			readonly exitCode: number | null;
 			/** ⚠ OBSERVED, NEVER INFERRED — see the header. */
 			readonly timedOut: boolean;
+			/** ⚠ THE TRANSIENT COPY. The durable one is `retention`'s, and only that one can be purged. */
 			readonly stdout: string;
 			readonly stderr: string;
+			/** ⛔ REQUIRED, AND EMPTY MEANS "NOTHING WAS CUT" — never "nobody looked". See the header. */
+			readonly omittedRegions: readonly ProcessOutputOmission[];
+			/** ⛔ REQUIRED — `R7`, and `REG-F-336` C-2's orphan. See the header. */
+			readonly retention: ProcessOutputRetention;
 			readonly durationMs: number;
 	  }
 	| { readonly ran: false; readonly refusedBecause: string };
+
+/**
+ * The workspace's own directory NAME, which is what a refusal may say about WHERE.
+ *
+ * ⭑ EXPORTED FROM THE PORT FOR THE REASON `containedWorkspacePath` IS: *"the invariant that makes a seam lawful
+ * belongs WITH the interface, so a second adapter cannot quietly implement a weaker one."* `refusedBecause` is
+ * defined here as a fact a step RECORDS — so it travels into a governed record and into a model's context — and
+ * the host's filesystem layout belongs in neither. That rule was stated in the refusing default and applied in
+ * exactly one place; Phase 2b adds the second implementation of this port, which is precisely when a
+ * one-adapter rule becomes a one-adapter rule that the other adapter does not follow.
+ *
+ * ⚠ THE LAST SEGMENT, NOT A TRUNCATION: it is the directory the host DERIVED from the owner id, so it names the
+ * workspace to anyone who has to act on the refusal. A path with no segments at all (a filesystem root) has no
+ * name, so the fallback is the path itself — which, being a root, discloses nothing about the layout above it.
+ */
+export function workspaceDirectoryName(cwd: string): string {
+	return cwd.split(/[\\/]+/).filter((segment) => segment !== '').at(-1) ?? cwd;
+}
 
 export interface ProcessRunner {
 	/**
