@@ -954,12 +954,21 @@ export const actions: Actions = {
 			// because `STA-8` says authorized, not merely requested.
 			...(binding
 				? ([
-						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding],
+						// ⭑ `binding.request` AND NOT `binding`. JAN-EXEC Phase 3 gave the binding a second field — the
+						// REQUIRES/USES needs the request was derived FROM — and `RequestRuntimeBindingPayloadSchema` is a
+						// `z.strictObject`, so dispatching the whole object is REFUSED by the command bus. The request half
+						// IS the payload, proved at compile time in `step-binding.ts`, so there is no projection to write.
+						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding.request],
 						[
 							'AuthorizeRuntimeBinding',
 							'RUNTIME_BINDING',
 							bindingId,
-							{ grantedCapabilities: [...binding.requestedCapabilities] }
+							// ⚠ THE DEMO GRANTS EVERYTHING THE STEP ASKED FOR, AND THAT IS A DEMO POSTURE RATHER THAN A RULE.
+							// `grantedWithinRequest` forbids granting MORE; nothing obliges granting ALL, and the precision
+							// control this phase turns on — `file-system` granted, `process-execution` withheld — is exactly a
+							// narrower grant. This surface has no authorizer UI to express one, so it authorizes the full
+							// request and the narrowing is driven at the seam instead.
+							{ grantedCapabilities: [...binding.request.requestedCapabilities] }
 						]
 					] satisfies Step[])
 				: []),
@@ -1067,13 +1076,34 @@ export const actions: Actions = {
 				return fail(400, { error: `The model invocation did not run: ${why}` });
 			}
 
-			/** The capabilities the binding CURRENTLY grants, from the store — never the request. */
-			const grantsFor = (id: string): string[] =>
-				(
-					(listByType(getEngine(), 'RUNTIME_BINDING')
-						.map((b) => b.state as Record<string, unknown>)
-						.find((b) => b.id === id)?.grantedCapabilities ?? []) as { capability?: unknown }[]
-				).map((c) => String(c.capability ?? ''));
+			/**
+			 * What the binding CURRENTLY says, from the store — never the request. Both halves, together.
+			 *
+			 * ⛔⛔ `W-1` — THE PROJECTION IS THE KERNEL'S, NOT A FOURTH SPELLING OF IT. This used to be
+			 * `.map((c) => String(c.capability ?? ''))`, which is a FOURTH projection of `grantedCapabilities`
+			 * and the only one that does not use `capabilityIdentities` — whose own docblock says *"ONE COPY,
+			 * because there are now three readers, and a projection duplicated per reader is how two of them come
+			 * to disagree."* ⚠ AND THEY DID DISAGREE: the kernel's DROPS a non-string element (fail-closed, an
+			 * unreadable grant grants nothing), while `String(c.capability ?? '')` COERCED one into the empty
+			 * string and kept it — an entry no authorizer wrote, in the list a tool surface is minted from.
+			 *
+			 * ⛔⛔ `B-1` — AND THE STATUS COMES BACK WITH IT, because a capability list is NOT an authorization.
+			 * `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and DELIBERATELY leaves
+			 * `grantedCapabilities` intact (its handler says so: the revocation event is derived from the set the
+			 * binding held). So every reader that took only the list saw the same answer before and after a
+			 * revocation, and §22.1's *"Revoked bindings cannot be used for new attempts"* — RATIFIED — was
+			 * enforced on the START arrow and nowhere per try. Returning the pair from ONE read is what stops a
+			 * caller holding a grant without the fact that says whether it still stands.
+			 */
+			const currentBinding = (id: string): { status: string; capabilities: string[] } => {
+				const state = listByType(getEngine(), 'RUNTIME_BINDING')
+					.map((b) => b.state as Record<string, unknown>)
+					.find((b) => b.id === id);
+				return {
+					status: typeof state?.authorizationStatus === 'string' ? state.authorizationStatus : '',
+					capabilities: capabilityIdentities(state?.grantedCapabilities)
+				};
+			};
 
 			// ── ⭐⭐ JAN-EXEC PHASE 2 — THE PRODUCER IS OPENED IN THE UNDERTAKING'S WORKSPACE ────────
 			//
@@ -1085,11 +1115,53 @@ export const actions: Actions = {
 			// does not need to: `undertakingId` is on the flattened PWU, which is also the field `listPwus` keys on —
 			// so the workspace belongs to the same object the work unit does, and a second step in a new session lands
 			// in the same directory as the first.
+			//
+			// ── ⭐⭐ JAN-EXEC PHASE 3 — AND THE STEP'S GRANT DECIDES WHAT THE MODEL CAN DO IN IT ──────────────
+			//
+			// `grantedCapabilities` is read from the STORE, not from the request, exactly as the per-try refusal
+			// below reads it: the tools minted for this session are the ones the RUNTIME_BINDING currently
+			// grants, and an ungranted tool is never minted, so the model is never told it exists.
+			//
+			// ── ⛔⛔ `B-1c` — THE DISCLOSURE THAT USED TO STAND HERE NAMED A REFUSAL THAT DID NOT EXIST ────────
+			//
+			// It read: *"a capability revoked between tries refuses the next try when the step REQUIRES it
+			// (`stepCapabilityRefusal`, below) — but a revoked capability the step merely USES leaves its tool
+			// minted for the rest of this held session."* **DRIVEN: IT DID NOT, FOR `REQUIRES` OR FOR `USES`.**
+			// And the sentence was wrong in a second way that is worse than the first: ⛔ **"a capability revoked
+			// between tries" IS NOT AN EXPRESSIBLE ACT.** `RevokeRuntimeCapability` takes NO capability list — it
+			// revokes the whole BINDING — and `grantIsMonotone` refuses an authorization that omits a capability
+			// already granted. There is no command in this engine that removes one capability from a live
+			// binding, so the disclosure described a mechanism, a refusal and a residual that all had no subject.
+			//
+			// ⭐ **WHAT IS TRUE NOW, AND IT IS THE `B-1` FIX RATHER THAN A REWORDING.** Revocation acts on the
+			// BINDING, and both readers now take its STATUS:
+			//   · BEFORE the session opens — `mintExecutionTools` mints NOTHING for a binding that cannot back a
+			//     new attempt, so a revoked binding gets a model with no hands at all;
+			//   · BETWEEN tries — `stepCapabilityRefusal` refuses the NEXT TRY outright, for `REQUIRES` and
+			//     `USES` alike, because the refusal is on the binding and not on one capability.
+			//
+			// ⚠ **AND THE BOUND THAT GENUINELY REMAINS, STATED WITHOUT THE PART THAT WAS FALSE.** The surface is
+			// minted ONCE, when the session opens, while the status and grant are re-read on EVERY try — so a
+			// binding revoked mid-unit leaves its already-minted tools ON THE HELD SESSION. What that costs is
+			// bounded by the refusal above: no further TURN is taken, so the model is never asked anything again
+			// and never gets to call them. The session is held on sponsor authority (`JAN-EXECSESS`), so "a
+			// session per try" is not available. ⭑ Pi exposes `AgentSession.setActiveToolsByName`, which can only
+			// NARROW a registry this host already built — that is the seam a later increment would use, and
+			// naming it keeps this a disclosed bound rather than an unknown one.
 			let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
 			try {
-				producer = await getExecutionSession()(
-					resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string))
-				);
+				const current = binding ? currentBinding(bindingId) : undefined;
+				producer = await getExecutionSession()({
+					...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
+					grantedCapabilities: current?.capabilities ?? [],
+					// ⚠ `''` FOR A STEP THAT NAMES NO BINDING, AND WHAT MAKES THAT SAFE IS THE **LIST**, NOT THIS
+					// FIELD — said because the plausible reading is the other way round. `canReuseBindingForNewAttempt`
+					// refuses REVOKED and DENIED and nothing else, so an empty status passes it; what mints nothing
+					// is the empty capability set beside it. ⛔ The same holds for a binding id that no longer
+					// resolves: both halves come back empty from ONE read, so the two cannot disagree about which
+					// case this is.
+					bindingAuthorizationStatus: current?.status ?? ''
+				});
 			} catch (e) {
 				// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
 				// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
@@ -1100,6 +1172,9 @@ export const actions: Actions = {
 			}
 			try {
 				for (let attempt = 1; ; attempt++) {
+					// ⛔ ONE READ PER TRY, HELD IN ONE VALUE. Reading the status and the grant through two calls
+					// would reinstate, at the call site, the very split `currentBinding` exists to close.
+					const onThisTry = binding ? currentBinding(bindingId) : undefined;
 					const tryOutcome = await runModelInvocationStep({
 						subject: {
 							id: pwuId,
@@ -1129,12 +1204,19 @@ export const actions: Actions = {
 						...(pwuType?.contextSpecification
 							? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
 							: {}),
-						// ⭑ EG-03 — the binding's CURRENT grant, read from the store on EVERY try. Revocation
-						// between tries changes the answer, which is the whole reason this is the stored grant
-						// and not the request echoed back at itself.
-						binding: binding
-							? { kind: 'BOUND', request: binding, granted: grantsFor(bindingId) }
-							: { kind: 'NONE' }
+						// ⭑ EG-03 — the binding's CURRENT status AND grant, read from the store on EVERY try.
+						// ⛔ `B-1`: BOTH, from ONE read. Revocation between tries changes the STATUS and leaves the
+						// GRANT untouched — `RevokeRuntimeCapability` does not clear it — so a caller passing the
+						// grant alone passed a value that could not change and called it a check.
+						binding:
+							binding && onThisTry
+								? {
+										kind: 'BOUND',
+										binding,
+										granted: onThisTry.capabilities,
+										authorizationStatus: onThisTry.status
+									}
+								: { kind: 'NONE' }
 					});
 
 					if (!tryOutcome.ran) {

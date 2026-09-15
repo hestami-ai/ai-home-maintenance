@@ -164,7 +164,7 @@ path-named. It needs the same trick one level down: **one durable root, one subd
 id, resolved per request rather than held in process.** The spike held the object in memory, which is exactly what
 a SvelteKit form action cannot do across requests.
 
-### 4.3 Capability → tools: grant by ABSENCE
+### 4.3 Capability → tools: grant by ABSENCE · ⭐ LANDED 2026-09-15 (Phase 3)
 
 **A tool the grant does not authorize is never minted, so the model is never told it exists.** There is no call to
 intercept and no refusal path to get wrong. A capability check *inside* a tool handed to the model anyway is
@@ -173,11 +173,28 @@ strictly weaker: it depends on the check firing, and it advertises the privilege
 Proven live, with the precision half this repository has historically not tested:
 
 ```
-granted ["network"] only          -> step REFUSED · model calls 0 · exchange records 0
+~~granted ["network"] only        -> step REFUSED · model calls 0 · exchange records 0~~   ⛔ SEE BELOW
 granted ["network","file-system"] -> minted ["write_file"] withheld ["run_command"]
                                      run_command calls = 0 · write_file calls = 1 · file on disk
 granted ["file"] / ["file-syste"] / ["file-system-extra"] / ["FILE-SYSTEM"] -> minted []
 ```
+
+⛔ **THE FIRST ROW DID NOT SURVIVE THE RULING THIS VERY SECTION MAKES, AND IT IS STRUCK RATHER THAN QUIETLY
+CORRECTED.** The spike refused a `["network"]`-only grant because it treated EVERY requested capability as
+REQUIRED — which is exactly the step-level reading the paragraph below says must NOT be chosen. Landing the
+REQUIRES/USES split therefore had to change that row: with `network` granted, the step it REQUIRES is
+authorized, so it **RUNS** — with **no tools minted at all**, because the two capabilities that authorise tools
+were not granted. What refuses is a grant that omits `network` itself.
+
+```
+granted [] / any grant WITHOUT "network" -> step REFUSED · model calls 0 · exchange records 0
+granted ["network"] only                 -> step RUNS · minted [] · the model is given no hands
+```
+
+⚠ **AND THE SPIKE'S ROW WAS THE STRICTER ONE, WHICH IS WHY IT LOOKED RIGHT.** A table that refuses more is easy
+to read as the safer table; here it was the one that quietly overturned the ratified rule's own wording. Both
+arrangements are asserted in `step-binding.test.ts` and `run-model-step.test.ts`, and `P3-e` is the mutant that
+restores the spike's behaviour and reddens.
 
 Exact membership, not prefix — it reuses the kernel's own `capabilityAuthorized`, the export a prior programme
 proved exact. Containment refuses `../`, `a/../../`, absolute and drive-qualified paths.
@@ -189,6 +206,90 @@ keeps working with a narrower tool set and says so (`"commandRun":false,"missing
 ⚠ **Consequence for the plan:** `stepBindingFor` currently hardcodes `requestedCapabilities: [{capability:'network'}]`
 for every model step. It must request **per step type**, and the design must distinguish capabilities a step
 REQUIRES (ungranted ⇒ refuse the step) from those it can USE (ungranted ⇒ do not mint the tool).
+
+### 4.3a ⭐ AS LANDED — what the spike promised, measured against a real model
+
+⚠ **THE SPIKE'S TABLE HELD IN EVERY ROW BUT ITS FIRST, AND THAT ROW WAS STRUCK ABOVE** — it encoded the
+step-level reading this design rules against. What was re-driven through the PRODUCTION seam against
+`openai-codex/gpt-5.6-sol`:
+
+```
+granted ["network","file-system","process-execution"] -> minted ["write_file","run_command"]
+                                                         greet.js 38 bytes on disk AFTER close
+                                                         run_command: exit 0, stdout "hello from the sandbox"
+                                                         record: OBSERVED, 2 calls, both MINTED_BY_HOST
+granted ["network","file-system"]                     -> minted ["write_file"]  run_command WITHHELD
+                                                         run_command calls = 0 · file STILL written
+                                                         the model's own limitation: "No shell or Node
+                                                         execution tool was available."
+granted ["file"] / ["file-syste"] / ["file-system-extra"] / ["FILE-SYSTEM"] / [" file-system"] -> minted []
+```
+
+⭐ **THE SECOND ROW IS THE ONE THAT MATTERS, AND IT PRODUCED ITS OWN CORROBORATION.** The precision control's
+sibling `…​.process-output/captures/` is EMPTY on disk while the full grant's holds three capture directories —
+so *"no `run_command` call was observed"* is confirmed by *"no process output exists"*, a fact none of this
+phase's instruments produced.
+
+⛔ **AND THE RULING `R11` LEFT OPEN IS ANSWERED BY REMOVING ITS SUBJECT.** A host may not mint a name the record
+plane cannot hold; `mintExecutionTools` validates the WHOLE catalog against `RecordPlaneNameSchema` and REFUSES
+before a session exists. The three candidates `R11` recorded all act at RECORD time, after a model has been told
+the tool exists and a call has been made; this acts at the one moment when the only party involved is the host.
+Full reasoning, and the two disclosed bounds (a surface minted once per held session; the demo authorizing its
+full request), in ROADMAP §5a.
+
+⚠ **AND IT OPENED A RETENTION SURFACE THE REPOSITORY'S OWN GATE CAUGHT** — `run_command` hands both streams to
+the model, so `REG-Q-066`'s stderr gate reddened and the disposition had to be written in the same commit. The
+class follows `REG-D-050` (participation is a property of USE); the bytes land on the CONTENT plane, which
+`PER-9` gives a removal path; and no byte reaches the RECORD plane, because `ObservedToolCall` has no field that
+could hold one. The residual — a build echoing its environment, removable only by an E-6 redaction nothing here
+performs — is stated rather than filtered, because filtering is a normaliser over arbitrary bytes.
+
+### 4.3b ⭐⭐ RULED (`R12` / `R13`, sponsor, 2026-09-15) — the capabilities are NOT independent, and what granting `process-execution` actually confers
+
+⛔ **`R12`, VERBATIM.** *"`process-execution` SUBSUMES `file-system` AND `network`. Driven: with `file-system`
+WITHHELD the model got only `run_command` and wrote a file outside the workspace anyway, because A CHILD PROCESS
+IS NOT CONFINED BY ANYTHING USERSPACE CAN ASSERT. The three capabilities are NOT independent and the vocabulary
+currently presents them as if they were."*
+
+⛔ **`R13`, VERBATIM.** *"DO NOT REFUSE THE INTERPRETER; RECORD THE FACT. … Refusing `cmd.exe` while permitting
+`node -e` is THEATRE, and worse, a later reader would mistake the refusal for a containment property. Record
+instead that `process-execution` means ARBITRARY CODE AS THE SERVER USER, and that `R9`'s deployment tier is the
+only claimed boundary."*
+
+⭐ **WHAT THIS CHANGES IS WHAT §4.3 MAY BE READ AS CLAIMING.** §4.3's table is still correct — every row of it was
+re-driven — but it is a table about **THE TOOL SURFACE THIS HOST OFFERS**, not about what the model can reach:
+
+| grant | what §4.3 says, and it is true | what `R12` adds, and it is also true |
+| --- | --- | --- |
+| `["network","file-system"]` | `run_command` WITHHELD; run_command calls = 0 | the model genuinely cannot start a process — **this narrowing bounds something** |
+| `["network","process-execution"]` | `write_file` WITHHELD; write_file calls = 0 | **the model writes files anyway, outside the workspace.** A tool was withheld; no ability was |
+| `["network"]` | nothing minted; the step RUNS with no hands | unchanged — with no child, userspace assertions are all there is |
+
+⭑ **SO THE ONE NARROWING THAT BOUNDS ANYTHING IS *"may write, may not run"*, AND THAT IS WHY `process-execution`
+STAYS ITS OWN CAPABILITY** rather than being collapsed into `file-system` — §6 item 1's reasoning survives the
+ruling, for a reason the ruling supplies. ⛔ **WHAT IS NOW SAID TO BE INEXPRESSIBLE IS THE CONVERSE:** *"may run,
+may not write"* is not a state this or any userspace grant can produce.
+
+⛔ **NO BLOCKLIST WAS ADDED, AND THE DEFERRAL THAT ASKED FOR ONE IS CLOSED BY THE RULING RATHER THAN BY CODE.**
+`child-process-runner.ts` already recorded *"a model naming `cmd.exe` or `powershell.exe` AS THE PROGRAM gets a
+command interpreter, because it asked for one. That is an argv policy belonging to the phase that lets a model
+choose an argv"* — Phase 3 is that phase, and the answer is the FACT rather than a refusal. ⚠ **The `.bat`/`.cmd`
+refusal is untouched and is NOT that blocklist:** it exists because Win32 re-parses a batch command line so that
+an ARGUMENT becomes a command, which is a defect in the no-shell guarantee this code MAKES.
+
+**WHERE IT IS RECORDED**, because a ruling that lives only in a design document is one nothing can check:
+
+- `STEP_CAPABILITY_VOCABULARY` — every note, plus a **`subsumes` field** carrying the containment as DATA, so a
+  later entry that forgets its relation to the others is a visible omission. Asserted in `step-binding.test.ts`.
+- `enforcement-register.ts['RPH-EXE-004']` — the `why` now narrows *"granting by absence bounds WHICH KINDS of
+  operation a step may perform"* to the host's tool surface, and names `R9`'s tier as the only claimed boundary.
+- `execution-tool-surface.ts` and `child-process-runner.ts` headers, where the tool is minted and where the
+  deferral was originally written down.
+
+⚠ **AND THE HONEST CONSEQUENCE FOR THIS DESIGN: `run_command` IS THE DEPLOYMENT DECISION.** §4.8 rules that the
+security boundary is the deployment environment's; `R12`/`R13` say which grant makes that boundary the ONLY one.
+A deployment that mints `run_command` without OS-level isolation has no containment, and nothing in this
+repository can give it any.
 
 ### 4.4 The evidence join — a second floor run, over the evidence
 
@@ -301,6 +402,23 @@ driven unprivileged on this host and both are carried by DISCLOSURE PROBES in th
 change that closes one reddens a test and forces the disclosure to be rewritten rather than quietly outliving
 it.
 
+⛔⛔ **AND `R12` CHANGED THE PREMISE OF ONE OF THOSE DISCLOSURES, WHICH IS A DIFFERENT EVENT FROM THE BEHAVIOUR
+CHANGING (`B-6`).** The hard link was disclosed as an exposure to *a party with filesystem access* — which reads
+as a party OTHER than the step, something already on the host. Since Phase 3 **the executing model IS that
+party**: `run_command` is arbitrary code as the server user, so the model plants the link itself, writes through
+the CONTAINED `write_file`, and `list()` reports another undertaking's file as this workspace's own entry. ⭐ The
+WRITE is now a stated property and this adapter cannot take it back. **The false INVENTORY is not a stated
+property of anything** — a workspace reporting a file it does not exclusively hold is a RECORD-plane defect
+regardless of who could reach it — so `WorkspaceEntry` gained **`nameCount`**, the filesystem's own count of the
+names holding those bytes. ⚠ It reports SHARING and never LOCATION, and the suite proves that limit rather than
+asserting it: a lawful second link INSIDE the workspace reports the same `2`.
+
+⚠ **AND THE TWO TOOLS ONE MODEL HOLDS DISAGREE ABOUT THE ROOT SWAP (`W-6`), WHICH NOBODY HAD TO STATE BEFORE
+PHASE 3.** `write_file` WRITES through a swapped root while `run_command` REFUSES — the asymmetry §4f explains,
+and a property rather than an effort gap. Both halves were disclosed separately and both are still true; what was
+missing is that ONE party now holds both, so the joint statement lives in `execution-tool-surface.ts` where that
+party's surface is minted: **writes succeed, commands refuse.**
+
 ⛔ **AND THE ROOT SWAP WAS THEN DRIVEN THROUGH THE `ProcessRunner`, WHICH IS A DIFFERENT SEAM AND A DIFFERENT
 ANSWER (`B11`, §4f).** A junction standing where the deliverable directory was made a LAWFUL `cwd` execute a
 command in the tree it pointed at. ⭑ THE RUNNER CAN CLOSE THIS FOR ITS OWN ACT AND THE WORKSPACE CANNOT CLOSE IT
@@ -345,6 +463,11 @@ adversary, which is what §4.8 exists to end.
    is recorded as DEFERRED TO THE PLATFORM POLICY PLANE. The spike coined `process-execution`. ⚠ Collapsing it
    into `file-system` would be worse than coining: starting a process is strictly larger than writing a file, and
    merging them makes the grant unable to express the distinction the live precision control turned on.
+   ⭐ **`R12`/`R13` (§4.3b) CONFIRM THE SHAPE AND DO NOT RATIFY THE NAME, and the difference is worth keeping.**
+   The sponsor ruled on what granting it MEANS — arbitrary code as the server user, subsuming `file-system` and
+   `network` — and that reasoning is what makes the separate capability worth having (*"may write, may not run"*
+   is the one narrowing that bounds anything). The NAME remains an in-process authoring act under `G-1`, exactly
+   as `CapabilityRequestSchema`'s deliberate `z.string()` allows; ratification is still owed.
 2. ~~**REG-Q-066's retention disposition**, re-answered per R7.~~ ⭐ **DELIVERED 2026-09-14 (Phase 2b).**
    ⚠ `REG-Q-066`'s three readings of ASR-11's raw validator output stay OPEN and stay the sponsor's.
 3. **`pol_test_adequacy`** (R4, second half), with its conformance rule amended in the same act.
@@ -358,7 +481,18 @@ adversary, which is what §4.8 exists to end.
 - **A working-set budget.** The spike's 64KB capture cap is arbitrary and unratified.
 - **The replay producer (R2).** A fourth `ProducerSession` answering from a committed recording — blocked behind
   B4's fidelity fix, because a recording of the wrong bytes replays a different run.
-- **Whether `stepCapabilityRefusal`'s step-level refusal should become REQUIRES/USES** (§4.3).
+- ~~**Whether `stepCapabilityRefusal`'s step-level refusal should become REQUIRES/USES** (§4.3).~~ ⭐ **SETTLED
+  AND LANDED** — REQUIRES refuses, USES withholds the tool (`P3-e` is the mutant).
+- **A per-step resource budget** (`W-2`, ROADMAP §5b). No bound exists on call count, on total wall clock, or on
+  bytes `write_file` accepts — driven: **40 MiB written in 48 ms**, 25 consecutive calls all accepted, two 1.5 s
+  commands costing 3144 ms because the timeout is per CALL. Under `R12` this is a RESOURCE question, not a
+  containment one, and `RuntimeBinding.sandboxPolicy` — where a quota would live — is DEFERRED TO THE PLATFORM
+  POLICY PLANE.
+- **Whether a sandboxed step's child inherits the server's environment** (`W-3`, ROADMAP §5b). Driven: a success
+  summary carried `USERNAME`, `USERPROFILE`, `PATH` and `TEMP` into the model's context and into the E-1
+  composite, while the REFUSAL on the same tool discloses ONE path segment by design. ⚠ Under `R12` withholding
+  it from the RESULT bounds the RECORD and not the model, so it is a RETENTION question whose load-bearing
+  dependency is **E-6**, which has no producer.
 - **e2e status.** Playwright was not run against the spike. Unknown, not assumed green.
 
 

@@ -10,12 +10,16 @@ import { resolve as resolvePath } from 'node:path';
 import {
 	oneShotSession,
 	producerWorkingDirectory,
-	type ProducerSessionContext
+	type ProducerSessionPorts
 } from './producer-session.js';
 
+// ⚠ `ProducerSessionPorts`, NOT `ProducerSessionContext`. JAN-EXEC Phase 3 widened the CONTEXT to carry the
+// live ports and the step's grant; the DECLARATIONS this function reads are unchanged, and arranging a case
+// from the narrower type is what keeps that a fact rather than a claim — a case that had to stand up a whole
+// `Workspace` to ask "where does this run?" would no longer be testing the same question.
 const workspace = (
-	over: Partial<ProducerSessionContext['workspace']> = {}
-): ProducerSessionContext['workspace'] => ({
+	over: Partial<ProducerSessionPorts['workspace']> = {}
+): ProducerSessionPorts['workspace'] => ({
 	ownerId: 'und_01ARZ3NDEKTSV4RRFFQ69G5PAA',
 	ownerKind: 'UNDERTAKING',
 	materialization: 'FILESYSTEM',

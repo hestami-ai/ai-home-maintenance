@@ -85,7 +85,12 @@ export function createInMemoryWorkspace(input: InMemoryWorkspaceInput): Workspac
 				.map(([path, held]): WorkspaceEntry => ({
 					path,
 					byteSize: held.byteSize,
-					purged: held.purged
+					purged: held.purged,
+					// ⭑ ONE, AND IT IS A MEASUREMENT RATHER THAN A DEFAULT. This workspace IS a Map: a path is a
+					// key, a key holds one value, and no caller can create a second name for it. An
+					// implementation that cannot be aliased is entitled to say so — what would be dishonest is a
+					// FILESYSTEM adapter hard-coding the same 1 without asking the filesystem (`B-6`).
+					nameCount: 1
 				}))
 				.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 		},

@@ -91,11 +91,27 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		expect(bind.executionStepId, 'the binding must name the step it authorizes').toBe(
 			(snap.executionPlans[0]!.state.steps as { id: string }[])[0]!.id
 		);
-		// ⛔ THE CAPABILITY IS THE RATIFIED ONE. `RPH-EXE-004` names `network` in its own example; nothing here
-		// is coined. THE MUTANT: grant a capability the request did not ask for — §22.1's
-		// *"requested capability is not granted capability"* runs the other way, but an unrequested grant is
-		// privilege expansion without an authorization event.
-		expect(bind.grantedCapabilities).toEqual([{ capability: 'network' }]);
+		// ⛔ THE GRANT IS EXACTLY THE REQUEST, AND NOT ONE CAPABILITY MORE. §22.1: an unrequested grant is
+		// privilege expansion without an authorization event, which `grantedWithinRequest` refuses. THE MUTANT:
+		// authorize a capability the request did not ask for.
+		//
+		// ⭐ THIS USED TO READ `toEqual([{ capability: 'network' }])` AND IT WENT RED ON JAN-EXEC PHASE 3, WHICH
+		// IS THE ASSERTION WORKING. The request is no longer one hardcoded capability: it is DERIVED from the
+		// step type's REQUIRES/USES table, because Phase 3 mints the model a file-writing and a
+		// command-running tool and a binding that never asked for them would be granting privilege nobody
+		// requested. ⚠ Re-typing the new list here would be the weaker repair — a literal asserts against a
+		// table this spec invented, so a needs table that drifted from production would stay green. The
+		// assertion is therefore GRANTED === REQUESTED, on the live objects.
+		expect(bind.grantedCapabilities).toEqual(bind.requestedCapabilities);
+		// ⭑ `network` IS STILL THERE BY NAME, because it is the one capability the ratified `RPH-EXE-004`
+		// example supplies and the one this step REQUIRES — a derivation-only assertion would pass on an empty
+		// request, which `RequestRuntimeBinding` refuses (N-20) but this spec should not depend on.
+		expect(bind.requestedCapabilities).toContainEqual({ capability: 'network' });
+		// ⛔ AND `process-execution` IS DISTINCT FROM `file-system`, ON THE WIRE. Starting a process is strictly
+		// larger than writing a file; collapsed into one capability the grant could not express "may write, may
+		// not run", which is the narrowest useful authorization this seam has.
+		expect(bind.requestedCapabilities).toContainEqual({ capability: 'file-system' });
+		expect(bind.requestedCapabilities).toContainEqual({ capability: 'process-execution' });
 
 		// ⭑ THE FIRST RECORD EVER WRITTEN TO THE EXECUTION PLANE. `plane` has carried an `EXECUTION` member
 		// since REG-D-055 and every record in the system said ASSURANCE or AUTHORING.

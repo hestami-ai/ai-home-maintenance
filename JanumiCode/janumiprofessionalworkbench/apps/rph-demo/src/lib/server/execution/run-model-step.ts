@@ -30,7 +30,7 @@ import {
 	splitExecutionEnvelope
 } from './execution-contract.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
-import { stepCapabilityRefusal, type StepBindingRequest } from './step-binding.js';
+import { stepCapabilityRefusal, type StepBinding } from './step-binding.js';
 import type { ProducerSession } from './producer-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
@@ -99,13 +99,36 @@ export interface RunModelStepInput {
 	readonly binding: StepBindingFacts;
 }
 
-/** What the caller knows about this step's binding. ⛔ `NONE` must be SAID, never left out. */
+/**
+ * What the caller knows about this step's binding. ⛔ `NONE` must be SAID, never left out.
+ *
+ * ⛔ `binding` IS THE WHOLE `StepBinding` — the wire request AND the REQUIRES/USES needs it was derived from
+ * — rather than the request alone. JAN-EXEC Phase 3 made the difference load-bearing: the refusal must fire on
+ * an ungranted REQUIRES and must NOT fire on an ungranted USES, and `requestedCapabilities` cannot tell the two
+ * apart. A caller asked to supply the split separately would be asked to re-derive a fact the step type owns,
+ * and the plausible wrong answer (everything REQUIRES) silently turns the degradation this phase exists to
+ * provide back into a refusal.
+ */
 export type StepBindingFacts =
 	| { readonly kind: 'NONE' }
 	| {
 			readonly kind: 'BOUND';
-			readonly request: StepBindingRequest;
+			readonly binding: StepBinding;
 			readonly granted: readonly string[];
+			/**
+			 * ⭐⭐ `B-1` — THE BINDING'S CURRENT `authorizationStatus`, AND IT IS A SEPARATE FACT FROM `granted`.
+			 *
+			 * ⛔ DRIVEN: `RevokeRuntimeCapability` advances the status to REVOKED and **deliberately does not
+			 * clear** `grantedCapabilities`, so `granted` is byte-identical before and after a revocation. Every
+			 * reader in the Phase 3 path took the list and never the status, so §22.1's *"Revoked bindings cannot
+			 * be used for new attempts"* — a RATIFIED rule — was enforced on the START arrow (`RPH-EXE-003`) and
+			 * nowhere per TRY. This loop takes several tries against ONE already-started step.
+			 *
+			 * ⛔ REQUIRED ON THE `BOUND` ARM, never optional: a caller that holds a binding holds its status, and
+			 * an optional field would make *"read the grant and skip the revocation question"* expressible by
+			 * omission — the dodge shape this type's own explicit `NONE` member exists to refuse one level up.
+			 */
+			readonly authorizationStatus: string;
 	  };
 
 /**
@@ -212,7 +235,13 @@ export async function runModelInvocationStep(
 	// Platform's and stays deferred. This refuses to BEGIN an invocation the binding does not authorise, which
 	// is step governance and JPWB's.
 	if (input.binding.kind === 'BOUND') {
-		const refusal = stepCapabilityRefusal(input.binding.request, input.binding.granted);
+		// ⛔ `B-1` — THE STATUS TRAVELS WITH THE GRANT, because a REVOKED binding still LISTS what it granted and
+		// a list is not an authorization. §22.1: revoked bindings cannot be used for new attempts.
+		const refusal = stepCapabilityRefusal(
+			input.binding.binding,
+			input.binding.granted,
+			input.binding.authorizationStatus
+		);
 		if (refusal) return { ran: false, refusedBecause: refusal };
 	}
 
@@ -308,14 +337,22 @@ export async function runModelInvocationStep(
 					'failed before any answer arrived, so there was nothing to separate out of an answer span and ' +
 					'nothing to store. The failure is quoted verbatim in this record’s parseOutcome detail.'
 			},
-			// ⛔ THE CALL FAILED, SO NO ADAPTER ANSWERED AND NOTHING OBSERVED ANYTHING. Reporting NONE_OBSERVED
-			// here would claim an instrument looked; there was no instrument.
-			observedToolCalls: governedToolCallReport({
-				canObserve: false,
-				reason:
-					'The model call failed, so no adapter returned a result and nothing was in a position to ' +
-					'observe tool calls. This record is not evidence that none ran.'
-			}),
+			// ⭐⭐ `B-2` — THE ADAPTER IS **ASKED**, BECAUSE A FAILED CALL IS NOT THE SAME FACT AS A BLIND ONE.
+			//
+			// ⛔ THIS ARM USED TO ASSERT `NOT_OBSERVABLE` WITH ITS OWN SENTENCE — *"no adapter returned a result
+			// and nothing was in a position to observe tool calls"* — AND THAT WAS FALSE FOR THE PI ADAPTER.
+			// Its observer is SESSION-scoped, subscribed inside `turn()` and unsubscribed in a `finally`: when
+			// `prompt` rejects it already HOLDS every call the model made before the failure. Writing the
+			// sentence here made one caller speak for every adapter, and it spoke wrongly for the only one that
+			// can see. ⚠ `R11` minted `NOT_OBSERVABLE` to mean *"nothing could look"*; using it for *"the call
+			// failed"* collapses the two facts the discriminator exists to separate — and collapses them in the
+			// direction that hides commands a model ran before it broke the run.
+			//
+			// ⭑ SO THE FACT COMES FROM THE PARTY THAT HOLDS IT. An adapter that genuinely could not look says so
+			// in its OWN words (`oneShotSession` does, and its reason is about being one-shot rather than about
+			// this failure), and an adapter that could look reports what it saw — which `governedToolCallReport`
+			// then grades `OBSERVED` or `NONE_OBSERVED` by the same rule it applies on the success path.
+			observedToolCalls: governedToolCallReport(input.session.lastTurnObservation()),
 			promptTemplateFingerprint: plan.fingerprint
 		});
 		record(input, sink);

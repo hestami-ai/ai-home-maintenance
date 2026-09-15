@@ -263,13 +263,30 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 		kind: 'DEFERRED',
 		why: "Triage §4, W3 execution harness (WP-3-005). The live start gate is canStartStepUnderPlan's wired sibling path; this bare form has no caller."
 	},
-	canReuseBindingForNewAttempt: {
-		kind: 'DEFERRED',
-		why: 'Triage §4, W3. Needs the attempt plane W2 defers.'
-	},
+	// ~~canReuseBindingForNewAttempt~~ REMOVED 2026-09-15 (JAN-EXEC Phase 3 review, `B-1`). It read: DEFERRED,
+	// "Needs the attempt plane W2 defers" — and that premise stopped holding the moment a repair LOOP existed:
+	// `JAN-EXECLOOP` takes SEVERAL TRIES against one already-started step, which IS the attempt plane, and each
+	// try is a NEW ATTEMPT in §22.1's own words. ⛔ THE GAP WAS LIVE, NOT THEORETICAL: `RevokeRuntimeCapability`
+	// advances `authorizationStatus` and DELIBERATELY leaves `grantedCapabilities` intact, so every Phase 3
+	// reader that took the capability LIST saw the same answer before and after a revocation — a revoked binding
+	// minted the full tool surface and backed another try. This census's own failure message calls a wired symbol
+	// "the good failure" and permits exactly one response: the row goes, because the symbol is not dead.
+	// ⭑ AND THE ADJACENT STALENESS WAS CHECKED RATHER THAN ASSUMED (`REG-F-016`): `RPH-EXE-003` already claimed
+	// carriage of *"Revoked bindings cannot be used for new attempts"* — truthfully, for the START arrow, which
+	// is where `bindingAuthorityVerdict` sits. Its row is amended to say that the PER-TRY reading was enforced
+	// nowhere until this commit, rather than left to read as though one arrow covered both.
+	// ⚠ ITS SIBLING `canStartStep` STAYS DEFERRED ON A GROUND OF ITS OWN: the live start gate is
+	// `canStartStepUnderPlan`'s wired path, and this pair was never deferred on one shared reason.
 	assessModelOutput: {
 		kind: 'DEFERRED',
-		why: "Triage §4, W3. JPWB hosts no tool or model invocation — the boundary RPH-EXE-004's row argues at length — so nothing produces model output to assess."
+		// ⛔ ITS STATED GROUND WAS FALSE AND IS STRUCK RATHER THAN DELETED (the WP-17 standard). ~~"JPWB hosts no
+		// tool or model invocation"~~ — `runModelInvocationStep` has invoked models since `JAN-EXECRUN`, and
+		// `JAN-EXEC` Phase 3 mints TOOLS for those invocations and observes the calls. `RPH-EXE-004`'s own row
+		// records both corrections; this one quoted the sentence that row has since withdrawn.
+		// ⚠ THE ROW STAYS DEFERRED ON THE GROUND THAT IS ACTUALLY TRUE: nothing calls this function. A stale
+		// GROUND under a correct verdict is the shape this census exists to catch one level up, so correcting it
+		// here rather than leaving it to read as a survey finding.
+		why: "Triage §4, W3. ~~JPWB hosts no tool or model invocation~~ — FALSE since JAN-EXECRUN, and doubly so since JAN-EXEC Phase 3 (a step invokes a model AND mints it tools). The row survives on the other ground: nothing calls assessModelOutput. The assurance path assesses a recorded exchange through the floor, not through this predicate."
 	},
 	selectControlAction: {
 		kind: 'DEFERRED',

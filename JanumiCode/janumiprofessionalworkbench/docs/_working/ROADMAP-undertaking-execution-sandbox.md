@@ -931,7 +931,7 @@ see §4 for the mutants that carry each limb, and for the one that SURVIVED its 
 
 ---
 
-## 5. Phase 3 · Capability → tools, by absence
+## 5. Phase 3 · Capability → tools, by absence · ⭐ LANDED 2026-09-15
 
 **DO:** thread the step's GRANTED capabilities into the session and mint only the authorised tools.
 `stepBindingFor` stops hardcoding `[{capability:'network'}]` and requests **per step type**, splitting
@@ -943,10 +943,422 @@ than one being chosen** — an unminted tool degrades the operation, exactly as 
 
 **RULE 2:** read by every sandboxed step. **If wrong:** a model holds a privilege the binding never granted.
 
-**PROOF (spike-established, to be re-proven as committed tests):** granted `["network"]` only ⇒ step refused,
-**0 model calls, 0 exchange records**; granted `file-system` but not process-execution ⇒ `write_file` minted,
-`run_command` withheld, **`run_command` calls = 0** with the file still on disk; and exact membership —
-`["file"]`, `["file-syste"]`, `["file-system-extra"]`, `["FILE-SYSTEM"]` all mint **nothing**.
+**PROOF (spike-established, to be re-proven as committed tests):** ~~granted `["network"]` only ⇒ step refused,
+**0 model calls, 0 exchange records**~~ ⛔ **STRUCK — SEE §5a AND DESIGN §4.3**; granted `file-system` but not
+process-execution ⇒ `write_file` minted, `run_command` withheld, **`run_command` calls = 0** with the file still
+on disk; and exact membership — `["file"]`, `["file-syste"]`, `["file-system-extra"]`, `["FILE-SYSTEM"]` all mint
+**nothing**.
+
+⛔ **THE STRUCK ROW IS NOT A TYPO AND WAS NOT A FAILURE TO REPRODUCE: the ruling in the line directly above it
+made it false.** The spike refused a `["network"]`-only grant because it treated every requested capability as
+REQUIRED — the step-level reading this very step says must not be chosen. Landed, `network` granted means the
+step's REQUIRES is met, so it **runs with NO tools minted**; what refuses is a grant that omits `network`.
+⚠ A proof line left standing beside the ruling that overturned it is the orphaned-narrative shape this
+programme has filed before, so it is struck here rather than silently reproduced in §5a.
+
+---
+
+## 5a. Phase 3 · ⭐ AS LANDED — the model got hands, and the R11-owed question was answered by removing its subject
+
+**EVERY LATENT SEAM ACQUIRED ITS FIRST PRODUCTION CALLER.** `Workspace.writeFile`, `ProcessRunner.run`,
+`planProcessRun`, `AdapterToolObservation.canObserve: true`, `mintedToolNames`, and the `OBSERVED` /
+`NONE_OBSERVED` members of `ObservedToolCallReport` — none of which had a producer at HEAD — are now reached by
+a real model choosing to use them.
+
+### ⭐⭐ DRIVEN LIVE, against `openai-codex/gpt-5.6-sol`, through the production seam
+
+| # | limb | what was observed |
+| --- | --- | --- |
+| a | a file the model wrote, **stat'ed after the session closed** | `greet.js`, 38 bytes, contents `console.log("hello from the sandbox");` |
+| b | a command the model ran, exit code and stdout **observed by the adapter** | `exit 0 in 89ms`, stdout `hello from the sandbox`; and, driven beside it, a **non-zero** exit (`exitCode: 3`, still `ok: true` — the CALL completed) and an **ENOENT refusal** (`ok: false`, no exit code invented) |
+| c | the exchange record | `{"observation":"OBSERVED","calls":[{"ordinal":1,"nameProvenance":"MINTED_BY_HOST","toolName":"write_file","outcome":"COMPLETED"},{"ordinal":2,…,"toolName":"run_command","outcome":"COMPLETED"}],"observedCount":2,"recordedLimit":32}` |
+| d | ⛔ **THE PRECISION CONTROL** — `file-system` granted, `process-execution` **NOT** | `mintedToolNames: ["write_file"]`, **`run_command` calls = 0**, and the file **still written** |
+
+⭐⭐ **AND (d) PRODUCED A FIFTH FACT NOBODY ASKED FOR, WHICH IS THE BEST EVIDENCE IN THE SET.** The model, given
+the narrower surface, **said so in its own work product**: *"The file was written, but I was unable to run it
+because no command-execution tool was available"*, with `limitations: ["No shell or Node execution tool was
+available."]`. That is `RPH-EXE-004`'s operation-level degradation happening — the invocation proceeds, the
+operation is unavailable, and the producer discloses it — rather than a step-level refusal standing in for it.
+
+⭐ **AND A SIXTH, ON DISK, INDEPENDENT OF EVERY INSTRUMENT THIS PHASE BUILT.** The full run's sibling
+`…​.process-output/captures/` holds **three** capture directories (`stdout.txt`, `stderr.txt`,
+`omissions.json` each); the precision control's sibling is **EMPTY**. So "no `run_command` call was observed" is
+corroborated by "no process output exists", which is a fact no adapter, observer or record produced.
+
+### ⭐⭐ THE `R11`-OWED RULING — and the answer is the FOURTH one, not one of the three recorded
+
+`R11` left the choice to *"the increment that first HAS a real tool surface"*: a host minting a `toolName` the
+record plane cannot hold makes the WHOLE exchange record unwritable. Its three candidates were **(a)** drop the
+spelling and keep `MINTED_BY_HOST` — *the handler refuses that*; **(b)** call it `NOT_MINTED` — *false, the host
+DID mint it*; **(c)** add a third provenance member — *an unratified change to a PERMANENT contract*.
+
+⛔ **ALL THREE ACT AT RECORD TIME, WHICH IS ALREADY TOO LATE.** By then a model has been told the tool exists, a
+call has been made, and a record is owed. **RULED: constrain what a host may mint, AT MINTING TIME**
+(`mintExecutionTools` validates every catalog name against `RecordPlaneNameSchema` and REFUSES). It removes the
+state rather than describing it, at the one moment when the only party involved is the host.
+
+⚠ **AND THE WHOLE CATALOG IS CHECKED, NOT THE MINTED SUBSET.** Checking only what a grant authorised leaves an
+unholdable name asleep until the day a grant WIDENS — a live step, a model mid-turn, an unwritable record.
+`P3-d` is the mutant for exactly that, and its victim case had to be re-arranged (granting the offending
+capability in the sibling case) so that an arrangement tripping two guards could not prove neither.
+
+### ⭐ THE CAPABILITY NAME — `G-1`'s form, followed rather than re-sought
+
+`file-system` is **VERBATIM** in `RPH-EXE-004` and is ADOPTED. `process-execution` is **COINED**, under
+`JAN-EXECGOV` `G-1`'s already-given grant — *"one capability per step type that a model invocation actually
+needs, named in the vocabulary with its note"* — so `STEP_CAPABILITY_VOCABULARY` is that vocabulary and every
+entry carries its note. ⛔ It is **NOT** collapsed into `file-system`: starting a process is strictly larger
+than writing a file, and the merge would make the grant unable to express the distinction (d) turns on. The
+value domain stays open (`CapabilityRequestSchema` is `{ capability: z.string() }`, pinned with its own reason),
+so this is an authoring act and **not** a contract change.
+
+### ⛔ A RETENTION SURFACE THIS PHASE OPENED, CAUGHT BY THE REPOSITORY'S OWN GATE
+
+`verif/agy-stderr-unbound.test.ts` went **RED** the moment `run_command` existed — `REG-Q-066`'s gate, doing
+exactly what Phase 2b built it to do. A command whose output the model cannot read is a command the model cannot
+act on, so both streams go back as the tool result; that puts them in the model's context and therefore in the
+E-1 composite `captureTry` stores `RETAINED_BY_PARTICIPATION`.
+
+⭐ **THE DISPOSITION, WRITTEN IN THE SAME COMMIT AS THE BINDING** (the gate's own demand): the class follows
+`REG-D-050` — *participation is a property of USE, not of kind* — because the model READ those bytes and its
+work product rests on them; they land on the **CONTENT** plane, which `PER-9` gives a lawful removal path (E-6)
+and the **RECORD** plane none; and **no byte of either stream reaches the record plane**, because
+`ObservedToolCall` has no arguments field and no result field BY CONSTRUCTION (`R11`). The disposed-site list is
+PINNED and now holds two entries, each with its own written disposition.
+
+⚠ **RESIDUAL, STATED RATHER THAN SMOOTHED:** a build that echoes its environment puts those bytes where only an
+E-6 redaction can reach them, and **nothing in this repository performs an E-6 redaction today**. Not new in
+KIND (an answer span can already quote a path) but new in VOLUME. Filtering is refused: a predicate deciding
+whether a line of build output *"looks like a secret"* is a normaliser over arbitrary bytes, which this seam has
+now declined three rounds running.
+
+### ⚠ TWO BOUNDS DISCLOSED RATHER THAN DISCOVERED
+
+1. **THE TOOL SURFACE IS MINTED ONCE, AT SESSION OPEN; THE GRANT IS RE-READ EVERY TRY.** So a capability revoked
+   between tries refuses the next try when the step REQUIRES it, but a revoked capability the step merely USES
+   leaves its tool minted for the remainder of the held session. The session is held on sponsor authority
+   (`JAN-EXECSESS`), so "a session per try" is not available. ⭑ Pi exposes `AgentSession.setActiveToolsByName`,
+   which can only NARROW a registry this host already built from the grant — named here so the seam a later
+   increment would use is on the record rather than unknown.
+2. **THE DEMO SURFACE AUTHORIZES THE FULL REQUEST**, because it has no authorizer UI able to express a narrower
+   grant. `grantedWithinRequest` forbids granting MORE; nothing obliges granting ALL. The precision control is
+   therefore driven at the seam and live, not through the page.
+
+**MUTANTS:** `bun run mutants P3-` — **10 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 KILLED_UNNAMED**
+(plus one pre-existing `P3-pending-source-invents-a-cause` CONTROL_HELD). Every one names a single victim suite.
+⭑ `bun run mutants:changed --run` over the diff selected exactly those ten and all ten KILLED.
+
+### ⛔ AND THE WHOLE-LEDGER AUDIT FOUND TWO SURVIVORS THAT ARE NOT THIS COMMIT'S — PROVED, NOT ASSERTED
+
+`bun run mutants` (674 entries) reports **`M7-unenforced-certified-covered`** and **`M8-wire-dead-predicate`**
+SURVIVED. ⚠ A SURVIVED verdict reads as *"a guard over this went slack"*, and that reading would be false here,
+so the alternative was established against the BRANCH POINT rather than argued from plausibility:
+
+| at `180c094d` | measured |
+| --- | --- |
+| `RPH-EXE-001…009` dispositions | `ENFORCED` ×5, `NOT_A_COMMAND_REFUSAL` ×3 (004, 007, 009). **None `UNENFORCED_DISCLOSED`** — so `M7`'s victim (`unenforcedRuleIds()` ∩ COVERED) had nothing in that family to catch |
+| rows naming a `deadPredicate` | `classifyInterruptedAttempt`, `validateAssumptionReification`, `blocksIrreversibleWork`. **`capabilityAuthorized` is not among them** — so `M8`'s mutation (re-importing it into a handler) is invisible to the census guard |
+
+⭐ **BOTH LOST THEIR SUBJECT AT `JAN-EXECGOV` (2026-09-08), WHEN `RPH-EXE-004` WAS RE-DISPOSITIONED** from
+`UNENFORCED_DISCLOSED` + `DEAD_PREDICATE` to `NOT_A_COMMAND_REFUSAL` — three merges before this branch existed.
+⛔ **FILED, NOT FIXED, AND THE REASON IS SCOPE RATHER THAN EFFORT.** The ledger's own vocabulary for a mutant
+whose code legitimately MOVED is `supersededBy` → `RETIRED` (*"it is not ledger rot, it is history"*), and
+applying it requires deciding WHERE each guard went — a judgement belonging to the programme that moved it, not
+to one that happens to be running the audit. ⚠ What this commit owes, and pays, is saying so: `bun run gate`
+(`gate:fast && mutants`) was already red at `180c094d` for these two, and `gate:fast` itself — the 14-step gate
+this increment is held to — is GREEN.
+
+### ⭐ AND ONE CLAIM OF MY OWN WAS REFUTED BY THE COMPILER BEFORE IT SHIPPED
+
+`step-binding.ts` asserts at compile time that its `StepBindingRequest` **is** the `RequestRuntimeBinding`
+payload, so no projection has to be written or guarded. The first form of that proof —
+`StepBindingRequest extends RequestRuntimeBindingPayload` — was **FALSE**: a `readonly T[]` is not assignable to
+a `T[]`. The wire is unaffected (zod sees a plain array), but the claim was wrong as written, so it now compares
+mapped types in **both directions** and says exactly which difference it tolerates and why.
+
+---
+
+## 5b. Phase 3 · ⭐⭐ THE ADVERSARIAL REVIEW — nine breaches, TWO SPONSOR RULINGS, and a record-plane honesty pass
+
+⭐⭐ **THE RULINGS CHANGED WHAT THE REST OF THE PASS WAS.** An adversary drove nine breaches through Phase 3. The
+sponsor ruled on the two architectural ones, and the ruling REFRAMED the remainder: **the model reaching outside
+the workspace is now a STATED PROPERTY, not a defect. What is still a defect is every place the record claims
+otherwise.** So this is a RECORD-PLANE HONESTY PASS and not a sandbox-tightening pass — with ONE exception,
+`B-1`, which is a ratified rule that was simply not enforced.
+
+### ⭐⭐ `R12` — SAY THE SUBSUMPTION PLAINLY
+
+> `process-execution` SUBSUMES `file-system` AND `network`. **Driven:** with `file-system` WITHHELD the model got
+> only `run_command` and wrote a file outside the workspace anyway, **because a child process is not confined by
+> anything userspace can assert.** The three capabilities are NOT independent and the vocabulary presented them
+> as if they were.
+
+⭑ **IT PAIRS WITH `R9`:** the real confinement is the deployment environment's (OpenSandbox / OpenShell / a
+container), not this code's. ⛔ **WHAT IT DOES NOT DO IS COLLAPSE THE VOCABULARY.** `process-execution` stays its
+own capability because the grant must be able to express *"may write, may not run"* — the narrowest useful
+authorization this seam has, and the one the live precision control turns on. What is no longer expressible, and
+is now SAID to be inexpressible, is the converse: *"may run, may not write"* is not a state.
+
+**RECORDED IN THREE PLACES, and one of them is data rather than prose:**
+
+| where | what |
+| --- | --- |
+| `step-binding.ts` | every `STEP_CAPABILITY_VOCABULARY` note, plus a **`subsumes` FIELD** on each entry |
+| `enforcement-register.ts` | `RPH-EXE-004`'s `why`, narrowing *"granting by absence bounds WHICH KINDS of operation"* |
+| §4.3b of the design | the table, and what it does and does not license |
+
+⚠ **THE FIELD IS THE PART THAT WILL SURVIVE.** A subsumption stated only in a note is a claim no gate can read,
+and this repository has twice found such a note outliving the thing it described. `P3-k`…`P3-o` are the mutants;
+the one for this is the vocabulary assertion in `step-binding.test.ts`, which reddens on an emptied `subsumes`.
+
+### ⭐⭐ `R13` — DO NOT REFUSE THE INTERPRETER; RECORD THE FACT
+
+> The model naming `cmd.exe` or `powershell.exe` as `argv[0]` was driven and works (`namesABatchTarget` tests
+> only `/\.(bat|cmd)$/`). ⛔ **DO NOT ADD A BLOCKLIST.** Refusing `cmd.exe` while permitting `node -e` is
+> THEATRE, and worse, a later reader would mistake the refusal for a containment property. Record instead that
+> **`process-execution` means arbitrary code as the server user**, and that `R9`'s deployment tier is the only
+> claimed boundary.
+
+⭐ **THE DEFERRAL THIS ANSWERS WAS ALREADY WRITTEN DOWN, WHICH IS WHY THE ANSWER LANDS IN `child-process-runner.ts`
+AS WELL.** That file's `B1`/`B10` section already said: *"a model naming `cmd.exe` or `powershell.exe` AS THE
+PROGRAM gets a command interpreter, because it asked for one. That is an argv policy belonging to the phase that
+lets a model choose an argv."* Phase 3 IS that phase; the paragraph now carries the ruling rather than the
+deferral. ⚠ **THE BATCH REFUSAL IS NOT WEAKENED AND IS NOT THAT BLOCKLIST:** it exists because Win32 re-parses a
+batch command line so that an ARGUMENT becomes a command, which is a defect in the no-shell guarantee this code
+MAKES — not an attempt to decide which programs a granted step may run.
+
+---
+
+### ⛔⛔ `B-1` — THE ONE BREACH THAT IS A DEFECT UNDER THE RULINGS TOO
+
+**§22.1 IS VERBATIM: *"Revoked bindings cannot be used for new attempts."* IT WAS ENFORCED ON ONE ARROW AND
+NOWHERE ELSE.** `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and **deliberately does not
+clear `grantedCapabilities`** — its handler says so, because the revocation EVENT is derived from the set the
+binding held. And every reader in the Phase 3 path took a capability **LIST** and never a **STATUS**: `grantsFor`,
+`mintExecutionTools`, `stepCapabilityRefusal`. So the stored value was byte-identical before and after a
+revocation, a revoked binding **minted the full tool surface**, and the repair loop happily took another try.
+
+⚠ **WHY NO ARROW CAUGHT IT, WHICH IS THE PART WORTH KEEPING.** `RPH-EXE-003` really does carry this rule — for
+START and RESUME, where `bindingAuthorityVerdict` sits. `JAN-EXECLOOP`'s loop takes SEVERAL TRIES against ONE
+already-started step and **dispatches no command between them**, and Phase 3 mints a tool surface at session
+open, through no arrow at all. A per-arrow enforcement is complete only while every attempt crosses an arrow.
+
+**FIXED AT TWO SITES, BOTH THROUGH THE KERNEL'S OWN `canReuseBindingForNewAttempt`** rather than a second
+spelling of `status !== 'REVOKED'`:
+
+| site | behaviour |
+| --- | --- |
+| `stepCapabilityRefusal` | FIRST limb, before any capability is examined — so the message names the REVOCATION and not a capability that is in fact granted |
+| `mintExecutionTools` | returns an EMPTY surface, so a revoked binding gives a model no hands at all |
+
+⛔ **AND THE ORDER INSIDE `mintExecutionTools` IS ASSERTED:** the whole-catalog NAME BOUND runs FIRST, because it
+is a property of the HOST rather than of one grant — returning early would leave an unholdable name dormant for
+every revoked binding, which is `P3-d`'s dormancy defect reached by a new road. ⭑ `canReuseBindingForNewAttempt`
+consequently LOST its dead-kernel census row, which is that gate's *"good failure"*, and `RPH-EXE-003`'s row was
+checked for the stale claim the census instructs (`REG-F-016`) and amended.
+
+⚠ **THE RESIDUAL, STATED:** the surface is minted ONCE per held session while the status is re-read every try, so
+a binding revoked mid-unit leaves already-minted tools on that session. What that costs is bounded by the first
+site — **no further TURN is taken** — and the session is held on sponsor authority (`JAN-EXECSESS`).
+
+### ⛔ `B-1b` / `B-1c` — TWO STATEMENTS THAT DESCRIBED A CONTROL THAT COULD NOT FAIL
+
+Both are now TRUE because `B-1` made them true, and both were rewritten rather than deleted — but the rewrite
+found something neither the docblock nor the disclosure had noticed:
+
+- `step-binding.ts` claimed *"AND IT CAN ACTUALLY FAIL … `RevokeRuntimeCapability` changes the answer."* In the
+  only production path it could not: the demo authorizes the FULL request, `grantIsMonotone` forbids narrowing,
+  and revocation leaves the granted set intact. The docblock now says which limb can fail and for whom.
+  ⚠⚠ **AND THE FIRST REWRITE REPEATED THE DEFECT IT WAS REPLACING, WHICH IS WHY THIS IS RECORDED RATHER THAN
+  QUIETLY FIXED.** It read *"only the STATUS limb fires on real work"* — which quietly claims the demo can revoke
+  a binding. **MEASURED: `RevokeRuntimeCapability` has ZERO production dispatch sites in `apps/`** (every
+  occurrence there is a comment from this programme), and the positive control discriminates —
+  `AuthorizeRuntimeBinding` HAS one, at `+page.server.ts:963`. So through the page today NEITHER limb can fire:
+  the capability limbs because the demo grants the full request and `grantIsMonotone` forbids narrowing it, and
+  the status limb because **no surface in this app issues the one command that changes a status.**
+  ⭑ **THAT IS A PROPERTY OF THE DEMO'S UI, NOT OF THE FUNCTION, AND THE DIFFERENCE FROM THE ORIGINAL DEFECT IS
+  ONE OF KIND.** Before `B-1` the refusal could not fire **for any caller at all**, because nothing read the
+  status; it now fires for every caller that revokes, and `RevokeRuntimeCapability` is a live command on the bus
+  with a real handler and a ratified machine. The demo simply has no button that issues it — a missing affordance,
+  filed as one, next to the other bound this surface already discloses (it authorizes its full request because it
+  has no authorizer UI able to express a narrower grant).
+- `+page.server.ts` disclosed *"a capability revoked between tries refuses the next try when the step REQUIRES
+  it."* It did not — for `REQUIRES` or `USES`. ⛔ **AND IT WAS WRONG IN A SECOND, WORSE WAY: "a capability revoked
+  between tries" IS NOT AN EXPRESSIBLE ACT.** `RevokeRuntimeCapability` takes no capability list (it revokes the
+  BINDING) and `grantIsMonotone` refuses an authorization that omits an already-granted capability. The
+  disclosure described a mechanism, a refusal and a residual that all had no subject.
+
+### ⛔ `B-2` — THE PERMANENT RECORD LOST CALLS THE ADAPTER HAD
+
+When `session.turn` threw, the catch arm wrote `NOT_OBSERVABLE` with *"nothing was in a position to observe tool
+calls"* — **false for the Pi adapter**, whose observer is session-scoped, subscribed INSIDE `turn()` and
+unsubscribed in a `finally`. It holds every call made before the failure. ⚠ `R11` minted `NOT_OBSERVABLE` to mean
+*"nothing could look"*; using it for *"the call failed"* collapses the two facts the discriminator exists to
+separate — in the direction that hides what a model ran before it broke the run.
+
+⭑ **THE FIX IS WHO SPEAKS, NOT WHAT IS SAID.** `ProducerSession` gained `lastTurnObservation()`, a REQUIRED
+member: the Pi adapter records its observation in the same `finally` that unsubscribes (so the failing and
+succeeding paths report the same measurement), and `oneShotSession` answers `NOT_OBSERVABLE` **in its own words,
+for its own reason** — being one-shot, not this failure. The caller no longer writes one sentence on every
+adapter's behalf, which is what made the old one false.
+
+### ⛔ `B-6` — THE INVENTORY LIED, AND ONLY HALF OF THAT IS FIXABLE
+
+The model plants a hard link with `run_command`, writes through the CONTAINED `write_file`, and `list()` reports
+**another undertaking's file as this workspace's own entry**. ⭐ Under `R12` the WRITE is a stated property and
+this adapter cannot take it back. The false INVENTORY is not a stated property of anything — a workspace
+reporting a file it does not exclusively hold is a **record-plane** defect regardless of who could reach it — so
+`WorkspaceEntry` gained **`nameCount`**, the filesystem's own count of the names holding those bytes.
+
+⚠ **WHAT IS REPORTED IS SHARING, NEVER LOCATION**, and the suite proves the limit rather than asserting it: a
+lawful second link INSIDE the workspace reports the same `2`. The filesystem answers *how many* and answers
+*where* to nobody, so the field is shaped to the fact that is knowable.
+
+⚠ **AND THE DISCLOSURE'S OWN PREMISE HAD CHANGED.** It named hard links as an exposure to *a party with
+filesystem access*, which reads as a party OTHER than the step. Since Phase 3 **the executing model IS that
+party**, so it is not a hazard the workspace might encounter but a vector its own tenant can create on purpose.
+Re-stated, in the adapter's header, with the count as the answer to the half that was fixable.
+
+### ⛔ `B-7` — TWO TRUE-SOUNDING STATEMENTS ABOUT ONE FILE
+
+`write_file('Report.md')` then `write_file('REPORT.MD')` each answered *"Wrote N bytes to <the caller's own
+spelling>"* while `list()` reported ONE entry — and the tool's description told the model *"writing the same path
+again replaces it"*, so two answers read as two files while one file changed underneath. ⛔ **THE BROKEN INVARIANT
+IS: a path `writeFile` REPORTS must be a path `list()` REPORTS.**
+
+⭑ **FIXED BY ASKING THE FILESYSTEM, NEVER BY FOLDING CASE** — the discipline this adapter's header already states
+and whose violation it already records (`toLowerCase()` folds MORE than NTFS does). `locate` now returns the
+spelling the DIRECTORY holds: exact match against its own listing, and otherwise identification by FILE IDENTITY.
+Both aliasing classes on this host — case folding and the NTFS 8.3 alias — are answered without either being
+named, and the tombstone key, `readFile` and `purge` agree with the inventory because the resolution sits in
+`locate` rather than in `writeFile`.
+
+⛔ **AND A MEASUREMENT CHANGED THE IMPLEMENTATION BEFORE IT SHIPPED.** The first form compared `Stats.ino` as a
+JS number. Measured on this host, an NTFS file id came back as `128634064358016640` — **more than fourteen times
+`Number.MAX_SAFE_INTEGER`** — so two different files can round to the same double, and the consequence would not
+have been a missed match but **a write redirected onto somebody else's file, by the function added to stop one
+file wearing two names.** It uses `{ bigint: true }`, which both runtimes this repository runs return exactly.
+
+⚠ **THE DESCRIPTION WAS FIXED TOO, BECAUSE THAT IS THE PART THE MODEL READS**, and it now says the outcome names
+the path as the workspace holds it. What is NOT closed: two LONG names can still collide through generated 8.3
+short names. The caller is told the surviving spelling instead of its own, which makes the collision VISIBLE; it
+does not prevent it.
+
+### ⚠ `W-1` — A FOURTH PROJECTION, AND THE TWO DID DISAGREE
+
+`grantsFor` was a fourth projection of `grantedCapabilities` and the only one not using the kernel's
+`capabilityIdentities`, whose docblock says *"ONE COPY, because there are now three readers, and a projection
+duplicated per reader is how two of them come to disagree."* ⛔ **THEY DID:** the kernel's DROPS a non-string
+element (fail-closed — an unreadable grant grants nothing), while `String(c.capability ?? '')` COERCED one into
+the empty string and KEPT it, putting an entry no authorizer wrote into the list a tool surface is minted from.
+Replaced, and folded into `currentBinding`, which returns the status and the capabilities from ONE read.
+
+### ⛔ `W-6` — TWO TOOLS, ONE MODEL, AND A DISAGREEMENT NOBODY HAD TO STATE BEFORE
+
+Under a swapped root **`write_file` WRITES** (into the junction's target, reported as an ordinary in-workspace
+path) while **`run_command` REFUSES** — the runner compares the RESOLVED `cwd` against the directory the host
+DECLARED, which is the one name a swap cannot move, and a containment predicate has no such declaration to
+compare against. Both halves were disclosed separately and both are still true; what was missing is that Phase 3
+is the first arrangement in which ONE party holds both. ⭑ The joint statement now lives in
+`execution-tool-surface.ts`, where that party's surface is minted, and the workspace header points at it: **the
+model's experience of a swapped workspace is *writes succeed, commands refuse*.**
+
+---
+
+### ⚠⚠ `W-2` — FILED, NOT FIXED: NO BOUND ON CALL COUNT, ON TOTAL WALL CLOCK, OR ON WRITTEN BYTES
+
+⛔ **DRIVEN AT THE PRODUCTION SEAM** (a real `ProcessRunner`, a real `FilesystemWorkspace`, both under
+`os.tmpdir()`), because a resource bound is exactly the kind of claim that reads as present and is not:
+
+| driven | measured |
+| --- | --- |
+| `write_file` with **40 MiB** of model-chosen bytes | `Wrote 41943040 UTF-8 bytes to huge.txt`, on disk, **in 48 ms**. No refusal, no cap, no declaration |
+| 25 consecutive `write_file` calls | **25 / 25 accepted.** Nothing counts calls. `OBSERVED_TOOL_CALL_LIMIT = 32` bounds what the RECORD may HOLD, never what a model may DO |
+| two 1.5 s commands back to back | **3144 ms** of wall clock, both `ok`. `EXECUTION_COMMAND_TIMEOUT_MS` is **per call**; N calls cost N × the bound |
+
+⚠ **UNDER `R12`/`R13` THIS IS A RESOURCE QUESTION, NOT A CONTAINMENT ONE** — a model granted `process-execution`
+can exhaust the same resources through a child process whatever this seam does, so a bound here buys accounting
+and fairness rather than confinement. That is precisely why it is filed rather than patched: a bound that
+pretends to be a containment control is the shape `R13` just refused.
+
+⛔ **WHAT WOULD HAVE TO BE DECIDED, and none of it is available to this increment:**
+1. **WHOSE BOUND IS IT?** `EXECUTION_COMMAND_TIMEOUT_MS` is authored and says so (*"nothing measured says 120
+   seconds"*). A per-STEP budget is not a host constant: it is a property of the work unit, and the corpus has no
+   field for one. `RuntimeBinding.sandboxPolicy` is recorded **DEFERRED TO THE PLATFORM POLICY PLANE**, which is
+   where a quota would naturally live — so authoring one here would encode one tool's model, the lock-in that
+   deferral exists to prevent.
+2. **WHAT HAPPENS AT THE BOUND?** A refused call mid-work leaves a partial deliverable; a failed STEP discards a
+   work product that exists. Both are recordable and they are different rulings, and `ProcessRunOutcome`'s
+   founding distinction (a refusal is not a failure) says they must not be folded.
+3. **WHAT DOES THE RECORD SAY?** A truncated run that did not disclose its truncation is `REG-F-345`'s shape. Any
+   bound needs a declared field, and `ObservedToolCall` has none.
+
+⭑ **AND ONE HALF IS CHEAPER THAN THE OTHERS AND STILL NOT TAKEN UNILATERALLY:** `write_file` could bound
+`contents` today with no ratification at all, because the refusal shape already exists and costs nothing. It is
+not done here because a size cap with no per-step budget beside it is a number that stops one call and no
+campaign — and picking it would be the authored-constant move this roadmap has twice had to disclose.
+
+### ⚠⚠ `W-3` — FILED, NOT FIXED: THE SUCCESS PATH IS GENEROUS WHERE THE REFUSAL PATH IS CAREFUL
+
+⛔ **DRIVEN, AND THE ASYMMETRY IS LARGER THAN IT READS.** `run_command` with
+`node -e "console.log(JSON.stringify(process.env))"`:
+
+- the SUCCESS summary was **3143 bytes** and carried `USERNAME`, `USERPROFILE` (`C:\Users\mchen`), `PATH` and
+  `TEMP` — the operating username and the host's layout — straight into the model's context;
+- the REFUSAL, on the same tool in the same call shape, was *"could not be started in the workspace directory
+  **'deliverable'** (ENOENT)"* — **one path segment**, by `workspaceDirectoryName`, deliberately, because
+  *"`refusedBecause` … travels into a governed record and into a model's context — and the host's filesystem
+  layout belongs in neither."*
+
+⚠ **THE TWO RULES ARE ABOUT THE SAME PLANE AND ONE OF THEM IS UNAPPLIED.** These bytes land in the E-1 composite
+as `materializedInputRef`, `RETAINED_BY_PARTICIPATION` — the class this phase argued for correctly under
+`REG-D-050` — and the removal path they rely on (**E-6 redaction**) has no producer, which `REG-005` already
+records and this AGGRAVATES rather than opens.
+
+⛔ **WHY IT IS NOT FIXED HERE, AND IT IS NOT EFFORT.** The obvious repair is a filter over stream bytes deciding
+what *"looks like a secret"* — a normaliser over arbitrary bytes, which is the shape this seam has now refused in
+four consecutive rounds, and which would make the record claim a completeness it does not have.
+
+⛔ **WHAT WOULD HAVE TO BE DECIDED:**
+1. **IS THE CHILD'S ENVIRONMENT THE CHILD'S TO INHERIT AT ALL?** The runner passes the server's environment
+   through. An explicit ALLOW-LIST is structure rather than sanitisation and is therefore the shape this seam
+   prefers — but it is a behaviour change for every command a model might reasonably run (`PATH` alone decides
+   whether `node` resolves), so it is a ruling about what a sandboxed step is entitled to, not a patch.
+2. **DOES THE SYMMETRY ARGUMENT SURVIVE `R12`?** A model granted `process-execution` can read the environment
+   whatever the tool result contains, so withholding it from the RESULT bounds the RECORD and not the model. That
+   makes this a RETENTION question — which is the honest framing, and the opposite of the one a reader would
+   assume from "the refusal is careful, so the success should be too".
+3. **WHICH PLANE PAYS?** Under `PER-9` the content plane has a removal path and the record plane does not. Nothing
+   here reaches the record plane (`ObservedToolCall` has no field that could hold it), so the whole question is
+   about a content object whose removal path is unimplemented — which makes **E-6** the load-bearing dependency
+   rather than this seam.
+
+---
+
+### VERIFICATION
+
+- `bun run mutants P3-` — **17 entries: 16 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 KILLED_UNNAMED**,
+  plus the pre-existing `P3-pending-source-invents-a-cause` CONTROL_HELD. The **six** new entries `P3-k`…`P3-p`
+  are each the **pre-fix behaviour restored**, so every claim above rests on an observed red rather than on a
+  prediction. ⚠ THE COUNT IN THE FIRST DRAFT OF THIS LINE WAS **15**, WRITTEN BEFORE `P3-p` EXISTED and left
+  standing for one revision — the "quote a count you did not re-measure" defect, caught by re-running rather than
+  by re-reading.
+- ⭐ **`P3-p` WAS NOT PLANNED; THE EXPORT-GUARD CENSUS DEMANDED IT.** Wiring `canReuseBindingForNewAttempt` made
+  it a production-consumed export for the first time, and `guards:export` went to **OUTSTANDING OBLIGATION 1** —
+  the two consumer mutants (`P3-k`, `P3-l`) are anchored in the CALL SITES, and a mutation of the shared
+  DECISION has to be caught where the decision lives. With `P3-p` the census reads **349 of 349, obligation 0**.
+- ⛔ **AND ONE OF MY OWN INSTRUMENTS PRODUCED A 4933-LINE DIFF OVER A 61-LINE CHANGE.** Running `prettier` on
+  `scripts/mutants/ledger.ts` to tidy six new entries reformatted every entry in the file — quote style and
+  wrapping — burying the change in a diff no reviewer could read. `format:check` is deliberately NOT a gate step,
+  so the repository does not hold that file to prettier and the sweep was pure noise. **Reverted, re-applied in
+  the file's own style: 61 insertions, 0 deletions**, and the P3 run was re-driven afterwards rather than
+  inherited. ⚠ This is the shape this programme keeps filing one level down — *the instruments fail more than
+  the code* — arriving in the commit that was fixing record-plane honesty.
+- ⛔ **ONE MUTANT WAS REFUTED BY THE COMPILER AND HAD TO BE RE-EXPRESSED.** `P3-o`'s first form
+  (`held !== undefined || …`) returned `NO_COMPILE`: it widened the type in the branch that consumes `held`.
+  Re-expressed as a ONE-CHARACTER operator (`held !== basename(abs)`) it compiles, restores the defect exactly,
+  and reddens. A mutant that cannot compile proves nothing, and the ledger says so rather than being tuned until
+  the count looked right.
 
 ---
 
@@ -1044,6 +1456,20 @@ Phase 0** — a recording of the wrong bytes replays a different run.
    `verif/agy-stderr-unbound.test.ts` plus `P2B-m`. ⚠ **What is still owed is smaller and is NOT this item:**
    `REG-Q-066`'s THREE READINGS of ASR-11's raw validator output remain OPEN and remain the sponsor's —
    `REG-F-326` was explicit that closing the bound closes nothing else, and neither does this.
+   ⭐ **AND A SECOND DOOR OPENED IN PHASE 3, WHICH THE GATE CAUGHT RATHER THAN A READER.** Phase 2b answered who
+   CAPTURES the streams; `run_command` answers to who HANDS THEM TO A MODEL, and
+   `verif/agy-stderr-unbound.test.ts` went RED the moment it existed. The second disposition landed in the same
+   commit as the binding (the gate's own demand) and is a DIFFERENT argument from the first: the class follows
+   `REG-D-050` — *participation is a property of USE* — because the model reads those bytes and its work product
+   rests on them, so they sit in the E-1 composite under `RETAINED_BY_PARTICIPATION`; that is the CONTENT plane,
+   which `PER-9` gives a lawful removal path and the RECORD plane none; and no byte reaches the record plane,
+   because `ObservedToolCall` has no field that could hold one (`R11`). The disposed-site list is PINNED and now
+   holds two entries, each with its disposition written at its own binding site.
+   ⛔ **AND IT AGGRAVATES AN ALREADY-RECORDED FINDING RATHER THAN OPENING A NEW ONE — the register was searched
+   first.** `REG-005` already records *"E-6 unimplemented"*, and `inputRedactionManifestRef` is
+   `PENDING_CONTENT` on every path in this repository. So the removal path this disposition RELIES ON has no
+   producer, and Phase 3 adds a high-VOLUME producer to the plane that needs it: a build prints far more than a
+   model writes. ⚠ That is a change in the SIZE of a known gap, not a new gap, and it is recorded here as such.
 3. ~~**The process-execution capability NAME** — ratification owed.~~ → ⭐ **NOT A NEW SPONSOR DECISION: it is an
    APPLICATION OF `JAN-EXECGOV`'s `G-1`, ALREADY GRANTED.** `G-1`'s recorded form is *"one capability per step
    type that a model invocation actually needs, named in the vocabulary with its note, exactly as `D-1` was
@@ -1055,6 +1481,10 @@ Phase 0** — a recording of the wrong bytes replays a different run.
    ⛔ Collapsing it into `file-system` is worse than naming it: starting a process is strictly larger than writing
    a file, and merging them makes the grant unable to express the distinction the live precision control turned
    on (granted `file-system` without process-execution ⇒ `write_file` minted, `run_command` withheld, 0 calls).
+   → ⭐ **LANDED 2026-09-15 (§5a) IN `G-1`'s FORM:** `STEP_CAPABILITY_VOCABULARY` names all three with their
+   notes, and the precision control was re-driven LIVE against `openai-codex/gpt-5.6-sol` — with the model
+   itself reporting the degradation (*"No shell or Node execution tool was available"*) and the sandbox's
+   process-output sibling EMPTY on disk.
 4. **`MODEL_EXCHANGE` carrying observed tool calls** (Phase 4 Part B) — a vocab change plus regeneration.
 5. **The invariant-violation codes for a process result**, since each member of `invariantViolations` becomes a
    BLOCKING observation code verbatim.
@@ -1083,6 +1513,11 @@ Phase 0** — a recording of the wrong bytes replays a different run.
    → ratification. There is no back door — `extensions[]` was DRIVEN and found unreachable from the command
    surface (`REG-005`). ⛔ **`bun run gen` is in NO gate step**, an open finding this programme already carries,
    so the freshness question arrives WITH this act rather than after it. Design §4.10.
+   → ⭐ **AND `R11`'s ONE DEFERRED SUB-QUESTION IS NOW ANSWERED (§5a), BY THE INCREMENT IT WAS DEFERRED TO.**
+   *"A host that mints a name the record plane cannot hold makes the WHOLE exchange record unwritable"* — ruled:
+   **constrain what a host may mint, AT MINTING TIME**, which is none of the three candidates `R11` recorded
+   because all three act at RECORD time, after a model has been told the tool exists. It needs no ratification:
+   it adds nothing to a contract and removes a state the host alone creates.
 
 ---
 

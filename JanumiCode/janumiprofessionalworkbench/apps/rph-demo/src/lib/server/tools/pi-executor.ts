@@ -1,15 +1,24 @@
 // JAN-TOOLSUITE TS-03 — the Pi EXECUTOR adapter: the tool that produces a work product.
 //
-// ⭑ THIS IS THE AUTHORING AGENT'S SESSION SHAPE WITH THE TOOLS TAKEN AWAY. An executing work unit renders a
+// ⭑ THIS WAS THE AUTHORING AGENT'S SESSION SHAPE WITH THE TOOLS TAKEN AWAY. ~~An executing work unit renders a
 // prompt and returns a work product; it has no business touching the workbench, so it gets no custom tools and
-// no built-ins. That is the whole difference, and reusing the shape rather than inventing one is deliberate —
-// `REG-F-318` prescribes the same *adopt-don't-derive* move.
+// no built-ins.~~ ⭐⭐ **JAN-EXEC PHASE 3 REPLACES THAT SENTENCE, AND THE REASON IT WAS EVER TRUE SURVIVES
+// INTACT.** What an executing work unit has no business touching is the WORKBENCH — the governed objects, the
+// command surface, the authoring broker — and it still touches none of them. What it now has is its own
+// Undertaking's WORKSPACE: a file it may write there and a command it may run there, each minted ONLY when the
+// step's RUNTIME_BINDING grants the capability that authorises it. `noTools: 'builtin'` is unchanged, so Pi's
+// own coding tools stay off and every hand the model has was minted by this host.
+//
+// ⭑ THE PATTERN IS THE AUTHORING AGENT'S, ADOPTED RATHER THAN DERIVED (`REG-F-318`): `pi-agent.ts` already does
+// `customTools: toPiTools(this.tools)` with `noTools: 'builtin'`, and `toTypeBox` is now shared between the two
+// minters rather than copied (`agent/pi-typebox.ts` records why the copy was the hazard).
 //
 // ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so the mock path and the whole
 // gate never load its heavy Node deps — the rule `agent/index.ts` already follows.
 import {
 	AuthStorage,
 	createAgentSession,
+	defineTool,
 	DefaultResourceLoader,
 	getAgentDir,
 	ModelRegistry,
@@ -19,13 +28,20 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
-import type { ToolInvocationResult } from './backing-tool.js';
+import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
 	producerWorkingDirectory,
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
-import { createMaterializedInputRecorder, type PayloadHookHost } from '../agent/materialized-input.js';
+import {
+	createMaterializedInputRecorder,
+	type PayloadHookHost
+} from '../agent/materialized-input.js';
+import { toPiToolResult } from '../agent/pi-tool-result.js';
+import { toTypeBox } from '../agent/pi-typebox.js';
+import { mintExecutionTools, type ExecutionToolDescriptor } from './execution-tool-surface.js';
+import { createToolCallObserver } from './tool-call-observer.js';
 
 /**
  * Resolve the executing model. ⛔ NO FALLBACK CHAIN, and that is the difference from the authoring agent.
@@ -50,6 +66,28 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
 }
 
 /**
+ * Wrap the minted execution tools as Pi custom tools.
+ *
+ * ⭑ THE SAME MAPPING THE AUTHORING AGENT USES, and deliberately so: one `ParamSpec` grammar, one TypeBox
+ * translation (`toTypeBox`), one result shape (`toPiToolResult`). ⚠ IT TAKES WHAT `mintExecutionTools` RETURNED
+ * AND FILTERS NOTHING — every decision about what the model may have was made at minting time, against the
+ * grant. A second filter here would be a second authority over the same question, and the weaker of two
+ * authorities is the one that eventually answers.
+ */
+function toPiExecutionTools(descriptors: readonly ExecutionToolDescriptor[]) {
+	return descriptors.map((d) =>
+		defineTool({
+			name: d.name,
+			label: d.name,
+			description: d.description,
+			parameters: toTypeBox(d.parameters),
+			execute: async (_toolCallId: string, params: Record<string, unknown>) =>
+				toPiToolResult(await d.run(params ?? {}))
+		})
+	);
+}
+
+/**
  * Run ONE bounded turn on Pi and return the work product plus who produced it.
  *
  * ⛔ `thinkingLevel: 'off'` — WE DO NOT SOLICIT CHAIN-OF-THOUGHT, and this is a settled position rather than a
@@ -63,9 +101,11 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
  * evaluator's context is a hidden-context independence violation (ASR-13)"*), and nothing in this codebase
  * detects that dimension. Not asking is the cheaper and stronger position.
  *
- * ⚠ `noTools: 'builtin'` with NO custom tools. The authoring agent grants workbench tools because authoring IS
- * tool use; an executing work unit produces a WORK PRODUCT. Granting it tools would let a step mutate the
- * workbench outside the command surface that governs every other change.
+ * ⚠ `noTools: 'builtin'` STILL, and `customTools` now carries EXACTLY what the grant authorised. The authoring
+ * agent grants WORKBENCH tools because authoring IS tool use; an executing work unit produces a WORK PRODUCT and
+ * gets none of them — granting it those would let a step mutate the workbench outside the command surface that
+ * governs every other change. What Phase 3 adds is disjoint from that: two tools bound to the Undertaking's own
+ * workspace and runner, which reach no governed object at all.
  */
 /**
  * Open ONE Pi session for a work unit and hand back a turn-taking handle.
@@ -85,9 +125,20 @@ function resolveExecutingModel(modelRegistry: ModelRegistry) {
  * sandbox and `producerWorkingDirectory` is the only thing that may answer the question; there is no fallback
  * arm, so an unresolvable workspace REFUSES the session rather than quietly restoring the defect.
  *
+ * ⭐⭐ JAN-EXEC PHASE 3 — THE STEP'S GRANT DECIDES THE MODEL'S HANDS, **BY ABSENCE**. `mintExecutionTools` is
+ * handed the capabilities the RUNTIME_BINDING currently grants and returns only the tools they authorise; an
+ * ungranted tool is never constructed, never named to Pi, and therefore never offered to the model. There is no
+ * call to intercept and no refusal path to get wrong. ⛔ A capability check INSIDE a tool handed over anyway
+ * would be strictly weaker — it depends on the check firing, and it advertises the privilege.
+ *
+ * ⭐ AND THE ADAPTER NOW WATCHES ITS OWN SESSION, which is what `R11`'s `observedToolCalls` has been waiting
+ * for. `OBSERVED` and `NONE_OBSERVED` had NO PRODUCER at HEAD, by construction: this adapter minted nothing and
+ * subscribed to nothing. Both are now reachable, and the reported facts are the ADAPTER's — §22.1 makes the
+ * model's account untrusted external input, so *"the model said it ran the tests"* is not evidence that tests ran.
+ *
  * ⚠ IT THROWS, MATCHING `resolveExecutingModel` DIRECTLY ABOVE, and for the same reason `REG-D-052` gives for
- * the model: a producer identity — or here, a producer LOCATION — may not be a fiction. The caller records it
- * as a failed step rather than letting it escape as a 500.
+ * the model: a producer identity — or here, a producer LOCATION or TOOL SURFACE — may not be a fiction. The
+ * caller records it as a failed step rather than letting it escape as a 500.
  */
 export async function openPiExecutionSession(
 	context: ProducerSessionContext
@@ -95,6 +146,20 @@ export async function openPiExecutionSession(
 	const working = producerWorkingDirectory(context);
 	if (!working.resolved) throw new Error(working.refusedBecause);
 	const cwd = working.directoryPath;
+
+	// ⛔ MINTED BEFORE THE SESSION EXISTS, AND THAT ORDER IS THE POINT. `mintExecutionTools` refuses a catalog
+	// name the permanent record plane could not hold; doing that here means the refusal lands before a model has
+	// been told anything, before a turn is taken, and before any exchange record is owed. The same argument
+	// `run-model-step.ts` makes for checking the binding *"before the prompt is rendered and before any model is
+	// called"* — a check that fires afterwards disclosed the harm afterwards.
+	const tools = mintExecutionTools({
+		ports: { workspace: context.workspace, runner: context.runner },
+		grantedCapabilities: context.grantedCapabilities,
+		// ⛔ `B-1` — THE STATUS TRAVELS WITH THE LIST, because a REVOKED binding still lists what it granted.
+		bindingAuthorizationStatus: context.bindingAuthorizationStatus
+	});
+	const mintedToolNames = tools.map((t) => t.name);
+	const observer = createToolCallObserver();
 
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
@@ -112,8 +177,11 @@ export async function openPiExecutionSession(
 	const created = await createAgentSession({
 		model,
 		thinkingLevel: 'off',
+		// ⛔ PI'S OWN CODING TOOLS STAY OFF. `noTools: 'builtin'` is what makes `mintedToolNames` a COMPLETE
+		// statement about the model's surface rather than a partial one: with the built-ins live, the model
+		// would hold a shell this host never minted, never observed and could not report.
 		noTools: 'builtin',
-		customTools: [],
+		customTools: toPiExecutionTools(tools),
 		resourceLoader: loader,
 		// ⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
 		// so the memory this change adds is per-unit and process-local, which the design states rather than
@@ -134,14 +202,53 @@ export async function openPiExecutionSession(
 	const inputs = createMaterializedInputRecorder();
 	inputs.install(session.agent as unknown as PayloadHookHost);
 
+	// ⭐⭐ `B-2` — WHAT THIS ADAPTER SAW ON THE TURN THAT IS RUNNING, HELD SO A **THROW** CANNOT LOSE IT.
+	//
+	// ⛔ THE MEASUREMENT IS ALREADY TAKEN WHEN THE FAILURE ARRIVES. `observer` is SESSION-scoped, the
+	// subscription is opened inside `turn()` and closed in its `finally`, so every `tool_execution_start` /
+	// `_end` that reached this host before `session.prompt` rejected is already in it. Reporting the calls only
+	// through the RETURN VALUE made them unreachable on exactly the path where they matter most — the caller's
+	// catch arm then recorded `NOT_OBSERVABLE` *"nothing was in a position to observe tool calls"*, which was
+	// FALSE of this adapter and collapsed `R11`'s *"nothing could look"* into *"the call failed"*.
+	//
+	// ⚠ ITS INITIAL VALUE IS A REFUSAL TO GUESS, not an empty observation. Before any turn there is no turn to
+	// report on, and `canObserve: true` with an empty `calls` would read as a MEASUREMENT — the exact
+	// fabrication `governedToolCallReport` refuses when it declines to call an absence of looking
+	// `NONE_OBSERVED`.
+	let lastTurn: AdapterToolObservation = {
+		canObserve: false,
+		reason:
+			'This session has taken no turn yet, so there is no turn for this adapter to report an observation ' +
+			'about. It is not evidence that no tool ran.'
+	};
+
 	return {
 		retainsHistory: true,
+		lastTurnObservation: () => lastTurn,
 		dispose: () => session.dispose(),
 		async turn(text: string): Promise<ToolInvocationResult> {
 			let answer = '';
 			let reasoning = '';
 			const before = inputs.captured().length;
+			// ⭐ THE MARKER THAT MAKES THE OBSERVATION PER-TURN. The observer spans the whole SESSION (it must:
+			// Pi dispatches tool calls inside `prompt`, across an unknown number of provider round trips), and a
+			// repair turn's record must name the calls THAT turn made — not the ones its predecessor made, which
+			// are already recorded on their own exchange. Same idiom, same reason, as `inputs.captured().length`
+			// one line up.
+			const callsBefore = observer.count();
 			const unsubscribe = session.subscribe((event) => {
+				// ⭐⭐ R11 / PHASE 3 — THE ADAPTER'S OBSERVATION, TAKEN FROM THE SESSION AND NOT FROM THE ANSWER.
+				// §22.1 makes the model's account untrusted external input; these two arms are what the host
+				// itself watched happen. ⚠ `tool_execution_update` is deliberately NOT handled: a partial result
+				// is not an outcome, and treating one as an end would grade a call that is still running.
+				if (event.type === 'tool_execution_start') {
+					observer.started(event.toolCallId, event.toolName);
+					return;
+				}
+				if (event.type === 'tool_execution_end') {
+					observer.ended(event.toolCallId, event.result, event.isError);
+					return;
+				}
 				if (event.type !== 'message_update') return;
 				const e = event.assistantMessageEvent;
 				if (e.type === 'text_delta') answer += e.delta;
@@ -154,6 +261,17 @@ export async function openPiExecutionSession(
 				await session.prompt(text);
 			} finally {
 				unsubscribe();
+				// ⛔ IN THE `finally`, SO THE FAILING PATH AND THE SUCCEEDING PATH RECORD THE SAME MEASUREMENT.
+				// Writing it after the `try` would leave it unset for exactly the case it exists for, and
+				// writing it in a `catch` would make the two paths disagree about which calls belong to this
+				// turn. ⚠ NOTHING HERE MAY THROW: `since` is a slice over an in-memory array — the rule this
+				// repository files as "cleanup must survive" — because a throw from a `finally` would replace the
+				// model's real failure with this line's.
+				lastTurn = {
+					canObserve: true,
+					mintedToolNames,
+					calls: observer.since(callsBefore)
+				};
 			}
 
 			// The payloads this turn produced — one per provider request, so a repair/retry inside Pi is included.
@@ -170,35 +288,30 @@ export async function openPiExecutionSession(
 					providerId: model.provider
 				},
 				identityEvidence: 'PROVIDER_REPORTED',
-				// ⭐⭐ R11 — AND THE ANSWER IS *NOT OBSERVABLE*, WHICH IS TWO MEASURED FACTS RATHER THAN A SHRUG.
+				// ⭐⭐ R11 / JAN-EXEC PHASE 3 — AND THE ANSWER IS NOW AN **OBSERVATION**, WHICH IS WHAT `R11`
+				// RECORDED AS OWED HERE.
 				//
-				//   (1) NO TOOL SURFACE EXISTS TO OBSERVE. `createAgentSession` above is called with
-				//       `noTools: 'builtin'` and `customTools: []` — readable twenty lines up, in this file —
-				//       so this host mints the executing model nothing to call.
-				//   (2) THIS ADAPTER DOES NOT SUBSCRIBE TO PI'S TOOL EVENTS. `session.subscribe` above handles
-				//       `text_delta` and `thinking_delta` and nothing else, so even a minted call would pass
-				//       unseen here.
+				// ~~(1) NO TOOL SURFACE EXISTS TO OBSERVE … (2) THIS ADAPTER DOES NOT SUBSCRIBE TO PI'S TOOL
+				// EVENTS.~~ Both statements were TRUE and both are now FALSE, in this file, ninety lines apart:
+				// `createAgentSession` above is called with `customTools: toPiExecutionTools(tools)`, and the
+				// subscription above handles `tool_execution_start` and `tool_execution_end`. `R11`'s `W6` said
+				// *"`OBSERVED` and `NONE_OBSERVED` have no producer until Phase 3"* — this is that producer.
 				//
-				// ⛔ `NONE_OBSERVED` WOULD BE A FABRICATED MEASUREMENT. It asserts that an instrument looked and
-				// saw nothing; (2) says no instrument looked. Grading an absence of looking as a clean result is
-				// the defect `ResolvedModelIdentity` exists to prevent one field over — and it is the reading a
-				// bare optional field would have produced for free.
+				// ⛔ AND IT IS STILL NOT THE MODEL'S ACCOUNT. Every field below comes from the SESSION'S event
+				// stream, watched by this host; nothing is parsed out of `answer`. §22.1 classifies model output
+				// as untrusted external input, so *"the model said it ran the tests"* is not evidence that tests
+				// ran — and the whole value of this arm is that it is a different witness.
 				//
-				// ⭑ JAN-EXEC PHASE 3 (capability → tools, by absence) IS THE INCREMENT THAT CHANGES BOTH, and
-				// when it does this arm becomes `{ canObserve: true, mintedToolNames, calls }`.
+				// ⭑ `mintedToolNames` IS THE SURFACE THIS SESSION ACTUALLY HAD, which is what makes
+				// `NONE_OBSERVED` a MEASUREMENT rather than an absence: a reader learns both that nothing was
+				// called AND what there was to call. With a capability ungranted the list is shorter, and the
+				// record says so without anything having to describe the withholding in prose.
 				observedToolCalls: {
-					canObserve: false,
-					reason:
-						'The Pi execution adapter mints no tool surface and watches no tool events. This host opens ' +
-						"the executing session with noTools:'builtin' and customTools:[], so the model has nothing " +
-						'to call; and this adapter subscribes only to text and thinking deltas, so it could not ' +
-						'report a call even if one were minted. ⛔ This is NOT a statement that no tool ran — it is ' +
-						'a statement that nothing here was in a position to see one. JAN-EXEC Phase 3 mints the ' +
-						"step's granted capabilities as tools and is where this becomes an observation."
+					canObserve: true,
+					mintedToolNames,
+					calls: observer.since(callsBefore)
 				},
-				...(composite === undefined
-					? {}
-					: { materializedInput: JSON.stringify(composite) })
+				...(composite === undefined ? {} : { materializedInput: JSON.stringify(composite) })
 			};
 		}
 	};

@@ -31,6 +31,19 @@
 //   · `createChildProcessRunner` REFUSES to be constructed against a workspace whose bytes could never be
 //     purged, or one that has no bytes on a disk at all — the disposition made structural, and the last cases.
 //
+// ══ ⭐⭐ AND A SECOND DOOR OPENED IN JAN-EXEC PHASE 3 — WHO HANDS THE STREAMS TO A MODEL ══════════════════════
+//
+// Phase 2b answered WHO CAPTURES them. Phase 3 mints `run_command`, and a command whose output the model cannot
+// read is a command the model cannot act on — so both streams are handed back as the tool's result, which puts
+// them in the model's context and therefore in the E-1 composite the exchange record stores. ⛔ THAT IS A
+// SECOND RETENTION SURFACE AND THIS GATE CAUGHT IT, which is the gate working: the binding arrived and the
+// answer had to be re-stated before the commit could go green.
+//
+// ⭐ ITS DISPOSITION IS AT `DISPOSED_STDERR_SITES` BELOW AND IN THE BINDING FILE'S OWN HEADER, and its shape is
+// this: the class follows `REG-D-050` (participation is a property of USE), the bytes land on the CONTENT plane
+// which `PER-9` gives a removal path, and the RECORD plane — which has none — receives no byte of either stream
+// because `ObservedToolCall` has no field that could hold one. ⚠ The residual is stated rather than smoothed.
+//
 // ⛔ AND THE GATE IS TIGHTENED WHERE IT IS NARROWED, DELIBERATELY. One file leaves the absence population, so
 // four limbs the previous gate was structurally unable to make are added against that file and the original
 // subject:
@@ -108,7 +121,29 @@ const DEMO_PREFIX = 'apps/rph-demo/src/';
  * warranted, add it here AND record its disposition the way `child-process-runner.ts` records its own — never
  * to get a suite green.
  */
-const DISPOSED_STDERR_SITES = ['lib/server/execution/child-process-runner.ts'];
+/**
+ * ⭐⭐ THE SITES THAT HAVE A RETENTION DISPOSITION. Two, since JAN-EXEC Phase 3, and the SECOND is a DIFFERENT
+ * question from the first rather than more of the same one.
+ *
+ *   1. `child-process-runner.ts` — WHO CAPTURES. Phase 2b, sponsor ruling `R7`: both streams retained, both
+ *      `PURGEABLE_AT_EXPIRY` in a SECOND workspace, referenced by `ProcessRunOutcome.retention`, reachable by
+ *      `Workspace.purge` — and the adapter REFUSES to be constructed where any of that is untrue.
+ *   2. `execution-tool-surface.ts` — WHO HANDS THEM TO A MODEL. Phase 3, and its class is decided by
+ *      `REG-D-050` (*participation is a property of USE, not of kind*): the model READS this output and its
+ *      next work product rests on it, so the bytes land in the E-1 composite `captureTry` stores
+ *      `RETAINED_BY_PARTICIPATION`. ⭑ THAT IS THE CONTENT PLANE, WHICH `PER-9` GIVES A LAWFUL REMOVAL PATH
+ *      (E-6 redaction) AND THE RECORD PLANE NONE — and no byte of either stream reaches the record plane,
+ *      because `ObservedToolCall` has no arguments field and no result field BY CONSTRUCTION (`R11`).
+ *      ⚠ ITS RESIDUAL IS WRITTEN IN THAT FILE AND IS NOT CLOSED: a build that prints its environment puts
+ *      those bytes where only an E-6 redaction can reach them, and nothing here performs one yet.
+ *
+ * ⛔ A THIRD ENTRY NEEDS THE EQUIVALENT WRITTEN IN THE SAME COMMIT AS THE BINDING — which is what the pin
+ * below is for: widening this list is an act a reviewer sees rather than a line that appeared.
+ */
+const DISPOSED_STDERR_SITES = [
+	'lib/server/execution/child-process-runner.ts',
+	'lib/server/tools/execution-tool-surface.ts'
+];
 
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
 const THE_ORIGINAL_SUBJECT = 'lib/server/assurance/agy-cli.ts';
@@ -429,10 +464,13 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 		).toBeGreaterThan(0);
 	});
 
-	it('⛔ the disposed-site list is PINNED at ONE — widening it is a deliberate, visible act', () => {
+	it('⛔ the disposed-site list is PINNED — widening it is a deliberate, visible act', () => {
 		// ⭑ THE `slice-subsumption.test.ts` IDIOM: a population that may only move by someone editing this literal
 		// and recording why. A list that grows quietly is how an exemption becomes a policy.
-		expect(DISPOSED_STDERR_SITES).toEqual(['lib/server/execution/child-process-runner.ts']);
+		expect(DISPOSED_STDERR_SITES).toEqual([
+			'lib/server/execution/child-process-runner.ts',
+			'lib/server/tools/execution-tool-surface.ts'
+		]);
 	});
 
 	it('⛔ every disposed site EXISTS — a stale exemption would silently re-open the hatch', () => {

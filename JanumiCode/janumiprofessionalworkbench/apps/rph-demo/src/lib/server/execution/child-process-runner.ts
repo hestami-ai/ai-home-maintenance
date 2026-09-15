@@ -124,6 +124,15 @@
 // ⛔ WHAT IS NOT CLAIMED: a model naming `cmd.exe` or `powershell.exe` AS THE PROGRAM gets a command
 // interpreter, because it asked for one. That is an argv policy belonging to the phase that lets a model choose
 // an argv, not to the no-shell guarantee — which is about what THIS CODE interposes.
+// ⭐⭐ **AND THAT DEFERRAL'S OWNER HAS ARRIVED AND ANSWERED IT: `R13` (SPONSOR, 2026-09-15).** JAN-EXEC Phase 3
+// is the phase that lets a model choose an argv, it was DRIVEN (`cmd.exe` as `argv[0]` runs; `namesABatchTarget`
+// tests only the `.bat`/`.cmd` extension), and the ruling is ⛔ **DO NOT ADD A BLOCKLIST**: refusing `cmd.exe`
+// while permitting `node -e` is theatre, and a later reader would mistake the refusal for a containment
+// property. What is recorded instead is the fact — **granting `process-execution` means arbitrary code as the
+// server user**, with `R9`'s deployment tier as the only claimed boundary. ⚠ The batch refusal above is NOT that
+// blocklist and is not weakened by this: it exists because Win32 re-parses a batch command line so that an
+// ARGUMENT becomes a command, which is a defect in the no-shell guarantee this code makes — not an attempt to
+// decide which programs a granted step may run.
 //
 // ── ⛔ B8 — THE `cwd` IS NOT THE CALLER'S TO CHOOSE, AND THE FIX IS STRUCTURAL ────────────────────────────────
 // `ProcessRunRequest.cwd` is a required string, `planProcessRun` is a plain function with ZERO production call

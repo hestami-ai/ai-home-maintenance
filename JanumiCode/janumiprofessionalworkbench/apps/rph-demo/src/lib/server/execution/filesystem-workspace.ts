@@ -77,18 +77,39 @@
 // exposure and "nothing in this host creates one", and the vector that arrived needed no symlink and no right
 // to make one. An exposure whose PRECONDITION is overstated reads as closed.
 //
-//  1. HARD LINK — ⛔ **OPEN, AND REPORTED AS IN-WORKSPACE.** Driven: a `mklink /H` hard link placed inside the
-//     workspace, pointing at a file outside it, was READ (`SECRET=1`), OVERWRITTEN by `writeFile`, and named by
-//     `list()` as an ordinary in-workspace entry. Both filesystem questions this adapter knows how to ask answer
-//     "contained": `lstat` reports `isSymbolicLink() === false` and `isFile() === true`, and `realpath` returns
-//     THE LINK'S OWN PATH under the root — because a hard link is a second NAME for one file, not a pointer to
-//     another. The only signal is `nlink === 2`, which says a second name exists and nothing whatever about
-//     WHERE it is: a lawful second link inside the workspace reports the same 2.
+//  1. HARD LINK — ⛔ **OPEN AS A READ AND A WRITE; NO LONGER UNREPORTED.** Driven: a `mklink /H` hard link
+//     placed inside the workspace, pointing at a file outside it, was READ (`SECRET=1`), OVERWRITTEN by
+//     `writeFile`, and named by `list()` as an ordinary in-workspace entry. Both filesystem questions this
+//     adapter knows how to ask answer "contained": `lstat` reports `isSymbolicLink() === false` and
+//     `isFile() === true`, and `realpath` returns THE LINK'S OWN PATH under the root — because a hard link is a
+//     second NAME for one file, not a pointer to another. The only signal is `nlink`, which says how many names
+//     exist and nothing whatever about WHERE they are: a lawful second link inside the workspace reports 2 too.
+//     ⛔⛔ **THE DISCLOSURE'S PREMISE CHANGED UNDER `R12`, AND THE BEHAVIOUR COULD NOT — SO THE STATEMENT DID.**
+//     This was disclosed as an exposure to *a party with filesystem access*, which read as a party OTHER than
+//     the step: something already on the host, planting a link beside work this seam then touched. Since JAN-EXEC
+//     Phase 3 **the executing model IS that party** — `run_command` runs arbitrary code as the server user
+//     (`R12`/`R13`) — so this is no longer a hazard the workspace might encounter, it is a vector the workspace's
+//     own tenant can create on purpose, and it was driven that way: plant the link with `run_command`, write
+//     through the CONTAINED `write_file`, and the inventory named another undertaking's file as this workspace's.
+//     ⭐ **WHAT CHANGED IN CODE IS THE ONE THING THAT COULD: `WorkspaceEntry.nameCount`.** Under `R12` the WRITE
+//     is a stated property of granting `process-execution` and this adapter cannot take it back. The false
+//     INVENTORY is not a stated property of anything, and it is a RECORD-plane defect regardless of who could
+//     reach it — so `list()` now reports the filesystem's own name count and the inventory stops asserting
+//     exclusivity it cannot support. ⚠ WHAT IS STILL NOT CLAIMED: the count says a name is SHARED, never where
+//     the other name is; the filesystem answers the first question and answers the second to nobody.
 //  2. ROOT SWAP — ⛔ **OPEN, PERSISTENT AND UNDETECTED.** A junction standing where the workspace ROOT was
 //     redirects the ENTIRE workspace: `realpath(root)` resolves to the attacker's directory, every child then
 //     resolves under it, and containment holds — against the wrong root. Driven: a planted file was read
 //     through the workspace and a step's write landed outside it. ⚠ This is NOT the TOCTOU race below: nothing
 //     is swapped mid-call, and the redirection survives a restart.
+//     ⛔ **AND SINCE PHASE 3 THE TWO TOOLS ONE MODEL HOLDS DISAGREE ABOUT IT (`W-6`).** `write_file` WRITES
+//     (through this adapter, into the junction's target, reported as an ordinary in-workspace path) while
+//     `run_command` REFUSES — the runner compares the RESOLVED `cwd` against the directory the host DECLARED,
+//     which is the one name a swap cannot move, and a containment predicate has no such declaration to compare
+//     against. Both halves were disclosed separately and both are still true; what was missing until Phase 3 is
+//     that ONE party now holds both, and its experience of a swapped workspace is *writes succeed, commands
+//     refuse*. The joint statement lives in `tools/execution-tool-surface.ts`, where that party's surface is
+//     minted, so it is made once rather than assembled from two files.
 //  3. JUNCTION OR SYMLINK INSIDE THE WORKSPACE — ⭑ **REFUSED**, and this is the one that IS closed. `locate`
 //     resolves the deepest EXISTING ancestor with `realpath` — which resolves junctions, measured — and
 //     requires it to be inside the resolved root; `livePaths` walks with `lstat` and neither descends into a
@@ -100,11 +121,18 @@
 //     `list()` still cannot ENUMERATE streams and no adapter written on `node:fs` can — there is no API — so a
 //     stream attached by anything else (a child process under Phase 3, a tool run outside this seam) holds
 //     bytes this inventory does not name. **UNREPORTED, not refused.**
-//  5. 8.3 SHORT NAMES — ⭑ **NO LONGER A CONTAINMENT VECTOR; STILL AN ALIASING ONE.** With the record outside
-//     the workspace, `JPWB-W~1.JSO` reaches nothing it did not already own. Two LONG names a step writes into
-//     one directory can still collide through their generated short names, in which case one write lands on the
-//     other's bytes — an intra-workspace aliasing fact, not an escape, and `list()` still names every file
-//     that exists.
+//  5. 8.3 SHORT NAMES AND CASE — ⭑ **NO LONGER A CONTAINMENT VECTOR; THE ALIASING IS NOW REPORTED RATHER THAN
+//     SILENT.** With the record outside the workspace, `JPWB-W~1.JSO` reaches nothing it did not already own.
+//     ⛔ WHAT WAS STILL WRONG WAS WHAT A CALLER WAS TOLD (`B-7`): two spellings of ONE file each got back their
+//     OWN spelling from `writeFile` — *"Wrote N bytes to Report.md"*, *"Wrote N bytes to REPORT.MD"* — while
+//     `list()` reported ONE entry, so a model reading two answers had two files and the filesystem had one.
+//     ⭐ `locate` now returns the spelling the DIRECTORY holds, found by exact match against its own listing and
+//     otherwise by file identity (`dev`+`ino`) — so `writeFile`, `readFile`, `purge` and the TOMBSTONE KEY all
+//     name the path `list()` reports. ⚠ NO CASE RULE AND NO 8.3 RULE WAS WRITTEN: both classes are answered by
+//     asking the filesystem which entry this is, which is why neither had to be recognised.
+//     ⚠ STILL TRUE, AND NOT CLOSED BY THAT: two LONG names a step writes into one directory can collide through
+//     their generated short names, in which case one write lands on the other's bytes. The caller is now told
+//     the surviving spelling instead of its own, which makes the collision VISIBLE; it does not prevent it.
 //
 // ⚠ AND THE INVENTORY IS BOUNDED IN THE OTHER DIRECTION TOO: `list()` reports what is UNDER the root, so on a
 // case-sensitive host a foreign process can leave a name this workspace's own predicate refuses (`a:b`, or a
@@ -128,6 +156,7 @@ import {
 	stat,
 	writeFile as fsWriteFile
 } from 'node:fs/promises';
+import type { BigIntStats } from 'node:fs';
 import { basename, dirname, join, resolve as resolvePath, sep } from 'node:path';
 import {
 	containedWorkspacePath,
@@ -190,6 +219,24 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 	 * ⛔ BOTH OF THOSE ARE PROPERTIES OF THE PATH TEXT, AND A JUNCTION DEFEATS BOTH — which is what
 	 * `insideResolvedRoot` is for, and why this function is async. `escape/.env` is a tidy relative path under
 	 * the root no matter what `escape` actually is on disk.
+	 *
+	 * ── ⭐⭐ `B-7` — AND THE SPELLING IT RETURNS IS THE ONE THE FILESYSTEM HOLDS, NOT THE ONE IT WAS GIVEN ──────
+	 *
+	 * DRIVEN: `writeFile('Report.md')` then `writeFile('REPORT.MD')` each answered *"Wrote N bytes to X"* with
+	 * the caller's own spelling, while `list()` reported ONE entry — so a model told *"writing the same path
+	 * again replaces it"* read two answers as two files, and the second write silently replaced the first. ⛔ THE
+	 * BROKEN INVARIANT IS EXACTLY THIS: **a path `writeFile` reports must be a path `list()` reports.**
+	 *
+	 * ⭑ IT IS FIXED BY ASKING THE FILESYSTEM, NEVER BY FOLDING CASE — the discipline the header already states,
+	 * and the mistake the retention record's guard already made once (`toLowerCase()` folds MORE than NTFS does).
+	 * `heldSpelling` compares by EXACT equality against the directory's own listing and, when the exact name is
+	 * absent, identifies the entry by FILE IDENTITY (`dev`+`ino`). No normaliser, no case rule, no 8.3 rule: the
+	 * two aliasing classes this host has (case folding and the NTFS 8.3 alias) are answered by the same question
+	 * without either being named.
+	 *
+	 * ⚠ AND IT IS IN `locate`, NOT IN `writeFile`, so `readFile`, `purge` and the TOMBSTONE KEY agree with the
+	 * inventory too. A tombstone keyed by a spelling `list()` never reports is a retention record naming a path
+	 * nobody can find.
 	 */
 	async function locate(
 		path: string
@@ -198,7 +245,62 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 		if (rel === undefined) return undefined;
 		const abs = resolvePath(root, rel);
 		if (abs !== root && !abs.startsWith(root + sep)) return undefined;
-		return (await insideResolvedRoot(abs)) ? { rel, abs } : undefined;
+		if (!(await insideResolvedRoot(abs))) return undefined;
+		const held = await heldSpelling(abs);
+		// ⚠ `undefined` MEANS "NOTHING IS THERE YET, OR THE FILESYSTEM WOULD NOT SAY", and in both cases the
+		// caller's spelling is the right answer: a path that does not exist will be created under the name it
+		// was given, and a filesystem that will not identify its own entry is not one to invent an answer for.
+		if (held === undefined || held === basename(abs)) return { rel, abs };
+		const parentRel = rel.slice(0, rel.length - basename(abs).length);
+		return { rel: `${parentRel}${held}`, abs: join(dirname(abs), held) };
+	}
+
+	/**
+	 * The name THIS DIRECTORY holds for the file at `abs`, or `undefined` when nothing is there to hold one.
+	 *
+	 * ⛔ TWO QUESTIONS, BOTH PUT TO THE FILESYSTEM, AND NEITHER A COMPARISON OF SPELLINGS. First: is the exact
+	 * basename in the directory's own listing? On a case-SENSITIVE host it always is when the file exists, so
+	 * this costs one `readdir` and returns immediately. Second, only when it is not: which listed entry IS this
+	 * file? Answered by `dev`+`ino`, the filesystem's own identity for a file, which both aliasing classes on
+	 * this host (case folding; the NTFS 8.3 alias) preserve because they are two NAMES for ONE file.
+	 *
+	 * ⛔⛔ `bigint: true`, AND THAT IS NOT A STYLE CHOICE — IT WAS MEASURED. A default `Stats.ino` is a JS NUMBER,
+	 * and on this host an NTFS file id came back as `128634064358016640`, **more than fourteen times
+	 * `Number.MAX_SAFE_INTEGER`**. Two genuinely different files can therefore round to the SAME double, and the
+	 * consequence would not be a missed match — it would be a WRITE REDIRECTED ONTO SOMEBODY ELSE'S FILE by the
+	 * very function added to stop one file wearing two names. The BigInt form is exact under both runtimes this
+	 * repository runs (measured: node 24 and bun 1.3.14 both return `bigint` for `ino` and `dev`).
+	 *
+	 * ⚠ `ino === 0n` IS TREATED AS "NO IDENTITY AVAILABLE" rather than as a match. A filesystem that reports no
+	 * inode would otherwise make every entry equal to every other, and the first one listed would be returned as
+	 * the held spelling of a file it has nothing to do with — a fabricated answer arriving through the arm that
+	 * was trying to be helpful.
+	 */
+	async function heldSpelling(abs: string): Promise<string | undefined> {
+		const exact = basename(abs);
+		let names: string[];
+		let target: BigIntStats;
+		try {
+			target = await stat(abs, { bigint: true });
+			names = await readdir(dirname(abs));
+		} catch {
+			return undefined;
+		}
+		if (names.includes(exact)) return exact;
+		if (target.ino === 0n) return undefined;
+		for (const name of names) {
+			let sibling: BigIntStats;
+			try {
+				sibling = await stat(join(dirname(abs), name), { bigint: true });
+			} catch {
+				continue;
+			}
+			// ⛔ BOTH HALVES OF THE IDENTITY. An inode number is unique within a VOLUME, not across volumes, and a
+			// directory can contain a mount point; comparing `ino` alone would call two files on different
+			// volumes the same file.
+			if (sibling.ino === target.ino && sibling.dev === target.dev) return name;
+		}
+		return undefined;
 	}
 
 	/**
@@ -343,11 +445,22 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 			await livePaths(root, '', live);
 			const stones = await readTombstones();
 			const entries: WorkspaceEntry[] = [];
-			for (const rel of live) entries.push({ path: rel, byteSize: (await stat(join(root, rel))).size, purged: false });
+			for (const rel of live) {
+				// ⭐⭐ `B-6` — THE INVENTORY STOPS CLAIMING EXCLUSIVITY IT CANNOT SUPPORT. `nlink` is the filesystem's
+				// own count of the NAMES that hold these bytes, and it is the ONE fact available about a hard link:
+				// `lstat` calls it a plain file, `realpath` answers with the link's own in-workspace path, and a
+				// second name says nothing whatever about WHERE it is. ⛔ SO THE COUNT IS REPORTED AND THE LOCATION
+				// IS NOT — reporting `> 1` is honest, inventing an "outside the workspace" would not be, and
+				// SUPPRESSING the entry would under-report a file that genuinely is in this directory.
+				const info = await stat(join(root, rel));
+				entries.push({ path: rel, byteSize: info.size, purged: false, nameCount: info.nlink });
+			}
 			const present = new Set(live);
 			for (const [rel, stone] of Object.entries(stones)) {
 				if (present.has(rel)) continue;
-				entries.push({ path: rel, byteSize: stone.byteSize, purged: true });
+				// ⚠ `1` FOR A PURGED ENTRY, AND IT IS A STATEMENT ABOUT THE PRESENT. The bytes are gone, so there
+				// is nothing left for a second name to hold; `byteSize` is what carries WHAT WAS REMOVED.
+				entries.push({ path: rel, byteSize: stone.byteSize, purged: true, nameCount: 1 });
 			}
 			return entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 		},

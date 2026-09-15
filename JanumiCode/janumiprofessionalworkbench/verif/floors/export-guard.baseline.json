@@ -828,6 +828,7 @@
 				"bindingAuthorityVerdict",
 				"canActivatePlan",
 				"canResumeExecutionOnPwu",
+				"canReuseBindingForNewAttempt",
 				"canSkipStep",
 				"capabilityAuthorized",
 				"capabilityIdentities",
@@ -847,6 +848,7 @@
 				"bindingAuthorityVerdict",
 				"canActivatePlan",
 				"canResumeExecutionOnPwu",
+				"canReuseBindingForNewAttempt",
 				"canSkipStep",
 				"capabilityAuthorized",
 				"capabilityIdentities",
@@ -1212,11 +1214,13 @@
 		"packages/rph-ports/src/ports/process-runner.ts": {
 			"consumedExports": [
 				"namesABatchTarget",
+				"planProcessRun",
 				"programFileName",
 				"workspaceDirectoryName"
 			],
 			"guardedExports": [
 				"namesABatchTarget",
+				"planProcessRun",
 				"programFileName",
 				"workspaceDirectoryName"
 			],

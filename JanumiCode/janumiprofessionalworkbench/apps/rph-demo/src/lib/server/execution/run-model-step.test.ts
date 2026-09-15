@@ -9,6 +9,7 @@ import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-
 import { assembledSources, runModelInvocationStep } from './run-model-step.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
+import { stepBindingFor } from './step-binding.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -22,6 +23,13 @@ const UNOBSERVED = {
 	canObserve: false as const,
 	reason: 'Fixture: this stand-in returns an answer and observes nothing.'
 };
+
+/**
+ * The status a live, usable binding carries. ⛔ NAMED RATHER THAN SPELLED PER ARRANGEMENT, so the REVOKED cases
+ * below differ from every other case by ONE token and nothing else — an arrangement that differed in two places
+ * would leave the refusal attributable to either.
+ */
+const AUTHORIZED = 'AUTHORIZED';
 
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
@@ -325,6 +333,7 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 			session: {
 				retainsHistory: true,
 				dispose: () => undefined,
+				lastTurnObservation: () => UNOBSERVED,
 				turn: async (text: string) => {
 					turns.push(text);
 					return ANSWER;
@@ -475,12 +484,13 @@ describe('OC-02 — the reviewer is handed the contract as part of the instructi
 // grounds are now false — `runModelInvocationStep` IS the broker, and `execution-invocation.ts:3-8` already
 // refutes the first sentence against the Guide. ⛔ The OPERATION tier stays the Platform's and is NOT built.
 describe('EG-03 — the binding must still authorize the invocation', () => {
-	const BINDING = {
-		runtimeBindingId: 'bind_1',
-		executionStepId: 'step_1',
-		roleId: 'MODEL',
-		requestedCapabilities: [{ capability: 'network' }]
-	} as const;
+	// ⭐⭐ THE PRODUCTION TABLE, NOT A HAND-WRITTEN ONE, AND JAN-EXEC PHASE 3 IS WHY THAT CHANGED. This used to
+	// be a literal `[{capability:'network'}]`, which was the whole request at the time. The request is now
+	// derived from the step type's REQUIRES/USES needs, and a literal here would assert against a table this
+	// suite invented — so a needs table that drifted from the one production uses would still be green.
+	// ⛔ `!` IS SAFE AND IS THE POINT: a MODEL_INVOCATION on a MODEL type is exactly the case that IS bound, and
+	// `step-binding.test.ts` is where the `undefined` arms are driven.
+	const BINDING = stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_1', 'step_1')!;
 
 	it('⭑⭑ REFUSES when the stored grant no longer covers what the step needs — BEFORE any model call', async () => {
 		// ⚠ THE ASSERTION THAT MATTERS IS `calls === 0`. A refusal that fires after the model has answered has
@@ -492,7 +502,12 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 				calls += 1;
 				return ANSWER;
 			}),
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: [] }
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: [],
+				authorizationStatus: AUTHORIZED
+			}
 		});
 		const out = await runModelInvocationStep(input);
 		expect(out.ran).toBe(false);
@@ -504,7 +519,12 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 		// A refusal a reader cannot act on is the silent omission `PER-9` forbids one layer up. THE MUTANT:
 		// return a bare boolean and let the caller invent a message.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['file-system'] }
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['file-system'],
+				authorizationStatus: AUTHORIZED
+			}
 		});
 		const out = await runModelInvocationStep(input);
 		expect(!out.ran && out.refusedBecause).toMatch(/RPH_CAPABILITY_NOT_GRANTED/);
@@ -516,7 +536,12 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 	it('⭑ CONTROL — a binding that DOES grant it proceeds, so this is not "refuse everything"', async () => {
 		// ⛔ Without this the check is satisfiable by refusing unconditionally, and `EG-02`'s whole path breaks.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network'] }
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network'],
+				authorizationStatus: AUTHORIZED
+			}
 		});
 		expect((await runModelInvocationStep(input)).ran).toBe(true);
 	});
@@ -532,10 +557,150 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 		// `RPH-EXE-004`'s example grants a subset and fails the operation outside it; nothing says a grant may
 		// not exceed the request. THE MUTANT: compare the two sets for equality — a binding authorized for more
 		// than this step asked would refuse a step it plainly covers.
+		// ⚠ THE ARRANGEMENT HAD TO GROW WITH THE REQUEST. It read `['network','file-system']`, which WAS a
+		// superset of the one-capability request and is now a strict SUBSET of a three-capability one — so it
+		// would have gone on passing while testing a different thing entirely. Every requested capability plus
+		// one nobody asked for is what "superset" means against the table production actually uses.
 		const { input } = harness({
-			binding: { kind: 'BOUND' as const, request: BINDING, granted: ['network', 'file-system'] }
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network', 'file-system', 'process-execution', 'secrets'],
+				authorizationStatus: AUTHORIZED
+			}
 		});
 		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⭐⭐ an ungranted capability the step merely USES does NOT refuse the step — it narrows the tools', async () => {
+		// ⛔ THIS IS THE LIMB `RPH-EXE-004`'s OPERATION-LEVEL WORDING TURNS ON, and before Phase 3 it did not
+		// exist: every requested capability was REQUIRED, so an ungranted one could only ever refuse. The
+		// ratified rule degrades an OPERATION — *"network operations fail authorization"* — and grant-by-absence
+		// is how that is delivered: `process-execution` ungranted means `run_command` is never minted, and the
+		// invocation proceeds with a narrower surface.
+		// ⚠ THE MODEL IS CALLED, AND THAT IS THE ASSERTION. A refusal here would look like the check working
+		// while actually overturning the rule it claims to enforce. THE MUTANT: drop the `need !== 'REQUIRES'`
+		// guard in `stepCapabilityRefusal` — every USES capability becomes a step-killer and this goes red.
+		let calls = 0;
+		const { input } = harness({
+			session: oneShotSession(async () => {
+				calls += 1;
+				return ANSWER;
+			}),
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network', 'file-system'],
+				authorizationStatus: AUTHORIZED
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran, 'an ungranted USES capability must not refuse the step').toBe(true);
+		expect(calls, 'the model must actually be invoked').toBe(1);
+	});
+
+	// ── ⭐⭐ `B-1` — §22.1 IS A RATIFIED RULE AND IT WAS NOT ENFORCED PER TRY ──────────────────────────────────
+	//
+	// ⛔ DRIVEN END TO END BEFORE THESE WERE WRITTEN. `RevokeRuntimeCapability` advances `authorizationStatus`
+	// to REVOKED and DELIBERATELY leaves `grantedCapabilities` intact — its handler says so, because the
+	// revocation EVENT is derived from the set the binding held. So the ONLY difference between a live binding
+	// and a revoked one is the token these two cases change, and before this limb existed the two arrangements
+	// below were INDISTINGUISHABLE to every reader in the Phase 3 path.
+	//
+	// ⚠ BOTH KINDS OF NEED, DELIBERATELY, AND THE `USES` CASE IS THE ONE THAT WOULD OTHERWISE HIDE. The old
+	// disclosure claimed revocation refused a `REQUIRES` try and left a `USES` tool minted — so a suite that
+	// only drove the REQUIRES case could be satisfied by the capability limb doing the work. Here BOTH grants
+	// are FULL: every capability the step needs is present, so the capability limbs cannot fire and only the
+	// status limb can explain a refusal.
+	it('⭐⭐ a REVOKED binding refuses the next try, and the message says REVOKED rather than "not granted"', async () => {
+		let calls = 0;
+		const { input } = harness({
+			session: oneShotSession(async () => {
+				calls += 1;
+				return ANSWER;
+			}),
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				// ⛔ THE FULL GRANT, SURVIVING THE REVOCATION — which is exactly what the store holds after
+				// RevokeRuntimeCapability, and exactly why a list is not an authorization.
+				granted: ['network', 'file-system', 'process-execution'],
+				authorizationStatus: 'REVOKED'
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran, 'a revoked binding cannot back a new attempt (§22.1)').toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/is REVOKED/);
+		expect(!out.ran && out.refusedBecause).toMatch(/cannot back a new attempt/);
+		// ⛔ AND IT MUST NOT CLAIM A CAPABILITY IS MISSING. Every one of them is granted; a message saying
+		// otherwise would state something false about what this call was given, which this repository holds to
+		// be worse than no refusal at all.
+		expect(!out.ran && out.refusedBecause).not.toMatch(/does not grant/);
+		expect(calls, 'and no model is invoked').toBe(0);
+	});
+
+	it('⛔ a DENIED binding refuses too — the kernel predicate names both terminal states', async () => {
+		const { input } = harness({
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network', 'file-system', 'process-execution'],
+				authorizationStatus: 'DENIED'
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/is DENIED/);
+	});
+
+	it('⭑ CONTROL — the SAME full grant under AUTHORIZED runs, so the status limb is not "refuse everything"', async () => {
+		// ⭐ THE ARRANGEMENT DIFFERS FROM THE REVOKED CASE IN ONE TOKEN. Without this the limb is satisfied by a
+		// refusal that fires unconditionally — the shape this repository has shipped before and named *a control
+		// that cannot fail* — and the whole Phase 3 path would be dead while every assertion above stayed green.
+		const { input } = harness({
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network', 'file-system', 'process-execution'],
+				authorizationStatus: AUTHORIZED
+			}
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⭑ CONTROL — PARTIALLY_AUTHORIZED is NOT a refusal, because a narrow grant is lawful', async () => {
+		// ⚠ THE OVER-REFUSAL THIS LIMB IS MOST AT RISK OF. `grantedWithinRequest` exists because a grant NARROWER
+		// than the request is legal and expected — it is `RPH-EXE-004`'s own example and the reason the ratified
+		// machine has this state at all. A limb that refused it would strand every least-privilege authorization
+		// the platform is built to express, which is a worse failure than the one it is fixing.
+		const { input } = harness({
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['network'],
+				authorizationStatus: 'PARTIALLY_AUTHORIZED'
+			}
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⛔ CONTROL — the very same grant, with the REQUIRED capability removed, DOES refuse', async () => {
+		// ⭐ THE CONTROL FOR THE CASE ABOVE, AND IT IS ITS OWN ARRANGEMENT RATHER THAN A RE-READING. Without it
+		// "a USES capability does not refuse" is satisfied by a `stepCapabilityRefusal` that refuses NOTHING —
+		// which is the shape this repository has shipped before and named *a control that cannot fail*. Same
+		// binding, same fixture, one capability moved; only the REQUIRES limb can explain the difference.
+		const { input } = harness({
+			binding: {
+				kind: 'BOUND' as const,
+				binding: BINDING,
+				granted: ['file-system'],
+				authorizationStatus: AUTHORIZED
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/does not grant 'network'/);
+		expect(!out.ran && out.refusedBecause).toMatch(/REQUIRES/);
 	});
 });
 
@@ -700,11 +865,15 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 			declared.relation,
 			'the envelope WAS honoured, so the work product came out of a named field of the answer span'
 		).toBe('ENVELOPE_FIELD');
-		expect(declared.sourceField, 'and the record must say WHICH field, or it cannot be re-performed').toBe(
-			'workProduct'
-		);
+		expect(
+			declared.sourceField,
+			'and the record must say WHICH field, or it cannot be re-performed'
+		).toBe('workProduct');
 		// ⛔ THE WHOLE ADDRESS, NOT JUST THE KEY — a reference that cannot be verified cannot be challenged.
-		expect(declared.storageProvider, 'the provider holding the bytes, not just the key').toBeTruthy();
+		expect(
+			declared.storageProvider,
+			'the provider holding the bytes, not just the key'
+		).toBeTruthy();
 		expect(declared.storageKey).toBe(out.storageKey);
 		expect(declared.contentHash).toBe(out.contentHash);
 		expect(declared.byteSize).toBe(out.byteSize);
@@ -813,6 +982,101 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		// an untrusted diagnostic is a second copy nothing will ever redact.
 		expect(rec.parseOutcome.detail).toContain('the backing tool exited 1');
 		expect(rec.workProductDerivation.reason).not.toContain('exited 1');
+	});
+
+	// ── ⭐⭐ `B-2` — A FAILED CALL IS NOT A BLIND ONE, AND THE RECORD MUST NOT SAY IT IS ─────────────────────────
+	//
+	// ⛔ THE CATCH ARM USED TO ASSERT `NOT_OBSERVABLE` IN ITS OWN WORDS — *"nothing was in a position to observe
+	// tool calls"* — WHICH WAS FALSE FOR THE PI ADAPTER. Its observer is SESSION-scoped, subscribed inside
+	// `turn()` and unsubscribed in a `finally`, so when `prompt` rejects it already HOLDS the calls the model
+	// made before the failure. ⚠ `R11` minted `NOT_OBSERVABLE` to mean *"nothing could look"*; using it for
+	// *"the call failed"* collapses the two facts the discriminator exists to separate — in the direction that
+	// hides the commands a model ran before it broke the run, which is when a reader most needs them.
+	//
+	// ⚠ THE FIXTURE IS SHAPED LIKE THE PI ADAPTER AND NOT LIKE A CONVENIENCE: it OBSERVES (so it answers
+	// `canObserve: true`), it DECLARES its minted surface, and its `turn` throws AFTER a call has been seen.
+	it('⭐⭐ a session that CAN observe reports what it saw when the turn THROWS', async () => {
+		const { input, dispatched } = harness({
+			session: {
+				retainsHistory: true,
+				dispose: () => undefined,
+				// ⭑ THE MEASUREMENT WAS ALREADY TAKEN WHEN THE FAILURE ARRIVED — one call watched start and end,
+				// on a surface this adapter minted and can name.
+				lastTurnObservation: () => ({
+					canObserve: true as const,
+					mintedToolNames: ['write_file', 'run_command'],
+					calls: [{ name: 'run_command', outcome: 'COMPLETED' as const }]
+				}),
+				turn: async () => {
+					throw new Error('the provider closed the stream mid-turn');
+				}
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+
+		const rec = dispatched.at(-1)!;
+		// ⛔ THE ASSERTION THIS TEST EXISTS FOR. `NOT_OBSERVABLE` here is the lost measurement.
+		expect(rec.observedToolCalls.observation, 'the adapter HAD the calls').toBe('OBSERVED');
+		expect(rec.observedToolCalls.observedCount).toBe(1);
+		expect(rec.observedToolCalls.calls?.[0]?.toolName).toBe('run_command');
+		expect(
+			rec.observedToolCalls.calls?.[0]?.nameProvenance,
+			'the adapter declared it minted this tool, so the record may hold the spelling'
+		).toBe('MINTED_BY_HOST');
+		// ⚠ AND THE FAILURE IS STILL RECORDED AS A FAILURE. The two facts are orthogonal, and a fix that made
+		// the step look successful in order to keep the observation would be a worse record than the one it replaced.
+		expect(rec.workProductDerivation.relation).toBe('EXPECTED_BUT_UNRETAINED');
+		expect(rec.parseOutcome.detail).toContain('closed the stream mid-turn');
+	});
+
+	it('⭐ an observing session that saw NOTHING records NONE_OBSERVED — a measurement, not silence', async () => {
+		// ⛔ THE CASE THAT SEPARATES THE TWO MEMBERS. A turn that failed before the model called anything is a
+		// MEASUREMENT a reader may rely on — *the surface existed and nothing was called* — and it is the fact
+		// `NOT_OBSERVABLE` would have destroyed. THE MUTANT: hand the caller a blanket `canObserve: false`;
+		// this case and the one above collapse into the same record and neither can be told from silence.
+		const { input, dispatched } = harness({
+			session: {
+				retainsHistory: true,
+				dispose: () => undefined,
+				lastTurnObservation: () => ({
+					canObserve: true as const,
+					mintedToolNames: ['write_file'],
+					calls: []
+				}),
+				turn: async () => {
+					throw new Error('the provider refused the request');
+				}
+			}
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(false);
+		const rec = dispatched.at(-1)!;
+		expect(rec.observedToolCalls.observation).toBe('NONE_OBSERVED');
+		expect(rec.observedToolCalls.reason, 'and it names the surface there was to call').toContain(
+			'write_file'
+		);
+	});
+
+	it('⭑ CONTROL — a ONE-SHOT session still records NOT_OBSERVABLE, in ITS OWN words', async () => {
+		// ⭐ THE CONTROL THAT KEEPS THE FIX FROM BEING "CALL EVERYTHING OBSERVED". `agy --print` and the
+		// deterministic fixture genuinely have no session, no tool surface and no subscriber, so the honest
+		// answer for them is unchanged — and the REASON now comes from the adapter that knows why, rather than
+		// from one sentence the caller wrote on every adapter's behalf. That sentence is what was false.
+		const { input, dispatched } = harness({
+			session: oneShotSession(async () => {
+				throw new Error('the backing tool exited 1');
+			})
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(false);
+		const rec = dispatched.at(-1)!;
+		expect(rec.observedToolCalls.observation).toBe('NOT_OBSERVABLE');
+		expect(rec.observedToolCalls.reason, 'and the reason is about being ONE-SHOT').toMatch(
+			/ONE-SHOT call with no held session/
+		);
+		expect(
+			rec.observedToolCalls.calls,
+			'an adapter that cannot see must not describe what it did not see'
+		).toBeUndefined();
 	});
 
 	it('⭑ CONTROL — the REVIEWER still receives no reasoning, so the fix is not "record everything, leak everything"', async () => {
