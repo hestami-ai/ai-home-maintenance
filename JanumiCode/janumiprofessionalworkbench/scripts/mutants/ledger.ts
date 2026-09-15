@@ -7477,5 +7477,66 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/tools/execution-tool-surface.test.ts'],
 		why: 'PROMISE: a command cwd comes from the WORKSPACE own directoryPath and from nothing a caller — or a model — can name. WHO RELIES: the entire containment this programme exists for. openPiExecutionSession hardcoded process.cwd() twice, which for the SvelteKit server is THIS REPOSITORY, and ProcessRunRequest.cwd is a required field so a hand-assembled request has to put something there. WHAT THE MUTATION DOES TO THEM: exactly the original defect, reached through the one tool that was built to prevent it — a model-chosen command runs in the workbench own checkout. ⚠ Phase 2b B8 correction means the REAL runner would still refuse the foreign cwd, and that is the point: this mutant proves the FIRST of the two independent refusals is really there, rather than being carried by the second. ⭑ It also reddens the IN_MEMORY case, because planProcessRun is what refuses a workspace with no directory at all.',
 		source: 'JAN-EXEC Phase 3 — planProcessRun is where a cwd nobody chose comes from'
+	},
+	{
+		id: 'P3-k-a-revoked-binding-still-backs-a-new-attempt',
+		file: 'apps/rph-demo/src/lib/server/execution/step-binding.ts',
+		find: '\tif (!canReuseBindingForNewAttempt(authorizationStatus))\n',
+		replace:
+			'\tif (false && !canReuseBindingForNewAttempt(authorizationStatus)) // MUTANT: the status is read and then disregarded, so a REVOKED binding backs another try\n',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/step-binding.test.ts'],
+		why: 'PROMISE: §22.1 verbatim — “Revoked bindings cannot be used for new attempts” — enforced PER TRY, which is where JAN-EXECLOOP actually takes them. WHO RELIES: whoever revokes a binding, which is the one act this engine offers for withdrawing a running step’s authority; RPH-EXE-003 carries the rule and enforces it on the START arrow, and the repair loop crosses no arrow between tries. WHAT THE MUTATION DOES TO THEM: exactly the shipped defect, restored. RevokeRuntimeCapability DELIBERATELY does not clear grantedCapabilities — its handler says so, because the revocation event is derived from the set the binding held — so the capability limbs see a FULL grant, the step runs, and the revocation becomes an event in the log with no consequence. ⛔ THE FAILURE MODE IS GREEN AND SILENT: nothing throws, the record is written, and a reader auditing “did the revocation stop anything” finds a completed try. ⭑ canReuseBindingForNewAttempt is still CALLED, so the dead-kernel census stays green and a reviewer scanning for the predicate finds it — which is what makes this the plausible regression rather than a strawman.',
+		source: 'JAN-EXEC Phase 3 review B-1 — §22.1 per try, not only per arrow'
+	},
+	{
+		id: 'P3-l-a-revoked-binding-still-mints-the-full-tool-surface',
+		file: 'apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts',
+		find: '\tif (!canReuseBindingForNewAttempt(input.bindingAuthorizationStatus)) return [];\n',
+		replace:
+			'\tvoid canReuseBindingForNewAttempt(input.bindingAuthorizationStatus); // MUTANT: the status is consulted and the surface is minted anyway\n',
+		expectRed: ['apps/rph-demo/src/lib/server/tools/execution-tool-surface.test.ts'],
+		why: 'PROMISE: a binding that cannot back a new attempt mints NOTHING, so a withdrawn authorization gives a model no hands. WHO RELIES: §22.1, and every Undertaking whose binding was revoked for a reason. WHAT THE MUTATION DOES TO THEM: the shipped defect restored at the seam where it mattered most — write_file and run_command are constructed, named to Pi and offered to the model on an authorization that was withdrawn, and under R12 run_command is arbitrary code as the server user. ⚠ IT IS INVISIBLE IN THE RECORD THIS PHASE PRODUCES: mintedToolNames is a faithful statement of what the HOST minted, so the exchange record agrees with the mutant and reports a complete surface. ⭑ THE CHECK IS STILL CALLED AND ITS ANSWER STILL COMPUTED, which is what makes this the plausible regression — the import survives, the predicate survives, and only the consequence is gone.',
+		source: 'JAN-EXEC Phase 3 review B-1 — the mint asks the status, not only the list'
+	},
+	{
+		id: 'P3-m-a-failed-turn-reports-an-instrument-that-was-not-there',
+		file: 'apps/rph-demo/src/lib/server/execution/run-model-step.ts',
+		find: '\t\t\tobservedToolCalls: governedToolCallReport(input.session.lastTurnObservation()),\n',
+		replace:
+			'\t\t\tobservedToolCalls: governedToolCallReport({ canObserve: false, reason: "The model call failed, so no adapter returned a result and nothing was in a position to observe tool calls. This record is not evidence that none ran." }), // MUTANT: one caller speaks for every adapter, and speaks falsely for the only one that can see\n',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
+		why: 'PROMISE: a FAILED call is not a BLIND one, and a permanent record must not say it is. WHO RELIES: R11, which minted NOT_OBSERVABLE to mean “nothing could look” precisely so it would stay distinguishable from a measurement; and any reader auditing a broken run for what it managed to do first. WHAT THE MUTATION DOES TO THEM: the shipped sentence restored — and it is FALSE of the Pi adapter, whose observer is session-scoped, subscribed inside turn() and unsubscribed in a finally, so it HOLDS the calls made before the failure. Those calls vanish from the record, and a run_command that ran is filed as a run nothing could see. ⛔ THE COLLAPSE RUNS IN THE WORSE DIRECTION: the case it destroys is the step that failed MID-COMMAND, which is when a reader most needs to know what executed. ⭑ THE ONE-SHOT ADAPTERS STILL ANSWER NOT_OBSERVABLE, correctly, so the control stays green and the mutation cannot be mistaken for the field being switched off.',
+		source: 'JAN-EXEC Phase 3 review B-2 — the adapter is asked, not spoken for'
+	},
+	{
+		id: 'P3-n-the-inventory-claims-exclusivity-it-cannot-support',
+		file: 'apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts',
+		find:
+			'\t\t\t\tentries.push({ path: rel, byteSize: info.size, purged: false, nameCount: info.nlink });\n',
+		replace:
+			'\t\t\t\tentries.push({ path: rel, byteSize: info.size, purged: false, nameCount: 1 }); // MUTANT: the filesystem is asked and its answer is replaced by the in-memory default\n',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts'],
+		why: 'PROMISE: this inventory reports how many NAMES hold each file, so it stops asserting an exclusivity a directory listing cannot support. WHO RELIES: anyone reading what an Undertaking produced, and the retention record beside it — R8 makes the workspace the DELIVERABLE. WHAT THE MUTATION DOES TO THEM: a hard link planted inside the workspace — which under R12 the model itself can plant, with run_command — is reported as an ordinary exclusive entry with a size, so ANOTHER UNDERTAKING’S FILE appears in this one’s inventory and nothing says otherwise. ⚠ THE MUTATION IS THE HONEST ANSWER FOR THE OTHER IMPLEMENTATION, which is exactly what makes it plausible: defaults/workspace.ts writes literally this, truthfully, because a Map key is one name. Copying it into an adapter that CAN ask the filesystem is where it becomes a claim. ⛔ IT CANNOT BE CAUGHT BY READING THE ENTRY: every other field stays correct.',
+		source: 'JAN-EXEC Phase 3 review B-6 — the inventory reports sharing, never location'
+	},
+	{
+		id: 'P3-o-two-spellings-of-one-file-get-two-answers',
+		file: 'apps/rph-demo/src/lib/server/execution/filesystem-workspace.ts',
+		find: '\t\tif (held === undefined || held === basename(abs)) return { rel, abs };\n',
+		replace:
+			'\t\tif (held === undefined || held !== basename(abs)) return { rel, abs }; // MUTANT: the held spelling is looked up and then discarded, so the caller gets its own spelling back\n',
+		expectRed: ['apps/rph-demo/src/lib/server/execution/filesystem-workspace.test.ts'],
+		why: 'PROMISE: a path writeFile REPORTS is a path list() REPORTS — one file, one spelling, one statement. WHO RELIES: the executing model, which is TOLD by write_file’s own description that writing the same file again replaces it, and which has no read-back tool with which to check. WHAT THE MUTATION DOES TO THEM: two case-spellings of one file each get back “Wrote N bytes to <the spelling I sent>” while the filesystem holds ONE file — so a model believes it produced two deliverables, the second write silently destroyed the first, and the tool description became a false statement made by this host to an untrusted party. ⛔ IT IS PLATFORM-SHAPED AND THEREFORE EASY TO MISS: on a case-keeping filesystem the two writes really are two files and every assertion still holds, which is why the victim PROBES the host it runs on rather than assuming from process.platform. ⭑ THE EXACT-REWRITE CONTROL STAYS GREEN, so this cannot be confused with “locate stopped resolving”.',
+		source: 'JAN-EXEC Phase 3 review B-7 — one file may not produce two true-sounding statements'
+	},
+	{
+		id: 'P3-p-the-revoked-limb-of-the-attempt-predicate-is-dropped',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\treturn authorizationStatus !== 'REVOKED' && authorizationStatus !== 'DENIED';\n",
+		replace:
+			"\treturn authorizationStatus !== 'DENIED'; // MUTANT: only a DENIED binding is refused, so REVOKED backs a new attempt\n",
+		expectRed: ['packages/rph-domain/src/execution.test.ts'],
+		why: 'PROMISE: §22.1 verbatim — “Revoked bindings cannot be used for new attempts” — decided ONCE, in the kernel, so its readers cannot disagree about it. WHO RELIES: three of them as of JAN-EXEC Phase 3 — bindingAuthorityVerdict on the START arrow, stepCapabilityRefusal on every TRY, and mintExecutionTools on the tool surface a model is handed. WHAT THE MUTATION DOES TO THEM: all three go permissive AT ONCE, from one line, and the whole of B-1 comes back through the predicate rather than through the call sites that were just fixed — a revoked binding runs steps and mints run_command again. ⛔ THE DENIED LIMB SURVIVES, which is what makes it the plausible edit rather than a deletion: the function still refuses something, still reads as a control, and the census still counts it as wired. ⚠ ITS VICTIM IS THE KERNEL UNIT, deliberately — the consumer suites have their own mutants (P3-k, P3-l), and a mutation of the shared DECISION must be caught where the decision lives, not only where it happens to be read.',
+		source: 'JAN-EXEC Phase 3 review B-1 — the §22.1 predicate acquired production callers'
 	}
 ];

@@ -80,8 +80,27 @@ function recordingRunner(
 	};
 }
 
-const mint = (granted: readonly string[], runner: ProcessRunner = recordingRunner()) =>
-	mintExecutionTools({ ports: { workspace: deliverable(), runner }, grantedCapabilities: granted });
+/**
+ * The status a live, usable binding carries.
+ *
+ * ⛔ NAMED, so the REVOKED arrangements below differ from every capability arrangement by exactly ONE token.
+ * An arrangement that changed two things would leave the empty mint attributable to either.
+ */
+const AUTHORIZED = 'AUTHORIZED';
+
+const mint = (
+	granted: readonly string[],
+	runner: ProcessRunner = recordingRunner(),
+	// ⛔ `B-1` — THE BINDING'S STATUS IS PART OF EVERY MINT, because a capability list is not an authorization.
+	// Defaulted HERE, in the helper, and never in `mintExecutionTools`: a default on the production function
+	// would make "mint without asking whether the binding still stands" expressible by omission.
+	bindingAuthorizationStatus: string = AUTHORIZED
+) =>
+	mintExecutionTools({
+		ports: { workspace: deliverable(), runner },
+		grantedCapabilities: granted,
+		bindingAuthorizationStatus
+	});
 
 const names = (granted: readonly string[]) => mint(granted).map((t) => t.name);
 
@@ -91,6 +110,42 @@ describe('⭐⭐ GRANT BY ABSENCE — an unauthorised tool is never minted', () 
 		// authorises no tool at all. THE MUTANT: mint the catalog unconditionally — every model step in the
 		// system silently acquires a filesystem seam and a child process.
 		expect(names(['network'])).toEqual([]);
+	});
+
+	// ── ⭐⭐ `B-1` — A REVOKED BINDING MINTED THE FULL TOOL SURFACE, AND §22.1 IS RATIFIED ─────────────────────
+	//
+	// ⛔ THE ARRANGEMENT IS WHAT THE STORE ACTUALLY HOLDS AFTER `RevokeRuntimeCapability`, which is what makes
+	// it a test rather than a strawman: the handler advances `authorizationStatus` to REVOKED and DELIBERATELY
+	// leaves `grantedCapabilities` INTACT, because the revocation EVENT is derived from the set the binding
+	// held. So the grant below is FULL — and before this limb, minting saw exactly what it saw for a live
+	// binding and handed a model a filesystem seam and a child process on an authorization that was withdrawn.
+	it('⭐⭐ a REVOKED binding mints NOTHING, on a grant that authorises EVERY tool', () => {
+		expect(
+			mint(['network', 'file-system', 'process-execution'], recordingRunner(), 'REVOKED')
+		).toEqual([]);
+	});
+
+	it('⛔ a DENIED binding mints nothing either — the kernel predicate names both terminal states', () => {
+		expect(mint(['file-system', 'process-execution'], recordingRunner(), 'DENIED')).toEqual([]);
+	});
+
+	it('⭑⭑ CONTROL — the SAME full grant under AUTHORIZED mints both tools, so this is not "mint nothing"', () => {
+		// ⭐ ONE TOKEN OF DIFFERENCE FROM THE CASE ABOVE. Without it the limb is satisfied by a `mintExecutionTools`
+		// that returns `[]` unconditionally — *a control that cannot fail*, and one that would silently disarm
+		// the entire tool surface while every refusal assertion in this file stayed green.
+		expect(names(['network', 'file-system', 'process-execution'])).toEqual([
+			'write_file',
+			'run_command'
+		]);
+	});
+
+	it('⭑ CONTROL — PARTIALLY_AUTHORIZED mints what it granted, because a NARROW grant is lawful', () => {
+		// ⚠ THE OVER-REFUSAL THIS LIMB IS MOST AT RISK OF. `RPH-EXE-004`'s own example is a partial grant, and
+		// the ratified machine has this state precisely for it. Refusing to mint here would strand every
+		// least-privilege authorization the platform exists to express.
+		expect(
+			mint(['file-system'], recordingRunner(), 'PARTIALLY_AUTHORIZED').map((t) => t.name)
+		).toEqual(['write_file']);
 	});
 
 	it('⭐⭐ THE PRECISION CONTROL — `file-system` granted, `process-execution` NOT: `write_file` minted, `run_command` WITHHELD', () => {
@@ -156,9 +211,14 @@ describe('⭐⭐ THE R11-OWED RULING — a host may not mint a name the record p
 		])
 			expect(
 				() =>
-					mintExecutionTools({ ports: PORTS(), grantedCapabilities: ['file-system'] }, [
-						unholdable(bad)
-					]),
+					mintExecutionTools(
+						{
+							ports: PORTS(),
+							grantedCapabilities: ['file-system'],
+							bindingAuthorizationStatus: AUTHORIZED
+						},
+						[unholdable(bad)]
+					),
 				bad
 			).toThrow(/cannot mint a tool named/);
 	});
@@ -172,7 +232,24 @@ describe('⭐⭐ THE R11-OWED RULING — a host may not mint a name the record p
 		// a live step, a model mid-turn, and an exchange record that cannot be written. THE MUTANT: move the
 		// check inside the `.filter`, after the capability test; this case goes green and the bomb stays armed.
 		expect(() =>
-			mintExecutionTools({ ports: PORTS(), grantedCapabilities: [] }, [unholdable('bad name')])
+			mintExecutionTools(
+				{ ports: PORTS(), grantedCapabilities: [], bindingAuthorizationStatus: AUTHORIZED },
+				[unholdable('bad name')]
+			)
+		).toThrow(/cannot mint a tool named/);
+	});
+
+	it('⛔ the NAME BOUND still fires for a REVOKED binding — the dormancy defect reached by a second road', () => {
+		// ⭐ THE ORDERING, ASSERTED RATHER THAN ASSUMED. The catalog check is a property of THIS HOST, not of one
+		// grant, so returning early on a revoked binding would make an unholdable name dormant for every revoked
+		// binding — `P3-d`'s exact defect arriving through the §22.1 limb instead of through the capability
+		// filter. THE MUTANT: move the revocation check above the catalog loop; this goes green and the bomb is
+		// re-armed by the fix that was supposed to be unrelated to it.
+		expect(() =>
+			mintExecutionTools(
+				{ ports: PORTS(), grantedCapabilities: [], bindingAuthorizationStatus: 'REVOKED' },
+				[unholdable('bad name')]
+			)
 		).toThrow(/cannot mint a tool named/);
 	});
 
@@ -181,7 +258,10 @@ describe('⭐⭐ THE R11-OWED RULING — a host may not mint a name the record p
 		// is whoever added the tool, and what they need is WHY renaming is the answer rather than a cast.
 		let message = '';
 		try {
-			mintExecutionTools({ ports: PORTS(), grantedCapabilities: [] }, [unholdable('bad name')]);
+			mintExecutionTools(
+				{ ports: PORTS(), grantedCapabilities: [], bindingAuthorizationStatus: AUTHORIZED },
+				[unholdable('bad name')]
+			);
 		} catch (e) {
 			message = e instanceof Error ? e.message : String(e);
 		}
@@ -195,9 +275,14 @@ describe('⭐⭐ THE R11-OWED RULING — a host may not mint a name the record p
 		// the shape this repository has shipped before and named *a control that cannot fail*. Same injected
 		// catalog, same ports, one character different in the name.
 		expect(
-			mintExecutionTools({ ports: PORTS(), grantedCapabilities: ['file-system'] }, [holdable]).map(
-				(t) => t.name
-			)
+			mintExecutionTools(
+				{
+					ports: PORTS(),
+					grantedCapabilities: ['file-system'],
+					bindingAuthorizationStatus: AUTHORIZED
+				},
+				[holdable]
+			).map((t) => t.name)
 		).toEqual(['probe_tool']);
 	});
 
@@ -215,7 +300,10 @@ describe('write_file — bound to the workspace, and it REFUSES rather than coer
 	const writeFileTool = () => mint(['file-system'])[0]!;
 
 	it('⭑ writes into the Undertaking’s workspace, and the bytes are on disk', async () => {
-		const out = await writeFileTool().run({ path: 'src/index.ts', contents: 'export const x = 1;\n' });
+		const out = await writeFileTool().run({
+			path: 'src/index.ts',
+			contents: 'export const x = 1;\n'
+		});
 		expect(out.ok).toBe(true);
 		expect(await readFile(join(dir, 'src/index.ts'), 'utf8')).toBe('export const x = 1;\n');
 	});
@@ -225,7 +313,12 @@ describe('write_file — bound to the workspace, and it REFUSES rather than coer
 		// `workspace.ts` precisely so *"a second adapter cannot quietly implement a weaker one"*. THE MUTANT:
 		// re-check the path here and let the workspace through; the second, weaker predicate is the one that
 		// answers, with a model on the other end of it.
-		for (const escape of ['../escaped.txt', 'a/../../escaped.txt', '/etc/passwd', 'C:\\escaped.txt']) {
+		for (const escape of [
+			'../escaped.txt',
+			'a/../../escaped.txt',
+			'/etc/passwd',
+			'C:\\escaped.txt'
+		]) {
 			const out = await writeFileTool().run({ path: escape, contents: 'x' });
 			expect(out.ok, escape).toBe(false);
 		}
@@ -237,7 +330,13 @@ describe('write_file — bound to the workspace, and it REFUSES rather than coer
 		// on an absent argument yields `'undefined'` — a plausible relative path — and on an object
 		// `'[object Object]'`. Both are files nobody chose. THE MUTANT: `String(args.path)`; the first case
 		// below writes a file called `undefined`.
-		for (const args of [{}, { path: 'a.txt' }, { contents: 'x' }, { path: 42, contents: 'x' }, { path: '', contents: 'x' }]) {
+		for (const args of [
+			{},
+			{ path: 'a.txt' },
+			{ contents: 'x' },
+			{ path: 42, contents: 'x' },
+			{ path: '', contents: 'x' }
+		]) {
 			const out = await writeFileTool().run(args as Record<string, unknown>);
 			expect(out.ok, JSON.stringify(args)).toBe(false);
 		}
@@ -284,8 +383,9 @@ describe('run_command — the cwd is the workspace’s, and it cannot be chosen'
 		// indistinguishable from a seam that refused to run anything — and the adapter grades `details.ok`
 		// as REFUSED, so the observed tool-call record would say a governed refusal happened when none did.
 		// THE MUTANT: `ok: outcome.exitCode === 0`.
-		const out = await runTool(recordingRunner({ exitCode: 1, stdout: '', stderr: '2 tests failed\n' }))
-			.run({ argv: ['npm', 'test'] });
+		const out = await runTool(
+			recordingRunner({ exitCode: 1, stdout: '', stderr: '2 tests failed\n' })
+		).run({ argv: ['npm', 'test'] });
 		expect(out.ok).toBe(true);
 		expect(out.summary).toContain('exit 1');
 		expect(out.summary).toContain('2 tests failed');
@@ -294,7 +394,10 @@ describe('run_command — the cwd is the workspace’s, and it cannot be chosen'
 	it('⛔ a runner that REFUSES is `ok: false`, and the reason travels back', async () => {
 		const runner: ProcessRunner = {
 			kind: 'REAL',
-			run: async () => ({ ran: false, refusedBecause: 'there is no such program on this host (ENOENT)' })
+			run: async () => ({
+				ran: false,
+				refusedBecause: 'there is no such program on this host (ENOENT)'
+			})
 		};
 		const out = await runTool(runner).run({ argv: ['nope-missing'] });
 		expect(out.ok).toBe(false);
@@ -319,7 +422,8 @@ describe('run_command — the cwd is the workspace’s, and it cannot be chosen'
 				}),
 				runner: recordingRunner()
 			},
-			grantedCapabilities: ['process-execution']
+			grantedCapabilities: ['process-execution'],
+			bindingAuthorizationStatus: AUTHORIZED
 		});
 		const out = await tools[0]!.run({ argv: ['node', '--version'] });
 		expect(out.ok).toBe(false);
@@ -331,7 +435,13 @@ describe('run_command — the cwd is the workspace’s, and it cannot be chosen'
 		// which is the same fabrication one layer lower. THE MUTANT: check `Array.isArray` alone.
 		const runner = recordingRunner();
 		const tool = runTool(runner);
-		for (const args of [{}, { argv: 'node --version' }, { argv: [] }, { argv: ['node', 42] }, { argv: ['', 'x'] }]) {
+		for (const args of [
+			{},
+			{ argv: 'node --version' },
+			{ argv: [] },
+			{ argv: ['node', 42] },
+			{ argv: ['', 'x'] }
+		]) {
 			const out = await tool.run(args as Record<string, unknown>);
 			expect(out.ok, JSON.stringify(args)).toBe(false);
 		}

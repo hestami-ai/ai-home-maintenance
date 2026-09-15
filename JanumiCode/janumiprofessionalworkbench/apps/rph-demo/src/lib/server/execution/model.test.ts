@@ -20,7 +20,13 @@ const SANDBOX: ProducerSessionContext = {
 	// ⛔ JAN-EXEC PHASE 3 — AND THE GRANT IS EMPTY, WHICH IS THE HERMETIC DEFAULT FOR THE SAME REASON THE PORTS
 	// ARE. An empty grant mints NO tools, so no spec in this suite hands a model a filesystem seam or a child
 	// process by accident. A spec that means to exercise a minted surface says so by naming the capability.
-	grantedCapabilities: []
+	grantedCapabilities: [],
+	// ⛔ JAN-EXEC `B-1` — AND THE STATUS IS SAID TOO. A capability list is not an authorization:
+	// `RevokeRuntimeCapability` leaves the list intact, so a context carrying only the list cannot tell a live
+	// binding from a revoked one. ⚠ AUTHORIZED here rather than `''`, so this fixture exercises the arm that
+	// LETS minting proceed — a fixture that refused for the wrong reason would make every spec below green
+	// without any of them meaning what they say.
+	bindingAuthorizationStatus: 'AUTHORIZED'
 };
 
 const SAVED = process.env.JPWB_EXECUTOR;
@@ -71,7 +77,9 @@ describe('JAN-TOOLSUITE — the execution producer names its OWN tool', () => {
 		// Without this control the refusals above are satisfiable by "everything throws". And the shape matters:
 		// `REG-F-351` records that the §9.7 split locates a JSON object, so an UNDELIMITED prose answer is
 		// blocked from retention and a step's work product is never kept.
-		const answer = await deterministicExecutionPrint('Assess the northern route against the safety rubric.');
+		const answer = await deterministicExecutionPrint(
+			'Assess the northern route against the safety rubric.'
+		);
 		const parsed = JSON.parse(answer) as {
 			workProduct?: { finding?: string; basis?: string };
 			rationale?: { rationale?: string };
@@ -81,7 +89,10 @@ describe('JAN-TOOLSUITE — the execution producer names its OWN tool', () => {
 		expect(parsed.workProduct?.basis).toContain('Assess the northern route');
 		// ⭑ AND IT MODELS A COMPLIANT ANSWER (`JAN-EXECRAT`). A fixture that omitted the rationale would take the
 		// shortfall branch on every gate run, so the compliant path would be exercised by nothing.
-		expect(parsed.rationale?.rationale, 'the fixture must honour the execution contract').toBeTruthy();
+		expect(
+			parsed.rationale?.rationale,
+			'the fixture must honour the execution contract'
+		).toBeTruthy();
 	});
 });
 

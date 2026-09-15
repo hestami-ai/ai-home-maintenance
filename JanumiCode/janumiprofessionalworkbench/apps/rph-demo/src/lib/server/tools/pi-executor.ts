@@ -28,13 +28,16 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
-import type { ToolInvocationResult } from './backing-tool.js';
+import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
 	producerWorkingDirectory,
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
-import { createMaterializedInputRecorder, type PayloadHookHost } from '../agent/materialized-input.js';
+import {
+	createMaterializedInputRecorder,
+	type PayloadHookHost
+} from '../agent/materialized-input.js';
 import { toPiToolResult } from '../agent/pi-tool-result.js';
 import { toTypeBox } from '../agent/pi-typebox.js';
 import { mintExecutionTools, type ExecutionToolDescriptor } from './execution-tool-surface.js';
@@ -151,7 +154,9 @@ export async function openPiExecutionSession(
 	// called"* — a check that fires afterwards disclosed the harm afterwards.
 	const tools = mintExecutionTools({
 		ports: { workspace: context.workspace, runner: context.runner },
-		grantedCapabilities: context.grantedCapabilities
+		grantedCapabilities: context.grantedCapabilities,
+		// ⛔ `B-1` — THE STATUS TRAVELS WITH THE LIST, because a REVOKED binding still lists what it granted.
+		bindingAuthorizationStatus: context.bindingAuthorizationStatus
 	});
 	const mintedToolNames = tools.map((t) => t.name);
 	const observer = createToolCallObserver();
@@ -197,8 +202,29 @@ export async function openPiExecutionSession(
 	const inputs = createMaterializedInputRecorder();
 	inputs.install(session.agent as unknown as PayloadHookHost);
 
+	// ⭐⭐ `B-2` — WHAT THIS ADAPTER SAW ON THE TURN THAT IS RUNNING, HELD SO A **THROW** CANNOT LOSE IT.
+	//
+	// ⛔ THE MEASUREMENT IS ALREADY TAKEN WHEN THE FAILURE ARRIVES. `observer` is SESSION-scoped, the
+	// subscription is opened inside `turn()` and closed in its `finally`, so every `tool_execution_start` /
+	// `_end` that reached this host before `session.prompt` rejected is already in it. Reporting the calls only
+	// through the RETURN VALUE made them unreachable on exactly the path where they matter most — the caller's
+	// catch arm then recorded `NOT_OBSERVABLE` *"nothing was in a position to observe tool calls"*, which was
+	// FALSE of this adapter and collapsed `R11`'s *"nothing could look"* into *"the call failed"*.
+	//
+	// ⚠ ITS INITIAL VALUE IS A REFUSAL TO GUESS, not an empty observation. Before any turn there is no turn to
+	// report on, and `canObserve: true` with an empty `calls` would read as a MEASUREMENT — the exact
+	// fabrication `governedToolCallReport` refuses when it declines to call an absence of looking
+	// `NONE_OBSERVED`.
+	let lastTurn: AdapterToolObservation = {
+		canObserve: false,
+		reason:
+			'This session has taken no turn yet, so there is no turn for this adapter to report an observation ' +
+			'about. It is not evidence that no tool ran.'
+	};
+
 	return {
 		retainsHistory: true,
+		lastTurnObservation: () => lastTurn,
 		dispose: () => session.dispose(),
 		async turn(text: string): Promise<ToolInvocationResult> {
 			let answer = '';
@@ -235,6 +261,17 @@ export async function openPiExecutionSession(
 				await session.prompt(text);
 			} finally {
 				unsubscribe();
+				// ⛔ IN THE `finally`, SO THE FAILING PATH AND THE SUCCEEDING PATH RECORD THE SAME MEASUREMENT.
+				// Writing it after the `try` would leave it unset for exactly the case it exists for, and
+				// writing it in a `catch` would make the two paths disagree about which calls belong to this
+				// turn. ⚠ NOTHING HERE MAY THROW: `since` is a slice over an in-memory array — the rule this
+				// repository files as "cleanup must survive" — because a throw from a `finally` would replace the
+				// model's real failure with this line's.
+				lastTurn = {
+					canObserve: true,
+					mintedToolNames,
+					calls: observer.since(callsBefore)
+				};
 			}
 
 			// The payloads this turn produced — one per provider request, so a repair/retry inside Pi is included.
@@ -274,9 +311,7 @@ export async function openPiExecutionSession(
 					mintedToolNames,
 					calls: observer.since(callsBefore)
 				},
-				...(composite === undefined
-					? {}
-					: { materializedInput: JSON.stringify(composite) })
+				...(composite === undefined ? {} : { materializedInput: JSON.stringify(composite) })
 			};
 		}
 	};

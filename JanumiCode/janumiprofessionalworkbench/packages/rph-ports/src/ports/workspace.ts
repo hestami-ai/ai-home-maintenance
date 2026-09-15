@@ -59,6 +59,31 @@ export interface WorkspaceEntry {
 	readonly byteSize: number;
 	/** True once the bytes have been purged. The entry stays — see the port header. */
 	readonly purged: boolean;
+	/**
+	 * ⭐⭐ HOW MANY NAMES HOLD THESE BYTES — **1 means this workspace's inventory is an exclusive statement.**
+	 *
+	 * ⛔ IT EXISTS BECAUSE THE INVENTORY WAS FOUND MAKING A CLAIM IT COULD NOT SUPPORT (`B-6`). A HARD LINK
+	 * planted inside a workspace is a SECOND NAME for a file that lives anywhere — `lstat` calls it a plain
+	 * file, `realpath` answers with the link's own path under the root, and both filesystem questions a
+	 * containment predicate knows how to ask answer *"contained"*. `list()` then reported **another
+	 * undertaking's file as this workspace's own entry**, with a size, as an ordinary deliverable.
+	 *
+	 * ⭑ WHAT IS REPORTABLE IS THE COUNT, NOT THE OTHER LOCATION, AND THE FIELD IS SHAPED TO THAT LIMIT. A
+	 * second name may be lawful and inside this very workspace, or it may be outside it; the filesystem answers
+	 * *how many* and answers *where* to nobody. So this states the fact that IS knowable and does not imply the
+	 * one that is not — the alternative being an inventory that reads as exclusive and is not.
+	 *
+	 * ⛔ REQUIRED, NOT OPTIONAL, AND NOT DEFAULTED. An absent value cannot distinguish *"one name"* from
+	 * *"this implementation does not know"*, and the first is a measurement a reader may rely on. An
+	 * implementation whose entries cannot be aliased says `1` and means it (`defaults/workspace.ts` does: a Map
+	 * key is one name).
+	 *
+	 * ⚠ A PURGED ENTRY REPORTS `1`, AND THAT IS A STATEMENT ABOUT THE PRESENT rather than a lost measurement:
+	 * the bytes are gone, so there is nothing left for a second name to hold. ⛔ It is `byteSize` that carries
+	 * WHAT WAS REMOVED, because that is the only surviving statement of it; sharing was a property of bytes that
+	 * no longer exist, so preserving a count for them would assert a live alias for an absent file.
+	 */
+	readonly nameCount: number;
 }
 
 /**

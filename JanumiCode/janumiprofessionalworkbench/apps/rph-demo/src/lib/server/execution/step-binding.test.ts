@@ -21,6 +21,15 @@ const req = (stepType: string, discharge: string | undefined) =>
 
 const MODEL_STEP = () => req('MODEL_INVOCATION', 'MODEL')!;
 
+/**
+ * The status a live, usable binding carries.
+ *
+ * ⛔ NAMED, so every capability arrangement below differs from the REVOKED arrangements by exactly ONE token.
+ * An arrangement that changed two things would leave a refusal attributable to either, which this repository
+ * files as *an arrangement that trips two guards proves neither*.
+ */
+const AUTHORIZED = 'AUTHORIZED';
+
 describe('EG-02 — the binding a step needs', () => {
 	it('⭑⭑ a MODEL_INVOCATION on a MODEL-discharged type is bound, and REQUIRES `network`', () => {
 		// ⛔ `network` IS NOT COINED. `RPH-EXE-004`, ratified conformance: *"When a binding requests file-system
@@ -104,11 +113,46 @@ describe('EG-02 — the binding a step needs', () => {
 		expect(capabilities).toContain('process-execution');
 		expect(new Set(capabilities).size, 'no capability is named twice').toBe(capabilities.length);
 	});
+
+	it('⭐⭐ R12 — the vocabulary SAYS that `process-execution` subsumes `file-system` and `network`', () => {
+		// ⛔ SPONSOR RULING R12 (2026-09-15), DRIVEN RATHER THAN REASONED: with `file-system` WITHHELD the model
+		// held only `run_command` and wrote a file OUTSIDE the workspace anyway, because a child process is not
+		// confined by anything userspace can assert. The three entries are NOT independent, and a LIST of three
+		// notes reads as though they were.
+		//
+		// ⚠ THIS ASSERTS THE DATA, NOT THE PROSE, and that is the whole point of the field: a subsumption stated
+		// only in a note is a claim no gate can read, and this repository has twice found such a note outliving
+		// the thing it described. THE MUTANT: empty `subsumes` on `process-execution` — the vocabulary goes back
+		// to presenting three independent capabilities and nothing turns red.
+		const byId = new Map(STEP_CAPABILITY_VOCABULARY.map((v) => [v.capability, v]));
+		expect([...byId.get('process-execution')!.subsumes].sort()).toEqual(['file-system', 'network']);
+		// ⭑ AND THE CONVERSE IS NOT CLAIMED. `file-system` subsuming `process-execution` would say writing a
+		// file starts a process, which is false and would make "may write, may not run" meaningless.
+		expect(byId.get('file-system')!.subsumes).toEqual([]);
+		expect(byId.get('network')!.subsumes).toEqual([]);
+	});
+
+	it('⛔ R13 — the vocabulary records that `process-execution` means arbitrary code as the server user', () => {
+		// ⭐ THE RULING'S OTHER HALF, AND IT IS A RECORD-PLANE OBLIGATION RATHER THAN A CODE ONE. `cmd.exe` and
+		// `powershell.exe` as `argv[0]` were DRIVEN and work; a BLOCKLIST IS REFUSED BY RULING, because refusing
+		// `cmd.exe` while permitting `node -e` is theatre a later reader would mistake for a containment
+		// property. What is owed instead is that the note SAYS what granting it confers, and names R9's
+		// deployment tier as the only claimed boundary. THE MUTANT: delete either sentence; the vocabulary then
+		// describes a tool while implying a confinement nothing provides.
+		const note = STEP_CAPABILITY_VOCABULARY.find((v) => v.capability === 'process-execution')!.note;
+		expect(note).toMatch(/ARBITRARY CODE AS THE SERVER USER/);
+		expect(note).toMatch(/blocklist is REFUSED BY RULING/);
+		expect(note, 'and it names whose boundary it is').toMatch(/R9/);
+	});
 });
 
 describe('EG-03 / Phase 3 — REQUIRES refuses the step, USES does not', () => {
 	it('⛔ an ungranted REQUIRES capability refuses, and the message says which and why', () => {
-		const refusal = stepCapabilityRefusal(MODEL_STEP(), ['file-system', 'process-execution']);
+		const refusal = stepCapabilityRefusal(
+			MODEL_STEP(),
+			['file-system', 'process-execution'],
+			AUTHORIZED
+		);
 		expect(refusal).toMatch(/does not grant 'network'/);
 		expect(refusal).toMatch(/REQUIRES/);
 		expect(refusal).toMatch(/RPH_CAPABILITY_NOT_GRANTED/);
@@ -118,8 +162,71 @@ describe('EG-03 / Phase 3 — REQUIRES refuses the step, USES does not', () => {
 		// ⛔ THE RECONCILIATION, ASSERTED. `RPH-EXE-004` degrades an OPERATION; refusing the whole step here
 		// would overturn that while appearing to enforce it. THE MUTANT: drop the `need !== 'REQUIRES'` guard —
 		// both arrangements below start refusing and the degradation becomes unreachable.
-		expect(stepCapabilityRefusal(MODEL_STEP(), ['network'])).toBeUndefined();
-		expect(stepCapabilityRefusal(MODEL_STEP(), ['network', 'file-system'])).toBeUndefined();
+		expect(stepCapabilityRefusal(MODEL_STEP(), ['network'], AUTHORIZED)).toBeUndefined();
+		expect(
+			stepCapabilityRefusal(MODEL_STEP(), ['network', 'file-system'], AUTHORIZED)
+		).toBeUndefined();
+	});
+
+	// ── ⭐⭐ `B-1` — §22.1 IS RATIFIED AND WAS ENFORCED NOWHERE PER TRY ────────────────────────────────────────
+	//
+	// ⛔ THE ARRANGEMENT IS THE ONE THE STORE ACTUALLY HOLDS AFTER A REVOCATION, and that is what makes it a
+	// test rather than a strawman: `RevokeRuntimeCapability` advances `authorizationStatus` and DELIBERATELY
+	// leaves `grantedCapabilities` alone, because the revocation EVENT is derived from the set the binding held.
+	// So the grant below is FULL — every capability the step needs is present, and the capability limbs CANNOT
+	// fire. Only the status limb can explain a refusal.
+	it('⭐⭐ a REVOKED binding refuses even on a FULL grant, and the message does not claim a missing capability', () => {
+		const full = ['network', 'file-system', 'process-execution'];
+		const refusal = stepCapabilityRefusal(MODEL_STEP(), full, 'REVOKED');
+		expect(refusal, 'a revoked binding cannot back a new attempt (§22.1)').toBeDefined();
+		expect(refusal).toMatch(/is REVOKED/);
+		expect(refusal).toMatch(/cannot back a new attempt/);
+		// ⛔ AND IT SAYS WHY THE SURVIVING LIST IS NOT AN AUTHORIZATION — the fact that made this defect
+		// invisible for a whole phase, written into the refusal so the next reader does not have to rediscover it.
+		expect(refusal).toMatch(/does not clear the set/);
+		// ⚠ A MESSAGE THAT NAMED A MISSING CAPABILITY WOULD BE FALSE OF ITS INPUT, which this repository holds
+		// to be worse than no refusal — see the over-folded workspace guard one plane over.
+		expect(refusal).not.toMatch(/does not grant/);
+	});
+
+	it('⛔ DENIED refuses too, and the message names the state it was actually in', () => {
+		const refusal = stepCapabilityRefusal(
+			MODEL_STEP(),
+			['network', 'file-system', 'process-execution'],
+			'DENIED'
+		);
+		expect(refusal).toMatch(/is DENIED/);
+	});
+
+	it('⭑ CONTROL — the same FULL grant under AUTHORIZED proceeds, so the limb is not "refuse everything"', () => {
+		// ⭐ ONE TOKEN OF DIFFERENCE FROM THE CASE ABOVE. Without it the limb is satisfied by an unconditional
+		// refusal, which is *a control that cannot fail* and would silently kill every model step in the system.
+		expect(
+			stepCapabilityRefusal(
+				MODEL_STEP(),
+				['network', 'file-system', 'process-execution'],
+				AUTHORIZED
+			)
+		).toBeUndefined();
+	});
+
+	it('⭑ CONTROL — PARTIALLY_AUTHORIZED is lawful, because a NARROWER grant is exactly what it means', () => {
+		// ⚠ THE OVER-REFUSAL THIS LIMB IS MOST AT RISK OF. `grantedWithinRequest` exists because a grant
+		// narrower than the request is legal — it is `RPH-EXE-004`'s own example — and refusing this state would
+		// strand every least-privilege authorization the ratified machine has a state for.
+		expect(
+			stepCapabilityRefusal(MODEL_STEP(), ['network'], 'PARTIALLY_AUTHORIZED')
+		).toBeUndefined();
+	});
+
+	it('⛔ the STATUS limb fires BEFORE the capability limbs, so the message describes the real reason', () => {
+		// ⚠ BOTH WOULD REFUSE THIS ARRANGEMENT, AND THAT IS WHY THE ORDER IS ASSERTED RATHER THAN ASSUMED: an
+		// arrangement that trips two conjuncts proves neither, so what is pinned is WHICH ONE SPOKE. A revoked
+		// binding whose grant also lacks `network` is revoked first; reporting the capability would send a
+		// reader to authorize a capability on a binding that can no longer authorize anything.
+		const refusal = stepCapabilityRefusal(MODEL_STEP(), [], 'REVOKED');
+		expect(refusal).toMatch(/is REVOKED/);
+		expect(refusal).not.toMatch(/does not grant 'network'/);
 	});
 
 	it('⚠ EXACT membership, never a prefix and never a case fold — the kernel’s own predicate', () => {
@@ -127,6 +234,8 @@ describe('EG-03 / Phase 3 — REQUIRES refuses the step, USES does not', () => {
 		// plausible normaliser would let through, and every one must refuse. THE MUTANT: `startsWith`, or a
 		// `toLowerCase()` "for convenience"; each hands a step a capability nobody granted.
 		for (const near of ['networ', 'networks', 'NETWORK', ' network'])
-			expect(stepCapabilityRefusal(MODEL_STEP(), [near]), near).toMatch(/does not grant 'network'/);
+			expect(stepCapabilityRefusal(MODEL_STEP(), [near], AUTHORIZED), near).toMatch(
+				/does not grant 'network'/
+			);
 	});
 });

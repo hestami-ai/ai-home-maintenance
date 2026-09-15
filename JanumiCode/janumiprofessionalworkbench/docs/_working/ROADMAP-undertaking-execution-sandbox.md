@@ -1078,6 +1078,290 @@ mapped types in **both directions** and says exactly which difference it tolerat
 
 ---
 
+## 5b. Phase 3 · ⭐⭐ THE ADVERSARIAL REVIEW — nine breaches, TWO SPONSOR RULINGS, and a record-plane honesty pass
+
+⭐⭐ **THE RULINGS CHANGED WHAT THE REST OF THE PASS WAS.** An adversary drove nine breaches through Phase 3. The
+sponsor ruled on the two architectural ones, and the ruling REFRAMED the remainder: **the model reaching outside
+the workspace is now a STATED PROPERTY, not a defect. What is still a defect is every place the record claims
+otherwise.** So this is a RECORD-PLANE HONESTY PASS and not a sandbox-tightening pass — with ONE exception,
+`B-1`, which is a ratified rule that was simply not enforced.
+
+### ⭐⭐ `R12` — SAY THE SUBSUMPTION PLAINLY
+
+> `process-execution` SUBSUMES `file-system` AND `network`. **Driven:** with `file-system` WITHHELD the model got
+> only `run_command` and wrote a file outside the workspace anyway, **because a child process is not confined by
+> anything userspace can assert.** The three capabilities are NOT independent and the vocabulary presented them
+> as if they were.
+
+⭑ **IT PAIRS WITH `R9`:** the real confinement is the deployment environment's (OpenSandbox / OpenShell / a
+container), not this code's. ⛔ **WHAT IT DOES NOT DO IS COLLAPSE THE VOCABULARY.** `process-execution` stays its
+own capability because the grant must be able to express *"may write, may not run"* — the narrowest useful
+authorization this seam has, and the one the live precision control turns on. What is no longer expressible, and
+is now SAID to be inexpressible, is the converse: *"may run, may not write"* is not a state.
+
+**RECORDED IN THREE PLACES, and one of them is data rather than prose:**
+
+| where | what |
+| --- | --- |
+| `step-binding.ts` | every `STEP_CAPABILITY_VOCABULARY` note, plus a **`subsumes` FIELD** on each entry |
+| `enforcement-register.ts` | `RPH-EXE-004`'s `why`, narrowing *"granting by absence bounds WHICH KINDS of operation"* |
+| §4.3b of the design | the table, and what it does and does not license |
+
+⚠ **THE FIELD IS THE PART THAT WILL SURVIVE.** A subsumption stated only in a note is a claim no gate can read,
+and this repository has twice found such a note outliving the thing it described. `P3-k`…`P3-o` are the mutants;
+the one for this is the vocabulary assertion in `step-binding.test.ts`, which reddens on an emptied `subsumes`.
+
+### ⭐⭐ `R13` — DO NOT REFUSE THE INTERPRETER; RECORD THE FACT
+
+> The model naming `cmd.exe` or `powershell.exe` as `argv[0]` was driven and works (`namesABatchTarget` tests
+> only `/\.(bat|cmd)$/`). ⛔ **DO NOT ADD A BLOCKLIST.** Refusing `cmd.exe` while permitting `node -e` is
+> THEATRE, and worse, a later reader would mistake the refusal for a containment property. Record instead that
+> **`process-execution` means arbitrary code as the server user**, and that `R9`'s deployment tier is the only
+> claimed boundary.
+
+⭐ **THE DEFERRAL THIS ANSWERS WAS ALREADY WRITTEN DOWN, WHICH IS WHY THE ANSWER LANDS IN `child-process-runner.ts`
+AS WELL.** That file's `B1`/`B10` section already said: *"a model naming `cmd.exe` or `powershell.exe` AS THE
+PROGRAM gets a command interpreter, because it asked for one. That is an argv policy belonging to the phase that
+lets a model choose an argv."* Phase 3 IS that phase; the paragraph now carries the ruling rather than the
+deferral. ⚠ **THE BATCH REFUSAL IS NOT WEAKENED AND IS NOT THAT BLOCKLIST:** it exists because Win32 re-parses a
+batch command line so that an ARGUMENT becomes a command, which is a defect in the no-shell guarantee this code
+MAKES — not an attempt to decide which programs a granted step may run.
+
+---
+
+### ⛔⛔ `B-1` — THE ONE BREACH THAT IS A DEFECT UNDER THE RULINGS TOO
+
+**§22.1 IS VERBATIM: *"Revoked bindings cannot be used for new attempts."* IT WAS ENFORCED ON ONE ARROW AND
+NOWHERE ELSE.** `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and **deliberately does not
+clear `grantedCapabilities`** — its handler says so, because the revocation EVENT is derived from the set the
+binding held. And every reader in the Phase 3 path took a capability **LIST** and never a **STATUS**: `grantsFor`,
+`mintExecutionTools`, `stepCapabilityRefusal`. So the stored value was byte-identical before and after a
+revocation, a revoked binding **minted the full tool surface**, and the repair loop happily took another try.
+
+⚠ **WHY NO ARROW CAUGHT IT, WHICH IS THE PART WORTH KEEPING.** `RPH-EXE-003` really does carry this rule — for
+START and RESUME, where `bindingAuthorityVerdict` sits. `JAN-EXECLOOP`'s loop takes SEVERAL TRIES against ONE
+already-started step and **dispatches no command between them**, and Phase 3 mints a tool surface at session
+open, through no arrow at all. A per-arrow enforcement is complete only while every attempt crosses an arrow.
+
+**FIXED AT TWO SITES, BOTH THROUGH THE KERNEL'S OWN `canReuseBindingForNewAttempt`** rather than a second
+spelling of `status !== 'REVOKED'`:
+
+| site | behaviour |
+| --- | --- |
+| `stepCapabilityRefusal` | FIRST limb, before any capability is examined — so the message names the REVOCATION and not a capability that is in fact granted |
+| `mintExecutionTools` | returns an EMPTY surface, so a revoked binding gives a model no hands at all |
+
+⛔ **AND THE ORDER INSIDE `mintExecutionTools` IS ASSERTED:** the whole-catalog NAME BOUND runs FIRST, because it
+is a property of the HOST rather than of one grant — returning early would leave an unholdable name dormant for
+every revoked binding, which is `P3-d`'s dormancy defect reached by a new road. ⭑ `canReuseBindingForNewAttempt`
+consequently LOST its dead-kernel census row, which is that gate's *"good failure"*, and `RPH-EXE-003`'s row was
+checked for the stale claim the census instructs (`REG-F-016`) and amended.
+
+⚠ **THE RESIDUAL, STATED:** the surface is minted ONCE per held session while the status is re-read every try, so
+a binding revoked mid-unit leaves already-minted tools on that session. What that costs is bounded by the first
+site — **no further TURN is taken** — and the session is held on sponsor authority (`JAN-EXECSESS`).
+
+### ⛔ `B-1b` / `B-1c` — TWO STATEMENTS THAT DESCRIBED A CONTROL THAT COULD NOT FAIL
+
+Both are now TRUE because `B-1` made them true, and both were rewritten rather than deleted — but the rewrite
+found something neither the docblock nor the disclosure had noticed:
+
+- `step-binding.ts` claimed *"AND IT CAN ACTUALLY FAIL … `RevokeRuntimeCapability` changes the answer."* In the
+  only production path it could not: the demo authorizes the FULL request, `grantIsMonotone` forbids narrowing,
+  and revocation leaves the granted set intact. The docblock now says which limb can fail and for whom.
+  ⚠⚠ **AND THE FIRST REWRITE REPEATED THE DEFECT IT WAS REPLACING, WHICH IS WHY THIS IS RECORDED RATHER THAN
+  QUIETLY FIXED.** It read *"only the STATUS limb fires on real work"* — which quietly claims the demo can revoke
+  a binding. **MEASURED: `RevokeRuntimeCapability` has ZERO production dispatch sites in `apps/`** (every
+  occurrence there is a comment from this programme), and the positive control discriminates —
+  `AuthorizeRuntimeBinding` HAS one, at `+page.server.ts:963`. So through the page today NEITHER limb can fire:
+  the capability limbs because the demo grants the full request and `grantIsMonotone` forbids narrowing it, and
+  the status limb because **no surface in this app issues the one command that changes a status.**
+  ⭑ **THAT IS A PROPERTY OF THE DEMO'S UI, NOT OF THE FUNCTION, AND THE DIFFERENCE FROM THE ORIGINAL DEFECT IS
+  ONE OF KIND.** Before `B-1` the refusal could not fire **for any caller at all**, because nothing read the
+  status; it now fires for every caller that revokes, and `RevokeRuntimeCapability` is a live command on the bus
+  with a real handler and a ratified machine. The demo simply has no button that issues it — a missing affordance,
+  filed as one, next to the other bound this surface already discloses (it authorizes its full request because it
+  has no authorizer UI able to express a narrower grant).
+- `+page.server.ts` disclosed *"a capability revoked between tries refuses the next try when the step REQUIRES
+  it."* It did not — for `REQUIRES` or `USES`. ⛔ **AND IT WAS WRONG IN A SECOND, WORSE WAY: "a capability revoked
+  between tries" IS NOT AN EXPRESSIBLE ACT.** `RevokeRuntimeCapability` takes no capability list (it revokes the
+  BINDING) and `grantIsMonotone` refuses an authorization that omits an already-granted capability. The
+  disclosure described a mechanism, a refusal and a residual that all had no subject.
+
+### ⛔ `B-2` — THE PERMANENT RECORD LOST CALLS THE ADAPTER HAD
+
+When `session.turn` threw, the catch arm wrote `NOT_OBSERVABLE` with *"nothing was in a position to observe tool
+calls"* — **false for the Pi adapter**, whose observer is session-scoped, subscribed INSIDE `turn()` and
+unsubscribed in a `finally`. It holds every call made before the failure. ⚠ `R11` minted `NOT_OBSERVABLE` to mean
+*"nothing could look"*; using it for *"the call failed"* collapses the two facts the discriminator exists to
+separate — in the direction that hides what a model ran before it broke the run.
+
+⭑ **THE FIX IS WHO SPEAKS, NOT WHAT IS SAID.** `ProducerSession` gained `lastTurnObservation()`, a REQUIRED
+member: the Pi adapter records its observation in the same `finally` that unsubscribes (so the failing and
+succeeding paths report the same measurement), and `oneShotSession` answers `NOT_OBSERVABLE` **in its own words,
+for its own reason** — being one-shot, not this failure. The caller no longer writes one sentence on every
+adapter's behalf, which is what made the old one false.
+
+### ⛔ `B-6` — THE INVENTORY LIED, AND ONLY HALF OF THAT IS FIXABLE
+
+The model plants a hard link with `run_command`, writes through the CONTAINED `write_file`, and `list()` reports
+**another undertaking's file as this workspace's own entry**. ⭐ Under `R12` the WRITE is a stated property and
+this adapter cannot take it back. The false INVENTORY is not a stated property of anything — a workspace
+reporting a file it does not exclusively hold is a **record-plane** defect regardless of who could reach it — so
+`WorkspaceEntry` gained **`nameCount`**, the filesystem's own count of the names holding those bytes.
+
+⚠ **WHAT IS REPORTED IS SHARING, NEVER LOCATION**, and the suite proves the limit rather than asserting it: a
+lawful second link INSIDE the workspace reports the same `2`. The filesystem answers *how many* and answers
+*where* to nobody, so the field is shaped to the fact that is knowable.
+
+⚠ **AND THE DISCLOSURE'S OWN PREMISE HAD CHANGED.** It named hard links as an exposure to *a party with
+filesystem access*, which reads as a party OTHER than the step. Since Phase 3 **the executing model IS that
+party**, so it is not a hazard the workspace might encounter but a vector its own tenant can create on purpose.
+Re-stated, in the adapter's header, with the count as the answer to the half that was fixable.
+
+### ⛔ `B-7` — TWO TRUE-SOUNDING STATEMENTS ABOUT ONE FILE
+
+`write_file('Report.md')` then `write_file('REPORT.MD')` each answered *"Wrote N bytes to <the caller's own
+spelling>"* while `list()` reported ONE entry — and the tool's description told the model *"writing the same path
+again replaces it"*, so two answers read as two files while one file changed underneath. ⛔ **THE BROKEN INVARIANT
+IS: a path `writeFile` REPORTS must be a path `list()` REPORTS.**
+
+⭑ **FIXED BY ASKING THE FILESYSTEM, NEVER BY FOLDING CASE** — the discipline this adapter's header already states
+and whose violation it already records (`toLowerCase()` folds MORE than NTFS does). `locate` now returns the
+spelling the DIRECTORY holds: exact match against its own listing, and otherwise identification by FILE IDENTITY.
+Both aliasing classes on this host — case folding and the NTFS 8.3 alias — are answered without either being
+named, and the tombstone key, `readFile` and `purge` agree with the inventory because the resolution sits in
+`locate` rather than in `writeFile`.
+
+⛔ **AND A MEASUREMENT CHANGED THE IMPLEMENTATION BEFORE IT SHIPPED.** The first form compared `Stats.ino` as a
+JS number. Measured on this host, an NTFS file id came back as `128634064358016640` — **more than fourteen times
+`Number.MAX_SAFE_INTEGER`** — so two different files can round to the same double, and the consequence would not
+have been a missed match but **a write redirected onto somebody else's file, by the function added to stop one
+file wearing two names.** It uses `{ bigint: true }`, which both runtimes this repository runs return exactly.
+
+⚠ **THE DESCRIPTION WAS FIXED TOO, BECAUSE THAT IS THE PART THE MODEL READS**, and it now says the outcome names
+the path as the workspace holds it. What is NOT closed: two LONG names can still collide through generated 8.3
+short names. The caller is told the surviving spelling instead of its own, which makes the collision VISIBLE; it
+does not prevent it.
+
+### ⚠ `W-1` — A FOURTH PROJECTION, AND THE TWO DID DISAGREE
+
+`grantsFor` was a fourth projection of `grantedCapabilities` and the only one not using the kernel's
+`capabilityIdentities`, whose docblock says *"ONE COPY, because there are now three readers, and a projection
+duplicated per reader is how two of them come to disagree."* ⛔ **THEY DID:** the kernel's DROPS a non-string
+element (fail-closed — an unreadable grant grants nothing), while `String(c.capability ?? '')` COERCED one into
+the empty string and KEPT it, putting an entry no authorizer wrote into the list a tool surface is minted from.
+Replaced, and folded into `currentBinding`, which returns the status and the capabilities from ONE read.
+
+### ⛔ `W-6` — TWO TOOLS, ONE MODEL, AND A DISAGREEMENT NOBODY HAD TO STATE BEFORE
+
+Under a swapped root **`write_file` WRITES** (into the junction's target, reported as an ordinary in-workspace
+path) while **`run_command` REFUSES** — the runner compares the RESOLVED `cwd` against the directory the host
+DECLARED, which is the one name a swap cannot move, and a containment predicate has no such declaration to
+compare against. Both halves were disclosed separately and both are still true; what was missing is that Phase 3
+is the first arrangement in which ONE party holds both. ⭑ The joint statement now lives in
+`execution-tool-surface.ts`, where that party's surface is minted, and the workspace header points at it: **the
+model's experience of a swapped workspace is *writes succeed, commands refuse*.**
+
+---
+
+### ⚠⚠ `W-2` — FILED, NOT FIXED: NO BOUND ON CALL COUNT, ON TOTAL WALL CLOCK, OR ON WRITTEN BYTES
+
+⛔ **DRIVEN AT THE PRODUCTION SEAM** (a real `ProcessRunner`, a real `FilesystemWorkspace`, both under
+`os.tmpdir()`), because a resource bound is exactly the kind of claim that reads as present and is not:
+
+| driven | measured |
+| --- | --- |
+| `write_file` with **40 MiB** of model-chosen bytes | `Wrote 41943040 UTF-8 bytes to huge.txt`, on disk, **in 48 ms**. No refusal, no cap, no declaration |
+| 25 consecutive `write_file` calls | **25 / 25 accepted.** Nothing counts calls. `OBSERVED_TOOL_CALL_LIMIT = 32` bounds what the RECORD may HOLD, never what a model may DO |
+| two 1.5 s commands back to back | **3144 ms** of wall clock, both `ok`. `EXECUTION_COMMAND_TIMEOUT_MS` is **per call**; N calls cost N × the bound |
+
+⚠ **UNDER `R12`/`R13` THIS IS A RESOURCE QUESTION, NOT A CONTAINMENT ONE** — a model granted `process-execution`
+can exhaust the same resources through a child process whatever this seam does, so a bound here buys accounting
+and fairness rather than confinement. That is precisely why it is filed rather than patched: a bound that
+pretends to be a containment control is the shape `R13` just refused.
+
+⛔ **WHAT WOULD HAVE TO BE DECIDED, and none of it is available to this increment:**
+1. **WHOSE BOUND IS IT?** `EXECUTION_COMMAND_TIMEOUT_MS` is authored and says so (*"nothing measured says 120
+   seconds"*). A per-STEP budget is not a host constant: it is a property of the work unit, and the corpus has no
+   field for one. `RuntimeBinding.sandboxPolicy` is recorded **DEFERRED TO THE PLATFORM POLICY PLANE**, which is
+   where a quota would naturally live — so authoring one here would encode one tool's model, the lock-in that
+   deferral exists to prevent.
+2. **WHAT HAPPENS AT THE BOUND?** A refused call mid-work leaves a partial deliverable; a failed STEP discards a
+   work product that exists. Both are recordable and they are different rulings, and `ProcessRunOutcome`'s
+   founding distinction (a refusal is not a failure) says they must not be folded.
+3. **WHAT DOES THE RECORD SAY?** A truncated run that did not disclose its truncation is `REG-F-345`'s shape. Any
+   bound needs a declared field, and `ObservedToolCall` has none.
+
+⭑ **AND ONE HALF IS CHEAPER THAN THE OTHERS AND STILL NOT TAKEN UNILATERALLY:** `write_file` could bound
+`contents` today with no ratification at all, because the refusal shape already exists and costs nothing. It is
+not done here because a size cap with no per-step budget beside it is a number that stops one call and no
+campaign — and picking it would be the authored-constant move this roadmap has twice had to disclose.
+
+### ⚠⚠ `W-3` — FILED, NOT FIXED: THE SUCCESS PATH IS GENEROUS WHERE THE REFUSAL PATH IS CAREFUL
+
+⛔ **DRIVEN, AND THE ASYMMETRY IS LARGER THAN IT READS.** `run_command` with
+`node -e "console.log(JSON.stringify(process.env))"`:
+
+- the SUCCESS summary was **3143 bytes** and carried `USERNAME`, `USERPROFILE` (`C:\Users\mchen`), `PATH` and
+  `TEMP` — the operating username and the host's layout — straight into the model's context;
+- the REFUSAL, on the same tool in the same call shape, was *"could not be started in the workspace directory
+  **'deliverable'** (ENOENT)"* — **one path segment**, by `workspaceDirectoryName`, deliberately, because
+  *"`refusedBecause` … travels into a governed record and into a model's context — and the host's filesystem
+  layout belongs in neither."*
+
+⚠ **THE TWO RULES ARE ABOUT THE SAME PLANE AND ONE OF THEM IS UNAPPLIED.** These bytes land in the E-1 composite
+as `materializedInputRef`, `RETAINED_BY_PARTICIPATION` — the class this phase argued for correctly under
+`REG-D-050` — and the removal path they rely on (**E-6 redaction**) has no producer, which `REG-005` already
+records and this AGGRAVATES rather than opens.
+
+⛔ **WHY IT IS NOT FIXED HERE, AND IT IS NOT EFFORT.** The obvious repair is a filter over stream bytes deciding
+what *"looks like a secret"* — a normaliser over arbitrary bytes, which is the shape this seam has now refused in
+four consecutive rounds, and which would make the record claim a completeness it does not have.
+
+⛔ **WHAT WOULD HAVE TO BE DECIDED:**
+1. **IS THE CHILD'S ENVIRONMENT THE CHILD'S TO INHERIT AT ALL?** The runner passes the server's environment
+   through. An explicit ALLOW-LIST is structure rather than sanitisation and is therefore the shape this seam
+   prefers — but it is a behaviour change for every command a model might reasonably run (`PATH` alone decides
+   whether `node` resolves), so it is a ruling about what a sandboxed step is entitled to, not a patch.
+2. **DOES THE SYMMETRY ARGUMENT SURVIVE `R12`?** A model granted `process-execution` can read the environment
+   whatever the tool result contains, so withholding it from the RESULT bounds the RECORD and not the model. That
+   makes this a RETENTION question — which is the honest framing, and the opposite of the one a reader would
+   assume from "the refusal is careful, so the success should be too".
+3. **WHICH PLANE PAYS?** Under `PER-9` the content plane has a removal path and the record plane does not. Nothing
+   here reaches the record plane (`ObservedToolCall` has no field that could hold it), so the whole question is
+   about a content object whose removal path is unimplemented — which makes **E-6** the load-bearing dependency
+   rather than this seam.
+
+---
+
+### VERIFICATION
+
+- `bun run mutants P3-` — **17 entries: 16 KILLED, 0 SURVIVED, 0 UNANCHORED, 0 NO_COMPILE, 0 KILLED_UNNAMED**,
+  plus the pre-existing `P3-pending-source-invents-a-cause` CONTROL_HELD. The **six** new entries `P3-k`…`P3-p`
+  are each the **pre-fix behaviour restored**, so every claim above rests on an observed red rather than on a
+  prediction. ⚠ THE COUNT IN THE FIRST DRAFT OF THIS LINE WAS **15**, WRITTEN BEFORE `P3-p` EXISTED and left
+  standing for one revision — the "quote a count you did not re-measure" defect, caught by re-running rather than
+  by re-reading.
+- ⭐ **`P3-p` WAS NOT PLANNED; THE EXPORT-GUARD CENSUS DEMANDED IT.** Wiring `canReuseBindingForNewAttempt` made
+  it a production-consumed export for the first time, and `guards:export` went to **OUTSTANDING OBLIGATION 1** —
+  the two consumer mutants (`P3-k`, `P3-l`) are anchored in the CALL SITES, and a mutation of the shared
+  DECISION has to be caught where the decision lives. With `P3-p` the census reads **349 of 349, obligation 0**.
+- ⛔ **AND ONE OF MY OWN INSTRUMENTS PRODUCED A 4933-LINE DIFF OVER A 61-LINE CHANGE.** Running `prettier` on
+  `scripts/mutants/ledger.ts` to tidy six new entries reformatted every entry in the file — quote style and
+  wrapping — burying the change in a diff no reviewer could read. `format:check` is deliberately NOT a gate step,
+  so the repository does not hold that file to prettier and the sweep was pure noise. **Reverted, re-applied in
+  the file's own style: 61 insertions, 0 deletions**, and the P3 run was re-driven afterwards rather than
+  inherited. ⚠ This is the shape this programme keeps filing one level down — *the instruments fail more than
+  the code* — arriving in the commit that was fixing record-plane honesty.
+- ⛔ **ONE MUTANT WAS REFUTED BY THE COMPILER AND HAD TO BE RE-EXPRESSED.** `P3-o`'s first form
+  (`held !== undefined || …`) returned `NO_COMPILE`: it widened the type in the branch that consumes `held`.
+  Re-expressed as a ONE-CHARACTER operator (`held !== basename(abs)`) it compiles, restores the defect exactly,
+  and reddens. A mutant that cannot compile proves nothing, and the ledger says so rather than being tuned until
+  the count looked right.
+
+---
+
 ## 6. Phase 4 · The observed tool-call record — split at the ratification line
 
 ⛔ **§22.1 makes model output untrusted external input, so *"the model said it ran the tests"* is not evidence

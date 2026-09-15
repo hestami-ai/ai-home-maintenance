@@ -574,6 +574,35 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		// RESTATED HERE: `errors.ts` rules that the count does not belong in prose, and the enum has since grown
 		// (REG-D-027 authored RPH_AUTHENTICATION_REQUIRED). The load-bearing premise is NON-MEMBERSHIP, unchanged.
 		refusalMarker: 'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding',
+		// ── AMENDED 2026-09-15 (JAN-EXEC Phase 3 review, B-1). THE CARRIAGE NOTE ABOVE WAS TRUE OF ONE ARROW AND
+		// READ AS THOUGH IT WERE TRUE OF EVERY ATTEMPT ──────────────────────────────────────────────────────────
+		//
+		// The note claims this row carries §22.1's "Revoked bindings cannot be used for new attempts", and it does
+		// — for the START and RESUME arrows, where bindingAuthorityVerdict sits. WHAT NOTHING CARRIED IS THE
+		// PER-TRY READING. JAN-EXECLOOP's repair loop takes SEVERAL TRIES against ONE already-started step and
+		// dispatches no command between them, so no arrow is crossed and no verdict is rendered; and JAN-EXEC
+		// Phase 3 mints a model's TOOL SURFACE from the same binding, at session open, through no arrow at all.
+		//
+		// DRIVEN END TO END: RevokeRuntimeCapability advances authorizationStatus to REVOKED and DELIBERATELY does
+		// not clear grantedCapabilities (its handler says so - the revocation event is derived from the set the
+		// binding held), and every reader in the Phase 3 path took a capability LIST and never a STATUS. So a
+		// revoked binding minted write_file and run_command and backed another try, with the stored list
+		// byte-identical before and after the revocation.
+		//
+		// NOW ENFORCED AT TWO MORE SITES, BOTH THROUGH THIS KERNEL'S OWN canReuseBindingForNewAttempt rather than
+		// through a second spelling of "status !== REVOKED":
+		//   · apps/rph-demo/src/lib/server/execution/step-binding.ts - stepCapabilityRefusal's FIRST limb, before
+		//     any capability is examined, so the message names the REVOCATION and not a capability that is in
+		//     fact granted;
+		//   · apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts - mintExecutionTools returns an EMPTY
+		//     surface, so a revoked binding gives a model no hands at all.
+		// It is NOT a command refusal at either site (the consequent is a failed step and an absent tool), which
+		// is why this row's own kind is unchanged and the sites are recorded here rather than in enforcedAt.
+		//
+		// THE RESIDUAL, STATED: the surface is minted ONCE per held session while the status is re-read every
+		// try, so a binding revoked mid-unit leaves already-minted tools on that session. What it costs is
+		// bounded by the first site - no further TURN is taken - and the session is held on sponsor authority
+		// (JAN-EXECSESS), so "a session per try" is not available.
 		// MUTATIONS CORRECTED BY RW-5. Two of the three named acts no longer exist: the precheck call was moved, and
 		// the §15.3 allowlist limb was WITHDRAWN. A `declaredMutations` entry that cannot be applied is worse than an
 		// absent one — the field's whole contract is "what to break to make this row's probe go RED", so an
@@ -680,7 +709,23 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'operation the host DID authorise - this connect(), this path, this host - which belongs to the ' +
 			'Platform Runtime Authorization Service (§33.4). Granting by absence bounds WHICH KINDS of operation a ' +
 			'step may perform; it bounds nothing about the arguments of one it may. EXIT for that tier: the ' +
-			'Platform runtime authorization service, deferred to M5.'
+			'Platform runtime authorization service, deferred to M5. ' +
+			'⛔⛔ AMENDED 2026-09-15 (SPONSOR R12/R13) - AND THE AMENDMENT NARROWS WHAT THE PARAGRAPH ABOVE MAY BE ' +
+			'READ AS CLAIMING. "Granting by absence bounds WHICH KINDS of operation a step may perform" is TRUE ' +
+			'OF THE TOOL SURFACE THIS HOST OFFERS AND FALSE OF WHAT THE MODEL CAN REACH, because the three ' +
+			'capabilities are not ' +
+			'independent: `process-execution` SUBSUMES `file-system` AND `network`. DRIVEN: with `file-system` ' +
+			'WITHHELD the model held only run_command and wrote a file OUTSIDE the workspace anyway - a child ' +
+			'process is not confined by anything userspace can assert. So withholding `file-system` removes a ' +
+			'TOOL and removes no ABILITY, and the ONE narrowing that bounds anything is the reverse: `file-system` ' +
+			'granted, `process-execution` withheld. ' +
+			'⛔ R13: granting `process-execution` means ARBITRARY CODE AS THE SERVER USER. A model naming cmd.exe ' +
+			'or powershell.exe as argv[0] was driven and works, and a BLOCKLIST IS REFUSED BY RULING - refusing ' +
+			'cmd.exe while permitting `node -e` is theatre, and a later reader would mistake the refusal for a ' +
+			'containment property. The only claimed boundary is the R9 deployment tier (OpenSandbox / OpenShell / ' +
+			'container isolation), which is the same tier this row already defers the OPERATION half to. ' +
+			'⭑ The subsumption is carried as DATA on STEP_CAPABILITY_VOCABULARY (`subsumes`), not only as prose, ' +
+			'so it is assertable rather than a note that can outlive what it describes.'
 	},
 	'RPH-EXE-005': {
 		// CLOSED 2026-07-26 by JAN-CAPBIND WP-3, and the blocker recorded here was REAL rather than an excuse — which

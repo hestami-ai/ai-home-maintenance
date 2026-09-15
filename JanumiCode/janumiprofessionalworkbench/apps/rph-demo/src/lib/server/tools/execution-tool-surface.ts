@@ -8,6 +8,35 @@
 // the check FIRING (a convention, not a control — `B8`), and it ADVERTISES the privilege, so an untrusted party
 // learns the host has a process-execution seam and merely declined this time.
 //
+// ── ⭐⭐ `R12` / `R13` (SPONSOR, 2026-09-15) — WHAT MINTING `run_command` ACTUALLY CONFERS ─────────────────────
+//
+// ⛔ **`process-execution` SUBSUMES `file-system` AND `network`.** DRIVEN: with `file-system` WITHHELD the model
+// held only `run_command` and wrote a file OUTSIDE the workspace anyway, because **a child process is not
+// confined by anything userspace can assert.** So "minted ["run_command"], withheld ["write_file"]" is a true
+// statement about THIS HOST'S TOOL SURFACE and a false one about the model's REACH, and only the first is
+// claimed anywhere. ⭑ The reverse narrowing — `file-system` granted, `process-execution` withheld — is the one
+// that bounds anything, and it is the live precision control this phase turns on.
+//
+// ⛔ **`R13`: THE INTERPRETER IS NOT REFUSED.** `cmd.exe` / `powershell.exe` as `argv[0]` was driven and works
+// (`namesABatchTarget` tests only `/\.(bat|cmd)$/`). A blocklist is REFUSED BY RULING: refusing `cmd.exe` while
+// permitting `node -e` is theatre, and worse, a later reader would mistake the refusal for a containment
+// property. **Minting this tool means ARBITRARY CODE AS THE SERVER USER**, and `R9`'s deployment tier —
+// OpenSandbox / OpenShell / container isolation — is the only claimed boundary. Everything below bounds what
+// this HOST does on the model's behalf; nothing below bounds the child.
+//
+// ── ⛔ `W-6` — THE TWO TOOLS DISAGREE UNDER A SWAPPED ROOT, AND PHASE 3 IS WHERE ONE PARTY SEES BOTH ──────────
+//
+// Both halves were disclosed separately and neither disclosure was wrong; what was missing is the JOINT
+// statement, because until this file existed no single party held both tools. **With a junction standing where
+// the Undertaking's deliverable directory was: `write_file` WRITES (into the junction's target, reported as an
+// ordinary in-workspace path) while `run_command` REFUSES (the runner compares the RESOLVED `cwd` against the
+// directory the host DECLARED, which is the one name a swap cannot move).** ⭑ THE ASYMMETRY IS A PROPERTY, NOT
+// AN EFFORT GAP: the runner has a DECLARATION to compare against, and workspace containment is necessarily
+// *is this child under that ROOT* — a swapped root resolves consistently for every child under it. ⚠ SO THE
+// MODEL'S EXPERIENCE OF ONE SWAPPED WORKSPACE IS: writes succeed, commands refuse, and the record shows a step
+// that produced files and could not run them. That is the honest description of the arrangement and it is
+// stated here, once, rather than left to be assembled from two files. See `DESIGN …sandbox.md` §4.8.
+//
 // ⭐ AND IT IS HOW `RPH-EXE-004`'s OPERATION-LEVEL WORDING AND THE CODE'S STEP-LEVEL REFUSAL ARE RECONCILED
 // RATHER THAN ONE BEING CHOSEN. The ratified rule says *"network OPERATIONS fail authorization"* — degradation
 // of the operation, not of the step. Granting by absence IS that: the invocation proceeds with a narrower
@@ -82,7 +111,7 @@
 // is a normaliser over arbitrary bytes, which is the shape this seam has now refused in three consecutive
 // rounds. The cut that IS applied is the runner's own bound, and it travels with its declaration.
 import { RecordPlaneNameSchema } from '@janumipwb/rph-contracts';
-import { capabilityAuthorized } from '@janumipwb/rph-domain';
+import { canReuseBindingForNewAttempt, capabilityAuthorized } from '@janumipwb/rph-domain';
 import { planProcessRun, type ProcessRunner, type Workspace } from '@janumipwb/rph-ports';
 import type { ParamSpec, ToolRunResult } from '../agent/types.js';
 
@@ -172,13 +201,22 @@ function requiredStringArray(args: Record<string, unknown>, field: string): stri
 const WRITE_FILE: ExecutionToolTemplate = {
 	name: 'write_file',
 	capability: 'file-system',
+	// ⛔ THE DESCRIPTION IS A STATEMENT TO AN UNTRUSTED PARTY AND IT MUST STILL BE TRUE (`B-7`). It used to end
+	// *"Writing the same path again replaces it"*, which a model reads as *"a different path is a different
+	// file"* — and on this host it is not: `write_file('Report.md')` then `write_file('REPORT.MD')` each
+	// answered "Wrote N bytes to X" while `list()` reported ONE entry. The adapter now answers with the spelling
+	// the workspace HOLDS, and the sentence says so, so the two statements about one file became one.
 	description:
 		'Write UTF-8 text to a file in this work unit’s workspace. The path is workspace-relative; a path that ' +
-		'escapes the workspace is refused and the refusal says so. Writing the same path again replaces it.',
+		'escapes the workspace is refused and the refusal says so. Writing the same file again replaces it. ' +
+		'The outcome names the path AS THIS WORKSPACE HOLDS IT, which may differ from the spelling you gave — on ' +
+		'a case-insensitive filesystem "Report.md" and "REPORT.MD" are ONE file, not two. Use the path the ' +
+		'outcome reports.',
 	parameters: {
 		path: {
 			type: 'string',
-			description: 'Workspace-relative path, forward-slashed. Never absolute and never containing "..".',
+			description:
+				'Workspace-relative path, forward-slashed. Never absolute and never containing "..".',
 			required: true
 		},
 		contents: { type: 'string', description: 'The complete UTF-8 text to write.', required: true }
@@ -319,9 +357,31 @@ export const EXECUTION_TOOL_CATALOG: readonly ExecutionToolTemplate[] = Object.f
  * `selectBackingTool` gives for the same parameter, in the same words: with the catalog hard-wired, every name
  * in it satisfies the bound and the refusal below could never be entered, so its test would assert nothing.
  * "A control that cannot fail", which this repository has shipped before.
+ *
+ * ── ⛔⛔ `B-1` — §22.1 IS ENFORCED HERE TOO, BECAUSE A LIST IS NOT AN AUTHORIZATION ───────────────────────────
+ *
+ * DRIVEN END TO END: `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and **deliberately does
+ * not clear `grantedCapabilities`** — its handler says so, because the revocation EVENT is derived from the set
+ * the binding held. Every reader in the Phase 3 path took the LIST and never the STATUS, so a revoked binding
+ * minted the **full tool surface**: a model handed a filesystem and a child process by an authorization that had
+ * been withdrawn. §22.1 verbatim: *"Revoked bindings cannot be used for new attempts."*
+ *
+ * ⛔ THE STATUS IS A REQUIRED PARAMETER AND NOT AN OPTIONAL ONE, for the reason `RunModelStepInput.binding` is
+ * required with an explicit `NONE`: an optional status makes *"mint without asking whether the binding still
+ * stands"* expressible by OMISSION, which is the dodge shape `REG-F-364` records.
+ *
+ * ⚠ AND IT IS ENFORCED **HERE**, not only in the caller that computes it. `stepCapabilityRefusal` applies the
+ * same kernel predicate one plane over, and that is not duplication: one asks *may this step take another try*,
+ * this asks *what may be built and named to a model*. What would be duplication is re-deriving
+ * `status !== 'REVOKED'` instead of calling `canReuseBindingForNewAttempt`, and neither site does.
  */
 export function mintExecutionTools(
-	input: { readonly ports: ExecutionToolPorts; readonly grantedCapabilities: readonly string[] },
+	input: {
+		readonly ports: ExecutionToolPorts;
+		readonly grantedCapabilities: readonly string[];
+		/** The binding's CURRENT `authorizationStatus`, read from the store. ⛔ Never the request's. */
+		readonly bindingAuthorizationStatus: string;
+	},
 	catalog: readonly ExecutionToolTemplate[] = EXECUTION_TOOL_CATALOG
 ): readonly ExecutionToolDescriptor[] {
 	for (const template of catalog) {
@@ -337,6 +397,10 @@ export function mintExecutionTools(
 					'false, and a third provenance member is an unratified change to a permanent contract. Rename the tool.'
 			);
 	}
+	// ⛔⛔ §22.1 — AND IT IS CHECKED **AFTER** THE NAME BOUND, DELIBERATELY. The catalog check is about what this
+	// HOST may ever mint and is a property of the host, not of one grant; returning early above it would make an
+	// unholdable name dormant for every revoked binding, which is `P3-d`'s dormancy defect reached by a new road.
+	if (!canReuseBindingForNewAttempt(input.bindingAuthorizationStatus)) return [];
 	return catalog
 		.filter(
 			(template) =>

@@ -162,7 +162,7 @@ describe('purge — the BYTES go and the ENTRY stays (PER-8, and the tombstone o
 		// undefined exactly as a lawful purge does, so `list()` is what tells "purged on schedule" apart from
 		// "never written" and from "lost" — and `byteSize` is the only surviving statement of WHAT was removed.
 		expect(await ws.list()).toEqual([
-			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true, nameCount: 1 }
 		]);
 		expect(existsSync(join(dir, 'logs', 'build.txt'))).toBe(false);
 	});
@@ -173,7 +173,7 @@ describe('purge — the BYTES go and the ENTRY stays (PER-8, and the tombstone o
 		await purgeable().writeFile('logs/build.txt', 'twelve-bytes');
 		await purgeable().purge('logs/build.txt');
 		expect(await purgeable().list()).toEqual([
-			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true, nameCount: 1 }
 		]);
 	});
 
@@ -184,7 +184,7 @@ describe('purge — the BYTES go and the ENTRY stays (PER-8, and the tombstone o
 		await ws.writeFile('logs/build.txt', 'second-run');
 		expect(await ws.readFile('logs/build.txt')).toBe('second-run');
 		expect(await ws.list()).toEqual([
-			{ path: 'logs/build.txt', byteSize: 'second-run'.length, purged: false }
+			{ path: 'logs/build.txt', byteSize: 'second-run'.length, purged: false, nameCount: 1 }
 		]);
 	});
 
@@ -223,7 +223,7 @@ describe('purge — the BYTES go and the ENTRY stays (PER-8, and the tombstone o
 		const ws = purgeable();
 		await ws.writeFile('a.txt', 'a');
 		await writeFile(resolvePath(dir) + RECORD_BASENAME, 'not json at all', 'utf8');
-		expect(await ws.list()).toEqual([{ path: 'a.txt', byteSize: 1, purged: false }]);
+		expect(await ws.list()).toEqual([{ path: 'a.txt', byteSize: 1, purged: false, nameCount: 1 }]);
 		expect(await ws.readFile('a.txt')).toBe('a');
 	});
 });
@@ -235,9 +235,9 @@ describe('list — every path the workspace knows about, sorted so two listings 
 		await ws.writeFile('src/a.txt', 'a');
 		await ws.writeFile('src/deep/c.txt', 'ccc');
 		expect(await ws.list()).toEqual([
-			{ path: 'b.txt', byteSize: 2, purged: false },
-			{ path: 'src/a.txt', byteSize: 1, purged: false },
-			{ path: 'src/deep/c.txt', byteSize: 3, purged: false }
+			{ path: 'b.txt', byteSize: 2, purged: false, nameCount: 1 },
+			{ path: 'src/a.txt', byteSize: 1, purged: false, nameCount: 1 },
+			{ path: 'src/deep/c.txt', byteSize: 3, purged: false, nameCount: 1 }
 		]);
 	});
 
@@ -328,7 +328,7 @@ describe('⛔ the filesystem realities, driven through the adapter that touches 
 		);
 		expect(await ws.readFile('report.md:stolen')).toBeUndefined();
 		expect(await ws.list()).toEqual([
-			{ path: 'report.md', byteSize: 'the report'.length, purged: false }
+			{ path: 'report.md', byteSize: 'the report'.length, purged: false, nameCount: 1 }
 		]);
 		// ⛔ AND NOT ON DISK BEHIND THE VISIBLE FILE: what `list()` reports is the whole of what is stored.
 		expect(existsSync(join(dir, 'report.md:stolen'))).toBe(false);
@@ -353,7 +353,7 @@ describe('⛔ the filesystem realities, driven through the adapter that touches 
 		const wrote = await ws.writeFile('src/report.md', 'the report\n');
 		expect(wrote.written && wrote.path).toBe('src/report.md');
 		expect(await ws.readFile('src/report.md')).toBe('the report\n');
-		expect(await ws.list()).toEqual([{ path: 'src/report.md', byteSize: 11, purged: false }]);
+		expect(await ws.list()).toEqual([{ path: 'src/report.md', byteSize: 11, purged: false, nameCount: 1 }]);
 		expect((await ws.purge('src/report.md')).purged).toBe(true);
 	});
 });
@@ -374,7 +374,7 @@ describe('the retention record is BESIDE the workspace directory, not inside it'
 		await ws.writeFile('logs/build.txt', 'twelve-bytes');
 		await ws.purge('logs/build.txt');
 		expect(await ws.list(), 'the genuine tombstone must exist before it can be forged over').toEqual([
-			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+			{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true, nameCount: 1 }
 		]);
 		return ws;
 	}
@@ -415,8 +415,8 @@ describe('the retention record is BESIDE the workspace directory, not inside it'
 			// `forged/never-written.txt` as purged and stopped reporting `logs/build.txt` -- the "purged on
 			// schedule vs never written" distinction destroyed through a name the guard could not see.
 			expect(await ws.list()).toEqual([
-				{ path: spelling, byteSize: 'A STEP WROTE THIS'.length, purged: false },
-				{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true }
+				{ path: spelling, byteSize: 'A STEP WROTE THIS'.length, purged: false, nameCount: 1 },
+				{ path: 'logs/build.txt', byteSize: 'twelve-bytes'.length, purged: true, nameCount: 1 }
 			]);
 		});
 	}
@@ -435,6 +435,84 @@ describe('the retention record is BESIDE the workspace directory, not inside it'
 				directoryPath: resolvePath(dir).slice(0, 2) + sep
 			})
 		).toThrow(/cannot be a workspace directory/);
+	});
+});
+
+// ── ⭐⭐ `B-7` — ONE FILE MUST NOT PRODUCE TWO TRUE-SOUNDING STATEMENTS ────────────────────────────────────────
+//
+// DRIVEN: `writeFile('Report.md')` then `writeFile('REPORT.MD')` each answered *"Wrote N bytes to <the caller's
+// own spelling>"* while `list()` reported ONE entry — and the tool description handed to the model says
+// *"writing the same path again replaces it"*, so two answers read as two files while one file changed under
+// it. ⛔ THE INVARIANT THAT WAS BROKEN IS EXACTLY THIS: **a path `writeFile` reports must be a path `list()`
+// reports.** It is asserted below in a form that is non-vacuous on BOTH kinds of host, because the aliasing
+// itself is a property of the filesystem and not of this adapter.
+describe('B-7 -- writeFile reports the spelling the FILESYSTEM holds, never the caller’s', () => {
+	/**
+	 * Does THIS filesystem treat two case-spellings as one file? ⛔ ASKED, NEVER ASSUMED FROM `process.platform`.
+	 *
+	 * ⚠ A SUITE THAT HARD-CODED "WINDOWS IS CASE-INSENSITIVE" WOULD BE MAKING THIS ADAPTER'S OWN MISTAKE ONE
+	 * LEVEL UP — a claim about a filesystem derived from a string rather than from the filesystem. A repository
+	 * checked out onto a case-sensitive volume on Windows, or a case-insensitive one on macOS, answers the other
+	 * way, and the probe below is cheap.
+	 */
+	async function foldsCase(): Promise<boolean> {
+		const probe = join(container, 'case-probe');
+		await mkdir(probe, { recursive: true });
+		await writeFile(join(probe, 'Probe.txt'), 'a', 'utf8');
+		return existsSync(join(probe, 'PROBE.TXT'));
+	}
+
+	it('⭐⭐ the reported path is one `list()` reports — on a case-folding host AND on a case-keeping one', async () => {
+		const ws = retained();
+		await ws.writeFile('Report.md', 'first');
+		const second = await ws.writeFile('REPORT.MD', 'second');
+		expect(second.written).toBe(true);
+
+		const listed = (await ws.list()).map((e) => e.path);
+		// ⛔ THE ASSERTION THIS BLOCK EXISTS FOR, AND IT IS NON-VACUOUS EITHER WAY: on a case-keeping host the
+		// second write creates a real second file and BOTH spellings are listed; on a case-folding host there is
+		// ONE file and the outcome must name the spelling that file actually has. Before the fix the
+		// case-folding branch returned `REPORT.MD`, which `list()` has never reported.
+		expect(second.written && listed).toContain(second.written ? second.path : '');
+
+		if (await foldsCase()) {
+			// ⭐ ONE FILE, AND THE CALLER IS TOLD SO BY GETTING BACK A SPELLING IT DID NOT SUPPLY.
+			expect(listed, 'this filesystem folds case, so there is exactly one file').toEqual([
+				'Report.md'
+			]);
+			expect(second.written && second.path).toBe('Report.md');
+			expect(await ws.readFile('Report.md'), 'and the second write replaced the first').toBe('second');
+		} else {
+			// ⭐ TWO FILES, AND THE CALLER'S OWN SPELLING IS THE RIGHT ANSWER — the over-correction this fix is
+			// most at risk of would rename a genuinely distinct file onto its neighbour.
+			expect([...listed].sort(), 'this filesystem keeps case, so there are two files').toEqual([
+				'REPORT.MD',
+				'Report.md'
+			]);
+			expect(second.written && second.path).toBe('REPORT.MD');
+			expect(await ws.readFile('Report.md'), 'and neither write touched the other').toBe('first');
+		}
+	});
+
+	it('⭑ CONTROL — an exact re-write keeps the caller’s spelling, so this is not "rename every path"', async () => {
+		// ⛔ WITHOUT THIS, `locate` is satisfied by returning the FIRST directory entry for every call — which
+		// would silently redirect every write in the workspace onto one file. Same workspace, same path, twice.
+		const ws = retained();
+		await ws.writeFile('src/notes.md', 'one');
+		const again = await ws.writeFile('src/notes.md', 'two');
+		expect(again.written && again.path).toBe('src/notes.md');
+		expect((await ws.list()).map((e) => e.path)).toEqual(['src/notes.md']);
+	});
+
+	it('⭑ CONTROL — a path that does not exist yet is created under the name it was GIVEN', async () => {
+		// ⚠ THE ARM WHERE THE FILESYSTEM HAS NOTHING TO SAY. `heldSpelling` returns `undefined` when nothing is
+		// there, and the caller's spelling is then the only honest answer — a fabricated one would name a file
+		// nobody asked for. THE MUTANT: return the first listed sibling when the target is absent.
+		const ws = retained();
+		await ws.writeFile('sibling.txt', 'x');
+		const fresh = await ws.writeFile('BrandNew.md', 'y');
+		expect(fresh.written && fresh.path).toBe('BrandNew.md');
+		expect((await ws.list()).map((e) => e.path)).toContain('BrandNew.md');
 	});
 });
 
@@ -475,8 +553,47 @@ describe('DISCLOSURE PROBES -- what an organisational boundary does not close', 
 		).toBe('OVERWRITTEN BY A STEP\n');
 		expect(
 			(await ws.list()).map((e) => e.path),
-			'UNREPORTED: the inventory names it as an ordinary in-workspace entry'
+			'STILL LISTED: the path IS in this directory, and suppressing it would under-report a file that is there'
 		).toEqual(['link.env']);
+		// ── ⭐⭐ `B-6` — AND THIS IS THE HALF THAT STOPPED BEING UNREPORTED ────────────────────────────────────
+		//
+		// ⛔ UNDER `R12` THE WRITE ABOVE IS A STATED PROPERTY and this adapter cannot take it back: granting
+		// `process-execution` means arbitrary code as the server user, so the model can plant the link itself and
+		// then write through the CONTAINED tool. THE FALSE INVENTORY IS NOT A STATED PROPERTY OF ANYTHING — a
+		// workspace reporting a file it does not exclusively hold is a RECORD-plane defect regardless of who
+		// could reach it — so `list()` now reports the filesystem's own count of the names that hold these bytes.
+		// ⚠ WHAT IS STILL NOT CLAIMED: the count says the bytes are SHARED and never where the other name is. A
+		// lawful second link inside this workspace reports 2 as well, and the filesystem answers "how many" to
+		// this adapter and "where" to nobody. THE MUTANT: hard-code `nameCount: 1` in the filesystem adapter, as
+		// the in-memory default legitimately does — the inventory goes back to asserting an exclusivity it has
+		// never been able to support, and nothing else in this suite notices.
+		expect(
+			(await ws.list())[0]?.nameCount,
+			'REPORTED: the inventory no longer claims these bytes are this workspace’s alone'
+		).toBe(2);
+	});
+
+	it('⭑ CONTROL — an ORDINARY file reports nameCount 1, so the count is measured and not a flag', async () => {
+		// ⛔ WITHOUT THIS, `nameCount` is satisfied by an adapter that reports 2 for everything — which would
+		// make every deliverable read as shared and the field as useless as the absent one it replaced. Same
+		// workspace, same call, one file written the ordinary way.
+		const ws = retained();
+		await ws.writeFile('ordinary.txt', 'one name only\n');
+		expect((await ws.list())[0]?.nameCount).toBe(1);
+	});
+
+	it('⭑⭑ CONTROL — a SECOND LINK INSIDE the workspace also reports 2, which is why WHERE is not claimed', async () => {
+		// ⭐ THE MEASUREMENT THAT BOUNDS WHAT THE FIELD MAY BE READ AS. A reader could take `> 1` for "this
+		// escaped the workspace"; it does not. Both names here are inside this very workspace and the count is
+		// the same 2 the escaping arrangement produces, so the honest statement is SHARED and nothing more.
+		const ws = retained();
+		await ws.writeFile('original.txt', 'shared bytes\n');
+		await link(join(dir, 'original.txt'), join(dir, 'alias.txt'));
+		const counts = (await ws.list()).map((e) => [e.path, e.nameCount]);
+		expect(counts).toEqual([
+			['alias.txt', 2],
+			['original.txt', 2]
+		]);
 	});
 
 	it('a ROOT SWAP redirects the WHOLE workspace, persistently and undetected', async () => {

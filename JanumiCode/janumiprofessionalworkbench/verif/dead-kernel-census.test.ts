@@ -263,10 +263,20 @@ const CENSUS: Readonly<Record<string, DeadEntry>> = {
 		kind: 'DEFERRED',
 		why: "Triage §4, W3 execution harness (WP-3-005). The live start gate is canStartStepUnderPlan's wired sibling path; this bare form has no caller."
 	},
-	canReuseBindingForNewAttempt: {
-		kind: 'DEFERRED',
-		why: 'Triage §4, W3. Needs the attempt plane W2 defers.'
-	},
+	// ~~canReuseBindingForNewAttempt~~ REMOVED 2026-09-15 (JAN-EXEC Phase 3 review, `B-1`). It read: DEFERRED,
+	// "Needs the attempt plane W2 defers" — and that premise stopped holding the moment a repair LOOP existed:
+	// `JAN-EXECLOOP` takes SEVERAL TRIES against one already-started step, which IS the attempt plane, and each
+	// try is a NEW ATTEMPT in §22.1's own words. ⛔ THE GAP WAS LIVE, NOT THEORETICAL: `RevokeRuntimeCapability`
+	// advances `authorizationStatus` and DELIBERATELY leaves `grantedCapabilities` intact, so every Phase 3
+	// reader that took the capability LIST saw the same answer before and after a revocation — a revoked binding
+	// minted the full tool surface and backed another try. This census's own failure message calls a wired symbol
+	// "the good failure" and permits exactly one response: the row goes, because the symbol is not dead.
+	// ⭑ AND THE ADJACENT STALENESS WAS CHECKED RATHER THAN ASSUMED (`REG-F-016`): `RPH-EXE-003` already claimed
+	// carriage of *"Revoked bindings cannot be used for new attempts"* — truthfully, for the START arrow, which
+	// is where `bindingAuthorityVerdict` sits. Its row is amended to say that the PER-TRY reading was enforced
+	// nowhere until this commit, rather than left to read as though one arrow covered both.
+	// ⚠ ITS SIBLING `canStartStep` STAYS DEFERRED ON A GROUND OF ITS OWN: the live start gate is
+	// `canStartStepUnderPlan`'s wired path, and this pair was never deferred on one shared reason.
 	assessModelOutput: {
 		kind: 'DEFERRED',
 		// ⛔ ITS STATED GROUND WAS FALSE AND IS STRUCK RATHER THAN DELETED (the WP-17 standard). ~~"JPWB hosts no
