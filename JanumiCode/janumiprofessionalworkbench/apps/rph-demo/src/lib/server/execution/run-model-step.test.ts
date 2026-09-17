@@ -333,6 +333,9 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 			session: {
 				retainsHistory: true,
 				dispose: () => undefined,
+				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
+				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
 				lastTurnObservation: () => UNOBSERVED,
 				turn: async (text: string) => {
 					turns.push(text);
@@ -1002,6 +1005,9 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				dispose: () => undefined,
 				// ⭑ THE MEASUREMENT WAS ALREADY TAKEN WHEN THE FAILURE ARRIVED — one call watched start and end,
 				// on a surface this adapter minted and can name.
+				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
+				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
 				lastTurnObservation: () => ({
 					canObserve: true as const,
 					mintedToolNames: ['write_file', 'run_command'],
@@ -1039,6 +1045,9 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 			session: {
 				retainsHistory: true,
 				dispose: () => undefined,
+				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
+				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
 				lastTurnObservation: () => ({
 					canObserve: true as const,
 					mintedToolNames: ['write_file'],

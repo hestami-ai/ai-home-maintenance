@@ -2,29 +2,30 @@
 //
 // ── ⭑ THIS IS SMALLER THAN IT LOOKS, THREE TIMES OVER ───────────────────────────────────────────────────────
 // Each of these was expected to be a subsystem and turned out to be a parameter:
-//   1. The floor validators do not inspect their subject (`REG-F-354`) — they judge FACTS the caller supplies.
+//   1. ~~The floor validators do not inspect their subject (`REG-F-354`) — they judge FACTS the caller
+//      supplies.~~ ⛔ TRUE OF TWO OF THE THREE, AND `JAN-EXEC` PHASE 5 WAS SPECIFIED ON THIS SENTENCE. The
+//      REASONING-REVIEW validator tested `subject.objectType === 'ARTIFACT'`, and because that test was
+//      BINARY its false arm — the PWA-graph framing — is where every OTHER subject kind landed, silently. A
+//      command result reached it, failed `JSON.parse`, and returned INCONCLUSIVE, which BLOCKS.
+//      ⭐ `REG-F-354`'s own measurement sentence cites `floor.ts:161` and `:213` — the two DETERMINISTIC
+//      validators — and its scope note carves the third out of BUILD EFFORT, never out of subject-inspection.
+//      This line generalised a measurement about two into a claim about three, and a later programme planned
+//      against the claim rather than against the measurement.
+//      ⭐ IT IS TRUE NOW (`R14`): the framing is DECLARED on `ReasoningReviewInput` by the caller, the switch
+//      is exhaustive, and no floor validator reads its subject for anything but identity and version.
 //   2. `classifyFloorRemediation` does not either: it reads dispositions and observation CODES, "never prose",
-//      and every mention of a PWA inside it is in a guidance STRING.
+//      and every mention of a PWA inside it is in a guidance STRING. ⭑ RE-MEASURED IN PHASE 5; IT HELD.
 //   3. `runPwaFloor` is a subject plus a context. An artifact run is the same call with different content.
+//      ⭑ HELD, AND IS NOW `floor-over-subject.ts` — but the parameter count was wrong: TWELVE, not four.
 // ⭑ Three times in one session the system turned out to have been designed for this and never used that way.
-import {
-	runFloorAndPlanRecording,
-	type AssuranceSubject,
-	type ValidatorContext
-} from '@janumipwb/rph-assurance';
-import { recordAssuranceRecordingPlan } from '@janumipwb/rph-engine';
+// ⚠ AND ONCE IT TURNED OUT NOT TO HAVE BEEN, WHICH IS WHY ITEM 1 IS STRUCK RATHER THAN DELETED.
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { splitAnswerSpan } from '../assurance/agy-cli.js';
-import { createFloorRegistry } from '../assurance/index.js';
-import { classifyFloorRemediation, type FloorRemediation, type FloorView } from '../floor.js';
-import { createExchangeSink } from '../assurance/exchange-capture.js';
-import { recordExchanges } from '../assurance/exchange-recorder.js';
-import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
-import { isTestMode } from '../workbench.js';
+import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
 
 /** What this module needs about the artifact and the call that produced it. Structural, so a test can drive it. */
 export interface WorkProductSubject {
@@ -130,150 +131,56 @@ export async function runWorkProductFloor(
 		readonly criteria: readonly AssessmentCriterion[];
 		readonly print?: (prompt: string) => Promise<string>;
 	}
-): Promise<{
-	satisfied: boolean;
-	observations: { code: string; statement: string }[];
-	/** ⭑ JAN-EXECLOOP — what to DO about an unsatisfied floor, decided by the SAME classifier the authoring
-	 *  plane uses. Computing it here rather than in the route keeps one definition of "these findings may go
-	 *  back to the producer", which is the distinction `REG-D-059` turns on. */
-	remediation: FloorRemediation;
-}> {
+	// ⭑ THE SHARED OUTCOME, NOT A RESTATEMENT OF IT. This was an inline object type carrying its own docblock
+	// for `remediation`; a second caller restating it is how two descriptions of one shape come to disagree
+	// (`REG-F-353`), which is the defect this file's own header records about a different pair.
+): Promise<FloorRunOutcome> {
 	const facts = await workProductFloorFacts(subject, opts.artifacts);
-
-	const assuranceSubject: AssuranceSubject = {
-		subjectId: subject.artifactId,
-		objectType: 'ARTIFACT',
-		semanticVersion: Number(subject.artifact.semanticVersion ?? 1),
-		isAiProduced: true,
-		// ⚠⚠ `modelId`, NOT ONLY `agentId`, AND THE INDEPENDENCE CHECK CAUGHT ME PUTTING IT IN THE WRONG FIELD.
-		// The reasoning-review policy requires `DIFFERENT_MODEL` (`floor-policies.ts:146`), and `checkIndependence`
-		// requires BOTH sides DEFINED and different — an undefined field is never "different", because an
-		// absence cannot evidence independence. With the model id only in `agentId`, `producer.modelId` was
-		// undefined, and the review was BOUNDARY_REJECTED for non-independence every time.
-		// ⭑ THE CHECK WAS RIGHT AND MY DECLARATION WAS WRONG. The producer of a work product IS a model, so its
-		// `modelId` is the field that must differ from the reviewer's.
-		producer: {
-			actorType: 'AGENT' as const,
-			agentId: `execution.model-invocation:${subject.artifactId}`,
-			modelId: subject.producerModelId,
-				providerId: subject.producerProviderId
-		}
-	};
-
-	const ctx: ValidatorContext = {
-		schemaInvariant: facts.schemaInvariant,
-		identityProvenance: facts.identityProvenance,
-		reasoningReview: {
-			criteria: opts.criteria,
-			// ⭑ `R14` — DECLARED BY THE CALLER, so the reviewer is told what it is looking at rather than having it
-			// inferred from `subject.objectType`. The inference was BINARY, and Phase 5 measured what that costs.
-			framing: 'WORK_PRODUCT',
-			// ⭑ THE REVIEWER JUDGES THE SAME PAIR THE PRODUCER SAW — the prompt that was given and the answer
-			// that came back. Handing it a summary would make the judgement about the summary.
-			prompt: subject.producingPrompt,
-			content: subject.answer,
-			// ⚠ PASSED UNCONDITIONALLY — the section renders `(none recorded)` when absent. §9.7: presence or
-			// absence is never a signal, so the reviewer's INPUT SHAPE must not encode whether the producer
-			// declared one. What the reviewer may do is find against a real absence, which is a judgement about
-			// the work rather than a difference in what it was handed.
-			rationale: subject.rationale,
-			narration: undefined,
-			// ⭑ THE DESIGNED CHANNEL, USED ONLY WHEN CONFIGURED. `judgePrompt` frames it as *"A PREVIOUS review
-			// flagged … Judge whether those are genuinely resolved"* — which is the right framing IF the
-			// reviewer is meant to know. It defaults to unset because the sponsor's model puts that state on
-			// the PRODUCER, and the paper's deployed pipeline does the same: the judge's reason goes to the
-			// GENERATOR's prompt, and the judge re-scores each draft cold.
-			prior: subject.priorGaps?.length ? { gaps: [...subject.priorGaps] } : undefined
-		}
-	};
-
-	// ⭑⭑ BOTH OR NEITHER — AND THE LIVE LANE IS WHAT FOUND THIS. `captureTry` REFUSES a store supplied without
-	// a sink, because bytes retained with no record referencing them are the orphan `REG-F-336 C-2` forbids.
-	// This call passed `artifacts` and no `exchanges`, so the FIRST real reviewer ever pointed at a work
-	// product failed with `VALIDATOR_EXECUTION_FAILED: a store was supplied with no sink`.
-	//
-	// ⚠ THE MOCK COULD NEVER HAVE CAUGHT IT: it captures nothing, so the sink was never reached and every gate
-	// run was green. That is the whole argument for a live lane — the guard was working correctly and the
-	// wiring around it had never been exercised.
-	const exchanges = createExchangeSink();
-	const plan = await runFloorAndPlanRecording(
-		assuranceSubject,
-		ctx,
-		createFloorRegistry({
-			testMode: isTestMode(),
-			artifacts: opts.artifacts,
-			exchanges,
-			...(opts.print ? { print: opts.print } : {})
-		})
-	);
-	recordAssuranceRecordingPlan(engine, plan, {
-		issuedAt: opts.now(),
-		correlationId: `work-product-floor:${subject.artifactId}`,
-		idPrefix: opts.newId('wpfloor'),
-		newId: opts.newId
-	});
-
-	// ⭑ THE DRAIN — `PER-9`'s durable record of the REVIEWING call, one per bounded try. Without it the review
-	// happened and nothing says so: the producing call is recorded on the EXECUTION plane and the reviewing
-	// call would have no record at all, which is the record-plane omission `PER-9` calls illegal.
-	const drained = exchanges.drain();
-	if (drained.length > 0) {
-		const outcome = recordExchanges(
-			(payload, aggregateId) =>
-				engine.dispatch({
-					commandId: opts.newId('cmd'),
-					commandType: 'RecordModelExchange',
-					commandSchemaVersion: 1,
-					targetAggregateType: 'MODEL_EXCHANGE',
-					targetAggregateId: aggregateId,
-					issuedAt: opts.now(),
-					correlationId: `model-exchange:${subject.artifactId}`,
-					idempotencyKey: `mex:${aggregateId}`,
-					payload
-				}),
-			drained,
-			{
-				runToken: opts.newId('wpfloorrun'),
-				// ⚠ THE REVIEW IS AN ASSURANCE ACT EVEN THOUGH ITS SUBJECT CAME OFF THE EXECUTION PLANE. The
-				// plane names WHO IS ACTING, not where the subject came from — conflating them would file the
-				// reviewer's call as though the work unit had made it.
-				plane: 'ASSURANCE',
-				invokerId: 'reasoning-review',
-				assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
-				subjectObjectId: subject.artifactId,
-				subjectObjectType: 'ARTIFACT',
-				subjectSemanticVersion: Number(subject.artifact.semanticVersion ?? 1),
-				newId: opts.newId
-			}
-		);
-		// A retention fault must not fail a review that already reached its conclusion — but it must not vanish
-		// either. Surfacing it is the disclosed shortfall PER-9 permits; swallowing it is what it forbids.
-		if (outcome.failures.length > 0)
-			console.warn(
-				`[MXR] ${outcome.recorded}/${drained.length} work-product exchange records written; ` +
-					`${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
-			);
-	}
-
-	return {
-		satisfied: plan.gatePermitsTransition,
-		observations: plan.assessments.flatMap((a) =>
-			a.observations.map((o) => ({ code: o.code, statement: o.statement }))
-		),
-		// ⚠ THE SAME CLASSIFIER, NOT A SECOND ONE. `classifyFloorRemediation` is subject-agnostic — it reads
-		// policy ids, dispositions and observation CODES, "never prose" — so an artifact subject is the same
-		// call with different content. Writing a work-product-specific one here is how two descriptions of one
-		// rule come to disagree (`REG-F-353`).
-		remediation: classifyFloorRemediation({
+	return runFloorOverSubject(
+		{
 			subjectId: subject.artifactId,
-			satisfied: plan.gatePermitsTransition,
-			waived: false,
-			policies: plan.assessments.map((a) => ({
-				policyId: a.policyId,
-				disposition: a.disposition,
-				independenceOk: a.independenceOk,
-				observations: a.observations
-			}))
-		} as unknown as FloorView)
-	};
+			objectType: 'ARTIFACT',
+			semanticVersion: Number(subject.artifact.semanticVersion ?? 1),
+			// ⚠ A LITERAL BEFORE AND STILL A LITERAL — but now one this file OWNS rather than one buried inside a
+			// shared run. `floor-gate.ts` makes a MODEL_INVOCATION step AI-produced BY CONSTRUCTION, so for a work
+			// product this is a fact about the path and not a judgement about the subject.
+			isAiProduced: true,
+			producer: {
+				agentId: `execution.model-invocation:${subject.artifactId}`,
+				modelId: subject.producerModelId,
+				providerId: subject.producerProviderId
+			},
+			runLabel: 'work-product-floor',
+			idPrefix: 'wpfloor'
+		},
+		{
+			schemaInvariant: facts.schemaInvariant,
+			identityProvenance: facts.identityProvenance,
+			reasoningReview: {
+				criteria: opts.criteria,
+				// ⭑ `R14` — DECLARED BY THE CALLER, so the reviewer is told what it is looking at rather than having
+				// it inferred from `subject.objectType`. The inference was BINARY, and Phase 5 measured what that
+				// costs.
+				framing: 'WORK_PRODUCT',
+				// ⭑ THE REVIEWER JUDGES THE SAME PAIR THE PRODUCER SAW — the prompt that was given and the answer
+				// that came back. Handing it a summary would make the judgement about the summary.
+				prompt: subject.producingPrompt,
+				content: subject.answer,
+				// ⚠ PASSED UNCONDITIONALLY — the section renders `(none recorded)` when absent. §9.7: presence or
+				// absence is never a signal, so the reviewer's INPUT SHAPE must not encode whether the producer
+				// declared one. What the reviewer may do is find against a real absence, which is a judgement about
+				// the work rather than a difference in what it was handed.
+				rationale: subject.rationale,
+				narration: undefined,
+				// ⭑ THE DESIGNED CHANNEL, USED ONLY WHEN CONFIGURED. `judgePrompt` frames it as *"A PREVIOUS review
+				// flagged … Judge whether those are genuinely resolved"* — which is the right framing IF the reviewer
+				// is meant to know. It defaults to unset because the sponsor's model puts that state on the
+				// PRODUCER, and the paper's deployed pipeline does the same: the judge's reason goes to the
+				// GENERATOR's prompt, and the judge re-scores each draft cold.
+				prior: subject.priorGaps?.length ? { gaps: [...subject.priorGaps] } : undefined
+			}
+		},
+		engine,
+		opts
+	);
 }

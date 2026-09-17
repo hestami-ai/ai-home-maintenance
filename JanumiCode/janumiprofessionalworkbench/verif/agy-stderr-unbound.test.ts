@@ -39,6 +39,40 @@
 // SECOND RETENTION SURFACE AND THIS GATE CAUGHT IT, which is the gate working: the binding arrived and the
 // answer had to be re-stated before the commit could go green.
 //
+// ══ ⭐⭐ AND A THIRD DOOR OPENED IN JAN-EXEC PHASE 5 — WHO TURNS THE STREAMS INTO EVIDENCE ═══════════════
+//
+// Phase 2b answered who CAPTURES them. Phase 3 answered who HANDS THEM TO A MODEL. Phase 5 asks a third
+// question, and it is not a rewording of the second: **evidence is CITED IN A JUDGEMENT and OUTLIVES the turn
+// that produced it.** A `TEST_RESULT` naming a command's output is read by a floor run, by a completion gate,
+// and by anyone auditing why a step was allowed to succeed — long after the model that ran it has gone.
+//
+// ⛔ AND THIS GATE CAUGHT IT, WHICH IS THE GATE WORKING FOR THE THIRD TIME. Two files entered the population
+// (`process-run-observer.ts` holds the transient streams so something outside the tool closure can see them;
+// `process-result-floor.ts` renders them as the subject a reviewer reads) and the commit could not go green
+// until the answer was re-stated.
+//
+// ⭐ THE DISPOSITION, AND ITS ARGUMENT IS SHORTER THAN PHASE 3'S BECAUSE PHASE 3 DID THE WORK:
+//   · NO NEW RETENTION SURFACE IS CREATED BY HOLDING THEM. `run_command` already hands both streams back to the
+//     model, so they are already in the E-1 composite stored under `RETAINED_BY_PARTICIPATION`. The observer
+//     holds the SAME transient strings for the length of the step and persists nothing of its own.
+//   · WHAT PHASE 5 ADDS IS AN **ADDRESSABLE** COPY, and that is a deliberate act with a declared class:
+//     `ArtifactStore.put(bytes, 'RETAINED_BY_PARTICIPATION')` (`R16`). The composite is the whole provider
+//     payload for a turn and nothing inside it names the test run; an evidence object must name its own bytes.
+//   · THE CLASS IS THE SAME ONE, FOR THE SAME REASON (`REG-D-050`, participation is a property of USE): a floor
+//     run JUDGES these bytes, so they participated in an assessment. Declaring them purgeable to make the
+//     problem go away would mean an assessment resting on bytes the system says it may destroy.
+//   · THE RUNNER'S OWN DURABLE COPY IS UNTOUCHED AND UNRECLASSIFIED. `ProcessOutputRetention` still names a
+//     `PURGEABLE_AT_EXPIRY` capture in the second workspace, and the evidence carries that reference BESIDE the
+//     minted address — so a purge still reaches one copy, and `R7` is not retroactively falsified for any prior
+//     run, which re-labelling it would have done.
+//   · ⛔ AND NO BYTE REACHES THE RECORD PLANE, unchanged: `ObservedToolCall` has no field that could hold one.
+//     `process-run-observer.ts` is CONTENT-plane material by construction and says so in its own header.
+//
+// ⚠ THE RESIDUAL IS THE SAME ONE PHASE 3 STATED AND IT IS NOW LARGER, WHICH IS THE HONEST WAY TO PUT IT. A
+// build that echoes a token or a host path now lands in a SECOND permanent content object — the evidence's —
+// and `PER-9`'s E-6 redaction, the removal path both dispositions rely on, still has no producer in this
+// repository (`REG-005`). That is a change in the SIZE of a recorded gap, not a new gap.
+//
 // ⭐ ITS DISPOSITION IS AT `DISPOSED_STDERR_SITES` BELOW AND IN THE BINDING FILE'S OWN HEADER, and its shape is
 // this: the class follows `REG-D-050` (participation is a property of USE), the bytes land on the CONTENT plane
 // which `PER-9` gives a removal path, and the RECORD plane — which has none — receives no byte of either stream
@@ -142,7 +176,9 @@ const DEMO_PREFIX = 'apps/rph-demo/src/';
  */
 const DISPOSED_STDERR_SITES = [
 	'lib/server/execution/child-process-runner.ts',
-	'lib/server/tools/execution-tool-surface.ts'
+	'lib/server/tools/execution-tool-surface.ts',
+	'lib/server/tools/process-run-observer.ts',
+	'lib/server/execution/process-result-floor.ts'
 ];
 
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
@@ -469,7 +505,9 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 		// and recording why. A list that grows quietly is how an exemption becomes a policy.
 		expect(DISPOSED_STDERR_SITES).toEqual([
 			'lib/server/execution/child-process-runner.ts',
-			'lib/server/tools/execution-tool-surface.ts'
+			'lib/server/tools/execution-tool-surface.ts',
+			'lib/server/tools/process-run-observer.ts',
+			'lib/server/execution/process-result-floor.ts'
 		]);
 	});
 
