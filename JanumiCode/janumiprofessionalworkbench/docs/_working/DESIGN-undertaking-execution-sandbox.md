@@ -93,6 +93,7 @@ recording is worth committing.
 | R15 | **`R6`'s SUBJECT IS THE EXISTING CONTRACTED RATIONALE, READ AGAINST THE ADAPTER'S OBSERVED TOOL CALLS.** The account already exists, is already permanent under `R10`, and needs no new producer and no untrusted-party field. Ruled 2026-09-17; see §4.12. |
 | R16 | **THE PARTICIPATING MINT IS A CONTENT-PLANE ADDRESS NAMED BY `EvidenceObject.contentReference` — NO SECOND `ARTIFACT` OBJECT.** A test log is not a work product. Ruled 2026-09-17; see §4.12. |
 | R17 | **TWO BLOCKING CODES, AND TRUNCATION IS NOT ONE OF THEM.** `PROCESS_OUTPUT_NOT_RETAINED` and `PROCESS_VERDICT_UNOBSERVED` block; a DECLARED prefix and an incomplete capture are recorded LIMITATIONS, because a declaration that travels with the bytes does not invalidate the exit code. Ruled 2026-09-17; see §4.12. |
+| R18 | **EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.** The host cannot tell which command was a test run, and a predicate over `argv` is the normaliser shape this seam has refused four times — so it records what it CAN say: it observed a command run and what it exited with. Calling `ls` a `TEST_RESULT` would be a claim about what the command WAS. Ruled 2026-09-17; see §4.13. |
 
 ---
 
@@ -793,3 +794,37 @@ truncated stdout is a pass nothing produced"*) is about the silent case, and thi
 ⛔ The strict reading was declined on measured grounds: capture is capped at 64 KiB per stream, so a real suite's
 output is routinely a declared prefix, and blocking on it would mean **no real test suite could ever produce
 admissible evidence.**
+
+
+---
+
+## 4.13 ⭐⭐ `R18` (SPONSOR, 2026-09-17) — the host records what it CAN say, and `evidenceType` is the place that discipline shows
+
+**THE QUESTION.** A step's model may run `npm ci`, then `npm test`, then `ls`. **Nothing tells the host which was
+the test run.** `ObservedToolCall` carries a tool NAME and `run_command` is one name for every command; the argv
+is content-plane and the host is not the party that chose it.
+
+**RULED: EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.**
+
+⭑ **`OBSERVATION` IS NOT A HEDGE — IT IS THE ACCURATE MEMBER.** What happened is that this host watched a
+command run and recorded what it exited with. `TEST_RESULT` is a claim about what the command WAS, and the only
+party who knows that is the untrusted one. ⛔ A predicate over `argv` — *does this look like a test command* — is
+a normaliser over text an untrusted party chose, which is the shape this seam has now refused in five
+consecutive rounds.
+
+⚠ **AND IT COSTS NOTHING BEHAVIOURALLY, WHICH IS WHY IT IS A RECORDS-HONESTY DECISION RATHER THAN A DESIGN ONE.**
+MEASURED: `evidenceType` appears in production at FOUR sites and **no production code branches on it** — not on
+`TEST_RESULT`, not on any member. `SubmitEvidenceForAssessment` carries it optionally and never compares it to
+the requirement's declared type. So the choice changes what the record SAYS and nothing else, which is precisely
+when getting it right is cheapest and mattering most.
+
+⛔ **EVERY COMPLETED RUN, INCLUDING ONES `R17` WILL BLOCK — AND THAT IS THE FAIL-CLOSED POSTURE, NOT AN OVERSIGHT.**
+A run whose output was not retained, or whose process was killed, is minted as evidence and then **refuses its
+own floor**. The alternative — minting only the runs that would pass — lets a step complete as though the killed
+command never happened. ⭑ That is the rule `unassessableAiContentBlock` already states one plane over: *AI-produced
+content may not enter the governed stream with nothing to assess.* A command that ran and cannot be assessed is
+exactly that, and `R17`'s codes exist so the block is LEGIBLE rather than mysterious.
+
+⚠ **THE COST, STATED: N COMMANDS MEANS N FLOOR RUNS AND N REVIEWER CALLS.** The bound is the observer's own
+(32, the same as `R11`'s record-plane cap), and a step that runs many commands pays for each. That is a
+resource question of the kind `W-2` already carries; it is not smoothed by minting fewer.

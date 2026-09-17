@@ -60,6 +60,11 @@ import { actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
 import {
+	describeRefusedEvidence,
+	joinProcessEvidence
+} from '$lib/server/execution/evidence-join';
+import { governedToolCallReport } from '$lib/server/tools/observed-tool-calls';
+import {
 	classifyTrend,
 	mayRetry,
 	reviewSeesPriorFindings
@@ -1340,6 +1345,56 @@ export const actions: Actions = {
 				producer.dispose();
 			}
 
+			// ── ⭐⭐ JAN-EXEC PHASE 5 — THE EVIDENCE JOIN: every command the host ran becomes a governed object ──
+			//
+			// ⛔ UNTIL THIS BLOCK, `proposedEvidenceIds` WAS THE LITERAL `[]` ON EVERY PATH IN THIS FILE, and the
+			// exit code of a model-run test suite existed NOWHERE after the turn ended — `ProcessRunOutcome.
+			// retention` had no production consumer and the tool-call observer drops everything but a name and an
+			// outcome. So a step could run a test suite and complete with no governed trace that it had.
+			//
+			// ⭐ `R18`: EVERY COMPLETED RUN, TYPED `OBSERVATION`. This host cannot tell `npm test` from `ls` —
+			// `run_command` is one tool name for every command and the argv was chosen by an untrusted party — so
+			// it records what it CAN say. ⛔ Including runs `R17` will BLOCK: minting only the ones that would
+			// pass would let a step complete as though a killed command never happened.
+			//
+			// ⚠ THE JOIN RUNS EVEN WHEN THE WORK-PRODUCT FLOOR REFUSED, and that is deliberate. A command that
+			// ran is a FACT about the world; whether the step may COMPLETE is a judgement about that fact. It is
+			// the same argument `PER-9` makes for not rolling the artifact back when the floor refuses it.
+			const observedRuns = producer.processRuns();
+			const join = await joinProcessEvidence(
+				{
+					runs: observedRuns.runs,
+					// ⭑ THE PRODUCING MODEL'S EXCHANGE (`R15`). A child process has no exchange; what
+					// `traceComplete` verifies is the record of the turn in which the model DECIDED to run this.
+					exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
+					producingPrompt: outcome.prompt,
+					producerModelId: outcome.producer.modelId,
+					producerProviderId: outcome.producer.providerId,
+					// ⭐ `R15`'s INDEPENDENT HALF — the adapter's own observation, not the model's word (§22.1).
+					observedToolCalls: governedToolCallReport(producer.lastTurnObservation()),
+					...(outcome.rationale ? { rationale: outcome.rationale } : {}),
+					scope: `commands run by the executing model for work unit ${pwuId}`,
+					tenantPrefix: EXECUTION_TENANT_PREFIX
+				},
+				uiSession(),
+				{
+					artifacts: getArtifactStore(),
+					now: hostNow,
+					newId: mintUiId,
+					criteria: reasoningReviewCriteria(uiSession()),
+					// ⚠ ONE COMMAND PER CALL, THROUGH THE SAME `runSteps` THE REST OF THIS ACTION USES, so a
+					// refusal anywhere rolls the whole action back (`SPEC-001-INV-14`). A module reaching for the
+					// engine directly would commit evidence this path's own failure arm could not undo.
+					propose: (evidenceId, payload) =>
+						runSteps([['ProposeEvidence', 'EVIDENCE', evidenceId, payload]]),
+					getObject: (id) => getObject(getEngine(), id) as Record<string, unknown> | undefined
+				}
+			);
+			if (join.refusedBecause)
+				return fail(400, {
+					error: `The model ran ${observedRuns.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
+				});
+
 			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
 			//
 			// `floor-gate.ts:30` — `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])` — makes this step AI-produced
@@ -1364,7 +1419,11 @@ export const actions: Actions = {
 						resultStatus: 'SUCCEEDED',
 						// ⭑ AN ACTUAL OUTPUT, WHERE THE DEMO HAS ONLY EVER RECORDED `noOutputResult`.
 						outputArtifactIds: [artifactId],
-						proposedEvidenceIds: [],
+						// ⭐⭐ PHASE 5 — AND NOW EVERY COMMAND THE MODEL RAN, EACH WITH ITS OWN FLOOR ALREADY
+						// RECORDED. `completeExecutionStep` unions this with `outputArtifactIds` and loops the floor
+						// gate over EVERY member at its own store-derived version — so naming an id whose floor is
+						// missing does not weaken the gate, it REFUSES the completion. That is why the join runs first.
+						proposedEvidenceIds: join.joined.map((j) => j.evidenceId),
 						detectedAssumptionIds: [],
 						structuredResult: {},
 						// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
@@ -1396,7 +1455,7 @@ export const actions: Actions = {
 							// ⭑ AND IT SAYS WHY THE LOOP STOPPED, not merely that it did. `REG-D-059` bounds the
 							// repair loop and escalates at the bound; an operator reading this needs to know
 							// whether the producer ran out of tries, stalled, or made things worse.
-							`The model ran, its work product was reviewed over ${openPerTry.length + 1} ${openPerTry.length === 0 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}`
+							`The model ran, its work product was reviewed over ${openPerTry.length + 1} ${openPerTry.length === 0 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
 				});
 			return { advanced: 'executed' };
 		}

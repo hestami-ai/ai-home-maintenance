@@ -1457,6 +1457,7 @@ and the `PURGEABLE_AT_EXPIRY` capture are two objects and cannot collide.
 | `R15` | the review's subject is the **existing contracted rationale read against the observed tool calls** | a `run_command` parameter filled by an untrusted party, and its ratification |
 | `R16` | **`EvidenceObject.contentReference` only** — no second governed `ARTIFACT` | a second object lifecycle, and a deliberate e2e red |
 | `R17` | **two blocking codes**; declared truncation and incomplete capture are LIMITATIONS | a rule under which no real test suite (64 KiB cap) could ever produce admissible evidence |
+| `R18` | **every completed run → one `EVIDENCE`, typed `OBSERVATION`** | a predicate over `argv` deciding what “looks like” a test command — the fifth refusal of that shape on this seam |
 
 ⭑ **THE PATTERN:** every one declined a change to a ratified or generated contract in favour of a change to how
 this host CONDUCTS the work. Phase 5 is now **one validator arm, one facts derivation, one mint, one seam.**

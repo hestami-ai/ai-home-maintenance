@@ -7655,5 +7655,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/tools/process-run-observer.test.ts"],
 		why: "PROMISE: what the host observed is the HOST's, and a reader may not edit it. WHO RELIES: every later reader in the same step — the evidence mint, the floor run, the record. WHAT THE MUTATION DOES TO THEM: a caller that sorts, filters or splices the array it was handed silently EDITS the host's own record of what happened, in place, with nothing recording that it did — so a later reader sees a different turn from the one that ran. ⚠ IT IS INVISIBLE IN EVERY ORDINARY USE, because a caller that only reads it behaves identically; the defect arrives the day someone writes `runs.sort(...)` to tidy a report.",
 		source: "JAN-EXEC Phase 5 — the host's own instrument for what it ran, and the bound it puts on itself"
+	},
+	{
+		id: "P5-n-every-command-becomes-a-test-result",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tevidenceType: 'OBSERVATION',\n",
+		replace: "\t\t\tevidenceType: 'TEST_RESULT', // MUTANT: the phase's brief, taken literally — `ls` is a test result\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: this host records what it CAN say — it watched a command run and saw what it exited with. `TEST_RESULT` is a claim about what the command WAS, and the only party who knows that is the one §22.1 classifies as untrusted (`R18`). WHO RELIES: every reader of the governed record, and every policy that will one day key on `evidenceType`. WHAT THE MUTATION DOES TO THEM: `npm ci`, `ls` and `cat package.json` are all recorded as TEST RESULTS, permanently. ⛔ AND NOTHING BREAKS, WHICH IS WHY IT NEEDS A MUTANT RATHER THAN A TYPE: `evidenceType` is a label NO production code branches on — measured, four sites, none of them a read — so every other test in this file stays green and the only casualty is that the record says something false. ⚠ It is also the PLAUSIBLE edit, because `TEST_RESULT` is the word this phase's own roadmap uses throughout.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-o-only-the-runs-that-would-pass-become-evidence",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\tfor (const run of input.runs) {\n",
+		replace: "\tfor (const run of input.runs.filter((r) => r.exitCode !== null && !r.timedOut)) { // MUTANT: mint only the runs that would pass their floor\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: a command that RAN is recorded, whatever happened to it, and `R17`'s codes make an unassessable one BLOCK legibly. WHO RELIES: the completion gate, and anyone auditing why a step succeeded. WHAT THE MUTATION DOES TO THEM: a test suite the host KILLED AT ITS DEADLINE is silently dropped from the evidence list, and the step completes as though that command had never run — with the work product's own floor SATISFIED and nothing to contradict it. ⛔ THIS IS THE FAIL-OPEN THE WHOLE PHASE EXISTS TO PREVENT, and it is the exact rule `unassessableAiContentBlock` states one plane over: AI-produced content may not enter the governed stream with nothing to assess. ⚠ AND IT READS AS A CORRECTNESS FIX — *why mint evidence that cannot pass its own floor?* — which is what makes it the dangerous edit rather than a careless one.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-p-the-participating-mint-is-purgeable-after-all",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tmediaType: 'text/plain',\n\t\t\tpurgeability: 'RETAINED_BY_PARTICIPATION'\n",
+		replace: "\t\t\tmediaType: 'text/plain',\n\t\t\tpurgeability: 'PURGEABLE_AT_EXPIRY' // MUTANT: the evidence's own bytes are declared destroyable\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: bytes a recorded ASSESSMENT rests on are `RETAINED_BY_PARTICIPATION` — `REG-D-050`, participation is a property of USE, and a floor run JUDGES these. WHO RELIES: every later reader of an EVIDENCE object, and `R7`, which this mint exists to keep true without re-labelling the runner's capture. WHAT THE MUTATION DOES TO THEM: an assessment stands on bytes the system DECLARES it may destroy — and because purgeability is part of the storage KEY, the evidence would also name an address in the purgeable half of the key space, which is the very collision the two-copy design avoids. ⚠ IT LOOKS CONSISTENT WITH THE CAPTURE BESIDE IT, which is exactly the confusion `R16` settles: the capture is purgeable BECAUSE nothing has judged it yet; the mint is not, because something has.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-q-the-evidence-claims-it-has-no-limitations",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tlimitations: processResultLimitations(run),\n",
+		replace: "\t\t\tlimitations: [], // MUTANT: an empty list, which reads as \"this evidence has no limitations\"\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: a bounded capture of someone else's process says what it does NOT establish. WHO RELIES: `evidenceAdmissibility`'s LIMITATIONS_RECORDED limb reads this field, and `RPH-EVD-004` — *passing tests support only claims within their scope* — is UNENFORCED_DISCLOSED in this repository's own register precisely because nothing else compares an evidence scope to a claim's breadth. WHAT THE MUTATION DOES TO THEM: a 64 KiB-truncated build log is recorded as evidence with NOTHING said about the truncation, so a reader takes a declared PREFIX for the whole. ⛔ AND IT STAYS ADMISSIBLE: the limb reads `=== undefined`, and *an empty array counts as recorded* — so the one check that touches this field cannot tell the two apart. ⚠ `R17` made truncation a LIMITATION rather than a BLOCK; this mutation is what makes that ruling meaningless.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
 	}
 ];
