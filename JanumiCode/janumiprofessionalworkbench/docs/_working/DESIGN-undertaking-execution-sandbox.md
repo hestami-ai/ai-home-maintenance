@@ -94,6 +94,9 @@ recording is worth committing.
 | R16 | **THE PARTICIPATING MINT IS A CONTENT-PLANE ADDRESS NAMED BY `EvidenceObject.contentReference` — NO SECOND `ARTIFACT` OBJECT.** A test log is not a work product. Ruled 2026-09-17; see §4.12. |
 | R17 | **TWO BLOCKING CODES, AND TRUNCATION IS NOT ONE OF THEM.** `PROCESS_OUTPUT_NOT_RETAINED` and `PROCESS_VERDICT_UNOBSERVED` block; a DECLARED prefix and an incomplete capture are recorded LIMITATIONS, because a declaration that travels with the bytes does not invalidate the exit code. Ruled 2026-09-17; see §4.12. |
 | R18 | **EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.** The host cannot tell which command was a test run, and a predicate over `argv` is the normaliser shape this seam has refused four times — so it records what it CAN say: it observed a command run and what it exited with. Calling `ls` a `TEST_RESULT` would be a claim about what the command WAS. Ruled 2026-09-17; see §4.13. |
+| R19 | **THE MISSING LIMB IS ASYMMETRIC.** A declared policy that HAS a concluded verdict votes whatever its status — nothing already enforced is weakened. A policy that LACKS one is DEMANDED only if it currently GOVERNS (exists, ACTIVE, §5.1 applicability permits). *We do not stop counting a verdict we have; we do not demand one that could not lawfully be obtained.* Ruled 2026-09-17; see §4.14. |
+| R20 | **THE EXECUTION PLANE IS DISCLOSED NOW AND TAKEN AS ITS OWN PHASE.** `CompleteExecutionStep` consults declared assurance NOWHERE, and the cause is structural — the floor set and the declarable set are DISJOINT BY CONSTRUCTION. Ruled 2026-09-17; see §4.14.4. |
+| R21 | **`PromoteBaseline` IS FIXED IN PHASE 6.** Its “required assessments” come from the CALLER'S PAYLOAD — the same *controller selects its own evidence* defect `JAN-PWU007` closed on `ChangePwuState`, still open one gate over. Ruled 2026-09-17; see §4.14.5. |
 
 ---
 
@@ -828,3 +831,120 @@ exactly that, and `R17`'s codes exist so the block is LEGIBLE rather than myster
 ⚠ **THE COST, STATED: N COMMANDS MEANS N FLOOR RUNS AND N REVIEWER CALLS.** The bound is the observer's own
 (32, the same as `R11`'s record-plane cap), and a step that runs many commands pays for each. That is a
 resource question of the kind `W-2` already carries; it is not smoothed by minting fewer.
+
+
+---
+
+## 4.14 ⭐⭐ PHASE 6, AS MEASURED — the roadmap described a gap that was HALF shut, and the half still open is wider than it said
+
+**HOW THIS WAS ESTABLISHED.** Four independent readers, 78 findings, then 32 adversarial verifiers — **14 of 32
+refuted**. Then one thing no agent was allowed to do: **the bypass was DRIVEN.**
+
+### 4.14.1 ⛔ WHAT THE ROADMAP GOT WRONG IN BOTH DIRECTIONS
+
+§8 opens by calling `RPH-PWU-007` / `RPH-ASR-012` *"`kind: 'UNENFORCED_DISCLOSED'`"*. **Both rows read
+`kind: 'ENFORCED'`**, closed by `JAN-PWU007` on 2026-09-14 — three days before this roadmap's Phase 5 landed —
+with `rejectUnsupportedDeclaredSatisfaction` chained in `changePwuState`, driven, with mutants.
+
+⭑ **AND THE ROADMAP'S OWN `DO` CLAUSE IS NOT WHAT THOSE ROWS ENFORCE.** It has three demands:
+
+| demand | status |
+| --- | --- |
+| (i) assemble `assurancePolicyIds` ∪ the PwuType's `requiredAssurancePolicyIds` | ✅ **LANDED**, in one kernel join (`declaredAssurancePolicyIds`) shared with the engine's own determination. **H2 refuted — do not file it.** |
+| (ii) refuse when any member **LACKS** a SATISFIED/CONDITIONALLY_SATISFIED assessment | ⛔ **OPEN.** What landed is the CONVERSE: refuse when a member **HAS** one that is stricter. |
+| (iii) at the subject's **CURRENT VERSION** | ⛔ **OPEN**, and asymmetric with the floor gate, which DOES version-bind out of the SAME index. |
+
+⭐ So the honest reading is neither *"Phase 6 is done"* nor *"Phase 6 is untouched"*: **the disposition is stale
+and the rule is half-landed**, and rewriting §8 as either would be an error.
+
+### 4.14.2 ⭐⭐ THE FINDING NOBODY HAD NAMED — ONE ACCEPTED COMMAND ERASES A REJECTION. DRIVEN.
+
+Take the repository's own `RPH-PWU-007` refusal fixture — a PWU whose declared policy reads REJECTED, which the
+ENFORCED guard refuses — and insert **ONE** command before the claim: a second `RequestAssuranceAssessment`
+under the SAME declared policy, requested and left at `READY`.
+
+```
+PROBE request status:         ACCEPTED
+PROBE claimSatisfied status:  ACCEPTED
+PROBE final state:            workLifecycleState: SATISFIED, assuranceState: SATISFIED
+```
+
+⛔ **THE MECHANISM, AND IT IS TWO LINES.** `latestAssessmentByPolicy` returns the latest record per policy
+**whatever its state** — correctly, and it says so, because for the floor gate an assessment still ASSESSING is
+precisely NOT a satisfied floor. `declaredPolicyVerdicts` then `continue`s past a latest record that is not one
+of the five concluded states **with no fallback to the previous concluded one**. The REJECTED verdict is still
+in the store. It simply stopped being *latest*, and a skipped policy votes nothing.
+
+⚠ **AND THE LIMB THAT DOES IT IS, BY THE REPOSITORY'S OWN MEASUREMENT, GUARDED BY NOTHING.** `RPH-ASR-012`'s
+own `declaredMutations` records that deleting the `CONCLUDED_ASSESSMENT_STATES` filter **SURVIVED** every probe,
+*"because every assessment these fixtures create is COMPLETED, so the limb is never reached with a lifecycle
+value. It is a real limb guarded by nothing."* That note was written as a disclosure of weak coverage. It is
+also, read one step further, the description of a live bypass — and nobody read it that way.
+
+⭑ **MY FIRST PROBE WAS WRONG AND THE WRONG-NESS IS WORTH KEEPING.** It cited no assessment, so it was refused
+by `rejectUnbackedDisposition` with `RPH_EVIDENCE_MISSING` — a refusal from a DIFFERENT guard, which proved
+nothing about the one under test. An arrangement that trips the wrong guard is not evidence about this one.
+
+### 4.14.3 ⭐ ONE RULE CLOSES ALL THREE, AND THE KERNEL ALREADY HAS IT
+
+The erasure, the never-assessed case and the stale version are the SAME hole seen three ways: **a declared
+policy with no concluded verdict bound to the subject's CURRENT version has not spoken.** §28.2's rung 3 —
+*"any required assessment missing"* — is exactly that rule, it is ratified, and `aggregateAssuranceDisposition`
+implements it already.
+
+⛔ **IT IS UNREACHABLE FROM THIS CALL SITE TODAY, AND THAT IS MEASURED RATHER THAN INFERRED.**
+`unsupportedSatisfaction` passes `assessed: true` for every element and passes only elements that HAVE a
+disposition — so `missing` is ALWAYS empty and the `assessed` discriminator is **dead code** at this caller.
+
+⭑ **SO THERE IS NO KERNEL CHANGE.** `AggregateInput` already carries `disposition?`, `assessed` AND
+`applicable`, and the fold already excludes `applicable === false` because *"a policy determined NOT_APPLICABLE
+requires nothing."* The caller simply stops hiding the missing ones and starts declaring applicability.
+
+### `R19` — and why the asymmetry is not a compromise
+
+| the policy | what it contributes |
+| --- | --- |
+| HAS a concluded verdict at the current version | `{disposition, assessed: true}` — votes, **whatever its status**. Unchanged; nothing enforced is weakened. |
+| LACKS one, and currently GOVERNS | `{disposition: undefined, assessed: …}` → rung 3 → `UNASSESSED`, which is stricter than SATISFIED. **Refuses.** |
+| LACKS one, and does NOT govern (absent, not ACTIVE, §5.1 excludes it) | `{applicable: false}` — filtered out of `required`. Silent, by the fold's own rule. |
+
+⚠ **THE MODULE'S RECORDED OBJECTION IS ANSWERED, NOT OVERRIDDEN.** `declared-assurance.ts` declined rung 3
+because *"folding an ABSENT assessment in makes `aggregateAssuranceDisposition([])` — which returns UNASSESSED
+by design — into a COMMAND refusal that no PWU declaring zero policies could ever escape."* ⭑ **That case never
+reaches the fold:** `rejectUnsupportedDeclaredSatisfaction` short-circuits on `if (declared.length === 0) return
+undefined;` two lines above. The objection names the one arrangement the guard already excludes.
+
+⚠ **AND THE VERSION LIMB'S DEFERRAL IS ANSWERED ON ITS OWN TERMS TOO.** It was deferred to `RPH-ASR-010`,
+*"which lives on the ASSESSMENT path (`completeAssuranceAssessment` binding a version the subject is not at),
+not on this one."* ⭑ Correct, and this is the OTHER path: a READER ignoring the version a verdict bound. Two
+sites, two rules, and a refusal here carries rung 3's marker rather than `RPH-ASR-010`'s — so one arrangement
+does not trip two guards.
+
+### 4.14.4 ⛔ `R20` — THE SPONSOR'S ORIGINAL DOUBT, ANSWERED WITH A MECHANISM AND DISCLOSED RATHER THAN FIXED HERE
+
+**`CompleteExecutionStep` consults declared assurance NOWHERE.** `floorGateBlock` maps over the module constant
+`FLOOR_POLICY_IDS_REQUIRED` and over nothing else; `execution.ts` contains zero references to a declared policy.
+
+⛔ **AND IT IS NOT AN OVERSIGHT — THE TWO SETS ARE DISJOINT BY CONSTRUCTION.** The engine REFUSES a floor id in
+a declared list (`pwa-authoring.ts` forces `requiredAssurancePolicyIds` non-floor), so a custom declared policy
+can NEVER be one of the three the execution gate iterates. **The intersection of {what an author may declare}
+and {what the execution gate checks} is EMPTY.**
+
+⚠ **AND THE SUBJECT IS WRONG TOO.** `floorGateBlock` runs per RESULT — the ARTIFACT / EVIDENCE ids a completion
+names — while declarations live on the PWU and its PwuType, objects that path never loads.
+
+⭑ **RULED: DISCLOSE NOW, TAKE IT AS ITS OWN PHASE.** `INV-5` (exec ≠ assurance) says a step completing is not
+supposed to grant assurance, so extending the completion gate needs its own argument rather than arriving as a
+rider on three unrelated fixes. ⛔ What is NOT acceptable is leaving it unsaid: the doubt is **correct as
+stated** for the execution plane, and it is now written down with the trace.
+
+### 4.14.5 ⭐ `R21` — `PromoteBaseline` HAS THE SAME DEFECT `JAN-PWU007` CLOSED, ONE GATE OVER
+
+Its *"required assessments"* are `p.requiredAssessmentIds.map(…)` — **the caller's own list**. A promotion
+naming NO assessments passes that arm vacuously. That is *"the controller selected its own evidence"*, verbatim
+the sentence `declared-assurance.ts`'s header uses about the hole it was written to close.
+
+⚠ **IT SURVIVES ONLY AS A MUTATION NOTE ON A ROW MARKED `ENFORCED`**, which is not a disclosure. ⭑ And the
+subject join EXISTS here, unlike on the execution plane: the baseline's own frozen `itemObjectVersions` name the
+objects, *"read from the object, not the promoting payload"* — the gate already does this for observations and
+contested claims. **RULED: fixed in Phase 6**, same rule, same kernel call.

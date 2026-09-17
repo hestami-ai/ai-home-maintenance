@@ -1564,20 +1564,103 @@ written (§7.0); re-specified as the six reds in §7.4.
 
 ---
 
-## 8. Phase 6 · Declared policies must actually bind (`R4`, first half)
+## 8. Phase 6 · Declared policies must actually bind (`R4`, first half) — ⭐ RE-SPECIFIED 2026-09-17 AFTER MEASUREMENT
+
+⭐⭐ **THE SPECIFICATION BELOW REPLACES §8a's. Design §4.14 carries the measurement.** Four readers, 78 findings,
+32 adversarial verifiers (**14 refuted**) — and then one thing no reader was allowed to do: **the bypass was
+DRIVEN.**
+
+### 8.0 ⛔ THE ROADMAP WAS WRONG IN BOTH DIRECTIONS
+
+§8a calls the two rows *"`kind: 'UNENFORCED_DISCLOSED'`"*. **Both read `kind: 'ENFORCED'`**, closed by
+`JAN-PWU007` on 2026-09-14. ⭑ **But its own `DO` clause is not what those rows enforce:** of its three demands,
+(i) the union is LANDED, (ii) *"refuse when any member LACKS"* is landed only in its CONVERSE (refuse when a
+member HAS one that is stricter), and (iii) *"at its CURRENT VERSION"* is not landed at all.
+
+### 8.1 ⭐⭐ DRIVEN — ONE ACCEPTED COMMAND ERASES A REJECTION
+
+The repository's own `RPH-PWU-007` refusal fixture, plus ONE `RequestAssuranceAssessment` under the same
+declared policy left at `READY`:
+
+```
+PROBE request status:         ACCEPTED
+PROBE claimSatisfied status:  ACCEPTED   ← the ENFORCED row's own arrangement, admitted
+PROBE final state:            workLifecycleState: SATISFIED, assuranceState: SATISFIED
+```
+
+⛔ `latestAssessmentByPolicy` returns the latest record whatever its state; `declaredPolicyVerdicts` skips a
+non-concluded latest **with no fallback**. The REJECTED verdict is still in the store — it stopped being
+*latest*, and a skipped policy votes nothing. ⚠ `RPH-ASR-012`'s own `declaredMutations` already recorded that
+deleting this filter **SURVIVED** every probe. That was written as a coverage disclosure; read one step further
+it is the bypass, and nobody read it that way.
+
+### 8.2 ⭐ ONE RULE, THREE HOLES, NO KERNEL CHANGE
+
+A declared policy with no concluded verdict **bound to the subject's CURRENT version** has not spoken — §28.2
+rung 3, which `aggregateAssuranceDisposition` already implements and which is **unreachable from this call site**
+because `unsupportedSatisfaction` passes `assessed: true` for every element and passes only elements that HAVE a
+disposition. `AggregateInput` already carries `disposition?`, `assessed` and `applicable`. The caller stops
+hiding the missing ones.
+
+**DO (`R19`, asymmetric — see design §4.14.3):**
+- a policy that **HAS** a concluded verdict at the current version votes, whatever its status — *unchanged*;
+- a policy that **LACKS** one and currently GOVERNS (exists, ACTIVE, §5.1 permits) → rung 3 → refuses;
+- a policy that LACKS one and does NOT govern → `applicable: false` → filtered out by the fold's own rule.
+
+**AND (`R21`) THE SAME RULE AT `PromoteBaseline`**, whose *"required assessments"* come from the CALLER'S
+PAYLOAD — the same *controller selects its own evidence* defect, one gate over, surviving only as a mutation
+note on a row marked ENFORCED.
+
+**RULE 2:** read by every arrival at PWU satisfaction and every baseline promotion. **If wrong:** a declared
+policy is routed around by never asking it, or by asking it once more and never answering.
+
+### 8.3 ⭐ THE PREDICTED RED IS ALREADY WRITTEN, BY THE PROGRAMME THAT DISCLOSED THE RESIDUAL
+
+`declared-assurance-binds.test.ts:703` — *"ADMITS SATISFIED while a declared policy has NO assessment at all —
+§28.2 rung 3 is NOT closed here"* — whose own comment says: *"the day it is closed, this test reddens and must
+be re-dispositioned rather than deleted."*
+
+| # | pins ONE limb | must fail today with |
+| --- | --- | --- |
+| `RED-1` | the never-assessed policy blocks | the EXISTING test at `:703` reddens — re-dispositioned, never deleted |
+| `RED-2` | the ERASURE blocks | today ACCEPTED (driven above); must become REJECTED naming rung 3, **not** the REJECTED marker — the verdict is gone, so claiming it bit would be false |
+| `RED-3` | a verdict bound to v1 does not count at v2 | today ADMITTED |
+| `RED-4` | CONTROL — a NON-GOVERNING declared policy (SUSPENDED / §5.1-excluded) still admits | must stay green, or `R19` became the symmetric rule |
+| `RED-5` | CONTROL — an ordinary satisfied declared policy still admits | must stay green |
+| `RED-6` | `PromoteBaseline` refuses a promotion whose item's declared policy was never assessed | today ADMITTED vacuously |
+
+### 8.4 ⛔ WHAT PHASE 6 DOES **NOT** DO, RULED AND DISCLOSED (`R20`)
+
+**`CompleteExecutionStep` CONSULTS DECLARED ASSURANCE NOWHERE**, and the cause is structural: the engine refuses
+a floor id in a declared list, so the intersection of {what an author may declare} and {what the execution gate
+checks} is **EMPTY BY CONSTRUCTION** — and the gate's subject is the step's RESULTS, while declarations live on
+the PWU. ⭑ Ruled its own phase: `INV-5` says a step completing is not supposed to grant assurance, so that needs
+its own argument rather than a rider on three unrelated fixes. ⛔ It is the sponsor's original doubt and it is
+**correct as stated for the execution plane** — written down here with the trace rather than left unsaid.
+
+⚠ **ALSO DISCLOSED, NOT FIXED:** `PublishPwa` consults only the floor; there is no Undertaking-advancement
+command at all (so §10 item 4's *"advancing an Undertaking"* names a gate that does not exist); a PWU may
+legally declare ZERO policies and the guard short-circuits before doing anything; and there is no separation of
+duties — the actor that claims satisfaction may also assess the policy satisfied.
+
+---
+
+## 8a. ~~Phase 6 · the specification as written before it was measured~~ (SUPERSEDED BY §8; kept for the reasoning)
 
 A PWU whose **declared** policy came back REJECTED with an OPEN BLOCKING finding reached SATISFIED by citing an
-assessment under an unrelated policy. Disclosed as `RPH-PWU-007` / `RPH-ASR-012`, `kind: 'UNENFORCED_DISCLOSED'`.
+assessment under an unrelated policy. ~~Disclosed as `RPH-PWU-007` / `RPH-ASR-012`, `kind: 'UNENFORCED_DISCLOSED'`.~~
+→ ⛔ **BOTH ROWS READ `ENFORCED`** since 2026-09-14 (§8.0). The narrative above describes the case that is now
+SHUT; the `DO` clause below describes one that is not.
 
 **DO:** in `rejectUnbackedDisposition`, after the existing citation check, assemble the PWU's
 `assurancePolicyIds` ∪ its PwuType's `requiredAssurancePolicyIds` and refuse when any member lacks a
 SATISFIED/CONDITIONALLY_SATISFIED assessment over this subject at its current version.
+⭑ **STILL THE RIGHT RULE, WRONG SITE AND INCOMPLETE COUNT.** The union landed elsewhere
+(`rejectUnsupportedDeclaredSatisfaction`, not `rejectUnbackedDisposition`); the LACKS limb and the VERSION limb
+are §8.2; and the clause does not anticipate the ERASURE, which no member LACKS — it HAS one, and the wrong one.
 
-**RULE 2:** read by every promotion and completion gate. **If wrong:** the PWA-authored assurance policies the
-sponsor asked for can be routed around at will — which is the sponsor's original doubt, in one sentence.
-
-**PROOF:** the driven probe, inverted — the same arrangement must now be REJECTED, with a control proving an
-ordinary satisfied policy still admits.
+**PROOF (as stated then):** the driven probe, inverted — the same arrangement must now be REJECTED, with a
+control proving an ordinary satisfied policy still admits. → ⭑ Carried forward verbatim as `RED-2` and `RED-5`.
 
 ---
 
