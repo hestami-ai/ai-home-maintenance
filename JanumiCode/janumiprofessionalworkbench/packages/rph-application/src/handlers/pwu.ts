@@ -86,6 +86,7 @@ import {
 	unsupportedSatisfaction,
 	unsupportedSatisfactionMessage
 } from './declared-assurance.js';
+import { policyGovernance } from './policy-governs.js';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
@@ -1408,7 +1409,13 @@ function rejectUnsupportedDeclaredSatisfaction(
 	command: DomainCommand,
 	id: string,
 	p: ChangePwuStatePayload,
-	current: PwuAxes
+	current: PwuAxes,
+	// ⭐ `R19` — THE SUBJECT'S CURRENT VERSION, TAKEN FROM THE HANDLER'S OWN LOAD rather than re-read here. Its
+	// sibling `rejectUnauthorizedWaiver` already receives it the same way, from the same `loadOrReject`, so the
+	// two guards cannot bind different revisions of one subject. ⛔ Re-loading inside this function would also
+	// have introduced an `if (!loaded)` arm no arrangement can reach — `loadOrReject` ran first — which is a
+	// fallback that cannot fail inside a guard about things that cannot fail.
+	subjectSemanticVersion: number
 ): CommandResult | undefined {
 	const arrivingOnAssurance = p.assuranceState !== current.assuranceState;
 	// THE WORK AXIS HAS ITS OWN TWO SATISFACTION STATES, and they are spelled here rather than imported because
@@ -1419,6 +1426,9 @@ function rejectUnsupportedDeclaredSatisfaction(
 		(p.newState === 'SATISFIED' || p.newState === 'CONDITIONALLY_SATISFIED') &&
 		p.newState !== current.workLifecycleState;
 	if (!arrivingOnAssurance && !arrivingOnWork) return undefined;
+	// ⭐ `R19` — ONE LOAD, BOTH FACTS. The declared list and the CURRENT semantic version come from the same read,
+	// so a verdict cannot be version-checked against a different revision of the subject than the one whose
+	// declarations were assembled.
 	const pwu = ctx.store.loadObject(id)?.state as
 		| { assurancePolicyIds?: string[]; pwuTypeId?: string }
 		| undefined;
@@ -1432,7 +1442,17 @@ function rejectUnsupportedDeclaredSatisfaction(
 	// ⭑ THE VERDICT INDEX IS PASSED LAZILY. It is an event-log walk and the rule governs two of eleven assurance
 	// values; `unsupportedSatisfaction` short-circuits on that test before calling this. See its docblock.
 	const unsupported = unsupportedSatisfaction(p.assuranceState, () =>
-		declaredPolicyVerdicts(declared, latestAssessmentByPolicy(ctx, id))
+		declaredPolicyVerdicts(
+			declared,
+			latestAssessmentByPolicy(ctx, id),
+			// ⭐ `R19` — THE SUBJECT'S CURRENT VERSION, READ FROM THE STORE. `loaded.semanticVersion` is the value
+			// the same handler already passes to `rejectUnauthorizedWaiver`, so the two guards bind the same
+			// number and a caller cannot move one without the other.
+			subjectSemanticVersion,
+			// ⛔ ASKED ONLY OF POLICIES BEING DEMANDED — see `DeclaredPolicyVerdict.applicable`. The thunk keeps
+			// the store read out of the fold's own module, which stays pure.
+			(policyId) => policyGovernance(ctx, policyId, id) === 'GOVERNS'
+		)
 	);
 	if (!unsupported) return undefined;
 	return reject(
@@ -1748,7 +1768,7 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// being asked for a decision the setter should never have been adjudicating.
 	const unearned =
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
-		rejectUnsupportedDeclaredSatisfaction(ctx, command, id, p, current) ??
+		rejectUnsupportedDeclaredSatisfaction(ctx, command, id, p, current, loaded.semanticVersion) ??
 		rejectUnauthorizedWaiver(ctx, command, id, p, current.assuranceState, loaded.semanticVersion) ??
 		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
 	if (unearned) return unearned;

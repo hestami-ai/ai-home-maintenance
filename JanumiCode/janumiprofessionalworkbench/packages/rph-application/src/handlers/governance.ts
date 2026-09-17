@@ -9,6 +9,7 @@ import type {
 	ApproveDecisionPayload,
 	BaselineObject,
 	BaselinePromotedPayload,
+	CommandResult,
 	BaselineSupersededPayload,
 	CreateBaselinePayload,
 	DecisionEffectivePayload,
@@ -45,6 +46,14 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
+import { latestAssessmentByPolicy } from './assessment-index.js';
+import { policyGovernance } from './policy-governs.js';
+import {
+	declaredPolicyVerdicts,
+	unsupportedSatisfaction,
+	unsupportedSatisfactionMessage
+} from './declared-assurance.js';
 
 const DECISION = 'DECISION';
 const BASELINE = 'BASELINE';
@@ -919,6 +928,76 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 					(i) => i.objectId
 				)
 			);
+			// ── ⭐⭐ `R21` (SPONSOR, 2026-09-17) — THE ITEMS' OWN DECLARED POLICIES, NOT THE PROMOTER'S LIST ──────
+			//
+			// ⛔ `requiredAssessments` ABOVE IS BUILT FROM `p.requiredAssessmentIds` — **the caller's own list** — so
+			// a promotion naming NO assessments passes that arm VACUOUSLY. That is *"the controller selected its own
+			// evidence"*, which is verbatim the sentence `declared-assurance.ts` uses about the hole `JAN-PWU007`
+			// was written to close on `ChangePwuState`. The same defect was still open one gate over, surviving only
+			// as a mutation note on a row marked `ENFORCED`.
+			//
+			// ⭑ THE SUBJECT JOIN EXISTS HERE, WHICH IS WHY THIS GATE COULD TAKE IT AND THE EXECUTION GATE COULD NOT
+			// (`R20`). The baseline froze its own `itemObjectVersions` at `CreateBaseline`, *"read from the object,
+			// not the promoting payload"* — the same source this handler already uses for observations and contested
+			// claims. Each item is an object; a PWU among them carries its declarations.
+			//
+			// ⭐ AND IT ASKS THE SAME QUESTION THE SATISFACTION GUARD ASKS, WITH THE SAME FUNCTION — not a second
+			// rule spelled for promotion. The question is: **does this PWU's own recorded assurance state still
+			// stand against the policies it declares?** Re-asking it at promotion catches what the arrival-time
+			// guard structurally cannot: a PWU that reached SATISFIED before `R19` existed, or one whose declared
+			// policy was assessed REJECTED *after* it arrived. A baseline becoming AUTHORITATIVE over such an item
+			// is the promotion this arm exists to refuse.
+			const unsupportedItem = ((): CommandResult | null => {
+				// ⭑ THE SAME ITEM SET THE OTHER ARMS READ — `baselineItemIds` above is built from this field, so a
+				// second spelling of "which items" would let two arms of one gate disagree about what a baseline
+				// contains.
+				for (const objectId of baselineItemIds) {
+					const loadedItem = hctx.store.loadObject(objectId);
+					const itemState = loadedItem?.state as
+						| {
+								objectType?: string;
+								assuranceState?: string;
+								assurancePolicyIds?: string[];
+								pwuTypeId?: string;
+						  }
+						| undefined;
+					// ⚠ PWUs ONLY, AND SILENTLY SO. A baseline item may be any governed object; only a PWU carries
+					// `assurancePolicyIds`, and asking this of an ARTIFACT would be asking a question its shape
+					// cannot answer. Every other item is left to the arms that own it. ⛔ An item that does not LOAD
+					// takes this same arm — `itemState` is then undefined and `?.objectType` is too — rather than a
+					// separate `if (!loadedItem)` whose arm no arrangement reaches, which would be a fallback that
+					// cannot fail inside a guard about things that cannot fail.
+					if (!loadedItem || itemState?.objectType !== 'PROFESSIONAL_WORK_UNIT') continue;
+					const pwuType = itemState.pwuTypeId
+						? (hctx.store.loadObject(itemState.pwuTypeId)?.state as
+								| { requiredAssurancePolicyIds?: string[] }
+								| undefined)
+						: undefined;
+					const declared = declaredAssurancePolicyIds(itemState, pwuType);
+					if (declared.length === 0) continue;
+					const assuranceState = String(itemState.assuranceState);
+					const unsupported = unsupportedSatisfaction(assuranceState, () =>
+						declaredPolicyVerdicts(
+							declared,
+							latestAssessmentByPolicy(hctx, objectId),
+							loadedItem.semanticVersion,
+							(policyId) => policyGovernance(hctx, policyId, objectId) === 'GOVERNS'
+						)
+					);
+					if (!unsupported) continue;
+					return reject(
+						command,
+						'RPH_INVARIANT_VIOLATION',
+						`Cannot promote baseline ${command.targetAggregateId}: UNSUPPORTED_ITEM_ASSURANCE — ` +
+							`${unsupportedSatisfactionMessage(objectId, assuranceState, unsupported)} ` +
+							'A baseline may not become AUTHORITATIVE over an item whose own declared assurance does not ' +
+							'stand, and the assessments a promotion NAMES are the promoter\u2019s choice while the policies ' +
+							'an item DECLARES are not.'
+					);
+				}
+				return null;
+			})();
+			if (unsupportedItem) return unsupportedItem;
 			const result = canPromoteBaseline({
 				baselineStatus: String(state.status),
 				// REG-F-073: the kernel now requires the decision to NAME this baseline. Without it, any effective

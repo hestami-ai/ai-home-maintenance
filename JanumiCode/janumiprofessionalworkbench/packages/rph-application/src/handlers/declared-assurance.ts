@@ -26,24 +26,30 @@
 //
 // ── WHAT IT DELIBERATELY DOES **NOT** DO, so a green is not read wider than it is ────────────────────────────
 //
-// 1. ⛔ IT DOES NOT FIRE ON A DECLARED POLICY WITH NO CONCLUDED ASSESSMENT (§28.2 rung 3, "any required
-//    assessment missing"). Only policies carrying one of §28.2's five recognised outcomes vote. The rung is real
-//    and this is a genuine residual — recorded, and OBSERVED by a test in
-//    `declared-assurance-binds.test.ts` rather than left to a reader's inference.
-//    WHY IT IS NOT TAKEN HERE: the rung's blast radius is a different rule with a different subject. Folding an
-//    ABSENT assessment in makes `aggregateAssuranceDisposition([])` — which returns UNASSESSED by design, because
-//    for a READ MODEL "no policy governs this" must not render as SATISFIED — into a COMMAND refusal that no PWU
-//    declaring zero policies could ever escape. That is a rule about whether work may be satisfied without any
-//    declared assurance at all; it is worth having, it is not RPH-PWU-007 or RPH-ASR-012, and landing it inside
-//    them would have been one arrangement tripping two rules, which proves neither.
+// 1. ~~⛔ IT DOES NOT FIRE ON A DECLARED POLICY WITH NO CONCLUDED ASSESSMENT (§28.2 rung 3, "any required
+//    assessment missing") … WHY IT IS NOT TAKEN HERE: folding an ABSENT assessment in makes
+//    `aggregateAssuranceDisposition([])` — which returns UNASSESSED by design — into a COMMAND refusal that no
+//    PWU declaring zero policies could ever escape.~~
+//    ⭐⭐ **CLOSED 2026-09-17 (`JAN-EXEC` PHASE 6 / `R19`), AND THE OBJECTION IS ANSWERED RATHER THAN OVERRIDDEN.**
+//    The case it names — a PWU declaring ZERO policies — NEVER REACHES THIS FOLD: `rejectUnsupportedDeclaredSatisfaction`
+//    short-circuits on `if (declared.length === 0) return undefined;` before calling. The objection was true of
+//    the arrangement it described and that arrangement was already excluded two lines above.
+//    ⛔ AND THE RESIDUAL TURNED OUT TO BE WIDER THAN "a policy nobody assessed", WHICH IS WHY IT WAS TAKEN. The
+//    skip had NO FALLBACK to the previous concluded record, so ONE further `RequestAssuranceAssessment` under an
+//    already-REJECTED declared policy made that verdict stop being `latest` and vanish from the fold — **DRIVEN:
+//    the repository's own `RPH-PWU-007` refusal fixture plus one accepted command returned ACCEPTED,
+//    workLifecycleState SATISFIED.** A residual that erases an ENFORCED row's own refusal is not a rung nobody
+//    reached; it is the row's bypass, and `RPH-ASR-012`'s `declaredMutations` had already recorded that this
+//    limb "is a real limb guarded by nothing" without anyone reading it that way.
 //
-// 2. ⛔ IT DOES NOT CHECK THE SUBJECT'S SEMANTIC VERSION. A verdict recorded against version n still counts at
-//    version n+1 here. That is RPH-ASR-010's disclosed gap — *"a verdict on version n accepted as satisfying
-//    version n+1"* — which lives on the ASSESSMENT path (`completeAssuranceAssessment` binding a version the
-//    subject is not at), not on this one, and still carries its own OBSERVED_ADMISSION probe. Adding the limb
-//    here would have made a single arrangement trip two guards and left neither individually proven.
-//    `SubjectAssessmentRecord` carries `subjectSemanticVersion`, so the limb is one comparison away when that row
-//    is taken up; it is absent because it is unproven here, not because the datum is missing.
+// 2. ~~⛔ IT DOES NOT CHECK THE SUBJECT'S SEMANTIC VERSION … the limb is one comparison away when that row is
+//    taken up.~~ ⭐ **CLOSED 2026-09-17 (`R19`), AND ITS DEFERRAL IS ANSWERED ON ITS OWN TERMS.** The deferral
+//    pointed at `RPH-ASR-010`, *"which lives on the ASSESSMENT path (`completeAssuranceAssessment` binding a
+//    version the subject is not at), not on this one."* ⭑ That is right, and THIS is the other one: a READER
+//    ignoring the version a verdict bound. Two sites, two rules — and a refusal here composes through rung 3
+//    (the verdict is MISSING at this version) rather than through the rejection rung, so the arrangement does
+//    NOT trip two guards. ⚠ The asymmetry that made it worth taking: `floorGateBlock` version-binds out of the
+//    SAME `SubjectAssessmentRecord`, in the same index, and this reader did not.
 //
 // 3. ⛔ IT DOES NOT TREAT `WAIVED`, `INVALIDATED`, `CANCELLED`, `VALIDATOR_FAILED`, `WAIVER_EXPIRED` OR
 //    `INDEPENDENCE_VIOLATION` AS VERDICTS. Those are six of the fifteen §30 assessment states and NONE of them is
@@ -76,12 +82,46 @@ const CONCLUDED_ASSESSMENT_STATES = new Set([
  */
 const SATISFACTION_CLAIMS = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED']);
 
-/** One declared policy's own verdict on this subject. */
+/**
+ * Why a declared policy has NOT spoken — three facts one `undefined` disposition would have flattened into one.
+ *
+ * ⛔ THE DISCRIMINATION IS THE POINT, NOT DECORATION. All three compose to the SAME §28.2 rung, so a refusal
+ * that named only the rung would tell an operator "a policy has not been assessed" for an arrangement in which
+ * the policy WAS assessed, REJECTED, and then had its verdict displaced. Each of the three has a different
+ * remedy: request an assessment; conclude the one in flight; re-assess at the current version.
+ */
+export type DeclaredPolicySilence =
+	/** No assessment for this policy over this subject exists at all. */
+	| 'NEVER_ASSESSED'
+	/** One exists and has not concluded — so it displaces any earlier verdict without replacing it. */
+	| 'IN_PROGRESS'
+	/** A concluded verdict exists, and it bound a DIFFERENT semantic version of this subject. */
+	| 'STALE_VERSION';
+
+/** One declared policy's standing on this subject — its verdict, or the reason it has none. */
 export interface DeclaredPolicyVerdict {
 	readonly policyId: string;
-	readonly assessmentId: string;
-	/** One of `CONCLUDED_ASSESSMENT_STATES` — never a §30 lifecycle value. */
-	readonly disposition: string;
+	/** The assessment that speaks for this policy, or the one whose silence is being reported. */
+	readonly assessmentId?: string;
+	/** One of `CONCLUDED_ASSESSMENT_STATES` — never a §30 lifecycle value. Absent when the policy is silent. */
+	readonly disposition?: string;
+	/** Set exactly when `disposition` is absent. See `DeclaredPolicySilence`. */
+	readonly silence?: DeclaredPolicySilence;
+	/**
+	 * §28.2's own discriminator for rung 3: does an assessment EXIST, even unconcluded? `false` → UNASSESSED,
+	 * `true` → EVIDENCE_REQUIRED. Both are stricter than SATISFIED, so both refuse; the pair is what makes a
+	 * refusal say whether anything is underway.
+	 */
+	readonly assessed: boolean;
+	/**
+	 * ⭐ `R19` — `false` when this policy does NOT currently govern the subject, so it is excluded from the fold.
+	 *
+	 * ⛔ ASYMMETRIC, AND THAT IS THE RULING RATHER THAN A CONVENIENCE. A policy that HAS a verdict votes whatever
+	 * its status — so nothing already enforced is weakened by a policy being suspended after it rejected. Only a
+	 * policy being DEMANDED is checked for governance, because demanding a verdict from a policy that is absent,
+	 * SUSPENDED, or §5.1-excluded is a refusal with no route forward.
+	 */
+	readonly applicable?: boolean;
 }
 
 /** The composition's answer when an asserted satisfaction is not supported by the subject's own declarations. */
@@ -106,13 +146,62 @@ export interface UnsupportedSatisfaction {
  */
 export function declaredPolicyVerdicts(
 	declaredPolicyIds: readonly string[],
-	latest: ReadonlyMap<string, SubjectAssessmentRecord>
+	latest: ReadonlyMap<string, SubjectAssessmentRecord>,
+	subjectSemanticVersion: number,
+	governs: (policyId: string) => boolean
 ): readonly DeclaredPolicyVerdict[] {
 	const verdicts: DeclaredPolicyVerdict[] = [];
 	for (const policyId of declaredPolicyIds) {
 		const rec = latest.get(policyId);
-		if (!rec || !CONCLUDED_ASSESSMENT_STATES.has(rec.assessmentState)) continue;
-		verdicts.push({ policyId, assessmentId: rec.assessmentId, disposition: rec.assessmentState });
+		// ⭐⭐ `R19` — EVERY DECLARED POLICY NOW RETURNS A ROW. It used to `continue` here, and the three ways a
+		// policy can fail to speak were all spelled as ABSENCE from this list — which the fold reads as "nothing
+		// to compose" rather than "something required is missing". §28.2 rung 3 was therefore unreachable from
+		// this call site, and `assessed` was dead code.
+		const silent = (silence: DeclaredPolicySilence, assessed: boolean): void => {
+			verdicts.push({
+				policyId,
+				...(rec ? { assessmentId: rec.assessmentId } : {}),
+				silence,
+				assessed,
+				// ⛔ GOVERNANCE IS ASKED ONLY HERE, ON THE DEMANDING ARM. A policy WITH a verdict votes whatever its
+				// status; see `DeclaredPolicyVerdict.applicable`.
+				applicable: governs(policyId)
+			});
+		};
+		if (!rec) {
+			silent('NEVER_ASSESSED', false);
+			continue;
+		}
+		if (!CONCLUDED_ASSESSMENT_STATES.has(rec.assessmentState)) {
+			// ⛔ THE ERASURE, AND IT IS WHY THIS ARM EXISTS. `latestAssessmentByPolicy` returns the latest record
+			// WHATEVER its state — correctly, because for the floor gate an assessment still ASSESSING is precisely
+			// NOT a satisfied floor. Skipping it here, with no fallback to the previous concluded record, meant one
+			// further `RequestAssuranceAssessment` under an already-REJECTED policy DELETED that policy's vote.
+			// DRIVEN before this was written: the ENFORCED `RPH-PWU-007` fixture plus one accepted command returned
+			// ACCEPTED, workLifecycleState SATISFIED.
+			//
+			// ⭑ AND THE ANSWER IS NOT "FALL BACK TO THE PREVIOUS CONCLUDED RECORD". That would make this gate walk
+			// assessment history looking for one it likes, which is the controller-selects-its-own-evidence shape
+			// this module exists to close, applied to time instead of to citation. A policy whose CURRENT word is
+			// an unconcluded assessment has not spoken — that is the honest reading, and it is rung 3's.
+			silent('IN_PROGRESS', true);
+			continue;
+		}
+		if (rec.subjectSemanticVersion !== subjectSemanticVersion) {
+			// ⛔ A VERDICT BOUND TO ANOTHER VERSION IS NOT THIS SUBJECT'S VERDICT. `floorGateBlock` version-binds out
+			// of this SAME record and this reader did not — an asymmetry between two consumers of one index.
+			// ⚠ `undefined` (the record bound no version) takes this arm too, and that is deliberate: the index
+			// documents `undefined` as *"not stated, never the current one"*, and a verdict that named no version
+			// cannot be shown to be about this one.
+			silent('STALE_VERSION', true);
+			continue;
+		}
+		verdicts.push({
+			policyId,
+			assessmentId: rec.assessmentId,
+			disposition: rec.assessmentState,
+			assessed: true
+		});
 	}
 	return verdicts;
 }
@@ -150,11 +239,28 @@ export function unsupportedSatisfaction(
 	const verdicts = declaredVerdicts();
 	if (verdicts.length === 0) return null;
 	const composed = aggregateAssuranceDisposition(
-		verdicts.map((v) => ({ policyId: v.policyId, disposition: v.disposition, assessed: true }))
+		// ⭐ `R19` — THE ROWS ARE PASSED AS THEY ARE, AND THAT IS THE WHOLE CHANGE. This used to hard-code
+		// `assessed: true` over a list from which every silent policy had already been dropped, so
+		// `aggregateAssuranceDisposition`'s `missing` filter was ALWAYS empty and its `assessed` discriminator was
+		// dead at this caller. The kernel implemented rung 3 the entire time; nothing here could reach it.
+		verdicts.map((v) => ({
+			policyId: v.policyId,
+			...(v.disposition !== undefined ? { disposition: v.disposition } : {}),
+			assessed: v.assessed,
+			...(v.applicable !== undefined ? { applicable: v.applicable } : {})
+		}))
 	);
 	const assertedRank = strictnessOf(asserted);
 	if (assertedRank <= strictnessOf(composed)) return null;
-	const blocking = verdicts.filter((v) => strictnessOf(v.disposition) < assertedRank);
+	// ⚠ A SILENT ROW THAT DOES NOT GOVERN IS NOT BLOCKING, AND IT MUST NOT BE LISTED AS ONE. The fold already
+	// excluded it (`applicable: false` never enters `required`), so including it here would name a policy in a
+	// refusal it played no part in — the "refusal that names the wrong rule" defect this file's own message
+	// docblock records having committed once.
+	const blocking = verdicts.filter(
+		(v) =>
+			v.applicable !== false &&
+			(v.disposition === undefined || strictnessOf(v.disposition) < assertedRank)
+	);
 	return { composed, blocking };
 }
 
@@ -178,8 +284,22 @@ export function unsupportedSatisfactionMessage(
 	asserted: string,
 	result: UnsupportedSatisfaction
 ): string {
+	// ⭐ `R19` — A SILENT POLICY SAYS WHY IT IS SILENT, AND WHICH ASSESSMENT (IF ANY) IS DISPLACING ITS VERDICT.
+	// ⛔ `${b.disposition}` over a silent row would render the word "undefined" into a governed refusal message,
+	// and the three silences have three different remedies — request one, conclude the one in flight, re-assess
+	// at the current version. A message that flattened them would send an operator to the wrong one.
+	const SILENCE_TEXT: Record<DeclaredPolicySilence, string> = {
+		NEVER_ASSESSED: 'has no assessment over this subject at all',
+		IN_PROGRESS:
+			'has no CONCLUDED assessment — its most recent one is still in progress, which displaces any earlier verdict without replacing it',
+		STALE_VERSION: 'has no assessment bound to this subject’s CURRENT semantic version'
+	};
 	const rows = result.blocking
-		.map((b) => `${b.policyId} is ${b.disposition} (assessment ${b.assessmentId})`)
+		.map((b) =>
+			b.silence
+				? `${b.policyId} ${SILENCE_TEXT[b.silence]}${b.assessmentId ? ` (most recent: ${b.assessmentId})` : ''}`
+				: `${b.policyId} is ${b.disposition} (assessment ${b.assessmentId})`
+		)
 		.join('; ');
 	return (
 		`ChangePwuState would set PWU ${pwuId} assuranceState=${asserted}, but a policy this PWU itself ` +

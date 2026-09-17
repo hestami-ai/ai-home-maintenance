@@ -6122,10 +6122,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MU-PWU007-declaredPolicyVerdicts",
 		file: "packages/rph-application/src/handlers/declared-assurance.ts",
-		find: "\t\tverdicts.push({ policyId, assessmentId: rec.assessmentId, disposition: rec.assessmentState });",
-		replace: "\t\tverdicts.push({ policyId, assessmentId: rec.assessmentId, disposition: 'SATISFIED' });",
+		find: "\t\t\tdisposition: rec.assessmentState,\n",
+		replace: "\t\t\tdisposition: 'SATISFIED', // MUTANT: every declared policy reports SATISFIED whatever its own assessment says\n",
 		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
-		why: "THE PROMISE (declared-assurance.ts): \"Keep the declared policies whose LATEST assessment carries a \u00a728.2 verdict\" \u2014 and the verdict it carries is the POLICY'S OWN, read off the stored assessment, never supplied by the caller. WHO RELIES ON IT: `unsupportedSatisfaction` in the same module, which folds exactly these rows and supplies no facts of its own; through it, `rejectUnsupportedDeclaredSatisfaction` (pwu.ts) and both register rows RPH-PWU-007 and RPH-ASR-012. WHAT THE MUTATION DOES TO THEM: reporting every declared policy as SATISFIED leaves the whole apparatus running and correct \u2014 the declared set is still assembled, the \u00a728.2 fold still executes, the strictness comparison still happens, the refusal is still reachable \u2014 and every input to it is a lie. This is the FAIL-OPEN in its most deniable form, and it is precisely the shape the register recorded as the original defect one layer down: a gate whose population is right and whose reading of it is not. \u2b51 CONSEQUENCE MUTATED, NOT CONDITION (the ledger's V-2c rule): neutering the `CONCLUDED_ASSESSMENT_STATES` filter instead would have removed a limb whose absence this increment's fixtures cannot observe, since every assessment they create is completed.\n\nOBSERVED (re-measured against the final code, 2026-09-14): declared-assurance-binds.test.ts 10/10 PASS -> 5 pass / 5 fail. All five are refusals that stopped happening: the RPH-PWU-007 arrangement, the RPH-ASR-012 arrangement and the work-axis reordering arrangement (all three `expected a refusal, got : : expected 'ACCEPTED' to be 'REJECTED'`), plus \"SATISFIED over a conditional required policy is refused\" and \"while the rejection stands, satisfaction is refused\". \u2b51 AND THE FIVE THAT HOLD ARE THE FIVE PURE `ADMITS` TESTS, which is what separates this mutant from one that merely disables the guard: the ordinary case was ADMITTED before and after, so the mutation is visible only where the guard was supposed to bite. Mutant compiles. Anchor: 1 hit, OWNERS [\"declaredPolicyVerdicts\"].",
+		why: "THE PROMISE (declared-assurance.ts): \"Keep the declared policies whose LATEST assessment carries a \u00a728.2 verdict\" \u2014 and the verdict it carries is the POLICY'S OWN, read off the stored assessment, never supplied by the caller. WHO RELIES ON IT: `unsupportedSatisfaction` in the same module, which folds exactly these rows and supplies no facts of its own; through it, `rejectUnsupportedDeclaredSatisfaction` (pwu.ts) and both register rows RPH-PWU-007 and RPH-ASR-012. WHAT THE MUTATION DOES TO THEM: reporting every declared policy as SATISFIED leaves the whole apparatus running and correct \u2014 the declared set is still assembled, the \u00a728.2 fold still executes, the strictness comparison still happens, the refusal is still reachable \u2014 and every input to it is a lie. This is the FAIL-OPEN in its most deniable form, and it is precisely the shape the register recorded as the original defect one layer down: a gate whose population is right and whose reading of it is not. \u2b51 CONSEQUENCE MUTATED, NOT CONDITION (the ledger's V-2c rule): neutering the `CONCLUDED_ASSESSMENT_STATES` filter instead would have removed a limb whose absence this increment's fixtures cannot observe, since every assessment they create is completed.\n\nOBSERVED (re-measured against the final code, 2026-09-14): declared-assurance-binds.test.ts 10/10 PASS -> 5 pass / 5 fail. All five are refusals that stopped happening: the RPH-PWU-007 arrangement, the RPH-ASR-012 arrangement and the work-axis reordering arrangement (all three `expected a refusal, got : : expected 'ACCEPTED' to be 'REJECTED'`), plus \"SATISFIED over a conditional required policy is refused\" and \"while the rejection stands, satisfaction is refused\". \u2b51 AND THE FIVE THAT HOLD ARE THE FIVE PURE `ADMITS` TESTS, which is what separates this mutant from one that merely disables the guard: the ordinary case was ADMITTED before and after, so the mutation is visible only where the guard was supposed to bite. Mutant compiles. Anchor: 1 hit, OWNERS [\"declaredPolicyVerdicts\"]. \n\n\u2b50 RE-ANCHORED 2026-09-17 (`JAN-EXEC` PHASE 6 \u2014 ledger rule #5, in the commit that moved the code). `R19` made EVERY declared policy return a row, so the single-line `verdicts.push({\u2026})` this anchored on became a multi-line object literal. \u26d4 THE GUARANTEE IS UNCHANGED, WHICH IS WHY THIS IS A RE-ANCHOR AND NOT A `supersededBy`: the promise is still *the verdict is the POLICY'S OWN, read off the stored assessment, never supplied by the caller*, and the mutation still replaces exactly that read with a constant. It now anchors on the `disposition:` property ALONE \u2014 content without surrounding punctuation, which is the form rule #4 asks for and which survives the next reformat.",
 		source: "JAN-PWU007 (RPH-PWU-007 / RPH-ASR-012 wiring) \u2014 one mutant per production-consumed export the increment adds"
 	},
 	{
@@ -7691,5 +7691,86 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
 		why: "PROMISE: a bounded capture of someone else's process says what it does NOT establish. WHO RELIES: `evidenceAdmissibility`'s LIMITATIONS_RECORDED limb reads this field, and `RPH-EVD-004` — *passing tests support only claims within their scope* — is UNENFORCED_DISCLOSED in this repository's own register precisely because nothing else compares an evidence scope to a claim's breadth. WHAT THE MUTATION DOES TO THEM: a 64 KiB-truncated build log is recorded as evidence with NOTHING said about the truncation, so a reader takes a declared PREFIX for the whole. ⛔ AND IT STAYS ADMISSIBLE: the limb reads `=== undefined`, and *an empty array counts as recorded* — so the one check that touches this field cannot tell the two apart. ⚠ `R17` made truncation a LIMITATION rather than a BLOCK; this mutation is what makes that ruling meaningless.",
 		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P6-a-the-skip-returns-and-erases-a-verdict",
+		file: "packages/rph-application/src/handlers/declared-assurance.ts",
+		find: "\t\t\tsilent('IN_PROGRESS', true);\n\t\t\tcontinue;\n",
+		replace: "\t\t\tcontinue; // MUTANT: the skip, restored — an unconcluded latest deletes the policy's vote entirely\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE: a declared policy that has not CONCLUDED has not spoken, and §28.2 rung 3 says a required assessment that is missing blocks. WHO RELIES: `RPH-PWU-007`'s own ENFORCED refusal — which this mutation reopens. WHAT THE MUTATION DOES TO THEM: the policy is dropped from the fold entirely, so ONE further `RequestAssuranceAssessment` under an already-REJECTED declared policy makes that verdict stop being `latest` and VANISH. ⛔ DRIVEN AS AN ADMISSION BEFORE THE FIX: the repository's own `RPH-PWU-007` refusal fixture plus one accepted command returned ACCEPTED, workLifecycleState SATISFIED. ⚠ AND THIS IS EXACTLY THE SHAPE `RPH-ASR-012`'s `declaredMutations` ALREADY RECORDED AS SURVIVING — *“It is a real limb guarded by nothing”* — written as a coverage disclosure and never read one step further, which is why it stayed open for three days on a row marked ENFORCED.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-b-a-verdict-from-another-version-still-counts",
+		file: "packages/rph-application/src/handlers/declared-assurance.ts",
+		find: "\t\tif (rec.subjectSemanticVersion !== subjectSemanticVersion) {\n",
+		replace: "\t\tif (false) { // MUTANT: the version limb dropped — a verdict bound to v1 satisfies v7\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE: a verdict that bound version n is not this subject's verdict at version n+1. WHO RELIES: every re-shaped PWU — a semantic version bump means the work CHANGED, and an assessment of the previous shape says nothing about the new one. WHAT THE MUTATION DOES TO THEM: a SATISFIED verdict over v1 authorises satisfaction at v7, so a controller can satisfy a PWU once and then re-shape it freely. ⚠ THE ASYMMETRY IS WHY THIS LIMB IS HERE AT ALL: `floorGateBlock` version-binds out of the SAME `SubjectAssessmentRecord`, in the same index, and this reader did not. ⛔ It compiles and every other test passes, because every other fixture binds version 1 and the PWU is at version 1.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-c-every-declared-policy-is-demanded-whatever-its-status",
+		file: "packages/rph-application/src/handlers/declared-assurance.ts",
+		find: "\t\t\t\tapplicable: governs(policyId)\n",
+		replace: "\t\t\t\tapplicable: true // MUTANT: the symmetric rule — a SUSPENDED or §5.1-excluded policy is demanded too\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE (`R19`): a verdict is DEMANDED only from a policy that currently GOVERNS — *we do not demand one that could not lawfully be obtained*. WHO RELIES: any PWU whose declared policy is later SUSPENDED, or whose §5.1 rule excludes this subject. WHAT THE MUTATION DOES TO THEM: the PWU is blocked PERMANENTLY, with no route forward — the policy cannot be assessed (`RequestAssuranceAssessment` refuses a non-ACTIVE policy and a NOT_APPLICABLE subject) and the declaration cannot be edited (no command adds or removes an id from `assurancePolicyIds`). ⛔ IT IS THE OVER-REFUSAL THE RULING EXPLICITLY DECLINED, and it is a MUTANT ON A CONTROL: without it, the control that proves `R19` is asymmetric would be satisfied by an implementation that demands everything.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-d-the-fold-is-told-every-policy-was-assessed",
+		file: "packages/rph-application/src/handlers/declared-assurance.ts",
+		find: "\t\t\tassessed: v.assessed,\n",
+		replace: "\t\t\tassessed: true, // MUTANT: the hard-coded literal, restored — rung 3's UNASSESSED arm becomes unreachable\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE: §28.2 rung 3 offers TWO words — UNASSESSED when nothing exists, EVIDENCE_REQUIRED when something is underway — and `assessed` is the kernel's own discriminator between them. WHO RELIES: an operator reading a refusal, who must know whether to REQUEST an assessment or to CONCLUDE one already in flight. WHAT THE MUTATION DOES TO THEM: every silence composes to EVIDENCE_REQUIRED, so a policy nobody ever assessed is reported as one whose assessment is merely awaiting evidence — and the operator waits for a verdict that no one has asked for. ⚠ THE REFUSAL STILL FIRES, which is what makes this survivable-looking: the gate still blocks, and only the WORD is wrong. ⭑ This literal was the whole reason rung 3 was unreachable from this call site before Phase 6.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-e-a-refusal-names-a-policy-that-played-no-part",
+		file: "packages/rph-application/src/handlers/declared-assurance.ts",
+		find: "\t\t\tv.applicable !== false &&\n",
+		replace: "\t\t\ttrue &&\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE: a refusal names the policies that actually blocked it. WHO RELIES: the operator it sends somewhere. WHAT THE MUTATION DOES TO THEM: a declared policy the fold EXCLUDED — because it does not govern this subject — is listed in the refusal as though it had blocked, so the operator is sent to reactivate a policy that had no vote. ⛔ THIS FILE'S OWN MESSAGE DOCBLOCK RECORDS COMMITTING THE SAME DEFECT ONCE: an earlier draft *“told the reader a rejection had blocked them when none existed”*, and calls a refusal that names the wrong rule *“the same defect as a register row quoting more than it enforces”*. ⚠ The disposition and the refusal are both unchanged; only the list is wrong.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-f-promotion-trusts-the-promoters-own-list-again",
+		file: "packages/rph-application/src/handlers/governance.ts",
+		find: "\t\t\t\t\tconst assuranceState = String(itemState.assuranceState);\n",
+		replace: "\t\t\t\t\tconst assuranceState = 'UNASSESSED'; // MUTANT: a constant that is not a satisfaction claim, so no item's own claim is ever re-asked\n",
+		expectRed: ["packages/rph-application/src/handlers/declared-assurance-binds.test.ts"],
+		why: "PROMISE (`R21`): a baseline may not become AUTHORITATIVE over an item whose OWN declared assurance no longer stands — *the assessments a promotion NAMES are the promoter's choice while the policies an item DECLARES are not*. WHO RELIES: every reader of an AUTHORITATIVE baseline. WHAT THE MUTATION DOES TO THEM: `requiredAssessmentIds` is the caller's own list again, so a promotion naming NO assessments passes vacuously — the *controller selected its own evidence* defect that `JAN-PWU007` closed on `ChangePwuState`, back at the gate one over. ⚠ AND THE ARRANGEMENT IT ADMITS IS ONE THE ARRIVAL-TIME GUARD CANNOT CATCH: the item reached SATISFIED LAWFULLY and its verdict was erased AFTERWARDS, which is why re-asking at promotion is not redundant with asking once.",
+		source: "JAN-EXEC Phase 6 / R19+R21 — a declared policy that has not spoken at the current version has not spoken"
+	},
+	{
+		id: "P6-g-a-suspended-policy-reads-as-a-decided-negative",
+		file: "packages/rph-application/src/handlers/policy-governs.ts",
+		find: "\tif (policy.status !== 'ACTIVE') return 'NOT_AVAILABLE';\n",
+		replace: "\tif (policy.status !== 'ACTIVE') return 'DOES_NOT_GOVERN'; // MUTANT: out of service reported as examined-and-excluded\n",
+		expectRed: ["packages/rph-application/src/handlers/policy-governs.test.ts"],
+		why: "PROMISE: `NOT_AVAILABLE` and `DOES_NOT_GOVERN` are DIFFERENT FACTS with different remedies — reactivate the policy, versus accept that it does not apply here. WHO RELIES: any operator reading why a policy was not demanded, and any later gate that treats a determination as authoritative about the SUBJECT. WHAT THE MUTATION DOES TO THEM: a policy that was taken out of service is recorded as having EXAMINED this subject and excluded it — a determination nobody made, about a subject nothing looked at. ⚠ BOTH ANSWERS PRODUCE THE SAME BEHAVIOUR AT TODAY'S ONE CALLER (neither is `GOVERNS`, so neither is demanded), which is exactly why it needs a mutant rather than a caller: the defect is in what the function SAYS, and it becomes behavioural the day a second reader distinguishes them.",
+		source: "JAN-EXEC Phase 6 / R19 — the §5.1 determination has THREE answers and a demanding gate needs all three"
+	},
+	{
+		id: "P6-h-an-unresolvable-subject-becomes-a-decided-negative",
+		file: "packages/rph-application/src/handlers/policy-governs.ts",
+		find: "\tif (!subject) return 'UNDECIDABLE';\n",
+		replace: "\tif (!subject) return 'DOES_NOT_GOVERN'; // MUTANT: having no information reported as a decided exclusion\n",
+		expectRed: ["packages/rph-application/src/handlers/policy-governs.test.ts"],
+		why: "PROMISE: a subject that will not resolve is left to the checks that own it — this one declines to answer. WHO RELIES: `R19`'s demanding arm, which must not silently stop demanding a verdict because a store read returned nothing. WHAT THE MUTATION DOES TO THEM: an unresolvable subject makes EVERY declared policy report `DOES_NOT_GOVERN`, so every policy is excluded from the fold and the satisfaction guard admits — a fail-OPEN reached by having no information. ⛔ THIS IS THE EXACT DEFECT THE EXTRACTED CODE RECORDS HAVING COMMITTED ONCE: *“a decided negative manufactured from having no information, at the call site of the kernel built to prevent exactly that.”* It is being re-committed here, one layer over.",
+		source: "JAN-EXEC Phase 6 / R19 — the §5.1 determination has THREE answers and a demanding gate needs all three"
+	},
+	{
+		id: "P6-i-a-rule-nobody-can-evaluate-is-treated-as-governing",
+		file: "packages/rph-application/src/handlers/policy-governs.ts",
+		find: "\tif (outcome === 'REQUIRES_HUMAN_DETERMINATION') return 'UNDECIDABLE';\n",
+		replace: "\tif (false) return 'UNDECIDABLE'; // MUTANT: REQUIRES_HUMAN_DETERMINATION falls through to GOVERNS\n",
+		expectRed: ["packages/rph-application/src/handlers/policy-governs.test.ts"],
+		why: "PROMISE: a policy whose §5.1 rule needs a human has not determined anything, so `R19` does not DEMAND a verdict from it. WHO RELIES: any PWU declaring a policy with an unevaluable `expression`. WHAT THE MUTATION DOES TO THEM: `applicabilityPermitsAssessment` admits REQUIRES_HUMAN_DETERMINATION, so the policy reads `GOVERNS`, a verdict is demanded, and the PWU is BLOCKED PERMANENTLY on a condition nobody can evaluate. ⚠ AND IT IS THE PLAUSIBLE EDIT, because the ONE OTHER CALLER OF THIS DETERMINATION WANTS THE MUTATED BEHAVIOUR: `RequestAssuranceAssessment` deliberately PERMITS an assessment under such a rule, *“Blocking on a condition nobody can evaluate would stop real work on the strength of not understanding it.”* Permitting and DEMANDING are opposite directions, and this line is where they part.",
+		source: "JAN-EXEC Phase 6 / R19 — the §5.1 determination has THREE answers and a demanding gate needs all three"
 	}
 ];

@@ -121,7 +121,13 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 		);
 	};
 
-	const proposePwu = (pwuId: string, declared: readonly string[]): void => {
+	const proposePwu = (
+		pwuId: string,
+		declared: readonly string[],
+		// ⭑ THE TYPE, OPTIONAL — defaulted away so no existing arrangement changes meaning. The union's TYPE half
+		// had never been driven at this seam; exactly one test passes it.
+		pwuTypeId?: string
+	): void => {
 		ok(
 			dispatch(
 				'ProposePwu',
@@ -148,6 +154,7 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 						}
 					],
 					assurancePolicyIds: [...declared],
+					...(pwuTypeId ? { pwuTypeId } : {}),
 					riskProfile: {
 						consequence: 'HIGH',
 						uncertainty: 'MEDIUM',
@@ -168,7 +175,11 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 		assessmentId: string,
 		policyId: string,
 		subject: string,
-		disposition: string
+		disposition: string,
+		// ⭐ `R19` — WHICH SUBJECT VERSION THIS ASSESSMENT BINDS. Defaulted to 1, which is what every arrangement
+		// in this file used before the version limb existed, so no fixture changes meaning. The stale-version
+		// test passes 7 and is the only caller that does.
+		boundVersion = 1
 	): void => {
 		ok(
 			dispatch(
@@ -178,7 +189,7 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 					assurancePolicyId: policyId,
 					policyVersion: '1.0.0',
 					subjectObjectIds: [subject],
-					subjectSemanticVersions: { [subject]: 1 },
+					subjectSemanticVersions: { [subject]: boundVersion },
 					claimIds: []
 				},
 				assessmentId,
@@ -201,7 +212,7 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 						policyVersion: '1.0.0',
 						assessmentId,
 						subjectObjectIds: [subject],
-						subjectSemanticVersions: { [subject]: 1 },
+						subjectSemanticVersions: { [subject]: boundVersion },
 						claimResults: [],
 						evidenceConsideredIds: [],
 						evidenceRejected: [],
@@ -698,9 +709,18 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 		expect(stateOf(pwu).assuranceState).toBe('SATISFIED');
 	});
 
-	// ── THE DISCLOSED RESIDUAL, OBSERVED RATHER THAN ASSERTED ───────────────────────────────────────────────
+	// ── ⭐⭐ THE DISCLOSED RESIDUAL, RE-DISPOSITIONED 2026-09-17 — `JAN-EXEC` PHASE 6 / `R19` ──────────────
+	//
+	// ⭑ THE TEST BELOW USED TO ASSERT THE ADMISSION, AND ITS OWN COMMENT SAID WHAT TO DO TODAY: *"the day it is
+	// closed, this test reddens and must be RE-DISPOSITIONED rather than deleted."* It reddened; this is that
+	// re-disposition. The arrangement is byte-identical — only the expected outcome moved — so a reader can see
+	// that what changed is the RULE and not the case.
+	//
+	// ⛔ AND IT WAS TAKEN BECAUSE THE RESIDUAL TURNED OUT TO BE WIDER THAN ITS OWN NAME. §28.2 rung 3 covers
+	// THREE silences, and the second of them ERASES AN EXISTING REJECTION — see the erasure test below, which was
+	// DRIVEN as an admission against this file's own `RPH-PWU-007` fixture before any of this was written.
 
-	it('ADMITS SATISFIED while a declared policy has NO assessment at all — §28.2 rung 3 is NOT closed here', () => {
+	it('⛔ REFUSES SATISFIED while a declared policy has NO assessment at all — §28.2 rung 3', () => {
 		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5G${n}`;
 		const pwu = id('pwu', '01');
 		const polAssessed = id('pol', '02');
@@ -712,12 +732,396 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 		driveToReady(pwu);
 		assess(asm, polAssessed, pwu, 'SATISFIED');
 		driveAssuranceToAssessing(pwu);
-		// `polSilent` is declared and NEVER assessed. This ACCEPTANCE is the residual this file discloses; the
-		// day it is closed, this test reddens and must be re-dispositioned rather than deleted.
+		const refused = setAssurance(pwu, 'SATISFIED', [asm]);
+		expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+		expect(refused.code).toBe('RPH_INVARIANT_VIOLATION');
+		// ⛔ THE COMPOSED RUNG IS THE MARKER, NOT THE SHARED OPENING CLAUSE — the same discipline the two register
+		// rows use to stay distinguishable. `UNASSESSED` is rung 3's NOTHING-AT-ALL arm; `EVIDENCE_REQUIRED` is its
+		// something-underway arm, and the erasure test below pins that one.
+		expect(refused.message).toContain('composed disposition UNASSESSED');
+		expect(refused.message, 'the refusal must name the silent policy').toContain(polSilent);
+		expect(refused.message, 'and say WHICH silence, because the three have different remedies').toContain(
+			'has no assessment over this subject at all'
+		);
+		expect(
+			refused.message,
+			'⚠ and must NOT name the policy that DID speak — a refusal listing an innocent policy sends the operator to the wrong place'
+		).not.toContain(polAssessed);
+		expect(stateOf(pwu).assuranceState, 'the axis must not have moved').toBe('ASSESSING');
+	});
+
+	it('⭐⛔ REFUSES the ERASURE — one further RequestAssuranceAssessment must not delete a REJECTED verdict', () => {
+		// ⭐⭐ THIS ARRANGEMENT WAS DRIVEN AS AN **ADMISSION** BEFORE THE FIX. Take the `RPH-PWU-007` refusal fixture
+		// verbatim — the one the ENFORCED register row pins — and insert ONE command: a second assessment under the
+		// SAME declared policy, requested and left unconcluded. Observed: request ACCEPTED, claim ACCEPTED,
+		// workLifecycleState SATISFIED. The REJECTED verdict was still in the store; it had merely stopped being
+		// `latest`, and `declaredPolicyVerdicts` skipped it with no fallback.
+		//
+		// ⛔ THE MARKER MUST BE RUNG 3 AND **NOT** THE REJECTION RUNG, which is the whole subtlety. The policy's
+		// current word is an unconcluded assessment — so claiming a rejection blocked this would tell a reader a
+		// verdict bit that this fold never saw. `EVIDENCE_REQUIRED` is rung 3's something-is-underway arm and it is
+		// what distinguishes this from the never-assessed case above.
+		const { pwu, polDeclared, asmCited } = arrangeWorkLifecycle('E', 'REJECTED');
+		const fresh = 'asm_01ARZ3NDEKTSV4RRFFQ69G5E99';
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId: fresh,
+					assurancePolicyId: polDeclared,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [pwu],
+					subjectSemanticVersions: { [pwu]: 1 },
+					claimIds: []
+				},
+				fresh,
+				'ASSURANCE_ASSESSMENT'
+			),
+			'the second assessment is still ACCEPTED — requesting one is lawful and stays lawful'
+		);
+		const refused = claimSatisfied(pwu, [asmCited]);
+		expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+		expect(refused.message).toContain('composed disposition EVIDENCE_REQUIRED');
+		expect(refused.message).toContain('its most recent one is still in progress');
+		expect(refused.message, 'the displacing assessment must be named').toContain(fresh);
+		const s = stateOf(pwu);
+		expect(s.workLifecycleState, 'the work axis must not have moved').toBe('UNDER_ASSURANCE');
+	});
+
+	it('⛔ REFUSES a verdict bound to a DIFFERENT semantic version of the subject', () => {
+		// ⚠ `floorGateBlock` version-binds out of the SAME `SubjectAssessmentRecord` and this reader did not — an
+		// asymmetry between two consumers of one index, which is what made this limb worth taking here rather than
+		// leaving it entirely to `RPH-ASR-010` (whose subject is the ASSESSMENT side: completing one against a
+		// version the subject is not at). Two sites, two rules.
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5H${n}`;
+		const pwu = id('pwu', '01');
+		const pol = id('pol', '02');
+		const asm = id('asm', '03');
+		seedPolicy(pol);
+		proposePwu(pwu, [pol]);
+		driveToReady(pwu);
+		// SATISFIED, but bound to version 7 while the PWU is at 1. Everything else is the ordinary arrangement —
+		// the CONTROL two tests up is byte-identical except for this number.
+		assess(asm, pol, pwu, 'SATISFIED', 7);
+		driveAssuranceToAssessing(pwu);
+		const refused = setAssurance(pwu, 'SATISFIED', [asm]);
+		expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+		expect(refused.message).toContain('CURRENT semantic version');
+		expect(refused.message).toContain(pol);
+	});
+
+	it('⭐⛔ a NON-GOVERNING policy is not NAMED in a refusal it played no part in', () => {
+		// ⛔ THIS TEST EXISTS BECAUSE ITS MUTANT SURVIVED. The control below proves a non-governing policy does not
+		// BLOCK; nothing proved it is not LISTED. Removing the `applicable !== false` conjunct from `blocking`
+		// left every assertion green, because in the control there is no refusal to inspect and in the refusal
+		// tests every declared policy governs.
+		//
+		// ⚠ AND THE DEFECT IT ADMITS IS ONE THIS FILE'S OWN MESSAGE DOCBLOCK RECORDS COMMITTING ONCE: a refusal
+		// that names the wrong rule *"told the reader a rejection had blocked them when none existed"*. Here it
+		// would send an operator to reactivate a SUSPENDED policy that had no vote, while the policy that really
+		// blocked sits beside it in the same list.
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5K${n}`;
+		const pwu = id('pwu', '01');
+		const polGoverning = id('pol', '02');
+		const polSuspended = id('pol', '03');
+		const asm = id('asm', '04');
+		seedPolicy(polGoverning);
+		seedPolicy(polSuspended);
+		proposePwu(pwu, [polGoverning, polSuspended]);
+		ok(
+			dispatch('SuspendAssurancePolicy', { policyId: polSuspended }, polSuspended, 'ASSURANCE_POLICY'),
+			'suspend one of the two'
+		);
+		driveToReady(pwu);
+		// ⭑ BOTH ARE SILENT, and only the GOVERNING one may appear. `asm` is an unrelated satisfied assessment so
+		// `rejectUnbackedDisposition` is satisfied and the refusal that arrives is THIS guard's.
+		assess(asm, polGoverning, pwu, 'SATISFIED');
+		driveAssuranceToAssessing(pwu);
+		// Re-open the governing policy's verdict by displacing it, so the claim is refused with BOTH declared —
+		// one governing and silent, one suspended and silent.
+		const fresh = id('asm', '05');
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId: fresh,
+					assurancePolicyId: polGoverning,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [pwu],
+					subjectSemanticVersions: { [pwu]: 1 },
+					claimIds: []
+				},
+				fresh,
+				'ASSURANCE_ASSESSMENT'
+			),
+			'displace the governing policy’s verdict'
+		);
+		const refused = setAssurance(pwu, 'SATISFIED', [asm]);
+		expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+		expect(refused.message, 'the policy that actually blocked must be named').toContain(polGoverning);
+		expect(
+			refused.message,
+			'⛔ and the SUSPENDED one must NOT be — the fold excluded it, so naming it sends the operator to a policy with no vote'
+		).not.toContain(polSuspended);
+	});
+
+	it('⭐ CONTROL — a declared policy that does NOT GOVERN is not demanded, so `R19` is asymmetric and not strict', () => {
+		// ⛔ WITHOUT THIS THE RULE ABOVE IS INDISTINGUISHABLE FROM "every declared id must be assessed", which would
+		// block a PWU permanently the moment a declared policy is SUSPENDED — no route forward, no remedy. `R19`
+		// demands a verdict only from a policy that CURRENTLY GOVERNS, and this is that half.
+		//
+		// ⚠ THE ARRANGEMENT IS THE RED TEST'S, ONE FIELD DIFFERENT: the silent policy is SUSPENDED rather than
+		// ACTIVE. Same two policies, same drive, same claim.
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5J${n}`;
+		const pwu = id('pwu', '01');
+		const polAssessed = id('pol', '02');
+		const polSilent = id('pol', '03');
+		const asm = id('asm', '04');
+		seedPolicy(polAssessed);
+		seedPolicy(polSilent);
+		proposePwu(pwu, [polAssessed, polSilent]);
+		ok(
+			dispatch('SuspendAssurancePolicy', { policyId: polSilent }, polSilent, 'ASSURANCE_POLICY'),
+			'suspend the silent policy'
+		);
+		driveToReady(pwu);
+		assess(asm, polAssessed, pwu, 'SATISFIED');
+		driveAssuranceToAssessing(pwu);
 		ok(
 			setAssurance(pwu, 'SATISFIED', [asm]),
-			'an unassessed declared policy does not block satisfaction'
+			'a SUSPENDED declared policy is not demanded — it cannot be assessed, so demanding it is a refusal with no route forward'
 		);
 		expect(stateOf(pwu).assuranceState).toBe('SATISFIED');
+	});
+
+	// ── ⭐⭐ `R21` — THE SAME QUESTION, RE-ASKED AT PROMOTION ──────────────────────────────────────
+	//
+	// ⛔ `PromoteBaseline` BUILT ITS "required assessments" FROM `p.requiredAssessmentIds` — the CALLER'S OWN
+	// LIST — so a promotion naming none passed that arm vacuously. Same defect, one gate over, surviving only as
+	// a mutation note on a row marked ENFORCED.
+	//
+	// ⭑ AND THE ARRANGEMENT BELOW IS ONE THE ARRIVAL-TIME GUARD STRUCTURALLY CANNOT CATCH: the PWU reached
+	// SATISFIED LAWFULLY, with its declared policy satisfied at the time. The erasure happens AFTERWARDS. Only a
+	// gate that re-asks at promotion sees it.
+
+	const promoteWith = (
+		pwu: string,
+		tag: string,
+		// ⭑ OTHER ITEMS THE BASELINE FREEZES BESIDE THE PWU — so the “not a PWU” arm can be driven with a real
+		// object rather than by asserting about a shape nothing built.
+		alsoItems: readonly string[] = []
+	): { readonly promote: () => Outcome; readonly decision: string } => {
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5${tag}${n}`;
+		const decision = id('dec', '90');
+		const baseline = id('bsl', '91');
+		ok(
+			dispatch(
+				'ProposeDecision',
+				{
+					decisionType: 'PROMOTE_BASELINE',
+					// ⛔ THE DECISION MUST NAME THE BASELINE (`REG-F-073`) — without it, any effective promotion
+					// decision in the store would authorize any promotion.
+					subjectObjectIds: [pwu, baseline],
+					selectedOption: 'promote',
+					rationale: 'ready',
+					authority: { actorId: 'u1', actorType: 'HUMAN', displayName: 'Controller' }
+				},
+				decision,
+				'DECISION'
+			),
+			'propose the promotion decision'
+		);
+		ok(
+			dispatch(
+				'ApproveDecision',
+				{
+					selectedOption: 'promote',
+					rationale: 'ready',
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: { [pwu]: 1 }
+				},
+				decision,
+				'DECISION'
+			),
+			'approve it'
+		);
+		ok(
+			dispatch(
+				'CreateBaseline',
+				{ baselineType: 'ARCHITECTURE', itemObjectIds: [pwu, ...alsoItems], assuranceAssessmentIds: [] },
+				baseline,
+				'BASELINE'
+			),
+			'create the baseline'
+		);
+		ok(dispatch('SubmitBaselineForReview', {}, baseline, 'BASELINE'), 'submit');
+		ok(dispatch('ApproveBaseline', {}, baseline, 'BASELINE'), 'approve');
+		return {
+			decision,
+			promote: () =>
+				dispatch(
+					'PromoteBaseline',
+					{
+						promotionDecisionId: decision,
+						expectedItemObjectVersions: [pwu, ...alsoItems].map((objectId) => ({
+							objectId,
+							semanticVersion: 1
+						})),
+						// ⛔ EMPTY, DELIBERATELY — AND THAT IS THE DEFECT IN ONE FIELD. This is the promoter's own list,
+						// and before `R21` an empty one passed the required-assessment arm vacuously.
+						requiredAssessmentIds: []
+					},
+					baseline,
+					'BASELINE'
+				)
+		};
+	};
+
+	it('⭐ CONTROL — a baseline over a LAWFULLY satisfied item promotes, naming NO assessments', () => {
+		// ⛔ WITHOUT THIS THE REFUSAL BELOW IS INDISTINGUISHABLE FROM "R21 blocks every promotion". The promoter
+		// still names no assessments here; what makes this one lawful is the ITEM's own declared policy, which
+		// spoke and said SATISFIED.
+		const { pwu, asmCited } = arrangeWorkLifecycle('P', 'SATISFIED');
+		ok(claimSatisfied(pwu, [asmCited]), 'the PWU reaches SATISFIED lawfully');
+		expect(stateOf(pwu).assuranceState).toBe('SATISFIED');
+		ok(promoteWith(pwu, 'P').promote(), 'and its baseline promotes');
+	});
+
+	it('⭐ the PwuTYPE half of the union binds too — a policy the TYPE requires is demanded of the instance', () => {
+		// ⛔ MEASURED GAP, NOT A BELT-AND-BRACES TEST. `declaredAssurancePolicyIds` is the union of the PWU's own
+		// `assurancePolicyIds` and its PwuType's `requiredAssurancePolicyIds`, and the union has been landed since
+		// `JAN-PWU007` — but EVERY test of this guard, and BOTH enforcement-register probes, declare policies ON
+		// THE PWU and never build a PwuType at all. The type half was held only by a mutant whose victim lives in
+		// another package, so at this command seam it was never driven in either direction.
+		//
+		// ⭑ AND IT IS THE HALF A PWA AUTHOR ACTUALLY USES: a PWU TYPE is what an author declares policies on when
+		// designing an architecture; the instance inherits them. That is the sponsor's own scenario.
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5T${n}`;
+		const pwa = id('pwa', '01');
+		const type = id('pwt', '02');
+		const pwu = id('pwu', '03');
+		const polOnType = id('pol', '04');
+		seedPolicy(polOnType);
+		ok(
+			dispatch(
+				'CreatePwa',
+				{ pwaId: pwa, name: 'A', description: 'd', domain: 'test', version: '1.0.0' },
+				pwa,
+				'PROFESSIONAL_WORK_ARCHITECTURE'
+			),
+			'create the PWA the type belongs to'
+		);
+		ok(
+			dispatch(
+				'DefinePwuType',
+				{
+					pwuTypeId: type,
+					pwaId: pwa,
+					pwuKind: 'ARCHITECTURE',
+					name: 'Architecture type',
+					purpose: 'p',
+					isRoot: true,
+					// ⭐ DECLARED ON THE TYPE, AND NOWHERE ELSE. The instance below names no policy of its own.
+					requiredAssurancePolicyIds: [polOnType]
+				},
+				type,
+				'PWU_TYPE'
+			),
+			'define the type that requires the policy'
+		);
+		proposePwu(pwu, [], type);
+		expect(stateOf(pwu).assurancePolicyIds, 'the instance declares NOTHING itself').toEqual([]);
+		driveToReady(pwu);
+		// ⛔ AN UNRELATED SATISFIED ASSESSMENT IS CITED, AND THAT IS NOT PADDING. Without it
+		// `rejectUnbackedDisposition` refuses first — for citing nothing — and the refusal would prove nothing
+		// about THIS guard. An arrangement that trips the wrong guard is not evidence about the one under test,
+		// which this session learned by making exactly that mistake while probing the erasure.
+		const polOther = id('pol', '05');
+		const asmCited = id('asm', '06');
+		seedPolicy(polOther);
+		assess(asmCited, polOther, pwu, 'SATISFIED');
+		driveAssuranceToAssessing(pwu);
+		const refused = setAssurance(pwu, 'SATISFIED', [asmCited]);
+		expect(refused.status).toBe('REJECTED');
+		expect(refused.message, 'a policy required by the TYPE must be demanded of the INSTANCE').toContain(
+			polOnType
+		);
+	});
+
+	it('⭑ a baseline item that is NOT a PWU is passed over — it carries no declarations to ask about', () => {
+		// ⚠ A BASELINE ITEM MAY BE ANY GOVERNED OBJECT. Only a PWU carries `assurancePolicyIds`; asking this of an
+		// ARTIFACT would be asking a question its shape cannot answer, and the arms that own it are elsewhere.
+		// THE MUTANT: drop the objectType test — every non-PWU item would then be read for a field it has not got.
+		const { pwu, asmCited } = arrangeWorkLifecycle('R', 'SATISFIED');
+		ok(claimSatisfied(pwu, [asmCited]), 'the PWU reaches SATISFIED lawfully');
+		const art = 'art_01ARZ3NDEKTSV4RRFFQ69G5R80';
+		ok(
+			dispatch(
+				'RecordArtifact',
+				{
+					artifactId: art,
+					artifactType: 'work-product',
+					mediaType: 'text/plain',
+					storageProvider: 'test',
+					storageKey: 'k',
+					contentHash: 'sha256:0',
+					byteSize: 1,
+					producingPwuId: pwu,
+					securityClassification: 'unclassified',
+					retentionClass: 'retained-by-participation',
+					status: 'recorded'
+				},
+				art,
+				'ARTIFACT'
+			),
+			'record an artifact to put in the baseline beside the PWU'
+		);
+		ok(promoteWith(pwu, 'R', [art]).promote(), 'the artifact item is passed over and the promotion stands');
+	});
+
+	it('⭑ a PWU item declaring NO policies is passed over — this guard has no opinion about it', () => {
+		// ⛔ A PWU MAY LEGALLY DECLARE ZERO POLICIES, and whether work may be satisfied with NO declared assurance
+		// at all is a DIFFERENT rule with a different subject. `R19` narrows an existing guard; it does not invent
+		// a requirement that every PWU declare something. THE MUTANT: drop the `declared.length === 0`
+		// short-circuit — `aggregateAssuranceDisposition([])` answers UNASSESSED, and every zero-declaring PWU
+		// becomes unpromotable.
+		const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5S${n}`;
+		const pwu = id('pwu', '01');
+		proposePwu(pwu, []);
+		expect(stateOf(pwu).assurancePolicyIds).toEqual([]);
+		ok(promoteWith(pwu, 'S', []).promote(), 'a PWU declaring nothing does not block its baseline');
+	});
+
+	it('⭐⛔ REFUSES a promotion whose ITEM\'s declared assurance no longer stands — the caller names nothing', () => {
+		// ⭑ THE ITEM REACHED SATISFIED LAWFULLY AND THEN ITS VERDICT WAS ERASED. The arrival-time guard already
+		// ran and passed — correctly, at the time. `R21` is the re-ask, and this is the arrangement that shows
+		// why re-asking is not redundant with asking once.
+		const { pwu, polDeclared, asmCited } = arrangeWorkLifecycle('Q', 'SATISFIED');
+		ok(claimSatisfied(pwu, [asmCited]), 'the PWU reaches SATISFIED lawfully');
+		const promotion = promoteWith(pwu, 'Q');
+		const fresh = 'asm_01ARZ3NDEKTSV4RRFFQ69G5Q99';
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId: fresh,
+					assurancePolicyId: polDeclared,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [pwu],
+					subjectSemanticVersions: { [pwu]: 1 },
+					claimIds: []
+				},
+				fresh,
+				'ASSURANCE_ASSESSMENT'
+			),
+			'a re-assessment is requested and left unconcluded — still a lawful act'
+		);
+		const refused = promotion.promote();
+		expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+		expect(refused.message).toContain('UNSUPPORTED_ITEM_ASSURANCE');
+		expect(refused.message, 'the refusal must name the ITEM, not only the baseline').toContain(pwu);
+		expect(refused.message, 'and the policy whose word is missing').toContain(polDeclared);
+		expect(refused.message).toContain('composed disposition EVIDENCE_REQUIRED');
 	});
 });
