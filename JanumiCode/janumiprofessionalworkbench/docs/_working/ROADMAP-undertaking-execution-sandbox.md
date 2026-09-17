@@ -1387,12 +1387,33 @@ the record.
 
 ---
 
-## 7. Phase 5 · The evidence join — ~~a second floor run, over the evidence~~ ⭐ RE-SPECIFIED 2026-09-17 AFTER MEASUREMENT
+## 7. Phase 5 · The evidence join — ~~a second floor run, over the evidence~~ ⭐ RE-SPECIFIED AND ⭐⭐ LANDED 2026-09-17
 
 ⭐⭐ **THE SPECIFICATION BELOW REPLACES §7a's. Design §4.11 carries the measurement; §7a is kept verbatim
 underneath because its reasoning is what the measurement overturned, and an overturned argument that vanishes
 teaches nobody.** 179 findings from six independent readers, then 40 adversarial verifiers told to REFUTE rather
 than confirm — **16 of 40 refuted**, three of them mine.
+
+### 7.L ⭐⭐ AS LANDED 2026-09-17 — three commits, 17 mutants, and the four instruments that could not see any of it
+
+| # | what landed | measured |
+| --- | --- | --- |
+| 1 | `R14`/`R15` — `ReasoningReviewInput.framing`, a REQUIRED closed union the caller declares; both reviewers switch exhaustively and neither reads its subject any more. A `PROCESS_RESULT` arm that joins the agent's account to the HOST's observed calls. | `P5-a`..`P5-e` KILLED. `P5-a` reddens 7 of 13 victims while the graph-arm tests and the routing CONTROL stay green. |
+| 2 | `runFloorOverSubject` (the extraction, once the fix made it possible), `processResultFloorFacts` (`R17`), the process-run observer, and `REG-Q-066`'s THIRD disposition. | `P5-f`..`P5-m` KILLED — **two SURVIVED first** (`hasProducer`'s second conjunct; `objectType`, which is UNOBSERVABLE in the default lane because the mock captures nothing and the exchange drain never runs). |
+| 3 | `joinProcessEvidence` — the mint, the `OBSERVATION` (`R18`), the per-subject floor, and `proposedEvidenceIds` on the AI path. | `P5-n`..`P5-q` KILLED — **two SURVIVED first**, and `P5-p` exposed a production defect: the reference RESTATED the caller's purgeability instead of reading it back from `stat`. |
+
+⭐ **17 OF 17 KILLED, AND FOUR OF THEM ONLY AFTER SURVIVING.** Each survivor was a missing
+DISCRIMINATION rather than a missing feature, and one of the four was a defect in the code rather than in the
+test. ⛔ **No mutant was weakened**; the assertions were added, and in `P5-p`'s case the production code changed.
+
+⛔ **AND WHAT IS NOT PROVEN IS SAID PLAINLY.** The ROUTE WIRING IS NOT EXERCISED BY THE GATE: the deterministic
+execution fixture calls no tools, so `observedRuns.runs` is empty in every gate lane and `proposedEvidenceIds`
+is still `[]` there. That is the blindness §7.4 recorded IN ADVANCE — three instruments cannot see this phase
+(`guards:export` walks `packages/` only; `apps/rph-demo` has zero coverage-floor entries; the AI e2e's floor
+assertion is subject-scoped to the artifact) and the demo's unit lane passes with zero tests collected. Closing
+it is **Phase 7's live end-to-end**, and no green here substitutes for it.
+
+---
 
 ### 7.0 ⛔ THE PREMISE THAT DID NOT SURVIVE, AND THE ONE THAT DID
 
