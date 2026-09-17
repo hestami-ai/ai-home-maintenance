@@ -4,7 +4,7 @@
 // mapper. The registry is a RUNTIME seam (not a persisted contract — §16.23 leaves deployment-capability projections
 // unresolved). Concrete model-backed Validators (e.g. agy/Gemini for Reasoning Review) live server-side and register
 // here; the deterministic floor Validators are pure and defined here.
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import {
 	BLOCKING_SEVERITIES,
 	type Disposition,
@@ -50,6 +50,29 @@ export interface ProfessionalRationaleSummary {
 	readonly residualUncertainty: readonly string[];
 }
 
+/**
+ * The kinds of thing a Reasoning Review can be conducted over, in this system, today.
+ *
+ * ⭑ ONE RUBRIC, N FRAMINGS (`R14`). Adding a member here does NOT add criteria and does not touch a policy: it
+ * adds a way of TELLING a reviewer what is in front of it. `§8.4`'s Reasoning Review is mandatory over
+ * AI-produced material whatever its shape, and this is the field that stops "whatever its shape" becoming
+ * "described as whichever shape came first".
+ */
+export type ReviewFraming =
+	/** A canonical PWA graph export — the original and, until `JAN-WPREVIEW`, the only one. */
+	| 'PWA_GRAPH'
+	/** A professional's deliverable, judged against the instruction that asked for it. */
+	| 'WORK_PRODUCT'
+	/**
+	 * The result of a command an executing model chose to run — `JAN-EXEC` Phase 5.
+	 *
+	 * ⛔ THE SUBJECT OF THIS REVIEW IS NOT THE EXIT CODE (`R15`). There is no model reasoning in `exitCode: 0`;
+	 * the producer is a child process. What is reviewed is the model's CONTRACTED ACCOUNT read against the
+	 * ADAPTER'S OBSERVED CALLS — `§22.1` makes the model's word untrusted, and the adapter's observation is the
+	 * only independent half available. `observedToolCalls` below is that half.
+	 */
+	| 'PROCESS_RESULT';
+
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
 export interface ReasoningReviewInput {
@@ -70,6 +93,28 @@ export interface ReasoningReviewInput {
 	 * what keeps the package DAG intact (this package may not import the engine).
 	 */
 	readonly criteria: readonly AssessmentCriterion[];
+	/**
+	 * ⭐ WHAT THE REVIEWER IS BEING TOLD IT IS LOOKING AT — declared by the CALLER, never inferred from the subject.
+	 *
+	 * ⛔ IT USED TO BE INFERRED, AND THE INFERENCE WAS BINARY. Both reviewers tested
+	 * `subject.objectType === 'ARTIFACT'` and treated the FALSE arm as "a PWA graph export" — so every subject
+	 * kind that was neither took the graph arm SILENTLY. `JAN-EXEC` Phase 5 measured the consequence: an
+	 * `EVIDENCE` subject carrying a process result was handed to a reviewer told it was reading a canonical graph
+	 * export, and the offline arm returned INCONCLUSIVE, which BLOCKS. A reviewer misdescribed to is worse than
+	 * no reviewer, because the result is recorded as a review.
+	 *
+	 * ⭑ REQUIRED, FOR THE REASON `criteria` IS, AND A CLOSED UNION FOR A SECOND REASON. Required, so a caller
+	 * that cannot say what it is reviewing fails the BUILD rather than quietly inheriting someone else's framing.
+	 * Closed, so a FOURTH subject kind is a compile-time hole in every reviewer's exhaustive switch instead of a
+	 * silent fall-through — which is exactly how the third kind arrived.
+	 *
+	 * ⚠ `ASR-4` BOUNDS WHAT THIS MAY VARY: policy meaning is stable across validator replacement, so this changes
+	 * how the review is CONDUCTED and NEVER what the policy means. The rubric stays `criteria`, above, read from
+	 * the one `floor.reasoning-review` policy object. A second rubric here would be `REG-F-353`'s restated
+	 * vocabulary — and, because `ValidatorResult.policyId` is typed `FloorPolicyId`, it would also be recorded
+	 * citing a policy that did not supply it (`R14`).
+	 */
+	readonly framing: ReviewFraming;
 	readonly prompt: string;
 	readonly content: string;
 	/** The producer's contracted §9.7 deliverable. Undefined means the producer did not discharge that half of its
@@ -80,6 +125,23 @@ export interface ReasoningReviewInput {
 	 *  reviews, so this is admissible — but it is weaker than the contracted account and is never the producer's
 	 *  interior (§9.7). Formerly `plan`, which was scraped narration standing in for the deliverable above. */
 	readonly narration?: string;
+	/**
+	 * ⭐ WHAT THE ADAPTER OBSERVED THE SESSION DO — the independent half of a `PROCESS_RESULT` review (`R15`).
+	 *
+	 * ⛔ THIS IS NOT `narration`, AND FILING IT THERE WOULD HAVE BEEN A CATEGORY ERROR. `narration` is the
+	 * PRODUCER's observable trace — the model's own account, weaker than its contracted one. This is the
+	 * ADAPTER's: the party that DROVE the session reporting what it watched start and finish. `§22.1` classifies
+	 * model output as untrusted external input, so the whole value of this field is that its author is not the
+	 * model. Writing it into a producer-owned field would have destroyed exactly that.
+	 *
+	 * ⚠ IT CARRIES NO ARGUMENT, RESULT, EXIT CODE OR OUTPUT BYTE, BY CONSTRUCTION (`R11`). What a reviewer can
+	 * ask of it is whether the producer's ACCOUNT squares with the calls that were SEEN — not what they printed.
+	 * The verdict lives on the content plane and reaches the review as `content`.
+	 *
+	 * Optional, because an adapter that cannot observe must be able to say so through `observation`, and a
+	 * framing that is not `PROCESS_RESULT` has nothing to put here.
+	 */
+	readonly observedToolCalls?: ObservedToolCallReport;
 	readonly prior?: { readonly gaps: readonly string[] };
 }
 export interface ValidatorContext {

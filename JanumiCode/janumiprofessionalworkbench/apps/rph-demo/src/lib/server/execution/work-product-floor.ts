@@ -165,6 +165,9 @@ export async function runWorkProductFloor(
 		identityProvenance: facts.identityProvenance,
 		reasoningReview: {
 			criteria: opts.criteria,
+			// ⭑ `R14` — DECLARED BY THE CALLER, so the reviewer is told what it is looking at rather than having it
+			// inferred from `subject.objectType`. The inference was BINARY, and Phase 5 measured what that costs.
+			framing: 'WORK_PRODUCT',
 			// ⭑ THE REVIEWER JUDGES THE SAME PAIR THE PRODUCER SAW — the prompt that was given and the answer
 			// that came back. Handing it a summary would make the judgement about the summary.
 			prompt: subject.producingPrompt,

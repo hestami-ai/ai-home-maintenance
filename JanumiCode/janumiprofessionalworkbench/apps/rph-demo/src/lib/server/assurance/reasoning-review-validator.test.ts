@@ -17,9 +17,11 @@ import {
 	REASONING_REVIEW_CRITERIA,
 	type AssuranceSubject,
 	type ProfessionalRationaleSummary,
+	type ReviewFraming,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import { describe, expect, it } from 'vitest';
+import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 import { createExchangeSink } from './exchange-capture.js';
@@ -84,12 +86,19 @@ const ctx = (
 		content: string;
 		/** ⭑ JAN-OUTCONTRACT — the producing INSTRUCTION, which is where the type's outputContract now rides. */
 		prompt: string;
+		framing: ReviewFraming;
+		observedToolCalls: ObservedToolCallReport;
 	}> = {}
 ): ValidatorContext => ({
 	reasoningReview: {
 		// The policy's criteria AS SEEDED — what the store holds, which is what the composition root reads and
 		// threads in. Not the `REASONING_REVIEW_CRITERIA` constant: the rubric and the score are the POLICY's now.
 		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+		// ⭐ `R14` — DEFAULTED HERE ONLY BECAUSE MOST OF THIS FILE'S TESTS PREDATE THE THIRD FRAMING AND ARE
+		// ABOUT SOMETHING ELSE ENTIRELY (identity, sanitisation, capture). The framing tests below all pass it
+		// EXPLICITLY; nothing that asserts about a framing relies on this default.
+		framing: over.framing ?? ('PWA_GRAPH' as const),
+		...(over.observedToolCalls ? { observedToolCalls: over.observedToolCalls } : {}),
 		prompt: over.prompt ?? 'Author a product realization PWA',
 		content: over.content ?? '{"pwuTypes":[{"id":"t1"}]}',
 		narration: over.narration ?? '',
@@ -397,7 +406,32 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 
 	const ARTIFACT: AssuranceSubject = { ...SUBJECT, objectType: 'ARTIFACT' };
 
-	async function promptFor(subject: AssuranceSubject): Promise<string> {
+	// ⭐⭐ `R14` (2026-09-17) — THESE TESTS WERE RE-POINTED, AND THE RE-POINTING IS THE POINT.
+	//
+	// ⛔ EVERY TEST BELOW USED TO SELECT ITS FRAMING BY PASSING A DIFFERENT **SUBJECT**, because the validator
+	// read `subject.objectType === 'ARTIFACT'`. That test was BINARY, so the graph arm was not a framing anyone
+	// chose — it was where everything ELSE landed. `JAN-EXEC` Phase 5 measured the cost: an `EVIDENCE` subject
+	// carrying a command result was told it was a canonical graph export, and the offline arm returned
+	// INCONCLUSIVE, which BLOCKS. ⭑ The framing is now DECLARED on the input and the switch is exhaustive, so
+	// these tests drive the DECLARATION. Each pins exactly the property it always pinned; what changed is that
+	// a THIRD framing exists and every loop below runs over all three rather than over "the two there were".
+	const FRAMINGS = ['WORK_PRODUCT', 'PWA_GRAPH', 'PROCESS_RESULT'] as const;
+
+	/** One `run_command` the host watched complete — the ordinary `PROCESS_RESULT` arrangement. */
+	const OBSERVED_ONE_COMMAND: ObservedToolCallReport = {
+		observation: 'OBSERVED',
+		calls: [
+			{ ordinal: 1, nameProvenance: 'MINTED_BY_HOST', toolName: 'run_command', outcome: 'COMPLETED' }
+		],
+		observedCount: 1,
+		recordedLimit: 32
+	};
+
+	async function promptFor(
+		subject: AssuranceSubject,
+		framing: ReviewFraming = 'PWA_GRAPH',
+		observedToolCalls?: ObservedToolCallReport
+	): Promise<string> {
 		let seen = '';
 		const capture: AgyPrint = async (p: string) => {
 			seen = p;
@@ -405,44 +439,142 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 		};
 		await createAgyReasoningReviewValidator({ print: capture, modelId: JUDGE }).evaluate(
 			subject,
-			ctx()
+			ctx({ framing, ...(observedToolCalls ? { observedToolCalls } : {}) })
 		);
 		return seen;
 	}
 
-	it('⭑ an ARTIFACT subject is described as a WORK PRODUCT, never as a graph export', async () => {
-		// THE MUTANT: keep one framing for both. The reviewer is then told a work product is a canonical graph
+	it('⭑ a WORK_PRODUCT framing is described as a WORK PRODUCT, never as a graph export', async () => {
+		// THE MUTANT: keep one framing for all. The reviewer is then told a work product is a canonical graph
 		// export, and its judgement is made against a description of something else.
-		const p = await promptFor(ARTIFACT);
+		const p = await promptFor(ARTIFACT, 'WORK_PRODUCT');
 		expect(p).toMatch(/WORK PRODUCT/);
 		expect(p, 'a work product is not a graph export').not.toMatch(/canonical graph export/);
 	});
 
-	it('⭑ CONTROL — a PWA subject KEEPS the graph framing, so this is routing and not replacement', async () => {
+	it('⭑ CONTROL — a PWA_GRAPH framing KEEPS the graph wording, so this is routing and not replacement', async () => {
 		// Without this, "describe everything as a work product" passes the test above — and the authoring
 		// floor's reviewer would silently be told it is reading something it is not.
-		const p = await promptFor(SUBJECT);
+		const p = await promptFor(SUBJECT, 'PWA_GRAPH');
 		expect(p).toMatch(/canonical graph export/);
 		expect(p).not.toMatch(/WORK PRODUCT/);
 	});
 
-	it('⚠ BOTH framings still render rationale and narration — §9.7: absence is never a signal', async () => {
+	it('⭐ a PROCESS_RESULT framing says the RESULT carries no reasoning of its own — `R15`', async () => {
+		// THE MUTANT THIS PINS IS THE ONE PHASE 5 FOUND IN PRODUCTION: route a command result to the graph arm.
+		// The reviewer would be told a build log is a canonical graph export. It must instead be told what it
+		// actually is, AND told that the child process is not the party whose reasoning is under review.
+		const p = await promptFor(ARTIFACT, 'PROCESS_RESULT');
+		expect(p).toMatch(/COMMAND RESULT/);
+		expect(p, 'a command result is not a graph export').not.toMatch(/canonical graph export/);
+		expect(
+			p,
+			'⛔ the reviewer must be told the producer of these bytes has no reasoning to review'
+		).toMatch(/carries no reasoning of its own/);
+	});
+
+	it('⭐ CONTROL — and the OTHER two framings never say COMMAND RESULT, so the third arm is routing too', async () => {
+		// Without this, "describe everything as a command result" passes the test above. This is the same
+		// discrimination the graph control performs, extended to the arm Phase 5 added.
+		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH'] as const)
+			expect(await promptFor(ARTIFACT, f), f).not.toMatch(/COMMAND RESULT/);
+	});
+
+	it('⭐ `R15` — a PROCESS_RESULT prompt carries the HOST\'s observation, and says whose it is', async () => {
+		// §22.1 makes the agent's account untrusted external input, so the ONLY thing that makes this review
+		// possible is that the call list comes from a different party. THE MUTANT: render it without saying
+		// whose it is — the reviewer would then read the host's observation as more of the agent's own account,
+		// and the one independent half of the join would be gone.
+		const p = await promptFor(ARTIFACT, 'PROCESS_RESULT', OBSERVED_ONE_COMMAND);
+		expect(p).toMatch(/What the HOST — not the agent — observed/);
+		expect(p, 'the call the host watched must be named').toMatch(/run_command — COMPLETED/);
+		expect(
+			p,
+			'⚠ COMPLETED must not be readable as "the command passed"'
+		).toMatch(/COMPLETED means the CALL completed/);
+	});
+
+	it('⭐⛔ the THREE observation members never collapse into one another — `R11`\'s discriminator, in a prompt', async () => {
+		// ⛔ THIS IS THE DEFECT `R11` MINTED THE DISCRIMINATOR TO PREVENT, arriving one layer over. A prompt is
+		// where "nothing could look" and "something looked and saw none" would quietly become the same sentence,
+		// because BOTH have an empty call list. THE MUTANT: render `calls ?? []` for every member. The reviewer
+		// would then be told a measurement was taken when none was, and the join would report a contradiction
+		// the host never observed.
+		const notObservable = await promptFor(ARTIFACT, 'PROCESS_RESULT', {
+			observation: 'NOT_OBSERVABLE',
+			reason: 'the backing tool returned only an answer string'
+		});
+		expect(notObservable).toMatch(/NOT IN A POSITION TO OBSERVE/);
+		expect(notObservable, 'draw no conclusion from an absence of observation').toMatch(
+			/Draw no conclusion/
+		);
+
+		const noneObserved = await promptFor(ARTIFACT, 'PROCESS_RESULT', {
+			observation: 'NONE_OBSERVED'
+		});
+		expect(noneObserved).toMatch(/WATCHED and observed NO tool calls/);
+		expect(
+			noneObserved,
+			'⛔ an observation of absence must not read as an absence of observation'
+		).not.toMatch(/NOT IN A POSITION TO OBSERVE/);
+
+		expect(
+			notObservable,
+			'⛔ and the converse: nothing could look, so nothing may be said about what ran'
+		).not.toMatch(/WATCHED and observed NO tool calls/);
+	});
+
+	it('⚠ a truncated call list SAYS it is truncated, so the reviewer cannot read 32 as the whole', async () => {
+		// The record-plane cap is 32 (`R11`). A reviewer handed the first 32 of 40 calls with no note would be
+		// reading a PREFIX as a complete account of the turn — the fabricated-completeness defect
+		// `omittedRegions` exists to prevent, one plane over.
+		const p = await promptFor(ARTIFACT, 'PROCESS_RESULT', {
+			observation: 'OBSERVED',
+			calls: [
+				{ ordinal: 1, nameProvenance: 'MINTED_BY_HOST', toolName: 'run_command', outcome: 'COMPLETED' }
+			],
+			observedCount: 40,
+			recordedLimit: 32
+		});
+		expect(p).toMatch(/40 calls were observed; only the first 32 are listed/);
+	});
+
+	it('⭐ CONTROL — and the other two framings carry NO observation section, so it is not unconditional', async () => {
+		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH'] as const)
+			expect(await promptFor(ARTIFACT, f), f).not.toMatch(/observed the session do this turn/);
+	});
+
+	it('⚠ ALL THREE framings still render rationale and narration — §9.7: absence is never a signal', async () => {
 		// An executing model declares no rationale, so these sections render "(none recorded)". THE MUTANT: drop
 		// them for work products. The reviewer's INPUT SHAPE would then encode whether the producer said
 		// anything, which is exactly what §9.7 forbids the reviewer from being able to see.
-		for (const s of [ARTIFACT, SUBJECT]) {
-			const p = await promptFor(s);
-			expect(p).toMatch(/PROFESSIONAL RATIONALE SUMMARY/);
-			expect(p).toMatch(/observable narration/);
+		for (const f of FRAMINGS) {
+			const p = await promptFor(ARTIFACT, f);
+			expect(p, f).toMatch(/PROFESSIONAL RATIONALE SUMMARY/);
+			expect(p, f).toMatch(/observable narration/);
 		}
 	});
 
-	it('⭑ and the rubric ids come from the POLICY in both framings, not from a second rubric', async () => {
+	it('⭑ and the rubric ids come from the POLICY in ALL THREE framings, not from a second rubric', async () => {
 		// `ASR-4`: policy meaning is stable across validator replacement — what varies with the subject is how
 		// the review is CONDUCTED, never what the policy means. THE MUTANT: invent a work-product rubric here.
 		// `coerceJudgement` would then drop every finding as unrecognised, and the review would silently pass.
+		// ⭐ `R14` DECLINED a second rubric for the process-result arm on exactly this ground, so this loop is
+		// now the guard on that ruling and not only on the original two.
 		const first = SEEDED_REASONING_REVIEW_CRITERIA[0]!.id;
-		for (const s of [ARTIFACT, SUBJECT]) expect(await promptFor(s)).toContain(first);
+		for (const f of FRAMINGS) expect(await promptFor(ARTIFACT, f), f).toContain(first);
+	});
+
+	it('⭐ ⛔ THE SUBJECT NO LONGER DECIDES — the same subject, two framings, two different prompts', async () => {
+		// ⭑ THIS IS THE RULING ITSELF, AS AN ASSERTION. Before `R14` the framing was a function of
+		// `subject.objectType`, so this test could not have been written: one subject had exactly one framing.
+		// THE MUTANT: restore the inference. Both calls would then produce the SAME prompt, because the subject
+		// is identical — and the process-result arm would be unreachable for any subject that is not an ARTIFACT.
+		const asWorkProduct = await promptFor(ARTIFACT, 'WORK_PRODUCT');
+		const asProcessResult = await promptFor(ARTIFACT, 'PROCESS_RESULT');
+		expect(asWorkProduct).not.toEqual(asProcessResult);
+		expect(asWorkProduct).toMatch(/WORK PRODUCT/);
+		expect(asProcessResult).toMatch(/COMMAND RESULT/);
 	});
 });
 

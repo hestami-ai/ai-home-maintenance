@@ -14,6 +14,7 @@
 // — reasoned fail-closed on missing INPUT, silent fail-open on unreadable CONTENT — and its own header claims
 // "an invalid one is REJECTED", which was a behaviour the code did not have.
 import { describe, expect, it } from 'vitest';
+import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
 import { REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
@@ -23,7 +24,12 @@ const SUBJECT = { id: 'pwa-1', semanticVersion: 1 };
 async function judgeContent(content: string) {
 	const v = createMockReasoningReviewValidator();
 	return v.evaluate(SUBJECT as never, {
-		reasoningReview: { content, criteria: REASONING_REVIEW_CRITERIA, prompt: 'x' }
+		reasoningReview: {
+			content,
+			criteria: REASONING_REVIEW_CRITERIA,
+			framing: 'PWA_GRAPH',
+			prompt: 'x'
+		}
 	} as never);
 }
 
@@ -81,5 +87,133 @@ describe('mock Reasoning Review — fail CLOSED on an unreadable subject', () =>
 		// assertions above while destroying the gate.
 		const r = await judgeContent(VALID_GRAPH);
 		expect(r.dispositionRecommendation).toBe('SATISFIED');
+	});
+});
+
+
+// ── ⭐⭐ `JAN-EXEC` PHASE 5 / `R14`+`R15` — THE PROCESS-RESULT ARM, AND THE BLOCK IT REPLACES ──────────────
+//
+// ⛔ WHAT THESE TESTS WOULD HAVE MEASURED BEFORE `R14`, AND IT IS WHY PHASE 5 WAS RE-SPECIFIED. The selector was
+// `subject.objectType === 'ARTIFACT'` with the GRAPH as its false arm, so a command result took the graph arm,
+// failed `JSON.parse`, and returned `unreadable()` → INCONCLUSIVE. INCONCLUSIVE BLOCKS. Every one of the tests
+// below would have returned INCONCLUSIVE with a limitation naming a PWA graph export — a step that could never
+// complete, arrived at by telling a reviewer it was reading something it was not.
+//
+// ⭑ AND THE ARM PERFORMS ONE CHECK, WHICH IS THE ONLY ONE §22.1 LICENSES OFFLINE: the agent's account is
+// untrusted, the HOST's observation is not, and the review is the JOIN. It does NOT grade the command — there is
+// no model reasoning in an exit code.
+describe('⭐ JAN-EXEC Phase 5 — the PROCESS_RESULT arm joins the agent\'s result to the HOST\'s observation', () => {
+	const RESULT = 'exit 0 in 89ms\n--- stdout ---\n12 passed\n--- stderr ---\n';
+
+	async function judgeProcess(content: string, observed?: ObservedToolCallReport) {
+		return createMockReasoningReviewValidator().evaluate(SUBJECT as never, {
+			reasoningReview: {
+				content,
+				criteria: REASONING_REVIEW_CRITERIA,
+				framing: 'PROCESS_RESULT',
+				prompt: 'Build the CLI and run its tests',
+				...(observed ? { observedToolCalls: observed } : {})
+			}
+		} as never);
+	}
+
+	const OBSERVED = (outcome: 'COMPLETED' | 'REFUSED' | 'FAILED' | 'UNKNOWN'): ObservedToolCallReport => ({
+		observation: 'OBSERVED',
+		calls: [{ ordinal: 1, nameProvenance: 'MINTED_BY_HOST', toolName: 'run_command', outcome }],
+		observedCount: 1,
+		recordedLimit: 32
+	});
+
+	it('⭐ A COMMAND RESULT THE HOST WATCHED COMPLETE IS SATISFIED — and this is the red the phase turns on', async () => {
+		// ⛔ BEFORE `R14` THIS RETURNED `INCONCLUSIVE`, because an EVIDENCE subject took the graph arm and a test
+		// log is not a graph export. INCONCLUSIVE blocks, so the completion this phase exists to permit could
+		// never have happened. THE MUTANT: restore the binary selector.
+		const r = await judgeProcess(RESULT, OBSERVED('COMPLETED'));
+		expect(r.dispositionRecommendation, JSON.stringify(r.limitations)).toBe('SATISFIED');
+	});
+
+	it('⚠ and it RECORDS what it did not check, so a structural join is not read as a semantic review', async () => {
+		// THE MUTANT: return SATISFIED with empty limitations. The floor would then record that a build was
+		// REASONING-REVIEWED when what happened is that two counts agreed. `ASR-11` requires a valid result to
+		// identify its limitations, and this is the one that matters.
+		const r = await judgeProcess(RESULT, OBSERVED('COMPLETED'));
+		expect(r.limitations.length).toBeGreaterThan(0);
+		expect(r.limitations.join(' ')).toMatch(/did NOT read the command/);
+	});
+
+	it('⛔ THE JOIN — a result exists while the host observed NO calls is a CONTRADICTION, and BLOCKS', async () => {
+		// §22.1: the model's word is untrusted external input. A command result under review means a command
+		// ran; if the party that DROVE the session watched and saw nothing, the two disagree and the result is
+		// not evidence of anything. THE MUTANT: treat NONE_OBSERVED as "no information" and pass.
+		const r = await judgeProcess(RESULT, { observation: 'NONE_OBSERVED' });
+		expect(r.dispositionRecommendation).toBe('REJECTED');
+		expect(r.observations.map((o) => o.code)).toContain('RR-07-no-contradiction');
+		expect(r.observations[0]?.severity).toBe('BLOCKING');
+	});
+
+	it('⛔ and a call the host saw REFUSE cannot have produced a result either', async () => {
+		// The second limb of the same join, and it is separable: `NONE_OBSERVED` is an empty list, this is a
+		// NON-empty list in which nothing completed. THE MUTANT: check only `calls.length > 0`, which passes a
+		// turn where every call was refused — exactly the seam-working-correctly case, read as a success.
+		const r = await judgeProcess(RESULT, OBSERVED('REFUSED'));
+		expect(r.dispositionRecommendation).toBe('REJECTED');
+		expect(r.observations.map((o) => o.code)).toContain('RR-07-no-contradiction');
+		expect(r.observations[0]?.statement).toMatch(/NONE completed/);
+	});
+
+	it('⭐⛔ NOT_OBSERVABLE is INCONCLUSIVE and NEVER a pass — the two absences do not collapse', async () => {
+		// ⛔ THE DISTINCTION `R11` MINTED THE DISCRIMINATOR FOR. "Nothing could look" is not "something looked
+		// and saw none": the first supplies no independent half, so the only check this arm performs could not
+		// be performed. THE MUTANT: fold NOT_OBSERVABLE into NONE_OBSERVED — the review would then REJECT a
+		// perfectly good command result because the adapter happened to be a one-shot seam.
+		const r = await judgeProcess(RESULT, {
+			observation: 'NOT_OBSERVABLE',
+			reason: 'the backing tool returned only an answer string'
+		});
+		expect(r.dispositionRecommendation).toBe('INCONCLUSIVE');
+		expect(r.limitations.join(' ')).toMatch(/not in a position to observe/i);
+		expect(
+			r.observations,
+			'⛔ an unperformed check must record NO finding — a finding would attribute a failure to the subject'
+		).toHaveLength(0);
+	});
+
+	it('⚠ an ABSENT observation is also INCONCLUSIVE — absence of observation is not observation of absence', async () => {
+		const r = await judgeProcess(RESULT, undefined);
+		expect(r.dispositionRecommendation).toBe('INCONCLUSIVE');
+		expect(r.observations).toHaveLength(0);
+	});
+
+	it('⭑ a result that says NOTHING is BLOCKING, mirroring the work-product arm', async () => {
+		// THE MUTANT: pass an empty result because the counts agreed. A passing verdict would then rest on the
+		// result's EXISTENCE rather than on anything it says — `RR-04`, verbatim.
+		const r = await judgeProcess('   \n  ', OBSERVED('COMPLETED'));
+		expect(r.dispositionRecommendation).toBe('REJECTED');
+		expect(r.observations.map((o) => o.code)).toContain('RR-04-no-proxy-satisfaction');
+	});
+
+	it('⭐ CONTROL — the same bytes under the GRAPH framing are still INCONCLUSIVE, so this is ROUTING', async () => {
+		// ⛔ WITHOUT THIS, "teach the offline reviewer to pass a test log" would satisfy every assertion above
+		// while destroying the graph arm — and the graph arm is what the AUTHORING floor runs on. The same
+		// content, one field different, must still reach the old verdict.
+		const r = await createMockReasoningReviewValidator().evaluate(SUBJECT as never, {
+			reasoningReview: {
+				content: RESULT,
+				criteria: REASONING_REVIEW_CRITERIA,
+				framing: 'PWA_GRAPH',
+				prompt: 'x'
+			}
+		} as never);
+		expect(r.dispositionRecommendation).toBe('INCONCLUSIVE');
+		expect(r.limitations.join(' ')).toMatch(/pars/i);
+	});
+
+	it('⭐ CONTROL — and a GRAPH under the PROCESS_RESULT framing does NOT get the graph verdict', async () => {
+		// The converse routing control. A well-formed graph is SATISFIED on the graph arm; here it must be judged
+		// by the JOIN instead, which with no observation is INCONCLUSIVE. THE MUTANT: fall back to the graph arm
+		// whenever the content happens to parse — a content-sniffing selector, which is the inference `R14`
+		// removed, re-entering through the back door.
+		const r = await judgeProcess('{"nodes":[],"edges":[]}', undefined);
+		expect(r.dispositionRecommendation).toBe('INCONCLUSIVE');
 	});
 });

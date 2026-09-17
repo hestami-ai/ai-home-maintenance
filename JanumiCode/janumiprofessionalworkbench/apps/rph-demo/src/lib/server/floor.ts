@@ -358,6 +358,10 @@ export async function runPwaFloor(
 		reasoningReview: {
 			// The POLICY's criteria, read from the store — not a constant. See reasoningReviewCriteria().
 			criteria: reasoningReviewCriteria(engine),
+			// ⭑ `R14` — DECLARED, NOT INFERRED. This arm is the original framing and the one the reviewers used to
+			// reach as the FALSE half of a boolean; naming it means the graph arm is now chosen rather than
+			// defaulted into, which is what stopped a third subject kind arriving there silently.
+			framing: 'PWA_GRAPH',
 			prompt: opts.prompt,
 			content: JSON.stringify({
 				...graphExport,

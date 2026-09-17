@@ -7538,5 +7538,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-domain/src/execution.test.ts'],
 		why: 'PROMISE: §22.1 verbatim — “Revoked bindings cannot be used for new attempts” — decided ONCE, in the kernel, so its readers cannot disagree about it. WHO RELIES: three of them as of JAN-EXEC Phase 3 — bindingAuthorityVerdict on the START arrow, stepCapabilityRefusal on every TRY, and mintExecutionTools on the tool surface a model is handed. WHAT THE MUTATION DOES TO THEM: all three go permissive AT ONCE, from one line, and the whole of B-1 comes back through the predicate rather than through the call sites that were just fixed — a revoked binding runs steps and mints run_command again. ⛔ THE DENIED LIMB SURVIVES, which is what makes it the plausible edit rather than a deletion: the function still refuses something, still reads as a control, and the census still counts it as wired. ⚠ ITS VICTIM IS THE KERNEL UNIT, deliberately — the consumer suites have their own mutants (P3-k, P3-l), and a mutation of the shared DECISION must be caught where the decision lives, not only where it happens to be read.',
 		source: 'JAN-EXEC Phase 3 review B-1 — the §22.1 predicate acquired production callers'
+	},
+	{
+		id: "P5-a-the-binary-selector-restored",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\t\t\t\t\t\treturn judgeProcessResult(input.content, input.observedToolCalls);\n",
+		replace: "\t\t\t\t\t\treturn judge(input.content); // MUTANT: the binary selector, restored — a command result routed to the graph arm\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: a reviewer is told what it is ACTUALLY looking at, so its judgement is made against a description of THIS subject (`R14`). WHO RELIES: every AI-executed step whose evidence is a command result — which under `R15` is the only kind Phase 5 produces. WHAT THE MUTATION DOES TO THEM: the command result takes the PWA-graph arm, fails `JSON.parse`, and returns `unreadable()` → INCONCLUSIVE. INCONCLUSIVE BLOCKS, so the step can never complete — and the failure reads as “the reviewer could not read the subject” rather than “the host sent it to the wrong reviewer”. ⛔ THIS IS NOT HYPOTHETICAL: IT IS THE STATE PHASE 5 FOUND IN PRODUCTION, and the roadmap’s own specification rested on a code comment saying it could not happen. ⭑ SEVEN VICTIMS REDDEN AND SIX STAY GREEN, and which six matters: the graph-arm tests and the routing CONTROL hold, so this cannot be confused with “the offline reviewer stopped working”.",
+		source: "JAN-EXEC Phase 5 / R14 — the framing is DECLARED by the caller, never inferred from the subject"
+	},
+	{
+		id: "P5-b-the-two-absences-collapse",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\tif (!observed || observed.observation === 'NOT_OBSERVABLE')\n\t\treturn unreadable(\n\t\t\tobserved?.reason\n\t\t\t\t? `the host was not in a position to observe tool calls (${observed.reason}), so the agent’s account could not be checked against what actually ran`\n\t\t\t\t: 'the host reported nothing about tool calls, so the agent’s account could not be checked against what actually ran'\n\t\t);\n",
+		replace: "\tif (!observed || observed.observation === 'NOT_OBSERVABLE')\n\t\t// MUTANT: the two absences collapse — \"nothing could look\" is graded as \"something looked and saw none\"\n\t\treturn {\n\t\t\tfindings: [\n\t\t\t\t{\n\t\t\t\t\tcriterionId: 'RR-07-no-contradiction',\n\t\t\t\t\tfailed: true,\n\t\t\t\t\tstatement: 'A command result is under review and no tool call completed.',\n\t\t\t\t\tseverity: 'BLOCKING'\n\t\t\t\t}\n\t\t\t],\n\t\t\trecommendation: 'REJECTED'\n\t\t};\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: “nothing was in a position to look” and “something looked and saw none” are DIFFERENT FACTS, and `R11` minted the discriminator precisely so they could never be confused. WHO RELIES: every adapter that cannot observe — the one-shot seam says so in its own words — and every reader of a record stating that a command ran. WHAT THE MUTATION DOES TO THEM: a perfectly good command result produced under a BLIND adapter is REJECTED with a BLOCKING finding asserting that the result and the observation CONTRADICT each other — about an observation that was never made. ⛔ A FABRICATED MEASUREMENT WITH THE SUBJECT AS ITS VICTIM, and the direction matters: it does not let a bad result through, it condemns a good one on evidence that does not exist. ⭑ IT IS A CONSEQUENCE MUTATION, DELIBERATELY, AND THE FIRST FORMULATION WAS WRONG. Mutating the CONDITION to `if (!observed)` narrowed `observed` to `undefined`, so `observed?.reason` in the branch body became `never` and the mutant did not compile — the ARTIFACT kind this ledger’s header warns is indistinguishable from a genuine type-level guarantee, and which it forbids reclassifying as TYPE_PREVENTED. The condition is therefore kept exactly as written and the REFUSAL IT RETURNS is replaced, which is the systemic repair that header prescribes. ⚠ THE VICTIM ASSERTS THE LIMITATION TEXT AND THE OBSERVATION COUNT, not only the disposition: both absences sit near INCONCLUSIVE and only the message tells them apart.",
+		source: "JAN-EXEC Phase 5 / R15 — the join needs an INDEPENDENT half, and the absence of one is not a verdict"
+	},
+	{
+		id: "P5-c-a-refused-call-counts-as-a-completed-one",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\tconst completed = (observed.calls ?? []).filter((c) => c.outcome === 'COMPLETED').length;\n",
+		replace: "\tconst completed = (observed.calls ?? []).length; // MUTANT: any observed call counts, including ones the seam refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: a command result is corroborated ONLY by a call the host watched COMPLETE. WHO RELIES: the governed record that says a test suite ran, and every reader who takes that record at its word. WHAT THE MUTATION DOES TO THEM: a turn in which every call was REFUSED — a path that escaped the workspace, an argv that was not an argv, a runner that would not run — corroborates a result nothing produced. ⛔ AND A REFUSAL IS THE GOVERNED SEAM WORKING CORRECTLY, so this mutation converts the system’s own successful refusals into evidence that work was done. ⚠ THE `NONE_OBSERVED` LIMB STAYS GREEN under it, which is what makes it survivable-looking: the join still refuses SOMETHING, and a census would still count the check as wired.",
+		source: "JAN-EXEC Phase 5 / R15 — tool-call-observer.ts: COMPLETED means the CALL completed, never that the command passed"
+	},
+	{
+		id: "P5-d-the-host-observation-is-rendered-as-the-agents-own",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t? `\\nWhat the HOST — not the agent — observed the session do this turn:\\n\"\"\"${renderObservedCalls(input.observedToolCalls)}\"\"\"`\n",
+		replace: "\t\t\t\t? `\\nAlso recorded this turn:\\n\"\"\"${renderObservedCalls(input.observedToolCalls)}\"\"\"` // MUTANT: the observation is rendered without saying whose it is\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE: the reviewer can tell the AGENT’s word from the HOST’s observation — the only thing that makes a `PROCESS_RESULT` review possible at all. WHO RELIES: §22.1, which classifies model output as untrusted external input; the entire value of the call list is that its author is NOT the model. WHAT THE MUTATION DOES TO THEM: the reviewer reads the host’s independent observation as more of the agent’s own account, so the JOIN becomes the agent’s word checked against the agent’s word — and a review that cannot distinguish its two inputs records a corroboration it never performed. ⚠ THE SECTION STILL RENDERS AND EVERY CALL IS STILL LISTED, so a reader diffing the prompt sees only a shorter sentence.",
+		source: "JAN-EXEC Phase 5 / R15 — the reviewer must be told which half is whose"
+	},
+	{
+		id: "P5-e-the-truncated-call-list-reads-as-the-whole",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t? `\\n  (${report.observedCount} calls were observed; only the first ${report.recordedLimit} are listed.)`\n",
+		replace: "\t\t\t? '' // MUTANT: the cut is not declared, so a 32-call prefix reads as the whole turn\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE: a bounded list DECLARES its bound, so a prefix cannot be read as a complete account. WHO RELIES: `R11` capped the record plane at 32 calls, so a step that runs 40 commands has 8 the record never held. WHAT THE MUTATION DOES TO THEM: the reviewer is handed 32 of 40 calls with nothing saying so, and judges whether the agent’s account squares with “what ran” against a list that is silently incomplete — so an account describing the 35th command reads as a fabrication. ⛔ THE FABRICATED-COMPLETENESS DEFECT `omittedRegions` EXISTS TO PREVENT, arriving one plane over in a prompt rather than in a record. ⚠ IT FIRES ONLY ABOVE THE CAP, so every ordinary turn stays green and the mutation is invisible until the exact case it breaks.",
+		source: "JAN-EXEC Phase 5 / R11 — a bounded capture that does not declare its cut hands the caller a prefix which reads as the whole"
 	}
 ];

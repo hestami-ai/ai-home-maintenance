@@ -131,6 +131,7 @@ const FLOOR_SUBJECT: AssuranceSubject = {
 const FLOOR_CTX: ValidatorContext = {
 	reasoningReview: {
 		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+		framing: 'PWA_GRAPH' as const,
 		prompt: 'Author a product realization PWA',
 		// The sentinel rides in the CONTENT, so it reaches the model prompt the way real graph content does.
 		content: `{"pwuTypes":[{"id":"${SENTINEL}"}]}`,
