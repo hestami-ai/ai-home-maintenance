@@ -114,6 +114,7 @@ import { RecordPlaneNameSchema } from '@janumipwb/rph-contracts';
 import { canReuseBindingForNewAttempt, capabilityAuthorized } from '@janumipwb/rph-domain';
 import { planProcessRun, type ProcessRunner, type Workspace } from '@janumipwb/rph-ports';
 import type { ParamSpec, ToolRunResult } from '../agent/types.js';
+import type { ProcessRunObserver } from './process-run-observer.js';
 
 /**
  * How long a model-chosen command may run before the runner kills it.
@@ -136,6 +137,21 @@ const EXECUTION_COMMAND_TIMEOUT_MS = 120_000;
 export interface ExecutionToolPorts {
 	readonly workspace: Workspace;
 	readonly runner: ProcessRunner;
+	/**
+	 * ⭐⭐ `JAN-EXEC` PHASE 5 — WHERE A COMMAND'S OUTCOME GOES SO SOMETHING OUTSIDE THIS CLOSURE CAN SEE IT.
+	 *
+	 * ⛔ WITHOUT IT THE EXIT CODE OF A MODEL-RUN TEST SUITE EXISTED NOWHERE AFTER THE TURN ENDED, and that is
+	 * measured rather than argued: this file built its `ToolRunResult.data` from four scalars and dropped
+	 * `ProcessRunOutcome.retention` — the ONLY field naming the durable capture — on the floor, while the
+	 * tool-call observer's `since()` returns `{ name, outcome }` alone. So a test result could not become
+	 * evidence because nothing downstream could say what ran or what it exited with.
+	 *
+	 * ⚠ OPTIONAL, AND FOR A REASON THAT IS NOT CONVENIENCE: a host may legitimately mint `run_command` with no
+	 * intention of turning its results into evidence, and requiring the instrument would make every such caller
+	 * construct one to throw away. What is NOT optional is the honesty of the absence — a step that mints the
+	 * tool and supplies no observer produces no process evidence, rather than empty evidence.
+	 */
+	readonly processRuns?: ProcessRunObserver;
 }
 
 /**
@@ -272,7 +288,7 @@ const RUN_COMMAND: ExecutionToolTemplate = {
 		}
 	},
 	mint:
-		({ workspace, runner }) =>
+		({ workspace, runner, processRuns }) =>
 		async (args) => {
 			const argv = requiredStringArray(args, 'argv');
 			if (argv === undefined)
@@ -297,6 +313,28 @@ const RUN_COMMAND: ExecutionToolTemplate = {
 			// indistinguishable from a seam that refused to run anything — `ProcessRunOutcome`'s founding
 			// distinction, one layer up.
 			if (!outcome.ran) return { ok: false, summary: `Refused: ${outcome.refusedBecause}` };
+			// ⭐⭐ PHASE 5 — THE HOST RECORDS WHAT IT JUST RAN, BEFORE THE MODEL IS TOLD ANYTHING ABOUT IT.
+			//
+			// ⛔ ONLY THE `ran` ARM, AND THE POSITION IS THE ARGUMENT. A refusal produced no result, so there is
+			// nothing to evidence — reporting one would put the host's own refusal into the record as though a
+			// command had produced it, which inverts `ProcessRunOutcome`'s founding distinction.
+			//
+			// ⚠ THE STREAMS ARE PASSED THROUGH AS THE RUNNER BOUNDED THEM, never re-trimmed and never re-declared.
+			// They are the TRANSIENT copy; the durable PURGEABLE_AT_EXPIRY one is `outcome.retention`'s, carried
+			// beside them so a later mint can name BOTH and a purge can reach one. See `process-run-observer.ts`
+			// for why holding them here adds no retention surface that `materializedInputRef` did not already
+			// create — and for the bound this instrument puts on itself.
+			processRuns?.ran({
+				argv,
+				exitCode: outcome.exitCode,
+				timedOut: outcome.timedOut,
+				durationMs: outcome.durationMs,
+				outputComplete: outcome.outputComplete,
+				omittedRegions: outcome.omittedRegions,
+				retention: outcome.retention,
+				stdout: outcome.stdout,
+				stderr: outcome.stderr
+			});
 			// ⚠ THE STREAMS GO BACK AS THE RUNNER BOUNDED THEM, WITH ITS OWN DECLARED CUTS — never re-trimmed
 			// here. A second bound applied on top would be a second truncation with no declaration beside it,
 			// which is the fabricated-completeness defect `omittedRegions` exists to prevent.

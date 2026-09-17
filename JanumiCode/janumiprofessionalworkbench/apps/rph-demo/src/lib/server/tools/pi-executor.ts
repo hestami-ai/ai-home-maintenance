@@ -42,6 +42,7 @@ import { toPiToolResult } from '../agent/pi-tool-result.js';
 import { toTypeBox } from '../agent/pi-typebox.js';
 import { mintExecutionTools, type ExecutionToolDescriptor } from './execution-tool-surface.js';
 import { createToolCallObserver } from './tool-call-observer.js';
+import { createProcessRunObserver } from './process-run-observer.js';
 
 /**
  * Resolve the executing model. ⛔ NO FALLBACK CHAIN, and that is the difference from the authoring agent.
@@ -152,8 +153,14 @@ export async function openPiExecutionSession(
 	// been told anything, before a turn is taken, and before any exchange record is owed. The same argument
 	// `run-model-step.ts` makes for checking the binding *"before the prompt is rendered and before any model is
 	// called"* — a check that fires afterwards disclosed the harm afterwards.
+	// ⭐⭐ PHASE 5 — THE HOST'S SECOND INSTRUMENT, BESIDE `createToolCallObserver` AND DELIBERATELY NOT INSIDE IT.
+	// One watches the SESSION's event stream and holds what `R11` lets a PERMANENT record carry — an ordinal, a
+	// provenance, a name, an outcome. This one holds what a command actually produced, which is CONTENT-plane
+	// material that may never reach that record. Merging them would put an exit code one field away from a
+	// structure whose emptiness is a ratified guarantee.
+	const processRuns = createProcessRunObserver();
 	const tools = mintExecutionTools({
-		ports: { workspace: context.workspace, runner: context.runner },
+		ports: { workspace: context.workspace, runner: context.runner, processRuns },
 		grantedCapabilities: context.grantedCapabilities,
 		// ⛔ `B-1` — THE STATUS TRAVELS WITH THE LIST, because a REVOKED binding still lists what it granted.
 		bindingAuthorizationStatus: context.bindingAuthorizationStatus
@@ -225,6 +232,9 @@ export async function openPiExecutionSession(
 	return {
 		retainsHistory: true,
 		lastTurnObservation: () => lastTurn,
+		// ⭐ PHASE 5 — SESSION-SCOPED, LIKE THE TOOL-CALL OBSERVER AND FOR THE SAME REASON: a turn's runs are
+		// a SLICE of this, and slicing needs the whole. The caller reads it after the turn it cares about.
+		processRuns: () => processRuns.observed(),
 		dispose: () => session.dispose(),
 		async turn(text: string): Promise<ToolInvocationResult> {
 			let answer = '';

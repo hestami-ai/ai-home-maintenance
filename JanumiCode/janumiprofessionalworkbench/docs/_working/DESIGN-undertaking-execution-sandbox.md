@@ -87,6 +87,13 @@ recording is worth committing.
 | R9 | **The workspace boundary is ORGANISATIONAL now and SECURITY later** — the security tier belongs to the deployment environment, and the ports are the seam it supplies. Ruled 2026-09-14; see §4.8. |
 | R10 | **A CONTRACTED rationale IS `PER-8` participating material — permanent.** Retaining the whole envelope as the answer half is therefore correct, and the permanence is CHOSEN rather than inherited. Volunteered reasoning stays separated under `PURGEABLE_AT_EXPIRY` (`PER-12`), which is the half that rule protects. Ruled 2026-09-15; see §4.9. |
 | R11 | **`MODEL_EXCHANGE` gains BOTH the derivation link and the observed tool-call record, in ONE ratification act.** Ruled 2026-09-15; see §4.10. |
+| R12 | **`process-execution` SUBSUMES `file-system` and `network`** — a child process is not confined by anything userspace can assert, so the only narrowing that bounds anything is the reverse one. Ruled 2026-09-15; see §4.3b. |
+| R13 | **THE INTERPRETER IS NOT REFUSED — the fact is RECORDED instead.** Refusing `cmd.exe` while permitting `node -e` is theatre, and a later reader would mistake it for a containment property. Ruled 2026-09-15; see §4.3b. |
+| R14 | **A THIRD FRAMING, ONE RUBRIC.** The reasoning review over a process result gets its own arm in both validators beside `ARTIFACT` and the PWA graph; the criteria still come from `floor.reasoning-review`. `R6`'s substance is the SUBJECT, not the rubric — so `ASR-4`/`REG-F-353` hold and no record misnames what checked it. Ruled 2026-09-17; see §4.12. |
+| R15 | **`R6`'s SUBJECT IS THE EXISTING CONTRACTED RATIONALE, READ AGAINST THE ADAPTER'S OBSERVED TOOL CALLS.** The account already exists, is already permanent under `R10`, and needs no new producer and no untrusted-party field. Ruled 2026-09-17; see §4.12. |
+| R16 | **THE PARTICIPATING MINT IS A CONTENT-PLANE ADDRESS NAMED BY `EvidenceObject.contentReference` — NO SECOND `ARTIFACT` OBJECT.** A test log is not a work product. Ruled 2026-09-17; see §4.12. |
+| R17 | **TWO BLOCKING CODES, AND TRUNCATION IS NOT ONE OF THEM.** `PROCESS_OUTPUT_NOT_RETAINED` and `PROCESS_VERDICT_UNOBSERVED` block; a DECLARED prefix and an incomplete capture are recorded LIMITATIONS, because a declaration that travels with the bytes does not invalidate the exit code. Ruled 2026-09-17; see §4.12. |
+| R18 | **EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.** The host cannot tell which command was a test run, and a predicate over `argv` is the normaliser shape this seam has refused four times — so it records what it CAN say: it observed a command run and what it exited with. Calling `ls` a `TEST_RESULT` would be a claim about what the command WAS. Ruled 2026-09-17; see §4.13. |
 
 ---
 
@@ -294,9 +301,17 @@ repository can give it any.
 ### 4.4 The evidence join — a second floor run, over the evidence
 
 `proposedEvidenceIds` cannot simply be populated (B2). The evidence subject needs its own floor run.
-`work-product-floor.ts` opens by recording that the floor validators *"do not inspect their subject … they judge
+~~`work-product-floor.ts` opens by recording that the floor validators *"do not inspect their subject … they judge
 FACTS the caller supplies"* and that a run is *"a subject plus a context"* — so this is a **call site, not a
-redesign.**
+redesign.**~~
+
+⛔ **THAT PREMISE IS REFUTED, AND IT WAS REFUTED BY READING THE VALIDATOR RATHER THAN THE COMMENT ABOVE IT.**
+The comment is true of TWO of the three floor validators. The REASONING-REVIEW validator inspects
+`subject.objectType` — `judgePrompt(input, subject.objectType === 'ARTIFACT')` at
+`reasoning-review-validator.ts:298`, and the identical test at `mock-reasoning-review-validator.ts:176` — and the
+test is BINARY, so every subject that is not an `ARTIFACT` takes the **PWA-graph arm.** A `TEST_RESULT` would be
+handed to a reviewer told it is reading a canonical graph export, which is the misdescription
+`reasoning-review-validator.ts:80-85` exists to record having already been committed once. See §4.11.
 
 **R6 settles the limb that had no answer.** There is no model reasoning in `exitCode: 0` — the producer is `node`.
 So the reasoning review's subject is **the step's own reasoning**: the model's account of why it ran that command
@@ -568,3 +583,248 @@ that content is that its author is the HOST, which is a producer property the bo
 
 The full ruling, the driven evidence, the `W4` filing against `RPH-PER-010` and the `W5` correction are in
 ROADMAP §4g.
+
+
+---
+
+## 4.11 ⭐⭐ PHASE 5, AS MEASURED — the evidence join is a PRODUCER, not a call site, and the roadmap's own premise was the first casualty
+
+**HOW THIS WAS ESTABLISHED.** Six independent readers over the evidence lifecycle, the floor machinery, the
+process-run bytes, the review criteria, the guard obligations and the predicted red — 179 findings — then 40
+adversarial verifiers told to REFUTE every load-bearing claim rather than confirm it. **16 of the 40 were
+refuted**, including three of my own summary's. What follows is what survived that, with the refutations folded
+in rather than appended.
+
+### 4.11.1 ⭐ WHAT IS ALREADY TRUE, AND IT IS MORE THAN THE ROADMAP CREDITED
+
+⭑ **THE KERNEL GATE NEEDS NOTHING.** `completeExecutionStep` already unions the two id lists —
+`const resultIds = [...(p.outputArtifactIds ?? []), ...(p.proposedEvidenceIds ?? [])]` (`execution.ts:1397`) —
+resolves each to a stored object at its own version, and loops `floorGateBlock` over every one. `stepResultSubjects`
+**never reads `objectType` at all**, so an EVIDENCE id reaches the floor gate on exactly the same terms as an
+ARTIFACT id. The docblock above it already names Evidence as a legal subject, citing §8.4.
+
+⭑ **AND THE WHOLE SHAPE IS ALREADY DRIVEN AT BOOT — WHICH I HAD MISSED, AND A VERIFIER FOUND.** I wrote that all
+three `CompleteExecutionStep` sites in the demo pass `proposedEvidenceIds: []`. **There is a FOURTH**, in the
+reference undertaking the demo seeds unconditionally (`workbench.ts:145` → `seed-workbench.ts:464` →
+`reference-undertaking.ts:764-773`): a `MODEL_INVOCATION` step completing with `outputArtifactIds: []` and
+`proposedEvidenceIds: [evidenceId]`, its three floor policies recorded SATISFIED over the EVIDENCE subject first.
+Because `send` throws on any non-ACCEPTED result, that completion really did clear `floorGateBlock` with an
+EVIDENCE as the floor subject. ⚠ Its own comment records that it **BLOCKED on first run** — *"floor.schema-invariant=
+MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING"* — *"which is the gate working,
+against me, correctly."*
+
+⛔ **SO THE PRECEDENT IS NARROWER THAN IT LOOKS AND IT IS THE PART THAT MATTERS.** That seed **RECORDS** three
+SATISFIED verdicts by dispatching commands. It does not **RUN** a validator over anything. It proves the COMMAND
+SEQUENCE is admissible for an EVIDENCE subject; it proves nothing about whether any real validator can reach a
+verdict there. Phase 5's whole content is replacing a hand-recorded SATISFIED with a computed one.
+
+### 4.11.2 ⛔ THE BLOCKER THE EXTRACTION DOES NOT TOUCH — a third framing, not a second rubric
+
+An `objectType: 'EVIDENCE'` subject takes the **graph arm** of both reviewers. Under `testMode` — the arm the gate
+actually runs — `judge(content)` does `JSON.parse`, fails or finds no `nodes`, and returns
+`unreadable(…)` → **`INCONCLUSIVE`, which BLOCKS.** So *extract-and-call-twice* yields a step that can never
+complete, and the roadmap's stated PROOF (*"becomes ACCEPTED only once the evidence subject's own floor run is
+SATISFIED"*) is unreachable by construction.
+
+⭐ **AND THE FIX IS ALREADY RULED, IN THE FILE ITSELF, AGAINST THE SHAPE `R6` IS WORDED IN.**
+`reasoning-review-validator.ts:87-90`, verbatim:
+
+> ⚠ **TWO FRAMINGS, ONE RUBRIC.** The criteria still come FROM THE POLICY: `ASR-4` holds that policy meaning is
+> stable across validator replacement, so what varies with the subject is how the review is CONDUCTED, never
+> what the policy means. Inventing a second rubric here would be the restated-vocabulary defect `REG-F-353`
+> names — *"a second way to say one thing is how restated vocabulary comes to disagree."*
+
+⛔ **AND A MECHANICAL CONSTRAINT MAKES THE SECOND-RUBRIC READING NOT MERELY UNWISE BUT UNRECORDABLE.**
+`ValidatorResult.policyId` is typed `FloorPolicyId` (`floor.ts:101`) and `reasoningReviewResultFromJudgement`
+hard-codes `FLOOR_POLICY_IDS.REASONING_REVIEW` (`validators.ts:243`). So an authored process-result rubric would
+be **scored and recorded under `floor.reasoning-review`** — a policy object whose stored `criteria` are the nine
+`RR-*` strings. The governed record would name a policy that did not supply the rubric. ⭑ That is *"a policy that
+lies about what it checks"*, reached from the opposite direction by the increment that exists to stop it.
+
+⚠ **THERE IS A SECOND REASON AUTHORING MORE CRITERIA IS NOT THE CONTROL IT LOOKS LIKE.** `validators.ts:230` maps
+`outcome: f?.failed ? 'NOT_MET' : 'MET'` — **a criterion the judge never mentions is recorded MET.** There is no
+`UNABLE_TO_DETERMINE` arm even though the ratified enum has one and `ASR-9` forbids treating undeterminable as
+met. Authoring MORE criteria strictly ENLARGES the set that can be recorded MET without the judge having
+addressed them. And the rubric passes through `excerpt(…, RUBRIC_MAX)` while the SCORE does not, so a longer
+authored set silently drops criteria out of the prompt while still scoring them — and a dropped criterion is
+scored MET. Filed; not Phase 5's to fix, but it is why *"author criteria"* cannot be the whole answer.
+
+### 4.11.3 ⛔ `R6` NAMES A SUBJECT THAT HAS NO PRODUCER
+
+`R6`: *"the reasoning review's subject is the step's own reasoning: the model's account of why it ran that command
+and what the result means."* **MEASURED: that account does not exist as a field anywhere.** `run_command` takes
+one parameter (`argv`). `ObservedToolCall` is a strict object of four fields — ordinal, provenance, name, outcome
+— and carries no reason BY CONSTRUCTION (`R11`), with `additionalProperties: false` at both levels of the
+generated schema. The envelope's `rationale` is one account per model TURN and its declared subject is *"how the
+work product discharges the obligation in the instruction"* — not a command.
+
+⚠ A rubric interrogating content the reviewer is never handed is the reviewer-misdescription defect
+`reasoning-review-validator.ts:81-85` records having already been committed once. **So `R6` cannot be implemented
+as worded without first minting its subject**, and which way that goes is §4.11.6's first question.
+
+### 4.11.4 ⭐ WHICH OBJECT CARRIES A TEST RUN'S OUTPUT — the mechanism is already ruled; only the shape is open
+
+Ratification item 1 asked *"which OBJECT, having done what past-tense act, carries a test run's files and
+output."* ⭑ **The runner answers the mechanism itself, in its own header, naming this phase**
+(`process-runner.ts:91-93`):
+
+> ⛔ A later phase that PERSISTS the outcome must persist the REFERENCE and not the bytes, or it mints a second
+> retention surface under no declared class — which is this same defect one plane over.
+
+So the lawful move is **`ArtifactStore.put(bytes, 'RETAINED_BY_PARTICIPATION')` at the moment of participation**,
+never a re-label of the capture. ⭑ And the store makes that STRUCTURAL rather than disciplinary: the purgeability
+is part of the storage key, so the participating copy and the `PURGEABLE_AT_EXPIRY` capture are two stored
+objects and cannot collide. ⛔ Re-labelling the capture would retroactively falsify `R7` for every prior run.
+
+⚠ **BUT THE PATH FROM THE RUN TO THE STEP IS SEVERED, AND THIS IS THE REAL WORK OF PHASE 5.**
+`ProcessRunOutcome.retention` — the only field that names the durable bytes — **has no production consumer.**
+`RUN_COMMAND.mint` builds its `data` from `exitCode`, `timedOut`, `durationMs`, `outputComplete` and drops
+`retention` on the floor. The observer then discards even that: `since()` returns `{ name, outcome }` only, so
+**the exit code of a model-run test suite exists nowhere after the turn ends.** Phase 5 must widen the tool
+surface to carry the outcome out — which is a new seam, not a call site.
+
+### 4.11.5 ⛔ THE FACTS HALF DOES NOT PORT, AND IT IS OUTSIDE THE EXTRACTION RANGE THE ROADMAP NAMED
+
+The roadmap says extract `work-product-floor.ts:143-275`. `workProductFloorFacts` is at `:69-103` — **outside it**
+— and three of its facts are wrong for an evidence subject:
+
+| fact | how it is derived today | for a `TEST_RESULT` |
+| --- | --- | --- |
+| `schemaValid` | `splitAnswerSpan(subject.answer).located` — *is a model ANSWER SPAN locatable* | meaningless; and its violation code `WORK_PRODUCT_NOT_PARSEABLE` would be a **false statement about a non-work-product** |
+| `hasProducer` | `subject.artifact.producingPwuId && producerModelId` | `EvidenceObjectSchema` has no `producingPwuId` and cannot; the evidence field is `producedBy` |
+| `traceComplete` | `verifyExchangeContent` re-hashes the producing MODEL_EXCHANGE | a `node` run has no exchange — but under `R6` the reasoning under review is the MODEL'S, so the producing exchange IS the right one to re-hash |
+
+⛔ **AND THE VIOLATION CODES ARE NOT COSMETIC:** each member of `invariantViolations` becomes a BLOCKING
+observation code **verbatim**. That is ratification item 5, and it is reached by Phase 5's first line of code.
+
+⭑ **ONE THING IS FORCED AND NEEDS NO RULING: `isAiProduced` MUST BE `true`.** `deMinimisFloorPlan` includes the
+reasoning review only when it is, and `floorGateBlock` requires all three policies SATISFIED — so `false` yields
+`floor.reasoning-review = MISSING` and blocks. **Both arms of the apparent dilemma block; only one is honest.**
+Under `R6` the reasoning under review is the model's, so `producer.modelId` = the EXECUTING model is a true
+statement and `DIFFERENT_MODEL` against the judge is decidable. The dilemma dissolves *because* of `R6`, which is
+the second thing that ruling bought.
+
+### 4.11.6 ⚠ WHAT THE MEASUREMENT PUT TO THE SPONSOR
+
+1. **`R6` vs *"TWO FRAMINGS, ONE RUBRIC"*** — the roadmap says the criteria for a process result *"must be
+   authored, not defaulted"*; the validator records the opposite position on `ASR-4`/`REG-F-353` grounds, and the
+   `FloorPolicyId` type makes an authored rubric unrecordable without misnaming its policy (§4.11.2).
+2. **`R6`'s subject has no producer** (§4.11.3) — narrow the review to the EXISTING contracted rationale read
+   against the observed tool calls, or mint a per-command account (a `run_command` parameter, which puts an
+   untrusted party in charge of the record's reason).
+3. **Does the participating mint also become a governed `ARTIFACT` object**, or only an `EvidenceObject.contentReference`
+   naming the content-plane address? `execution-model-invocation.e2e.ts:140` asserts `snap.artifacts` is length 1,
+   so this is a deliberate red or a deliberate green, not something to discover.
+4. **The invariant-violation codes for a process result** (ratification item 5, §4.11.5).
+
+### 4.11.7 ⛔ THREE INSTRUMENT FINDINGS, FILED HERE BECAUSE PHASE 5 WOULD OTHERWISE RIDE ON THEM
+
+- ⛔ **`guards:export` WALKS `packages/` ONLY** (`export-guard.ts:245`). `apps/rph-demo` is outside the obligation
+  census entirely, and `apps/rph-demo` has **zero** entries in the per-file coverage floor baseline. So
+  extracting `runFloorOverSubject` in place satisfies **rule 7 vacuously** — the gate would be green and nothing
+  would have measured it. ⭑ Phase 5's guard must therefore be a REPORTED ROW from a named test, never a ratchet.
+- ⛔ **THE GATE'S OWN E2E IS BLIND TO THIS PHASE.** `execution-model-invocation.e2e.ts`'s floor assertion is
+  SUBJECT-SCOPED to the artifact, so a second floor run over an evidence subject **cannot redden it**. If Phase 5
+  ships and that spec stays green, the green proves nothing about the join.
+- ⛔ **`verif/evidence-gate-reachability.test.ts` CENSUSES TWO ARRAYS AND CALLS THEM PRODUCTION.** Its title says
+  *"no production evidence requirement gates ASSESSING"* while its sources are `FLOOR_POLICY_DEFINITIONS` and
+  `ontology.seedPolicies` only — blind to `DEMO_POLICY_PAYLOAD`, which a production route dispatches and which
+  declares a `requiredEvidence` item. **Production declares 14, not 13.** Not Phase 5's defect and not its fix;
+  recorded because Phase 5 was about to cite that census as a tripwire.
+- ⚠ **`floor-fixtures.ts:99-103` SEEDS THE FLOOR POLICIES WITHOUT `'EVIDENCE'`** —
+  `['PROFESSIONAL_WORK_ARCHITECTURE','PROFESSIONAL_WORK_UNIT','ARTIFACT']` — through the real handler. The two
+  PRODUCTION seeders derive all 31 types, so production admits an EVIDENCE subject and **that fixture refuses
+  it.** A Phase 5 test written into the `rph-application` execution-floor files would fail for a reason that has
+  nothing to do with Phase 5.
+
+
+---
+
+## 4.12 ⭐⭐ `R14`–`R17` (SPONSOR, 2026-09-17) — the four Phase 5 rulings, and what each one REMOVED
+
+⭑ **ALL FOUR TOOK THE NARROWER OPTION, AND THAT IS THE PATTERN WORTH NAMING.** Each ruling declined a change to
+a ratified or generated contract in favour of a change to how this host CONDUCTS the work. Together they take
+Phase 5 from *"a vocab change, a new floor policy, a new tool parameter and a second ARTIFACT"* to **one new
+validator arm, one new facts derivation, and one mint.**
+
+### `R14` — a third framing, one rubric
+
+The reasoning-review validators gain a **process-result arm** beside the `ARTIFACT` arm and the PWA-graph arm.
+⛔ **THE BINARY TEST IS WHAT MUST GO** — `subject.objectType === 'ARTIFACT'` with the graph as its false arm —
+because a two-valued test silently routes every FUTURE subject into the graph arm too. The replacement selects
+the framing by naming the subject, so a fourth subject kind is a compile-time hole rather than a silent
+misdescription.
+
+⭑ **AND THE RUBRIC DOES NOT MOVE.** The nine `RR-*` criteria still come from the `floor.reasoning-review` policy
+object, so `ValidatorResult.policyId` keeps telling the truth. ⚠ `R6` is honoured in the half that was always its
+content: **what the reviewer is told it is looking at**, which is `reasoning-review-validator.ts:80-85`'s own
+statement of why framing is not cosmetic.
+
+### `R15` — the account that already exists
+
+The reviewer is handed the model's **CONTRACTED rationale** (permanent under `R10`) and the **adapter's observed
+tool calls**, and asked whether the account squares with what was OBSERVED. ⭑ That is a real question with
+existing inputs, and it is the one §22.1 actually licenses: the account is the model's word, the call list is
+the ADAPTER's, and the review is the join. ⛔ **A `run_command` `purpose` parameter was declined** — it would make
+an untrusted party the author of the record's reason, and `R11` removed exactly that surface from the record
+plane by construction.
+
+### `R16` — one mint, on the plane that has a removal path
+
+`ArtifactStore.put(bytes, 'RETAINED_BY_PARTICIPATION')` → `{storageProvider, storageKey, contentHash, byteSize}`
+→ `EvidenceObject.contentReference`. ⭑ **NO second governed `ARTIFACT` object**, so
+`execution-model-invocation.e2e.ts:140`'s `snap.artifacts === 1` stays green **for the right reason** rather than
+by accident. ⚠ And the content hash is the part that earns its place: `ProcessOutputRetention` carries workspace
+PATHS and no hash, so an evidence record naming only the capture could only be BELIEVED — the same argument
+Phase 0 made for `WORK_PRODUCT_DERIVATION` carrying the whole address.
+
+### `R17` — what makes a process result unfit to be evidence at all
+
+| condition | disposition | why |
+| --- | --- | --- |
+| `retention.retained === false` | ⛔ `PROCESS_OUTPUT_NOT_RETAINED` — **BLOCKING** | the evidence would name bytes nobody kept |
+| `exitCode === null` or `timedOut` | ⛔ `PROCESS_VERDICT_UNOBSERVED` — **BLOCKING** | there is no verdict to evidence; `null` means terminated by a signal, and folding it into a number asserts a termination nobody observed |
+| `omittedRegions.length > 0` | ⚠ recorded LIMITATION | a DECLARED prefix travels with its declaration, so it does not invalidate the exit code |
+| `outputComplete === false` | ⚠ recorded LIMITATION | same: the guarantee that nothing more was coming is gone, the verdict is not |
+
+⭑ **THE LINE THE RULING DRAWS IS BETWEEN A SILENT PREFIX AND A DECLARED ONE**, which is precisely the
+distinction `omittedRegions` was built to carry — *"`REG-D-057` requires the omission be declared with enough
+structure to undo it, and a flag has none."* The runner's hazard sentence (*"a test result read off a SILENTLY
+truncated stdout is a pass nothing produced"*) is about the silent case, and this seam has no silent case.
+⛔ The strict reading was declined on measured grounds: capture is capped at 64 KiB per stream, so a real suite's
+output is routinely a declared prefix, and blocking on it would mean **no real test suite could ever produce
+admissible evidence.**
+
+
+---
+
+## 4.13 ⭐⭐ `R18` (SPONSOR, 2026-09-17) — the host records what it CAN say, and `evidenceType` is the place that discipline shows
+
+**THE QUESTION.** A step's model may run `npm ci`, then `npm test`, then `ls`. **Nothing tells the host which was
+the test run.** `ObservedToolCall` carries a tool NAME and `run_command` is one name for every command; the argv
+is content-plane and the host is not the party that chose it.
+
+**RULED: EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.**
+
+⭑ **`OBSERVATION` IS NOT A HEDGE — IT IS THE ACCURATE MEMBER.** What happened is that this host watched a
+command run and recorded what it exited with. `TEST_RESULT` is a claim about what the command WAS, and the only
+party who knows that is the untrusted one. ⛔ A predicate over `argv` — *does this look like a test command* — is
+a normaliser over text an untrusted party chose, which is the shape this seam has now refused in five
+consecutive rounds.
+
+⚠ **AND IT COSTS NOTHING BEHAVIOURALLY, WHICH IS WHY IT IS A RECORDS-HONESTY DECISION RATHER THAN A DESIGN ONE.**
+MEASURED: `evidenceType` appears in production at FOUR sites and **no production code branches on it** — not on
+`TEST_RESULT`, not on any member. `SubmitEvidenceForAssessment` carries it optionally and never compares it to
+the requirement's declared type. So the choice changes what the record SAYS and nothing else, which is precisely
+when getting it right is cheapest and mattering most.
+
+⛔ **EVERY COMPLETED RUN, INCLUDING ONES `R17` WILL BLOCK — AND THAT IS THE FAIL-CLOSED POSTURE, NOT AN OVERSIGHT.**
+A run whose output was not retained, or whose process was killed, is minted as evidence and then **refuses its
+own floor**. The alternative — minting only the runs that would pass — lets a step complete as though the killed
+command never happened. ⭑ That is the rule `unassessableAiContentBlock` already states one plane over: *AI-produced
+content may not enter the governed stream with nothing to assess.* A command that ran and cannot be assessed is
+exactly that, and `R17`'s codes exist so the block is LEGIBLE rather than mysterious.
+
+⚠ **THE COST, STATED: N COMMANDS MEANS N FLOOR RUNS AND N REVIEWER CALLS.** The bound is the observer's own
+(32, the same as `R11`'s record-plane cap), and a step that runs many commands pays for each. That is a
+resource question of the kind `W-2` already carries; it is not smoothed by minting fewer.

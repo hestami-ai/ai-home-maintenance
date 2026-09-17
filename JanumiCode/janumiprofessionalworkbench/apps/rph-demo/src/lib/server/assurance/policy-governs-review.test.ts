@@ -58,6 +58,7 @@ function capturing(reply: string) {
 const ctx = (criteria: readonly AssessmentCriterion[]): ValidatorContext => ({
 	reasoningReview: {
 		criteria,
+		framing: 'PWA_GRAPH' as const,
 		prompt: 'Author a product realization PWA',
 		content: '{"pwuTypes":[{"id":"t1"}]}',
 		narration: ''

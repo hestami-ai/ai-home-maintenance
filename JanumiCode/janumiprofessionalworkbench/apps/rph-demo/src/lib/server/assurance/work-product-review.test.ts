@@ -6,7 +6,11 @@
 // SATISFIED with zero findings, "a control that cannot fail, sitting inside the assurance floor".
 import { describe, expect, it } from 'vitest';
 import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
-import type { AssuranceSubject, ValidatorContext } from '@janumipwb/rph-assurance';
+import type {
+	AssuranceSubject,
+	ReviewFraming,
+	ValidatorContext
+} from '@janumipwb/rph-assurance';
 
 const CRITERIA = [
 	{ id: 'RR-01-no-problem-substitution', description: 'discharges its obligation' },
@@ -23,9 +27,17 @@ const ARTIFACT: AssuranceSubject = {
 
 const PROMPT = 'Assess the northern delivery route against the safety rubric.';
 
-async function review(content: string, subject: AssuranceSubject = ARTIFACT, prompt = PROMPT) {
+async function review(
+	content: string,
+	subject: AssuranceSubject = ARTIFACT,
+	prompt = PROMPT,
+	// ⭐ `R14` — THE SELECTOR MOVED OFF THE SUBJECT AND ONTO THE INPUT, so this parameter is what used to be
+	// `subject.objectType === 'ARTIFACT'`. The CONTROL below still proves the two arms are distinguishable; what
+	// changed is that reaching the graph arm is now a DECLARATION rather than the false half of a boolean.
+	framing: ReviewFraming = 'WORK_PRODUCT'
+) {
 	const ctx: ValidatorContext = {
-		reasoningReview: { criteria: CRITERIA, prompt, content }
+		reasoningReview: { criteria: CRITERIA, framing, prompt, content }
 	};
 	return createMockReasoningReviewValidator().evaluate(subject, ctx);
 }
@@ -97,7 +109,7 @@ describe('JAN-WPREVIEW — the offline reviewer judges a work product', () => {
 			artifacts: [],
 			roots: []
 		});
-		const r = await review(EMPTY_GRAPH, graph);
+		const r = await review(EMPTY_GRAPH, graph, PROMPT, 'PWA_GRAPH');
 
 		// ⚠ MY FIRST EXPECTATION HERE WAS WRONG, AND THE CODE WAS RIGHT: I asserted SATISFIED on the theory
 		// that an empty graph is "well-formed". `analyzePwaGraph` disagrees — a graph with no root is not

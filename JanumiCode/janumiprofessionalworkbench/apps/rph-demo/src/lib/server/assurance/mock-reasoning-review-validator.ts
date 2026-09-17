@@ -12,6 +12,7 @@ import {
 	type ReasoningReviewJudgement,
 	type Validator
 } from '@janumipwb/rph-assurance';
+import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 
 const EVALUATOR: Identity = {
 	actorType: 'AGENT',
@@ -158,6 +159,77 @@ function judgeWorkProduct(content: string, prompt: string): ReasoningReviewJudge
 	};
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` PHASE 5 / `R15` — THE OFFLINE ARM FOR A PROCESS RESULT, AND ITS SUBJECT IS NOT THE EXIT CODE.
+ *
+ * ⛔ THERE IS NO MODEL REASONING IN `exitCode: 0`; THE PRODUCER IS A CHILD PROCESS. So this arm does not grade
+ * the command. It performs the ONE check `§22.1` licenses and nothing else can: the agent's account is untrusted
+ * external input, the HOST's observation is not, and the review is the JOIN between them.
+ *
+ * ⭑ THE JOIN IS STRUCTURAL, WHICH IS WHY IT IS DECIDABLE OFFLINE. A process result is under review, so a command
+ * ran. If the host WATCHED and completed nothing, the subject's existence and the observation contradict each
+ * other — `RR-07-no-contradiction`, verbatim: *"No contradiction with intent, constraints, inputs, or evidence."*
+ *
+ * ⛔ AND IT DELIBERATELY DOES NOT MATCH TOOL NAMES OR READ THE ACCOUNT'S PROSE. Deciding whether a sentence
+ * *claims* a command ran is a predicate over arbitrary text — the normaliser shape this programme has refused in
+ * four consecutive rounds. `outcome === 'COMPLETED'` is a fact the host recorded about its own dispatch, and it
+ * is the whole of what is compared.
+ *
+ * ⚠ `NOT_OBSERVABLE` IS INCONCLUSIVE AND NOT A PASS. An adapter that could not look has supplied no independent
+ * half, so the only check this arm performs could not be performed. `unreadable()` already carries the rule this
+ * file records: a Validator that could not read its subject has not reviewed it.
+ */
+function judgeProcessResult(
+	content: string,
+	observed: ObservedToolCallReport | undefined
+): ReasoningReviewJudgement {
+	if (!observed || observed.observation === 'NOT_OBSERVABLE')
+		return unreadable(
+			observed?.reason
+				? `the host was not in a position to observe tool calls (${observed.reason}), so the agent’s account could not be checked against what actually ran`
+				: 'the host reported nothing about tool calls, so the agent’s account could not be checked against what actually ran'
+		);
+
+	const findings: ReasoningReviewFinding[] = [];
+
+	// ⭑ A RESULT THAT SAYS NOTHING, mirroring the work-product arm. A command result with no content conceals
+	// whether anything was run just as surely as an empty work product conceals whether work was done.
+	if (content.trim() === '')
+		findings.push({
+			criterionId: 'RR-04-no-proxy-satisfaction',
+			failed: true,
+			statement:
+				'The command result carries no content at all: nothing is recorded that could be reviewed, so a passing verdict would rest on the result’s existence rather than on anything it says.',
+			severity: 'BLOCKING'
+		});
+
+	// ⛔ THE JOIN. `NONE_OBSERVED` means the host WATCHED and saw nothing — it is not an absence of observation,
+	// and `R11` minted the discriminator so those two could never be confused here.
+	const completed = (observed.calls ?? []).filter((c) => c.outcome === 'COMPLETED').length;
+	if (observed.observation === 'NONE_OBSERVED' || completed === 0)
+		findings.push({
+			criterionId: 'RR-07-no-contradiction',
+			failed: true,
+			statement:
+				observed.observation === 'NONE_OBSERVED'
+					? 'A command result is under review, yet the host watched this turn and observed NO tool calls at all. The result and the host’s own observation contradict each other.'
+					: `A command result is under review, yet of the ${(observed.calls ?? []).length} tool call(s) the host observed, NONE completed. Nothing the host watched could have produced this result.`,
+			severity: 'BLOCKING'
+		});
+
+	if (findings.length > 0) return { findings, recommendation: 'REJECTED' };
+
+	return {
+		findings: [],
+		recommendation: 'SATISFIED',
+		// ⚠ THE LIMITATION IS WHAT KEEPS THE WORD HONEST, exactly as in the work-product arm. Without it a
+		// two-limb structural join is recorded as a passed REASONING review over a build.
+		limitations: [
+			`This review checked the JOIN only — that a command result exists and that the host observed ${completed} tool call(s) complete this turn, so the result and the observation do not contradict each other. It did NOT read the command’s output, did NOT judge whether the right command was run, and did NOT assess whether the agent’s account of why it ran is sound. A semantic review requires the configured reviewer model.`
+		]
+	};
+}
+
 export function createMockReasoningReviewValidator(): Validator {
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
@@ -169,13 +241,28 @@ export function createMockReasoningReviewValidator(): Validator {
 			// path that only the production adapter takes. A mock that quietly kept the constant would make the
 			// whole increment untested end-to-end (§13.3: fail closed on missing policy).
 			if (!input) throw new Error('reasoning-review context is missing');
-			// ⭑ ONE VALIDATOR, TWO ARMS — not a second registered validator. The POLICY is the same policy, and
+			// ⭑ ONE VALIDATOR, THREE ARMS — not three registered validators. The POLICY is the same policy, and
 			// `ASR-4` holds that "policy meaning is stable across validator replacement": what changes with the
 			// subject is how the review is conducted, never what the policy means.
-			const judgement =
-				subject.objectType === 'ARTIFACT'
-					? judgeWorkProduct(input.content, input.prompt)
-					: judge(input.content);
+			//
+			// ⛔ THE SELECTOR USED TO BE `subject.objectType === 'ARTIFACT'`, AND ITS FALSE ARM WAS THE GRAPH — so
+			// every subject kind that was neither took the graph arm SILENTLY, which for a process result meant a
+			// guaranteed INCONCLUSIVE and a permanently blocked step. `R14`: the CALLER declares the framing, and
+			// this switch is exhaustive, so a fourth kind is a type error here rather than a misdescription there.
+			const judgement = ((): ReasoningReviewJudgement => {
+				switch (input.framing) {
+					case 'WORK_PRODUCT':
+						return judgeWorkProduct(input.content, input.prompt);
+					case 'PROCESS_RESULT':
+						return judgeProcessResult(input.content, input.observedToolCalls);
+					case 'PWA_GRAPH':
+						return judge(input.content);
+					default: {
+						const _never: never = input.framing;
+						throw new Error(`Unknown review framing: ${String(_never)}`);
+					}
+				}
+			})();
 			return Promise.resolve(
 				reasoningReviewResultFromJudgement(
 					subject,

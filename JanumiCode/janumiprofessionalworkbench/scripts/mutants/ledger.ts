@@ -7538,5 +7538,158 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-domain/src/execution.test.ts'],
 		why: 'PROMISE: §22.1 verbatim — “Revoked bindings cannot be used for new attempts” — decided ONCE, in the kernel, so its readers cannot disagree about it. WHO RELIES: three of them as of JAN-EXEC Phase 3 — bindingAuthorityVerdict on the START arrow, stepCapabilityRefusal on every TRY, and mintExecutionTools on the tool surface a model is handed. WHAT THE MUTATION DOES TO THEM: all three go permissive AT ONCE, from one line, and the whole of B-1 comes back through the predicate rather than through the call sites that were just fixed — a revoked binding runs steps and mints run_command again. ⛔ THE DENIED LIMB SURVIVES, which is what makes it the plausible edit rather than a deletion: the function still refuses something, still reads as a control, and the census still counts it as wired. ⚠ ITS VICTIM IS THE KERNEL UNIT, deliberately — the consumer suites have their own mutants (P3-k, P3-l), and a mutation of the shared DECISION must be caught where the decision lives, not only where it happens to be read.',
 		source: 'JAN-EXEC Phase 3 review B-1 — the §22.1 predicate acquired production callers'
+	},
+	{
+		id: "P5-a-the-binary-selector-restored",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\t\t\t\t\t\treturn judgeProcessResult(input.content, input.observedToolCalls);\n",
+		replace: "\t\t\t\t\t\treturn judge(input.content); // MUTANT: the binary selector, restored — a command result routed to the graph arm\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: a reviewer is told what it is ACTUALLY looking at, so its judgement is made against a description of THIS subject (`R14`). WHO RELIES: every AI-executed step whose evidence is a command result — which under `R15` is the only kind Phase 5 produces. WHAT THE MUTATION DOES TO THEM: the command result takes the PWA-graph arm, fails `JSON.parse`, and returns `unreadable()` → INCONCLUSIVE. INCONCLUSIVE BLOCKS, so the step can never complete — and the failure reads as “the reviewer could not read the subject” rather than “the host sent it to the wrong reviewer”. ⛔ THIS IS NOT HYPOTHETICAL: IT IS THE STATE PHASE 5 FOUND IN PRODUCTION, and the roadmap’s own specification rested on a code comment saying it could not happen. ⭑ SEVEN VICTIMS REDDEN AND SIX STAY GREEN, and which six matters: the graph-arm tests and the routing CONTROL hold, so this cannot be confused with “the offline reviewer stopped working”.",
+		source: "JAN-EXEC Phase 5 / R14 — the framing is DECLARED by the caller, never inferred from the subject"
+	},
+	{
+		id: "P5-b-the-two-absences-collapse",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\tif (!observed || observed.observation === 'NOT_OBSERVABLE')\n\t\treturn unreadable(\n\t\t\tobserved?.reason\n\t\t\t\t? `the host was not in a position to observe tool calls (${observed.reason}), so the agent’s account could not be checked against what actually ran`\n\t\t\t\t: 'the host reported nothing about tool calls, so the agent’s account could not be checked against what actually ran'\n\t\t);\n",
+		replace: "\tif (!observed || observed.observation === 'NOT_OBSERVABLE')\n\t\t// MUTANT: the two absences collapse — \"nothing could look\" is graded as \"something looked and saw none\"\n\t\treturn {\n\t\t\tfindings: [\n\t\t\t\t{\n\t\t\t\t\tcriterionId: 'RR-07-no-contradiction',\n\t\t\t\t\tfailed: true,\n\t\t\t\t\tstatement: 'A command result is under review and no tool call completed.',\n\t\t\t\t\tseverity: 'BLOCKING'\n\t\t\t\t}\n\t\t\t],\n\t\t\trecommendation: 'REJECTED'\n\t\t};\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: “nothing was in a position to look” and “something looked and saw none” are DIFFERENT FACTS, and `R11` minted the discriminator precisely so they could never be confused. WHO RELIES: every adapter that cannot observe — the one-shot seam says so in its own words — and every reader of a record stating that a command ran. WHAT THE MUTATION DOES TO THEM: a perfectly good command result produced under a BLIND adapter is REJECTED with a BLOCKING finding asserting that the result and the observation CONTRADICT each other — about an observation that was never made. ⛔ A FABRICATED MEASUREMENT WITH THE SUBJECT AS ITS VICTIM, and the direction matters: it does not let a bad result through, it condemns a good one on evidence that does not exist. ⭑ IT IS A CONSEQUENCE MUTATION, DELIBERATELY, AND THE FIRST FORMULATION WAS WRONG. Mutating the CONDITION to `if (!observed)` narrowed `observed` to `undefined`, so `observed?.reason` in the branch body became `never` and the mutant did not compile — the ARTIFACT kind this ledger’s header warns is indistinguishable from a genuine type-level guarantee, and which it forbids reclassifying as TYPE_PREVENTED. The condition is therefore kept exactly as written and the REFUSAL IT RETURNS is replaced, which is the systemic repair that header prescribes. ⚠ THE VICTIM ASSERTS THE LIMITATION TEXT AND THE OBSERVATION COUNT, not only the disposition: both absences sit near INCONCLUSIVE and only the message tells them apart.",
+		source: "JAN-EXEC Phase 5 / R15 — the join needs an INDEPENDENT half, and the absence of one is not a verdict"
+	},
+	{
+		id: "P5-c-a-refused-call-counts-as-a-completed-one",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "\tconst completed = (observed.calls ?? []).filter((c) => c.outcome === 'COMPLETED').length;\n",
+		replace: "\tconst completed = (observed.calls ?? []).length; // MUTANT: any observed call counts, including ones the seam refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
+		why: "PROMISE: a command result is corroborated ONLY by a call the host watched COMPLETE. WHO RELIES: the governed record that says a test suite ran, and every reader who takes that record at its word. WHAT THE MUTATION DOES TO THEM: a turn in which every call was REFUSED — a path that escaped the workspace, an argv that was not an argv, a runner that would not run — corroborates a result nothing produced. ⛔ AND A REFUSAL IS THE GOVERNED SEAM WORKING CORRECTLY, so this mutation converts the system’s own successful refusals into evidence that work was done. ⚠ THE `NONE_OBSERVED` LIMB STAYS GREEN under it, which is what makes it survivable-looking: the join still refuses SOMETHING, and a census would still count the check as wired.",
+		source: "JAN-EXEC Phase 5 / R15 — tool-call-observer.ts: COMPLETED means the CALL completed, never that the command passed"
+	},
+	{
+		id: "P5-d-the-host-observation-is-rendered-as-the-agents-own",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t? `\\nWhat the HOST — not the agent — observed the session do this turn:\\n\"\"\"${renderObservedCalls(input.observedToolCalls)}\"\"\"`\n",
+		replace: "\t\t\t\t? `\\nAlso recorded this turn:\\n\"\"\"${renderObservedCalls(input.observedToolCalls)}\"\"\"` // MUTANT: the observation is rendered without saying whose it is\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE: the reviewer can tell the AGENT’s word from the HOST’s observation — the only thing that makes a `PROCESS_RESULT` review possible at all. WHO RELIES: §22.1, which classifies model output as untrusted external input; the entire value of the call list is that its author is NOT the model. WHAT THE MUTATION DOES TO THEM: the reviewer reads the host’s independent observation as more of the agent’s own account, so the JOIN becomes the agent’s word checked against the agent’s word — and a review that cannot distinguish its two inputs records a corroboration it never performed. ⚠ THE SECTION STILL RENDERS AND EVERY CALL IS STILL LISTED, so a reader diffing the prompt sees only a shorter sentence.",
+		source: "JAN-EXEC Phase 5 / R15 — the reviewer must be told which half is whose"
+	},
+	{
+		id: "P5-e-the-truncated-call-list-reads-as-the-whole",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t? `\\n  (${report.observedCount} calls were observed; only the first ${report.recordedLimit} are listed.)`\n",
+		replace: "\t\t\t? '' // MUTANT: the cut is not declared, so a 32-call prefix reads as the whole turn\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE: a bounded list DECLARES its bound, so a prefix cannot be read as a complete account. WHO RELIES: `R11` capped the record plane at 32 calls, so a step that runs 40 commands has 8 the record never held. WHAT THE MUTATION DOES TO THEM: the reviewer is handed 32 of 40 calls with nothing saying so, and judges whether the agent’s account squares with “what ran” against a list that is silently incomplete — so an account describing the 35th command reads as a fabrication. ⛔ THE FABRICATED-COMPLETENESS DEFECT `omittedRegions` EXISTS TO PREVENT, arriving one plane over in a prompt rather than in a record. ⚠ IT FIRES ONLY ABOVE THE CAP, so every ordinary turn stays green and the mutation is invisible until the exact case it breaks.",
+		source: "JAN-EXEC Phase 5 / R11 — a bounded capture that does not declare its cut hands the caller a prefix which reads as the whole"
+	},
+	{
+		id: "P5-f-a-result-is-well-formed-whatever-happened-to-it",
+		file: "apps/rph-demo/src/lib/server/execution/process-result-floor.ts",
+		find: "\t\t\tschemaValid: retained && verdict,\n",
+		replace: "\t\t\tschemaValid: true, // MUTANT: every command result is well-formed, whatever the run did\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts"],
+		why: "PROMISE: a command result is well-formed only when its bytes were KEPT and its verdict was SEEN (`R17`). WHO RELIES: `FS-01-schema`, whose `MET`/`NOT_MET` is one of the two mandatory criteria of `floor.schema-invariant`. WHAT THE MUTATION DOES TO THEM: `FS-01` reports MET for a run whose output nobody retained and whose process was killed by a signal — so the criterion that exists to say “this result is readable at all” becomes unable to say otherwise. ⛔ AND IT IS THE HALF THAT SURVIVES A CARELESS READING: `invariantViolations` still fires, `FS-02` still reports NOT_MET, and the floor still refuses — so the mutation looks harmless right up to the moment anything reads `schemaValid` on its own, which is what `FS-01` IS. ⚠ The victim therefore asserts BOTH fields on the same fact, because either alone is satisfied by half the implementation.",
+		source: "JAN-EXEC Phase 5 / R17 — two blocking codes, and a declared truncation is not one of them"
+	},
+	{
+		id: "P5-g-a-deadline-becomes-a-test-verdict",
+		file: "apps/rph-demo/src/lib/server/execution/process-result-floor.ts",
+		find: "\treturn run.exitCode !== null && !run.timedOut;\n",
+		replace: "\treturn run.exitCode !== null; // MUTANT: a process the host KILLED at its deadline still evidences a verdict\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts"],
+		why: "PROMISE: a verdict is something the RUN produced, not something the host's deadline produced (`R17`). WHO RELIES: every `TEST_RESULT` minted from a long suite — the host's timeout is 120 seconds and belongs to the host, so hitting it is a property of this deployment and not of the code under test. WHAT THE MUTATION DOES TO THEM: a suite killed at 120s carries the KILL's exit status into the governed record as though the tests had returned it. ⛔ ON WINDOWS A KILLED PROCESS OFTEN EXITS 1, SO THE USUAL READING IS “the tests failed” — a failing verdict nothing produced, which is `RULE 6`'s fabrication arriving through the timeout instead of through a no-op runner. ⚠ `exitCode !== null` ALONE LOOKS COMPLETE, and §36.2's TIMEOUT-vs-TOOL_FAILURE split is preserved everywhere ELSE in this file, which is exactly why the limb is easy to drop here.",
+		source: "JAN-EXEC Phase 5 / R17 — two blocking codes, and a declared truncation is not one of them"
+	},
+	{
+		id: "P5-h-an-evidence-object-names-its-producer-without-naming-a-model",
+		file: "apps/rph-demo/src/lib/server/execution/process-result-floor.ts",
+		find: "\t\t\thasProducer: Boolean(subject.evidence.producedBy) && Boolean(subject.producerModelId),\n",
+		replace: "\t\t\thasProducer: Boolean(subject.evidence.producedBy), // MUTANT: the work unit is producer enough; the model need not be named\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts"],
+		why: "PROMISE: an output's producer is the MODEL, and a record naming only the work unit does not say WHO made it (`REG-F-352`). WHO RELIES: `IP-04`, and through it the whole `floor.identity-provenance` policy. WHAT THE MUTATION DOES TO THEM: a `TEST_RESULT` whose producing model is UNKNOWN passes the provenance floor — and `producedBy` is populated by the caller on every path, so the surviving limb can never fail and the criterion becomes a control that cannot fail. ⛔ IT ALSO SILENTLY BREAKS THE INDEPENDENCE CHECK'S PREMISE: `checkIndependence('DIFFERENT_MODEL')` needs BOTH sides defined, so a subject with no model id is BOUNDARY_REJECTED rather than judged — and this fact is the only place the floor would have noticed before the reviewer did. ⚠ THE ARTIFACT PATH MAKES THE SAME CONJUNCTION for the same reason, so dropping it here reads as a simplification of a field an Evidence object does not share.",
+		source: "JAN-EXEC Phase 5 / R17 — two blocking codes, and a declared truncation is not one of them"
+	},
+	{
+		id: "P5-i-the-floor-is-recorded-against-the-wrong-object-type",
+		file: "apps/rph-demo/src/lib/server/execution/process-result-floor.ts",
+		find: "\t\t\tobjectType: 'EVIDENCE',\n",
+		replace: "\t\t\tobjectType: 'ARTIFACT', // MUTANT: the evidence's floor is filed as though its subject were a work product\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts"],
+		why: "PROMISE: a floor run says WHAT it judged, and the type travels to two places from one parameter — `AssuranceSubject.objectType` (which `R14` made the reviewers stop reading, but which still names the subject) and `RecordModelExchange.subjectObjectType`, which is the 31-member contract enum on a PERMANENT record. WHO RELIES: anyone auditing what an assessment was over. WHAT THE MUTATION DOES TO THEM: the reviewing model's exchange is filed against an ARTIFACT that does not exist at that id, so a permanent record asserts a subject type its own subject id contradicts. ⛔ NOTHING REFUSES IT: `subjectObjectType` is validated against the ENUM and `'ARTIFACT'` is a member, and `stepResultSubjects` never reads `objectType` at all — so the gate still permits the completion and the record is simply wrong. ⚠ AND IT IS THE PLAUSIBLE EDIT: this value was `'ARTIFACT'` in the function this one was extracted from.",
+		source: "JAN-EXEC Phase 5 / R17 — two blocking codes, and a declared truncation is not one of them"
+	},
+	{
+		id: "P5-j-a-declared-truncation-blocks-after-all",
+		file: "apps/rph-demo/src/lib/server/execution/process-result-floor.ts",
+		find: "\tconst violations = [\n",
+		replace: "\tconst violations = [\n\t\t...(subject.run.omittedRegions.length > 0 ? ['PROCESS_OUTPUT_TRUNCATED'] : []), // MUTANT: the strict reading R17 declined\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts"],
+		why: "PROMISE: a DECLARED prefix does not invalidate the exit code, so a bounded capture does not make a result inadmissible (`R17`). WHO RELIES: every real test suite — capture is capped at 64 KiB PER STREAM, so a suite with more output than that is routinely a declared prefix. WHAT THE MUTATION DOES TO THEM: no real test suite can ever produce admissible evidence, and the failure arrives as a BLOCKING floor observation about the OUTPUT rather than as “your suite prints too much”. ⛔ THIS MUTANT EXISTS BECAUSE THE CONTROL NEEDS ONE. The truncation case is asserted as a PASS, and an assertion that something does NOT block is satisfied by an implementation that blocks on nothing — “a control that cannot fail”, which this repository has shipped three times. ⚠ It is also the READING A CAREFUL PERSON REACHES from the runner's own hazard sentence; what that sentence names is the SILENTLY truncated case, and this seam has no silent case.",
+		source: "JAN-EXEC Phase 5 / R17 — two blocking codes, and a declared truncation is not one of them"
+	},
+	{
+		id: "P5-k-the-observer-reports-what-it-kept-not-what-ran",
+		file: "apps/rph-demo/src/lib/server/tools/process-run-observer.ts",
+		find: "\t\tobserved: () => ({ runs: [...runs], observedCount: total, recordedLimit: limit })\n",
+		replace: "\t\tobserved: () => ({ runs: [...runs], observedCount: runs.length, recordedLimit: limit }) // MUTANT: the count is of what was KEPT, so a drop can never be declared\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/process-run-observer.test.ts"],
+		why: "PROMISE: a bounded record DECLARES its bound, so a prefix cannot be read as the whole turn. WHO RELIES: anything that turns a run into evidence — a step that ran 40 commands has 8 this instrument never held, and only the gap between the two numbers says so. WHAT THE MUTATION DOES TO THEM: the two numbers ALWAYS AGREE, so the declaration can never fire and 32 reads as the complete account of a 40-command turn. ⛔ THE FABRICATED-COMPLETENESS DEFECT `omittedRegions` EXISTS ONE PLANE DOWN TO PREVENT, arriving in the instrument that was built to avoid it. ⚠ IT FIRES ONLY ABOVE THE CAP, so every ordinary turn stays green and the mutation is invisible until the exact case it breaks — which is why the victim constructs an observer with a bound of TWO rather than trying to run 33 commands.",
+		source: "JAN-EXEC Phase 5 — the host's own instrument for what it ran, and the bound it puts on itself"
+	},
+	{
+		id: "P5-l-the-observer-keeps-the-last-runs-not-the-first",
+		file: "apps/rph-demo/src/lib/server/tools/process-run-observer.ts",
+		find: "\t\t\tif (runs.length < limit) runs.push({ ordinal: total, ...run });\n",
+		replace: "\t\t\truns.push({ ordinal: total, ...run });\n\t\t\tif (runs.length > limit) runs.shift(); // MUTANT: keep the most RECENT N, the way a log would\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/process-run-observer.test.ts"],
+		why: "PROMISE: an ORDINAL means the same act in this instrument as in the record plane's tool-call list, because both keep the FIRST N. WHO RELIES: a reader joining a recorded `ObservedToolCall` to the command that produced a `TEST_RESULT`. WHAT THE MUTATION DOES TO THEM: past the cap the two instruments disagree about which act is #1 — the `MODEL_EXCHANGE` names the turn's first call and the process record names its 33rd — so a join that looks exact silently pairs a tool call with a command it did not make. ⛔ AND IT IS THE PLAUSIBLE EDIT, NOT A CARELESS ONE: keeping the most recent N is what a LOG does, it is what most people would write, and the ordinals it produces are still correct, still ascending, still unique. Nothing about the output looks wrong.",
+		source: "JAN-EXEC Phase 5 — the host's own instrument for what it ran, and the bound it puts on itself"
+	},
+	{
+		id: "P5-m-the-host-hands-out-its-own-record-to-edit",
+		file: "apps/rph-demo/src/lib/server/tools/process-run-observer.ts",
+		find: "\t\tobserved: () => ({ runs: [...runs], observedCount: total, recordedLimit: limit })\n",
+		replace: "\t\tobserved: () => ({ runs, observedCount: total, recordedLimit: limit }) // MUTANT: the caller is handed the live array\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/process-run-observer.test.ts"],
+		why: "PROMISE: what the host observed is the HOST's, and a reader may not edit it. WHO RELIES: every later reader in the same step — the evidence mint, the floor run, the record. WHAT THE MUTATION DOES TO THEM: a caller that sorts, filters or splices the array it was handed silently EDITS the host's own record of what happened, in place, with nothing recording that it did — so a later reader sees a different turn from the one that ran. ⚠ IT IS INVISIBLE IN EVERY ORDINARY USE, because a caller that only reads it behaves identically; the defect arrives the day someone writes `runs.sort(...)` to tidy a report.",
+		source: "JAN-EXEC Phase 5 — the host's own instrument for what it ran, and the bound it puts on itself"
+	},
+	{
+		id: "P5-n-every-command-becomes-a-test-result",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tevidenceType: 'OBSERVATION',\n",
+		replace: "\t\t\tevidenceType: 'TEST_RESULT', // MUTANT: the phase's brief, taken literally — `ls` is a test result\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: this host records what it CAN say — it watched a command run and saw what it exited with. `TEST_RESULT` is a claim about what the command WAS, and the only party who knows that is the one §22.1 classifies as untrusted (`R18`). WHO RELIES: every reader of the governed record, and every policy that will one day key on `evidenceType`. WHAT THE MUTATION DOES TO THEM: `npm ci`, `ls` and `cat package.json` are all recorded as TEST RESULTS, permanently. ⛔ AND NOTHING BREAKS, WHICH IS WHY IT NEEDS A MUTANT RATHER THAN A TYPE: `evidenceType` is a label NO production code branches on — measured, four sites, none of them a read — so every other test in this file stays green and the only casualty is that the record says something false. ⚠ It is also the PLAUSIBLE edit, because `TEST_RESULT` is the word this phase's own roadmap uses throughout.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-o-only-the-runs-that-would-pass-become-evidence",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\tfor (const run of input.runs) {\n",
+		replace: "\tfor (const run of input.runs.filter((r) => r.exitCode !== null && !r.timedOut)) { // MUTANT: mint only the runs that would pass their floor\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: a command that RAN is recorded, whatever happened to it, and `R17`'s codes make an unassessable one BLOCK legibly. WHO RELIES: the completion gate, and anyone auditing why a step succeeded. WHAT THE MUTATION DOES TO THEM: a test suite the host KILLED AT ITS DEADLINE is silently dropped from the evidence list, and the step completes as though that command had never run — with the work product's own floor SATISFIED and nothing to contradict it. ⛔ THIS IS THE FAIL-OPEN THE WHOLE PHASE EXISTS TO PREVENT, and it is the exact rule `unassessableAiContentBlock` states one plane over: AI-produced content may not enter the governed stream with nothing to assess. ⚠ AND IT READS AS A CORRECTNESS FIX — *why mint evidence that cannot pass its own floor?* — which is what makes it the dangerous edit rather than a careless one.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-p-the-participating-mint-is-purgeable-after-all",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tmediaType: 'text/plain',\n\t\t\tpurgeability: 'RETAINED_BY_PARTICIPATION'\n",
+		replace: "\t\t\tmediaType: 'text/plain',\n\t\t\tpurgeability: 'PURGEABLE_AT_EXPIRY' // MUTANT: the evidence's own bytes are declared destroyable\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: bytes a recorded ASSESSMENT rests on are `RETAINED_BY_PARTICIPATION` — `REG-D-050`, participation is a property of USE, and a floor run JUDGES these. WHO RELIES: every later reader of an EVIDENCE object, and `R7`, which this mint exists to keep true without re-labelling the runner's capture. WHAT THE MUTATION DOES TO THEM: an assessment stands on bytes the system DECLARES it may destroy — and because purgeability is part of the storage KEY, the evidence would also name an address in the purgeable half of the key space, which is the very collision the two-copy design avoids. ⚠ IT LOOKS CONSISTENT WITH THE CAPTURE BESIDE IT, which is exactly the confusion `R16` settles: the capture is purgeable BECAUSE nothing has judged it yet; the mint is not, because something has.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
+	},
+	{
+		id: "P5-q-the-evidence-claims-it-has-no-limitations",
+		file: "apps/rph-demo/src/lib/server/execution/evidence-join.ts",
+		find: "\t\t\tlimitations: processResultLimitations(run),\n",
+		replace: "\t\t\tlimitations: [], // MUTANT: an empty list, which reads as \"this evidence has no limitations\"\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/evidence-join.test.ts"],
+		why: "PROMISE: a bounded capture of someone else's process says what it does NOT establish. WHO RELIES: `evidenceAdmissibility`'s LIMITATIONS_RECORDED limb reads this field, and `RPH-EVD-004` — *passing tests support only claims within their scope* — is UNENFORCED_DISCLOSED in this repository's own register precisely because nothing else compares an evidence scope to a claim's breadth. WHAT THE MUTATION DOES TO THEM: a 64 KiB-truncated build log is recorded as evidence with NOTHING said about the truncation, so a reader takes a declared PREFIX for the whole. ⛔ AND IT STAYS ADMISSIBLE: the limb reads `=== undefined`, and *an empty array counts as recorded* — so the one check that touches this field cannot tell the two apart. ⚠ `R17` made truncation a LIMITATION rather than a BLOCK; this mutation is what makes that ruling meaningless.",
+		source: "JAN-EXEC Phase 5 / R18 — every completed run becomes one governed OBSERVATION, minted not re-labelled"
 	}
 ];

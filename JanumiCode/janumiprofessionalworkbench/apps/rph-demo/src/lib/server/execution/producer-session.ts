@@ -19,6 +19,8 @@
 // `producerWorkingDirectory` below is the only thing that may supply it.
 import type { AdapterToolObservation, ToolInvocationResult } from '../tools/backing-tool.js';
 import type { ProcessRunner, Workspace } from '@janumipwb/rph-ports';
+import type { ProcessRunObservation } from '../tools/process-run-observer.js';
+import { OBSERVED_PROCESS_RUN_LIMIT } from '../tools/process-run-observer.js';
 
 export interface ProducerSession {
 	/** One turn. Turn 1 carries the rendered instruction; later turns carry review findings. */
@@ -46,6 +48,20 @@ export interface ProducerSession {
 	 * is built from.
 	 */
 	lastTurnObservation(): AdapterToolObservation;
+	/**
+	 * ⭐⭐ `JAN-EXEC` PHASE 5 — WHAT THE HOST RAN ON THE MODEL'S BEHALF, SO A COMMAND'S RESULT CAN BECOME EVIDENCE.
+	 *
+	 * ⛔ REQUIRED, FOR THE REASON `lastTurnObservation` IS: an adapter that runs no commands must SAY it ran
+	 * none rather than express it by leaving a method out and letting the caller pick a sentence on its behalf.
+	 *
+	 * ⭐ AND UNLIKE TOOL CALLS, THERE IS NO BLIND CASE HERE, WHICH IS WHY THIS RETURNS A MEASUREMENT AND NOT A
+	 * CAN-OBSERVE UNION. Tool calls are dispatched by the model's SDK and the host WATCHES an event stream, so
+	 * *"nothing was in a position to look"* is a real state `R11` minted a discriminator for. A process run goes
+	 * THROUGH this host's own `ProcessRunner` port: if no run was recorded, no run happened. `observedCount: 0`
+	 * is therefore an observed absence and never an absence of observation — the one place in this seam where
+	 * those two genuinely coincide, and it is said here so nobody later assumes the discriminator was forgotten.
+	 */
+	processRuns(): ProcessRunObservation;
 	/** Released when the work unit stops being worked on — satisfied, escalated, or out of tries. */
 	dispose(): void;
 	/**
@@ -196,6 +212,12 @@ export function oneShotSession(
 				'events, and had no observer running when the turn failed. Nothing was in a position to observe ' +
 				'tool calls, so this record is not evidence that none ran.'
 		}),
+		// ⭐ PHASE 5 — A ONE-SHOT CALL MINTS NO TOOLS, SO IT RAN NO COMMANDS, AND THAT IS A MEASUREMENT.
+		// ⚠ CONTRAST IT WITH `lastTurnObservation` DIRECTLY ABOVE, WHICH REFUSES TO ANSWER. The difference is
+		// not inconsistency: a tool CALL would be dispatched by a session this adapter does not have and could
+		// not watch, while a process RUN would go through this host's own port — and this adapter never hands
+		// that port to anyone. Zero here is what happened, not what could not be seen.
+		processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: OBSERVED_PROCESS_RUN_LIMIT }),
 		dispose: () => undefined,
 		retainsHistory: false
 	};

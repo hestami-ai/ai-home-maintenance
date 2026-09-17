@@ -1387,31 +1387,180 @@ the record.
 
 ---
 
-## 7. Phase 5 · The evidence join — a second floor run, over the evidence
+## 7. Phase 5 · The evidence join — ~~a second floor run, over the evidence~~ ⭐ RE-SPECIFIED AND ⭐⭐ LANDED 2026-09-17
+
+⭐⭐ **THE SPECIFICATION BELOW REPLACES §7a's. Design §4.11 carries the measurement; §7a is kept verbatim
+underneath because its reasoning is what the measurement overturned, and an overturned argument that vanishes
+teaches nobody.** 179 findings from six independent readers, then 40 adversarial verifiers told to REFUTE rather
+than confirm — **16 of 40 refuted**, three of them mine.
+
+### 7.L ⭐⭐ AS LANDED 2026-09-17 — three commits, 17 mutants, and the four instruments that could not see any of it
+
+| # | what landed | measured |
+| --- | --- | --- |
+| 1 | `R14`/`R15` — `ReasoningReviewInput.framing`, a REQUIRED closed union the caller declares; both reviewers switch exhaustively and neither reads its subject any more. A `PROCESS_RESULT` arm that joins the agent's account to the HOST's observed calls. | `P5-a`..`P5-e` KILLED. `P5-a` reddens 7 of 13 victims while the graph-arm tests and the routing CONTROL stay green. |
+| 2 | `runFloorOverSubject` (the extraction, once the fix made it possible), `processResultFloorFacts` (`R17`), the process-run observer, and `REG-Q-066`'s THIRD disposition. | `P5-f`..`P5-m` KILLED — **two SURVIVED first** (`hasProducer`'s second conjunct; `objectType`, which is UNOBSERVABLE in the default lane because the mock captures nothing and the exchange drain never runs). |
+| 3 | `joinProcessEvidence` — the mint, the `OBSERVATION` (`R18`), the per-subject floor, and `proposedEvidenceIds` on the AI path. | `P5-n`..`P5-q` KILLED — **two SURVIVED first**, and `P5-p` exposed a production defect: the reference RESTATED the caller's purgeability instead of reading it back from `stat`. |
+
+⭐ **17 OF 17 KILLED, AND FOUR OF THEM ONLY AFTER SURVIVING.** Each survivor was a missing
+DISCRIMINATION rather than a missing feature, and one of the four was a defect in the code rather than in the
+test. ⛔ **No mutant was weakened**; the assertions were added, and in `P5-p`'s case the production code changed.
+
+⛔ **AND WHAT IS NOT PROVEN IS SAID PLAINLY.** The ROUTE WIRING IS NOT EXERCISED BY THE GATE: the deterministic
+execution fixture calls no tools, so `observedRuns.runs` is empty in every gate lane and `proposedEvidenceIds`
+is still `[]` there. That is the blindness §7.4 recorded IN ADVANCE — three instruments cannot see this phase
+(`guards:export` walks `packages/` only; `apps/rph-demo` has zero coverage-floor entries; the AI e2e's floor
+assertion is subject-scoped to the artifact) and the demo's unit lane passes with zero tests collected. Closing
+it is **Phase 7's live end-to-end**, and no green here substitutes for it.
+
+---
+
+### 7.0 ⛔ THE PREMISE THAT DID NOT SURVIVE, AND THE ONE THAT DID
+
+⛔ **REFUTED: *"a call site, not a redesign."*** It rested on `work-product-floor.ts:5` — *"the floor validators
+do not inspect their subject"* — which is true of TWO of the three. The REASONING-REVIEW validator tests
+`subject.objectType === 'ARTIFACT'` (`reasoning-review-validator.ts:298`, and identically at
+`mock-reasoning-review-validator.ts:176`), and the test is **binary**: every non-`ARTIFACT` subject takes the
+**PWA-graph arm**. Under `testMode` — the arm the gate runs — a `TEST_RESULT` fails `JSON.parse`, returns
+`unreadable(…)` → **INCONCLUSIVE, which BLOCKS.** So extract-and-call-twice produces a step that can never
+complete, and §7a's own stated PROOF is **unreachable by construction**.
+
+⭑ **AND THE COMMENT WAS A GENERALISATION OF A MEASUREMENT.** `REG-F-354`'s measurement sentence cites
+`floor.ts:161` and `:213` — the two deterministic validators. Its scope note discusses the third at length and
+carves it out of **BUILD EFFORT**, never out of subject-inspection. The code comment turned *"we measured two"*
+into *"the validators do not."* ⚠ This is `feedback_absence_of_evidence` and `feedback_verify_the_recorded_remedy`
+in one: a remedy quoted from a comment rather than driven.
+
+⭐ **SURVIVED, AND STRONGER THAN CLAIMED: THE KERNEL GATE NEEDS NOTHING.** `execution.ts:1397` already unions
+`outputArtifactIds` with `proposedEvidenceIds`; `stepResultSubjects` **never reads `objectType`**; the floor
+policies are seeded applicable to all 31 object types at both PRODUCTION seeders. ⭑ And the whole shape is
+already DRIVEN AT BOOT — a FOURTH `CompleteExecutionStep` I had missed, in the reference undertaking
+(`reference-undertaking.ts:764-773`), completes a `MODEL_INVOCATION` step with `proposedEvidenceIds: [evidenceId]`
+after recording the floor over that EVIDENCE. ⚠ But it **records** three SATISFIED verdicts by dispatch; it never
+RUNS a validator. **Phase 5's entire content is replacing a hand-recorded SATISFIED with a computed one.**
+
+### 7.1 ⛔ THE TWO SEAMS THAT DO NOT EXIST, WHICH IS WHY THIS IS A PRODUCER AND NOT A CALL SITE
+
+**S-A. THE EXIT CODE OF A MODEL-RUN TEST SUITE EXISTS NOWHERE AFTER THE TURN ENDS.**
+`ProcessRunOutcome.retention` — the only field naming the durable capture — **has no production consumer**:
+`RUN_COMMAND.mint` builds `data` from `exitCode`/`timedOut`/`durationMs`/`outputComplete` and drops it, and the
+observer's `since()` returns `{ name, outcome }` only. `ObservedToolCall` has **no** arguments, result, exit-code
+or output field BY CONSTRUCTION (`R11`), `additionalProperties: false` at both schema levels. ⛔ And
+`outcome: 'COMPLETED'` **explicitly does not mean the command passed** — reading it that way ships the exact
+fabrication `tool-call-observer.ts` was written to prevent.
+
+**S-B. THE FACTS HALF IS OUTSIDE THE NAMED EXTRACTION RANGE AND DOES NOT PORT.** `workProductFloorFacts` is
+`:69-103`; §7a said extract `:143-275`. `schemaValid` is `splitAnswerSpan(answer).located` — *is a model answer
+span locatable* — meaningless over a test log, and its violation code `WORK_PRODUCT_NOT_PARSEABLE` would be a
+false statement about a non-work-product. `hasProducer` reads `producingPwuId`, a field `EvidenceObjectSchema`
+does not and cannot have.
+
+### 7.2 ⭐ WHAT IS FORCED AND NEEDS NO RULING
+
+⭑ **`isAiProduced: true`, and `R6` is what makes it honest.** `deMinimisFloorPlan` includes the reasoning review
+only when it is true; `floorGateBlock` requires all three SATISFIED, so `false` yields `MISSING` and blocks. Both
+arms of the apparent dilemma block — only one is honest. Under `R6` the reasoning under review is **the model's**,
+so `producer.modelId` = the executing model is a true statement and `DIFFERENT_MODEL` against the judge is
+decidable. ⭐ The dilemma dissolves *because of* `R6`; that is the second thing the ruling bought.
+
+⭑ **THE PARTICIPATING MINT, AND IT IS THE RUNNER'S OWN INSTRUCTION TO THIS PHASE** (`process-runner.ts:91-93`):
+*"A later phase that PERSISTS the outcome must persist the REFERENCE and not the bytes, or it mints a second
+retention surface under no declared class."* → `ArtifactStore.put(bytes, 'RETAINED_BY_PARTICIPATION')` at the
+moment of participation. ⛔ **NEVER a re-label of the capture**, which would retroactively falsify `R7` for every
+prior run. ⭑ The store makes this structural: purgeability is part of the storage key, so the participating copy
+and the `PURGEABLE_AT_EXPIRY` capture are two objects and cannot collide.
+
+### 7.3 ⭐ RULED 2026-09-17 — all four taken NARROW. Design §4.12.
+
+| # | ruled | what it REMOVED from Phase 5 |
+| --- | --- | --- |
+| `R14` | a **third framing, one rubric** — a process-result arm in both validators; criteria still from `floor.reasoning-review` | a fourth floor policy, a `FloorPolicyId` widening, a ratification, and a census red |
+| `R15` | the review's subject is the **existing contracted rationale read against the observed tool calls** | a `run_command` parameter filled by an untrusted party, and its ratification |
+| `R16` | **`EvidenceObject.contentReference` only** — no second governed `ARTIFACT` | a second object lifecycle, and a deliberate e2e red |
+| `R17` | **two blocking codes**; declared truncation and incomplete capture are LIMITATIONS | a rule under which no real test suite (64 KiB cap) could ever produce admissible evidence |
+| `R18` | **every completed run → one `EVIDENCE`, typed `OBSERVATION`** | a predicate over `argv` deciding what “looks like” a test command — the fifth refusal of that shape on this seam |
+
+⭑ **THE PATTERN:** every one declined a change to a ratified or generated contract in favour of a change to how
+this host CONDUCTS the work. Phase 5 is now **one validator arm, one facts derivation, one mint, one seam.**
+
+---
+
+### 7.3a ~~The four questions, as put~~ (ANSWERED ABOVE; kept because the arguments are what the rulings turned on)
+
+1. **`R6` vs *"TWO FRAMINGS, ONE RUBRIC."*** §7a says the criteria *"must be authored, not defaulted"*;
+   `reasoning-review-validator.ts:87-90` records the opposite on `ASR-4`/`REG-F-353` grounds. ⛔ And it is not
+   only a preference: `ValidatorResult.policyId` is typed `FloorPolicyId` and
+   `reasoningReviewResultFromJudgement` hard-codes `FLOOR_POLICY_IDS.REASONING_REVIEW`, so an authored rubric
+   would be **recorded under a policy whose stored criteria are the nine `RR-*` strings** — a record that
+   misnames what checked it.
+2. **`R6`'s subject has no producer.** The model's account of *why it ran that command* is not captured by any
+   tool, schema or envelope field. Narrow the review to the EXISTING contracted rationale read against the
+   observed tool calls, or mint a per-command account.
+3. **Does the participating mint also become a governed `ARTIFACT` object**, or only an
+   `EvidenceObject.contentReference`? `execution-model-invocation.e2e.ts:140` pins `snap.artifacts` at 1, so this
+   is a deliberate red or a deliberate green.
+4. **The invariant-violation codes for a process result** — ratification item 5, reached by the first line of code.
+
+### 7.4 ⭐ THE PREDICTED REDS, NAMED BEFORE ANYTHING IS WRITTEN
+
+⛔ **THREE INSTRUMENTS CANNOT SEE THIS PHASE, SO NONE OF THEM MAY BE THE PROOF.**
+`guards:export` walks `packages/` ONLY (`export-guard.ts:245`) and `apps/rph-demo` has **zero** entries in the
+coverage-floor baseline — so extracting `runFloorOverSubject` in place satisfies **rule 7 vacuously**. The gate's
+own `execution-model-invocation.e2e.ts` floor assertion is SUBJECT-SCOPED to the artifact and **cannot redden**.
+The demo's unit lane passes with ZERO tests collected. ⭑ **Every Phase 5 proof must therefore be a REPORTED ROW
+from a named test, confirmed to have been collected.**
+
+| # | pins ONE limb | must fail today with |
+| --- | --- | --- |
+| `RED-1` | the demo's AI path NAMES its `TEST_RESULT` | `ExecutionStepSucceeded.proposedEvidenceIds` length `0`, expected ≥1 — ⚠ NOT paired with `stepState === 'SUCCEEDED'`, which is already green and would ride along |
+| `RED-2` | `runFloorOverSubject` records three assessments naming the EVIDENCE id | a measured `0` vs `3` on the ENGINE's recorded assessments — ⚠ never a compile failure, which is a weak red |
+| `RED-3` | the reasoning review over an EVIDENCE subject is **not** the graph arm | today: `INCONCLUSIVE` with `limitations` naming *"not a PWA graph export"* |
+| `RED-4` | the REJECTED half **names the evidence id** | ⛔ with an ARTIFACT and an EVIDENCE both in scope, REJECTED + `RPH_INVARIANT_VIOLATION` is produced by BOTH — an arrangement tripping two guards proves neither. Only the id distinguishes them |
+| `RED-5` | the participating bytes are a NEWLY MINTED `RETAINED_BY_PARTICIPATION` object, not the capture re-labelled | no such object exists at all; assert the key is NOT either `retention` path |
+| `RED-6` | the criteria handed to the evidence run are not byte-identical to the work-product run's | silent reuse of `reasoningReviewCriteria()` compiles and passes every red above |
+
+⚠ **AND A TRAP FOR WHERE THEY LIVE.** `floor-fixtures.ts:99-103` seeds the floor policies with
+`['PROFESSIONAL_WORK_ARCHITECTURE','PROFESSIONAL_WORK_UNIT','ARTIFACT']` — **no `EVIDENCE`** — through the real
+handler, while both PRODUCTION seeders derive all 31 types. A Phase 5 test written into the `rph-application`
+execution-floor files would fail for a reason that has nothing to do with Phase 5.
+
+⚠ **AND ONE MORE: `execution-exe006-explicit-result.test.ts` IS NOT AVAILABLE.** Its header pins every step
+NON-AI on purpose, because an AI fixture would make its two limbs mask each other. That is the same header §7a
+quoted to refute its own *"one unwired caller"* hypothesis.
+
+**RULE 2:** read by `CompleteExecutionStep` and by promotion. **If wrong:** either no test result can ever become
+evidence, or one becomes evidence without passing the floor.
+
+---
+
+## 7a. ~~Phase 5 · the specification as written before it was measured~~ (SUPERSEDED BY §7; kept for the reasoning)
 
 ⛔ **NOT ONE UNWIRED CALLER** (my own hypothesis, refuted by the spike). The green proof that the join works is
 pinned by its own header as *"a NON-AI TRANSFORMATION with HUMAN provenance"* so the floor **cannot fire**; with
 AI provenance the same flow is `REJECTED`, all three limbs MISSING.
 
-⭐ **BUT IT IS A CALL SITE, NOT A REDESIGN, AND THE MECHANICS CONFIRM IT:** the recorder is **already
+~~⭐ **BUT IT IS A CALL SITE, NOT A REDESIGN, AND THE MECHANICS CONFIRM IT:** the recorder is **already
 subject-agnostic** — `AssuranceRecordingPlan` carries no `objectType` at all — and the floor validators
-*"do not inspect their subject … they judge FACTS the caller supplies."*
+*"do not inspect their subject … they judge FACTS the caller supplies."*~~ → **REFUTED §7.0.** The recorder half
+is TRUE and survives; the validator half is true of two of three.
 
-**DO:** extract the generic run (`work-product-floor.ts:143-275`) into `runFloorOverSubject(subject, ctx, …)`,
+~~**DO:** extract the generic run (`work-product-floor.ts:143-275`) into `runFloorOverSubject(subject, ctx, …)`,
 parameterising the four literals. **Nothing in `rph-assurance`, `rph-application` or `rph-engine` changes.** Then
-call it a second time with the `TEST_RESULT` as subject, and populate `proposedEvidenceIds`.
+call it a second time with the `TEST_RESULT` as subject, and populate `proposedEvidenceIds`.~~
+⚠ **THE COUNT WAS WRONG AND THE RANGE WAS WRONG.** Six `artifactId` sites inside the function, not five; two
+`objectType` literals; and the FACTS half at `:69-103` is outside the range entirely (§7.1 S-B).
 
 **R6 SETTLES THE LIMB THAT HAD NO ANSWER.** There is no model reasoning in `exitCode: 0` — the producer is
 `node`. The reasoning review's subject is **the step's own reasoning**: the model's account of why it ran that
 command and what the result means. `schema-invariant` and `identity-provenance` judge the result itself.
-⚠ `ReasoningReviewInput.criteria` is **required by design** — *"an optional field with a constant fallback is how
-this regresses silently"* — so the criteria for a process result must be authored, not defaulted.
+~~⚠ `ReasoningReviewInput.criteria` is **required by design** — *"an optional field with a constant fallback is how
+this regresses silently"* — so the criteria for a process result must be authored, not defaulted.~~
+⚠ The TYPE requirement is real; the INFERENCE from it is §7.3 item 1's open question. The type forces the second
+call site to NAME a criteria value — it does not force a NEW one, and passing the work-product rubric compiles.
 
-**RULE 2:** read by `CompleteExecutionStep` and by promotion. **If wrong:** either no test result can ever become
-evidence, or one becomes evidence without passing the floor.
-
-**PROOF:** the AI-provenance completion that is `REJECTED` today becomes `ACCEPTED` **only** once the evidence
-subject's own floor run is SATISFIED — and stays REJECTED when it is not.
+**PROOF (as stated then):** the AI-provenance completion that is `REJECTED` today becomes `ACCEPTED` **only** once
+the evidence subject's own floor run is SATISFIED — and stays REJECTED when it is not. → ⛔ Unreachable as
+written (§7.0); re-specified as the six reds in §7.4.
 
 ---
 
