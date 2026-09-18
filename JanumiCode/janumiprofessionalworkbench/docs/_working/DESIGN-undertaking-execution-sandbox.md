@@ -99,6 +99,7 @@ recording is worth committing.
 | R21 | **`PromoteBaseline` IS FIXED IN PHASE 6.** Its “required assessments” come from the CALLER'S PAYLOAD — the same *controller selects its own evidence* defect `JAN-PWU007` closed on `ChangePwuState`, still open one gate over. Ruled 2026-09-17; see §4.14.5. |
 | R22 | **THE DEMO GAINS AN ASSURANCE-REVIEWER PRINCIPAL, AND THE ASSESSMENT ACTS ARE ISSUED BY IT.** Every one of the ontology’s 15 PWU templates declares a policy demanding a reviewer distinct from the producer — 0 of 15 are single-actor satisfiable — and the demo signed off as both parties under a NONE-independence policy of its own. Naming the reviewer in a payload the operator’s session issues is FORBIDDEN (`REG-F-061`): the reviewer holds a credential and issues the command. Ruled 2026-09-18; see §4.15. |
 | R23 | **AN ATOMIC ACT MAY HAVE MORE THAN ONE ACTING PARTY, AND THE KERNEL NOW SAYS SO.** `SPEC-001-INV-14` demands a multi-command affordance commit atomically; §39 inv-8 demands an independent reviewer; and `dispatchBatchAs` stamps ONE principal for a whole transaction — so the two rules were incompatible for every assurance act, and nothing had to notice while the surface reviewed its own work. `dispatchMultiPartyBatch` puts both parties in one transaction, each command stamped from its OWN resolved principal. Ruled 2026-09-18; see §4.16. |
+| R24 | **ONE FLAG ANSWERED TWO QUESTIONS, SO THE PRODUCT’S CENTRAL CLAIM COULD NOT BE TESTED END TO END.** `RPH_DEMO_MODE` is single-valued, and Phase 7 needs a process that is OBSERVABLE (the `/test-api` harness) and REAL (durable workspace + real process runner) at once — which it can never be. `workbench.ts:38-45` had already named them *“two different questions”* and could not answer them separately. Durability keeps `RPH_DEMO_MODE === 'server'`; the harness gains its own affirmative declaration; and `resetEngine` REFUSES a durable store, because reset is for disposable state by the repository’s own argument. Ruled 2026-09-18; see §4.17. |
 
 ---
 
@@ -1197,3 +1198,128 @@ credentials, simulating two parties, with the record saying truthfully which one
 ⭐ Property 2 is the one with no other detector: independence is computed from `producer`/`evaluator` in the
 payload, so a batch that mis-stamped every issuer would satisfy INV-8, satisfy INV-14, and record a lie. Its
 mutant is `P6c-b`, and the assertion pairs `issuedBy` per command against the credential that carried it.
+
+## 4.17 ⭐⭐ `R24` — ONE FLAG ANSWERS TWO QUESTIONS, AND THAT IS WHY THE PRODUCT'S CENTRAL CLAIM CANNOT BE TESTED END TO END
+
+⛔ **PHASE 7 AS SPECIFIED IS NOT PERFORMABLE TODAY, AND THE REASON IS STRUCTURAL RATHER THAN MISSING WORK.** Its
+sentence — *"a small CLI or web app is written to the durable workspace, its unit and e2e tests are executed"* —
+needs a process that is simultaneously **observable** and **real**, and no such process can exist.
+
+### 4.17.1 ⛔ THE CHAIN, VERIFIED AT FOUR INDEPENDENT SITES
+
+```
+RPH_DEMO_MODE === 'server' + absolute JPWB_DEMO_DB  →  durable root  →  FILESYSTEM workspace  →  REAL runner
+anything else                                       →  IN_MEMORY workspace                    →  REFUSING runner
+/test-api/{reset,introspect,dispatch}               →  requires RPH_DEMO_MODE === 'test'
+```
+
+- `workbench.ts:37` `const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';`
+- `workbench.ts:45` `const SERVING = process.env.RPH_DEMO_MODE === 'server';`
+- `workspace-host.ts:140` `if (env.RPH_DEMO_MODE !== SERVING_DECLARATION) return undefined;`
+- `test-api/introspect/+server.ts:25` `if (!isTestMode()) throw error(404, 'Not found');`
+
+⭑ **THE PAIRING OF RUNNER TO WORKSPACE IS PRINCIPLED AND MUST SURVIVE**, stated as `RULE 5`: *"The real runner is
+wired where and only where the workspace materialization is FILESYSTEM"* — a real runner needs a real `cwd`, and
+wiring one without would mean *"a command executing in the server's own tree"*. Nothing in `R24` touches it.
+
+⭑ **AND THE AFFIRMATIVE FORM MUST SURVIVE TOO.** `=== 'server'` replaced a negative predicate after a measured
+defect: `vitest.config.ts` sets no mode, so `vitest run` with `JPWB_DEMO_DB` set *"produced a durable
+2,719,744-byte `demo.sqlite`"* and reddened a CONTROL. The header's ruling is explicit — *"a blocklist of runners
+is a list that rots"*. Every predicate `R24` writes is affirmative for the same reason.
+
+### 4.17.2 ⭐⭐ THE CODEBASE HAD ALREADY NAMED THE TWO QUESTIONS AND COULD NOT ANSWER THEM SEPARATELY
+
+This is not a gap someone missed. `workbench.ts:38-45` states it in terms:
+
+> *"It is deliberately NOT the negation of `TEST_MODE`: those two are different questions. `TEST_MODE` asks
+> whether the harness endpoints exist, and a process that is neither a harness nor a server (a unit runner, a
+> script, a future tool) must answer NO to both."*
+
+⚠ **TWO DIFFERENT QUESTIONS, ONE SINGLE-VALUED VARIABLE.** `RPH_DEMO_MODE` can say `test` or `server` and
+therefore YES to exactly one of them. The sentence above is correct about the semantics and the encoding cannot
+express it. **RULED (`R24`): split the declarations.**
+
+| question | who asks it | declaration |
+|---|---|---|
+| is this process SERVING for real? | durability: store, artifact plane, workspace root, real runner | `RPH_DEMO_MODE === 'server'` (unchanged) |
+| does this process expose the HARNESS? | `/test-api/{reset,introspect,dispatch}` | ⭐ `JPWB_HARNESS === '1'`, **or** `RPH_DEMO_MODE === 'test'` |
+| is this process the DETERMINISTIC fixture? | mock agent/executor, stable ids | `RPH_DEMO_MODE === 'test'` (unchanged) |
+
+⭑ **THE THIRD ROW IS WHY THIS IS TWO DECLARATIONS AND NOT THREE.** The fixture question is already
+orthogonalised by configuration: `model.ts:66` reads `TEST_MODE && !resolveExecutorToolId()`, so naming a real
+executor overrides the fixture without touching the mode. Only the harness question had no way to be asked.
+
+### 4.17.3 ⛔ THE HAZARD THIS CREATES, WHICH IS NEW AND MUST BE GUARDED
+
+Today `DB_PATH` is gated on `SERVING`, so a harness process has an **in-memory** store and `/test-api/reset`
+destroys nothing durable. After `R24` a process can be durable **and** harness-exposed. That is a new hazard and
+it is mine to close.
+
+~~so reset could delete a real store and real workspaces~~ ⛔ **STRUCK — I OVERSTATED IT, AND AN ADVERSARIAL
+REVIEW MEASURED WHAT RESET ACTUALLY TOUCHES.** `resetEngine`'s entire mutating body is `handle?.close()` then
+`handle = newEngine()` — **no path, no filesystem call, no artifact-store reset**. It deletes nothing. The real
+hazard is narrower and worse in one specific way: the durable handle is CLOSED and replaced by an empty
+in-memory one, so the server keeps answering, from nothing, while its data sits on disk unreferenced — and the
+memoized `artifacts` binding is never cleared, so the content plane still points at the old store. ⭑ Naming the
+hazard I could defend rather than the scarier one matters here, because the guard is justified by what it
+prevents.
+
+⭐ **THE GUARD FOLLOWS FROM THE REPOSITORY'S OWN ARGUMENT RATHER THAN FROM A NEW POLICY.** `JPWB_DEMO_DB`'s
+docblock already says why the two are contradictory: *"a durable store shared across specs would make them
+order-dependent, which is the failure mode `resetEngine` exists to prevent."* **`resetEngine` REFUSES when the
+store is durable.** Reset is for disposable state by definition; refusing the combination states a truth the
+codebase had already written down.
+
+⚠ **AND PHASE 7 DOES NOT NEED RESET.** It is one journey, not a suite — it starts from a fresh `JPWB_DEMO_DB`
+path per run. The READ affordance (`introspect`) is what a live lane actually needs, and reading is safe with
+durability. ⭑ That is the real shape of the split: **read affordances compose with durability; destructive ones
+do not.**
+
+### 4.17.4 ⛔ THREE THINGS PHASE 7 CANNOT DELIVER, MEASURED AND DISCLOSED NOW RATHER THAN DISCOVERED LATE
+
+- **`TEST_RESULT` evidence has no producer, and `R18` forbids minting one.** `evidence-join.ts` emits
+  `evidenceType: 'OBSERVATION'` deliberately: `run_command` is one tool name for every command and the argv is
+  chosen by the untrusted party, so a predicate over argv cannot type the result. ⚠ And typing it would buy
+  nothing — **no production code branches on `evidenceType` at all**; the only two comparisons are
+  presence tests. Phase 7's wording must change or its premise must be ratified; it cannot be coded past.
+- **Declared policies still do not gate the execution plane (`R20`).** Already ruled its own phase. Phase 7's
+  *"the declared assurance policies gate it"* is therefore about the ASSURANCE plane only.
+- **⭐ `RPH-EVD-004` IS `UNENFORCED_DISCLOSED` AND ITS DISCLOSED ARRANGEMENT IS THE PHASE 7 SCENARIO** — *"A
+  unit-test result used to support full product fitness must be rejected or qualified as out of scope."* A
+  live run that builds an app, runs its unit tests, and offers them as fitness evidence is **exactly** the
+  arrangement that rule exists to refuse, and nothing enforces it. Phase 7 will therefore produce the
+  arrangement; whether the engine refuses it is a separate, nameable increment.
+
+### 4.17.5 ⚠ AND THE EXISTING LIVE LANE IS ALREADY BROKEN, WHICH NOBODY WOULD HAVE KNOWN
+
+`execution.live.ts` boots `RPH_DEMO_MODE='test'` with no `JPWB_DEMO_DB`, so the workspace is IN_MEMORY — and
+`openPiExecutionSession` **throws** on a non-FILESYSTEM workspace. The lane is pinned to `pi` by its
+`PROVIDER_REPORTED` assertion, so with the documented configuration it fails before it measures anything. ⛔ It
+has never been run in CI, by construction: it is outside the gate and needs four keys nobody sets.
+
+### 4.17.6 ⛔ WHAT AN ADVERSARIAL REVIEW FOUND IN `R24` AFTER ITS OWN TESTS WERE GREEN
+
+Ten tests passed and the change still had four defects. ⭑ **Every one is the same class** — a rule stated in this
+very section and then applied to fewer things than it governs — which is worth recording as one shape rather
+than four fixes.
+
+| # | the defect | the rule it was applied to fewer things than |
+|---|---|---|
+| 1 | `/test-api/reset` called `clearAuthoringTurns()` **before** the guard could refuse | *a refused act must not have destroyed anything* |
+| 2 | the refusal escaped as a **500 `Internal Error`** | *a refusal must reach the party who can act on it* |
+| 3 | `/test-api/dispatch` got no durability guard, no test, no disclosure | §4.17.3's own *"read affordances compose with durability; destructive ones do not"* |
+| 4 | three route headers still asserted `404s unless RPH_DEMO_MODE=test` | *a doc line stating the wrong predicate is how the next reader reasons about a guard that is not there* |
+
+⭐ **(1) IS THE SHARPEST, AND IT IS THE SHAPE `resetEngine`'s OWN COMMENT NAMES.** The guard I wrote lived inside
+`resetEngine`; the route destroys every in-flight authoring turn one line earlier. So a refused reset had already
+closed and deleted every uncommitted candidate a professional had in flight — and `discardAuthoringTurn` records
+nothing, by design: *"No compensating Command is needed because canonical state never changed."* ⛔ **A guard that
+refuses after the first destructive step is not a guard**, and this is `SPEC-001-INV-14`'s partial application
+one layer up from where Phase 6c met it. The fix moves the question to the boundary (`durableStateRefusal`),
+asked before anything mutates, with `resetEngine`'s throw demoted to defence in depth.
+
+⚠ **(3) IS THE ONE I WOULD NOT HAVE FOUND.** §4.17.3 enumerates the set `{reset, introspect, dispatch}` and
+classifies two of them. `dispatch` is neither a read nor reset — it is a WRITE channel into the permanent,
+append-only record — so the rule governs it and the section simply did not say so. It now refuses a durable
+store too. ⭑ The gated suite is unaffected (`RPH_DEMO_MODE=test` ⇒ `DB_PATH` undefined by construction); what it
+forecloses is a live lane **shortcutting the surface**, which is the one thing such a lane exists not to do.
