@@ -161,7 +161,7 @@
 				"unsupportedSatisfaction",
 				"unsupportedSatisfactionMessage"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 1
 		},
 		"packages/rph-application/src/handlers/decomposition.ts": {
 			"consumedExports": [
@@ -360,6 +360,15 @@
 			"guardedExports": [
 				"assertConstraint",
 				"assertObligation"
+			],
+			"unattributedMutants": 0
+		},
+		"packages/rph-application/src/handlers/policy-governs.ts": {
+			"consumedExports": [
+				"policyGovernance"
+			],
+			"guardedExports": [
+				"policyGovernance"
 			],
 			"unattributedMutants": 0
 		},

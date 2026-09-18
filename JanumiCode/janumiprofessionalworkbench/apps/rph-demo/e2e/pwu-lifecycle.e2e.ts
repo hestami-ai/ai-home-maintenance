@@ -68,6 +68,43 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		expect(pwu.state.assuranceState).toBe('SATISFIED');
 		expect(pwu.state.executionState).toBe('SUCCEEDED');
 
+		// ── ⭐⭐ AND IT IS SATISFIED BECAUSE THE POLICIES IT DECLARES WERE ASSESSED, BY SOMEONE ELSE (`JAN-EXEC`
+		// `R22`) ───────────────────────────────────────────────────────────────────────────────────────────
+		//
+		// ⛔ THE ASSERTION ABOVE PASSED FOR TWO YEARS WHILE THIS SURFACE ASSESSED A POLICY THE PWU DOES NOT
+		// DECLARE, signing off its own work under a policy chosen because its `independenceRequirement: NONE`
+		// means the check is skipped. `workLifecycleState === 'SATISFIED'` cannot tell the difference, which is
+		// why it took `RPH-PWU-007`'s §28.2 fold to surface it.
+		//
+		// ⚠ AND THE UNIT TEST CANNOT COVER THIS HALF. `declared-policy-signoff.test.ts` dispatches the review
+		// under the reviewer's session ITSELF, so it would stay green if the ROUTE went back to issuing under the
+		// operator's. Only the browser exercises who actually holds the credential.
+		const declared = (pwu.state.assurancePolicyIds as string[] | undefined) ?? [];
+		const typeRow = snap.pwuTypes.find((x) => x.id === String(pwu.state.pwuTypeId as string));
+		const required = (typeRow?.state.requiredAssurancePolicyIds as string[] | undefined) ?? [];
+		const governing = [...new Set([...declared, ...required])];
+		expect(governing.length, 'an ARCHITECTURE_DEFINITION instance declares its type\u2019s policies').toBeGreaterThan(
+			0
+		);
+		for (const policyId of governing) {
+			const asm = snap.assessments.find(
+				(a) =>
+					String(a.state.assurancePolicyId as string) === policyId &&
+					((a.state.subjectObjectIds as string[] | undefined) ?? []).includes(pwu.id)
+			);
+			expect(asm, `no assessment covers declared policy ${policyId}`).toBeTruthy();
+			expect(asm!.state.assessmentState, `${policyId} was not satisfied`).toBe('SATISFIED');
+			// ⭐ THE PARTY. `evaluator` is what the verdict RECORDS; `updatedBy` is what the engine STAMPS from the
+			// session credential. Asserting both is the whole of `R22`'s discipline: a surface that named a
+			// reviewer it did not issue as would satisfy the first and fail the second.
+			expect((asm!.state.evaluator as { actorId?: string } | undefined)?.actorId).toBe(
+				'assurance-reviewer-1'
+			);
+			expect((asm!.state.updatedBy as { actorId?: string } | undefined)?.actorId).toBe(
+				'assurance-reviewer-1'
+			);
+		}
+
 		await page.screenshot({ path: 'e2e-results/pwu-lifecycle-satisfied.png', fullPage: true });
 	});
 

@@ -9,9 +9,9 @@
 // becomes the credential this table would resolve. The ENGINE cannot tell the difference, which is what CON-000
 // AX-10 requires: "Deployment topology MUST NOT change professional meaning."
 //
-// ── THREE PRINCIPALS, AND THE SEPARATION IS THE POINT ────────────────────────────────────────────────────────
-// The workbench user, the authoring agent, and the seeder are DIFFERENT ACTORS and must resolve to different
-// principals. Before this, every one of them was the same hardcoded `ui-user` (REG-F-054), which is why the
+// ── FOUR PRINCIPALS, AND THE SEPARATION IS THE POINT ────────────────────────────────────────────────────────
+// The workbench user, the authoring agent, the assurance reviewer and the seeder are DIFFERENT
+// ACTORS and must resolve to different principals. Before this, every one of them was the same hardcoded `ui-user` (REG-F-054), which is why the
 // record could not answer "who did what". Giving the agent its own credential is also what stops D-1 from
 // making forgeability LIVE: without it the broker's AGENT identity would fall dead the moment the engine began
 // stamping, and every agent-authored command would silently acquire the human's identity (REG-F-056).
@@ -30,6 +30,27 @@ const STANDALONE_ORG = 'org-local';
 export const SESSION_CREDENTIAL = asCredential('jpwb.session.local');
 /** The authoring agent. A DISTINCT credential — see the note above on why this is load-bearing. */
 export const AGENT_CREDENTIAL = asCredential('jpwb.session.agent');
+/**
+ * ⭐⭐ THE INDEPENDENT ASSURANCE REVIEWER (`JAN-EXEC` `R22`, design §4.15) — the party that ASSESSES work the
+ * workbench user PRODUCED.
+ *
+ * ⛔ IT EXISTS BECAUSE THE SURFACE WAS REVIEWING ITS OWN WORK AND NOTHING COULD SEE IT. `recordAssurance`
+ * completed every assessment with `producer: evaluator` — one identity wearing both hats — under a demo policy
+ * whose own comment says it was chosen so *"`completeAssuranceAssessment` skips the independence check"*. The
+ * PWUs being signed off meanwhile declare ontology policies that demand `DIFFERENT_AGENT` or
+ * `DIFFERENT_INVOCATION`. Declaring policies that require independence and assessing a DIFFERENT policy that
+ * requires none is not two shortcuts; it is one bypass.
+ *
+ * ⭑ MEASURED, NOT FEARED: **0 of the ontology's 15 PWU templates** can be satisfied by a single actor. This is
+ * not one unlucky PWU kind, and no choice of subject avoids it.
+ *
+ * ⚠ A CREDENTIAL RATHER THAN A LITERAL, AND THAT IS THE WHOLE DISCIPLINE. Writing `assurance-reviewer-1` into
+ * an `evaluator` field on a command the USER's session issues would be `REG-F-061` restated — *"an identity no
+ * authenticator issues, no credential resolves to, and nothing could ever hold to account"*. The reviewer holds
+ * a credential and ISSUES the assessment commands, so the stamped `issuedBy` and the recorded `evaluator` name
+ * the same party. `reference-undertaking.ts` made exactly this move for exactly this reason.
+ */
+export const ASSURANCE_REVIEWER_CREDENTIAL = asCredential('jpwb.session.assurance-reviewer');
 /** Seeding and recovery, which run at construction before any user session exists. */
 export const SYSTEM_CREDENTIAL = asCredential('jpwb.session.system');
 /**
@@ -49,7 +70,27 @@ const PRINCIPALS: Readonly<Record<string, Principal>> = {
 		actorType: 'HUMAN',
 		displayName: 'Workbench User',
 		tenantId: STANDALONE_TENANT,
-		organizationId: STANDALONE_ORG
+		organizationId: STANDALONE_ORG,
+		// ⭐ THE INVOCATION THIS PARTY ACTS IN — required on BOTH sides or `DIFFERENT_INVOCATION` decides nothing.
+		// `checkIndependence`'s `differs()` demands the field PRESENT ON BOTH and unequal, so a one-sided id is
+		// worth exactly as much as no id: `pol_assumption_disclosure` and `pol_intent_completeness` would fail
+		// closed forever. `reference-undertaking.ts` records the same trap in its own words — *"independence you
+		// cannot demonstrate is independence you do not have."*
+		executionInstanceId: 'jpwb-workbench-session'
+	},
+	[ASSURANCE_REVIEWER_CREDENTIAL]: {
+		// ⛔ DISTINCT IN BOTH DIMENSIONS THE DECLARED POLICIES ACTUALLY TEST, and neither is decoration:
+		// `actorId` is what `DIFFERENT_AGENT` compares (the seam maps `actorId`→`agentId`), and
+		// `executionInstanceId` is what `DIFFERENT_INVOCATION` compares. A reviewer differing only in
+		// `displayName` would be refused by the first and would deserve to be.
+		actorId: 'assurance-reviewer-1',
+		// HUMAN, which is also what `pol_fitness_for_purpose` and `pol_baseline_promotion` require of an
+		// evaluator — satisfied by BEING one, not by being a different one.
+		actorType: 'HUMAN',
+		displayName: 'Independent Assurance Reviewer',
+		tenantId: STANDALONE_TENANT,
+		organizationId: STANDALONE_ORG,
+		executionInstanceId: 'jpwb-assurance-review'
 	},
 	[AGENT_CREDENTIAL]: {
 		actorId: 'jpwb-authoring-agent',

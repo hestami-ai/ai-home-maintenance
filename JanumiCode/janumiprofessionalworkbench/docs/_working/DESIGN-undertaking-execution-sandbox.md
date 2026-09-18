@@ -94,6 +94,11 @@ recording is worth committing.
 | R16 | **THE PARTICIPATING MINT IS A CONTENT-PLANE ADDRESS NAMED BY `EvidenceObject.contentReference` — NO SECOND `ARTIFACT` OBJECT.** A test log is not a work product. Ruled 2026-09-17; see §4.12. |
 | R17 | **TWO BLOCKING CODES, AND TRUNCATION IS NOT ONE OF THEM.** `PROCESS_OUTPUT_NOT_RETAINED` and `PROCESS_VERDICT_UNOBSERVED` block; a DECLARED prefix and an incomplete capture are recorded LIMITATIONS, because a declaration that travels with the bytes does not invalidate the exit code. Ruled 2026-09-17; see §4.12. |
 | R18 | **EVERY COMPLETED RUN BECOMES ONE `EVIDENCE` OBJECT, TYPED `OBSERVATION`.** The host cannot tell which command was a test run, and a predicate over `argv` is the normaliser shape this seam has refused four times — so it records what it CAN say: it observed a command run and what it exited with. Calling `ls` a `TEST_RESULT` would be a claim about what the command WAS. Ruled 2026-09-17; see §4.13. |
+| R19 | **THE MISSING LIMB IS ASYMMETRIC.** A declared policy that HAS a concluded verdict votes whatever its status — nothing already enforced is weakened. A policy that LACKS one is DEMANDED only if it currently GOVERNS (exists, ACTIVE, §5.1 applicability permits). *We do not stop counting a verdict we have; we do not demand one that could not lawfully be obtained.* Ruled 2026-09-17; see §4.14. |
+| R20 | **THE EXECUTION PLANE IS DISCLOSED NOW AND TAKEN AS ITS OWN PHASE.** `CompleteExecutionStep` consults declared assurance NOWHERE, and the cause is structural — the floor set and the declarable set are DISJOINT BY CONSTRUCTION. Ruled 2026-09-17; see §4.14.4. |
+| R21 | **`PromoteBaseline` IS FIXED IN PHASE 6.** Its “required assessments” come from the CALLER'S PAYLOAD — the same *controller selects its own evidence* defect `JAN-PWU007` closed on `ChangePwuState`, still open one gate over. Ruled 2026-09-17; see §4.14.5. |
+| R22 | **THE DEMO GAINS AN ASSURANCE-REVIEWER PRINCIPAL, AND THE ASSESSMENT ACTS ARE ISSUED BY IT.** Every one of the ontology’s 15 PWU templates declares a policy demanding a reviewer distinct from the producer — 0 of 15 are single-actor satisfiable — and the demo signed off as both parties under a NONE-independence policy of its own. Naming the reviewer in a payload the operator’s session issues is FORBIDDEN (`REG-F-061`): the reviewer holds a credential and issues the command. Ruled 2026-09-18; see §4.15. |
+| R23 | **AN ATOMIC ACT MAY HAVE MORE THAN ONE ACTING PARTY, AND THE KERNEL NOW SAYS SO.** `SPEC-001-INV-14` demands a multi-command affordance commit atomically; §39 inv-8 demands an independent reviewer; and `dispatchBatchAs` stamps ONE principal for a whole transaction — so the two rules were incompatible for every assurance act, and nothing had to notice while the surface reviewed its own work. `dispatchMultiPartyBatch` puts both parties in one transaction, each command stamped from its OWN resolved principal. Ruled 2026-09-18; see §4.16. |
 
 ---
 
@@ -828,3 +833,367 @@ exactly that, and `R17`'s codes exist so the block is LEGIBLE rather than myster
 ⚠ **THE COST, STATED: N COMMANDS MEANS N FLOOR RUNS AND N REVIEWER CALLS.** The bound is the observer's own
 (32, the same as `R11`'s record-plane cap), and a step that runs many commands pays for each. That is a
 resource question of the kind `W-2` already carries; it is not smoothed by minting fewer.
+
+
+---
+
+## 4.14 ⭐⭐ PHASE 6, AS MEASURED — the roadmap described a gap that was HALF shut, and the half still open is wider than it said
+
+**HOW THIS WAS ESTABLISHED.** Four independent readers, 78 findings, then 32 adversarial verifiers — **14 of 32
+refuted**. Then one thing no agent was allowed to do: **the bypass was DRIVEN.**
+
+### 4.14.1 ⛔ WHAT THE ROADMAP GOT WRONG IN BOTH DIRECTIONS
+
+§8 opens by calling `RPH-PWU-007` / `RPH-ASR-012` *"`kind: 'UNENFORCED_DISCLOSED'`"*. **Both rows read
+`kind: 'ENFORCED'`**, closed by `JAN-PWU007` on 2026-09-14 — three days before this roadmap's Phase 5 landed —
+with `rejectUnsupportedDeclaredSatisfaction` chained in `changePwuState`, driven, with mutants.
+
+⭑ **AND THE ROADMAP'S OWN `DO` CLAUSE IS NOT WHAT THOSE ROWS ENFORCE.** It has three demands:
+
+| demand | status |
+| --- | --- |
+| (i) assemble `assurancePolicyIds` ∪ the PwuType's `requiredAssurancePolicyIds` | ✅ **LANDED**, in one kernel join (`declaredAssurancePolicyIds`) shared with the engine's own determination. **H2 refuted — do not file it.** |
+| (ii) refuse when any member **LACKS** a SATISFIED/CONDITIONALLY_SATISFIED assessment | ⛔ **OPEN.** What landed is the CONVERSE: refuse when a member **HAS** one that is stricter. |
+| (iii) at the subject's **CURRENT VERSION** | ⛔ **OPEN**, and asymmetric with the floor gate, which DOES version-bind out of the SAME index. |
+
+⭐ So the honest reading is neither *"Phase 6 is done"* nor *"Phase 6 is untouched"*: **the disposition is stale
+and the rule is half-landed**, and rewriting §8 as either would be an error.
+
+### 4.14.2 ⭐⭐ THE FINDING NOBODY HAD NAMED — ONE ACCEPTED COMMAND ERASES A REJECTION. DRIVEN.
+
+Take the repository's own `RPH-PWU-007` refusal fixture — a PWU whose declared policy reads REJECTED, which the
+ENFORCED guard refuses — and insert **ONE** command before the claim: a second `RequestAssuranceAssessment`
+under the SAME declared policy, requested and left at `READY`.
+
+```
+PROBE request status:         ACCEPTED
+PROBE claimSatisfied status:  ACCEPTED
+PROBE final state:            workLifecycleState: SATISFIED, assuranceState: SATISFIED
+```
+
+⛔ **THE MECHANISM, AND IT IS TWO LINES.** `latestAssessmentByPolicy` returns the latest record per policy
+**whatever its state** — correctly, and it says so, because for the floor gate an assessment still ASSESSING is
+precisely NOT a satisfied floor. `declaredPolicyVerdicts` then `continue`s past a latest record that is not one
+of the five concluded states **with no fallback to the previous concluded one**. The REJECTED verdict is still
+in the store. It simply stopped being *latest*, and a skipped policy votes nothing.
+
+⚠ **AND THE LIMB THAT DOES IT IS, BY THE REPOSITORY'S OWN MEASUREMENT, GUARDED BY NOTHING.** `RPH-ASR-012`'s
+own `declaredMutations` records that deleting the `CONCLUDED_ASSESSMENT_STATES` filter **SURVIVED** every probe,
+*"because every assessment these fixtures create is COMPLETED, so the limb is never reached with a lifecycle
+value. It is a real limb guarded by nothing."* That note was written as a disclosure of weak coverage. It is
+also, read one step further, the description of a live bypass — and nobody read it that way.
+
+⭑ **MY FIRST PROBE WAS WRONG AND THE WRONG-NESS IS WORTH KEEPING.** It cited no assessment, so it was refused
+by `rejectUnbackedDisposition` with `RPH_EVIDENCE_MISSING` — a refusal from a DIFFERENT guard, which proved
+nothing about the one under test. An arrangement that trips the wrong guard is not evidence about this one.
+
+### 4.14.3 ⭐ ONE RULE CLOSES ALL THREE, AND THE KERNEL ALREADY HAS IT
+
+The erasure, the never-assessed case and the stale version are the SAME hole seen three ways: **a declared
+policy with no concluded verdict bound to the subject's CURRENT version has not spoken.** §28.2's rung 3 —
+*"any required assessment missing"* — is exactly that rule, it is ratified, and `aggregateAssuranceDisposition`
+implements it already.
+
+⛔ **IT IS UNREACHABLE FROM THIS CALL SITE TODAY, AND THAT IS MEASURED RATHER THAN INFERRED.**
+`unsupportedSatisfaction` passes `assessed: true` for every element and passes only elements that HAVE a
+disposition — so `missing` is ALWAYS empty and the `assessed` discriminator is **dead code** at this caller.
+
+⭑ **SO THERE IS NO KERNEL CHANGE.** `AggregateInput` already carries `disposition?`, `assessed` AND
+`applicable`, and the fold already excludes `applicable === false` because *"a policy determined NOT_APPLICABLE
+requires nothing."* The caller simply stops hiding the missing ones and starts declaring applicability.
+
+### `R19` — and why the asymmetry is not a compromise
+
+| the policy | what it contributes |
+| --- | --- |
+| HAS a concluded verdict at the current version | `{disposition, assessed: true}` — votes, **whatever its status**. Unchanged; nothing enforced is weakened. |
+| LACKS one, and currently GOVERNS | `{disposition: undefined, assessed: …}` → rung 3 → `UNASSESSED`, which is stricter than SATISFIED. **Refuses.** |
+| LACKS one, and does NOT govern (absent, not ACTIVE, §5.1 excludes it) | `{applicable: false}` — filtered out of `required`. Silent, by the fold's own rule. |
+
+⚠ **THE MODULE'S RECORDED OBJECTION IS ANSWERED, NOT OVERRIDDEN.** `declared-assurance.ts` declined rung 3
+because *"folding an ABSENT assessment in makes `aggregateAssuranceDisposition([])` — which returns UNASSESSED
+by design — into a COMMAND refusal that no PWU declaring zero policies could ever escape."* ⭑ **That case never
+reaches the fold:** `rejectUnsupportedDeclaredSatisfaction` short-circuits on `if (declared.length === 0) return
+undefined;` two lines above. The objection names the one arrangement the guard already excludes.
+
+⚠ **AND THE VERSION LIMB'S DEFERRAL IS ANSWERED ON ITS OWN TERMS TOO.** It was deferred to `RPH-ASR-010`,
+*"which lives on the ASSESSMENT path (`completeAssuranceAssessment` binding a version the subject is not at),
+not on this one."* ⭑ Correct, and this is the OTHER path: a READER ignoring the version a verdict bound. Two
+sites, two rules, and a refusal here carries rung 3's marker rather than `RPH-ASR-010`'s — so one arrangement
+does not trip two guards.
+
+### 4.14.4 ⛔ `R20` — THE SPONSOR'S ORIGINAL DOUBT, ANSWERED WITH A MECHANISM AND DISCLOSED RATHER THAN FIXED HERE
+
+**`CompleteExecutionStep` consults declared assurance NOWHERE.** `floorGateBlock` maps over the module constant
+`FLOOR_POLICY_IDS_REQUIRED` and over nothing else; `execution.ts` contains zero references to a declared policy.
+
+⛔ **AND IT IS NOT AN OVERSIGHT — THE TWO SETS ARE DISJOINT BY CONSTRUCTION.** The engine REFUSES a floor id in
+a declared list (`pwa-authoring.ts` forces `requiredAssurancePolicyIds` non-floor), so a custom declared policy
+can NEVER be one of the three the execution gate iterates. **The intersection of {what an author may declare}
+and {what the execution gate checks} is EMPTY.**
+
+⚠ **AND THE SUBJECT IS WRONG TOO.** `floorGateBlock` runs per RESULT — the ARTIFACT / EVIDENCE ids a completion
+names — while declarations live on the PWU and its PwuType, objects that path never loads.
+
+⭑ **RULED: DISCLOSE NOW, TAKE IT AS ITS OWN PHASE.** `INV-5` (exec ≠ assurance) says a step completing is not
+supposed to grant assurance, so extending the completion gate needs its own argument rather than arriving as a
+rider on three unrelated fixes. ⛔ What is NOT acceptable is leaving it unsaid: the doubt is **correct as
+stated** for the execution plane, and it is now written down with the trace.
+
+### 4.14.5 ⭐ `R21` — `PromoteBaseline` HAS THE SAME DEFECT `JAN-PWU007` CLOSED, ONE GATE OVER
+
+Its *"required assessments"* are `p.requiredAssessmentIds.map(…)` — **the caller's own list**. A promotion
+naming NO assessments passes that arm vacuously. That is *"the controller selected its own evidence"*, verbatim
+the sentence `declared-assurance.ts`'s header uses about the hole it was written to close.
+
+⚠ **IT SURVIVES ONLY AS A MUTATION NOTE ON A ROW MARKED `ENFORCED`**, which is not a disclosure. ⭑ And the
+subject join EXISTS here, unlike on the execution plane: the baseline's own frozen `itemObjectVersions` name the
+objects, *"read from the object, not the promoting payload"* — the gate already does this for observations and
+contested claims. **RULED: fixed in Phase 6**, same rule, same kernel call.
+
+## 4.15 ⭐⭐ PHASE 6b, AS MEASURED — the demo's sign-off is a SELF-REVIEW, and the policy it chose is the thing that hid it
+
+Phase 6 left `gate:fast` **RED** on three browser specs, and the commit said the red was the finding. It is —
+but the finding is **larger than the sentence that commit could support**, and measuring it before writing any
+code is what made the difference between a one-line id swap and the ruling below.
+
+### 4.15.1 ⛔ WHAT THE REFUSAL ACTUALLY SAYS, VERBATIM
+
+From `e2e-results/.../pwu-lifecycle…/error-context.md`, the alert the browser rendered:
+
+> *"ChangePwuState would set PWU `pwu_…0D` assuranceState=SATISFIED, but a policy this PWU itself declares has
+> not been satisfied. … yields composed disposition UNASSESSED … `pol_assumption_disclosure` has no assessment
+> over this subject at all; `pol_decomposition_coverage` has no assessment over this subject at all;
+> `pol_architecture_coverage` has no assessment over this subject at all; `pol_intent_preservation` has no
+> assessment over this subject at all."*
+
+Four policies, named. They arrive from the PwuType — `undertakings/+page.server.ts:234` copies
+`type.state.requiredAssurancePolicyIds` onto the instance — and the type's list is the ontology's
+`pwuTemplates[].defaultPolicyIds` for `ARCHITECTURE_DEFINITION`. Nothing here is invented by the demo; it is
+ratified content, correctly instantiated.
+
+Meanwhile `assurancePrelude` opens exactly one assessment, under `DEMO_POLICY_ID`, which is in **none** of those
+four. So `R19` is doing precisely what it was built to do.
+
+### 4.15.2 ⭐⭐ THE HALF THE COMMIT MESSAGE DID NOT REACH — TWO PIECES OF ONE BYPASS
+
+The obvious repair is "assess the declared policies instead". ⛔ **It does not work, and the reason is the
+finding.** `recordAssurance` completes its assessment with
+
+```ts
+producer: evaluator          // and evaluator === actingActor(uiSession())
+```
+
+— the operator recorded as **both** the producer of the work and its assessor. That is a self-review. It has
+never been refused, because `demo-policy.ts` chose a policy that cannot refuse it, and **says so in its own
+words**:
+
+> *"independence NONE, so `completeAssuranceAssessment` skips the independence check (assurance.ts) and a
+> SATISFIED disposition backs the PWU's assuranceState=SATISFIED hop without a separate reviewer identity."*
+
+⚠ **Read together, those two facts are not two defects but one arrangement**: declare policies that demand
+independence, and assess a *different* policy that demands none. Either half alone looks like a shortcut. The
+pair is a bypass, and `R19` is what forced the halves into the same sentence for the first time.
+
+### 4.15.3 ⛔ DERIVED, NOT ENUMERATED — NO PWU KIND IN THE ONTOLOGY IS SINGLE-ACTOR SATISFIABLE
+
+⚠ The question *"is this one unlucky PWU kind?"* is the one worth asking, and hand-listing the answer is the
+defect one level up. Derived over the whole ontology (`seedPolicies` × `pwuTemplates`):
+
+| policy | independence | policy | independence |
+|---|---|---|---|
+| `pol_intent_fidelity` | `DIFFERENT_AGENT` | `pol_assumption_disclosure` | `DIFFERENT_INVOCATION` |
+| `pol_requirement_coverage` | `DIFFERENT_AGENT` | `pol_intent_completeness` | `DIFFERENT_INVOCATION` |
+| `pol_decomposition_coverage` | `DIFFERENT_AGENT` | `pol_fitness_for_purpose` | `HUMAN` |
+| `pol_constraint_propagation` | `DIFFERENT_AGENT` | `pol_baseline_promotion` | `HUMAN` |
+| `pol_architecture_coverage` | `DIFFERENT_AGENT` | `pol_historical_consistency` | `DIFFERENT_AGENT` |
+| `pol_intent_preservation` | `DIFFERENT_AGENT` | `pol_test_adequacy` | `DIFFERENT_AGENT` |
+
+**0 of 15 PWU templates can be satisfied by one actor.** Every template declares at least one `DIFFERENT_AGENT`
+or `DIFFERENT_INVOCATION` policy. (`HUMAN` is *not* a blocker — `checkIndependence` tests
+`evaluator.actorType === 'HUMAN'` and the operator is one.)
+
+~~⭑ **AND NOTHING ELSE STANDS IN THE WAY, WHICH MATTERS.** All four of the PWU's policies carry
+`requiredEvidence: []`, so Gate A admits everything and every assessment lands in `READY` directly. Independence
+is not *one* obstacle among several — after `R19`, it is **the whole gate**.~~
+
+⛔ **STRUCK 2026-09-18 — IT WAS TRUE OF THE FOUR POLICIES I MEASURED AND FALSE OF THE ONTOLOGY, AND THE BROWSER
+FOUND IT, NOT THIS DOCUMENT.** The sentence generalised from `ARCHITECTURE_DEFINITION`, the one PWU kind the
+failing spec happened to use. Derived over all twelve seeded policies:
+
+| policy | `requiredEvidence` | `requiredForDispositions` |
+|---|---|---|
+| `pol_intent_fidelity` | **7** | `SATISFIED_ONLY` |
+| `pol_intent_completeness` | **6** | `SATISFIED_ONLY` |
+| the other ten | 0 | — |
+
+⚠ **FOUR OF FIFTEEN PWU KINDS ARE AFFECTED** — `PRODUCT_REALIZATION`, `INTENT_AND_PRODUCT_DEFINITION` (13
+requirements), `INTENT_DISCOVERY` and `PRODUCT_BOUNDARY`. This is the *derive, never enumerate* rule turned on
+its author: I derived the INDEPENDENCE table over all fifteen templates and checked `requiredEvidence` on four
+policies by eye. The correct statement is that independence is the whole gate **for the eleven kinds that
+declare no gated evidence**, and for the other four Gate A stands behind it.
+
+⭐ **AND THE REMEDY IS ALREADY RULED, IN GATE A's OWN MESSAGE**: *"Submit it (SubmitEvidenceForAssessment)
+first, **or return a non-satisfied disposition**."* `earnAssurance` took the second route and said why — *"A
+policy whose required evidence this undertaking cannot supply does not get the caller's requested SATISFIED —
+it gets CONDITIONALLY_SATISFIED, which is what the evidence actually supports … asking for it and being
+refused, or lowering it here, differ only in whether the drive tells the truth first."* Phase 6b does the same,
+per policy, and folds the PWU's own assurance axis from the verdicts rather than asserting a constant.
+
+⛔ **SO A `PRODUCT_BOUNDARY` PWU IN THIS DEMO REACHES `CONDITIONALLY_SATISFIED` AND NOT GREEN, AND THAT IS
+CORRECT.** It is short thirteen pieces of evidence the corpus requires. Nothing in this phase invents them.
+
+⛔ `DIFFERENT_INVOCATION` fails closed here for a second reason: `differs()` requires the field present on BOTH
+sides, and no demo principal carries an `executionInstanceId` at all. `reference-undertaking.ts` already
+recorded this exact trap —
+
+> *"DIFFERENT_INVOCATION FAILS CLOSED when neither party records one — correctly: independence you cannot
+> demonstrate is independence you do not have."*
+
+### 4.15.4 ⭐⭐ `R22` (SPONSOR, 2026-09-18) — A SECOND PRINCIPAL, AND THE ACT IS **ISSUED** BY IT
+
+**RULED: the demo gains an assurance-reviewer principal, and `recordAssurance` issues the assessment acts under
+that credential.** The stamped `issuedBy` and the recorded `evaluator` then name the same party, and `producer`
+stays the operator.
+
+⭑ **PRECEDENTED TWICE IN THIS REPOSITORY, WHICH IS WHY IT IS NOT AN INVENTION.**
+
+- `reference-undertaking.ts` already separates `ACTOR` (`owner-1`, `executionInstanceId: 'exec-production'`)
+  from `EVALUATOR` (`evaluator-1`, `'exec-assurance-review'`), and its own header states the reason: *"the
+  reference undertaking stamped `owner-1` as BOTH the producer of every artifact AND the evaluator of every
+  assessment, so a real independence check … would have had to REJECT the canonical drive or be defeated to
+  pass."* **That is the demo's position today, word for word.**
+- `identity.ts` already holds the general rule: *"The workbench user, the authoring agent, and the seeder are
+  DIFFERENT ACTORS and must resolve to different principals."* A reviewer is the fourth such actor, not a new
+  kind of thing.
+
+⛔ **WHAT `R22` DOES NOT LICENSE — AND THIS IS THE WHOLE DISCIPLINE.** It does **not** permit naming
+`assurance-reviewer-1` as `evaluator` on a command the operator's session issues. That would be a literal
+identity in a payload that no credential resolves to — `REG-F-061` exactly, the finding `actingActor()` exists
+to have closed. The reviewer must **hold a credential and issue the command**, or the record is a forgery that
+happens to satisfy a check.
+
+⚠ **THE COST, STATED**: two parties acting is two transactions. `runSteps` is one atomic `dispatchBatch` under
+one session, so the assurance acts and the controller's own state hops can no longer share a batch. ⭑ That is
+not a regression to absorb quietly — it is what INV-5 looks like at the surface, and `recordBlockingFinding`'s
+own header already argued the same shape: *"Two acts, minuted separately."*
+
+### 4.15.5 ⭐ THE COMPANION GAP — A §20 VERDICT MAY NAME A POLICY IT WAS NOT MEASURED AGAINST
+
+Measured while designing the fix: `completeAssuranceAssessment` reads `dispositionRecommendation`,
+`subjectObjectIds`, `subjectSemanticVersions`, `evidenceConsideredIds`, `residualUncertainty`,
+`recommendedControlActions`, `validatorId`, `validatorVersion` and `executionProvenance.evaluator` off the
+`ValidatorResult` — and **never compares `validatorResult.policyId` to the assessment's own
+`assurancePolicyId`**.
+
+⛔ **THE CONTROL EXISTS ONE MODULE OVER AND NOT HERE.** `floor.ts:319` computes
+`policyVersionMatches: r.policyVersion === p.policyVersion` and `classifyValidatorResult` refuses on it. The
+general command path has no equivalent. `reference-undertaking.ts` passes `policyId: pid` per assessment and
+records why — *"a ValidatorResult whose `policyId` did not match the assessment's would be a verdict attributed
+to criteria it was not measured against"* — so the ratified drive already honours a rule nothing enforces.
+
+⚠ **AND IT IS THE INVARIANT `R22`'s FIX DEPENDS ON.** Today the demo's single hardcoded
+`policyId: DEMO_POLICY_ID` is accidentally consistent, because the assessment is under `DEMO_POLICY_ID` too.
+The moment one action opens N assessments under N different policies, "each verdict names its own policy"
+becomes a live obligation with nothing checking it. **RULED: closed in this phase, beside the fix that needs
+it** — a guard whose population is empty today is worth nothing, and this is the commit that fills it.
+
+### 4.15.6 ⭑ WHAT DELIBERATELY DOES NOT CHANGE
+
+- **A PWU that declares nothing keeps `DEMO_POLICY_ID`.** `undertakings/[id]/+page.server.ts:898` proposes
+  ad-hoc PWUs with `assurancePolicyIds: []`; `R19` has no opinion about them and neither does this phase. The
+  else-branch stays byte-identical, so no existing spec changes meaning for a reason this phase did not argue.
+- **The ontology is not edited.** The policies demand independence because the corpus says they do. Relaxing a
+  ratified `independenceRequirement` to make a demo green is the trade this register exists to refuse.
+- **`markSatisfied` is untouched.** It already refuses without assurance; that is the property the lifecycle
+  spec is named after and it was never the thing at fault.
+
+### 4.15.7 ⛔ FILED, NOT FIXED — `ValidatorResult.limitations` REACHES NO READER
+
+Found by writing an assertion for it and watching it go red. A §20 verdict's `limitations` array is:
+
+- **not read** by `completeAssuranceAssessment` — it reads nine ValidatorResult fields and this is not one;
+- **not carried** by the ratified `AssuranceAssessmentCompleted` payload, which is a `strictObject` declaring
+  `evidenceConsideredIds`, `observationIds`, `residualUncertainty`, `recommendedControlActions`, `validatorId`,
+  `validatorVersion` and `independenceResult` — and no `limitations`;
+- **not stored** on the assessment object.
+
+⚠ **A FIELD EVERY CALLER FILLS AND NOTHING READS** is the hollow-governed-layer shape this repository keeps
+finding — and it matters here specifically, because Phase 6b's honesty about what its reviewer did *not* do
+was going to live there. It is written to `residualUncertainty` as well, which the event does carry, so the
+disclosure is reachable; `limitations` keeps the value in its proper home for the day it is read.
+
+⛔ **NOT FIXED HERE, DELIBERATELY.** Widening a ratified event payload is a governance act, and `§0.3`'s rule
+against settling an open elicitation by implementation applies exactly. Filed for the register.
+
+### 4.15.8 ⭐ THE SECOND THING AN ACCEPTED COMMAND DOES NOT MEAN
+
+`completeAssuranceAssessment` does **not** reject a self-review. It takes the ratified §30
+`ASSESSING -> INDEPENDENCE_VIOLATION` arrow and **ACCEPTS** the command, because the violation is a fact to be
+minuted rather than a malformed request.
+
+⚠ A caller reading `batch.ok` alone therefore reports a completed review for an assessment that reached the
+one state INV-8 forbids from ever being SATISFIED — the swallowed-refusal shape `REG-F-015` exists to catch,
+arrived at through an **accept** rather than a rejection, which is why no existing instrument names it.
+`unconcludedReviews` is the answer, and without it the operator would have seen `RPH-PWU-007`'s §28.2 refusal
+instead: *"a policy this PWU itself declares has not been satisfied"* — true, and useless, because it names
+the silence and not the reason for it.
+
+## 4.16 ⭐⭐ `R23` — AN ATOMIC PROFESSIONAL ACT MAY HAVE MORE THAN ONE ACTING PARTY, AND THE ENGINE COULD NOT SAY SO
+
+⛔ **FOUND BY A REGRESSION I CAUSED, WHICH IS THE ONLY REASON IT WAS REACHABLE.** Phase 6b split the sign-off
+into two transactions — the reviewer's assessments, then the controller's state hops — and
+`undertaking-atomicity.e2e.ts` went red: **39 assessments before, 42 after** a refused affordance. Three orphans.
+
+### 4.16.1 ⛔ TWO RATIFIED RULES THAT COULD NOT BOTH HOLD
+
+- **`SPEC-001-INV-14` / FORK-23 (b)** — *"a multi-Command Affordance is ATOMIC where an atomic dispatch exists,
+  and a partially-applied sequence SHALL NOT leave committed state behind."*
+- **`DOC-004 §39` invariant 8** — an assessment under a policy requiring independence may not be satisfied
+  unless the evaluator is independent of the producer.
+
+⚠ **AND THE ENGINE'S ATOMIC ENVELOPE BINDS EXACTLY ONE PRINCIPAL.** `dispatchBatchAs(principal, …)` wraps the
+loop in `store.transaction()` and stamps **every** command from that one principal. So a single atomic operation
+cannot contain two parties' acts, and an affordance that needs both must choose which rule to break.
+
+⭑ **NOTHING HAD TO CHOOSE BEFORE, AND THAT IS THE FINDING.** Every multi-command affordance in this surface was
+single-party — because the assurance one was **reviewing its own work**. `REG-F-400` removed that, and the
+conflict it had been masking surfaced immediately. ⛔ This is the general form: it will recur for **every**
+future act that spans parties — a governance Decision proposed by one party and approved by another, a waiver
+granted beside the work it waives — none of which can be atomic today.
+
+### 4.16.2 ⭐ WHAT IS BUILT, AND WHY IT SITS BEHIND A CREDENTIAL
+
+`AuthedEngineHandle.dispatchMultiPartyBatch(entries)`, where each entry is a command plus an OPTIONAL `as`
+credential; omitted means *this session's own*. One `store.transaction()`; each command stamped from **its own**
+resolved principal.
+
+⛔ **IT IS NOT ON THE BARE `EngineHandle`, AND THAT IS DELIBERATE.** `engine.ts` records why dispatch lives
+behind `as()` at all: *"Moving them behind a credential is what makes every unmigrated call site a COMPILE ERROR
+rather than a silent last-write-wins path."* A multi-party batch reachable without presenting any credential
+would undo exactly that. The **composing** party authenticates; the other parties authenticate for their own
+commands.
+
+### 4.16.3 ⚠ THE AUTHORIZATION STATEMENT, MADE EXPLICITLY RATHER THAN LEFT TO THE PLUMBING
+
+**A host that HOLDS two credentials may bundle both parties' commands into one atomic act.** That is a widening
+of what a *session* can compose and **not** a widening of what any *party* may do: every command is still
+stamped from the principal its own credential resolves to, an unresolvable credential still fails closed, and no
+party gains the ability to act as another. ⭑ The engine already refuses a declared `issuedBy` that disagrees
+with the resolved principal — *"Overwriting quietly would make a forgery attempt invisible"* — and this path
+does not touch that.
+
+⚠ **IT IS ALSO EXACTLY WHAT THE SINGLE-USER DEMO IS**: one host holding the operator's and the reviewer's
+credentials, simulating two parties, with the record saying truthfully which one issued what.
+
+### 4.16.4 ⛔ THE THREE PROPERTIES THAT MUST BE GUARDED, BECAUSE EACH FAILS SILENTLY
+
+| # | property | how it fails silently if unguarded |
+|---|---|---|
+| 1 | one transaction — any refusal rolls back **every** party's commands | the orphan-assessment defect, restored |
+| 2 | each command is stamped from **its own** principal | every command looks like the composing session's; the record shows one party doing both halves, and `checkIndependence` still passes because it reads the PAYLOAD, not the issuer |
+| 3 | an unresolvable credential fails **that** command and aborts | falling back to a neighbouring principal is the defaulted identity `actingActor()` throws rather than supply |
+
+⭐ Property 2 is the one with no other detector: independence is computed from `producer`/`evaluator` in the
+payload, so a batch that mis-stamped every issuer would satisfy INV-8, satisfy INV-14, and record a lie. Its
+mutant is `P6c-b`, and the assertion pairs `issuedBy` per command against the credential that carried it.

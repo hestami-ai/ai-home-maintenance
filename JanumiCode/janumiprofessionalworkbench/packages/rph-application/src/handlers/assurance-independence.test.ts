@@ -1312,8 +1312,17 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		createPolicyPermitting(STRICT, ['CONTINUE']);
 		createPolicyPermitting(PERMISSIVE, ['CONTINUE', 'ESCALATE']);
 
-		// THE KILL. The assessment is pinned to STRICT; the verdict names PERMISSIVE as its own policy and
-		// recommends ESCALATE, which STRICT does not permit and PERMISSIVE does. The pinned policy must decide.
+		// ⭐⭐ THE KILL — AND SINCE `JAN-EXEC` PHASE 6b IT LANDS ONE GUARD EARLIER, WHICH IS A STRENGTHENING.
+		//
+		// The arrangement is unchanged: pinned to STRICT, the verdict names PERMISSIVE and recommends ESCALATE,
+		// which STRICT does not permit and PERMISSIVE does. What changed is the answer. `completeAssuranceAssessment`
+		// now REFUSES a verdict whose `policyId` disagrees with the assessment's own (design §4.15.5), so the
+		// validator no longer gets as far as being judged by the wrong rules — it is refused for naming them.
+		//
+		// ⛔ THE ASSERTION IS MOVED, NOT WEAKENED, AND THE DIFFERENCE MATTERS. Leaving `Permitted: [CONTINUE]`
+		// here would have been an assertion about Gate B satisfied by a refusal Gate B never issued — the
+		// `an-arrangement-that-trips-two-guards` shape this repository has now recorded several times: an
+		// arrangement tripping two conjuncts proves NEITHER. Gate B's own precision is driven below, unconfounded.
 		const pinnedStrict = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A80';
 		assessingUnder(pinnedStrict, STRICT);
 		const r = engine.dispatch(
@@ -1325,11 +1334,28 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			r.status,
 			'a validator naming a permissive policy in its own result must not choose the rules it is judged by'
 		).toBe('REJECTED');
-		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
-		// THE MESSAGE, not merely the code: it enumerates the permitted set of the policy that was ACTUALLY
-		// consulted, so it is the one observable that says WHOSE rules refused. `Permitted: [CONTINUE]` is STRICT's.
-		expect(r.error?.message).toContain('Permitted: [CONTINUE]');
+		expect(r.error?.code).toBe('RPH_VALIDATOR_OUTPUT_INVALID');
+		// BOTH ids, because the refusal is ABOUT the disagreement and a reader cannot act on half of it.
+		expect(r.error?.message).toContain(STRICT);
+		expect(r.error?.message).toContain(PERMISSIVE);
 		expect(stateOf(pinnedStrict)?.assessmentState).toBe('ASSESSING'); // no verdict was recorded
+
+		// ⭑ GATE B'S OWN PRECISION, UNCONFOUNDED — the verdict names ITS OWN policy, so the guard above is silent
+		// and the only thing that can refuse is the pinned policy's permitted set. `Permitted: [CONTINUE]` is
+		// STRICT's, and it is the one observable that says WHOSE rules refused.
+		const pinnedStrictOwnName = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A83';
+		assessingUnder(pinnedStrictOwnName, STRICT);
+		const gateB = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', pinnedStrictOwnName, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdictNaming(pinnedStrictOwnName, STRICT, 'ESCALATE')
+			})
+		);
+		expect(gateB.status, 'STRICT does not permit ESCALATE, and STRICT is what this assessment pins').toBe(
+			'REJECTED'
+		);
+		expect(gateB.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(gateB.error?.message).toContain('Permitted: [CONTINUE]');
+		expect(stateOf(pinnedStrictOwnName)?.assessmentState).toBe('ASSESSING');
 
 		// CONTROL 1 — THE DISCRIMINATING ONE. The very same ESCALATE recommendation is ADMITTED when the
 		// assessment is genuinely pinned to PERMISSIVE. So the refusal above was about WHICH policy was consulted,

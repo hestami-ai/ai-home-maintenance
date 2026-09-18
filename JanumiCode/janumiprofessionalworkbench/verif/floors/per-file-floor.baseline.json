@@ -128,6 +128,12 @@
 			"functions": 0,
 			"lines": 0
 		},
+		"packages/rph-application/src/handlers/policy-governs.ts": {
+			"statements": 0,
+			"branches": 1,
+			"functions": 0,
+			"lines": 0
+		},
 		"packages/rph-application/src/handlers/product-behavior.ts": {
 			"statements": 0,
 			"branches": 0,
