@@ -1,7 +1,7 @@
 // TEST-MODE ONLY endpoint — the E2E harness reads the engine's ground truth here (the append-only event log and
 // every object's current materialized state) to assert the UI reflects REAL engine state, not just rendered markup
 // (e.g. that a node the graph paints "green" truly has assuranceState SATISFIED — INV-5, no green without
-// assurance). 404s unless RPH_DEMO_MODE=test, so it does not exist in a normal / production boot.
+// assurance). 404s unless the process DECLARES the harness (RPH_DEMO_MODE=test or JPWB_HARNESS=1) -- JAN-EXEC R24.
 import { error, json } from '@sveltejs/kit';
 import {
 	listPwas,
@@ -17,12 +17,12 @@ import {
 	listByType,
 	listConversations
 } from '@janumipwb/rph-engine';
-import { getEngine, isTestMode } from '$lib/server/workbench';
+import { getEngine, harnessExposed } from '$lib/server/workbench';
 import { getPendingAuthoringTurn, summarizeAuthoringTurn } from '$lib/server/authoring-turn';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = () => {
-	if (!isTestMode()) throw error(404, 'Not found');
+	if (!harnessExposed()) throw error(404, 'Not found');
 	const e = getEngine();
 	const pwas = listPwas(e);
 	return json({

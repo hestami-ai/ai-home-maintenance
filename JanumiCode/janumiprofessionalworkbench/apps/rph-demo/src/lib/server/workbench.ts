@@ -43,6 +43,24 @@ const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
  * script, a future tool) must answer NO to both.
  */
 const SERVING = process.env.RPH_DEMO_MODE === 'server';
+/**
+ * ⭐⭐ DOES THIS PROCESS EXPOSE THE HARNESS — the SECOND question, asked separately for the first time
+ * (`JAN-EXEC` `R24`, design §4.17).
+ *
+ * ⛔ THE COMMENT ABOVE `SERVING` HAD ALREADY NAMED TWO QUESTIONS AND THERE WAS ONLY ONE VARIABLE TO ANSWER
+ * THEM WITH. `RPH_DEMO_MODE` is single-valued, so a process could say `test` (the harness exists) or `server`
+ * (durable store, durable workspace, REAL process runner) and never both — and `JAN-EXEC` Phase 7, which builds
+ * a product in a durable workspace and runs its tests, needs both. It was not unbuilt; it was UNSAYABLE.
+ *
+ * ⚠ AFFIRMATIVE AND EXACT, NEVER TRUTHY. `'0'`, `'false'` and `'no'` are all truthy strings, so
+ * `Boolean(env.JPWB_HARNESS)` would answer YES to an operator who wrote the word for no. The comparison is to
+ * the one value that means yes.
+ *
+ * ⛔ AND IT IS STILL A LIST NOBODY HAS TO MAINTAIN: `vitest.config.ts` declares neither key, so this runner —
+ * and every future one — gets no harness and no durability BY CONSTRUCTION. That is the ruling
+ * `workbench-durable-store-declaration.test.ts` records, not reopened here.
+ */
+const HARNESS = process.env.JPWB_HARNESS === '1';
 const productionUlid = monotonicFactory();
 
 /**
@@ -188,9 +206,56 @@ export function getEngine(): EngineHandle {
 	return handle;
 }
 
-/** Whether the host is running in E2E test mode (RPH_DEMO_MODE=test). Guards the /test-api endpoints. */
+/**
+ * Whether the host is the DETERMINISTIC fixture (RPH_DEMO_MODE=test) — mock agent/executor, stable ids.
+ *
+ * ⚠ IT NO LONGER GUARDS THE `/test-api` ENDPOINTS, AND THE DOC LINE THAT SAID SO IS WHY THIS SPLIT EXISTS.
+ * Those are `harnessExposed()`'s business now. This predicate keeps the callers that are genuinely about the
+ * FIXTURE — and that question was already orthogonalised by configuration, since `model.ts` reads
+ * `TEST_MODE && !resolveExecutorToolId()`, so naming a real executor overrides the fixture without touching
+ * the mode.
+ */
 export function isTestMode(): boolean {
 	return TEST_MODE;
+}
+
+/**
+ * ⭐⭐ Whether the `/test-api` harness endpoints exist. The question `RPH_DEMO_MODE` could not ask on its own.
+ *
+ * ⭑ `test` STILL ANSWERS YES, and that limb is load-bearing rather than politeness: every gated browser spec
+ * reaches `/test-api/reset` and `/introspect` under `RPH_DEMO_MODE=test`, so a split that stopped answering yes
+ * there would take the whole e2e suite with it.
+ */
+export function harnessExposed(): boolean {
+	return TEST_MODE || HARNESS;
+}
+
+/**
+ * ⭐⭐ WHY A DESTRUCTIVE HARNESS ACT IS REFUSED HERE, OR `undefined` — ASKABLE BEFORE ANYTHING MUTATES.
+ *
+ * ⛔ IT IS A SEPARATE FUNCTION BECAUSE PUTTING THE CHECK INSIDE `resetEngine` PUT IT ONE FUNCTION TOO DEEP, AND
+ * AN ADVERSARIAL REVIEW MEASURED THE COST. `/test-api/reset` calls `clearAuthoringTurns()` FIRST — which closes
+ * every in-flight authoring turn's engine and deletes it — and only then calls `resetEngine`, where the refusal
+ * lived. So a refused reset had already destroyed every uncommitted candidate a professional had in flight, and
+ * `discardAuthoringTurn`'s own docblock says nothing records it: *"No compensating Command is needed because
+ * canonical state never changed."*
+ *
+ * ⚠ THAT IS THE SHAPE `resetEngine`'s OWN COMMENT NAMES — *"a destructive act that leaves the process looking
+ * healthy is the one a caller cannot detect"* — committed by the guard against it, and it is `SPEC-001-INV-14`'s
+ * partial application one layer up. A guard that refuses AFTER the first destructive step is not a guard.
+ *
+ * ⭑ THE RULE ITSELF IS UNCHANGED and is the repository's own: a durable store and a reset are contradictory,
+ * because *"a durable store shared across specs would make them order-dependent, which is the failure mode
+ * `resetEngine` exists to prevent."*
+ */
+export function durableStateRefusal(): string | undefined {
+	if (DB_PATH === undefined || DB_PATH === '') return undefined;
+	return (
+		`This process declared itself a server with a DURABLE store (${DB_PATH}), and destructive harness ` +
+		'affordances do not compose with durability. Reset would close the durable store and continue from an ' +
+		'empty in-memory one, so the data would still be on disk with nothing reading it. Point JPWB_DEMO_DB at ' +
+		'a fresh path per run, or drop the serving declaration.'
+	);
 }
 
 /** TEST MODE ONLY — tear down and recreate the engine so each E2E spec starts from a known state.
@@ -211,9 +276,18 @@ export function isTestMode(): boolean {
  *  install — day one, before anyone has done anything. A branch that only that state can reach is a branch a real
  *  first-time user meets first.
  *
- *  Throws outside test mode. */
+ *  Throws outside the harness, and throws for a DURABLE store even inside it — see `durableStateRefusal`. */
 export function resetEngine(seed: 'reference' | 'empty' | 'bare'): void {
-	if (!TEST_MODE) throw new Error('resetEngine is only available when RPH_DEMO_MODE=test');
+	if (!harnessExposed())
+		throw new Error(
+			'resetEngine is only available to a process that declares the harness (RPH_DEMO_MODE=test or JPWB_HARNESS=1).'
+		);
+	// ⚠ DEFENCE IN DEPTH, NOT THE PRIMARY GUARD. The route asks `durableStateRefusal()` BEFORE it destroys
+	// anything, because this check is one function too deep to stop `clearAuthoringTurns()`. It stays because
+	// `resetEngine` is an exported function and the route is not its only possible caller — but a caller that
+	// reaches this throw has already been allowed to do whatever it did first.
+	const refusal = durableStateRefusal();
+	if (refusal !== undefined) throw new Error(`resetEngine refused: ${refusal}`);
 	handle?.close();
 	cmdSeq = 0;
 	idSeq = 0;

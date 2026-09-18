@@ -7882,5 +7882,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/multi-party-batch.test.ts"],
 		why: "PROMISE: an entry whose credential does not resolve carries NO principal and NO borrowed one \u2014 `dispatchAs` refuses it with `RPH_AUTHENTICATION_REQUIRED` and the batch unwinds. \u00a713.3: *\"Fail closed on missing identity, tenant, POLICY, schema, or authority context\"*, and `actingActor()` THROWS rather than substitute for exactly this reason. WHAT THE MUTATION DOES: an unknown credential silently ACTS AS THE COMPOSING SESSION \u2014 so a caller that mistyped a credential, or one whose party was revoked, has its commands attributed to whoever composed the batch, and the batch SUCCEEDS. \u26a0 AND IT IS THE PLAUSIBLE EDIT: the fallback reads as defensive tidiness, and the only thing distinguishing it from the correct code is that the correct code refuses to invent an actor. That is the same judgement `identity.ts` records making once already.",
 		source: "JAN-EXEC Phase 6c / R23 — one atomic act, two acting parties"
+	},
+	{
+		id: "P7a-a-the-harness-declaration-is-ignored",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\treturn TEST_MODE || HARNESS;\n",
+		replace: "\treturn TEST_MODE; // MUTANT: the new declaration is accepted and never consulted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: a process may declare the harness INDEPENDENTLY of declaring itself a server \u2014 the whole of `R24`. WHO RELIES ON IT: `JAN-EXEC` Phase 7, which needs one process to be OBSERVABLE (the `/test-api` harness) and REAL (durable workspace + real child-process runner) at once, and could not exist while `RPH_DEMO_MODE` answered both questions with one value. WHAT THE MUTATION DOES: `JPWB_HARNESS=1` is read, stored, and silently disregarded \u2014 so the endpoints 404 for exactly the configuration the split was built for, and every OTHER test in the file still passes because they all involve `test` mode or expect a refusal. \u26a0 A DECLARATION NOTHING CONSULTS IS THE HOLLOW-GOVERNED-LAYER SHAPE this repository keeps finding, arriving here as an env key instead of as a policy field.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7a-b-the-harness-is-exposed-to-everyone",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "const HARNESS = process.env.JPWB_HARNESS === \x271\x27;\n",
+		replace: "const HARNESS = true; // MUTANT: every process declares the harness\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: serving is not a request to be inspected \u2014 `harnessExposed()` must answer NO to a process that did not declare it. WHO RELIES ON IT: every deployment, which would otherwise ship `/test-api/reset` and `/test-api/dispatch`; and `vitest`, which declares nothing and must be offered nothing. \u26d4 THE MUTANT IS NOT `() => true` ON THE FUNCTION, WHICH WOULD BE THE LAZY FORM: it attacks the DECLARATION, leaving `TEST_MODE || HARNESS` intact and readable, so the function still looks like it is asking a question. WHAT KILLS IT: the two CONTROLS \u2014 `server` alone must not expose the harness, and a process declaring NEITHER must get neither. Without those controls the positive test is satisfied by a predicate that has stopped discriminating, which is the defect class this ledger was built for.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7a-c-a-truthy-string-counts-as-yes",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "const HARNESS = process.env.JPWB_HARNESS === \x271\x27;\n",
+		replace: "const HARNESS = Boolean(process.env.JPWB_HARNESS); // MUTANT: truthy, not equal to the one value that means yes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: the declaration is AFFIRMATIVE AND EXACT. `'0'`, `'false'` and `'no'` are all truthy strings in JavaScript, so a `Boolean(...)` reading answers YES to an operator who wrote the word for no \u2014 the one mistake that turns a safety declaration into its opposite while looking like defensive coding. WHO RELIES ON IT: an operator disabling the harness the way a person naturally would. \u26a0 AND IT IS THE PLAUSIBLE EDIT, not a contrived one: `Boolean(env.X)` is how most codebases read a flag, and it is wrong here for a reason that only shows up when someone tries to turn the flag OFF. \u2b51 DELIBERATELY DISTINCT FROM `P7a-b`: that one admits EVERY process, this one admits every process that mentions the key at all \u2014 including the ones trying to opt out.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7a-d-the-durable-refusal-never-fires",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\tif (DB_PATH === undefined || DB_PATH === '') return undefined;\n",
+		replace: "\treturn undefined; // MUTANT: no destructive harness act is ever refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: destructive harness affordances do not compose with durability \u2014 design \u00a74.17.3, and the rule is the repository's own: *\"a durable store shared across specs would make them order-dependent, which is the failure mode `resetEngine` exists to prevent.\"* WHO RELIES ON IT: both `/test-api/reset` and `/test-api/dispatch`, which ask this question at their boundary before anything mutates. WHAT THE MUTATION DOES: a reset on a durable server closes the durable store and continues from an empty in-memory one \u2014 the server keeps answering, from nothing, while its data sits on disk unreferenced. \u26d4 THAT IS THE FAILURE MODE `resetEngine`'s OWN COMMENT NAMES: *\"a destructive act that leaves the process looking healthy is the one a caller cannot detect.\"* \u2b51 The function still exists and still returns a `string | undefined`, so nothing becomes statically dead.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7a-e-the-refusal-returns-to-being-one-function-too-deep",
+		file: "apps/rph-demo/src/routes/test-api/reset/+server.ts",
+		find: "\tconst refusal = durableStateRefusal();\n\tif (refusal !== undefined) throw error(409, refusal);\n\tconst body = (await request.json().catch(() => ({}))) as { seed?: string };\n",
+		replace: "\tconst body = (await request.json().catch(() => ({}))) as { seed?: string };\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: a REFUSED act must not have destroyed anything. WHAT THE MUTATION RESTORES IS THE DEFECT AN ADVERSARIAL REVIEW FOUND IN `R24` ITSELF: with the boundary guard gone the route still refuses \u2014 `resetEngine`'s own throw is deliberately kept as defence in depth \u2014 but `clearAuthoringTurns()` runs FIRST, closing every in-flight authoring turn and deleting it, and `discardAuthoringTurn` records nothing by design (*\"No compensating Command is needed because canonical state never changed\"*). So a professional's uncommitted candidate PWAs are gone and the caller is told the operation was refused. \u26d4 A GUARD THAT REFUSES AFTER THE FIRST DESTRUCTIVE STEP IS NOT A GUARD \u2014 `SPEC-001-INV-14`'s partial application, one layer up from where Phase 6c met it. \u26a0 THE STATUS ALONE CANNOT KILL THIS, and that is why the test asserts on the SURVIVING TURN: the defective ordering also ends in a refusal, it just destroys something on the way.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7a-f-the-write-endpoint-is-unclassified-again",
+		file: "apps/rph-demo/src/routes/test-api/dispatch/+server.ts",
+		find: "\tconst refusal = durableStateRefusal();\n\tif (refusal !== undefined) throw error(409, refusal);\n",
+		replace: "\t// MUTANT: the write channel is exempt from the rule that governs writes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
+		why: "PROMISE: \u00a74.17.3's rule \u2014 *\"read affordances compose with durability; destructive ones do not\"* \u2014 governs ALL THREE members of the set it enumerates. `/test-api/dispatch` is a WRITE channel into the permanent, append-only record: it dispatches any command in the registry under the workbench's own session, with no `expectedRevision`. \u26d4 THIS IS THE DEFECT VERBATIM: `R24` classified `introspect` (read) and `reset` (destructive) and left this one out, so it was moved into a newly reachable durable configuration with no guard, no test and no disclosure while its sibling in the same sentence got all four. A rule applied to two of the three things it names is the shape this programme keeps finding. \u2b51 THE GATED SUITE CANNOT SEE IT: those specs run under `RPH_DEMO_MODE=test`, where `DB_PATH` is undefined BY CONSTRUCTION, so the refusal can never fire for them \u2014 which is exactly why the victim is a unit test that builds the durable arrangement directly.",
+		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
 	}
 ];

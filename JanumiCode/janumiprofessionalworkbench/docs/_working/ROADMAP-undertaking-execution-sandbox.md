@@ -1812,6 +1812,61 @@ because `engine.ts` put dispatch there deliberately and a reachable-without-a-cr
 composing session would satisfy INV-8, satisfy INV-14, and write a record saying one party did both halves. It
 is exactly the forgery `R22` forbids, arrived at from underneath.
 
+## 8d. Phase 7a · A process may be OBSERVABLE and REAL at the same time (`R24`)
+
+⛔ **PHASE 7 CANNOT START UNTIL THIS LANDS, AND THAT WAS NOT KNOWN WHEN PHASE 7 WAS WRITTEN.** Measured across
+five subsystems before any code: Phase 7 needs a process that exposes the `/test-api` harness AND has a durable
+workspace with a real process runner, and `RPH_DEMO_MODE` is a single-valued variable that grants exactly one.
+Design §4.17 has the chain, verified at four sites.
+
+### 8d.1 ⭐ WHAT IS BUILT
+
+- **`harnessExposed()`** — a new affirmative predicate, `RPH_DEMO_MODE === 'test' || JPWB_HARNESS === '1'`.
+  The three `/test-api` routes gate on it instead of on `isTestMode()`.
+- **`isTestMode()` is UNCHANGED** and keeps its own callers (the deterministic fixture selection, stable ids).
+  The fixture question was already orthogonalised by configuration — `model.ts:66` reads
+  `TEST_MODE && !resolveExecutorToolId()` — so naming a real executor overrides it without touching the mode.
+- **Durability is UNCHANGED**: `RPH_DEMO_MODE === 'server'` and nothing else.
+- **`resetEngine` REFUSES a durable store.** New guard, and the hazard it closes is created by this phase:
+  before `R24` a harness process was in-memory by construction, so reset destroyed nothing on disk.
+
+### 8d.2 ⛔ WHAT IS **NOT** BUILT
+
+- **No predicate becomes negative.** `vitest` sets neither declaration and must stay in-memory BY CONSTRUCTION;
+  a blocklist of runners is *“a list that rots”*, and that ruling is not reopened.
+- **`RULE 5` is untouched** — the real runner stays wired where and only where the workspace is FILESYSTEM.
+- **No third mode value.** The point is to stop one flag answering two questions, not to add a value meaning
+  “both of the other two”.
+
+### 8d.3 ⭐⭐ THE PREDICTED REDS, NAMED BEFORE ANYTHING IS WRITTEN
+
+| # | The assertion | Why it MUST be red at HEAD |
+|---|---|---|
+| `PR-1` | with `RPH_DEMO_MODE=server` and `JPWB_HARNESS=1`, `/test-api/introspect` responds | HEAD 404s — the endpoint asks `isTestMode()` |
+| `PR-2` | `resetEngine` REFUSES when the store is durable | no such guard exists |
+| `PR-3` | `RPH_DEMO_MODE=server` ALONE does not expose the harness | serving must not imply a harness, or every deployment gets one |
+| `PR-4` | `JPWB_HARNESS=1` ALONE does not buy durability | the declarations must stay independent in BOTH directions |
+| `PR-5` | a process declaring NEITHER gets no harness and no durability | the `vitest` case, which is the defect this predicate shape exists to prevent |
+
+⚠ `PR-3`/`PR-4`/`PR-5` are CONTROLS and each needs its own mutant: without them `PR-1` is satisfied by a
+predicate that simply returns `true`.
+
+### 8d.4 ⛔ WHAT PHASE 7 STILL CANNOT DELIVER AFTER THIS — DISCLOSED NOW
+
+Three findings from the measurement, none of them closable by `R24`:
+
+1. **`TEST_RESULT` evidence has no producer and `R18` forbids minting one**; and nothing in production branches
+   on `evidenceType` at all, so typing it would buy nothing. Phase 7's wording needs a ruling, not code.
+2. **Declared policies still do not gate the execution plane** (`R20`, already its own phase).
+3. **⭐ `RPH-EVD-004` is `UNENFORCED_DISCLOSED` and its disclosed arrangement IS the Phase 7 scenario** — *"A
+   unit-test result used to support full product fitness must be rejected or qualified as out of scope."*
+   Phase 7 will PRODUCE that arrangement; whether the engine refuses it is a separate, nameable increment.
+
+⚠ **AND THE EXISTING LIVE LANE IS ALREADY BROKEN.** `execution.live.ts` boots `RPH_DEMO_MODE='test'` with no
+`JPWB_DEMO_DB`, so the workspace is IN_MEMORY — and `openPiExecutionSession` THROWS on a non-FILESYSTEM
+workspace. Pinned to `pi` by its own assertion, it fails before it measures anything. It has never run in CI by
+construction. `R24` is what makes it fixable.
+
 ## 9. Phase 7 · The live end-to-end, and Phase 8 · the committed replay
 
 **PHASE 7 (validation, not a gate step):** author the product-realization PWA live → accept the candidate hash →
