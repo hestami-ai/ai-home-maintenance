@@ -75,7 +75,11 @@ export interface Principal {
 	readonly tenantId: string;
 	readonly organizationId: string;
 	/**
-	 * ASR-13 independence dimensions, for AGENT/MODEL principals; absent for a human.
+	 * ASR-13 independence dimensions. `modelId` / `providerId` belong to AGENT and MODEL principals; ⭑
+	 * `executionInstanceId` is carried by HUMANS TOO and always was — `reference-undertaking.ts` gives its
+	 * `ACTOR` and `EVALUATOR` (both HUMAN) distinct ones precisely so `DIFFERENT_INVOCATION` can decide, and
+	 * `JAN-EXEC` `R22` does the same for the demo's operator and reviewer. ~~absent for a human~~ was a
+	 * description of the fixtures at the time, never a rule, and it read as one.
 	 * ⚠ Omitting these does not make the ladder permissive — `checkIndependence`'s `differs()` requires BOTH
 	 * sides present and unequal, so an absent id FAILS CLOSED. They exist so the rungs can compare rather than
 	 * refuse everything.

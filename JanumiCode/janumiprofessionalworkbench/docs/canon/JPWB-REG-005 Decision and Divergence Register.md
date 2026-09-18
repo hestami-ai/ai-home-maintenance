@@ -35631,3 +35631,198 @@ matched against a **live refusal message**, so it cannot drift from behaviour wi
 row's `arrangement` is prose compared against **nothing**. That is a second instance of the family this register
 keeps recording — a gate that checks the citation and not the claim — and it should be taken up as its own
 increment rather than asserted closed by this one.
+
+### REG-F-400 — the workbench signed its own work off, and the policy it chose to be judged by is what made that invisible
+
+- **Date:** 2026-09-18 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a self-review, routed around every rule
+  that forbids one** · **Status:** ✅ **CLOSED** — `JAN-EXEC` Phase 6b (`R22`); the demo now assesses the
+  policies each PWU declares, and a second principal issues those assessments.
+
+**THE ARRANGEMENT, IN TWO HALVES THAT ONLY LOOK SEPARATE.** `recordAssurance` (`undertakings/[id]`) opened one
+assessment under `DEMO_POLICY_ID` and completed it with `producer: evaluator` — one identity recorded as both
+the producer of the work and its assessor. The PWU it then drove to `assuranceState: SATISFIED` declares its
+PwuType's `requiredAssurancePolicyIds`, and `DEMO_POLICY_ID` is in none of them.
+
+⚠ **EACH HALF READS AS A SHORTCUT AND THE PAIR IS A BYPASS.** `demo-policy.ts` states the second half in its own
+words: independence NONE *"so `completeAssuranceAssessment` skips the independence check (assurance.ts) and a
+SATISFIED disposition backs the PWU's assuranceState=SATISFIED hop **without a separate reviewer identity**"*.
+Declaring policies that demand independence and assessing a *different* policy that demands none is one
+arrangement, not two economies.
+
+**DERIVED, NOT ENUMERATED — AND THE DERIVATION IS WHY THIS IS NOT ONE UNLUCKY PWU.** Over all twelve seeded
+policies × fifteen `pwuTemplates`: **0 of 15 PWU kinds can be satisfied by a single actor.** Every template
+declares at least one `DIFFERENT_AGENT` or `DIFFERENT_INVOCATION` policy. (`HUMAN` is not a blocker —
+`checkIndependence` tests `evaluator.actorType === 'HUMAN'` and the operator is one.) ⛔ `DIFFERENT_INVOCATION`
+failed closed for a second reason: `differs()` requires the field present on BOTH sides and no demo principal
+carried an `executionInstanceId` at all — the trap `reference-undertaking.ts` had already recorded, *"independence
+you cannot demonstrate is independence you do not have."*
+
+**WHAT FOUND IT.** Not review. `RPH-PWU-007`'s §28.2 fold, landed the previous day, refused the sign-off and
+named the four silent policies — and the first reading of that red was *"the demo assesses the wrong policy id"*.
+Only measuring what those four actually demand turned a one-line id swap into this entry.
+
+**THE REMEDY, AND THE ONE IT IS NOT.** A fifth credential, `ASSURANCE_REVIEWER_CREDENTIAL`, resolving to a HUMAN
+principal distinct from the operator in **both** dimensions the declared policies compare. ⛔ **The reviewer
+ISSUES the assessment commands.** Naming `assurance-reviewer-1` in an `evaluator` field on a command the
+operator's session stamps would be `REG-F-061` restated — *"an identity no authenticator issues, no credential
+resolves to, and nothing could ever hold to account"* — and would have satisfied `checkIndependence` exactly as
+well, because that kernel compares the payload's two actors and never consults the issuer. The distinction is
+invisible to every guard in the engine, which is why the e2e asserts `evaluator` **and** `updatedBy`.
+
+⭑ **PRECEDENTED, NOT INVENTED.** `reference-undertaking.ts` separated `ACTOR` from `EVALUATOR` for this reason
+and said so; `identity.ts` already held the rule — *"The workbench user, the authoring agent, and the seeder are
+DIFFERENT ACTORS and must resolve to different principals."* The reviewer is the fourth such actor.
+
+---
+
+### REG-F-401 — a §20 verdict may name a policy it was never measured against, and the control for it exists one module over
+
+- **Date:** 2026-09-18 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a ratified field with no reader on the
+  path every caller uses** · **Status:** ✅ **CLOSED** — guard added in `completeAssuranceAssessment`.
+
+`ValidatorResultSchema` declares `policyId` REQUIRED. `completeAssuranceAssessment` read nine fields off the
+supplied verdict and **`policyId` was not one of them**, so a verdict stamped with one policy could be recorded
+as the conclusion of an assessment held under another.
+
+⚠ **THE CONTROL EXISTED AND WAS NOT ON THIS PATH.** `floor.ts:319` computes `policyVersionMatches` and
+`classifyValidatorResult` refuses on it — but only the floor recorder routes through it. Every other caller in
+the product comes through the command handler, which had no equivalent.
+`reference-undertaking.ts` passes `policyId: pid` per assessment and records why — *"a ValidatorResult whose
+`policyId` did not match the assessment's would be a verdict attributed to criteria it was not measured
+against"* — so the ratified drive honoured a rule nothing enforced.
+
+⭑ **WHY IT COULD NOT HONESTLY HAVE BEEN WRITTEN EARLIER, AND WHY IT IS WRITTEN NOW.** Until Phase 6b every
+caller assessed ONE policy per act and hardcoded its id on both sides, so the invariant held by construction and
+the guard would have had an **empty population** — a control that cannot fail. The demo surface now opens N
+assessments under N declared policies in a single operator act, which is what makes it falsifiable.
+
+⭐ **AND IT SUBSUMED AN EXISTING MUTANT, WHICH IS THE PART WORTH RECORDING.**
+`MU-PFA-AF1-01-governing-policy-from-validator` made the completion path load its governing policy from the
+verdict rather than the assessment's pin; its kill needed the one arrangement where the two DISAGREE. The new
+guard refuses that disagreement **before** the load, so the mutation is now equivalent on every reachable input.
+It is marked `expectSurvive` with `supersededBy: P6b-e` — **not deleted** — because a mutant that silently
+stopped being killable is exactly what this ledger exists to notice.
+
+⚠ **ITS VICTIM SUITE NEEDED THE SAME CARE.** `assurance-independence.test.ts`'s Gate B arrangement (assessment
+pinned to STRICT, verdict naming PERMISSIVE, recommending ESCALATE) now trips the NEW guard first. Its
+`Permitted: [CONTINUE]` assertion was **MOVED** to a second arrangement in which the verdict names its own
+policy and only Gate B can refuse — never weakened. An arrangement tripping two conjuncts proves neither.
+
+---
+
+### REG-F-402 — an ACCEPTED command is not a concluded review: the swallowed refusal, reached through an accept
+
+- **Date:** 2026-09-18 · **Type:** FINDING · **Class:** INSTRUMENT — ⭑ **a failure mode no existing instrument
+  names, because every one of them looks for a rejection** · **Status:** ✅ **CLOSED** — `unconcludedReviews`.
+
+`completeAssuranceAssessment` does **not** reject a self-review. It takes the ratified §30
+`ASSESSING -> INDEPENDENCE_VIOLATION` arrow, records `AssuranceIndependenceViolated`, and **ACCEPTS** the
+command — correctly, because the violation is a fact to be minuted rather than a malformed request.
+
+⛔ **SO A CALLER THAT READS `batch.ok` REPORTS A COMPLETED REVIEW FOR AN ASSESSMENT IN THE ONE STATE INV-8
+FORBIDS FROM EVER BEING SATISFIED.** This is `REG-F-015`'s swallowed-refusal shape arrived at through an
+**accept**, which is why no guard, no type and no existing ledger entry names it: they all watch for a
+non-ACCEPTED status.
+
+**HOW IT WAS FOUND.** A control asserting `batch.ok === false` for a `displayName`-only impostor reviewer. It
+was red, and the red was right — the first version of the control had the wrong observable, and the correct one
+is the assessment's own state.
+
+⚠ **AND THE OPERATOR WOULD HAVE SEEN THE WRONG MESSAGE.** Without the check, the next act fails on
+`RPH-PWU-007`'s §28.2 fold — *"a policy this PWU itself declares has not been satisfied"* — which is true and
+useless: it names the silence and not the reason for it.
+
+---
+
+### REG-F-403 — I derived the independence table over all fifteen templates and eyeballed the evidence one over four policies
+
+- **Date:** 2026-09-18 · **Type:** FINDING · **Class:** INSTRUMENT — ⛔ **the derive-never-enumerate rule,
+  broken by its own author in the same document that applies it correctly** · **Status:** ✅ **CLOSED** — the
+  design statement is struck and replaced; the behaviour it justified is now per-policy.
+
+**THE CLAIM.** Design §4.15.3 stated: *"All four of the PWU's policies carry `requiredEvidence: []`, so Gate A
+admits everything … Independence is not one obstacle among several — after `R19`, it is **the whole gate**."*
+
+**WHAT WAS ACTUALLY MEASURED.** The independence property was derived over all twelve policies × all fifteen
+templates and reported as a table. The evidence property was checked on the **four policies one failing spec
+happened to involve**, and generalised. Derived properly: `pol_intent_fidelity` declares **7** §6.1
+requirements and `pol_intent_completeness` **6**, all `SATISFIED_ONLY` — so **four of fifteen PWU kinds** carry
+13 requirements this workbench cannot evidence, and Gate A stands behind independence for them.
+
+⚠ **THE TELL WAS AVAILABLE AND I DID NOT READ IT.** The same probe that produced the independence table printed
+`requiredEvidence` for the four policies it queried. Widening one loop would have answered it. Two properties
+were established in one sitting by two different standards, and only the weaker one was wrong.
+
+⭐ **THE CORRECTION IMPROVED THE PRODUCT RATHER THAN JUST THE DOCUMENT**, which is the reason this is filed
+rather than silently amended. The remedy was already ruled in Gate A's own message — *"Submit it … **or return a
+non-satisfied disposition**"* — and in `earnAssurance`: *"A policy whose required evidence this undertaking
+cannot supply does not get the caller's requested SATISFIED … asking for it and being refused, or lowering it
+here, differ only in whether the drive tells the truth first."* The reviewer now reaches, **per policy**, the
+strongest positive disposition its evidence supports, and the PWU's axis is the §28.2 fold of those verdicts
+rather than a constant. A `PRODUCT_BOUNDARY` PWU in this demo therefore reaches `CONDITIONALLY_SATISFIED` and
+**not green** — correctly, because it is short thirteen pieces of evidence the corpus requires.
+
+⛔ **AND THE RULE DERIVED FROM `requiredForDispositions` READS ALL THREE OF ITS VALUES**, not the two today's
+catalog uses. Every seeded requirement is `SATISFIED_ONLY`, so a two-valued rule would have passed every test in
+this repository and been wrong the first time an `ALL` requirement is authored — which is the same defect one
+level up, and the one this entry is about.
+
+---
+
+### REG-F-404 — two ratified rules that could not both hold, and nothing had to notice while the surface reviewed its own work
+
+- **Date:** 2026-09-18 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a structural gap in the engine's atomic
+  envelope, unreachable until independence was real** · **Status:** ✅ **CLOSED** — `JAN-EXEC` `R23`,
+  `dispatchMultiPartyBatch`.
+
+**THE TWO RULES.**
+
+- `SPEC-001-INV-14` / FORK-23 (b): *"a multi-Command Affordance is ATOMIC where an atomic dispatch exists, and a
+  partially-applied sequence SHALL NOT leave committed state behind."*
+- `JPWB-DOC-004 §39` invariant 8: an assessment may not be satisfied unless its evaluator is independent of the
+  producer.
+
+⛔ **AND `dispatchBatchAs` STAMPS ONE PRINCIPAL PER TRANSACTION.** So an affordance requiring both parties had to
+break one of them. There was no third option and no warning anywhere: each rule is guarded, and nothing guards
+their conjunction.
+
+**HOW IT SURFACED — A REGRESSION I SHIPPED FOR ONE COMMIT.** `REG-F-400`'s fix split the sign-off into the
+reviewer's transaction and the controller's. `undertaking-atomicity.e2e.ts` measured **39 assessments before a
+refused affordance and 42 after** — three orphans, behind a UI that correctly told the operator the action was
+refused. ⭑ That spec was written in July for a different defect and caught this one unaided, which is the best
+argument available for asserting on engine ground truth rather than on rendered markup.
+
+⚠ **THE CONFLICT WAS OLDER THAN THE REGRESSION.** It could not be reached before, because the only multi-party
+affordance in the product was **reviewing its own work** — so every atomic act was single-party by accident of
+the defect `REG-F-400` records. Removing that defect made this one reachable in the same commit.
+
+⭑ **THE GENERAL FORM, AND IT IS WHY THIS IS A KERNEL CHANGE RATHER THAN A REORDERING.** Every multi-party act the
+corpus describes has the same problem today: a governance Decision proposed by one party and approved by
+another; a waiver granted beside the work it waives; any counter-signature. None can be atomic without this.
+⛔ The two workarounds were considered and rejected in terms — reordering the batches makes the failing spec
+green while leaving the window open in the other direction, and collapsing back to one session restores the
+self-review.
+
+**THE REMEDY.** `AuthedEngineHandle.dispatchMultiPartyBatch(entries)` — entries of `{ command, as? }`, one
+`store.transaction()`, each command stamped from **its own** resolved principal. Behind a credential, never on
+the bare `EngineHandle`, because `engine.ts` put dispatch there deliberately: *"Moving them behind a credential
+is what makes every unmigrated call site a COMPILE ERROR rather than a silent last-write-wins path."*
+
+⚠ **THE AUTHORIZATION STATEMENT, MADE RATHER THAN LEFT IN THE PLUMBING.** A host that HOLDS two credentials may
+bundle both parties' commands into one atomic act. That widens what a *session* may compose and **not** what any
+*party* may do: every command is stamped from the principal its own credential resolves to, an unresolvable
+credential fails closed, and the existing refusal of a declared `issuedBy` that disagrees with the resolved
+principal is untouched.
+
+⭐ **THE PROPERTY WITH NO OTHER DETECTOR.** Independence is computed from `producer` / `evaluator` **in the
+payload** and never from the issuer — so a batch that stamped every command from the composing session would
+satisfy invariant 8, satisfy `SPEC-001-INV-14`, commit atomically, and record one party doing both halves. Every
+guard in the engine would read green. `P6c-a` is its mutant; the kernel test asserts `createdBy.actorId` per
+command against the credential that carried it, and `pwu-lifecycle.e2e.ts` pairs the recorded `evaluator` with
+the stamped `updatedBy`.
+
+⛔ **AND ONE MUTANT OF MY OWN WAS WEAK BEFORE IT WAS RIGHT.** `P6c-b`'s first formulation replaced the
+transaction with an **uninvoked** arrow: nothing ran, and all five tests failed — controls included. A mutant
+that kills by disabling the function proves nothing about durability. Re-formulated to run the identical loop
+outside a transaction, it reddens exactly one assertion: the rollback. This is the fourth time the register has
+recorded a control that passed for a reason other than the one in its name.

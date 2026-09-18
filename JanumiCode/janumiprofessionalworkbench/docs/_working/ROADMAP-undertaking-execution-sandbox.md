@@ -1664,6 +1664,154 @@ control proving an ordinary satisfied policy still admits. → ⭑ Carried forwa
 
 ---
 
+## 8b. Phase 6b · The demo assesses what its PWUs DECLARE — and stops reviewing its own work (`R22`)
+
+⛔ **THIS PHASE EXISTS BECAUSE PHASE 6 LEFT THE GATE RED, AND THE RED WAS A REAL DEFECT IN THE DEMO SURFACE.**
+Design §4.15 has the measurement. In one sentence: the surface assesses `DEMO_POLICY_ID` while the PWU it then
+claims SATISFIED declares four other policies — and the four it skips all demand a reviewer distinct from the
+producer, which the surface has never had.
+
+### 8b.0 ⭐ THE TWO FACTS THAT MAKE THIS ONE PHASE AND NOT TWO
+
+1. **The wrong subject.** `assurancePrelude` opens one assessment under `DEMO_POLICY_ID`. `R19` now folds the
+   PWU's *declared* policies and finds four with no verdict at all.
+2. **The wrong parties.** `recordAssurance` passes `producer: evaluator`. Fixing (1) alone lands three of the
+   four in `INDEPENDENCE_VIOLATION` instead of `SATISFIED` — a different refusal, not a fix.
+
+⭑ Derived over the ontology: **0 of 15 PWU templates are single-actor satisfiable**, so (2) is not a property of
+one unlucky PWU kind and cannot be dodged by choosing a different one.
+
+### 8b.1 ⭐ WHAT IS BUILT
+
+- **`identity.ts`** — a fifth credential, `ASSURANCE_REVIEWER_CREDENTIAL`, resolving to a HUMAN principal
+  distinct from `local-professional` in **both** dimensions the declared policies test: `actorId` (for
+  `DIFFERENT_AGENT`) and `executionInstanceId` (for `DIFFERENT_INVOCATION`, which fails closed when the field is
+  absent on either side). The workbench user's principal gains its own `executionInstanceId` for the same
+  reason — one-sided presence proves nothing.
+- **`workbench.ts`** — `reviewerSession()`, beside `uiSession()`, the ONE place the reviewer credential is
+  presented.
+- **`undertakings/[id]/+page.server.ts`** — `assurancePrelude` and `recordAssurance` drive **one assessment per
+  governing declared policy**, computed by `selectGoverningPolicies` (the same `DECLARED ∩ DETERMINED` the
+  reference drive uses — not a second spelling). Each verdict names **its own** policy id and version. All of
+  them are cited on the `assuranceState=SATISFIED` hop.
+- **`completeAssuranceAssessment`** — refuses a `ValidatorResult` whose `policyId` disagrees with the
+  assessment's own `assurancePolicyId` (design §4.15.5).
+
+### 8b.2 ⛔ WHAT IS **NOT** BUILT, AND WHY
+
+- **The ontology is not edited.** A ratified `independenceRequirement` is not relaxed to make a demo green.
+- **A PWU declaring nothing keeps `DEMO_POLICY_ID`.** The else-branch stays byte-identical.
+- **No evaluator is named without being the issuer.** Writing `assurance-reviewer-1` into a payload the
+  operator's session stamps is `REG-F-061` restated, and is forbidden by `R22` explicitly.
+
+### 8b.3 ⭐⭐ THE PREDICTED REDS, NAMED BEFORE ANYTHING IS WRITTEN
+
+⚠ Each of these MUST fail at HEAD. A green I cannot predict a red for is a green I have not earned.
+
+| # | The assertion | Why it MUST be red at HEAD |
+|---|---|---|
+| `PR-1` | the sign-off opens an assessment for **every** governing declared policy | HEAD opens exactly one, under a policy the PWU does not declare |
+| `PR-2` | the completed assessment's `evaluator` is **not** the `producer` | HEAD passes `producer: evaluator` — the same object |
+| `PR-3` | the assessment command's stamped `issuedBy` **equals** the recorded evaluator | HEAD stamps `local-professional` and names `local-professional`; it would go green for the wrong reason if the fix named a reviewer it did not issue as — so this is the control on `R22`'s own discipline |
+| `PR-4` | each verdict's `validatorResult.policyId` equals its assessment's `assurancePolicyId` | HEAD hardcodes `DEMO_POLICY_ID` on every verdict |
+| `PR-5` | `CompleteAssuranceAssessment` **REFUSES** a mismatched `validatorResult.policyId` | the guard does not exist at HEAD |
+| `PR-6` | the three browser specs reach SATISFIED | red at HEAD — that is why this phase exists |
+
+⭑ **CONTROLS (each needs its own mutant, or it proves nothing):**
+
+- `C-1` a PWU declaring **no** policy still signs off under `DEMO_POLICY_ID` — the else-branch is untouched.
+- `C-2` a declared policy that does **not** govern this subject is **not** assessed — `selectGoverningPolicies`
+  is doing the selecting, not a `declared` list copied straight through.
+- `C-3` the reviewer principal is distinct **in the dimension each policy tests** — a reviewer differing only in
+  `displayName` must still be refused by `DIFFERENT_AGENT`.
+
+### 8b.4 ⭐ VERIFICATION
+
+`bun run gate:fast` GREEN — all 14 steps, the three browser specs included. Mutants `P6b-*` appended to
+`scripts/mutants/ledger.ts`, one per limb above, every one KILLED. ⛔ No assertion weakened, no ratified
+independence requirement relaxed, no evaluator named that did not issue its own command.
+
+### 8b.5 ⭐⭐ AS LANDED — FOUR THINGS §8b.1 DID NOT KNOW ABOUT, EACH FOUND BY DRIVING
+
+⚠ Every one of these came from a RED, not from a reading. Recorded because the plan being incomplete in these
+four specific ways is more useful to the next phase than the plan looking prescient.
+
+**(1) ⛔ THE EVIDENCE CLAIM WAS GENERALISED FROM ONE PWU KIND.** §4.15.3 said all the declared policies carry
+`requiredEvidence: []`. True of `ARCHITECTURE_DEFINITION` — the kind the failing spec happened to use — and
+false of the ontology: `pol_intent_fidelity` declares **7** and `pol_intent_completeness` **6**, so four of
+fifteen PWU kinds carry 13 §6.1 requirements this workbench cannot evidence. The browser found it; the design
+had asserted it. ⭑ **The remedy was already ruled**: Gate A's own message says *"or return a non-satisfied
+disposition"*, and `earnAssurance` took that route first. The reviewer now reaches, per policy, the strongest
+positive disposition its evidence supports — and the PWU's axis is the §28.2 FOLD of those verdicts, not a
+constant. A `PRODUCT_BOUNDARY` PWU therefore reaches `CONDITIONALLY_SATISFIED` and **not green**, correctly.
+
+**(2) ⛔ AN ACCEPTED COMMAND IS NOT A CONCLUDED REVIEW.** A self-review is not REJECTED —
+`completeAssuranceAssessment` takes the ratified §30 `ASSESSING -> INDEPENDENCE_VIOLATION` arrow and **accepts**,
+because the violation is a fact to be minuted. Reading `batch.ok` alone reports success for an assessment in the
+one state INV-8 forbids from being SATISFIED. `unconcludedReviews` is the answer; without it the operator saw
+§28.2's *"a policy this PWU itself declares has not been satisfied"* — true, and naming the silence rather than
+its reason. **Found by a control whose first version asserted the wrong observable.**
+
+**(3) ⛔ `ValidatorResult.limitations` REACHES NO READER — filed, not fixed (design §4.15.7).** Not read by the
+handler, not declared by the ratified `AssuranceAssessmentCompleted` payload, not stored on the object. The
+disclosure this phase owed its reviewer was going to live there. It is written to `residualUncertainty` as well,
+which the event does carry. **Found by writing the assertion and watching it go red** — the cheapest possible
+way to learn a field is hollow, and one no reading of the schema would have produced.
+
+**(4) ⭐ THE NEW KERNEL GUARD SUBSUMED AN OLDER MUTANT, AND DE-CONFOUNDED ITS VICTIM.**
+`MU-PFA-AF1-01-governing-policy-from-validator` made the completion path load its policy from the verdict rather
+than the assessment's pin; its kill needed the one arrangement where those DISAGREE. §4.15.5's guard now refuses
+that disagreement before the load, so the mutation is **equivalent on every reachable input** — marked
+`expectSurvive` with `supersededBy: P6b-e`, not deleted, because *"a mutant that suddenly compiles reports
+SURVIVED and fails the build"* and the history is the point. ⚠ Its victim suite needed the same treatment:
+`assurance-independence.test.ts`'s Gate B arrangement now trips the NEW guard first, so its `Permitted:
+[CONTINUE]` assertion **moved to a second arrangement** in which the verdict names its own policy and only Gate B
+can refuse. An arrangement tripping two conjuncts proves neither — the assertion was MOVED, never weakened.
+
+### 8b.6 ⚠ THE ONE PREDICTED RED THAT NEEDED A SECOND INSTRUMENT
+
+`PR-3` — *the stamped issuer equals the recorded evaluator* — cannot be proved by
+`declared-policy-signoff.test.ts`, because that suite dispatches the review under the reviewer's session
+**itself**. It would stay green if the ROUTE reverted to issuing under the operator's. Only the browser
+exercises the route's own credential choice, so the assertion pairs `evaluator` with `updatedBy` in
+`pwu-lifecycle.e2e.ts`, and `P6b-i` is the mutant that reddens it. ⭑ A test that cannot fail for the reason in
+its name is the defect this repository has recorded most often; catching it in a predicted red rather than in
+review is the instrument working.
+
+## 8c. Phase 6c · One atomic act, two acting parties (`R23`)
+
+⛔ **THIS PHASE EXISTS BECAUSE PHASE 6b BROKE A RATIFIED RULE AND THE BREAK WAS REAL.** Splitting the sign-off
+into the reviewer's transaction and the controller's left **3 orphan assessments** behind a refused affordance
+(`undertaking-atomicity.e2e.ts`: 39 → 42). Design §4.16 has the argument; in one line: `SPEC-001-INV-14` wants
+one transaction, §39 inv-8 wants two parties, and `dispatchBatchAs` stamps one principal per transaction.
+
+⭑ **AND IT IS THE GENERAL FORM, NOT THIS AFFORDANCE.** Every multi-party act the corpus describes — a
+governance Decision proposed by one party and approved by another, a waiver granted beside the work it waives —
+has the same problem today. Nothing had to notice while the assurance affordance reviewed its own work.
+
+### 8c.1 ⭐ WHAT IS BUILT
+
+`AuthedEngineHandle.dispatchMultiPartyBatch(entries)` — entries of `{ command, as? }`, one `store.transaction()`,
+each command stamped from its OWN resolved principal. Behind a credential (never on the bare `EngineHandle`),
+because `engine.ts` put dispatch there deliberately and a reachable-without-a-credential path would undo it.
+
+### 8c.2 ⭐⭐ THE PREDICTED REDS, NAMED BEFORE ANYTHING IS WRITTEN
+
+| # | The assertion | Why it MUST be red at HEAD |
+|---|---|---|
+| `PR-7` | a refusal in ANY party's command rolls back EVERY party's | no such call exists; two batches commit independently |
+| `PR-8` | each command's `issuedBy` is the principal of the credential THAT ENTRY carried | `dispatchBatchAs` stamps one principal for the whole batch |
+| `PR-9` | an unresolvable credential on ONE entry refuses that entry and aborts the batch | — |
+| `PR-10` | `undertaking-atomicity.e2e.ts` is green again | red at HEAD — 39 → 42, which is why this phase exists |
+
+⭑ **CONTROLS:** `C-4` an all-accepted multi-party batch still commits in full (else a no-op satisfies `PR-7`);
+`C-5` an entry with no `as` uses the composing session's own credential, so no existing caller changes meaning.
+
+⛔ **PROPERTY 2 (`PR-8`) HAS NO OTHER DETECTOR AND IS THE ONE TO WATCH.** Independence is computed from
+`producer`/`evaluator` in the PAYLOAD, never from the issuer — so a batch that stamped every command from the
+composing session would satisfy INV-8, satisfy INV-14, and write a record saying one party did both halves. It
+is exactly the forgery `R22` forbids, arrived at from underneath.
+
 ## 9. Phase 7 · The live end-to-end, and Phase 8 · the committed replay
 
 **PHASE 7 (validation, not a gate step):** author the product-realization PWA live → accept the candidate hash →

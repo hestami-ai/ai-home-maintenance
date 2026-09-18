@@ -53,6 +53,18 @@ type CommandSpec = { readonly payload: ZodType };
 /** Internal marker to unwind a dispatchBatch transaction (rolls back every commit in the batch). */
 class BatchAbort extends Error {}
 
+/**
+ * ⭐⭐ ONE ENTRY OF A MULTI-PARTY ATOMIC BATCH (`JAN-EXEC` `R23`, design §4.16).
+ *
+ * `as` names the credential THIS command is issued under; omitted means the composing session's own. The
+ * command is stamped from whatever principal that credential resolves to — never from the composing session's,
+ * and never from a neighbouring entry's.
+ */
+export interface MultiPartyCommand {
+	readonly command: DomainCommand;
+	readonly as?: Credential;
+}
+
 /** Result of dispatchBatch: every command's result in order, plus whether the whole batch committed. */
 export interface BatchResult {
 	readonly ok: boolean;
@@ -116,6 +128,21 @@ export interface AuthedEngine {
 	readonly principal: Principal | undefined;
 	dispatch(command: DomainCommand): CommandResult;
 	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
+	/**
+	 * ⭐⭐ THE SAME ALL-OR-NOTHING ENVELOPE, WITH MORE THAN ONE ACTING PARTY (`R23`, design §4.16).
+	 *
+	 * ⛔ IT EXISTS BECAUSE TWO RATIFIED RULES COULD NOT BOTH HOLD WITHOUT IT. `SPEC-001-INV-14` requires a
+	 * multi-Command affordance to commit atomically; DOC-004 §39 invariant 8 requires an assessment's evaluator
+	 * to be independent of the producer. `dispatchBatch` stamps ONE principal for a whole transaction, so an
+	 * affordance needing both had to break one of them — and nothing had to notice while the only such affordance
+	 * in this product was REVIEWING ITS OWN WORK (`REG-F-400`).
+	 *
+	 * ⚠ IT WIDENS WHAT A SESSION MAY COMPOSE, NOT WHAT A PARTY MAY DO. Every command is stamped from the
+	 * principal ITS OWN credential resolves to; an unresolvable credential refuses that command and aborts the
+	 * batch; and the existing refusal of a declared `issuedBy` that disagrees with the resolved principal is
+	 * untouched. A host can bundle two parties' acts only by HOLDING both credentials.
+	 */
+	dispatchMultiPartyBatch(entries: readonly MultiPartyCommand[]): BatchResult;
 	dispatchBatchGuarded(
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
@@ -165,6 +192,8 @@ export class Engine {
 			principal,
 			dispatch: (command) => this.dispatchAs(principal, reason, command),
 			dispatchBatch: (commands) => this.dispatchBatchAs(principal, reason, commands),
+			dispatchMultiPartyBatch: (entries) =>
+				this.dispatchMultiPartyBatchAs(principal, reason, entries),
 			dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>
 				this.dispatchBatchGuardedAs(
 					principal,
@@ -493,17 +522,61 @@ export class Engine {
 	 * non-mutating DUPLICATE (idempotency replay) counts as success. A multi-step authoring sequence (or the agent
 	 * proposing several linked commands) uses this so a mid-sequence failure can't strand a half-built DRAFT.
 	 */
+	/**
+	 * The single-party batch IS the multi-party one with no `as` anywhere (`JAN-EXEC` `R23`).
+	 *
+	 * ⛔ IT IS A DELEGATION BECAUSE THE COVERAGE FLOOR REFUSED THE ALTERNATIVE, AND THE FLOOR WAS RIGHT. Writing
+	 * the transaction-and-rollback envelope a second time arrived with its re-raise line uncovered and two
+	 * branches that could not be taken at all — and two copies of *"the first refusal unwinds everything"* is
+	 * the drift where one copy gets fixed and the other does not. `multi-party-batch.test.ts`'s `C-5` pins the
+	 * equivalence this relies on: an entry with no `as` is the composing session, so no existing caller changes
+	 * meaning.
+	 */
 	private dispatchBatchAs(
 		principal: Principal | undefined,
 		reason: string | undefined,
 		commands: readonly DomainCommand[]
 	): BatchResult {
+		return this.dispatchMultiPartyBatchAs(
+			principal,
+			reason,
+			commands.map((command) => ({ command }))
+		);
+	}
+
+	/**
+	 * `R23` — all-or-nothing across PARTIES. Each entry resolves its own credential and is stamped from its own
+	 * principal; the first non-accepted result unwinds the whole transaction, including the other party's work.
+	 */
+	private dispatchMultiPartyBatchAs(
+		sessionPrincipal: Principal | undefined,
+		sessionReason: string | undefined,
+		entries: readonly MultiPartyCommand[]
+	): BatchResult {
 		const results: CommandResult[] = [];
 		let failedIndex: number | undefined;
 		try {
 			this.store.transaction(() => {
-				for (let i = 0; i < commands.length; i += 1) {
-					const r = this.dispatchAs(principal, reason, commands[i]!);
+				for (let i = 0; i < entries.length; i += 1) {
+					const entry = entries[i]!;
+					// ⛔ RESOLVED PER ENTRY, AND THE FAILURE IS NOT INHERITED. An entry naming a credential that
+					// does not resolve carries NO principal and NO borrowed one — `dispatchAs` then refuses it with
+					// `RPH_AUTHENTICATION_REQUIRED` and the batch unwinds. Falling back to the composing session
+					// would be the defaulted identity §13.3 forbids and `actingActor()` throws rather than supply.
+					// ⚠ `resolved` IS THE DISCRIMINATOR, and it is one value rather than two tests of `entry.as`.
+					// The first form asked `entry.as` three times and then reached for `outcome?.` — optional
+					// chaining on something that cannot be absent when `entry.as` is set, so two of its branches
+					// were UNREACHABLE and the coverage floor said so. An unreachable branch is not a small
+					// untidiness here: it is a branch no test can ever drive, in the function that decides who
+					// acted.
+					const resolved = entry.as ? this.authenticate.authenticate(entry.as) : undefined;
+					const principal = resolved
+						? resolved.ok
+							? resolved.principal
+							: undefined
+						: sessionPrincipal;
+					const reason = resolved ? (resolved.ok ? undefined : resolved.reason) : sessionReason;
+					const r = this.dispatchAs(principal, reason, entry.command);
 					results.push(r);
 					if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') {
 						failedIndex = i;

@@ -207,6 +207,22 @@ function recordingEngine(
 		dispatchBatchGuarded() {
 			throw new Error('A staged candidate cannot create a nested guarded canonical commit.');
 		},
+		/**
+		 * ⛔ REFUSED, AND FOR THIS RECORDER'S OWN STATED INVARIANT (`JAN-EXEC` `R23`). The note above says it in
+		 * terms: *"The recorder IS the delegate's identity, not a second one. Anything else would let a surface
+		 * read one actor off this handle and have its commands recorded as another."* A multi-party batch carries
+		 * commands issued by a party this turn is NOT bound to — recording them into the turn's replay log would
+		 * make exactly that substitution, and the replay would attribute another party's acts to the delegate.
+		 *
+		 * ⚠ A THROW RATHER THAN A SILENT PASS-THROUGH TO `delegate.dispatchMultiPartyBatch`, which would compile
+		 * and would record nothing at all — the staged candidate would then be missing commands it had committed.
+		 */
+		dispatchMultiPartyBatch() {
+			throw new Error(
+				'An authoring turn records one party\u2019s commands for replay; a multi-party batch would attribute ' +
+					'another party\u2019s acts to this turn\u2019s delegate.'
+			);
+		},
 		subscribe: (handler) => delegate.subscribe(handler),
 		drainOutbox: () => delegate.drainOutbox(),
 		recoverOutbox: () => delegate.recoverOutbox(),

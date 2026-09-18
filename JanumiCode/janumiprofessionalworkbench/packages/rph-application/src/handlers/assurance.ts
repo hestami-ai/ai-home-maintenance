@@ -1771,6 +1771,10 @@ function actorReferenceToIdentity(a: ActorReference): Identity {
 interface CompleteValidatorResult {
 	validatorId?: string;
 	validatorVersion?: string;
+	/** ⭐ The policy this verdict was measured against. `ValidatorResultSchema` declares it REQUIRED, so it is
+	 *  optional here only because this interface describes the fields the HANDLER reads off an unvalidated
+	 *  payload shape — the guard at :2090 compares it to the assessment's own pin (design §4.15.5). */
+	policyId?: string;
 	dispositionRecommendation?: string;
 	subjectObjectIds?: string[];
 	subjectSemanticVersions?: Record<string, number>;
@@ -2066,6 +2070,44 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	const producer = p.producer;
 	const assessmentState = ctx.store.loadObject(command.targetAggregateId)?.state as
 		{ assurancePolicyId?: string } | undefined;
+	// ── ⭐ THE VERDICT NAMES THE POLICY IT WAS MEASURED AGAINST (`JAN-EXEC` PHASE 6b, design §4.15.5) ───
+	//
+	// This handler reads NINE fields off the supplied `ValidatorResult` and, until now, `policyId` was not one of
+	// them — so a verdict stamped with one policy could be recorded as the conclusion of an assessment held under
+	// another. `reference-undertaking.ts` already states what that would mean: *"a ValidatorResult whose
+	// `policyId` did not match the assessment's would be a verdict attributed to criteria it was not measured
+	// against."* The ratified drive honoured the rule; nothing enforced it.
+	//
+	// ⚠ `floor.ts:319` HAS THE EQUIVALENT CHECK AND THE GENERAL PATH DID NOT. `classifyValidatorResult` refuses
+	// on `policyVersionMatches`, but only the floor recorder routes through it. Every other caller in the product
+	// comes through here.
+	//
+	// ⛔ WHY IT COULD NOT HAVE BEEN WRITTEN EARLIER, WHICH IS THE POINT. Until Phase 6b every caller assessed ONE
+	// policy per act and hardcoded its id on both sides, so the invariant held by construction and this guard
+	// would have had an EMPTY POPULATION — a control that cannot fail. The demo surface now opens N assessments
+	// under N declared policies in a single operator act, which is what makes "each verdict names its own policy"
+	// falsifiable and therefore worth guarding.
+	//
+	// ⚠ THE POLICY, NOT THE VERSION. DOC-004 invariant 2 also binds an assessment to its policy VERSION, and that
+	// is a DIFFERENT rule with a different remedy; refusing both here would leave a reader unable to say which one
+	// bit. `validator-result-policy-binding.test.ts` pins the version case as deliberately ADMITTED.
+	const verdictPolicyId = p.validatorResult?.policyId;
+	if (
+		verdictPolicyId !== undefined &&
+		assessmentState?.assurancePolicyId !== undefined &&
+		verdictPolicyId !== assessmentState.assurancePolicyId
+	) {
+		return reject(
+			command,
+			'RPH_VALIDATOR_OUTPUT_INVALID',
+			`CompleteAssuranceAssessment: this assessment is held under ${assessmentState.assurancePolicyId}, but the ` +
+				`validatorResult names ${verdictPolicyId}. A verdict may only conclude the assessment it was measured ` +
+				`for — recording it here would attribute the judgement to criteria it was never evaluated against ` +
+				`(DOC-007 §20). Complete the assessment held under ${verdictPolicyId}, or re-issue a verdict naming ` +
+				`${assessmentState.assurancePolicyId}.`,
+			[assessmentState.assurancePolicyId, verdictPolicyId]
+		);
+	}
 	// Load the governing policy ONCE — its rule arrays must actually decide, not sit settable-and-ignored (the
 	// "hollow governed layer"). Three fields govern here: independenceRequirement (the §39-inv-8 check below,
 	// Increment I2), permittedControlActions (Gate B), and requiredEvidence (Gate A).

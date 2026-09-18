@@ -27,10 +27,12 @@ import { monotonicFactory } from 'ulid';
 import {
 	AGENT_CREDENTIAL,
 	REFERENCE_OWNER_CREDENTIAL,
+	ASSURANCE_REVIEWER_CREDENTIAL,
 	SESSION_CREDENTIAL,
 	SYSTEM_CREDENTIAL,
 	standaloneAuthenticator
 } from './identity.js';
+import type { Credential } from '@janumipwb/rph-ports';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 /**
@@ -306,6 +308,33 @@ export function dispatchBatch(commands: readonly UiCommandInput[]) {
 }
 
 /**
+ * ⭐⭐ ONE ATOMIC OPERATION, MORE THAN ONE ACTING PARTY (`JAN-EXEC` `R23`, design §4.16).
+ *
+ * ⛔ THIS REPLACED A `dispatchReviewerBatch` THAT WAS A REAL REGRESSION. Issuing the reviewer's assessments in
+ * their own transaction and the controller's hops in another left three committed assessments behind a refused
+ * affordance — `undertaking-atomicity.e2e.ts` measured 39 before and 42 after — which is verbatim the defect
+ * `SPEC-001-INV-14` pins: *"a partially-applied sequence SHALL NOT leave committed state behind."*
+ *
+ * ⚠ THE ENVELOPE HAD TO CHANGE, NOT THE ORDERING. `SPEC-001-INV-14` wants one transaction and DOC-004 §39
+ * invariant 8 wants two parties; `dispatchBatch` stamps ONE principal per transaction, so the two ratified rules
+ * were incompatible for every assurance act. Nothing had to notice while this surface reviewed its own work.
+ *
+ * Each entry carries the credential it is issued under (omitted = this workbench session's own), and the engine
+ * stamps every command from ITS OWN resolved principal — so the record says truthfully which party did which
+ * half, and a refusal anywhere unwinds both halves together.
+ */
+export function dispatchMultiPartyBatch(
+	entries: readonly { readonly command: UiCommandInput; readonly as?: Credential }[]
+) {
+	return uiSession().dispatchMultiPartyBatch(
+		entries.map(({ command, as }) => ({
+			command: uiCommand(command),
+			...(as === undefined ? {} : { as })
+		}))
+	);
+}
+
+/**
  * The workbench user's authenticated session — the ONE place `SESSION_CREDENTIAL` is presented for UI work.
  *
  * Routes need it for more than dispatch: a handful of ratified payloads must NAME the acting professional
@@ -315,6 +344,19 @@ export function dispatchBatch(commands: readonly UiCommandInput[]) {
  */
 export function uiSession(): AuthedEngineHandle {
 	return getEngine().as(SESSION_CREDENTIAL);
+}
+
+/**
+ * The independent assurance reviewer's authenticated session — the ONE place `ASSURANCE_REVIEWER_CREDENTIAL` is
+ * presented, mirroring `uiSession()` exactly so neither becomes the special case.
+ *
+ * ⭑ The reviewer is a REAL SECOND PARTY in this workbench, not a label on the operator: `identity.ts` resolves
+ * it to its own principal with its own `actorId` and its own `executionInstanceId`, which are the two dimensions
+ * the declared ontology policies compare. `actingActor(reviewerSession())` is therefore the evaluator identity
+ * AND the stamped issuer of the commands that carry it.
+ */
+export function reviewerSession(): AuthedEngineHandle {
+	return getEngine().as(ASSURANCE_REVIEWER_CREDENTIAL);
 }
 
 /** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the

@@ -1918,7 +1918,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace:
 			'\tif (batch.ok) return null;\n\tif (batch.failedIndex !== undefined) return null; // MUTANT: swallow the refusal',
 		expectRed: ['apps/rph-demo/e2e/undertaking-atomicity.e2e.ts'],
-		why: 'INV-14: a refused multi-Command action must commit nothing — and a Surface must not report success for a sequence the engine refused',
+		why:
+			'INV-14: a refused multi-Command action must commit nothing — and a Surface must not report success for a sequence the engine refused. ⭐ RE-ANCHORED 2026-09-18 (JAN-EXEC Phase 6c, ledger rule #5 — in the commit that moved the code): R23 briefly gave this line TWO homes (`runStepsWith` and `runMultiParty`) and this ledger’s own gate reported UNANCHORED for it. The repair was to stop duplicating the rule rather than to write a cleverer anchor: both runners now map a refused batch through ONE `batchError`, which is where the anchor lives. ⛔ THE GUARANTEE IS UNCHANGED and now covers BOTH runners — single-party and multi-party — with one mutation.',
 		source: 'JPWB-SPEC-001-DR-001 S-3'
 	},
 	{
@@ -5001,7 +5002,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace: "\t\t? (ctx.store.loadObject((command.payload as { validatorResult?: { policyId?: string } } | undefined)?.validatorResult?.policyId ?? assessmentState.assurancePolicyId)?.state as",
 		expectRed: ["packages/rph-application/src/handlers/assurance-independence.test.ts"],
 		why: "PROMISE: the policy whose rules govern this completion is the one the ASSESSMENT pins (assessmentState.assurancePolicyId — §18's version/policy pin), consulted from committed state, NOT the one the validator reports about itself. Everything in the completion path hangs off that one load: independenceRequirement (§39 inv-8), dispositionRules (Gate C foreclosure AND JAN-DISPIND's requiredIndependence), permittedControlActions (Gate B), requiredEvidence (Gate A), escalationRules (Gate D). Under the mutant a validator that names a permissive policy in its own verdict chooses the rules it will be judged by — the authority-source defect this handler already refuses elsewhere in its own voice: its DISABLED-validator gate declines to join `evaluator` to `validatorId` because 'joining them would be inferring a binding from proximity'. The gates' OBVIOUS failures are all tested (validator-registry.test.ts covers DISABLED/ACTIVE/DEGRADED/unregistered; assurance-independence.test.ts:589 covers Gate B's explicit-[] arm; assurance-disposition-independence.test.ts kills both the take-the-first-rule and the record-the-policy-level-requirement mutants) — what no test varies is WHERE the governing policy comes from. WOULD KILL IT: one arrangement with two ACTIVE policies, strict and permissive, where the assessment is pinned to the strict one and the validatorResult names the permissive one, asserting the strict policy's gate still refuses.",
-		source: "JAN-PFA S3.3 assertion-first increment (assurance.ts); the assertion that kills this was written BEFORE the entry was declared"
+		source: "JAN-PFA S3.3 assertion-first increment (assurance.ts); the assertion that kills this was written BEFORE the entry was declared",
+		expectSurvive: "\u2b50\u2b50 SUPERSEDED BY A STRONGER RULE, 2026-09-18 (`JAN-EXEC` Phase 6b, design \u00a74.15.5) \u2014 AND SURVIVAL IS NOW THE CORRECT VERDICT RATHER THAN A REGRESSION. This mutant made the completion path load its governing policy from `validatorResult.policyId` instead of the assessment's own pin, and its kill depended on ONE arrangement in which those two DISAGREE (assessment pinned to STRICT, verdict naming PERMISSIVE). `completeAssuranceAssessment` now REFUSES that disagreement outright \u2014 the guard runs BEFORE `policyState` is loaded and compares the two ids directly \u2014 so on every input that reaches the mutated line the two sources are EQUAL BY CONSTRUCTION and the mutation can have no observable effect. \u26d4 `expectSurvive` RATHER THAN `supersededBy`, AND THE DIFFERENCE IS MEASUREMENT VERSUS ASSERTION. `supersededBy` makes the runner report RETIRED and SKIP the mutation \u2014 it would take my word for the equivalence \u2014 and its ledger definition is a target \"legitimately REMOVED or MOVED\", which this is not: the load is still there, still correct, and the anchor still resolves. `expectSurvive` APPLIES the mutation every run and treats a KILL as the finding. \u2b50 THAT IS PRECISELY THE ALARM WANTED HERE: if the Phase 6b guard is ever removed, this mutant becomes killable again, reports KILLED against an `expectSurvive` entry, and FAILS THE BUILD \u2014 so the subsuming rule cannot be deleted quietly. \u26a0 THE SUCCESSOR ATTACKS THE RULE THAT SUBSUMED IT, not the load: `P6b-e` neuters the comparison, and `validator-result-policy-binding.test.ts` reddens. \u2b51 AND THE VICTIM SUITE WAS DE-CONFOUNDED IN THE SAME COMMIT \u2014 `assurance-independence.test.ts`'s Gate B arrangement now trips the NEW guard first, so its `Permitted: [CONTINUE]` assertion moved to a second arrangement in which the verdict names its own policy and only Gate B can refuse. An arrangement tripping two conjuncts proves neither."
 	},
 	{
 		id: "MU-PFA-AF1-02-edit-leaves-an-ungoverned-remediation-action",
@@ -7772,5 +7774,113 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/handlers/policy-governs.test.ts"],
 		why: "PROMISE: a policy whose §5.1 rule needs a human has not determined anything, so `R19` does not DEMAND a verdict from it. WHO RELIES: any PWU declaring a policy with an unevaluable `expression`. WHAT THE MUTATION DOES TO THEM: `applicabilityPermitsAssessment` admits REQUIRES_HUMAN_DETERMINATION, so the policy reads `GOVERNS`, a verdict is demanded, and the PWU is BLOCKED PERMANENTLY on a condition nobody can evaluate. ⚠ AND IT IS THE PLAUSIBLE EDIT, because the ONE OTHER CALLER OF THIS DETERMINATION WANTS THE MUTATED BEHAVIOUR: `RequestAssuranceAssessment` deliberately PERMITS an assessment under such a rule, *“Blocking on a condition nobody can evaluate would stop real work on the strength of not understanding it.”* Permitting and DEMANDING are opposite directions, and this line is where they part.",
 		source: "JAN-EXEC Phase 6 / R19 — the §5.1 determination has THREE answers and a demanding gate needs all three"
+	},
+	{
+		id: "P6b-a-the-verdict-names-another-policy",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\t\t\t\t\tpolicyId,\n\t\t\t\t\tpolicyVersion,\n",
+		replace: "\t\t\t\t\tpolicyId: selected[0]!, // MUTANT: every verdict names the FIRST policy, whatever it assessed\n\t\t\t\t\tpolicyVersion,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: each of the N assessments this act opens carries a \u00a720 verdict naming ITS OWN policy \u2014 `reference-undertaking.ts` states the consequence of getting it wrong: *\"a ValidatorResult whose `policyId` did not match the assessment's would be a verdict attributed to criteria it was not measured against.\"* WHO RELIES ON IT: every reader of the governed stream, and the promotion gate that cites assessments per policy (\u00a724). WHAT THE MUTATION DOES: with one declared policy it is INVISIBLE \u2014 which is why the fixture declares TWO \u2014 and with two, the second assessment's verdict is attributed to the first policy's criteria. \u2b51 IT IS ALSO THE MUTATION THE KERNEL GUARD ADDED IN THIS SAME PHASE CATCHES, so the red arrives as a REFUSAL rather than a silent mis-attribution: the two halves of \u00a74.15 protect each other.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-b-independence-is-skipped-by-withholding-the-producer",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\t\t\t\tproducer\n",
+		replace: "\t\t\t\t...(false ? { producer } : {}) // MUTANT: no producer supplied, so \\u00a739 inv-8 never runs\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE, and it is THE PROMISE OF THIS WHOLE PHASE: supplying the producer is what makes the \u00a739 invariant-8 independence check RUN. `completeAssuranceAssessment` skips it when EITHER operand is absent \u2014 *\"the assessment proceeds WITHOUT a check rather than fabricate a pass or a violation\"* \u2014 so withholding the producer buys a green by REMOVING THE QUESTION rather than answering it. \u26d4 THIS IS THE MOST DENIABLE FORM OF THE DEFECT PHASE 6b EXISTS TO CLOSE, and it is a one-line omission that no type and no schema refuses. \u26a0 THE MAIN TEST CANNOT KILL IT \u2014 with a genuinely independent reviewer the assessments reach SATISFIED either way \u2014 which is exactly why the `displayName`-only impostor CONTROL exists: under the mutant the impostor reaches SATISFIED instead of INDEPENDENCE_VIOLATION. A control with its own mutant, which this repository has recorded needing three times.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-c-every-policy-is-reported-fully-evidenced",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tif (!demanded.some((r) => gates(r?.requiredForDispositions, 'SATISFIED'))) return 'SATISFIED';\n",
+		replace: "\treturn 'SATISFIED'; // MUTANT: the evidence a policy requires is never consulted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: the verdict is what the EVIDENCE supports, per policy \u2014 `earnAssurance`'s ruling, *\"A policy whose required evidence this undertaking cannot supply does not get the caller's requested SATISFIED.\"* WHO RELIES ON IT: four of the ontology's fifteen PWU kinds, whose declared policies carry 13 \u00a76.1 requirements (`pol_intent_fidelity` 7, `pol_intent_completeness` 6) this workbench cannot evidence. WHAT THE MUTATION DOES: every verdict claims SATISFIED, Gate A refuses it \u2014 so the surface asks for a disposition it cannot have and the operator sees a refusal instead of the CONDITIONALLY_SATISFIED state their work genuinely reached. \u2b51 THE FAILURE IS LOUD RATHER THAN SILENT, which is why this mutant is about HONESTY-FIRST rather than about a hole: *\"asking for it and being refused, or lowering it here, differ only in whether the drive tells the truth first.\"*",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-d-the-axis-takes-the-friendliest-verdict",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tconst foldedAssuranceState = dispositions.length\n\t\t? STRICTEST.find((d) => dispositions.includes(d))\n\t\t: undefined;\n",
+		replace: "\tconst foldedAssuranceState = dispositions.length ? dispositions[0]! : undefined; // MUTANT: first, not strictest\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: DOC-004 \u00a728.2 \u2014 the PWU's assurance axis is the STRICTEST verdict any declared policy reached, *\"preserve the strictest unresolved required disposition\"*. WHO RELIES ON IT: `RPH-PWU-007`, which refuses a claim stronger than the fold and would then REJECT the surface's own hop. WHAT THE MUTATION DOES: a PWU with one SATISFIED and one CONDITIONALLY_SATISFIED policy claims SATISFIED on the strength of the first one listed \u2014 declaration ORDER deciding a governed state. \u26a0 AND DECLARATION ORDER IS EXACTLY WHAT THE FIXTURE VARIES: the SATISFIED policy is declared FIRST, so a first-wins read answers SATISFIED and the fold answers CONDITIONALLY_SATISFIED. Without that ordering the two readings agree and the assertion would say nothing.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-e-a-verdict-may-name-a-policy-it-was-not-measured-against",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "\tconst verdictPolicyId = p.validatorResult?.policyId;\n",
+		replace: "\tconst verdictPolicyId = assessmentState?.assurancePolicyId; // MUTANT: the guard compares the pin to itself\n",
+		expectRed: ["packages/rph-application/src/handlers/validator-result-policy-binding.test.ts"],
+		why: "PROMISE (design \u00a74.15.5): a \u00a720 verdict may only conclude the assessment it was MEASURED FOR. WHO RELIES ON IT: `MU-PFA-AF1-01`, whose guarantee this rule SUBSUMES \u2014 that entry is now marked `expectSurvive` and names this one as its successor \u2014 and `planDeclaredSignoff`, which opens N assessments under N policies in one act and so makes \u2018each verdict names its own policy\u2019 falsifiable for the first time. WHAT THE MUTATION DOES: comparing the pin to ITSELF is always equal, so the guard admits everything while remaining present and readable \u2014 the tautological control this repository has caught before (*\"the engine comparing a number against the read it came from\"*). \u2b51 CONSEQUENCE MUTATED, NOT CONDITION: the `if` and its refusal are untouched, nothing becomes statically dead, and the CONTROL that a matching verdict still completes stays green \u2014 so the mutant is visible only where the guard was supposed to bite.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-f-a-violated-review-is-reported-as-concluded",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tconst SATISFYING = new Set<AssessmentDisposition>(['SATISFIED', 'CONDITIONALLY_SATISFIED']);\n",
+		replace: "\tconst SATISFYING = new Set<AssessmentDisposition>(['SATISFIED', 'CONDITIONALLY_SATISFIED', 'INCONCLUSIVE']);\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: an assessment that reached `INDEPENDENCE_VIOLATION` has NOT concluded in the subject's favour \u2014 INV-8 forbids that state from ever being SATISFIED. WHO RELIES ON IT: `recordAssurance`, which calls this before hopping the PWU and refuses with a message naming the violated policy. WHAT THE MUTATION DOES: the route reports a completed review, proceeds to the hops, and the operator receives `RPH-PWU-007`'s \u00a728.2 refusal instead \u2014 *\"a policy this PWU itself declares has not been satisfied\"* \u2014 which is TRUE and names the silence rather than the reason for it. \u26d4 THE WHOLE REASON THIS FUNCTION EXISTS is that a self-review is an ACCEPTED command: `completeAssuranceAssessment` takes the ratified \u00a730 arrow and accepts, because the violation is a fact to be minuted. A caller reading `batch.ok` alone sees success. That is the swallowed-refusal shape reached through an accept, which no existing instrument names.\n\n\u2b50 RE-ANCHORED 2026-09-18 (`JAN-EXEC` PHASE 6c \u2014 ledger rule #5, in the commit that moved the code). `R23` moved this check AHEAD OF DISPATCH and made it pure over the plan: the first form read the STORE after the reviewer had committed, which meant learning the answer required having already written something \u2014 the residue `SPEC-001-INV-14` forbids. \u26d4 THE GUARANTEE IS UNCHANGED, WHICH IS WHY THIS IS A RE-ANCHOR AND NOT A `supersededBy`: a verdict that is not a satisfaction must never be reported as a concluded review, and the mutation still widens the satisfying set to admit one that is not. The admitted value changed from INDEPENDENCE_VIOLATION to INCONCLUSIVE because the pure check reasons over DISPOSITIONS rather than \u00a730 states \u2014 the independence case is now held by the ATOMIC ENVELOPE instead, which is `R23` itself.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-g-determination-is-dropped-and-declaration-is-obeyed",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tconst { selected, excluded } = selectGoverningPolicies(engine, pwuId);\n",
+		replace: "\tconst { declared: selected, excluded } = selectGoverningPolicies(engine, pwuId); // MUTANT: DECLARED, not DECLARED n DETERMINED\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: the set assessed is `DECLARED \u2229 DETERMINED` \u2014 the same join `RPH-PWU-007`'s guard folds and the same one `earnAssurance` drives, so the surface and the kernel cannot answer \u2018which policies must this PWU satisfy\u2019 differently. WHO RELIES ON IT: `R19`'s asymmetry, which DEMANDS a verdict only from a policy that currently GOVERNS precisely because *\"demanding one from a policy that is absent, SUSPENDED, or \u00a75.1-excluded is a refusal with no route forward.\"* WHAT THE MUTATION DOES: a policy declared while ACTIVE and later withdrawn from service is assessed anyway \u2014 `RequestAssuranceAssessment` refuses a non-ACTIVE policy, so the whole review batch fails and the PWU cannot be signed off at all, for a policy nobody is entitled to demand. \u2b51 The fixture builds exactly that history, because `DefinePwuType` refuses to newly reference a non-ACTIVE policy \u2014 which is also the only way the arrangement arises in production.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-h-optional-evidence-is-treated-as-mandatory",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tconst demanded = required.filter((r) => r?.cardinality !== 'ZERO_OR_MORE');\n",
+		replace: "\tconst demanded = required; // MUTANT: a requirement demanding no instance is counted as unmet\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE: a `ZERO_OR_MORE` requirement demands no instance and therefore gates nothing \u2014 the exemption Gate A applies through `demandsAnInstance`, reproduced here so the surface's reading of \u00a76.1 and the kernel's cannot diverge. WHO RELIES ON IT: the demo's own sign-off policy, whose SINGLE requirement is `ZERO_OR_MORE` (*\"with this policy's only requirement carrying `cardinality: 'ZERO_OR_MORE'`, `requestAssuranceAssessment`'s required set is empty\"*). WHAT THE MUTATION DOES: every verdict is silently DOWNGRADED to CONDITIONALLY_SATISFIED, so no PWU in the workbench can ever reach a SATISFIED assurance axis \u2014 and nothing is refused, so it presents as the product being conservative rather than as a defect. \u26a0 A DOWNGRADE NOBODY ASKED FOR IS AS WRONG AS AN UPGRADE NOBODY EARNED, and only the direction differs in how easily it is mistaken for caution.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6b-i-the-review-is-issued-by-the-party-it-reviews",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t...reviewerSteps.map((step) => ({ step, as: ASSURANCE_REVIEWER_CREDENTIAL })),\n",
+		replace: "\t\t...reviewerSteps.map((step) => ({ step, as: undefined })), // MUTANT: the operator issues the commands that name the reviewer\n",
+		expectRed: ["apps/rph-demo/e2e/pwu-lifecycle.e2e.ts"],
+		why: "PROMISE (`R22`, in terms): the reviewer HOLDS A CREDENTIAL AND ISSUES THE COMMAND, so the stamped `issuedBy` and the recorded `evaluator` name the same party by construction rather than by agreement. Naming `assurance-reviewer-1` in a payload the operator's session stamps is `REG-F-061` restated \u2014 *\"an identity no authenticator issues, no credential resolves to, and nothing could ever hold to account.\"* WHAT THE MUTATION DOES: the record still LOOKS right \u2014 the evaluator field, the independence check and every disposition are unchanged, because `checkIndependence` compares the payload's producer to the payload's evaluator and never consults the issuer. Only `updatedBy` moves. \u26d4 AND THE UNIT SUITE CANNOT SEE IT: `declared-policy-signoff.test.ts` dispatches the review under the reviewer's session ITSELF, so it stays green. The browser is the only place the route's own credential choice is exercised, which is why the victim is an e2e and why the assertion pairs `evaluator` with `updatedBy`.\n\n\u2b50 RE-ANCHORED 2026-09-18 (`JAN-EXEC` PHASE 6c \u2014 ledger rule #5). `R23` replaced the reviewer's own BATCH with the reviewer's own CREDENTIAL on its entries of a single multi-party transaction, so the anchor moved from the runner to the entry that names the party. \u26d4 THE GUARANTEE IS WORD-FOR-WORD THE SAME \u2014 the reviewer ISSUES the commands that name it \u2014 and the mutation is still \u201cthe operator issues them instead\u201d, now spelled `as: undefined`, which is exactly how a caller would write the defect by accident.",
+		source: "JAN-EXEC Phase 6b / R22 — the demo assesses what its PWUs DECLARE, reviewed by a party that did not produce the work"
+	},
+	{
+		id: "P6c-a-every-command-is-stamped-from-the-composing-session",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\t\t\t\tconst principal = resolved\n\t\t\t\t\t\t? resolved.ok\n\t\t\t\t\t\t\t? resolved.principal\n\t\t\t\t\t\t\t: undefined\n\t\t\t\t\t\t: sessionPrincipal;\n",
+		replace: "\t\t\t\t\tconst principal = sessionPrincipal; // MUTANT: every party\u2019s command stamped as the composer\n",
+		expectRed: ["packages/rph-application/src/multi-party-batch.test.ts"],
+		why: "PROMISE (design \u00a74.16.4, property 2): each command is stamped from the principal of the credential THAT ENTRY carried. \u26d4 THIS IS THE ONE WITH NO OTHER DETECTOR, AND THE LEDGER ENTRY EXISTS BECAUSE OF THAT. Independence is computed from `producer` / `evaluator` IN THE PAYLOAD and never from the issuer \u2014 so a batch that stamped every command from the composing session would satisfy DOC-004 \u00a739 invariant 8, satisfy `SPEC-001-INV-14`, commit atomically, and write a record saying ONE PARTY DID BOTH HALVES. Every guard in the engine reads green. WHO RELIES ON IT: `R22`'s whole discipline \u2014 *the reviewer HOLDS A CREDENTIAL AND ISSUES THE COMMAND* \u2014 which is `REG-F-061` restated and would be defeated from underneath. WHAT KILLS IT: the kernel test asserts `createdBy.actorId` per command against the credential that carried it, and the browser spec pairs the recorded `evaluator` with the stamped `updatedBy`. \u2b50 RE-ANCHORED 2026-09-18 (ledger rule #5, in the commit that moved the code): the coverage floor refused the first form because its `outcome?.` optional chaining had branches no test could ever take, so the resolution now hangs off a single `resolved` discriminator. THE GUARANTEE IS UNCHANGED -- each command is stamped from the principal of the credential THAT ENTRY carried -- and the mutation still replaces exactly that read with the composing session's.",
+		source: "JAN-EXEC Phase 6c / R23 — one atomic act, two acting parties"
+	},
+	{
+		id: "P6c-b-a-multi-party-batch-is-not-a-transaction",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\t\tthis.store.transaction(() => {\n\t\t\t\tfor (let i = 0; i < entries.length; i += 1) {\n",
+		replace: "\t\t\t((run: () => void) => run())(() => {\n\t\t\t\tfor (let i = 0; i < entries.length; i += 1) {\n",
+		expectRed: ["packages/rph-application/src/multi-party-batch.test.ts"],
+		why: "PROMISE: `SPEC-001-INV-14` / FORK-23 (b) \u2014 *\"a multi-Command Affordance is ATOMIC where an atomic dispatch exists, and a partially-applied sequence SHALL NOT leave committed state behind.\"* WHAT THE MUTATION DOES: the loop still runs, the first refusal still aborts, and the results array is still correct \u2014 only the ROLLBACK is gone, so every command that ran before the refusal stays committed. \u26d4 THIS IS THE EXACT DEFECT PHASE 6b SHIPPED FOR ONE COMMIT AND `undertaking-atomicity.e2e.ts` MEASURED: 39 assessments before a refused affordance, 42 after. Three orphans, in a product whose surface tells the operator the action was refused. \u26a0 THE CALLBACK IS STILL INVOKED, AND MY FIRST FORMULATION WAS NOT -- it replaced the transaction with an UNINVOKED arrow, so nothing ran at all and every test in the file failed, controls included. A mutant that kills by disabling the function proves nothing about DURABILITY; this one runs the identical loop outside a transaction, so the controls stay green and only the rollback assertions redden. THE VICTIM IS THE UNIT TEST ALONE because the runner refuses a mixed e2e/unit victim set in one measurement (`isE2eTarget`) -- `undertaking-atomicity.e2e.ts` is what FOUND this defect in production code and asserts the same property one layer up, and `P6b-i` is the entry that credits a browser spec. THE `BatchAbort` THROW IS LEFT INTACT deliberately \u2014 removing it too would change the RESULT as well as the durability, and the mutant would then be killed by the wrong assertion.",
+		source: "JAN-EXEC Phase 6c / R23 — one atomic act, two acting parties"
+	},
+	{
+		id: "P6c-c-an-unknown-credential-borrows-the-composer-identity",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\t\t\t\t\t\t: undefined\n\t\t\t\t\t\t: sessionPrincipal;\n",
+		replace: "\t\t\t\t\t\t\t: sessionPrincipal // MUTANT: an unresolvable credential acts as the composing session\n\t\t\t\t\t\t: sessionPrincipal;\n",
+		expectRed: ["packages/rph-application/src/multi-party-batch.test.ts"],
+		why: "PROMISE: an entry whose credential does not resolve carries NO principal and NO borrowed one \u2014 `dispatchAs` refuses it with `RPH_AUTHENTICATION_REQUIRED` and the batch unwinds. \u00a713.3: *\"Fail closed on missing identity, tenant, POLICY, schema, or authority context\"*, and `actingActor()` THROWS rather than substitute for exactly this reason. WHAT THE MUTATION DOES: an unknown credential silently ACTS AS THE COMPOSING SESSION \u2014 so a caller that mistyped a credential, or one whose party was revoked, has its commands attributed to whoever composed the batch, and the batch SUCCEEDS. \u26a0 AND IT IS THE PLAUSIBLE EDIT: the fallback reads as defensive tidiness, and the only thing distinguishing it from the correct code is that the correct code refuses to invent an actor. That is the same judgement `identity.ts` records making once already.",
+		source: "JAN-EXEC Phase 6c / R23 — one atomic act, two acting parties"
 	}
 ];

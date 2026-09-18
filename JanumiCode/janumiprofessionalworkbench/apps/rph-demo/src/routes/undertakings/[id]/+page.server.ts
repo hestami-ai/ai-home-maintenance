@@ -51,12 +51,18 @@ import {
 	dispatchBatch,
 	getArtifactStore,
 	getEngine,
+	dispatchMultiPartyBatch,
 	getRegisteredIntent,
 	hostNow,
 	mintUiId,
+	reviewerSession,
 	uiSession
 } from '$lib/server/workbench';
-import { actingActor } from '$lib/server/identity';
+import {
+	planDeclaredSignoff,
+	unsatisfyingReviews
+} from '$lib/server/assurance/declared-policy-signoff';
+import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
 import {
@@ -823,20 +829,71 @@ function chg(
  * assessment-count assertion — NOT on the refusal assertion, which passed throughout. A test that only checked
  * the error was surfaced would have been green against this defect for as long as it existed.
  */
-function runSteps(steps: Step[]): string | null {
-	const batch = dispatchBatch(
-		steps.map(([commandType, targetAggregateType, targetAggregateId, payload]) => ({
-			commandType,
-			targetAggregateType,
-			targetAggregateId,
-			payload
-		}))
-	);
+/**
+ * ⭐ THE ONE PLACE A REFUSED BATCH BECOMES A MESSAGE — for the single-party runner and the multi-party one alike.
+ *
+ * ⛔ IT IS ONE FUNCTION BECAUSE THE LEDGER'S OWN GATE SAID SO. `R23` briefly gave these five lines two homes,
+ * and `S3-runSteps-loses-atomicity` — whose anchor is the `batch.ok` line — immediately reported UNANCHORED:
+ * *"a claim someone cited as evidence can no longer be performed."* The repair is not a cleverer anchor. Two
+ * copies of the rule *"a Surface must not report success for a sequence the engine refused"* is exactly the
+ * drift that lets one copy be fixed and the other not.
+ */
+function batchError(
+	batch: ReturnType<typeof dispatchBatch>,
+	commandTypeAt: (index: number) => string
+): string | null {
 	if (batch.ok) return null;
 	const at = batch.failedIndex ?? batch.results.length - 1;
-	const commandType = steps[at]?.[0] ?? '(unknown command)';
 	const failed = batch.results[at];
-	return `${commandType}: ${failed?.error?.message ?? failed?.status ?? 'REJECTED'}`;
+	return `${commandTypeAt(at)}: ${failed?.error?.message ?? failed?.status ?? 'REJECTED'}`;
+}
+
+function runSteps(steps: readonly Step[]): string | null {
+	return batchError(
+		dispatchBatch(
+			steps.map(([commandType, targetAggregateType, targetAggregateId, payload]) => ({
+				commandType,
+				targetAggregateType,
+				targetAggregateId,
+				payload
+			}))
+		),
+		(index) => steps[index]?.[0] ?? '(unknown command)'
+	);
+}
+
+/**
+ * ⭐⭐ ONE TRANSACTION, TWO ACTING PARTIES (`JAN-EXEC` `R23`, design §4.16).
+ *
+ * ⛔ THE TWO-BATCH VERSION OF THIS WAS A REAL REGRESSION AND `undertaking-atomicity.e2e.ts` CAUGHT IT: 39
+ * assessments before a refused affordance, 42 after. Three orphans, which is verbatim the defect
+ * `SPEC-001-INV-14` pins — *"a partially-applied sequence SHALL NOT leave committed state behind"*.
+ *
+ * ⚠ AND THE OBVIOUS FIX WAS THE WRONG ONE. Reordering the batches so the refusal happens first would have made
+ * that spec green while leaving the window open in the other direction, and collapsing back to one session would
+ * have restored the self-review (`REG-F-400`). The envelope itself had to admit two parties, because the corpus
+ * requires BOTH atomicity and independence and the engine could previously express only one at a time.
+ *
+ * Each entry names the credential it is issued under; the reviewer's assessments and the controller's state hops
+ * commit together or not at all, and every command is stamped from its OWN resolved principal.
+ */
+function runMultiParty(
+	reviewerSteps: readonly Step[],
+	operatorSteps: readonly Step[]
+): string | null {
+	const entries = [
+		...reviewerSteps.map((step) => ({ step, as: ASSURANCE_REVIEWER_CREDENTIAL })),
+		...operatorSteps.map((step) => ({ step, as: undefined }))
+	];
+	return batchError(
+		dispatchMultiPartyBatch(
+			entries.map(({ step: [commandType, targetAggregateType, targetAggregateId, payload], as }) => ({
+				command: { commandType, targetAggregateType, targetAggregateId, payload },
+				...(as === undefined ? {} : { as })
+			}))
+		),
+		(index) => entries[index]?.step[0] ?? '(unknown command)'
+	);
 }
 
 async function pwuIdFrom(request: Request): Promise<string> {
@@ -1777,10 +1834,55 @@ export const actions: Actions = {
 		const pending = pendingAssessmentFor(pwuId);
 		const assessmentId = pending ?? mintUiId('asm');
 		const considered = pending ? evidenceSubmittedTo(pending) : [];
-		// Independence NONE, and the operator IS the reviewer — so the evaluator must be the real session, or the
-		// assessment records a sign-off by nobody.
+		// The OPERATOR's own sign-off under the demo policy: independence NONE, the operator is the reviewer, and
+		// the policy says so. That act is unchanged — it is a real judgement by a real party about work they did.
 		const evaluator = actingActor(uiSession());
-		const err = runSteps([
+
+		// ── ⭐⭐ THE INDEPENDENT REVIEW OF WHAT THIS PWU ACTUALLY DECLARES (`R22`, design §4.15) ─────────────
+		//
+		// ⛔ WITHOUT THIS THE SURFACE ASSESSED ONE POLICY THE PWU DOES NOT DECLARE AND CLAIMED SATISFACTION OF THE
+		// FOUR IT DOES. `RPH-PWU-007`'s §28.2 fold now refuses that, correctly — the refusal naming each silent
+		// policy is what opened this phase.
+		//
+		// ⚠ AND IT IS ISSUED BY THE REVIEWER, NOT NAMED BY THE OPERATOR. `actingActor(reviewerSession())` reads the
+		// identity off the SAME authenticated session whose credential stamps these commands, so `issuedBy` and
+		// `evaluator` are the same party by construction rather than by agreement. `producer` is the operator, so
+		// §39 invariant 8 is ANSWERED rather than skipped — which is what the declared policies' `DIFFERENT_AGENT`
+		// and `DIFFERENT_INVOCATION` requirements have always demanded and never got.
+		const reviewer = actingActor(reviewerSession());
+		const review = planDeclaredSignoff({
+			engine: getEngine(),
+			pwuId,
+			// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
+			// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
+			// compares against the STORE, and an assessment pinned to the wrong version is silently STALE rather
+			// than loudly wrong. One read costs nothing and cannot rot.
+			subjectSemanticVersion: getEngine().loadObject(pwuId)?.semanticVersion ?? 1,
+			evaluator: reviewer,
+			producer: evaluator,
+			evidenceConsideredIds: considered,
+			mintId: mintUiId
+		});
+		{
+			// ⛔ REFUSED BEFORE ANYTHING IS DISPATCHED, which is what `SPEC-001-INV-14` deserves rather than a
+			// rollback after the fact. A policy whose §6.1 evidence gates EVERY positive disposition cannot be
+			// concluded in this PWU's favour at all, and that is knowable from the policy object alone.
+			//
+			// ⚠ THE OPERATOR GETS THE REASON, NOT THE SYMPTOM. Left to the kernel, the refusal would arrive as
+			// `RPH-PWU-007`'s §28.2 fold — *"a policy this PWU itself declares has not been satisfied"* — which
+			// is true and names the silence rather than the evidence that is missing.
+			const unsatisfying = unsatisfyingReviews(review);
+			if (unsatisfying.length > 0)
+				return fail(400, {
+					error:
+						`The independent review cannot conclude in favour of this PWU: ` +
+						unsatisfying.map((u) => `${u.policyId} reaches ${u.disposition}`).join('; ') +
+						`. A positive disposition cannot stand with unmet mandatory evidence (DOC-004 §10.3), so ` +
+						`this PWU cannot be recorded SATISFIED until that evidence is supplied.`
+				});
+		}
+
+		const err = runMultiParty(review.steps, [
 			// A pending assessment has already been REQUESTED, so re-running the prelude would attempt a second
 			// `RequestAssuranceAssessment` on a live aggregate and CONFLICT. It needs only the two acts that
 			// remain before a verdict: who is assessing, and the start of the assessment itself.
@@ -1817,10 +1919,28 @@ export const actions: Actions = {
 			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
 				assessmentId
 			]),
-			// The only guarded hop: assuranceState=SATISFIED must cite the SATISFIED assessment covering this PWU.
-			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
-				assessmentId
-			])
+			// The only guarded hop: assuranceState=SATISFIED must cite the SATISFIED assessments covering this PWU.
+			//
+			// ⭐ ALL OF THEM, NOT THE FIRST. `earnAssurance` records why it returns every assessment it created:
+			// *"a caller that goes on to promote a baseline must cite the assessments that permitted the
+			// satisfaction — ALL of them"*, because naming 1 of 4 leaves the promotion gate verifying a single
+			// policy's verdict while the others go unnamed at the one moment the corpus asks for them (§24).
+			//
+			// ⛔ AND THE AXIS IS THE FOLD, NOT THE CONSTANT `SATISFIED` THIS LINE USED TO CARRY. Four of the
+			// ontology's fifteen PWU kinds declare policies with §6.1 required evidence this workbench does not
+			// have (13 requirements for `INTENT_AND_PRODUCT_DEFINITION` alone), so their honest verdict is
+			// CONDITIONALLY_SATISFIED and the PWU's axis must say so. Asserting SATISFIED over a conditional
+			// verdict is refused by `RPH-PWU-007` — correctly — and would have left the operator unable to
+			// record the state their assurance genuinely reached.
+			chg(
+				pwuId,
+				'UNDER_ASSURANCE',
+				'UNDER_ASSURANCE',
+				'SUCCEEDED',
+				review.foldedAssuranceState ?? 'SATISFIED',
+				'PRESERVED',
+				[assessmentId, ...review.assessmentIds]
+			)
 		]);
 		if (err) return fail(400, { error: `Assurance failed: ${err}` });
 		return { advanced: 'assured' };
