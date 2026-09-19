@@ -100,6 +100,7 @@ recording is worth committing.
 | R22 | **THE DEMO GAINS AN ASSURANCE-REVIEWER PRINCIPAL, AND THE ASSESSMENT ACTS ARE ISSUED BY IT.** Every one of the ontology’s 15 PWU templates declares a policy demanding a reviewer distinct from the producer — 0 of 15 are single-actor satisfiable — and the demo signed off as both parties under a NONE-independence policy of its own. Naming the reviewer in a payload the operator’s session issues is FORBIDDEN (`REG-F-061`): the reviewer holds a credential and issues the command. Ruled 2026-09-18; see §4.15. |
 | R23 | **AN ATOMIC ACT MAY HAVE MORE THAN ONE ACTING PARTY, AND THE KERNEL NOW SAYS SO.** `SPEC-001-INV-14` demands a multi-command affordance commit atomically; §39 inv-8 demands an independent reviewer; and `dispatchBatchAs` stamps ONE principal for a whole transaction — so the two rules were incompatible for every assurance act, and nothing had to notice while the surface reviewed its own work. `dispatchMultiPartyBatch` puts both parties in one transaction, each command stamped from its OWN resolved principal. Ruled 2026-09-18; see §4.16. |
 | R24 | **ONE FLAG ANSWERED TWO QUESTIONS, SO THE PRODUCT’S CENTRAL CLAIM COULD NOT BE TESTED END TO END.** `RPH_DEMO_MODE` is single-valued, and Phase 7 needs a process that is OBSERVABLE (the `/test-api` harness) and REAL (durable workspace + real process runner) at once — which it can never be. `workbench.ts:38-45` had already named them *“two different questions”* and could not answer them separately. Durability keeps `RPH_DEMO_MODE === 'server'`; the harness gains its own affirmative declaration; and `resetEngine` REFUSES a durable store, because reset is for disposable state by the repository’s own argument. Ruled 2026-09-18; see §4.17. |
+| R25 | **THE REVIEWER JUDGES; THE ENGINE CARRIES THE VERDICT.** Ratifies `REG-Q-061` (OPEN since 2026-08-23, naming `pol_test_adequacy`): adequacy governs the VALIDATOR’S judgment, not the engine’s contracts — no adequacy axis, no new §20 field. The engine owes three things instead: a competent reviewer was asked, their report is carried FAITHFULLY, and a satisfaction their own report does not support is refused. ⭐ The third is already built and correct in `dispositionFromFindings`, and UNREACHABLE because the only producer maps an unmentioned criterion to `MET`. Ruled 2026-09-19; see §4.18. |
 
 ---
 
@@ -1323,3 +1324,95 @@ classifies two of them. `dispatch` is neither a read nor reset — it is a WRITE
 append-only record — so the rule governs it and the section simply did not say so. It now refuses a durable
 store too. ⭑ The gated suite is unaffected (`RPH_DEMO_MODE=test` ⇒ `DB_PATH` undefined by construction); what it
 forecloses is a live lane **shortcutting the surface**, which is the one thing such a lane exists not to do.
+
+## 4.18 ⭐⭐ `R25` — THE REVIEWER JUDGES, THE ENGINE CARRIES THE VERDICT; AND THE RULE THAT ENFORCES IT IS BUILT, CORRECT, AND UNREACHABLE
+
+⛔ **THIS RULING WAS OWED TO THE REGISTER BEFORE ANY CODE.** `REG-Q-061` has been OPEN since 2026-08-23, names
+`pol_test_adequacy` explicitly, and warns that *“each of the two obvious repairs would ratify a reading by
+accident”*. The sponsor ruled 2026-09-19: **the limb governs the VALIDATOR's judgment, not the engine's
+contracts.**
+
+### 4.18.1 ⛔ WHAT THE RULING FORECLOSES, AND WHY THAT IS THE USEFUL HALF
+
+No adequacy axis is minted. No field is added to §20. The engine does **not** compute whether tests are adequate
+— *“test count is not test adequacy”* (DOC-003 §8.3, ASR-7) is a rule about what a JUDGEMENT must weigh, and
+the engine has no judgement to offer.
+
+⭑ What the engine owes instead is narrow and entirely checkable:
+
+1. **make sure a competent reviewer was asked** — landed by `R22`: independence, a named evaluator, the reviewer
+   issuing its own commands;
+2. **carry what the reviewer said FAITHFULLY**;
+3. **refuse a satisfaction the reviewer's own report does not support.**
+
+### 4.18.2 ⭐⭐ (3) IS ALREADY BUILT, ALREADY CORRECT, AND CANNOT FIRE
+
+`dispositionFromFindings` (`assurance-rules.ts`) contains, verbatim:
+
+```ts
+if (input.evidenceDeficit || mandatory.some((c) => c.outcome === 'UNABLE_TO_DETERMINE'))
+    return 'INCONCLUSIVE';
+```
+
+and its docblock states the rule in terms: *“UNABLE_TO_DETERMINE on a mandatory criterion is INCONCLUSIVE (never
+a pass)”*. That **is** `RPH-ASR-005`, implemented.
+
+⛔ **AND NOTHING PRODUCES THE VALUE IT TURNS ON.** `UNABLE_TO_DETERMINE` is one of five ratified
+`CriterionOutcome` values and **no production path emits it**.
+
+~~A criterion the reviewer never addressed has no entry in `byId`, so it is recorded MET — silence is scored as
+a pass.~~
+
+⛔ **STRUCK — THAT DIAGNOSIS WAS WRONG AND THE EXISTING SUITE REFUTED IT.** I changed the mapper to report an
+unmentioned criterion `UNABLE_TO_DETERMINE`; **twelve tests went red**, one named *"maps each failure class to a
+mandatory criterion (MET iff absent)"*, and the contract says so at the type: `ReasoningReviewFinding.failed` is
+documented *"True = the failure class IS present"*. The reviewer reports **faults**. An absent finding is a
+POSITIVE statement that the fault did not occur, so `MET` is correct — and my change would have made every clean
+review INCONCLUSIVE, a refusal that looks like rigour and stops all work. Reverted.
+
+⭑ **THE REAL REASON IS A CONTRACT GAP ONE LAYER UP.** The judgement carries only faults, so a reviewer that
+evaluated every criterion and one that engaged with nothing emit the identical `{ findings: [] }`. There is no
+input meaning *"not evaluated"*, therefore no output meaning it. `RPH-ASR-005` stays unreachable, and the remedy
+is a change to what a judgement may SAY — not a re-reading of the mapper. Filed as `REG-F-407` and pinned by a
+disclosure test.
+
+⭑ **THIS IS PHASE 6'S SHAPE AGAIN, AND THAT IS THE POINT.** §28.2 rung 3 was implemented and unreachable from
+its caller; this is the same defect one plane over. A rule that cannot fire is indistinguishable from a rule
+nobody wrote, and both look like compliance.
+
+### 4.18.3 ⛔ THE SECOND HOLE — THE REVIEWER SETS ITS OWN STAKES
+
+The same function builds the observations the engine actually enforces on:
+
+```ts
+mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),   // ✓ from the POLICY
+severity: f.severity ?? 'MATERIAL',                       // ⛔ from the MODEL, defaulted
+```
+
+⚠ **THE POLICY'S DECLARED SEVERITY GOVERNS THE FIELD THAT NEVER LEAVES THE PACKAGE, AND THE MODEL'S OPINION
+GOVERNS THE FIELD THE KERNEL GATE READS.** `mandatory` is package-private and never crosses the ratified command
+boundary. What crosses is an observation whose severity the reviewer chose — defaulting to `MATERIAL` when the
+reviewer offered none.
+
+⛔ Gate C (`rejectForeclosedDisposition`) forecloses a positive disposition on an open `BLOCKING`/`CRITICAL`
+observation, and it is UNIVERSAL — *“there is no value an author can write … that removes it”*. `MATERIAL` is
+not in that set. So a reviewer that reports a failed criterion **without a severity** downgrades a policy's
+declared `BLOCKING` to `MATERIAL` and Gate C stays silent.
+
+⭑ **AND IT WEAKENS THE FLOOR, NOT ONLY AUTHORED POLICIES.** Every floor criterion declares
+`severityIfNotMet: 'BLOCKING'`. `severityIfNotMet` is the policy author's ratified statement of *what it means*
+if this criterion is unmet; whether it is unmet is the reviewer's call. Letting the reviewer pick the severity
+lets the judged party set its own stakes — which is the authority-source defect this handler already refuses
+elsewhere in its own voice.
+
+### 4.18.4 ⭑ WHAT `R25` DOES **NOT** LICENSE
+
+- **No new ratified field, and no claim id invented to carry criterion results.** `record-assurance.ts` already
+  refuses that in terms: §20 routes per-criterion results only through `claimResults`, §33 nests them under a
+  `claimId`, the floor evaluates CRITERIA against a SUBJECT — *“so its criterion results have no ratified home
+  in §20 without inventing a claim id, and inventing one is the disease this whole program is treating.”*
+- **No routing of an authored policy through the floor reviewer.** The floor set and the declarable set are
+  disjoint BY RULE (`pwa-authoring.ts` refuses a floor id in a declared list), and `FloorPolicyId` is a closed
+  union that a compiler probe confirmed refuses `pol_test_adequacy` at four seams. That remains `R20`'s phase.
+- **No fourth register entry for “criteria are never evaluated”.** It is filed three times already —
+  `RPH-ASR-004`, `RPH-ASR-005`, `RPH-CON-005` — plus `REG-F-243` for `evaluationMethod`'s absent reader.

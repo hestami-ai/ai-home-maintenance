@@ -15625,7 +15625,7 @@ this engine has no field for, and the only quantity it does hold collapses five 
 Boolean
 
 **Date:** 2026-08-23 · **Type:** QUESTION (W-3b invariant census), carrying one finding-grade conjunct ·
-**Status:** OPEN
+**Status:** ✅ **RATIFIED 2026-09-19 by sponsor ruling (`R25`, `JAN-EXEC`)** — **THE LIMB GOVERNS THE VALIDATOR’S JUDGMENT, NOT THE ENGINE’S CONTRACTS.** Adequacy is a professional judgement and the engine does not compute it. No adequacy axis is minted on the ratified criterion shape, and no field is added to §20. What the engine owes is narrower and checkable: **make sure a competent reviewer was asked, carry what they said FAITHFULLY, and refuse a satisfaction the reviewer’s own report does not support.** ⭑ The safe default this entry recorded is DISCHARGED in the direction it anticipated — *“do not read a satisfied requiredEvidence set, or a READY assessment, as an adequacy determination”* remains true and is now true BY DESIGN rather than by prohibition, because the engine is ruled never to make that determination at all. ⛔ The cardinality conjunct this entry carries is NOT closed by the ruling and is not claimed to be: making a count exact still does not make it an adequacy determination, which is the entry’s own sentence. ⭐ WHAT THE RULING IMMEDIATELY LICENSES, and what `JAN-EXEC` Phase 7b then measured: `RPH-ASR-005`’s kernel rule is ALREADY BUILT AND CORRECT — `dispositionFromFindings` returns INCONCLUSIVE for a mandatory `UNABLE_TO_DETERMINE`, and its docblock says *“UNABLE_TO_DETERMINE on a mandatory criterion is INCONCLUSIVE (never a pass)”* — and it is UNREACHABLE — ⚠ **not because the mapper mis-scores silence, which I asserted and the existing suite refuted, but because the judgement shape has no way to say a criterion went unevaluated**: a reviewer that judged everything and one that engaged with nothing emit the identical empty finding list. The remedy is a change to what a judgement may SAY. See `REG-F-407`; superseding ~~OPEN~~
 
 **In one line:** canon forbids reading a COUNT as an ADEQUACY determination, and this engine expresses
 neither — so the question is whether an adequacy axis is to be minted on the ratified criterion shape,
@@ -35945,3 +35945,78 @@ Measured across five subsystems, adversarially verified:
 workspace. Pinned to `pi` by its own `PROVIDER_REPORTED` assertion, it fails before it measures anything. ⛔ It
 has never run in CI **by construction**: outside the gate, and needing four keys nobody sets. `R24` is what makes
 it fixable; nothing had reported it because nothing had run it.
+
+---
+
+### REG-F-407 — a reviewer that engaged with nothing is indistinguishable from one that found nothing, so a ratified rule cannot fire
+
+- **Date:** 2026-09-19 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a contract that cannot express
+  "unevaluated", so the outcome value for it is emitted by nothing** · **Status:** ⚠ **OPEN** — disclosed and
+  pinned by a test; the remedy is a contract change and is not taken here.
+
+**THE RULE THAT CANNOT FIRE.** `dispositionFromFindings` (`rph-assurance/src/assurance-rules.ts`) contains
+`if (input.evidenceDeficit || mandatory.some((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';`
+and its docblock states it in terms: *"UNABLE_TO_DETERMINE on a mandatory criterion is INCONCLUSIVE (never a
+pass)."* That is `RPH-ASR-005`, implemented and correct.
+
+⛔ **AND NO PRODUCTION PATH EMITS THAT VALUE.** `reasoningReviewResultFromJudgement` is the only mapper from a
+reviewer's judgement onto criterion outcomes, and its input cannot express non-evaluation:
+`ReasoningReviewJudgement` carries `findings` only, and `ReasoningReviewFinding.failed` is documented *"True =
+the failure class IS present."* A reviewer that evaluated all eight criteria and found nothing, and a reviewer
+that engaged with nothing at all, both emit `{ findings: [] }`. **They are the same value.** So the mapper has no
+input meaning "not evaluated" and therefore no output meaning it, and a review that judged nothing composes to
+`SATISFIED`.
+
+⚠ **THE DIAGNOSIS I FILED FIRST WAS WRONG, AND THE CORRECTION IS THE USEFUL PART.** I asserted the mapper was
+mis-scoring silence as `MET` and changed it to report `UNABLE_TO_DETERMINE`. **Twelve existing tests went red** —
+one named *"maps each failure class to a mandatory criterion (MET iff absent)"* — and they were right: absence of
+a fault report is a POSITIVE statement that the fault did not occur, so `MET` is correct, and the change would
+have made every clean review INCONCLUSIVE. ⭑ **A refusal that looks like rigour and stops all work is not a
+stricter gate.** Reverted; the defect is one layer up, in what a judgement is allowed to say.
+
+**THE REMEDY, NOT TAKEN HERE.** The judgement would have to report what it EVALUATED, not only what it FAULTED —
+a change to `ReasoningReviewJudgement`, to the reviewer prompt, and to the live-model contract. That is a
+deliberate increment with its own predicted reds, and it touches the one path that costs money to drive.
+
+⭑ **PINNED RATHER THAN LEFT TO PROSE.** `reviewer-silence-is-not-a-pass.test.ts` carries a DISCLOSURE test
+asserting the current behaviour and saying so: *"when the contract gains a way to say what was evaluated, this
+test must go red and be rewritten. Its failure is the signal that the gap closed."*
+
+⚠ **RELATED AND ALREADY FILED — do not duplicate:** `RPH-ASR-004`, `RPH-ASR-005`, `RPH-CON-005` (all
+`UNENFORCED_DISCLOSED`) and `REG-F-243` (`evaluationMethod` has no reader). This entry is narrower than any of
+them: it names the specific reason the implemented rule is unreachable.
+
+---
+
+### REG-F-408 — the reviewer set its own stakes: a policy's declared severity governed a package-private field while the model's opinion governed the kernel gate
+
+- **Date:** 2026-09-19 · **Type:** FINDING · **Class:** DEFECT — ⛔ **the judged party chose how bad its own
+  failure was** · **Status:** ✅ **CLOSED** — `JAN-EXEC` `R25` / Phase 7b.
+
+`reasoningReviewResultFromJudgement` built two things from one judgement:
+
+```ts
+mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),   // from the POLICY  — package-private
+severity:  f.severity ?? 'MATERIAL',                      // from the MODEL   — crosses the boundary
+```
+
+⛔ **THE POLICY'S DECLARED SEVERITY GOVERNED THE FIELD THAT NEVER LEAVES THE PACKAGE, AND THE REVIEWER'S OPINION
+GOVERNED THE FIELD THE KERNEL ENFORCES ON.** `mandatory` never crosses the ratified command boundary. What
+crosses is an observation, and `rejectForeclosedDisposition` (Gate C) forecloses a positive disposition only on
+an open `BLOCKING`/`CRITICAL` one — universally, *"there is no value an author can write … that removes it"*.
+`MATERIAL` is not in that set.
+
+⚠ **SO THE LIKELIEST SHAPE WAS NOT AN ADVERSARIAL DOWNGRADE BUT AN ORDINARY OMISSION.** `severity` is optional on
+a finding. A reviewer that reported a real failure and simply left it off produced a `MATERIAL` observation, and
+a policy that declared the criterion `BLOCKING` was never heard. ⛔ **Every floor criterion declares `BLOCKING`,
+so this weakened the de minimis floor, not only authored policies.**
+
+**THE RULE, AND WHY IT FOLLOWS FROM `R25` RATHER THAN BEING NEW.** `severityIfNotMet` is the policy author's
+ratified statement of *what it means* if a criterion is unmet; whether it is unmet is the reviewer's call. `R25`
+says the reviewer judges and the engine carries the verdict **faithfully** — and carrying it faithfully means
+carrying the policy's stakes, not the reviewer's estimate of them.
+
+⚠ **ONE RESIDUE, DISCLOSED AND TESTED.** A finding naming a criterion id the policy does not declare has no
+declared severity to prefer, so the reviewer's own value is kept rather than the finding dropped. A reviewer
+could therefore reach the old behaviour by naming an undeclared id — a weaker bypass, since it forfeits the
+criterion result entirely, but not nothing. Recorded here rather than left for a reader to find.
