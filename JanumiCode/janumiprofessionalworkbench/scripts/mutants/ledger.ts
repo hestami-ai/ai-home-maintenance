@@ -7936,5 +7936,32 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/workbench-harness-declaration.test.ts"],
 		why: "PROMISE: \u00a74.17.3's rule \u2014 *\"read affordances compose with durability; destructive ones do not\"* \u2014 governs ALL THREE members of the set it enumerates. `/test-api/dispatch` is a WRITE channel into the permanent, append-only record: it dispatches any command in the registry under the workbench's own session, with no `expectedRevision`. \u26d4 THIS IS THE DEFECT VERBATIM: `R24` classified `introspect` (read) and `reset` (destructive) and left this one out, so it was moved into a newly reachable durable configuration with no guard, no test and no disclosure while its sibling in the same sentence got all four. A rule applied to two of the three things it names is the shape this programme keeps finding. \u2b51 THE GATED SUITE CANNOT SEE IT: those specs run under `RPH_DEMO_MODE=test`, where `DB_PATH` is undefined BY CONSTRUCTION, so the refusal can never fire for them \u2014 which is exactly why the victim is a unit test that builds the durable arrangement directly.",
 		source: "JAN-EXEC Phase 7a / R24 — the harness and the server are two questions"
+	},
+	{
+		id: "P7b-a-the-reviewer-sets-its-own-stakes-again",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\tseverity: declaredSeverity.get(f.criterionId) ?? f.severity ?? 'MATERIAL',\n",
+		replace: "\t\t\tseverity: f.severity ?? 'MATERIAL', // MUTANT: the judged party chooses how bad its own failure was\n",
+		expectRed: ["packages/rph-assurance/src/reviewer-silence-is-not-a-pass.test.ts"],
+		why: "PROMISE (`R25`): `severityIfNotMet` is the POLICY AUTHOR'S ratified statement of what it MEANS if a criterion is unmet; whether it is unmet is the reviewer's call. The engine carries the verdict FAITHFULLY, and faithfully means carrying the policy's stakes rather than the reviewer's estimate of them. WHO RELIES ON IT: `rejectForeclosedDisposition` (Gate C), which forecloses a positive disposition over an open BLOCKING/CRITICAL observation \u2014 universally, *\"there is no value an author can write \u2026 that removes it\"* \u2014 and `MATERIAL` is not in that set. WHAT THE MUTATION RESTORES: `severity` is OPTIONAL on a finding, so a reviewer that reports a real failure and simply omits it downgrades a declared BLOCKING to MATERIAL and Gate C stays silent. \u26d4 AND IT WEAKENS THE DE MINIMIS FLOOR, NOT ONLY AUTHORED POLICIES: every floor criterion declares `severityIfNotMet: 'BLOCKING'`. \u2b51 The `mandatory` flag beside it is derived from the policy correctly and is package-private \u2014 it never crosses the ratified command boundary \u2014 so the correct derivation was already there, governing the field nobody enforces on.",
+		source: "JAN-EXEC Phase 7b / R25 — the reviewer judges, the engine carries the verdict (ratifies REG-Q-061)"
+	},
+	{
+		id: "P7b-b-every-failure-becomes-blocking",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\tseverity: declaredSeverity.get(f.criterionId) ?? f.severity ?? 'MATERIAL',\n",
+		replace: "\t\t\tseverity: 'BLOCKING', // MUTANT: every reported failure is a blocker, whatever the policy declared\n",
+		expectRed: ["packages/rph-assurance/src/reviewer-silence-is-not-a-pass.test.ts"],
+		why: "PROMISE: the fix carries the POLICY's severity \u2014 which means it must RAISE nothing the policy did not declare, as well as lower nothing. WHY THIS MUTANT EXISTS SEPARATELY FROM `P7b-a`: the two are opposite errors and a single test cannot tell them apart. Hardcoding BLOCKING satisfies every assertion that a declared-BLOCKING criterion arrives BLOCKING, and promotes every ADVISORY criterion into a blocker \u2014 which is the mirror defect, and the one that would look like rigour. \u26a0 THE FLOOR'S OWN MAPPER NAMES THIS TRAP for the sibling field: hardcoding `mandatory: true` *\"would have silently promoted any ADVISORY criterion the moment one was added\"*. WHAT KILLS IT: the ADVISORY control, which is the only test in the file that would go red \u2014 without it `P7b-a`'s fix is indistinguishable from this.",
+		source: "JAN-EXEC Phase 7b / R25 — the reviewer judges, the engine carries the verdict (ratifies REG-Q-061)"
+	},
+	{
+		id: "P7b-c-the-disclosure-is-quietly-blessed",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\toutcome: f?.failed ? 'NOT_MET' : 'MET',\n",
+		replace: "\t\t\toutcome: f === undefined ? 'UNABLE_TO_DETERMINE' : f.failed ? 'NOT_MET' : 'MET', // MUTANT: the change I made and reverted\n",
+		expectRed: ["packages/rph-assurance/src/validators.test.ts"],
+		why: "\u2b50\u2b50 THIS MUTANT IS THE CHANGE I ACTUALLY MADE AND HAD TO REVERT, KEPT SO THE REVERSAL CANNOT BE UNDONE BY SOMEONE READING THE SAME THING INTO THE SAME LINE. PROMISE: `ReasoningReviewFinding.failed` is documented *\"True = the failure class IS present\"* \u2014 the reviewer reports FAULTS, so an absent finding is a POSITIVE statement that the fault did not occur and `MET` is correct. WHAT THE MUTATION DOES: reinterprets absence as non-evaluation, which turns every CLEAN review INCONCLUSIVE \u2014 a refusal that looks like rigour and stops all work. \u26a0 IT IS THE PLAUSIBLE EDIT, which is exactly why it needs a standing mutant: the line reads like a bug to anyone who has not found the twelve tests that say otherwise, and I was that reader. \u26d4 THE RESIDUE IS REAL AND IS FILED SEPARATELY (`REG-F-407`): a reviewer that engaged with nothing is indistinguishable from one that found nothing, so `UNABLE_TO_DETERMINE` is emitted by no production path and `RPH-ASR-005` cannot fire. The remedy is a CONTRACT change \u2014 the judgement saying what it EVALUATED \u2014 not this line.",
+		source: "JAN-EXEC Phase 7b / R25 — the reviewer judges, the engine carries the verdict (ratifies REG-Q-061)"
 	}
 ];

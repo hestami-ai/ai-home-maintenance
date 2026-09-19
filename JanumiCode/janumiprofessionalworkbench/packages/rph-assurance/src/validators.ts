@@ -284,11 +284,30 @@ export function reasoningReviewResultFromJudgement(
 	policyCriteria: readonly AssessmentCriterion[]
 ): ValidatorResult {
 	const byId = new Map(j.findings.map((f) => [f.criterionId, f]));
+	// ⭐ THE POLICY'S OWN DECLARED SEVERITY, BY CRITERION ID (`JAN-EXEC` `R25`). `severityIfNotMet` is the policy
+	// author's ratified statement of what it MEANS if a criterion is unmet; whether it is unmet is the reviewer's
+	// call. Those are different questions and only the second belongs to the reviewer.
+	const declaredSeverity = new Map(policyCriteria.map((c) => [c.id, c.severityIfNotMet]));
 	const criteria: FloorCriterion[] = policyCriteria.map((c) => {
 		const f = byId.get(c.id);
 		return {
 			criterionId: c.id,
 			mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),
+			// ⛔ ABSENCE MEANS THE FAILURE DID NOT OCCUR — NOT THAT THE CRITERION WENT UNJUDGED, AND I HAD THAT
+			// BACKWARDS (`JAN-EXEC` `R25`). I changed this to report the criterion undetermined whenever the reviewer
+			// had not mentioned it, reasoning that silence was being scored a pass. TWELVE EXISTING TESTS WENT RED,
+			// one of them named *"maps each failure class to a mandatory criterion (MET iff absent)"*, and the
+			// contract states it at the type: `ReasoningReviewFinding.failed` is documented *"True = the failure class
+			// IS present"*. The reviewer reports FAILURE CLASSES, so an absent finding is a positive statement that
+			// the failure did not occur. MET is correct, and the change would have made every clean review
+			// INCONCLUSIVE — a refusal that looks like rigour and stops all work.
+			//
+			// ⚠ WHAT SURVIVES AS A REAL RESIDUE, RECORDED RATHER THAN FIXED: this shape cannot distinguish a reviewer
+			// that evaluated every criterion and found nothing from one that engaged with nothing and returned an
+			// empty finding list. Both are CLEAN here. So the ratified outcome value for "could not determine" is
+			// emitted by NO production path, and `dispositionFromFindings`'s mandatory-undetermined rule — *"never a
+			// pass"* — cannot fire. ⛔ THE REMEDY IS A CONTRACT CHANGE (the judgement would have to say what it
+			// EVALUATED, not only what it FAULTED), not a re-reading of this line. Filed as `REG-F-407`.
 			outcome: f?.failed ? 'NOT_MET' : 'MET',
 			...(f?.statement ? { rationale: f.statement } : {})
 		};
@@ -297,7 +316,25 @@ export function reasoningReviewResultFromJudgement(
 		.filter((f) => f.failed)
 		.map((f) => ({
 			code: f.criterionId,
-			severity: f.severity ?? 'MATERIAL',
+			// ⭐ THE POLICY'S SEVERITY WHERE THE POLICY DECLARED ONE (`R25`). This read `f.severity ?? 'MATERIAL'`
+			// — the reviewer's own opinion, defaulted — and it is the field the KERNEL GATE actually enforces on:
+			// `rejectForeclosedDisposition` forecloses a positive disposition over an open BLOCKING/CRITICAL
+			// observation, universally, and `MATERIAL` is not in that set.
+			//
+			// ⛔ SO THE JUDGED PARTY SET ITS OWN STAKES. `mandatory` above is derived from the policy correctly and
+			// is package-private — it never crosses the ratified command boundary. What crossed was this severity.
+			// A reviewer that reported a failure and simply OMITTED a severity downgraded a policy's declared
+			// BLOCKING to MATERIAL and Gate C stayed silent. Every floor criterion declares BLOCKING, so this
+			// weakened the de minimis floor and not only authored policies.
+			//
+			// ⚠ THE FALLBACK SURVIVES FOR AN UNDECLARED ID, AND IT IS A DISCLOSED RESIDUE RATHER THAN A CHOICE I
+			// LIKE. A finding naming a criterion the policy does not declare is not a criterion verdict at all, so
+			// there is no declared severity to prefer; keeping the reviewer's own value records what it said
+			// instead of dropping it. ⛔ THE RESIDUE: a reviewer could reach the old behaviour by naming an id the
+			// policy does not declare. That is a weaker bypass than the one this closes — it forfeits the
+			// criterion result entirely, which `UNABLE_TO_DETERMINE` now makes visible — but it is not nothing,
+			// and it is tested rather than assumed.
+			severity: declaredSeverity.get(f.criterionId) ?? f.severity ?? 'MATERIAL',
 			statement: f.statement,
 			open: true
 		}));

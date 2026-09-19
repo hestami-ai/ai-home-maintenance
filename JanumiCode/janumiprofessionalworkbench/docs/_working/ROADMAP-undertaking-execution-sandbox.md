@@ -1867,6 +1867,47 @@ Three findings from the measurement, none of them closable by `R24`:
 workspace. Pinned to `pi` by its own assertion, it fails before it measures anything. It has never run in CI by
 construction. `R24` is what makes it fixable.
 
+## 8e. Phase 7b · A reviewer's silence stops being a pass (`R25`)
+
+⛔ **THE RULING CAME FIRST AND IT IS RECORDED IN THE REGISTER, NOT HERE.** `REG-Q-061` was OPEN since
+2026-08-23 and warned that *“each of the two obvious repairs would ratify a reading by accident”*. Ratified
+2026-09-19: **the limb governs the VALIDATOR's judgment, not the engine's contracts.** Design §4.18.
+
+### 8e.1 ⭐ WHAT THE RULING MAKES BUILDABLE
+
+The engine owes three things. The first landed with `R22`. The third is **already built and correct** —
+`dispositionFromFindings` returns INCONCLUSIVE for a mandatory `UNABLE_TO_DETERMINE` — and cannot fire. Two
+lines in one function are what stand between a ratified rule and its own reachability.
+
+| # | what is built | why |
+|---|---|---|
+| ~~1~~ | ~~a criterion the reviewer did not address becomes `UNABLE_TO_DETERMINE`, not `MET`~~ | ⛔ **REFUTED AND REVERTED.** Twelve existing tests went red; `ReasoningReviewFinding.failed` means *"the failure class IS present"*, so an absent finding is a positive PASS statement and `MET` is correct. The change would have made every clean review INCONCLUSIVE. |
+| 2 | a failed criterion's observation carries the POLICY's `severityIfNotMet`, not the model's `severity ?? 'MATERIAL'` | the policy author declares what an unmet criterion MEANS; the reviewer judges only whether it is met |
+| 3 | a DISCLOSURE test pinning what the judgement shape cannot say | the real reason `RPH-ASR-005` cannot fire is a contract gap, not a mapping bug — `REG-F-407` |
+
+### 8e.2 ⛔ WHAT IS **NOT** BUILT
+
+- **No new ratified field**, and no claim id invented to give criterion results a home in §20.
+- **No authored policy routed through the floor reviewer** — rule-blocked and type-blocked; still `R20`'s phase.
+- **No fourth register entry** for *“criteria are never evaluated”*: filed three times already.
+- ⚠ **`RPH-ASR-004` is NOT claimed closed.** Gate C is universal and already refuses a positive disposition over
+  an open BLOCKING observation; fix (2) is what makes a policy's declared BLOCKING actually arrive as BLOCKING.
+  Whether that discharges the row is a measurement for the increment, not a promise made here.
+
+### 8e.3 ⭐⭐ THE PREDICTED REDS, NAMED BEFORE ANYTHING IS WRITTEN
+
+| # | The assertion | Why it MUST be red at HEAD |
+|---|---|---|
+| ~~`PR-1`~~ | ~~a criterion the reviewer never mentions is `UNABLE_TO_DETERMINE`~~ | ⛔ **REFUTED.** It was red at HEAD and the red was CORRECT: absence means the fault did not occur. |
+| ~~`PR-2`~~ | ~~a mandatory unmentioned criterion yields `INCONCLUSIVE`~~ | ⛔ **REFUTED** with `PR-1`. The kernel rule is real and unreachable, but for a contract reason — `REG-F-407`. |
+| `PR-3` | a failed criterion's observation severity is the POLICY's `severityIfNotMet` | HEAD takes the model's `severity ?? 'MATERIAL'` |
+| `PR-4` | a reviewer reporting a failure with NO severity still blocks a BLOCKING criterion | HEAD downgrades it to `MATERIAL`, which Gate C does not foreclose |
+
+⭑ **CONTROLS:** `C-1` a criterion the reviewer explicitly says PASSED is still `MET` (the fix must not turn
+every criterion undetermined); `C-2` a genuinely advisory criterion keeps its non-blocking severity, so fix (2)
+raises nothing it should not; `C-3` the existing floor run still reaches SATISFIED when every criterion is
+addressed and met — without which `PR-1`/`PR-2` are satisfied by a reviewer that can never pass anything.
+
 ## 9. Phase 7 · The live end-to-end, and Phase 8 · the committed replay
 
 **PHASE 7 (validation, not a gate step):** author the product-realization PWA live → accept the candidate hash →
