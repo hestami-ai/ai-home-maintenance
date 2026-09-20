@@ -16,6 +16,27 @@ with a named ratification rather than quietly claimed.
 
 ⭑ **SO THE ORDER IS L3 → L1, NOT L1 → L3.** A coverage gate over `claimResults` cannot ship while the only production producer of a positive disposition cannot populate `claimResults`. **L2 is unaffected** — with every production site passing `[]` there are zero answers, hence zero undetermined answers, hence no arrangement in which it can over-refuse.
 
+### ✅ STATUS 2026-09-20 — L3 IS BUILT; THE READER IS WHAT REMAINS
+
+`CR-06` **landed** as `DESIGN-the-command-nobody-built.md` / `ROADMAP-the-command-nobody-built.md` (`CB-01`–`CB-04`, `REG-F-423`): §32's `recordCriterionResult` is built, emits the ratified §31 `AssuranceCriterionEvaluated`, and the floor records one per computed criterion.
+
+⭐⭐ **SO THE REMEDY HAS MOVED FROM PRODUCER TO READER, AND THAT CHANGES WHAT `CR-01`/`CR-02` ARE.** They were written to read `validatorResult.claimResults`. They must instead **fold the recorded events** from the assessment's own log, the way Gate A folds `AssuranceEvidenceReceived`. `REG-F-420` is why the old subject is unusable: a coverage gate on `claimResults` refuses the floor's own SATISFIED path.
+
+### ⛔ THE PRECONDITION, MEASURED, AND IT IS NOT THE ONE THE EARLIER REVISION NAMED
+
+A fold-based gate refuses any positive disposition whose mandatory criteria have **no recorded result**. Re-measured by CALLER rather than by filename:
+
+| dispatch site | app-reachable? | records criteria? | refused by a fold-gate? |
+|---|---|---|---|
+| `record-assurance.ts:165` | ✅ yes (`floor.ts:394`, `floor-over-subject.ts:157`) | ⭐ **yes, since `CB-03`** | no |
+| `declared-policy-signoff.ts:196` | ✅ yes (`+page.server.ts:64`) | no | no — governed by the PWU's declared policies; the demo's declares one MATERIAL criterion |
+| `+page.server.ts:1967` / `:2073` | ✅ yes | no | no — MATERIAL criterion / negative disposition |
+| `reference-undertaking.ts:655` / `:1162` | ⛔ **NO — every importer is a `.test.ts`** | no | ⛔ **YES** |
+
+⭑ **THE BLOCKER IS THE SEED, AND THE GATE WOULD BE RIGHT TO REFUSE IT.** `satisfyFloor` completes SATISFIED against all three floor policies — including `floor.reasoning-review`'s nine all-BLOCKING criteria — **having evaluated none of them**. Canon's anchor for `RPH-CON-005` is *“Partial output — an unanswered mandatory criterion — is invalid output”*, and zero-of-nine answered is nine unanswered. ⛔ So the seed asserts a verdict it did not earn, and the gate's refusal is the rule working. **Fixing the seed is the precondition, not weakening the gate.**
+
+⚠ **AND IT IS A TEST-HARNESS BLOCKER, NOT A PRODUCT ONE** — six test files redden, nothing in the running demo breaks. That distinction is load-bearing for sequencing and was wrong in `REG-F-422` until corrected there.
+
 ### ⭐ REVISED ORDER
 
 | # | item | status |
