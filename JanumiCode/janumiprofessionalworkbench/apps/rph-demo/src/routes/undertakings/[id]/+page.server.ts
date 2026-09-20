@@ -80,7 +80,10 @@ import { getExecutionSession } from '$lib/server/execution/model';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
 import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
-import { resolveJudgeModel } from '$lib/server/assurance/agy-cli';
+// ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
+// the last live reference to the REVIEWER's model on the EXECUTION path — `REG-F-356`'s defect, whose final
+// residue survived in the host-configured fallback identity below. Lint is what reports a relapse.
+import { resolveExecutorModel, resolveExecutorToolId } from '$lib/server/tools/backing-tool';
 import type {
 	ActorReference,
 	ContextSpecification,
@@ -1255,8 +1258,27 @@ export const actions: Actions = {
 							dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
 						newId: mintUiId,
 						now: hostNow,
-						modelId: resolveJudgeModel() ?? 'unresolved',
-						providerId: 'agy',
+						// ⭐⭐ `JAN-NOANS` — THE EXECUTOR'S OWN CONFIGURATION, AND THIS LINE READ THE REVIEWER'S.
+						//
+						// ⛔ IT SAID `resolveJudgeModel() ?? 'unresolved'` WITH `providerId: 'agy'` — the ASSURANCE
+						// model and the ASSURANCE tool, handed to an EXECUTION step. That is `REG-F-356`'s defect,
+						// which `TS-04`/`LE-01` fixed on the paths two comments below (*"This read
+						// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id"*)
+						// — and this arm was left behind.
+						//
+						// ⚠ IT SURVIVED BECAUSE NOTHING REACHED IT. These values are the HOST_CONFIGURED FALLBACK,
+						// used only when the tool reports no identity of its own: the success path always overrides
+						// them with `produced.producer`. So the only readers were the `catch` arm and — now —
+						// `JAN-NOANS`'s no-answer arm, and the defect became visible on the first live run that
+						// took one: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
+						//
+						// ⭑ MEASURED, NOT REASONED. `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so a
+						// failed execution call was recorded as having been produced by the reviewer.
+						modelId: resolveExecutorModel() ?? 'unresolved',
+						// ⭑ THE TOOL, GRADED HOST_CONFIGURED, WHICH IS WHAT IT HONESTLY IS. The provider proper is
+						// embedded in the model label (`openai-codex/gpt-6-astra`) and only the tool can resolve it —
+						// so when the tool told us nothing, the tool id is the strongest true thing available.
+						providerId: resolveExecutorToolId() ?? 'unresolved',
 						session: producer,
 						priorFindings,
 						// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the
