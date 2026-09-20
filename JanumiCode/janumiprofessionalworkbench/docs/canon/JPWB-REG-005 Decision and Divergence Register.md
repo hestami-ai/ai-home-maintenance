@@ -36214,8 +36214,31 @@ Subject: Route Assessment
 Required outputs: [object Object]
 ```
 
-⭑ **A STRINGIFICATION FAULT IN THE DEMO'S INSTRUCTION BUILDER**, not in the contract or the adapter: an object
-interpolated into a template string. ⚠ **IT IS VISIBLE TO EVERY EXECUTING MODEL AND TO EVERY REVIEWER**, since
+⛔⛔ **CORRECTED 2026-09-20.** I first filed this as ~~"a stringification fault in the DEMO's instruction
+builder — an object interpolated into a template string"~~. **Both halves are wrong: wrong package, and
+wrong defect class.** Traced:
+
+1. `packages/rph-contracts/src/objects.ts:556` — `expectedOutputs: z.array(OutputDefinitionSchema)`, and
+   `OutputDefinitionSchema` is `z.record(z.string(), z.unknown())`. So the field holds **OBJECTS**.
+2. `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1246` —
+   `expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? []`. An **unchecked type
+   assertion** launders `OutputDefinition[]` into `string[]`.
+3. `packages/rph-application/src/execution-invocation.ts:28` declares
+   `readonly expectedOutputs?: readonly string[]`, and `:94` renders it `subject.expectedOutputs?.join(', ')`.
+   `Array.prototype.join` on objects yields `[object Object]`.
+
+⭐⭐ **SO THE INSTRUCTION BUILDER IS CORRECT AND THE TYPE IT WAS GIVEN IS A LIE.** `.join(', ')` is the
+right code for the type it declares; what is wrong is that the declared type was ASSERTED INTO EXISTENCE
+at the call site. ⛔ **`check-types` CANNOT CATCH THIS — the cast exists precisely to stop it.** This is
+not a formatting slip; it is a boundary where the type system was switched off by hand, and the gate that
+would have caught it is the one the cast disabled.
+
+⚠ **AND THE LINE BELOW CARRIES THE SAME CAST.** `inputRequirements: (pwu?.inputRequirements as string[] |
+undefined) ?? []` — same laundering, same `.join`, invisible only because this fixture leaves it empty.
+⭑ **THE GENERAL FORM IS THE FINDING**: every field in that subject literal is hand-asserted
+(`String((pwu?.title ?? '') as string)` and so on), so the whole projection→invocation boundary is
+unchecked. Filing only the one field that happened to be visible would be this repository's own
+hand-listing defect one level up. ⚠ **IT IS VISIBLE TO EVERY EXECUTING MODEL AND TO EVERY REVIEWER**, since
 the reviewer is shown the producing agent's instruction verbatim — so the rubric criterion
 `RR-07-no-contradiction` (*"no contradiction with intent, constraints, inputs"*) is being judged against an
 instruction that names its required outputs as `[object Object]`.
