@@ -36370,3 +36370,42 @@ was recorded as having been produced by the reviewer — the exact collision `RE
 what they honestly are. Re-driving the same lane now records `openai-codex/gpt-5.4-mini`. ⭐ **And the
 `resolveJudgeModel` import is gone from that route**, which is the standing check: it was the last live
 reference to the reviewer's model on the execution path there, and lint reports a relapse.
+
+---
+
+### REG-F-414 — `REG-F-409`'s accounting counted the vitest half; the same deliberate red also fails THIRTEEN e2e specs, and nothing had run them
+
+**Filed 2026-09-20** (`JAN-ASSERTED`). **Status:** ⚠ **OPEN** — it is an accounting correction to `REG-F-409`,
+not a new defect, and it closes when `REG-F-409` does.
+
+⭐ **HOW IT WAS FOUND: BY REFUSING TO ASSUME A BASELINE.** A `JAN-ASSERTED` increment touched the execution
+route, so the demo e2e suite was run to check for regression. **13 specs failed.** Rather than reason about
+whether they were pre-existing, the uncommitted work was `git stash`ed and one spec re-run: **identical
+failure, same assertion, same message.** The changes are not the cause.
+
+⛔ **THE CAUSE IS `REG-F-409`, AND THE ASSERTION SAYS SO IN ONE LINE:**
+
+```
+expect(rr?.state.assessmentState, 'the work product was not assured').toBe('SATISFIED');
+```
+
+for `floor.reasoning-review`. ⭑ The line ABOVE it passes — `expect(overArtifact.length).toBe(3)` — so the
+floor **did** run over the work product; what it could not do is satisfy, because the deterministic fixture
+examines two of nine criteria and the other seven now arrive `UNABLE_TO_DETERMINE` (`R26`).
+
+⚠ **THE OTHER ELEVEN FAIL FOR THE SAME REASON ONE LAYER OUT**, on the authoring side: a candidate never
+reaches `READY_TO_COMMIT` and the assured-candidate hash is never exposed, because the floor those specs wait
+on is inconclusive.
+
+⭐⭐ **WHY NOBODY KNEW: `gate:fast` SHORT-CIRCUITS AT ITS FIRST FAILING TASK, AND E2E IS THE LAST STEP.**
+`REG-F-409` recorded its evidence as *"11 failed | 4171 passed | 3 skipped, 8 files of 388"* — a `vitest run`
+measurement, honestly labelled as such. It was complete for the instrument it named and silently partial for
+the phase's true reach, because the instrument that would have measured the rest **never ran on this branch at
+all.**
+
+⭑ **SO THE CORRECTED SPREAD IS 11 UNIT TESTS AND 13 E2E SPECS, NOT 11.** `REG-F-409`'s own text asks a reader
+to *"read the SPREAD, not the count"* — this entry is that instruction applied to the entry itself.
+
+⚠ **AND THE GENERAL FORM IS AN INSTRUMENT PROBLEM, NOT A COUNTING ONE.** A gate that stops at its first failing
+task cannot report the extent of a deliberate red, and a deliberate red is exactly when extent is the thing a
+reader needs. Recorded here rather than remedied: changing the gate's short-circuit is its own decision.

@@ -34,6 +34,11 @@ export type {
 } from './exchange-resolution.js';
 export { renderPromptTemplate, markersIn, promptTemplateFingerprint } from './prompt-render.js';
 export type { RenderOutcome } from './prompt-render.js';
-export { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
+export {
+	assembleStepContext,
+	prepareModelInvocation,
+	resolveInvocationSubject,
+	resolvePwuTypeFacts
+} from './execution-invocation.js';
 export type { ContextAssembly, InvocationPlan, InvocationSubject } from './execution-invocation.js';
 export * from './context-assembly.js';

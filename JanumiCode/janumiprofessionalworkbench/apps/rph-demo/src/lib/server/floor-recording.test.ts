@@ -213,6 +213,22 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			expect(view!.answer, 'the reviewer answer did not survive the round trip').toBe(JUDGEMENT);
 			expect(view!.disclosure, 'a verified read must say it was verified').toMatch(/re-hashed/i);
 
+			// ⭐⭐ `JAN-ASSERTED` `AS-06` — THE FIELD IS ASSERTED INTO EXISTENCE AND NOTHING SUPPLIES IT.
+			//
+			// ⛔ `reviewer-answer.ts` reads `state.exchangeId` off a value it obtained with
+			// `as unknown as ResolvableExchange`. But `handlers/model-exchange.ts` destructures `exchangeId`
+			// OUT before persisting, and `ModelExchangeSchema` is a `strictObject` that neither declares it nor
+			// accepts it. So the assertion names a field NO SCHEMA CARRIES, and the value read is `undefined`.
+			//
+			// ⭑ THIS IS `REG-F-411`'s CLASS, AND IT IS THE HALF THE DERIVATION COULD NOT DERIVE: an instrument
+			// that compares an asserted type against a contract schema cannot see a laundering whose asserted
+			// type invents a field the contract has never heard of. Only parsing against the contract catches it.
+			//
+			// ⚠ AND NINE ASSERTIONS IN THIS FILE PASSED OVER IT, INCLUDING THE `Object.keys(...).sort()` ONE
+			// BELOW — because a key whose value is `undefined` still counts as a key. A structural assertion
+			// that cannot see an absent VALUE is exactly the instrument this repository keeps re-learning about.
+			expect(view!.exchangeId, 'the view must NAME the stored MODEL_EXCHANGE it read').toMatch(/^mex/);
+
 			// ⛔ AND THE VOLUNTEERED HALF HAS NO CONTENT-BEARING FIELD — not merely an empty one. PER-12 material
 			// is behind REG-Q-077, and a view carrying it "for the page to filter" would put that decision in a
 			// template.

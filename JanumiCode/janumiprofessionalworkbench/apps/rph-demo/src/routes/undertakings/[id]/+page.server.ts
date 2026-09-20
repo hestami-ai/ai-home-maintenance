@@ -84,11 +84,11 @@ import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host'
 // the last live reference to the REVIEWER's model on the EXECUTION path — `REG-F-356`'s defect, whose final
 // residue survived in the host-configured fallback identity below. Lint is what reports a relapse.
 import { resolveExecutorModel, resolveExecutorToolId } from '$lib/server/tools/backing-tool';
-import type {
-	ActorReference,
-	ContextSpecification,
-	PromptTemplate
-} from '@janumipwb/rph-contracts';
+import { resolveInvocationSubject, resolvePwuTypeFacts } from '@janumipwb/rph-application';
+// ⭐ `PromptTemplate` IS NO LONGER IMPORTED HERE, and its absence is the check. Its only use in this route was
+// the assertion `pwuType?.promptTemplate as PromptTemplate | undefined`; `resolvePwuTypeFacts` PARSES that
+// object now, so the route has no reason to name the type at all. Lint reports a relapse.
+import type { ActorReference, ContextSpecification } from '@janumipwb/rph-contracts';
 
 /** ⚠ ONE TENANT, DECLARED RATHER THAN INLINE. §31.2 requires an opaque tenant-scoped key prefix, and this demo
  *  is single-tenant; naming the constant keeps the day it becomes multi-tenant a one-line change instead of a
@@ -985,10 +985,23 @@ export const actions: Actions = {
 		// ⛔ NO TEMPLATE MEANS NO SUBSTITUTION. A type without one declares no agent behaviour — true of every
 		// type authored before `REG-D-058` — and the demo keeps its existing TRANSFORMATION lifecycle for those,
 		// unchanged. Inventing a prompt so every work unit LOOKS executable is the defect `REG-F-351` refuses.
-		const pwu = getObject(getEngine(), pwuId);
+		// ⭐⭐ `JAN-ASSERTED` `R30` — `getObjectOfType`, NOT `getObject`, AND THE REPOSITORY SAID SO IN TERMS.
+		// `queries.ts` warns on `getObject`: *"⚠ TYPE-BLIND — see `getObjectOfType` above before using this with
+		// an id that arrives from outside the system."* `pwuId` arrives from the request. `getObjectOfType` was
+		// already imported in this file and already used for the undertaking seven hundred lines up.
+		const pwu = getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', pwuId);
 		const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);
-		const pwuType = pwuTypeId ? getObject(getEngine(), pwuTypeId) : undefined;
-		const template = pwuType?.promptTemplate as PromptTemplate | undefined;
+		const pwuType = pwuTypeId ? getObjectOfType(getEngine(), 'PWU_TYPE', pwuTypeId) : undefined;
+		// ⭐ PARSED, NOT ASSERTED (`REG-F-411`). This read `pwuType?.promptTemplate as PromptTemplate | undefined`
+		// — a whole strict structured object, asserted — and `prompt-render.ts` then does
+		// `new Set(template.declaredPlaceholders)`. ⛔ A wrong shape there is a **TypeError, not a refusal**: the
+		// surface 500s and the record says nothing about why. `resolvePwuTypeFacts` makes it a stated refusal
+		// that names the type.
+		const typeFacts = resolvePwuTypeFacts(
+			(id) => getObjectOfType(getEngine(), 'PWU_TYPE', id),
+			pwuTypeId || undefined
+		);
+		const template = typeFacts.promptTemplate;
 		// ⭑ JAN-DISCHARGE — DECLARED, NOT SNIFFED. This read `template?.status === 'ACTIVE'`, which inferred a
 		// decision from an artefact: a type became model-executed because someone happened to arm a prompt. The
 		// type now SAYS who does its work, and `checkDischargeCoherence` keeps the two from disagreeing — an
@@ -1241,11 +1254,26 @@ export const actions: Actions = {
 					// would reinstate, at the call site, the very split `currentBinding` exists to close.
 					const onThisTry = binding ? currentBinding(bindingId) : undefined;
 					const tryOutcome = await runModelInvocationStep({
+						// ⭐⭐ `JAN-ASSERTED` `R30` — ONE PARSE REPLACES FIVE HAND-WRITTEN ASSERTIONS.
+						//
+						// ⛔ THIS LITERAL USED TO READ `String((pwu?.title ?? '') as string)` and four more like
+						// it. Every field was ASSERTED into the shape this call wanted, so `check-types` had
+						// nothing to check and two of them contradicted the contract outright.
+						//
+						// ⭑ `resolveInvocationSubject` refuses on ABSENCE **and on SHAPE**, the way
+						// `resolveContextAssemblyPolicy` already does one object over. It closes the boundary by
+						// CONSTRUCTION rather than by enumeration: a twelfth field added later is checked for
+						// free, and a field the schema has never heard of becomes an error instead of `undefined`.
+						//
+						// ⚠ `purpose` COMES FROM THE **TYPE**, not the work unit, so it is supplied from the
+						// parsed type facts rather than folded into the subject resolver — two objects, two
+						// parses, neither one speaking for the other.
 						subject: {
-							id: pwuId,
-							title: String((pwu?.title ?? '') as string),
-							description: String((pwu?.description ?? '') as string),
-							purpose: String((pwuType?.purpose ?? '') as string),
+							...resolveInvocationSubject(
+								(id) => getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', id),
+								pwuId
+							),
+							...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {})
 							// ⭐⭐ `JAN-ASSERTED` — TWO CASTS USED TO SIT HERE, AND THEY ARE `REG-F-411` IN FULL:
 							//
 							//     expectedOutputs:   (pwu?.expectedOutputs   as string[] | undefined) ?? [],

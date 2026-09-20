@@ -15,6 +15,8 @@ import type {
 	ContextSpecification,
 	PromptTemplate
 } from '@janumipwb/rph-contracts';
+// ⭑ RUNTIME schemas, not types — `R30` parses a projection rather than asserting its shape.
+import { ProfessionalWorkUnitSchema, PwuTypeSchema } from '@janumipwb/rph-contracts';
 import { permits, type ContextAssemblyPolicyContent } from './context-assembly.js';
 import { promptTemplateFingerprint, renderPromptTemplate } from './prompt-render.js';
 
@@ -53,6 +55,87 @@ export interface InvocationSubject {
 	readonly description?: string;
 	readonly statement?: string;
 	readonly purpose?: string;
+}
+
+/**
+ * ⭐⭐ `JAN-ASSERTED` `R30` — BUILD THE SUBJECT BY **PARSING** THE STORED WORK UNIT, NEVER BY ASSERTING IT.
+ *
+ * ⛔ WHAT THIS REPLACES IS ELEVEN HAND-WRITTEN TYPE ASSERTIONS AT ONE CALL SITE. The demo route read a PWU
+ * with a type-blind `getObject`, then asserted each field into the shape it wanted:
+ * `String((pwu?.title ?? '') as string)`, `(pwu?.expectedOutputs as string[] | undefined) ?? []`, and so on.
+ * Two of those contradicted their contract outright (`REG-F-411`), and `check-types` could not say so —
+ * **because the assertions existed precisely to stop it.**
+ *
+ * ⭑ PRECEDENT, NOT INVENTION. Six production sites in this package already parse a projection before trusting
+ * it, and `handlers/abandon-authorization.ts` states the argument: *"It must PARSE as one … guessing at the
+ * fields would be the field-name-inference defect this repo has recorded."* `resolveContextAssemblyPolicy`
+ * above is the same function one object over, and this deliberately mirrors its signature.
+ *
+ * ⭐ IT CLOSES THE FORM BY CONSTRUCTION RATHER THAN BY ENUMERATION. One parse covers every field, so a twelfth
+ * field added later is checked for free — and a field the schema has never heard of (the `AS-06` class, where
+ * an assertion INVENTED `exchangeId`) becomes a named error instead of a silent `undefined`.
+ *
+ * ⚠ IT CANNOT SPURIOUSLY REFUSE A WELL-FORMED STORE, and that is measured rather than hoped: `handlers/kit.ts`
+ * validates every `nextState` against `OBJECT_SCHEMAS[objectType].schema` and rejects with
+ * `produced_state_invalid`, so anything the engine persisted already parses. A refusal here means the row was
+ * written by something that bypassed the command path, which is exactly when a caller should stop.
+ */
+export function resolveInvocationSubject(
+	find: (objectId: string) => unknown,
+	pwuId: string
+): InvocationSubject {
+	const raw = find(pwuId);
+	if (raw === undefined || raw === null)
+		throw new Error(
+			`Work unit '${pwuId}' does not resolve, so there is no subject to put in front of a producer. ` +
+				'Refusing rather than invoking a model on behalf of a work unit that does not exist.'
+		);
+	const parsed = ProfessionalWorkUnitSchema.safeParse(raw);
+	if (!parsed.success)
+		throw new Error(
+			`Work unit '${pwuId}' resolved to an object that does not parse as a PROFESSIONAL_WORK_UNIT: ` +
+				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+		);
+	const pwu = parsed.data;
+	// ⭑ ONLY THE FIELDS A TEMPLATE MAY DRAW ON, and every one of them is a `z.string()` in the contract. ⛔ A
+	// STRUCTURED FIELD MUST NEVER BE ADDED HERE without a ratified rendering — `expectedOutputs` was, rendered
+	// with `.join(', ')`, and every producer was shown `[object Object]` (`R29`).
+	return { id: pwuId, title: pwu.title, description: pwu.description };
+}
+
+/**
+ * The facts a work-unit TYPE contributes to an invocation, parsed rather than asserted.
+ *
+ * ⭐⭐ THE `promptTemplate` ARM IS THE SHARPEST REASON THIS EXISTS. The demo route read it as
+ * `pwuType?.promptTemplate as PromptTemplate | undefined` — a whole strict structured object, asserted — and
+ * `prompt-render.ts` then does `new Set(template.declaredPlaceholders)`. ⛔ A wrong shape there is a
+ * **`TypeError`, not a refusal**: the surface 500s and the record says nothing about why. Parsing turns the
+ * same fact into a stated refusal that names the type.
+ *
+ * ⚠ `undefined` IS RETURNED FOR AN ABSENT TYPE, NOT A THROW, and the asymmetry with the subject above is
+ * deliberate: a work unit with no resolvable TYPE is already handled downstream — `prepareModelInvocation`
+ * refuses with *"declares no agent behaviour"*, which names the type and is the message a reader wants. A
+ * throw here would replace a good refusal with a worse one.
+ */
+export function resolvePwuTypeFacts(
+	find: (objectId: string) => unknown,
+	pwuTypeId: string | undefined
+): { purpose?: string; promptTemplate?: PromptTemplate; contextSpecification?: ContextSpecification } {
+	if (!pwuTypeId) return {};
+	const raw = find(pwuTypeId);
+	if (raw === undefined || raw === null) return {};
+	const parsed = PwuTypeSchema.safeParse(raw);
+	if (!parsed.success)
+		throw new Error(
+			`Work-unit type '${pwuTypeId}' resolved to an object that does not parse as a PWU_TYPE: ` +
+				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+		);
+	const t = parsed.data;
+	return {
+		purpose: t.purpose,
+		...(t.promptTemplate ? { promptTemplate: t.promptTemplate } : {}),
+		...(t.contextSpecification ? { contextSpecification: t.contextSpecification } : {})
+	};
 }
 
 /**

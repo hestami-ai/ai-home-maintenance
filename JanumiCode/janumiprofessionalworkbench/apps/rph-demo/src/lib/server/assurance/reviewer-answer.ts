@@ -60,7 +60,22 @@ export async function loadReviewerAnswer(
 	const read = await readAnswerSpan(state, store);
 
 	return {
-		exchangeId: state.exchangeId,
+		// ⭐⭐ `JAN-ASSERTED` `AS-06` — THE AGGREGATE'S OWN ID, NOT A FIELD THE STATE NEVER CARRIED.
+		//
+		// ⛔ THIS READ `state.exchangeId`, AND THE VALUE WAS ALWAYS `undefined`. `state` is obtained by
+		// `as unknown as ResolvableExchange` a few lines up; `handlers/model-exchange.ts` destructures
+		// `exchangeId` OUT before persisting, and `ModelExchangeSchema` is a `strictObject` that neither
+		// declares the field nor accepts one. The assertion invented a field no contract has ever had.
+		//
+		// ⭑ AND THAT IS WHY IT SURVIVED A DERIVED SWEEP. An instrument comparing an asserted type against a
+		// contract schema can only see a field the schema HAS and disagrees about; a field the schema has never
+		// heard of is invisible to it. `REG-F-411`'s remedy — parse rather than assert — is the only one that
+		// reaches this class, which is why it is filed with it rather than on its own.
+		//
+		// ⚠ THE ENGINE ALREADY RETURNED THE ANSWER. `listByType` yields rows keyed by aggregate id, and a
+		// `MODEL_EXCHANGE` aggregate IS its exchange — so the id is a fact this function already holds, was
+		// already sorting on, and threw away in favour of an assertion.
+		exchangeId: rows[0]!.id,
 		attemptOrdinal: Number((rows[0]!.state as { attemptOrdinal?: number }).attemptOrdinal ?? 0),
 		...(read.available ? { answer: read.bytes } : {}),
 		disclosure: read.available
