@@ -6182,6 +6182,24 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-EXEC Phase 0 (ROADMAP-undertaking-execution-sandbox.md §2), unblocked by the sponsor's ruling of 2026-09-14"
 	},
 	{
+		id: 'R32-a-severity-downgrade-turns-a-rejection-into-an-assurance',
+		file: 'packages/rph-assurance/src/floor-policies.ts',
+		// ⭐⭐ THIS MUTANT EXISTS BECAUSE THE EDIT IT MAKES WAS MEASURED, ACCIDENTALLY, AND ALMOST NOTHING SAW IT.
+		// During `R32`'s costing a parallel probe applied exactly this one-line downgrade to the working tree. On
+		// that tree the floor stopped merely satisfying-over-unjudged-criteria and began OVERRULING A REJECTION:
+		// the reviewer returned `recommendation: REJECTED` with a BLOCKING finding and the floor recorded
+		// SATISFIED, because `R25` takes severity from the POLICY rather than the reviewer.
+		// ⛔ IT COST **2 RED TESTS OUT OF 4202**, BOTH IN `apps/rph-demo`, and ZERO in `packages/` or `verif/` —
+		// including `rph-assurance`'s own suite. Nothing guarded the de minimis floor's declared severity from
+		// the core outward. This entry and its victim are that guard.
+		find: "\t\t\tseverityIfNotMet: 'BLOCKING' as const,",
+		replace:
+			"\t\t\tseverityIfNotMet: (c.id === 'RR-04-no-proxy-satisfaction' ? 'BLOCKING' : 'ADVISORY') as 'BLOCKING' | 'ADVISORY', // MUTANT: the floor stops blocking",
+		expectRed: ['apps/rph-demo/src/lib/server/assurance/default-lane-cannot-assure.test.ts'],
+		why: "PROMISE: \u00a78.4's de minimis Reasoning Review is the MANDATORY, NON-SUPPRESSIBLE floor \u2014 the seeded policy says so in terms (*\"No profile, low-risk classification, or planner may waive it\"*), and `mandatory` is DERIVED from `severityIfNotMet` at `validators.ts`, so the policy's declared severity IS the floor's teeth. WHO RELIES: `dispositionFromFindings` (a non-mandatory criterion's `NOT_MET` no longer REJECTS and its `UNABLE_TO_DETERMINE` no longer forces INCONCLUSIVE), the publish gate, and every downstream reader of an assessment. WHAT THE MUTATION DOES TO THEM: a criterion the reviewer REJECTED on is scored ADVISORY, the floor reports SATISFIED, and the gate opens \u2014 `REG-F-409` reintroduced with the reviewer's own rejection overruled. \u26a0 It is not a crash and not a type error: the record stays well-formed and internally consistent, which is why only a test asserting the DERIVED mandatory set notices.",
+		source: 'JAN-EXEC R32 Control A (REG-D-067); the edit was measured during the R32 costing pass'
+	},
+	{
 		id: 'AS-04-the-boundary-asserts-instead-of-parsing',
 		file: 'packages/rph-application/src/execution-invocation.ts',
 		// ⛔ THE MUTATION RESTORES EXACTLY THE SHAPE `REG-F-411` WAS FILED FOR: a projection ASSERTED into the

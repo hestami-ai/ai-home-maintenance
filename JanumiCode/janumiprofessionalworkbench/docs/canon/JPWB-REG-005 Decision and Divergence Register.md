@@ -36573,3 +36573,111 @@ satisfied run and one that is not.
 ⭐ **BOTH ARE `R26` COLLATERAL OF THE SAME KIND AS `REG-D-066`** — not a fixture re-meant, but an ASSERTION
 re-meant. Filed together because the general form is one thing: *a ruling that changes what a value means
 changes what every assertion about that value is worth, and neither the ruling nor its tests re-read them.*
+
+---
+
+### REG-D-067 — `JAN-EXEC` `R32`: the thirteen e2e reds are ACCEPTED as an INTERIM position, with controls and a named successor
+
+**Ruled 2026-09-20** (sponsor). **Status:** ⚠ **OPEN — INTERIM, NOT CLOSED.** ⛔ *Accepted* and *closed* are
+not the same word, and this entry exists partly to stop them becoming one.
+
+⭐⭐ **WHAT WAS ACCEPTED, PRECISELY:** the gate's default lane cannot satisfy the mandatory Reasoning Review
+floor, thirteen e2e specs therefore fail, and **that red is the true statement.** The lane's reviewer examines
+two of nine criteria and declares so; a green here would require it to claim work it did not do — the repair
+the sponsor rejected by name under `R26`.
+
+⛔ **WHAT WAS *NOT* ACCEPTED, AND THE DISTINCTION IS LOAD-BEARING.** `REG-F-409` names the adjacent danger:
+*"accepting an INCONCLUSIVE floor in the gate would retire 'no publish without a satisfied floor'."* **This
+ruling does not do that.** `ASR-3` stays fully enforced and the publish gate still requires SATISFIED. The
+entire cost is paid in the MERGE plane; none of it in the PRODUCT plane.
+
+⚠ **THE TWO ALTERNATIVES WERE COSTED AND BOTH ATTACKED TO FATAL:**
+- **Scope out via policy severity** — measured: a one-line `severityIfNotMet` downgrade makes the floor
+  **overrule a rejection** (the reviewer returns REJECTED with a BLOCKING finding; the floor records SATISFIED,
+  because `R25` takes severity from the POLICY). It cost **2 red tests out of 4202**, both in `apps/rph-demo`,
+  **zero** in `packages/` or `verif/`. It also weakens the LIVE lane, which demonstrably *can* judge those
+  criteria.
+- **Replay a recorded judgement** — a content-keyed cache is honest only if the cached thing is a function of
+  the key; measured, it is not. Attributing one artifact's judgement to another is fabrication.
+
+⭑ **THE CONTROL THAT MAKES THE ACCEPTANCE HONEST** is `default-lane-cannot-assure.test.ts`: it drives the real
+checker over a clean subject on all three arms and asserts the **incapacity** — mandatory criteria unjudged,
+disposition INCONCLUSIVE — plus a control proving the criteria it *does* examine are genuinely judged, so
+*"INCONCLUSIVE because it judged nothing"* cannot pass for *"INCONCLUSIVE because it judged two of nine."*
+
+⭐ **AND IT IS WRITTEN TO DIE ON ITS OWN REMEDY** (`REG-F-407`'s pattern, which `REG-F-409` praises): when a
+reviewer that examines all nine reaches this lane, the file goes red and must be deleted. Its failure is the
+signal that the gap closed.
+
+⛔ **NAMED SUCCESSOR, WITHOUT WHICH THIS IS AN AMNESTY:** a reviewer on the gate's default lane that evaluates
+every mandatory criterion — the only exit that neither fabricates nor disarms. ⚠ **Owed and NOT built:** an
+additive check that the failing-spec SET has not grown, so a fourteenth failure cannot hide among thirteen. It
+is recorded here rather than built hastily because its costing named it *"the most dangerous artifact this
+option introduces"* — there is **zero** precedent (no `test.skip`/`fail`/`fixme` in 41 e2e files), and wired
+wrongly it is the rubber stamp one plane up.
+
+---
+
+### REG-F-417 — `REG-F-409`'s stated exit is insufficient by two criteria, and by the wrong axis
+
+**Filed 2026-09-20** (`JAN-EXEC` `R32`). **Status:** ⚠ **OPEN** — a correction to a recorded exit condition.
+
+`REG-F-409` names its exit as five criteria: `RR-02`, `RR-03`, `RR-05`, `RR-06`, `RR-08`. ⛔ **Measured, the
+undetermined set is SEVEN per arm, and it differs BETWEEN arms:**
+
+| arm | undetermined |
+|---|---|
+| `PWA_GRAPH` | RR-01, RR-02, RR-03, **RR-05**, RR-06, **RR-07**, RR-08 |
+| `WORK_PRODUCT` | RR-02, RR-03, RR-05, RR-06, **RR-07**, RR-08, **RR-09** |
+
+⭐ **`RR-07` IS UNDETERMINED ON BOTH ARMS AND THE EXIT DOES NOT NAME IT.** So satisfying `REG-F-409`'s exit *as
+written* — evaluating or scoping out its five — would leave the floor INCONCLUSIVE anyway. **Any remedy keyed
+on that five-criterion list is insufficient by two, derived per arm.**
+
+⭑ **AND THE AXIS IS WRONG.** The thirteen do not split by criterion; they split by **ARM, 12 / 1**: twelve
+depend on the `PWA_GRAPH` arm, exactly one on `WORK_PRODUCT`, none on `PROCESS_RESULT`. ⚠ Two specs whose
+filenames say *execution* (`execution-agent-authored-binding`) are gated purely by the **authoring** arm and
+touch the work-product floor in no way — measured, not inferred.
+
+⚠ **AND NONE OF THE THIRTEEN WOULD PASS ON A MERELY *DEFINITE* DISPOSITION.** Measured: the REJECTED case
+(`assurance-floor.e2e.ts`) **passes today** asserting that no Accept button appears. All thirteen require
+SATISFIED specifically.
+
+---
+
+### REG-F-418 — the deterministic checker still RECOMMENDS `SATISFIED` while declaring two of nine examined
+
+**Filed 2026-09-20** (`JAN-EXEC` `R32`). **Status:** ⚠ **OPEN.**
+
+All three clean arms of `mock-reasoning-review-validator.ts` return `recommendation: 'SATISFIED'` while the same
+object declares it examined **two of nine** criteria. `classifyValidatorResult` tests only for a mandatory
+criterion `NOT_MET`, so `UNABLE_TO_DETERMINE` never trips the boundary and **nothing flags the
+self-contradiction**. The same file's `unreadable()` arm returns `INCONCLUSIVE` for exactly this reason.
+
+⭐ **IT IS `REG-D-066`'s GENERAL FORM, ONE FILE FURTHER IN.** These literals were authored when absence meant
+`MET` — when they were *true*. The `R26` commit re-read the criteria **declaration** and did not re-read the
+**recommendation**.
+
+⚠ **IT CHANGES NO BEHAVIOUR TODAY** — the demo records the *recomputed* disposition, never the recommendation —
+so it is a record-plane honesty defect, not a gate defect. ⛔ **But it is a fixture recommending a verdict it
+did not earn, which is the shape the sponsor rejected by name.**
+
+---
+
+### REG-F-419 — JPWB has no CI that runs; every gate in this repository is read by a human or not at all
+
+**Filed 2026-09-20** (`JAN-EXEC` `R32`). **Status:** ⚠ **OPEN.**
+
+⛔ **The only workflow GitHub Actions reads is scoped to a different project.** The git root is
+`E:/Projects/hestami-ai`; its `.github/workflows/ci.yml` is scoped `paths: ['JanumiCode/janumicode/**']`. JPWB's
+own `ci.yml` sits three levels down at `JanumiCode/janumiprofessionalworkbench/.github/workflows/`, **where
+Actions does not look** — and it declares no e2e step in any case.
+
+⭐ **THIS RE-FRAMES EVERY RATCHET THIS PROGRAMME HAS BUILT.** `gate:fast`, the mutation ledger, the coverage
+floors, the export census and the slice pins are all read by a human running a command, or by nobody. ⚠ It is
+also why `REG-F-414` was possible: `gate:fast` short-circuits at its first failing task and e2e is step 13 of
+13, so the e2e half of a deliberate red went unmeasured for the life of the phase.
+
+⭑ **AND IT COMPOUNDS `REG-D-067` SPECIFICALLY.** An accepted red behind an eight-minute manual step, with no
+automation that will ever object, is the condition under which *"13"* stops being a number anyone reads —
+which is exactly what that ruling's owed successor control is for.
