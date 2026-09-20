@@ -36713,3 +36713,92 @@ also why `REG-F-414` was possible: `gate:fast` short-circuits at its first faili
 ⭑ **AND IT COMPOUNDS `REG-D-067` SPECIFICALLY.** An accepted red behind an eight-minute manual step, with no
 automation that will ever object, is the condition under which *"13"* stops being a number anyone reads —
 which is exactly what that ruling's owed successor control is for.
+
+---
+
+### REG-F-420 — the coverage gate `JAN-CRITREAD` was about to build refuses the floor's own SATISFIED path, and the design's measurement said it could not fire at all
+
+**Filed 2026-09-20** (`JAN-CRITREAD`, before any code). **Status:** ⭐ **CLOSED BY REVISION** — the design and
+roadmap are corrected in place (`DESIGN-the-criterion-results-nobody-reads.md` §0;
+`ROADMAP-the-criterion-results-nobody-reads.md` REVISED ORDER). No code was written.
+
+⛔⛔ **THE DESIGN'S CENTRAL MEASUREMENT WAS FALSE, AND IT WAS FALSE IN THE DIRECTION THAT HIDES HARM.**
+§6.1 stated: *“there are **ZERO non-test production dispatchers** of `CompleteAssuranceAssessment` anywhere
+(only the handler registry and a test fixture)”*. **There are six** — `record-assurance.ts:165`,
+`reference-undertaking.ts:655` and `:1162`, `declared-policy-signoff.ts:196`, and
+`undertakings/[id]/+page.server.ts:1967` and `:2073`. Every one passes `claimResults: []`.
+
+⛔ **THE SEARCH THAT MISSED THEM IS THIS REPOSITORY'S OWN NAMED DEFECT.** I grepped for the noun I had coined —
+a `dispatch('CompleteAssuranceAssessment'` call — rather than the obligation. All six sites build their
+command through a local `send(…)` helper. The rule broken is the one this corpus quotes approvingly:
+*grep the OBLIGATION, never a noun I coined this session.* ⭑ It is the same failure mode as `REG-F-415`,
+filed four commits earlier in the same programme, and it survived the design review that corrected `REG-F-415`.
+
+⭐⭐ **CORRECTED, THE FACT INVERTS THE PROGRAMME.** “No producer exists” would have made the coverage gate
+merely unexercised — the `REG-F-365` dead-kernel risk the design spent §5 worrying about. The truth is the
+opposite hazard. Five measured links:
+
+1. `record-assurance.ts:183` passes `claimResults: []` **unconditionally**;
+2. `:195` passes `dispositionRecommendation: a.disposition` — the floor's own verdict, straight through;
+3. `dispositionFromFindings` returns **SATISFIED** when every mandatory criterion is `MET`/`NOT_APPLICABLE`;
+4. `floor.ts`'s `FS-01-schema`, `FS-02-invariants` and `IP-01`…`IP-05` are **all**
+   `mandatory: true` **with no `UNABLE_TO_DETERMINE` arm** (`facts.schemaValid ? 'MET' : 'NOT_MET'`);
+5. so a clean subject is a **positive disposition with zero criterion answers over seven mandatory criteria** —
+   the exact arrangement the `RPH-CON-005` gate is written to refuse.
+
+⛔ **AND IT IS LIVE, NOT LATENT.** `packages/rph-engine/src/record-assurance.test.ts` — *“a fully-satisfied
+floor records one SATISFIED assessment per policy, no open observations”* — **passes today (4 tests, run
+2026-09-20)**. `recordAssuranceRecordingPlan` **throws** on any refusal (`record-assurance.ts:122`)
+and is called from two live demo paths (`floor-over-subject.ts:157`, `floor.ts:394`). The gate would
+not have reddened a test. **It would have thrown in the demo's floor at runtime.**
+
+⭑ **WHY THE FLOOR CANNOT SIMPLY COMPLY.** `record-assurance.ts:174-182` already discloses it: §20 routes
+per-criterion results **only** through `claimResults`, §33 nests them under a `claimId`, and floor
+assessments carry `claimIds: []` — *“so its criterion results have no ratified home in §20 without inventing
+a claim id, and inventing one is the disease this whole program is treating.”* The gate would demand exactly the
+fabrication the repository exists to prevent.
+
+⭐ **THE RULING THE FINDING FORCES:** the floor-path limb is not the third limb of this programme, it is the
+**precondition of the first**. A coverage gate over `claimResults` may not ship while the only production
+producer of a positive disposition is structurally unable to populate `claimResults`. The disposition limb
+(`RPH-ASR-005`) is unaffected and still ships: with all six sites passing `[]` there are zero answers,
+hence zero **answered-undetermined** criteria, hence no arrangement in which it can over-refuse.
+
+⚠ **AND THE DEMO LANE'S ESCAPE IS AN ACCIDENT, RECORDED AS ONE.** `demo-policy.ts:68` declares the demo
+policy's single criterion `severityIfNotMet: 'MATERIAL'` — not BLOCKING, so not mandatory. That one value
+is the only reason the demo's own SATISFIED path (`+page.server.ts:1967`, which sends SATISFIED with
+`claimResults: []`) sits outside the gate's arrangement too.
+
+⭑ **WHAT ACTUALLY CAUGHT IT**, because the instrument matters more than the catch: not a review of the design,
+but re-running its measurement against the obligation before building on it. The design had been committed,
+reviewed and recommended. ⛔ **Three of this register's standing rules — grep the obligation, verify the recorded
+remedy, a remedy recommended to the sponsor is a hypothesis — all point at the same act, and none of them is
+gated by anything.** `REG-F-419` is why: there is no CI, so a design's measurements are checked by a human
+choosing to check them, or by nobody.
+
+---
+
+### REG-F-421 — an adversarial panel refuted 9 of 9 design calls, and three of this programme's load-bearing premises were false: §20.1 and §33 compose, the census claim is fabricated, and L3's “missing ratification” is a ratified command nobody built
+
+**Filed 2026-09-20** (`JAN-CRITREAD`, before any code). **Status:** ⭐ **CLOSED BY REVISION** — design §0.7 and the roadmap's `CR-01`/`CR-06` corrected in place. Companion to `REG-F-420`.
+
+Nine reviewers — three design calls × three lenses (contract / precedent / vacuity), each instructed to REFUTE and to default to refuted when uncertain — returned **nine refutations, no survivals**. Each finding below was then verified independently before it was accepted; the panel is the instrument, not the authority.
+
+**(1) ⛔⛔ §20.1 AND §33 COMPOSE; THE “DISCREPANCY” WAS MINE.** Canon §33 (`Assurance Policy Catalog and Validator Contract.md:1887-1902`) carries `claimResults: [{ claimId, criterionResults: [{ criterionId, result, rationale, evidenceIds }] }]` — leaves that are **field-for-field `CriterionResultSchema`** (`objects.ts:238`). §20 declares the container, §20.1 defines the leaf, §33 exhibits the composition. One shape. ⭑ So `CriterionResultSchema` is not an orphan but §33's leaf type, and **the three enforcement probes are the off-canon artifact**: their flat `{criterionId, result}` entries match no ratified shape. I took a fixture's shape for the repository's — while quoting the rule against doing so.
+
+**(2) ⛔ THE CENSUS CLAIM WAS FABRICATED, AND IT SHIPPED AN UNFIREABLE PREDICTED RED.** The design asserted that reusing `mandatoryCriterionUnmet` *“would collapse `deadPredicate`'s census, which exists to detect exactly that wiring”*, and the roadmap made that a predicted red. **`deadPredicate: '` occurs three times** in `enforcement-register.ts` — `:2683`, `:3482`, `:3562` — and `mandatoryCriterionUnmet` is in none. `RPH-CON-005`'s guard is `OBSERVED_ADMISSION`, and its own `whyNoPredicate` exists to say a `DEAD_PREDICATE` row would be wrong. ⚠ **A predicted red that cannot fire is a control that cannot fail** — the defect this register has recorded more than any other, authored here by the programme built to close it.
+
+⭑ The conclusion survives on a fact I should have used instead: `mandatoryCriterionUnmet` is `readonly mandatoryCriterionUnmet?: boolean` (`assurance-rules.ts:249`) — one boolean, no criterion identity, folded into a reason string at `:277`. Reuse could not name the failing criterion.
+
+**(3) ⭐⭐ L3'S “MISSING RATIFICATION” IS A RATIFIED COMMAND NOBODY BUILT.** The design concluded, from `record-assurance.ts`'s comment, that floor criterion results *“have no ratified home in §20 without inventing a claim id”* and that §20 therefore needs a ruling. §32's ratified command list contains **`recordCriterionResult`** — criterion-keyed by its own name, between `beginAssuranceAssessment` and `recordAssuranceObservation`, needing no `claimId`. It is unbuilt, and `assurance.ts:2038` says so **three lines from the comment I built on**: *“Criterion results ARE still dropped at the boundary: `recordCriterionResult` was never built.”* `HARMONIZATION-LOG.md:1768` and `limb:ASR-5:6`'s remedy say it twice more, and `submitEvidenceForAssessment` — one of the same four unbuilt §32 commands — is the built precedent (`REG-005:771`).
+
+**(4) ⚠ AND `REG-F-209` LANDS ON THE GATE'S FOUNDATION.** Deriving mandatoriness from the stored policy makes it mutable after the assessment was held: `EDITABLE_PATCH_FIELDS` includes `'criteria'` (`assurance.ts:275`) and `editAssurancePolicy` commits `newSemanticVersion: loaded.semanticVersion` (`:400`). `REG-F-209` (**OPEN**) drove it: *“`editPwa` and `editAssurancePolicy` never raise at all, whatever they rewrite.”* The gate would judge against criteria the assessment was never measured under — what `RPH-CON-006`/`007` forbid for policy and subject version at this same site.
+
+**⭐ THE SEARCHES, WITH POSITIVE CONTROLS — AND `P-3` IS WHY THEY ARE HERE.** This entry makes two absence claims, and the repository's own `verif/absence-claims.test.ts` (`P-3`) went RED on it for stating neither. ⭑ The gate fired on the phrase *“nothing in the artifact”* — prose about this design, not a corpus claim, the false positive its own docblock documents — but it was **right for the wrong reason**: the two real absence claims below were genuinely unevidenced in the filing, and rewording to clear the regex would have been gaming the control instead of answering it.
+
+| claim | search run | result | positive control, same corpus and shape |
+|---|---|---|---|
+| `mandatoryCriterionUnmet` is in no `DEAD_PREDICATE` row | `grep -c "deadPredicate: '" packages/rph-domain/src/enforcement-register.ts` | **3**, every one opened (`:2683` `classifyInterruptedAttempt`, `:3482` `validateAssumptionReification`, `:3562` `blocksIrreversibleWork`) — none is the subject | `grep -c "kind: 'ENFORCED'"`, same file → **34**. The instrument resolves row-level facts here. |
+| §32's `recordCriterionResult` was never built | `recordCriterionResult` across `packages/` + `apps/` `.ts`, excluding `dist/`, non-comment lines; and the handler registry | **0** and **0** — every hit is a comment recording its own absence | `export const submitEvidenceForAssessment` → **1** handler; registry → **2** entries. ⭑ The instrument finds §32 commands that WERE built, and this one is from the same unbuilt four. |
+
+⛔⛔ **THE PATTERN, WHICH IS THE POINT OF FILING THIS SEPARATELY FROM `REG-F-420`.** Four load-bearing claims, in a design that was written, reviewed, committed and **recommended to the sponsor** — and every one was checkable in under a minute. Three were refuted by reading a document the design cites; the fourth by reading a comment three lines from one it quotes. ⭑ **The design's prose quality was what carried them**: each false claim was stated with the same emphasis as the true ones, so nothing in the artifact distinguished the measured from the assumed. ⚠ That is why the panel was told to refute rather than review — and why it returned 9/9 where my own re-reading, three hours earlier, had returned a recommendation to proceed.
