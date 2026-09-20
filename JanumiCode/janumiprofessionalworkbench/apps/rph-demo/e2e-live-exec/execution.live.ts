@@ -49,7 +49,13 @@ const TEMPLATE = [
 	'You are assessing a delivery route for operational risk.',
 	'',
 	'Subject: {subject}',
-	'Required outputs: {expectedOutputs}',
+	// ⛔ `'Required outputs: {expectedOutputs}'` USED TO SIT HERE, AND IT RENDERED `[object Object]` ON
+	// EVERY LIVE RUN — measured in the retained `materializedInputRef` bytes, and shown to the reviewer
+	// that judges `RR-07-no-contradiction` against this very instruction (`REG-F-411`).
+	// ⭐ REMOVING IT COSTS THIS SPEC NOTHING, WHICH IS THE TELL. The required output is stated two lines
+	// below, exactly and in the professional's own terms — so the placeholder was contributing no
+	// information even before it broke. `R29` stops supplying it; a template still declaring it would
+	// now REFUSE, which is `JAN-PROMPT`'s ratified default #2 working rather than a regression.
 	'',
 	// ⛔ A DELIMITED ANSWER IS A RETENTION REQUIREMENT, NOT A PREFERENCE. `REG-F-351`: the §9.7 split LOCATES a
 	// JSON object, so an undelimited prose answer is blocked from retention and the step's work product is

@@ -53,7 +53,7 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 						// The type SAYS a model does this work. `stepBindingFor` requires BOTH this and a
 						// MODEL_INVOCATION step type; either alone yields no binding.
 						workDischarge: 'MODEL',
-						promptTemplateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+						promptTemplateText: 'Assess {subject}.',
 						promptOutputContract: 'A short assessment.',
 						// ⛔ ARMING, NOT AUTHORING. A DRAFT template renders nothing and the step refuses; this
 						// boolean is the difference, and `EG-07b` made it reachable by the agent at all.

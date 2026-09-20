@@ -1,0 +1,195 @@
+// JAN-ASSERTED `AS-02` — WHAT A REAL STORED WORK UNIT RENDERS INTO A PROFESSIONAL'S INSTRUCTION.
+//
+// ⛔ THIS SUITE EXISTS BECAUSE THE EXISTING ONE CANNOT EXPRESS ITS OWN DEFECT, AND THE REASON IS THE FIXTURE
+// RATHER THAN THE ASSERTION. `execution-invocation.test.ts:31` DOES assert the rendered value — it is not a
+// weak test. What it asserts is the rendering of a PWU **the store would reject at write**: driving the real
+// engine with `expectedOutputs: ['a viability finding']` returns `VALIDATION_FAILED` — *"expected record,
+// received string"* — and persists nothing. A hand-built literal can only ever carry the type its author
+// asserted, and the whole defect is that the STORED shape differs from the asserted one.
+//
+// ⭐ SO THE ONLY INSTRUMENT THAT CAN SEE IT IS A REAL WRITE FOLLOWED BY A REAL READ. That is this file.
+//
+// ⚠ `REG-F-411`: `objects.ts:556` declares `expectedOutputs: z.array(OutputDefinitionSchema)` and
+// `OutputDefinitionSchema = z.record(z.string(), z.unknown())` — OBJECTS. A cast in the demo route laundered
+// them into `readonly string[]`, `execution-invocation.ts:94` rendered them with `.join(', ')`, and every
+// executing model and every reviewer was shown `Required outputs: [object Object]`.
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { AuthedEngine } from '@janumipwb/rph-application';
+import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
+import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Engine } from './index.js';
+import { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
+
+const TS = '2026-09-20T00:00:00Z';
+const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5K00';
+const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5K10';
+
+describe('⭐ AS-02 — the invocation subject is built from a REAL stored work unit', () => {
+	let store: SqliteStorageAdapter;
+	let engine: AuthedEngine;
+	let seq = 0;
+
+	function dispatch(commandType: string, payload: unknown, id: string, type: string) {
+		const n = ++seq;
+		const command: DomainCommand = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			correlationId: 'corr',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+		return engine.dispatch(command);
+	}
+
+	/**
+	 * ⭑ THE SHAPE THE SURFACE ACTUALLY MINTS — `+page.server.ts:957`, verbatim, for every PWU it creates.
+	 *
+	 * ⛔ EVERY OTHER FIELD IS FULLY VALID, AND THAT IS NOT TIDINESS. The first draft of this helper passed
+	 * `boundaries: {}` and `riskProfile: {}`, and the command was refused with NINE issues — none of them about
+	 * `expectedOutputs`. The refusal test below then PASSED WHILE PROVING NOTHING: an arrangement that trips
+	 * two guards attributes to neither. `expectedOutputs` is the only variable here, and the test asserts the
+	 * MESSAGE rather than the status so it cannot drift back.
+	 */
+	const proposePwu = (expectedOutputs: unknown) =>
+		dispatch(
+			'ProposePwu',
+			{
+				pwuId: PWU,
+				pwuKind: 'ASSESSMENT',
+				title: 'Route Assessment',
+				description: 'Assess the delivery route',
+				intentId: INTENT,
+				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				obligationIds: [],
+				constraintIds: [],
+				assumptionIds: [],
+				expectedOutputs,
+				assurancePolicyIds: [],
+				riskProfile: {
+					consequence: 'LOW',
+					uncertainty: 'LOW',
+					irreversibility: 'LOW',
+					securitySensitivity: 'NONE',
+					regulatoryExposure: 'NONE'
+				}
+			},
+			PWU,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+
+	/** The issue paths a refusal named, so a test can say WHICH guard fired rather than merely that one did. */
+	const issuePaths = (out: unknown): string[] =>
+		(
+			(out as { error?: { details?: { issues?: { path?: string }[] } } }).error?.details?.issues ?? []
+		).map((i) => i.path ?? '');
+
+	beforeEach(() => {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		engine = new Engine({
+			authenticate: testAuthenticator(),
+			store,
+			now: () => TS,
+			newEventId: () => `e${++seq}`
+		}).as(TEST_CRED.human);
+		dispatch(
+			'CaptureIntent',
+			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+			INTENT,
+			'INTENT'
+		);
+	});
+
+	it('⛔ the store REFUSES the string fixture three suites were built on', () => {
+		// ⭐ THIS IS THE TEST THAT EXPLAINS THE BLINDNESS, and it is why `AS-01` lands before anything else.
+		// `execution-invocation.test.ts:14`, `run-model-step.test.ts:38` and
+		// `no-answer-is-not-an-answer.test.ts:37` all describe a work unit that CANNOT BE WRITTEN. Every
+		// assertion they make about rendering is an assertion about an object that does not exist.
+		const out = proposePwu(['a viability finding']);
+		expect(out.status, 'the store accepted a shape its own contract forbids').not.toBe('ACCEPTED');
+		// ⭑ THE MESSAGE, NOT THE STATUS. Every other field in this arrangement is valid, so the refusal must
+		// name `expectedOutputs` and nothing else — otherwise this test would pass for a fixture that was
+		// malformed somewhere the finding is not about, which is precisely how its first draft behaved.
+		expect(issuePaths(out), 'the refusal must be about expectedOutputs and nothing else').toEqual([
+			'expectedOutputs.0'
+		]);
+		expect(store.loadObject(PWU), 'a refused command persisted an object').toBeUndefined();
+	});
+
+	it('⛔ and a work unit the store DOES accept must never render [object Object]', () => {
+		// THE MUTANT: render `expectedOutputs` with `.join(', ')`. That is HEAD before this programme, and it
+		// is what every executing model and every reviewer was shown.
+		const out = proposePwu([{ outputId: `out_${PWU}`, kind: 'DOCUMENT' }]);
+		expect(out.status, `the surface-minted shape must be storable: ${issuePaths(out).join(', ')}`).toBe(
+			'ACCEPTED'
+		);
+
+		const stored = store.loadObject(PWU)?.state as Record<string, unknown>;
+		expect(stored, 'the accepted command persisted nothing').toBeDefined();
+
+		const ctx = assembleStepContext(
+			{ id: PWU, title: String(stored.title), ...stored },
+			{
+				templateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+				templateVersion: 1,
+				declaredPlaceholders: ['subject', 'expectedOutputs'],
+				status: 'ACTIVE'
+			}
+		);
+		// ⭑ ASSERTED OVER EVERY SUPPLIED VALUE, NOT JUST THE ONE FIELD. A remedy that fixes `expectedOutputs`
+		// and lets a sibling launder the same way would pass a single-field assertion.
+		for (const [key, value] of Object.entries(ctx))
+			expect(String(value), `the producer must never be shown [object Object] for {${key}}`).not.toContain(
+				'[object Object]'
+			);
+
+		// ⛔⛔ AND THE ABSENCE MUST BE A REFUSAL, NOT A SILENCE — WITHOUT THIS THE ASSERTION ABOVE IS TRIVIAL.
+		// Once `R29` stops supplying `{expectedOutputs}`, the loop iterates a context that simply does not
+		// contain it, and "no supplied value says [object Object]" becomes true of an implementation that
+		// supplies NOTHING. That is the difference between honouring the ratified rule and quietly disabling it.
+		//
+		// ⭑ THE RULE IS THE SPONSOR'S: `JAN-PROMPT` default #2 (2026-09-04, `REG-D-058`) — *"A missing declared
+		// placeholder at render time is a REFUSAL, not a disclosed gap."*
+		const plan = prepareModelInvocation(
+			{ id: PWU, title: String(stored.title) },
+			'pwut_9',
+			{
+				templateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+				templateVersion: 1,
+				declaredPlaceholders: ['subject', 'expectedOutputs'],
+				status: 'ACTIVE'
+			},
+			{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] }
+		);
+		expect(plan.ready, 'a template declaring an unsuppliable placeholder must REFUSE').toBe(false);
+		expect(!plan.ready && plan.reason, 'the refusal must name the marker it could not fill').toMatch(
+			/\{expectedOutputs\}/
+		);
+	});
+
+	it('⭐ CONTROL — a placeholder the work unit genuinely cannot supply is ABSENT, not empty', () => {
+		// ⛔ WITHOUT THIS, "never render [object Object]" passes for an implementation that supplies NOTHING —
+		// and supplying nothing would silently disable the ratified refusal rather than honour it.
+		//
+		// ⭑ THE RULE IS THE SPONSOR'S, NOT THIS SUITE'S: `JAN-PROMPT` default #2 (2026-09-04, `REG-D-058`) —
+		// *"A missing declared placeholder at render time is a REFUSAL, not a disclosed gap."* A `?? []` at the
+		// production call site turned ABSENT into PRESENT-BUT-EMPTY and made it unreachable there.
+		const ctx = assembleStepContext(
+			{ id: PWU, title: 'Route Assessment' },
+			{
+				templateText: 'Assess {subject} against {criteria}.',
+				templateVersion: 1,
+				declaredPlaceholders: ['subject', 'criteria'],
+				status: 'ACTIVE'
+			}
+		);
+		expect('criteria' in ctx, 'absent, not present-and-empty — the refusal depends on this').toBe(false);
+		expect(ctx.subject, 'the control must still supply what the unit HAS').toBe('Route Assessment');
+	});
+});

@@ -35,7 +35,7 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		// that declares anything else, so this line is the spec obeying the coherence rule rather than
 		// dodging it: an armed prompt and a declared discharge are one decision, said once.
 		await page.getByTestId('pwu-type-discharge').selectOption('MODEL');
-		await page.getByTestId('pwu-type-prompt').fill('Assess {subject}. Deliver {expectedOutputs}.');
+		await page.getByTestId('pwu-type-prompt').fill('Assess {subject}.');
 		// ⛔ WITHOUT THIS THE TEMPLATE IS A DRAFT AND THE STEP REFUSES. Authoring is not arming — the checkbox
 		// is the difference, and this line is the spec exercising that distinction rather than dodging it.
 		await page.getByRole('checkbox', { name: /Ready to use/i }).check();

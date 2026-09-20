@@ -1246,8 +1246,29 @@ export const actions: Actions = {
 							title: String((pwu?.title ?? '') as string),
 							description: String((pwu?.description ?? '') as string),
 							purpose: String((pwuType?.purpose ?? '') as string),
-							expectedOutputs: (pwu?.expectedOutputs as string[] | undefined) ?? [],
-							inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+							// ⭐⭐ `JAN-ASSERTED` — TWO CASTS USED TO SIT HERE, AND THEY ARE `REG-F-411` IN FULL:
+							//
+							//     expectedOutputs:   (pwu?.expectedOutputs   as string[] | undefined) ?? [],
+							//     inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+							//
+							// ⛔ THE CONTRACT SAYS OBJECTS. `objects.ts:556`/`:555` declare both as
+							// `z.array(z.record(z.string(), z.unknown()))`, so `.join(', ')` downstream rendered
+							// `[object Object]` into every executing model's instruction — and into every
+							// reviewer's, which judges `RR-07-no-contradiction` against it. `check-types` could
+							// not see it because **the cast existed precisely to stop it**.
+							//
+							// ⭑ AND `?? []` WAS THE SECOND DEFECT, QUIETER THAN THE FIRST. It turned ABSENT into
+							// PRESENT-BUT-EMPTY, which defeated `JAN-PROMPT`'s ratified default #2 (2026-09-04,
+							// `REG-D-058`) — *"A missing declared placeholder at render time is a REFUSAL, not a
+							// disclosed gap."* The guard is live in `prompt-render.ts` and pinned green by
+							// `execution-invocation.test.ts`; four characters here made it unreachable at the only
+							// production call site.
+							//
+							// ⭐ NOTHING REPLACES THEM, BY RULING (`R29`). No form anywhere lets a professional
+							// author `expectedOutputs`; every production site mints `{outputId: 'out_<ulid>',
+							// kind: 'DOCUMENT'}`, so the best possible rendering is an internal id and a constant
+							// the surface invented. The professional's own statement of the required output
+							// already reaches the instruction through `PromptTemplate.outputContract`.
 						},
 						subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
 						pwuTypeId,

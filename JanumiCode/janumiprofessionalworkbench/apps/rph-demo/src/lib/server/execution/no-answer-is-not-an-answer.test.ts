@@ -33,17 +33,20 @@ const UNOBSERVED = {
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
 	title: 'Route Assessment',
-	purpose: 'Decide whether the route is viable',
-	expectedOutputs: ['a viability finding']
+	// ⛔ NO `expectedOutputs` (`JAN-ASSERTED` `R29`). The old value — `['a viability finding']` — was a
+	// PWU **the store rejects at write**: `OutputDefinitionSchema` is `z.record(...)`, so a string array
+	// is `VALIDATION_FAILED` and nothing persists. Every assertion made over it was an assertion about
+	// an object that cannot exist (`REG-F-411`).
+	purpose: 'Decide whether the route is viable'
 };
 
 // ⛔ NO CAST. The first draft of this fixture invented a template shape and wrote `as unknown as
 // PromptTemplate` over the mismatch — which is `REG-F-411`'s defect (an unchecked assertion switching off the
 // gate that would have caught it) committed in the suite filed next to it. `check-types` now has to agree.
 const ACTIVE: PromptTemplate = {
-	templateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+	templateText: 'Assess {subject}. Deliver {purpose}.',
 	templateVersion: 4,
-	declaredPlaceholders: ['subject', 'expectedOutputs'],
+	declaredPlaceholders: ['subject', 'purpose'],
 	status: 'ACTIVE'
 };
 

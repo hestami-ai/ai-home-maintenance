@@ -18,15 +18,41 @@ import type {
 import { permits, type ContextAssemblyPolicyContent } from './context-assembly.js';
 import { promptTemplateFingerprint, renderPromptTemplate } from './prompt-render.js';
 
-/** The PWU fields a template may draw on. Structural, so a fixture can drive this without an engine. */
+/**
+ * The PWU fields a template may draw on. Structural, so a fixture can drive this without an engine.
+ *
+ * ⭐⭐ `JAN-ASSERTED` `R29` — `expectedOutputs` AND `inputRequirements` ARE GONE FROM THIS TYPE, and their
+ * absence is the remedy rather than a tidy-up (`REG-F-411`).
+ *
+ * ⛔ THEY WERE DECLARED `readonly string[]` AND THE CONTRACT SAYS OBJECTS. `objects.ts:556` declares
+ * `expectedOutputs: z.array(OutputDefinitionSchema)` where `OutputDefinitionSchema = z.record(z.string(),
+ * z.unknown())`; `:555` says the same of `inputRequirements`. A cast in the demo route laundered the objects
+ * into strings, `.join(', ')` rendered them, and **every executing model and every reviewer was shown
+ * `Required outputs: [object Object]`** — while `check-types` stayed green, because the cast existed precisely
+ * to stop it.
+ *
+ * ⭑ AND NO FORMATTER WOULD HAVE HELPED, WHICH IS WHY THE FIELDS LEAVE RATHER THAN CHANGE TYPE. Every
+ * production site mints `{ outputId: 'out_<ulid>', kind: 'DOCUMENT' }` — `+page.server.ts:957`,
+ * `undertakings/+page.server.ts:233`, `reference-undertaking.ts:449` — and NO form anywhere lets a
+ * professional author the field. The best possible rendering is a minted id and a constant the surface
+ * invented: not a rendering problem, but a claim the record cannot support. `OutputDefinition`'s fields are
+ * additionally unratified (`vocab/m1-object-fields.json:2662`: *"Source TBD"*), so a key-precedence formatter
+ * would fabricate.
+ *
+ * ⭐ THE PROFESSIONAL'S OWN STATEMENT OF THE REQUIRED OUTPUT ALREADY REACHES THE INSTRUCTION BY ANOTHER ROUTE:
+ * `PromptTemplate.outputContract`, authored in the PWA Designer and appended by `withOutputContract` below.
+ * Nothing a professional wrote is lost by this removal; what is lost is a value nobody wrote.
+ *
+ * ⚠ A TEMPLATE DECLARING `{expectedOutputs}` NOW **REFUSES**, and that is the ratified behaviour rather than a
+ * new one: `JAN-PROMPT` sponsor default #2 (2026-09-04, `REG-D-058`) — *"A missing declared placeholder at
+ * render time is a REFUSAL, not a disclosed gap."*
+ */
 export interface InvocationSubject {
 	readonly id: string;
 	readonly title?: string;
 	readonly description?: string;
 	readonly statement?: string;
 	readonly purpose?: string;
-	readonly expectedOutputs?: readonly string[];
-	readonly inputRequirements?: readonly string[];
 }
 
 /**
@@ -85,14 +111,18 @@ export function assembleStepContext(
 	subject: InvocationSubject,
 	template: PromptTemplate
 ): Record<string, string> {
+	// ⭐⭐ EVERY VALUE HERE IS A STRING IN ITS OWN CONTRACT, AND THAT IS NOW AN INVARIANT OF THIS MAP RATHER
+	// THAN A COINCIDENCE (`JAN-ASSERTED` `R29`, `REG-F-411`). `expectedOutputs` and `inputRequirements` used to
+	// sit in this literal rendered with `.join(', ')`; their contracts declare ARRAYS OF OBJECTS, so what a
+	// producer actually received was `[object Object]`. ⛔ A structured field does not belong in a map whose
+	// values are handed to a professional verbatim — if one is ever wanted here it needs a ratified rendering,
+	// not a `.join`.
 	const available: Record<string, string | undefined> = {
 		subject: subject.title ?? subject.statement,
 		title: subject.title,
 		description: subject.description,
 		statement: subject.statement,
-		purpose: subject.purpose,
-		expectedOutputs: subject.expectedOutputs?.join(', '),
-		inputRequirements: subject.inputRequirements?.join(', ')
+		purpose: subject.purpose
 	};
 	const context: Record<string, string> = {};
 	for (const name of template.declaredPlaceholders) {

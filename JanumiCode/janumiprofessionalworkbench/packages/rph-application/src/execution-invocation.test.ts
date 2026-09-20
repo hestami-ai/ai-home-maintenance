@@ -10,15 +10,17 @@ const PWU = {
 	id: 'pwu_1',
 	title: 'Route Assessment',
 	description: 'Assess the delivery route',
-	purpose: 'Decide whether the route is viable',
-	expectedOutputs: ['a viability finding'],
-	inputRequirements: ['the route plan']
+	purpose: 'Decide whether the route is viable'
 };
 
 const ACTIVE: PromptTemplate = {
-	templateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+	// ⭐ `{purpose}` RATHER THAN `{expectedOutputs}` (`JAN-ASSERTED` `R29`, `REG-F-411`). The old fixture
+	// declared a placeholder the work unit can no longer supply, so every test leaning on it would
+	// now be exercising the REFUSAL path instead of the rendering it means to assert. `purpose` is a
+	// `z.string()` in the contract (`objects.ts:855`), so it renders as itself.
+	templateText: 'Assess {subject}. Deliver {purpose}.',
 	templateVersion: 4,
-	declaredPlaceholders: ['subject', 'expectedOutputs'],
+	declaredPlaceholders: ['subject', 'purpose'],
 	status: 'ACTIVE'
 };
 
@@ -28,7 +30,7 @@ const ASSEMBLY = { policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] } 
 describe('JAN-EXECRUN — preparing a model invocation', () => {
 	it('renders the prompt and resolves the fingerprint to something a reader can look up', () => {
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
-		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 		// PER-9: a fingerprint "identifies that record; it never substitutes for it". Before REG-D-058 this
 		// field named a template with no home.
 		expect(plan.ready && plan.fingerprint).toBe('pwut_9@v4');
@@ -72,7 +74,7 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 		// `{description}` and render successfully having declared nothing — and the closed list, which is the
 		// whole mechanism keeping a prompt's dependencies visible, would be decorative.
 		const ctx = assembleStepContext(PWU, ACTIVE);
-		expect(Object.keys(ctx).sort()).toEqual(['expectedOutputs', 'subject']);
+		expect(Object.keys(ctx).sort()).toEqual(['purpose', 'subject']);
 		expect(ctx.description, 'an undeclared field must not be handed over').toBeUndefined();
 	});
 
@@ -277,7 +279,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 		// trailer would announce a contract and then show the producer nothing, which is worse than silence —
 		// and it would change every existing prompt fingerprint's rendered text for no reason.
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
-		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
 
 	it('⚠ a whitespace-only contract is treated as ABSENT, not as an empty contract', () => {
@@ -289,7 +291,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 			{ ...ACTIVE, outputContract: '   ' },
 			ASSEMBLY
 		);
-		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
 
 	it('⭑ the contract follows the rendered work, never precedes it', () => {

@@ -34,14 +34,17 @@ const AUTHORIZED = 'AUTHORIZED';
 const SUBJECT = {
 	id: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X01',
 	title: 'Route Assessment',
-	purpose: 'Decide whether the route is viable',
-	expectedOutputs: ['a viability finding']
+	// ⛔ NO `expectedOutputs` (`JAN-ASSERTED` `R29`). The old value — `['a viability finding']` — was a
+	// PWU **the store rejects at write**: `OutputDefinitionSchema` is `z.record(...)`, so a string array
+	// is `VALIDATION_FAILED` and nothing persists. Every assertion made over it was an assertion about
+	// an object that cannot exist (`REG-F-411`).
+	purpose: 'Decide whether the route is viable'
 };
 
 const ACTIVE: PromptTemplate = {
-	templateText: 'Assess {subject}. Deliver {expectedOutputs}.',
+	templateText: 'Assess {subject}. Deliver {purpose}.',
 	templateVersion: 4,
-	declaredPlaceholders: ['subject', 'expectedOutputs'],
+	declaredPlaceholders: ['subject', 'purpose'],
 	status: 'ACTIVE'
 };
 
@@ -92,7 +95,7 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 
 		// The model got the AUTHORED prompt with the work unit's own facts in it — not a generic instruction
 		// and not a template with the markers still in it.
-		expect(seen).toBe('Assess Route Assessment. Deliver a viability finding.');
+		expect(seen).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 
 		// THE MUTANT: record on the ASSURANCE plane, or omit the record entirely. The run still "works" and the
 		// governed stream then contains a model call attributed to the wrong plane, or no trace that a work
@@ -486,7 +489,7 @@ describe('OC-02 — the reviewer is handed the contract as part of the instructi
 		// existing prompt would silently gain a trailer.
 		const { input } = harness();
 		const out = await runModelInvocationStep(input);
-		expect(out.ran && out.prompt).toBe('Assess Route Assessment. Deliver a viability finding.');
+		expect(out.ran && out.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
 });
 
