@@ -240,6 +240,74 @@ describe('⭐ AS-02 — the invocation subject is built from a REAL stored work 
 			expect(() => resolvePwuTypeFacts(() => ({ objectType: 'PWU_TYPE', purpose: 7 }), 'pwut_9')).toThrow(
 				/does not parse as a PWU_TYPE/
 			);
+
+			// ⛔⛔ AND THE CONTROL DID NOT CONTROL, WHICH THE COVERAGE FLOOR CAUGHT AND NOT A REVIEWER.
+			// Everything above is an EMPTY or a THROW: three assertions, not one of which passes a well-formed
+			// PWU_TYPE through. A resolver that returned `{}` for every parseable input would satisfy two of the
+			// three, and this block is titled *“the TYPE facts parse too”* — a claim it never tested.
+			// `JAN-PFA`'s per-file floor is what surfaced it: `resolvePwuTypeFacts`'s success path was the only
+			// uncovered statement pair in the file, which is the ratchet catching a control that could not fail.
+			//
+			// ⭑ THE FIXTURE IS NOT HAND-INVENTED. It is the `base` object `rph-contracts/src/objects.test.ts`
+			// asserts parses (`PwuTypeSchema.safeParse(base).success === true`), so a drift in the schema fails
+			// there first. And if it did not parse, `resolvePwuTypeFacts` THROWS — so a bad fixture here is loud,
+			// unlike the silent one that made an earlier control unreadable.
+			const actor = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
+			const wellFormedType = {
+				id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+				objectType: 'PWU_TYPE',
+				schemaVersion: 1,
+				semanticVersion: 1,
+				revision: 0,
+				lifecycleStatus: 'DRAFT',
+				createdAt: TS,
+				createdBy: actor,
+				updatedAt: TS,
+				updatedBy: actor,
+				provenance: { originType: 'HUMAN_DECISION', sourceObjectIds: [], sourceEventIds: [] },
+				tags: [],
+				extensions: [],
+				pwaId: 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00',
+				pwaVersion: '1.0.0',
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'Root',
+				purpose: 'assess the route against the approved need',
+				isRoot: true,
+				permittedParentTypeIds: [],
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: [],
+				completionRule: 'done',
+				status: 'DRAFT'
+			};
+			const facts = resolvePwuTypeFacts(() => wellFormedType, 'pwut_01ARZ3NDEKTSV4RRFFQ69G5FAV');
+			expect(facts.purpose, 'the parsed type lost the purpose it exists to carry').toBe(
+				'assess the route against the approved need'
+			);
+			// ⭑ AND THE TWO OPTIONAL SPREADS STAY ABSENT rather than arriving as `undefined` keys: a caller
+			// spreading these into an invocation must not introduce a key whose value is a silent nothing.
+			expect(Object.keys(facts)).toEqual(['purpose']);
+
+			// ⭐ AND THE PRESENT SIDE OF BOTH SPREADS — the other half of each branch pair, and the half that
+			// actually carries a professional's authored work. A type whose `promptTemplate` were silently
+			// dropped here would reach the producer with no instruction at all, which is `R29`'s defect in the
+			// opposite direction: not a bad rendering, an absent one.
+			const rich = resolvePwuTypeFacts(
+				() => ({
+					...wellFormedType,
+					promptTemplate: {
+						templateText: 'Assess {subject}.',
+						templateVersion: 1,
+						declaredPlaceholders: ['subject'],
+						status: 'DRAFT'
+					},
+					contextSpecification: { requiredElements: ['subject'], constraintDispositions: [] }
+				}),
+				'pwut_01ARZ3NDEKTSV4RRFFQ69G5FAV'
+			);
+			expect(Object.keys(rich).sort()).toEqual(['contextSpecification', 'promptTemplate', 'purpose']);
+			expect(rich.promptTemplate?.templateText).toBe('Assess {subject}.');
 		});
 	});
 });

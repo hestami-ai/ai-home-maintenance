@@ -17,6 +17,7 @@ import {
 	ConstraintStrengthSchema,
 	ConstraintTypeSchema,
 	ControlActionSchema,
+	CriterionResultOutcomeSchema,
 	DecisionStatusSchema,
 	DecisionTypeSchema,
 	DecompositionContractStatusSchema,
@@ -223,6 +224,12 @@ export const RequestAssuranceAssessmentPayloadSchema = z.strictObject({
 export type RequestAssuranceAssessmentPayload = z.infer<
 	typeof RequestAssuranceAssessmentPayloadSchema
 >;
+export const RecordCriterionResultPayloadSchema = z.strictObject({
+	criterionId: z.string(),
+	result: CriterionResultOutcomeSchema,
+	rationale: z.string().optional()
+});
+export type RecordCriterionResultPayload = z.infer<typeof RecordCriterionResultPayloadSchema>;
 export const SubmitEvidenceForAssessmentPayloadSchema = z.strictObject({
 	evidenceId: z.string(),
 	satisfiesRequirementId: z.string(),
@@ -1035,6 +1042,15 @@ export const AssuranceAssessmentSatisfiedPayloadSchema = z.strictObject({
 });
 export type AssuranceAssessmentSatisfiedPayload = z.infer<
 	typeof AssuranceAssessmentSatisfiedPayloadSchema
+>;
+export const AssuranceCriterionEvaluatedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	criterionId: z.string(),
+	result: CriterionResultOutcomeSchema,
+	rationale: z.string().optional()
+});
+export type AssuranceCriterionEvaluatedPayload = z.infer<
+	typeof AssuranceCriterionEvaluatedPayloadSchema
 >;
 export const AssuranceEvidenceReceivedPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
@@ -2174,6 +2190,12 @@ export const COMMANDS = {
 		alsoEmitsEvents: ['AssuranceEvidenceRequired'],
 		firstSlice: true
 	},
+	RecordCriterionResult: {
+		payload: RecordCriterionResultPayloadSchema,
+		targetAggregateType: 'ASSURANCE_ASSESSMENT',
+		emitsEvent: 'AssuranceCriterionEvaluated',
+		firstSlice: false
+	},
 	SubmitEvidenceForAssessment: {
 		payload: SubmitEvidenceForAssessmentPayloadSchema,
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
@@ -2821,6 +2843,10 @@ export const EVENTS = {
 	},
 	AssuranceAssessmentSatisfied: {
 		payload: AssuranceAssessmentSatisfiedPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
+	},
+	AssuranceCriterionEvaluated: {
+		payload: AssuranceCriterionEvaluatedPayloadSchema,
 		aggregateType: 'AssuranceAssessment'
 	},
 	AssuranceEvidenceReceived: {

@@ -61,6 +61,17 @@ const BOUND = new Set<string>([
  * drifts, rather than re-deriving a number no single worker can see.
  */
 const EMITTED_2026_08_04 = new Set([
+	// + 2026-09-20, JAN-CRITREAD L3 / CB-02: `AssuranceCriterionEvaluated` acquires its first and only
+	// emitter, `RecordCriterionResult` — §32's last unbuilt command that this engine reaches. Recorded BY
+	// HAND for the reason this set exists, but the emission is DRIVEN, not asserted:
+	// `handlers/record-criterion-result.test.ts` dispatches the command and reads the event back out of the
+	// store, asserting its payload field by field.
+	//
+	// ⭑ AND IT LEAVES THE BOUND-BUT-UNEMITTED LIST AT ZERO RATHER THAN RAISING IT. The vocabulary entry and
+	// the handler landed in ONE commit — forced by `command-dispatch-census`, which refuses a declared command
+	// no test drives. So the interval this file was written to surface (a corpus naming an event the engine
+	// cannot produce) never opened for this event.
+	'AssuranceCriterionEvaluated',
 	// + 2026-09-06, JAN-CTXPOL / ICP-04 (sponsor grant D-1): `ContextAssemblyPolicyCreated` acquires its first
 	// and only emitter, `CreateContextAssemblyPolicy`. Recorded BY HAND for the reason this set exists — no
 	// single vitest worker sees the whole suite's emissions — but the emission is DRIVEN, not asserted:

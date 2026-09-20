@@ -278,7 +278,14 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// and here it is the CHECK rather than a footnote: a move of +2 would have meant events had started
 		// counting, and +1 is therefore evidence the new event is bound where it belongs rather than leaking
 		// into a population it does not belong to. The new OBJECT TYPE moves nothing here either.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 277 }]);
+		// 277 -> 278: `RecordCriterionResult` (JAN-CRITREAD L3 / CB-02). +1 for ONE COMMAND — §32's last
+		// unbuilt command that this engine reaches — and its event `AssuranceCriterionEvaluated` does not move
+		// this number for the same reason every note above gives: EVENTS is not one of the four w2 populations.
+		// ⭑ SIXTH time that distinction has been load-bearing, and it was the CHECK again: +2 would have meant
+		// events had started counting, and +0 that the census could not see the command — which for this
+		// increment was never in doubt, because `command-dispatch-census` forces the driving test into the same
+		// commit as the declaration, so the scanner can always find the name.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 278 }]);
 	});
 });
 

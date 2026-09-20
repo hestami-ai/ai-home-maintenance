@@ -205,6 +205,51 @@ done so.
 
 ---
 
+## 10. ⭐⭐ `CB-01` DECIDED — and canon classifies the whole question, five lines above the §32 list
+
+§5 posed the payload as a choice between inventing a `rationale` and relaxing a ratified required field. **Both options were wrong, because the premise was.** The event payload was never §20.1's shape.
+
+### 10.1 Canon's own classification of this exact condition-set
+
+Catalog `:1828-1829`, verbatim:
+
+> *“Both events are ratified **names** here but **schematized nowhere** in the corpus (DOC-007 omits them), and the §32 commands that would emit them are **not yet built**. **So it is a schema-and-wiring task, *not* a ratification decision.**”*
+
+Canon says this of `AssuranceEvidenceRequired` and `AssuranceEvidenceReceived`. ⚠ Applying it to a third event is an INFERENCE, not a quotation — so state the inference: the three conditions hold **identically** for `AssuranceCriterionEvaluated`.
+
+| condition | `AssuranceCriterionEvaluated` | how measured |
+|---|---|---|
+| ratified NAME in §31 | ✅ | catalog `:1774`, inside the fence |
+| schematized nowhere in DOC-007 | ✅ | **0** hits in the Contract Package — control `AssuranceObservationRecorded` → **2** |
+| its §32 command not built | ✅ | `REG-F-422`'s census |
+
+⭐ **AND THE INFERENCE HAS A BUILT PRECEDENT, WHICH IS STRONGER THAN THE INFERENCE.** `AssuranceEvidenceReceived` was authored and shipped on exactly this basis. Its vocabulary entry records the convention verbatim: *“**UNRATIFIED-AUTHORED (2026-07-18, sponsor grant)**: DOC-004 §31 ratifies this event NAME; DOC-007 schematizes no interface for it … Fields **AUTHORED to source the §38 ‘missing evidence’ satisfaction side** … **Cited for the NAME only**.”*
+
+⚠ **ONE DRIFT, RECORDED RATHER THAN COPIED.** That entry cites the licensing sentence as *“§31 L1783-1785”*; the sentence is now at **`:1828`** and L1783-1785 lands on the waiver events. The citation rotted with the document. This design cites the **phrase**, not the line — the repository's own rule (*never infer a § from a line number; quote byte-exact*), applied to the precedent I am following.
+
+### 10.2 ⛔ THE DECISION: the payload is a RECEIPT, not a copy of §20.1
+
+The sibling's payload is **not** the ratified `Evidence` object shape. It is `{assessmentId, evidenceId, satisfiesRequirementId, evidenceType?}` — the assessment, the thing, the **declared item it answers**, and one optional descriptor. ⭑ Transposed one axis over:
+
+| field | required | why |
+|---|---|---|
+| `assessmentId` | ✅ | id-ref; mirrors the sibling exactly |
+| `criterionId` | ✅ | id-ref — the `AssessmentCriterion` evaluated. Occupies `satisfiesRequirementId`'s role: **the declared item this answers** |
+| `result` | ✅ | the ratified `CriterionResultOutcome` (`enums.ts:323`) — derived from canon, never restated |
+| `rationale` | ⭑ **optional** | carried when the evaluator produced one, exactly as `evidenceType?` is. `validators.ts:322` supplies it on failure |
+
+⛔ **AND `evidenceIds` IS EXCLUDED ON PRINCIPLE, NOT OMITTED.** No ratified consumer asks for it — §38's fourteen required view items do not include criterion results at all. Including it would force `[]` on every floor criterion, and `[]` is indistinguishable downstream from *not asked*, which is `REG-D-059`'s manufacture-from-silence shape. ⭑ A field nothing reads, carrying a value that cannot be told from silence, is two of this repository's recorded defects in one.
+
+### 10.3 The discipline this follows, stated so the next author inherits it
+
+⭐ **FIELDS ARE AUTHORED TO SOURCE A NAMED RATIFIED CONSUMER — never to mirror a domain type.** The sibling's fields exist to source §38's *“missing evidence”*. These exist to source `RPH-CON-005`'s coverage question (*which mandatory criteria were answered?*) and `RPH-ASR-005`'s disposition question (*did any come back undetermined?*). Both need exactly `criterionId` and `result`.
+
+⭑ **WHAT THIS DISSOLVES.** §5's fabrication problem does not arise: nothing invents a `rationale` for a MET criterion, and nothing manufactures an `evidenceIds`. ⚠ §5 is left standing unedited — its measurements are correct and its trap (reusing `floor-policies.ts`'s per-criterion rationale) is still live for anyone who later widens this payload.
+
+⚠ **WHAT THIS DOES *NOT* DECIDE.** §20.1's `CriterionResult` remains the shape a **validator result** carries, and remains referenced by nothing. This increment gives it no reader. That is `CR-02`'s question, and it stays open.
+
+---
+
 ## 9. Exit
 
 `recordCriterionResult` is dispatchable, emits the ratified `AssuranceCriterionEvaluated`, refuses a

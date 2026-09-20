@@ -82,6 +82,7 @@ import {
 	invalidateEvidence,
 	proposeEvidence,
 	recordAssuranceObservation,
+	recordCriterionResult,
 	requestAssuranceAssessment,
 	selectAssuranceEvaluator,
 	submitEvidenceForAssessment,
@@ -237,6 +238,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	CancelAssuranceAssessment: cancelAssuranceAssessment,
 	SubmitEvidenceForAssessment: submitEvidenceForAssessment,
 	CompleteAssuranceAssessment: completeAssuranceAssessment,
+	RecordCriterionResult: recordCriterionResult,
 	RecordAssuranceObservation: recordAssuranceObservation,
 	// Governance: decisions / waivers / baselines (DOC-002 §23, §24)
 	ProposeDecision: proposeDecision,

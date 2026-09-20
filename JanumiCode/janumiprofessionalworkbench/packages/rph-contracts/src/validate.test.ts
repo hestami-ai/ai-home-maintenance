@@ -181,6 +181,19 @@ describe('validate', () => {
 		// the next increment', written when only the object existed. The pair landed in the same slice, so the
 		// number AND its reasoning were corrected together — a pin whose warrant describes a different change
 		// is worse than an unexplained pin, because it reads as verified.
-		expect(buildContractRegistry().ids()).toHaveLength(386);
+		// 386 -> 388 (2026-09-20, JAN-CRITREAD L3 / CB-02): `RecordCriterionResultPayloadSchema` and
+		// `AssuranceCriterionEvaluatedPayloadSchema`. **+2** — a command/event pair minting one payload shape
+		// each, and NO object schema, because this command records a fact onto an EXISTING aggregate rather than
+		// minting one (the whole reason it is modelled on `submitEvidenceForAssessment` rather than on
+		// `recordAssuranceObservation`, which mints an `ASSURANCE_OBSERVATION`).
+		// ⚠ DERIVED, NOT READ OFF THE FAILURE, as the notes above demand: the registry was built and filtered,
+		// and it returns THREE matching ids — `enum:CriterionResultOutcome`, `command:RecordCriterionResult`,
+		// `event:AssuranceCriterionEvaluated` — of which the ENUM PRE-EXISTED. So the delta is fully
+		// accounted for at +2.
+		// ⭐ AND +2 RATHER THAN +3 IS THE LOAD-BEARING PART, because it proves a design decision rather than
+		// merely counting: the payload's `result` field is declared with `enumRef: CriterionResultOutcomeSchema`,
+		// deriving DOC-007 §20.1's ratified vocabulary instead of restating it. Had it minted its own enum the
+		// delta would be +3 — so this arithmetic is the check that canon's enum was reused, not copied.
+		expect(buildContractRegistry().ids()).toHaveLength(388);
 	});
 });

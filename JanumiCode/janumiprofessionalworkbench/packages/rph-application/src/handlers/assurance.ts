@@ -36,6 +36,7 @@ import type {
 	ProposeEvidencePayload,
 	RecordClaimAssessmentPayload,
 	RecordAssuranceObservationPayload,
+	RecordCriterionResultPayload,
 	BeginAssuranceAssessmentPayload,
 	CancelAssuranceAssessmentPayload,
 	RequestAssuranceAssessmentPayload,
@@ -1187,6 +1188,41 @@ export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 const demandsAnInstance = (r: unknown): boolean =>
 	(r as { cardinality?: string } | undefined)?.cardinality !== 'ZERO_OR_MORE';
 
+/** The ids a governing policy DECLARES under one of its rule arrays, as a set.
+ *
+ * ⭐ ONE READER FOR TWO GUARDS, AND THE DUPLICATION IT REPLACES WAS MEASURED. `submitEvidenceForAssessment`
+ * refuses a `satisfiesRequirementId` the policy's `requiredEvidence` does not declare, and
+ * `recordCriterionResult` refuses a `criterionId` its `criteria` does not declare — the same
+ * load, the same map, the same string filter, one field name apart. Writing it twice duplicated four
+ * defensive branches into a file whose per-file coverage floor then refused the increment (`JAN-PFA` R1),
+ * which is the ratchet doing precisely what it exists for: the honest fix is one reader, not a lower floor.
+ *
+ * ⛔ FAIL CLOSED BY CONSTRUCTION. An unreadable policy, an absent array and a malformed entry all yield an
+ * EMPTY set, so every candidate id is refused rather than admitted. A caller can only ever be too strict.
+ */
+const policyRows = (
+	ctx: HandlerContext,
+	policyId: unknown,
+	field: 'requiredEvidence' | 'criteria'
+): readonly unknown[] => {
+	const policy =
+		typeof policyId === 'string'
+			? (ctx.store.loadObject(policyId)?.state as Record<string, unknown> | undefined)
+			: undefined;
+	const rows = policy?.[field];
+	return Array.isArray(rows) ? (rows as readonly unknown[]) : [];
+};
+
+/** The declared ids of those rows. Split from the load because the evidence path needs the ROWS too (it
+ *  filters them on `requiredForDispositions` and cardinality to decide the READY arrow), while both paths
+ *  need the id SET for their fail-closed guard. */
+const idsOf = (rows: readonly unknown[]): ReadonlySet<string> =>
+	new Set(
+		rows
+			.map((r) => (r as { id?: unknown } | undefined)?.id)
+			.filter((id): id is string => typeof id === 'string')
+	);
+
 const ASSESSMENT = 'ASSURANCE_ASSESSMENT';
 /**
  * DERIVED FROM THE RATIFIED ENUM, NOT RESTATED (REG-F-026 group (a)).
@@ -1513,16 +1549,8 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	// explicit (satisfiesRequirementId), never inferred from proximity. Fail closed when the requirement is not
 	// declared: otherwise "missing evidence" could be reduced by evidence that satisfies nothing the policy asked
 	// for. (This is exactly the namespace subtlety Increment K flagged as why this was not a trivial fold.)
-	const policyId = loaded.state.assurancePolicyId as string | undefined;
-	const policy = policyId
-		? (ctx.store.loadObject(policyId)?.state as
-				{ requiredEvidence?: Array<{ id?: string }> } | undefined)
-		: undefined;
-	const declared = new Set(
-		(policy?.requiredEvidence ?? [])
-			.map((r) => r?.id)
-			.filter((x): x is string => typeof x === 'string')
-	);
+	const requiredRows = policyRows(ctx, loaded.state.assurancePolicyId, 'requiredEvidence');
+	const declared = idsOf(requiredRows);
 	if (!declared.has(p.satisfiesRequirementId)) {
 		return reject(
 			command,
@@ -1555,14 +1583,16 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	// Only the requirements that gate ASSESSING (requiredForDispositions === 'ALL') hold the arrow — see the
 	// request handler. A 'SATISFIED_ONLY' requirement outstanding does not keep an assessment out of ASSESSING; it
 	// keeps a SATISFIED verdict out, at Gate A.
-	const blocking = (policy?.requiredEvidence ?? [])
-		.filter(
-			(r) =>
-				(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
+	const blocking = [
+		...idsOf(
+			requiredRows
+				.filter(
+					(r) =>
+						(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
+				)
+				.filter(demandsAnInstance)
 		)
-		.filter(demandsAnInstance)
-		.map((r) => r?.id)
-		.filter((x): x is string => typeof x === 'string');
+	];
 	const stillOutstanding = blocking.filter((r) => !receivedIds.has(r));
 	// Only from EVIDENCE_PENDING: submitting more evidence to an assessment already READY or ASSESSING records the
 	// receipt without moving anything, which is correct — the machine does not go backwards and does not re-enter a
@@ -1584,6 +1614,94 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 			evidenceId: p.evidenceId,
 			satisfiesRequirementId: p.satisfiesRequirementId,
 			...(p.evidenceType !== undefined ? { evidenceType: p.evidenceType } : {})
+		}
+	});
+	return commitState(ctx, command, {
+		objectType: ASSESSMENT,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/**
+ * RecordCriterionResult (DOC-004 §32) — records ONE criterion's outcome against an assessment that is
+ * ASSESSING, emitting the ratified §31 `AssuranceCriterionEvaluated`. The last of §32's commands to be
+ * built that this engine reaches: `completeAssuranceAssessment` has carried the note *“Criterion results ARE
+ * still dropped at the boundary: `recordCriterionResult` was never built”* since the boundary was written.
+ *
+ * ⭐ MODELLED ON `submitEvidenceForAssessment`, NOT ON `recordAssuranceObservation`, AND THE CHOICE IS LOAD-BEARING.
+ * The observation handler MINTS a separate aggregate and never writes the assessment at all (its
+ * `observationIds` is set [] at creation and only ever read back), so a criterion result recorded that way
+ * would be invisible to the assessment it belongs to. This targets the ASSESSMENT and commits NO state
+ * delta beyond the envelope bump — the judgement lives on the EVENT, exactly as the evidence receipt does.
+ *
+ * ⛔ AND IT TAKES NO ARROW, WHICH IS WHERE THE TEMPLATE STOPS APPLYING. `submitEvidenceForAssessment` DOES
+ * move the machine (EVIDENCE_PENDING -> READY, `transitions.data.ts` names it as that trigger). Criterion
+ * results are recorded WITHIN ASSESSING: §31's composition note places these fine events on the chain that
+ * ENDS at ASSESSING, and no §30 arrow names this command. Nothing here advances a state.
+ *
+ * ⚠ THE PAYLOAD IS AUTHORED, NOT RATIFIED, and the vocabulary entry says so in its own `sourceSection`.
+ * §31 states the classification for exactly this condition-set — a ratified NAME, schematized nowhere in
+ * DOC-007, whose §32 command is unbuilt: *“it is a schema-and-wiring task, NOT a ratification decision.”*
+ * The fields exist to source RPH-CON-005's coverage question and RPH-ASR-005's disposition question.
+ * `evidenceIds` is deliberately ABSENT rather than empty: no ratified consumer asks for it (§38's
+ * fourteen view items do not include criterion results), and [] would be indistinguishable downstream from
+ * “not asked” — REG-D-059's manufacture-from-silence shape.
+ */
+export const recordCriterionResult: CommandHandler = (ctx, command, payload) => {
+	const p = payload as RecordCriterionResultPayload;
+	const id = command.targetAggregateId; // the assessment aggregate
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	// ASSESSING ONLY, and NARROWER THAN THE EVIDENCE WINDOW ON PURPOSE. Evidence may arrive in
+	// EVIDENCE_PENDING or READY because it is an INPUT to a verdict not yet given. A criterion result is a
+	// piece of the verdict itself, so its window is the state in which judging happens — and recording one
+	// after a terminal disposition would append a judgement the completed verdict never considered.
+	const assessmentState = loaded.state.assessmentState;
+	if (assessmentState !== 'ASSESSING') {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RecordCriterionResult: assessment ${id} is ${String(assessmentState)}, not ASSESSING — a criterion result is a judgement made DURING assessment. Recording one before it begins, or after it has concluded, would attribute a judgement to a window in which nobody was judging.`,
+			[id]
+		);
+	}
+	// FAIL CLOSED AGAINST THE POLICY'S DECLARED CRITERIA (DOC-004 §7), the same shape the evidence handler
+	// uses for `satisfiesRequirementId`: a result recorded against a criterion the policy never declared
+	// would answer a question nobody asked, and would count toward coverage of a rubric it is not part of.
+	//
+	// ⚠ THE POLICY IS LOADED FRESH, AND REG-F-209 (OPEN) GOVERNS THAT. `EDITABLE_PATCH_FIELDS` contains
+	// `'criteria'` and `editAssurancePolicy` commits `newSemanticVersion: loaded.semanticVersion`, so a
+	// criterion's declaration can change under an in-flight assessment. ⭑ That exposure is NOT introduced
+	// here: it is the one this site already carries for `requiredEvidence`, which is in the same list.
+	// Disclosed rather than repaired, and cited so the next reader does not re-derive it as new.
+	const declared = idsOf(policyRows(ctx, loaded.state.assurancePolicyId, 'criteria'));
+	if (!declared.has(p.criterionId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RecordCriterionResult: '${p.criterionId}' is not a criterion the assessment's policy declares (DOC-004 §7) — a result can only be recorded against a declared criterion.`,
+			[id, p.criterionId]
+		);
+	}
+	const newRevision = loaded.revision + 1;
+	// NO STATE DELTA. The assessment snapshot is unchanged beyond the envelope bump — the judgement lives
+	// on the event, and a reader folds the results from the aggregate's log the way Gate A folds receipts.
+	const next = nextEnvelope(loaded.state, command, newRevision);
+	const event = makeEvent(ctx, command, {
+		eventType: 'AssuranceCriterionEvaluated',
+		aggregateType: ASSESSMENT,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: {
+			assessmentId: id,
+			criterionId: p.criterionId,
+			result: p.result,
+			...(p.rationale !== undefined ? { rationale: p.rationale } : {})
 		}
 	});
 	return commitState(ctx, command, {

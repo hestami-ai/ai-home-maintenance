@@ -632,6 +632,34 @@
 			]
 		},
 		{
+			"commandType": "RecordCriterionResult",
+			"targetAggregateType": "ASSURANCE_ASSESSMENT",
+			"emitsEvent": "AssuranceCriterionEvaluated",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-09-20, JAN-CRITREAD L3): DOC-004 §32 ratifies the command NAME 'recordCriterionResult' and §31 the event NAME 'AssuranceCriterionEvaluated'; DOC-007 schematizes NO interface for either (measured: 0 hits in the Contract Package, against AssuranceObservationRecorded = 2 as a positive control). §31's composition note states the classification for exactly this condition-set: 'ratified names here but schematized nowhere in the corpus (DOC-007 omits them), and the §32 commands that would emit them are not yet built. So it is a schema-and-wiring task, NOT a ratification decision.' CITED BY PHRASE, NOT BY LINE: the sibling SubmitEvidenceForAssessment entry cites 'L1783-1785' and the document has since drifted — that sentence now sits at :1828, and L1783-1785 lands on the waiver events. Fields are AUTHORED to source RPH-CON-005's coverage question and RPH-ASR-005's disposition question; do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAMES only: DOC-004 §32 (command), §31 (event).",
+			"payloadFields": [
+				{
+					"field": "criterionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref — the AssessmentCriterion (DOC-004 §7) evaluated; must be one the assessment's governing policy declares, fail-closed exactly as SubmitEvidenceForAssessment validates satisfiesRequirementId"
+				},
+				{
+					"field": "result",
+					"required": true,
+					"type": "CriterionResultOutcome",
+					"enumRef": "CriterionResultOutcomeSchema",
+					"note": "DOC-007 §20.1 CriterionResult.result, derived from the ratified enum rather than restated"
+				},
+				{
+					"field": "rationale",
+					"required": false,
+					"type": "string",
+					"note": "carried when the evaluator produced one (validators.ts supplies it on failure); optional exactly as the sibling's evidenceType is. evidenceIds is deliberately ABSENT, not omitted: no ratified consumer asks for it (§38's fourteen view items do not include criterion results) and [] would be indistinguishable downstream from 'not asked', which is REG-D-059's manufacture-from-silence shape"
+				}
+			]
+		},
+		{
 			"commandType": "SubmitEvidenceForAssessment",
 			"targetAggregateType": "ASSURANCE_ASSESSMENT",
 			"emitsEvent": "AssuranceEvidenceReceived",
@@ -4405,6 +4433,38 @@
 					"type": "enum",
 					"enumRef": "AssuranceDispositionSchema",
 					"note": "ASSESSING->SATISFIED; drives PWU.assuranceState SATISFIED + workLifecycleState UNDER_ASSURANCE->SATISFIED"
+				}
+			]
+		},
+		{
+			"eventType": "AssuranceCriterionEvaluated",
+			"aggregateType": "AssuranceAssessment",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-09-20, JAN-CRITREAD L3): DOC-004 §32 ratifies the command NAME 'recordCriterionResult' and §31 the event NAME 'AssuranceCriterionEvaluated'; DOC-007 schematizes NO interface for either (measured: 0 hits in the Contract Package, against AssuranceObservationRecorded = 2 as a positive control). §31's composition note states the classification for exactly this condition-set: 'ratified names here but schematized nowhere in the corpus (DOC-007 omits them), and the §32 commands that would emit them are not yet built. So it is a schema-and-wiring task, NOT a ratification decision.' CITED BY PHRASE, NOT BY LINE: the sibling SubmitEvidenceForAssessment entry cites 'L1783-1785' and the document has since drifted — that sentence now sits at :1828, and L1783-1785 lands on the waiver events. Fields are AUTHORED to source RPH-CON-005's coverage question and RPH-ASR-005's disposition question; do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAMES only: DOC-004 §32 (command), §31 (event).",
+			"payloadFields": [
+				{
+					"field": "assessmentId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref — the ASSURANCE_ASSESSMENT this result belongs to"
+				},
+				{
+					"field": "criterionId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref — the AssessmentCriterion (DOC-004 §7) evaluated; must be one the assessment's governing policy declares, fail-closed exactly as SubmitEvidenceForAssessment validates satisfiesRequirementId"
+				},
+				{
+					"field": "result",
+					"required": true,
+					"type": "CriterionResultOutcome",
+					"enumRef": "CriterionResultOutcomeSchema",
+					"note": "DOC-007 §20.1 CriterionResult.result, derived from the ratified enum rather than restated"
+				},
+				{
+					"field": "rationale",
+					"required": false,
+					"type": "string",
+					"note": "carried when the evaluator produced one (validators.ts supplies it on failure); optional exactly as the sibling's evidenceType is. evidenceIds is deliberately ABSENT, not omitted: no ratified consumer asks for it (§38's fourteen view items do not include criterion results) and [] would be indistinguishable downstream from 'not asked', which is REG-D-059's manufacture-from-silence shape"
 				}
 			]
 		},

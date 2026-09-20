@@ -6200,6 +6200,26 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'JAN-EXEC R32 Control A (REG-D-067); the edit was measured during the R32 costing pass'
 	},
 	{
+		id: 'CB-02-the-criterion-guard-admits-an-undeclared-rubric',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// ⭐⭐ THIS ENTRY EXISTS BECAUSE THE EXPORT CENSUS DEMANDED IT, AND THE CENSUS WAS RIGHT.
+		// `recordCriterionResult` shipped with seven driven tests and was STILL the repository's one bare
+		// production-consumed export: 352 of 353 guarded. ⚠ Tests prove the behaviour I thought to write;
+		// a mutant proves a named test NOTICES when the behaviour is removed. Those are different claims,
+		// and the R3 census is what keeps the second from being assumed from the first.
+		//
+		// ⛔ THE GUARD UNDER ATTACK IS THE FAIL-CLOSED ONE. `policyRows` returns an EMPTY array for an
+		// unreadable policy, an absent `criteria` array and a malformed row alike, so the refusal arm is the
+		// one that fires on every degraded input. Neutering the check does not merely admit a typo — it
+		// converts every one of those degraded cases from a refusal into an acceptance.
+		find: 'if (!declared.has(p.criterionId)) {',
+		replace:
+			'if (declared.size < 0) { // MUTANT: the declared-criterion guard can never fire',
+		expectRed: ['packages/rph-application/src/handlers/record-criterion-result.test.ts'],
+		why: "PROMISE: DOC-004 \u00a77 \u2014 a criterion result is recorded against a criterion the governing policy DECLARES, and against no other. The guard is the criterion-side twin of `submitEvidenceForAssessment`'s `satisfiesRequirementId` check, and both now read one shared `policyRows`/`idsOf` pair so the two cannot drift. WHO RELIES: `RPH-CON-005`'s coverage question (*were all mandatory criteria answered?*), which is answerable only if every recorded answer belongs to the rubric being counted; and every reader of an assessment's criterion history. WHAT THE MUTATION DOES TO THEM: a result recorded against an id the policy never contained is ACCEPTED and appended to the governed stream, so coverage can be satisfied by answers to questions nobody asked \u2014 the rubric is no longer the thing being measured. \u26a0 It is not a crash and not a type error: the event is well-formed and internally consistent, which is why only a driven refusal notices. \u2b51 AND THE MUTATION KEEPS `declared` USED, so it cannot pass as a NO_COMPILE artifact \u2014 this ledger's own header says such a result is worth nothing.",
+		source: 'JAN-CRITREAD L3 CB-02 (ROADMAP-the-command-nobody-built.md); §32 recordCriterionResult'
+	},
+	{
 		id: 'AS-04-the-boundary-asserts-instead-of-parsing',
 		file: 'packages/rph-application/src/execution-invocation.ts',
 		// ⛔ THE MUTATION RESTORES EXACTLY THE SHAPE `REG-F-411` WAS FILED FOR: a projection ASSERTED into the
