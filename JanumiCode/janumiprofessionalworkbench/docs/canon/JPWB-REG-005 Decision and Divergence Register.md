@@ -36551,6 +36551,38 @@ recording: the record is internally consistent, structurally complete, and says 
 ⚠ Independent of `R31`: correcting the fixtures removed the *occasions* on which this was visible in the unit
 suite, and removed none of the defect.
 
+⛔⛔ **CORRECTED 2026-09-20, BEFORE ANY REMEDY WAS BUILT — AND THE CORRECTION IS AGAINST MYSELF TWICE OVER.**
+
+**(1) THE DIAGNOSIS ABOVE IS TOO SHALLOW.** ~~*“Observations are derived only from `failed: true`, so the
+floor produces zero observations.”*~~ True, and not the cause. I went looking for where the criterion
+outcomes go and they go **nowhere**: the persisted `AssuranceAssessmentCompleted` payload carries
+`assessmentId, assurancePolicyId, policyVersion, subjectObjectIds, subjectSemanticVersions, disposition,
+evidenceConsideredIds, observationIds, residualUncertainty, recommendedControlActions, validatorId,
+validatorVersion` — **and no criteria.** `ValidatorResultSchema` has `claimResults` and `observations` and
+no criterion-results field either. ⭑ So the per-criterion outcomes exist only IN PROCESS and are dropped at
+the contract boundary. `observationIds` is the only channel out, and observations come only from failures.
+
+**(2) AND THAT GAP WAS ALREADY REGISTERED, THREE WAYS, BEFORE I FILED THIS.** The enforcement register
+records `RPH-ASR-004`, `RPH-ASR-005` and `RPH-CON-005` on exactly it, and `REG-F-409` **bounds its own
+scope by naming it**: *“`completeAssuranceAssessment` never reads criterion RESULTS at all … which is the
+COMMAND path. Two separate reasons the ratified rule cannot fire; this entry names one.”*
+
+⭐ **SO THIS ENTRY IS NOT A NEW FINDING. IT IS THE DEMO-VISIBLE SYMPTOM OF A KNOWN, BOUNDED ONE**, and it is
+retained as that rather than deleted: the empty string after the colon is the first time the command-path
+limb of `RPH-ASR-005` has been *seen* rather than registered, which is worth keeping.
+
+⛔ **WHAT I DID WRONG:** this repository's standing rule is to GREP THE REGISTER before filing, and its own
+record of that rule says four entries were already answered when it was last broken. I filed this one in the
+same session in which I corrected two other entries of mine for asserting absences I had not searched for.
+
+⭑ **AND THE CONSEQUENCE IS NOT COSMETIC, WHICH IS WHY IT IS CORRECTED BEFORE ANY CODE.** As filed, the
+remedy looks like a demo-side render fix — an hour's work on `describeRefusedEvidence`. Correctly diagnosed,
+the remedy is **criterion results crossing the ratified command boundary**: a contract change, vocabulary
+regeneration and a ratification, sequenced against `RPH-ASR-004`/`005`/`CON-005`. Building the render fix
+first would have made a registered gap *look* closed from the only surface anyone watches.
+
+**Status supersedes ~~OPEN~~ → ⚠ OPEN AS A SYMPTOM; the defect is `RPH-ASR-005`'s command-path limb.**
+
 ---
 
 ### REG-F-416 — `R26` turned an existing boolean into a control that cannot fail, and nothing recorded it
