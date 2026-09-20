@@ -36409,3 +36409,57 @@ to *"read the SPREAD, not the count"* — this entry is that instruction applied
 ⚠ **AND THE GENERAL FORM IS AN INSTRUMENT PROBLEM, NOT A COUNTING ONE.** A gate that stops at its first failing
 task cannot report the extent of a deliberate red, and a deliberate red is exactly when extent is the thing a
 reader needs. Recorded here rather than remedied: changing the gate's short-circuit is its own decision.
+
+---
+
+### REG-D-065 — `JAN-ASSERTED` sponsor rulings: `{expectedOutputs}` stops being supplied, and the projection is parsed rather than asserted
+
+**Ruled 2026-09-20** (sponsor, `JAN-ASSERTED`). **Status:** ✅ **RATIFIED** — both limbs applied and verified
+live in the commits that record this entry.
+
+⭐⭐ **`R29` — `{expectedOutputs}` IS NO LONGER SUPPLIED TO A PROMPT TEMPLATE, until `OutputDefinition`'s fields
+are ratified.**
+
+⛔ **THE DECIDING FACT IS THAT NOBODY AUTHORED THE VALUE.** Every production site mints
+`{ outputId: 'out_<ulid>', kind: 'DOCUMENT' }` — `+page.server.ts:957`, `undertakings/+page.server.ts:233`,
+`reference-undertaking.ts:449` — and **no form anywhere lets a professional author the field.** So the best
+possible formatter would render an internal id and a constant the surface invented into a professional's
+instruction. That is not a rendering problem; it is a claim the record cannot support. `OutputDefinition`'s
+fields are additionally unratified (`vocab/m1-object-fields.json:2662`: *"Source TBD"*) with two rival key sets
+and neither as authority, so a key-precedence formatter would fabricate.
+
+⭑ **NOTHING A PROFESSIONAL WROTE IS LOST.** `PromptTemplate.outputContract` is authored in the PWA Designer and
+already appended to the same instruction by `withOutputContract`. ⭐ **And the live lane's template is the
+tell**: removing `'Required outputs: {expectedOutputs}'` cost that spec nothing, because the required output is
+stated exactly two lines below in the professional's own terms. The placeholder was carrying no information
+even before it broke.
+
+⚠ **THE RULE THIS RESTORES IS NOT NEW.** `JAN-PROMPT` sponsor default #2, accepted 2026-09-04 under
+`REG-D-058`: *"A missing declared placeholder at render time is a **REFUSAL**, not a disclosed gap."*
+`prompt-render.ts` implements it and `execution-invocation.test.ts:79-86` pins it GREEN — and a `?? []` at the
+only production call site turned ABSENT into PRESENT-BUT-EMPTY, making a ratified rule, a live guard and a
+passing test all unreachable exactly where they govern. **`R29` mints no policy; it restores one.**
+
+⭐⭐ **`R30` — THE PROJECTION IS PARSED AGAINST ITS CONTRACT, NOT ASSERTED ACROSS THE BOUNDARY.**
+
+⛔ **THE SHAPE `R30` REPLACES:** an unchecked id → a type-blind `getObject` → **eleven hand-written type
+assertions across two objects**, one of them a whole structured sub-object. `check-types` could say nothing
+about any of it, *because the assertions existed precisely to stop it.*
+
+⭑ **PRECEDENT, NOT INVENTION:** six production sites in `rph-application` already parse a projection before
+trusting it, and `abandon-authorization.ts` states the argument — *"It must PARSE as one … guessing at the
+fields would be the field-name-inference defect this repo has recorded."*
+
+⭐ **IT CLOSES THE FORM BY CONSTRUCTION RATHER THAN BY ENUMERATION.** One parse covers every field, so a twelfth
+added later is checked for free — and it is **the only remedy that reaches `REG-F-411`'s second limb**, where
+an assertion invented a field (`exchangeId`) that no schema carries. A field-name-vs-schema instrument is blind
+to that class by construction; a contract parse turns it into a named error.
+
+⚠ **AND THE HALF-REMEDY WAS MEASURED AND REJECTED.** Correcting the TYPE alone reddens the cast (`TS2322`) but
+`.join(', ')` on `readonly OutputDefinition[]` **still compiles**, because `Array.prototype.join` accepts any
+array. A repo applying that alone would retype the cast, ship green, and still print `[object Object]` — while
+*looking* like the gate had done its job. That is the more dangerous of the two half-remedies, which is why
+`R30` subsumes the type correction rather than competing with it.
+
+⚠ **THE CONTENT-PLANE QUESTION STAYS AS `R28` LEFT IT** (`REG-D-064`): callers gate, the port does not refuse,
+and the weakness is disclosed rather than prevented.
