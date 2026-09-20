@@ -514,7 +514,31 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// already owns this* forced reading all three rows together — and the three turn out to be ONE absence
 			// seen from three sides, of which only the floor-path third needs a ratification. I had costed it as a
 			// single contract change plus a ruling; it is three limbs and two of them need neither.
-		).toBe(46);
+			// 
+			// 46 -> 47 (2026-09-20): `ROADMAP-the-command-nobody-built.md` (`JAN-CRITREAD` L3). ⭑ THE
+			// NEAREST CLAIMANT IS A ROADMAP THAT IS ALREADY COMPLETE, AND CHECKING WHY IT DID NOT COVER THIS IS
+			// WHAT MADE THE SCOPE HONEST.
+			//   · `ROADMAP-assessment-lifecycle-restoration.md` is the real candidate: its DESIGN names
+			//     `recordCriterionResult` by name as one of the unbuilt §32 commands, cites its §32 line, and
+			//     settles two questions this work inherits rather than re-deriving — that §32 carries *“no
+			//     exhaustiveness clause and no rule that each listed command be its own dispatch”*, and what the
+			//     dispatch multiplier costs. ⛔ But it is **COMPLETE** (`REG-F-021` closed, 2026-08-05) and its
+			//     ROADMAP mentions the command **zero** times: its scope was the three skipped STATES, and
+			//     `recordCriterionResult` takes no arrow. It built the two ARROW commands and stopped.
+			//   · `ROADMAP-claim-assessment.md` — **zero** mentions; its design names the command only as an
+			//     example of §32 repairing §34.2's omissions, never as work.
+			//   · `ROADMAP-the-criterion-results-nobody-reads.md` is where this came FROM, and cannot hold it:
+			//     `REG-F-421` reframed its `CR-06` from *request a ruling* to *build a ratified command*,
+			//     and a four-increment build does not fit one line item of a roadmap whose other items are
+			//     **blocked on it**. Folding it back would hide a blocker inside its own dependent.
+			// 
+			// ⭐ AND ASKING PRODUCED THE CORRECTION THAT MATTERS MOST. Reading the complete roadmap to rule it
+			// out is what surfaced that this work had a settled corpus basis I was about to re-derive — and, one
+			// step on, that §31 ratifies `AssuranceCriterionEvaluated` 73 lines above the §32 command list I
+			// had read, while I was deriving a divergent event name from 21 handlers (`REG-F-422`). ⚠ The
+			// subsumption question keeps paying for a reason its own text does not claim: it forces reading a
+			// NEIGHBOURING artifact end to end, and the answer is usually next to the thing you missed.
+		).toBe(47);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
