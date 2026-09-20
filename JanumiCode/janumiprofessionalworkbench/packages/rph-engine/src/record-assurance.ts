@@ -139,6 +139,37 @@ export function recordAssuranceRecordingPlan(
 			subjectSemanticVersions: { [plan.subjectId]: plan.subjectSemanticVersion },
 			claimIds: []
 		});
+		// ⭐⭐ THE CRITERION RESULTS, WHICH USED TO STOP HERE (`JAN-CRITREAD` L3 `CB-03`).
+		//
+		// The floor computes every criterion's outcome (`a.criteria`) and, until now, dropped all of them at
+		// this boundary — `claimResults: []` below, disclosed but unrepaired, because §20's only route for
+		// per-criterion results is claim-keyed and a floor assessment carries `claimIds: []`. §32's
+		// `recordCriterionResult` is the route that needs no claim id, and it was never built.
+		//
+		// ⛔ ONE DISPATCH PER CRITERION, AND THE HANDLER REFUSES ANY ID THE POLICY DOES NOT DECLARE — which
+		// makes this loop a live check that the floor's computed ids and its policies' declared ids agree.
+		// They do by construction (`floor.ts` mints `FS-01-schema`…`IP-05-trace` and `floor-policies.ts`
+		// declares exactly those; the Reasoning Review derives its ids FROM the policy). ⚠ `send` THROWS on
+		// any refusal, so a drift between those two lists takes the whole floor recording down rather than
+		// silently recording less — which is the correct failure for a record that claims to be complete.
+		//
+		// ⭑ `mandatory` IS NOT SENT. The payload carries what was JUDGED; whether a criterion is mandatory is
+		// the POLICY's declaration, derived at read time from `severityIfNotMet`. `R25`: the judged party
+		// does not set its own stakes, and a payload that carried them would let it.
+		a.criteria.forEach((c) => {
+			send('RecordCriterionResult', 'ASSURANCE_ASSESSMENT', assessmentId, {
+				criterionId: c.criterionId,
+				// ⭑ THE RENAME IS THE WHOLE MAPPING, and it is between two spellings of ONE ratified vocabulary:
+				// the kernel's `FloorCriterion.outcome` and DOC-007 §20.1's `CriterionResult.result` are both
+				// `CriterionResultOutcome`. Nothing is converted; only the field name differs.
+				result: c.outcome,
+				// ⛔ CARRIED ONLY WHEN THE EVALUATOR PRODUCED ONE, AND NEVER SYNTHESIZED. `floor-policies.ts`
+				// declares a `rationale` per criterion, and reusing it here would be a conflation: that is the
+				// policy's reason for HAVING the criterion, not this assessment's reason for its OUTCOME. A MET
+				// criterion the floor judged mechanically has no rationale, and an absent one stays absent.
+				...(c.rationale !== undefined ? { rationale: c.rationale } : {})
+			});
+		});
 		// Record each proposed observation while ASSESSING (observations require the assessment to exist).
 		a.observations.forEach((o) => {
 			const observationId = opts.newId('obs');
@@ -171,7 +202,16 @@ export function recordAssuranceRecordingPlan(
 				assessmentId,
 				subjectObjectIds: [plan.subjectId],
 				subjectSemanticVersions: { [plan.subjectId]: plan.subjectSemanticVersion },
-				// EMPTY, AND NOT BECAUSE THE FLOOR HAS NOTHING TO SAY — a surfaced gap, not a silent drop.
+				// STILL EMPTY, AND THE REASON IS NOW NARROWER (`JAN-CRITREAD` L3 `CB-03`). ⭐ THE CRITERION RESULTS
+				// ARE NO LONGER DROPPED — every one is recorded above through §32's `recordCriterionResult`,
+				// emitting the ratified §31 `AssuranceCriterionEvaluated`. What remains empty is this FIELD, and
+				// only because §20 routes it through a CLAIM id the floor does not have. The paragraph below stated
+				// that as a total loss; it was a loss of ROUTE, and the route existed in §32 unbuilt.
+				// ⚠ WHAT IS STILL OPEN: nothing READS the recorded results yet. `RPH-CON-005`'s coverage gate asks
+				// `validatorResult.claimResults`, which this does not change, so that rule stays
+				// UNENFORCED_DISCLOSED. Recording is a precondition of enforcing, not the enforcing.
+				//
+				// ~~EMPTY, AND NOT BECAUSE THE FLOOR HAS NOTHING TO SAY — a surfaced gap, not a silent drop.~~
 				// §20 routes per-criterion results ONLY through `claimResults: ClaimAssessmentResult[]`, and §33's
 				// worked example nests them under a `claimId`. The floor's assessments carry `claimIds: []` (see
 				// RequestAssuranceAssessment above): it evaluates CRITERIA against a subject, not claims. So its

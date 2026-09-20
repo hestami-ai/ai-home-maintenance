@@ -210,6 +210,83 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 		expect(evaluator?.actorId).toBe('judge');
 	});
 
+	it('⭐⭐ every criterion the floor COMPUTES is now RECORDED, and the expectation is DERIVED from the plan', async () => {
+		// ⛔ THIS IS THE ASSERTION `JAN-CRITREAD` L3 EXISTS FOR. Until `CB-03` the floor computed every
+		// criterion's outcome and dropped all of them at this boundary — `claimResults: []` — because §20's
+		// only route is claim-keyed and a floor assessment carries `claimIds: []`. §32's
+		// `recordCriterionResult` is the claim-less route, and it had never been built.
+		//
+		// ⭑ THE EXPECTATION IS DERIVED, NEVER HAND-LISTED. A literal list would encode today's floor rubric
+		// and then defend it: this repository's own record is that hand-listing IS the defect one level up.
+		// Adding a criterion to any floor policy must move this test by construction, not by edit.
+		const { eng, plan } = await runAndRecord(goodCtx);
+		const expected = plan.assessments
+			.flatMap((a) => a.criteria.map((c) => `${c.criterionId}=${c.outcome}`))
+			.sort();
+
+		// ⛔ THE CONTROL ON THE CONTROL: if the floor computed NO criteria, every assertion below would pass
+		// against two empty lists — the shape that makes a green test mean nothing.
+		expect(expected.length, 'the floor computed no criteria at all, so this proves nothing').toBeGreaterThan(
+			0
+		);
+
+		const recorded = eng
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+			.map((e) => e.payload as { criterionId: string; result: string })
+			.map((p) => `${p.criterionId}=${p.result}`)
+			.sort();
+
+		expect(recorded, 'a criterion the floor judged did not reach the governed stream').toEqual(expected);
+
+		// ⭑ AND THE STAKES ARE NOT IN THE PAYLOAD (`R25`). `FloorCriterion` carries `mandatory`, derived from
+		// the policy's `severityIfNotMet`. Sending it would let the judged party declare how bad its own
+		// failure is; a reader must re-derive it from the policy every time.
+		const keys = new Set(
+			eng
+				.readAllEvents()
+				.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+				.flatMap((e) => Object.keys(e.payload as Record<string, unknown>))
+		);
+		// ⚠ A SUBSET CHECK, NOT AN EQUALITY, AND THE FIRST DRAFT GOT THAT WRONG. It asserted exactly three
+		// keys and reddened on `rationale` — which the Reasoning Review legitimately supplies from the
+		// reviewer's own statement even on a CLEAN run. So the optional field is genuinely exercised here,
+		// and the claim worth asserting is about what must NEVER appear, not about an exact shape.
+		expect([...keys].sort(), 'the payload grew a field the vocabulary does not declare').toEqual(
+			[...keys].filter((k) => ['assessmentId', 'criterionId', 'result', 'rationale'].includes(k)).sort()
+		);
+		expect(keys.has('mandatory'), 'the judged party is declaring its own stakes (R25)').toBe(false);
+		expect(keys.has('outcome'), 'the kernel spelling leaked past the boundary rename').toBe(false);
+	});
+
+	it('⛔ a FAILED criterion crosses the boundary with its outcome intact, which is what used to be lost', async () => {
+		// A clean run records nine MET results, and a recorder that hardcoded MET would pass the test above.
+		// This is the arrangement that tells them apart: `FS-01-schema` genuinely fails, and its NOT_MET
+		// must arrive as NOT_MET. ⭑ The observation carrying the same failure is asserted separately below —
+		// observations come only from failures, which is precisely why they could never carry the MET results.
+		const { eng } = await runAndRecord({
+			...goodCtx,
+			schemaInvariant: { schemaValid: false, invariantViolations: [] }
+		});
+
+		const results = eng
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+			.map((e) => e.payload as { criterionId: string; result: string });
+
+		const schemaCriterion = results.find((p) => p.criterionId === 'FS-01-schema');
+		expect(schemaCriterion?.result, 'the failing criterion did not reach the stream as failing').toBe(
+			'NOT_MET'
+		);
+		// ⭐ AND THE REST ARE NOT COLLATERALLY FAILED — a recorder that wrote one outcome for the whole
+		// assessment would satisfy the line above and destroy the per-criterion detail this increment exists
+		// to preserve.
+		expect(
+			results.filter((p) => p.result === 'MET').length,
+			'every criterion took the failing one\u2019s outcome, so nothing per-criterion survived'
+		).toBeGreaterThan(0);
+	});
+
 	it('a schema failure records a REJECTED assessment + an observation carrying the specific finding code', async () => {
 		const { eng, plan } = await runAndRecord({
 			...goodCtx,

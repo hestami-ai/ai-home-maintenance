@@ -2146,6 +2146,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'RPH-ASR-005 record from the disposition side, seen here from the COVERAGE side. A policy declaring five ' +
 			'BLOCKING criteria is completed by a validator result answering four, and the assessment advances to ' +
 			'SATISFIED with `completedAt` written. So a PARTIAL validator result mutates authoritative state, which ' +
+			'\u2b50 CHANGED 2026-09-20 (JAN-CRITREAD L3), AND THE CHANGE MOVES THE REMEDY RATHER THAN THE ROW. ' +
+			'Criterion results now REACH the governed stream: \u00a732\u2019s `recordCriterionResult` is built and the floor ' +
+			'dispatches one per computed criterion, emitting the ratified \u00a731 `AssuranceCriterionEvaluated`. What ' +
+			'this gate reads is `validatorResult.claimResults`, which is UNCHANGED and still `[]` at every ' +
+			'production site. \u26d4 So the rule stays UNENFORCED, and the reason is now precise: what is missing is ' +
+			'a READER, not a producer. The arrangement below is unaffected and still admitted. ' +
+			'\u26a0 AND THE GATE CANNOT SIMPLY BE POINTED AT `claimResults` EITHER: the floor reaches SATISFIED with ' +
+			'`claimResults: []` over all-mandatory criteria, so a coverage gate on that field would refuse the ' +
+			'floor\u2019s own success path (REG-F-420). The reader must fold the recorded events. ' +
 			'is the precise consequent DOC-003 forbids. The rule names "the Assurance Service" as the rejecting ' +
 			'actor and REG-F-007 records that no such component exists.',
 		guard: {
