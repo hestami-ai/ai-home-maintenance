@@ -499,7 +499,22 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// *a ruling changed what an arrangement MEANT, and nothing re-read the arrangements* — the `R26` commit
 			// touched seven files and no fixture among them. That is a general hazard about rulings, not a local
 			// defect about tests, and it belongs in its own entry where the next ruling's author will find it.
-		).toBe(45);
+			//
+			// 45 -> 46 (2026-09-20): `ROADMAP-the-criterion-results-nobody-reads.md` (`JAN-CRITREAD`). ⭑ THE
+			// SUBSUMPTION QUESTION HAS A DIFFERENT SHAPE AGAIN: the nearest claimant is not a roadmap but the
+			// ENFORCEMENT REGISTER, which already carries all three rules as rows.
+			//   · `RPH-ASR-004`/`005`/`CON-005` are registered `UNENFORCED_DISCLOSED` with driven admissions. ⛔ A
+			//     register ROW is a disposition, not a plan: it records that a rule is unenforced and why, and it
+			//     has no place to sequence the work, name predicted reds, or bound a partial remedy. Folding the
+			//     plan into the row would put a roadmap inside an append-only ledger.
+			//   · `JAN-EXEC` Phase 7c carries `R26`, which closed the FLOOR limb of exactly this defect. Refused for
+			//     `REG-D-066`'s reason, now measured a second time: the ruling's own programme is the worst place to
+			//     record what the ruling did NOT reach.
+			// ⭐ AND ASKING PRODUCED THE DECOMPOSITION THAT IS THIS DESIGN'S WHOLE VALUE. Asking *which roadmap
+			// already owns this* forced reading all three rows together — and the three turn out to be ONE absence
+			// seen from three sides, of which only the floor-path third needs a ratification. I had costed it as a
+			// single contract change plus a ruling; it is three limbs and two of them need neither.
+		).toBe(46);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
