@@ -36153,13 +36153,44 @@ model answers that fast. A model writing a risk assessment does not.
 
 ⭐ **THIS IS THIS REPOSITORY'S OWN RECURRING CLASS, ONE PLANE DOWN: AN ABSENCE READ AS A VALUE.** `REG-F-409`
 is the same defect in the assurance plane — a criterion nobody evaluated scored `MET` — and `R26` was ruled to
-close it. This is its twin on the execution plane: **a turn nobody took scored as a turn that went badly.** The
-`ExchangeParseOutcome` vocabulary has no member for *"there was no answer to coerce"*, exactly as
-`CriterionOutcome` had no reachable `UNABLE_TO_DETERMINE`.
+close it. This is its twin on the execution plane: **a turn nobody took scored as a turn that went badly.**
 
-⚠ **AND THE ASYMMETRY IS THE TELL.** `observedToolCalls` on the same record gets this right — it distinguishes
-`NONE_OBSERVED` (*"this adapter observes tool calls and observed none"*) from `NOT_OBSERVABLE` (*"nothing was
-in a position to look"*), and says so in the record. The answer half has no such distinction available.
+⛔⛔ **CORRECTED 2026-09-20, BEFORE ANY DESIGN WORK RESTED ON IT.** This entry originally continued:
+~~"The `ExchangeParseOutcome` vocabulary has no member for *“there was no answer to coerce”*, exactly as
+`CriterionOutcome` had no reachable `UNABLE_TO_DETERMINE`."~~ **That is FALSE, and I filed it without
+grepping for it.** The vocabulary has carried `EMPTY_RESPONSE` all along
+(`packages/rph-contracts/src/objects.ts:294`), and `MODEL_EXCHANGE.disposition` has carried `NO_RESPONSE`
+(`objects.ts:1025`). ⭑ This is the repository’s standing rule about absence claims applied to me: *“not
+defined” is a claim about MY SEARCH*, and the cost of getting it wrong here would have been a design
+programme to add two members that already exist.
+
+⭐⭐ **AND THE TRUE FINDING IS SHARPER THAN THE ONE I FILED.** `EMPTY_RESPONSE` is not merely present — it is
+**already produced, correctly, one plane over**. `reasoning-review-validator.ts:305` classifies a reviewer
+that returns nothing as `EMPTY_RESPONSE` / *“The model returned no bytes at all”*, and its docblock states
+the exact argument this finding needs:
+
+> *“THE THREE FAULTS HAVE THREE DIFFERENT REMEDIES … an empty response is an INFRASTRUCTURE OR BUDGET
+> problem, prose is a PROMPT problem, and well-formed JSON of the wrong shape is a CONTRACT problem.
+> Collapsing them loses the only thing the record was kept for.”*
+
+⛔ **SO THE ASSURANCE PLANE ASKS “DID THE MODEL RETURN NO BYTES?” FIRST, AND THE EXECUTION PLANE NEVER ASKS
+IT AT ALL.** `run-model-step.ts` has exactly two arms: a `catch` that records `NOT_ATTEMPTED` /
+`disposition: rejected` when the call THROWS, and a success path that hardcodes `disposition: 'accepted'`
+and delegates E-5 to `describeWorkProductDerivation(envelope)` — which sees only the ENVELOPE, never the raw
+answer, and can therefore return only `PARSED` or `SCHEMA_COERCION_FAILED`. **A call that returns holding
+nothing falls down the success path.** The defect is not a missing member; it is a classifier that was
+never given the input it needed and a disposition that was never derived.
+
+⚠ **NEITHER MEMBER HAS A SINGLE TEST.** `EMPTY_RESPONSE` and `NO_RESPONSE` appear in no `*.test.ts` in this
+repository — so even the assurance plane’s correct behaviour is unguarded, and `NO_RESPONSE` is currently
+reachable only as a FALLBACK for an absent disposition (`exchange-recorder.ts:222`), never as a decision.
+That is why this is filed as a CLASS: the right instrument exists, is right, is used in one place, and is
+pinned nowhere.
+
+⚠ **AND THE ASYMMETRY IS STILL THE TELL, one field over.** `observedToolCalls` on the same record
+distinguishes `NONE_OBSERVED` (*“this adapter observes tool calls and observed none”*) from `NOT_OBSERVABLE`
+(*“nothing was in a position to look”*) and says which it means. The answer half HAS the vocabulary to draw
+the same distinction and does not draw it.
 
 ⛔ **THE SCOPE IS NOT ONE ADAPTER.** `pi-executor.ts` is where it was measured, but the shape — accumulate
 deltas, return the accumulator, let a downstream parser interpret emptiness — is the shape of every adapter
