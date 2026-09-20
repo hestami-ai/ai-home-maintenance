@@ -66,18 +66,19 @@ const judgement = (findings: ReasoningReviewJudgement['findings']): ReasoningRev
 const outcomeOf = (result: { criteria: readonly { criterionId: string; outcome: string }[] }, id: string) =>
 	result.criteria.find((c) => c.criterionId === id)?.outcome;
 
-describe('⛔ R25 — what the reviewer’s report CANNOT say, and the rule that therefore cannot fire', () => {
-	// ⛔ MY HYPOTHESIS WAS REFUTED BY THE EXISTING SUITE, AND THE REVERSAL IS THE POINT OF THIS BLOCK.
+describe('⭐ R26 — absence means the reviewer did not judge it; a pass must be SAID', () => {
+	// ⭐⭐ THIS BLOCK REPLACES A DISCLOSURE THAT WAS WRITTEN TO GO RED ON EXACTLY THIS CHANGE, AND DID.
 	//
-	// I asserted that a criterion the reviewer never mentioned was being wrongly scored MET, and changed the
-	// mapper to report it UNABLE_TO_DETERMINE. TWELVE EXISTING TESTS WENT RED — one named *"maps each failure
-	// class to a mandatory criterion (MET iff absent)"* — and the contract states it at the type:
-	// `ReasoningReviewFinding.failed` is documented *"True = the failure class IS present"*.
+	// Yesterday it asserted the gap and said so in terms: *"when the contract gains a way to say what was
+	// evaluated, this test must go red and be rewritten. Its failure is the signal that the gap closed."* It
+	// failed on the first run after `R26`. ⭑ A disclosure test that reddens on its own remedy is the only kind
+	// worth writing — the alternative is prose that silently stops being true.
 	//
-	// ⭑ THE REVIEWER REPORTS FAILURE CLASSES. An absent finding is a POSITIVE STATEMENT that the failure did not
-	// occur, not silence about the criterion. MET is correct, and my change would have made every clean review
-	// INCONCLUSIVE — a refusal that looks like rigour and stops all work.
-	it('⭑ a criterion with no finding against it is MET — because a finding IS a failure report', () => {
+	// ⚠ AND THE ROUTE TO GETTING HERE WAS NOT STRAIGHT. I first claimed the contract COULD NOT express
+	// non-evaluation and was refuted by twelve tests; the truth is that `failed` is a boolean, a `failed: false`
+	// row is an explicit clean verdict, the live prompt already asks for one per criterion, and THIS MAPPER threw
+	// the distinction away. The remedy was two lines; finding out which two took a day and a reversal.
+	it('⛔ a criterion the reviewer did not mention is UNABLE_TO_DETERMINE, not MET', () => {
 		const result = reasoningReviewResultFromJudgement(
 			SUBJECT,
 			EVALUATOR,
@@ -86,22 +87,14 @@ describe('⛔ R25 — what the reviewer’s report CANNOT say, and the rule that
 			[criterion('TA-01', 'BLOCKING'), criterion('TA-02', 'BLOCKING')]
 		);
 		expect(outcomeOf(result, 'TA-01'), 'faulted').toBe('NOT_MET');
-		expect(outcomeOf(result, 'TA-02'), 'not faulted, therefore met — this is the contract').toBe('MET');
+		expect(outcomeOf(result, 'TA-02'), 'never mentioned — so never judged').toBe('UNABLE_TO_DETERMINE');
 	});
 
-	// ⛔ THE RESIDUE, PINNED SO IT CANNOT CHANGE SILENTLY — AND THIS TEST ASSERTS A GAP, NOT A GUARANTEE.
-	it('⛔ DISCLOSURE — a reviewer that engaged with NOTHING is indistinguishable from one that found nothing', () => {
-		// ⚠ READ THIS AS A FILED DEFECT WITH A TEST, NOT AS A BLESSING. The judgement shape carries only FAULTS,
-		// so `{ findings: [] }` is emitted both by a reviewer that evaluated every criterion and passed them all
-		// and by one that never engaged. They are the same value and nothing downstream can tell them apart.
-		//
-		// ⛔ THE CONSEQUENCE IS THAT A RATIFIED RULE CANNOT FIRE. `dispositionFromFindings` returns INCONCLUSIVE
-		// for a mandatory `UNABLE_TO_DETERMINE` and its docblock says *"never a pass"* — and no production path
-		// emits that value, because this mapper has no input that means "not evaluated". `RPH-ASR-005` is
-		// implemented and unreachable. Filed as `REG-F-407`.
-		//
-		// ⭐ WHEN THE CONTRACT GAINS A WAY TO SAY WHAT WAS EVALUATED, THIS TEST MUST GO RED AND BE REWRITTEN. Its
-		// failure is the signal that the gap closed; leaving it green afterwards would be the fiction.
+	it('⭐ a reviewer that judged NOTHING can no longer compose to SATISFIED', () => {
+		// ⛔ THIS IS THE DEFECT `REG-F-409` MEASURED, CLOSED AT THE MAPPER. A review that addressed no criterion
+		// used to produce a record in which every criterion read PASSED, and the floor opened the publish gate on
+		// it. `dispositionFromFindings`'s mandatory-undetermined rule — built, correct, and unreachable until now
+		// — finally fires.
 		const unengaged = reasoningReviewResultFromJudgement(
 			SUBJECT,
 			EVALUATOR,
@@ -109,27 +102,21 @@ describe('⛔ R25 — what the reviewer’s report CANNOT say, and the rule that
 			judgement([]),
 			[criterion('TA-01', 'BLOCKING'), criterion('TA-08', 'BLOCKING')]
 		);
-		expect(unengaged.criteria.every((c) => c.outcome === 'MET'), 'every criterion reads as passed').toBe(
-			true
-		);
-		expect(
-			unengaged.criteria.some((c) => c.outcome === 'UNABLE_TO_DETERMINE'),
-			'the ratified value for \u201ccould not determine\u201d is emitted by no production path'
-		).toBe(false);
+		expect(unengaged.criteria.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')).toBe(true);
 		expect(
 			dispositionFromFindings({ findings: [], criteria: unengaged.criteria }),
-			'so a review that judged nothing still composes to SATISFIED \u2014 the gap, stated'
-		).toBe('SATISFIED');
+			'never a pass'
+		).toBe('INCONCLUSIVE');
 	});
 
-	it('⭑ CONTROL — an explicitly passed criterion is MET and composes to SATISFIED', () => {
-		// Without this the disclosure above is satisfied by a mapper that answers MET unconditionally, which
-		// would hide a genuine NOT_MET as easily as it hides a non-evaluation.
+	it('⭑ CONTROL — a reviewer that SAYS a criterion is clean still reaches SATISFIED', () => {
+		// ⚠ WITHOUT THIS, THE TWO ABOVE ARE SATISFIED BY A MAPPER THAT ANSWERS UNDETERMINED UNCONDITIONALLY —
+		// which would make every review inconclusive forever, the exact trap I fell into and reverted a day ago.
 		const result = reasoningReviewResultFromJudgement(
 			SUBJECT,
 			EVALUATOR,
 			'test.reviewer',
-			judgement([{ criterionId: 'TA-01', failed: false, statement: 'traced' }]),
+			judgement([{ criterionId: 'TA-01', failed: false, statement: 'evaluated, clean' }]),
 			[criterion('TA-01', 'BLOCKING')]
 		);
 		expect(outcomeOf(result, 'TA-01')).toBe('MET');

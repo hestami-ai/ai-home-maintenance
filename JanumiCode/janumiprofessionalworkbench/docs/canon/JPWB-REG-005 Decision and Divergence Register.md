@@ -35959,13 +35959,18 @@ it fixable; nothing had reported it because nothing had run it.
 and its docblock states it in terms: *"UNABLE_TO_DETERMINE on a mandatory criterion is INCONCLUSIVE (never a
 pass)."* That is `RPH-ASR-005`, implemented and correct.
 
-⛔ **AND NO PRODUCTION PATH EMITS THAT VALUE.** `reasoningReviewResultFromJudgement` is the only mapper from a
-reviewer's judgement onto criterion outcomes, and its input cannot express non-evaluation:
-`ReasoningReviewJudgement` carries `findings` only, and `ReasoningReviewFinding.failed` is documented *"True =
-the failure class IS present."* A reviewer that evaluated all eight criteria and found nothing, and a reviewer
-that engaged with nothing at all, both emit `{ findings: [] }`. **They are the same value.** So the mapper has no
-input meaning "not evaluated" and therefore no output meaning it, and a review that judged nothing composes to
-`SATISFIED`.
+~~⛔ AND NO PRODUCTION PATH EMITS THAT VALUE … its input cannot express non-evaluation … a reviewer that evaluated all eight criteria and one that engaged with nothing both emit `{ findings: [] }`.~~
+
+⛔ **STRUCK 2026-09-20 — WRONG IN TWO WAYS, AND WEAKER THAN THE TRUTH. Measured, not re-read.**
+
+1. **THE CONTRACT CAN ALREADY EXPRESS IT.** `ReasoningReviewFinding.failed` is a BOOLEAN, so a `failed: false` entry is an explicit *“I evaluated this criterion and it is clean”*. The live prompt already asks for exactly that — *“Evaluate EACH derivational-integrity failure class below”* — and its output example literally shows `“failed”:false` (`reasoning-review-validator.ts:220`, `:232`). ⭑ **The information is asked for, and the wire shape carries it.** What destroys it is ONE LINE downstream: `outcome: f?.failed ? ‘NOT_MET’ : ‘MET’` (`validators.ts:311`) reads *absent* and *present-with-`failed:false`* as the same thing. The defect is a DISCARDED distinction, not an inexpressible one — which makes the remedy smaller and its absence harder to excuse.
+2. **“ALL EIGHT CRITERIA” IS A MISCOUNT.** The Reasoning Review policy declares **nine**, `RR-01` … `RR-09` — verified by loading the built floor-policy definitions, not by reading.
+
+⚠ **AND THE SCOPE CLAIM NEEDS BOUNDING.** Closing this closes the FLOOR path only. The enforcement register records `RPH-ASR-005` as `UNENFORCED_DISCLOSED` for an INDEPENDENT reason — *“`completeAssuranceAssessment` never reads criterion RESULTS at all”* (`enforcement-register.ts:1289-1298`) — which is the COMMAND path. Two separate reasons the ratified rule cannot fire; this entry names one. Scoping the remedy as *“this closes `RPH-ASR-005`”* would be wrong by half.
+
+⛔ **MY PROPOSED REMEDY WAS ALSO REFUTED.** I suggested routing *“the reviewer did not say what it evaluated”* through `executionFailed` / `VALIDATOR_EXECUTION_FAILED`. An answering-but-malformed reviewer DID execute; that path is named INFRASTRUCTURE FAILURE by `RPH-ASR-006`, and it would additionally record a spurious `INDEPENDENCE_VIOLATION` at severity BLOCKING carrying the execution-failure reason string. `BOUNDARY_REJECTED` (remediation `CHANGE_REVIEWER`) is the class that fits.
+
+⭐ **THE SHARPER FORM IS FILED AS `REG-F-409`**: what this entry calls a rule that cannot fire is, measured, a floor reporting itself satisfied over a rubric it examined less than half of — in the gate, today.
 
 ⚠ **THE DIAGNOSIS I FILED FIRST WAS WRONG, AND THE CORRECTION IS THE USEFUL PART.** I asserted the mapper was
 mis-scoring silence as `MET` and changed it to report `UNABLE_TO_DETERMINE`. **Twelve existing tests went red** —
@@ -36020,3 +36025,90 @@ carrying the policy's stakes, not the reviewer's estimate of them.
 declared severity to prefer, so the reviewer's own value is kept rather than the finding dropped. A reviewer
 could therefore reach the old behaviour by naming an undeclared id — a weaker bypass, since it forfeits the
 criterion result entirely, but not nothing. Recorded here rather than left for a reader to find.
+
+
+---
+
+### REG-F-409 — the mandatory Reasoning Review floor passes the gate having evaluated FOUR of its NINE ratified criteria, and the other five are recorded as met
+
+- **Date:** 2026-09-20 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a control reporting itself satisfied over
+  a rubric it never examined** · **Status:** ⚠ **OPEN** — measured and filed; the remedy is a fork that needs a
+  ruling and is NOT taken here.
+
+**THE MEASUREMENT.** The Reasoning Review policy declares nine criteria, `RR-01` … `RR-09`. The deterministic
+reviewer the GATE runs — `mock-reasoning-review-validator.ts` — can fault exactly **four**:
+
+| evaluated by the fixture | never mentioned by it |
+|---|---|
+| `RR-01-no-problem-substitution` · `RR-04-no-proxy-satisfaction` · `RR-07-no-contradiction` · `RR-09-no-completeness-from-existence` | `RR-02-no-obligation-elision` · `RR-03-no-unjustified-scope-reduction` · `RR-05-no-premature-convergence` · `RR-06-sound-inference` · `RR-08-evidence-integrity` |
+
+⛔ **AND BECAUSE ABSENCE READS AS MET, THOSE FIVE ARE RECORDED AS PASSED ON EVERY GATED RUN.**
+`outcome: f?.failed ? 'NOT_MET' : 'MET'` (`validators.ts:311`) maps *no finding for this criterion* to `MET`, so
+the composed floor is SATISFIED and the publish gate opens.
+
+⚠ **THIS IS NOT `REG-F-407`'s CLAIM AND IS STRONGER.** That entry says a ratified rule cannot fire. This says a
+mandatory control **is passing, now, in CI, over a rubric it examined less than half of** — and the shortfall is
+not a property of the criteria but of the fixture standing in for a reviewer.
+
+⭑ **THE FIXTURE IS NOT AT FAULT FOR BEING A FIXTURE.** A deterministic stand-in cannot judge *“no premature
+convergence”* or *“sound inference”*, and code pretending otherwise would be worse. The defect is that the
+arrangement CANNOT SAY SO: with absence meaning `MET`, a fixture that evaluated four criteria and a reviewer
+that evaluated all nine produce byte-identical records.
+
+⛔ **THE REMEDY IS A FORK, NOT A PATCH — WHICH IS WHY THIS IS FILED RATHER THAN FIXED.** Making absence mean
+*“not evaluated”* is a two-line change, and it turns the gate's floor INCONCLUSIVE — correctly, because the
+fixture genuinely does not evaluate five criteria. Every option then costs something real: a deterministic
+fixture cannot honestly acquire the five; `NOT_APPLICABLE` is foreclosed because every Reasoning Review
+criterion is seeded `mayBeNotApplicable: false`; and accepting an INCONCLUSIVE floor in the gate would retire
+*“no publish without a satisfied floor”*. The choice belongs to the sponsor.
+
+⚠ **AND THE LIVE HALF IS UNMEASURED.** Whether a real reviewer model returns one row per criterion, and how
+often, is recorded nowhere in this repository — searched both directions; the only live-behaviour findings are
+about the PRODUCER, not the reviewer. Driving it needs the paid live lane and a pinned judge model.
+
+**⭐⭐ THE EVIDENCE: ELEVEN TESTS, MEASURED AFTER CLOSING THE DISCARD (`R26`, 2026-09-20).**
+
+The remedy is two lines — the mapper stops collapsing *absent* into `MET`, and the fixture declares the criteria
+each arm examined. Driven, the result is **11 failures, 908 passes**, and ⛔ **every one of the eleven is a test
+asserting that a floor it never earned was SATISFIED.** None is collateral. This table is the finding's
+evidence, because a defect that costs nothing to fix is not a defect anyone believes.
+
+| # | file | the assertion that fails | what it now reports |
+|---|---|---|---|
+| 1 | `rph-assurance/src/validators.test.ts` | *all floor validators present + clean → aggregate SATISFIED, gate OPEN* | `expected 'INCONCLUSIVE' to be 'SATISFIED'` |
+| 2 | `rph-engine/src/floor-execution-plane.test.ts` | *records the same floor over an EXECUTION-plane work product as over a PWA* | gate closed |
+| 3 | `rph-engine/src/floor-gate.test.ts` | *an AGENT PWA is blocked until the real recorded floor is SATISFIED, then publishes* | it never publishes |
+| 4 | `rph-engine/src/record-assurance.test.ts` | *a fully-satisfied floor records one SATISFIED assessment per policy* | no such floor exists |
+| 5 | `rph-engine/src/record-assurance.test.ts` | *a schema failure records a REJECTED assessment + its finding code* | `expected 'INCONCLUSIVE' to be 'SATISFIED'` on the OTHER policy in the same plan |
+| 6 | `apps/rph-demo/.../reasoning-review-validator.test.ts` | *reaches a VALID Assessment with all volunteered reasoning material withheld (the ablation)* | not valid |
+| 7 | `apps/rph-demo/.../evidence-join.test.ts` | *three commands become THREE evidence objects, each with its own SATISFIED floor* | none satisfied |
+| 8 | `apps/rph-demo/.../evidence-join.test.ts` | *and the refusal NAMES the evidence id and the command it ran* | ⭐ *the run that PASSED must not appear in a refusal* — it now does |
+| 9 | `apps/rph-demo/.../process-result-floor.test.ts` | *A COMMAND RESULT THE HOST WATCHED COMPLETE SATISFIES THE FLOOR — the phase turns on this* | it does not |
+| 10 | `apps/rph-demo/.../work-product-floor-run.test.ts` | *a substantive work product SATISFIES the floor* | it does not |
+| 11 | `apps/rph-demo/.../work-product-floor-run.test.ts` | *a producer whose model DIFFERS from the reviewer is assured* | it is not |
+
+⭑ **READ THE SPREAD, NOT THE COUNT.** The eleven land on the PWA floor, the execution-plane floor, the publish
+gate, the canonical recorder, the reasoning-review validator, the evidence join, the process-result floor and
+the work-product floor — **every place in the product where a reasoning review is claimed satisfied.** That is
+the true reach of the defect: not one fixture's shortfall, but every downstream claim that rested on it.
+
+⚠ **#8 IS THE ONE TO READ TWICE.** Its message is *\"the run that PASSED must not appear in a refusal\"* — and
+after the change it does, because the run's own floor is now inconclusive. The refusal text was correct; what
+was false was the pass it distinguished itself from.
+
+⛔ **THREE TESTS WERE CORRECTED RATHER THAN LEFT RED, AND THE DISTINCTION IS DELIBERATE.** They asserted the
+OLD MAPPER CONTRACT (*\"MET iff absent\"*), which `R26` changed by ruling — correcting them is following the
+ruling, not weakening a guard. The eleven above assert FLOOR SATISFACTION, which the product genuinely no longer
+achieves, and they stay red.
+
+⭐ **AND ONE OF THE CORRECTED THREE WAS WRITTEN TO DIE HERE.** `REG-F-407`'s disclosure test carried its own
+instruction: *\"when the contract gains a way to say what was evaluated, this test must go red and be rewritten.
+Its failure is the signal that the gap closed.\"* It failed on the first run after `R26`. A disclosure that
+reddens on its own remedy is the only kind worth writing; the alternative is prose that quietly stops being
+true.
+
+**STATUS OF THE LANE.** The change is committed to `jan-exec/phase7c` and **NOT merged to main**: `gate:fast`
+stays RED until the five judgement criteria — `RR-02-no-obligation-elision`,
+`RR-03-no-unjustified-scope-reduction`, `RR-05-no-premature-convergence`, `RR-06-sound-inference`,
+`RR-08-evidence-integrity` — are evaluated by a real reviewer or deliberately scoped out. That is the sponsor's
+ruling (`R26`, 2026-09-20) and the cost was named when it was made.

@@ -302,13 +302,23 @@ export function reasoningReviewResultFromJudgement(
 			// the failure did not occur. MET is correct, and the change would have made every clean review
 			// INCONCLUSIVE — a refusal that looks like rigour and stops all work.
 			//
-			// ⚠ WHAT SURVIVES AS A REAL RESIDUE, RECORDED RATHER THAN FIXED: this shape cannot distinguish a reviewer
+			// ⚠ WHAT SURVIVES AS A REAL RESIDUE — AND THE SHAPE IS NOT THE PROBLEM, WHICH I HAD WRONG. `failed` is
+			// a BOOLEAN, so a `failed: false` row already says *"I evaluated this and it is clean"*, and the live
+			// prompt asks for exactly that (*"Evaluate EACH derivational-integrity failure class below"*) with an
+			// example showing `"failed":false`. THIS LINE is what discards it: absent and present-with-false
+			// collapse to one `MET`. ⛔ MEASURED CONSEQUENCE (`REG-F-409`): the deterministic fixture the GATE runs
+			// faults only FOUR of this policy's NINE criteria, so five are recorded PASSED on every gated run.
+			// ⚠ The residue restated correctly: this shape cannot distinguish a reviewer
 			// that evaluated every criterion and found nothing from one that engaged with nothing and returned an
 			// empty finding list. Both are CLEAN here. So the ratified outcome value for "could not determine" is
 			// emitted by NO production path, and `dispositionFromFindings`'s mandatory-undetermined rule — *"never a
 			// pass"* — cannot fire. ⛔ THE REMEDY IS A CONTRACT CHANGE (the judgement would have to say what it
 			// EVALUATED, not only what it FAULTED), not a re-reading of this line. Filed as `REG-F-407`.
-			outcome: f?.failed ? 'NOT_MET' : 'MET',
+			// ⭐⭐ THREE-WAY (`JAN-EXEC` `R26`). A reviewer's report distinguishes three things and this line used
+			// to carry two: faulted, evaluated-and-clean, and NOT EVALUATED. `failed` is a boolean, so a
+			// `failed: false` row is an explicit clean verdict — the live prompt asks for one per criterion and
+			// its example shows it — and ABSENCE is now what it always meant: the reviewer did not judge this.
+			outcome: f === undefined ? 'UNABLE_TO_DETERMINE' : f.failed ? 'NOT_MET' : 'MET',
 			...(f?.statement ? { rationale: f.statement } : {})
 		};
 	});

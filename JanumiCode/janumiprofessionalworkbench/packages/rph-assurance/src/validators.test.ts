@@ -65,7 +65,10 @@ function mockReasoningReview(j: ReasoningReviewJudgement, evaluator: Identity = 
 const CLEAN: ReasoningReviewJudgement = { findings: [], recommendation: 'SATISFIED' };
 
 describe('reasoningReviewResultFromJudgement — judgement → schema-conformant ValidatorResult', () => {
-	it('maps each failure class to a mandatory criterion (MET iff absent) + open observations', () => {
+	// ⭐ RENAMED AND RE-ASSERTED FOR `R26`. This read *“MET iff absent”* — the contract that made a
+	// criterion the reviewer never mentioned read as PASSED. Absence now means the reviewer did not judge
+	// it, which is what `UNABLE_TO_DETERMINE` is for; a clean verdict must be SAID (`failed: false`).
+	it('maps each judged failure class to a criterion; UNJUDGED classes are UNABLE_TO_DETERMINE', () => {
 		const r = reasoningReviewResultFromJudgement(
 			subject,
 			GEMINI,
@@ -87,7 +90,25 @@ describe('reasoningReviewResultFromJudgement — judgement → schema-conformant
 		expect(
 			r.criteria.find((c) => c.criterionId === 'RR-05-no-premature-convergence')?.outcome
 		).toBe('NOT_MET');
+		// ⛔ THE JUDGEMENT SAID NOTHING ABOUT `RR-01`, SO THE RECORD SAYS NOTHING ABOUT IT EITHER. Before `R26`
+		// this asserted `MET` — a pass the reviewer never gave.
 		expect(r.criteria.find((c) => c.criterionId === 'RR-01-no-problem-substitution')?.outcome).toBe(
+			'UNABLE_TO_DETERMINE'
+		);
+		// ⭑ AND A CLEAN VERDICT STILL READS AS ONE when the reviewer actually gives it.
+		const said = reasoningReviewResultFromJudgement(
+			subject,
+			GEMINI,
+			'v1',
+			{
+				findings: [
+					{ criterionId: 'RR-01-no-problem-substitution', failed: false, statement: 'clean' }
+				],
+				recommendation: 'SATISFIED'
+			},
+			SEEDED_REASONING_REVIEW_CRITERIA
+		);
+		expect(said.criteria.find((c) => c.criterionId === 'RR-01-no-problem-substitution')?.outcome).toBe(
 			'MET'
 		);
 		expect(r.observations).toHaveLength(1);

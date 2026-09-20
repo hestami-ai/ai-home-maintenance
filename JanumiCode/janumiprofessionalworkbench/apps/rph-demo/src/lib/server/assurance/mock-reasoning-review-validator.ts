@@ -78,10 +78,54 @@ function judge(content: string): ReasoningReviewJudgement {
 	let recommendation: ReasoningReviewJudgement['recommendation'] = 'SATISFIED';
 	if (!report.valid) recommendation = 'REJECTED';
 	else if (findings.length > 0) recommendation = 'CONDITIONALLY_SATISFIED';
-	return { findings, recommendation };
+	// ⭐ TWO OF NINE, DECLARED. `report.valid` is the RR-09 check and `unusedOutputs` is the RR-04 check; this
+	// arm examines nothing else, and now says so rather than letting seven silences read as passes.
+	return {
+		findings: [...findings, ...alsoEvaluated(GRAPH_ARM_EVALUATES, findings)],
+		recommendation
+	};
 }
 
 /** Every string leaf in a parsed work product, so "it said nothing" and "it echoed the prompt" are decidable. */
+/** The criterion ids this fixture is able to examine at all — four of the policy's nine (`REG-F-409`). */
+const RR_SUBSTITUTION = 'RR-01-no-problem-substitution';
+const RR_PROXY = 'RR-04-no-proxy-satisfaction';
+const RR_CONTRADICTION = 'RR-07-no-contradiction';
+const RR_COMPLETENESS = 'RR-09-no-completeness-from-existence';
+/** Per ARM, because coverage is a property of the check that ran, not of the fixture as a whole. */
+const GRAPH_ARM_EVALUATES = [RR_COMPLETENESS, RR_PROXY] as const;
+const PROCESS_ARM_EVALUATES = [RR_PROXY, RR_CONTRADICTION] as const;
+
+/**
+ * ⭐⭐ THE CRITERIA THIS ARM ACTUALLY EVALUATED AND FOUND CLEAN (`JAN-EXEC` `R26`).
+ *
+ * ⛔ THIS FIXTURE FAULTS FOUR OF THE POLICY'S NINE CRITERIA AND USED TO SAY NOTHING ABOUT THE OTHER FIVE — and
+ * because absence read as `MET`, those five were RECORDED AS PASSED on every gated run. A mandatory control was
+ * reporting itself satisfied over a rubric it examined less than half of (`REG-F-409`).
+ *
+ * ⭑ THE FIXTURE IS NOT AT FAULT FOR BEING A FIXTURE. A deterministic check cannot judge *“sound inference”* or
+ * *“no premature convergence”*, and code pretending it could would be worse than the silence. What was wrong is
+ * that the silence was INDISTINGUISHABLE FROM A PASS. Each arm now names exactly the criteria it examined; the
+ * rest arrive `UNABLE_TO_DETERMINE`, and §28.2's ladder does the rest.
+ *
+ * ⚠ THE ARMS ALREADY SAID THIS IN PROSE — *“This review judged STRUCTURE only … it did not assess professional
+ * quality”* — in a `limitations` string no machine reads. The honesty existed and could not be acted on.
+ */
+function alsoEvaluated(
+	evaluated: readonly string[],
+	faulted: readonly ReasoningReviewFinding[]
+): ReasoningReviewFinding[] {
+	const faultedIds = new Set(faulted.map((f) => f.criterionId));
+	return evaluated
+		.filter((criterionId) => !faultedIds.has(criterionId))
+		.map((criterionId) => ({
+			criterionId,
+			failed: false,
+			statement:
+				'Evaluated by the deterministic fixture: this failure class is not present. Structural check only.'
+		}));
+}
+
 function stringLeaves(value: unknown, out: string[] = []): string[] {
 	if (typeof value === 'string') {
 		if (value.trim() !== '') out.push(value.trim());
@@ -145,10 +189,18 @@ function judgeWorkProduct(content: string, prompt: string): ReasoningReviewJudge
 			});
 	}
 
-	if (findings.length > 0) return { findings, recommendation: 'REJECTED' };
+	// ⭐ WHAT THIS ARM EXAMINED, AND IT IS BRANCH-DEPENDENT. `RR-04` is always checked; `RR-01` is only
+	// reachable when there were leaves to compare against the prompt — on an empty work product it is NOT
+	// evaluated, and claiming otherwise would be the fiction this change exists to remove.
+	const evaluated = leaves.length === 0 ? [RR_PROXY] : [RR_PROXY, RR_SUBSTITUTION];
+	if (findings.length > 0)
+		return {
+			findings: [...findings, ...alsoEvaluated(evaluated, findings)],
+			recommendation: 'REJECTED'
+		};
 
 	return {
-		findings: [],
+		findings: alsoEvaluated(evaluated, findings),
 		recommendation: 'SATISFIED',
 		// ⚠ THE LIMITATION IS NOT DECORATION — IT IS WHAT KEEPS THE WORD HONEST. Without it a shape check is
 		// recorded as a passed REASONING review. ASR-11 requires a valid result to identify its limitations,
@@ -217,10 +269,15 @@ function judgeProcessResult(
 			severity: 'BLOCKING'
 		});
 
-	if (findings.length > 0) return { findings, recommendation: 'REJECTED' };
+	// ⭐ TWO OF NINE, DECLARED — the empty-result check (`RR-04`) and the observation join (`RR-07`).
+	if (findings.length > 0)
+		return {
+			findings: [...findings, ...alsoEvaluated(PROCESS_ARM_EVALUATES, findings)],
+			recommendation: 'REJECTED'
+		};
 
 	return {
-		findings: [],
+		findings: alsoEvaluated(PROCESS_ARM_EVALUATES, findings),
 		recommendation: 'SATISFIED',
 		// ⚠ THE LIMITATION IS WHAT KEEPS THE WORD HONEST, exactly as in the work-product arm. Without it a
 		// two-limb structural join is recorded as a passed REASONING review over a build.

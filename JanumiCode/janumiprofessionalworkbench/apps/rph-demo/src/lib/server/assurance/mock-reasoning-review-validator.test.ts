@@ -217,3 +217,52 @@ describe('⭐ JAN-EXEC Phase 5 — the PROCESS_RESULT arm joins the agent\'s res
 		expect(r.dispositionRecommendation).toBe('INCONCLUSIVE');
 	});
 });
+
+// ── ⭐⭐ THE FIXTURE MAY DECLARE ONLY WHAT IT EXAMINED (`JAN-EXEC` `R26`, evidence in `REG-F-409`) ───────
+//
+// ⛔ THIS BLOCK EXISTS TO STOP A SPECIFIC, TEMPTING REPAIR THAT THE SPONSOR REJECTED BY NAME. With the mapper
+// now reading ABSENCE as `UNABLE_TO_DETERMINE`, the gate's floor is INCONCLUSIVE — correctly, because this
+// fixture faults four of the policy's nine criteria and evaluates only two per arm. The one-line way to make
+// the gate green again is to have the fixture claim it evaluated all nine. That is a fixture asserting work it
+// did not do, and it would BURY `REG-F-409` rather than close it.
+//
+// ⭑ A DETERMINISTIC CHECK CANNOT JUDGE *“sound inference”* OR *“no premature convergence”*. Nothing here is
+// asked to. What it is asked to do is say so, which is all this test enforces.
+describe('⛔ R26 — the deterministic fixture declares the criteria it examined, and no others', () => {
+	const ALL_NINE = REASONING_REVIEW_CRITERIA.map((c) => c.id);
+
+	it('⭐ the PWA-graph arm declares TWO of the policy\u2019s NINE, and stays silent on the rest', async () => {
+		const r = await judgeContent(VALID_GRAPH);
+		const declared = new Set(r.criteria.filter((c) => c.outcome !== 'UNABLE_TO_DETERMINE').map((c) => c.criterionId));
+		expect(ALL_NINE, 'precondition: the policy declares nine').toHaveLength(9);
+		expect(
+			[...declared].sort(),
+			'RR-09 is the well-formedness check and RR-04 the dead-end check; this arm runs no others'
+		).toEqual(['RR-04-no-proxy-satisfaction', 'RR-09-no-completeness-from-existence']);
+	});
+
+	it('⛔ and the seven it did not examine arrive UNABLE_TO_DETERMINE, never MET', async () => {
+		// ⚠ THE OBSERVABLE IS THE OUTCOME, NOT THE COUNT. Asserting “seven silences” would pass for a fixture
+		// that claimed all nine and then faulted seven — the opposite defect, and a worse record.
+		const r = await judgeContent(VALID_GRAPH);
+		const unjudged = r.criteria.filter((c) => c.outcome === 'UNABLE_TO_DETERMINE').map((c) => c.criterionId);
+		expect(unjudged.sort()).toEqual([
+			'RR-01-no-problem-substitution',
+			'RR-02-no-obligation-elision',
+			'RR-03-no-unjustified-scope-reduction',
+			'RR-05-no-premature-convergence',
+			'RR-06-sound-inference',
+			'RR-07-no-contradiction',
+			'RR-08-evidence-integrity'
+		]);
+		expect(
+			r.criteria.every((c) => c.outcome !== 'MET' || declaredByThisArm(c.criterionId)),
+			'no criterion may read MET unless this arm actually examined it'
+		).toBe(true);
+	});
+});
+
+/** The two this arm runs — spelled here so the assertion above cannot drift with the fixture silently. */
+function declaredByThisArm(id: string): boolean {
+	return id === 'RR-04-no-proxy-satisfaction' || id === 'RR-09-no-completeness-from-existence';
+}
