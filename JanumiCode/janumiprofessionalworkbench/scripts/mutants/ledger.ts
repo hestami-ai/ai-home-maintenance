@@ -6167,9 +6167,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// RUNS for an execution step — the record then takes the "nothing to separate" branch and asserts, in
 		// `volunteeredReasoningRef`'s own words, that this is *"an observed absence, not an unretained presence"*
 		// for a reply that demonstrably carried reasoning.
-		find: '\t\trawOutput: rawReply,',
+		// ⭐ RE-ANCHORED 2026-09-20 (`JAN-NOANS`, ledger rule #5 — in the commit that moved it).
+		// ⛔ THE OLD ANCHOR BECAME AMBIGUOUS BY SUBSTRING, NOT BY DUPLICATION. `JAN-NOANS`'s no-answer arm
+		// passes the same value one level deeper, and a THREE-tab line CONTAINS the two-tab anchor — which
+		// is precisely what rule #4 warns of when it says to anchor on CONTENT, without leading whitespace.
+		// ⭑ CONTENT ALONE IS NOT UNIQUE HERE EITHER (`rawOutput: rawReply,` now appears on both arms), so the
+		// anchor widens to the following line, which NAMES the arm: only the SUCCESS path dispositions
+		// `accepted`. The attack, the victim and the promise are all unchanged.
+		find: "rawOutput: rawReply,\n\t\tdisposition: 'accepted',",
 		replace:
-			'\t\trawOutput: answer, // MUTANT: the recorder is handed the value AFTER two coercions',
+			"rawOutput: answer, // MUTANT: the recorder is handed the value AFTER two coercions\n\t\tdisposition: 'accepted',",
 		expectRed: ['apps/rph-demo/src/lib/server/execution/run-model-step.test.ts'],
 		why: "PROMISE: Guide §9.7 as `captureTry` implements it — *\"where it arrives inline with the answer, separate it at retention so that only the answer span binds under Section 8.4\"* — with `REG-D-050` classifying the halves (answer RETAINED_BY_PARTICIPATION, volunteered reasoning PURGEABLE_AT_EXPIRY) and `REG-D-057` requiring the omission be DECLARED with enough structure to undo. WHO RELIES: every consumer of `MODEL_EXCHANGE`, retention (a purge of the reasoning half is impossible if it was never separated out), and any future replay — `DESIGN-undertaking-execution-sandbox.md` B4 measured a replay of the unfixed path reproducing a DIFFERENT run. WHAT THE MUTATION DOES TO THEM: `splitAnswerSpan` sees a value with no reasoning left in it, so `volunteered` is empty, `volunteeredReasoningRef` goes PENDING with the *\"observed absence\"* reason, `rawOutputBeforeCoercionRef` aliases the answer span, and `omittedRegions` stays empty — a governed record stating as measured fact something the STEP itself destroyed one line earlier. ⚠ IT IS NOT A BYTE-COUNT DEFECT: the record is internally consistent and looks complete, which is why no existing assertion outside this suite notices.",
 		source: "JAN-EXEC Phase 0 (ROADMAP-undertaking-execution-sandbox.md §2), unblocked by the sponsor's ruling of 2026-09-14"

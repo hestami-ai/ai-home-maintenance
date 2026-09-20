@@ -26,7 +26,7 @@ import {
 	SessionManager,
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
-import { executorModel } from './backing-tool.js';
+import { answerFromTurnEnd, executorModel } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
@@ -239,6 +239,20 @@ export async function openPiExecutionSession(
 		async turn(text: string): Promise<ToolInvocationResult> {
 			let answer = '';
 			let reasoning = '';
+			// ⭐⭐ `JAN-NOANS` — WHAT THE TURN ENDED AS, WHICH THIS ADAPTER IS THE ONLY PARTY IN A POSITION TO KNOW.
+			//
+			// ⛔ `REG-F-410`: a provider refused the configured model, `session.prompt` RESOLVED, no `text_delta`
+			// ever arrived, and this adapter returned `answerText: ''`. Downstream that became a PRODUCER
+			// shortfall — *"The answer is not a JSON object"* — an ACCEPTED try, a zero-byte artifact and nine
+			// CRITICAL findings against work that was never attempted. Every layer below was reasoning correctly
+			// from a fact this layer had and threw away.
+			//
+			// ⚠ `message_end` IS THE RIGHT ANCHOR AND `message_update` IS NOT, which is not obvious and cost a
+			// reading of the SDK to establish. `AssistantMessageEvent` HAS an `error` member, so
+			// `else if (e.type === 'error')` in the handler below looks correct — but `pi-agent-core`'s loop
+			// forwards only the nine streaming DELTAS as `message_update`, and routes BOTH `done` and `error`
+			// through `message_end`. That arm would never fire.
+			let ended: { readonly stopReason: string; readonly errorMessage?: string } | undefined;
 			const before = inputs.captured().length;
 			// ⭐ THE MARKER THAT MAKES THE OBSERVATION PER-TURN. The observer spans the whole SESSION (it must:
 			// Pi dispatches tool calls inside `prompt`, across an unknown number of provider round trips), and a
@@ -257,6 +271,15 @@ export async function openPiExecutionSession(
 				}
 				if (event.type === 'tool_execution_end') {
 					observer.ended(event.toolCallId, event.result, event.isError);
+					return;
+				}
+				// ⭐ THE TERMINAL FACT. `stopReason` is `'stop' | 'length' | 'toolUse' | 'error' | 'aborted'` and
+				// `errorMessage` carries the provider's own sentence. Read here and classified below, because a
+				// turn that ends in `error` must never be reported as a producer that chose to say nothing.
+				if (event.type === 'message_end') {
+					const m = event.message as { role?: string; stopReason?: string; errorMessage?: string };
+					if (m.role === 'assistant' && typeof m.stopReason === 'string')
+						ended = { stopReason: m.stopReason, ...(m.errorMessage ? { errorMessage: m.errorMessage } : {}) };
 					return;
 				}
 				if (event.type !== 'message_update') return;
@@ -288,8 +311,11 @@ export async function openPiExecutionSession(
 			const turnInputs = inputs.captured().slice(before);
 			const composite = turnInputs.at(-1)?.payload;
 
+			// ⭐⭐ `JAN-NOANS` — THE ANSWER, OR A STATED REASON THERE IS NONE.
+			const classified = answerFromTurnEnd(answer, ended);
+
 			return {
-				answerText: answer,
+				answer: classified,
 				...(reasoning ? { volunteeredReasoning: reasoning } : {}),
 				rawOutput: reasoning ? reasoning + answer : answer,
 				producer: {
@@ -316,11 +342,25 @@ export async function openPiExecutionSession(
 				// `NONE_OBSERVED` a MEASUREMENT rather than an absence: a reader learns both that nothing was
 				// called AND what there was to call. With a capability ungranted the list is shorter, and the
 				// record says so without anything having to describe the withholding in prose.
-				observedToolCalls: {
-					canObserve: true,
-					mintedToolNames,
-					calls: observer.since(callsBefore)
-				},
+				// ⛔⛔ AND IT STOPS CLAIMING A MEASUREMENT WHEN THE TURN NEVER REACHED A MODEL. `NONE_OBSERVED`
+				// renders as *"This adapter observes tool calls and observed none on this try … and the model
+				// called nothing on it."* On the `REG-F-410` path NO MODEL RAN, so that sentence is an absence
+				// wearing a measurement's words — the same defect as the answer half, in the field this
+				// repository cites as the one that got it right. A record cannot be consistent while one field
+				// says *"the model called nothing"* and the next says *"no model was invoked."*
+				//
+				// ⚠ THE TEST IS `CALL_FAILED`/`CALL_ABORTED`, NOT EMPTINESS. A model that ended its turn having
+				// said nothing DID run, and `NONE_OBSERVED` is a true and useful measurement about it.
+				observedToolCalls:
+					classified.arrived || classified.cause === 'ENDED_WITHOUT_ANSWER'
+						? { canObserve: true, mintedToolNames, calls: observer.since(callsBefore) }
+						: {
+								canObserve: false,
+								reason:
+									'The turn did not reach a model, so there was no model to observe using tools. ' +
+									'Reporting NONE_OBSERVED here would assert that a model was watched and called ' +
+									`nothing. The turn ended instead as: ${classified.cause}.`
+							},
 				...(composite === undefined ? {} : { materializedInput: JSON.stringify(composite) })
 			};
 		}

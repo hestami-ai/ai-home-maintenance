@@ -23,10 +23,17 @@ import type {
 } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { captureTry, createExchangeSink } from '../assurance/exchange-capture.js';
-import { isToolInvocationResult, type ToolInvocationResult } from '../tools/backing-tool.js';
+import {
+	answerFromText,
+	isToolInvocationResult,
+	type AdapterAnswer,
+	type ToolInvocationResult
+} from '../tools/backing-tool.js';
 import {
 	declareWorkProductDerivation,
 	describeWorkProductDerivation,
+	noAnswerOutcome,
+	noAnswerRefusal,
 	splitExecutionEnvelope
 } from './execution-contract.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
@@ -274,6 +281,8 @@ export async function runModelInvocationStep(
 	const sink = createExchangeSink();
 	const exchangeId = input.newId('exch');
 	const requestedAt = input.now();
+	/** ⭐ `JAN-NOANS` — the answer, OR a stated reason none arrived. Narrowed once, below. */
+	let adapterAnswer: AdapterAnswer;
 	let answer: string;
 	// ⭐⭐ E-2 WHOLE, AS IT ARRIVED — THE ONE VALUE THE RECORDER MUST NOT BE HANDED ALREADY REDUCED.
 	//
@@ -296,10 +305,13 @@ export async function runModelInvocationStep(
 		const returned = await input.session.turn(turnText);
 		if (isToolInvocationResult(returned)) {
 			produced = returned;
-			answer = returned.answerText;
+			adapterAnswer = returned.answer;
 			rawReply = returned.rawOutput;
 		} else {
-			answer = returned;
+			// ⭐ `JAN-NOANS` — A BARE STRING IS STILL CLASSIFIED, because a one-shot CLI's empty stdout is exactly
+			// as much a non-answer as a refused provider's silence. `answerFromText` is the single place that
+			// decides what an empty string means, so the three seams returning one cannot drift.
+			adapterAnswer = answerFromText(returned);
 			// A tool that told us only its answer told us the whole reply too — there is no interior it withheld.
 			rawReply = returned;
 		}
@@ -368,6 +380,69 @@ export async function runModelInvocationStep(
 	//
 	// ⚠ THE WORK PRODUCT IS WHAT GETS RETAINED, NOT THE ENVELOPE. The professional's own `outputContract` still
 	// means what it says; the harness's wrapper is unwrapped and then forgotten.
+	// ── ⭐⭐ `JAN-NOANS` — A TURN THAT YIELDED NOTHING IS NOT A TURN THAT ANSWERED BADLY (`REG-F-410`) ────────
+	//
+	// ⛔ THIS ARM DID NOT EXIST, AND ITS ABSENCE IS THE FINDING. A live run was configured with a model the
+	// provider refuses outright; `session.prompt` RESOLVED, no text ever arrived, and execution fell straight
+	// down the success path below. The record then said `disposition: ACCEPTED`, `SCHEMA_COERCION_FAILED` —
+	// *"The answer is not a JSON object"* — and addressed `sha256:e3b0c442…`, the hash of the EMPTY STRING, as
+	// the work product every downstream assessment rested on. Three zero-byte artifacts were recorded and nine
+	// assurance assessments ran over them.
+	//
+	// ⭑ IT SITS **BEFORE** `splitExecutionEnvelope` AND BEFORE `store.put`, AND BOTH ARE DELIBERATE. The
+	// envelope splitter can only report a PRODUCER shortfall, because that is the only thing it is able to
+	// report — so anything that reaches it has already been attributed to the producer. And `put` is what
+	// mints the zero-byte artifact: gating after it would record the object and then decline to use it.
+	if (!adapterAnswer.arrived) {
+		const respondedAt = input.now();
+		await captureTry({
+			store: input.store,
+			sink,
+			tenantPrefix: input.tenantPrefix,
+			exchangeId,
+			role: 'initial',
+			// ⛔ THE **WEAKER** IDENTITY, NOT THE TOOL'S REPORTED ONE, AND THIS IS NOT AN OVERSIGHT. The success
+			// path below reads `produced.identityEvidence`, which the Pi adapter hardcodes `PROVIDER_REPORTED`.
+			// On a refusal the provider reported that it would NOT run this model — grading that as the provider
+			// CONFIRMING the model turns the one field a reader would use to diagnose the fault into a false
+			// record. The `catch` arm directly above already uses this shape, for the same reason.
+			model: { modelId: input.modelId, providerId: input.providerId },
+			prompt: produced?.materializedInput ?? turnText,
+			rawOutput: rawReply,
+			disposition: 'no-response',
+			attemptOrdinal: 1,
+			requestedAt,
+			respondedAt,
+			parseOutcome: noAnswerOutcome(adapterAnswer),
+			// ⭑ `EXPECTED_BUT_UNRETAINED`, THE SAME MEMBER THE `catch` ARM USES AND FOR THE SAME REASON. This
+			// step OWED a work product and none exists. ⛔ What it must never do is what the live run did:
+			// declare `WHOLE_ANSWER_SPAN` over `sha256:e3b0c442…` — the empty string — and thereby name an
+			// address for bytes every downstream assessment would then rest on.
+			workProductDerivation: {
+				relation: 'EXPECTED_BUT_UNRETAINED',
+				reason:
+					'This MODEL_INVOCATION step owed a work product and none was retained: no answer bytes ' +
+					'arrived, so there was nothing to separate out of an answer span and nothing to store. What ' +
+					'became of the turn is stated verbatim in this record’s parseOutcome detail.'
+			},
+			// ⭑ THE ADAPTER IS ASKED, exactly as on the `catch` arm — the party that drove the session is the
+			// only one that knows whether it was in a position to watch. Its RETURNED observation is preferred
+			// over `lastTurnObservation()` because an adapter that knows no model ran downgrades the returned
+			// one to `NOT_OBSERVABLE`, and `NONE_OBSERVED` here would assert a model was watched and called
+			// nothing.
+			observedToolCalls: governedToolCallReport(
+				produced?.observedToolCalls ?? input.session.lastTurnObservation()
+			),
+			promptTemplateFingerprint: plan.fingerprint
+		});
+		record(input, sink);
+		return {
+			ran: false,
+			refusedBecause: noAnswerRefusal(adapterAnswer)
+		};
+	}
+	answer = adapterAnswer.text;
+
 	const envelope = splitExecutionEnvelope(answer);
 	answer = envelope.workProduct;
 

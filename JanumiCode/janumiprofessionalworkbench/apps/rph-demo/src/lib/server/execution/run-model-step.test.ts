@@ -205,7 +205,7 @@ describe('JAN-TOOLSUITE TS-04 — who produced the work product', () => {
 		// weakens to HOST_CONFIGURED, and `PROVIDER_REPORTED` goes back to having zero producers.
 		const { input, dispatched } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ANSWER,
+				answer: { arrived: true, text: ANSWER },
 				rawOutput: ANSWER,
 				producer: {
 					agentId: 'execution.model-invocation',
@@ -278,7 +278,7 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 		const REASONING = 'First I considered the southern leg, then rejected it.';
 		const { input } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ANSWER,
+				answer: { arrived: true, text: ANSWER },
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
@@ -308,7 +308,7 @@ describe('JAN-TOOLSUITE TS-05 — the reviewer never receives the producer’s r
 		// Without this control, "always return the empty string" would pass the assertion above.
 		const { input } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ANSWER,
+				answer: { arrived: true, text: ANSWER },
 				rawOutput: ANSWER,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 				identityEvidence: 'PROVIDER_REPORTED' as const,
@@ -752,7 +752,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		const ENVELOPE = `{"workProduct":"${ANSWER}","rationale":"Both legs were weighed."}`;
 		const { input, dispatched } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ENVELOPE,
+				answer: { arrived: true, text: ENVELOPE },
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
@@ -830,7 +830,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 			`"assumptions":[],"limitations":[],"residualUncertainty":[]}}`;
 		const { input, dispatched, store } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ENVELOPE,
+				answer: { arrived: true, text: ENVELOPE },
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
@@ -934,7 +934,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 			`"assumptions":[],"limitations":[],"residualUncertainty":[]}}`;
 		const { input, dispatched } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ENVELOPE,
+				answer: { arrived: true, text: ENVELOPE },
 				rawOutput: ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 				identityEvidence: 'PROVIDER_REPORTED' as const,
@@ -1095,7 +1095,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		const ENVELOPE = `{"workProduct":"${ANSWER}","rationale":"Both legs were weighed."}`;
 		const { input, store } = harness({
 			session: oneShotSession(async () => ({
-				answerText: ENVELOPE,
+				answer: { arrived: true, text: ENVELOPE },
 				volunteeredReasoning: REASONING,
 				rawOutput: REASONING + ENVELOPE,
 				producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },

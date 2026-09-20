@@ -36117,7 +36117,8 @@ ruling (`R26`, 2026-09-20) and the cost was named when it was made.
 
 ### REG-F-410 — a provider that REFUSED the model was recorded as a producer that failed its contract, and a live reviewer then wrote nine CRITICAL findings about work that was never attempted
 
-**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status: OPEN — recorded, not remedied.** The remedy is
+**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status:** ⚠ **OPEN** — recorded, not
+remedied. The remedy is
 a design question and this entry does not pre-empt it.
 
 ⭐⭐ **HOW IT PRESENTED.** Three consecutive live runs recorded an execution exchange with
@@ -36206,7 +36207,7 @@ is plainly wrong and `REJECTED` would assert a producer fault that equally did n
 
 ### REG-F-411 — the instruction rendered to every executing model contains `Required outputs: [object Object]`
 
-**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status: OPEN.** Seen in the retained
+**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status:** ⚠ **OPEN**. Seen in the retained
 `materializedInputRef` bytes of every live execution exchange, in the demo's rendered work-unit instruction:
 
 ```
@@ -36248,10 +36249,16 @@ are one entry only if "noticed together" is a relationship, which it is not.
 
 ---
 
-### REG-F-409 ADDENDUM — `R26`'s premise, which was recorded nowhere, has now been measured on four live reviews and holds
+### REG-F-412 — `R26`'s premise, which was recorded nowhere, has now been measured on four live reviews and holds
 
-**Appended 2026-09-20** (`JAN-EXEC`, live-execution lane). Appended rather than written into `REG-F-409` above,
-because this register is append-only and the original entry is left exactly as it was filed.
+**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status:** ✅ **CLOSED on filing** — it records a
+completed measurement, and what it measures is `REG-F-409`’s stated exit condition.
+
+⭑ **IT IS A SEPARATE ENTRY RATHER THAN AN ADDENDUM TO `REG-F-409`, AND THE GATE IS WHY.** It was first
+written as `### REG-F-409 ADDENDUM`, which minted a SECOND block carrying an EXISTING id — and register
+blocks are keyed by id, so *"which block is `REG-F-409`"* stopped having an answer. Three independent
+censuses went red on it at once. The append-only rule is satisfied either way; a distinct measurement
+earning a distinct id is simply the correct shape, and `REG-F-409` above is still untouched.
 
 ⭐⭐ **THE PREMISE.** `R26` was ruled on the expectation that a real reviewer emits **one row per criterion**,
 including explicit clean rows — the thing that lets `UNABLE_TO_DETERMINE` mean *"nobody judged this"* instead

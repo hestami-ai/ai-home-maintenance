@@ -22,6 +22,7 @@
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { StoredArtifactRef } from '@janumipwb/rph-ports';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
+import type { AdapterAnswer } from '../tools/backing-tool.js';
 import type { WorkProductDerivation } from '@janumipwb/rph-contracts';
 
 /**
@@ -213,6 +214,65 @@ export function declareWorkProductDerivation(
  * envelope with a declared two-field shape, `splitExecutionEnvelope` coerces it, and saying nothing was
  * attempted would assert an absence the step manufactured.
  */
+/**
+ * ⭐⭐ `JAN-NOANS` — E-5 FOR A TRY THAT PRODUCED NO ANSWER (`REG-F-410`).
+ *
+ * ⛔ THE HARD PART IS NOT THE OUTCOME MEMBER; IT IS THE SENTENCE BESIDE IT. `EMPTY_RESPONSE` is right for all
+ * three causes. But the assurance plane's existing detail — *"The model returned no bytes at all"* — is FALSE
+ * when the provider refused the model, because then there was no model. Three independent adversarial passes
+ * over three independent candidate designs each found that same defect first: a record that collapses
+ * *"the provider refused"* into *"the producer said nothing"* commits `REG-F-410` inside `REG-F-410`'s fix.
+ *
+ * ⭑ SO THE DETAIL IS WRITTEN FROM WHAT THIS HOST ACTUALLY OBSERVED, and the reporter's own words are carried
+ * verbatim rather than glossed — frequently that one sentence is the entire diagnosis, and a record without it
+ * costs a human a CLI reproduction to learn what the host already knew.
+ */
+export function noAnswerOutcome(answer: AdapterAnswer & { arrived: false }): ExchangeParseOutcome {
+	const preamble = 'No answer bytes reached this host on this try, so there is nothing to coerce. ';
+	if (answer.cause === 'CALL_FAILED')
+		return {
+			outcome: 'EMPTY_RESPONSE',
+			detail:
+				preamble +
+				`The ${answer.reportedBy === 'PROVIDER' ? 'provider' : 'backing tool'} reported the call failed, ` +
+				`in its own words: “${answer.message}” ⛔ Nothing here is a finding about a PRODUCER — on this ` +
+				'path a model may never have been invoked at all.'
+		};
+	if (answer.cause === 'CALL_ABORTED')
+		return {
+			outcome: 'EMPTY_RESPONSE',
+			detail:
+				preamble +
+				'The turn was aborted or timed out before an answer arrived' +
+				(answer.message ? `, reported as: “${answer.message}”` : ' and nothing further was reported') +
+				'. ⛔ This is not a finding about a producer.'
+		};
+	return {
+		outcome: 'EMPTY_RESPONSE',
+		detail:
+			preamble +
+			'The turn ended and nothing reported a failure, so as far as this host can tell the producer ' +
+			'completed its turn without saying anything. ⚠ That is the weakest of the three readings and it is ' +
+			'the one used when no stronger signal was available.'
+	};
+}
+
+/** Why the step refused, in the caller's terms. ⭑ Same three causes, same rule: never speak for a model that
+ *  may not have run. */
+export function noAnswerRefusal(answer: AdapterAnswer & { arrived: false }): string {
+	const tail =
+		'The try IS recorded (disposition `no-response`), but no work product exists, so no artifact is ' +
+		'retained and no assurance floor is run — a reviewer asked to judge nothing produces findings about ' +
+		'nothing, which is exactly what `REG-F-410` measured.';
+	if (answer.cause === 'CALL_FAILED')
+		return `The execution call failed and produced no answer: ${answer.message} ${tail}`;
+	if (answer.cause === 'CALL_ABORTED')
+		return `The execution call was aborted before any answer arrived${
+			answer.message ? `: ${answer.message}` : '.'
+		} ${tail}`;
+	return `The execution turn ended without producing any answer. ${tail}`;
+}
+
 export function describeWorkProductDerivation(envelope: ExecutionEnvelope): ExchangeParseOutcome {
 	return envelope.shortfall
 		? {

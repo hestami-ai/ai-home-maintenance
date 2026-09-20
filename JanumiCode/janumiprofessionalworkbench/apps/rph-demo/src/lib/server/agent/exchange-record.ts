@@ -41,7 +41,21 @@ export type TruncationState = 'none-declared' | 'declared' | 'detected' | 'unkno
 /** E-5. `accepted-for-normalization` is renamed `accepted` (CSAA's normalization pipeline has no JPWB
  *  counterpart); the rest are verbatim. `repair-requested` is what a repair's PREDECESSOR records — the fact
  *  finding #62's bare `catch` currently drops. */
-export type ExchangeDisposition = 'accepted' | 'rejected' | 'quarantined' | 'repair-requested';
+export type ExchangeDisposition =
+	| 'accepted'
+	| 'rejected'
+	| 'quarantined'
+	| 'repair-requested'
+	/**
+	 * ⭐⭐ `JAN-NOANS` — THE TRY HAPPENED AND NO ANSWER CAME BACK (`REG-F-410`).
+	 *
+	 * ⛔ IT IS NOT `rejected`, AND THE DIFFERENCE IS THE FINDING. `rejected` says a producer answered and the
+	 * answer was refused; on this path no answer exists to refuse, and frequently no model was invoked at all.
+	 * Recording it as `accepted` — which is what happened three times in a live run — says the opposite and is
+	 * worse. ⭑ The contract has carried the `NO_RESPONSE` member all along; nothing could reach it, because
+	 * this union had no way to say it.
+	 */
+	| 'no-response';
 
 /** The identity that actually served the try (E-3).
  *

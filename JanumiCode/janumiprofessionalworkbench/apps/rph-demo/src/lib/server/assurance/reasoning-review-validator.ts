@@ -444,7 +444,16 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				try {
 					const returned = await print(p);
 					if (isToolInvocationResult(returned)) {
-						text = returned.answerText;
+						// ⚠ `JAN-NOANS` — NARROWED HERE, AND THIS PLANE'S BEHAVIOUR IS DELIBERATELY UNCHANGED.
+						// `classifyParse` below already asks *"did the model return no bytes?"* FIRST and reports
+						// `EMPTY_RESPONSE` — the assurance plane has been right about this all along, and
+						// `REG-F-410` is that the EXECUTION plane never asked. Collapsing to `''` preserves that
+						// verdict exactly.
+						// ⛔ WHAT IT DOES NOT YET DO is carry the CAUSE — a reviewer whose provider refused the
+						// model is still recorded as a reviewer that said nothing. That is the same finding on
+						// this plane, it is `NA-05` on the roadmap, and it is stated here rather than left for a
+						// reader to notice the asymmetry and assume it was considered.
+						text = returned.answer.arrived ? returned.answer.text : '';
 						// ⚠ TAKEN OUTSIDE THE IDENTITY GUARD BELOW, DELIBERATELY. What a tool observed and whether
 						// it named a usable model are INDEPENDENT facts; nesting this inside the identity check
 						// would silently discard a real observation because an unrelated field was empty.

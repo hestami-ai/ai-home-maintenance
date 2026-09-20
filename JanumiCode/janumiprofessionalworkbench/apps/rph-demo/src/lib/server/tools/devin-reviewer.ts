@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
+import { answerFromText } from './backing-tool.js';
 import type { ToolInvocationResult } from './backing-tool.js';
 
 const run = promisify(execFile);
@@ -84,7 +85,12 @@ export async function devinPrint(prompt: string): Promise<string | ToolInvocatio
 		// configured, graded `HOST_CONFIGURED`, which is the honest fact.
 		if (!reported) return stdout;
 		return {
-			answerText: stdout,
+			// ⭐ `JAN-NOANS` — `execFile` RESOLVES ON EXIT 0, AND EXIT 0 WITH EMPTY STDOUT IS NOT AN ANSWER.
+			// This adapter has no richer signal than the bytes: the CLI either printed something or it did not,
+			// and `ENDED_WITHOUT_ANSWER` is the weakest honest member. ⛔ It deliberately does NOT claim
+			// `CALL_FAILED` — a zero exit code is the tool reporting success, and contradicting it here would
+			// assert a cause nobody stated (`REG-F-410`, inverted).
+			answer: answerFromText(stdout),
 			rawOutput: stdout,
 			producer: {
 				agentId: 'devin',

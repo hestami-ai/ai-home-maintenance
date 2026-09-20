@@ -444,7 +444,30 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// actually needs, named in the vocabulary with its note"* - ALREADY COVERS naming the process-execution
 			// capability. The new roadmap had it filed as ratification OWED. It is instead an application of a
 			// grant already made, and only this pin's question surfaced that.
-		).toBe(42);
+			//
+			// 42 -> 43 (2026-09-20): `ROADMAP-no-answer-is-not-an-answer.md` (`JAN-NOANS`). ⭑ THE SUBSUMPTION
+			// QUESTION WAS ASKED OF THE FOUR NEAREST, and three of them are closer than anything was last time
+			// — this touches `run-model-step.ts`, the adapters, and the exchange record's own vocabulary.
+			//   · `JAN-EXECRUN` (model invocation step) OWNS the file the third arm lands in, and the answer is
+			//     still COMPLEMENT: its `XR-01`-`XR-04` build a step that RUNS a model and records the try. This
+			//     one is about what the record may SAY when no model ran. Its stages are landed, so folding
+			//     pending work into it would hide that work inside a completed roadmap — the failure this pin
+			//     exists to catch, which `41 -> 42` already had to refuse once.
+			//   · `JAN-MXR` (the durable exchange record) is the one that MINTED `EMPTY_RESPONSE` and
+			//     `NO_RESPONSE`, so it has the best claim of the four. ⛔ AND THAT IS PRECISELY WHY IT MUST NOT
+			//     ABSORB THIS. `JAN-MXR` shipped the members; `REG-F-410` is that NOTHING COULD REACH THEM for
+			//     the six months since. Filing the reachability defect inside the roadmap that declared the
+			//     vocabulary complete would put the evidence of a gap inside the document whose completion
+			//     claim the gap refutes.
+			//   · `JAN-TOOLSUITE` (the backing tools) owns the two adapters that must change, and `JAN-LIVEEXEC`
+			//     owns the lane that MEASURED the defect. Both are landed; both are the same completed-roadmap
+			//     objection.
+			// ⭐ AND ASKING PRODUCED SOMETHING AGAIN, WHICH IS THE ARGUMENT FOR THE PIN. `JAN-TOOLSUITE`'s own
+			// `TS-04` widened the seam from `print: (prompt) => Promise<string>` to a result that could REPORT
+			// WHO ANSWERED — and it widened every field EXCEPT the answer, which stayed a bare `string`. So the
+			// shape `REG-F-410` turns on is a residue of a widening that was already performed once, for the
+			// same reason, on the same interface. That belongs in this roadmap's argument and was not in it.
+		).toBe(43);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

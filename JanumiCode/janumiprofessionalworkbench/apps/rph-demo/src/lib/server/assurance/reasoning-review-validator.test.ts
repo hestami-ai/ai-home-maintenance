@@ -588,7 +588,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 	const reporting =
 		(modelId = 'glm-5-2'): AgyPrint =>
 		async () => ({
-			answerText: CLEAN,
+			answer: { arrived: true, text: CLEAN },
 			rawOutput: CLEAN,
 			producer: { agentId: 'devin', modelId, providerId: 'devin' },
 			identityEvidence: 'PROVIDER_REPORTED' as const,
@@ -645,7 +645,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 		// genuine sameness. THE MUTANT: assign the reported producer unconditionally.
 		const exchanges = createExchangeSink();
 		const blank: AgyPrint = async () => ({
-			answerText: CLEAN,
+			answer: { arrived: true, text: CLEAN },
 			rawOutput: CLEAN,
 			producer: { agentId: 'devin', modelId: '', providerId: '' },
 			identityEvidence: 'PROVIDER_REPORTED' as const,

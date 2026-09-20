@@ -149,9 +149,114 @@ export function selectBackingTool(
  * the adapter imports Pi's SDK at module scope — a type import from there would pull Pi's heavy Node deps into
  * the gate and undo the lazy loading `agent/index.ts` established.
  */
+/**
+ * ⭐⭐ `JAN-NOANS` — WHY NO ANSWER ARRIVED, WHEN NONE DID (`REG-F-410`).
+ *
+ * ⛔ THE THREE MEMBERS ARE NOT STYLISTIC. The assurance plane's `classifyParse` already states the argument
+ * this union exists to carry: *"an empty response is an INFRASTRUCTURE OR BUDGET problem, prose is a PROMPT
+ * problem, and well-formed JSON of the wrong shape is a CONTRACT problem. Collapsing them loses the only thing
+ * the record was kept for."*
+ *
+ * ⭑ AND THE FIRST TWO ARE SEPARATE FROM THE THIRD FOR A MEASURED REASON. A provider that REFUSES a model and a
+ * model that ENDS ITS TURN SAYING NOTHING are different facts with different remedies — one is a deployment
+ * error, the other is a producer's behaviour. `REG-F-410` was recorded three times as the second when it was
+ * the first, and a record that collapses them again would repeat the finding inside its own fix.
+ */
+export type NoAnswerCause =
+	/**
+	 * The call failed and the tool or provider SAID SO. ⛔ `message` is the reporter's own sentence, VERBATIM —
+	 * never a gloss written from a status code. It is frequently the only line that identifies the fault
+	 * (*"The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account"*), and a record
+	 * without it costs a human a CLI reproduction to learn what the host already knew.
+	 */
+	| { readonly cause: 'CALL_FAILED'; readonly reportedBy: 'PROVIDER' | 'TOOL'; readonly message: string }
+	/** The turn was cancelled or timed out. ⚠ Distinct from `CALL_FAILED`: nothing rejected the request. */
+	| { readonly cause: 'CALL_ABORTED'; readonly message?: string }
+	/** ⭑ The turn completed NORMALLY and the model emitted no answer. This one IS a fact about the producer. */
+	| { readonly cause: 'ENDED_WITHOUT_ANSWER' };
+
+/**
+ * ⭐⭐ THE ANSWER HALF, OR A STATED REASON THERE IS NONE — a UNION, for the reason `AdapterToolObservation`
+ * below is one.
+ *
+ * ⛔ IT USED TO BE `answerText: string`, AND THAT IS THE WHOLE OF `REG-F-410`. Every way a turn can yield
+ * nothing collapsed into `''`, which is indistinguishable from an answer of zero length — so a provider that
+ * refused the model reached `splitExecutionEnvelope('')`, which reported a PRODUCER SHORTFALL because a
+ * producer shortfall is the only thing that function is able to report. The record then said the producer
+ * ignored its contract; no producer had been asked.
+ *
+ * ⭑ THE ARGUMENT IS ALREADY IN THIS FILE, eight fields down, and it was simply never applied here: *"a shape
+ * with an optional list would let a caller read `calls` off an adapter that cannot observe, and the value it
+ * would read — the empty list — is the one that reads as a clean bill of health while asserting nothing at
+ * all."* `answerText: ''` **is** that empty list. A sibling boolean would not do: a caller could still read the
+ * string without consulting the flag, and the defect survives the fix.
+ */
+export type AdapterAnswer =
+	| { readonly arrived: true; readonly text: string }
+	| ({ readonly arrived: false } & NoAnswerCause);
+
+/**
+ * A bare-string seam's answer, classified. ⭑ Some backing tools are one-shot CLIs whose whole contract is
+ * `Promise<string>` — they have nothing richer to report, and an empty stdout is all the host ever sees. This
+ * is the ONE place that decides what such a string means, so the three seams that return one cannot drift.
+ *
+ * ⚠ `ENDED_WITHOUT_ANSWER`, NOT `CALL_FAILED`: a bare string carries no report of a failure, and inventing one
+ * would be the mirror of the defect — asserting a cause nobody stated.
+ */
+export function answerFromText(text: string): AdapterAnswer {
+	return text.trim() === '' ? { arrived: false, cause: 'ENDED_WITHOUT_ANSWER' } : { arrived: true, text };
+}
+
+/**
+ * Classify a session turn that has ended, from the text it produced and how it terminated.
+ *
+ * ⭑ PURE AND SDK-FREE ON PURPOSE. The adapter that needs it imports Pi's heavy Node deps at module scope, so
+ * it has no test in the gate — `model.ts` already records what that costs: *"NO UNIT TEST COULD HAVE CAUGHT
+ * IT. Every test of `runModelInvocationStep` INJECTS its own `print` … the one adapter that narrows it was
+ * never on any tested path. The LIVE lane found it on its second run."* Keeping the JUDGEMENT here and the
+ * plumbing there is what puts this decision on a tested path at all.
+ *
+ * ⚠ TEXT WINS WHEN TEXT ARRIVED, AND THE BOUND IS DISCLOSED RATHER THAN HIDDEN. A turn that produced an answer
+ * and *then* errored is reported as an answer: the professional's work is not discarded because the transport
+ * died afterwards, which is the rule `splitExecutionEnvelope` already follows one layer up. ⛔ What that costs
+ * is that a TRUNCATED answer is currently indistinguishable from a complete one — `outputTruncation` is the
+ * field that should carry it, and nothing populates it. Named here, not silently decided.
+ */
+export function answerFromTurnEnd(
+	text: string,
+	ended: { readonly stopReason: string; readonly errorMessage?: string } | undefined
+): AdapterAnswer {
+	if (text.trim() !== '') return { arrived: true, text };
+	if (ended?.stopReason === 'error')
+		return {
+			arrived: false,
+			cause: 'CALL_FAILED',
+			reportedBy: 'PROVIDER',
+			// ⛔ A STATEMENT ABOUT THE REPORT, NOT ABOUT THE MODEL. When the tool reports an error with no
+			// sentence, saying so is the honest record; inventing a cause would be the defect this union exists
+			// to prevent, committed at the moment of preventing it.
+			message:
+				ended.errorMessage ??
+				'The backing tool reported that the turn ended in error but supplied no message with it.'
+		};
+	if (ended?.stopReason === 'aborted')
+		return {
+			arrived: false,
+			cause: 'CALL_ABORTED',
+			...(ended.errorMessage ? { message: ended.errorMessage } : {})
+		};
+	// ⭑ Reached when the turn ended normally (`stop`, `length`, `toolUse`) with nothing said, AND when no
+	// terminal event was seen at all. The second is not a claim that the model chose silence — it is the
+	// weakest honest member, and the adapter that can do better reports better.
+	return { arrived: false, cause: 'ENDED_WITHOUT_ANSWER' };
+}
+
 export interface ToolInvocationResult {
-	/** E-2, answer half — the work product. */
-	readonly answerText: string;
+	/**
+	 * E-2, answer half — the work product, OR a stated reason none arrived.
+	 * ⛔ Narrow on `arrived`; there is deliberately no way to read a string off the absent arm.
+	 */
+	readonly answer: AdapterAnswer;
 	/** E-2, reasoning half. ⭑ `undefined` means NONE AROSE — an observed absence (PER-12), not a capture failure. */
 	readonly volunteeredReasoning?: string;
 	/** E-2, whole — retained for the blocked path only. */

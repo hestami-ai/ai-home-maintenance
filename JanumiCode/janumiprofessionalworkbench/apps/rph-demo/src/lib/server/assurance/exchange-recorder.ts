@@ -16,6 +16,7 @@ import { OmittedRegionSchema, type RecordModelExchangePayload } from '@janumipwb
 
 import type {
 	ContentRef,
+	ExchangeDisposition,
 	ExchangeRecord,
 	ExchangeRole,
 	ResolvedModelIdentity,
@@ -60,8 +61,26 @@ const DISPOSITION = {
 	accepted: 'ACCEPTED',
 	rejected: 'REJECTED',
 	quarantined: 'QUARANTINED',
-	'repair-requested': 'REPAIR_REQUESTED'
+	'repair-requested': 'REPAIR_REQUESTED',
+	// ⭐ `JAN-NOANS` — the member the contract has always had and nothing could reach (`REG-F-410`).
+	'no-response': 'NO_RESPONSE'
 } as const;
+
+/**
+ * The try's disposition, or a refusal to project a record without one.
+ *
+ * ⚠ THE FIELD IS OPTIONAL ON THE APP-LOCAL RECORD AND REQUIRED ON THE CONTRACT, and that gap used to be closed
+ * by substituting `NO_RESPONSE`. It cannot be any more: `NO_RESPONSE` is now a DECISION a step makes, so
+ * spending it on an omission would make the two unreadable apart.
+ */
+function requireDisposition(rec: ExchangeRecord): ExchangeDisposition {
+	if (rec.disposition) return rec.disposition;
+	throw new Error(
+		`exchange-recorder: try '${rec.exchangeId}' carries no disposition, so E-5 cannot be projected. ` +
+			'Refusing rather than substituting one: every disposition in the contract asserts something about ' +
+			'what happened, and an omission asserts nothing. `unsatisfiedElements` reports this as a missing E-5.'
+	);
+}
 
 /**
  * The closed role vocabulary an omitted region may claim — DERIVED FROM THE CONTRACT, never re-listed.
@@ -219,7 +238,16 @@ export function toRecordModelExchange(
 			byteSize: r.byteSize,
 			byteOffset: r.byteOffset
 		})),
-		disposition: rec.disposition ? DISPOSITION[rec.disposition] : 'NO_RESPONSE',
+		// ⛔⛔ THIS LINE USED TO READ `rec.disposition ? DISPOSITION[rec.disposition] : 'NO_RESPONSE'`, AND
+		// `JAN-NOANS` MADE THAT UNTENABLE. While nothing could DECIDE `NO_RESPONSE`, using it for an OMITTED
+		// disposition was merely odd. Now that a step can decide it (`REG-F-410`), a fallback that also emits it
+		// makes a decided verdict indistinguishable from a missing one — the very conflation the finding is
+		// about, reintroduced by the fix for the finding.
+		//
+		// ⭑ SO IT REFUSES INSTEAD OF SUBSTITUTING. `unsatisfiedElements` already names an absent disposition as
+		// a missing E-5; projecting a permanent record that says something else about it would put a fiction in
+		// the stream that the completeness check reports as a gap.
+		disposition: DISPOSITION[requireDisposition(rec)],
 		parseOutcome: rec.parseOutcome,
 		...(rec.promptTemplateFingerprint
 			? { promptTemplateFingerprint: rec.promptTemplateFingerprint }
