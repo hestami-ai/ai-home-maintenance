@@ -103,6 +103,10 @@ export default defineConfig({
 		env: {
 			RPH_DEMO_MODE: 'server',
 			JPWB_HARNESS: '1',
+			// ⭐ THE SEED THIS LANE NEEDS, CHOSEN AT BOOT BECAUSE IT CANNOT RESET. The spec asserts the PWA
+			// picker holds exactly TWO options — the placeholder and the one it publishes itself — so the
+			// reference workbench's own published PWA would break it. `empty` seeds the policy library only.
+			JPWB_SEED: 'empty',
 			// ⚠ ABSOLUTE AND RUN-SCOPED, AND BOTH HALVES ARE LOAD-BEARING. `resolveUndertakingSandbox` REFUSES a
 			// root that resolves against the process (it would put deliverables inside the server's own tree),
 			// and `R24`'s reset guard refuses a durable store outright — so a lane that reused one path would be

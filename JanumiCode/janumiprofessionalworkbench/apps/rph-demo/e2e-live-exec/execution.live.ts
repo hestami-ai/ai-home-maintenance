@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
+import { introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
 
 // JAN-LIVEEXEC — a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT one.
 //
@@ -63,9 +63,13 @@ const TEMPLATE = [
 type Identity = { availability?: string; evidence?: string; value?: string };
 
 test.describe('LIVE — a work unit is executed by a real model and reviewed by a different one', () => {
-	test.beforeEach(async ({ request }) => {
-		await resetEngine(request, 'empty');
-	});
+	// ⛔ NO RESET, AND THE ABSENCE IS THE POINT. This lane runs as a SERVER so its work unit gets a real
+	// workspace and a real process runner, and `R24` refuses a reset on a durable store — it would close the
+	// durable handle and keep answering from an empty in-memory one, destructive in the way a caller cannot
+	// detect. ⭑ Isolation comes from a FRESH run-scoped database instead (the config mints one per run under
+	// `tmpdir()`), seeded `empty` at BOOT via `JPWB_SEED`. A harness resets; a server boots.
+	//
+	// ⚠ MEASURED, NOT REASONED: the first real run of this lane failed in 76ms on exactly that refusal.
 
 	test('produces a work product on the executor and has it reviewed by the assurance tool', async ({
 		page,

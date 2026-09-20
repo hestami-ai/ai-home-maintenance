@@ -61,6 +61,32 @@ const SERVING = process.env.RPH_DEMO_MODE === 'server';
  * `workbench-durable-store-declaration.test.ts` records, not reopened here.
  */
 const HARNESS = process.env.JPWB_HARNESS === '1';
+/**
+ * ⭐⭐ WHICH SEED A FRESH STORE IS BORN WITH — a BOOT decision, because a serving process may not reset.
+ *
+ * ⛔ THE LANE THAT NEEDED THIS FAILED IN 76ms TO PROVE IT. `R24` lets one process be durable AND expose the
+ * harness, which is what the live execution lane requires; `R24` also refuses `resetEngine` on a durable store,
+ * because a reset would close the durable handle and keep answering from an empty in-memory one. Both are
+ * right, and together they leave a lane that cannot choose its starting state the only way the harness offers.
+ *
+ * ⭑ SO IT CHOOSES AT BOOT INSTEAD, AND THE VOCABULARY IS NOT NEW: `resetEngine` has always taken exactly
+ * these three seeds. This exposes the same choice to a process that gets ONE fresh store and no second chance.
+ * A harness RESETS; a server BOOTS — the same distinction `R24` drew, one level down.
+ *
+ * ⚠ OMISSION CHANGES NOTHING. Unset means `reference`, which is what every existing host already gets, so no
+ * deployment and no test moves by this arriving. An unrecognised value is REFUSED rather than defaulted: a
+ * typo silently seeding the wrong workbench is the class of fiction this module keeps refusing.
+ */
+const SEEDS = ['reference', 'empty', 'bare'] as const;
+type SeedChoice = (typeof SEEDS)[number];
+const configuredSeed = process.env.JPWB_SEED?.trim();
+if (configuredSeed !== undefined && configuredSeed !== '' && !SEEDS.includes(configuredSeed as SeedChoice))
+	throw new Error(
+		`JPWB_SEED='${configuredSeed}' is not a seed this workbench knows. Use one of ${SEEDS.join(' | ')}, ` +
+			'or leave it unset for `reference`. Refusing rather than defaulting: a typo that silently seeded the ' +
+			'wrong workbench would be discovered as a missing object three layers away.'
+	);
+const BOOT_SEED: SeedChoice = (configuredSeed || 'reference') as SeedChoice;
 const productionUlid = monotonicFactory();
 
 /**
@@ -162,7 +188,14 @@ export function openWorkbench(dbPath?: string): EngineHandle {
 	// ⚠ SYSTEM, NOT THE USER. Seeding runs at construction before any session exists, and it is ~80% of all
 	// dispatches by volume. Handing it the human's credential would put a fiction into `createdBy` on every
 	// seeded object and would defeat D-2 at the largest site in the system.
-	if (engine.readAllEvents().length === 0) seedWorkbench(engine.as(REFERENCE_OWNER_CREDENTIAL));
+	// ⭐ THE SEED IS A CHOICE, AND IT IS MADE HERE BECAUSE A DURABLE STORE IS SEEDED ONCE, EVER. `BOOT_SEED` is
+	// `reference` unless the host declared otherwise, so this line means exactly what it meant before for every
+	// existing caller.
+	if (engine.readAllEvents().length === 0) {
+		if (BOOT_SEED === 'reference') seedWorkbench(engine.as(REFERENCE_OWNER_CREDENTIAL));
+		else if (BOOT_SEED === 'empty') seedPolicyLibrary(engine.as(SYSTEM_CREDENTIAL));
+		// `bare` seeds NOTHING — the genuine cold-start state of a standalone install (REG-F-108).
+	}
 	// A DURABLE HOST SHALL RECOVER ITS PENDING OUTBOX AT STARTUP — `EngineHandle.recoverOutbox`, WP-2-007. The
 	// obligation has existed since the engine gained a durable store; until W-2 the demo had none, so it bound
 	// nothing and no one noticed. Measured before this line existed: a restart left **300** entries PENDING and
