@@ -36112,3 +36112,124 @@ stays RED until the five judgement criteria — `RR-02-no-obligation-elision`,
 `RR-03-no-unjustified-scope-reduction`, `RR-05-no-premature-convergence`, `RR-06-sound-inference`,
 `RR-08-evidence-integrity` — are evaluated by a real reviewer or deliberately scoped out. That is the sponsor's
 ruling (`R26`, 2026-09-20) and the cost was named when it was made.
+
+---
+
+### REG-F-410 — a provider that REFUSED the model was recorded as a producer that failed its contract, and a live reviewer then wrote nine CRITICAL findings about work that was never attempted
+
+**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status: OPEN — recorded, not remedied.** The remedy is
+a design question and this entry does not pre-empt it.
+
+⭐⭐ **HOW IT PRESENTED.** Three consecutive live runs recorded an execution exchange with
+`parseOutcome: SCHEMA_COERCION_FAILED` and the detail *"The answer is not a JSON object, so the execution
+contract's envelope could not be read."* Read at face value that says: **the model answered, and answered
+badly.** I reported exactly that to the sponsor, and it was false.
+
+⛔ **WHAT HAD ACTUALLY HAPPENED.** The model was never invoked. Driving the identical configuration through the
+CLI returns one line:
+
+```
+Codex error: The 'gpt-5.4-mini' model is not supported when using Codex with a ChatGPT account.
+```
+
+⭑ **MEASURED, NOT INFERRED — two independent instruments agree.** The stored work-product `contentHash` on all
+three exchanges is `sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, which is the hash
+of the **empty string**; and `respondedAt − requestedAt` was **408ms, 458ms and 1.25s**. A provider refusing a
+model answers that fast. A model writing a risk assessment does not.
+
+⛔⛔ **THE PART THAT MATTERS: EVERY LAYER BEHAVED CORRECTLY, AND THE COMPOSITION LIED.**
+
+1. `pi-executor.ts` accumulates its answer from `text_delta` events alone. A provider error emits none, so
+   `answer` stays `''`.
+2. `session.prompt` resolves without throwing, so the turn looks successful.
+3. The exchange is recorded `disposition: ACCEPTED` with a zero-byte work product.
+4. `splitExecutionEnvelope('')` cannot parse it and — correctly, by its own contract — reports a **producer**
+   shortfall, because a producer shortfall is the only thing it is able to report.
+5. A live reviewer, reasoning soundly from what it was shown, returned nine findings at CRITICAL: *"The agent
+   produced no output, failing entirely to discharge the delegated obligation"*, *"The delegated obligation …
+   was completely and silently dropped."*
+
+**Every sentence in that judgement is defensible given its inputs, and the judgement as a whole is fiction.**
+
+⭐ **THIS IS THIS REPOSITORY'S OWN RECURRING CLASS, ONE PLANE DOWN: AN ABSENCE READ AS A VALUE.** `REG-F-409`
+is the same defect in the assurance plane — a criterion nobody evaluated scored `MET` — and `R26` was ruled to
+close it. This is its twin on the execution plane: **a turn nobody took scored as a turn that went badly.** The
+`ExchangeParseOutcome` vocabulary has no member for *"there was no answer to coerce"*, exactly as
+`CriterionOutcome` had no reachable `UNABLE_TO_DETERMINE`.
+
+⚠ **AND THE ASYMMETRY IS THE TELL.** `observedToolCalls` on the same record gets this right — it distinguishes
+`NONE_OBSERVED` (*"this adapter observes tool calls and observed none"*) from `NOT_OBSERVABLE` (*"nothing was
+in a position to look"*), and says so in the record. The answer half has no such distinction available.
+
+⛔ **THE SCOPE IS NOT ONE ADAPTER.** `pi-executor.ts` is where it was measured, but the shape — accumulate
+deltas, return the accumulator, let a downstream parser interpret emptiness — is the shape of every adapter
+this host drives. A remedy that patches one adapter would leave the class open and the register would carry a
+finding that reads as closed.
+
+**WHAT IS NOT YET SETTLED**, and why this entry stops here: whether the remedy belongs at the adapter (a turn
+that yields nothing REFUSES rather than returning `''`), at the record (`ExchangeParseOutcome` gains a member
+for an absent answer), or at both — and what `disposition` a non-exchange should carry, given that `ACCEPTED`
+is plainly wrong and `REJECTED` would assert a producer fault that equally did not occur. Design first.
+
+---
+
+### REG-F-411 — the instruction rendered to every executing model contains `Required outputs: [object Object]`
+
+**Filed 2026-09-20** (`JAN-EXEC`, live-execution lane). **Status: OPEN.** Seen in the retained
+`materializedInputRef` bytes of every live execution exchange, in the demo's rendered work-unit instruction:
+
+```
+Subject: Route Assessment
+Required outputs: [object Object]
+```
+
+⭑ **A STRINGIFICATION FAULT IN THE DEMO'S INSTRUCTION BUILDER**, not in the contract or the adapter: an object
+interpolated into a template string. ⚠ **IT IS VISIBLE TO EVERY EXECUTING MODEL AND TO EVERY REVIEWER**, since
+the reviewer is shown the producing agent's instruction verbatim — so the rubric criterion
+`RR-07-no-contradiction` (*"no contradiction with intent, constraints, inputs"*) is being judged against an
+instruction that names its required outputs as `[object Object]`.
+
+⛔ **RECORDED SEPARATELY FROM `REG-F-410` ON PURPOSE.** It was found on the same run and shares no cause; they
+are one entry only if "noticed together" is a relationship, which it is not.
+
+---
+
+### REG-F-409 ADDENDUM — `R26`'s premise, which was recorded nowhere, has now been measured on four live reviews and holds
+
+**Appended 2026-09-20** (`JAN-EXEC`, live-execution lane). Appended rather than written into `REG-F-409` above,
+because this register is append-only and the original entry is left exactly as it was filed.
+
+⭐⭐ **THE PREMISE.** `R26` was ruled on the expectation that a real reviewer emits **one row per criterion**,
+including explicit clean rows — the thing that lets `UNABLE_TO_DETERMINE` mean *"nobody judged this"* instead
+of merely *"the fixture is thin"*. When the ruling was made, whether a reviewer model actually does that was
+**recorded nowhere in this repository**. It was an assumption the gate's red was resting on.
+
+⭑ **IT HOLDS. 9 of 9 rows, in 4 of 4 live reviews (`gemini-3.1-pro-high`), on BOTH verdicts:**
+
+| review | artifact | rows | verdict | clean rows (`failed: false`) |
+|---|---|---|---|---|
+| 1 | empty (the `REG-F-410` artifact) | 9 | REJECTED | none |
+| 2 | empty | 9 | REJECTED | `RR-04`, `RR-06` |
+| 3 | empty | 9 | REJECTED | `RR-04`, `RR-06` |
+| 4 | a real work product | 9 | SATISFIED | all nine |
+
+⭐ **REVIEWS 2 AND 3 ARE THE DECISIVE ONES, NOT REVIEW 4.** A reviewer that faults everything, or clears
+everything, proves only that it filled nine slots. Reviews 2 and 3 **discriminated** — they faulted seven
+criteria and explicitly cleared two on the *same* artifact, which is the reviewer distinguishing *"I examined
+this and it is clean"* from silence. That distinction is precisely what `R26` turns on, and it is now observed
+rather than assumed.
+
+⛔ **SO `phase7c`'s RED IS A PROPERTY OF THE DETERMINISTIC FIXTURE, NOT OF THE DESIGN.** Review 4 cleared the
+reasoning-review floor with **zero `UNABLE_TO_DETERMINE`**, live, end to end. The exit condition
+`REG-F-409` names — *"evaluated by a real reviewer"* — is reachable, and the eleven red tests are not a dead
+end.
+
+⚠ **AND `REG-F-408` IS NOW VINDICATED BY OBSERVATION RATHER THAN BY ARGUMENT.** Review 1 returned `CRITICAL`
+for the same criteria that reviews 2 and 3 returned `BLOCKING` for, on near-identical artifacts.
+**Reviewer-assigned severity is not stable across calls** — which is exactly why `REG-F-408` ruled that the
+policy's declared `severityIfNotMet` governs and the model's opinion does not. That was filed as a reasoned
+position; it is now a measured one.
+
+⭑ **WHAT IS STILL OWED IS UNCHANGED.** Four reviews on two artifacts by one reviewer model is evidence that the
+contract is honoured, not a bound on how often it is. Nothing here licenses removing the fixture's declared
+coverage or the guard in `mock-reasoning-review-validator.test.ts` that pins it.
