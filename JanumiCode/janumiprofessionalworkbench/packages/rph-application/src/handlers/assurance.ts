@@ -2076,6 +2076,92 @@ function escalateOnOpenObservation(
 	});
 }
 
+/** The mandatory criteria this assessment has ANSWERED `UNABLE_TO_DETERMINE`, folded from its own event log.
+ *
+ * ⭐ FOLDED FROM EVENTS, NOT READ FROM THE PAYLOAD, AND GATE A IS THE PRECEDENT AT THIS SAME SITE.
+ * `rejectUnmetRequiredEvidence` folds its received set from `AssuranceEvidenceReceived` rather than trusting
+ * the completion to describe its own history. Criterion results arrive the same way now that §32's
+ * `recordCriterionResult` exists, so the same fold applies one axis over.
+ *
+ * ⛔ IT DOES **NOT** READ `validatorResult.claimResults`, AND THAT IS `REG-F-420` APPLIED. A coverage gate
+ * on that field would refuse the floor's own SATISFIED path, because §20 routes per-criterion results
+ * through a CLAIM id and a floor assessment carries `claimIds: []`. The events are the route that has no
+ * such requirement.
+ *
+ * ⭑ MANDATORINESS COMES FROM THE POLICY, DERIVED THE WAY THE KERNEL DERIVES IT (`BLOCKING_SEVERITIES` over
+ * `severityIfNotMet`), never from the recorded result. `R25`: the judged party does not set its own stakes.
+ *
+ * ⚠ LATEST RECORDING WINS. A criterion may be recorded more than once — the handler permits it, and each
+ * recording is its own durable event — so the fold must say which one counts. A later determination
+ * SUPERSEDES an earlier undetermined one; the reverse reading would let a stale UNABLE_TO_DETERMINE block a
+ * verdict the evaluator has since reached.
+ */
+const undeterminedMandatoryCriteria = (
+	ctx: HandlerContext,
+	assessmentId: string,
+	policyId: unknown
+): string[] => {
+	// ⭑ THE ID EXTRACTION IS `idsOf`'s, NOT A THIRD COPY. Writing it again here is what the per-file
+	// coverage floor caught the FIRST time this file grew a policy read (`CB-02`), and it caught the second
+	// one too — the ratchet is measuring duplication, not thoroughness.
+	const mandatory = idsOf(
+		policyRows(ctx, policyId, 'criteria').filter((c) =>
+			// ⚠ NO `?.` HERE, AND THE ABSENCE IS DELIBERATE. `AssessmentCriterionSchema` makes
+			// `severityIfNotMet` REQUIRED, and `commitState` validates a policy against its schema before it is
+			// stored — so a criterion row without one cannot exist to be read. An optional-chain here would be a
+			// branch no arrangement can reach, which the per-file floor correctly refuses to let in: an untestable
+			// arm is not defensiveness, it is a claim that the contract does not hold.
+			BLOCKING_SEVERITIES.has((c as { severityIfNotMet: string }).severityIfNotMet as never)
+		)
+	);
+	if (mandatory.size === 0) return [];
+	const latest = new Map<string, string>();
+	ctx.store
+		.readAggregateEvents(ASSESSMENT, assessmentId)
+		.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+		.forEach((e) => {
+			const p = e.payload as { criterionId?: unknown; result?: unknown };
+			if (typeof p.criterionId === 'string' && typeof p.result === 'string')
+				latest.set(p.criterionId, p.result);
+		});
+	return [...latest.entries()]
+		.filter(([id, result]) => mandatory.has(id) && result === 'UNABLE_TO_DETERMINE')
+		.map(([id]) => id)
+		.sort();
+};
+
+/** GATE E (`JAN-CRITREAD` `CR-03`) — `RPH-ASR-005`: a POSITIVE disposition may not stand over a mandatory
+ *  criterion that came back UNABLE_TO_DETERMINE. Canon states it as an absolute with no policy override:
+ *  *“Unable-to-determine is never treated as met.”*
+ *
+ * ⛔ POSITIVE DISPOSITIONS ONLY, on Gate A's own reasoning: *“escalating or rejecting BECAUSE evidence is
+ * insufficient is the correct response, not a blocked one.”* An assessment that goes INCONCLUSIVE BECAUSE a
+ * criterion is undetermined is this rule WORKING; gating it would refuse the right answer.
+ *
+ * ⭐ AND IT IS A CROSS-CHECK ON THE KERNEL, NOT A DUPLICATE OF IT. `dispositionFromFindings` already folds
+ * an undetermined mandatory criterion to INCONCLUSIVE on the FLOOR path, so the pairing this gate refuses
+ * cannot arise there — measured, not assumed. What the gate adds is the COMMAND path: a validator that
+ * computes its own disposition and recommends SATISFIED while reporting an undetermined mandatory criterion
+ * was previously taken at its word. ⭑ Two independent statements of one rule, at two layers, which is what
+ * makes a regression in either one observable.
+ */
+function rejectUndeterminedMandatoryCriterion(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	disposition: string,
+	policyId: unknown
+): CommandResult | null {
+	if (!POSITIVE_DISPOSITIONS.has(disposition)) return null;
+	const undetermined = undeterminedMandatoryCriteria(ctx, command.targetAggregateId, policyId);
+	if (undetermined.length === 0) return null;
+	return reject(
+		command,
+		'RPH_VALIDATION_SEMANTIC_FAILED',
+		`CompleteAssuranceAssessment: a ${disposition} disposition may not stand while mandatory criteri${undetermined.length === 1 ? 'on' : 'a'} [${undetermined.join(', ')}] came back UNABLE_TO_DETERMINE (DOC-003 §7: unable-to-determine is never treated as met). An undetermined mandatory criterion is not a met one — record a determination (RecordCriterionResult), or return a non-positive disposition.`,
+		[command.targetAggregateId, ...undetermined]
+	);
+}
+
 /** GATE A (Increment R) — a POSITIVE disposition may not stand while its own mandatory evidence is unmet. §6.1's
  *  requiredForDispositions declares which dispositions each requirement gates; a SATISFIED verdict that ignores its
  *  required evidence certifies past its own gaps (§10.3). The received set is folded from the §32
@@ -2462,6 +2548,17 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		policyState?.requiredEvidence
 	);
 	if (gateAReject) return gateAReject;
+
+	// GATE E (`JAN-CRITREAD` `CR-03`) — `RPH-ASR-005`. Runs beside Gate A and on the same principle: a
+	// positive disposition may not stand over its own unmet mandatory input. Gate A's axis is EVIDENCE;
+	// this one's is the CRITERION RESULTS the assessment has recorded.
+	const gateEReject = rejectUndeterminedMandatoryCriterion(
+		ctx,
+		command,
+		disposition,
+		assessmentState?.assurancePolicyId
+	);
+	if (gateEReject) return gateEReject;
 
 	// GATE C (#1a) — dispositionRules ENFORCED: the §10.3 foreclosure. The policy's rule for the recommended
 	// disposition may forbid it while an observation of certain severities is still OPEN ("an open MATERIAL finding

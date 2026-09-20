@@ -130,6 +130,10 @@ export function seedPolicy(
 		/** §10.3 foreclosure rules. Absent = the policy forecloses no disposition, so Gate C skips entirely — which
 		 *  is why a test that forgets these gets a PASS from a gate that never ran. */
 		dispositionRules?: unknown[];
+		/** The policy's own criteria, replacing the single MATERIAL `C1` below. Symmetric with `requiredEvidence`
+		 *  and `dispositionRules`, and present for the same reason: a criterion's `severityIfNotMet` is what
+		 *  makes it MANDATORY, so a test about mandatory criteria cannot use the default. */
+		criteria?: unknown[];
 	} = {}
 ): void {
 	createAndActivate(
@@ -145,7 +149,7 @@ export function seedPolicy(
 			...(opts.applicability ? { applicability: opts.applicability } : {}),
 			...(opts.dispositionRules ? { dispositionRules: opts.dispositionRules } : {}),
 			evaluatedClaimTypes: ['FITNESS'],
-			criteria: [
+			criteria: opts.criteria ?? [
 				{
 					id: 'C1',
 					name: 'Fit',

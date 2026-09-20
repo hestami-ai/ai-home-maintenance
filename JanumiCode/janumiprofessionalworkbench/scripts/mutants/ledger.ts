@@ -6200,6 +6200,36 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'JAN-EXEC R32 Control A (REG-D-067); the edit was measured during the R32 costing pass'
 	},
 	{
+		id: 'CR-03-the-undetermined-gate-computes-and-discards',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// ⛔ THE MUTATION LEAVES THE FOLD INTACT AND THROWS THE ANSWER AWAY, which is the plausible form of
+		// this defect: a gate that LOOKS wired — the predicate is called, the policy is read, the events are
+		// folded — and refuses nothing. Deleting the call would be caught by `check-types` on the unused
+		// binding; this compiles cleanly and is invisible to every instrument except a driven refusal.
+		find: 'const undetermined = undeterminedMandatoryCriteria(ctx, command.targetAggregateId, policyId);',
+		replace:
+			'const undetermined = undeterminedMandatoryCriteria(ctx, command.targetAggregateId, policyId).filter(() => false); // MUTANT: the gate can never fire',
+		expectRed: ['packages/rph-application/src/handlers/undetermined-criterion-gate.test.ts'],
+		why: "PROMISE: DOC-003 \u00a77 states it as an absolute with no policy override \u2014 *\u201cUnable-to-determine is never treated as met.\u201d* `RPH-ASR-005` records that `completeAssuranceAssessment` never read criterion RESULTS at all, so a validator computing its own disposition could recommend SATISFIED while reporting a mandatory criterion undetermined and be taken at its word. WHO RELIES: every reader of a SATISFIED assessment, and the publish gate that treats one as a green light. WHAT THE MUTATION DOES TO THEM: the gate computes the undetermined set correctly and then discards it, so an assessment advances to a POSITIVE terminal disposition over a criterion nobody could determine \u2014 `REG-F-409`'s defect on the command plane, which is where it was never closed. \u26a0 It is not a crash and the record stays well-formed: the assessment simply reads SATISFIED, which is why only a driven refusal notices. \u2b51 The mutation keeps every binding used, so it cannot pass as a NO_COMPILE artifact.",
+		source: 'JAN-CRITREAD CR-03 (ROADMAP-the-criterion-results-nobody-reads.md); RPH-ASR-005 on the command path'
+	},
+	{
+		id: 'CR-03-mandatoriness-stops-coming-from-the-policy',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// ⭐⭐ THE OVER-REFUSAL DIRECTION, AND IT IS THE ONE A REFUSAL-BASED REMEDY SHIPS. Six of the seven
+		// tests in the victim file pass under this mutation, because they exercise the BLOCKING criterion and
+		// the mutant still refuses it. Only the ADVISORY control fails. ⚠ A file without that control would
+		// report this mutant SURVIVED while looking thoroughly tested — which is what `a control proves
+		// DISCRIMINATION, not correctness` means in practice.
+		find:
+			".filter(([id, result]) => mandatory.has(id) && result === 'UNABLE_TO_DETERMINE')",
+		replace:
+			".filter(([id, result]) => id !== undefined && result === 'UNABLE_TO_DETERMINE') // MUTANT: every criterion is mandatory",
+		expectRed: ['packages/rph-application/src/handlers/undetermined-criterion-gate.test.ts'],
+		why: "PROMISE: `R25` \u2014 mandatoriness is DERIVED from the policy's `severityIfNotMet`, never declared by the judged party, and the recorded criterion result carries no severity at all precisely so it cannot be. WHO RELIES: every policy that declares ADVISORY criteria alongside BLOCKING ones, which is the normal shape of an authored rubric. WHAT THE MUTATION DOES TO THEM: an ADVISORY criterion left undetermined now blocks a positive disposition, so a policy author's own grading of consequence stops meaning anything and the gate over-refuses \u2014 the failure mode Gate A's control exists to catch, one axis over. \u2b50 THIS IS THE MUTANT THAT MATTERS MOST HERE: every other test in the victim file passes under it, because they all use the BLOCKING criterion. Only the discrimination control tells the two gates apart, which is the whole reason that control was written.",
+		source: 'JAN-CRITREAD CR-03; the R25 limb of the undetermined-criterion gate'
+	},
+	{
 		id: 'CB-02-the-criterion-guard-admits-an-undeclared-rubric',
 		file: 'packages/rph-application/src/handlers/assurance.ts',
 		// ⭐⭐ THIS ENTRY EXISTS BECAUSE THE EXPORT CENSUS DEMANDED IT, AND THE CENSUS WAS RIGHT.
