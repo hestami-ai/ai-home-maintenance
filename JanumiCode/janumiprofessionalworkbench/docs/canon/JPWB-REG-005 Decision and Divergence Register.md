@@ -36294,3 +36294,79 @@ position; it is now a measured one.
 ⭑ **WHAT IS STILL OWED IS UNCHANGED.** Four reviews on two artifacts by one reviewer model is evidence that the
 contract is honoured, not a bound on how often it is. Nothing here licenses removing the fixture's declared
 coverage or the guard in `mock-reasoning-review-validator.test.ts` that pins it.
+
+---
+
+### REG-D-064 — `JAN-NOANS` sponsor rulings: a thrown call is `no-response`, and the content plane is gated by callers rather than by the port
+
+**Ruled 2026-09-20** (sponsor, `JAN-NOANS`). **Status:** ✅ **RATIFIED** — both limbs applied in the commit that
+records this entry.
+
+⭐⭐ **`R27` — A CALL THAT THREW IS DISPOSITIONED `no-response`, NOT `rejected`.**
+
+`run-model-step.ts`'s `catch` arm recorded `disposition: 'rejected'` for a model call that never returned.
+⛔ `rejected` is a **producer-fault** disposition: it asserts an answer arrived and was refused. On that arm no
+answer exists, and frequently no model was invoked — so the record named a fault the producer did not commit.
+`REG-F-338` states the general cost — *"worse than a lost record: it is a false one"* — and the ratified
+vocabulary note for `NO_RESPONSE` names *"a timeout or abort"* as its own referent, which is precisely this arm.
+
+⭑ **ONLY THE DISPOSITION MOVES, AND THAT IS THE POINT.** The `catch` arm keeps `NOT_ATTEMPTED` and the
+no-answer arm carries `EMPTY_RESPONSE`: *the call broke* and *the call returned holding nothing* are different
+facts with different remedies, and E-5 is where that difference belongs. Collapsing them into one disposition
+**and** one outcome would be `REG-F-410` committed inside its own fix.
+
+⚠ **IT CORRECTED A PASSING ASSERTION**, which is why it was put to the sponsor rather than slipped in alongside
+an adjacent fix. `run-model-step.test.ts:193` read `expect(...).toBe('REJECTED')` and passed. It is **rewritten,
+not deleted** — the guarantee it carries is unchanged and still worth pinning (a failed call LEAVES A RECORD, on
+the EXECUTION plane, with a disposition that does not lie about whose fault it was); only the expected token
+moved, and the arm now also pins `NOT_ATTEMPTED` so the two non-answers cannot later be collapsed silently.
+
+⭐ **`R28` — THE CONTENT PLANE STAYS GATED BY CALLERS; THE PORT QUESTION IS FILED, NOT ANSWERED.**
+
+The alternative was to make `ArtifactStore.put` REFUSE zero-byte bytes. ⛔ Declined for now: `put` cannot
+currently express a refusal, so it would need a union return or a throw — a **breaking change to a port with two
+adapters and every caller** — and the harm it guards is already prevented upstream, where the step returns
+before `put` is reached.
+
+⚠ **THE WEAKNESS IS DISCLOSED RATHER THAN PREVENTED, AND THE SPONSOR CHOSE IT KNOWING SO.** All five current
+call sites were audited and all are safe; **an audit is not a type**, and a sixth caller could mint a zero-byte
+retained artifact without anything noticing. What makes this tolerable is that it is *recorded* — this entry is
+the disclosure, and `NA-06`'s derived coverage table is what would surface a new producer of the wrong shape.
+
+---
+
+### REG-F-413 — the execution step's host-configured identity named the REVIEWER's model, and nothing could reach the field to notice
+
+**Filed 2026-09-20** (`JAN-EXEC` / `JAN-NOANS`, live-execution lane). **Status:** ✅ **CLOSED on filing** — found
+and fixed in the same commit, and verified by re-driving the lane.
+
+⭐ **FOUND BY THE FIX FOR `REG-F-410`, ON THE FIRST LIVE RUN THAT EXERCISED THE NEW ARM.** The record was
+otherwise exactly right — `NO_RESPONSE`, `EMPTY_RESPONSE`, the provider's sentence verbatim,
+`EXPECTED_BUT_UNRETAINED`, zero artifacts, zero assessments — and one field was plainly false:
+
+```
+resolvedModel: {"availability":"REPORTED","evidence":"HOST_CONFIGURED","value":"gemini-3.1-pro-high"}
+```
+
+That is the **assurance** model, on an **execution** exchange, for a step configured to run `gpt-5.4-mini`.
+
+⛔ **THE CAUSE IS ONE LINE, AND IT IS `REG-F-356` SURVIVING ITS OWN FIX.**
+`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1258` passed
+`modelId: resolveJudgeModel() ?? 'unresolved'` with `providerId: 'agy'` — the reviewer's model and the
+reviewer's tool — as the EXECUTION step's host-configured identity. ⭑ **Two comments in the same file already
+record fixing this exact thing** (*"This read `resolveJudgeModel()` — it labelled the PRODUCING model with the
+REVIEWING model's id"*): `TS-04`/`LE-01` repaired the paths those comments sit on and **left the fallback
+behind**.
+
+⚠ **IT SURVIVED BECAUSE NOTHING COULD REACH IT.** These values are used ONLY when the tool reports no identity
+of its own, and the success path always overrides them with `produced.producer`. The sole readers were the
+`catch` arm and — as of `JAN-NOANS` — the no-answer arm. ⭐ **That is `REG-F-410`'s own structure, one field
+over: a wrong value sitting in an arm nothing executed.**
+
+⛔ **NOT COSMETIC.** `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so every failed execution call
+was recorded as having been produced by the reviewer — the exact collision `REG-F-356` was filed for.
+
+⭑ **REMEDY, VERIFIED:** `resolveExecutorModel()` / `resolveExecutorToolId()`, graded `HOST_CONFIGURED`, which is
+what they honestly are. Re-driving the same lane now records `openai-codex/gpt-5.4-mini`. ⭐ **And the
+`resolveJudgeModel` import is gone from that route**, which is the standing check: it was the last live
+reference to the reviewer's model on the execution path there, and lint reports a relapse.

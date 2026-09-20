@@ -328,7 +328,19 @@ export async function runModelInvocationStep(
 			model: { modelId: input.modelId, providerId: input.providerId },
 			prompt: turnText,
 			rawOutput: '',
-			disposition: 'rejected',
+			// ⭐⭐ SPONSOR RULING (`JAN-NOANS`, 2026-09-20): a THROWN call is `no-response`, not `rejected`.
+			//
+			// ⛔ `rejected` IS A PRODUCER-FAULT DISPOSITION AND THE PRODUCER COMMITTED NO FAULT HERE. It says an
+			// answer arrived and was refused; on this arm the call never returned one. `REG-F-338` states the
+			// cost of the shape in general — *"worse than a lost record: it is a false one"* — and the ratified
+			// vocabulary note for `NO_RESPONSE` names *"a timeout or abort"* as its own referent, which is
+			// precisely this arm.
+			//
+			// ⭑ THE TWO NON-ANSWERS STAY DISTINGUISHABLE, which is why only the DISPOSITION moves. This arm keeps
+			// `NOT_ATTEMPTED` and the silent-turn arm below carries `EMPTY_RESPONSE`: *the call broke* and *the
+			// call returned holding nothing* are different facts with different remedies, and E-5 is where that
+			// difference belongs. Collapsing them into one disposition AND one outcome would be the finding.
+			disposition: 'no-response',
 			attemptOrdinal: 1,
 			requestedAt,
 			respondedAt,

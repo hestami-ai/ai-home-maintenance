@@ -449,10 +449,19 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 						// `EMPTY_RESPONSE` — the assurance plane has been right about this all along, and
 						// `REG-F-410` is that the EXECUTION plane never asked. Collapsing to `''` preserves that
 						// verdict exactly.
-						// ⛔ WHAT IT DOES NOT YET DO is carry the CAUSE — a reviewer whose provider refused the
-						// model is still recorded as a reviewer that said nothing. That is the same finding on
-						// this plane, it is `NA-05` on the roadmap, and it is stated here rather than left for a
-						// reader to notice the asymmetry and assume it was considered.
+						// ⭐ AND THE COLLAPSE IS CURRENTLY LOSSLESS, WHICH I CHECKED RATHER THAN ASSUMED. My first
+						// note here said a reviewer whose provider refused the model would be recorded as a
+						// reviewer that said nothing — the same finding on this plane. **That is not reachable
+						// today.** Only two adapters can be a reviewer (`agyPrint` at `:340` by default,
+						// `devinPrint` via `assurance/index.ts:69`), and BOTH THROW on a failed invocation rather
+						// than returning. So the only cause that can arrive here is `ENDED_WITHOUT_ANSWER`, which
+						// is exactly what `classifyParse` already reports as `EMPTY_RESPONSE`.
+						//
+						// ⚠ IT BECOMES LOSSY THE MOMENT A SESSION-BASED REVIEWER IS WIRED — one that RESOLVES on a
+						// provider refusal instead of throwing, which is precisely what `pi-executor` does and why
+						// `REG-F-410` happened on the execution plane first. Whoever wires that must widen this
+						// line in the same commit; the bound is stated here rather than left as an asymmetry a
+						// reader would have to assume was considered.
 						text = returned.answer.arrived ? returned.answer.text : '';
 						// ⚠ TAKEN OUTSIDE THE IDENTITY GUARD BELOW, DELIBERATELY. What a tool observed and whether
 						// it named a usable model are INDEPENDENT facts; nesting this inside the identity check

@@ -190,7 +190,21 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		expect(out.ran).toBe(false);
 		expect(!out.ran && out.refusedBecause).toMatch(/provider unreachable/);
 		expect(dispatched, 'the failed try left no record').toHaveLength(1);
-		expect(dispatched[0]!.disposition).toBe('REJECTED');
+		// ⭐⭐ THIS ASSERTION READ `REJECTED` AND PASSED, AND IT WAS ASSERTING SOMETHING FALSE.
+		//
+		// ⛔ CORRECTED BY SPONSOR RULING (`JAN-NOANS`, 2026-09-20), NOT BY CONVENIENCE. `rejected` is a
+		// PRODUCER-FAULT disposition: it says an answer arrived and was refused. This arrangement throws before
+		// any answer exists, so the producer committed no fault — and the ratified vocabulary note for
+		// `NO_RESPONSE` names *"a timeout or abort"* as its referent, which is exactly this arm.
+		//
+		// ⚠ REWRITTEN RATHER THAN DELETED. The guarantee it carries is unchanged and still worth pinning: a
+		// failed call LEAVES A RECORD, on the EXECUTION plane, with a disposition that does not lie about whose
+		// fault it was. Only the expected token moved.
+		expect(dispatched[0]!.disposition).toBe('NO_RESPONSE');
+		// ⭑ AND E-5 STILL SEPARATES THE TWO NON-ANSWERS. A thrown call is `NOT_ATTEMPTED`; a call that returned
+		// holding nothing is `EMPTY_RESPONSE` (`no-answer-is-not-an-answer.test.ts`). They share a disposition
+		// and must not share an outcome — that is the whole reason only the disposition moved.
+		expect(dispatched[0]!.parseOutcome.outcome).toBe('NOT_ATTEMPTED');
 		expect(dispatched[0]!.plane).toBe('EXECUTION');
 	});
 });
