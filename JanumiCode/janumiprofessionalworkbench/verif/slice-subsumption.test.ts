@@ -467,7 +467,25 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// WHO ANSWERED — and it widened every field EXCEPT the answer, which stayed a bare `string`. So the
 			// shape `REG-F-410` turns on is a residue of a widening that was already performed once, for the
 			// same reason, on the same interface. That belongs in this roadmap's argument and was not in it.
-		).toBe(43);
+			//
+			// 43 -> 44 (2026-09-20): `ROADMAP-the-cast-that-disabled-its-own-gate.md` (`JAN-ASSERTED`). ⭑ TWO
+			// CANDIDATES ARE CLOSER THAN ANY PREVIOUS PAIR, and both had to be refused on the SAME ground.
+			//   · `JAN-PROMPT` owns the rule this programme restores — sponsor default #2 of 2026-09-04 under
+			//     `REG-D-058`: *“A missing declared placeholder at render time is a REFUSAL, not a disclosed
+			//     gap.”* It is the closest claim anything has had. ⛔ REFUSED because it is LANDED, and folding
+			//     pending work into a completed roadmap is the failure this pin exists to catch — the objection
+			//     `41 -> 42` and `42 -> 43` each had to make once already.
+			//   · `JAN-OUTCONTRACT` owns `outputContract`, the channel that makes `R29` cost nothing: the
+			//     producer is still told what output is required after `{expectedOutputs}` stops being supplied.
+			//     Also landed; same objection.
+			// ⭐⭐ AND ASKING PRODUCED THE FACT THAT REFRAMED THE WHOLE PROGRAMME, which is now the third time
+			// running. `AS-03` reads as new policy — *“stop supplying a placeholder”* — and it is not: the
+			// sponsor RATIFIED that refusal two weeks ago, `prompt-render.ts` implements it, and
+			// `execution-invocation.test.ts:79-86` pins it GREEN. A `?? []` in a route turned ABSENT into
+			// PRESENT-BUT-EMPTY and made all three unreachable at the only production call site. ⭑ The design
+			// said “mint a rule” until this question was asked; it now says “restore one”, which is a different
+			// programme with a different burden of proof.
+		).toBe(44);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
