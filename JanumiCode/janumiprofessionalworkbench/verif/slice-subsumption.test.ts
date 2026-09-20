@@ -485,7 +485,21 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// PRESENT-BUT-EMPTY and made all three unreachable at the only production call site. ⭑ The design
 			// said “mint a rule” until this question was asked; it now says “restore one”, which is a different
 			// programme with a different burden of proof.
-		).toBe(44);
+			//
+			// 44 -> 45 (2026-09-20): `ROADMAP-the-fixtures-a-ruling-orphaned.md` (`JAN-ORPHANED`). ⭑ THE NEAREST
+			// CANDIDATE IS THE RULING THAT CAUSED IT, WHICH IS A NEW SHAPE FOR THIS PIN.
+			//   · `JAN-EXEC` Phase 7c carries `R26`, the ruling that re-meant these fixtures. ⛔ REFUSED, and not
+			//     on the usual “already landed” ground: Phase 7c is still OPEN. The reason is different and
+			//     stronger — a ruling's own programme is the WORST place to record the collateral that ruling
+			//     caused, because the entry that says *“this was the right call”* would also be the entry that
+			//     says what it broke, and a reader auditing the cost would have to take the ruling's word for it.
+			//   · `JAN-PFA` owns the ratchets and `JAN-VERIF` the mutation ledger; `OR-04` touches a ledger entry
+			//     but only to annotate an entry whose predicted red was unobservable. Neither owns the fixtures.
+			// ⭐ AND ASKING PRODUCED THE FRAMING AGAIN: this programme is not “fix eleven red tests”. It is
+			// *a ruling changed what an arrangement MEANT, and nothing re-read the arrangements* — the `R26` commit
+			// touched seven files and no fixture among them. That is a general hazard about rulings, not a local
+			// defect about tests, and it belongs in its own entry where the next ruling's author will find it.
+		).toBe(45);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

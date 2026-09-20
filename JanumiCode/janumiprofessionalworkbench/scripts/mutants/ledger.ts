@@ -6182,6 +6182,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-EXEC Phase 0 (ROADMAP-undertaking-execution-sandbox.md §2), unblocked by the sponsor's ruling of 2026-09-14"
 	},
 	{
+		id: 'AS-04-the-boundary-asserts-instead-of-parsing',
+		file: 'packages/rph-application/src/execution-invocation.ts',
+		// ⛔ THE MUTATION RESTORES EXACTLY THE SHAPE `REG-F-411` WAS FILED FOR: a projection ASSERTED into the
+		// type the caller wanted, rather than parsed against the contract that governs it. It keeps every
+		// parameter used and every type intact, so it cannot pass as a NO_COMPILE artifact.
+		// ⚠ THE FIRST FORM OF THIS MUTATION WAS A `NO_COMPILE` ARTIFACT, and this ledger's own header says such
+		// a result is worth nothing. `{ success: true, data } as const` REMOVED `.error`, which the refusal arm
+		// reads — so `tsc` failed on the MUTANT rather than the victim failing on the BEHAVIOUR. The shape below
+		// keeps all three members with a non-literal `success`, so it compiles and simply never refuses, which is
+		// the behaviour actually under attack.
+		find: '\tconst parsed = ProfessionalWorkUnitSchema.safeParse(raw);',
+		replace:
+			'\tconst parsed = { success: true as boolean, data: raw as { title: string; description: string }, error: { issues: [] as { path: string[]; message: string }[] } }; // MUTANT: assert, do not parse',
+		expectRed: ['packages/rph-application/src/execution-invocation-projection.test.ts'],
+		why: "PROMISE: `R30` (REG-D-065) \u2014 the projection is PARSED against its contract, refusing on ABSENCE and on SHAPE, because a boundary that asserts cannot be checked by `check-types` (*\"the gate that would have caught the defect is the one the defect disabled\"*). WHO RELIES: every producer shown a rendered instruction, and every reviewer shown that instruction \u2014 `RR-07-no-contradiction` is judged against it. WHAT THE MUTATION DOES TO THEM: a stored row of the wrong shape flows through to the renderer, which is how `Required outputs: [object Object]` reached every executing model for as long as the two casts existed. \u26a0 It is not a crash: the record stays internally consistent and LOOKS complete, which is why only a driven shape-refusal notices.",
+		source: 'JAN-ASSERTED AS-04 (ROADMAP-the-cast-that-disabled-its-own-gate.md), sponsor ruling R30 / REG-D-065'
+	},
+	{
+		id: 'AS-04-an-absent-type-throws-instead-of-deferring',
+		file: 'packages/rph-application/src/execution-invocation.ts',
+		// ⭑ THE OTHER DIRECTION, AND IT IS THE ONE A REFUSAL-BASED REMEDY GETS WRONG. `resolvePwuTypeFacts`
+		// returns `{}` for an absent type ON PURPOSE: `prepareModelInvocation` already refuses such a work unit
+		// with *\"declares no agent behaviour\"*, which NAMES the type. Throwing here replaces a good refusal
+		// with a worse one — the shape `D-2`'s first horn describes.
+		find: '\tif (raw === undefined || raw === null) return {};',
+		replace:
+			'\tif (raw === undefined || raw === null) throw new Error(`no type ${pwuTypeId}`); // MUTANT: refuse everything',
+		expectRed: ['packages/rph-application/src/execution-invocation-projection.test.ts'],
+		why: "PROMISE: the boundary refuses on SHAPE but DEFERS on absence, so the downstream refusal that can name the type is the one a reader sees. WHO RELIES: every work unit whose type is missing or not yet authored \u2014 the demo's own TRANSFORMATION lifecycle path. WHAT THE MUTATION DOES TO THEM: every such unit throws at the boundary instead of being refused with a message that says which type is missing, and the CONTROL that distinguishes `refuse on shape` from `refuse on everything` is the only thing that reports it. \u2b50 This mutant exists because the remedy it guards is a REFUSAL, and an untested refusal tends toward refusing everything.",
+		source: 'JAN-ASSERTED AS-04 (ROADMAP-the-cast-that-disabled-its-own-gate.md), sponsor ruling R30 / REG-D-065'
+	},
+	{
 		id: 'P0-b-the-declared-relation-resolves-to-nothing',
 		file: 'apps/rph-demo/src/lib/server/execution/execution-contract.ts',
 		// ⛔ THE MUTATION SWAPS TWO FIELDS RATHER THAN DELETING THEM, DELIBERATELY. Deleting the address would leave

@@ -56,8 +56,30 @@ const SUBJECT: AssuranceSubject = {
 
 const JUDGE = 'gemini-judge-3';
 
+/**
+ * ⭐⭐ `JAN-ORPHANED` `OR-02` — WHAT A CLEAN REVIEW ACTUALLY LOOKS LIKE: one `failed: false` row per
+ * criterion, DERIVED from the policy's own list.
+ *
+ * ⛔ THIS WAS `findings: []`, AND THAT IS NOT A CLEAN REVIEW — IT IS A NON-ANSWER. This file's own
+ * header insists it exercises *“the REAL Validator path … with ONLY the impure subprocess faked”*, and
+ * the real prompt this Validator sends says *“Evaluate EACH derivational-integrity failure class below”*
+ * and shows `"failed":false` in its own example. An empty list models a reviewer that DISOBEYED the
+ * prompt the file claims to be running.
+ *
+ * ⚠ AND THE OLD FIXTURE PUT THIS FILE IN DIRECT CONTRADICTION WITH A RATIFIED GUARD.
+ * `reviewer-silence-is-not-a-pass.test.ts` arranges the SAME `findings: []` + SATISFIED over mandatory
+ * criteria and asserts every criterion IS `UNABLE_TO_DETERMINE`; the ablation below asserts NONE is.
+ * Both cannot hold, and the other one is `R26`'s own guard.
+ *
+ * ⭑ MEASURED, NOT ARGUED: with `findings: []` the ablation's assertion could not tell a mutant that
+ * TRUNCATES the findings list from its own baseline — both were red. Derived rows make it discriminate.
+ */
 const CLEAN = JSON.stringify({
-	findings: [],
+	findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+		criterionId: c.id,
+		failed: false,
+		statement: 'evaluated; the failure class is absent'
+	})),
 	recommendation: 'SATISFIED',
 	residualUncertainty: []
 });

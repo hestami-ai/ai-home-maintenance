@@ -22,6 +22,31 @@ import type { EngineHandle } from './engine.js';
 import { createEngine, recordAssuranceRecordingPlan } from './index.js';
 import { seedFloorPolicies } from './seed-workbench.js';
 
+/**
+ * ⭐⭐ `JAN-ORPHANED` `OR-02` — WHAT A REVIEWER THAT EVALUATED EVERYTHING AND FAULTED NOTHING ACTUALLY
+ * RETURNS: one `failed: false` row per criterion.
+ *
+ * ⛔ THIS FIXTURE USED TO BE `findings: []`, AND THAT MEANT THE OPPOSITE OF WHAT IT MEANS NOW. It was
+ * authored 2026-07-14 under the contract where an unmentioned criterion read as `MET` — so an empty list
+ * said *“evaluated everything, found nothing”*. `R26` (2026-09-20) ruled that absence means the reviewer
+ * did not judge it, and re-meant every such literal without touching one: the `R26` commit changed seven
+ * files and no fixture among them.
+ *
+ * ⭑ THE INTENT WAS ALWAYS THIS — IT IS WRITTEN IN THE FIXTURE'S OWN DOCSTRING (*“all 9 criteria MET”*).
+ * What changed is only that a clean verdict must now be SAID rather than inferred from silence, which is
+ * exactly what a live reviewer does: `REG-F-412` measured nine rows in five of five reviews.
+ *
+ * ⚠ DERIVED, NEVER HAND-LISTED. Nine written-out ids would stop covering a tenth criterion silently — the
+ * hand-listing defect one level up. (The criterion list itself is pinned by id AND count in
+ * `pwa-export.test.ts`, so this cannot mask a new one.)
+ */
+const allClean = () =>
+	SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+		criterionId: c.id,
+		failed: false,
+		statement: 'evaluated; the failure class is absent'
+	}));
+
 const TS = '2026-07-14T00:00:00Z';
 const AGENT: ActorReference = {
 	actorId: 'agent-1',
@@ -58,7 +83,7 @@ const rrSatisfied: Validator = {
 				JUDGE,
 				'test.reasoning-review',
 				{
-					findings: [],
+					findings: allClean(),
 					recommendation: 'SATISFIED'
 				},
 				SEEDED_REASONING_REVIEW_CRITERIA

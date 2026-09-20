@@ -13,6 +13,10 @@ import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
 import { reasoningReviewCriteria } from '../floor.js';
+import {
+	clearingReviewerFor,
+	withLiveReviewerSeam
+} from '../assurance/clearing-reviewer.testing.js';
 import { runWorkProductFloor } from './work-product-floor.js';
 
 const TS = '2026-09-05T00:00:00Z';
@@ -51,7 +55,8 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 			purgeability: 'RETAINED_BY_PARTICIPATION' as const,
 			contentDurability: artifacts.durability
 		};
-		const out = await runWorkProductFloor(
+		const out = await withLiveReviewerSeam(async () =>
+			runWorkProductFloor(
 			{
 				artifactId: 'art_01ARZ3NDEKTSV4RRFFQ69G5A01',
 				artifact: { semanticVersion: 1, provenance: {}, producingPwuId: 'pwu_1' },
@@ -68,7 +73,20 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 				producerModelId: 'test-model'
 			},
 			session,
-			{ artifacts, now: () => TS, newId, criteria: reasoningReviewCriteria(session) }
+			{
+				artifacts,
+				now: () => TS,
+				newId,
+				criteria: reasoningReviewCriteria(session),
+				// ⭐ `JAN-ORPHANED` `OR-02` — a CLEARING reviewer, framed for a work product.
+				// ⛔ ITS PARTNER BELOW STAYS ON THE DETERMINISTIC CHECKER, DELIBERATELY: that half asserts the
+				// EMPTY product is refused WITH an `RR-04` observation, which is the checker's own judgement and
+				// must keep being tested. ⚠ The two halves therefore run on different instruments, and the
+				// positive half no longer proves `judgeWorkProduct` ACCEPTS anything —
+				// `work-product-review.test.ts`'s own CONTROL is that guard, and it is green.
+				print: clearingReviewerFor('The WORK PRODUCT to review', reasoningReviewCriteria(session))
+			}
+			)
 		);
 		expect(out.satisfied, `not satisfied: ${JSON.stringify(out.observations)}`).toBe(true);
 	});
@@ -146,7 +164,8 @@ describe('JAN-TOOLSUITE TS-08 — independence is DECIDED on the recorded produc
 			purgeability: 'RETAINED_BY_PARTICIPATION' as const,
 			contentDurability: artifacts.durability
 		};
-		return runWorkProductFloor(
+		return withLiveReviewerSeam(async () =>
+			runWorkProductFloor(
 			{
 				artifactId: 'art_01ARZ3NDEKTSV4RRFFQ69G5B01',
 				artifact: { semanticVersion: 1, provenance: {}, producingPwuId: 'pwu_1' },
@@ -163,7 +182,14 @@ describe('JAN-TOOLSUITE TS-08 — independence is DECIDED on the recorded produc
 				producerModelId
 			},
 			session,
-			{ artifacts, now: () => TS, newId, criteria: reasoningReviewCriteria(session) }
+			{
+				artifacts,
+				now: () => TS,
+				newId,
+				criteria: reasoningReviewCriteria(session),
+				print: clearingReviewerFor('The WORK PRODUCT to review', reasoningReviewCriteria(session))
+			}
+			)
 		);
 	}
 
@@ -181,7 +207,11 @@ describe('JAN-TOOLSUITE TS-08 — independence is DECIDED on the recorded produc
 		// ⚠ THE ASSERTION IS ON THE OBSERVATION, NOT MERELY ON `satisfied`. An empty work product is ALSO not
 		// satisfied, so `satisfied === false` alone cannot tell a non-independent review apart from a rejected
 		// one — an arrangement that trips two guards proves neither.
-		const out = await runWith('mock-reasoning-review');
+		// ⭐ `JAN-ORPHANED`: `'test-judge-model'`, NOT `'mock-reasoning-review'`. The pair turns on producer and
+		// reviewer carrying the SAME model id, and under the live reviewer seam the reviewer's id is the
+		// configured judge model. ⛔ Moving only the passing half would have broken this one — the identity
+		// literal has to move with it, which is why both halves are on the seam.
+		const out = await runWith('test-judge-model');
 		expect(out.satisfied).toBe(false);
 		expect(JSON.stringify(out.observations)).toMatch(/INDEPENDENCE/i);
 	});

@@ -40,7 +40,9 @@
 		"packages/rph-application/src/execution-invocation.ts": {
 			"consumedExports": [
 				"assembleStepContext",
-				"prepareModelInvocation"
+				"prepareModelInvocation",
+				"resolveInvocationSubject",
+				"resolvePwuTypeFacts"
 			],
 			"guardedExports": [
 				"assembleStepContext",
@@ -161,7 +163,7 @@
 				"unsupportedSatisfaction",
 				"unsupportedSatisfactionMessage"
 			],
-			"unattributedMutants": 1
+			"unattributedMutants": 0
 		},
 		"packages/rph-application/src/handlers/decomposition.ts": {
 			"consumedExports": [

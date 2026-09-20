@@ -21,6 +21,10 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
 import { reasoningReviewCriteria } from '../floor.js';
+import {
+	clearingReviewerFor,
+	withLiveReviewerSeam
+} from '../assurance/clearing-reviewer.testing.js';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import {
 	PROCESS_RESULT_VIOLATIONS,
@@ -305,13 +309,27 @@ describe('⭐⭐ JAN-EXEC Phase 5 — the floor RUNS over an EVIDENCE subject, w
 		// ⛔ THE RED. Before `R14` this returned INCONCLUSIVE whatever the facts said: the subject's `objectType`
 		// selected the reviewer's framing, `'EVIDENCE'` was not `'ARTIFACT'`, and the graph arm cannot read a
 		// build log. INCONCLUSIVE BLOCKS, so the completion Phase 5 exists to permit was unreachable.
+		// ⭐⭐ `JAN-ORPHANED` `OR-03` — THE REVIEWER IS A CLEARING ONE, AND IT STILL KNOWS ITS FRAMING.
+		//
+		// ⛔ IT USED TO BE THE DETERMINISTIC STRUCTURAL CHECKER, which examines two of the policy's nine criteria
+		// — so after `R26` the other seven arrive `UNABLE_TO_DETERMINE` and this floor is INCONCLUSIVE whatever
+		// the command result says. That is a fact about the fixture's COVERAGE, not about the routing this test
+		// exists to prove.
+		//
+		// ⭑ AND A FIXED CLEARING REPLY WOULD HAVE BEEN WORSE THAN THE PROBLEM: framing-blind, it answers
+		// identically under either arm, so the `R14` red named in this test's own comment would stop reddening
+		// — a control that cannot fail, introduced by the repair. `clearingReviewerFor` REFUSES the framing it
+		// was not written for, so reverting `R14` still turns this red.
 		const { session, artifacts, newId } = harness();
-		const out = await runProcessResultFloor(await subjectFor(artifacts), session, {
-			artifacts,
-			now: () => TS,
-			newId,
-			criteria: reasoningReviewCriteria(session)
-		});
+		const out = await withLiveReviewerSeam(async () =>
+			runProcessResultFloor(await subjectFor(artifacts), session, {
+				artifacts,
+				now: () => TS,
+				newId,
+				criteria: reasoningReviewCriteria(session),
+				print: clearingReviewerFor('The COMMAND RESULT to review', reasoningReviewCriteria(session))
+			})
+		);
 		expect(out.satisfied, `not satisfied: ${JSON.stringify(out.observations)}`).toBe(true);
 	});
 

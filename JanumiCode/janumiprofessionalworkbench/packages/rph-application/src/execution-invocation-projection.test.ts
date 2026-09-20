@@ -19,7 +19,12 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from './index.js';
-import { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
+import {
+	assembleStepContext,
+	prepareModelInvocation,
+	resolveInvocationSubject,
+	resolvePwuTypeFacts
+} from './execution-invocation.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
 
 const TS = '2026-09-20T00:00:00Z';
@@ -191,5 +196,50 @@ describe('⭐ AS-02 — the invocation subject is built from a REAL stored work 
 		);
 		expect('criteria' in ctx, 'absent, not present-and-empty — the refusal depends on this').toBe(false);
 		expect(ctx.subject, 'the control must still supply what the unit HAS').toBe('Route Assessment');
+	});
+
+	// ── ⭐⭐ `JAN-ASSERTED` `AS-04` — THE BOUNDARY REFUSES ON SHAPE, NOT ONLY ON ABSENCE ──────────────────────────
+	//
+	// ⛔ THIS SUITE WAS COMMITTED WITHOUT THESE TWO, AND THE ROADMAP HAD PREDICTED THEM. `AS-04`'s own table names
+	// *"assert instead of parse → a stored row that does not parse must REFUSE, not proceed"* and *"refuse on
+	// absence only, not on shape → the same test."* The remedy landed; the test that proves it did not. It was
+	// found by asking why `guards:export` reported two newly BARE exports — the census noticing an unguarded
+	// promise is what surfaced a missing test, which is the census doing exactly its job.
+	describe('⭐ AS-04 — the invocation subject is PARSED, so a malformed projection refuses', () => {
+		it('⛔ REFUSES a projection that does not parse as a PROFESSIONAL_WORK_UNIT — the cast said it did', () => {
+			// THE MUTANT: assert instead of parse (`raw as ProfessionalWorkUnit`). The malformed row then flows
+			// straight through to the template renderer, which is `REG-F-411` exactly: eleven hand-written
+			// assertions and a `check-types` that could say nothing about any of them.
+			expect(() =>
+				resolveInvocationSubject(() => ({ objectType: 'PROFESSIONAL_WORK_UNIT', title: 42 }), PWU)
+			).toThrow(/does not parse as a PROFESSIONAL_WORK_UNIT/);
+		});
+
+		it('⛔ and REFUSES an id that resolves to nothing, naming the work unit', () => {
+			expect(() => resolveInvocationSubject(() => undefined, PWU)).toThrow(/does not resolve/);
+		});
+
+		it('⭐ CONTROL — a well-formed STORED work unit resolves, so this is not "refuse everything"', () => {
+			// ⛔ WITHOUT THIS, BOTH ASSERTIONS ABOVE PASS FOR A RESOLVER THAT THROWS UNCONDITIONALLY — the shape
+			// `D-2`'s first horn describes, and the one a refusal-based remedy is most likely to ship.
+			const out = proposePwu([{ outputId: `out_${PWU}`, kind: 'DOCUMENT' }]);
+			expect(out.status).toBe('ACCEPTED');
+			const subject = resolveInvocationSubject((id) => store.loadObject(id)?.state, PWU);
+			expect(subject.id).toBe(PWU);
+			expect(subject.title, 'the parsed subject lost the value it exists to carry').toBe(
+				'Route Assessment'
+			);
+		});
+
+		it('⭐ CONTROL — the TYPE facts parse too, and an absent type is not an error', () => {
+			// ⭑ THE ASYMMETRY IS DELIBERATE AND IS ASSERTED, not left to a reader. A work unit with no resolvable
+			// TYPE is already handled downstream by `prepareModelInvocation`'s "declares no agent behaviour"
+			// refusal, which names the type; throwing here would replace a good refusal with a worse one.
+			expect(resolvePwuTypeFacts(() => undefined, undefined)).toEqual({});
+			expect(resolvePwuTypeFacts(() => undefined, 'pwut_missing')).toEqual({});
+			expect(() => resolvePwuTypeFacts(() => ({ objectType: 'PWU_TYPE', purpose: 7 }), 'pwut_9')).toThrow(
+				/does not parse as a PWU_TYPE/
+			);
+		});
 	});
 });

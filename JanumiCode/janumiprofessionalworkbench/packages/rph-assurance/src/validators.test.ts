@@ -62,7 +62,31 @@ function mockReasoningReview(j: ReasoningReviewJudgement, evaluator: Identity = 
 			)
 	};
 }
-const CLEAN: ReasoningReviewJudgement = { findings: [], recommendation: 'SATISFIED' };
+/**
+ * ⭐⭐ `JAN-ORPHANED` `OR-02` — WHAT A REVIEWER THAT EVALUATED EVERYTHING AND FAULTED NOTHING ACTUALLY
+ * RETURNS: one `failed: false` row per criterion.
+ *
+ * ⛔ THIS FIXTURE USED TO BE `findings: []`, AND THAT MEANT THE OPPOSITE OF WHAT IT MEANS NOW. It was
+ * authored 2026-07-14 under the contract where an unmentioned criterion read as `MET` — so an empty list
+ * said *“evaluated everything, found nothing”*. `R26` (2026-09-20) ruled that absence means the reviewer
+ * did not judge it, and re-meant every such literal without touching one: the `R26` commit changed seven
+ * files and no fixture among them.
+ *
+ * ⭑ THE INTENT WAS ALWAYS THIS — IT IS WRITTEN IN THE FIXTURE'S OWN DOCSTRING (*“all 9 criteria MET”*).
+ * What changed is only that a clean verdict must now be SAID rather than inferred from silence, which is
+ * exactly what a live reviewer does: `REG-F-412` measured nine rows in five of five reviews.
+ *
+ * ⚠ DERIVED, NEVER HAND-LISTED. Nine written-out ids would stop covering a tenth criterion silently — the
+ * hand-listing defect one level up. (The criterion list itself is pinned by id AND count in
+ * `pwa-export.test.ts`, so this cannot mask a new one.)
+ */
+const allClean = () =>
+	SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+		criterionId: c.id,
+		failed: false,
+		statement: 'evaluated; the failure class is absent'
+	}));
+const CLEAN: ReasoningReviewJudgement = { findings: allClean(), recommendation: 'SATISFIED' };
 
 describe('reasoningReviewResultFromJudgement — judgement → schema-conformant ValidatorResult', () => {
 	// ⭐ RENAMED AND RE-ASSERTED FOR `R26`. This read *“MET iff absent”* — the contract that made a
@@ -130,6 +154,31 @@ describe('validator registry + runDeMinimisFloor', () => {
 		const out = await runDeMinimisFloor(subject, goodCtx, registry(mockReasoningReview(CLEAN)));
 		expect(out.aggregate).toBe('SATISFIED');
 		expect(out.gatePermitsTransition).toBe(true);
+	});
+
+	// ── ⭐⭐ `JAN-ORPHANED` `OR-01` — A SILENT REVIEWER CLOSES THE GATE, PROVEN AT THE COMPOSITION LEVEL ──────
+	//
+	// ⛔ THIS TEST IS WRITTEN **BEFORE** THE FIXTURES ARE CORRECTED, AND THAT ORDER IS THE WHOLE POINT. Until
+	// `JAN-ORPHANED`, the arrangement above (`CLEAN` = `findings: []`) WAS this signal — inverted. It failed,
+	// and its failure was the only thing in the suite demonstrating that a reviewer which judged nothing cannot
+	// compose to SATISFIED. Correcting the fixture first would have removed that demonstration silently, and
+	// nothing would have gone red to say so.
+	//
+	// ⚠ THE GAP IT FILLS IS DERIVED, NOT GUESSED. `reviewer-silence-is-not-a-pass.test.ts` asserts
+	// `dispositionFromFindings` DIRECTLY — it never calls a floor runner. Grepping the filesystem for call
+	// sites of `runDeMinimisFloor` / `runFloorAndPlanRecording` returns only the tests being corrected plus one
+	// failure-path test. So after the correction, no test anywhere would drive SILENCE through the real
+	// composition. This one does.
+	//
+	// ⭑ IT ASSERTS THE GATE AS WELL AS THE AGGREGATE. An INCONCLUSIVE aggregate that still opened the gate is
+	// the harm `REG-F-409` is about; asserting only the aggregate would leave the harm untested.
+	it('⭐ a reviewer that judged NOTHING blocks the floor: aggregate INCONCLUSIVE, gate CLOSED', async () => {
+		// THE MUTANT: revert `R26` — map an unmentioned criterion back to `MET`. Every criterion then reads
+		// PASSED on the word of a reviewer that said nothing, the aggregate goes SATISFIED, and the gate opens.
+		const silent: ReasoningReviewJudgement = { findings: [], recommendation: 'SATISFIED' };
+		const out = await runDeMinimisFloor(subject, goodCtx, registry(mockReasoningReview(silent)));
+		expect(out.aggregate, 'a reviewer that judged nothing composed to a verdict').toBe('INCONCLUSIVE');
+		expect(out.gatePermitsTransition, 'silence opened the publish gate').toBe(false);
 	});
 
 	it('an AI subject with NO Reasoning-Review validator registered is UNASSESSED and blocked', async () => {

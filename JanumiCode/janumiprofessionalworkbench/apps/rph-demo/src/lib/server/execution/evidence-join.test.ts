@@ -16,6 +16,10 @@ import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type { ProcessOutputRetention } from '@janumipwb/rph-ports';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
 import { reasoningReviewCriteria } from '../floor.js';
+import {
+	clearingReviewerFor,
+	withLiveReviewerSeam
+} from '../assurance/clearing-reviewer.testing.js';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import {
 	describeRefusedEvidence,
@@ -96,7 +100,13 @@ function harness() {
 	return { session, artifacts, newId, propose, getObject };
 }
 
+// ⭑ THE WHOLE HELPER RUNS UNDER THE LIVE REVIEWER SEAM, once, rather than each test arranging it. The env
+// keys are PROCESS-WIDE and a leak silently switches every later test in this worker onto the live path.
 async function join(runs: readonly ObservedProcessRun[], h = harness()) {
+	return withLiveReviewerSeam(() => joinUnderSeam(runs, h));
+}
+
+async function joinUnderSeam(runs: readonly ObservedProcessRun[], h: ReturnType<typeof harness>) {
 	const ref = await h.artifacts.put({
 		tenantPrefix: 'tnt-t',
 		bytes: 'the producing turn',
@@ -135,7 +145,20 @@ async function join(runs: readonly ObservedProcessRun[], h = harness()) {
 			newId: h.newId,
 			criteria: reasoningReviewCriteria(h.session),
 			propose: h.propose,
-			getObject: h.getObject
+			getObject: h.getObject,
+			// ⭐⭐ `JAN-ORPHANED` `OR-02` — A CLEARING REVIEWER, FRAMED FOR A COMMAND RESULT.
+			//
+			// ⛔ THIS FILE'S SUBJECT IS THE JOIN, NOT THE REVIEW. Its four documented mutants are all producer-
+			// or content-plane facts, and `PROCESS_VERDICT_UNOBSERVED` originates in `processResultFloorFacts`
+			// (`schemaValid: retained && verdict`), entirely independent of what a reviewer says. Nothing here
+			// mentions a reviewer — it reached the deterministic structural checker AMBIENTLY, through test mode.
+			//
+			// ⭑ AND LEAVING IT ON THAT CHECKER MADE ONE ASSERTION UNKILLABLE BY CONSTRUCTION. The refusal test
+			// below asserts *“the run that PASSED must not appear in a refusal”* — which can only be killed when
+			// ONE run is satisfied and one is not. With every subject refusing for want of criterion coverage,
+			// neither is, and the discrimination it exists to prove cannot fail. Leaving it red preserved a
+			// BROKEN discriminator, not a true statement.
+			print: clearingReviewerFor('The COMMAND RESULT to review', reasoningReviewCriteria(h.session))
 		}
 	);
 	return { ...out, h };

@@ -43,7 +43,26 @@ const JUDGE: Identity = {
 	providerId: 'google'
 };
 
-/** An independent Reasoning-Review Validator with a caller-chosen recommendation (findings only when it rejects). */
+/**
+ * ⭐⭐ `JAN-ORPHANED` `OR-02` — A REVIEWER THAT EVALUATED EVERYTHING AND FAULTED NOTHING RETURNS ONE
+ * `failed: false` ROW PER CRITERION.
+ *
+ * ⛔ THE SATISFIED ARM BELOW USED TO BE `[]`, AND THAT MEANT THE OPPOSITE OF WHAT IT MEANS NOW. Authored
+ * 2026-07-14 under the contract where an unmentioned criterion read as `MET`, an empty list said
+ * *“evaluated everything, found nothing”*. `R26` ruled that absence means the reviewer did not judge it,
+ * and re-meant this literal without touching it.
+ *
+ * ⚠ DERIVED, NEVER HAND-LISTED — nine written-out ids would stop covering a tenth criterion silently.
+ */
+const allClean = () =>
+	SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+		criterionId: c.id,
+		failed: false,
+		statement: 'evaluated; the failure class is absent'
+	}));
+
+/** An independent Reasoning-Review Validator with a caller-chosen recommendation; both arms report on
+ *  every criterion, which is what a real reviewer does (`REG-F-412`: nine rows, five of five reviews). */
 function rr(recommendation: 'SATISFIED' | 'REJECTED'): Validator {
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
@@ -66,7 +85,7 @@ function rr(recommendation: 'SATISFIED' | 'REJECTED'): Validator {
 											severity: 'BLOCKING'
 										}
 									]
-								: [],
+								: allClean(),
 						recommendation
 					},
 					SEEDED_REASONING_REVIEW_CRITERIA

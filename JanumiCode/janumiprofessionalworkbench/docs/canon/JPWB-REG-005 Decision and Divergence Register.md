@@ -36410,6 +36410,22 @@ to *"read the SPREAD, not the count"* — this entry is that instruction applied
 task cannot report the extent of a deliberate red, and a deliberate red is exactly when extent is the thing a
 reader needs. Recorded here rather than remedied: changing the gate's short-circuit is its own decision.
 
+⛔⛔ **CORRECTED 2026-09-20, SAME DAY, BY DRIVING IT.** This entry said the 11 and the 13 share a cause, and
+implied they share a REMEDY. ~~*“The corrected spread is 11 unit tests and 13 e2e specs.”*~~ The cause is
+shared; the remedy is not, and `JAN-ORPHANED` measured the difference:
+
+- **The 11 were FIXTURE-ORPHANED** — hand-built judgement literals in test files, re-meant by `R26`
+  (`REG-D-066`). Corrected: the whole unit suite is **391 files, 4199 passed, 0 failed**.
+- **The 13 e2e are THE REAL THING.** They drive the actual demo server, whose reasoning review is the
+  DETERMINISTIC STRUCTURAL CHECKER — the object `REG-F-409` is about, and the one the sponsor forbade
+  making claim nine. Re-measured after `JAN-ORPHANED`: **still 13, same assertion, unchanged.**
+
+⭐ **SO THE E2E HALF IS `REG-F-409`'s ACTUAL REMAINING DEBT, AND IT IS THE HONEST ONE.** The gate's default
+lane cannot satisfy this floor, because the checker on it examines two of nine criteria and says so. That
+is not a test defect to be corrected — it is the finding, still true, now visible in the only instrument
+that was ever going to show it. ⚠ `JAN-ORPHANED`'s design disclosed this in advance rather than discovering
+it afterwards; this correction is that disclosure meeting its measurement.
+
 ---
 
 ### REG-D-065 — `JAN-ASSERTED` sponsor rulings: `{expectedOutputs}` stops being supplied, and the projection is parsed rather than asserted
@@ -36463,3 +36479,97 @@ array. A repo applying that alone would retype the cast, ship green, and still p
 
 ⚠ **THE CONTENT-PLANE QUESTION STAYS AS `R28` LEFT IT** (`REG-D-064`): callers gate, the port does not refuse,
 and the weakness is disclosed rather than prevented.
+
+---
+
+### REG-D-066 — `JAN-ORPHANED` sponsor ruling `R31`: a ruling changed what a fixture MEANT, and nothing re-read the fixtures
+
+**Ruled 2026-09-20** (sponsor, `JAN-ORPHANED`). **Status:** ✅ **RATIFIED** — applied and verified in the commit
+that records this entry.
+
+⭐⭐ **`R31` — THE ELEVEN RED TESTS WERE NOT `REG-F-409`'s GUARDS. THEY WERE ITS COLLATERAL.**
+
+`REG-F-409` recorded that the eleven *"assert FLOOR SATISFACTION, which the product genuinely no longer
+achieves, and they stay red."* ⛔ **That reading is refuted by measurement.** Reverting `R26` — deliberately
+reintroducing the defect — turns the six demo tests **GREEN** and turns **five** `R26` guards **RED**.
+
+⭑ **A test that guards a defect goes RED when the defect is PRESENT. These went GREEN.** They are
+*anti-correlated* with the finding: red when the product is correct, green when it is broken.
+
+⛔ **AND NONE OF THE ELEVEN TOUCHES THE DETERMINISTIC STRUCTURAL CHECKER** — the object `REG-F-409` is actually
+about, and the one the sponsor forbade making claim nine. Every one of them obtained its review from a
+**hand-built judgement literal in the test file**, and every one was `findings: []`. ⭑ None of those fixtures
+inspects its subject; they are a reviewer's **report**, and `validators.test.ts` says so: *"stands in for the
+agy backend in unit tests."* `REG-F-412` measured what that backend returns: **nine rows, five of five.**
+
+⭐⭐ **THE GENERAL FORM, WHICH IS THE PART WORTH KEEPING: A RULING SILENTLY RE-MEANT EVERY ARRANGEMENT KEYED ON
+THE OLD MEANING.** The engine literals date to **2026-07-14**, authored when absence read as `MET` — so
+`findings: []` **meant** *"evaluated everything, found nothing."* The author wrote the intent down and it is
+still in the file: *"recommends SATISFIED with no findings (all 9 criteria MET)."* ⛔ `git show --stat` of the
+`R26` commit: **seven files, no fixture among them.** The ruling was right and its collateral was never
+re-read.
+
+⚠ **ONE ORPHAN HAD DRIFTED INTO CONTRADICTING A RATIFIED GUARD.** `reviewer-silence-is-not-a-pass.test.ts`
+arranges the same `findings: []` + SATISFIED over mandatory criteria and asserts every criterion **IS**
+`UNABLE_TO_DETERMINE`; the ablation test asserted **none** is. Both cannot hold.
+
+⭑ **THE REMEDY IS DERIVED, NEVER HAND-LISTED** — one `failed: false` row per criterion, from the policy's own
+list. **No assertion was weakened**, and that was measured rather than claimed: all six declared mutants whose
+victims are these files still redden, and ⭐ **one becomes observable for the first time** —
+`schema-floor-certifies-without-facts` declares a predicted red that **does not fire at HEAD at all**, because
+the reviewer's silence keeps the gate closed regardless.
+
+⛔ **WHAT `R31` ADDED RATHER THAN MOVED (`OR-01`), BECAUSE THE ALTERNATIVE WAS A SILENT LOSS.** After the
+correction, no test anywhere drove SILENCE through the real composition — `reviewer-silence-is-not-a-pass`
+asserts `dispositionFromFindings` directly and never calls a floor runner. A new test asserts the composition:
+*a reviewer that judged nothing → aggregate INCONCLUSIVE, gate CLOSED.* ⭑ **It was written BEFORE the fixtures
+were corrected**, and it was verified to redden on the `R26` revert — a guard nobody has seen fail proves
+nothing.
+
+⚠ **AND THE FRAMING-SENSITIVE REVIEWER (`OR-03`) EXISTS BECAUSE THE OBVIOUS REPAIR WOULD HAVE SHIPPED A CONTROL
+THAT CANNOT FAIL.** `process-result-floor`'s case names `R14` framing routing as its own red; a fixed clearing
+reply is framing-blind and would have left it green with `R14` reverted. The helper refuses the framing it was
+not written for, and **was measured to redden on exactly that revert.**
+
+---
+
+### REG-F-415 — an INCONCLUSIVE reasoning-review floor refuses with NO reason recorded
+
+**Filed 2026-09-20** (`JAN-ORPHANED` `C-2`). **Status:** ⚠ **OPEN.**
+
+Observations are derived only from findings where `failed: true`. So a floor that is INCONCLUSIVE **because
+criteria were never judged** produces **zero observations** — and `describeRefusedEvidence` prints:
+
+```
+evd_01ARZ… (npm test): 
+```
+
+⛔ **A refusal that names no reason is its own defect**, and it is the exact shape this repository keeps
+recording: the record is internally consistent, structurally complete, and says nothing a reader can act on.
+⭑ Measured verbatim during triage as `AssertionError: not satisfied: []`.
+
+⚠ Independent of `R31`: correcting the fixtures removed the *occasions* on which this was visible in the unit
+suite, and removed none of the defect.
+
+---
+
+### REG-F-416 — `R26` turned an existing boolean into a control that cannot fail, and nothing recorded it
+
+**Filed 2026-09-20** (`JAN-ORPHANED`). **Status:** ⚠ **OPEN** — recorded, not remedied.
+
+In `work-product-floor-run.test.ts` the pair *"a substantive work product SATISFIES / an EMPTY work product does
+NOT"* names its mutant: *"teach the work-product arm to pass any parseable content … exactly the pair that
+separates a review from a parse."*
+
+⛔ **Measured: under that mutant the empty half's `satisfied === false` assertion stays GREEN**, because `R26`
+makes the empty product INCONCLUSIVE regardless of what the reviewer says. The kill now happens **only** at the
+sibling assertion on the `RR-04` observation code.
+
+⭑ The pair still discriminates — but **one half stopped being the half that does**, and a reader would credit
+the boolean. ⚠ A second instance of the same class: `evidence-join.test.ts`'s *"the run that PASSED must not
+appear in a refusal"* is **unkillable by construction** whenever every subject refuses, since it needs one
+satisfied run and one that is not.
+
+⭐ **BOTH ARE `R26` COLLATERAL OF THE SAME KIND AS `REG-D-066`** — not a fixture re-meant, but an ASSERTION
+re-meant. Filed together because the general form is one thing: *a ruling that changes what a value means
+changes what every assertion about that value is worth, and neither the ruling nor its tests re-read them.*
