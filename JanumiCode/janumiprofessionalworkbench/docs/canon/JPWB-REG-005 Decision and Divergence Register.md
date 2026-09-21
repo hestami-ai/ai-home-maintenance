@@ -36858,3 +36858,30 @@ Nine reviewers — three design calls × three lenses (contract / precedent / va
 **(5) ⭐ FOUR GATES CAUGHT THINGS NO REVIEW WOULD HAVE.** `REG-F-015`'s refused-and-never-read guard found that my own test's arrangement was failing silently — a credential passed where an `ActorReference` was required, so the evaluator was never selected on any test and the assessment reached ASSESSING by another route. The schema-count pin forced a DERIVED delta whose **+2-rather-than-+3 proves** the payload reuses canon's enum instead of minting one. The per-file coverage floor refused the increment until a duplicated four-branch policy read became one shared reader — and in passing exposed a control titled *“the TYPE facts parse too”* that asserted three empties and a throw and never once parsed a type. The export census refused to call the new handler guarded until a mutant proved a **named test notices its removal**.
 
 **(6) ⛔ AND TWO GATE STEPS HAD BEEN FAILING FOR SEVERAL COMMITS.** `guards:export` (step 2) since `35a15e11`; `coverage:floor` (step 11) since `62109085` — **both my own earlier commits in this same session**. Nothing caught either, because `REG-F-419` holds: there is no CI, so a gate runs when a human runs it. Both are swept up here. ⭑ This is the first time that finding has been **demonstrated rather than predicted**, and it cost two undetected regressions to do it.
+
+---
+
+### REG-D-068 — a RECORDED reviewer judgement, bound to the subject it was made about, may stand in for a live one
+
+**Ruled 2026-09-21** (sponsor). **Status:** ⭐ **OPEN — the ruling is given; the mechanism is owed.**
+
+⭐⭐ **THE QUESTION PUT, AND WHY IT WAS A RULING RATHER THAN A DESIGN CHOICE.** The de minimis Reasoning Review floor has nine criteria, all BLOCKING, and they are **judgements about reasoning** — `RR-01-no-problem-substitution`, `RR-06-sound-inference`, `RR-07-no-contradiction` and six more — not structural checks. A deterministic checker can decide two of them honestly; it declares so, and the other seven arrive `UNABLE_TO_DETERMINE`. So the test lane faced a trilemma with no good corner:
+
+| reviewer available to a test lane | deterministic? | does its judgement mean anything? |
+|---|---|---|
+| a live model | ⛔ no — cost, latency, network, and `REG-F-419`: there is no CI | ✅ yes |
+| a clearing fixture | ✅ yes | ⛔ **no — it cannot fail** |
+| the structural checker (today) | ✅ yes | ⚠ for two of nine, which is why it returns INCONCLUSIVE |
+
+⭑ **WHAT WAS RULED:** a **fourth** corner exists and is permitted — a judgement a REAL reviewer made, captured, and replayed **bound to the subject it was made about**. It is deterministic, and unlike a clearing fixture it **can still fail**: the binding goes stale the moment the subject changes.
+
+⛔⛔ **WHAT WAS *NOT* RULED, AND THE DISTINCTION IS THE WHOLE VALUE OF THE ENTRY.**
+- **A hand-written judgement is NOT licensed.** `clearingJudgement` exists in test support and produces a reply that faults nothing; it is legitimate for unit arrangements and would be a **fabrication** here. The difference is provenance, not shape — the two are byte-identical and only the record of where one came from tells them apart. ⚠ Any mechanism built on this ruling must make that difference **structural**, not a matter of the author's good intentions.
+- **An UNBOUND recording is NOT licensed.** A judgement replayed against a subject it was not made about is a statement nobody made, and the fact that the model once said it makes that worse rather than better.
+- **NOTHING about suppressing the floor.** §8.4's Reasoning Review remains mandatory and non-suppressible: *“No profile, low-risk classification, or planner may waive it.”* A recorded judgement is a way of ANSWERING the floor, never of skipping it.
+
+⭐ **WHAT IT UNBLOCKS, AND IT IS TWO THINGS THAT LOOKED UNRELATED.**
+- `REG-D-067`'s **thirteen accepted-red e2e specs**. That ruling accepted the reds as *the true statement* and named a successor: a reviewer that examines all nine. This is that successor, arrived at from a direction the ruling did not anticipate — not a better checker, a recorded real one.
+- `JAN-CRITREAD`'s `CR-02` coverage gate. The reference-undertaking seed completes SATISFIED against all three floor policies having evaluated none of their criteria, which canon calls invalid output (*“Partial output — an unanswered mandatory criterion — is invalid output”*). With a recorded judgement the seed can answer the floor **honestly**, which was the one option among six that was neither fabrication nor breaking the worked example.
+
+⚠ **AND THE MEASUREMENT THAT MADE THE RULING ASKABLE IS ALREADY FILED.** `REG-F-412` (CLOSED) measured that a live reviewer emits **one row per criterion, including explicit clean rows**. Without it, *“record a real judgement”* would have been a hope; with it, the artifact being proposed is known to exist in the shape the mapper needs. ⭑ `reasoningReviewResultFromJudgement` is pure and backend-agnostic by prior design, so a recorded judgement replays through the **same** mapper a live one does — no second path, and therefore no second thing to drift.
