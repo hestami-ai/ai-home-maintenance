@@ -192,6 +192,13 @@ there. A property under no attack is measured, not guarded.
 
 ## `DD-7` — the records
 
+⭑ **DONE 2026-09-22.** `REG-F-430` CLOSED with its measured evidence (PR-2a asserting the commit LANDS; 12 of 12
+cases red on the old implementation first; the mutant verdicts); `REG-F-434`'s *"what closes the gap is the whole-log
+counter"* struck to G1; `REG-D-069` DELIVERED and `REG-D-070` DELIVERED-with-one-gate-owed (`DD-6b`);
+`AUTHORING-BACKBONE.md`'s "safe false conflict" limit superseded by the ratified rule; `DESIGN-the-turn-that-refuses-
+itself.md` §2 and §5.3 struck to the new mechanism; and the ruled next sequence (`REG-F-433` → drop G4 →
+`REG-F-431`) recorded in BOTH of those entries, where the next programme will look.
+
 - `REG-F-430`: **CLOSED**, struck at the head, with the measured evidence (the reds observed first, the mutant
   verdicts, PR-2a committing).
 - `REG-F-434`: *"what closes the gap is the whole-log counter"* struck to G1.

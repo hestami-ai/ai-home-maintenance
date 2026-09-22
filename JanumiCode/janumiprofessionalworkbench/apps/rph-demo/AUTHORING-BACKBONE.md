@@ -266,9 +266,17 @@ execution, configuration, or independence failures enter `BLOCKED_EXTERNAL` inst
   that prior assurance/approval can be resurrected.
 - The revision vector and candidate lifecycle are app-local implementation structures, not ratified public objects or
   wire contracts.
-- The captured event-log position is deliberately conservative: any unrelated canonical Event in the process causes
+- ~~The captured event-log position is deliberately conservative: any unrelated canonical Event in the process causes
   the candidate commit to conflict. Narrower multi-PWA concurrency requires a ratified/scoped dependency-vector rule;
-  this demo chooses a safe false conflict rather than an undetected new-aggregate race.
+  this demo chooses a safe false conflict rather than an undetected new-aggregate race.~~
+  ⭑ **SUPERSEDED 2026-09-22 — the ratified dependency rule IS that scoped rule** (`REG-D-070`, designed in
+  `docs/_working/DESIGN-what-a-draft-depends-on.md`, built in `JAN-CRITREAD` `DD-0`..`DD-6a`). A candidate declares
+  what it depends on — its PWA, the three floor policies, the policies its replay validates, the validator a recorded
+  review names, everything it writes, and four keyed groups (its conversation, its PWA's types, its floor review
+  records under those policies, the reviewer exchanges about its PWA) — and is refused ONLY when one of those
+  changed, named, with the act that changed it. The "safe false conflict" went with the counter; the
+  new-aggregate race it guarded against is covered by G1 and G2, which see a birth no revision vector can name
+  (`REG-F-430`, `REG-F-434`).
 - The canonical engine remains authoritative. Candidate commit reuses its typed Commands, handlers, invariants,
   idempotency, Events, and transaction boundary; the fork, XState, `@statelyai/graph`, and Svelte Flow do not acquire
   domain authority.

@@ -37,6 +37,8 @@ why no gated lane saw it.
 
 ## 2. What the whole-log counter actually protects — and what the records say it protects
 
+> ⭑ **SUPERSEDED 2026-09-22 (`REG-D-070`, built in `JAN-CRITREAD` `DD-3b`).** The whole-log counter is DELETED. Its one unique job — a phantom aggregate no revision vector can name — is now done by the declared groups G1 (the conversation of the PWA) and G2 (its types), which see a birth by keying on `pwaId` instead of by counting the log. What follows is the reasoning that led to that rule, kept as it was written.
+
 ⭑ **Its one unique job is PHANTOMS: a new aggregate the per-aggregate revision vector cannot name.** Its author
 said so (`authoring-turn.ts:19`: *"detects a concurrent new aggregate that is absent from the vector"*;
 `apps/rph-demo/AUTHORING-BACKBONE.md:269-271`: *"a safe false conflict rather than an undetected new-aggregate
@@ -134,6 +136,8 @@ replayed handler, referenced by no recorded command (`evidenceConsideredIds` is 
 `affectedIds`. A write you made yourself cannot be a change you failed to observe.
 
 ### 5.3 ⛔ What (b) deliberately does NOT fix — disclosed, not solved
+
+> ⭑ **FIXED 2026-09-22, not merely disclosed (`REG-D-070`; `REG-F-430` CLOSED in `DD-3b`).** The cross-professional false conflict described below is gone: a draft is refused only by a change to something it DECLARED, and another PWA's reviewer record is not one of those. `PR-2a` now asserts that the commit LANDS. What follows is the record of what was known when (b) was chosen.
 
 **The cross-professional false conflict stays**, including its exchange-borne share, which now becomes routine:
 two turns on different PWAs, each reviewed by a real reviewer, **destroy each other** — T1's commit sees T2's
