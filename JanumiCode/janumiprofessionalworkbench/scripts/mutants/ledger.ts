@@ -2520,6 +2520,141 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
+		id: "DD2-M1-equals-matches-everything-else",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if ('equals' in conjunct) return value === conjunct.equals;",
+		replace: "if ('equals' in conjunct) return value !== conjunct.equals; // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: inverts `equals`. OBSERVED: KILLED, 6 of 20 — the operator test (`expected false to be true`), the conjunction test, G-B1, G-B3, G-B10 and the G-B2 CONTROL (`expected true to be false`): with the operator inverted a non-member write is refused.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M2-contains-matches-any-array",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "return Array.isArray(value) && value.includes(conjunct.contains);",
+		replace: "return Array.isArray(value); // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: `contains` accepts any array (G3's `subjectObjectIds ∋ P` would match every assessment). OBSERVED: KILLED, exactly 1 of 20 — *\"contains: the field must be an array holding the value\"*, `expected true to be false`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M3-one-of-matches-any-string",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "return typeof value === 'string' && conjunct.oneOf.includes(value);",
+		replace: "return typeof value === 'string'; // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: `oneOf` accepts any string (G3's floor-policy conjunct would match every policy). OBSERVED: KILLED, 2 of 20 — the oneOf test and the conjunction test (`every conjunct must hold: expected true to be false`).",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M4-a-key-is-a-disjunction",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "return key.every((conjunct) => {",
+		replace: "return key.some((conjunct) => { // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: a key matches when ANY conjunct holds, so G3's `subject AND floor policy` would take every floor assessment of every subject. OBSERVED: KILLED, exactly 1 of 20 — *\"a key is a conjunction\"*, `every conjunct must hold: expected true to be false`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M5-own-acts-are-not-skipped",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (admitted.has(event.eventId)) continue;",
+		replace: "void admitted; // MUTANT: the candidate's own acts are not skipped",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: the candidate's own admitted acts are examined like anyone else's, so a draft's own reviewer records (G4) would refuse it — `REG-F-425` again. OBSERVED: KILLED, exactly 1 of 20 — G-B4, `expected [ 'evt_4', 'evt_6' ] to deeply equal [ 'evt_6' ]`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M6-only-the-first-violation-is-reported",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (violations.length > 0) return { ok: false, results: [], dependencyViolations: violations };",
+		replace: "if (violations.length > 0) return { ok: false, results: [], dependencyViolations: violations.slice(0, 1) }; // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: reports only the first violation (FORK-22: a professional told one of two changes discards, reloads and is refused again). OBSERVED: KILLED, 3 of 20 — G-B3 (`expected [ 'intent 1' ] to deeply equal [ 'intent 1', 'intent 3' ]`), G-B7 and G-B11.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M7-undecidable-membership-reads-as-not-a-member",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (undecidable === undefined && !memberOfGroup(state, group.key)) continue;",
+		replace: "if (!memberOfGroup(state, group.key)) continue; // MUTANT: fail OPEN",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: fails OPEN — an aggregate that cannot be read, reads as another type, or lacks a key field is taken as 'not a member'. ⚠ The key-field case was OBSERVED while building DD-2: a fixture keyed INTENT on `intentId` (the state says `id`) matched nothing and its discrimination control passed for the wrong reason. OBSERVED: KILLED, 3 of 20 — G-B5, G-B8 and G-B9, each `expected undefined to deeply equal [ ObjectContaining{…} ]`: the change commits unseen.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M8-groups-match-events-of-any-type",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "const groups = declared.groups.filter((group) => group.aggregateType === event.aggregateType);",
+		replace: "const groups = declared.groups; // MUTANT: every group is tried on every event",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: every group is tried on every event, so an aggregate of another type whose state happens to carry the key field is taken for a member — a false conflict. OBSERVED: KILLED, exactly 1 of 20 — G-B6, the INTENT event named as a member of a PWU_TYPE group (`[{\"kind\":\"GROUP\",\"name\":\"not intents\",…}]: expected false to be true`).",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M9-the-pins-are-not-checked",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "violations = this.declaredDependencyViolations(preconditions, declared);",
+		replace: "violations = this.declaredDependencyViolations([], declared); // MUTANT: the pins are dropped",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: the declared-groups form stops checking the candidate's pinned aggregates (the PWA, the floor policies). OBSERVED: KILLED, 2 of 20 — G-B7 (`expected [ 'GROUP:intent 1' ] to deeply equal [ …(2) ]`) and G-B11: the moved pins go unreported.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M10-a-type-mismatch-reads-as-readable",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: ": object.objectType !== event.aggregateType",
+		replace: ": object.objectType !== object.objectType // MUTANT: an aggregate that reads as another type is taken as readable",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: an aggregate whose stored type differs from its event's is taken as readable, and its membership decided on a state of the wrong shape. OBSERVED: KILLED, exactly 1 of 20 — G-B9, `expected undefined to deeply equal [ ObjectContaining{…} ]`: the change commits unseen.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M11-a-member-touched-twice-is-reported-twice",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (reported.has(at)) continue;",
+		replace: "void reported; // MUTANT: a member touched twice is reported twice",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: a member touched by two events after the mark is reported once per event, so the disclosure repeats itself and names a LATER event as what changed it. OBSERVED: KILLED, exactly 1 of 20 — G-B10, `expected [ 'evt_4', 'evt_6' ] to deeply equal [ 'evt_4' ]`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M12-a-diverged-replay-is-not-rolled-back",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (violations.length > 0) return;\n\t\t\t\tresult = this.dispatchBatchAs(principal, reason, commands);\n\t\t\t\tif (!result.ok) return;\n\t\t\t\tpostconditionConflict = this.postconditionMismatch(postconditions);\n\t\t\t\tif (postconditionConflict) throw new PostconditionAbort();",
+		replace: "if (violations.length > 0) return;\n\t\t\t\tresult = this.dispatchBatchAs(principal, reason, commands);\n\t\t\t\tif (!result.ok) return;\n\t\t\t\tpostconditionConflict = this.postconditionMismatch(postconditions);\n\t\t\t\tvoid 0; // MUTANT: a diverged replay is not rolled back",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: a replay whose result differs from the candidate the professional accepted is reported as diverged but NOT rolled back — canonical holds state nobody accepted. OBSERVED: KILLED, 2 of 20 — G-B13 and G-B16, each `expected true to be false`: the batch applied.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M13-a-failure-inside-the-transaction-is-swallowed",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "} catch (error) {\n\t\t\tif (!(error instanceof PostconditionAbort)) throw error;\n\t\t}\n\t\tif (violations.length > 0) return {",
+		replace: "} catch (error) {\n\t\t\tvoid error; // MUTANT: every failure inside the transaction is swallowed\n\t\t}\n\t\tif (violations.length > 0) return {",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: every error raised inside the transaction is swallowed, so a store that could not take its write lock (`RPH_STORE_BUSY`, `DD-1`) reaches the caller as no answer at all. OBSERVED: KILLED, exactly 1 of 20 — G-B14, `expected undefined to be an instance of StoreBusyError`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M14-a-missing-aggregate-satisfies-its-postcondition",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "const actualContentHash = actual ? contentHash(actual) : undefined;",
+		replace: "const actualContentHash = actual ? contentHash(actual) : postcondition.expectedContentHash; // MUTANT",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: an aggregate the replay did not produce satisfies its postcondition, so a candidate's expected object can be absent from what committed. OBSERVED: KILLED, exactly 1 of 20 — G-B16, `expected true to be false`: the batch applied.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD2-M15-every-postcondition-refuses",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (actualContentHash !== postcondition.expectedContentHash)",
+		replace: "if (actualContentHash === actualContentHash) // MUTANT: every postcondition refuses",
+		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
+		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: every postcondition refuses, matching or not — G-B15 is the CONTROL this mutant exists for: without it, a form that could never commit a candidate would pass every refusal test in the file. OBSERVED: KILLED, exactly 1 of 20 — G-B15, the two identical hashes printed side by side, `expected false to be true`.",
+		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',

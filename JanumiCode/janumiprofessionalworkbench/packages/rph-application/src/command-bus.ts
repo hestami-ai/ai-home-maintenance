@@ -74,6 +74,76 @@ export interface BatchResult {
 	readonly guardConflict?: RevisionGuardConflict;
 	/** Present when replay succeeded but did not produce the exact candidate object state; the transaction rolled back. */
 	readonly postconditionConflict?: ObjectPostconditionConflict;
+	/**
+	 * Present when a guarded batch in the DECLARED-GROUPS form refused (`JAN-CRITREAD` `DD-2`, `REG-D-070`): EVERY
+	 * declared dependency that changed, not the first — a pin whose revision moved, a group one of whose members an
+	 * event after the caller's position touched, or a group-typed event whose aggregate could not be read.
+	 */
+	readonly dependencyViolations?: readonly DependencyViolation[];
+}
+
+/** One conjunct of a group's key: a string field of the member's state, compared with string ids. */
+export type DependencyKey =
+	| { readonly field: string; readonly equals: string }
+	| { readonly field: string; readonly contains: string }
+	| { readonly field: string; readonly oneOf: readonly string[] };
+
+/**
+ * A declared dependency on a KEYED SET: every aggregate of `aggregateType` whose state matches every conjunct of
+ * `key`. The caller depends on the set's membership (a new member, or a change to one, is a change to it). The
+ * key's fields must never change after an aggregate's birth, or "a member" would depend on WHEN it was read.
+ */
+export interface DependencyGroup {
+	readonly name: string;
+	readonly aggregateType: string;
+	readonly key: readonly DependencyKey[];
+}
+
+/** One declared dependency the guarded batch found changed — see `BatchResult.dependencyViolations`. */
+export interface DependencyViolation {
+	/** `PIN`: an aggregate's revision moved. `GROUP`: a member was touched. `UNREADABLE`: a group-typed event's
+	 *  aggregate could not be read, so membership could not be decided — refused rather than assumed (fail closed). */
+	readonly kind: 'PIN' | 'GROUP' | 'UNREADABLE';
+	/** The group's declared name; for a pin, the aggregate id. */
+	readonly name: string;
+	readonly aggregateId: string;
+	/** For `UNREADABLE`: why membership could not be decided. */
+	readonly detail?: string;
+	readonly expectedRevision?: number;
+	readonly actualRevision?: number;
+	/** The FIRST event after the caller's position that touched it — what changed it, by whom, in what flow. */
+	readonly event?: {
+		readonly eventId: string;
+		readonly eventType: string;
+		readonly actorId: string;
+		readonly correlationId: string;
+	};
+}
+
+/** The declared-groups form of `dispatchBatchGuarded`'s event-log argument (`DD-2`). */
+export interface DeclaredEventLog {
+	/** The store position (`StorageAdapter.highWaterMark`) the caller's candidate was built against. */
+	readonly mark: number;
+	/** The caller's OWN acts after `mark`, matched by event id: never a dependency of the caller. */
+	readonly admittedEventIds: readonly string[];
+	readonly groups: readonly DependencyGroup[];
+}
+
+/** What a guarded batch's candidate was built against — see `dispatchBatchGuarded`. */
+export type ExpectedEventLog =
+	| number
+	| { readonly position: number; readonly admittedEventIds: readonly string[] }
+	| DeclaredEventLog;
+
+/** Does `state` belong to a group with this key? Pure, so the key operators are testable on their own. */
+export function memberOfGroup(state: unknown, key: readonly DependencyKey[]): boolean {
+	const fields = (state ?? {}) as Record<string, unknown>;
+	return key.every((conjunct) => {
+		const value = fields[conjunct.field];
+		if ('equals' in conjunct) return value === conjunct.equals;
+		if ('contains' in conjunct) return Array.isArray(value) && value.includes(conjunct.contains);
+		return typeof value === 'string' && conjunct.oneOf.includes(value);
+	});
 }
 
 /** One serializable object precondition captured when an isolated candidate began. */
@@ -161,12 +231,15 @@ export interface AuthedEngine {
 	 * event must be in the tail — so a caller can admit its own acts (`JAN-CRITREAD` `TT`, `REG-F-425`) and
 	 * nothing else. ⚠ Both terms are needed: counting alone is fooled by a foreign event standing in for a
 	 * missing admitted one; membership alone admits a log that lost one.
+	 *
+	 * ⭐ The DECLARED-GROUPS form (`DeclaredEventLog`, `JAN-CRITREAD` `DD-2`, `REG-D-070`) refuses only when an event
+	 * after `mark` touches a member of a declared group, or a precondition's revision moved — and reports EVERY such
+	 * change in `dependencyViolations`. Any other write to the store is not the candidate's business.
 	 */
 	dispatchBatchGuarded(
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
-		expectedEventLog?:
-			number | { readonly position: number; readonly admittedEventIds: readonly string[] },
+		expectedEventLog?: ExpectedEventLog,
 		postconditions?: readonly ObjectPostcondition[]
 	): BatchResult;
 	// The read/lifecycle surface rides along so a caller that dispatches does not need to hold two references.
@@ -621,10 +694,18 @@ export class Engine {
 		reason: string | undefined,
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
-		expectedEventLog?:
-			number | { readonly position: number; readonly admittedEventIds: readonly string[] },
+		expectedEventLog?: ExpectedEventLog,
 		postconditions: readonly ObjectPostcondition[] = []
 	): BatchResult {
+		if (typeof expectedEventLog === 'object' && 'groups' in expectedEventLog)
+			return this.dispatchBatchDeclaredAs(
+				principal,
+				reason,
+				commands,
+				preconditions,
+				expectedEventLog,
+				postconditions
+			);
 		let conflict: RevisionGuardConflict | undefined;
 		let postconditionConflict: ObjectPostconditionConflict | undefined;
 		let result: BatchResult | undefined;
@@ -678,27 +759,135 @@ export class Engine {
 				}
 				result = this.dispatchBatchAs(principal, reason, commands);
 				if (!result.ok) return;
-				for (const postcondition of postconditions) {
-					const actual = this.store.loadObject(postcondition.aggregateId);
-					const actualContentHash = actual ? contentHash(actual) : undefined;
-					if (actualContentHash !== postcondition.expectedContentHash) {
-						postconditionConflict = { ...postcondition, actualContentHash };
-						throw new PostconditionAbort();
-					}
-				}
+				postconditionConflict = this.postconditionMismatch(postconditions);
+				if (postconditionConflict) throw new PostconditionAbort();
 			});
 		} catch (error) {
 			if (!(error instanceof PostconditionAbort)) throw error;
 		}
 		if (conflict) return { ok: false, results: [], guardConflict: conflict };
-		if (postconditionConflict) {
-			return {
-				ok: false,
-				results: result?.results ?? [],
-				postconditionConflict
-			};
-		}
+		// `result` is set before any postcondition is read, so a conflict always has one.
+		if (postconditionConflict)
+			return { ok: false, results: result!.results, postconditionConflict };
 		return result!;
+	}
+
+	/** The first postcondition the replay did not reproduce — the candidate's exact resulting state — else undefined. */
+	private postconditionMismatch(
+		postconditions: readonly ObjectPostcondition[]
+	): ObjectPostconditionConflict | undefined {
+		for (const postcondition of postconditions) {
+			const actual = this.store.loadObject(postcondition.aggregateId);
+			const actualContentHash = actual ? contentHash(actual) : undefined;
+			if (actualContentHash !== postcondition.expectedContentHash)
+				return { ...postcondition, actualContentHash };
+		}
+		return undefined;
+	}
+
+	/**
+	 * ⭐ THE DECLARED-GROUPS FORM (`JAN-CRITREAD` `DD-2`, `REG-D-070`). A candidate is refused only when something it
+	 * DECLARED it depends on changed — a pinned aggregate's revision, or a member of a declared group touched by an
+	 * event after `mark` that is not one of the candidate's own admitted acts. Every other write to the store is
+	 * ignored, which is what ends `REG-F-430`'s false conflict. Everything runs inside the ONE transaction the
+	 * replay runs in, and the store takes its write lock before the first read (`DD-1`), so nothing checked here
+	 * can change before the replay commits.
+	 *
+	 * ⚠ It COLLECTS every violation rather than stopping at the first: a professional told only one of three
+	 * changes discards, reloads and is refused again (FORK-22: disclose what changed).
+	 */
+	private dispatchBatchDeclaredAs(
+		principal: Principal | undefined,
+		reason: string | undefined,
+		commands: readonly DomainCommand[],
+		preconditions: readonly RevisionPrecondition[],
+		declared: DeclaredEventLog,
+		postconditions: readonly ObjectPostcondition[]
+	): BatchResult {
+		let violations: DependencyViolation[] = [];
+		let postconditionConflict: ObjectPostconditionConflict | undefined;
+		let result: BatchResult | undefined;
+		try {
+			this.store.transaction(() => {
+				violations = this.declaredDependencyViolations(preconditions, declared);
+				if (violations.length > 0) return;
+				result = this.dispatchBatchAs(principal, reason, commands);
+				if (!result.ok) return;
+				postconditionConflict = this.postconditionMismatch(postconditions);
+				if (postconditionConflict) throw new PostconditionAbort();
+			});
+		} catch (error) {
+			if (!(error instanceof PostconditionAbort)) throw error;
+		}
+		if (violations.length > 0) return { ok: false, results: [], dependencyViolations: violations };
+		if (postconditionConflict)
+			return { ok: false, results: result!.results, postconditionConflict };
+		return result!;
+	}
+
+	/** Every declared dependency that changed — the pins first (the candidate's own aggregates), then the groups. */
+	private declaredDependencyViolations(
+		preconditions: readonly RevisionPrecondition[],
+		declared: DeclaredEventLog
+	): DependencyViolation[] {
+		const violations: DependencyViolation[] = [];
+		for (const precondition of preconditions) {
+			const expectedRevision =
+				'mustNotExist' in precondition ? undefined : precondition.expectedRevision;
+			const actualRevision = this.store.loadObject(precondition.aggregateId)?.revision;
+			if (actualRevision !== expectedRevision)
+				violations.push({
+					kind: 'PIN',
+					name: precondition.aggregateId,
+					aggregateId: precondition.aggregateId,
+					...(expectedRevision === undefined ? {} : { expectedRevision }),
+					...(actualRevision === undefined ? {} : { actualRevision })
+				});
+		}
+		const admitted = new Set(declared.admittedEventIds);
+		const reported = new Set<string>();
+		for (const event of this.store.eventsAfter(declared.mark)) {
+			if (admitted.has(event.eventId)) continue;
+			const groups = declared.groups.filter((group) => group.aggregateType === event.aggregateType);
+			if (groups.length === 0) continue;
+			const object = this.store.loadObject(event.aggregateId);
+			// FAIL CLOSED: an event on a group's type whose aggregate cannot be read, or reads as another type,
+			// cannot be shown NOT to be a member — so it is refused and named, never assumed harmless.
+			const unreadable =
+				object === undefined
+					? 'the aggregate could not be read'
+					: object.objectType !== event.aggregateType
+						? `the aggregate reads as ${object.objectType}, not ${event.aggregateType}`
+						: undefined;
+			for (const group of groups) {
+				const at = `${group.name}|${event.aggregateId}`;
+				if (reported.has(at)) continue;
+				// ⚠ A KEY FIELD THE MEMBER'S TYPE DOES NOT CARRY IS A DEFECT IN THE DECLARATION, and it must not read as
+				// "not a member": a misnamed field makes the group silently EMPTY, and every change to it commits
+				// unseen. Observed while building this: a fixture keyed INTENT on `intentId` (the state says `id`)
+				// and its discrimination CONTROL passed for the wrong reason. So an absent key field fails closed.
+				const state = (object?.state ?? {}) as Record<string, unknown>;
+				const absent = group.key.find((conjunct) => !(conjunct.field in state))?.field;
+				const undecidable =
+					unreadable ??
+					(absent === undefined ? undefined : `its state has no key field '${absent}'`);
+				if (undecidable === undefined && !memberOfGroup(state, group.key)) continue;
+				reported.add(at);
+				violations.push({
+					kind: undecidable === undefined ? 'GROUP' : 'UNREADABLE',
+					name: group.name,
+					aggregateId: event.aggregateId,
+					...(undecidable === undefined ? {} : { detail: undecidable }),
+					event: {
+						eventId: event.eventId,
+						eventType: event.eventType,
+						actorId: event.actor.actorId,
+						correlationId: event.correlationId
+					}
+				});
+			}
+		}
+		return violations;
 	}
 
 	/**
