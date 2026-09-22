@@ -96,7 +96,7 @@ explicit `opts.canonical` on an active turn's fork**.
 
 | Mutant | Must redden |
 |---|---|
-| TT-M4 the type-exemption shape (admit every `MODEL_EXCHANGE` in the tail) | PR-2a — PR-1 stays green BY DESIGN |
+| TT-M4 the type-exemption shape (admit every `MODEL_EXCHANGE` in the tail) | PR-2a — PR-1 stays green BY DESIGN. ⚠ Observed: W3 too — the exemption also admits a DISCARDED PREDECESSOR's late try |
 | TT-M5 drain on the fork (`canonical.dispatch` → `engine.dispatch`) | PR-3, and PR-1's pre-accept assertion |
 | TT-M6 floor ignores the witness | PR-1 (detail with the new suffix — `why` written from the OBSERVED output) |
 | TT-M7 witness admits any command | W1 |

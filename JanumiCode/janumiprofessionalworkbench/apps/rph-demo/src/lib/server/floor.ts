@@ -28,6 +28,7 @@ import type { AgyPrint } from './assurance/reasoning-review-validator.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
 import { recordExchanges } from './assurance/exchange-recorder.js';
 import { SESSION_CREDENTIAL } from './identity.js';
+import { canonicalActsOf } from './authoring-turn.js';
 import { buildPwaExport, getArtifactStore, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
 
 /**
@@ -326,6 +327,11 @@ export async function runPwaFloor(
 		 * exists because `runPwaFloor` otherwise reaches module state (`getEngine()`), which no test can
 		 * observe — the drain would dispatch into an engine the caller cannot see, and the wiring would be
 		 * unassertable. Tests pass their own host; production omits it.
+		 *
+		 * ⛔ AND IT IS REFUSED WHEN `engine` IS AN ACTIVE AUTHORING TURN'S FORK (`JAN-CRITREAD` `TT-2`). There
+		 * the drain goes through the turn's canonical WITNESS (`canonicalActsOf`), which is what lets the turn's
+		 * commit admit its own reviewer's records. An explicit handle would drain unwitnessed and silently
+		 * reproduce `REG-F-425`: a really-reviewed turn that refuses its own candidate.
 		 */
 		canonical?: AuthedEngineHandle;
 		/** The content plane, injectable so a gate can assert against a store it controls. */
@@ -338,6 +344,13 @@ export async function runPwaFloor(
 	// is run because a professional asked for it, and the record should say so.
 	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL)
 ): Promise<FloorView | undefined> {
+	const witness = canonicalActsOf(engine);
+	if (witness && opts.canonical) {
+		throw new Error(
+			'runPwaFloor on an authoring turn records its tries through the turn’s own canonical witness; ' +
+				'an explicit `canonical` would drain them unwitnessed and the turn would refuse its own candidate.'
+		);
+	}
 	const pwa = getObject(engine, pwaId);
 	const graphExport = buildPwaExport(pwaId, engine);
 	if (!pwa || !graphExport) return undefined;
@@ -407,7 +420,12 @@ export async function runPwaFloor(
 	// produced a bad answer is precisely the try PER-9 wants kept. Recording an act that happened is not
 	// candidate state. That property is why REG-D-055 made this record its own aggregate, and routing it
 	// through the fork would silently hand it back.
-	const canonical = opts.canonical ?? getEngine().as(SESSION_CREDENTIAL);
+	//
+	// ⭐ ON A TURN, THROUGH THE TURN'S WITNESS (`JAN-CRITREAD` `TT-2`, `REG-F-425`): the same canonical store and
+	// the same SESSION principal, one dispatch per try — but the events it produces are NOTED as the turn's own
+	// acts, so its commit admits them. Undrained through the witness, each try refused the turn's own candidate.
+	const canonical =
+		opts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL);
 	const drained = exchanges.drain();
 	if (drained.length > 0) {
 		const outcome = recordExchanges(

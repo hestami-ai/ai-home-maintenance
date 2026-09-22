@@ -16,7 +16,10 @@ type TurnActor = ReturnType<typeof newTurnActor>;
 
 interface RevisionSnapshot {
 	readonly revisions: ReadonlyMap<string, number>;
-	/** Conservative whole-store position: it detects a concurrent new aggregate that is absent from the vector. */
+	/**
+	 * Whole-store position at the fork. The commit guard admits the log's growth past it ONLY by the turn's own
+	 * witnessed acts (`witnessedEventIds`), so it still detects a concurrent new aggregate the vector cannot name.
+	 */
 	readonly eventCount: number;
 }
 
@@ -47,6 +50,12 @@ interface MutableAuthoringTurn {
 	readonly createdAt: string;
 	readonly recordedCommands: DomainCommand[];
 	readonly base: RevisionSnapshot;
+	/**
+	 * Canonical events this turn's OWN acts produced before acceptance — today only the exchange records its
+	 * reviewer's tries write (PER-9). Never reset by a resume, exactly as `base` is not: every try across the
+	 * turn's life is its own. See `witnessingEngine`.
+	 */
+	readonly witnessedEventIds: string[];
 	readonly actor: TurnActor;
 	candidateHash?: string;
 	assuredSubjectHash?: string;
@@ -73,6 +82,8 @@ export type CommitAuthoringTurnResult =
 	  };
 
 const turnsByPwa = new Map<string, MutableAuthoringTurn>();
+/** Every candidate engine a turn hands out — including each `as()` re-binding — to the turn it records for. */
+const recorderTurns = new WeakMap<AuthedEngineHandle, () => MutableAuthoringTurn>();
 
 function newTurnActor() {
 	return createActor(authoringTurnMachine).start();
@@ -234,7 +245,72 @@ function recordingEngine(
 		ontology: delegate.ontology,
 		close: () => delegate.close()
 	};
+	recorderTurns.set(recorder, currentTurn);
 	return recorder;
+}
+
+/**
+ * ⭐ THE ONE CANONICAL WRITE A TURN MAKES BEFORE ACCEPTANCE, AND THE RECORD OF WHAT IT PRODUCED (`JAN-CRITREAD`
+ * `TT-2`, `REG-F-425`). A real reviewer's every try is recorded CANONICALLY as a `MODEL_EXCHANGE` (PER-9: a try
+ * that was made survives a discarded turn), so the log grows under the turn. The commit guard used to refuse any
+ * growth at all, and every really-reviewed turn refused its own candidate. This handle writes those records and
+ * notes the events they produced; the commit admits exactly those, and nothing else.
+ *
+ * ⛔ ONLY `RecordModelExchange`. Candidate state belongs on `turn.engine`; letting anything else through here
+ * would make it a back door to canonical that the commit then admits as the turn's own.
+ * ⛔ THE DISPATCH IS UNCONDITIONAL — never refused because of the turn's state (PER-9). Only the NOTING is
+ * conditional, on an ACCEPTED result: a DUPLICATE carries an EARLIER act's events, which are not this turn's.
+ * ⭑ NOTED ON THIS TURN OBJECT, never on "whichever turn the PWA has now". A discarded turn's late try is noted on
+ * the discarded turn, which can never commit, and so is never admitted into a successor's commit. That keying is
+ * the whole protection; a liveness check on the noting path would add nothing observable. Nothing here throws.
+ */
+function witnessingEngine(
+	turn: MutableAuthoringTurn,
+	delegate: AuthedEngineHandle
+): AuthedEngineHandle {
+	const closed = (what: string) => () => {
+		throw new Error(
+			`An authoring turn's canonical witness records exchange tries only; ${what} is not one of its acts.`
+		);
+	};
+	return {
+		principal: delegate.principal,
+		as: (credential) => witnessingEngine(turn, delegate.as(credential)),
+		dispatch(command) {
+			if (command.commandType !== 'RecordModelExchange') {
+				throw new Error(
+					`An authoring turn writes only its exchange records to canonical before acceptance; ` +
+						`${command.commandType} belongs on the turn's candidate engine.`
+				);
+			}
+			const result = delegate.dispatch(command);
+			if (result.status === 'ACCEPTED') turn.witnessedEventIds.push(...result.producedEventIds);
+			return result;
+		},
+		dispatchBatch: closed('a batch'),
+		dispatchBatchGuarded: closed('a guarded batch'),
+		dispatchMultiPartyBatch: closed('a multi-party batch'),
+		subscribe: (handler) => delegate.subscribe(handler),
+		drainOutbox: () => delegate.drainOutbox(),
+		recoverOutbox: () => delegate.recoverOutbox(),
+		loadObject: (id) => delegate.loadObject(id),
+		readAllEvents: () => delegate.readAllEvents(),
+		fork: closed('a fork'),
+		ontology: delegate.ontology,
+		close: closed('closing canonical')
+	};
+}
+
+/**
+ * The canonical handle an assurance run on `handle` must record its tries through: the witness of the ACTIVE turn
+ * whose candidate engine `handle` is (any `as()` re-binding of it included), else `undefined` — `handle` is then
+ * not a turn's fork, and its tries are nobody's candidate's business.
+ */
+export function canonicalActsOf(handle: AuthedEngineHandle): AuthedEngineHandle | undefined {
+	const turnOf = recorderTurns.get(handle);
+	if (!turnOf) return undefined;
+	const turn = turnOf();
+	return turnsByPwa.get(turn.pwaId) === turn ? witnessingEngine(turn, turn.canonical) : undefined;
 }
 
 /** Begin an isolated candidate. There may be only one pending natural-language turn per PWA in this process. */
@@ -266,6 +342,7 @@ export function beginAuthoringTurn(
 		createdAt: new Date().toISOString(),
 		recordedCommands,
 		base: snapshotRevisions(isolated, pwaId),
+		witnessedEventIds: [],
 		actor: newTurnActor()
 	};
 	turnRef.current = turn;
@@ -443,8 +520,13 @@ function recordCommitFailure(
 		result.failedIndex === undefined ? undefined : result.results[result.failedIndex];
 	const conflict = result.guardConflict ?? (rejected?.status === 'CONFLICT' ? rejected : undefined);
 	if (conflict) {
+		// The prefix is byte-identical to what it always was; the suffix names WHOSE act moved the log.
+		const unadmitted = result.guardConflict?.unadmitted;
 		const detail = result.guardConflict
-			? `${result.guardConflict.aggregateId} changed from revision ${String(result.guardConflict.expectedRevision)} to ${String(result.guardConflict.actualRevision)}.`
+			? `${result.guardConflict.aggregateId} changed from revision ${String(result.guardConflict.expectedRevision)} to ${String(result.guardConflict.actualRevision)}.` +
+				(unadmitted
+					? ` First unadmitted event: ${unadmitted.eventType} on ${unadmitted.aggregateType} ${unadmitted.aggregateId}.`
+					: '')
 			: (rejected?.error?.message ?? 'A replayed command observed a revision conflict.');
 		current.detail = detail;
 		transition(current, { type: 'CONFLICT' }, 'CONFLICTED');
@@ -479,7 +561,8 @@ export function commitAuthoringTurn(
 		result = current.canonical.dispatchBatchGuarded(
 			current.recordedCommands,
 			preconditions,
-			current.base.eventCount,
+			// The log may have grown past the fork by exactly the turn's own witnessed acts — nothing else.
+			{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },
 			affectedObjects.map(({ id: aggregateId, contentHash: expectedContentHash }) => ({
 				aggregateId,
 				expectedContentHash

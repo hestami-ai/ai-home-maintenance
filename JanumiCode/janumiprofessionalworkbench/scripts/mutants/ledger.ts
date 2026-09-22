@@ -2302,11 +2302,83 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "TT-M1b-turn-stops-asking-for-the-log-check",
 		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
-		find: "\t\t\tcurrent.base.eventCount,",
+		find: "\t\t\t{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },",
 		replace: "\t\t\tundefined, // MUTANT: the turn stops asking the bus for the whole-log check",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
-		why: "PROMISE: an authoring turn's commit asks the bus to verify the canonical log against the turn's own base — without it, a new aggregate created concurrently (the PWA's FIRST conversation, which nothing pins) commits beside the turn's own. WHO RELIES: the one-conversation-per-PWA rule, and every guarantee the turn's candidate rests on that the per-aggregate vector cannot name. WHAT THE MUTATION DOES: passes `undefined` for the expected log, so the turn simply stops asking — the bus limb stays correct and unused. OBSERVED: KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit lands and one PWA owns two conversations.",
+		why: "PROMISE: an authoring turn's commit asks the bus to verify the canonical log against the turn's own base — without it, a new aggregate created concurrently (the PWA's FIRST conversation, which nothing pins) commits beside the turn's own. WHO RELIES: the one-conversation-per-PWA rule, and every guarantee the turn's candidate rests on that the per-aggregate vector cannot name. WHAT THE MUTATION DOES: passes `undefined` for the expected log, so the turn simply stops asking — the bus limb stays correct and unused. RE-ANCHORED in `TT-2`, where the argument became `{position, admittedEventIds}`; the consequence mutated is unchanged. OBSERVED (re-run after re-anchoring): KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit lands and one PWA owns two conversations.",
 		source: "JAN-CRITREAD TT-0/TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M4-the-type-exemption-admits-every-exchange",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t\t{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },",
+		replace: "\t\t\t{ position: current.base.eventCount, admittedEventIds: current.canonical.readAllEvents().slice(current.base.eventCount).filter((event) => event.aggregateType === 'MODEL_EXCHANGE').map((event) => event.eventId) }, // MUTANT: the type exemption - every exchange record in the tail is admitted, whoever made it",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: the commit admits the turn's OWN exchange records, by identity — not every `MODEL_EXCHANGE` in the tail. WHO RELIES: a professional whose turn must not commit past another turn's acts unnoticed. WHAT THE MUTATION DOES: replaces the witnessed set with the TYPE EXEMPTION (DESIGN §5.3 — the candidate remedy for the disclosed cross-turn conflict, owed a sponsor ruling): every exchange record after the base is admitted, whoever made it. ⭑ PR-1 stays green BY DESIGN — that shape also fixes `REG-F-425`; what separates the two is whose records get in. OBSERVED: KILLED, 2 of 10 — *\"PR-2a — ANOTHER turn’s exchange record is a foreign event\"* and *\"W3 — a discarded turn’s late try … refuses its successor rather than joining it\"*, both `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`. ⚠ W3 was NOT predicted: the exemption admits a discarded PREDECESSOR's late try too, not only another professional's.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M5-the-drain-moves-onto-the-fork",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\t\t\tcanonical.dispatch({",
+		replace: "\t\t\t\tengine.dispatch({ // MUTANT: the tries are recorded on the candidate fork",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: PER-9 — a try that was made is recorded CANONICALLY, before acceptance, and survives a discarded turn. WHO RELIES: `REG-D-055`, which made the exchange its own aggregate for exactly this; and the witness, whose admission is only safe because the records it admits are canonical acts, not candidate state. WHAT THE MUTATION DOES: dispatches the drain on `engine` — on a turn, the candidate fork — which is the tempting \"fix\" for `REG-F-425` (no canonical growth, no refusal). OBSERVED: KILLED, 8 of 10. The kill that matters: PR-1 `PER-9: the try is recorded canonically BEFORE acceptance: expected 0 to be greater than or equal to 1`, and PR-3 `expected 0 to be greater than or equal to 1` — a discard would take the tries with it. (W2 and W3 fail in their ARRANGEMENT, `the floor drained a real exchange command: expected undefined to be defined`, because their capture spy is the explicit canonical the mutant bypasses; they are not the evidence.)",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M6-the-floor-ignores-the-witness",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\topts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL);",
+		replace: "\t\topts.canonical ?? getEngine().as(SESSION_CREDENTIAL); // MUTANT: the floor drains unwitnessed",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a floor run on a turn's fork drains through the turn's witness, so the commit admits the turn's own tries. WHO RELIES: every real-reviewer authoring acceptance — the whole of `REG-F-425`. WHAT THE MUTATION DOES: derives the drain's handle as it was before `TT-2` (`opts.canonical ?? getEngine()`), so the tries land canonically but unwitnessed. OBSERVED: KILLED, 5 of 10 — it IS `REG-F-425`, now with the suffix naming the cause: PR-1 `\"@event-log changed from revision 29 to 30. First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE mex_00000000000000000000000008.\"`; PR-1r and PR-1s `29 to 31`; PR-1p `59 to 60`. PR-2a also fails, `expected '@event-log changed from revision 30 t…' to contain 'First unadmitted event: ModelExchange…'`: the first unadmitted event is now the turn's OWN try, not the other turn's.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M7-the-witness-admits-any-command",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t\t\tthrow new Error(\n\t\t\t\t\t`An authoring turn writes only its exchange records to canonical before acceptance; ` +",
+		replace: "\t\t\t\tvoid new Error( // MUTANT: the witness admits any command\n\t\t\t\t\t`An authoring turn writes only its exchange records to canonical before acceptance; ` +",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: the only canonical write an authoring turn makes before acceptance is its exchange records. WHO RELIES: the premise that canonical STATE is unchanged until acceptance (DESIGN §7) — the witness's writes are admitted by the commit as the turn's own, so anything it let through would be a back door to canonical that the guard then waves in. WHAT THE MUTATION DOES: the refusal is built and discarded (`void new Error(`), the consequence mutated rather than the condition (V-2c). OBSERVED: KILLED, exactly 1 of 10 — *\"W1 — it writes exchange records only: any other command is refused, and canonical is unchanged\"* fails with `expected [Function] to throw an error`: a `CreatePwa` goes straight to canonical through the witness.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M8-noted-by-pwa-not-by-turn",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t\tif (result.status === 'ACCEPTED') turn.witnessedEventIds.push(...result.producedEventIds);",
+		replace: "\t\t\tif (result.status === 'ACCEPTED') turnsByPwa.get(turn.pwaId)?.witnessedEventIds.push(...result.producedEventIds); // MUTANT: noted on whichever turn the PWA has now",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a try is noted on the turn that made it, so a DISCARDED turn's late try is never admitted into its successor's commit on the same PWA. WHO RELIES: the successor turn, whose acceptance must not carry another turn's act past the guard unexamined. WHAT THE MUTATION DOES: notes on `turnsByPwa.get(turn.pwaId)` — whichever turn the PWA has NOW — the natural shape of a PWA-keyed witness. OBSERVED: KILLED, exactly 1 of 10 — *\"W3 — a discarded turn’s late try is recorded (PER-9), and refuses its successor rather than joining it\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the predecessor's try is admitted as the successor's own. ⭑ Keying the note on the turn OBJECT is the whole protection: the design's extra \"still the active turn\" condition on noting was an equivalent mutant and was removed in TT-2.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M9-a-duplicate-is-noted",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t\tif (result.status === 'ACCEPTED') turn.witnessedEventIds.push(...result.producedEventIds);",
+		replace: "\t\t\tturn.witnessedEventIds.push(...result.producedEventIds); // MUTANT: every result noted, a DUPLICATE included",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: only an ACCEPTED dispatch is the turn's own act. WHO RELIES: the exactness of the admitted set — a DUPLICATE carries the `producedEventIds` of the EARLIER act it replays (`answerFromReceipt`), events that sit before the turn's base. WHAT THE MUTATION DOES: drops the ACCEPTED term, so every result's events are noted. OBSERVED: KILLED, exactly 1 of 10 — *\"W2 — a DUPLICATE is an EARLIER act, not this turn’s: it is not admitted, and the commit lands\"* fails with `\"@event-log changed from revision 60 to 59.\"`: the admitted set claims one event more than the tail holds, and the bus's LENGTH term refuses a turn that did nothing wrong.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M10-a-resume-forgets-witnessed-acts",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\tturn.detail = undefined;\n\treturn publicTurn(turn);",
+		replace: "\tturn.detail = undefined;\n\tturn.witnessedEventIds.length = 0; // MUTANT: a resume forgets the tries already made\n\treturn publicTurn(turn);",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: every try across a turn's life is its own — a resume keeps the witnessed acts exactly as it keeps `base`. WHO RELIES: the revise-and-review-again path (REVISION_REQUIRED → resume → floor → accept), the non-destructive route that exists so a substantive revision never forces a discard. WHAT THE MUTATION DOES: a resume clears `witnessedEventIds`. OBSERVED: KILLED, exactly 1 of 10 — *\"PR-1s — review, revise, resume, review again\"* fails with `\"@event-log changed from revision 30 to 31. First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE mex_00000000000000000000000008.\"`: the first review's try, forgotten, refuses the turn that made it.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M11-an-explicit-canonical-on-a-fork-is-accepted",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\tthrow new Error(\n\t\t\t'runPwaFloor on an authoring turn records its tries through the turn’s own canonical witness; ' +",
+		replace: "\t\tvoid new Error( // MUTANT: an explicit canonical on a fork is accepted\n\t\t\t'runPwaFloor on an authoring turn records its tries through the turn’s own canonical witness; ' +",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: `runPwaFloor` on an active turn's fork refuses an explicit `canonical` (DESIGN §6.4, the judges' condition). WHO RELIES: every future caller — the witness is found from the engine, so an explicit handle would drain unwitnessed and silently reproduce `REG-F-425` with nothing to say why. WHAT THE MUTATION DOES: the refusal is built and discarded (`void new Error(`), the consequence mutated (V-2c). OBSERVED: KILLED, exactly 1 of 10 — *\"W4 — an explicit canonical on an active turn’s fork is refused before any work\"* fails with `promise resolved \"{ …(6) }\" instead of rejecting`: the floor runs to completion on the opt-out.",
+		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',

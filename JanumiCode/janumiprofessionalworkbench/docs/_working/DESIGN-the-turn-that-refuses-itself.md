@@ -169,10 +169,17 @@ It needs the sponsor's ruling on `AUTHORING-BACKBONE.md:269-271` first.
   NOT reset it**, exactly as it does not reset `base`.
 - `witnessingEngine(turn, delegate)`: `dispatch` **refuses any command other than `RecordModelExchange`**
   (candidate state belongs on `turn.engine`); for that one it dispatches **unconditionally** (PER-9 — never
-  refused because of the turn's state) and notes `producedEventIds` only if the result is `ACCEPTED` AND the
-  turn is still the active turn for its PWA. Nothing on the noting path throws. `dispatchBatch*`, `fork`,
+  refused because of the turn's state) and notes `producedEventIds` only if the result is `ACCEPTED` ~~AND the
+  turn is still the active turn for its PWA~~. Nothing on the noting path throws. `dispatchBatch*`, `fork`,
   `close` throw; reads pass through.
+  ⭑ **Struck in `TT-2`, as an equivalent mutant.** The note goes on the turn OBJECT. A discarded turn's late
+  try is therefore noted on the discarded turn, which can never commit, and never on its successor. A turn
+  object never re-enters `turnsByPwa`, so a liveness check on the noting path changes nothing observable.
+  What the struck clause was meant to protect is carried by the per-turn keying; mutant `TT-M8` (noted on
+  whichever turn the PWA has now) is KILLED by W3.
 - `canonicalActsOf(handle)`: the witness of the active turn whose `engine` IS `handle`, else `undefined`.
+  (Implemented through a `WeakMap` of every recorder the turn hands out, so an `as()` re-binding of the fork is
+  found too.)
 - `commitAuthoringTurn` passes `{position: base.eventCount, admittedEventIds: witnessedEventIds}`.
   **`base.eventCount` is unchanged**, and so are its slice and hash jobs (§4.3).
 - Witnessed ids are NOT bound into `candidateHash`: the hash names base, commands and resulting state, none of
