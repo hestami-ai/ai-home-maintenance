@@ -51,7 +51,7 @@ import {
 	type GuardCensus,
 	type GuardEntry
 } from './export-guard-core.js';
-import { DECLARED_MUTANTS } from './mutants/ledger.js';
+import { DECLARED_MUTANTS, isHistory } from './mutants/ledger.js';
 import { anchorRange } from './mutants/scope-core.js';
 
 // ⛔ FORWARD SLASHES, EVERYWHERE, FROM THE ROOT DOWN. `fileURLToPath` yields backslashes on Windows, and the
@@ -230,9 +230,7 @@ for (const file of [`${ROOT}packages`, `${ROOT}apps`, `${ROOT}verif`, `${ROOT}sc
 }
 
 // ── the census ─────────────────────────────────────────────────────────────────────────────────────────────
-const MEASURABLE = DECLARED_MUTANTS.filter(
-	(m) => m.supersededBy === undefined && m.duplicateOf === undefined
-);
+const MEASURABLE = DECLARED_MUTANTS.filter((m) => !isHistory(m));
 /** file -> the measurable mutants declared against it, so each can be attributed to an export by line. */
 const mutantsByFile = new Map<string, typeof MEASURABLE>();
 for (const m of MEASURABLE) {

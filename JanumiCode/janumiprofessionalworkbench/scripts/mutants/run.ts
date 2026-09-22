@@ -16,7 +16,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
+import { DECLARED_MUTANTS, isHistory, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
 import {
 	captureMutationTreeBaseline,
@@ -53,6 +53,8 @@ type Verdict =
 	// pass on an unmeasured mutant; what it must never do is masquerade as a finding about the code.
 	| 'INCONCLUSIVE'
 	| 'DUPLICATE'
+	// The guarded PROPERTY was removed by a named ruling (`abolishedBy`). History, like RETIRED - never a failure.
+	| 'ABOLISHED'
 	// PREFLIGHT ONLY, and deliberately not a measurement. See `PREFLIGHT` below.
 	| 'APPLICABLE';
 
@@ -221,6 +223,17 @@ function preApplyVerdict(m: DeclaredMutant): { result: Result } | { original: st
 				mutant: m,
 				verdict: 'DUPLICATE',
 				detail: `same mutation as ${m.duplicateOf.split(' —')[0]}`
+			}
+		};
+
+	// ABOLISHED, likewise decided before anything is applied: the property the mutant attacked no longer
+	// exists, so applying it would report UNANCHORED or SURVIVED - a fact about removed code, not about a guard.
+	if (m.abolishedBy !== undefined)
+		return {
+			result: {
+				mutant: m,
+				verdict: 'ABOLISHED',
+				detail: `abolished by ${m.abolishedBy.split(' —')[0]}`
 			}
 		};
 
@@ -1079,8 +1092,7 @@ const selected = HARVEST
 	? chosen.filter(
 			(m) =>
 				m.expectRed.length === 0 &&
-				m.supersededBy === undefined &&
-				m.duplicateOf === undefined &&
+				!isHistory(m) &&
 				m.expectSurvive === undefined &&
 				m.expectNoCompile === undefined
 		)
@@ -1180,7 +1192,7 @@ if (PREFLIGHT) {
 	console.log(
 		`\n=== PREFLIGHT: ${by('APPLICABLE').length} applicable, ${rot.length} rotted, ` +
 			`${by('RETIRED').length} retired, ${by('DUPLICATE').length} duplicate, ` +
-			`${by('TYPE_PREVENTED').length} type-prevented ===\n` +
+			`${by('ABOLISHED').length} abolished, ${by('TYPE_PREVENTED').length} type-prevented ===\n` +
 			'NOT A MEASUREMENT. No test ran; APPLICABLE means only that the mutant still lands and still builds.'
 	);
 	for (const r of rot) console.log(`\n${r.verdict}: ${r.mutant.id}\n  ${r.detail}`);
@@ -1233,15 +1245,16 @@ for (const v of [
 	'ABORTED_DIRTY',
 	'CONTROL_HELD',
 	'INCONCLUSIVE',
-	'DUPLICATE'
+	'DUPLICATE',
+	'ABOLISHED'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
 
 // THE HONEST DENOMINATOR. `DECLARED_MUTANTS.length` counts ENTRIES; what a reader wants is how many DISTINCT
 // mutations were measured. Printing the entry count alone is how "90 mutants, 0 SURVIVED" was reported for 87.
 console.log(
-	`\n${selected.length} entries -> ${selected.length - by('DUPLICATE').length - by('RETIRED').length} distinct mutations measured ` +
-		`(${by('DUPLICATE').length} duplicate, ${by('RETIRED').length} retired).`
+	`\n${selected.length} entries -> ${selected.length - by('DUPLICATE').length - by('RETIRED').length - by('ABOLISHED').length} distinct mutations measured ` +
+		`(${by('DUPLICATE').length} duplicate, ${by('RETIRED').length} retired, ${by('ABOLISHED').length} abolished).`
 );
 
 // INCONCLUSIVE prints WITH the failures, and the ordering is deliberate: it is listed LAST so that a run which is

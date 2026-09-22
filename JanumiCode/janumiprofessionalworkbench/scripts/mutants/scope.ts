@@ -43,7 +43,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
+import { DECLARED_MUTANTS, isHistory, type DeclaredMutant } from './ledger.js';
 import {
 	anchorRange,
 	classifyRunnerTranscript,
@@ -61,10 +61,8 @@ const STRICT = flags.includes('--strict');
 const rangeFlag = flags.find((f) => f.startsWith('--range='));
 const RANGE = rangeFlag?.slice('--range='.length);
 
-/** Entries a verdict can be had about — `supersededBy`/`duplicateOf` are history, not measurements. */
-const MEASURABLE = DECLARED_MUTANTS.filter(
-	(m) => m.supersededBy === undefined && m.duplicateOf === undefined
-);
+/** Entries a verdict can be had about — retired, duplicated and abolished entries are history (`isHistory`). */
+const MEASURABLE = DECLARED_MUTANTS.filter((m) => !isHistory(m));
 
 interface Anchor {
 	readonly mutant: DeclaredMutant;

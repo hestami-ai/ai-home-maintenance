@@ -30,6 +30,7 @@
 //   TYPE_PREVENTED  it is DECLARED as not compiling, and that refusal IS the guarantee (`expectNoCompile`).
 //   KILLED_UNNAMED  killed, but package-wide, because the declaring work package never named its victim.
 //   DUPLICATE   another entry declares the SAME mutation and is NAMED (`duplicateOf`).
+//   ABOLISHED   the PROPERTY it guarded was removed by a named ruling, so no successor can prove it (`abolishedBy`).
 //   ABORTED_DIRTY   the tree was already dirty — EVERY VERDICT FROM HERE ON IS VOID, and the run stops.
 //
 // ── THE V-2c LESSON: WHY SO MANY HARVESTED MUTANTS DID NOT COMPILE ──────────────────────────────────────────
@@ -144,6 +145,27 @@ export interface DeclaredMutant {
 	 * about which guards were felt to be load-bearing, and deleting the entry erases it.
 	 */
 	readonly duplicateOf?: string;
+	/**
+	 * Set when the PROPERTY this mutant guarded was deliberately removed by a ruling, so no successor can prove it.
+	 * Names the ruling (a `REG-D-` entry) and the reason. Reports ABOLISHED, decided before anything is applied.
+	 *
+	 * ⚠ DISTINCT FROM `supersededBy`, which says the guard MOVED and names where its proof went. Here there is no
+	 * "where": the rule the mutant attacked no longer exists (`JAN-CRITREAD` `DD-0`, for `REG-D-070` — the authoring
+	 * turn's exact-tail check became a declared-groups check, so its length term guards nothing). Without this field
+	 * such an entry could only be deleted, erasing that the guard was ever needed, or be given a successor that
+	 * proves some OTHER property, which is a false record. The ruling must exist: `verif/mutant-ledger.test.ts`
+	 * resolves it against the register.
+	 */
+	readonly abolishedBy?: string;
+}
+
+/**
+ * An entry that is HISTORY rather than a measurement: retired, duplicated, or abolished by ruling. Every place that
+ * selects the population a run measures uses this one predicate, so a fourth kind of history cannot be added to some
+ * of those places and missed in others.
+ */
+export function isHistory(m: DeclaredMutant): boolean {
+	return m.supersededBy !== undefined || m.duplicateOf !== undefined || m.abolishedBy !== undefined;
 }
 
 export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
@@ -2381,6 +2403,33 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
+		id: "DD0-M1-abolished-entries-count-as-measured",
+		file: "scripts/mutants/ledger.ts",
+		find: "\treturn m.supersededBy !== undefined || m.duplicateOf !== undefined || m.abolishedBy !== undefined;",
+		replace: "\treturn m.supersededBy !== undefined || m.duplicateOf !== undefined; // MUTANT: an abolished entry is measured",
+		expectRed: ["verif/mutant-ledger.test.ts"],
+		why: "PROMISE: an entry abolished by ruling is HISTORY — never applied, never counted as a measurement, excluded from every population a run or census selects. WHO RELIES: the runner, the scope selector, the export-guard census and this ledger's own rules, which all select through `isHistory` precisely so that a new kind of history cannot be honoured in some of them and missed in others. WHAT THE MUTATION DOES: drops the `abolishedBy` term, so an abolished entry is measured again — applied, and reported UNANCHORED or SURVIVED against code its ruling removed. ⚠ ANCHORED WITH ITS LEADING TAB deliberately: without it the text also occurs inside this very entry's escaped `find`, and rule #4 allows leading whitespace exactly when content alone is not unique. OBSERVED: KILLED by one test — *\"treats every kind of history as history — retired, duplicated AND abolished — and a plain entry as measurable\"* fails with `an abolished entry is not measured: expected false to be true`.",
+		source: "JAN-CRITREAD DD-0 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD0-M2-an-unresolvable-ruling-is-accepted",
+		file: "verif/mutant-ledger.test.ts",
+		find: "defects.push(`${m.id}: abolishedBy names no REG-D ruling in the register (${m.abolishedBy})`);",
+		replace: "void 0; // MUTANT: an abolishedBy that cites no existing ruling is accepted",
+		expectRed: ["verif/mutant-ledger.test.ts"],
+		why: "PROMISE: `abolishedBy` must cite a `REG-D-` ruling that EXISTS in the register. WHO RELIES: every reader of a mutation run — ABOLISHED is the one disposition that removes a mutant from measurement WITHOUT naming another entry that still proves its guard, so without this check an inconvenient SURVIVED could be silenced by prose. WHAT THE MUTATION DOES: an unresolvable citation is no longer reported. OBSERVED: KILLED by one test — *\"CONTROL: the abolishedBy rule reddens on a ruling that does not exist and on a combined disposition\"* fails with `expected [] to deeply equal [ Array(1) ]`: the fixture citing `REG-D-999` is accepted.",
+		source: "JAN-CRITREAD DD-0 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD0-M3-a-combined-disposition-is-accepted",
+		file: "verif/mutant-ledger.test.ts",
+		find: "if (m[field] !== undefined) defects.push(`${m.id}: abolishedBy combined with ${field}`);",
+		replace: "if (m[field] !== undefined) void 0; // MUTANT: abolishedBy may be combined with another disposition",
+		expectRed: ["verif/mutant-ledger.test.ts"],
+		why: "PROMISE: an abolished entry carries no other disposition. WHO RELIES: the same readers — `supersededBy` would claim the guard MOVED and name where, `expectSurvive` that it never guarded anything, `duplicateOf` that another entry measures it; each contradicts \"the property no longer exists\". WHAT THE MUTATION DOES: the combination is no longer reported. OBSERVED: KILLED by one test — the CONTROL above fails with `expected [] to deeply equal [ Array(1) ]`: the fixture combining `abolishedBy` with `supersededBy` is accepted.",
+		source: "JAN-CRITREAD DD-0 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',
@@ -2442,10 +2491,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'F100-b-the-anchor-census-loses-its-population',
 		file: 'verif/mutant-ledger.test.ts',
-		find: ') => m.supersededBy === undefined && m.duplicateOf === undefined\n);',
-		replace: ') => m.supersededBy === undefined && m.duplicateOf === undefined\n).slice(0, 0);',
+		find: 'const MEASURABLE = DECLARED_MUTANTS.filter((m) => !isHistory(m));',
+		replace: 'const MEASURABLE = DECLARED_MUTANTS.filter((m) => !isHistory(m)).slice(0, 0);',
 		expectRed: ['verif/mutant-ledger.test.ts'],
-		why: "THE CONTROL'S OWN MUTANT. An empty population makes the census pass VACUOUSLY — zero entries checked, zero offenders, green — which is the exact shape the census exists to prevent elsewhere. Emptying the SHARED `MEASURABLE` must therefore redden the CONTROL and nothing else. Observed: 1 failed / 8 passed, the failure being `CONTROL — the anchor census has a population and a reader that resolves`. Mutating a test file is deliberate: the guarantee under test is that the census has something to census, and that lives in the census.",
+		why: "THE CONTROL'S OWN MUTANT. An empty population makes the census pass VACUOUSLY — zero entries checked, zero offenders, green — which is the exact shape the census exists to prevent elsewhere. Emptying the SHARED `MEASURABLE` must therefore redden the CONTROL and nothing else. Observed: 1 failed / 8 passed, the failure being `CONTROL — the anchor census has a population and a reader that resolves`. Mutating a test file is deliberate: the guarantee under test is that the census has something to census, and that lives in the census. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-0`): the census's filter became the shared `isHistory` predicate, so the anchor moved to that line; the consequence mutated is unchanged. Re-observed: KILLED by the same CONTROL alone, 1 failed of the suite's 15 (`the ledger must contain measurable mutants to check: expected 0 to be greater than 100`).",
 		source: 'REG-F-100; feedback: a control needs its own mutant'
 	},
 	// ── REG-F-102, THE CATEGORY-ERROR HOLE IN `authorityBasis` ──────────────────────────────────────────────────

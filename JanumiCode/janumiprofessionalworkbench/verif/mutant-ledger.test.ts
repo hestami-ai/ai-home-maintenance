@@ -19,7 +19,35 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DECLARED_MUTANTS } from '../scripts/mutants/ledger.js';
+import { DECLARED_MUTANTS, isHistory } from '../scripts/mutants/ledger.js';
+
+/** The `REG-D-` rulings the register actually holds, read from its entry headings. */
+function registerRulings(): ReadonlySet<string> {
+	const register = readFileSync(
+		fileURLToPath(new URL('../docs/canon/JPWB-REG-005 Decision and Divergence Register.md', import.meta.url)),
+		'utf8'
+	);
+	return new Set([...register.matchAll(/^### ~?~?(REG-D-\d+)/gm)].map((m) => m[1]!));
+}
+
+type Disposed = Pick<
+	(typeof DECLARED_MUTANTS)[number],
+	'id' | 'supersededBy' | 'duplicateOf' | 'expectSurvive' | 'expectNoCompile' | 'abolishedBy'
+>;
+
+/** Every `abolishedBy` must cite an existing `REG-D-` ruling and stand alone. Pure, so its control can use fixtures. */
+function abolishedByDefects(entries: readonly Disposed[], rulings: ReadonlySet<string>): string[] {
+	return entries.flatMap((m) => {
+		if (m.abolishedBy === undefined) return [];
+		const cited = /^(REG-D-\d+)\b/.exec(m.abolishedBy.trim())?.[1];
+		const defects: string[] = [];
+		if (cited === undefined || !rulings.has(cited))
+			defects.push(`${m.id}: abolishedBy names no REG-D ruling in the register (${m.abolishedBy})`);
+		for (const field of ['supersededBy', 'duplicateOf', 'expectSurvive', 'expectNoCompile'] as const)
+			if (m[field] !== undefined) defects.push(`${m.id}: abolishedBy combined with ${field}`);
+		return defects;
+	});
+}
 
 /** The three fields the anchor census reads — narrowed so the control below can build fixtures. */
 interface Anchored {
@@ -32,9 +60,7 @@ const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 /** The entries a run actually measures. Shared by the anchor census and its control, so that a population which
  *  shrinks to nothing reddens the CONTROL rather than being absorbed by the census passing vacuously. */
-const MEASURABLE = DECLARED_MUTANTS.filter(
-	(m) => m.supersededBy === undefined && m.duplicateOf === undefined
-);
+const MEASURABLE = DECLARED_MUTANTS.filter((m) => !isHistory(m));
 
 /**
  * The mutation itself, independent of who declared it or what they expected.
@@ -70,7 +96,7 @@ describe('the mutant ledger is internally coherent', () => {
 			//     case that matters: one mutation, asked of the unit suite and of the reference seed, because "the unit
 			//     tests catch it" and "the seed cannot survive it" are two facts and the second is the load-bearing one.
 			const undeclared = group.filter(
-				(m) => m.duplicateOf === undefined && m.supersededBy === undefined
+				(m) => !isHistory(m)
 			);
 			const victimSets = new Set(undeclared.map((m) => [...m.expectRed].sort().join('|')));
 			if (undeclared.length > 1 && victimSets.size !== undeclared.length)
@@ -94,6 +120,42 @@ describe('the mutant ledger is internally coherent', () => {
 			})
 		);
 		expect(dangling).toEqual([]);
+	});
+
+	// ── `DD-0`: A GUARD ABOLISHED BY RULING MUST NAME A RULING THAT EXISTS, AND BE NOTHING ELSE ──────────────
+	//
+	// `abolishedBy` is the one disposition that removes a mutant from measurement WITHOUT naming another entry that
+	// still proves its guard. That makes it the easiest to abuse: an inconvenient SURVIVED silenced by prose. So the
+	// ruling it cites must be a `REG-D-` DECISION that exists in the register, and the entry may carry no other
+	// disposition — `supersededBy` would claim the guard MOVED, `expectSurvive` that it never guarded anything.
+	it('resolves every abolishedBy to a REG-D ruling that exists, and never combines it with another disposition', () => {
+		expect(abolishedByDefects(DECLARED_MUTANTS, registerRulings())).toEqual([]);
+	});
+
+	it('CONTROL: the abolishedBy rule reddens on a ruling that does not exist and on a combined disposition', () => {
+		const base = { id: 'x', supersededBy: undefined, duplicateOf: undefined, expectSurvive: undefined, expectNoCompile: undefined };
+		const rulings = new Set(['REG-D-070']);
+		expect(abolishedByDefects([{ ...base, abolishedBy: 'REG-D-070 — the length term is gone' }], rulings)).toEqual([]);
+		expect(abolishedByDefects([{ ...base, abolishedBy: 'REG-D-999 — no such ruling' }], rulings)).toEqual([
+			'x: abolishedBy names no REG-D ruling in the register (REG-D-999 — no such ruling)'
+		]);
+		expect(abolishedByDefects([{ ...base, abolishedBy: 'the length term is gone' }], rulings)).toEqual([
+			'x: abolishedBy names no REG-D ruling in the register (the length term is gone)'
+		]);
+		expect(
+			abolishedByDefects([{ ...base, abolishedBy: 'REG-D-070', supersededBy: 'y' }], rulings)
+		).toEqual(['x: abolishedBy combined with supersededBy']);
+		expect(
+			abolishedByDefects([{ ...base, abolishedBy: 'REG-D-070', expectSurvive: 'inert' }], rulings)
+		).toEqual(['x: abolishedBy combined with expectSurvive']);
+	});
+
+	it('treats every kind of history as history — retired, duplicated AND abolished — and a plain entry as measurable', () => {
+		const plain = DECLARED_MUTANTS.find((m) => !isHistory(m))!;
+		expect(isHistory(plain), 'a plain entry is measured').toBe(false);
+		expect(isHistory({ ...plain, supersededBy: 'y' })).toBe(true);
+		expect(isHistory({ ...plain, duplicateOf: 'y' })).toBe(true);
+		expect(isHistory({ ...plain, abolishedBy: 'REG-D-070' }), 'an abolished entry is not measured').toBe(true);
 	});
 
 	it('never marks one entry as both retired and duplicate, which would say the guard moved AND did not', () => {
@@ -130,8 +192,7 @@ describe('the mutant ledger is internally coherent', () => {
 		// which population the rule governs.
 		const measurable = DECLARED_MUTANTS.filter(
 			(m) =>
-				m.supersededBy === undefined &&
-				m.duplicateOf === undefined &&
+				!isHistory(m) &&
 				m.expectSurvive === undefined &&
 				m.expectNoCompile === undefined
 		);
