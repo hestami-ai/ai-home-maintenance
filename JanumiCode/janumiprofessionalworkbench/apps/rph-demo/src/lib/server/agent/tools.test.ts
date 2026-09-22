@@ -152,9 +152,71 @@ describe('PWU-Type boundary tool params (JAN-PRPWA DWP-04)', () => {
 	};
 	const rationale = { declare: vi.fn(), get: () => undefined } as RationaleSink;
 	const buildTools = (methods: Record<string, unknown>) =>
-		buildAuthoringTools({ help: () => FULL_HELP, ...methods } as unknown as PwaAuthoringBroker, rationale);
+		buildAuthoringTools(
+			{ help: () => FULL_HELP, ...methods } as unknown as PwaAuthoringBroker,
+			rationale
+		);
 	const find = (methods: Record<string, unknown>, name: string) =>
 		buildTools(methods).find((t) => t.name === name)!;
+
+	// ⭐ THE ASSISTANT IS SHOWN ONLY ACTIVE POLICIES (`JAN-CRITREAD` `DD-5`, `REG-D-070` Q3(c)). A policy it cannot
+	// reference is one it can only choose AROUND — inventing a near-duplicate of a policy someone may re-activate a
+	// moment later. The CONTROL is the ACTIVE row: a tool that listed nothing would satisfy the first assertion alone.
+	it('list_assurance_policies: only ACTIVE policies are listed — a suspended one is not offered', () => {
+		const listPolicies = () => [
+			{
+				id: 'pol_active',
+				name: 'Requirement Coverage',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'ACTIVE',
+				isFloor: false
+			},
+			{
+				id: 'pol_draft',
+				name: 'Awaiting activation',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'DRAFT',
+				isFloor: false
+			},
+			{
+				id: 'pol_suspended',
+				name: 'Suspended',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'SUSPENDED',
+				isFloor: false
+			},
+			{
+				id: 'pol_superseded',
+				name: 'Superseded',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'SUPERSEDED',
+				isFloor: false
+			},
+			{
+				id: 'floor.reasoning-review',
+				name: 'Reasoning Review',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'ACTIVE',
+				isFloor: true
+			}
+		];
+		const tool = find({ listPolicies }, 'list_assurance_policies');
+
+		const result = tool.run({});
+
+		expect((result.data as { id: string }[]).map((p) => p.id)).toEqual([
+			'pol_active',
+			'floor.reasoning-review'
+		]);
+		expect(result.summary, 'and the assistant reads only those').toBe(
+			'pol_active — Requirement Coverage [ACTIVE]\nfloor.reasoning-review — Reasoning Review [MANDATORY/locked]'
+		);
+	});
 
 	it('define_pwu_type: rejects a garbage executionBoundary and does not call the broker', () => {
 		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
@@ -192,16 +254,26 @@ describe('PWU-Type boundary tool params (JAN-PRPWA DWP-04)', () => {
 	it('define_pwu_type: omits boundary fields entirely when none are given (INTERNAL resolves downstream)', () => {
 		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
 		find({ defineType }, 'define_pwu_type').run({ name: 'Internal', pwuKind: 'X' });
-		expect(defineType).toHaveBeenCalledWith(expect.not.objectContaining({ executionBoundary: expect.anything() }));
-		expect(defineType).toHaveBeenCalledWith(expect.not.objectContaining({ boundaryContract: expect.anything() }));
+		expect(defineType).toHaveBeenCalledWith(
+			expect.not.objectContaining({ executionBoundary: expect.anything() })
+		);
+		expect(defineType).toHaveBeenCalledWith(
+			expect.not.objectContaining({ boundaryContract: expect.anything() })
+		);
 	});
 
 	it('edit_pwu_type: rejects a garbage boundary, then reassembles the contract into the patch', () => {
 		const editType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
 		const tool = find({ editType }, 'edit_pwu_type');
-		expect(tool.run({ pwuTypeId: 'pwut_x', executionBoundary: 'nope' })).toMatchObject({ ok: false });
+		expect(tool.run({ pwuTypeId: 'pwut_x', executionBoundary: 'nope' })).toMatchObject({
+			ok: false
+		});
 		expect(editType).not.toHaveBeenCalled();
-		tool.run({ pwuTypeId: 'pwut_x', executionBoundary: 'DELEGATED_EXTERNAL', counterpartyLabel: 'Lab' });
+		tool.run({
+			pwuTypeId: 'pwut_x',
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			counterpartyLabel: 'Lab'
+		});
 		expect(editType).toHaveBeenCalledWith(
 			'pwut_x',
 			expect.objectContaining({

@@ -23,6 +23,9 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toMatch(/workbench-wide shared-library entry/);
 		expect(prompt).toMatch(/requires explicit user authorization/);
 		expect(prompt).toMatch(/REUSE only ACTIVE non-floor ids/);
+		// ⭑ `DD-5` (`REG-D-070` Q3(c)): the listing itself is now ACTIVE-only, and the agent is told so — else it
+		// would read the absence of a policy it just created as that policy having failed to exist.
+		expect(prompt).toMatch(/it lists only ACTIVE policies/);
 		expect(prompt).toMatch(/has no policy-activation tool/);
 		expect(prompt).toMatch(/authoring tools reject any newly added DRAFT/);
 		expect(prompt).toMatch(/do not reference its id until then/);

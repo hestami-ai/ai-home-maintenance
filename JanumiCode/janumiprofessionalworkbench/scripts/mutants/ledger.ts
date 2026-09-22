@@ -2971,6 +2971,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
+		id: "DD5-M1-the-assistant-is-shown-every-policy",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "const pols = broker.listPolicies().filter((p) => p.status === 'ACTIVE');",
+		replace: "const pols = broker.listPolicies(); // MUTANT: the assistant is shown every policy, whatever its status",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE: the assistant is shown ONLY ACTIVE assurance policies (`REG-D-070` Q3(c), `JAN-CRITREAD` `DD-5`). WHO RELIES: every draft that reasons about the policy library — a policy it cannot reference is one it can only choose AROUND, inventing a near-duplicate of a policy someone may re-activate a moment later, which is the stale business assumption PER-4 forbids. The ruling's condition was CONFIRMED in `DD-5` before this landed: a draft can never legitimately reference a non-ACTIVE policy — the domain write boundary refuses a newly-referenced DRAFT/SUSPENDED/SUPERSEDED id (`checkAssurancePolicyRefs`), and this agent has no policy-activation tool, so even a policy it created itself in the same draft is unreferenceable until a human activates it. WHAT THE MUTATION DOES: the tool lists the whole library again, whatever each policy's status. OBSERVED: KILLED, exactly 1 of 16 — *\"list_assurance_policies: only ACTIVE policies are listed — a suspended one is not offered\"*, `expected [ 'pol_active', 'pol_draft', …(3) ] to deeply equal [ 'pol_active', …(1) ]`. ⛔ FILTERED AT THE TOOL, NOT IN `broker.listPolicies()`: that is also `validatePolicyReferences`'s source, where filtering would make a DRAFT policy read as \"does not exist\"; and the HUMAN's policy manager must keep showing every policy, since that is where a DRAFT one is activated.",
+		source: "JAN-CRITREAD DD-5 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 Q3"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',

@@ -71,8 +71,13 @@ function dischargeInput(a: Record<string, unknown>): {
 	workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
 	promptTemplate?: PromptTemplate;
 } {
-	const out: { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } = {};
-	if (a.workDischarge === 'MODEL' || a.workDischarge === 'HUMAN' || a.workDischarge === 'UNDECLARED')
+	const out: { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } =
+		{};
+	if (
+		a.workDischarge === 'MODEL' ||
+		a.workDischarge === 'HUMAN' ||
+		a.workDischarge === 'UNDECLARED'
+	)
 		out.workDischarge = a.workDischarge;
 	const templateText = str(a.promptTemplateText).trim();
 	if (templateText) {
@@ -268,11 +273,22 @@ export function buildAuthoringTools(
 		{
 			name: 'list_assurance_policies',
 			description:
-				'List the workbench Assurance Policy library and each policy status. The LOCKED mandatory floor policies always apply and must never be declared. Only additive ACTIVE policies may be referenced via requiredAssurancePolicyIds; DRAFT policies require human activation first. Use create_assurance_policy only for a genuinely new required treatment.',
+				'List the ACTIVE workbench Assurance Policies. The LOCKED mandatory floor policies always apply and must never be declared; every other listed policy may be referenced via requiredAssurancePolicyIds. Policies awaiting human activation are NOT listed — including one you just created with create_assurance_policy, which a human activates in the policy manager. Use create_assurance_policy only for a genuinely new required treatment.',
 			parameters: {},
 			mutates: false,
+			// ⭑ ONLY ACTIVE POLICIES ARE SHOWN TO THE ASSISTANT (`JAN-CRITREAD` `DD-5`, `REG-D-070` Q3(c)). A draft can
+			// never legitimately reference a non-ACTIVE one: the domain write boundary refuses a newly-referenced
+			// DRAFT/SUSPENDED/SUPERSEDED id, and this agent has no policy-activation tool — so a policy it cannot use
+			// is one it can only choose AROUND, inventing a near-duplicate of a policy that someone may re-activate a
+			// moment later. Unshown, it cannot have chosen against it, and a policy activated later is like a policy
+			// created later: not something it chose against.
+			//
+			// ⛔ FILTERED HERE, NOT IN `broker.listPolicies()`, WHICH IS ALSO THE VALIDATOR'S SOURCE
+			// (`validatePolicyReferences`): filtering there would make a DRAFT policy read as "does not exist" and
+			// would tell a professional the wrong thing about their own library. The HUMAN's policy manager keeps
+			// showing every policy — that is where a DRAFT one is activated.
 			run: () => {
-				const pols = broker.listPolicies();
+				const pols = broker.listPolicies().filter((p) => p.status === 'ACTIVE');
 				return {
 					ok: true,
 					summary: pols
