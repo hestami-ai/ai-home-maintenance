@@ -1,7 +1,7 @@
 # DESIGN — what a draft depends on: replacing the whole-log commit check with a dependency rule
 
-**Programme:** `JAN-CRITREAD` · **Date:** 2026-09-22 · **Status:** DRAFT, revision 3 — for the sponsor's rulings in
-§7.3 before any code is built.
+**Programme:** `JAN-CRITREAD` · **Date:** 2026-09-22 · **Status:** revision 3 — **RATIFIED by `REG-D-070`** (sponsor, 2026-09-22): Q1 adopted; Q2 keep G4 now, then
+`REG-F-433` → drop G4 → `REG-F-431`; Q3 option (c); Q4 yes; Q5 option (a). Build: `ROADMAP-what-a-draft-depends-on.md`.
 **Ruling:** `REG-D-069` (sponsor, 2026-09-22) · **Defect:** `REG-F-430` · **Related:** `REG-F-425`, `REG-F-431`,
 `REG-F-433`, `REG-F-434`, `REG-F-046`, `REG-D-025`, `REG-D-041`, `REG-D-067`, `REG-D-068`
 

@@ -37112,7 +37112,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-069 — SPONSOR RULING: the cross-professional false conflict is to be designed out by a DEPENDENCY rule — refuse a draft only when something it depends on changed — not by exempting reviewer records
 
-**Ruled 2026-09-22** (sponsor, in session, choosing among the three options put to them for `REG-F-430`). **Status:** ⛔ **OPEN — the ruling is given; the design is owed (`JAN-CRITREAD`, design → roadmap → implementation).**
+**Ruled 2026-09-22** (sponsor, in session, choosing among the three options put to them for `REG-F-430`). ~~**Status:** ⛔ **OPEN — the ruling is given; the design is owed (`JAN-CRITREAD`, design → roadmap → implementation).**~~ **Status:** ⛔ **OPEN — designed (`DESIGN-what-a-draft-depends-on.md`, `ddb8d2dc`) and ratified (`REG-D-070`); the build is owed (`ROADMAP-what-a-draft-depends-on.md`).**
 
 - **THE QUESTION PUT.** An authoring turn's commit refuses when ANY canonical write landed while it was staged (`REG-F-430`), so two professionals' really-reviewed drafts on different PWAs destroy each other. Three options were put, in plain terms: (a) the type exemption — ignore reviewer records (`MODEL_EXCHANGE`) when checking; designed, unbuilt, fixes only the reviewer-record share, and measured today to also admit a discarded predecessor's late try (`TT-M4`); (b) keep the strict rule; (c) the proper fix — work out what each draft actually depends on and refuse only when THOSE change.
 - **WHAT WAS RULED: (c).** The type exemption is NOT adopted as the remedy.
@@ -37133,3 +37133,40 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `assurance-floor.e2e.ts` *"a rejected dead-end candidate never mutates canonical state and can be discarded"* — *"Expected substring: \"Assurance floor REJECTED\""*. EXPECTED of an always-yes stand-in: the test needs a reviewer that CATCHES the dead end. ⚠ Relevant to `REG-D-068`: a replayed recording must itself reject here, and none of the four local models measured caught this defect (`REG-F-427`, P-2: 0 of 4).
   - `undertaking-scroll.e2e.ts` *"the workbench scrolls, and the last assurance row can be reached"* — *"wheeling the workbench must scroll it — this is the W-1 defect — Expected: > 100, Received: 0"*, on both attempts. Its own arrangement assertions passed (more than 20 rows; the last row starts below the fold), so the page overflows and a wheel does not move it. ⛔ **UNEXPLAINED.** It reproduces the pre-fix always-yes lane (notes H-2, *"undertaking-scroll newly red"*), so it depends on the reviewer path, not on chance. Not investigated; owed.
 - **WHAT IT DOES NOT SHOW.** An always-yes stand-in proves reachability, never judgement: this is the CEILING a reviewer on the default lane could reach, not evidence that any real reviewer reaches it.
+
+---
+
+### REG-D-070 — SPONSOR RULING: the draft dependency rule is ratified as designed, with the five answers of its §7.3
+
+**Ruled 2026-09-22** (sponsor, in session, answering the five questions of `docs/_working/DESIGN-what-a-draft-depends-on.md` §7.3, revision 3, committed `ddb8d2dc`). **Status:** ⛔ **OPEN — ratified; the build is owed (`docs/_working/ROADMAP-what-a-draft-depends-on.md`, `DD-0`..`DD-7`).**
+
+- **THE RULING, VERBATIM:** *"1 - yes adopt the rule / 2 - agree / 3 - agree / 4 - agree / 5 - agree"* — each answering the recommendation as put in §7.3.
+- **Q1 — THE RULE IS ADOPTED** (§7.1–§7.2): *"A staged draft is refused at acceptance only if something it depends on changed since it was started. It depends on: its PWA; that PWA's types, including a new one; its conversation, including a first one; its review records under the three review policies; those policies and any policy it newly uses; and everything it writes. Nothing else can refuse it. A refusal names each thing that changed and what changed it. If the final save step fails although nothing it depends on changed, the draft is lost, and that is reported as a defect in this rule, not as a conflict."* The precise form, its exclusions and its premises are §7.2 of the design.
+- **Q2 — W3's BLOCK IS KEPT FOR NOW** (group G4: a reviewer record on the draft's PWA that is not the draft's own refuses it), and the ORDER is ruled: **`REG-F-433`'s join key → drop G4 → `REG-F-431`'s drain fix.** ⛔ `REG-F-431` must not be fixed while G4 stands, or every discard during a review would routinely refuse the next draft on that PWA.
+- **Q3 — OPTION (c): the assistant is shown only ACTIVE policies**, so it can never have chosen around a suspended one. ⚠ Conditional, as put: the roadmap first confirms a draft never needs to reference a non-active policy; if it does, the question comes back to the sponsor rather than the ruling being widened.
+- **Q4 — MANUAL EDITS TO A PWA ARE REFUSED WHILE AN AGENT DRAFT ON IT IS OPEN**, at one choke point; `newPolicyVersion` **skips** such a PWA and says so; `recordWaiver` is refused while a draft is open. Within one process, until a durable per-PWA lease exists — correctness does not depend on it (PER-6), because the acceptance check is the durable guarantee.
+- **Q5 — OPTION (a): NO CLARIFICATION OF PER-4.** PER-4 governs a command's own update and does not forbid a guarded batch from also refusing when a declared group changed. **This entry is the rule's record.**
+- **NOT RULED, AND OWED:** a durable per-PWA lease; the items the design files separately (`REG-F-436`, `REG-F-437`); the ruled Q2 sequence after this build.
+
+---
+
+### REG-F-436 — nothing enforces one authoring conversation per PWA outside a staged turn, and nothing structural guards a PWA's type set except the version bump
+
+**Filed 2026-09-22** (`JAN-CRITREAD`, the separately-filed item of `DESIGN-what-a-draft-depends-on.md` §10). **Status:** ⚠ **OPEN — inferred from code, not driven for writers outside a turn; the remedy candidate is recorded, not chosen.**
+
+- **THE GAP.** `AppendConversationEntries` creates a conversation on first append by id and checks no per-PWA uniqueness (`packages/rph-application/src/handlers/pwa-authoring.ts:71-94`). `getConversation` returns the FIRST conversation in log order (`packages/rph-engine/src/queries.ts:212-214`), so a second one for the same PWA is invisible to every reader of the conversation, and its entries with it.
+- **WHO CAN CREATE ONE.** Inside a staged turn, `REG-D-070`'s group G1 refuses the commit (once `DD-3` is built). Outside a turn, no production caller writes a conversation to canonical (every `recordConversation` call passes the turn's engine); `/test-api/dispatch` and a second process can. So today this is an integrity gap with no production path, not a live defect.
+- **THE SAME SHAPE FOR TYPES.** A PWA's type set has no structural guard: a new type is seen only because every current `PWU_TYPE` writer bumps the PWA (`withPwaVersionBump`, `pwa-authoring.ts:201-222`), a mechanism `REG-F-046` records as violating AGG-1. `REG-D-070`'s G2 covers staged turns without it.
+- **REMEDY CANDIDATE (design B of the panel), NOT CHOSEN:** store-enforced identity keys — one conversation per PWA, a dense slot per type — claimed by the storage adapter and backed by a trigger. Recorded costs: the migration ladder's rules (additive `ALTER` only, `packages/rph-persistence/src/schema.ts`) do not allow a new table and backfill as written; a backfill of legacy duplicates; key state in the fork overlay.
+
+---
+
+### REG-F-437 — the assurance-assessment reader ranks by the host clock and ignores subject version, so across hosts a stale floor record can shadow a current one
+
+**Filed 2026-09-22** (`JAN-CRITREAD`, the separately-filed item of `DESIGN-what-a-draft-depends-on.md` §10). **Status:** ⚠ **OPEN — inferred from code, not driven; its predicted red is below.**
+
+- **THE READER.** `latestAssessmentByPolicy` (`packages/rph-application/src/handlers/assessment-index.ts:58-82`) takes, per policy, the assessment with the greatest `updatedAt`; the app's `latestFloorAssessments` (`apps/rph-demo/src/lib/server/floor.ts:497-512`) is a second copy of the walk. `updatedAt` is the COMMAND's stamp — for a floor run, the host clock when the floor ran (`floor.ts:408`), not when anything was committed.
+- **ITS REACH.** Three direct call sites — `floorGateBlock` (`floor-gate.ts:280`), `governance.ts:982`, `pwu.ts:1447` — reaching the `PublishPwa` floor gate (`pwa-authoring.ts:1051`), the execution-plane floor gate (`execution.ts:1432`), a governance gate and PWU satisfaction; plus the PWA page through `floor.ts:548`.
+- **THE HARM, WALKED.** Host B's clock is ahead. A turn on B floors version *v* of a PWA and commits. Later a turn on host A forks, edits the PWA to *v+1*, floors it — earlier than B's stamp by the clock — and commits. The reader picks B's record, finds its version stale, and the publish gate FAILS CLOSED although a SATISFIED floor of the current version is recorded. Nothing concurrent happened, so neither the old whole-log check nor `REG-D-070`'s G3 (which covers only records committed while a draft is open) sees it.
+- **WHY IT IS ITS OWN DESIGN.** Its four gates; the index's deliberate rule that an IN-PROGRESS re-assessment masks an older SATISFIED one; and ASR-10 — *"disagreement between valid assessments is never silently arbitrated"* — which a "latest wins" ranking by any order touches. Commit-order ranking was proposed and withdrawn in the design's review for exactly these reasons.
+- **PREDICTED RED:** two hosts' clocks inverted as above (or two assessments with injected `issuedAt` in that order); assert the gate reads the current version's floor.

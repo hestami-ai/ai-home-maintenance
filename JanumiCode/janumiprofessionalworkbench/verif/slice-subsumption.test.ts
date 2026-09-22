@@ -554,7 +554,15 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//   · `ROADMAP-fork22-surface-wiring.md` touches the authoring fork only as a loader source.
 			// ⚠ This roadmap is deliberately NOT that owed sequence: it fixes the SELF-conflict and files the
 			// cross-professional one, so the counter's own programme is still owed and still unwritten.
-		).toBe(48);
+			//
+			// 48 -> 49 (2026-09-22): `ROADMAP-what-a-draft-depends-on.md` (`JAN-CRITREAD` `DD`, `REG-D-069`,
+			// `REG-D-070`). ⭑ IT IS THE OWED SEQUENCE THE WARRANT ABOVE NAMED — the counter's own programme.
+			//   · `ROADMAP-the-turn-that-refuses-itself.md` cannot hold it: its exits are MET (TT-0..TT-4
+			//     committed) and it filed this work as out of scope, owed a sponsor ruling that now exists.
+			//   · `ROADMAP-coordination.md` excludes the whole-store counter by name, and its `C-5` is the
+			//     HANDLER-reachable declaration; this is a host-side instance that does not close `C-5`
+			//     (`DESIGN-what-a-draft-depends-on.md` §3.3), so folding it there would misfile both.
+		).toBe(49);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
