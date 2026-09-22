@@ -214,8 +214,11 @@ form could not express.
 fork, so those writes replay under `dispatchBatchGuarded` with `snapshotRevisions`' vector. But that
 vector (`authoring-turn.ts:125-146`) pins the PWA, the PWU_TYPEs, the ASSURANCE_POLICYs and the
 conversation — **and no DECISION.** `hasEffectiveWaiver` reads Decisions to set `FloorView.waived`. A
-waiver granted or revoked mid-turn is a read dependency the vector does not carry. **The mechanism
-is right and its input is incomplete** — which is a one-line fix and a good first increment.
+waiver granted or revoked mid-turn is a read dependency the vector does not carry. ~~**The mechanism
+is right and its input is incomplete** — which is a one-line fix and a good first increment.~~
+⛔ **WITHDRAWN (`REG-F-066`, 2026-08-08):** the DECISION read is display-only (`FloorView.waived` has no consumer on
+the turn path), so this names no write it corrupts. ⭑ The vector's real gap is an ABSENT conversation (`REG-F-434`,
+2026-09-22), and the rule replacing the whole-log check is `DESIGN-what-a-draft-depends-on.md`.
 
 ---
 
@@ -285,7 +288,7 @@ caution and may not approve or revoke** (from REG-E-031). Both constrain §8.1 b
 | # | Increment | Why here |
 |---|---|---|
 | **C-0** | **The arrow-reachability control**: every declared arrow × a registered command; failures listed, not summarised | it is the instrument that found §3, generalised; it will find the others before they are designed |
-| **C-1** | Add DECISION to the authoring turn's revision vector | one line; closes §5's named hole with the mechanism that already exists |
+| ~~**C-1**~~ | ~~Add DECISION to the authoring turn's revision vector~~ | ~~one line; closes §5's named hole with the mechanism that already exists~~ ⛔ withdrawn, `REG-F-066` |
 | **C-2** | Wrap the four multi-dispatch acts of §6 in the batch envelope the app already uses | no new mechanism; deletes four partial-failure residues |
 | **C-3** | Make the outbox's silent discard loud (§7) — a drain with no subscriber is a refusal or a recorded gap, never a PUBLISHED row | the coordinator cannot be built on a channel that lies |
 | **C-4** | ASR-8's cascade into CANONICAL state, via Harness commands (§3, §4) | the substantive finding; needs C-0 and C-3 first |
