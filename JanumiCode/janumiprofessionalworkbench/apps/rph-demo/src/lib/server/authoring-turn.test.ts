@@ -21,6 +21,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import {
 	createEngine,
 	getConversation,
+	listByType,
 	listPwuTypes,
 	type AuthedEngineHandle,
 	type EngineHandle
@@ -213,6 +214,58 @@ describe('isolated authoring turn and guarded commit', () => {
 		const result = commitAuthoringTurn(turn, candidateHash);
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
 		expect(turn.status).toBe('CONFLICTED');
+		expect(listPwuTypes(engine, PWA)).toEqual([]);
+		expect(engine.readAllEvents()).toHaveLength(beforeCommitEvents);
+	});
+
+	// ⭐ THE WHOLE-LOG LIMB'S OWN JOB, ISOLATED (`JAN-CRITREAD` `TT-0`). The test above cannot tell the commit
+	// guard's two refusing limbs apart: its `EditPwa` moves the event log AND the PWA's own revision, which the
+	// vector pins, so deleting the whole-log refusal left this file green — measured, mutant
+	// `TT-M1-event-log-refusal-becomes-admission` SURVIVED 6/6. The count's unique job is a NEW aggregate the
+	// vector never pinned (`authoring-turn.ts:19`): here, the PWA's FIRST conversation, created on canonical by a
+	// second writer while the turn records its own on the fork. Nothing pins an ABSENT conversation, the turn's own
+	// conversation passes `mustNotExist`, and the PWA is untouched — so only the count can refuse, and without it
+	// the commit lands TWO conversations for one PWA.
+	it('refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone', () => {
+		expect(
+			getConversation(engine, PWA),
+			'precondition: no conversation exists to be pinned'
+		).toBeUndefined();
+		const turn = beginTurn();
+		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
+		const subjectHash = markAuthoringTurnValid(turn);
+		recordConversation(
+			PWA,
+			[{ role: 'USER', kind: 'message', text: 'Author the plan.' }],
+			turn.engine,
+			turn.id
+		);
+		const candidateHash = markAuthoringTurnAssured(turn, subjectHash);
+		const pwaRevision = engine.loadObject(PWA)?.revision;
+
+		recordConversation(
+			PWA,
+			[{ role: 'USER', kind: 'message', text: 'A second writer, elsewhere.' }],
+			engine,
+			'other-writer'
+		);
+		const phantom = getConversation(engine, PWA);
+		expect(phantom, 'the concurrent writer created a conversation').toBeDefined();
+		expect(phantom!.id, 'the phantom is NOT the id the turn will commit').not.toBe(
+			getConversation(turn.engine, PWA)!.id
+		);
+		expect(engine.loadObject(PWA)?.revision, 'the PWA limb has nothing to see').toBe(pwaRevision);
+		const beforeCommitEvents = engine.readAllEvents().length;
+
+		const result = commitAuthoringTurn(turn, candidateHash);
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toMatch(
+			/^@event-log changed from revision \d+ to \d+\./
+		);
+		expect(listByType(engine, 'AUTHORING_CONVERSATION'), 'one PWA, one conversation').toHaveLength(
+			1
+		);
 		expect(listPwuTypes(engine, PWA)).toEqual([]);
 		expect(engine.readAllEvents()).toHaveLength(beforeCommitEvents);
 	});

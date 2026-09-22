@@ -2273,6 +2273,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'REG-D-027(b); DOC-004 §5; V-2c mutation-operator rule'
 	},
 	{
+		id: "TT-M1-event-log-refusal-becomes-admission",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\t\t\t\t\tconflict = {\n\t\t\t\t\t\t\taggregateId: '@event-log',\n\t\t\t\t\t\t\texpectedRevision: expectedEventCount,\n\t\t\t\t\t\t\tactualRevision: actualEventCount\n\t\t\t\t\t\t};\n\t\t\t\t\t\treturn;",
+		replace: "\t\t\t\t\t\t// MUTANT: the whole-log refusal became an admission",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: the authoring turn's commit guard refuses a candidate whose canonical base moved in a way the per-aggregate revision vector cannot name — a NEW aggregate nobody pinned (`authoring-turn.ts:19`: *\"detects a concurrent new aggregate that is absent from the vector\"*). WHO RELIES: every professional whose staged turn commits while another writer acts; concretely the one-conversation-per-PWA rule, since nothing pins an ABSENT conversation. WHAT THE MUTATION DOES: keeps the whole-log comparison and deletes its consequence, so a moved log is silently admitted. ⛔ MEASURED BEFORE THE CONTROL EXISTED: SURVIVED, 6/6 green — the file's only conflict test arranged its conflict with `EditPwa`, which also moves the PWA's pinned revision, so the per-aggregate limb refused it and nothing noticed the whole-log limb was gone. OBSERVED AFTER `TT-0`'s control: KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails at its first assertion with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit LANDS, and one PWA would own two conversations.",
+		source: "JAN-CRITREAD TT-0 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',
