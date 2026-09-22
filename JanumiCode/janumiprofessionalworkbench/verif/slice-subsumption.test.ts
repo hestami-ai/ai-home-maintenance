@@ -538,7 +538,23 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// had read, while I was deriving a divergent event name from 21 handlers (`REG-F-422`). ⚠ The
 			// subsumption question keeps paying for a reason its own text does not claim: it forces reading a
 			// NEIGHBOURING artifact end to end, and the answer is usually next to the thing you missed.
-		).toBe(47);
+			//
+			// 47 -> 48 (2026-09-22): `ROADMAP-the-turn-that-refuses-itself.md` (`JAN-CRITREAD` `TT`,
+			// `REG-F-425`/`REG-F-426`). ⭑ THE WARRANT IS A DEFECT TWO COMPLETE PROGRAMMES CREATED BETWEEN THEM,
+			// the `JAN-DISCHARGE` precedent (23 -> 24) one level up.
+			//   · `ROADMAP-JAN-MXR-model-exchange-record.md` is the nearest claimant: its `MXR-05` built the
+			//     canonical drain that collides with the turn's commit guard. ⛔ But its exits are the RECORDS'
+			//     — *"an authoring turn that calls the model produces durable records"* — and that exit is MET;
+			//     the defect is that the turn which produced them can no longer be ACCEPTED. The fix changes the
+			//     command bus's guard contract, which `JAN-MXR` never owned; folding it there would file a
+			//     concurrency redesign under an audit-record programme.
+			//   · `ROADMAP-coordination.md:230-238` EXCLUDES the whole-store counter by name (*"they keep their
+			//     own sequence"*), and that sequence was never written — `DESIGN-trust-boundary.md` §4 schedules
+			//     D-0..D-5 and none of them is the counter.
+			//   · `ROADMAP-fork22-surface-wiring.md` touches the authoring fork only as a loader source.
+			// ⚠ This roadmap is deliberately NOT that owed sequence: it fixes the SELF-conflict and files the
+			// cross-professional one, so the counter's own programme is still owed and still unwritten.
+		).toBe(48);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
