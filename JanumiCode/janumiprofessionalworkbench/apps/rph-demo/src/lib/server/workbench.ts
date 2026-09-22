@@ -22,7 +22,7 @@ import { SqliteArtifactStore, SqliteStorageAdapter } from '@janumipwb/rph-persis
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { makeRphError, type CommandResult, type DomainCommand } from '@janumipwb/rph-contracts';
 import { monotonicFactory } from 'ulid';
 import {
 	AGENT_CREDENTIAL,
@@ -33,6 +33,7 @@ import {
 	standaloneAuthenticator
 } from './identity.js';
 import type { Credential } from '@janumipwb/rph-ports';
+import { openDraftOn } from './open-drafts.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 /**
@@ -407,15 +408,70 @@ export function dispatch(
 	targetAggregateId: string,
 	payload: unknown,
 	expectedRevision?: number
-) {
-	return uiSession().dispatch(
-		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload, expectedRevision })
-	);
+): CommandResult {
+	const input = { commandType, targetAggregateType, targetAggregateId, payload, expectedRevision };
+	const command = uiCommand(input);
+	return heldByOpenDraft([input], [command])?.refusal ?? uiSession().dispatch(command);
 }
 
 /** Dispatch a multi-command UI operation atomically. A rejection rolls the entire operation back. */
 export function dispatchBatch(commands: readonly UiCommandInput[]) {
-	return uiSession().dispatchBatch(commands.map((command) => uiCommand(command)));
+	const built = commands.map((command) => uiCommand(command));
+	const held = heldByOpenDraft(commands, built);
+	if (held) return { ok: false, results: [held.refusal], failedIndex: 0 };
+	return uiSession().dispatchBatch(built);
+}
+
+// ── ONE CHOKE POINT: A PWA WITH AN OPEN AUTHORING DRAFT TAKES NO MANUAL WRITE (`JAN-CRITREAD` `DD-4`, `REG-D-070` §5.6) ──
+//
+// While a draft is open the page renders the draft's FORK, so a manual edit to canonical would be invisible there —
+// and would then refuse the draft at acceptance, destroying the work. Every page action and `test-api/dispatch` reach
+// canonical through `dispatch`, `dispatchBatch` and `dispatchMultiPartyBatch`, and all three ask here first. The check
+// runs INSIDE the helper, synchronously with the dispatch, so a turn beginning during an action's `await
+// request.formData()` cannot slip past it.
+//
+// ⚠ A turn's OWN acceptance never comes through here: it replays through the turn's canonical handle
+// (`commitAuthoringTurn`), so the refusal cannot refuse the draft it protects. Writes that are not a PWA's structure —
+// a policy edit, a review record — are not refused: a draft that depends on them is refused at acceptance, naming
+// the change (§5.6, "not refused, disclosed").
+
+/** The PWA whose STRUCTURE a command writes, if any: the PWA itself, one of its types, or its conversation. A type or
+ *  conversation that already exists belongs to the PWA its canonical state names; a new one, to its payload's. */
+function owningPwa(input: UiCommandInput): string | undefined {
+	if (input.targetAggregateType === 'PROFESSIONAL_WORK_ARCHITECTURE') return input.targetAggregateId;
+	if (input.targetAggregateType !== 'PWU_TYPE' && input.targetAggregateType !== 'AUTHORING_CONVERSATION')
+		return undefined;
+	const existing = getEngine().loadObject(input.targetAggregateId)?.state as { pwaId?: unknown } | undefined;
+	const pwaId = existing?.pwaId ?? (input.payload as { pwaId?: unknown } | undefined)?.pwaId;
+	return typeof pwaId === 'string' ? pwaId : undefined;
+}
+
+/** The first command that writes to a PWA an open draft holds, as the refusal to return in its place. */
+function heldByOpenDraft(
+	inputs: readonly UiCommandInput[],
+	commands: readonly DomainCommand[]
+): { readonly refusal: CommandResult } | undefined {
+	for (const [index, input] of inputs.entries()) {
+		const pwaId = owningPwa(input);
+		const turnId = pwaId === undefined ? undefined : openDraftOn(pwaId);
+		if (pwaId === undefined || turnId === undefined) continue;
+		const command = commands[index]!;
+		return {
+			refusal: {
+				commandId: command.commandId,
+				status: 'REJECTED',
+				producedEventIds: [],
+				error: makeRphError('RPH_INVARIANT_VIOLATION', {
+					message:
+						`PWA ${pwaId} has an open authoring draft (${turnId}). A change made here now would not be in ` +
+						'the draft, and would refuse it at acceptance. Accept or discard the draft first.',
+					correlationId: command.correlationId,
+					targetObjectIds: [command.targetAggregateId]
+				})
+			}
+		};
+	}
+	return undefined;
 }
 
 /**
@@ -437,9 +493,15 @@ export function dispatchBatch(commands: readonly UiCommandInput[]) {
 export function dispatchMultiPartyBatch(
 	entries: readonly { readonly command: UiCommandInput; readonly as?: Credential }[]
 ) {
+	const built = entries.map(({ command }) => uiCommand(command));
+	const held = heldByOpenDraft(
+		entries.map(({ command }) => command),
+		built
+	);
+	if (held) return { ok: false, results: [held.refusal], failedIndex: 0 };
 	return uiSession().dispatchMultiPartyBatch(
-		entries.map(({ command, as }) => ({
-			command: uiCommand(command),
+		entries.map(({ as }, index) => ({
+			command: built[index]!,
 			...(as === undefined ? {} : { as })
 		}))
 	);

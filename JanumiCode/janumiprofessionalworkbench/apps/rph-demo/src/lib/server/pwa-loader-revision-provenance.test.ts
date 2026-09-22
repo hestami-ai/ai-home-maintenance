@@ -24,8 +24,13 @@
 
 import { describe, expect, it, afterEach } from 'vitest';
 import { SEED_PWA } from '@janumipwb/rph-engine';
-import { beginAuthoringTurn, clearAuthoringTurns, getPendingAuthoringTurn } from './authoring-turn.js';
+import {
+	beginAuthoringTurn,
+	clearAuthoringTurns,
+	getPendingAuthoringTurn
+} from './authoring-turn.js';
 import { dispatch, getEngine } from './workbench.js';
+import { SESSION_CREDENTIAL } from './identity.js';
 import { load } from '../../routes/pwa/[id]/+page.server.js';
 
 afterEach(() => {
@@ -42,12 +47,42 @@ describe('pwa/[id] loader — the declared revision comes from CANONICAL, not fr
 		expect(before, 'the seeded PWA must exist to fork').toBeTypeOf('number');
 
 		// Stage a candidate. `beginAuthoringTurn` forks canonical, capturing the PWA at `before`.
-		beginAuthoringTurn(SEED_PWA);
+		const turn = beginAuthoringTurn(SEED_PWA);
 
-		// CANONICAL MOVES ON, and the fork does not see it. The seeded PWA is PUBLISHED, so Deprecate is the
-		// legal next act — chosen because it succeeds, not for its meaning.
-		const moved = dispatch('DeprecatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {}, before);
-		expect(moved.status, 'the canonical write must land for the two stores to diverge').toBe('ACCEPTED');
+		// ⭑ THIS PROCESS'S PAGE CAN NO LONGER MAKE THIS WRITE (`JAN-CRITREAD` `DD-4`, `REG-D-070` §5.6): a draft on the
+		// PWA is open, so the workbench's own dispatch refuses it. Asserted, because it is why this arrangement moved.
+		const refused = dispatch(
+			'DeprecatePwa',
+			'PROFESSIONAL_WORK_ARCHITECTURE',
+			SEED_PWA,
+			{},
+			before
+		);
+		expect(refused.status).toBe('REJECTED');
+		expect(refused.error?.message).toBe(
+			`PWA ${SEED_PWA} has an open authoring draft (${turn.id}). A change made here now would not be in the ` +
+				'draft, and would refuse it at acceptance. Accept or discard the draft first.'
+		);
+
+		// CANONICAL STILL MOVES ON, and the fork does not see it — from ANOTHER PROCESS, whose own draft registry
+		// knows nothing of this one's (the registry is per process; the acceptance check is what is durable). Played
+		// by the canonical session directly, which is what that process's dispatch reaches. The seeded PWA is
+		// PUBLISHED, so Deprecate is the legal next act — chosen because it succeeds, not for its meaning.
+		const moved = getEngine().as(SESSION_CREDENTIAL).dispatch({
+			commandId: 'another-process-deprecates',
+			commandType: 'DeprecatePwa',
+			commandSchemaVersion: 1,
+			targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			targetAggregateId: SEED_PWA,
+			issuedAt: '2026-09-22T00:00:00Z',
+			correlationId: 'another-process',
+			idempotencyKey: 'another-process-deprecates',
+			expectedRevision: before,
+			payload: {}
+		});
+		expect(moved.status, 'the canonical write must land for the two stores to diverge').toBe(
+			'ACCEPTED'
+		);
 
 		const canonicalNow = engine.loadObject(SEED_PWA)?.revision;
 		const forkNow = getPendingAuthoringTurn(SEED_PWA)?.engine.loadObject(SEED_PWA)?.revision;
@@ -55,7 +90,9 @@ describe('pwa/[id] loader — the declared revision comes from CANONICAL, not fr
 		// ── THE CONTROL. Without this the assertion below is satisfied by either implementation. ────────────
 		expect(forkNow, 'the fork must still hold the pre-write revision').toBe(before);
 		expect(canonicalNow, 'canonical must have advanced past the fork').toBe((before as number) + 1);
-		expect(forkNow, 'THE TWO STORES MUST DISAGREE or this test proves nothing').not.toBe(canonicalNow);
+		expect(forkNow, 'THE TWO STORES MUST DISAGREE or this test proves nothing').not.toBe(
+			canonicalNow
+		);
 
 		// ── THE ASSERTION. MUTANT: read `engine` instead of `canonicalEngine` in the loader and this reddens
 		//    while every e2e stays green.

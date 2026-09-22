@@ -2863,6 +2863,114 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
+		id: "DD4-M1-a-single-dispatch-ignores-the-open-draft",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "return heldByOpenDraft([input], [command])?.refusal ?? uiSession().dispatch(command);",
+		replace: "return uiSession().dispatch(command); // MUTANT: a single dispatch ignores the open draft",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a PWA with an open authoring draft takes no manual write (`REG-D-070` §5.6). WHO RELIES: the professional whose draft the write would destroy — the page renders the draft's FORK, so a canonical edit made then is invisible there and refuses the draft at acceptance. WHAT THE MUTATION DOES: the single dispatch — the helper behind 25 of the surface's 28 write sites, and behind `test-api/dispatch` — stops asking. OBSERVED: KILLED, 4 of 12 — O-1 (`expected 'ACCEPTED' to be 'REJECTED'`), O-2, O-3 and O-5, each write landing on a held PWA.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M2-a-batch-ignores-the-open-draft",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "if (held) return { ok: false, results: [held.refusal], failedIndex: 0 };\n\treturn uiSession().dispatchBatch(built);",
+		replace: "void held; // MUTANT: a batch ignores the open draft\n\treturn uiSession().dispatchBatch(built);",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a PWA with an open authoring draft takes no manual write (`REG-D-070` §5.6). WHO RELIES: the professional whose draft the write would destroy — the page renders the draft's FORK, so a canonical edit made then is invisible there and refuses the draft at acceptance. WHAT THE MUTATION DOES: an atomic UI batch stops asking, so one held command carries the whole batch through. OBSERVED: KILLED, exactly 1 of 12 — O-3, `expected true to be false`: the batch committed.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M3-a-multi-party-batch-ignores-the-open-draft",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "if (held) return { ok: false, results: [held.refusal], failedIndex: 0 };\n\treturn uiSession().dispatchMultiPartyBatch(",
+		replace: "void held; // MUTANT: a multi-party batch ignores the open draft\n\treturn uiSession().dispatchMultiPartyBatch(",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a PWA with an open authoring draft takes no manual write (`REG-D-070` §5.6). WHO RELIES: the professional whose draft the write would destroy — the page renders the draft's FORK, so a canonical edit made then is invisible there and refuses the draft at acceptance. WHAT THE MUTATION DOES: the multi-party batch stops asking — the envelope an assurance act uses, where a second party's half would carry the first's write onto a held PWA. OBSERVED: KILLED, exactly 1 of 12 — O-4, `expected true to be false`.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M4-an-existing-aggregates-owner-is-read-from-the-payload",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "const pwaId = existing?.pwaId ?? (input.payload as { pwaId?: unknown } | undefined)?.pwaId;",
+		replace: "const pwaId = existing === null ? existing : (input.payload as { pwaId?: unknown } | undefined)?.pwaId; // MUTANT: the canonical state is not asked",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a PWA with an open authoring draft takes no manual write (`REG-D-070` §5.6). WHO RELIES: the professional whose draft the write would destroy — the page renders the draft's FORK, so a canonical edit made then is invisible there and refuses the draft at acceptance. WHAT THE MUTATION DOES: an existing type's or conversation's owner is read from the command's PAYLOAD instead of its CANONICAL state — and a removal's payload names no PWA, so the write is owned by nobody and refused by nothing. OBSERVED: KILLED, exactly 1 of 12 — O-2, `expected undefined to be 'PWA pwa_…40 has an open authoring draft …'`.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M5-a-pwa-command-owns-no-pwa",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "if (input.targetAggregateType === 'PROFESSIONAL_WORK_ARCHITECTURE') return input.targetAggregateId;",
+		replace: "if (input.targetAggregateType === 'NOTHING') return input.targetAggregateId; // MUTANT: a PWA command owns no PWA",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a PWA with an open authoring draft takes no manual write (`REG-D-070` §5.6). WHO RELIES: the professional whose draft the write would destroy — the page renders the draft's FORK, so a canonical edit made then is invisible there and refuses the draft at acceptance. WHAT THE MUTATION DOES: a command on the PWA aggregate itself (its details, its lifecycle) is owned by no PWA. OBSERVED: KILLED, 3 of 12 — O-3, O-4 and O-5 (`expected { ok: true, results: [ { …(2) } ] } to deeply equal { ok: false, results: [ { …(4) } ] }`).",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M6-a-draft-never-takes-its-pwa",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "holdForDraft(pwaId, id);",
+		replace: "// MUTANT: a draft never takes its PWA",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a draft HOLDS its PWA from the moment its turn begins until it is committed or discarded — CONFLICTED and COMMIT_FAILED included, whose only exit is DISCARD (`REG-D-070` §5.6). WHO RELIES: the choke point, which can only refuse what the registry says is held. WHAT THE MUTATION DOES: a beginning turn never takes its PWA, so nothing is ever held and every refusal in this file is inert. OBSERVED: KILLED, 8 of 12 — O-1..O-5, R-1, N-1 and W-1. ⚠ The two CONTROLS (O-6, O-7) and R-2 stay green, which is what they are for: they must pass whether or not anything is held.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M7-a-commit-never-releases-the-pwa",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "releaseDraft(current.pwaId, current.id);",
+		replace: "// MUTANT: a commit never releases the PWA",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a draft HOLDS its PWA from the moment its turn begins until it is committed or discarded — CONFLICTED and COMMIT_FAILED included, whose only exit is DISCARD (`REG-D-070` §5.6). WHO RELIES: the choke point, which can only refuse what the registry says is held. WHAT THE MUTATION DOES: a committed turn never releases its PWA, so the professional's own accepted draft locks its PWA for the life of the process. OBSERVED: KILLED, 4 of 12 — R-2 (`expected 'sess_00000000000000000000000001' to be undefined`), and R-3, N-1, W-1, which the leaked hold reaches through the shared registry.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M8-a-discard-never-releases-the-pwa",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "releaseDraft(pwaId, turn.id);",
+		replace: "// MUTANT: a discard never releases the PWA",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a draft HOLDS its PWA from the moment its turn begins until it is committed or discarded — CONFLICTED and COMMIT_FAILED included, whose only exit is DISCARD (`REG-D-070` §5.6). WHO RELIES: the choke point, which can only refuse what the registry says is held. WHAT THE MUTATION DOES: a discarded turn never releases its PWA — the discard being the professional's own way out of a CONFLICTED draft. OBSERVED: KILLED, 10 of 12 — including BOTH controls (O-6, O-7), because the leaked hold from the file's earlier discards reaches every later case through the shared registry.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M9-a-stale-release-frees-a-successors-hold",
+		file: "apps/rph-demo/src/lib/server/open-drafts.ts",
+		find: "if (held.get(pwaId) === turnId) held.delete(pwaId);",
+		replace: "held.delete(pwaId); // MUTANT: a stale release frees a successor’s hold",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a draft HOLDS its PWA from the moment its turn begins until it is committed or discarded — CONFLICTED and COMMIT_FAILED included, whose only exit is DISCARD (`REG-D-070` §5.6). WHO RELIES: the choke point, which can only refuse what the registry says is held. WHAT THE MUTATION DOES: a release frees whatever is held, without naming its own turn — so a discarded turn's late release frees the hold its SUCCESSOR now has, and the successor takes manual writes beside itself. OBSERVED: KILLED, exactly 1 of 12 — R-3, `the first turn's release must not free the second's hold: expected undefined to be 'sess_second'`.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M10-a-policy-version-refuses-instead-of-skipping",
+		file: "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
+		find: "...migrateReferenceCommands(migrating, policyId, successorId),",
+		replace: "...migrateReferenceCommands(draftReferences, policyId, successorId), // MUTANT: the held PWA is not skipped",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a new policy version SKIPS a PWA with an open draft and says so, rather than refusing the whole action (`REG-D-070` Q4) — refusing would let one professional's draft block another's act on a DIFFERENT PWA, the interference `REG-D-069` removes. WHO RELIES: every other professional versioning a policy while somebody, somewhere, has a draft open. WHAT THE MUTATION DOES: the held PWA's types go back into the batch, so the choke point refuses the batch and the action fails for everyone. OBSERVED: KILLED, exactly 1 of 12 — N-1, `expected undefined to deeply equal [ 'pwa_…40' ]`: no successor, no migration, nothing reported.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M11-a-waiver-is-recorded-beside-an-open-draft",
+		file: "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
+		find: "const draft = openDraftOn(params.id);",
+		replace: "const draft = openDraftOn('no-such-pwa'); // MUTANT: a waiver is recorded beside an open draft",
+		expectRed: ["apps/rph-demo/src/lib/server/open-draft-refusal.test.ts"],
+		why: "PROMISE: a waiver is refused while the PWA's draft is open (`REG-D-070` §5.6) — the floor on screen is the DRAFT's, and a waiver acts on the canonical floor below it, so the professional would be waiving a finding they are not looking at. WHO RELIES: ASR-3's reading of what a waiver accepts; a waiver minted against the wrong floor names a finding nobody read. WHAT THE MUTATION DOES: the check asks about a PWA that does not exist, so it never fires. OBSERVED: KILLED, exactly 1 of 12 — W-1, `expected 400 to be 409`: the action proceeds to its own floor check instead of refusing.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD4-M12-the-editors-are-offered-while-the-run-is-live",
+		file: "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
+		find: "const editable = $derived(isDraft && !hasStagedCandidate && !running);",
+		replace: "const editable = $derived(isDraft && (!hasStagedCandidate || running)); // MUTANT: offered while the run is live",
+		expectRed: ["apps/rph-demo/e2e/editors-locked-during-run.e2e.ts"],
+		why: "PROMISE: the page does not OFFER a manual canonical edit while an agent run is live or its candidate is staged (`REG-D-070` §5.6). WHO RELIES: the professional, who cannot be expected to know that the graph on screen is a fork while the button beside it writes canonical. WHAT THE MUTATION DOES: restores the formula this increment replaced — `isDraft && (!hasStagedCandidate || running)` — under which the editors were live EXACTLY while the run was. OBSERVED: KILLED. ⚠ ITS LANE IS NOT CLEAN: the runner reports `victim NOT green before mutation: assurance-floor-waiver.e2e.ts`, one of `REG-D-067`'s thirteen accepted reds, so the e2e verdict alone attributes little. MEASURED DIRECTLY INSTEAD: the spec run alone against a page carrying exactly this formula fails at its mid-run assertion — `expect(locator).toHaveCount(expected) failed / Locator: getByRole('button', { name: '+ Define PWU Type' }) / Expected: 0 / Received: 1`.",
+		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',

@@ -54,6 +54,7 @@ import { markersIn } from '@janumipwb/rph-application';
 import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
 import { getArtifactStore } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
+import { openDraftOn } from '$lib/server/open-drafts';
 import { SESSION_CREDENTIAL } from '$lib/server/identity';
 import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
 import {
@@ -706,6 +707,14 @@ export const actions: Actions = {
 	recordWaiver: async ({ request, params }) => {
 		const rationale = String(((await request.formData()).get('rationale') ?? '') as string).trim();
 		if (!rationale) return fail(400, { error: 'A waiver rationale is required.' });
+		// ⛔ REFUSED WHILE A DRAFT ON THIS PWA IS OPEN (`JAN-CRITREAD` `DD-4`, `REG-D-070` §5.6). The page renders the
+		// DRAFT's floor, but a waiver acts on the CANONICAL floor below — so the professional would be waiving a
+		// finding they are not looking at. Read AFTER the form, synchronously with the dispatches below.
+		const draft = openDraftOn(params.id);
+		if (draft)
+			return fail(409, {
+				error: `PWA ${params.id} has an open authoring draft (${draft}); the floor on screen is the draft's, not the one a waiver would act on. Accept or discard the draft first.`
+			});
 		// A waiver must name the EXACT policy and criterion it discharges (DOC-004 §12.2; RPH-GOV-005 forbids
 		// bleeding to another criterion). It used to send a free-text scope of "de minimis assurance floor", which
 		// the gate honored as a blanket bypass of the WHOLE floor — including a REJECTED independent review. So we
@@ -828,6 +837,15 @@ export const actions: Actions = {
 		const requested = String((form.get('version') ?? '') as string).trim();
 		const newVersion = requested || bumpVersion(String((prev.version ?? '1.0.0') as string));
 		const { referencingTypes, draftReferences } = collectPolicyReferences(policyId);
+		// ⭑ A PWA WITH AN OPEN AUTHORING DRAFT IS SKIPPED, AND SAID SO (`JAN-CRITREAD` `DD-4`, `REG-D-070` Q4). Refusing
+		// the whole action would let one professional's draft block another's act on a DIFFERENT PWA — the interference
+		// `REG-D-069` removes. A skipped type keeps the predecessor, as a published PWA's does; a draft that newly
+		// referenced the policy is refused at acceptance, naming it.
+		const ownerOf = (type: PwuTypeRow) => String((type.state.pwaId ?? '') as string);
+		const skippedForOpenDrafts = [
+			...new Set(draftReferences.map(ownerOf).filter((pwaId) => openDraftOn(pwaId) !== undefined))
+		];
+		const migrating = draftReferences.filter((type) => !skippedForOpenDrafts.includes(ownerOf(type)));
 		const successorId = mintUiId('pol');
 		const commands: UiCommandInput[] = [
 			{
@@ -842,7 +860,7 @@ export const actions: Actions = {
 				targetAggregateId: successorId,
 				payload: { policyId: successorId }
 			},
-			...migrateReferenceCommands(draftReferences, policyId, successorId),
+			...migrateReferenceCommands(migrating, policyId, successorId),
 			{
 				commandType: 'SupersedeAssurancePolicy',
 				targetAggregateType: 'ASSURANCE_POLICY',
@@ -866,8 +884,9 @@ export const actions: Actions = {
 		if (!batch.ok) return refuseBatch(batch);
 		return {
 			newVersion: successorId,
-			migratedReferences: draftReferences.length,
-			pinnedHistoricalReferences: referencingTypes.length - draftReferences.length
+			migratedReferences: migrating.length,
+			pinnedHistoricalReferences: referencingTypes.length - draftReferences.length,
+			skippedForOpenDrafts
 		};
 	},
 

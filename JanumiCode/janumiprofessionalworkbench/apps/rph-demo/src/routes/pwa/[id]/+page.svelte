@@ -64,6 +64,7 @@
 			createdPolicy?: string;
 			editedPolicy?: string;
 			newVersion?: string;
+			skippedForOpenDrafts?: string[];
 			suspendedPolicy?: string;
 			activatedPolicy?: string;
 			acceptedCandidate?: string;
@@ -98,13 +99,16 @@
 		data.authoringTurn?.status === 'REVISION_REQUIRED' ||
 			data.authoringTurn?.status === 'BLOCKED_EXTERNAL'
 	);
-	// A live run needs its candidate preview to stay visible as tool invalidations arrive. Once the run finishes,
-	// canonical/manual controls lock until the exact candidate is accepted or discarded.
-	const editable = $derived(isDraft && (!hasStagedCandidate || running));
-	// The chat stays open in MORE cases than manual canonical editing: a recoverable staged candidate can be refined
-	// via chat (routed into the same fork) without discarding — while manual canonical edits stay locked so they can
-	// never diverge from the staged fork.
-	const chatOpen = $derived(editable || (isDraft && candidateResumable));
+	// ⛔ MANUAL CANONICAL EDITS ARE NOT OFFERED WHILE AN AGENT RUN IS LIVE, NOR WHILE ITS CANDIDATE IS STAGED
+	// (`JAN-CRITREAD` `DD-4`, `REG-D-070` §5.6). The page shows the draft's FORK from the moment the run begins; an
+	// edit made then would write canonical, be invisible here, and refuse the draft at acceptance. The server refuses
+	// such a write anyway (`workbench.ts`); this stops offering it. (It used to be `isDraft && (!hasStagedCandidate ||
+	// running)` — the editors were live exactly while the run was.)
+	const editable = $derived(isDraft && !hasStagedCandidate && !running);
+	// The chat stays open in MORE cases than manual canonical editing: throughout a live run (its log streams there),
+	// and for a recoverable staged candidate, which can be refined via chat (routed into the same fork) without
+	// discarding — while manual canonical edits stay locked so they can never diverge from the staged fork.
+	const chatOpen = $derived(isDraft && (!hasStagedCandidate || running || candidateResumable));
 	const panelAwareFitViewOptions: FitViewOptions = $derived({
 		padding: {
 			top: '24px',
@@ -947,6 +951,15 @@
 					<button class="primary small" type="submit">Save</button>
 					<button type="button" class="ghost small" onclick={() => (showPwaEdit = false)}>Cancel</button>
 				</form>
+			{/if}
+			{#if form?.skippedForOpenDrafts?.length}
+				<p class="hint" role="status" data-testid="policy-version-skipped">
+					The new policy version was not applied to {form.skippedForOpenDrafts.length === 1
+						? 'one PWA'
+						: `${form.skippedForOpenDrafts.length} PWAs`} with an open authoring draft ({form.skippedForOpenDrafts.join(
+						', '
+					)}); their types keep the previous version.
+				</p>
 			{/if}
 			{#if form?.error}
 				<p class="err" role="alert">
@@ -1840,7 +1853,7 @@
 						</div>
 						<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
 						<!-- ⭑⭑ JAN-EXECGOV EG-07a — WHAT THE APPROVAL MOMENT COULD NOT SEE.
-						     `editable = isDraft && (!hasStagedCandidate || running)`, and the type FORM — the only
+						     `editable = isDraft && !hasStagedCandidate && !running` (`DD-4`), and the type FORM — the only
 						     surface in this repository that rendered `workDischarge` or the prompt — sits behind
 						     `{:else if editable && formMode !== null}`. With an agent candidate STAGED, `editable` is
 						     FALSE and the panel falls HERE. So at `acceptAgentCandidate`, documented as "explicit human

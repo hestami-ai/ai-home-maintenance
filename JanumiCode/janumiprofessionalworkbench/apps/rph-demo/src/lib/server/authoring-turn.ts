@@ -9,6 +9,7 @@ import { createActor } from 'xstate';
 import { authoringTurnMachine, type AuthoringTurnState } from '$lib/server/authoring-turn-machine';
 import { AGENT_CREDENTIAL } from './identity.js';
 import { getEngine, makeAuthoringBroker, mintUiId } from '$lib/server/workbench';
+import { holdForDraft, releaseDraft } from './open-drafts.js';
 
 type TurnActor = ReturnType<typeof newTurnActor>;
 
@@ -344,6 +345,8 @@ export function beginAuthoringTurn(
 	};
 	turnRef.current = turn;
 	turnsByPwa.set(pwaId, turn);
+	// The draft HOLDS its PWA from here until it is committed or discarded (`DD-4`, `REG-D-070` §5.6).
+	holdForDraft(pwaId, id);
 	return publicTurn(turn);
 }
 
@@ -750,6 +753,7 @@ export function commitAuthoringTurn(
 	}
 	current.actor.stop();
 	turnsByPwa.delete(current.pwaId);
+	releaseDraft(current.pwaId, current.id);
 	return { ok: true, candidateHash, commandCount: current.recordedCommands.length };
 }
 
@@ -765,6 +769,7 @@ export function discardAuthoringTurn(pwaId: string): boolean {
 	} finally {
 		turn.actor.stop();
 		turnsByPwa.delete(pwaId);
+		releaseDraft(pwaId, turn.id);
 	}
 	return true;
 }
