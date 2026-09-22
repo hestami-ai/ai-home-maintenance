@@ -116,6 +116,11 @@ export interface ForkBase {
 	revisionAt(aggregateId: string): number | undefined;
 	/** The fork's own writes, in commit order; a rolled-back transaction's are not among them. */
 	writes(): readonly StagedWrite[];
+	/**
+	 * Every aggregate the fork has been asked for BY ID, outside an enumeration (`JAN-CRITREAD` `DD-6b`,
+	 * `REG-D-070` §5.5). The containment gate asks of each one: is it pinned, in a declared group, or advisory?
+	 */
+	directLoads(): readonly string[];
 }
 
 /** The public engine seam. Everything a host needs: dispatch commands, observe events, drain the outbox to
@@ -221,7 +226,8 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 				? {
 						mark: store.highWaterMark(),
 						revisionAt: (aggregateId) => store.revisionAtBase(aggregateId),
-						writes: () => store.stagedWrites()
+						writes: () => store.stagedWrites(),
+						directLoads: () => store.directLoads()
 					}
 				: undefined,
 		ontology,

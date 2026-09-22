@@ -2,10 +2,16 @@
 // concrete store.
 export const RPH_APPLICATION_VERSION = '0.0.0';
 
-export { Engine } from './command-bus.js';
+export { Engine, memberOfGroup } from './command-bus.js';
+// `memberOfGroup` is exported for the containment gate (`JAN-CRITREAD` `DD-6b`): the gate asks whether an
+// aggregate a draft read by id is a member of a declared group, and it must ask with the SAME predicate the
+// commit uses — a second copy of the rule in a test would answer a question the product does not ask.
 export type { AuthedEngine } from './command-bus.js';
 export type {
 	BatchResult,
+	DependencyGroup,
+	DependencyKey,
+	DependencyViolation,
 	EngineDeps,
 	EventSubscriber,
 	ObjectPostcondition,

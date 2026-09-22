@@ -4,10 +4,12 @@
 	"files": {
 		"packages/rph-application/src/command-bus.ts": {
 			"consumedExports": [
-				"Engine"
+				"Engine",
+				"memberOfGroup"
 			],
 			"guardedExports": [
-				"Engine"
+				"Engine",
+				"memberOfGroup"
 			],
 			"unattributedMutants": 0
 		},
@@ -430,7 +432,7 @@
 				"submitPwaForReview",
 				"validatePwa"
 			],
-			"unattributedMutants": 2
+			"unattributedMutants": 3
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
 			"consumedExports": [
@@ -1260,6 +1262,17 @@
 			],
 			"guardedExports": [
 				"containedWorkspacePath"
+			],
+			"unattributedMutants": 0
+		},
+		"packages/rph-ports/src/scan-context.ts": {
+			"consumedExports": [
+				"inScanContext",
+				"withScanContext"
+			],
+			"guardedExports": [
+				"inScanContext",
+				"withScanContext"
 			],
 			"unattributedMutants": 0
 		},

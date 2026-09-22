@@ -3,6 +3,7 @@
 // version is immutable (changes create a successor). An Undertaking is instantiated from a PUBLISHED PWA version
 // (§42): CreateUndertaking binds the exact PWA version; the root PWU Instance + children are then shaped in the
 // Undertaking context (via ProposePwu carrying undertakingId + pwuTypeId — the CON-009 ownership binding).
+import { withScanContext } from '@janumipwb/rph-ports';
 import type {
 	AppendConversationEntriesPayload,
 	CommandResult,
@@ -397,10 +398,14 @@ function assurancePolicyStatuses(ctx: HandlerContext): Map<string, string> {
 	const ids = new Set<string>();
 	for (const e of ctx.store.readAllEvents())
 		if (e.aggregateType === ASSURANCE_POLICY) ids.add(e.aggregateId);
-	for (const pid of ids) {
-		const s = ctx.store.loadObject(pid)?.state as { status?: string } | undefined;
-		if (s) status.set(pid, String(s.status ?? 'DRAFT'));
-	}
+	// ⭑ AN ENUMERATION, NOT A BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5): this walks the whole population
+	// of a type, so its loads are the scan's. Counting them as direct dependencies would report the whole store.
+	withScanContext(() => {
+		for (const pid of ids) {
+			const s = ctx.store.loadObject(pid)?.state as { status?: string } | undefined;
+			if (s) status.set(pid, String(s.status ?? 'DRAFT'));
+		}
+	});
 	return status;
 }
 

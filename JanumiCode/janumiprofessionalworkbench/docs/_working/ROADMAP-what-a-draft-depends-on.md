@@ -181,7 +181,11 @@ sponsor** with the finding; do not widen the ruling.
 event-per-state-change premise, the last two measured across the WHOLE suite by wrapping `commit` (the seam
 `emitted-event-guard.ts` already uses), each with its control mutant. **DD-6b** — the direct by-id containment gate
 (the scan-context flag in `listByType` and the handler scans, and the conformance test over the turn scenarios),
-which needs load instrumentation of its own and is its own increment.
+which needs load instrumentation of its own and is its own increment. ⭑ **DD-6b DONE 2026-09-22.** The fork records
+what a draft reads BY ID; `withScanContext` (in `rph-ports`) lets `listByType` and the four handler scans that walk a
+whole type declare themselves, so an enumeration's loads are not counted. Measured on the turn scenarios: 24 by-id
+reads BEFORE the handler scans were flagged, of which 12 were the additive policy library; 12 after, and every one of
+them PINNED — the ADVISORY list is empty.
 
 ⚠ **A MEASUREMENT IS NOT YET A GUARD.** `DD6-M2` SURVIVED its first aim: the key-field premise was measured over
 every commit in the suite, and nothing in the suite ever tried to rewrite a key field, so the mutant changed no

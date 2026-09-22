@@ -5,6 +5,7 @@
 // (which makes VALIDATOR_FAILED→REJECTED and INDEPENDENCE_VIOLATION→SATISFIED illegal). Evidence admissibility
 // (§8.11) is enforced at AdmitEvidence by @janumipwb/rph-assurance's evidenceAdmissibility — the kernel rule,
 // called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
+import { withScanContext } from '@janumipwb/rph-ports';
 import {
 	BLOCKING_SEVERITIES,
 	checkIndependence,
@@ -705,14 +706,18 @@ function claimsWithAdmissibleEvidence(ctx: HandlerContext): ReadonlySet<string> 
 	for (const e of ctx.store.readAllEvents())
 		if (e.aggregateType === EVIDENCE) evidenceIds.add(e.aggregateId);
 	const supported = new Set<string>();
-	for (const id of evidenceIds) {
-		const st = ctx.store.loadObject(id)?.state as
-			{ status?: unknown; supportsClaimIds?: unknown } | undefined;
-		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
-		if (!Array.isArray(st.supportsClaimIds)) continue;
-		for (const claimId of st.supportsClaimIds)
-			if (typeof claimId === 'string') supported.add(claimId);
-	}
+	// ⭑ AN ENUMERATION, NOT A BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5): this walks the whole
+	// population of a type, so its loads are the scan's, not a caller's dependency.
+	withScanContext(() => {
+		for (const id of evidenceIds) {
+			const st = ctx.store.loadObject(id)?.state as
+				{ status?: unknown; supportsClaimIds?: unknown } | undefined;
+			if (!st || String(st.status) !== 'ADMISSIBLE') continue;
+			if (!Array.isArray(st.supportsClaimIds)) continue;
+			for (const claimId of st.supportsClaimIds)
+				if (typeof claimId === 'string') supported.add(claimId);
+		}
+	});
 	return supported;
 }
 
@@ -935,12 +940,16 @@ function admissibleEvidenceFor(ctx: HandlerContext, claimId: string): string[] {
 	for (const e of ctx.store.readAllEvents())
 		if (e.aggregateType === EVIDENCE) ids.add(e.aggregateId);
 	const out: string[] = [];
-	for (const id of ids) {
-		const st = ctx.store.loadObject(id)?.state as
-			{ status?: unknown; supportsClaimIds?: unknown } | undefined;
-		if (!st || String(st.status) !== 'ADMISSIBLE') continue;
-		if (Array.isArray(st.supportsClaimIds) && st.supportsClaimIds.includes(claimId)) out.push(id);
-	}
+	// ⭑ AN ENUMERATION, NOT A BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5): this walks the whole
+	// population of a type, so its loads are the scan's, not a caller's dependency.
+	withScanContext(() => {
+		for (const id of ids) {
+			const st = ctx.store.loadObject(id)?.state as
+				{ status?: unknown; supportsClaimIds?: unknown } | undefined;
+			if (!st || String(st.status) !== 'ADMISSIBLE') continue;
+			if (Array.isArray(st.supportsClaimIds) && st.supportsClaimIds.includes(claimId)) out.push(id);
+		}
+	});
 	return out;
 }
 

@@ -7,6 +7,7 @@ import {
 	ProfessionalWorkObjectTypeSchema,
 	type ProfessionalWorkObjectType
 } from '@janumipwb/rph-contracts';
+import { withScanContext } from '@janumipwb/rph-ports';
 import type { EngineHandle } from './engine.js';
 
 export interface ObjectRow {
@@ -39,15 +40,20 @@ export function listByType(handle: EngineHandle, objectType: string): ObjectRow[
 	for (const e of handle.readAllEvents())
 		if (e.aggregateType === objectType) ids.add(e.aggregateId);
 	const rows: ObjectRow[] = [];
-	for (const id of ids) {
-		const loaded = handle.loadObject(id);
-		if (loaded?.state)
-			rows.push({
-				id,
-				state: loaded.state as Record<string, unknown>,
-				revision: loaded.revision
-			});
-	}
+	// ⭑ THE LOADS BELOW ARE THE SCAN'S, NOT A CALLER'S BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5). Every
+	// aggregate of the type is loaded here to materialise the row; counting those as direct dependencies would make
+	// the containment gate report the whole store.
+	withScanContext(() => {
+		for (const id of ids) {
+			const loaded = handle.loadObject(id);
+			if (loaded?.state)
+				rows.push({
+					id,
+					state: loaded.state as Record<string, unknown>,
+					revision: loaded.revision
+				});
+		}
+	});
 	return rows;
 }
 
@@ -302,7 +308,8 @@ export interface GovernedObjectRow {
  * already records at `QueryScope` — fixing it at the call site is what was tried before, four times.
  */
 export function listGovernedObjects(handle: EngineHandle, scope: QueryScope): GovernedObjectRow[] {
-	const owned = scope.kind === 'WORKSPACE' ? undefined : undertakingObjectIds(handle, scope.undertakingId);
+	const owned =
+		scope.kind === 'WORKSPACE' ? undefined : undertakingObjectIds(handle, scope.undertakingId);
 	const rows: GovernedObjectRow[] = [];
 	for (const [objectType, ids] of governedIdsByType(handle))
 		for (const id of ids) {
@@ -311,7 +318,9 @@ export function listGovernedObjects(handle: EngineHandle, scope: QueryScope): Go
 			if (row) rows.push(row);
 		}
 	// Stable ordering so the picker does not reshuffle between loads (event-log order is insertion order per type).
-	return rows.sort((a, b) => a.objectType.localeCompare(b.objectType) || a.label.localeCompare(b.label));
+	return rows.sort(
+		(a, b) => a.objectType.localeCompare(b.objectType) || a.label.localeCompare(b.label)
+	);
 }
 
 /**
@@ -348,7 +357,9 @@ function governedRow(
 		id,
 		objectType,
 		label: typeof named === 'string' ? named : id,
-		...(typeof state.semanticVersion === 'number' ? { semanticVersion: state.semanticVersion } : {}),
+		...(typeof state.semanticVersion === 'number'
+			? { semanticVersion: state.semanticVersion }
+			: {}),
 		revision: loaded.revision
 	};
 }

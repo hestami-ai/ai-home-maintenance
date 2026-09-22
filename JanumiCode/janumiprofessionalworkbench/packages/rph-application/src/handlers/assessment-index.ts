@@ -24,6 +24,7 @@
 // then loads each object. `handlers/assurance.ts` states the same constraint at its own SUPPORTS relation. The
 // walk is bounded by the assessment count, and both callers are on refusal paths that run once per command.
 import type { HandlerContext } from './kit.js';
+import { withScanContext } from '@janumipwb/rph-ports';
 
 /** One policy's most recent assessment over a subject, reduced to the four fields both gates read. */
 export interface SubjectAssessmentRecord {
@@ -63,20 +64,25 @@ export function latestAssessmentByPolicy(
 	for (const e of ctx.store.readAllEvents())
 		if (e.aggregateType === 'ASSURANCE_ASSESSMENT') ids.add(e.aggregateId);
 	const latest = new Map<string, SubjectAssessmentRecord>();
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as StoredAssessmentState | undefined;
-		if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId)) continue;
-		const policyId = String(s.assurancePolicyId);
-		const at = String(s.updatedAt ?? '');
-		const prev = latest.get(policyId);
-		if (!prev || at >= prev.at)
-			latest.set(policyId, {
-				assessmentId: id,
-				policyId,
-				assessmentState: String(s.assessmentState),
-				subjectSemanticVersion: s.subjectSemanticVersions?.[subjectId],
-				at
-			});
-	}
+	// ⭑ AN ENUMERATION, NOT A BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5): this walks the whole
+	// population of a type, so its loads are the scan's, not a caller's dependency.
+	withScanContext(() => {
+		for (const id of ids) {
+			const s = ctx.store.loadObject(id)?.state as StoredAssessmentState | undefined;
+			if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId))
+				continue;
+			const policyId = String(s.assurancePolicyId);
+			const at = String(s.updatedAt ?? '');
+			const prev = latest.get(policyId);
+			if (!prev || at >= prev.at)
+				latest.set(policyId, {
+					assessmentId: id,
+					policyId,
+					assessmentState: String(s.assessmentState),
+					subjectSemanticVersion: s.subjectSemanticVersions?.[subjectId],
+					at
+				});
+		}
+	});
 	return latest;
 }

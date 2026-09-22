@@ -1,4 +1,5 @@
 import type { DomainEvent } from '@janumipwb/rph-contracts';
+import { inScanContext } from '@janumipwb/rph-ports';
 import type {
 	CommandReceiptRecord,
 	CommitInput,
@@ -46,6 +47,8 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	private outbox: OutboxRecord[] = [];
 	/** Append-only, so a rolled-back transaction is undone by truncating to the length it began at. */
 	private readonly writes: StagedWrite[] = [];
+	/** A Set, so the census is the aggregates read rather than how many times each was read. */
+	private readonly directLoadIds = new Set<string>();
 	private closed = false;
 
 	constructor(private readonly source: StorageAdapter) {
@@ -77,8 +80,18 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 
 	loadObject(id: string): StoredObject | undefined {
 		this.assertOpen();
+		// ⭑ WHAT THE DRAFT READ BY ID (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5). Every read a candidate makes passes
+		// through this fork, so this is where the containment gate can see them — and `inScanContext` is what keeps an
+		// ENUMERATION's loads out of the count (`listByType` loads every aggregate of a type to materialise its rows).
+		if (!inScanContext()) this.directLoadIds.add(id);
 		const object = this.stagedObjects.get(id) ?? this.baseObjects.get(id);
 		return object ? clone(object) : undefined;
+	}
+
+	/** Every aggregate this fork has been asked for BY ID, outside an enumeration, in first-read order. */
+	directLoads(): string[] {
+		this.assertOpen();
+		return [...this.directLoadIds];
 	}
 
 	commit(input: CommitInput): CommitResult {

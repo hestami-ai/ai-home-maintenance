@@ -3007,6 +3007,60 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-6 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
 	},
 	{
+		id: "DD6B-M1-a-query-enumeration-counts-as-by-id-reads",
+		file: "packages/rph-engine/src/queries.ts",
+		find: "withScanContext(() => {",
+		replace: "((run: () => void) => run())(() => { // MUTANT: the query enumeration no longer declares itself as one",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: every aggregate a draft reads BY ID is one it DECLARED — pinned, in a group, or knowingly advisory (`REG-D-070` §5.5, §7.2 clause 1a). WHO RELIES: every draft after `DD-3`; an undeclared by-id read is a change the commit cannot see, which is the class the old whole-log limb caught for free. An ENUMERATION's loads are not a caller's dependency: a scan loads every aggregate of a type, and counting those would report the whole store as a direct dependency — the defect that sank two earlier recorders (revision 1's was coarse; revision 2 recorded at the storage layer, where the two are indistinguishable unless the enumerator says which it is). WHAT THE MUTATION DOES: `listByType` stops declaring itself an enumeration (the loop still runs; only the flag goes). OBSERVED: KILLED, 2 of 2 — the CONTROL names the twelve it now counts (`expected [ 'pol_intent_fidelity', …(11) ] to deeply equal []`), and the containment case reddens with them as undeclared reads.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6B-M2-a-handler-scan-counts-as-by-id-reads",
+		file: "packages/rph-application/src/handlers/pwa-authoring.ts",
+		find: "withScanContext(() => {",
+		replace: "((run: () => void) => run())(() => { // MUTANT: the handler scan no longer declares itself as one",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: every aggregate a draft reads BY ID is one it DECLARED — pinned, in a group, or knowingly advisory (`REG-D-070` §5.5, §7.2 clause 1a). WHO RELIES: every draft after `DD-3`; an undeclared by-id read is a change the commit cannot see, which is the class the old whole-log limb caught for free. An ENUMERATION's loads are not a caller's dependency: a scan loads every aggregate of a type, and counting those would report the whole store as a direct dependency — the defect that sank two earlier recorders (revision 1's was coarse; revision 2 recorded at the storage layer, where the two are indistinguishable unless the enumerator says which it is). WHAT THE MUTATION DOES: the handler's own walk of the policy library (`assurancePolicyStatuses`, which every PWU-Type write runs) stops declaring itself. ⚠ THIS IS THE SITE THE MEASUREMENT FOUND: before `DD-6b` wrapped it, a turn's twelve additive-policy loads read as by-id dependencies. OBSERVED: KILLED, 2 of 2 — the same twelve, `expected [ 'pol_intent_fidelity', …(11) ] to deeply equal []`.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6B-M3-the-recorder-ignores-the-scan-context",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "if (!inScanContext()) this.directLoadIds.add(id);",
+		replace: "this.directLoadIds.add(id); // MUTANT: an enumeration reads as a by-id dependency",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: every aggregate a draft reads BY ID is one it DECLARED — pinned, in a group, or knowingly advisory (`REG-D-070` §5.5, §7.2 clause 1a). WHO RELIES: every draft after `DD-3`; an undeclared by-id read is a change the commit cannot see, which is the class the old whole-log limb caught for free. An ENUMERATION's loads are not a caller's dependency: a scan loads every aggregate of a type, and counting those would report the whole store as a direct dependency — the defect that sank two earlier recorders (revision 1's was coarse; revision 2 recorded at the storage layer, where the two are indistinguishable unless the enumerator says which it is). WHAT THE MUTATION DOES: the fork's recorder counts every load, flag or no flag — the recorder revision 2 had. OBSERVED: KILLED, 2 of 2 — the control's twelve, and the containment case with them.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6B-M4-the-fork-records-no-read-at-all",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "if (!inScanContext()) this.directLoadIds.add(id);",
+		replace: "void inScanContext; // MUTANT: the fork records nothing, so the gate measures nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: every aggregate a draft reads BY ID is one it DECLARED — pinned, in a group, or knowingly advisory (`REG-D-070` §5.5, §7.2 clause 1a). WHO RELIES: every draft after `DD-3`; an undeclared by-id read is a change the commit cannot see, which is the class the old whole-log limb caught for free. WHAT THE MUTATION DOES: the fork records nothing, so the gate measures nothing and passes — the silent failure `emitted-event-guard` and `unread-refusal-guard` both exist to rule out. OBSERVED: KILLED, 2 of 2, on the LIVENESS assertions rather than the containment one: `the fork recorded the reads this scenario made: expected 0 to be greater than 5`, and the control's `expected 0 to be greater than 0`.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6B-M5-no-load-is-ever-inside-an-enumeration",
+		file: "packages/rph-ports/src/scan-context.ts",
+		find: "return depth > 0;",
+		replace: "return false; // MUTANT: no load is ever inside an enumeration",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: an ENUMERATION says so, so the loads it makes are the scan's and not a caller's by-id dependency (`REG-D-070` §5.5, `JAN-CRITREAD` `DD-6b`). WHO RELIES: the containment gate — without the distinction it reports the whole store as a direct dependency, the defect that sank two earlier recorders. WHAT THE MUTATION DOES: `inScanContext` always answers no, so every enumeration's loads are counted. OBSERVED: KILLED, 2 of 2 — the CONTROL naming the twelve additive policies the floor's handler scans walk (`expected [ 'pol_intent_fidelity', …(11) ] to deeply equal []`), and the containment case with them as undeclared reads.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6B-M6-entering-an-enumeration-does-not-raise-the-depth",
+		file: "packages/rph-ports/src/scan-context.ts",
+		find: "depth += 1;",
+		replace: "void 0; // MUTANT: entering an enumeration does not raise the depth",
+		expectRed: ["apps/rph-demo/src/lib/server/direct-load-containment.test.ts"],
+		why: "PROMISE: an ENUMERATION says so, so the loads it makes are the scan's and not a caller's by-id dependency (`REG-D-070` §5.5, `JAN-CRITREAD` `DD-6b`). WHO RELIES: the containment gate — without the distinction it reports the whole store as a direct dependency, the defect that sank two earlier recorders. WHAT THE MUTATION DOES: entering an enumeration does not raise the depth, so `withScanContext` marks nothing and every scan's loads are counted — the same outcome by the other side of the pair. OBSERVED: KILLED, 2 of 2 — the same twelve, in the control and in the containment case.",
+		source: "JAN-CRITREAD DD-6b (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',
@@ -3566,14 +3620,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// ⚠ TWO LINES, because the identical ADMISSIBLE test appears TWICE in this file — assurance.ts:705 in
 		// `claimsWithAdmissibleEvidence` (the GUARD's set) and :935 in `admissibleEvidenceFor` (the MUTATE
 		// path). Only the following line distinguishes them, and only the first is the one this rule refuses on.
-		find:
-			"\t\tif (!st || String(st.status) !== 'ADMISSIBLE') continue;\n" +
-			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
-		replace:
-			"\t\tif (!st) continue;\n" +
-			'\t\tif (!Array.isArray(st.supportsClaimIds)) continue;',
+		find: "\t\t\tif (!st || String(st.status) !== 'ADMISSIBLE') continue;\n\t\t\tif (!Array.isArray(st.supportsClaimIds)) continue;",
+		replace: "\t\t\tif (!st) continue;\n\t\t\tif (!Array.isArray(st.supportsClaimIds)) continue;",
 		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
-		why: "ADMISSIBLE COLLAPSES INTO MERELY PRESENT — the one distinction this rule exists to draw. RPH-EVD-002 is the single NON-FORGEABLE refusal in this command precisely because admissibility is a fact the ENGINE holds: evidence reaches ADMISSIBLE only through `AdmitEvidence`, and the guard folds COMMITTED events rather than reading the payload. Weakening the status test to a presence check hands that fact back to the caller, who can then reach SUPPORTED on evidence it merely PROPOSED. ⚠ THE ENFORCEMENT PROBE’S CONTROL CANNOT SEE THIS — the control ADMITS its evidence, so it stays ACCEPTED either way; only the OBSERVED arm, whose evidence was never admitted, flips from REJECTED to ACCEPTED. That asymmetry is why the probe carries two claim aggregates instead of asserting a refusal alone.",
+		why: "ADMISSIBLE COLLAPSES INTO MERELY PRESENT — the one distinction this rule exists to draw. RPH-EVD-002 is the single NON-FORGEABLE refusal in this command precisely because admissibility is a fact the ENGINE holds: evidence reaches ADMISSIBLE only through `AdmitEvidence`, and the guard folds COMMITTED events rather than reading the payload. Weakening the status test to a presence check hands that fact back to the caller, who can then reach SUPPORTED on evidence it merely PROPOSED. ⚠ THE ENFORCEMENT PROBE’S CONTROL CANNOT SEE THIS — the control ADMITS its evidence, so it stays ACCEPTED either way; only the OBSERVED arm, whose evidence was never admitted, flips from REJECTED to ACCEPTED. That asymmetry is why the probe carries two claim aggregates instead of asserting a refusal alone. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-6b`): the loop these two lines sit in now declares itself an ENUMERATION (`withScanContext`, so its loads are not counted as a draft’s by-id dependencies), which indented them by one tab. Same two lines, same consequence, same victim — and the two-line anchor still tells this site apart from the identical ADMISSIBLE test in `admissibleEvidenceFor`.",
 		source: 'REG-F-138'
 	},
 	// ── REG-F-159: THE GUARD THE OCCUPANCY CENSUS RESTS ON, AND THE DECLARATION THAT FEEDS IT ────────────────
