@@ -154,10 +154,13 @@ what depends on it. Traced now:
 - The publication gate *does* honour an EFFECTIVE waiver (`pwa-authoring.ts:946`), but it runs at
   `PublishPwa`, reading live state at that moment. **A staged turn cannot make it stale.**
 
-So the vector is not missing anything that affects a write: everything the recording depends on —
-the PWA, the types, the reasoning-review policy whose criteria it reads — is already pinned. **The
-mechanism is right AND its input is complete**, which is the opposite of what this increment and the
+~~So the vector is not missing anything that affects a write:~~ everything the recording depends on —
+the PWA, the types, the reasoning-review policy whose criteria it reads — is already pinned. ~~**The
+mechanism is right AND its input is complete**~~, which is the opposite of what this increment and the
 survey critic both asserted.
+⛔ **STRUCK 2026-09-22 (`REG-F-434`, JPWB-REG-005):** complete for every aggregate that EXISTS, not for one
+that does not yet — an absent conversation is outside the vector, and only the whole-log counter catches it
+(driven: `authoring-turn.test.ts`, `JAN-CRITREAD` `TT-0`).
 
 **THIS IS THE SECOND HAZARD IN THIS PROGRAMME THAT DISSOLVED ON VERIFICATION** (REG-F-065 was the
 first, and it was mine too). Both were written down from a plausible reading and neither was traced
