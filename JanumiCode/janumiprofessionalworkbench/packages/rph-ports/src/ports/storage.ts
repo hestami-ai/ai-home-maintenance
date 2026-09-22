@@ -62,6 +62,26 @@ export type CommitResult =
 			readonly actualRevision: number | undefined;
 	  };
 
+/**
+ * The store's write lock could not be acquired within its busy timeout. NOTHING WAS READ OR WRITTEN: the operation
+ * never started. Distinct from a revision conflict (the store was reachable and something changed) and from any
+ * other fault, so a caller can say "try again" without guessing (`JAN-CRITREAD` `DD-1`, `REG-D-070`).
+ */
+export class StoreBusyError extends Error {
+	readonly code = 'RPH_STORE_BUSY';
+	constructor(message = 'The store is busy: another writer holds its write lock.') {
+		super(message);
+		this.name = 'StoreBusyError';
+	}
+}
+
+/**
+ * ⭑ THE CONTRACT EVERY ADAPTER MUST MEET (`DESIGN-what-a-draft-depends-on.md` §5.3). A write transaction is
+ * SERIALIZABLE against every other writer — the lock is taken before its first read — and the store issues a
+ * COMMIT-ORDERED position (`highWaterMark`), so that "the events committed after position P" is a question with one
+ * answer. ⚠ `SERIALIZABLE` alone does not supply the second: under an MVCC store a sequence taken before commit can
+ * be seen out of order, so an adapter must issue the position at commit, under the lock.
+ */
 export interface StorageAdapter {
 	/** Idempotency lookup: the prior receipt for this idempotency key, if any. */
 	getReceipt(idempotencyKey: string): CommandReceiptRecord | undefined;
@@ -77,8 +97,21 @@ export interface StorageAdapter {
 	 * Run `fn` inside a single storage transaction: commit on normal return, roll back on throw. Nestable — an
 	 * inner `commit`'s own transaction becomes a savepoint — so a caller can wrap several command dispatches and
 	 * have the WHOLE batch be atomic (all-or-nothing). Used by Engine.dispatchBatch.
+	 *
+	 * The OUTERMOST call takes the write lock BEFORE `fn` runs, so nothing `fn` reads can be invalidated by another
+	 * writer's commit. If the lock is not acquired within the store's busy timeout it throws `StoreBusyError` and
+	 * `fn` is never entered.
 	 */
 	transaction<T>(fn: () => T): T;
+	/**
+	 * Run `fn` against ONE consistent snapshot of the store without taking the write lock: every read inside sees
+	 * the same committed state, whatever other writers commit meanwhile. Used to capture a fork.
+	 */
+	readTransaction<T>(fn: () => T): T;
+	/** The store's commit-ordered position: the position of the last committed event, 0 when the store is empty. */
+	highWaterMark(): number;
+	/** The events committed after `mark`, in commit order. */
+	eventsAfter(mark: number): DomainEvent[];
 	/** Events for one aggregate in aggregateRevision order (for replay). */
 	readAggregateEvents(aggregateType: string, aggregateId: string): DomainEvent[];
 	/** All events in global_sequence order (for projection rebuild). */

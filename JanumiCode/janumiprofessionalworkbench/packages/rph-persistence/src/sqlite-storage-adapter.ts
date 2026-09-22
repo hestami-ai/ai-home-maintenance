@@ -111,6 +111,28 @@ export class SqliteStorageAdapter implements StorageAdapter {
 		return this.db.transaction(fn);
 	}
 
+	/** Run `fn` against one snapshot, taking no write lock (the fork's capture). */
+	readTransaction<T>(fn: () => T): T {
+		return this.db.readTransaction(fn);
+	}
+
+	/** The commit-ordered position: `global_sequence` is `INTEGER PRIMARY KEY AUTOINCREMENT` under one writer. */
+	highWaterMark(): number {
+		const row = this.db
+			.prepare('SELECT COALESCE(MAX(global_sequence), 0) AS mark FROM domain_events')
+			.get() as { mark: number };
+		return row.mark;
+	}
+
+	eventsAfter(mark: number): DomainEvent[] {
+		const rows = this.db
+			.prepare(
+				'SELECT payload FROM domain_events WHERE global_sequence > ? ORDER BY global_sequence ASC'
+			)
+			.all(mark) as EventPayloadRow[];
+		return rows.map((r) => JSON.parse(r.payload) as DomainEvent);
+	}
+
 	getReceipt(idempotencyKey: string): CommandReceiptRecord | undefined {
 		const row = this.db
 			.prepare('SELECT * FROM command_receipts WHERE idempotency_key = ?')

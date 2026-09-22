@@ -301,6 +301,29 @@ function hasEffectiveWaiver(engine: AuthedEngineHandle, subjectId: string): bool
 	);
 }
 
+/** How many times the canonical exchange drain tries a write the store reported BUSY before recording the shortfall. */
+const BUSY_ATTEMPTS = 3;
+
+/**
+ * ⭑ `JAN-CRITREAD` `DD-1`: a busy store must not lose a try (PER-9). Every outermost write now takes the store's
+ * lock up front, so a write that meets another process's long commit waits the busy timeout and then fails with
+ * `RPH_STORE_BUSY` — nothing written. For the record of an act that happened, that is a bounded retry, then the
+ * disclosed shortfall the drain already reports. Any other failure is not retried.
+ */
+function retryingWhenBusy(handle: AuthedEngineHandle): Pick<AuthedEngineHandle, 'dispatch'> {
+	return {
+		dispatch(command) {
+			for (let attempt = 1; ; attempt += 1) {
+				try {
+					return handle.dispatch(command);
+				} catch (error) {
+					if ((error as { code?: unknown }).code !== 'RPH_STORE_BUSY' || attempt >= BUSY_ATTEMPTS) throw error;
+				}
+			}
+		}
+	};
+}
+
 /** Run the de minimis floor over the current DRAFT PWA graph and RECORD it as canonical assessments/observations.
  *  Returns the composed view (or undefined if the PWA/graph is unavailable). `priorGaps` are surfaced to the
  *  Reasoning Review so a re-run judges whether the previous findings are genuinely resolved. */
@@ -424,8 +447,9 @@ export async function runPwaFloor(
 	// ⭐ ON A TURN, THROUGH THE TURN'S WITNESS (`JAN-CRITREAD` `TT-2`, `REG-F-425`): the same canonical store and
 	// the same SESSION principal, one dispatch per try — but the events it produces are NOTED as the turn's own
 	// acts, so its commit admits them. Undrained through the witness, each try refused the turn's own candidate.
-	const canonical =
-		opts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL);
+	const canonical = retryingWhenBusy(
+		opts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL)
+	);
 	const drained = exchanges.drain();
 	if (drained.length > 0) {
 		const outcome = recordExchanges(

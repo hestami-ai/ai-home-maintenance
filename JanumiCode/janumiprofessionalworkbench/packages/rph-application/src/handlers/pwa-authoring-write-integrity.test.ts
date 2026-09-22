@@ -77,6 +77,15 @@ class FaultInjectingStore implements StorageAdapter {
 	transaction<T>(fn: () => T): T {
 		return this.inner.transaction(fn);
 	}
+	readTransaction<T>(fn: () => T): T {
+		return this.inner.readTransaction(fn);
+	}
+	highWaterMark() {
+		return this.inner.highWaterMark();
+	}
+	eventsAfter(mark: number) {
+		return this.inner.eventsAfter(mark);
+	}
 	readAggregateEvents(aggregateType: string, aggregateId: string) {
 		return this.inner.readAggregateEvents(aggregateType, aggregateId);
 	}

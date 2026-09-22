@@ -2351,10 +2351,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "TT-M6-the-floor-ignores-the-witness",
 		file: "apps/rph-demo/src/lib/server/floor.ts",
-		find: "\t\topts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL);",
-		replace: "\t\topts.canonical ?? getEngine().as(SESSION_CREDENTIAL); // MUTANT: the floor drains unwitnessed",
+		find: "opts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL)",
+		replace: "opts.canonical ?? getEngine().as(SESSION_CREDENTIAL) /* MUTANT: the floor drains unwitnessed */",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
-		why: "PROMISE: a floor run on a turn's fork drains through the turn's witness, so the commit admits the turn's own tries. WHO RELIES: every real-reviewer authoring acceptance — the whole of `REG-F-425`. WHAT THE MUTATION DOES: derives the drain's handle as it was before `TT-2` (`opts.canonical ?? getEngine()`), so the tries land canonically but unwitnessed. OBSERVED: KILLED, 5 of 10 — it IS `REG-F-425`, now with the suffix naming the cause: PR-1 `\"@event-log changed from revision 29 to 30. First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE mex_00000000000000000000000008.\"`; PR-1r and PR-1s `29 to 31`; PR-1p `59 to 60`. PR-2a also fails, `expected '@event-log changed from revision 30 t…' to contain 'First unadmitted event: ModelExchange…'`: the first unadmitted event is now the turn's OWN try, not the other turn's.",
+		why: "PROMISE: a floor run on a turn's fork drains through the turn's witness, so the commit admits the turn's own tries. WHO RELIES: every real-reviewer authoring acceptance — the whole of `REG-F-425`. WHAT THE MUTATION DOES: derives the drain's handle as it was before `TT-2` (`opts.canonical ?? getEngine()`), so the tries land canonically but unwitnessed. OBSERVED: KILLED, 5 of 10 — it IS `REG-F-425`, now with the suffix naming the cause: PR-1 `\"@event-log changed from revision 29 to 30. First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE mex_00000000000000000000000008.\"`; PR-1r and PR-1s `29 to 31`; PR-1p `59 to 60`. PR-2a also fails, `expected '@event-log changed from revision 30 t…' to contain 'First unadmitted event: ModelExchange…'`: the first unadmitted event is now the turn's OWN try, not the other turn's. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-1`): the drain's handle is now wrapped in `retryingWhenBusy(...)`, so the anchor is the inner expression; the consequence mutated is unchanged.",
 		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
@@ -2428,6 +2428,96 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/mutant-ledger.test.ts"],
 		why: "PROMISE: an abolished entry carries no other disposition. WHO RELIES: the same readers — `supersededBy` would claim the guard MOVED and name where, `expectSurvive` that it never guarded anything, `duplicateOf` that another entry measures it; each contradicts \"the property no longer exists\". WHAT THE MUTATION DOES: the combination is no longer reported. OBSERVED: KILLED by one test — the CONTROL above fails with `expected [] to deeply equal [ Array(1) ]`: the fixture combining `abolishedBy` with `supersededBy` is accepted.",
 		source: "JAN-CRITREAD DD-0 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M1-the-write-lock-is-taken-at-the-first-write",
+		file: "packages/rph-persistence/src/sql-driver.ts",
+		find: ".immediate();",
+		replace: ".deferred(); // MUTANT: the write lock is taken at the first write, not before the first read",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: a write transaction takes the store's lock BEFORE its first read, so nothing it read can be invalidated by another writer's commit. WHO RELIES: every multi-step write — the guarded batch whose dependency check and replay must see one state, `withPwaVersionBump`'s read-then-write, and any second process (`AX-10`). WHAT THE MUTATION DOES: restores the deferred BEGIN. OBSERVED: KILLED, 3 of 7 — the read-first, nested and raw-BUSY cases fail with `SqliteError: database is locked`: the pre-DD-1 SQLITE_BUSY_SNAPSHOT, a raw error escaping the store with the transaction lost, exactly as the probe observed on the old build.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M2-a-lock-never-acquired-escapes-raw",
+		file: "packages/rph-persistence/src/sql-driver.ts",
+		find: "if (!entered && (error as { code?: string }).code === 'SQLITE_BUSY')\n\t\t\t\t\tthrow new StoreBusyError();",
+		replace: "if (!entered && (error as { code?: string }).code === 'SQLITE_BUSY')\n\t\t\t\t\tvoid 0; // MUTANT: a lock never acquired escapes as a raw SqliteError",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: a lock that could not be acquired is reported as `StoreBusyError` — nothing read or written, try again. WHO RELIES: the exchange drain's bounded retry, and the guarded commit's store-busy route (DD-2/DD-3), which can only act on a refusal they can recognise. WHAT THE MUTATION DOES: lets the raw SqliteError through. OBSERVED: KILLED, 2 of 7 — `A was refused while B held the lock — not allowed to invalidate B: expected SqliteError{ …(3) } to be an instance of StoreBusyError`, and the nested case alike.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M3-a-busy-after-the-lock-is-called-busy",
+		file: "packages/rph-persistence/src/sql-driver.ts",
+		find: "if (!entered && (error as { code?: string }).code === 'SQLITE_BUSY')\n\t\t\t\t\tthrow new StoreBusyError();",
+		replace: "if ((error as { code?: string }).code === 'SQLITE_BUSY')\n\t\t\t\t\tthrow new StoreBusyError(); // MUTANT: a BUSY after the work began is called 'nothing happened'",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: only a lock NEVER acquired is 'busy'. A BUSY that surfaces after the transaction's work began keeps its own identity, because 'StoreBusyError' tells the caller nothing happened. WHO RELIES: any caller that retries on busy — a retry after partial work would repeat it. WHAT THE MUTATION DOES: drops the `entered` term. OBSERVED: KILLED, exactly 1 of 7 — *\"a BUSY raised AFTER the lock was taken is not reported as 'the store is busy'\"* fails with `the raw fault, as it happened: expected 'RPH_STORE_BUSY' to be 'SQLITE_BUSY'`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M4-a-read-transaction-is-not-one-snapshot",
+		file: "packages/rph-persistence/src/sql-driver.ts",
+		find: "readTransaction: <T>(fn: () => T): T => db.transaction(fn).deferred(),",
+		replace: "readTransaction: <T>(fn: () => T): T => fn(), // MUTANT: each read is its own autocommit snapshot",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: a read transaction is one consistent snapshot, whatever other writers commit meanwhile. WHO RELIES: the fork's capture — a draft is built on it and judged against it. WHAT THE MUTATION DOES: runs the reads as separate autocommit reads. OBSERVED: KILLED, 2 of 7 — the snapshot case (`expected [ 1, 2, 2 ] to deeply equal [ 1, 1, 1 ]`) and the fork race (`so its object must be revision 0 too — not the racing 1: expected 1 to be +0`).",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M5-the-fork-is-captured-outside-one-snapshot",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "const captured = source.readTransaction(() => {",
+		replace: "const captured = (<R>(read: () => R): R => read())(() => { // MUTANT: the fork reads through separate snapshots",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: a fork's events, objects and position are ONE point in time. WHO RELIES: every draft built on the fork; before DD-1 the probe observed a fork whose object (revision 1) was newer than its own events (revision 0). WHAT THE MUTATION DOES: the overlay captures through separate reads again. OBSERVED: KILLED, exactly 1 of 7 — *\"its events and its objects are the same moment even when a commit lands between reading them\"* fails with `expected 1 to be +0`: the torn fork is back.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M6-events-after-includes-the-mark",
+		file: "packages/rph-persistence/src/sqlite-storage-adapter.ts",
+		find: "WHERE global_sequence > ? ORDER BY global_sequence ASC",
+		replace: "WHERE global_sequence >= ? ORDER BY global_sequence ASC",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: `eventsAfter(mark)` returns exactly the events committed after the position — the question the draft dependency check asks. WHO RELIES: the guarded batch (DD-2), which would otherwise re-examine the fork's own last event as a change. WHAT THE MUTATION DOES: `>` becomes `>=`. OBSERVED: KILLED, exactly 1 of 7 — `expected [ …(3) ] to deeply equal [ …(2) ]`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M7-a-fork-answers-for-positions-it-never-saw",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "if (mark < this.baseMark)\n\t\t\tthrow new Error(",
+		replace: "if (mark < this.baseMark)\n\t\t\tvoid (",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: a fork refuses to answer for a position before its base; it never saw canonical's positions there. WHO RELIES: any caller tempted to ask a fork for canonical history — a guess there is a silent wrong answer. WHAT THE MUTATION DOES: drops the refusal. OBSERVED: KILLED, exactly 1 of 7 — `it cannot answer for positions it never saw: expected [Function] to throw an error`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M8-store-busy-loses-its-code",
+		file: "packages/rph-ports/src/ports/storage.ts",
+		find: "readonly code = 'RPH_STORE_BUSY';",
+		replace: "readonly code = 'RPH_STORE_WAIT'; // MUTANT: the busy refusal no longer carries its code",
+		expectRed: ["packages/rph-persistence/src/store-position-and-lock.test.ts"],
+		why: "PROMISE: the busy refusal carries the engine-authored code `RPH_STORE_BUSY` (FORK-22: surfaced with the engine's code). WHO RELIES: the exchange drain's retry, which recognises busy by this code, and the guarded commit's disclosure. Also the export census's guard for `StoreBusyError`. WHAT THE MUTATION DOES: changes the code. OBSERVED: KILLED, exactly 1 of 7 — `expected 'RPH_STORE_WAIT' to be 'RPH_STORE_BUSY'`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M9-the-drain-never-retries-a-busy-write",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "if ((error as { code?: unknown }).code !== 'RPH_STORE_BUSY' || attempt >= BUSY_ATTEMPTS) throw error;",
+		replace: "throw error; // MUTANT: a busy write is not retried",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-busy-retry.test.ts"],
+		why: "PROMISE: PER-9 — a reviewer try that was made is recorded; a canonical write that meets a busy store is retried, bounded, not dropped. WHO RELIES: every real-reviewer floor run, now that writes wait on the lock. WHAT THE MUTATION DOES: never retries. OBSERVED: KILLED, 2 of 3 — `one busy refusal, then the retry: expected 1 to be 2` (the try is lost) and the bounded case `expected 1 to be 3`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD1-M10-the-drain-retry-bound-moves",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "const BUSY_ATTEMPTS = 3;",
+		replace: "const BUSY_ATTEMPTS = 5; // MUTANT",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-busy-retry.test.ts"],
+		why: "PROMISE: the retry is BOUNDED at three attempts, so a store that stays busy is reported as a shortfall rather than holding a floor run hostage. WHO RELIES: the professional waiting on the floor. WHAT THE MUTATION DOES: moves the bound to five. OBSERVED: KILLED, exactly 1 of 3 — `expected 5 to be 3`.",
+		source: "JAN-CRITREAD DD-1 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
@@ -3726,10 +3816,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MU-PFA-BD1-05-transaction-does-not-roll-back",
 		file: "packages/rph-persistence/src/sql-driver.ts",
-		find: "\t\ttransaction: <T>(fn: () => T): T => db.transaction(fn)(),",
-		replace: "\t\ttransaction: <T>(fn: () => T): T => fn(),",
+		find: "return db\n\t\t\t\t\t.transaction(() => {\n\t\t\t\t\t\tentered = true;\n\t\t\t\t\t\treturn fn();\n\t\t\t\t\t})\n\t\t\t\t\t.immediate();",
+		replace: "entered = true;\n\t\t\t\treturn fn(); // MUTANT: fn runs bare in autocommit, so nothing rolls back",
 		expectRed: ["packages/rph-persistence/src/sqlite-storage-adapter.test.ts"],
-		why: "createSqliteDriver is the production SqlDriver, and the guarantee its interface states in so many words is `Run fn inside a single transaction; commit on return, roll back on throw`. Running fn bare in autocommit keeps every statement that succeeded before the throw, so SqliteStorageAdapter.commit is no longer all-or-nothing — the exact atomicity CommandBus.dispatchBatch, the replay guard, pwa-authoring's two-aggregate version bump, and the schema-migration ladder all rely on to never leave a half-written store.",
+		why: "createSqliteDriver is the production SqlDriver, and the guarantee its interface states in so many words is `Run fn inside a single transaction; commit on return, roll back on throw`. Running fn bare in autocommit keeps every statement that succeeded before the throw, so SqliteStorageAdapter.commit is no longer all-or-nothing — the exact atomicity CommandBus.dispatchBatch, the replay guard, pwa-authoring's two-aggregate version bump, and the schema-migration ladder all rely on to never leave a half-written store. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-1`): the driver's `transaction` now takes the write lock up front (`.immediate()`) and reports a lock never acquired as `StoreBusyError`, so the one-line implementation this entry anchored on no longer exists. The consequence mutated is the same — `fn` runs bare, outside any transaction.",
 		source: "JAN-PFA R3 S3.3 burn-down increment 1"
 	},
 	{

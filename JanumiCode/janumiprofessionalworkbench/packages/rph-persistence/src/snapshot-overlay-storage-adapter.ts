@@ -22,6 +22,8 @@ import type {
 export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	private readonly baseObjects = new Map<string, StoredObject>();
 	private readonly baseEvents: DomainEvent[];
+	/** The source's commit-ordered position at capture: the canonical point this fork reflects. */
+	private readonly baseMark: number;
 	private readonly stagedObjects = new Map<string, StoredObject>();
 	private readonly receipts = new Map<string, CommandReceiptRecord>();
 	private stagedEvents: DomainEvent[] = [];
@@ -29,11 +31,21 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	private closed = false;
 
 	constructor(private readonly source: StorageAdapter) {
-		this.baseEvents = clone(source.readAllEvents());
-		for (const id of new Set(this.baseEvents.map((event) => event.aggregateId))) {
-			const object = source.loadObject(id);
-			if (object) this.baseObjects.set(id, clone(object));
-		}
+		// ⭑ ONE READ TRANSACTION (`DD-1`). The events, the objects and the position used to be separate autocommit
+		// reads, so a commit landing between them left this "point-in-time" fork holding an object NEWER than its
+		// events. Inside one snapshot they are one point in time, whatever other writers do.
+		const captured = source.readTransaction(() => {
+			const events = clone(source.readAllEvents());
+			const objects = new Map<string, StoredObject>();
+			for (const id of new Set(events.map((event) => event.aggregateId))) {
+				const object = source.loadObject(id);
+				if (object) objects.set(id, clone(object));
+			}
+			return { events, objects, mark: source.highWaterMark() };
+		});
+		this.baseEvents = captured.events;
+		for (const [id, object] of captured.objects) this.baseObjects.set(id, object);
+		this.baseMark = captured.mark;
 	}
 
 	getReceipt(idempotencyKey: string): CommandReceiptRecord | undefined {
@@ -94,6 +106,32 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 			this.outbox = checkpoint.outbox;
 			throw error;
 		}
+	}
+
+	/** A fork is one snapshot already; a read transaction over it needs nothing more. */
+	readTransaction<T>(fn: () => T): T {
+		this.assertOpen();
+		return fn();
+	}
+
+	/** The canonical position this fork was taken at. Its own staged events have no canonical position. */
+	highWaterMark(): number {
+		this.assertOpen();
+		return this.baseMark;
+	}
+
+	/**
+	 * The events after `mark` as this fork knows them: its own staged events, when asked from its base position or
+	 * later. ⛔ It cannot answer for a position BEFORE its base — it never saw canonical's positions — so it refuses
+	 * rather than guess.
+	 */
+	eventsAfter(mark: number): DomainEvent[] {
+		this.assertOpen();
+		if (mark < this.baseMark)
+			throw new Error(
+				`A fork cannot answer for events before its base position (${String(mark)} < ${String(this.baseMark)}).`
+			);
+		return clone(this.stagedEvents);
 	}
 
 	readAggregateEvents(aggregateType: string, aggregateId: string): DomainEvent[] {
