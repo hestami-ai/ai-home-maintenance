@@ -3,6 +3,8 @@
 **Design:** `DESIGN-what-a-draft-depends-on.md` (revision 3, `ddb8d2dc`) · **Ratified:** `REG-D-070` (sponsor,
 2026-09-22) · **Defect:** `REG-F-430` · **Date:** 2026-09-22
 
+✅ **BUILT WHOLE 2026-09-22** — `DD-0` `5d0e9880`, `DD-1` `2f2161d4`, `DD-2` `9648d9be`, `DD-3b` `1b4a6784`, `DD-3c` `1ceeac69`, `DD-4` `bfc841b7`, `DD-5` `9821bd27`, `DD-6a` `85a1a2ea`, `DD-7` `388dc692`, `DD-6b` `75edcd06`. Every increment gated; `gate:fast` green throughout but for `REG-D-067`'s thirteen accepted e2e reds, which never changed in status or in failure location, and the one e2e this programme added.
+
 ⭑ **Exit:** the whole-log limb refuses only on declared groups; every dependency is declared, and undeclared reads on
 the named file set are caught by gates; PR-2 refuses naming G1, PR-2a commits, W3 is refused naming G4; every refusal
 names what changed; the fork is captured in one read transaction at a store-issued position; every outermost write
