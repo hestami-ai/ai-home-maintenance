@@ -177,6 +177,17 @@ sponsor** with the finding; do not widen the ruling.
 | each gate's control mutant (an undeclared read added; a key field rewritten after birth; a state change without an event) | RED |
 | a scan's own loads are NOT counted as direct reads | a mutant removing the flag reddens the containment test |
 
+⭑ **BUILT IN TWO PARTS (2026-09-22).** **DD-6a** — the scan-site census, the key-field premise and the
+event-per-state-change premise, the last two measured across the WHOLE suite by wrapping `commit` (the seam
+`emitted-event-guard.ts` already uses), each with its control mutant. **DD-6b** — the direct by-id containment gate
+(the scan-context flag in `listByType` and the handler scans, and the conformance test over the turn scenarios),
+which needs load instrumentation of its own and is its own increment.
+
+⚠ **A MEASUREMENT IS NOT YET A GUARD.** `DD6-M2` SURVIVED its first aim: the key-field premise was measured over
+every commit in the suite, and nothing in the suite ever tried to rewrite a key field, so the mutant changed no
+observable outcome. The case was added to the premise test (an append naming ANOTHER PWA) and the mutant then died
+there. A property under no attack is measured, not guarded.
+
 ---
 
 ## `DD-7` — the records

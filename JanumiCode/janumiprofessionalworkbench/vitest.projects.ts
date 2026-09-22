@@ -24,6 +24,10 @@ const SETUP_UNREAD_REFUSAL = join(ROOT, 'verif', 'unread-refusal-guard.ts');
  *  the same reason: a new package must not be able to opt out of it by omission. */
 const SETUP_EMITTED_EVENT = join(ROOT, 'verif', 'emitted-event-guard.ts');
 
+/** `REG-D-070` §5.1's two premises — see `verif/draft-dependency-premises.ts`. Declared here for the same reason as
+ *  the two above: a new package must not be able to opt out of a standing guard by omission. */
+const SETUP_DRAFT_PREMISES = join(ROOT, 'verif', 'draft-dependency-premises.ts');
+
 /** Every `*.test.ts` under `dir`, recursively. Returns count only — the projects declare their own globs. */
 function countTests(dir: string): number {
 	if (!existsSync(dir)) return 0;
@@ -93,7 +97,7 @@ export function projectsFor(extendsConfig: true): Array<Record<string, unknown>>
 				// reads the result — the shape that let `floor-waiver-scope.test.ts` pass for months while
 				// arranging nothing. Declared HERE rather than per-package so a new package cannot opt out by
 				// omission, for the same reason the project list itself is derived rather than enumerated.
-				setupFiles: [SETUP_UNREAD_REFUSAL, SETUP_EMITTED_EVENT]
+				setupFiles: [SETUP_UNREAD_REFUSAL, SETUP_EMITTED_EVENT, SETUP_DRAFT_PREMISES]
 			}
 		})),
 		// THE APPS, and the blind spot they were in until DR-002 W-2 tried to use the ledger on one.
@@ -119,7 +123,9 @@ export function projectsFor(extendsConfig: true): Array<Record<string, unknown>>
 			// from the artifact half of the cross-check. Vite concatenates alias arrays when a project extends a
 			// config, so this adds to the mode's resolution rather than replacing it.
 			resolve: {
-				alias: [{ find: /^\$lib\/(.*)$/, replacement: `${join(ROOT, 'apps', name, 'src', 'lib')}/$1` }]
+				alias: [
+					{ find: /^\$lib\/(.*)$/, replacement: `${join(ROOT, 'apps', name, 'src', 'lib')}/$1` }
+				]
 			},
 			test: {
 				name: `app:${name}`,
@@ -128,7 +134,7 @@ export function projectsFor(extendsConfig: true): Array<Record<string, unknown>>
 				passWithNoTests: false,
 				// The apps dispatch too, and they are the layer this list forgot once already — see above. An
 				// unread refusal in an app test is the same defect as in a package test.
-				setupFiles: [SETUP_UNREAD_REFUSAL, SETUP_EMITTED_EVENT]
+				setupFiles: [SETUP_UNREAD_REFUSAL, SETUP_EMITTED_EVENT, SETUP_DRAFT_PREMISES]
 			}
 		}))
 	];

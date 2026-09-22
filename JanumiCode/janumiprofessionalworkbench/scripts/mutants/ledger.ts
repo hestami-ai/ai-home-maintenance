@@ -2980,6 +2980,33 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-5 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 Q3"
 	},
 	{
+		id: "DD6-M1-an-unclassified-scan-site-passes",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "const nodes = listPwuTypes(engine, pwaId)",
+		replace: "void listPwuTypes(engine, pwaId); // MUTANT: a new, unclassified set read\n\tconst nodes = listPwuTypes(engine, pwaId)",
+		expectRed: ["verif/draft-dependency-scan-sites.test.ts"],
+		why: "PROMISE: the net the whole-log limb used to provide. It caught an UNDECLARED dependency for free — any write anywhere refused the draft — and `REG-D-070` narrowed it away, so these gates replace it (DESIGN §5.5). WHO RELIES: every draft after `DD-3`; without them a new undeclared read, or a broken premise, is a stale commit nobody measures. WHAT THE MUTATION DOES: adds a SET read to a file in the named set — the shape of somebody teaching a draft to read a new set and declaring nothing. OBSERVED: KILLED, exactly 1 of 2 — the scan-site census, `apps/rph-demo/src/lib/server/workbench.ts :: listPwuTypes: the number of calls moved: expected 1 to be 2`. ⚠ THE GATE'S POPULATION IS DERIVED, not listed: a query counts as a SCAN when it reaches `listByType` or `readAllEvents` in `queries.ts`'s own call graph, so a new list helper is measured the moment it is written.",
+		source: "JAN-CRITREAD DD-6 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6-M2-a-group-key-field-is-rewritten-after-birth",
+		file: "packages/rph-application/src/handlers/pwa-authoring.ts",
+		find: "const next: Record<string, unknown> = {\n\t\t...nextEnvelope(loaded.state, command, newRevision),\n\t\tentries: [...prior, ...p.entries]",
+		replace: "const next: Record<string, unknown> = {\n\t\t...nextEnvelope(loaded.state, command, newRevision),\n\t\tpwaId: p.pwaId, // MUTANT: an append rewrites the key field G1 keys on\n\t\tentries: [...prior, ...p.entries]",
+		expectRed: ["verif/draft-dependency-premises.test.ts"],
+		why: "PROMISE: the net the whole-log limb used to provide. It caught an UNDECLARED dependency for free — any write anywhere refused the draft — and `REG-D-070` narrowed it away, so these gates replace it (DESIGN §5.5). WHO RELIES: every draft after `DD-3`; without them a new undeclared read, or a broken premise, is a stale commit nobody measures. WHAT THE MUTATION DOES: an append takes the PAYLOAD's `pwaId` for an EXISTING conversation, so the field G1 keys on can be rewritten — a conversation leaving one PWA's group and joining another's between a fork and its commit. OBSERVED: KILLED, exactly 1 of 2 — the premise test's own attack (`the conversation still belongs to the PWA it was born under: expected 'pwa_…V03' to be 'pwa_…V00'`) and, in the same run, the whole-suite guard (`draft-dependency premises (REG-D-070 §5.1), measured over 9 commit(s)`). ⚠ IT SURVIVED ITS FIRST AIM, and that was the finding: the guard MEASURES key fields across the suite, but NOTHING in the suite ever appended while naming another PWA, so the property was never under pressure. The case was added to the premise test — a measurement with no attack is not a guard.",
+		source: "JAN-CRITREAD DD-6 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
+		id: "DD6-M3-an-event-lands-on-another-aggregate",
+		file: "packages/rph-application/src/handlers/kit.ts",
+		find: "aggregateType: args.aggregateType,\n\t\taggregateId: args.aggregateId,\n\t\taggregateRevision: args.aggregateRevision,",
+		replace: "aggregateType: args.aggregateType,\n\t\taggregateId: `${args.aggregateId}-elsewhere`, // MUTANT: the event lands on another aggregate\n\t\taggregateRevision: args.aggregateRevision,",
+		expectRed: ["verif/draft-dependency-premises.test.ts"],
+		why: "PROMISE: the net the whole-log limb used to provide. It caught an UNDECLARED dependency for free — any write anywhere refused the draft — and `REG-D-070` narrowed it away, so these gates replace it (DESIGN §5.5). WHO RELIES: every draft after `DD-3`; without them a new undeclared read, or a broken premise, is a stale commit nobody measures. WHAT THE MUTATION DOES: every handler's event is committed under a DIFFERENT aggregate id than the state it records — so a state change carries no event on its own aggregate, and the dependency rule, which reads the events after a fork, cannot see it at all. OBSERVED: KILLED, exactly 1 of 2 — `every state change carried its own event: expected [ …(9) ] to deeply equal []`, and the guard's own throw over the same 9 commits.",
+		source: "JAN-CRITREAD DD-6 (ROADMAP-what-a-draft-depends-on.md); REG-D-070 §5.5"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',
