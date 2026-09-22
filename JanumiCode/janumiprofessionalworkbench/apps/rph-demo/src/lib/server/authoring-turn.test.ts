@@ -27,6 +27,7 @@ import {
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
+import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -41,10 +42,13 @@ import { recordConversation } from './workbench.js';
 
 const TS = '2026-07-18T12:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
+const OTHER_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P03';
 
 describe('isolated authoring turn and guarded commit', () => {
 	/** The UNAUTHENTICATED host, kept so each caller can open the session that matches WHO IT IS. */
 	let host: EngineHandle;
+	/** The canonical store itself — held only to play a writer that bypasses the command handlers. */
+	let store: SqliteStorageAdapter;
 	/** The workbench human's session: canonical setup + every assertion read below. */
 	let engine: AuthedEngineHandle;
 	let sequence: number;
@@ -83,7 +87,9 @@ describe('isolated authoring turn and guarded commit', () => {
 
 	beforeEach(() => {
 		sequence = 0;
+		store = new SqliteStorageAdapter({ now: () => TS });
 		host = createEngine({
+			store,
 			authenticate: standaloneAuthenticator(),
 			ontology,
 			now: () => TS,
@@ -213,20 +219,20 @@ describe('isolated authoring turn and guarded commit', () => {
 
 		const result = commitAuthoringTurn(turn, candidateHash);
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			`Changed since this draft began: your PWA ${PWA} is at revision 1, not revision 0.`
+		);
 		expect(turn.status).toBe('CONFLICTED');
 		expect(listPwuTypes(engine, PWA)).toEqual([]);
 		expect(engine.readAllEvents()).toHaveLength(beforeCommitEvents);
 	});
 
-	// ⭐ THE WHOLE-LOG LIMB'S OWN JOB, ISOLATED (`JAN-CRITREAD` `TT-0`). The test above cannot tell the commit
-	// guard's two refusing limbs apart: its `EditPwa` moves the event log AND the PWA's own revision, which the
-	// vector pins, so deleting the whole-log refusal left this file green — measured, mutant
-	// `TT-M1-event-log-refusal-becomes-admission` SURVIVED 6/6. The count's unique job is a NEW aggregate the
-	// vector never pinned (`authoring-turn.ts:19`): here, the PWA's FIRST conversation, created on canonical by a
-	// second writer while the turn records its own on the fork. Nothing pins an ABSENT conversation, the turn's own
-	// conversation passes `mustNotExist`, and the PWA is untouched — so only the count can refuse, and without it
-	// the commit lands TWO conversations for one PWA.
-	it('refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone', () => {
+	// ⭐ G1 — THE PWA'S CONVERSATION, INCLUDING A FIRST ONE (`JAN-CRITREAD` `DD-3`, `REG-D-070`; this was the whole-log
+	// limb's own job, `TT-0`). A second writer creates the PWA's FIRST conversation on canonical while the turn records
+	// its own on the fork. Nothing pins an ABSENT conversation — the turn's own is a new id, and the PWA is untouched —
+	// so only the declared group can refuse, and without it the commit lands TWO conversations for one PWA. The refusal
+	// names the group's role, the conversation, and the act that created it.
+	it('PR-2 — a concurrent first conversation is refused by G1, naming the conversation and what created it', () => {
 		expect(
 			getConversation(engine, PWA),
 			'precondition: no conversation exists to be pinned'
@@ -254,20 +260,178 @@ describe('isolated authoring turn and guarded commit', () => {
 		expect(phantom!.id, 'the phantom is NOT the id the turn will commit').not.toBe(
 			getConversation(turn.engine, PWA)!.id
 		);
-		expect(engine.loadObject(PWA)?.revision, 'the PWA limb has nothing to see').toBe(pwaRevision);
+		expect(engine.loadObject(PWA)?.revision, 'the PWA pin has nothing to see').toBe(pwaRevision);
 		const beforeCommitEvents = engine.readAllEvents().length;
 
 		const result = commitAuthoringTurn(turn, candidateHash);
 
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
-		expect(result.ok ? '' : result.detail).toMatch(
-			/^@event-log changed from revision \d+ to \d+\./
+		expect(result.ok ? '' : result.detail).toBe(
+			`Changed since this draft began: your PWA’s conversation ${phantom!.id} was changed by ` +
+				`ConversationEntriesAppended (actor ${engine.principal!.actorId}, correlation other-writer).`
 		);
 		expect(listByType(engine, 'AUTHORING_CONVERSATION'), 'one PWA, one conversation').toHaveLength(
 			1
 		);
 		expect(listPwuTypes(engine, PWA)).toEqual([]);
 		expect(engine.readAllEvents()).toHaveLength(beforeCommitEvents);
+	});
+
+	// ⭐ G2 — ANY BIRTH, EDIT OR REMOVAL OF THE PWA'S TYPES, NOT RESTING ON THE PWA'S VERSION BUMP (§5.1, job (c)).
+	// Every type command today ALSO bumps the PWA, so the PWA pin sees it too — but that bump is recorded as violating
+	// AGG-1 (`REG-F-046`) and may go. A writer that births a type WITHOUT the bump is played here by committing straight
+	// to the store, so the PWA's revision cannot move and only G2 can refuse.
+	it('G2 — a type born for the PWA by a writer that does not bump it is refused, naming the type', () => {
+		const turn = beginTurn();
+		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
+		const candidateHash = markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
+		const pwaRevision = engine.loadObject(PWA)?.revision;
+		const latent = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P09';
+		const committed = store.commit({
+			aggregateType: 'PWU_TYPE',
+			aggregateId: latent,
+			objectType: 'PWU_TYPE',
+			expectedRevision: undefined,
+			newRevision: 0,
+			newSemanticVersion: 1,
+			currentState: { id: latent, pwaId: PWA, name: 'Born without the bump' },
+			events: [
+				{
+					eventId: 'evt_latent',
+					eventType: 'PwuTypeDefined',
+					eventSchemaVersion: 1,
+					aggregateType: 'PWU_TYPE',
+					aggregateId: latent,
+					aggregateRevision: 0,
+					occurredAt: TS,
+					recordedAt: TS,
+					actor: { actorId: 'latent-writer', actorType: 'SERVICE', displayName: 'No bump' },
+					correlationId: 'latent',
+					payload: {}
+				}
+			],
+			receipt: {
+				commandId: 'latent',
+				idempotencyKey: 'latent',
+				commandType: 'DefinePwuType',
+				targetAggregateId: latent,
+				status: 'ACCEPTED',
+				producedEventIds: ['evt_latent']
+			}
+		});
+		expect(committed.ok, 'arrangement: the latent writer committed').toBe(true);
+		expect(engine.loadObject(PWA)?.revision, 'the PWA pin has nothing to see').toBe(pwaRevision);
+
+		const result = commitAuthoringTurn(turn, candidateHash);
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			`Changed since this draft began: a type of your PWA ${latent} was changed by PwuTypeDefined ` +
+				'(actor latent-writer, correlation latent).'
+		);
+		expect(listPwuTypes(engine, PWA).map((type) => type.id)).toEqual([latent]);
+	});
+
+	// ⭐ THE WRITE SET (§5.1 pin 5): every aggregate the draft writes, held at its revision at the fork or held ABSENT.
+	// A group cannot see an object that is not its member — here the draft's own NEW conversation id, taken on
+	// canonical by another writer for ANOTHER PWA, so G1 (keyed on this PWA) does not match it. Only the pin can name
+	// it; without the pin the replay's own append meets a stranger's object and the draft is lost as COMMIT_FAILED.
+	it('the write set — an object the draft creates, taken by another writer under the same id, is refused by name', () => {
+		expect(
+			dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', OTHER_PWA, {
+				pwaId: OTHER_PWA,
+				name: 'Another PWA',
+				description: 'Another professional’s',
+				domain: 'software',
+				version: '1.0.0'
+			}).status
+		).toBe('ACCEPTED');
+		const turn = beginTurn();
+		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
+		const subjectHash = markAuthoringTurnValid(turn);
+		recordConversation(
+			PWA,
+			[{ role: 'USER', kind: 'message', text: 'Author the plan.' }],
+			turn.engine,
+			turn.id
+		);
+		const candidateHash = markAuthoringTurnAssured(turn, subjectHash);
+		const mine = getConversation(turn.engine, PWA)!.id;
+		expect(
+			dispatch('AppendConversationEntries', 'AUTHORING_CONVERSATION', mine, {
+				conversationId: mine,
+				pwaId: OTHER_PWA,
+				entries: [{ role: 'USER', kind: 'message', text: 'The same id, for another PWA.' }]
+			}).status,
+			'arrangement: another writer took the id'
+		).toBe('ACCEPTED');
+
+		const result = commitAuthoringTurn(turn, candidateHash);
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			`Changed since this draft began: an object this draft writes ${mine} is at revision 0, not absent.`
+		);
+	});
+
+	// ⭐ A REFUSAL WHILE EVERYTHING DECLARED HELD IS A GAP IN THE RULE, SAID LOUDLY (§5.4). The replay also reads what
+	// no rule declares — here the idempotency receipt of a recorded command (§3.1), claimed on canonical by another
+	// writer under the same key for another target. Nothing the draft depends on changed, so this is not a conflict and
+	// must not be presented as one; the draft is lost, and the refusal says the rule has a gap.
+	it('a replay refused while every declared dependency held is COMMIT_FAILED, and says it is a gap in the rule', () => {
+		const turn = beginTurn();
+		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
+		const candidateHash = markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
+		const key = turn.commands[0]!.idempotencyKey;
+		const stranger = 'scr_01ARZ3NDEKTSV4RRFFQ69G5P10';
+		const committed = store.commit({
+			aggregateType: 'SCRATCH',
+			aggregateId: stranger,
+			objectType: 'SCRATCH',
+			expectedRevision: undefined,
+			newRevision: 0,
+			newSemanticVersion: 1,
+			currentState: { id: stranger },
+			events: [
+				{
+					eventId: 'evt_stranger',
+					eventType: 'Scratched',
+					eventSchemaVersion: 1,
+					aggregateType: 'SCRATCH',
+					aggregateId: stranger,
+					aggregateRevision: 0,
+					occurredAt: TS,
+					recordedAt: TS,
+					actor: { actorId: 'stranger', actorType: 'SERVICE', displayName: 'Another writer' },
+					correlationId: 'stranger',
+					payload: {}
+				}
+			],
+			receipt: {
+				commandId: 'stranger',
+				idempotencyKey: key,
+				commandType: 'DefinePwuType',
+				targetAggregateId: stranger,
+				status: 'ACCEPTED',
+				producedEventIds: ['evt_stranger'],
+				payloadHash: 'sha256:another-payload'
+			}
+		});
+		expect(committed.ok, 'arrangement: the key is claimed on canonical').toBe(true);
+
+		const result = commitAuthoringTurn(turn, candidateHash);
+
+		expect(result).toMatchObject({ ok: false, status: 'COMMIT_FAILED' });
+		const detail = result.ok ? '' : result.detail;
+		expect(
+			detail.startsWith(
+				'The save step refused this draft although nothing it declares it depends on changed — a gap in the ' +
+					'dependency rule (REG-D-070), not a conflict. The refusal: '
+			),
+			detail
+		).toBe(true);
+		expect(detail, 'the refusal is the replay’s own').toContain(key);
+		expect(listPwuTypes(engine, PWA)).toEqual([]);
 	});
 
 	it('discards an isolated candidate without compensation or canonical mutation', () => {

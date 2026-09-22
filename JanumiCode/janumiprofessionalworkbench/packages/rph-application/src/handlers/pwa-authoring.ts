@@ -245,7 +245,9 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 		objectType: PWA,
 		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
 		// ⚠ NOTE THE FIELD: `publicationStatus`, not `status`.
-		births: [{ machine: 'PWA.publicationStatus', statusField: 'publicationStatus', values: ['DRAFT'] }],
+		births: [
+			{ machine: 'PWA.publicationStatus', statusField: 'publicationStatus', values: ['DRAFT'] }
+		],
 		aggregateId: p.pwaId,
 		state,
 		eventType: 'PwaCreated',
@@ -415,15 +417,12 @@ function assurancePolicyStatuses(ctx: HandlerContext): Map<string, string> {
 function checkAssurancePolicyRefs(
 	command: DomainCommand,
 	statuses: ReadonlyMap<string, string>,
-	requestedIds: readonly string[],
-	existingIds: readonly string[],
+	newlyReferencedIds: readonly string[],
 	id: string,
 	label: string
 ): CommandResult | null {
-	const existing = new Set(existingIds);
 	const floor = new Set<string>(FLOOR_POLICY_IDS_REQUIRED);
-	for (const pid of requestedIds) {
-		if (existing.has(pid)) continue; // a retained declaration — never re-validated
+	for (const pid of newlyReferencedIds) {
 		if (floor.has(pid))
 			return reject(
 				command,
@@ -450,6 +449,41 @@ function checkAssurancePolicyRefs(
 	return null;
 }
 
+/** The two fields a PWU-Type state references assurance policies through. */
+type AssurancePolicyRefField = 'requiredAssurancePolicyIds' | 'attestedAssurancePolicyIds';
+
+function assurancePolicyRefs(
+	state: Record<string, unknown> | undefined,
+	field: AssurancePolicyRefField
+): string[] {
+	const value =
+		field === 'requiredAssurancePolicyIds'
+			? state?.requiredAssurancePolicyIds
+			: (state?.boundaryContract as { attestedAssurancePolicyIds?: unknown } | undefined)
+					?.attestedAssurancePolicyIds;
+	return Array.isArray(value) ? (value as string[]) : [];
+}
+
+/**
+ * ⭑ ONE DEFINITION OF "NEWLY REFERENCED" (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1 pin 3). The policy ids a write from
+ * `priorState` to `nextState` newly references, per field and in order: exactly what `checkPolicyRefsOnState`
+ * validates — a retained declaration is never re-validated — and exactly what an authoring turn must pin, because its
+ * replay re-validates each of them against that command's OWN prior state. Two copies of this rule would drift, and
+ * the drift would leave a policy the replay reads unpinned.
+ */
+export function newlyReferencedAssurancePolicyIds(
+	nextState: Record<string, unknown> | undefined,
+	priorState: Record<string, unknown> | undefined
+): readonly { readonly field: AssurancePolicyRefField; readonly policyIds: readonly string[] }[] {
+	return (['requiredAssurancePolicyIds', 'attestedAssurancePolicyIds'] as const).map((field) => {
+		const retained = new Set(assurancePolicyRefs(priorState, field));
+		return {
+			field,
+			policyIds: assurancePolicyRefs(nextState, field).filter((pid) => !retained.has(pid))
+		};
+	});
+}
+
 /** Validate BOTH assurance-policy-reference fields of a PWU-Type write against the live policy library, retaining
  *  each field's pre-existing declarations. Returns a rejecting CommandResult or null. */
 function checkPolicyRefsOnState(
@@ -459,31 +493,12 @@ function checkPolicyRefsOnState(
 	priorState: Record<string, unknown> | undefined,
 	id: string
 ): CommandResult | null {
-	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
-	const attestedOf = (s: Record<string, unknown> | undefined): string[] =>
-		arr(
-			(s?.boundaryContract as { attestedAssurancePolicyIds?: unknown } | undefined)
-				?.attestedAssurancePolicyIds
-		);
 	const statuses = assurancePolicyStatuses(ctx);
-	return (
-		checkAssurancePolicyRefs(
-			command,
-			statuses,
-			arr(nextState.requiredAssurancePolicyIds),
-			arr(priorState?.requiredAssurancePolicyIds),
-			id,
-			'requiredAssurancePolicyIds'
-		) ??
-		checkAssurancePolicyRefs(
-			command,
-			statuses,
-			attestedOf(nextState),
-			attestedOf(priorState),
-			id,
-			'attestedAssurancePolicyIds'
-		)
-	);
+	for (const { field, policyIds } of newlyReferencedAssurancePolicyIds(nextState, priorState)) {
+		const refused = checkAssurancePolicyRefs(command, statuses, policyIds, id, field);
+		if (refused) return refused;
+	}
+	return null;
 }
 
 /** DefinePwuType — create a PWU Type under a DRAFT PWA (types are edited draft-only, §39). */
@@ -545,7 +560,9 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		// not save me from it.
 		...(p.workDischarge !== undefined ? { workDischarge: p.workDischarge } : {}),
 		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
-		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {}),
+		...(p.contextSpecification !== undefined
+			? { contextSpecification: p.contextSpecification }
+			: {}),
 		status: 'DRAFT'
 	};
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, state, p.pwuTypeId);
@@ -559,8 +576,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	return withPwaVersionBump(ctx, command, p.pwaId, () =>
 		createObject(ctx, command, {
 			objectType: PWU_TYPE,
-		// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
-		births: [{ machine: 'PwuType.status', statusField: 'status', values: ['DRAFT'] }],
+			// JAN-PWUWP / REG-F-074 residue: declared so C-0c can analyse this machine at all. Value TRACED FROM THE HANDLER, not from the machine's `initialState` (REG-F-071 measured that as a fiction on some machines (the set is DERIVED and pinned by name — `initialStateFictions()`, REG-F-125)).
+			births: [{ machine: 'PwuType.status', statusField: 'status', values: ['DRAFT'] }],
 			aggregateId: p.pwuTypeId,
 			state,
 			eventType: 'PwuTypeDefined',
@@ -751,7 +768,9 @@ function buildRedefinedTypeState(
 		// above, so an edit that does not mention the template leaves it alone rather than clearing it.
 		...(p.workDischarge !== undefined ? { workDischarge: p.workDischarge } : {}),
 		...(p.promptTemplate !== undefined ? { promptTemplate: p.promptTemplate } : {}),
-		...(p.contextSpecification !== undefined ? { contextSpecification: p.contextSpecification } : {})
+		...(p.contextSpecification !== undefined
+			? { contextSpecification: p.contextSpecification }
+			: {})
 	};
 }
 

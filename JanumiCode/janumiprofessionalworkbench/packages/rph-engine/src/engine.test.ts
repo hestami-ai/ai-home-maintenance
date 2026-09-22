@@ -42,7 +42,11 @@ function beginDiscovery(): DomainCommand {
 
 describe('createEngine — the composition facade', () => {
 	it('stands up an in-memory engine with the Product Realization PWA ontology loaded (root Product Realization PWU)', () => {
-		const engine = createEngine({ authenticate: testAuthenticator(), ontology, now: () => '2026-07-11T00:00:00Z' }).as(TEST_CRED.human);
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
+			ontology,
+			now: () => '2026-07-11T00:00:00Z'
+		}).as(TEST_CRED.human);
 		const root = engine.ontology.pwuTemplates.find((t) => t.isRoot);
 		expect(root?.pwuKind).toBe('PRODUCT_REALIZATION');
 		engine.close();
@@ -50,7 +54,8 @@ describe('createEngine — the composition facade', () => {
 
 	it('drives the walking-skeleton flow end-to-end through the public seam', () => {
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_${++n}`
@@ -85,7 +90,8 @@ describe('createEngine — the composition facade', () => {
 
 	it('forks a point-in-time candidate that exercises real handlers without mutating canonical state', () => {
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_fork_${++n}`
@@ -106,7 +112,8 @@ describe('createEngine — the composition facade', () => {
 
 	it('a fork is point-in-time: later canonical writes do not leak into the candidate', () => {
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_snapshot_${++n}`
@@ -126,7 +133,8 @@ describe('createEngine — the composition facade', () => {
 
 	it('guards the base revision and exact resultant object state inside the replay transaction', () => {
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_guard_${++n}`
@@ -151,7 +159,8 @@ describe('createEngine — the composition facade', () => {
 
 	it('rolls back replay when a resultant-state postcondition does not match', () => {
 		let n = 0;
-		const engine = createEngine({ authenticate: testAuthenticator(),
+		const engine = createEngine({
+			authenticate: testAuthenticator(),
 			ontology,
 			now: () => '2026-07-11T00:00:00Z',
 			newEventId: () => `evt_post_${++n}`
@@ -174,12 +183,13 @@ describe('createEngine — the composition facade', () => {
 	});
 });
 
-// ⭐ THE WHOLE-LOG LIMB ADMITS AN EXACT SET, AND NAMES WHAT IT REFUSES (`JAN-CRITREAD` `TT-1`, `REG-F-425`).
-// A staged authoring turn must be able to commit past the canonical records of its OWN reviewer's tries — and past
-// nothing else. So the log after the caller's position must be EXACTLY the admitted events. Each case below
-// isolates one term: B3 has equal counts (only IDENTITY can refuse it), B4 has no foreign event (only LENGTH can
-// refuse it), B5 is the original bare-number rule, unchanged. In every refusal the guarded batch must not apply.
-describe('the guarded batch admits exactly the named tail of the event log', () => {
+// ⭐ THROUGH THE FACADE: A DECLARED DEPENDENCY REFUSES, THE CALLER'S OWN ACTS NEVER DO (`JAN-CRITREAD` `DD-3`,
+// `REG-D-070`). A staged authoring turn is refused only by a change to something it declared — a member of a group,
+// or a pin — and never by its own acts, which it names BY ID. `TT-1`'s exact-tail form is gone; B1–B3 carry over in
+// the declared form. ⛔ B4 — an admitted event MISSING from the log, refused by LENGTH — is ABOLISHED by `REG-D-070`:
+// with no length term, admitting an event that is not in the tail changes nothing (its mutant, `TT-M3`, records the
+// ruling). B5 is the original bare-number rule, unchanged. In every refusal the guarded batch must not apply.
+describe('the guarded batch refuses on a declared dependency, never on the caller’s own acts', () => {
 	const otherIntentId = (k: number) => `int_01ARZ3NDEKTSV4RRFFQ69G5X0${k}`;
 	const otherIntent = (k: number): DomainCommand => ({
 		...captureIntent(),
@@ -188,6 +198,12 @@ describe('the guarded batch admits exactly the named tail of the event log', () 
 		idempotencyKey: `idem-other-${k}`,
 		payload: { ...(captureIntent().payload as Record<string, unknown>), intentId: otherIntentId(k) }
 	});
+	/** The declared group: the other intents this file acts on (an intent's stored state keys it as `id`). */
+	const others = {
+		name: 'the other intents',
+		aggregateType: 'INTENT',
+		key: [{ field: 'id', oneOf: [1, 2, 3].map(otherIntentId) }]
+	};
 
 	function arrange() {
 		let n = 0;
@@ -198,87 +214,77 @@ describe('the guarded batch admits exactly the named tail of the event log', () 
 			newEventId: () => `evt_log_${++n}`
 		}).as(TEST_CRED.human);
 		expect(engine.dispatch(captureIntent()).status).toBe('ACCEPTED');
+		/** The bare-number form's position: an event COUNT, as it always was. */
 		const position = engine.readAllEvents().length;
-		/** An event on an aggregate the guarded batch never touches — admitted or foreign by the caller's say. */
+		/** The declared form's position: the store's own, read the way a turn reads it — off a fork's base. */
+		const probe = engine.fork();
+		const mark = probe.forkBase()!.mark;
+		probe.close();
+		/** An event on an aggregate the guarded batch never touches — the caller's own or foreign, by its say. */
 		const act = (k: number): string => {
 			const r = engine.dispatch(otherIntent(k));
 			expect(r.status).toBe('ACCEPTED');
 			expect(r.producedEventIds).toHaveLength(1);
 			return r.producedEventIds[0]!;
 		};
-		const guarded = (expected: number | readonly string[]) =>
+		const guarded = (admittedEventIds: readonly string[]) =>
 			engine.dispatchBatchGuarded(
 				[beginDiscovery()],
 				[{ aggregateId: INTENT_ID, expectedRevision: 0 }],
-				typeof expected === 'number' ? expected : { position, admittedEventIds: expected }
+				{ mark, admittedEventIds, groups: [others] }
 			);
-		const untouched = () => expect(engine.loadObject(INTENT_ID)?.revision, 'the batch applied').toBe(0);
-		return { engine, position, act, guarded, untouched };
+		const bare = (expected: number) =>
+			engine.dispatchBatchGuarded(
+				[beginDiscovery()],
+				[{ aggregateId: INTENT_ID, expectedRevision: 0 }],
+				expected
+			);
+		const untouched = () =>
+			expect(engine.loadObject(INTENT_ID)?.revision, 'the batch applied').toBe(0);
+		return { engine, position, act, guarded, bare, untouched };
 	}
 
-	it('B1 — a tail that is exactly the admitted events commits', () => {
+	it('B1 — a tail of the caller’s own acts on a declared member commits', () => {
 		const { engine, act, guarded } = arrange();
 		const own = act(1);
 		const result = guarded([own]);
-		expect(result.ok, JSON.stringify(result.guardConflict)).toBe(true);
+		expect(result.ok, JSON.stringify(result.dependencyViolations)).toBe(true);
 		expect(engine.loadObject(INTENT_ID)?.revision).toBe(1);
 		engine.close();
 	});
 
-	it('B2 — one foreign event beside the admitted ones refuses, and is named', () => {
-		const { engine, position, act, guarded, untouched } = arrange();
+	it('B2 — a foreign event on a declared member beside the caller’s own refuses, and is named', () => {
+		const { engine, act, guarded, untouched } = arrange();
 		const own = act(1);
 		const foreign = act(2);
 		const result = guarded([own]);
 		expect(result.ok).toBe(false);
-		expect(result.guardConflict).toEqual({
-			aggregateId: '@event-log',
-			expectedRevision: position + 1,
-			actualRevision: position + 2,
-			unadmitted: {
-				eventId: foreign,
-				eventType: 'IntentCaptured',
-				aggregateType: 'INTENT',
-				aggregateId: otherIntentId(2)
+		expect(result.dependencyViolations).toEqual([
+			{
+				kind: 'GROUP',
+				name: 'the other intents',
+				aggregateId: otherIntentId(2),
+				event: expect.objectContaining({ eventId: foreign, eventType: 'IntentCaptured' }) as unknown
 			}
-		});
+		]);
 		untouched();
 		engine.close();
 	});
 
 	it('B3 — equal counts do not fool it: a foreign event standing in for an admitted one refuses by IDENTITY', () => {
-		const { engine, position, act, guarded, untouched } = arrange();
+		const { engine, act, guarded, untouched } = arrange();
 		const foreign = act(2);
 		const result = guarded(['evt_admitted_but_never_written']);
 		expect(result.ok).toBe(false);
-		expect(result.guardConflict).toMatchObject({
-			expectedRevision: position + 1,
-			actualRevision: position + 1,
-			unadmitted: { eventId: foreign }
-		});
-		untouched();
-		engine.close();
-	});
-
-	it('B4 — an admitted event missing from the log refuses by LENGTH, with nothing foreign to name', () => {
-		const { engine, position, act, guarded, untouched } = arrange();
-		const own = act(1);
-		const result = guarded([own, 'evt_admitted_but_never_written']);
-		expect(result.ok).toBe(false);
-		expect(result.guardConflict).toMatchObject({
-			aggregateId: '@event-log',
-			expectedRevision: position + 2,
-			actualRevision: position + 1
-		});
-		expect(result.guardConflict?.unadmitted).toBeUndefined();
+		expect(result.dependencyViolations?.map((v) => v.event?.eventId)).toEqual([foreign]);
 		untouched();
 		engine.close();
 	});
 
 	it('B5 — the bare-number form is the original rule: any growth refuses', () => {
-		const { engine, position, act, guarded, untouched } = arrange();
+		const { engine, position, act, bare, untouched } = arrange();
 		const foreign = act(2);
-		const result = guarded(position);
+		const result = bare(position);
 		expect(result.ok).toBe(false);
 		expect(result.guardConflict).toMatchObject({
 			aggregateId: '@event-log',

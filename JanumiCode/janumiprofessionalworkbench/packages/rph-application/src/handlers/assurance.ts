@@ -1588,7 +1588,8 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 			requiredRows
 				.filter(
 					(r) =>
-						(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions === 'ALL'
+						(r as { requiredForDispositions?: string } | undefined)?.requiredForDispositions ===
+						'ALL'
 				)
 				.filter(demandsAnInstance)
 		)
@@ -2207,6 +2208,19 @@ function rejectUnmetRequiredEvidence(
 	);
 }
 
+/**
+ * The validator a command's result names — the one registry entry `completeAssuranceAssessment` reads by id
+ * (DOC-004 §35); `undefined` when none is named. ONE definition, shared with the authoring turn, which pins it for
+ * every review it recorded because the replay reads it (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1 pin 4). Only
+ * `CompleteAssuranceAssessment` carries a `validatorResult` today.
+ */
+export function validatorNamedBy(command: DomainCommand): string | undefined {
+	const validatorId = (
+		command.payload as { validatorResult?: { validatorId?: unknown } } | undefined
+	)?.validatorResult?.validatorId;
+	return typeof validatorId === 'string' ? validatorId : undefined;
+}
+
 /** CompleteAssuranceAssessment — ASSESSING -> a terminal disposition read from the validator recommendation
  * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
  * disposition transitions (INV-8/INV-9/INV-10). */
@@ -2385,10 +2399,8 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// `lastFailureClass`. No production path registers a validator today, so refusing on absence would make every
 	// existing assessment uncompletable: a gate that bars the entire product is not a stricter gate, it is a
 	// broken one.
-	const validatorIdOnResult = (
-		command.payload as { validatorResult?: { validatorId?: string } } | undefined
-	)?.validatorResult?.validatorId;
-	if (typeof validatorIdOnResult === 'string') {
+	const validatorIdOnResult = validatorNamedBy(command);
+	if (validatorIdOnResult !== undefined) {
 		const entry = ctx.store.loadObject(validatorIdOnResult)?.state as
 			{ status?: string } | undefined;
 		if (entry?.status === 'DISABLED')

@@ -18,12 +18,13 @@ export { HANDLERS } from './handlers/registry.js';
 // `pwu-fold-drive-sites.test.ts` (REG-F-084) walks every row to check the event is emitted by some test.
 // Restating this list in a control is how it rots — five files already name its rows in prose.
 export { PWU_SEMANTIC_LIFECYCLE_COMMANDS } from './handlers/pwu.js';
+// What an authoring turn's replay reads by id — ONE definition each, shared by the handler that reads it and the turn
+// that must pin it (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1).
+export { newlyReferencedAssurancePolicyIds } from './handlers/pwa-authoring.js';
+export { validatorNamedBy } from './handlers/assurance.js';
 export type { OwnedLifecycleTarget } from './handlers/pwu.js';
 export type { CommandHandler, HandlerContext } from './handlers/kit.js';
-export {
-	verifyExchangeContent,
-	readAnswerSpan
-} from './exchange-resolution.js';
+export { verifyExchangeContent, readAnswerSpan } from './exchange-resolution.js';
 export type {
 	RetentionVerdict,
 	RefResolution,

@@ -1,27 +1,15 @@
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { contentHash } from '@janumipwb/rph-contracts/hash';
+import { newlyReferencedAssurancePolicyIds, validatorNamedBy } from '@janumipwb/rph-application';
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
-import {
-	getConversation,
-	listAssurancePolicies,
-	listPwuTypes,
-	type AuthedEngineHandle
-} from '@janumipwb/rph-engine';
+import { listPwuTypes, type AuthedEngineHandle, type ForkBase } from '@janumipwb/rph-engine';
 import { createActor } from 'xstate';
 import { authoringTurnMachine, type AuthoringTurnState } from '$lib/server/authoring-turn-machine';
 import { AGENT_CREDENTIAL } from './identity.js';
 import { getEngine, makeAuthoringBroker, mintUiId } from '$lib/server/workbench';
 
 type TurnActor = ReturnType<typeof newTurnActor>;
-
-interface RevisionSnapshot {
-	readonly revisions: ReadonlyMap<string, number>;
-	/**
-	 * Whole-store position at the fork. The commit guard admits the log's growth past it ONLY by the turn's own
-	 * witnessed acts (`witnessedEventIds`), so it still detects a concurrent new aggregate the vector cannot name.
-	 */
-	readonly eventCount: number;
-}
 
 /**
  * One in-process natural-language authoring candidate. `engine` is a point-in-time fork: every agent tool,
@@ -49,10 +37,11 @@ interface MutableAuthoringTurn {
 	readonly broker: PwaAuthoringBroker;
 	readonly createdAt: string;
 	readonly recordedCommands: DomainCommand[];
-	readonly base: RevisionSnapshot;
+	/** What the fork was taken from — the position, and every aggregate's revision there — and what it wrote since. */
+	readonly forkBase: ForkBase;
 	/**
 	 * Canonical events this turn's OWN acts produced before acceptance — today only the exchange records its
-	 * reviewer's tries write (PER-9). Never reset by a resume, exactly as `base` is not: every try across the
+	 * reviewer's tries write (PER-9). Never reset by a resume, exactly as `forkBase` is not: every try across the
 	 * turn's life is its own. See `witnessingEngine`.
 	 */
 	readonly witnessedEventIds: string[];
@@ -131,30 +120,6 @@ function publicTurn(turn: MutableAuthoringTurn): AuthoringTurn {
 			return turn.detail;
 		}
 	};
-}
-
-function snapshotRevisions(snapshot: AuthedEngineHandle, pwaId: string): RevisionSnapshot {
-	const revisions = new Map<string, number>();
-	const pwa = snapshot.loadObject(pwaId);
-	if (!pwa) throw new Error(`PWA ${pwaId} does not exist.`);
-	revisions.set(pwaId, pwa.revision);
-
-	for (const type of listPwuTypes(snapshot, pwaId)) {
-		const stored = snapshot.loadObject(type.id);
-		if (stored) revisions.set(type.id, stored.revision);
-	}
-	// Policy status/criteria/independence are dependencies of type-reference validation and the assurance floor.
-	for (const policy of listAssurancePolicies(snapshot)) {
-		const stored = snapshot.loadObject(policy.id);
-		if (stored) revisions.set(policy.id, stored.revision);
-	}
-	const conversation = getConversation(snapshot, pwaId);
-	if (conversation) {
-		const stored = snapshot.loadObject(conversation.id);
-		if (stored) revisions.set(conversation.id, stored.revision);
-	}
-
-	return { revisions, eventCount: snapshot.readAllEvents().length };
 }
 
 const MUTABLE_STATES: ReadonlySet<AuthoringTurnState> = new Set(['COLLECTING', 'ASSURING']);
@@ -242,6 +207,7 @@ function recordingEngine(
 		fork() {
 			throw new Error('Nested candidate forks are not part of an authoring turn.');
 		},
+		forkBase: () => delegate.forkBase(),
 		ontology: delegate.ontology,
 		close: () => delegate.close()
 	};
@@ -296,6 +262,7 @@ function witnessingEngine(
 		loadObject: (id) => delegate.loadObject(id),
 		readAllEvents: () => delegate.readAllEvents(),
 		fork: closed('a fork'),
+		forkBase: () => delegate.forkBase(),
 		ontology: delegate.ontology,
 		close: closed('closing canonical')
 	};
@@ -327,6 +294,9 @@ export function beginAuthoringTurn(
 
 	const id = mintUiId('sess');
 	const isolated = canonical.fork();
+	const forkBase = isolated.forkBase();
+	if (!forkBase) throw new Error('An authoring turn needs a fork of canonical to record into.');
+	if (!isolated.loadObject(pwaId)) throw new Error(`PWA ${pwaId} does not exist.`);
 	const recordedCommands: DomainCommand[] = [];
 	const turnRef: { current?: MutableAuthoringTurn } = {};
 	const engine = recordingEngine(isolated, recordedCommands, () => {
@@ -341,7 +311,7 @@ export function beginAuthoringTurn(
 		broker: makeAuthoringBroker(pwaId, engine, id),
 		createdAt: new Date().toISOString(),
 		recordedCommands,
-		base: snapshotRevisions(isolated, pwaId),
+		forkBase,
 		witnessedEventIds: [],
 		actor: newTurnActor()
 	};
@@ -431,14 +401,21 @@ export function markAuthoringTurnAssured(turn: AuthoringTurn, reviewedSubjectHas
 	return finalizeAuthoringTurn(turn);
 }
 
-function candidateArtifacts(turn: MutableAuthoringTurn) {
-	const stagedEvents = turn.engine.readAllEvents().slice(turn.base.eventCount);
-	const affectedIds = [
+/** Every aggregate the candidate writes: each recorded command's target, and each aggregate the fork's writes touched
+ *  (a command may write more than its target — a type edit also bumps its PWA). */
+function writeSet(turn: MutableAuthoringTurn): string[] {
+	return [
 		...new Set([
 			...turn.recordedCommands.map((command) => command.targetAggregateId),
-			...stagedEvents.map((event) => event.aggregateId)
+			...turn.forkBase.writes().map((write) => write.aggregateId)
 		])
-	].sort((left, right) => Number(left > right) - Number(left < right));
+	];
+}
+
+function candidateArtifacts(turn: MutableAuthoringTurn) {
+	const affectedIds = writeSet(turn).sort(
+		(left, right) => Number(left > right) - Number(left < right)
+	);
 	const affectedObjects = affectedIds.map((id) => {
 		const object = turn.engine.loadObject(id);
 		if (!object) throw new Error(`Candidate affected aggregate ${id} is missing.`);
@@ -447,17 +424,17 @@ function candidateArtifacts(turn: MutableAuthoringTurn) {
 	return { affectedIds, affectedObjects };
 }
 
-/** Bind a digest to the base vector, exact accepted command sequence, and resulting materialized object states. */
+/** Bind a digest to the declared dependencies, exact accepted command sequence, and resulting object states. */
 export function finalizeAuthoringTurn(turn: AuthoringTurn): string {
 	const current = mutable(turn);
 	const { affectedObjects } = candidateArtifacts(current);
 	current.candidateHash = contentHash({
 		pwaId: current.pwaId,
 		base: {
-			revisions: [...current.base.revisions]
-				.map(([id, revision]) => ({ id, revision }))
-				.sort((left, right) => left.id.localeCompare(right.id)),
-			eventCount: current.base.eventCount
+			mark: current.forkBase.mark,
+			pins: declaredPreconditions(current).sort((left, right) =>
+				left.aggregateId.localeCompare(right.aggregateId)
+			)
 		},
 		commands: current.recordedCommands,
 		affectedObjects,
@@ -491,59 +468,197 @@ function assertReadyToCommit(
 	return candidateHash;
 }
 
-/** Build the revision guard vector: captured base revisions plus a mustNotExist guard for every touched aggregate. */
-function commitGuardPreconditions(
-	current: MutableAuthoringTurn,
-	affectedIds: readonly string[]
-): GuardPrecondition[] {
-	const preconditions = new Map<string, number | undefined>(current.base.revisions);
-	for (const targetId of current.recordedCommands.map((command) => command.targetAggregateId)) {
-		if (!preconditions.has(targetId)) preconditions.set(targetId, undefined);
+// ── WHAT A DRAFT DEPENDS ON (`JAN-CRITREAD` `DD-3`, `REG-D-070`) ────────────────────────────────────────────────────
+//
+// A staged draft is refused at acceptance only if something it depends on changed since it was started. Nothing else
+// can refuse it — which is what ends `REG-F-430`, where any write anywhere in the store destroyed every open draft.
+// It depends on the PINS below, each held at its revision at the fork's position or held absent, and on the GROUPS
+// below, keyed sets whose membership it read or whose ranking its commit writes into.
+
+type DeclaredEventLog = Extract<
+	Parameters<AuthedEngineHandle['dispatchBatchGuarded']>[2],
+	{ readonly groups: unknown }
+>;
+type DependencyGroup = DeclaredEventLog['groups'][number];
+type DependencyViolation = NonNullable<GuardedBatchResult['dependencyViolations']>[number];
+
+/** Why each pinned aggregate is pinned, in the words the disclosure uses. The FIRST role an id earns is the one shown. */
+export type PinRole =
+	| 'your PWA'
+	| 'a floor review policy'
+	| 'a policy this draft newly references'
+	| 'the validator a recorded review names'
+	| 'an object this draft writes';
+
+const FLOOR_POLICIES: readonly string[] = Object.values(FLOOR_POLICY_IDS);
+
+/**
+ * The §5.1 pins, each with its role: the PWA; the three floor policies (the floor verdict is computed on the fork and
+ * never re-judged at replay); every policy a write newly referenced against the state it replaced — exactly what the
+ * replay re-validates, command by command; the validator a recorded review names (the replay reads it by id); and
+ * every aggregate the draft writes. ⛔ No longer every policy in the store: an unrelated policy edited mid-draft is
+ * not this draft's business.
+ */
+function declaredPins(current: MutableAuthoringTurn): ReadonlyMap<string, PinRole> {
+	const pins = new Map<string, PinRole>();
+	const pin = (aggregateId: string, role: PinRole) => {
+		if (!pins.has(aggregateId)) pins.set(aggregateId, role);
+	};
+	pin(current.pwaId, 'your PWA');
+	for (const policyId of FLOOR_POLICIES) pin(policyId, 'a floor review policy');
+	for (const write of current.forkBase.writes()) {
+		for (const { policyIds } of newlyReferencedAssurancePolicyIds(
+			write.nextState as Record<string, unknown> | undefined,
+			write.priorState as Record<string, unknown> | undefined
+		)) {
+			for (const policyId of policyIds) pin(policyId, 'a policy this draft newly references');
+		}
 	}
-	for (const id of affectedIds) {
-		if (!preconditions.has(id)) preconditions.set(id, undefined);
+	for (const command of current.recordedCommands) {
+		const validatorId = validatorNamedBy(command);
+		if (validatorId !== undefined) pin(validatorId, 'the validator a recorded review names');
 	}
-	return [...preconditions].map(([aggregateId, expectedRevision]) =>
-		expectedRevision === undefined
-			? { aggregateId, mustNotExist: true as const }
-			: { aggregateId, expectedRevision }
-	);
+	for (const aggregateId of writeSet(current)) pin(aggregateId, 'an object this draft writes');
+	return pins;
 }
 
-/** Classify a failed guarded canonical batch (revision conflict vs commit failure), record the detail, and transition. */
+/** Each pin at its revision at the fork's position, or held absent if it did not exist there. */
+function declaredPreconditions(current: MutableAuthoringTurn): GuardPrecondition[] {
+	return [...declaredPins(current).keys()].map((aggregateId) => {
+		const expectedRevision = current.forkBase.revisionAt(aggregateId);
+		return expectedRevision === undefined
+			? { aggregateId, mustNotExist: true as const }
+			: { aggregateId, expectedRevision };
+	});
+}
+
+/**
+ * The §5.1 groups. A key field must never change after its aggregate's birth, or "a member" would depend on when it
+ * was read. G1 is the draft's conversation, including a FIRST one another writer creates; G2 is any birth, edit or
+ * removal of the PWA's types, NOT resting on the PWA's version bump; G3 is the review records a canonical reader
+ * ranks per floor policy, which this draft's commit writes into; G4 is a reviewer's exchange about the PWA — kept by
+ * ruling (`REG-D-070` Q2) until `REG-F-433`'s join key lets it go.
+ */
+function declaredGroups(pwaId: string): DependencyGroup[] {
+	return [
+		{
+			name: 'your PWA’s conversation',
+			aggregateType: 'AUTHORING_CONVERSATION',
+			key: [{ field: 'pwaId', equals: pwaId }]
+		},
+		{
+			name: 'a type of your PWA',
+			aggregateType: 'PWU_TYPE',
+			key: [{ field: 'pwaId', equals: pwaId }]
+		},
+		{
+			name: 'your PWA’s review record under a floor policy',
+			aggregateType: 'ASSURANCE_ASSESSMENT',
+			key: [
+				{ field: 'subjectObjectIds', contains: pwaId },
+				{ field: 'assurancePolicyId', oneOf: FLOOR_POLICIES }
+			]
+		},
+		{
+			name: 'a reviewer exchange about your PWA',
+			aggregateType: 'MODEL_EXCHANGE',
+			key: [{ field: 'subjectObjectId', equals: pwaId }]
+		}
+	];
+}
+
+/** A draft's declared dependencies as its commit will check them — each pin with its role, and the groups. */
+export interface DeclaredDependencies {
+	readonly mark: number;
+	readonly pins: readonly (GuardPrecondition & { readonly role: PinRole })[];
+	readonly groups: readonly DependencyGroup[];
+}
+
+/**
+ * What an active draft depends on, read-only: the instrument for anything that must check the declaration itself —
+ * the pins a scenario earned, and (`DD-6`) whether every by-id read a turn makes is pinned, grouped or advisory.
+ */
+export function declaredDependenciesOf(turn: AuthoringTurn): DeclaredDependencies {
+	const current = mutable(turn);
+	const roles = declaredPins(current);
+	return {
+		mark: current.forkBase.mark,
+		pins: declaredPreconditions(current).map((pin) => ({
+			...pin,
+			role: roles.get(pin.aggregateId)!
+		})),
+		groups: declaredGroups(current.pwaId)
+	};
+}
+
+const revisionText = (revision: number | undefined) =>
+	revision === undefined ? 'absent' : `revision ${String(revision)}`;
+
+/**
+ * ⭑ EVERY CHANGE, WITH ITS ROLE, AND WHAT CHANGED IT (§5.4, FORK-22). A professional told one of three changes
+ * discards, reloads and is refused again, so every violation is named — past FORK-22's minimum, and in place of the
+ * pseudo-aggregate `@event-log` that told nobody what moved.
+ */
+function disclose(
+	violations: readonly DependencyViolation[],
+	roles: ReadonlyMap<string, PinRole>
+): string {
+	const items = violations.map((violation) => {
+		const by = violation.event
+			? ` by ${violation.event.eventType} (actor ${violation.event.actorId}, correlation ${violation.event.correlationId})`
+			: '';
+		if (violation.kind === 'PIN')
+			return (
+				`${roles.get(violation.aggregateId) ?? 'a pinned object'} ${violation.aggregateId} is at ` +
+				`${revisionText(violation.actualRevision)}, not ${revisionText(violation.expectedRevision)}`
+			);
+		if (violation.kind === 'GROUP')
+			return `${violation.name} ${violation.aggregateId} was changed${by}`;
+		return (
+			`${violation.name}: ${violation.aggregateId} could not be checked (${violation.detail ?? 'unreadable'}), ` +
+			`so it is treated as changed${by}`
+		);
+	});
+	return `Changed since this draft began: ${items.join('; ')}.`;
+}
+
+/**
+ * Classify a failed guarded canonical batch, record the detail, and transition. A declared dependency that changed is
+ * a CONFLICT (PER-4: reload and re-form). Anything else — a replay the handlers refused, or one that diverged from the
+ * candidate — happened while everything the draft declares HELD, so it is a gap in the rule, not a conflict, and is
+ * said so loudly (§5.4).
+ */
 function recordCommitFailure(
 	current: MutableAuthoringTurn,
 	candidateHash: string,
-	result: GuardedBatchResult
+	result: GuardedBatchResult,
+	roles: ReadonlyMap<string, PinRole>
 ): CommitAuthoringTurnResult {
-	const rejected =
-		result.failedIndex === undefined ? undefined : result.results[result.failedIndex];
-	const conflict = result.guardConflict ?? (rejected?.status === 'CONFLICT' ? rejected : undefined);
-	if (conflict) {
-		// The prefix is byte-identical to what it always was; the suffix names WHOSE act moved the log.
-		const unadmitted = result.guardConflict?.unadmitted;
-		const detail = result.guardConflict
-			? `${result.guardConflict.aggregateId} changed from revision ${String(result.guardConflict.expectedRevision)} to ${String(result.guardConflict.actualRevision)}.` +
-				(unadmitted
-					? ` First unadmitted event: ${unadmitted.eventType} on ${unadmitted.aggregateType} ${unadmitted.aggregateId}.`
-					: '')
-			: (rejected?.error?.message ?? 'A replayed command observed a revision conflict.');
+	const violations = result.dependencyViolations ?? [];
+	if (violations.length > 0) {
+		const detail = disclose(violations, roles);
 		current.detail = detail;
 		transition(current, { type: 'CONFLICT' }, 'CONFLICTED');
 		return { ok: false, status: 'CONFLICTED', candidateHash, detail };
 	}
-	const detail = result.postconditionConflict
-		? `Canonical replay diverged for ${result.postconditionConflict.aggregateId}; the transaction was rolled back.`
+	const rejected =
+		result.failedIndex === undefined ? undefined : result.results[result.failedIndex];
+	const refusal = result.postconditionConflict
+		? `the replay of ${result.postconditionConflict.aggregateId} diverged from the candidate and was rolled back`
 		: (rejected?.error?.message ??
-			`Canonical batch rejected at command ${String(result.failedIndex ?? 'unknown')}.`);
+			`command ${String(result.failedIndex ?? 'unknown')} was ${rejected?.status ?? 'refused'}`);
+	const detail =
+		'The save step refused this draft although nothing it declares it depends on changed — a gap in the ' +
+		`dependency rule (REG-D-070), not a conflict. The refusal: ${refusal}`;
 	current.detail = detail;
 	transition(current, { type: 'COMMIT_ERROR' }, 'COMMIT_FAILED');
 	return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
 }
 
 /**
- * A human accepts the exact preview hash. The engine then checks the revision vector and expected resultant object
- * hashes inside the same transaction as replay. Any conflict/rejection/divergence leaves canonical state unchanged.
+ * A human accepts the exact preview hash. The engine then checks every declared dependency and the expected resultant
+ * object hashes inside the same transaction as the replay. Any conflict/rejection/divergence leaves canonical state
+ * unchanged.
  */
 export function commitAuthoringTurn(
 	turn: AuthoringTurn,
@@ -553,16 +668,20 @@ export function commitAuthoringTurn(
 	const candidateHash = assertReadyToCommit(turn, current, acceptedCandidateHash);
 	transition(current, { type: 'COMMIT' }, 'COMMITTING');
 
-	const { affectedIds, affectedObjects } = candidateArtifacts(current);
-	const preconditions = commitGuardPreconditions(current, affectedIds);
+	const { affectedObjects } = candidateArtifacts(current);
+	const roles = declaredPins(current);
 
 	let result;
 	try {
 		result = current.canonical.dispatchBatchGuarded(
 			current.recordedCommands,
-			preconditions,
-			// The log may have grown past the fork by exactly the turn's own witnessed acts — nothing else.
-			{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },
+			declaredPreconditions(current),
+			// Refused only by a change to something declared; the turn's own witnessed tries are admitted by id.
+			{
+				mark: current.forkBase.mark,
+				admittedEventIds: [...current.witnessedEventIds],
+				groups: declaredGroups(current.pwaId)
+			},
 			affectedObjects.map(({ id: aggregateId, contentHash: expectedContentHash }) => ({
 				aggregateId,
 				expectedContentHash
@@ -575,7 +694,7 @@ export function commitAuthoringTurn(
 		return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
 	}
 
-	if (!result.ok) return recordCommitFailure(current, candidateHash, result);
+	if (!result.ok) return recordCommitFailure(current, candidateHash, result, roles);
 
 	// Canonical state is committed at this point. Projection delivery/cleanup failure must never turn this into a
 	// retryable COMMIT_FAILED state and accidentally replay an already-successful turn.

@@ -19,6 +19,22 @@ import type {
  * This is deliberately a persistence mechanism rather than an undo mechanism: discarding the overlay abandons an
  * uncommitted candidate. It never deletes or rewrites canonical Events.
  */
+/**
+ * One write a fork staged (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1): which aggregate, the revision it had at the
+ * fork's BASE, and the state this write REPLACED. A candidate declares its dependencies from these — each written
+ * aggregate pinned at its base revision, and each policy a write newly referenced against the state it replaced,
+ * which is exactly the state the replay will validate that command against.
+ */
+export interface StagedWrite {
+	readonly aggregateType: string;
+	readonly aggregateId: string;
+	/** Its revision at the fork's base position; `undefined` if it did not exist there. */
+	readonly baseRevision: number | undefined;
+	/** The state this write replaced — the fork's own earlier write, else the base; `undefined` for a birth. */
+	readonly priorState: unknown;
+	readonly nextState: unknown;
+}
+
 export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	private readonly baseObjects = new Map<string, StoredObject>();
 	private readonly baseEvents: DomainEvent[];
@@ -28,6 +44,8 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	private readonly receipts = new Map<string, CommandReceiptRecord>();
 	private stagedEvents: DomainEvent[] = [];
 	private outbox: OutboxRecord[] = [];
+	/** Append-only, so a rolled-back transaction is undone by truncating to the length it began at. */
+	private readonly writes: StagedWrite[] = [];
 	private closed = false;
 
 	constructor(private readonly source: StorageAdapter) {
@@ -74,6 +92,13 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 			return { ok: false, reason: 'REVISION_CONFLICT', actualRevision };
 		}
 
+		this.writes.push({
+			aggregateType: input.aggregateType,
+			aggregateId: input.aggregateId,
+			baseRevision: this.baseObjects.get(input.aggregateId)?.revision,
+			priorState: clone(existing?.state),
+			nextState: clone(input.currentState)
+		});
 		this.stagedObjects.set(input.aggregateId, {
 			objectType: input.objectType,
 			revision: input.newRevision,
@@ -95,7 +120,8 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 			objects: cloneMap(this.stagedObjects),
 			receipts: cloneMap(this.receipts),
 			events: clone(this.stagedEvents),
-			outbox: clone(this.outbox)
+			outbox: clone(this.outbox),
+			writes: this.writes.length
 		};
 		try {
 			return fn();
@@ -104,6 +130,7 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 			replaceMap(this.receipts, checkpoint.receipts);
 			this.stagedEvents = checkpoint.events;
 			this.outbox = checkpoint.outbox;
+			this.writes.length = checkpoint.writes;
 			throw error;
 		}
 	}
@@ -118,6 +145,18 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 	highWaterMark(): number {
 		this.assertOpen();
 		return this.baseMark;
+	}
+
+	/** The revision `aggregateId` had at this fork's base position; `undefined` if it did not exist there. */
+	revisionAtBase(aggregateId: string): number | undefined {
+		this.assertOpen();
+		return this.baseObjects.get(aggregateId)?.revision;
+	}
+
+	/** Every write this fork staged, in commit order. A rolled-back transaction's writes are not among them. */
+	stagedWrites(): StagedWrite[] {
+		this.assertOpen();
+		return clone(this.writes);
 	}
 
 	/**

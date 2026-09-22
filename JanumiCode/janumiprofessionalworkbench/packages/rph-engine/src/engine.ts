@@ -4,18 +4,18 @@
 // PWA-AGNOSTIC mechanism: the Product Realization PWA (or any PWA) is loaded as versioned DATA and INJECTED by
 // the composition root — the engine does not import or default to any specific PWA. Downstream surfaces consume
 // ONLY this seam; they never reach into the individual packages.
-import {
-	Engine,
-	type EventSubscriber,
-	type AuthedEngine
-} from '@janumipwb/rph-application';
+import { Engine, type EventSubscriber, type AuthedEngine } from '@janumipwb/rph-application';
 import type {
 	AssessmentCriterion,
 	EvidenceRequirement,
 	DomainEvent,
 	Frozen
 } from '@janumipwb/rph-contracts';
-import { SnapshotOverlayStorageAdapter, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import {
+	SnapshotOverlayStorageAdapter,
+	SqliteStorageAdapter,
+	type StagedWrite
+} from '@janumipwb/rph-persistence';
 import type {
 	AuthenticationPort,
 	Credential,
@@ -103,6 +103,21 @@ export interface CreateEngineDeps {
 	readonly logger?: Logger;
 }
 
+/**
+ * What a FORK was taken from, and what it has written since (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1). An authoring
+ * turn declares its dependencies from this: every aggregate it writes pinned at its revision at `mark`, and every
+ * policy each write newly referenced against the state that write replaced — which is exactly the state the replay
+ * validates that command against.
+ */
+export interface ForkBase {
+	/** The canonical position (`StorageAdapter.highWaterMark`) the fork was captured at. */
+	readonly mark: number;
+	/** The revision `aggregateId` had at `mark`; `undefined` if it did not exist then. */
+	revisionAt(aggregateId: string): number | undefined;
+	/** The fork's own writes, in commit order; a rolled-back transaction's are not among them. */
+	writes(): readonly StagedWrite[];
+}
+
 /** The public engine seam. Everything a host needs: dispatch commands, observe events, drain the outbox to
  *  projections, query current objects / the event log, and read the loaded ontology. */
 /** An `EngineHandle` that has been given a credential: everything the handle does, plus dispatch. */
@@ -134,6 +149,8 @@ export interface EngineHandle {
 	 * to an overlay; closing or abandoning the fork cannot mutate this engine's canonical state.
 	 */
 	fork(): EngineHandle;
+	/** What this handle was forked from (`ForkBase`); `undefined` on a handle that is not a fork. */
+	forkBase(): ForkBase | undefined;
 	readonly ontology: EngineOntology;
 	/** Release the underlying storage (closes the sqlite connection). */
 	close(): void;
@@ -199,6 +216,14 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 				...deps,
 				store: new SnapshotOverlayStorageAdapter(store)
 			}),
+		forkBase: () =>
+			store instanceof SnapshotOverlayStorageAdapter
+				? {
+						mark: store.highWaterMark(),
+						revisionAt: (aggregateId) => store.revisionAtBase(aggregateId),
+						writes: () => store.stagedWrites()
+					}
+				: undefined,
 		ontology,
 		close: () => store.close()
 	};

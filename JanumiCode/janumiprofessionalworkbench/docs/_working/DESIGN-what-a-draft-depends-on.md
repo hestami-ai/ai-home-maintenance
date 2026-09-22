@@ -327,9 +327,15 @@ G1–G3 can contain one. So **the witness's admission matters only through G4**,
 | TT-M5 (drain on the fork) | live | live (PER-9) |
 
 `TT-1`'s bus rule changes meaning: B1 and B2 carry over; **B3 and TT-M2 stay** — the new rule still skips admitted
-events *by identity*; **B4 and TT-M3 (the length term) and W2 and TT-M9 (a DUPLICATE's earlier events are not
-admitted)** guard properties the new rule removes — with no length term, admitting an event that is not in the tail
-changes nothing — so they become vacuous. B5 (a bare number) is unchanged. TT-M1 and TT-M1b are re-anchored.
+events *by identity*; **B4 and TT-M3 (the length term)** ~~and W2 and TT-M9 (a DUPLICATE's earlier events are not
+admitted)~~ guard ~~properties~~ **a property** the new rule removes — with no length term, admitting an event that is not
+in the tail changes nothing — so ~~they become~~ **it becomes** vacuous. B5 (a bare number) is unchanged. TT-M1 and TT-M1b
+are re-anchored.
+
+> ⚠ **STRUCK 2026-09-22 (`JAN-CRITREAD` `DD-3`) — `REG-F-438`.** W2 + TT-M9 are NOT vacuous. W2 as written (an act
+> from BEFORE the fork) is; TT-M9's property is not: a DUPLICATE of ANOTHER writer's act made AFTER the fork carries
+> events that ARE in the tail, on a member of G4, and noting them would admit the change the draft must be refused
+> for. TT-M9 stays live and W2 is re-aimed at that case.
 
 **A ledger rule is needed.** The runner reports `RETIRED` only when `supersededBy` names a successor mutant proving
 the same guard (`scripts/mutants/run.ts:202-211`; `verif/mutant-ledger.test.ts:82` checks the successor exists).

@@ -2297,23 +2297,24 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "TT-M1-event-log-refusal-becomes-admission",
 		file: "packages/rph-application/src/command-bus.ts",
-		find: "\t\t\t\t\t\t};\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
-		replace: "\t\t\t\t\t\t};\n\t\t\t\t\t\tconflict = undefined; // MUTANT: the whole-log refusal became an admission\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
+		find: "if (violations.length > 0) return;",
+		replace: "void 0; // MUTANT: a declared dependency that changed no longer stops the replay",
 		expectRed: ["packages/rph-engine/src/engine.test.ts"],
-		why: "PROMISE: the guarded batch refuses when the event log moved in any way the caller did not admit. WHO RELIES: every caller that stages a candidate against a log position — today the authoring turn, whose defence against a NEW aggregate its revision vector never pinned is exactly this limb (`authoring-turn.ts:19`). WHAT THE MUTATION DOES: builds the conflict and then DISCARDS it (`conflict = undefined`), so the limb detects and admits — the consequence mutated, not the condition (V-2c). ⛔ HISTORY: before `TT-0` this limb had no test that isolated it, and deleting its refusal SURVIVED the turn suite 6/6. OBSERVED: KILLED, 4 of 11 in its own suite — B2, B3, B4 and B5 each fail `expected true to be false`: every refused batch applies. The TURN's use of the limb is owned separately by `TT-M1b`, so each victim is the suite whose assertions are about what the mutant breaks.",
+		why: "PROMISE: the guarded batch refuses when the event log moved in any way the caller did not admit. WHO RELIES: every caller that stages a candidate against a log position — today the authoring turn, whose defence against a NEW aggregate its revision vector never pinned is exactly this limb (`authoring-turn.ts:19`). WHAT THE MUTATION DOES: builds the conflict and then DISCARDS it (`conflict = undefined`), so the limb detects and admits — the consequence mutated, not the condition (V-2c). ⛔ HISTORY: before `TT-0` this limb had no test that isolated it, and deleting its refusal SURVIVED the turn suite 6/6. OBSERVED: KILLED, 4 of 11 in its own suite — B2, B3, B4 and B5 each fail `expected true to be false`: every refused batch applies. The TURN's use of the limb is owned separately by `TT-M1b`, so each victim is the suite whose assertions are about what the mutant breaks. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-3`, `REG-D-070`): the exact-tail form this limb lived in is deleted. Its successor for the turn is the DECLARED form's refusal: a violation found inside the transaction must stop the replay. The mutation lets the replay run past the collected violations — the result still says refused, and the batch applied. OBSERVED at DD-3: KILLED, 2 of 10 — B2 and B3 (carried to the declared form), each `the batch applied: expected 1 to be +0`. The bare-number form's own refusal is now `DD3-M15`.",
 		source: "JAN-CRITREAD TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
 		id: "TT-M2-admitted-by-count-not-identity",
 		file: "packages/rph-application/src/command-bus.ts",
-		find: "if (log.length !== position + admitted.size || foreign) {",
-		replace: "if (log.length !== position + admitted.size) { // MUTANT: identity term dropped",
+		find: "for (const event of this.store.eventsAfter(declared.mark)) {\n\t\t\tif (admitted.has(event.eventId)) continue;",
+		replace: "for (const [index, event] of this.store.eventsAfter(declared.mark).entries()) {\n\t\t\tif (index < admitted.size) continue; // MUTANT: admitted by count, not identity",
 		expectRed: ["packages/rph-engine/src/engine.test.ts"],
-		why: "PROMISE: the log after the caller's position must be EXACTLY the admitted events — by identity, not merely by count. WHO RELIES: an authoring turn admitting its own reviewer's records (`REG-F-425`): if another writer's event lands while one of the turn's own admitted writes is missing, the COUNT still matches. WHAT THE MUTATION DOES: drops the identity term, so any tail of the right length is admitted. OBSERVED: KILLED, exactly 1 of 11 — *\"B3 — equal counts do not fool it: a foreign event standing in for an admitted one refuses by IDENTITY\"* fails with `expected true to be false`: the foreign event is admitted in the missing one's place and the batch applies. Every other case still refuses on length, which is why only B3 can see this.",
+		why: "PROMISE: the log after the caller's position must be EXACTLY the admitted events — by identity, not merely by count. WHO RELIES: an authoring turn admitting its own reviewer's records (`REG-F-425`): if another writer's event lands while one of the turn's own admitted writes is missing, the COUNT still matches. WHAT THE MUTATION DOES: drops the identity term, so any tail of the right length is admitted. OBSERVED: KILLED, exactly 1 of 11 — *\"B3 — equal counts do not fool it: a foreign event standing in for an admitted one refuses by IDENTITY\"* fails with `expected true to be false`: the foreign event is admitted in the missing one's place and the batch applies. Every other case still refuses on length, which is why only B3 can see this. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-3`, `REG-D-070`): onto the declared form's skip of the caller's own acts, which must still be BY IDENTITY; the mutation skips the first `admitted.size` tail events instead. OBSERVED at DD-3: KILLED, exactly 1 of 10 — B3 (carried to the declared form), `expected true to be false`: the foreign event is skipped in the missing one's place and the batch applies.",
 		source: "JAN-CRITREAD TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
 		id: "TT-M3-admitted-by-membership-not-exactness",
+		abolishedBy: "REG-D-070 — the dependency rule has no length term: an admitted event that is not in the tail changes nothing, so \"a caller cannot be admitted past acts that never landed\" no longer describes any refusal. Its test, B4 (engine.test.ts), is removed with it (JAN-CRITREAD DD-3).",
 		file: "packages/rph-application/src/command-bus.ts",
 		find: "if (log.length !== position + admitted.size || foreign) {",
 		replace: "if (foreign) { // MUTANT: length term dropped",
@@ -2324,19 +2325,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "TT-M1b-turn-stops-asking-for-the-log-check",
 		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
-		find: "\t\t\t{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },",
-		replace: "\t\t\tundefined, // MUTANT: the turn stops asking the bus for the whole-log check",
+		find: "{\n\t\t\t\tmark: current.forkBase.mark,\n\t\t\t\tadmittedEventIds: [...current.witnessedEventIds],\n\t\t\t\tgroups: declaredGroups(current.pwaId)\n\t\t\t},",
+		replace: "undefined, // MUTANT: the turn stops declaring what it depends on",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
-		why: "PROMISE: an authoring turn's commit asks the bus to verify the canonical log against the turn's own base — without it, a new aggregate created concurrently (the PWA's FIRST conversation, which nothing pins) commits beside the turn's own. WHO RELIES: the one-conversation-per-PWA rule, and every guarantee the turn's candidate rests on that the per-aggregate vector cannot name. WHAT THE MUTATION DOES: passes `undefined` for the expected log, so the turn simply stops asking — the bus limb stays correct and unused. RE-ANCHORED in `TT-2`, where the argument became `{position, admittedEventIds}`; the consequence mutated is unchanged. OBSERVED (re-run after re-anchoring): KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit lands and one PWA owns two conversations.",
+		why: "PROMISE: an authoring turn's commit asks the bus to verify the canonical log against the turn's own base — without it, a new aggregate created concurrently (the PWA's FIRST conversation, which nothing pins) commits beside the turn's own. WHO RELIES: the one-conversation-per-PWA rule, and every guarantee the turn's candidate rests on that the per-aggregate vector cannot name. WHAT THE MUTATION DOES: passes `undefined` for the expected log, so the turn simply stops asking — the bus limb stays correct and unused. RE-ANCHORED in `TT-2`, where the argument became `{position, admittedEventIds}`; the consequence mutated is unchanged. OBSERVED (re-run after re-anchoring): KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit lands and one PWA owns two conversations. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-3`, `REG-D-070`): the argument is now the declared dependencies `{ mark, admittedEventIds, groups }`; the mutation drops it (`undefined`), so only the pins are checked, as the old revision guard. OBSERVED at DD-3: KILLED, 4 of 10 — PR-2 and G2 COMMIT (`expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: two conversations for one PWA; a type born unseen), and the concurrent PWA edit and the write-set case are still refused by the pins but lose their classification (`expected { ok: false, …(3) } to match object { ok: false, status: 'CONFLICTED' }` — reported as a gap in the rule).",
 		source: "JAN-CRITREAD TT-0/TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
 		id: "TT-M4-the-type-exemption-admits-every-exchange",
 		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
-		find: "\t\t\t{ position: current.base.eventCount, admittedEventIds: [...current.witnessedEventIds] },",
-		replace: "\t\t\t{ position: current.base.eventCount, admittedEventIds: current.canonical.readAllEvents().slice(current.base.eventCount).filter((event) => event.aggregateType === 'MODEL_EXCHANGE').map((event) => event.eventId) }, // MUTANT: the type exemption - every exchange record in the tail is admitted, whoever made it",
+		find: "admittedEventIds: [...current.witnessedEventIds],",
+		replace: "admittedEventIds: current.canonical.readAllEvents().filter((event) => event.aggregateType === 'MODEL_EXCHANGE').map((event) => event.eventId), // MUTANT: the type exemption - every exchange is admitted",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
-		why: "PROMISE: the commit admits the turn's OWN exchange records, by identity — not every `MODEL_EXCHANGE` in the tail. WHO RELIES: a professional whose turn must not commit past another turn's acts unnoticed. WHAT THE MUTATION DOES: replaces the witnessed set with the TYPE EXEMPTION (DESIGN §5.3 — the candidate remedy for the disclosed cross-turn conflict, owed a sponsor ruling): every exchange record after the base is admitted, whoever made it. ⭑ PR-1 stays green BY DESIGN — that shape also fixes `REG-F-425`; what separates the two is whose records get in. OBSERVED: KILLED, 2 of 10 — *\"PR-2a — ANOTHER turn’s exchange record is a foreign event\"* and *\"W3 — a discarded turn’s late try … refuses its successor rather than joining it\"*, both `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`. ⚠ W3 was NOT predicted: the exemption admits a discarded PREDECESSOR's late try too, not only another professional's.",
+		why: "PROMISE: the commit admits the turn's OWN exchange records, by identity — not every `MODEL_EXCHANGE` in the tail. WHO RELIES: a professional whose turn must not commit past another turn's acts unnoticed. WHAT THE MUTATION DOES: replaces the witnessed set with the TYPE EXEMPTION (DESIGN §5.3 — the candidate remedy for the disclosed cross-turn conflict, owed a sponsor ruling): every exchange record after the base is admitted, whoever made it. ⭑ PR-1 stays green BY DESIGN — that shape also fixes `REG-F-425`; what separates the two is whose records get in. OBSERVED: KILLED, 2 of 10 — *\"PR-2a — ANOTHER turn’s exchange record is a foreign event\"* and *\"W3 — a discarded turn’s late try … refuses its successor rather than joining it\"*, both `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`. ⚠ W3 was NOT predicted: the exemption admits a discarded PREDECESSOR's late try too, not only another professional's. ⭑ RE-ANCHORED 2026-09-22 (`JAN-CRITREAD` `DD-3`, `REG-D-070`): onto the declared form's admitted list; the mutation admits every exchange on canonical. PR-2a now COMMITS by ruling (`REG-D-069`), so it no longer sees this; W2, re-aimed by `REG-F-438`, does. OBSERVED at DD-3: KILLED, 2 of 14 — W2 and W3, both `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: another writer's try, and a discarded predecessor's, are admitted and the draft commits past them.",
 		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
@@ -2381,7 +2382,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\tif (result.status === 'ACCEPTED') turn.witnessedEventIds.push(...result.producedEventIds);",
 		replace: "\t\t\tturn.witnessedEventIds.push(...result.producedEventIds); // MUTANT: every result noted, a DUPLICATE included",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
-		why: "PROMISE: only an ACCEPTED dispatch is the turn's own act. WHO RELIES: the exactness of the admitted set — a DUPLICATE carries the `producedEventIds` of the EARLIER act it replays (`answerFromReceipt`), events that sit before the turn's base. WHAT THE MUTATION DOES: drops the ACCEPTED term, so every result's events are noted. OBSERVED: KILLED, exactly 1 of 10 — *\"W2 — a DUPLICATE is an EARLIER act, not this turn’s: it is not admitted, and the commit lands\"* fails with `\"@event-log changed from revision 60 to 59.\"`: the admitted set claims one event more than the tail holds, and the bus's LENGTH term refuses a turn that did nothing wrong.",
+		why: "PROMISE: only an ACCEPTED dispatch is the turn's own act. WHO RELIES: the exactness of the admitted set — a DUPLICATE carries the `producedEventIds` of the EARLIER act it replays (`answerFromReceipt`), events that sit before the turn's base. WHAT THE MUTATION DOES: drops the ACCEPTED term, so every result's events are noted. OBSERVED: KILLED, exactly 1 of 10 — *\"W2 — a DUPLICATE is an EARLIER act, not this turn’s: it is not admitted, and the commit lands\"* fails with `\"@event-log changed from revision 60 to 59.\"`: the admitted set claims one event more than the tail holds, and the bus's LENGTH term refuses a turn that did nothing wrong. ⭑ RE-AIMED 2026-09-22 (`JAN-CRITREAD` `DD-3`, `REG-F-438`): the length term is gone, so a DUPLICATE of an act from BEFORE the fork no longer matters — but a DUPLICATE of ANOTHER writer's act made AFTER the fork carries events that ARE in the tail, on a G4 member, and noting them admits them. W2 now arranges exactly that. The design's §5.8 called this guard vacuous; it is not. OBSERVED at DD-3: KILLED, exactly 1 of 14 — W2, `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the other writer's try is admitted as the turn's own and the draft commits past it.",
 		source: "JAN-CRITREAD TT-2 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
@@ -2653,6 +2654,159 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/command-bus-groups.test.ts"],
 		why: "PROMISE: a staged candidate is refused ONLY when something it declared it depends on changed (`REG-D-070`); the declared-groups form of the guarded batch decides that. WHO RELIES: every authoring draft once DD-3 switches the turn to it — a wrong answer is either a stale commit (a member change missed) or `REG-F-430`'s false conflict back (a non-member write refused). WHAT THE MUTATION DOES: every postcondition refuses, matching or not — G-B15 is the CONTROL this mutant exists for: without it, a form that could never commit a candidate would pass every refusal test in the file. OBSERVED: KILLED, exactly 1 of 20 — G-B15, the two identical hashes printed side by side, `expected false to be true`.",
 		source: "JAN-CRITREAD DD-2 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M1-a-rolled-back-write-survives",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "this.writes.length = checkpoint.writes;",
+		replace: "void checkpoint.writes; // MUTANT: a rolled-back transaction's writes survive",
+		expectRed: ["packages/rph-engine/src/fork-base.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: a rolled-back transaction's writes stay in the fork's write log, so a batch the handlers refused still contributes pins and referenced policies. OBSERVED: KILLED, exactly 1 of 4 — FB-4, `expected [ { aggregateType: 'INTENT', …(4) } ] to deeply equal []`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M2-the-base-revision-reads-the-forks-own-write",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "return this.baseObjects.get(aggregateId)?.revision;",
+		replace: "return (this.stagedObjects.get(aggregateId) ?? this.baseObjects.get(aggregateId))?.revision; // MUTANT: the fork's own write read as the base",
+		expectRed: ["packages/rph-engine/src/fork-base.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the revision 'at the base' reads the fork's own later write, so every aggregate the draft writes is pinned at a revision canonical never had — every such draft refused. OBSERVED: KILLED, exactly 1 of 4 — FB-2, `expected 1 to be +0`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M3-every-write-replaced-the-base",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "priorState: clone(existing?.state),",
+		replace: "priorState: clone(this.baseObjects.get(input.aggregateId)?.state), // MUTANT: every write \"replaced\" the base",
+		expectRed: ["packages/rph-engine/src/fork-base.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: every write records the BASE state as the one it replaced, so a second write to one aggregate diffs against the base — a policy removed and re-added reads as retained, and goes unpinned. OBSERVED: KILLED, exactly 1 of 4 — FB-3, `a second write replaced the fork’s OWN earlier one: expected undefined to deeply equal { …(23) }`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M4-a-retained-declaration-counts-as-new",
+		file: "packages/rph-application/src/handlers/pwa-authoring.ts",
+		find: "policyIds: assurancePolicyRefs(nextState, field).filter((pid) => !retained.has(pid))",
+		replace: "policyIds: assurancePolicyRefs(nextState, field) // MUTANT: a retained declaration counts as newly referenced",
+		expectRed: ["packages/rph-application/src/handlers/replay-reads.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: a retained declaration counts as newly referenced — the handler re-validates it (refusing an edit to a type whose retained policy has left ACTIVE) and the turn over-pins. OBSERVED: KILLED, 2 of 5 — R-2 and R-3, each `expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ [ …(2) ], [ …(2) ] ]`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M5-the-attested-field-is-never-read",
+		file: "packages/rph-application/src/handlers/pwa-authoring.ts",
+		find: "field === 'requiredAssurancePolicyIds'",
+		replace: "field === field // MUTANT: both fields read requiredAssurancePolicyIds",
+		expectRed: ["packages/rph-application/src/handlers/replay-reads.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the attested field reads `requiredAssurancePolicyIds`, so a delegated node's attested policies are never validated or pinned. OBSERVED: KILLED, 4 of 5 — R-1..R-4 (R-4: `the re-add newly references it: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ [ …(2) ], [ …(2) ] ]`).",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M6-no-validator-is-ever-named",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "return typeof validatorId === 'string' ? validatorId : undefined;",
+		replace: "return typeof validatorId === 'string' ? undefined : undefined; // MUTANT: no validator is ever named",
+		expectRed: ["packages/rph-application/src/handlers/replay-reads.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: no result ever names a validator — the handler's DISABLED-validator refusal can never fire, and the turn never pins one. OBSERVED: KILLED, exactly 1 of 5 — V-1, `expected undefined to be 'val_1'`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M7-g1-the-conversation-group-is-dropped",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "aggregateType: 'AUTHORING_CONVERSATION',",
+		replace: "aggregateType: 'NO_SUCH_TYPE', // MUTANT: G1 matches nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: G1 matches nothing. OBSERVED: KILLED, exactly 1 of 10 — PR-2, `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the draft commits beside another writer's FIRST conversation — two conversations for one PWA.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M8-g2-the-type-group-is-dropped",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "aggregateType: 'PWU_TYPE',",
+		replace: "aggregateType: 'NO_SUCH_TYPE', // MUTANT: G2 matches nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: G2 matches nothing. OBSERVED: KILLED, exactly 1 of 10 — G2, `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: a type born for the PWA without the version bump goes unseen.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M9-g3-the-review-record-group-is-dropped",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "aggregateType: 'ASSURANCE_ASSESSMENT',",
+		replace: "aggregateType: 'NO_SUCH_TYPE', // MUTANT: G3 matches nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: G3 matches nothing. OBSERVED: KILLED, exactly 1 of 14 — G3, `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the draft commits beside another run's review records for the same PWA, which a canonical reader ranks against its own.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M10-g4-the-exchange-group-is-dropped",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "aggregateType: 'MODEL_EXCHANGE',",
+		replace: "aggregateType: 'NO_SUCH_TYPE', // MUTANT: G4 matches nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: G4 matches nothing. OBSERVED: KILLED, 2 of 14 — W2 and W3, each `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: another writer's try, and a discarded predecessor's, go unseen.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M11-newly-referenced-policies-are-not-pinned",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "for (const policyId of policyIds) pin(policyId, 'a policy this draft newly references');",
+		replace: "void policyIds; // MUTANT: the policies the replay validates are not pinned",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the policies the replay re-validates are not pinned. OBSERVED: KILLED, exactly 1 of 14 — the removed-and-re-added policy, `expected { ok: false, …(3) } to match object { ok: false, status: 'CONFLICTED' }`: the replay refuses the re-add and the draft is LOST as a gap in the rule (COMMIT_FAILED) — the very outcome pin 3 exists to turn into a named conflict.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M12-the-named-validator-is-not-pinned",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "if (validatorId !== undefined) pin(validatorId, 'the validator a recorded review names');",
+		replace: "void validatorId; // MUTANT: the validator a review names is not pinned",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the validator a recorded review names is not pinned. OBSERVED: KILLED, exactly 1 of 14 — the validator-pin test, `expected [ { …(3) }, { …(3) }, { …(3) }, …(5) ] to deep equally contain { …(3) }`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M13-the-write-set-is-not-pinned",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "for (const aggregateId of writeSet(current)) pin(aggregateId, 'an object this draft writes');",
+		replace: "// MUTANT: the write set is not pinned",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the aggregates the draft writes are not pinned. OBSERVED: KILLED, exactly 1 of 10 — the write-set test, `expected { ok: false, …(3) } to match object { ok: false, status: 'CONFLICTED' }`: another writer's object under the draft's new id is met by the replay, and the draft is lost as COMMIT_FAILED instead of refused by name.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M14-the-all-policies-pin-returns",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "for (const policyId of FLOOR_POLICIES) pin(policyId, 'a floor review policy');",
+		replace: "for (const policyId of [...FLOOR_POLICIES, ...current.engine.readAllEvents().filter((event) => event.aggregateType === 'ASSURANCE_POLICY').map((event) => event.aggregateId)]) pin(policyId, 'a floor review policy'); // MUTANT: the all-policies pin, reinstated",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: every policy in the store is pinned again, as before `REG-D-070`. OBSERVED: KILLED, 2 of 14 — the unrelated policy (`\"Changed since this draft began: a floor review policy pol_intent_fidelity is at revision 2, not revision 1.\"}: expected { ok: false, …(3) } to match object { ok: true }` — `REG-F-430`'s false conflict, back) and the removed-and-re-added policy (named under the wrong role).",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M15-the-bare-number-refusal-becomes-admission",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\t\t\t\t\t};\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
+		replace: "\t\t\t\t\t\t};\n\t\t\t\t\t\tconflict = undefined; // MUTANT: the bare-number refusal became an admission\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the bare-number form's refusal becomes an admission — any growth of the log is accepted. OBSERVED: KILLED, exactly 1 of 10 — B5, `expected true to be false`.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M16-only-the-first-change-is-disclosed",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "return `Changed since this draft began: ${items.join('; ')}.`;",
+		replace: "return `Changed since this draft began: ${items.slice(0, 1).join('; ')}.`; // MUTANT: the first change only",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-reviewed.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: the refusal names only the first change (FORK-22: a professional told one of several discards, reloads and is refused again). OBSERVED: KILLED, exactly 1 of 14 — G3: the disclosure stops after `asmt_00000000000000000000000004` where the store recorded more.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3-M17-a-replay-refusal-is-presented-as-a-conflict",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "if (violations.length > 0) {",
+		replace: "if (violations.length > 0 || result.failedIndex !== undefined) { // MUTANT: a replay refusal presented as a conflict",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a draft is refused at acceptance only when something it DECLARED it depends on changed, and every such change refuses it, by name (`REG-D-070` §5.1, §5.4). WHO RELIES: every authoring draft's acceptance — a wrong pin or group is either a stale commit or `REG-F-430`'s false conflict back. WHAT THE MUTATION DOES: a replay the handlers refused, while everything declared held, is presented as a conflict. OBSERVED: KILLED, exactly 1 of 10 — the gap test, `expected { ok: false, …(3) } to match object { ok: false, status: 'COMMIT_FAILED' }`: a gap in the rule would be reported as someone else's change.",
+		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',

@@ -102,7 +102,8 @@
 				"selectAssuranceEvaluator",
 				"submitEvidenceForAssessment",
 				"supersedeAssurancePolicy",
-				"suspendAssurancePolicy"
+				"suspendAssurancePolicy",
+				"validatorNamedBy"
 			],
 			"guardedExports": [
 				"activateAssurancePolicy",
@@ -126,7 +127,8 @@
 				"selectAssuranceEvaluator",
 				"submitEvidenceForAssessment",
 				"supersedeAssurancePolicy",
-				"suspendAssurancePolicy"
+				"suspendAssurancePolicy",
+				"validatorNamedBy"
 			],
 			"unattributedMutants": 6
 		},
@@ -405,6 +407,7 @@
 				"deprecatePwa",
 				"editPwa",
 				"editPwuType",
+				"newlyReferencedAssurancePolicyIds",
 				"publishPwa",
 				"removePwuType",
 				"retirePwa",
@@ -420,13 +423,14 @@
 				"deprecatePwa",
 				"editPwa",
 				"editPwuType",
+				"newlyReferencedAssurancePolicyIds",
 				"publishPwa",
 				"removePwuType",
 				"retirePwa",
 				"submitPwaForReview",
 				"validatePwa"
 			],
-			"unattributedMutants": 1
+			"unattributedMutants": 2
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
 			"consumedExports": [

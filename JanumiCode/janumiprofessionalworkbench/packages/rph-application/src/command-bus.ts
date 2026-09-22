@@ -130,10 +130,7 @@ export interface DeclaredEventLog {
 }
 
 /** What a guarded batch's candidate was built against — see `dispatchBatchGuarded`. */
-export type ExpectedEventLog =
-	| number
-	| { readonly position: number; readonly admittedEventIds: readonly string[] }
-	| DeclaredEventLog;
+export type ExpectedEventLog = number | DeclaredEventLog;
 
 /** Does `state` belong to a group with this key? Pure, so the key operators are testable on their own. */
 export function memberOfGroup(state: unknown, key: readonly DependencyKey[]): boolean {
@@ -226,11 +223,10 @@ export interface AuthedEngine {
 	dispatchMultiPartyBatch(entries: readonly MultiPartyCommand[]): BatchResult;
 	/**
 	 * `expectedEventLog` — the log the caller's candidate was built against. A bare NUMBER is a position: the log
-	 * must not have grown past it at all (the original, conservative whole-store rule). The OBJECT form admits
-	 * EXACTLY the named events after `position` — every event in the tail must be admitted, and every admitted
-	 * event must be in the tail — so a caller can admit its own acts (`JAN-CRITREAD` `TT`, `REG-F-425`) and
-	 * nothing else. ⚠ Both terms are needed: counting alone is fooled by a foreign event standing in for a
-	 * missing admitted one; membership alone admits a log that lost one.
+	 * must not have grown past it at all (the original, conservative whole-store rule).
+	 *
+	 * ⛔ `TT-1`'s EXACT-TAIL form — "the tail must be exactly these admitted events" — is gone (`JAN-CRITREAD`
+	 * `DD-3`): its only caller, the authoring turn, now declares what it depends on (`REG-D-070`).
 	 *
 	 * ⭐ The DECLARED-GROUPS form (`DeclaredEventLog`, `JAN-CRITREAD` `DD-2`, `REG-D-070`) refuses only when an event
 	 * after `mark` touches a member of a declared group, or a precondition's revision moved — and reports EVERY such
@@ -697,7 +693,7 @@ export class Engine {
 		expectedEventLog?: ExpectedEventLog,
 		postconditions: readonly ObjectPostcondition[] = []
 	): BatchResult {
-		if (typeof expectedEventLog === 'object' && 'groups' in expectedEventLog)
+		if (typeof expectedEventLog === 'object')
 			return this.dispatchBatchDeclaredAs(
 				principal,
 				reason,
@@ -712,23 +708,15 @@ export class Engine {
 		try {
 			this.store.transaction(() => {
 				if (expectedEventLog !== undefined) {
-					// ⭐ THE TAIL MUST BE EXACTLY THE ADMITTED SET (`JAN-CRITREAD` `TT-1`). A bare number admits nothing,
-					// which is the original whole-store rule unchanged. Exact because `event_id` is UNIQUE in the log,
-					// so a duplicate admitted id collapses in the Set and an admitted id from BEFORE `position` leaves
-					// the tail short — both refuse. ⚠ Still the FIRST check, before any per-aggregate precondition:
-					// the order decides which limb a multi-limb conflict is reported under, and moving it is a
-					// separate decision (DESIGN §8).
-					const { position, admittedEventIds } =
-						typeof expectedEventLog === 'number'
-							? { position: expectedEventLog, admittedEventIds: [] as readonly string[] }
-							: expectedEventLog;
-					const admitted = new Set(admittedEventIds);
+					// A BARE NUMBER: the log must not have grown past the position at all — the original whole-store
+					// rule, unchanged. The first event past it is named. ⚠ Still the FIRST check, before any
+					// per-aggregate precondition: the order decides which limb a multi-limb conflict is reported under.
 					const log = this.store.readAllEvents();
-					const foreign = log.slice(position).find((event) => !admitted.has(event.eventId));
-					if (log.length !== position + admitted.size || foreign) {
+					const foreign = log[expectedEventLog];
+					if (log.length !== expectedEventLog) {
 						conflict = {
 							aggregateId: '@event-log',
-							expectedRevision: position + admitted.size,
+							expectedRevision: expectedEventLog,
 							actualRevision: log.length,
 							...(foreign
 								? {

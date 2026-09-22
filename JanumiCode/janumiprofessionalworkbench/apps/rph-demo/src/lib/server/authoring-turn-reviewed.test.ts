@@ -26,6 +26,7 @@ import {
 	canonicalActsOf,
 	clearAuthoringTurns,
 	commitAuthoringTurn,
+	declaredDependenciesOf,
 	discardAuthoringTurn,
 	markAuthoringTurnAssured,
 	markAuthoringTurnRevisionRequired,
@@ -96,6 +97,44 @@ function reviewOnTurn(
 }
 
 const exchanges = () => listByType(session, 'MODEL_EXCHANGE').length;
+
+/** The refusal a professional reads (§5.4): every change, in the order the store recorded it. */
+const disclosure = (...items: string[]) => `Changed since this draft began: ${items.join('; ')}.`;
+/** One group's change, named from the canonical log's OWN record of the first event that touched the aggregate. */
+function touched(role: string, aggregateId: string): string {
+	const first = session.readAllEvents().find((event) => event.aggregateId === aggregateId);
+	expect(first, `arrangement: ${aggregateId} has an event on canonical`).toBeDefined();
+	return (
+		`${role} ${aggregateId} was changed by ${first!.eventType} ` +
+		`(actor ${first!.actor.actorId}, correlation ${first!.correlationId})`
+	);
+}
+
+function setupCommand(
+	commandType: string,
+	targetAggregateType: string,
+	id: string,
+	payload: unknown
+) {
+	sequence += 1;
+	return {
+		commandId: `setup-${sequence}`,
+		commandType,
+		commandSchemaVersion: 1,
+		targetAggregateType,
+		targetAggregateId: id,
+		issuedAt: TS,
+		correlationId: 'setup',
+		idempotencyKey: `setup-idem-${sequence}`,
+		payload
+	} satisfies DomainCommand;
+}
+/** Two ACTIVE, non-floor policies from the seeded library — one a draft references, one nothing references. */
+const seededPolicy = (index: number): string => {
+	const policyId = getEngine().ontology.seedPolicies[index]?.policyId;
+	expect(policyId, `arrangement: the library seeds policy #${String(index)}`).toBeDefined();
+	return policyId!;
+};
 
 /** A REAL `RecordModelExchange`, captured off a floor run straight on canonical — no turn, so nobody's witness. */
 async function capturedExchangeCommand(): Promise<DomainCommand> {
@@ -275,19 +314,33 @@ describe('the witness admits the turn’s own tries and nothing else', () => {
 		expect(session.loadObject(OTHER_PWA)).toBeUndefined();
 	});
 
-	it('W2 — a DUPLICATE is an EARLIER act, not this turn’s: it is not admitted, and the commit lands', async () => {
-		const earlier = await capturedExchangeCommand();
+	// ⭐ RE-AIMED BY `REG-D-070` (`JAN-CRITREAD` `DD-3`). This case used to be "a DUPLICATE of an act from BEFORE the fork
+	// is not admitted", and the dependency rule makes that vacuous — an event before the fork is never in the tail. It
+	// does NOT make the property vacuous: a DUPLICATE of ANOTHER writer's act made AFTER the fork carries events that ARE
+	// in the tail, on a member of G4, and noting them as the turn's own would admit exactly the change the draft must be
+	// refused for. (The design's §5.8 abolished this guard; this case is why it stays.)
+	it('W2 — a DUPLICATE of another writer’s act after the fork is not the turn’s: not admitted, and the commit is refused', async () => {
+		const template = await capturedExchangeCommand();
 		const { turn, subjectHash } = validatedTurn();
+		const theirs = asNewTry(template);
+		expect(
+			session.dispatch(theirs).status,
+			'arrangement: another writer records a try after the fork'
+		).toBe('ACCEPTED');
 
-		const replay = canonicalActsOf(turn.engine)!.dispatch(earlier);
+		const replay = canonicalActsOf(turn.engine)!.dispatch(theirs);
 		expect(replay.status, 'arrangement: an idempotent replay').toBe('DUPLICATE');
 		expect(
 			replay.producedEventIds,
-			'arrangement: carrying the earlier act’s events'
+			'arrangement: carrying the OTHER writer’s event'
 		).not.toHaveLength(0);
 
 		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
-		expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(touched('a reviewer exchange about your PWA', theirs.targetAggregateId))
+		);
 	});
 
 	it('W3 — a discarded turn’s late try is recorded (PER-9), and refuses its successor rather than joining it', async () => {
@@ -309,8 +362,8 @@ describe('the witness admits the turn’s own tries and nothing else', () => {
 		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
 
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
-		expect(result.ok ? '' : result.detail).toContain(
-			`First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE ${lateTry.targetAggregateId}.`
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(touched('a reviewer exchange about your PWA', lateTry.targetAggregateId))
 		);
 	});
 
@@ -342,8 +395,11 @@ describe('the witness admits the turn’s own tries and nothing else', () => {
 	});
 });
 
-describe('what the turn still refuses — disclosed, not solved (DESIGN §5.3)', () => {
-	it('PR-2a — ANOTHER turn’s exchange record is a foreign event: the commit is refused, and says whose', async () => {
+describe('what no longer refuses a draft — another PWA’s acts, an unrelated policy (REG-D-069, REG-D-070)', () => {
+	// ⭐ `REG-F-430` CLOSED HERE. Under the whole-log rule this was refused ("disclosed, not solved"): ANY write
+	// anywhere destroyed every open draft. Another professional's reviewer try is about ANOTHER PWA — no member of
+	// anything this draft declares — so the draft commits.
+	it('PR-2a — ANOTHER turn’s exchange record, about ANOTHER PWA, is not this draft’s business: the commit lands', async () => {
 		createPwa(OTHER_PWA, 'Another professional’s PWA');
 		const mine = beginAuthoringTurn(PWA);
 		expect(mine.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
@@ -356,18 +412,138 @@ describe('what the turn still refuses — disclosed, not solved (DESIGN §5.3)',
 		);
 		const before = exchanges();
 		await reviewOnTurn(theirs, OTHER_PWA, clearing, markAuthoringTurnValid(theirs));
-		const foreign = listByType(session, 'MODEL_EXCHANGE').slice(before);
-		expect(foreign, 'arrangement: the other turn recorded exactly one try').toHaveLength(1);
+		expect(exchanges() - before, 'arrangement: the other turn recorded exactly one try').toBe(1);
 
 		const result = commitAuthoringTurn(mine, markAuthoringTurnAssured(mine, mineHash));
 
+		expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+		expect(listPwuTypes(session, PWA).map((t) => t.state.name)).toEqual(['Plan']);
+	});
+
+	// ⭐ THE ALL-POLICIES PIN IS RETIRED (§5.1). A policy the draft neither references nor is floored by is only SHOWN
+	// to the agent; editing it mid-draft used to refuse the draft, and must not.
+	it('a policy the draft does not depend on, suspended mid-draft, is not its business: the commit lands', () => {
+		const { turn, subjectHash } = validatedTurn();
+		const unrelated = seededPolicy(0);
+		expect(
+			session.dispatch(
+				setupCommand('SuspendAssurancePolicy', 'ASSURANCE_POLICY', unrelated, {
+					policyId: unrelated
+				})
+			).status,
+			'arrangement: the policy moved'
+		).toBe('ACCEPTED');
+
+		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
+
+		expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+	});
+});
+
+describe('what a draft depends on refuses it, by name (REG-D-070 §5.1)', () => {
+	// ⭐ G3 — THE REVIEW RECORDS A CANONICAL READER RANKS, which this draft's own commit writes into (§3.2, job (b)).
+	// Another run's floor for the PWA, recorded on canonical after the draft began, is a member; the mock reviewer
+	// records no exchange, so G4 has nothing to see and G3 alone refuses.
+	it('G3 — floor records for the PWA written on canonical after the draft began refuse it, naming each one', async () => {
+		const { turn, subjectHash } = validatedTurn();
+		const position = session.readAllEvents().length;
+		await runPwaFloor(PWA, { prompt: 'Assess the draft.', producer: PRODUCER }, session);
+		expect(exchanges(), 'arrangement: the mock reviewer recorded no exchange').toBe(0);
+		const recorded = [
+			...new Set(
+				session
+					.readAllEvents()
+					.slice(position)
+					.filter((event) => event.aggregateType === 'ASSURANCE_ASSESSMENT')
+					.map((event) => event.aggregateId)
+			)
+		];
+		expect(recorded.length, 'arrangement: the floor recorded review records').toBeGreaterThan(0);
+
+		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
+
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
-		expect(result.ok ? '' : result.detail).toMatch(
-			/^@event-log changed from revision \d+ to \d+\. /
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(
+				...recorded.map((id) => touched('your PWA’s review record under a floor policy', id))
+			)
 		);
-		expect(result.ok ? '' : result.detail).toContain(
-			`First unadmitted event: ModelExchangeRecorded on MODEL_EXCHANGE ${foreign[0]!.id}.`
+	});
+
+	// ⭐ PIN 3 — THE POLICIES THE REPLAY WILL VALIDATE, COMMAND BY COMMAND. A draft removes a policy from a type and
+	// adds it back: the re-add newly references it against ITS OWN prior state, so the replay re-validates it. A
+	// derivation against the type's BASE state would see "retained" and leave it unpinned — and a concurrent suspension
+	// would then surface as the replay's refusal, a lost draft, instead of a named conflict.
+	it('a policy the draft removes and re-adds, suspended concurrently, refuses it by name', () => {
+		const policy = seededPolicy(1);
+		const typeId = mintUiId('pwut');
+		expect(
+			session.dispatch(
+				setupCommand('DefinePwuType', 'PWU_TYPE', typeId, {
+					pwuTypeId: typeId,
+					pwaId: PWA,
+					pwuKind: 'PLAN',
+					name: 'Plan',
+					purpose: 'Plan the work',
+					isRoot: true,
+					permittedChildTypeIds: [],
+					requiredInputs: [],
+					requiredOutputs: [],
+					requiredAssurancePolicyIds: [policy]
+				})
+			).status,
+			'arrangement: a type that declares the policy'
+		).toBe('ACCEPTED');
+		const turn = beginAuthoringTurn(PWA);
+		expect(turn.broker.editType(typeId, { requiredAssurancePolicyIds: [] }).ok).toBe(true);
+		expect(turn.broker.editType(typeId, { requiredAssurancePolicyIds: [policy] }).ok).toBe(true);
+		const subjectHash = markAuthoringTurnValid(turn);
+		const revision = session.loadObject(policy)!.revision;
+		expect(
+			session.dispatch(
+				setupCommand('SuspendAssurancePolicy', 'ASSURANCE_POLICY', policy, { policyId: policy })
+			).status,
+			'arrangement: the policy is suspended concurrently'
+		).toBe('ACCEPTED');
+
+		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(
+				`a policy this draft newly references ${policy} is at revision ${String(revision + 1)}, ` +
+					`not revision ${String(revision)}`
+			)
 		);
-		expect(listPwuTypes(session, PWA)).toEqual([]);
+	});
+
+	// ⭐ PIN 4 — THE VALIDATOR A RECORDED REVIEW NAMES. The replay reads it by id (a DISABLED validator refuses the
+	// review). On the authoring path it names nothing in the store, and the rule says so: it is held ABSENT.
+	it('the validator each recorded review names is pinned — held absent, as the store holds it', async () => {
+		const { turn, subjectHash } = validatedTurn();
+		await reviewOnTurn(turn, PWA, clearing, subjectHash);
+		const named = [
+			...new Set(
+				turn.commands
+					.map(
+						(command) =>
+							(command.payload as { validatorResult?: { validatorId?: unknown } } | undefined)
+								?.validatorResult?.validatorId
+					)
+					.filter((id): id is string => typeof id === 'string')
+			)
+		];
+		expect(named.length, 'arrangement: the review recorded a named validator').toBeGreaterThan(0);
+
+		const { pins } = declaredDependenciesOf(turn);
+
+		for (const validatorId of named) {
+			expect(session.loadObject(validatorId), 'the store holds no such entry').toBeUndefined();
+			expect(pins).toContainEqual({
+				aggregateId: validatorId,
+				mustNotExist: true,
+				role: 'the validator a recorded review names'
+			});
+		}
 	});
 });

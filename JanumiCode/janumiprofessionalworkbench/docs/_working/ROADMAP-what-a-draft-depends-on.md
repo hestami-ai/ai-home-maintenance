@@ -99,14 +99,19 @@ unchanged in this increment.
   held, worded as a gap in the rule.
 - **Recorder:** refuses to record a command under a principal other than the turn's; reads may still re-bind.
 - **Idempotency:** the conversation append's key becomes turn-scoped (`workbench.ts:362-364`).
-- **Ledger** (per `DESIGN` §5.8, G4 kept): B4 + TT-M3 and W2 + TT-M9 `abolishedBy: REG-D-070`; TT-M1, TT-M1b, TT-M2
-  re-anchored; TT-M4, M6, M8, M10, M11 stay live and are re-run.
+- **Ledger** (per `DESIGN` §5.8, G4 kept): B4 + TT-M3 ~~and W2 + TT-M9~~ `abolishedBy: REG-D-070`; TT-M1, TT-M1b,
+  TT-M2 re-anchored; TT-M4, M6, M8, M10, M11 stay live and are re-run. ⚠ **W2 + TT-M9 stay live, W2 re-aimed —
+  `REG-F-438`** (a DUPLICATE of another writer's act AFTER the fork is in the tail).
+
+⭑ **BUILT IN TWO PARTS (2026-09-22).** **DD-3b** — the pins, the groups, the disclosure, the gap classification, the
+exact-tail form deleted, the ledger — and **DD-3c** — the recorder's principal rule, the turn-scoped conversation key,
+the `RPH_STORE_BUSY` arrow — each gated and committed on its own.
 
 | Test | Asserts | on HEAD |
 |---|---|---|
 | **PR-2 by group** | `CONFLICTED`, naming G1 and the conversation event | ⭐ RED (detail is `@event-log…`) — the old assertion replaced, never loosened |
 | **PR-2a** | commits | ⭐ RED (`CONFLICTED`) |
-| **an unrelated policy edited mid-turn** | commits | RED (all-policies pin) |
+| **an unrelated policy edited mid-turn** | commits | RED ~~(all-policies pin)~~ — **observed: refused by the whole-log limb, which runs first; the pin would have refused it too** |
 | **a type born for `P` without the bump** | `CONFLICTED`, naming G2 | green on HEAD via the limb; the naming is new |
 | **another turn's floor record for `P`** | `CONFLICTED`, naming G3 | same |
 | **W3** | `CONFLICTED`, naming G4 | green on HEAD; re-asserted by name |

@@ -9,3 +9,4 @@ export { SCHEMA_SQL } from './schema.js';
 export { SqliteStorageAdapter } from './sqlite-storage-adapter.js';
 export { SqliteArtifactStore, SQLITE_STORAGE_PROVIDER } from './sqlite-artifact-store.js';
 export { SnapshotOverlayStorageAdapter } from './snapshot-overlay-storage-adapter.js';
+export type { StagedWrite } from './snapshot-overlay-storage-adapter.js';
