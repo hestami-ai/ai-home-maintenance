@@ -36971,6 +36971,8 @@ Introspection: **29 events before the turn, 30 after it, and the only event adde
 
 **(3) ✅ A FRESH MODEL LOAD BEFORE EVERY REVIEW PINS IT.** Unloading the model before each call: **all four models byte-identical across two fresh loads on 16/16 prompts**, and on every constructed probe. ⭐ gpt-oss returned **byte-identical replies on 12/12 prompts across two separate runs ~1.5 h apart**, through two different clients (the app, and a replay script), with three other models loaded and unloaded in between. ⭑ Sampled decoding is pinned too: temperature 0.6 with a fixed seed, fresh load ×3 → one reply per prompt (8/8 cases, all four models). Cost: ~7–8 s of load per review for gpt-oss (a lower bound). ⚠ **gpt-oss's Ollama template injects `Current date: {{ currentDate }}`** into every request, so its pin holds within a calendar day at most; the other three are served with a bare `{{ .Prompt }}` template. Untested: across days, server builds, GPUs, and concurrent load.
 
+⛔ **SEE `REG-F-429` — ACROSS THE DAY BOUNDARY IT WAS MEASURED, AND THE PIN DID NOT HOLD:** 0 of 4 gpt-oss replies byte-identical to the previous day's, with the gate flipping on 3 of 4.
+
 **(4) ⛔⛔ BUT NONE OF THE FOUR JUDGES THE DEFECT, AND ALL FOUR JUDGE THE NAME.** No prompt the lane produces has SATISFIED as its correct answer (fifteen of sixteen declare no rationale — see (7) — and the sixteenth reviews a fixture that says it performed no analysis), so a positive control was CONSTRUCTED: the lane's own Floor Happy / Floor Blocked subjects rebuilt through the REAL `judgePrompt` (control: without a rationale both rebuild byte-for-byte to the lane's prompts), each given a rationale TRUE for it, under neutral names. Fresh load, two reps each, all byte-identical:
 
 | model | clean graph, true rationale | dead-end graph (spec: fails `RR-04`) | same clean graph, three names |
@@ -37005,3 +37007,24 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 **(2) ⚠ A CORRUPTED ID ERASES A VERDICT.** Measured on three shapes: seven of nine ids written with a space for a hyphen (`RR-03-no-unjustified-scope reduction`), one written as `RR-08-no-evidence-integrity` beside a spurious tenth row, and `RR-09-no-completeness_from_existence`. `coerceJudgement` drops findings whose id the policy does not declare (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:261`) — correct by design, since an id outside the policy must not be scored — and the mapper then records the criterion `UNABLE_TO_DETERMINE` (`packages/rph-assurance/src/validators.ts:321`). ⭑ The reviewer DID evaluate it; the record says nobody did. In one case this flips the gate on its own: a reply that judged all nine clean became INCONCLUSIVE because RR-08's clean verdict sat under a corrupted id.
 
 ⭑ **REMEDY CANDIDATES, NOT CHOSEN:** (a) treat a non-boolean `failed`, a duplicate key, or an undeclared id as a MALFORMED reply — the same class as unparseable — and send it down the existing repair path, recording what was malformed; (b) at minimum, record a limitation naming every dropped id, so *“unjudged”* is distinguishable from *“judged under a name we could not accept”*. ⚠ The sibling JanumiCode programme's settled rule applies: model id drift is fixed UPSTREAM, never by a fuzzy id matcher downstream. For an Ollama-served reviewer, schema-constrained output (`format`: a JSON schema with the ids as an enum and `failed` as a boolean) would remove both at the source — untested here.
+
+---
+
+### REG-F-429 — gpt-oss's pinned verdicts changed overnight with no code change: 0 of 4 replies identical, the gate flipped on 3 of 4, and the new answers are themselves stable
+
+**Filed 2026-09-22** (`JAN-CRITREAD`, the cross-day arm of `REG-F-427`). **Status:** ✅ **CLOSED on filing — a completed measurement.**
+
+⭑ **WHY IT WAS RUN.** gpt-oss's Ollama template injects `Current date: {{ currentDate }}` into every request (`REG-F-427` (3)). The server keeps local time on UTC−4, so its date changes at 04:00 UTC. The same four prompts were re-run at 04:05 UTC in the configuration `REG-F-427` found reproducible (model unloaded before each call, temperature 0, seed 42, `num_ctx 131072`, `think: medium`).
+
+⛔ **THE RESULT — 0 OF 4 BYTE-IDENTICAL, AND THE FLOOR OUTCOME MOVED ON 3 OF 4** (floor outcomes through the product's own rules):
+
+| prompt | 2026-09-21 | 2026-09-22 |
+|---|---|---|
+| `97f5a9ff9a` (Agent PWA) | REJECTED | **SATISFIED** |
+| `d6812fe1b2` (Scaffold PWA) | INCONCLUSIVE | **SATISFIED** |
+| `ef726faf94` (Agent UI PWA) | BOUNDARY_REJECTED (duplicate key) | REJECTED |
+| `ef4e38d5e3` (Floor Happy) | REJECTED | **SATISFIED** |
+
+⭐ **THE CONTROLS.** (a) Ollama `0.34.2` and model digest `17052f91a42e` are UNCHANGED from the previous day's saved provenance. (b) The NEW answers are stable: two further fresh loads each of `97f5a9ff9a` and `ef4e38d5e3` reproduced the 04:05 replies byte-for-byte. So the answers SHIFTED at the day boundary and hold within the new day. ⚠ The injected date is the only input KNOWN to have changed; that it is the ONLY cause is not proven — a server restart or driver state could in principle do the same, and none was observed.
+
+⭐⭐ **WHAT IT MEANS.** A gpt-oss reviewer pinned by fresh load is a function of **(prompt, date)**, not of the prompt: a gate running it would turn tests red or green on a calendar boundary with no code change. ⭑ That is precisely `REG-D-067`'s objection — *“the cached thing is a function of the key; measured, it is not”* — arriving one layer down: here the ‘cache’ is the model itself, and the hidden key is today's date. ⚠ The other three models are served with a bare template and should not carry this particular dependence; it was not measured for them.
