@@ -78,7 +78,15 @@ export async function introspect(request: APIRequestContext): Promise<EngineSnap
 	return (await res.json()) as EngineSnapshot;
 }
 
-/** Accept the exact assured hash emitted by the staged agent SSE turn through the real SvelteKit form action. */
+/**
+ * Accept the exact assured hash emitted by the staged agent SSE turn through the real SvelteKit form action.
+ *
+ * ⛔ `res.ok()` IS NOT ACCEPTANCE (`REG-F-426`). `request.post` sends no `Accept: text/html`, so SvelteKit answers
+ * the form action with its JSON envelope — HTTP 200 even when the action returned `fail(409)`. A refused
+ * acceptance passed this helper and surfaced only at later assertions that named a symptom, never the cause;
+ * that is how `REG-F-425` hid. The envelope's `type` is the action's own verdict, so it is what is asserted, and
+ * a refusal is quoted whole so the red says why.
+ */
 export async function acceptAgentCandidate(
 	request: APIRequestContext,
 	pwaId: string,
@@ -90,6 +98,13 @@ export async function acceptAgentCandidate(
 		form: { candidateHash: candidateHash! }
 	});
 	expect(res.ok(), 'exact candidate acceptance should succeed').toBeTruthy();
+	const envelope = (await res.json()) as { type?: string; data?: unknown };
+	expect(envelope.type, `exact candidate acceptance was refused: ${JSON.stringify(envelope)}`).toBe(
+		'success'
+	);
+	expect(String(envelope.data), 'the action accepted a different candidate').toContain(
+		candidateHash!
+	);
 	return candidateHash!;
 }
 

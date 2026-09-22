@@ -113,8 +113,15 @@ explicit `opts.canonical` on an active turn's fork**.
 `apps/rph-demo/e2e/support/harness.ts:82-94`: after `res.ok()`, parse the body and assert the SvelteKit envelope
 `type === 'success'`, quoting `data` on failure.
 
-**Predicted red, observable on today's default lane:** the accepted reds that call this helper now fail AT
-acceptance, quoting the refusal (`…is BLOCKED_EXTERNAL, not READY_TO_COMMIT.`), instead of at a later assertion.
+~~**Predicted red, observable on today's default lane:** the accepted reds that call this helper now fail AT
+acceptance, quoting the refusal (`…is BLOCKED_EXTERNAL, not READY_TO_COMMIT.`), instead of at a later assertion.~~
+⛔ **REFUTED BEFORE IT RAN, from the TT-1 gate's own failure log: on the default lane NO test reaches the helper's
+POST.** The two agent-sse reds fail INSIDE the helper at `harness.ts:88`, before the post, because a
+BLOCKED_EXTERNAL turn emits no candidate hash. The four floor/waiver reds fail at `assurance-floor-waiver.e2e.ts:70`
+and `assurance-floor.e2e.ts:70`, before calling it. The other seven never call it, and no PASSING test calls it
+either. So the default lane can show no red here. It shows only the control: same thirteen, same failure lines.
+⭑ **The red is shown on the stand-in lane instead:** `TT-M6` re-applied (REG-F-425 restored) plus the new
+helper, predicted to make every helper-calling test fail AT the helper, quoting the `CONFLICTED` refusal.
 ⛔ **No spec outside the thirteen may change status**; the failing set must equal R32's.
 
 **The payoff, measured not predicted:** rerun `REG-F-427`'s stand-in lane (real-reviewer path, a canned
