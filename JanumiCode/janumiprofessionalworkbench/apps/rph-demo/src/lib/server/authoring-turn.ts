@@ -4,6 +4,7 @@ import { newlyReferencedAssurancePolicyIds, validatorNamedBy } from '@janumipwb/
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { listPwuTypes, type AuthedEngineHandle, type ForkBase } from '@janumipwb/rph-engine';
+import { isDeepStrictEqual } from 'node:util';
 import { createActor } from 'xstate';
 import { authoringTurnMachine, type AuthoringTurnState } from '$lib/server/authoring-turn-machine';
 import { AGENT_CREDENTIAL } from './identity.js';
@@ -66,6 +67,15 @@ export type CommitAuthoringTurnResult =
 	| {
 			readonly ok: false;
 			readonly status: 'CONFLICTED' | 'COMMIT_FAILED';
+			readonly candidateHash: string;
+			readonly detail: string;
+	  }
+	| {
+			/** The store could not take its write lock in time: NOTHING was read or written, and the draft is back at
+			 *  READY_TO_COMMIT exactly as accepted. Accepting again re-runs every check (`REG-D-070` §5.4). */
+			readonly ok: false;
+			readonly status: 'READY_TO_COMMIT';
+			readonly code: 'RPH_STORE_BUSY';
 			readonly candidateHash: string;
 			readonly detail: string;
 	  };
@@ -149,6 +159,20 @@ function recordingEngine(
 			throw new Error(`Candidate mutation is closed while the authoring turn is ${status}.`);
 		}
 	};
+	/**
+	 * ⛔ ONE PRINCIPAL PER TURN (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.2). The replay dispatches every recorded command
+	 * through the turn's ONE canonical session, so a command recorded under any other identity would be replayed —
+	 * and attributed — as the turn's. A re-bound handle may READ (the PWA page loader does); it may not WRITE.
+	 */
+	const assertOwnPrincipal = () => {
+		const own = currentTurn().engine.principal;
+		if (!isDeepStrictEqual(delegate.principal, own)) {
+			throw new Error(
+				`An authoring turn records only its own principal's commands (${own?.actorId ?? 'none'}); this ` +
+					`handle acts as ${delegate.principal?.actorId ?? 'nobody'}. Re-binding a turn's engine is for reading.`
+			);
+		}
+	};
 	const accepted = (batch: readonly DomainCommand[]) => {
 		const turn = currentTurn();
 		commands.push(...structuredClone(batch));
@@ -161,19 +185,22 @@ function recordingEngine(
 		// actor off this handle and have its commands recorded as another.
 		principal: delegate.principal,
 		/**
-		 * Re-binding produces a recorder bound to the NEW identity, never this one wearing another name.
+		 * Re-binding produces a recorder bound to the NEW identity, never this one wearing another name — and that
+		 * recorder may READ, but refuses to record a write unless its identity IS the turn's (`assertOwnPrincipal`).
 		 * Returning `recorder` unchanged would let a caller present any credential and still have the acts
 		 * recorded — and later replayed — as the identity this turn happened to open with.
 		 */
 		as: (credential) => recordingEngine(delegate.as(credential), commands, currentTurn),
 		dispatch(command) {
 			assertMutable();
+			assertOwnPrincipal();
 			const result = delegate.dispatch(command);
 			if (result.status === 'ACCEPTED') accepted([command]);
 			return result;
 		},
 		dispatchBatch(batch) {
 			assertMutable();
+			assertOwnPrincipal();
 			const result = delegate.dispatchBatch(batch);
 			if (result.ok) {
 				accepted(batch.filter((_, index) => result.results[index]?.status === 'ACCEPTED'));
@@ -690,6 +717,18 @@ export function commitAuthoringTurn(
 	} catch (error) {
 		const detail = error instanceof Error ? error.message : String(error);
 		current.detail = detail;
+		// The store could not take its write lock in time — nothing was read or written. Back to READY_TO_COMMIT,
+		// never a blind retry: the professional accepts again, and every check runs again.
+		if ((error as { code?: unknown }).code === 'RPH_STORE_BUSY') {
+			transition(current, { type: 'STORE_BUSY' }, 'READY_TO_COMMIT');
+			return {
+				ok: false,
+				status: 'READY_TO_COMMIT',
+				code: 'RPH_STORE_BUSY',
+				candidateHash,
+				detail
+			};
+		}
 		transition(current, { type: 'COMMIT_ERROR' }, 'COMMIT_FAILED');
 		return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
 	}

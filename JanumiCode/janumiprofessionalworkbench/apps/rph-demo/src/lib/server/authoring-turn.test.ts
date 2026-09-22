@@ -28,6 +28,7 @@ import {
 } from '@janumipwb/rph-engine';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { StoreBusyError } from '@janumipwb/rph-ports';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -432,6 +433,87 @@ describe('isolated authoring turn and guarded commit', () => {
 		).toBe(true);
 		expect(detail, 'the refusal is the replay’s own').toContain(key);
 		expect(listPwuTypes(engine, PWA)).toEqual([]);
+	});
+
+	// ⭐ ONE PRINCIPAL PER TURN (`REG-D-070` §5.2). The replay runs every recorded command through the turn's ONE
+	// canonical session; a command recorded under another identity would be replayed — and attributed — as the turn's.
+	it('the recorder writes only under the turn’s own principal; a re-bound handle may read, never write', () => {
+		const turn = beginTurn();
+		const human = turn.engine.as(SESSION_CREDENTIAL);
+		expect(human.loadObject(PWA), 'a re-bound handle reads').toBeDefined();
+		const before = turn.engine.readAllEvents().length;
+		const refusal =
+			`An authoring turn records only its own principal's commands (${turn.engine.principal!.actorId}); this ` +
+			`handle acts as ${engine.principal!.actorId}. Re-binding a turn's engine is for reading.`;
+		const edit = (name: string) =>
+			command('EditPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', PWA, { pwaId: PWA, name });
+
+		expect(() => human.dispatch(edit('By someone else'))).toThrow(refusal);
+		expect(() => human.dispatchBatch([edit('By someone else, in a batch')])).toThrow(refusal);
+
+		expect(turn.commands, 'nothing recorded').toHaveLength(0);
+		expect(turn.engine.readAllEvents(), 'nothing written to the fork').toHaveLength(before);
+		expect(
+			turn.engine.as(AGENT_CREDENTIAL).dispatch(edit('By the turn')).status,
+			'the turn’s own identity, re-bound, still writes'
+		).toBe('ACCEPTED');
+		expect(turn.commands).toHaveLength(1);
+	});
+
+	// ⭐ A BUSY STORE IS NOT A FAILED COMMIT (`REG-D-070` §5.4). Nothing was read or written, so the draft goes back to
+	// READY_TO_COMMIT exactly as accepted — no automatic retry; the professional accepts again and every check re-runs.
+	it('a store that cannot take its write lock returns the draft to READY_TO_COMMIT, and accepting again commits', () => {
+		let busy = true;
+		const agent = host.as(AGENT_CREDENTIAL);
+		const canonical: AuthedEngineHandle = {
+			...agent,
+			dispatchBatchGuarded: (...args) => {
+				if (busy) throw new StoreBusyError();
+				return agent.dispatchBatchGuarded(...args);
+			}
+		};
+		const turn = beginAuthoringTurn(PWA, canonical);
+		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
+		const candidateHash = markAuthoringTurnAssured(turn, markAuthoringTurnValid(turn));
+
+		const first = commitAuthoringTurn(turn, candidateHash);
+
+		expect(first).toEqual({
+			ok: false,
+			status: 'READY_TO_COMMIT',
+			code: 'RPH_STORE_BUSY',
+			candidateHash,
+			detail: new StoreBusyError().message
+		});
+		expect(turn.status).toBe('READY_TO_COMMIT');
+		expect(listPwuTypes(engine, PWA), 'nothing was written').toEqual([]);
+
+		busy = false;
+		expect(commitAuthoringTurn(turn, candidateHash)).toMatchObject({ ok: true });
+		expect(listPwuTypes(engine, PWA).map((type) => type.state.name)).toEqual(['Plan']);
+	});
+
+	// ⭐ A TURN'S CONVERSATION KEY IS THE TURN'S, NOT THE PROCESS'S (§3.1). The replay re-dispatches each append under
+	// its original key; a process-wide counter restarts at 1 with the process and would meet an older receipt.
+	it('a turn’s conversation appends carry turn-scoped keys, never the process-wide counter', () => {
+		const turn = beginTurn();
+		recordConversation(PWA, [{ role: 'USER', kind: 'message', text: 'one' }], turn.engine, turn.id);
+		recordConversation(
+			PWA,
+			[{ role: 'AGENT', kind: 'message', text: 'two' }],
+			turn.engine,
+			turn.id
+		);
+		const conversationId = getConversation(turn.engine, PWA)!.id;
+
+		expect(
+			turn.commands
+				.filter((recorded) => recorded.commandType === 'AppendConversationEntries')
+				.map((recorded) => recorded.idempotencyKey)
+		).toEqual([
+			`${turn.id}:conversation:${conversationId}:0`,
+			`${turn.id}:conversation:${conversationId}:1`
+		]);
 	});
 
 	it('discards an isolated candidate without compensation or canonical mutation', () => {

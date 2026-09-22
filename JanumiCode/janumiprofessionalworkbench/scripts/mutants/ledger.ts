@@ -2809,6 +2809,60 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-CRITREAD DD-3 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
+		id: "DD3C-M1-a-foreign-principal-dispatch-is-recorded",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "assertOwnPrincipal();\n\t\t\tconst result = delegate.dispatch(command);",
+		replace: "// MUTANT: a foreign principal dispatch is recorded\n\t\t\tconst result = delegate.dispatch(command);",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a turn records and replays commands under ONE principal, its own (`REG-D-070` §5.2) — the replay dispatches every recorded command through the turn's canonical session. WHO RELIES: the attribution of every accepted authoring act — a command recorded under another identity is replayed, and attributed, as the turn's. WHAT THE MUTATION DOES: a re-bound handle's single dispatch is recorded under the other identity. OBSERVED: KILLED, exactly 1 of 13 — the one-principal test, `expected [Function] to throw an error`.",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3C-M2-a-foreign-principal-batch-is-recorded",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "assertOwnPrincipal();\n\t\t\tconst result = delegate.dispatchBatch(batch);",
+		replace: "// MUTANT: a foreign principal batch is recorded\n\t\t\tconst result = delegate.dispatchBatch(batch);",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a turn records and replays commands under ONE principal, its own (`REG-D-070` §5.2) — the replay dispatches every recorded command through the turn's canonical session. WHO RELIES: the attribution of every accepted authoring act — a command recorded under another identity is replayed, and attributed, as the turn's. WHAT THE MUTATION DOES: a re-bound handle's batch is recorded under the other identity. OBSERVED: KILLED, exactly 1 of 13 — the one-principal test (its batch leg), `expected [Function] to throw an error`.",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3C-M3-a-busy-store-fails-the-commit",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "if ((error as { code?: unknown }).code === 'RPH_STORE_BUSY') {",
+		replace: "if ((error as { code?: unknown }).code === 'RPH_STORE_BUSY_NEVER') { // MUTANT: a busy store fails the commit",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a store that could not take its write lock is NOT a failed commit — nothing was read or written, so the draft goes back to READY_TO_COMMIT exactly as accepted, and the professional accepts again (`REG-D-070` §5.4). WHO RELIES: a professional whose accepted draft would otherwise be LOST to another process's momentary lock. WHAT THE MUTATION DOES: a busy store takes the old route to COMMIT_FAILED, whose only exit is DISCARD. OBSERVED: KILLED, exactly 1 of 13 — the busy-store test, `expected { ok: false, …(3) } to deeply equal { ok: false, …(4) }`: no RPH_STORE_BUSY code, and the draft is lost.",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3C-M4-the-machine-has-no-way-back-from-committing",
+		file: "apps/rph-demo/src/lib/server/authoring-turn-machine.ts",
+		find: "STORE_BUSY: 'READY_TO_COMMIT'",
+		replace: "STORE_BUSY_NEVER: 'READY_TO_COMMIT' // MUTANT: no way back from COMMITTING",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-machine.test.ts"],
+		why: "PROMISE: a store that could not take its write lock is NOT a failed commit — nothing was read or written, so the draft goes back to READY_TO_COMMIT exactly as accepted, and the professional accepts again (`REG-D-070` §5.4). WHO RELIES: a professional whose accepted draft would otherwise be LOST to another process's momentary lock. WHAT THE MUTATION DOES: the machine's STORE_BUSY arrow is renamed away, so COMMITTING has no way back. OBSERVED: KILLED, 2 of 6 — the arrow's own test (`expected 'COMMITTING' to be 'READY_TO_COMMIT'`) and the graph-agreement test (`expected [ …(21) ] to deeply equal [ …(21) ]`: the machine's arrow and the graph's copy no longer name the same event).",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3C-M5-the-serializable-graph-loses-an-arrow",
+		file: "apps/rph-demo/src/lib/server/authoring-turn-machine.ts",
+		find: "['COMMITTING', 'READY_TO_COMMIT', 'STORE_BUSY'],",
+		replace: "// MUTANT: the serializable graph loses the arrow the machine has",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-machine.test.ts"],
+		why: "PROMISE: the serializable lifecycle graph — a second, HAND-KEPT copy of the machine's arrows, which the graph checks validate — says exactly what the machine does. WHO RELIES: every lifecycle claim read off the graph (reachability, shortest paths, structural issues). WHAT THE MUTATION DOES: the copy loses the arrow the machine has. OBSERVED: KILLED, exactly 1 of 6 — the graph-agreement test, `expected [ …(20) ] to deeply equal [ …(21) ]`. Nothing compared the two copies before `DD-3c`.",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
+		id: "DD3C-M6-the-conversation-key-is-the-process-counter",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "correlationId === 'ui' ? undefined : `${correlationId}:conversation:${conversationId}:${String(prior)}`",
+		replace: "undefined // MUTANT: the process-wide counter again",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
+		why: "PROMISE: a turn's conversation append is recorded under a key that names the ACT — the turn, the conversation, its length before — and not the process (`REG-D-070` §3.1). WHO RELIES: the replay at acceptance, which re-dispatches the append under its original key; the process-wide counter restarts at 1 with the process and could meet an older receipt, refusing the draft as a reused key. WHAT THE MUTATION DOES: the process-wide counter again. OBSERVED: KILLED, exactly 1 of 13 — the key test, `expected [ 'ui-idem-5-1931', 'ui-idem-6-1932' ] to deeply equal [ …(2) ]` (the counter, with a clock suffix).",
+		source: "JAN-CRITREAD DD-3c (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
+	},
+	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
 		file: 'apps/rph-demo/src/routes/decisions/+page.server.ts',
 		find: '\t\t\tauthority: actingActor(uiSession()),',

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	authoringTurnLifecycleIssues,
 	authoringTurnMachine,
+	buildAuthoringTurnLifecycleGraph,
 	authoringTurnPath,
 	type AuthoringTurnState
 } from './authoring-turn-machine.js';
@@ -15,6 +16,38 @@ describe('authoring-turn lifecycle', () => {
 			actor.send({ type });
 		}
 		expect(actor.getSnapshot().value).toBe('COMMITTED');
+	});
+
+	it('a store that could not take its write lock returns the draft to READY_TO_COMMIT, and only that', () => {
+		const actor = createActor(authoringTurnMachine).start();
+		for (const type of ['VALIDATE', 'VALID', 'ASSURANCE_OK', 'COMMIT', 'STORE_BUSY']) {
+			actor.send({ type });
+		}
+		expect(actor.getSnapshot().value).toBe('READY_TO_COMMIT');
+		actor.send({ type: 'COMMIT' });
+		actor.send({ type: 'COMMIT_OK' });
+		expect(actor.getSnapshot().value, 'accepting again goes through the whole commit').toBe(
+			'COMMITTED'
+		);
+	});
+
+	// ⭐ THE SERIALIZABLE GRAPH IS A SECOND COPY OF THE MACHINE, KEPT BY HAND — so it is checked against the machine,
+	// arrow for arrow. An arrow added to one and not the other would leave the graph checks below validating a
+	// lifecycle the turn does not have.
+	it('the serializable lifecycle graph and the machine agree, arrow for arrow', () => {
+		const states = authoringTurnMachine.config.states as Record<
+			string,
+			{ readonly on?: Record<string, string> }
+		>;
+		const fromMachine = Object.entries(states)
+			.flatMap(([source, node]) =>
+				Object.entries(node.on ?? {}).map(([event, target]) => `${source} --${event}--> ${target}`)
+			)
+			.sort();
+		const fromGraph = buildAuthoringTurnLifecycleGraph()
+			.edges.map((edge) => `${edge.sourceId} --${String(edge.label)}--> ${edge.targetId}`)
+			.sort();
+		expect(fromGraph).toEqual(fromMachine);
 	});
 
 	it('routes external assurance failure without pretending it is a candidate defect', () => {

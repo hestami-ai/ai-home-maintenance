@@ -38,7 +38,16 @@ export const authoringTurnMachine = createMachine({
 		REVISION_REQUIRED: { on: { REVISE: 'COLLECTING', DISCARD: 'DISCARDED' } },
 		BLOCKED_EXTERNAL: { on: { RETRY_ASSURANCE: 'ASSURING', DISCARD: 'DISCARDED' } },
 		COMMITTING: {
-			on: { COMMIT_OK: 'COMMITTED', CONFLICT: 'CONFLICTED', COMMIT_ERROR: 'COMMIT_FAILED' }
+			on: {
+				COMMIT_OK: 'COMMITTED',
+				CONFLICT: 'CONFLICTED',
+				COMMIT_ERROR: 'COMMIT_FAILED',
+				// ⭑ THE ONE WAY BACK FROM COMMITTING (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.4), and it is narrow on purpose:
+				// ONLY when the store could not take its write lock in time, which means NOTHING was read or written.
+				// The draft is exactly as accepted, so the professional accepts again, which re-runs every check. No
+				// automatic retry; every other failure keeps its route to COMMIT_FAILED.
+				STORE_BUSY: 'READY_TO_COMMIT'
+			}
 		},
 		CONFLICTED: { on: { DISCARD: 'DISCARDED' } },
 		// A transport/process failure cannot distinguish "definitely not committed" from unknown success without a
@@ -68,6 +77,7 @@ const TRANSITIONS = [
 	['COMMITTING', 'COMMITTED', 'COMMIT_OK'],
 	['COMMITTING', 'CONFLICTED', 'CONFLICT'],
 	['COMMITTING', 'COMMIT_FAILED', 'COMMIT_ERROR'],
+	['COMMITTING', 'READY_TO_COMMIT', 'STORE_BUSY'],
 	['CONFLICTED', 'DISCARDED', 'DISCARD'],
 	['COMMIT_FAILED', 'DISCARDED', 'DISCARD']
 ] as const satisfies readonly (readonly [AuthoringTurnState, AuthoringTurnState, string])[];

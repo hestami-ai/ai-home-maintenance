@@ -346,7 +346,11 @@ export interface UiCommandInput {
 }
 
 /** Build one UI-authored command with the same envelope policy used by single and atomic dispatch. */
-function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
+function uiCommand(
+	input: UiCommandInput,
+	correlationId = 'ui',
+	idempotencyKey?: string
+): DomainCommand {
 	cmdSeq += 1;
 	return {
 		commandId: `ui-${cmdSeq}`,
@@ -359,9 +363,9 @@ function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 		// hardcode `ui-user` — the SIXTH such site, and the one that would have refused every action in
 		// the running app once the session became `local-professional`.
 		correlationId,
-		idempotencyKey: TEST_MODE
-			? `ui-idem-${cmdSeq}`
-			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
+		idempotencyKey:
+			idempotencyKey ??
+			(TEST_MODE ? `ui-idem-${cmdSeq}` : `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`),
 		// ── THE REVISION THE PAGE WAS RENDERED FROM (SPEC-001 §11.4.22 item 2; DOC-003 §9 PER-4) ────────
 		// Set only when the caller supplies one, because a value invented here would be exactly the
 		// tautology REG-F-050 records: the engine comparing a number against the read it came from.
@@ -514,6 +518,7 @@ export function recordConversation(
 	if (entries.length === 0) return;
 	const existing = getConversation(engine, pwaId);
 	const conversationId = existing?.id ?? mintUiId('conv');
+	const prior = Array.isArray(existing?.state.entries) ? existing.state.entries.length : 0;
 	const result = engine.dispatch(
 		uiCommand(
 			{
@@ -522,7 +527,12 @@ export function recordConversation(
 				targetAggregateId: conversationId,
 				payload: { conversationId, pwaId, entries }
 			},
-			correlationId
+			correlationId,
+			// ⭑ TURN-SCOPED WHEN A TURN NAMES ITSELF (`JAN-CRITREAD` `DD-3`, `REG-D-070` §3.1). A turn's append is RECORDED and
+			// REPLAYED at acceptance under its original key; the process-wide counter restarts at 1 with the process, so
+			// after a restart a replayed append could meet an older receipt under the same key and be refused as a reused
+			// key. The turn's id, the conversation and its length before this append name the act and nothing else.
+			correlationId === 'ui' ? undefined : `${correlationId}:conversation:${conversationId}:${String(prior)}`
 		)
 	);
 	if (result.status !== 'ACCEPTED' && result.status !== 'DUPLICATE') {
