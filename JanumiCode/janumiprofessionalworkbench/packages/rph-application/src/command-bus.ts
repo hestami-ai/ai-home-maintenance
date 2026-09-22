@@ -85,6 +85,17 @@ export interface RevisionGuardConflict {
 	readonly aggregateId: string;
 	readonly expectedRevision: number | undefined;
 	readonly actualRevision: number | undefined;
+	/**
+	 * ⭑ THE FIRST EVENT THE WHOLE-LOG LIMB REFUSED, when it refused one (`JAN-CRITREAD` `TT-1`). A pseudo-aggregate
+	 * named `@event-log` tells a professional nothing about WHAT moved; this does. Absent when the log is refused
+	 * only because an admitted event is MISSING from it.
+	 */
+	readonly unadmitted?: {
+		readonly eventId: string;
+		readonly eventType: string;
+		readonly aggregateType: string;
+		readonly aggregateId: string;
+	};
 }
 
 /** Exact materialized-state expectation for an aggregate after candidate replay. */
@@ -143,10 +154,19 @@ export interface AuthedEngine {
 	 * untouched. A host can bundle two parties' acts only by HOLDING both credentials.
 	 */
 	dispatchMultiPartyBatch(entries: readonly MultiPartyCommand[]): BatchResult;
+	/**
+	 * `expectedEventLog` — the log the caller's candidate was built against. A bare NUMBER is a position: the log
+	 * must not have grown past it at all (the original, conservative whole-store rule). The OBJECT form admits
+	 * EXACTLY the named events after `position` — every event in the tail must be admitted, and every admitted
+	 * event must be in the tail — so a caller can admit its own acts (`JAN-CRITREAD` `TT`, `REG-F-425`) and
+	 * nothing else. ⚠ Both terms are needed: counting alone is fooled by a foreign event standing in for a
+	 * missing admitted one; membership alone admits a log that lost one.
+	 */
 	dispatchBatchGuarded(
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
-		expectedEventCount?: number,
+		expectedEventLog?:
+			number | { readonly position: number; readonly admittedEventIds: readonly string[] },
 		postconditions?: readonly ObjectPostcondition[]
 	): BatchResult;
 	// The read/lifecycle surface rides along so a caller that dispatches does not need to hold two references.
@@ -194,13 +214,13 @@ export class Engine {
 			dispatchBatch: (commands) => this.dispatchBatchAs(principal, reason, commands),
 			dispatchMultiPartyBatch: (entries) =>
 				this.dispatchMultiPartyBatchAs(principal, reason, entries),
-			dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>
+			dispatchBatchGuarded: (commands, preconditions, expectedEventLog, postconditions) =>
 				this.dispatchBatchGuardedAs(
 					principal,
 					reason,
 					commands,
 					preconditions,
-					expectedEventCount,
+					expectedEventLog,
 					postconditions
 				),
 			subscribe: (handler) => this.subscribe(handler),
@@ -601,7 +621,8 @@ export class Engine {
 		reason: string | undefined,
 		commands: readonly DomainCommand[],
 		preconditions: readonly RevisionPrecondition[],
-		expectedEventCount?: number,
+		expectedEventLog?:
+			number | { readonly position: number; readonly admittedEventIds: readonly string[] },
 		postconditions: readonly ObjectPostcondition[] = []
 	): BatchResult {
 		let conflict: RevisionGuardConflict | undefined;
@@ -609,13 +630,35 @@ export class Engine {
 		let result: BatchResult | undefined;
 		try {
 			this.store.transaction(() => {
-				if (expectedEventCount !== undefined) {
-					const actualEventCount = this.store.readAllEvents().length;
-					if (actualEventCount !== expectedEventCount) {
+				if (expectedEventLog !== undefined) {
+					// ⭐ THE TAIL MUST BE EXACTLY THE ADMITTED SET (`JAN-CRITREAD` `TT-1`). A bare number admits nothing,
+					// which is the original whole-store rule unchanged. Exact because `event_id` is UNIQUE in the log,
+					// so a duplicate admitted id collapses in the Set and an admitted id from BEFORE `position` leaves
+					// the tail short — both refuse. ⚠ Still the FIRST check, before any per-aggregate precondition:
+					// the order decides which limb a multi-limb conflict is reported under, and moving it is a
+					// separate decision (DESIGN §8).
+					const { position, admittedEventIds } =
+						typeof expectedEventLog === 'number'
+							? { position: expectedEventLog, admittedEventIds: [] as readonly string[] }
+							: expectedEventLog;
+					const admitted = new Set(admittedEventIds);
+					const log = this.store.readAllEvents();
+					const foreign = log.slice(position).find((event) => !admitted.has(event.eventId));
+					if (log.length !== position + admitted.size || foreign) {
 						conflict = {
 							aggregateId: '@event-log',
-							expectedRevision: expectedEventCount,
-							actualRevision: actualEventCount
+							expectedRevision: position + admitted.size,
+							actualRevision: log.length,
+							...(foreign
+								? {
+										unadmitted: {
+											eventId: foreign.eventId,
+											eventType: foreign.eventType,
+											aggregateType: foreign.aggregateType,
+											aggregateId: foreign.aggregateId
+										}
+									}
+								: {})
 						};
 						return;
 					}

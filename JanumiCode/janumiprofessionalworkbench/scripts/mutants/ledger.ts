@@ -2275,11 +2275,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "TT-M1-event-log-refusal-becomes-admission",
 		file: "packages/rph-application/src/command-bus.ts",
-		find: "\t\t\t\t\t\tconflict = {\n\t\t\t\t\t\t\taggregateId: '@event-log',\n\t\t\t\t\t\t\texpectedRevision: expectedEventCount,\n\t\t\t\t\t\t\tactualRevision: actualEventCount\n\t\t\t\t\t\t};\n\t\t\t\t\t\treturn;",
-		replace: "\t\t\t\t\t\t// MUTANT: the whole-log refusal became an admission",
+		find: "\t\t\t\t\t\t};\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
+		replace: "\t\t\t\t\t\t};\n\t\t\t\t\t\tconflict = undefined; // MUTANT: the whole-log refusal became an admission\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tfor (const precondition of preconditions) {",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "PROMISE: the guarded batch refuses when the event log moved in any way the caller did not admit. WHO RELIES: every caller that stages a candidate against a log position — today the authoring turn, whose defence against a NEW aggregate its revision vector never pinned is exactly this limb (`authoring-turn.ts:19`). WHAT THE MUTATION DOES: builds the conflict and then DISCARDS it (`conflict = undefined`), so the limb detects and admits — the consequence mutated, not the condition (V-2c). ⛔ HISTORY: before `TT-0` this limb had no test that isolated it, and deleting its refusal SURVIVED the turn suite 6/6. OBSERVED: KILLED, 4 of 11 in its own suite — B2, B3, B4 and B5 each fail `expected true to be false`: every refused batch applies. The TURN's use of the limb is owned separately by `TT-M1b`, so each victim is the suite whose assertions are about what the mutant breaks.",
+		source: "JAN-CRITREAD TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M2-admitted-by-count-not-identity",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (log.length !== position + admitted.size || foreign) {",
+		replace: "if (log.length !== position + admitted.size) { // MUTANT: identity term dropped",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "PROMISE: the log after the caller's position must be EXACTLY the admitted events — by identity, not merely by count. WHO RELIES: an authoring turn admitting its own reviewer's records (`REG-F-425`): if another writer's event lands while one of the turn's own admitted writes is missing, the COUNT still matches. WHAT THE MUTATION DOES: drops the identity term, so any tail of the right length is admitted. OBSERVED: KILLED, exactly 1 of 11 — *\"B3 — equal counts do not fool it: a foreign event standing in for an admitted one refuses by IDENTITY\"* fails with `expected true to be false`: the foreign event is admitted in the missing one's place and the batch applies. Every other case still refuses on length, which is why only B3 can see this.",
+		source: "JAN-CRITREAD TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M3-admitted-by-membership-not-exactness",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "if (log.length !== position + admitted.size || foreign) {",
+		replace: "if (foreign) { // MUTANT: length term dropped",
+		expectRed: ["packages/rph-engine/src/engine.test.ts"],
+		why: "PROMISE: an admitted event must actually BE in the log — a caller cannot be admitted past acts that never landed. WHO RELIES: the same turn: if its own reviewer record was lost or written elsewhere, the commit must not proceed as though the log held it. WHAT THE MUTATION DOES: drops the length term, so only foreign events refuse and a log that is SHORT of the admitted set is accepted. OBSERVED: KILLED, exactly 1 of 11 — *\"B4 — an admitted event missing from the log refuses by LENGTH, with nothing foreign to name\"* fails with `expected true to be false`. B4 is the only case with no foreign event, so it is the only one that can see this.",
+		source: "JAN-CRITREAD TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+	},
+	{
+		id: "TT-M1b-turn-stops-asking-for-the-log-check",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t\tcurrent.base.eventCount,",
+		replace: "\t\t\tundefined, // MUTANT: the turn stops asking the bus for the whole-log check",
 		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn.test.ts"],
-		why: "PROMISE: the authoring turn's commit guard refuses a candidate whose canonical base moved in a way the per-aggregate revision vector cannot name — a NEW aggregate nobody pinned (`authoring-turn.ts:19`: *\"detects a concurrent new aggregate that is absent from the vector\"*). WHO RELIES: every professional whose staged turn commits while another writer acts; concretely the one-conversation-per-PWA rule, since nothing pins an ABSENT conversation. WHAT THE MUTATION DOES: keeps the whole-log comparison and deletes its consequence, so a moved log is silently admitted. ⛔ MEASURED BEFORE THE CONTROL EXISTED: SURVIVED, 6/6 green — the file's only conflict test arranged its conflict with `EditPwa`, which also moves the PWA's pinned revision, so the per-aggregate limb refused it and nothing noticed the whole-log limb was gone. OBSERVED AFTER `TT-0`'s control: KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails at its first assertion with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit LANDS, and one PWA would own two conversations.",
-		source: "JAN-CRITREAD TT-0 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
+		why: "PROMISE: an authoring turn's commit asks the bus to verify the canonical log against the turn's own base — without it, a new aggregate created concurrently (the PWA's FIRST conversation, which nothing pins) commits beside the turn's own. WHO RELIES: the one-conversation-per-PWA rule, and every guarantee the turn's candidate rests on that the per-aggregate vector cannot name. WHAT THE MUTATION DOES: passes `undefined` for the expected log, so the turn simply stops asking — the bus limb stays correct and unused. OBSERVED: KILLED, exactly 1 of 7 — *\"refuses a concurrent first conversation the revision vector cannot name — the whole-log limb alone\"* fails with `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the commit lands and one PWA owns two conversations.",
+		source: "JAN-CRITREAD TT-0/TT-1 (ROADMAP-the-turn-that-refuses-itself.md); REG-F-425"
 	},
 	{
 		id: 'D1-payload-actor-reverts-to-the-ui-user-literal',
