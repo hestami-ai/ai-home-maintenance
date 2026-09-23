@@ -152,7 +152,10 @@ export async function runFloorOverSubject(
 			artifacts: opts.artifacts,
 			exchanges,
 			...(opts.print ? { print: opts.print } : {})
-		})
+		}),
+		// ⭐ `REG-D-071` Q5: the engine this floor records into decides whether a stipulated answer counts — the same
+		// engine whose Gate E judges the completion. One source, so the ladder and the gate cannot disagree.
+		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }
 	);
 	recordAssuranceRecordingPlan(engine, plan, {
 		issuedAt: opts.now(),

@@ -20,6 +20,7 @@ import {
 	schemaInvariantValidator,
 	type AssuranceOutcome,
 	type AssuranceSubject,
+	type ComposeOptions,
 	type FloorCriterion,
 	type FloorObservation,
 	type FloorPolicyId,
@@ -444,10 +445,11 @@ async function runFloorResults(
 export async function runDeMinimisFloor(
 	subject: AssuranceSubject,
 	ctx: ValidatorContext,
-	registry: ValidatorRegistry
+	registry: ValidatorRegistry,
+	opts: ComposeOptions = {}
 ): Promise<AssuranceOutcome> {
 	const { plan, results } = await runFloorResults(subject, ctx, registry);
-	return composeAssuranceOutcome(subject, plan, results);
+	return composeAssuranceOutcome(subject, plan, results, opts);
 }
 
 /**
@@ -458,8 +460,9 @@ export async function runDeMinimisFloor(
 export async function runFloorAndPlanRecording(
 	subject: AssuranceSubject,
 	ctx: ValidatorContext,
-	registry: ValidatorRegistry
+	registry: ValidatorRegistry,
+	opts: ComposeOptions = {}
 ): Promise<AssuranceRecordingPlan> {
 	const { plan, results } = await runFloorResults(subject, ctx, registry);
-	return assuranceRecordingPlan(subject, plan, results);
+	return assuranceRecordingPlan(subject, plan, results, opts);
 }

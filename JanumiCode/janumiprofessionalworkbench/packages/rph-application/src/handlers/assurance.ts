@@ -2131,16 +2131,29 @@ const undeterminedMandatoryCriteria = (
 	);
 	if (mandatory.size === 0) return [];
 	const latest = new Map<string, string>();
+	// ⭐ WHETHER THE LATEST RECORDING OF EACH CRITERION CARRIES A STIPULATION (`REG-D-071` Q5 (a)). Kept with the
+	// result, from the SAME event, so "latest wins" applies to both: a stipulation recorded earlier and then
+	// superseded by an unstipulated `UNABLE_TO_DETERMINE` does not survive into the later row.
+	const latestStipulated = new Map<string, boolean>();
 	ctx.store
 		.readAggregateEvents(ASSESSMENT, assessmentId)
 		.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
 		.forEach((e) => {
-			const p = e.payload as { criterionId?: unknown; result?: unknown };
-			if (typeof p.criterionId === 'string' && typeof p.result === 'string')
+			const p = e.payload as { criterionId?: unknown; result?: unknown; stipulated?: unknown };
+			if (typeof p.criterionId === 'string' && typeof p.result === 'string') {
 				latest.set(p.criterionId, p.result);
+				latestStipulated.set(p.criterionId, p.stipulated === 'MET');
+			}
 		});
+	// ⭐ THE ONE ADMITTING BRANCH OF GATE E (`REG-D-071` Q5 (a)): in an engine built to admit them — never durable, by
+	// the `Engine`'s own refusal — a mandatory `UNABLE_TO_DETERMINE` whose latest recording carries `stipulated:
+	// 'MET'` is not held against a positive disposition. ⛔ ONLY UNDER `floor.reasoning-review`: every other policy,
+	// and every engine not built for tests, reads `UNABLE_TO_DETERMINE` exactly as before — never met.
+	const admitted =
+		ctx.admitStipulatedAnswers === true && policyId === FLOOR_POLICY_IDS.REASONING_REVIEW;
 	return [...latest.entries()]
 		.filter(([id, result]) => mandatory.has(id) && result === 'UNABLE_TO_DETERMINE')
+		.filter(([id]) => !(admitted && latestStipulated.get(id) === true))
 		.map(([id]) => id)
 		.sort();
 };

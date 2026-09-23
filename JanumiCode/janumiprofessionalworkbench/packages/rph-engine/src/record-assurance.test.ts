@@ -385,3 +385,63 @@ describe('⭐ REG-D-071 Q4 (form D) — a stipulated row reaches the governed st
 		}
 	});
 });
+
+describe('⭐ REG-D-071 Q5 (a) — in an engine built to admit them, a stipulated remainder is recorded SATISFIED end to end', () => {
+	it('⭐ the ladder composes SATISFIED and Gate E admits the completion — both reading the same engine', async () => {
+		// PREDICTED RED BEFORE J1-1c: the ladder has no admitting branch (INCONCLUSIVE). ⛔ AND THE MUTANT THIS FILE
+		// OWNS: drop the flag from `createEngine`'s enumeration. The handle would still SAY it admits, the ladder
+		// (told so) would compose SATISFIED, and the Engine's Gate E — never given the flag — would refuse the
+		// completion, which the recorder turns into a throw.
+		let s = 0;
+		const eng = createEngine({
+			authenticate: DIR.authenticate,
+			ontology,
+			now: () => '2026-07-14T00:00:00Z',
+			newEventId: () => `e${++s}`,
+			admitStipulatedAnswers: true
+		}).as(DIR.credentialFor(ACTOR.actorId));
+		seedFloorPolicies(eng);
+		const judged = new Set(['RR-04-no-proxy-satisfaction', 'RR-09-no-completeness-from-existence']);
+		const rr: Validator = {
+			policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+			validatorId: 'test.reasoning-review',
+			evaluate: (sub) =>
+				Promise.resolve(
+					reasoningReviewResultFromJudgement(
+						sub,
+						JUDGE,
+						'test.reasoning-review',
+						{
+							findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+								criterionId: c.id,
+								failed: false,
+								statement: judged.has(c.id) ? 'evaluated; clean' : 'stipulated clean by the test; not reviewed',
+								...(judged.has(c.id) ? {} : { stipulated: true as const })
+							})),
+							recommendation: 'SATISFIED'
+						},
+						SEEDED_REASONING_REVIEW_CRITERIA
+					)
+				)
+		};
+		const r = createValidatorRegistry();
+		r.register(schemaInvariantValidatorInstance);
+		r.register(identityProvenanceValidatorInstance);
+		r.register(rr);
+		const plan = await runFloorAndPlanRecording(subject, goodCtx, r, {
+			admitStipulatedAnswers: eng.admitStipulatedAnswers
+		});
+		expect(plan.gatePermitsTransition, 'the ladder, told the engine admits, composes SATISFIED').toBe(true);
+
+		recordAssuranceRecordingPlan(eng, plan, {
+			issuedAt: '2026-07-14T00:00:00Z',
+			correlationId: 'floor-run',
+			idPrefix: 'rec-admit',
+			newId: ulidGen()
+		});
+		const review = listByType(eng, 'ASSURANCE_ASSESSMENT').find(
+			(a) => a.state.assurancePolicyId === 'floor.reasoning-review'
+		)!;
+		expect(review.state.assessmentState, 'Gate E admitted the completion').toBe('SATISFIED');
+	});
+});

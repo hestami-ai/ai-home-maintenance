@@ -4849,8 +4849,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MU-PFA-BD2-02-recording-plan-truncates-the-floor",
 		file: "packages/rph-assurance/src/validators.ts",
-		find: "\treturn assuranceRecordingPlan(subject, plan, results);",
-		replace: "\treturn assuranceRecordingPlan(subject, plan.slice(0, 1), results);",
+		// ⭑ RE-ANCHORED 2026-09-23 (`JAN-CRITREAD` J1-1c): the wrapper now forwards the ladder's options
+		// (`admitStipulatedAnswers`), so the call gained one argument and nothing else. The mutation is unchanged.
+		find: "\treturn assuranceRecordingPlan(subject, plan, results, opts);",
+		replace: "\treturn assuranceRecordingPlan(subject, plan.slice(0, 1), results, opts);",
 		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
 		why: "It promises the recording plan covers the WHOLE ordered de minimis floor with the same run and blocking semantics as runDeMinimisFloor — one canonical ASSURANCE_ASSESSMENT per planned policy. Truncating the plan records step 1 only and opens the gate on a floor where identity/provenance and the non-suppressible Reasoning Review were actually run but never assessed, aggregated or persisted: the §8.4 floor suppressed at the exact recording seam apps/rph-demo floor.ts and work-product-floor.ts gate on. Predicted red: `expect(assessments).toHaveLength(3)` (and the policyId-sort assertion beside it) in 'a fully-satisfied floor records one SATISFIED assessment per policy'.",
 		source: "JAN-PFA R3 S3.3 burn-down increment 2a"
@@ -8962,5 +8964,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-engine/src/admit-stipulated-answers.test.ts"],
 		why: "PROMISE: absent is the refusing value. The floor callers read this member to decide whether the ladder counts a stipulation, so a handle that always said true would make every production floor's ladder admit — and Gate E refuse the completion it composed. OBSERVED: KILLED — 1 test(s) red in admit-stipulated-answers.test.ts: '⭐ an engine built without the flag does not admit — absent is the refusing value' (AssertionError: expected true to be false // Object.is equality)",
 		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1C-M1-gate-e-ignores-the-flag",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "\t\tctx.admitStipulatedAnswers === true && policyId === FLOOR_POLICY_IDS.REASONING_REVIEW;\n",
+		replace: "\t\tpolicyId === FLOOR_POLICY_IDS.REASONING_REVIEW; // MUTANT: every engine admits\n",
+		expectRed: ["packages/rph-application/src/handlers/stipulated-answer-gate.test.ts"],
+		why: "PROMISE: outside an engine built to admit them, a stipulated row is what it says it is — UNABLE_TO_DETERMINE, never met (DOC-003 §7). Ignoring the flag would let every production engine satisfy the reasoning-review floor on answers nobody gave. OBSERVED: KILLED — 1 test(s) red in stipulated-answer-gate.test.ts: '⛔ an engine NOT built to admit them refuses the same completion, naming the stipulated row' (AssertionError: expected 'ACCEPTED' to be 'REJECTED' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1C-M2-gate-e-admits-under-every-policy",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "\t\tctx.admitStipulatedAnswers === true && policyId === FLOOR_POLICY_IDS.REASONING_REVIEW;\n",
+		replace: "\t\tctx.admitStipulatedAnswers === true; // MUTANT: the permission reaches every policy\n",
+		expectRed: ["packages/rph-application/src/handlers/stipulated-answer-gate.test.ts"],
+		why: "PROMISE (REG-D-071 Q5 (a)): the one permission is for floor.reasoning-review, the policy whose judgement criteria a structural checker cannot answer. Any other policy's UNABLE_TO_DETERMINE is refused even in an admitting engine. OBSERVED: KILLED — 1 test(s) red in stipulated-answer-gate.test.ts: '⛔ an admitting engine still refuses a stipulated row under ANY OTHER policy' (AssertionError: expected 'ACCEPTED' to be 'REJECTED' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1C-M3-gate-e-takes-the-union-of-stipulations",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "\t\t\t\tlatestStipulated.set(p.criterionId, p.stipulated === 'MET');\n",
+		replace: "\t\t\t\tif (p.stipulated === 'MET') latestStipulated.set(p.criterionId, true); // MUTANT: any stipulation ever recorded counts\n",
+		expectRed: ["packages/rph-application/src/handlers/stipulated-answer-gate.test.ts"],
+		why: "PROMISE: latest wins, WHOLE. The fold keeps the latest RESULT per criterion; the stipulation must come from that same event, or an earlier stipulation superseded by an unstipulated UNABLE_TO_DETERMINE would still admit the completion. OBSERVED: KILLED — 1 test(s) red in stipulated-answer-gate.test.ts: '⛔ a stipulation SUPERSEDED by an unstipulated UNABLE_TO_DETERMINE no longer counts — latest wins, whole' (AssertionError: expected 'ACCEPTED' to be 'REJECTED' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1C-M4-the-ladder-ignores-the-option",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\tif (opts.admitStipulatedAnswers !== true || policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW) return criteria;\n",
+		replace: "\tif (policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW) return criteria; // MUTANT: the ladder always admits\n",
+		expectRed: ["packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts"],
+		why: "PROMISE: absent means today's ladder exactly. A ladder that always counted stipulations would compose SATISFIED in every engine, and every non-admitting Gate E would then refuse the completion — which the recorder turns into a throw. OBSERVED: KILLED — 1 test(s) red in stipulated-row-is-not-a-pass.test.ts: '⛔ a ladder not told the engine admits — the default — reads the same record INCONCLUSIVE' (AssertionError: expected 'SATISFIED' to be 'INCONCLUSIVE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1C-M5-the-ladder-admits-under-every-policy",
+		file: "packages/rph-assurance/src/floor.ts",
+		find: "\tif (opts.admitStipulatedAnswers !== true || policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW) return criteria;\n",
+		replace: "\tif (opts.admitStipulatedAnswers !== true) return criteria; // MUTANT: the ladder admits under every policy\n",
+		expectRed: ["packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts"],
+		why: "PROMISE (REG-D-072 D3): the ladder's branch has Gate E's scope. Unscoped, a stipulated row under another policy composes SATISFIED where Gate E refuses the completion, and the recorder throws on any refusal. OBSERVED: KILLED — 1 test(s) red in stipulated-row-is-not-a-pass.test.ts: '⛔ and an admitting ladder still reads a stipulated row under ANOTHER policy as INCONCLUSIVE (REG-D-072 D3)' (AssertionError: expected 'SATISFIED' to be 'INCONCLUSIVE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1C-M6-the-flag-never-reaches-the-engine",
+		file: "packages/rph-engine/src/engine.ts",
+		find: "\t\tadmitStipulatedAnswers: deps.admitStipulatedAnswers\n",
+		replace: "\t\t// MUTANT: the flag is left out of the enumeration\n",
+		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
+		why: "PROMISE: the handle and the Engine agree. Left out of createEngine's enumeration, the handle still SAYS it admits (it reads deps), the floor callers tell the ladder so, the ladder composes SATISFIED, and the Engine's Gate E — never given the flag — refuses the completion. OBSERVED: KILLED — 1 test(s) red in record-assurance.test.ts: '⭐ the ladder composes SATISFIED and Gate E admits the completion — both reading the same engine' (Error: recordAssuranceRecordingPlan failed at CompleteAssuranceAssessment (asmt_00000000000000000000000003): REJECTED {\"code\":\"RPH_VALIDATION_SEMANTIC_FAILED\",\"category\":\"VALIDATION\",\"message\":\"CompleteAssuranceAssessment: a SATISFIED dispo)",
+		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
 	}
 ];

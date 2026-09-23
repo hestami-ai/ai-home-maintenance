@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { dispositionFromFindings } from './assurance-rules.js';
-import type { AssuranceSubject } from './floor.js';
+import { composeAssuranceOutcome, deMinimisFloorPlan, FLOOR_POLICY_IDS, type AssuranceSubject } from './floor.js';
 import { reasoningReviewResultFromJudgement } from './validators.js';
 import type { ReasoningReviewJudgement } from './validators.js';
 
@@ -112,5 +112,54 @@ describe('⭐ REG-D-071 Q4 (form D) — a stipulated answer is recorded as NOT J
 				criteria: r.criteria
 			})
 		).toBe('INCONCLUSIVE');
+	});
+});
+
+describe('⭐ REG-D-071 Q5 (a) — the ladder counts a stipulation only when told the engine admits it, and only for the reasoning review', () => {
+	/** An independent evaluator — the policy asks for a different MODEL from the producer. */
+	const PRODUCED: AssuranceSubject = { ...SUBJECT, producer: { agentId: 'producer-1', actorType: 'AGENT', modelId: 'producer-model' } };
+	const rrRef = deMinimisFloorPlan(PRODUCED).find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW)!;
+	const stipulatedRemainder = reasoningReviewResultFromJudgement(
+		PRODUCED,
+		EVALUATOR,
+		'standin.reasoning-review',
+		{
+			findings: [
+				{ criterionId: 'RR-A', failed: false, statement: 'evaluated; clean' },
+				{ criterionId: 'RR-B', failed: false, statement: 'stipulated', stipulated: true },
+				{ criterionId: 'RR-C', failed: false, statement: 'stipulated', stipulated: true }
+			],
+			recommendation: 'SATISFIED'
+		},
+		POLICY
+	);
+	const dispositionOf = (o: ReturnType<typeof composeAssuranceOutcome>, policyId: string) =>
+		o.perPolicy.find((p) => p.policyId === policyId)?.disposition;
+
+	it('⭐ an admitting ladder composes the stipulated remainder SATISFIED', () => {
+		// PREDICTED RED BEFORE J1-1c: there is no admitting branch, so this is INCONCLUSIVE.
+		const o = composeAssuranceOutcome(PRODUCED, [rrRef], [stipulatedRemainder], { admitStipulatedAnswers: true });
+		expect(dispositionOf(o, FLOOR_POLICY_IDS.REASONING_REVIEW)).toBe('SATISFIED');
+	});
+
+	it('⛔ a ladder not told the engine admits — the default — reads the same record INCONCLUSIVE', () => {
+		// THE MUTANT: honour a stipulation regardless of the option. Every production floor outside a test engine
+		// would then pass on answers nobody gave.
+		expect(dispositionOf(composeAssuranceOutcome(PRODUCED, [rrRef], [stipulatedRemainder]), FLOOR_POLICY_IDS.REASONING_REVIEW)).toBe(
+			'INCONCLUSIVE'
+		);
+	});
+
+	it('⛔ and an admitting ladder still reads a stipulated row under ANOTHER policy as INCONCLUSIVE (REG-D-072 D3)', () => {
+		// THE MUTANT: drop the policy scope. Gate E is scoped to the reasoning review; a ladder that was not would
+		// compose SATISFIED where Gate E refuses the completion, and the recorder throws.
+		const siRef = deMinimisFloorPlan(PRODUCED).find((p) => p.policyId === FLOOR_POLICY_IDS.SCHEMA_INVARIANT)!;
+		const stipulatedSchema = {
+			...stipulatedRemainder,
+			policyId: FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+			policyVersion: siRef.policyVersion
+		};
+		const o = composeAssuranceOutcome(PRODUCED, [siRef], [stipulatedSchema], { admitStipulatedAnswers: true });
+		expect(dispositionOf(o, FLOOR_POLICY_IDS.SCHEMA_INVARIANT)).toBe('INCONCLUSIVE');
 	});
 });

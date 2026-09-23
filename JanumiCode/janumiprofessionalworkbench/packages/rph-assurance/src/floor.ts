@@ -283,6 +283,34 @@ export interface AssuranceOutcome {
 	readonly gatePermitsTransition: boolean;
 }
 
+/** Options for the composition step. Absent means today's ladder exactly. */
+export interface ComposeOptions {
+	/**
+	 * ⭐ THE ENGINE ADMITS TEST-STIPULATED ANSWERS (`REG-D-071` Q5 (a)). Callers pass the flag of the engine they will
+	 * RECORD INTO (`EngineHandle.admitStipulatedAnswers`), so the ladder and Gate E answer the same question the
+	 * same way — a ladder that admitted what Gate E refused would make the recorder throw.
+	 */
+	readonly admitStipulatedAnswers?: boolean;
+}
+
+/**
+ * ⭐ THE ONE ADMITTING BRANCH OF THE LADDER (`REG-D-071` Q5 (a); `REG-D-072` D3). In an engine built to admit them, a
+ * reasoning-review row recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it counts as met — and only
+ * there, only under `floor.reasoning-review`. The record itself is untouched: it still says nobody judged the row.
+ * ⛔ SCOPED TO ONE POLICY, AS GATE E IS: unscoped, a stipulated row under another policy would compose SATISFIED
+ * here while Gate E refused the completion, and the recorder throws on any refusal.
+ */
+function countedCriteria(
+	policyId: string,
+	criteria: readonly FloorCriterion[],
+	opts: ComposeOptions
+): readonly FloorCriterion[] {
+	if (opts.admitStipulatedAnswers !== true || policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW) return criteria;
+	return criteria.map((c) =>
+		c.outcome === 'UNABLE_TO_DETERMINE' && c.stipulated === 'MET' ? { ...c, outcome: 'MET' as const } : c
+	);
+}
+
 /**
  * The Assurance-Service composition step. For each planned floor policy: if its Validator result is MISSING, the
  * floor is incomplete (never assume satisfied). Otherwise classify the result at the boundary (VALIDATOR_FAILED /
@@ -293,7 +321,8 @@ export interface AssuranceOutcome {
 export function composeAssuranceOutcome(
 	subject: AssuranceSubject,
 	plan: readonly FloorPolicyRef[],
-	results: readonly ValidatorResult[]
+	results: readonly ValidatorResult[],
+	opts: ComposeOptions = {}
 ): AssuranceOutcome {
 	const byPolicy = new Map(results.map((r) => [r.policyId, r]));
 	const perPolicy: FloorPolicyOutcome[] = [];
@@ -340,7 +369,7 @@ export function composeAssuranceOutcome(
 		} else {
 			disposition = dispositionFromFindings({
 				findings: r.observations.map((o) => ({ severity: o.severity, open: o.open })),
-				criteria: r.criteria
+				criteria: countedCriteria(p.policyId, r.criteria, opts)
 			});
 			aggDisposition = disposition;
 		}

@@ -425,7 +425,10 @@ export async function runPwaFloor(
 	const plan = await runFloorAndPlanRecording(
 		subject,
 		ctx,
-		createFloorRegistry({ testMode: isTestMode(), artifacts, exchanges, ...(opts.print ? { print: opts.print } : {}) })
+		createFloorRegistry({ testMode: isTestMode(), artifacts, exchanges, ...(opts.print ? { print: opts.print } : {}) }),
+		// ⭐ THE ENGINE THIS FLOOR RECORDS INTO decides whether a stipulated answer counts (`REG-D-071` Q5) — the same
+		// engine whose Gate E will judge the completion, so the two cannot disagree. Never `isTestMode()`.
+		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }
 	);
 	recordAssuranceRecordingPlan(engine, plan, {
 		issuedAt: hostNow(),

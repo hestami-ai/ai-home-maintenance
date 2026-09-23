@@ -11,6 +11,7 @@ import type { AggregateDisposition, Disposition, Identity, Severity } from './as
 import {
 	composeAssuranceOutcome,
 	type AssuranceSubject,
+	type ComposeOptions,
 	type FloorCriterion,
 	type FloorPolicyId,
 	type FloorPolicyOutcome,
@@ -93,9 +94,10 @@ function toRecordable(d: FloorPolicyOutcome['disposition']): Disposition {
 export function assuranceRecordingPlan(
 	subject: AssuranceSubject,
 	plan: readonly FloorPolicyRef[],
-	results: readonly ValidatorResult[]
+	results: readonly ValidatorResult[],
+	opts: ComposeOptions = {}
 ): AssuranceRecordingPlan {
-	const outcome = composeAssuranceOutcome(subject, plan, results);
+	const outcome = composeAssuranceOutcome(subject, plan, results, opts);
 	const byPolicy = new Map(results.map((r) => [r.policyId, r]));
 	const assessments: RecordablePolicyAssessment[] = [];
 	for (const po of outcome.perPolicy) {
