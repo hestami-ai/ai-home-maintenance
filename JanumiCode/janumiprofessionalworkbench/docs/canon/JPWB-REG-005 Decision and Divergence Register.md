@@ -36888,6 +36888,8 @@ Nine reviewers — three design calls × three lenses (contract / precedent / va
 
 ⛔⛔ **SEE `REG-F-424` — THIS RULING WAS MADE ON INFORMATION I FAILED TO SUPPLY.** The ruling's words are unchanged and it is not struck; what is recorded there is that the option was put to the sponsor as novel when `REG-D-067` had costed and killed a neighbouring form of it the previous day, and that one of the two payoffs claimed above is unreachable by construction. **The sponsor should be given the chance to re-decide before anything is built on this.**
 
+⭑ **POINTER 2026-09-23.** The sponsor asked for a design in place of this entry's three options (*"what if we don't make the tests do two different jobs at once?"*): `docs/_working/DESIGN-what-the-tests-prove.md` (revision 4, PROPOSED). It answers `REG-F-424`'s question and puts this entry's re-decision to the sponsor as its Q2.
+
 ---
 
 ### REG-F-424 — I recommended a mechanism the previous day's ruling had already attacked to fatal, and one of the two payoffs I claimed for it is unreachable by construction
@@ -36913,6 +36915,8 @@ I presented replay to the sponsor as a **fourth corner nobody had considered**. 
 > **Do the thirteen e2e specs exist to prove the WIRING carries a judgement, or to prove the floor CAN BE SATISFIED?**
 
 If the former, a replayed real judgement exercises the whole path and is legitimate. ⛔ If the latter, replay is **circular** — the lane goes green because a recording says so, and the thirteen honest reds become thirteen greens that assert nothing about capability. That is the distinction `REG-D-067` was protecting, and it is the one I should have surfaced before recommending anything.
+
+⭑ **POINTER 2026-09-23.** The sponsor asked for a design in place of this entry's three options (*"what if we don't make the tests do two different jobs at once?"*): `docs/_working/DESIGN-what-the-tests-prove.md` (revision 4, PROPOSED). It answers `REG-F-424`'s question and puts this entry's re-decision to the sponsor as its Q2.
 
 ⚠ **WHAT I DID WRONG, IN ONE SENTENCE.** The standing rule is to grep the register before recommending, and this session had already recorded it paying six times — including twice in entries I wrote myself (`REG-F-420`, `REG-F-421`). ⛔ This is the first time the failure reached the **sponsor** as a recommendation rather than stopping at a design doc, which is the difference between wasting my time and spending someone else's decision.
 
@@ -37129,15 +37133,15 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-435 — with `REG-F-425` fixed, a reviewer that ANSWERS every criterion turns twelve of `REG-D-067`'s thirteen reds green; the thirteenth is not about the reviewer, and two passing tests go red
 
-**Filed 2026-09-22** (`JAN-CRITREAD`, measured to answer the sponsor's question of how far the thirteen are from green). **Status:** ⚠ **OPEN — a completed measurement; one of the two new reds is unexplained and owed an investigation.**
+**Filed 2026-09-22** (`JAN-CRITREAD`, measured to answer the sponsor's question of how far the thirteen are from green). ~~**Status:** ⚠ **OPEN — a completed measurement; one of the two new reds is unexplained and owed an investigation.**~~ **Status:** ✅ **CLOSED 2026-09-23 — settled by `REG-F-444`:** the red it left unexplained was Playwright's tracing, not the reviewer (tracing off, 0 of 5; the gate's tracing, 5 of 5, same reviewer), and on the gate's own lane its thirteenth red is the reviewer's INCONCLUSIVE, not the race.
 
-- **THE LANE.** The full e2e suite with every setting of `playwright.config.ts` (retries 1, timeouts 30 s / 7 s, one worker) EXCEPT the reviewer: the real-reviewer path (`JPWB_ASSURANCE_TOOL=agy`) answered by the canned all-clean stand-in `agy-harvest` — NOT a reviewer; it answers SATISFIED to every criterion it is shown. Code at `748ad162`. Config `apps/rph-demo/e2e-results/tt-full-standin.config.ts` (git-ignored, kept for reproduction).
+- **THE LANE.** The full e2e suite with every setting of `playwright.config.ts` (retries 1, timeouts 30 s / 7 s, one worker) EXCEPT the reviewer ⭑ *(pointer 2026-09-23, `REG-F-444`: and except tracing, screenshots and port — its config ran `trace: 'off'`)*: the real-reviewer path (`JPWB_ASSURANCE_TOOL=agy`) answered by the canned all-clean stand-in `agy-harvest` — NOT a reviewer; it answers SATISFIED to every criterion it is shown. Code at `748ad162`. Config `apps/rph-demo/e2e-results/tt-full-standin.config.ts` (git-ignored, kept for reproduction).
 - **THE RESULT: 90 passed, 3 failed, 0 timed out, in 220 s** (the gate's default lane at the same commit: 80 / 13, 489 s). 19 reviewer calls.
 - **TWELVE OF THE THIRTEEN GO GREEN:** `agent-retention` (1), `agent-sse` (2), `agent-ui` (1), `assurance-floor-waiver` (3), `assurance-floor` (the clean-graph test), `execution-agent-authored-binding` (2, both timeouts before), `graph-validation` (1), `pwa-coherence` (1). ⭑ Before the fix, the same stand-in turned NONE green (`REG-F-427` (6); notes H-2: 78/93).
-- ⛔ **THE THIRTEENTH IS NOT ABOUT THE REVIEWER.** `execution-model-invocation.e2e.ts`: *"the floor never ran over the work product — Expected: 3, Received: 0"*. `REG-F-425` records it as a race — the spec introspects before the out-of-process work-product review is recorded. It needs its own fix whatever `REG-D-068` becomes.
+- ⛔ **THE THIRTEENTH IS NOT ABOUT THE REVIEWER.** `execution-model-invocation.e2e.ts`: *"the floor never ran over the work product — Expected: 3, Received: 0"*. `REG-F-425` records it as a race — the spec introspects before the out-of-process work-product review is recorded. It needs its own fix whatever `REG-D-068` becomes. ⭑ *Pointer 2026-09-23 (`REG-F-444`): true of this lane only. On the gate's own default lane the review runs in-process and the test fails at `:235` (*"the work product was not assured"*), so there the red IS the reviewer's INCONCLUSIVE.*
 - **TWO PASSING TESTS GO RED.**
   - `assurance-floor.e2e.ts` *"a rejected dead-end candidate never mutates canonical state and can be discarded"* — *"Expected substring: \"Assurance floor REJECTED\""*. EXPECTED of an always-yes stand-in: the test needs a reviewer that CATCHES the dead end. ⚠ Relevant to `REG-D-068`: a replayed recording must itself reject here, and none of the four local models measured caught this defect (`REG-F-427`, P-2: 0 of 4).
-  - `undertaking-scroll.e2e.ts` *"the workbench scrolls, and the last assurance row can be reached"* — *"wheeling the workbench must scroll it — this is the W-1 defect — Expected: > 100, Received: 0"*, on both attempts. Its own arrangement assertions passed (more than 20 rows; the last row starts below the fold), so the page overflows and a wheel does not move it. ⛔ **UNEXPLAINED.** It reproduces the pre-fix always-yes lane (notes H-2, *"undertaking-scroll newly red"*), so it depends on the reviewer path, not on chance. Not investigated; owed.
+  - `undertaking-scroll.e2e.ts` *"the workbench scrolls, and the last assurance row can be reached"* — *"wheeling the workbench must scroll it — this is the W-1 defect — Expected: > 100, Received: 0"*, on both attempts. Its own arrangement assertions passed (more than 20 rows; the last row starts below the fold), so the page overflows and a wheel does not move it. ~~⛔ **UNEXPLAINED.** It reproduces the pre-fix always-yes lane (notes H-2, *"undertaking-scroll newly red"*), so it depends on the reviewer path, not on chance. Not investigated; owed.~~ ⭑ **STRUCK 2026-09-23 (`REG-F-444`):** measured with the gate's own reviewer, changing only tracing — off, 0 of 5 pass; the gate's tracing, 5 of 5. Every lane where it failed ran with tracing off; the reviewer path never mattered, and the test calls no reviewer.
 - **WHAT IT DOES NOT SHOW.** An always-yes stand-in proves reachability, never judgement: this is the CEILING a reviewer on the default lane could reach, not evidence that any real reviewer reaches it.
 
 ---
@@ -37269,3 +37273,35 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `JPWB_ASSESSOR=agy`, `JPWB_ASSURANCE_TOOL` unset: the mock reviews, but the preflight refuses the turn for a missing judge model it will never use.
 - **SEARCHED.** `JPWB_ASSESSOR` in `apps/rph-demo/src`: one live read (`+server.ts:344`); the rest are comments and `model.test.ts`'s deliberate converse mutant. The register has one hit (`:31681`), about `execution/model.ts`.
 - **REMEDY — UNTESTED.** Feed the preflight the same selection `createFloorRegistry` makes, through one function both call, and give it the mutant pair `model.test.ts` has.
+
+---
+
+### REG-F-444 — two of `REG-F-435`'s attributions were wrong: the scrolling test's red depends on Playwright tracing, not on the reviewer (trace off fails 5 of 5, on passes 5 of 5), and on the gate's own lane the thirteenth red IS the reviewer
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, measured before a design relied on it). It settles `REG-F-435`, whose one open item was the red it left unexplained. **Status:** ⚠ **OPEN — a test-synchronisation defect: the gate's green on the scrolling test rests on tracing slowing it down. Both of `REG-F-435`'s attributions are struck in place with a pointer here.**
+
+- **THE CONFOUND.** `REG-F-435` recorded `undertaking-scroll.e2e.ts` going red on its stand-in lane and concluded *"it depends on the reviewer path, not on chance"*, on the ground that the lane used *"every setting of `playwright.config.ts` … EXCEPT the reviewer"*. ⛔ It did not: every lane on record where the test failed ran `trace: 'off'` (`e2e-results/tt-full-standin.config.ts:25`; the scratchpad `live-ollama.config.ts:23`), while the gate's config records a trace for every test (`playwright.config.ts:41`, `trace: 'retain-on-failure'`). The reviewer path and the trace setting changed together in every recorded run, and the test calls no reviewer at all — it resets to the reference seed, whose floor records never reach one (`REG-F-424` (2)).
+- **THE DISCRIMINATING RUN** (2026-09-23, commit `7c30a470`, the gate's own config and reviewer, one worker, retries 0, `--repeat-each 5`), changing ONE thing:
+
+  | tracing | *"the workbench scrolls, and the last assurance row can be reached"* | its CONTROL (graph tab stays viewport-locked) |
+  |---|---|---|
+  | `--trace off` | **0 of 5 passed** — 3 at `:106` (*"Expected: > 100, Received: 0"*), 2 at `:114` (*"the last row must be reachable by scrolling"*) | 5 of 5 passed |
+  | the config's own (`retain-on-failure`) | **5 of 5 passed** | 5 of 5 passed |
+
+- **THE LIKELY MECHANISM — CONSISTENT WITH THE RUN, NOT PROVEN.** `settled()` returns as soon as two consecutive `boundingBox()` reads are equal (`undertaking-scroll.e2e.ts:59-67`), and Playwright documents that `mouse.wheel` *"does not wait for the scrolling to finish before returning"* (`playwright-core/types/types.d.ts:20140-20141`). If both reads land before a smooth scroll starts, the test measures 0. Tracing slows each call enough to space the reads out.
+- ⛔ **WHAT IT MEANS FOR THE GATE.** The test is green in `gate:fast` because tracing is on, not because the synchronisation is sound: with tracing off it goes red with no product change (measured), and anything else that shortens the gap between two Playwright calls plausibly would too (inferred, not run). It also removes one of the two reds `REG-F-435` said a reviewer on the default lane would bring: this one was never about the reviewer.
+- **THE SECOND ATTRIBUTION: *"THE THIRTEENTH IS NOT ABOUT THE REVIEWER"*.** True of `REG-F-435`'s own lane only, where the review ran out of process and the spec introspected before it was recorded (`:233`, *"Received: 0"*). On the gate's own default lane the review runs in-process, the three assessments are already present, and `execution-model-invocation.e2e.ts` fails at `:235` on both attempts — *"the work product was not assured"* (the gate run of `7c30a470`, 2026-09-23). There the red IS the reviewer's INCONCLUSIVE; the race `REG-F-425` records shows only out of process.
+- **SEARCHED BEFORE FILING.** The register for `undertaking-scroll` (1 hit: `REG-F-435`), `trace: 'off'` (0), `retain-on-failure` (1: `REG-F-182`, about a trace destroyed by a later run — unrelated). Positive control: `REG-F-435` → 5 hits.
+- **REMEDY (untested):** synchronise on the scroll having started and stopped — the page's `scrollend` event, or a first read that differs from the pre-wheel position before stability is accepted — and prove it by the run above: 5 of 5 green with tracing off.
+
+---
+
+### REG-F-445 — the live-execution lane's only report of which reviews passed reads a field assessments do not have: its one stored run says `undefined=SATISFIED` three times
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, found by the fact-gathering for `DESIGN-what-the-tests-prove.md`, verified first-hand). **Status:** ⚠ **OPEN — a harness reporting defect in an ungated lane; the fix is two field names.**
+
+- **THE CODE.** `apps/rph-demo/e2e-live-exec/execution.live.ts:212` prints `a.policyId` and `:219` builds the lane's one persistent report, its `live-review` annotation, from `a.policyId` and `a.assessmentState`, where `a` is an assessment's state (`:202`). The assessment schema's field is `assurancePolicyId` (`packages/rph-contracts/src/objects.ts:674`). The observation line at `:214` reads `o.code`; the observation schema's field is `findingCode` (`objects.ts:701`).
+- **THE STORED RESULT.** `apps/rph-demo/e2e-results/results-live-exec.json` (2026-09-20, the only run on record) carries the annotation `live-review: "undefined=SATISFIED undefined=SATISFIED undefined=SATISFIED"`. The lane exists, in its own words, because *"only this tells us whether the reviewer is any good"* (`:200-201`), and the only thing it recorded cannot say which policy each verdict belongs to.
+- **WHY NOTHING NOTICED.** The lane is deliberately outside the gate, its results are git-ignored, and the annotation is reported, never asserted (`DESIGN-live-execution-lane.md:113`). ⭑ A report no one reads has no reader to notice it is wrong — the same class as `REG-F-419`'s gates.
+- **SEARCHED BEFORE FILING.** The register for `undefined=SATISFIED` (0), `a\.policyId` (0), `results-live-exec` (0) and `live-review` (1: `REG-F-428`'s *"live-reviewer"*, unrelated). Positive control: `reproducible coin` → 1 (`REG-F-427`).
+- **REMEDY (untested):** read `assurancePolicyId` and `findingCode`, and assert — in the lane's own spec — that each annotation token names a floor policy, so the report cannot silently go blank again.
