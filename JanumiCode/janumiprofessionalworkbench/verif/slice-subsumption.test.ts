@@ -562,7 +562,24 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//   · `ROADMAP-coordination.md` excludes the whole-store counter by name, and its `C-5` is the
 			//     HANDLER-reachable declaration; this is a host-side instance that does not close `C-5`
 			//     (`DESIGN-what-a-draft-depends-on.md` §3.3), so folding it there would misfile both.
-		).toBe(49);
+			//
+			// 49 -> 50 (2026-09-23): `ROADMAP-what-the-tests-prove.md` (`JAN-CRITREAD` `J`, `REG-D-071`,
+			// `REG-D-072`). ⭑ IT REPLACES A RULING THAT NEVER HAD A ROADMAP, AND ITS TWO HALVES EACH HAVE A NEAR
+			// CLAIMANT THAT CANNOT HOLD THEM.
+			//   · `ROADMAP-live-execution-lane.md` is nearest to Job 2 — its lane's own spec says *"only this tells
+			//     us whether the reviewer is any good"* (`e2e-live-exec/execution.live.ts:200-201`) — and its header
+			//     says `LE-03`–`LE-05` *"are non-deterministic by construction — they may never gate"*. ⛔ Qualification's whole point is a check that DOES
+			//     gate (`reviewer:qual:check` in `gate:tail`) over a recorded, reproducible measurement; folding it
+			//     there would contradict that roadmap's founding rule.
+			//   · `ROADMAP-validator-health.md` owns `ValidatorRegistryEntry.status` and its arrows, and its design
+			//     refuses a selection scorer. ⛔ Qualification ranks nothing and moves no status — it records what a
+			//     candidate reviewer did on known cases — so it is a different object, not an unfinished part.
+			//   · `REG-D-068` (the replay ruling Job 1 supersedes) and `REG-D-067`'s interim were never given a
+			//     roadmap; there is nothing to fold into.
+			// ⭐ AND ASKING SHARPENED THE SCOPE: reading the live lane's roadmap end to end is what showed that the
+			// lane's report was the ONE place a reviewer's quality was ever recorded, and that its report is
+			// broken (`REG-F-445`) — qualification is the first durable record of it, not a second one.
+		).toBe(50);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

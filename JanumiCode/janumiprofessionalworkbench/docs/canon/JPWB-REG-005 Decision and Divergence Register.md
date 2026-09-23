@@ -37371,3 +37371,42 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **One paid frontier run** on the path to green (Q7 (c)).
 - **DELEGATED, AND HOW EACH IS RECORDED.** The two steps the design reserved for the sponsor — conferring the case set (J2-1) and choosing the frontier candidate — and any design question the build raises are decided by the agent, each recorded in this register as delegated best judgement flagged for sponsor confirmation. ⚠ **The case-set conferral carries a conflict:** the agent that confers the oracle is the one that could tune the reviewer's prompt. So the design's oracle-integrity rule is kept strictly — no increment that edits the reviewer's prompt, criteria or scoring edits the cases, and version one tunes nothing.
 - **MADE WITH THIS ENTRY.** `REG-D-068` → SUPERSEDED; `REG-F-424` → CLOSED; `REG-D-067`'s status names its replaced successor; `REG-F-409`'s status names its ruled exit; `REG-D-060`'s *"OWED. The judge's own lifecycle"* pointed at Job 2. **Owed with the trigger (J2-3 + J2-4):** `REG-Q-025` amended with what is then built, and the interim-carrier entry for `reviewer:qual:check` (`DOC-004:258`).
+
+---
+
+### REG-D-072 — DELEGATED (`REG-D-071`): where the roadmap departs from the ratified design, because the code refutes or sharpens seventeen of its premises
+
+**Decided 2026-09-23** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for the build (`docs/_working/ROADMAP-what-the-tests-prove.md` §0); sponsor confirmation owed.**
+
+- **HOW IT WAS FOUND.** Before the roadmap was written, six read-only readers checked `DESIGN-what-the-tests-prove.md`'s premises against the code (five per increment, one completeness critic that spot-checked their refutations). Each departure below was then verified first-hand where the roadmap changes course on it.
+- **THE DEPARTURES** (the roadmap's §0 carries each with its evidence):
+  - **D1** the admitting flag's durability refusal lives in the `Engine` constructor, not only `createEngine` — `Engine` is public (`rph-application/src/index.ts:5`) and 132 sites construct it directly, so a `createEngine`-only lock would not make "an admitting engine is never durable" the engine's guarantee.
+  - **D2** the flag is required on `EngineHandle` only, optional elsewhere; the turn-recorder mutant sets it `false` rather than dropping it (a dropped required member is `NO_COMPILE`, which proves nothing).
+  - **D3** the ladder's admitting branch is scoped to `floor.reasoning-review`, like Gate E's; unscoped, a stipulated row under another policy composes SATISFIED where Gate E refuses and the recorder throws (`record-assurance.ts:119-124`).
+  - **D4** a finding both failed and stipulated maps `NOT_MET`.
+  - **D5** the durability report is `DURABLE | NOT_DURABLE | UNKNOWN`, derived from the opened connection; only `NOT_DURABLE` admits. `SqliteArtifactStore`'s class-declared `DURABLE` (`sqlite-artifact-store.ts:64`) is the pattern not copied.
+  - **D6** the stipulation registry is the demo host's module state, discarded by reset, reached through a lookup the floor callers pass in — never through `getEngine()`, which lazily opens and seeds a workbench.
+  - **D7** `/test-api/reviewer-script`'s "refuses a durable store" limb is dropped: under `isTestMode()` the store is in-memory by construction, so it had no path to red, and D1 refuses anyway.
+  - **D8** the lane control is computed by the SERVER over each segment between reset marks, at every reset and at a final `globalTeardown` call, which fails the run on any kept violation: with `retries: 1` a per-test failure that passes on retry exits 0, a server action can finish after the test's teardown, and no mark existed after the boot seed.
+  - **D9** the races (J1-4) land before the lane control (J1-3), each shown red by holding the browser's POST; the binding site's race cannot be exposed by a work-product delay (the binding is written at `undertakings/[id]/+page.server.ts:1039`, the floor runs at `:1413`); seven sites, not four.
+  - **D10** the sequencing pin scans every `.ts` under `e2e/` and `e2e-live/`, exempting the harness module by path — scanning only `*.e2e.ts`, the exemption's mutant could never redden; `gate:tail` exports its step list so the pin can resolve it.
+  - **D11** `reviewer:qual:check` reads source; under bare `bun`, `@janumipwb/*` resolves to built `dist`.
+  - **D12** the runner refuses `JPWB_AGY_BIN`/`JPWB_DEVIN_BIN` before importing a transport, binds the model variable to the recorded label and asserts the argv — the transports pick the model from the environment (`agy-cli.ts:79`).
+  - **D13** each case's producer carries a model id no candidate uses (the policy requires a different model, `floor.ts:76`).
+  - **D14** the runner and the Ollama transport live under `scripts/reviewer-qual/`, outside two gates' populations.
+  - **D15** the test-mode unit files are ten (`vi.hoisted`) plus three (`vi.stubEnv`), not twelve.
+  - **D16** the live authoring lane is inside the pin's scan.
+  - **D17** the process-result wrapper is not factored in version one, and it is said that a change to `renderProcessResult` moves no fingerprint.
+- **ALSO CORRECTED IN THE DESIGN'S CITATIONS, NO DEPARTURE:** `composeAssuranceOutcome` is at `floor.ts:290` (`:56` is the plan that supplies the RR reference, which §5.2 cites correctly); `createEngine`'s enumeration is at `engine.ts:192-198`, and the comment at `:188-191` — *"reaches a FORK automatically and reaches THIS object … not at all"* — is wrong, as the design's §4.3 already says (the roadmap corrects the comment); SQLite is not the only storage adapter (the overlay and a test double implement the port); some vitest engines are file-backed; `/test-api/dispatch` already refuses a durable store (`dispatch/+server.ts:24-25`); only `120d4ce6`'s gate step drives temp fixtures (`ea99ff28`'s drives a pure core in memory).
+
+---
+
+### REG-F-447 — an inconclusive review is shown to the professional as "The reviewer call failed"
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, found by the roadmap's premise check, verified first-hand). **Status:** ⚠ **OPEN — a copy defect; the fix is scheduled in `ROADMAP-what-the-tests-prove.md` `J1-2`.**
+
+- **THE PATH.** A reasoning review that is INCONCLUSIVE with no subject finding is classified `RETRY_OR_CONFIGURE_REVIEWER` (`apps/rph-demo/src/lib/server/floor.ts:223-245`); the agent route counts that action as operational and marks the turn `BLOCKED_EXTERNAL` (`routes/pwa/[id]/agent/+server.ts:245-254`); and the draft page shows, for every `BLOCKED_EXTERNAL`, *"The reviewer call failed (external/operational) — this candidate is preserved."* (`routes/pwa/[id]/+page.svelte:1062-1063`).
+- ⛔ **THE REVIEWER CALL DID NOT FAIL.** It ran and could not settle every mandatory question. The guidance the floor itself carries says so correctly — *"the mandatory Reasoning Review is incomplete but produced no valid subject finding"* — and the page replaces it with a false cause. Today every draft on the default lane lands here (the thirteen reds show `BLOCKED_EXTERNAL`), and a real reviewer that leaves a criterion unanswered would too.
+- ⭑ **IT IS THE SECOND TIME THIS BANNER NAMED THE WRONG CAUSE.** `REG-F-062` (2026-08-07) found it telling readers *"The reviewer call failed"* when a RECORDER throw had killed every floor run, and drew the lesson — *"A catch-all that classifies by WHERE it caught rather than WHAT it caught will name the wrong component every time the cause is internal."* It fixed the throw; the banner still classifies by status.
+- **SEARCHED BEFORE FILING.** The register for `reviewer call failed` (1: `REG-F-062`, above) and `candidate-resume-hint` (0). Positive control: `BLOCKED_EXTERNAL` → 3.
+- **REMEDY (J1-2):** the hint names the recorded cause — an execution failure, an independence failure, or an incomplete review — from the remediation the floor already computed, not from the turn's status alone.
