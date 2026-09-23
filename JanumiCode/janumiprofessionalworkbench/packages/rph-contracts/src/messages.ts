@@ -43,6 +43,7 @@ import {
 	ScenarioClassSchema,
 	ShapeIntegrityStateSchema,
 	StepStateSchema,
+	StipulatedCriterionResultSchema,
 	ValidatorCostClassSchema,
 	ValidatorLatencyClassSchema,
 	ValidatorRegistryStatusSchema,
@@ -227,7 +228,8 @@ export type RequestAssuranceAssessmentPayload = z.infer<
 export const RecordCriterionResultPayloadSchema = z.strictObject({
 	criterionId: z.string(),
 	result: CriterionResultOutcomeSchema,
-	rationale: z.string().optional()
+	rationale: z.string().optional(),
+	stipulated: StipulatedCriterionResultSchema.optional()
 });
 export type RecordCriterionResultPayload = z.infer<typeof RecordCriterionResultPayloadSchema>;
 export const SubmitEvidenceForAssessmentPayloadSchema = z.strictObject({
@@ -1047,7 +1049,8 @@ export const AssuranceCriterionEvaluatedPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
 	criterionId: z.string(),
 	result: CriterionResultOutcomeSchema,
-	rationale: z.string().optional()
+	rationale: z.string().optional(),
+	stipulated: StipulatedCriterionResultSchema.optional()
 });
 export type AssuranceCriterionEvaluatedPayload = z.infer<
 	typeof AssuranceCriterionEvaluatedPayloadSchema

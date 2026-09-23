@@ -194,6 +194,12 @@ describe('validate', () => {
 		// merely counting: the payload's `result` field is declared with `enumRef: CriterionResultOutcomeSchema`,
 		// deriving DOC-007 §20.1's ratified vocabulary instead of restating it. Had it minted its own enum the
 		// delta would be +3 — so this arithmetic is the check that canon's enum was reused, not copied.
-		expect(buildContractRegistry().ids()).toHaveLength(388);
+		// 388 -> 389 (2026-09-23, JAN-CRITREAD J1-1a / REG-D-071 Q4): +1 enum `StipulatedCriterionResult`. The
+		// `stipulated` field it types is added to TWO payloads (`RecordCriterionResult`, `AssuranceCriterionEvaluated`)
+		// and payload fields carry no registry ids — the same arithmetic as `PruneCause` above (+1 enum, three
+		// fields, no new command or event). ⭑ AND +1 RATHER THAN +2 OR +3 IS THE CHECK THAT MATTERS: form D adds a
+		// field BESIDE `result` and leaves ASR-9's five-valued `CriterionResultOutcome` untouched; had a sixth
+		// outcome been minted (form A, the canon amendment), `CriterionResultOutcome` would have changed instead.
+		expect(buildContractRegistry().ids()).toHaveLength(389);
 	});
 });

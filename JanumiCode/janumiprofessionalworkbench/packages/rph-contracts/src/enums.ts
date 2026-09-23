@@ -781,6 +781,10 @@ export const StepTypeSchema = z.enum([
 ]);
 export type StepType = z.infer<typeof StepTypeSchema>;
 
+/** RecordCriterionResult.stipulated / AssuranceCriterionEvaluated.stipulated — the answer a TEST stated for a criterion nobody judged, carried BESIDE the true result (UNABLE_TO_DETERMINE), never in its place — UNRATIFIED-AUTHORED (2026-09-23, JAN-CRITREAD J1-1a; DESIGN-what-the-tests-prove.md §4.2 form D, adopted by REG-D-071 Q4). RecordCriterionResult and AssuranceCriterionEvaluated are themselves UNRATIFIED-AUTHORED payloads (2026-09-20, JAN-CRITREAD L3), so extending them is within this programme's authority. ASR-9's five-valued CriterionResultOutcome is deliberately NOT extended (form A was the canon amendment and was not chosen). Ratification pending. */
+export const StipulatedCriterionResultSchema = z.enum(['MET']);
+export type StipulatedCriterionResult = z.infer<typeof StipulatedCriterionResultSchema>;
+
 /** TraceLink.relation — RPH-DOC-007 §24 / DOC-002 §25 (17 values; DOC-007 governs TraceRelation) */
 export const TraceRelationSchema = z.enum([
 	'DERIVED_FROM',
@@ -936,6 +940,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	ShapeIntegrityState: ShapeIntegrityStateSchema,
 	StepState: StepStateSchema,
 	StepType: StepTypeSchema,
+	StipulatedCriterionResult: StipulatedCriterionResultSchema,
 	TraceRelation: TraceRelationSchema,
 	TransitionType: TransitionTypeSchema,
 	ValidatorCostClass: ValidatorCostClassSchema,

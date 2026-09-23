@@ -250,6 +250,13 @@ export interface ReasoningReviewFinding {
 	readonly failed: boolean;
 	readonly statement: string;
 	readonly severity?: Severity;
+	/**
+	 * ⭐ `JAN-CRITREAD` J1-1a (`REG-D-071` Q4, form D): the answer a TEST stipulated for this criterion — no reviewer
+	 * judged it. Only the test-mode stand-in writes it; a model's own `stipulated` is dropped by `coerceJudgement`,
+	 * which rebuilds every finding field by field. The mapper records such a finding as `UNABLE_TO_DETERMINE` — the
+	 * truth — with the stipulation beside it, and a FAILED finding stays a fault whatever else it says.
+	 */
+	readonly stipulated?: true;
 }
 export interface ReasoningReviewJudgement {
 	readonly findings: readonly ReasoningReviewFinding[];
@@ -290,6 +297,20 @@ export function reasoningReviewResultFromJudgement(
 	const declaredSeverity = new Map(policyCriteria.map((c) => [c.id, c.severityIfNotMet]));
 	const criteria: FloorCriterion[] = policyCriteria.map((c) => {
 		const f = byId.get(c.id);
+		// ⭐ A STIPULATED CLEAN ANSWER RECORDS THE TRUTH — NOBODY JUDGED THIS — WITH THE TEST'S ANSWER BESIDE IT
+		// (`REG-D-071` Q4, form D). Every reader that knows nothing of stipulations sees `UNABLE_TO_DETERMINE` and
+		// fails closed; only an engine built to admit them counts `stipulated` as met. ⛔ Recording it as `MET` here
+		// would write `REG-F-409`'s shape — an unjudged criterion recorded as passed — which is why revision 1 of the
+		// design was replaced. ⛔ AND A FAILED FINDING IS A FAULT, recorded below as one: a stipulation never softens
+		// a fault (`REG-D-072` D4).
+		if (f?.stipulated === true && !f.failed)
+			return {
+				criterionId: c.id,
+				mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),
+				outcome: 'UNABLE_TO_DETERMINE',
+				stipulated: 'MET',
+				...(f.statement ? { rationale: f.statement } : {})
+			};
 		return {
 			criterionId: c.id,
 			mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),

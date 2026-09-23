@@ -1711,7 +1711,12 @@ export const recordCriterionResult: CommandHandler = (ctx, command, payload) => 
 			assessmentId: id,
 			criterionId: p.criterionId,
 			result: p.result,
-			...(p.rationale !== undefined ? { rationale: p.rationale } : {})
+			...(p.rationale !== undefined ? { rationale: p.rationale } : {}),
+			// ⭐ `REG-D-071` Q4 (form D): a test's stipulated answer rides BESIDE `result`, never in it. Copied
+			// field by field like `rationale`, and ⚠ NOTHING ELSE CATCHES A DROP: this event is not in
+			// `RATIFIED_EVENT_PAYLOADS`, so the kit never re-checks it at runtime, and the suite-wide emitted-event
+			// guard sees an EXTRA key, never a MISSING optional one. `record-criterion-result.test.ts` is the guard.
+			...(p.stipulated !== undefined ? { stipulated: p.stipulated } : {})
 		}
 	});
 	return commitState(ctx, command, {

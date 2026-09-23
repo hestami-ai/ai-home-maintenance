@@ -253,7 +253,13 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 		// reviewer's own statement even on a CLEAN run. So the optional field is genuinely exercised here,
 		// and the claim worth asserting is about what must NEVER appear, not about an exact shape.
 		expect([...keys].sort(), 'the payload grew a field the vocabulary does not declare').toEqual(
-			[...keys].filter((k) => ['assessmentId', 'criterionId', 'result', 'rationale'].includes(k)).sort()
+			[...keys]
+				.filter((k) =>
+					// ⭑ `stipulated` IS DECLARED BY THE VOCABULARY since `REG-D-071` Q4 (form D) — an optional field
+					// beside `result`, never a replacement for it. The subset rule is unchanged: anything else reddens.
+					['assessmentId', 'criterionId', 'result', 'rationale', 'stipulated'].includes(k)
+				)
+				.sort()
 		);
 		expect(keys.has('mandatory'), 'the judged party is declaring its own stakes (R25)').toBe(false);
 		expect(keys.has('outcome'), 'the kernel spelling leaked past the boundary rename').toBe(false);
@@ -307,5 +313,75 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 		expect(obs.state.observationType).toBe('POLICY_VIOLATION');
 		expect(obs.state.severity).toBe('CRITICAL');
 		expect(obs.state.assessmentId).toBe(schema.id);
+	});
+});
+
+describe('⭐ REG-D-071 Q4 (form D) — a stipulated row reaches the governed stream as NOT JUDGED, with the claim beside it', () => {
+	/** A reviewer that judged RR-04 and RR-09 itself and was handed a CLEAN stipulation for everything else —
+	 *  the shape the test-mode stand-in (`J1-2`) will produce. Derived from the policy's own list, never hand-listed. */
+	const judged = new Set(['RR-04-no-proxy-satisfaction', 'RR-09-no-completeness-from-existence']);
+	const rrStipulated: Validator = {
+		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+		validatorId: 'test.reasoning-review',
+		evaluate: (s) =>
+			Promise.resolve(
+				reasoningReviewResultFromJudgement(
+					s,
+					JUDGE,
+					'test.reasoning-review',
+					{
+						findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+							criterionId: c.id,
+							failed: false,
+							statement: judged.has(c.id) ? 'evaluated; clean' : 'stipulated clean by the test; not reviewed',
+							...(judged.has(c.id) ? {} : { stipulated: true as const })
+						})),
+						recommendation: 'SATISFIED'
+					},
+					SEEDED_REASONING_REVIEW_CRITERIA
+				)
+			)
+	};
+
+	it('records the judged rows MET, the stipulated rows UNABLE_TO_DETERMINE + stipulated MET — and the floor is NOT satisfied', async () => {
+		// ⛔ THE RECORDER IS WHAT THIS GUARDS: `FloorCriterion.stipulated` must cross the command boundary. THE MUTANT:
+		// drop the recorder's `stipulated` spread — every row then reads as an ordinary UNABLE_TO_DETERMINE and the
+		// stipulation is lost. ⭑ AND THE DISPOSITION IS THE POINT OF FORM D: in an engine that does not admit
+		// stipulations (every engine, until `J1-1c`), the same record is INCONCLUSIVE — the true value fails closed.
+		const eng = engine();
+		seedFloorPolicies(eng);
+		const r = createValidatorRegistry();
+		r.register(schemaInvariantValidatorInstance);
+		r.register(identityProvenanceValidatorInstance);
+		r.register(rrStipulated);
+		const plan = await runFloorAndPlanRecording(subject, goodCtx, r);
+		recordAssuranceRecordingPlan(eng, plan, {
+			issuedAt: '2026-07-14T00:00:00Z',
+			correlationId: 'floor-run',
+			idPrefix: 'rec-stip',
+			newId: ulidGen()
+		});
+
+		const review = listByType(eng, 'ASSURANCE_ASSESSMENT').find(
+			(a) => a.state.assurancePolicyId === 'floor.reasoning-review'
+		)!;
+		expect(review.state.assessmentState, 'a stipulated remainder is not a pass outside an admitting engine').toBe(
+			'INCONCLUSIVE'
+		);
+		const rows = eng
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+			.map((e) => e.payload as { assessmentId: string; criterionId: string; result: string; stipulated?: string })
+			.filter((p) => p.assessmentId === review.id);
+		expect(rows.length, 'one row per criterion of the policy').toBe(SEEDED_REASONING_REVIEW_CRITERIA.length);
+		for (const p of rows) {
+			if (judged.has(p.criterionId)) {
+				expect(p.result, `${p.criterionId} was judged`).toBe('MET');
+				expect(p.stipulated, `${p.criterionId} was judged, so nothing was stipulated`).toBeUndefined();
+			} else {
+				expect(p.result, `${p.criterionId} was judged by nobody`).toBe('UNABLE_TO_DETERMINE');
+				expect(p.stipulated, `${p.criterionId}'s stipulation must cross the boundary`).toBe('MET');
+			}
+		}
 	});
 });

@@ -742,3 +742,30 @@ describe('JAN-OUTCONTRACT — the instruction carries the contract, and truncati
 		expect(prompts[0], 'and the reviewer is TOLD so').toContain('…(truncated)');
 	});
 });
+
+describe('⛔ REG-D-071 Q4 — a MODEL cannot mark its own answers stipulated', () => {
+	it('drops a model-supplied `stipulated`: a clean row the model wrote stays an EVALUATED MET', async () => {
+		// `stipulated` is the TEST's statement that nobody judged a criterion. A reviewer that could write it would
+		// turn its own answers into unjudged ones — and, in an admitting engine, into answers counted without being
+		// scored. `coerceJudgement` rebuilds every finding field by field, so the key is dropped today. THE MUTANT:
+		// copy it through.
+		const reply = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+				criterionId: c.id,
+				failed: false,
+				statement: 'evaluated; the failure class is absent',
+				stipulated: true
+			})),
+			recommendation: 'SATISFIED',
+			residualUncertainty: []
+		});
+		const { print } = capturing(reply);
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+
+		expect(result.criteria.map((c) => c.outcome)).toEqual(SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET'));
+		expect(
+			result.criteria.filter((c) => (c as { stipulated?: string }).stipulated !== undefined),
+			'no criterion may carry a stipulation the model wrote'
+		).toEqual([]);
+	});
+});

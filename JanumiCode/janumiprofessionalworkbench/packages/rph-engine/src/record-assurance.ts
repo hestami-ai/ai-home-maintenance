@@ -167,7 +167,10 @@ export function recordAssuranceRecordingPlan(
 				// declares a `rationale` per criterion, and reusing it here would be a conflation: that is the
 				// policy's reason for HAVING the criterion, not this assessment's reason for its OUTCOME. A MET
 				// criterion the floor judged mechanically has no rationale, and an absent one stays absent.
-				...(c.rationale !== undefined ? { rationale: c.rationale } : {})
+				...(c.rationale !== undefined ? { rationale: c.rationale } : {}),
+				// ⭐ `REG-D-071` Q4 (form D): a stipulated row keeps `result: UNABLE_TO_DETERMINE` and carries the
+				// test's answer BESIDE it. Carried only when present; absence means no stipulation.
+				...(c.stipulated !== undefined ? { stipulated: c.stipulated } : {})
 			});
 		});
 		// Record each proposed observation while ASSESSING (observations require the assessment to exist).

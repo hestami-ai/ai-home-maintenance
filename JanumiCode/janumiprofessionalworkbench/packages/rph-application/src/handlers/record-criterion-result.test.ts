@@ -243,4 +243,42 @@ describe('⛔ RecordCriterionResult (DOC-004 §32) — the criterion results tha
 		expect(events.length, 'each recording is its own durable event').toBe(2);
 		expect(events.map((e) => e.result)).toEqual(['PARTIALLY_MET', 'MET']);
 	});
+	it('⭐ a STIPULATED answer travels BESIDE the true result, and the event carries both (REG-D-071 Q4)', () => {
+		// ⛔ PREDICTED RED BEFORE `J1-1a`: the payload schema is strict, so `stipulated` was refused at the contract
+		// boundary (`VALIDATION_FAILED`). After it, the command is accepted and — the part this test guards — the
+		// HANDLER copies the field onto the event. THE MUTANT: drop that copy. Nothing else notices: the event is not
+		// in `RATIFIED_EVENT_PAYLOADS`, and the suite-wide emitted-event guard catches an EXTRA key, never a missing one.
+		beginAssessing();
+		const r = dispatch('RecordCriterionResult', {
+			criterionId: DECLARED,
+			result: 'UNABLE_TO_DETERMINE',
+			stipulated: 'MET'
+		});
+
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(evaluatedEvents()).toEqual([
+			{ assessmentId: ASSESS, criterionId: DECLARED, result: 'UNABLE_TO_DETERMINE', stipulated: 'MET' }
+		]);
+	});
+
+	it('⭐ an unstipulated result carries NO `stipulated` key — absence is the conservative reading', () => {
+		beginAssessing();
+		expect(dispatch('RecordCriterionResult', { criterionId: DECLARED, result: 'UNABLE_TO_DETERMINE' }).status).toBe(
+			'ACCEPTED'
+		);
+		expect(Object.keys(evaluatedEvents()[0] ?? {})).not.toContain('stipulated');
+	});
+
+	it('⛔ refuses a stipulation other than MET — version one stipulates only a CLEAN remainder', () => {
+		// A scripted FAULT would leave a BLOCKING observation indistinguishable from a reviewer's finding
+		// (DESIGN §4.1 rule 5), so the vocabulary admits one value. Refused at the contract boundary, like `result`.
+		beginAssessing();
+		const r = dispatch('RecordCriterionResult', {
+			criterionId: DECLARED,
+			result: 'UNABLE_TO_DETERMINE',
+			stipulated: 'NOT_MET'
+		});
+		expect(r.status).toBe('VALIDATION_FAILED');
+		expect(evaluatedEvents().length).toBe(0);
+	});
 });

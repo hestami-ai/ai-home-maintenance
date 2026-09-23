@@ -93,6 +93,15 @@
       "note": "BRANCH_DECISION: a settled BRANCH's recorded selection excluded this step — carries selectedByBranchStepId / selectedEdgeId. DEAD_PREDECESSOR: a predecessor reached an IRRECOVERABLE terminal state (CANCELLED / SUPERSEDED) and can never conduct, so the arm below it is structurally dead — carries deadPredecessorStepId / deadPredecessorStepState. ADDED BECAUSE THE SECOND CASE HAD NO VOCABULARY: pruneProvenance returned undefined for it, so the event carried only {stepId, stepState:'SKIPPED'} — byte-identical in CONTENT to a waived skip, which is exactly the conflation DR-004 §19-M1 minted a distinct event to prevent (finding N-8). Reusing selectedByBranchStepId for a non-BRANCH predecessor was rejected: a field named for a branch, holding a step that is not one, makes the audit trail lie."
     },
     {
+      "name": "StipulatedCriterionResult",
+      "appliesTo": "RecordCriterionResult.stipulated / AssuranceCriterionEvaluated.stipulated — the answer a TEST stated for a criterion nobody judged, carried BESIDE the true result (UNABLE_TO_DETERMINE), never in its place",
+      "values": [
+        "MET"
+      ],
+      "canonicalSource": "UNRATIFIED-AUTHORED (2026-09-23, JAN-CRITREAD J1-1a; DESIGN-what-the-tests-prove.md §4.2 form D, adopted by REG-D-071 Q4). RecordCriterionResult and AssuranceCriterionEvaluated are themselves UNRATIFIED-AUTHORED payloads (2026-09-20, JAN-CRITREAD L3), so extending them is within this programme's authority. ASR-9's five-valued CriterionResultOutcome is deliberately NOT extended (form A was the canon amendment and was not chosen). Ratification pending.",
+      "note": "ONE VALUE IN VERSION ONE: a test may stipulate only a CLEAN remainder (§4.1 rule 5); a scripted fault would leave a BLOCKING observation indistinguishable from a reviewer's finding. RECORD THE TRUE VALUE, CARRY THE CLAIM BESIDE IT: the row's result stays UNABLE_TO_DETERMINE — nobody judged the criterion — so every reader that knows nothing of stipulations fails it closed with no change. Only an engine built with admitStipulatedAnswers (never over a durable store) counts it as met, and only under floor.reasoning-review. Revision 1 of the design recorded such a row as MET plus a mark, which is REG-F-409's shape (an unjudged criterion recorded as passed), and was replaced."
+    },
+    {
       "name": "ExecutionBoundary",
       "appliesTo": "PwuType.executionBoundary — where a PWU Type's work is discharged relative to the authoring organization's accountability scope (JAN-PRPWA-DS-001 STD-2, R-9)",
       "values": [

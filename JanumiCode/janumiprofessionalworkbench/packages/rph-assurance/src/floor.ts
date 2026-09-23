@@ -90,6 +90,9 @@ export interface FloorObservation {
 export interface FloorCriterion extends CriterionResult {
 	readonly criterionId: string;
 	readonly rationale?: string;
+	/** ⭐ `REG-D-071` Q4 (form D): a test's stipulated answer, carried BESIDE `outcome` (which stays
+	 *  `UNABLE_TO_DETERMINE`). Absent means no stipulation — the conservative reading. */
+	readonly stipulated?: 'MET';
 }
 
 /**

@@ -656,6 +656,13 @@
 					"required": false,
 					"type": "string",
 					"note": "carried when the evaluator produced one (validators.ts supplies it on failure); optional exactly as the sibling's evidenceType is. evidenceIds is deliberately ABSENT, not omitted: no ratified consumer asks for it (§38's fourteen view items do not include criterion results) and [] would be indistinguishable downstream from 'not asked', which is REG-D-059's manufacture-from-silence shape"
+				},
+				{
+					"field": "stipulated",
+					"required": false,
+					"type": "enum",
+					"enumRef": "StipulatedCriterionResultSchema",
+					"note": "JAN-CRITREAD J1-1a (REG-D-071 Q4, form D). The answer a TEST stated for a criterion nobody judged, carried BESIDE result — which stays UNABLE_TO_DETERMINE, the true value — never in its place. OPTIONAL, for PruneCause's reason: events written before it carry none, and ABSENCE IS THE CONSERVATIVE READING (no stipulation), so no stored event becomes invalid and nothing is upgraded by being absent. Counted as met ONLY by an engine built with admitStipulatedAnswers, which is never durable, and only under floor.reasoning-review; every other reader sees UNABLE_TO_DETERMINE and fails closed. /test-api/dispatch refuses a request that carries it, so a test cannot hand-write one past the stand-in."
 				}
 			]
 		},
@@ -4465,6 +4472,13 @@
 					"required": false,
 					"type": "string",
 					"note": "carried when the evaluator produced one (validators.ts supplies it on failure); optional exactly as the sibling's evidenceType is. evidenceIds is deliberately ABSENT, not omitted: no ratified consumer asks for it (§38's fourteen view items do not include criterion results) and [] would be indistinguishable downstream from 'not asked', which is REG-D-059's manufacture-from-silence shape"
+				},
+				{
+					"field": "stipulated",
+					"required": false,
+					"type": "enum",
+					"enumRef": "StipulatedCriterionResultSchema",
+					"note": "JAN-CRITREAD J1-1a (REG-D-071 Q4, form D). The answer a TEST stated for a criterion nobody judged, carried BESIDE result — which stays UNABLE_TO_DETERMINE, the true value — never in its place. OPTIONAL, for PruneCause's reason: events written before it carry none, and ABSENCE IS THE CONSERVATIVE READING (no stipulation), so no stored event becomes invalid and nothing is upgraded by being absent. Counted as met ONLY by an engine built with admitStipulatedAnswers, which is never durable, and only under floor.reasoning-review; every other reader sees UNABLE_TO_DETERMINE and fails closed. /test-api/dispatch refuses a request that carries it, so a test cannot hand-write one past the stand-in."
 				}
 			]
 		},

@@ -8854,5 +8854,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-assurance/src/validators.test.ts"],
 		why: "\u2b50\u2b50 THIS MUTANT IS THE CHANGE I ACTUALLY MADE AND HAD TO REVERT, KEPT SO THE REVERSAL CANNOT BE UNDONE BY SOMEONE READING THE SAME THING INTO THE SAME LINE. PROMISE: `ReasoningReviewFinding.failed` is documented *\"True = the failure class IS present\"* \u2014 the reviewer reports FAULTS, so an absent finding is a POSITIVE statement that the fault did not occur and `MET` is correct. WHAT THE MUTATION DOES: reinterprets absence as non-evaluation, which turns every CLEAN review INCONCLUSIVE \u2014 a refusal that looks like rigour and stops all work. \u26a0 IT IS THE PLAUSIBLE EDIT, which is exactly why it needs a standing mutant: the line reads like a bug to anyone who has not found the twelve tests that say otherwise, and I was that reader. \u26d4 THE RESIDUE IS REAL AND IS FILED SEPARATELY (`REG-F-407`): a reviewer that engaged with nothing is indistinguishable from one that found nothing, so `UNABLE_TO_DETERMINE` is emitted by no production path and `RPH-ASR-005` cannot fire. The remedy is a CONTRACT change \u2014 the judgement saying what it EVALUATED \u2014 not this line.\n\n\u2b50\u2b50 OVERTURNED AND INVERTED 2026-09-20 (`R26`). \u26d4 THIS ENTRY EXISTED TO FORBID EXACTLY THE CHANGE THE SPONSOR HAS NOW RULED IN, so it is NOT re-anchored in the ordinary sense: its promise is gone, not moved. What I had wrong was the DIAGNOSIS, not the direction \u2014 `failed` is a boolean, a `failed: false` row is an explicit clean verdict, the live prompt already asks for one per criterion, and the mapper threw the distinction away. `REG-F-409` then measured the cost: the gate's fixture faults four of nine criteria and the other five were recorded PASSED on every run. \u2b51 THE ENTRY IS KEPT AND ITS MUTATION INVERTED \u2014 it now restores the COLLAPSE (`f?.failed ? 'NOT_MET' : 'MET'`), so the guard it once argued against is the guard it now defends. \u26a0 THE SUPERSEDED READING IS LEFT ABOVE IN FULL RATHER THAN REWRITTEN, because a ruling that overturns a verdict orphans every field authored for it, and deleting the old argument would erase why anyone believed it.",
 		source: "JAN-EXEC Phase 7b / R25 — the reviewer judges, the engine carries the verdict (ratifies REG-Q-061)"
+	},
+	{
+		id: "J1A-M1-the-handler-drops-the-stipulation",
+		file: "packages/rph-application/src/handlers/assurance.ts",
+		find: "\t\t\t...(p.stipulated !== undefined ? { stipulated: p.stipulated } : {})\n",
+		replace: "\t\t\t// MUTANT: the stipulation is accepted and never reaches the event\n",
+		expectRed: ["packages/rph-application/src/handlers/record-criterion-result.test.ts"],
+		why: "PROMISE: a stipulated answer accepted by the command reaches the durable event. NOTHING ELSE WOULD NOTICE THE DROP: AssuranceCriterionEvaluated is not in RATIFIED_EVENT_PAYLOADS (kit.ts:473-475 skips it) and verif/emitted-event-guard.ts catches an EXTRA key, never a missing optional one. OBSERVED: KILLED — 1 test(s) red in record-criterion-result.test.ts: '⭐ a STIPULATED answer travels BESIDE the true result, and the event carries both (REG-D-071 Q4)' (AssertionError: expected [ { …(3) } ] to deeply equal [ { …(4) } ])",
+		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
+	},
+	{
+		id: "J1A-M2-a-stipulated-row-is-recorded-as-met",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\t\t\toutcome: 'UNABLE_TO_DETERMINE',\n\t\t\t\tstipulated: 'MET',\n",
+		replace: "\t\t\t\toutcome: 'MET', // MUTANT: a criterion nobody judged is recorded as passed\n\t\t\t\tstipulated: 'MET',\n",
+		expectRed: ["packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts"],
+		why: "PROMISE (form D): the row's result is the TRUE value, UNABLE_TO_DETERMINE, and the test's claim rides beside it. THE MUTATION IS REVISION 1 OF THE DESIGN — MET plus a mark — which is REG-F-409's shape: every reader that does not know about the mark sees a pass. OBSERVED: KILLED — 2 test(s) red in stipulated-row-is-not-a-pass.test.ts: '⛔ a stipulated clean finding maps to UNABLE_TO_DETERMINE + stipulated MET — never to MET' (AssertionError: nobody judged RR-B, and the record says so: expected { criterionId: 'RR-B', …(4) } to match object { Object (outcome, stipulated) }); '⭐ the ladder, which knows nothing of stipulations, reads a stipulated remainder as INCONCLUSIVE' (AssertionError: expected 'SATISFIED' to be 'INCONCLUSIVE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
+	},
+	{
+		id: "J1A-M3-a-stipulation-softens-a-fault",
+		file: "packages/rph-assurance/src/validators.ts",
+		find: "\t\tif (f?.stipulated === true && !f.failed)\n",
+		replace: "\t\tif (f?.stipulated === true) // MUTANT: a stipulated fault is recorded as unjudged\n",
+		expectRed: ["packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts"],
+		why: "PROMISE (REG-D-072 D4): a FAILED finding is a fault whatever else it says. Honouring `stipulated` on a failed row would turn a found fault into an unjudged row — which an admitting engine then counts as met. OBSERVED: KILLED — 1 test(s) red in stipulated-row-is-not-a-pass.test.ts: '⛔ a stipulation never softens a FAULT: failed + stipulated is NOT_MET, with an open observation (REG-D-072 D4)' (AssertionError: expected { criterionId: 'RR-A', …(4) } to match object { outcome: 'NOT_MET' })",
+		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
+	},
+	{
+		id: "J1A-M4-a-model-marks-its-own-answers-stipulated",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tfailed: Boolean(f.failed),\n",
+		replace: "\t\t\t\t\tfailed: Boolean(f.failed),\n\t\t\t\t\t...(f.stipulated === true ? { stipulated: true as const } : {}), // MUTANT: the model's own claim is copied\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE: only the test-mode stand-in may say a criterion was stipulated. A reviewer that could write `stipulated` would turn its own answers into unjudged ones — and, in an admitting engine, into answers counted without being scored. coerceJudgement rebuilds each finding field by field, which is the whole guard. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: 'drops a model-supplied `stipulated`: a clean row the model wrote stays an EVALUATED MET' (AssertionError: expected [ 'UNABLE_TO_DETERMINE', …(8) ] to deeply equal [ 'MET', 'MET', 'MET', 'MET', …(5) ])",
+		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
+	},
+	{
+		id: "J1A-M5-the-recorder-drops-the-stipulation",
+		file: "packages/rph-engine/src/record-assurance.ts",
+		find: "\t\t\t\t...(c.stipulated !== undefined ? { stipulated: c.stipulated } : {})\n",
+		replace: "\t\t\t\t// MUTANT: the stipulation never crosses the command boundary\n",
+		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
+		why: "PROMISE: FloorCriterion.stipulated crosses the command boundary, so the governed stream says which rows a TEST answered. Dropped, every stipulated row reads as an ordinary UNABLE_TO_DETERMINE and the disclosure J1-2 builds on is gone. OBSERVED: KILLED — 1 test(s) red in record-assurance.test.ts: 'records the judged rows MET, the stipulated rows UNABLE_TO_DETERMINE + stipulated MET — and the floor is NOT satisfied' (AssertionError: RR-01-no-problem-substitution's stipulation must cross the boundary: expected undefined to be 'MET' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
 	}
 ];
