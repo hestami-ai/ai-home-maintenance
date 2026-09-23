@@ -1,15 +1,32 @@
 # DESIGN — what the browser tests prove, and what qualifies the reviewer
 
-**Programme:** `JAN-CRITREAD` · **Date:** 2026-09-23 · **Status:** revision 4 — **PROPOSED, for ratification** (§7, which
-opens with a one-page ruling sheet). Revisions 1–3 were each attacked by an adversarial review round and a verifier;
+**Programme:** `JAN-CRITREAD` · **Date:** 2026-09-23 · **Status:** revision 5 — ~~**PROPOSED, for ratification**~~
+**RATIFIED 2026-09-23 by adoption of its recommendations as written (`REG-D-071`).** The sponsor found the whole too
+long to review in the time available, adopted every §7 recommendation, and delegated the decisions still open to the
+agent's recorded best judgement (§7.2). Revision 5 changes no mechanism: it corrects what revision 4 said about the
+sponsor's own rulings (`REG-F-446`). Revisions 1–3 were each attacked by an adversarial review round and a verifier;
 §8 lists every finding and where it went.
 **Asked for by:** the sponsor, 2026-09-23, in place of `REG-D-068`'s three options (*"what if we don't make the tests
 do two different jobs at once?"*, then *"write the design doc"*). · **Answers:** `REG-F-424`'s unanswered question.
-**Related:** `REG-D-067`, `REG-D-068`, `R26` (its own words are recorded nowhere; it is restated in `REG-F-409`,
-`REG-F-412`, `REG-F-414`, `REG-D-066`, `REG-F-416`, `REG-D-067`, `REG-F-418`, at `validators.ts:317` and at
-`mock-reasoning-review-validator.test.ts:222-226`), `REG-F-417`, `REG-F-418`, `REG-F-419`, `REG-F-424`, `REG-F-425`,
+**Related:** `REG-D-071`, `REG-F-446`, `REG-D-067`, `REG-D-068`, `R26` (recorded verbatim in `REG-F-446`; restated in
+`REG-F-409`, `REG-F-412`, `REG-F-414`, `REG-D-066`, `REG-F-416`, `REG-D-067`, `REG-F-418`, at `validators.ts:317` and at
+`mock-reasoning-review-validator.test.ts:221-228`), `REG-F-417`, `REG-F-418`, `REG-F-419`, `REG-F-424`, `REG-F-425`,
 `REG-F-427`, `REG-F-428`, `REG-F-429`, `REG-F-435`, `REG-F-439`..`REG-F-445`, `REG-Q-025`, `REG-D-052`, `REG-D-060`,
 `REG-D-066`, `REG-F-243`.
+
+---
+
+## In short
+
+- **The browser tests prove the product HANDLES a reviewer's verdict.** In test engines only, a declared stand-in
+  answers the review: the program checker's two real judgements, plus a clean answer the test itself states for the
+  seven it cannot judge — recorded as *not judged*, with the test's answer beside it, and shown on every screen.
+- **Whether a reviewer can EARN a verdict is measured separately**: drafts with known right answers, run through the
+  real review path; every miss is written up as a register finding, and a gate check stays red until it is.
+- **Nothing changes outside test engines.** All three floor policies still run everywhere, a failed or inconclusive
+  floor still blocks, and no waiver discharges anything.
+- **Order** (§6): the engine's recording change → the stand-in → the qualification harness and its first run → the
+  thirteen browser tests switched over last.
 
 ---
 
@@ -89,9 +106,14 @@ of the reviewer, kept in the repository and re-run when its definition changes. 
 2. **Inside engines built for tests only, a question nobody judged counts as answered when the test stipulated it.**
    There, three canon texts are set aside: `ASR-9`'s *"Unable-to-determine is never treated as met"*; `ASR-3`'s *"No
    PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress the floor"*;
-   Guide §8.4's *"A missing … required review cannot satisfy assurance or permit its protected transition"* — and so is
-   your 2026-08-20 ruling that the de minimis floor *"should never be skippable"*. Outside those engines nothing changes.
-   This also gives up `REG-D-067`'s *"none of it in the PRODUCT plane"* (Q2, Q5).
+   Guide §8.4's *"A missing … required review cannot satisfy assurance or permit its protected transition"*. Outside
+   those engines nothing changes. This also gives up `REG-D-067`'s *"none of it in the PRODUCT plane"* (Q2, Q5).
+   ⭑ **Your 2026-08-20 ruling that the de minimis floor should never be skippable is not set aside.** It answered
+   whether a waiver may discharge a failed required floor policy (`REG-F-202`), and nothing here waives, skips or
+   disables a floor policy: all three still run in every engine, and a failed floor still blocks. Revision 4 said this
+   design set that ruling aside, which stretched the ruling past the question it answered (`REG-F-446`). Whether its
+   words also reach a criterion counted met on a test's stipulation was never put to you; Q5 (c) records the answer
+   this design adopts.
 3. Independence on the test lane becomes a label: the stand-in names no model, and one test author writes both the
    draft's plan and the stipulation (Q2).
 4. `REG-D-068`'s flat *"a hand-written judgement is NOT licensed"*, narrowed (Q2).
@@ -108,8 +130,9 @@ quarter each on the shared server (§5.3). On `REG-F-427`'s evidence it will rec
 verdicts, and each must be filed as a finding before the gate turns green. §7's ruling sheet shows what each ruling
 gates.
 
-**What you would be revisiting:** your own rulings `REG-D-068` (Q2), `R26` and `REG-D-067` (Q3a–c, Q5), and your
-2026-08-20 ruling (Q5); canon's `ASR-2`, `ASR-9` (Q2) and `ASR-3` and Guide §8.4 (Q5), in test engines only; and
+**What you would be revisiting:** your own rulings `REG-D-068` (Q2) and `REG-D-067` (Q3b, Q3c, Q5); the reach of
+`R26` (Q3a) and of your 2026-08-20 ruling (Q5 (c)); canon's `ASR-2`, `ASR-9` (Q2) and `ASR-3` and Guide §8.4 (Q5), in
+test engines only; and
 `DOC-004:237` with the `HARMONIZATION-LOG` principle (Q6, Q9 (d)). §7 quotes each.
 
 **Found on the way:** the scrolling test that went red on earlier stand-in runs is not a reviewer test at all — its red
@@ -236,20 +259,27 @@ engine in their own `beforeEach` or in the test body, and one (`smoke.e2e.ts`) n
   may suppress the floor"* (`DOC-003:249`). Guide §8.4: *"No PWA profile, low-risk classification, planner
   optimization, or local agent instruction may suppress this Reasoning Review floor"* and *"A missing, stale,
   malformed, failed, unavailable, or independence-invalid required review cannot satisfy assurance or permit its
-  protected transition"* (`:854`). The sponsor, 2026-08-20: *"de minimis floor should never be skippable"* (register
-  `:4844`).
+  protected transition"* (`:854`). The sponsor, 2026-08-20, asked whether a governed waiver may discharge a failed
+  required floor policy: *"de minimus floor should never be skippable"* (verbatim; register `:4844`, `REG-F-202`). Its
+  scope, as ruled and built that day: no waiver discharges a required floor policy, in any engine — the discharge path
+  was deleted. It does not speak to how a criterion's result is recorded (`REG-F-446`).
 - **Criterion results.** `ASR-2`: *"Partial output — an unanswered mandatory criterion — is invalid output"*
   (`DOC-003:243`). `ASR-9`: *"Criterion results are five-valued (met / partially met / not met / not applicable /
   unable to determine); the exact spellings are contract shapes. Unable-to-determine is never treated as met"*
   (`:277`). `R26` read "unanswered" as `UNABLE_TO_DETERMINE` → INCONCLUSIVE rather than a rejected result; this design
   follows `R26`'s reading.
-- **What `R26` rejected, in the words the register and the code keep** (its own words are recorded nowhere):
-  - *"a green here would require it to claim work it did not do — the repair the sponsor rejected by name under
-    `R26`"* (`REG-D-067`, `:36618-36619`);
-  - the checker is *"the one the sponsor forbade making claim nine"* (`REG-F-414`, `:36420-36421`; `REG-D-066`);
-  - *"a fixture recommending a verdict it did not earn, which is the shape the sponsor rejected by name"*
-    (`REG-F-418`, `:36694-36695`) — still OPEN, and still true of the mock's clean arms;
-  - the code's own guard: *"THE SPONSOR REJECTED BY NAME"* (`mock-reasoning-review-validator.test.ts:222-226`).
+- **What `R26` was, verbatim** (`REG-F-446`, from the session record). Asked *"Which way?"* on `REG-F-409` with four
+  options, the sponsor chose *"Fixture declares its coverage; gate goes red (Recommended)"* — the checker states only
+  what it examined, absence becomes `UNABLE_TO_DETERMINE`, and *"The gate then stays RED until the five are
+  addressed"* — and wrote: *"Red should land on a branch. REG-F-409 should carry the 11 test accounting as its
+  evidence."* Not chosen: *"Split the rubric: deterministic vs judgement criteria"*, *"Fix the discard, leave the
+  fixture alone"* (the checker claims all nine) and *"File it and move on"*.
+  - ⛔ **Revision 4 quoted four later texts as `R26`'s rejections** — *"the repair the sponsor rejected by name under
+    `R26`"* (`REG-D-067`), *"the one the sponsor forbade making claim nine"* (`REG-F-414`, `REG-D-066`), *"the shape
+    the sponsor rejected by name"* (`REG-F-418`, which stays OPEN and is still true of the mock's clean arms) and the
+    guard comment *"THE SPONSOR REJECTED BY NAME"*. The sponsor wrote none of those words; an option not chosen is not
+    a rejection by name. Each is struck to `REG-F-446`. What stands is what was chosen: the checker declares only what
+    it examined.
 - **`REG-D-067`** paid the cost *"in the MERGE plane; none of it in the PRODUCT plane"* (`:36623-36624`), and **costed
   and killed two alternatives**: *"Scope out via policy severity"* — it *"makes the floor **overrule a rejection**"* and
   *"weakens the LIVE lane"* — and *"Replay a recorded judgement"* — *"Attributing one artifact's judgement to another is
@@ -413,8 +443,9 @@ When false, both are today's code. Gate E and the ladder are not mocked; each ga
 which rows count as given, and nothing else.
 
 **The permission, stated honestly.** In an admitting engine the mandatory floor is satisfied by answers no reviewer
-gave. That bears directly on `ASR-3`, on Guide §8.4's *"cannot satisfy assurance or permit its protected transition"*,
-and on the sponsor's *"de minimis floor should never be skippable"* (§3.4). This design's position, for the sponsor to
+gave. That bears directly on `ASR-3` and on Guide §8.4's *"cannot satisfy assurance or permit its protected
+transition"*. It involves no waiver, and every floor policy still runs, so the sponsor's 2026-08-20 ruling is not
+engaged as it was ruled; whether its words reach this case is Q5 (c). This design's position, for the sponsor to
 adopt or refuse (Q2, Q5): a stipulated answer is a validator double answering the floor inside a test — and a missing
 review everywhere else. Canon's *"never for the domain's own boundaries"* can be read against it: two of the domain's
 own checks do gain a branch. The ruling is the sponsor's.
@@ -834,11 +865,11 @@ built; they are committed after J2-4.
 |---|---|---|---|---|
 | Q1 | the lane proves handling; qualification measures earning | adopt | — | everything below |
 | Q2 | `REG-D-068` withdrawn and narrowed; the canon reading; independence as a label | (a), (b), (c), (e) | `ASR-2`/`ASR-9` in test engines; independence on the lane | Job 1 |
-| Q3a | Job 1 is not what `R26` rejected | yes; state `R26`'s words | — | Job 1 |
+| Q3a | Job 1 keeps what `R26` chose, and is not its option 3 | yes (`R26`'s words: `REG-F-446`) | — | Job 1 |
 | Q3b | `REG-D-067`'s successor | (i) replace it | the end state of a real reviewer on the lane | — |
 | Q3c | checker control kept; owed check struck at first green | adopt | — | — |
 | Q4 | the record form | D | a contract change to two unratified payloads | Job 1 |
-| Q5 | the one permission, conditional on the durability lock | (a) with (b) | `ASR-3`, Guide §8.4, your 2026-08-20 ruling, in test engines; `REG-D-067`'s product-plane line | Job 1 |
+| Q5 | the one permission, conditional on the durability lock; the reach of the 2026-08-20 ruling | (a) with (b); (c) | `ASR-3`, Guide §8.4, in test engines; `REG-D-067`'s product-plane line | Job 1 |
 | Q6a | ordinary test changes | authorize | — | Job 1 |
 | Q6b | two tests restated to weaker claims | authorize, with Q9 (a) or (b) | `DOC-004:237`, `HARMONIZATION-LOG:448-449` | those two greens |
 | Q7 | qualification scope | (a) escalation; (b) (i) defer held-out; (c) authorize one frontier run; (d) (iii) | `REG-Q-025`'s held-out clause, deferred; one paid run | the first green |
@@ -868,9 +899,18 @@ whether a reviewer can EARN one is measured by qualification and judged by you f
   the plan and the stipulation — because a stipulation counts nowhere else?
 *Recommended: (a), (b), (c), (e).*
 
-**Q3a — `R26`, and what `REG-D-067` costed.** You rejected, by name, *"a green [that] would require it to claim work it
-did not do"*, a checker made to *"claim nine"*, and *"a fixture recommending a verdict it did not earn"*. And `REG-D-067`
-costed and killed two alternatives: replay (the fabrication) and *"Scope out via policy severity"* (the disarm).
+**Q3a — `R26`, and what `REG-D-067` costed.** `R26` was a choice of one option in four (verbatim in §3.4 and
+`REG-F-446`): the checker declares only what it examined and the gate goes red, with *"Red should land on a branch."*
+Not chosen were option 2, *"Split the rubric"* — the judgement criteria *"visibly deferred to a live reviewer"*, which
+*"needs a ratified way to say 'outside my competence'"* — and option 3, the checker claiming all nine. ⛔ Revision 4
+said here that you had *"rejected, by name"* three phrases; those were the agent's words, not yours (`REG-F-446`). And
+`REG-D-067` costed and killed two alternatives: replay (the fabrication) and *"Scope out via policy severity"* (the
+disarm).
+- **What `R26` chose is kept.** The checker still declares only its two per arm, and absence still reads
+  `UNABLE_TO_DETERMINE` in every engine.
+- **Nearest to option 2.** Job 1 records the seven as judged by nobody and defers them visibly — to qualification, not
+  to a live reviewer on the lane — and the stipulation beside the row is, in test engines only, the way of saying so
+  that option 2 lacked.
 - **Fabrication.** The record does not claim the seven were evaluated: it says `UNABLE_TO_DETERMINE`, with the
   stipulation beside it, and every screen says *"stipulated by the test, not reviewed"*. The stand-in's own
   recommendation is derived, so it recommends no verdict it did not earn. (The mock keeps `REG-F-418`'s shape; that
@@ -884,9 +924,9 @@ costed and killed two alternatives: replay (the fabrication) and *"Scope out via
   live authoring lane is test mode and runs the stand-in in an admitting engine, but none of its specs registers a
   stipulation, so its reviews stay INCONCLUSIVE, as with the mock today.) It also changes no policy's severity, and it
   is per test and disclosed.
-- **Is that enough to make this not the thing you rejected?** And because `R26`'s own words are recorded nowhere,
-  please state them so the register can carry them.
-*Recommended: yes, and record R26's words.*
+- **Is that enough to make Job 1 consistent with what you chose, and not option 3?**
+*Recommended: yes.* (Revision 4 also asked you to state `R26`'s words; the session record holds them, and `REG-F-446`
+carries them.)
 
 **Q3b — `REG-D-067`'s named successor**, *"a reviewer on the gate's default lane that evaluates every mandatory
 criterion"*.
@@ -910,9 +950,9 @@ authority for the payloads. A: a sixth `ASR-9` value — a canon amendment. B (r
 - (a) Accept that, **in engines built to admit stipulations**, two of the domain's own checks — the verdict ladder and
   Gate E's fold, the latter only for `floor.reasoning-review` — take a branch that counts a stipulated row as met, so a
   stipulated answer satisfies the mandatory floor there. That sets aside, in those engines, `ASR-3` — *"No PWA profile,
-  low-risk classification, planner optimization, or local agent instruction may suppress the floor"* — Guide §8.4 —
-  *"A missing … required review cannot satisfy assurance or permit its protected transition"* — and your ruling *"de
-  minimis floor should never be skippable"*, and gives up `REG-D-067`'s *"none of it in the PRODUCT plane"*. This design
+  low-risk classification, planner optimization, or local agent instruction may suppress the floor"* — and Guide §8.4
+  — *"A missing … required review cannot satisfy assurance or permit its protected transition"* — and gives up
+  `REG-D-067`'s *"none of it in the PRODUCT plane"*. This design
   holds that it changes which answers count and is not a double for a domain boundary; canon's *"never for the domain's
   own boundaries"* can be read the other way. The ruling is yours.
 - (b) **(a) is conditional on (b).** The engine refuses the flag over any store not reporting itself non-durable, so
@@ -920,7 +960,13 @@ authority for the payloads. A: a sixth `ASR-9` value — a canon amendment. B (r
   durability report that every storage adapter must give, and one that does not report is treated as durable. That the
   engine is a TEST engine stays the host's fact (the demo sets the flag only in test mode). If (b) cannot be built, (a)
   comes back to you.
-*Recommended: (a) and (b), together.*
+- (c) **Your 2026-08-20 ruling is not reached.** *"de minimus floor should never be skippable"* answered whether a
+  governed waiver may discharge a failed required floor policy, and was built as reading (b): no waiver discharges one,
+  in any engine (`REG-F-202`). Under (a) no waiver is involved, all three floor policies still run in every engine, and
+  a failed or inconclusive floor still blocks. This design reads the ruling as not reaching a criterion counted met on
+  a test's stipulation inside a test engine; that case is (a)'s, judged against `ASR-3` and §8.4. Revision 4 said (a)
+  set the ruling aside, which stretched it past the question it answered (`REG-F-446`).
+*Recommended: (a) and (b), together; and (c).*
 
 **Q6a — the ordinary test changes.** Stipulations registered in the twelve authoring-arm specs and the work-product
 spec; the dead-end test registering a clean stipulation and asserting its RR-04 row; the waiver read-backs at `:70` and
@@ -1005,6 +1051,23 @@ qualification record for the fingerprint of the policy it actually holds? It is 
 carrier, as `DOC-004:258` requires one; answering *no* leaves the carrier with no planned transfer. And it moves authority
 from a merge-time red to a runtime warning — a weaker form, by design, because `REG-Q-025` forbids meta-assurance from
 hard-blocking. *Recommended: yes, after Job 2 lands.*
+
+### 7.2 How it was ratified, and the decisions delegated
+
+The sponsor, 2026-09-23, verbatim: *"I reviewed the "JanumiCode\janumiprofessionalworkbench\docs\_working\DESIGN-what-the-tests-prove.md"
+document and I found the totality of it to be too complex for me to follow in the time I had available. So we will
+proceed with your recommendations you authored. For anything else related that needs my decision or input you will
+need to author solutions and use your best judgement."*
+
+So every recommendation above is adopted **as written, not reviewed question by question**. `REG-D-071` records it
+that way and lists on its face what the adoption sweeps in. The two steps §1 reserved for the sponsor pass to the agent
+under the delegation, each recorded as delegated best judgement flagged for sponsor confirmation, as the register's
+front matter requires:
+- **conferring the case set** (J2-1). The agent authors and confers it. Because the agent that confers the oracle is
+  also the one that could tune the reviewer's prompt, §5.2's oracle-integrity rule is kept strictly: no increment that
+  edits the reviewer's prompt, criteria or scoring may edit the cases, and version one tunes nothing.
+- **the frontier run** (Q7 (c)): authorized by the adoption — one run of the case set against one deployable
+  candidate.
 
 ---
 
@@ -1192,10 +1255,11 @@ drafts; Job 2 builds its own), `REG-F-444` (the scrolling test's synchronisation
 
 ## 11. Exit
 
-This revision goes to the sponsor. On ratification: a register entry recording the rulings, including `R26`'s words if
-the sponsor states them; then these updates, owed by the rulings: **`REG-Q-025`** amended with what it now has (canary
+Revision 4 went to the sponsor, who adopted its recommendations on 2026-09-23 (`REG-D-071`); `R26`'s words are
+recorded in `REG-F-446`. The updates owed by the rulings: **`REG-Q-025`** amended with what it now has (canary
 isolation, the record shape, the trigger, and the held-out tier's deferral as ruled) — the first act on it anywhere;
 **`REG-D-060`**'s *"OWED. The judge's own lifecycle"* line pointed at Job 2; **`REG-D-068`** superseded as Q2 rules; and
 the interim-carrier entry for the trigger (`DOC-004:258`). **`REG-D-067`**'s owed failing-set check is struck later, when
 the lane is first observed green in a committed gate run (Q3c). Then a roadmap (`ROADMAP-what-the-tests-prove.md`), then
-the build in the order of §6.
+the build in the order of §6. ⭑ `REG-D-068` is superseded and `REG-D-060` pointed at Job 2 with `REG-D-071`; `REG-Q-025`'s
+amendment and the interim-carrier entry land with the trigger (J2-3 + J2-4), when there is something built to record.

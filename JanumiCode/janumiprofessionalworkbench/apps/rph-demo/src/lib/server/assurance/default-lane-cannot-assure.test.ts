@@ -97,8 +97,8 @@ describe('⛔ R32 — the gate default lane CANNOT assure the reasoning-review f
 
 	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
 		it(`⛔ ${framing}: a CLEAN subject still leaves mandatory criteria unjudged, so the floor is INCONCLUSIVE`, async () => {
-			// THE MUTANT THAT KILLS THIS: teach the checker to claim it evaluated all nine — the repair the
-			// sponsor rejected by name. This file then goes green-by-fabrication, which is why
+			// THE MUTANT THAT KILLS THIS: teach the checker to claim it evaluated all nine — `R26`'s option 3,
+			// which the sponsor did not choose (`REG-F-446`). This file then goes green-by-fabrication, which is why
 			// `mock-reasoning-review-validator.test.ts` guards the DECLARATION separately.
 			const r = await judgeCleanly(framing);
 			const undetermined = r.criteria

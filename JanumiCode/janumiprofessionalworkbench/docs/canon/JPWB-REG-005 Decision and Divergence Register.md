@@ -31875,7 +31875,7 @@ that collides with the envelope's, so it would have been read as a MALFORMED env
 branch on **every gate run**, green and silently exercising the non-compliant path forever. The fixture now
 models a COMPLIANT answer, and a test asserts it honours the contract.
 
-**OWED.** The judge's own lifecycle (the paper's central claim) — our rubric is seeded once and never tuned.
+**OWED.** The judge's own lifecycle (the paper's central claim) — our rubric is seeded once and never tuned. ⭑ *Pointer 2026-09-23: `REG-D-071` rules its first act — qualification of the reviewer (`DESIGN-what-the-tests-prove.md` Job 2); tuning stays unruled.*
 `REG-D-059`'s feedback loop, now doubly motivated and finally supplied with real findings. ~~And the reviewer
 still records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`: `readReportedModel` reads
 the model out of Devin's ATIF export and **is never called**, because the assurance seam still returns a bare
@@ -36032,8 +36032,8 @@ criterion result entirely, but not nothing. Recorded here rather than left for a
 ### REG-F-409 — the mandatory Reasoning Review floor passes the gate having evaluated FOUR of its NINE ratified criteria, and the other five are recorded as met
 
 - **Date:** 2026-09-20 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a control reporting itself satisfied over
-  a rubric it never examined** · **Status:** ⚠ **OPEN** — measured and filed; the remedy is a fork that needs a
-  ruling and is NOT taken here.
+  a rubric it never examined** · ~~**Status:** ⚠ **OPEN** — measured and filed; the remedy is a fork that needs a~~
+  ~~ruling and is NOT taken here.~~ **Status:** ⚠ **OPEN** — the fork was taken the same day by `R26` (verbatim in `REG-F-446`); the exit is ruled by `REG-D-071`: it closes when the default lane's reds are green on the declared stand-in and qualification's first run is recorded with its escalations (`DESIGN-what-the-tests-prove.md` §6).
 
 **THE MEASUREMENT.** The Reasoning Review policy declares nine criteria, `RR-01` … `RR-09`. The deterministic
 reviewer the GATE runs — `mock-reasoning-review-validator.ts` — can fault exactly **four**:
@@ -36111,7 +36111,7 @@ true.
 stays RED until the five judgement criteria — `RR-02-no-obligation-elision`,
 `RR-03-no-unjustified-scope-reduction`, `RR-05-no-premature-convergence`, `RR-06-sound-inference`,
 `RR-08-evidence-integrity` — are evaluated by a real reviewer or deliberately scoped out. That is the sponsor's
-ruling (`R26`, 2026-09-20) and the cost was named when it was made.
+ruling (`R26`, 2026-09-20) and the cost was named when it was made. ⭑ *2026-09-23 (`REG-F-446`): the sponsor's words were the chosen option's "The gate then stays RED until the five are addressed" and "Red should land on a branch."; "evaluated by a real reviewer or deliberately scoped out" is this entry's paraphrase. The exit is now ruled by `REG-D-071`.*
 
 ---
 
@@ -36417,8 +36417,8 @@ shared; the remedy is not, and `JAN-ORPHANED` measured the difference:
 - **The 11 were FIXTURE-ORPHANED** — hand-built judgement literals in test files, re-meant by `R26`
   (`REG-D-066`). Corrected: the whole unit suite is **391 files, 4199 passed, 0 failed**.
 - **The 13 e2e are THE REAL THING.** They drive the actual demo server, whose reasoning review is the
-  DETERMINISTIC STRUCTURAL CHECKER — the object `REG-F-409` is about, and the one the sponsor forbade
-  making claim nine. Re-measured after `JAN-ORPHANED`: **still 13, same assertion, unchanged.**
+  DETERMINISTIC STRUCTURAL CHECKER — the object `REG-F-409` is about, and the one ~~the sponsor forbade
+  making claim nine~~ `R26` chose to have declare only what it examined (`REG-F-446`). Re-measured after `JAN-ORPHANED`: **still 13, same assertion, unchanged.**
 
 ⭐ **SO THE E2E HALF IS `REG-F-409`'s ACTUAL REMAINING DEBT, AND IT IS THE HONEST ONE.** The gate's default
 lane cannot satisfy this floor, because the checker on it examines two of nine criteria and says so. That
@@ -36497,7 +36497,7 @@ reintroducing the defect — turns the six demo tests **GREEN** and turns **five
 *anti-correlated* with the finding: red when the product is correct, green when it is broken.
 
 ⛔ **AND NONE OF THE ELEVEN TOUCHES THE DETERMINISTIC STRUCTURAL CHECKER** — the object `REG-F-409` is actually
-about, and the one the sponsor forbade making claim nine. Every one of them obtained its review from a
+about, and the one ~~the sponsor forbade making claim nine~~ `R26` chose to have declare only what it examined (`REG-F-446`). Every one of them obtained its review from a
 **hand-built judgement literal in the test file**, and every one was `findings: []`. ⭑ None of those fixtures
 inspects its subject; they are a reviewer's **report**, and `validators.test.ts` says so: *"stands in for the
 agy backend in unit tests."* `REG-F-412` measured what that backend returns: **nine rows, ~~five of five~~ four of four.** ⭑ *Corrected 2026-09-23 (`REG-F-439`): `REG-F-412` recorded four reviews; seven are stored, every one with nine rows.*
@@ -36610,13 +36610,13 @@ changes what every assertion about that value is worth, and neither the ruling n
 
 ### REG-D-067 — `JAN-EXEC` `R32`: the thirteen e2e reds are ACCEPTED as an INTERIM position, with controls and a named successor
 
-**Ruled 2026-09-20** (sponsor). **Status:** ⚠ **OPEN — INTERIM, NOT CLOSED.** ⛔ *Accepted* and *closed* are
+**Ruled 2026-09-20** (sponsor). ~~**Status:** ⚠ **OPEN — INTERIM, NOT CLOSED.**~~ **Status:** ⚠ **OPEN — INTERIM, NOT CLOSED; its named successor is replaced by `REG-D-071` (Q3b (i): Job 1 plus Job 2), and it closes when the lane is first observed green in a committed gate run, when its owed failing-set check is struck (Q3c).** ⛔ *Accepted* and *closed* are
 not the same word, and this entry exists partly to stop them becoming one.
 
 ⭐⭐ **WHAT WAS ACCEPTED, PRECISELY:** the gate's default lane cannot satisfy the mandatory Reasoning Review
 floor, thirteen e2e specs therefore fail, and **that red is the true statement.** The lane's reviewer examines
-two of nine criteria and declares so; a green here would require it to claim work it did not do — the repair
-the sponsor rejected by name under `R26`.
+two of nine criteria and declares so; a green here would require it to claim work it did not do — ~~the repair
+the sponsor rejected by name under `R26`~~ `R26`'s option 3, which the sponsor did not choose (`REG-F-446`).
 
 ⛔ **WHAT WAS *NOT* ACCEPTED, AND THE DISTINCTION IS LOAD-BEARING.** `REG-F-409` names the adjacent danger:
 *"accepting an INCONCLUSIVE floor in the gate would retire 'no publish without a satisfied floor'."* **This
@@ -36692,7 +36692,7 @@ self-contradiction**. The same file's `unreadable()` arm returns `INCONCLUSIVE` 
 
 ⚠ **IT CHANGES NO BEHAVIOUR TODAY** — the demo records the *recomputed* disposition, never the recommendation —
 so it is a record-plane honesty defect, not a gate defect. ⛔ **But it is a fixture recommending a verdict it
-did not earn, which is the shape the sponsor rejected by name.**
+did not earn, which is ~~the shape the sponsor rejected by name~~ close to the shape of `R26`'s option 3, which the sponsor did not choose (`REG-F-446`).**
 
 ---
 
@@ -36863,7 +36863,7 @@ Nine reviewers — three design calls × three lenses (contract / precedent / va
 
 ### REG-D-068 — a RECORDED reviewer judgement, bound to the subject it was made about, may stand in for a live one
 
-**Ruled 2026-09-21** (sponsor). **Status:** ⭐ **OPEN — the ruling is given; the mechanism is owed.**
+**Ruled 2026-09-21** (sponsor). ~~**Status:** ⭐ **OPEN — the ruling is given; the mechanism is owed.**~~ **Status:** **SUPERSEDED 2026-09-23 by `REG-D-071`** (Q2) — replay withdrawn, never built; *"A hand-written judgement is NOT licensed"* narrowed as `REG-D-071` records.
 
 ⭐⭐ **THE QUESTION PUT, AND WHY IT WAS A RULING RATHER THAN A DESIGN CHOICE.** The de minimis Reasoning Review floor has nine criteria, all BLOCKING, and they are **judgements about reasoning** — `RR-01-no-problem-substitution`, `RR-06-sound-inference`, `RR-07-no-contradiction` and six more — not structural checks. A deterministic checker can decide two of them honestly; it declares so, and the other seven arrive `UNABLE_TO_DETERMINE`. So the test lane faced a trilemma with no good corner:
 
@@ -36894,7 +36894,7 @@ Nine reviewers — three design calls × three lenses (contract / precedent / va
 
 ### REG-F-424 — I recommended a mechanism the previous day's ruling had already attacked to fatal, and one of the two payoffs I claimed for it is unreachable by construction
 
-**Filed 2026-09-21** (`JAN-CRITREAD`, before any mechanism was built). **Status:** ⛔ **OPEN — `REG-D-068` IS AWAITING RE-DECISION.**
+**Filed 2026-09-21** (`JAN-CRITREAD`, before any mechanism was built). ~~**Status:** ⛔ **OPEN — `REG-D-068` IS AWAITING RE-DECISION.**~~ **Status:** ✅ **CLOSED 2026-09-23 by `REG-D-071` — the re-decision it awaited is made: `REG-D-068` is superseded, and this entry's question is answered (Q1: the lane proves the WIRING; whether a reviewer can satisfy the floor moves to qualification). (2)'s seed keeps its own remedy.**
 
 **(1) ⛔⛔ THE OPTION WAS COSTED AND KILLED TWENTY-FOUR HOURS EARLIER, BY NAME.** `REG-D-067` (`:36632-36633`), verbatim:
 
@@ -37210,7 +37210,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   gpt-oss gave THREE outcomes, not a 2:2 split; north-mini-code three; ornith two; laguna rejected every one it could parse. ⭑ The entry's conclusion — the verdict moves with the name — is STRENGTHENED rather than weakened: it now holds on the lane's own prompts for three of the four models, not only on the constructed probes. Laguna's consistency here is that of a model that rejected 13 of the 16 lane prompts.
 - **(2) `REG-F-412`'s count, and what cites it.** `REG-F-412` says *"9 of 9 rows, in 4 of 4 live reviews"*, and it was TRUE when committed (`74c0efb6`, 09:57:57 EDT 2026-09-20). The live-execution lane keeps one database per run (`%TEMP%\jpwb-live-exec-*`); those hold the fourth review at 08:52 EDT, a fifth at 09:58:31 — thirty-four seconds after the commit — and **SEVEN** by 11:41 EDT, all `gemini-3.1-pro-high`, every one with nine distinct rows. Written after the seventh (`ad3dd706`, 13:26 EDT), `REG-D-066` (`:36503`) and `DESIGN-the-fixtures-a-ruling-orphaned.md:42` say *"five of five"*, and so do four test comments (`packages/rph-assurance/src/validators.test.ts:77`, `packages/rph-engine/src/floor-execution-plane.test.ts:65`, `floor-gate.test.ts:37`, `record-assurance.test.ts:76`).
   - ⭑ **What the seven show.** The CONTRACT claim — a row for every criterion — holds 7 of 7. The DISCRIMINATION evidence does not grow: all four reviews of a real work product cleared all nine criteria, so the only reviews that faulted some criteria and cleared others are still reviews 2 and 3, on the same empty artifact. None of the seven was given a planted defect, so they say nothing about whether this reviewer catches one.
-- **(3) `REG-D-068`'s quotation of §8.4.** *"No profile, low-risk classification, or planner may waive it."* is not §8.4. It is the REASONING_REVIEW policy's own authored rationale (`packages/rph-assurance/src/floor-policies.ts:143`), which `REG-F-202` (`:4854`) quoted correctly AS that. Canon reads *"No PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress this Reasoning Review floor."* (Coding Agent Guide `:854`; `JPWB-DOC-003` ASR-3 `:249` says the same of the floor). ⛔ **The substitution is not cosmetic:** canon forbids SUPPRESSING the floor, and `REG-F-202` records that a governed waiver CAN discharge a required floor policy — so *"waive"* states a rule canon does not state, and drops two of the four sources canon names.
+- **(3) `REG-D-068`'s quotation of §8.4.** *"No profile, low-risk classification, or planner may waive it."* is not §8.4. It is the REASONING_REVIEW policy's own authored rationale (`packages/rph-assurance/src/floor-policies.ts:143`), which `REG-F-202` (`:4854`) quoted correctly AS that. Canon reads *"No PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress this Reasoning Review floor."* (Coding Agent Guide `:854`; `JPWB-DOC-003` ASR-3 `:249` says the same of the floor). ⛔ **The substitution is not cosmetic:** canon forbids SUPPRESSING the floor, and `REG-F-202` records that a governed waiver ~~CAN~~ could — until that day's ruling deleted the path (`REG-F-446`) — discharge a required floor policy — so *"waive"* states a rule canon does not state, and drops two of the four sources canon names.
 - **CORRECTIONS APPLIED.** (1) struck in `REG-F-427` with a pointer here. (2) struck in `REG-D-066` and in the design doc, and the four test comments corrected; `REG-F-412` itself is unchanged, because it was right. (3) the quotation struck in `REG-D-068` and replaced with canon's words.
 - **SEARCHED BEFORE FILING.** The register for `Scaffold PWA` (1 hit: `REG-F-429`'s table), `Floor Waiver` (0), `five of five` (1: `:36503`), `seven (live )?reviews` (0), `may waive it` (2: `REG-F-202`, which attributes it correctly, and `REG-D-068`). Positive control: `floor-policies\.ts:14` → 3.
 
@@ -37305,3 +37305,69 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY NOTHING NOTICED.** The lane is deliberately outside the gate, its results are git-ignored, and the annotation is reported, never asserted (`DESIGN-live-execution-lane.md:113`). ⭑ A report no one reads has no reader to notice it is wrong — the same class as `REG-F-419`'s gates.
 - **SEARCHED BEFORE FILING.** The register for `undefined=SATISFIED` (0), `a\.policyId` (0), `results-live-exec` (0) and `live-review` (1: `REG-F-428`'s *"live-reviewer"*, unrelated). Positive control: `reproducible coin` → 1 (`REG-F-427`).
 - **REMEDY (untested):** read `assurancePolicyId` and `findingCode`, and assert — in the lane's own spec — that each annotation token names a floor policy, so the report cannot silently go blank again.
+
+---
+
+### REG-F-446 — the register, two test comments and two designs record `R26` as a rejection "by name" of an option the sponsor simply did not choose, and a design stretched the sponsor's 2026-08-20 waiver ruling over a question it did not answer
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, on the sponsor's questions *"what is "never skippable"? And what is the scope of that?"* and *"What is R26 about that we know of?"*; every quotation below read first-hand from the session record). **Status:** ✅ **CLOSED on filing — the sponsor's words are recorded below, and every overstatement found is struck in place with a pointer here.**
+
+- **(1) `R26`, VERBATIM.** 2026-09-20 10:24 UTC, the agent asked, on `REG-F-409`: *"Making absence mean "not evaluated" is two lines — and it correctly turns the gate's Reasoning Review floor INCONCLUSIVE, because the fixture genuinely cannot judge 5 of 9 criteria. Which way?"* — with four options:
+
+  | # | option label, verbatim | its description, abridged (full text in the session record) |
+  |---|---|---|
+  | 1 | *"Fixture declares its coverage; gate goes red (Recommended)"* | the fixture emits `failed:false` only for what it evaluates; absence becomes `UNABLE_TO_DETERMINE`; *"The gate then stays RED until the five are addressed"*; *"it stops other work until you decide what the five criteria are worth"* |
+  | 2 | *"Split the rubric: deterministic vs judgement criteria"* | the five judgement criteria marked *"outside a deterministic reviewer's competence"* and *"visibly deferred to a live reviewer"*; *"it needs a ratified way to say "outside my competence""*; *"a governance change to floor content, not just code"* |
+  | 3 | *"Fix the discard, leave the fixture alone"* | absence becomes `UNABLE_TO_DETERMINE` and the fixture claims all nine; *"the fixture then asserts an evaluation it did not perform"* |
+  | 4 | *"File it and move on"* | no behaviour change |
+
+  The sponsor selected option 1 (10:27 UTC) and, seventeen minutes later, wrote their only words on it: *"Red should land on a branch. REG-F-409 should carry the 11 test accounting as its evidence."* The label `R26` is the agent's, and so is every judgement written into the options' descriptions.
+- **(2) WHAT THE RECORD SAYS INSTEAD — ALL OF IT THE AGENT'S WORDS.**
+  - `REG-D-067` (`:36618-36619`): *"the repair the sponsor rejected by name under `R26`"*;
+  - `REG-F-414` (`:36420-36421`) and `REG-D-066` (`:36500`): the checker is *"the one the sponsor forbade making claim nine"*;
+  - `REG-F-418` (`:36695`): *"the shape the sponsor rejected by name"*;
+  - `apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts:223`: *"THE SPONSOR REJECTED BY NAME"*; `default-lane-cannot-assure.test.ts:101`: *"the repair the sponsor rejected by name"*;
+  - `DESIGN-the-fixtures-a-ruling-orphaned.md:33` and `:136`; and `DESIGN-what-the-tests-prove.md` revision 4 (§3.4, Q3a), which quoted three of these AS the sponsor's rejections and said *"`R26`'s own words are recorded nowhere"*.
+
+  ⛔ **The sponsor typed no rejection. An option not chosen is not a rejection by name, and "forbade" reports an instruction nobody gave.** The error did work: it made option 3's rejection read as the sponsor's standing condition, which the design then asked the sponsor to be released from (Q3a), and it hid that option 2 — nearest to what that design proposes — was never rejected at all. ⭑ **What stands is what was chosen:** the checker declares only what it examined, and absence reads `UNABLE_TO_DETERMINE`.
+- **(3) `REG-F-409`'s EXIT IS A PARAPHRASE, AND ITS STATUS CONTRADICTED ITS BODY.** It closes *"`gate:fast` stays RED until the five judgement criteria … are evaluated by a real reviewer or deliberately scoped out. That is the sponsor's ruling (`R26`, 2026-09-20)"*; the sponsor's words were the chosen option's *"until the five are addressed"*. And its status said *"the remedy is a fork that needs a ruling and is NOT taken here"* while its body records the fork taken the same day.
+- **(4) THE 2026-08-20 RULING, AND ITS SCOPE.** Verbatim, 22:26 UTC: *"de minimus floor should never be skippable. I suppose I don't understand how this is even a question given the corpus position on this. Perhaps I'm still misunderstanding."* It answered the agent's question *"does ASR-3's "unconditional" permit a governed, criterion-exact, expiring waiver with compensating controls — or no waiver at all?"*, and was built that day as reading (b): no waiver discharges a required floor policy, in any engine (`REG-F-202`). ⛔ `DESIGN-what-the-tests-prove.md` revision 4 said its test-engine permission set that ruling aside (§1, §4.3, Q5 and the ruling sheet). That stretched the ruling past its question: the design waives, skips and disables no floor policy — all three run in every engine, and a failed floor still blocks. What the design does bear on is `ASR-3` and Guide §8.4, which it already named. Whether the ruling's words also reach a criterion counted met on a test's stipulation was never put to the sponsor; revision 5 records the design's answer (Q5 (c): not reached), adopted with the rest in `REG-D-071`.
+  - And `REG-F-439` (3) said *"`REG-F-202` records that a governed waiver CAN discharge a required floor policy"* — true of `REG-F-202` as first filed, false since that day's ruling deleted the path. Struck in place.
+- **CORRECTIONS APPLIED.** Struck in place with a pointer here: `REG-D-067`, `REG-F-414`, `REG-D-066`, `REG-F-418`, `REG-F-439` (3), and `REG-F-409` (a pointer after its exit; its status struck and replaced). The two test comments reworded; `DESIGN-the-fixtures-a-ruling-orphaned.md` struck; `DESIGN-what-the-tests-prove.md` corrected in revision 5. **Not corrected:** commit `333fae67`'s message and later ones, which are history.
+- **THE GENERAL FORM.** When the sponsor answers a question the agent wrote, the sponsor's words are the selection and whatever they type; every description, warning and ⛔ inside the options is the agent's. Record the question, the options and the choice verbatim, and describe an option not chosen as *not chosen*.
+- **SEARCHED BEFORE FILING.** `rejected by name|forbade|sponsor rejected` across the repository: the texts in (2), plus uses about other entries (`REG-F-114`, `REG-F-040`, `REG-F-136`) and texts about other rulings — the per-file floor's rejected *"at least one mutant per file"* (`DESIGN-per-file-assurance-floor.md:110`, `scripts/export-guard.ts:5`) and *"The sponsor rejected the frame"* (`DESIGN-context-assembly-policy.md:351`) — not re-checked here. Every `R26` hit in the repository was read; the others restate the mapper change or the ruling's date, which are true. Positive control: `THE SPONSOR REJECTED BY NAME` → 1.
+
+---
+
+### REG-D-071 — SPONSOR RULING: `DESIGN-what-the-tests-prove.md` is ratified by adoption of its recommendations as written, and the decisions still open are delegated to the agent's recorded best judgement
+
+**Ruled 2026-09-23** (sponsor, in session, on revision 4 as corrected by revision 5 — `REG-F-446`). **Status:** ⚠ **OPEN — ratified; the build is owed (`docs/_working/ROADMAP-what-the-tests-prove.md`, J1-1..J2-4). Decisions made under its delegation are recorded as the agent's best judgement, flagged for sponsor confirmation.**
+
+- **THE RULING, VERBATIM:** *"Yes - correct the design's wording and register. And then, I reviewed the "JanumiCode\janumiprofessionalworkbench\docs\_working\DESIGN-what-the-tests-prove.md" document and I found the totality of it to be too complex for me to follow in the time I had available. So we will proceed with your recommendations you authored. For anything else related that needs my decision or input you will need to author solutions and use your best judgement."*
+- ⛔ **WHAT THAT IS, AND IS NOT.** It adopts every §7 recommendation **as authored**; it is not a ruling on each question after reading it. Each ruling below is the agent's recommendation, carrying the sponsor's authority by adoption. Cite none of them as the sponsor's considered judgement of that one question.
+- **THE RULINGS ADOPTED** (the design's §7.0 sheet, revision 5):
+
+  | Q | adopted |
+  |---|---|
+  | Q1 | the default lane's browser tests prove the product HANDLES a reviewer's verdict; whether a reviewer can EARN one is measured by qualification. `REG-F-424`'s question is answered: WIRING |
+  | Q2 | (a) replay withdrawn, never built; (b) `REG-D-068`'s *"A hand-written judgement is NOT licensed"* narrowed: a stipulated answer is licensed in a test engine when recorded `UNABLE_TO_DETERMINE` with the stipulation beside it, and counts for nothing anywhere else; unit arrangements' hand-written replies stay legitimate as `REG-D-066` derives them; (c) the reading *a validator double's answer is an answer inside a test* (`DOC-004:238`); (e) on the lane, independence is a label |
+  | Q3a | Job 1 keeps what `R26` chose and is not its option 3 (`R26` verbatim: `REG-F-446`) |
+  | Q3b | (i) `REG-D-067`'s named successor is replaced by Job 1 plus Job 2 |
+  | Q3c | `default-lane-cannot-assure.test.ts` kept and retitled; `REG-D-067`'s owed failing-set check struck when the lane is first observed green in a committed gate run |
+  | Q4 | form D: `result: UNABLE_TO_DETERMINE` with an optional `stipulated: 'MET'` beside it |
+  | Q5 | (a) conditional on (b): in engines built to admit stipulations — never durable, by the engine's own refusal — the verdict ladder, and Gate E for `floor.reasoning-review` only, count a stipulated row as met; (c) the 2026-08-20 ruling is not reached |
+  | Q6a | the ordinary test changes authorized |
+  | Q6b | `assurance-floor`'s clean test and `execution-model-invocation` restated to weaker claims, conditional on Q9 (a), without the enforced alternative |
+  | Q7 | (a) report-only, with mandatory escalation; (b) (i) the held-out tier deferred in version one; (c) one frontier run authorized; (d) (iii) a deployable candidate in the first run |
+  | Q8 | (a) (i) the trigger as designed; (b) its escalation limb is compatible with *"never hard-block"* — both as an interim carrier |
+  | Q9 | (a) the reds go green only once the trigger and a first run exist; (d) a lane green that discloses every stipulation, plus a separate gate on the reviewer, is not the *"green suite concealing non-enforcement"* |
+  | Q10 | a product-side WARNING, never a refusal, after Job 2 lands |
+
+- ⛔ **WHAT THE ADOPTION SWEEPS IN, STATED SO IT IS NOT CONFERRED BY OMISSION** (`REG-D-063`'s rule for a wholesale conferral):
+  - **Canon set aside inside test engines, for stipulated rows only:** `ASR-9`'s *"Unable-to-determine is never treated as met"*, `ASR-2`'s *"Partial output — an unanswered mandatory criterion — is invalid output"*, `ASR-3`'s *"may suppress the floor"* and Guide §8.4's *"cannot satisfy assurance or permit its protected transition"*. Outside those engines all four apply unchanged.
+  - **The sponsor's own rulings revisited:** `REG-D-068` superseded (Q2); `REG-D-067`'s successor replaced and its *"none of it in the PRODUCT plane"* given up (Q3b, Q5).
+  - **Two tests restated to weaker claims**, against `DOC-004:237` and `HARMONIZATION-LOG.md:448-449` (Q6b).
+  - **`REG-Q-025`'s "Run held-out canaries" deferred** in version one (Q7 (b)).
+  - **One paid frontier run** on the path to green (Q7 (c)).
+- **DELEGATED, AND HOW EACH IS RECORDED.** The two steps the design reserved for the sponsor — conferring the case set (J2-1) and choosing the frontier candidate — and any design question the build raises are decided by the agent, each recorded in this register as delegated best judgement flagged for sponsor confirmation. ⚠ **The case-set conferral carries a conflict:** the agent that confers the oracle is the one that could tune the reviewer's prompt. So the design's oracle-integrity rule is kept strictly — no increment that edits the reviewer's prompt, criteria or scoring edits the cases, and version one tunes nothing.
+- **MADE WITH THIS ENTRY.** `REG-D-068` → SUPERSEDED; `REG-F-424` → CLOSED; `REG-D-067`'s status names its replaced successor; `REG-F-409`'s status names its ruled exit; `REG-D-060`'s *"OWED. The judge's own lifecycle"* pointed at Job 2. **Owed with the trigger (J2-3 + J2-4):** `REG-Q-025` amended with what is then built, and the interim-carrier entry for `reviewer:qual:check` (`DOC-004:258`).

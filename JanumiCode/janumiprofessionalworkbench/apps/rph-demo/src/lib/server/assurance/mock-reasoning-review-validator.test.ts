@@ -220,7 +220,9 @@ describe('⭐ JAN-EXEC Phase 5 — the PROCESS_RESULT arm joins the agent\'s res
 
 // ── ⭐⭐ THE FIXTURE MAY DECLARE ONLY WHAT IT EXAMINED (`JAN-EXEC` `R26`, evidence in `REG-F-409`) ───────
 //
-// ⛔ THIS BLOCK EXISTS TO STOP A SPECIFIC, TEMPTING REPAIR THAT THE SPONSOR REJECTED BY NAME. With the mapper
+// ⛔ THIS BLOCK EXISTS TO STOP A SPECIFIC, TEMPTING REPAIR: `R26`'s option 3, which the sponsor did not choose
+// (`REG-F-446` records the question and the choice verbatim; this line once said the sponsor rejected it by name,
+// words the sponsor never wrote). With the mapper
 // now reading ABSENCE as `UNABLE_TO_DETERMINE`, the gate's floor is INCONCLUSIVE — correctly, because this
 // fixture faults four of the policy's nine criteria and evaluates only two per arm. The one-line way to make
 // the gate green again is to have the fixture claim it evaluated all nine. That is a fixture asserting work it

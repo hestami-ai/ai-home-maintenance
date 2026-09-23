@@ -30,7 +30,7 @@ redden on the revert.
 ## 2. The structural fact: none of the eleven touches the deterministic checker
 
 ⛔ **`mock-reasoning-review-validator.ts` — the structural checker that is `REG-F-409`'s actual subject, and the
-thing the sponsor forbade making claim nine — is not on any of the eleven paths.** Every one of them obtains
+thing ~~the sponsor forbade making claim nine~~ `R26` chose to have declare only what it examined (`REG-F-446`) — is not on any of the eleven paths.** Every one of them obtains
 its reasoning review from a **hand-built `ReasoningReviewJudgement` literal declared in the test file itself**,
 and every one of those literals is `findings: []`.
 
@@ -133,7 +133,7 @@ radius is exactly six.
 
 1. ⛔ **The deterministic structural checker is NOT touched.** `mock-reasoning-review-validator.ts` keeps its
    honest two-of-nine declaration and the guard that pins it. That object is `REG-F-409`'s subject and the
-   sponsor rejected changing it by name; nothing here goes near it.
+   ~~sponsor rejected changing it by name~~ subject of `R26`, which settled what it declares (`REG-F-446`); nothing here goes near it.
 2. ⛔ **No assertion is weakened, and this was tested rather than asserted.** Every declared mutant still
    reddens; six of them at a sharper line than before.
 3. ⛔ **REFUTED AND NOT DONE:** giving the cross-plane REJECTED arm nine rows was proposed as *"more faithful"*.
