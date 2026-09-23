@@ -36500,7 +36500,7 @@ reintroducing the defect — turns the six demo tests **GREEN** and turns **five
 about, and the one the sponsor forbade making claim nine. Every one of them obtained its review from a
 **hand-built judgement literal in the test file**, and every one was `findings: []`. ⭑ None of those fixtures
 inspects its subject; they are a reviewer's **report**, and `validators.test.ts` says so: *"stands in for the
-agy backend in unit tests."* `REG-F-412` measured what that backend returns: **nine rows, five of five.**
+agy backend in unit tests."* `REG-F-412` measured what that backend returns: **nine rows, ~~five of five~~ four of four.** ⭑ *Corrected 2026-09-23 (`REG-F-439`): `REG-F-412` recorded four reviews; seven are stored, every one with nine rows.*
 
 ⭐⭐ **THE GENERAL FORM, WHICH IS THE PART WORTH KEEPING: A RULING SILENTLY RE-MEANT EVERY ARRANGEMENT KEYED ON
 THE OLD MEANING.** The engine literals date to **2026-07-14**, authored when absence read as `MET` — so
@@ -36878,7 +36878,7 @@ Nine reviewers — three design calls × three lenses (contract / precedent / va
 ⛔⛔ **WHAT WAS *NOT* RULED, AND THE DISTINCTION IS THE WHOLE VALUE OF THE ENTRY.**
 - **A hand-written judgement is NOT licensed.** `clearingJudgement` exists in test support and produces a reply that faults nothing; it is legitimate for unit arrangements and would be a **fabrication** here. The difference is provenance, not shape — the two are byte-identical and only the record of where one came from tells them apart. ⚠ Any mechanism built on this ruling must make that difference **structural**, not a matter of the author's good intentions.
 - **An UNBOUND recording is NOT licensed.** A judgement replayed against a subject it was not made about is a statement nobody made, and the fact that the model once said it makes that worse rather than better.
-- **NOTHING about suppressing the floor.** §8.4's Reasoning Review remains mandatory and non-suppressible: *“No profile, low-risk classification, or planner may waive it.”* A recorded judgement is a way of ANSWERING the floor, never of skipping it.
+- **NOTHING about suppressing the floor.** §8.4's Reasoning Review remains mandatory and non-suppressible: ~~*“No profile, low-risk classification, or planner may waive it.”*~~ *“No PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress this Reasoning Review floor.”* (Coding Agent Guide `:854`) ⭑ *Corrected 2026-09-23 (`REG-F-439`): the struck words are the policy's own paraphrase (`floor-policies.ts:143`), not §8.4, and canon's verb is SUPPRESS, not waive.* A recorded judgement is a way of ANSWERING the floor, never of skipping it.
 
 ⭐ **WHAT IT UNBLOCKS, AND IT IS TWO THINGS THAT LOOKED UNRELATED.**
 - `REG-D-067`'s **thirteen accepted-red e2e specs**. That ruling accepted the reds as *the true statement* and named a successor: a reviewer that examines all nine. This is that successor, arrived at from a direction the ruling did not anticipate — not a better checker, a recorded real one.
@@ -36996,7 +36996,7 @@ Introspection: **29 events before the turn, 30 after it, and the only event adde
 | `north-mini-code` | SATISFIED | **SATISFIED** | SAT / SAT / *loop* |
 | `gpt-oss` | SATISFIED | **SATISFIED** | SAT / **REJECTED** / *unparseable* |
 
-The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything else byte-identical. ⭑ **All four can pass a clean subject** (the positive control holds); **none catches the planted defect**; and **every one returns a different verdict for the identical subject under a different name**, which no reading of the rubric permits. ⚠ Whether a reasoning reviewer must reject a dead-end in a declared-shallow graph is the spec's claim (`assurance-floor.e2e.ts:113`), not a universal one; the name result is the unambiguous one. It reproduces on the lane's own prompts: four lane prompts carry the identical graph under four names, and gpt-oss split them 2:2.
+The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything else byte-identical. ⭑ **All four can pass a clean subject** (the positive control holds); **none catches the planted defect**; and **every one returns a different verdict for the identical subject under a different name**, which no reading of the rubric permits. ⚠ Whether a reasoning reviewer must reject a dead-end in a declared-shallow graph is the spec's claim (`assurance-floor.e2e.ts:113`), not a universal one; the name result is the unambiguous one. ~~It reproduces on the lane's own prompts: four lane prompts carry the identical graph under four names, and gpt-oss split them 2:2.~~ ⭑ **CORRECTED 2026-09-23 (`REG-F-439`):** it reproduces on the lane's own prompts, and more widely than this said — FIVE lane prompts carry the identical graph under five names, and in fresh-load mode gpt-oss gave three different outcomes across them, north-mini-code three and ornith two.
 
 **(5) ⚠ FORM.** Of 48 fresh-load and warm replies per model on the lane's prompts, well-formed: **gpt-oss 40, laguna 40, ornith 42, north 30.** Malformation classes observed: a greedy thinking LOOP (`6931aaecb0`, gpt-oss: 45,000 tokens of reasoning and **no answer**, repeating *“This is perplexing. Let's check the original prompt again”*), a CORRUPTED criterion id, a DUPLICATE key, a genuinely skipped row (laguna only), and unparseable JSON. The corrupted id and duplicate key are decided silently by the product — filed as `REG-F-428`. ⭑ **Every reply that hit the 12,000-token cap was re-run under the product's OWN bound** — fresh load, no token cap, the connection cut at 240 s exactly as `agyPrint`'s execFile kill does: **9 of 9 were killed at 240 s with no answer at all** (100k–190k characters of reasoning, zero of reply). None of the loops was an artifact of the cap. Prompts that loop at temperature 0: gpt-oss 1/16, laguna 1/16, ornith 2/16, north-mini-code 5/16 — each a `VALIDATOR_FAILED` in the product, and each costing 240 s. ⭑ At temperature 0.6 with a fixed seed, gpt-oss answered its looping prompt in 14 s, reproducibly — greedy decoding produced that loop, and pinning does not require it.
 
@@ -37186,3 +37186,86 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **FALSE OF TT-M9'S PROPERTY.** A DUPLICATE answers with the ORIGINAL act's events (`answerFromReceipt`), and nothing requires the original to predate the fork. Another writer's `RecordModelExchange` recorded AFTER the fork, then replayed through the turn's witness, answers DUPLICATE with events that ARE in the tail — on a member of G4. Noting them as the turn's own (TT-M9's mutation) admits exactly the change the draft must be refused for.
 - **RESOLUTION.** TT-M9 is NOT abolished. W2 is re-aimed at that case: the commit is refused, naming G4 and the other writer's exchange. Observed: TT-M9 KILLED, exactly 1 of 14 — the re-aimed W2, `expected { ok: true, …(2) } to match object { ok: false, status: 'CONFLICTED' }`: the other writer's try is admitted as the turn's own and the draft commits past it. W2 as it was written would stay green under the mutation (INFERRED, not driven: with no length term, admitting events from before the fork changes nothing) — which is the case the design reasoned from. The design's §5.8 row is struck to this entry.
 - **THE GENERAL FORM.** "A term the new rule no longer reads is vacuous" holds for a term that only measured the log's SHAPE (the length). It does not hold for a term that decides WHICH events are the caller's own, because the new rule still reads that set. The design classified the guards by what they had guarded, not by what still reads their output.
+
+---
+
+### REG-F-439 — three records overstated or misattributed what was measured: `REG-F-427` names four identical lane drafts where there are five, `REG-F-412` is cited as "five of five" where seven reviews are stored, and `REG-D-068` quotes a policy's paraphrase as §8.4
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, found while exporting the reviewer prompts for the sponsor to read and answering their questions on `REG-D-068`). **Status:** ✅ **CLOSED on filing — three corrections, applied by striking in place with a pointer here.**
+
+- **(1) `REG-F-427` (4): *"four lane prompts carry the identical graph under four names, and gpt-oss split them 2:2"*.** ⛔ There are **FIVE**. Normalising each of the sixteen lane prompts for its PWA name, its ids and its candidate hash leaves five byte-identical: *Scaffold PWA*, *Floor Waiver Framing*, *Floor Waiver Nondischarge*, *Floor Waiver Control*, *Floor Happy*. The lab note the entry was written from (`NOTES.md` C-5) named the last four and missed *Scaffold PWA*. Floor outcomes through the product's own rules, fresh-load mode, both repetitions identical in every cell:
+
+  | draft | gpt-oss | laguna | ornith | north-mini-code |
+  |---|---|---|---|---|
+  | Scaffold PWA | INCONCLUSIVE | REJECTED | SATISFIED | REJECTED |
+  | Floor Waiver Framing | REJECTED | REJECTED | REJECTED | VALIDATOR_FAILED |
+  | Floor Waiver Nondischarge | SATISFIED | REJECTED | REJECTED | SATISFIED |
+  | Floor Waiver Control | SATISFIED | unparseable (repair unmeasured) | REJECTED | REJECTED |
+  | Floor Happy | REJECTED | REJECTED | REJECTED | SATISFIED |
+
+  gpt-oss gave THREE outcomes, not a 2:2 split; north-mini-code three; ornith two; laguna rejected every one it could parse. ⭑ The entry's conclusion — the verdict moves with the name — is STRENGTHENED rather than weakened: it now holds on the lane's own prompts for three of the four models, not only on the constructed probes. Laguna's consistency here is that of a model that rejected 13 of the 16 lane prompts.
+- **(2) `REG-F-412`'s count, and what cites it.** `REG-F-412` says *"9 of 9 rows, in 4 of 4 live reviews"*, and it was TRUE when committed (`74c0efb6`, 09:57:57 EDT 2026-09-20). The live-execution lane keeps one database per run (`%TEMP%\jpwb-live-exec-*`); those hold the fourth review at 08:52 EDT, a fifth at 09:58:31 — thirty-four seconds after the commit — and **SEVEN** by 11:41 EDT, all `gemini-3.1-pro-high`, every one with nine distinct rows. Written after the seventh (`ad3dd706`, 13:26 EDT), `REG-D-066` (`:36503`) and `DESIGN-the-fixtures-a-ruling-orphaned.md:42` say *"five of five"*, and so do four test comments (`packages/rph-assurance/src/validators.test.ts:77`, `packages/rph-engine/src/floor-execution-plane.test.ts:65`, `floor-gate.test.ts:37`, `record-assurance.test.ts:76`).
+  - ⭑ **What the seven show.** The CONTRACT claim — a row for every criterion — holds 7 of 7. The DISCRIMINATION evidence does not grow: all four reviews of a real work product cleared all nine criteria, so the only reviews that faulted some criteria and cleared others are still reviews 2 and 3, on the same empty artifact. None of the seven was given a planted defect, so they say nothing about whether this reviewer catches one.
+- **(3) `REG-D-068`'s quotation of §8.4.** *"No profile, low-risk classification, or planner may waive it."* is not §8.4. It is the REASONING_REVIEW policy's own authored rationale (`packages/rph-assurance/src/floor-policies.ts:143`), which `REG-F-202` (`:4854`) quoted correctly AS that. Canon reads *"No PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress this Reasoning Review floor."* (Coding Agent Guide `:854`; `JPWB-DOC-003` ASR-3 `:249` says the same of the floor). ⛔ **The substitution is not cosmetic:** canon forbids SUPPRESSING the floor, and `REG-F-202` records that a governed waiver CAN discharge a required floor policy — so *"waive"* states a rule canon does not state, and drops two of the four sources canon names.
+- **CORRECTIONS APPLIED.** (1) struck in `REG-F-427` with a pointer here. (2) struck in `REG-D-066` and in the design doc, and the four test comments corrected; `REG-F-412` itself is unchanged, because it was right. (3) the quotation struck in `REG-D-068` and replaced with canon's words.
+- **SEARCHED BEFORE FILING.** The register for `Scaffold PWA` (1 hit: `REG-F-429`'s table), `Floor Waiver` (0), `five of five` (1: `:36503`), `seven (live )?reviews` (0), `may waive it` (2: `REG-F-202`, which attributes it correctly, and `REG-D-068`). Positive control: `floor-policies\.ts:14` → 3.
+
+---
+
+### REG-F-440 — every authoring review the default lane sends asks the reviewer to judge a TEST SCRIPT as the professional's intent, so no lane draft has a correct verdict for a real reviewer to reach
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, found reading the lane's review prompts with the sponsor). **Status:** ⚠ **OPEN — a fixture-realism defect. It bounds what ANY reviewer — live, pinned or recorded — can show on this lane, and it bears on the design the sponsor asked for on 2026-09-23 in place of `REG-D-068`'s three options.**
+
+- **MEASURED, 15 OF 15.** Of the sixteen distinct review prompts the default lane produces (`REG-F-427` (1)), fifteen are on the authoring arm. In every one of the fifteen:
+  - the block the prompt introduces as *"The artifact was produced by a DIFFERENT AI agent from this intent:"* holds the spec's raw JSON step list — `{"plan":[{"tool":"scaffold_graph",…}]}` or its `define_pwu_type` equivalent;
+  - the *"observable narration"* block echoes it (*"Working on: “{"plan":[…”"*);
+  - the rationale block is `renderRationale`'s *"(NOT DECLARED — …)"*.
+
+  The sixteenth, on the work-product arm, is shown the instruction *"Assess Route Assessment."*.
+- **WHY.** The reviewer's intent is `input.prompt` (`reasoning-review-validator.ts`, `judgePrompt`), and the agent route passes it the turn's instruction (`routes/pwa/[id]/agent/+server.ts:130`, `:156`). In the lane, the instruction IS the step list the mock agent parses as its plan (`agent/mock-agent.ts`, `parsePlan`) — correct wiring for a professional's instruction, a category error for a test's tool script. `REG-F-427` (7) recorded the missing rationale; the intent half was unrecorded.
+- **WHAT IT BOUNDS.** RR-01 asks whether *"the result genuinely discharges its delegated obligation"*. Against an intent that IS the tool calls there are two defensible answers — the draft does exactly what the script says, or it discharges no professional obligation at all — and the prompt separately instructs the reviewer to count the missing rationale against the draft. So:
+  - `REG-F-435`'s twelve of thirteen is the ceiling of a stand-in that answers SATISFIED to everything. A reviewer that follows its own prompt has, on these drafts, a lawful reason to refuse every one.
+  - A recording of a real reviewer on these prompts (`REG-D-068`) would record a judgement of a test script.
+  - A measurement of reviewer quality cannot use these prompts as known-answer cases, which is why `REG-F-427` (4) had to CONSTRUCT its probes.
+- **ILLUSTRATION, NOT A RATE.** gpt-oss rejected *Floor Waiver Framing* with *"Delegated obligation to produce full architecture omitted"* — nothing in the script asks for a full architecture — and cleared RR-09 without mentioning the undeclared rationale, the one ground the prompt gives it.
+- **SEARCHED BEFORE FILING.** The register for `JSON plan` (2 hits: a lane description at `:34351`, and `REG-F-427` (7), which records the rationale half only), `as the intent|as its intent|intent.{0,20}(tool-call|step list|JSON plan)` (0), `"plan"` (0), `parsePlan` (0). Positive control: `completeness shortcut` → 2 (`REG-D-060` and `REG-F-427` (7)).
+
+---
+
+### REG-F-441 — the reviewer PROGRAM can be replaced in every mode, and a replaced program's reviews are recorded as the real tool's: `JPWB_AGY_BIN` and `JPWB_DEVIN_BIN` are read ungated
+
+**Filed 2026-09-23** (`JAN-CRITREAD`; raised by the adversarial check of the reframing put to the sponsor, verified first-hand). **Status:** ⛔ **OPEN — a product defect in the class `createFloorRegistry` already closed once for the mock; the remedy is a design choice and is owed.**
+
+- **THE READS.** `apps/rph-demo/src/lib/server/assurance/agy-cli.ts:8` — `const AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';` — and `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:20` — `const DEVIN_BIN = process.env.JPWB_DEVIN_BIN ?? 'devin';`. Module scope, no mode test. Searched `process\.env\.[A-Z_]*_(BIN|PATH|CMD|COMMAND|EXE)\b` across `apps/rph-demo/src`: these two, and nothing else.
+- **WHAT IS RECORDED.** The evaluator a review records is built from the TOOL, not the program that ran: `agentId: opts.agentId ?? 'agy'`, `modelId: opts.modelId ?? judgeModel()`, `providerId: opts.providerId ?? 'google'` (`reasoning-review-validator.ts:366-369`). A replaced program's review is therefore recorded as an agy review by the configured model, and nothing in the record names what actually ran. PER-9 requires *"the resolved provider, model, and version actually invoked"* (`JPWB-DOC-003:369`).
+- **IT IS THE CLASS `index.ts` SAYS IT CLOSED.** `createFloorRegistry` confines the mock to test mode *"because `JPWB_ASSESSOR=mock` once swapped in the content-blind mock in ANY environment while the floor still recorded SATISFIED"* (`assurance/index.ts:44-46`). The program override is the same swap one layer down, and it is ungated.
+- **IT HAS BEEN EXERCISED — BY ME.** Every stand-in measurement in `REG-F-425`, `REG-F-427`, `REG-F-429` and `REG-F-435` reached its stand-in through `JPWB_AGY_BIN` — including `agy-harvest`, which answers SATISFIED to everything. The register records the variable only as a measurement method (`:36980`, its one hit; `JPWB_DEVIN_BIN` 0 hits), never as a hazard.
+- ⚠ **REACH — INFERRED FROM CODE, NOT DRIVEN.** In `RPH_DEMO_MODE=server`, an environment that sets `JPWB_AGY_BIN` to a program printing an all-clean judgement satisfies the mandatory floor, with a durable record naming agy and the configured model. Whoever sets a server's environment can usually change its code as well, so this is not an escalation of privilege. It is a RECORD that states a fiction, which is the property §8.4's identity rule and PER-9 protect.
+- **REMEDY CANDIDATES, UNTESTED.** (a) honour the override only in test mode, as the mock is; (b) whenever an override is set, record the resolved program path and its content hash in the evaluator identity, so the record says what ran; (c) both. ⛔ Whatever replaces `REG-D-068`'s options must not build a test stand-in on this route.
+
+---
+
+### REG-F-442 — two host documents still describe the judge-model default that `REG-D-052` removed
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ⚠ **OPEN — documentation residue of `REG-F-331` / `REG-D-052`; the remedy is to rewrite two paragraphs.**
+
+- `apps/rph-demo/README.md:68-69`: *"If `JPWB_JUDGE_MODEL` is not set, the application pins `Gemini 3.5 Flash (High)` and passes that exact label to `agy --model`."*
+- `apps/rph-demo/AUTHORING-BACKBONE.md:73-75`: *"an app-local preflight resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default `Gemini 3.5 Flash (High)`."*
+- **THE CODE SAYS THE OPPOSITE.** `judgeModel()` THROWS when `JPWB_JUDGE_MODEL` is unset — *"there is no application default"* (`assurance/agy-cli.ts:39-48`). The preflight FAILS CLOSED on the same condition (`assurance/preflight.ts:35-40`). `agy-cli.test.ts:20` holds a mutant that reintroduces the default. And `REG-D-052` (sponsor): *"We won't be pinning judge model"*.
+- **WHY THE DOCS WERE MISSED.** `REG-D-052` names its merge target as *"`agy-cli.ts`, `preflight.ts`, the SSE route. **Owed:** nothing."* (`:29482`). Neither document was in it.
+- **WHY IT MATTERS MORE THAN A TYPO.** The README is where an operator learns to run the real reviewer. It tells them a default exists, and the label it names is the one `REG-F-331` measured the installed agy REJECTING.
+- **SEARCHED BEFORE FILING.** The register for `Gemini 3.5 Flash` (5 hits, all inside `REG-F-331` / `REG-D-052` and all about the code), `AUTHORING-BACKBONE\.md:7[0-9]` (0), and its 17 `README.md` hits (none about the rph-demo README's reviewer paragraph).
+
+---
+
+### REG-F-443 — the authoring preflight still reads the retired `JPWB_ASSESSOR` switch while the reviewer is chosen by `JPWB_ASSURANCE_TOOL`, so in test mode the two disagree in both directions
+
+**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ⚠ **OPEN — a migration residual; read from code, not driven.**
+
+- **THE MIGRATION.** `f35cb69d` (`JAN-LIVEEXEC`, 2026-09-05) retired the *"`JPWB_ASSESSOR='agy'`-means-real sentinel"*. `createFloorRegistry` now selects the real reviewer whenever `JPWB_ASSURANCE_TOOL` is set (`assurance/index.ts:47`: `const useMock = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL;`), and `execution/model.ts` was moved off the old switch with mutants in both directions (`execution/model.test.ts:137-147`).
+- **THE CALL SITE IT MISSED.** The agent route still feeds the preflight `assessor: process.env.JPWB_ASSESSOR` (`routes/pwa/[id]/agent/+server.ts:344`, a line last changed in `43ec23d0`, 2026-07-18). The preflight requires a judge model only when `!input.testMode || input.assessor === 'agy'` (`assurance/preflight.ts:30`), and its comment still states the old rule (`:27-28`).
+- **THE TWO DISAGREEMENTS.** Both are in test mode only; outside it, both sides always select the real reviewer.
+  - `JPWB_ASSURANCE_TOOL` set, `JPWB_ASSESSOR` unset: the real reviewer runs, but the preflight returns READY without checking `JPWB_JUDGE_MODEL`. If that is unset, the turn proceeds and fails inside `judgeModel()`'s throw — the late, opaque failure the preflight exists to prevent (`REG-F-331`). The real-reviewer lanes of `REG-F-425` / `REG-F-427` / `REG-F-435` selected their reviewer this way.
+  - `JPWB_ASSESSOR=agy`, `JPWB_ASSURANCE_TOOL` unset: the mock reviews, but the preflight refuses the turn for a missing judge model it will never use.
+- **SEARCHED.** `JPWB_ASSESSOR` in `apps/rph-demo/src`: one live read (`+server.ts:344`); the rest are comments and `model.test.ts`'s deliberate converse mutant. The register has one hit (`:31681`), about `execution/model.ts`.
+- **REMEDY — UNTESTED.** Feed the preflight the same selection `createFloorRegistry` makes, through one function both call, and give it the mutant pair `model.test.ts` has.

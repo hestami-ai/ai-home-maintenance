@@ -73,7 +73,7 @@ function ulidGen() {
  *
  * ⭑ THE INTENT WAS ALWAYS THIS — IT IS WRITTEN IN THE FIXTURE'S OWN DOCSTRING (*“all 9 criteria MET”*).
  * What changed is only that a clean verdict must now be SAID rather than inferred from silence, which is
- * exactly what a live reviewer does: `REG-F-412` measured nine rows in five of five reviews.
+ * exactly what a live reviewer does: `REG-F-412` measured nine rows in four of four reviews; seven stored, all nine (`REG-F-439`).
  *
  * ⚠ DERIVED, NEVER HAND-LISTED. Nine written-out ids would stop covering a tenth criterion silently — the
  * hand-listing defect one level up. (The criterion list itself is pinned by id AND count in

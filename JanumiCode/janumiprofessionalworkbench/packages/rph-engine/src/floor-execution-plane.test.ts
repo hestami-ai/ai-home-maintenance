@@ -62,7 +62,7 @@ const allClean = () =>
 	}));
 
 /** An independent Reasoning-Review Validator with a caller-chosen recommendation; both arms report on
- *  every criterion, which is what a real reviewer does (`REG-F-412`: nine rows, five of five reviews). */
+ *  every criterion, which is what a real reviewer does (`REG-F-412`: nine rows, four of four reviews; seven stored, all nine — `REG-F-439`). */
 function rr(recommendation: 'SATISFIED' | 'REJECTED'): Validator {
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,

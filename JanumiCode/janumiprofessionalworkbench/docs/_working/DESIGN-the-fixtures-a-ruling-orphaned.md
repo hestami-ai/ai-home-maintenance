@@ -39,7 +39,7 @@ key the result; the findings are constants. A fixture that examines nothing cann
 pretending to judge sound inference"* — it is **a reviewer's report**, and `validators.test.ts:48` says so in
 terms: *"stands in for the agy backend in unit tests."*
 
-⭐ **`REG-F-412` measured what that backend actually returns: nine of nine rows, in five of five reviews.** So
+⭐ **`REG-F-412` measured what that backend actually returns: nine of nine rows, in ~~five of five~~ four of four reviews.** ⭑ *Corrected 2026-09-23 (`REG-F-439`): seven reviews are stored, every one with nine rows.* So
 a fixture standing in for it should return nine rows. It returns zero.
 
 ---
