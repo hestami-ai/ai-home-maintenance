@@ -25,6 +25,20 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (refusal !== undefined) throw error(409, refusal);
 	const body = (await request.json().catch(() => ({}))) as { steps?: Step[] };
 	const steps = Array.isArray(body.steps) ? body.steps : [];
+	// ⛔ A TEST CANNOT HAND-WRITE A STIPULATION PAST THE STAND-IN (`REG-D-071` Q5; `JAN-CRITREAD` J1-1d). In an engine
+	// built for tests, `stipulated: 'MET'` beside an `UNABLE_TO_DETERMINE` row counts as met, so the only lawful
+	// writer on the lane is the declared stand-in. ⚠ THE WHOLE REQUEST, BEFORE ANYTHING RUNS: this route dispatches
+	// step by step with no transaction around the batch, so refusing one step would still land the steps around it
+	// — a stipulated row refused, then a Complete admitted.
+	const stipulating = steps.findIndex((step) => {
+		const payload = Array.isArray(step) ? step[3] : undefined;
+		return typeof payload === 'object' && payload !== null && 'stipulated' in payload;
+	});
+	if (stipulating >= 0)
+		throw error(
+			422,
+			`/test-api/dispatch refused the whole request: step ${stipulating} (${String(steps[stipulating]?.[0])}) carries \`stipulated\`, which only the test-mode stand-in may write (REG-D-071 Q5). Nothing was dispatched.`
+		);
 	const results = steps.map(([ct, agg, id, pl]) => {
 		const r = dispatch(ct, agg, id, pl);
 		return { commandType: ct, status: r.status, code: r.error?.code, message: r.error?.message };

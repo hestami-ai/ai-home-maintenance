@@ -9018,5 +9018,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
 		why: "PROMISE: the handle and the Engine agree. Left out of createEngine's enumeration, the handle still SAYS it admits (it reads deps), the floor callers tell the ladder so, the ladder composes SATISFIED, and the Engine's Gate E — never given the flag — refuses the completion. OBSERVED: KILLED — 1 test(s) red in record-assurance.test.ts: '⭐ the ladder composes SATISFIED and Gate E admits the completion — both reading the same engine' (Error: recordAssuranceRecordingPlan failed at CompleteAssuranceAssessment (asmt_00000000000000000000000003): REJECTED {\"code\":\"RPH_VALIDATION_SEMANTIC_FAILED\",\"category\":\"VALIDATION\",\"message\":\"CompleteAssuranceAssessment: a SATISFIED dispo)",
 		source: "JAN-CRITREAD J1-1c — the two admitting branches, the ladder and Gate E, both scoped to floor.reasoning-review (REG-D-071 Q5 (a); REG-D-072 D3)"
+	},
+	{
+		id: "J1D-M1-dispatch-carries-a-stipulation",
+		file: "apps/rph-demo/src/routes/test-api/dispatch/+server.ts",
+		find: "\tif (stipulating >= 0)\n",
+		replace: "\tif (stipulating >= 0 && stipulating < 0) // MUTANT: the refusal never fires\n",
+		expectRed: ["apps/rph-demo/src/lib/server/test-api-dispatch-stipulation.test.ts"],
+		why: "PROMISE (§4.3): a spec cannot hand-write a stipulation past the stand-in through /test-api/dispatch, and the whole request is refused before anything runs — the route dispatches step by step with no transaction, so the steps around a refused one would still land. OBSERVED: KILLED — 1 test(s) red in test-api-dispatch-stipulation.test.ts: '⛔ a request whose first step carries `stipulated` is refused, naming the step, and NOTHING lands' (AssertionError: promise resolved \"Response { status: 200, statusText: '', headers: Headers { 'content-length': '247', 'content-type': 'application/json' }, body: ReadableStream { locked: false, state: 'readable', supportsBYOB: true }, bodyU)",
+		source: "JAN-CRITREAD J1-1d — the channels closed: /test-api/dispatch refuses a stipulation, and every writer is named (DESIGN-what-the-tests-prove.md §4.3; REG-D-071 Q5)"
+	},
+	{
+		id: "J1D-M2-an-unnamed-writer-appears",
+		file: "apps/rph-demo/src/routes/test-api/introspect/+server.ts",
+		find: "import { error, json } from '@sveltejs/kit';\n",
+		replace: "import { error, json } from '@sveltejs/kit';\nconst __unnamedWriter = { stipulated: 'MET' as const }; // MUTANT: a new writer of a stipulation\nvoid __unnamedWriter;\n",
+		expectRed: ["verif/stipulation-writers.test.ts"],
+		why: "PROMISE: every writer of a stipulation — or builder of an admitting engine — is named, with its reason, in the commit that adds it. The engine admits a stipulated row from ANY writer, so a new one must be a reviewed act, not an accident. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ no file outside the named list writes `stipulated`, or builds an engine that admits stipulations' (AssertionError: a NEW writer of a stipulation. Name it in WRITERS with the reason it writes one — in the same commit — or remove the write: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-1d — the channels closed: /test-api/dispatch refuses a stipulation, and every writer is named (DESIGN-what-the-tests-prove.md §4.3; REG-D-071 Q5)"
+	},
+	{
+		id: "J1D-M3-a-named-writer-is-dropped",
+		file: "verif/stipulation-writers.test.ts",
+		find: "\t'apps/rph-demo/src/lib/server/workbench.ts': 'the demo host builds the admitting engine — in TEST mode only',\n",
+		replace: "\t// MUTANT: the demo host's admitting engine is no longer named\n",
+		expectRed: ["verif/stipulation-writers.test.ts"],
+		why: "PROMISE: the named list is exactly the writers. Dropping a name must redden (the file's writes are then unnamed), or the list could shrink silently while the writes stayed. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ no file outside the named list writes `stipulated`, or builds an engine that admits stipulations' (AssertionError: a NEW writer of a stipulation. Name it in WRITERS with the reason it writes one — in the same commit — or remove the write: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-1d — the channels closed: /test-api/dispatch refuses a stipulation, and every writer is named (DESIGN-what-the-tests-prove.md §4.3; REG-D-071 Q5)"
+	},
+	{
+		id: "J1D-M4-the-census-skips-tests",
+		file: "verif/stipulation-writers.test.ts",
+		find: "\t\telse if (/\\.(ts|mts|cts|svelte)$/.test(name)) acc.push(p);\n",
+		replace: "\t\telse if (/\\.(ts|mts|cts|svelte)$/.test(name) && !name.includes('.test.')) acc.push(p); // MUTANT: tests are not read\n",
+		expectRed: ["verif/stipulation-writers.test.ts"],
+		why: "PROMISE: tests are IN the population — a test that builds an admitting engine is exactly what this census watches. The copied template (agy-stderr-unbound.test.ts) excludes tests; this one must not. OBSERVED: KILLED — 2 test(s) red in stipulation-writers.test.ts: '⛔ every named file still writes one — a stale name would hide the next writer behind it' (AssertionError: expected [ …(7) ] to deeply equal []); '⭐ CONTROL — the census reads tests and product alike, and skips build output' (AssertionError: tests are in the population: expected false to be true // Object.is equality)",
+		source: "JAN-CRITREAD J1-1d — the channels closed: /test-api/dispatch refuses a stipulation, and every writer is named (DESIGN-what-the-tests-prove.md §4.3; REG-D-071 Q5)"
 	}
 ];
