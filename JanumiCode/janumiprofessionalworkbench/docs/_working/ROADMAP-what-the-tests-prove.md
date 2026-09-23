@@ -1,7 +1,7 @@
 # ROADMAP — `JAN-CRITREAD` `J`: what the browser tests prove, and what qualifies the reviewer
 
 **Design:** `DESIGN-what-the-tests-prove.md` (revision 5, `c715be57`) · **Ratified:** `REG-D-071` (sponsor, 2026-09-23,
-by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** PLANNED
+by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-1d` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`)
 
 ⭑ **Exit:** in test engines, a declared stand-in answers the review — the checker's real judgements plus a remainder
 the test stipulates, recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it and disclosed on every surface;
@@ -314,5 +314,12 @@ failure locations must not move.
 
 ## Order
 
-`J1-1a` → `J1-1b` → `J1-1c` → `J1-1d` → `J1-4` → `J1-2` → `J2-1` → `J2-2` → `J2-3 + J2-4` (with the first run) →
-`J1-3`. Nothing is pushed.
+~~`J1-1a` → `J1-1b` → `J1-1c` → `J1-1d` → `J1-4` → `J1-2` → `J2-1` → `J2-2` → `J2-3 + J2-4` (with the first run) →
+`J1-3`.~~ ⭑ **Reordered 2026-09-23, on measurement:** `J1-1a` → `J1-1b` → `J1-1c` → `J1-1d` → `J1-2a` → `J1-2b` →
+`J1-4` → `J2-1` → `J2-2` → `J2-3 + J2-4` (with the first run) → `J1-3`. Six of `J1-4`'s seven race sites sit AFTER
+the line where their spec fails today (`agent-retention` fails at `:38`, before `:51`; the binding test at `:68`, the
+accept click itself; its CONTROL at `:148`, before `:166`; `graph-validation` at `:61`; `pwa-coherence` at `:97`), so
+no held request can reach them until the stand-in exists and a registration carries the draft past its review. Each
+race is therefore shown red on the working tree with its spec temporarily registering, and only the wait is
+committed. `J1-4` still lands before `J1-3` (D9). `J1-2` is split in two commits: the stand-in, its registry, route and
+sequencing pin (`J1-2a`), then the disclosure (`J1-2b`). Nothing is pushed.

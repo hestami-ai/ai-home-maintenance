@@ -24,6 +24,7 @@ import {
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
+import { stipulationFor } from './stipulations.js';
 import type { AgyPrint } from './assurance/reasoning-review-validator.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
 import { recordExchanges } from './assurance/exchange-recorder.js';
@@ -425,7 +426,15 @@ export async function runPwaFloor(
 	const plan = await runFloorAndPlanRecording(
 		subject,
 		ctx,
-		createFloorRegistry({ testMode: isTestMode(), artifacts, exchanges, ...(opts.print ? { print: opts.print } : {}) }),
+		createFloorRegistry({
+			testMode: isTestMode(),
+			artifacts,
+			exchanges,
+			...(opts.print ? { print: opts.print } : {}),
+			// ⭐ THE GRAPH ARM'S SUBJECT IS THE PWA ITSELF, so its registration is looked up by that id — and nothing is
+			// read from any engine to do it, so a turn's fork sees no extra by-id read (`REG-D-072` D6).
+			stipulations: (s, framing) => (framing === 'PWA_GRAPH' ? stipulationFor(s.subjectId, 'PWA_GRAPH') : undefined)
+		}),
 		// ⭐ THE ENGINE THIS FLOOR RECORDS INTO decides whether a stipulated answer counts (`REG-D-071` Q5) — the same
 		// engine whose Gate E will judge the completion, so the two cannot disagree. Never `isTestMode()`.
 		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }

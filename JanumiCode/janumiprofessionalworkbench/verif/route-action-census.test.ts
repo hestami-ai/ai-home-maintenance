@@ -153,6 +153,8 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 	],
 	'pwa/[id]/agent/+server.ts': ['POST'],
 	'test-api/dispatch/+server.ts': ['POST'],
+	// ⭐ `JAN-CRITREAD` J1-2: a spec declares a stipulated remainder; test mode only (not the harness switch).
+	'test-api/reviewer-script/+server.ts': ['POST'],
 	'test-api/introspect/+server.ts': ['GET'],
 	'test-api/reset/+server.ts': ['POST'],
 	'undertakings/+page.server.ts': ['create'],

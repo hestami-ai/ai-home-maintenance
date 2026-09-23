@@ -41,6 +41,10 @@ const WRITERS: Readonly<Record<string, string>> = {
 	'packages/rph-engine/src/record-assurance.ts': 'the recorder sends FloorCriterion.stipulated across the command boundary',
 	'packages/rph-engine/src/engine.ts': 'the handle reports the flag the Engine was built with (`deps.admitStipulatedAnswers === true`)',
 	'apps/rph-demo/src/lib/server/workbench.ts': 'the demo host builds the admitting engine — in TEST mode only',
+	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts':
+		'THE declared stand-in (J1-2): stipulates the DERIVED remainder CLEAN, only where a test registered one',
+	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts':
+		'the stand-in’s rules, composed as an ADMITTING engine would compose them',
 	'packages/rph-application/src/handlers/record-criterion-result.test.ts': 'the handler’s guard: a stipulated command reaches the event',
 	'packages/rph-application/src/handlers/stipulated-answer-gate.test.ts': 'Gate E’s admitting branch, driven in admitting and non-admitting engines',
 	'packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts': 'the mapper’s and the ladder’s guards',

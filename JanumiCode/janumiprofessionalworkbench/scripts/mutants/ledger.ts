@@ -8437,8 +8437,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P5-a-the-binary-selector-restored",
 		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
-		find: "\t\t\t\t\t\treturn judgeProcessResult(input.content, input.observedToolCalls);\n",
-		replace: "\t\t\t\t\t\treturn judge(input.content); // MUTANT: the binary selector, restored — a command result routed to the graph arm\n",
+		// ⭑ RE-ANCHORED 2026-09-23 (`JAN-CRITREAD` J1-2): the switch moved into the exported `judgeStructurally`, which the
+		// declared stand-in runs unchanged, so the line lost three levels of indentation and nothing else.
+		find: "\t\t\treturn judgeProcessResult(input.content, input.observedToolCalls);\n",
+		replace: "\t\t\treturn judge(input.content); // MUTANT: the binary selector, restored — a command result routed to the graph arm\n",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.test.ts"],
 		why: "PROMISE: a reviewer is told what it is ACTUALLY looking at, so its judgement is made against a description of THIS subject (`R14`). WHO RELIES: every AI-executed step whose evidence is a command result — which under `R15` is the only kind Phase 5 produces. WHAT THE MUTATION DOES TO THEM: the command result takes the PWA-graph arm, fails `JSON.parse`, and returns `unreadable()` → INCONCLUSIVE. INCONCLUSIVE BLOCKS, so the step can never complete — and the failure reads as “the reviewer could not read the subject” rather than “the host sent it to the wrong reviewer”. ⛔ THIS IS NOT HYPOTHETICAL: IT IS THE STATE PHASE 5 FOUND IN PRODUCTION, and the roadmap’s own specification rested on a code comment saying it could not happen. ⭑ SEVEN VICTIMS REDDEN AND SIX STAY GREEN, and which six matters: the graph-arm tests and the routing CONTROL hold, so this cannot be confused with “the offline reviewer stopped working”.",
 		source: "JAN-EXEC Phase 5 / R14 — the framing is DECLARED by the caller, never inferred from the subject"
@@ -9054,5 +9056,104 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/stipulation-writers.test.ts"],
 		why: "PROMISE: tests are IN the population — a test that builds an admitting engine is exactly what this census watches. The copied template (agy-stderr-unbound.test.ts) excludes tests; this one must not. OBSERVED: KILLED — 2 test(s) red in stipulation-writers.test.ts: '⛔ every named file still writes one — a stale name would hide the next writer behind it' (AssertionError: expected [ …(7) ] to deeply equal []); '⭐ CONTROL — the census reads tests and product alike, and skips build output' (AssertionError: tests are in the population: expected false to be true // Object.is equality)",
 		source: "JAN-CRITREAD J1-1d — the channels closed: /test-api/dispatch refuses a stipulation, and every writer is named (DESIGN-what-the-tests-prove.md §4.3; REG-D-071 Q5)"
+	},
+	{
+		id: "J12A-M1-a-stipulation-by-default",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\t\tregistered === 'CLEAN'\n",
+		replace: "\t\tregistered === 'CLEAN' || registered === undefined // MUTANT: every subject is stipulated, registered or not\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts"],
+		why: "PROMISE (§4.1 rule 4): without a registration nothing else is answered, and the review is INCONCLUSIVE. A stand-in that stipulated by default would pass every unregistered review on the lane — no test would have to say what it stipulates. OBSERVED: KILLED — 3 test(s) red in standin-reasoning-review-validator.test.ts: '⛔ rule 4 — no registration: the remainder is NOT answered, and the review is INCONCLUSIVE (not a throw)' (AssertionError: expected [ …(7) ] to deeply equal []); '⛔ rule 6 — the recommendation is DERIVED: unregistered, it is INCONCLUSIVE though the checker says SATISFIED' (AssertionError: expected 'SATISFIED' to be 'INCONCLUSIVE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M2-the-checker-recommendation-is-copied",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\tconst recommendation: ReasoningReviewJudgement['recommendation'] = faulted\n",
+		replace: "\tconst recommendation: ReasoningReviewJudgement['recommendation'] = faulted || true // MUTANT: the checker's constant is copied\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts"],
+		why: "PROMISE (§4.1 rule 6): the recommendation is DERIVED — SATISFIED only when nothing was faulted and the whole remainder is stipulated. The mock's clean arms recommend SATISFIED over two of nine (REG-F-418); copying that constant would give the stand-in the same unearned shape. OBSERVED: KILLED — 1 test(s) red in standin-reasoning-review-validator.test.ts: '⛔ rule 6 — the recommendation is DERIVED: unregistered, it is INCONCLUSIVE though the checker says SATISFIED' (AssertionError: expected 'SATISFIED' to be 'INCONCLUSIVE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M3-an-unread-subject-is-stipulated-over",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\tif (checker.findings.length === 0) return checker;\n",
+		replace: "\t// MUTANT: a subject the checker could not read is completed by the test\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts"],
+		why: "PROMISE (§4.1 rule 2): a stipulation completes a subject the checker READ; it never replaces a read. Otherwise the whole rubric of a subject nobody read — an unparseable draft — would be answered by the test. OBSERVED: KILLED — 1 test(s) red in standin-reasoning-review-validator.test.ts: '⛔ rule 2 — an UNREADABLE subject is never stipulated over, even with a registration' (AssertionError: expected [ …(9) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M4-stipulations-outlive-the-engine",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\tclearStipulations();\n",
+		replace: "\t// MUTANT: stipulations survive the reset\n",
+		expectRed: ["apps/rph-demo/src/lib/server/reviewer-script.test.ts"],
+		why: "PROMISE (§4.5): a registration dies with its engine. Test-mode ids restart at every reset, so a surviving registration would answer a LATER test's PWA that happened to get the same id. OBSERVED: KILLED — 1 test(s) red in reviewer-script.test.ts: '⛔ a registration never survives a reset — ids restart, so it would answer a LATER test’s PWA' (AssertionError: expected 'CLEAN' to be undefined)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M5-keyed-by-pwa-alone",
+		file: "apps/rph-demo/src/lib/server/stipulations.ts",
+		find: "const key = (pwaId: string, framing: StipulableFraming) => `${pwaId}\\u0000${framing}`;",
+		replace: "const key = (pwaId: string, _framing: StipulableFraming) => pwaId; // MUTANT: one registration answers every arm",
+		expectRed: ["apps/rph-demo/src/lib/server/reviewer-script.test.ts"],
+		why: "PROMISE (§4.5): a registration answers only the arm it names. Keyed by PWA alone, a spec that stipulates its graph review would silently stipulate its work-product review too. OBSERVED: KILLED — 1 test(s) red in reviewer-script.test.ts: '⛔ a registration answers ONLY the arm it names' (AssertionError: expected 'CLEAN' to be undefined)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M6-the-harness-switch-opens-the-route",
+		file: "apps/rph-demo/src/routes/test-api/reviewer-script/+server.ts",
+		find: "\tif (!isTestMode()) throw error(404, 'Not found');\n",
+		replace: "\tif (!(isTestMode() || process.env.JPWB_HARNESS === '1')) throw error(404, 'Not found'); // MUTANT: gated like the other routes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/reviewer-script.test.ts"],
+		why: "PROMISE (§4.5; REG-D-072 D7): the route is test mode only. Every other /test-api route gates on harnessExposed(), which is also true on the durable live-execution lane — the red-first form: a copy of the existing routes would answer 200 there. OBSERVED: KILLED — 1 test(s) red in reviewer-script.test.ts: '⛔ answers 404 on a server that exposes the harness but is NOT test mode — the live-execution lane' (AssertionError: expected { Object (status, body) } to match object { status: 404 })",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M7-the-stand-in-never-sees-the-registry",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "createStandinReasoningReviewValidator({ stipulationFor: opts.stipulations ?? (() => undefined) })",
+		replace: "createStandinReasoningReviewValidator({ stipulationFor: () => undefined }) /* MUTANT: the caller's lookup is dropped */",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-stipulated.test.ts"],
+		why: "PROMISE: the stand-in answers what the test registered. Selected but never handed the registry, it would stipulate nothing, and every registered lane test would stay red for a reason no spec could see. OBSERVED: KILLED — 1 test(s) red in authoring-turn-stipulated.test.ts: '⭐ with a registration: the floor is satisfied on the turn, under the stand-in, and the commit lands' (AssertionError: [{\"policyId\":\"floor.schema-invariant\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":\"floor.identity-provenance\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M8-the-recorder-hides-the-flag",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\tadmitStipulatedAnswers: delegate.admitStipulatedAnswers,\n\t\tclose: () => delegate.close()",
+		replace: "\t\tadmitStipulatedAnswers: false, // MUTANT: the turn's recorder says its engine does not admit\n\t\tclose: () => delegate.close()",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-stipulated.test.ts"],
+		why: "PROMISE (REG-D-072 D2): the turn's hand-written recorder forwards the engine's flag, because the floor callers read it from the engine they record into — and on a turn that is the recorder. Hidden, the ladder would compose INCONCLUSIVE what Gate E admits. (A DROPPED member is NO_COMPILE, which proves nothing; this is the compiling form.) OBSERVED: KILLED — 1 test(s) red in authoring-turn-stipulated.test.ts: '⭐ with a registration: the floor is satisfied on the turn, under the stand-in, and the commit lands' (AssertionError: [{\"policyId\":\"floor.schema-invariant\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":\"floor.identity-provenance\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M9-the-ladder-is-never-told",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\t{ admitStipulatedAnswers: engine.admitStipulatedAnswers }\n",
+		replace: "\t\t{} // MUTANT: the ladder is never told the engine admits\n",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-stipulated.test.ts"],
+		why: "PROMISE (REG-D-071 Q5): the ladder and Gate E answer from the same engine. Not told, the ladder composes INCONCLUSIVE and the registered clean draft never passes. OBSERVED: KILLED — 1 test(s) red in authoring-turn-stipulated.test.ts: '⭐ with a registration: the floor is satisfied on the turn, under the stand-in, and the commit lands' (AssertionError: [{\"policyId\":\"floor.schema-invariant\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":\"floor.identity-provenance\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M10-the-graph-lookup-is-dropped",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "stipulations: (s, framing) => (framing === 'PWA_GRAPH' ? stipulationFor(s.subjectId, 'PWA_GRAPH') : undefined)",
+		replace: "stipulations: () => undefined /* MUTANT: the graph arm never finds a registration */",
+		expectRed: ["apps/rph-demo/src/lib/server/authoring-turn-stipulated.test.ts"],
+		why: "PROMISE: the graph arm's subject is the PWA itself, and its registration is found by that id. Dropped, the authoring arm — twelve of the thirteen lane reds — could never be stipulated. OBSERVED: KILLED — 1 test(s) red in authoring-turn-stipulated.test.ts: '⭐ with a registration: the floor is satisfied on the turn, under the stand-in, and the commit lands' (AssertionError: [{\"policyId\":\"floor.schema-invariant\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":\"floor.identity-provenance\",\"disposition\":\"SATISFIED\",\"independenceOk\":true,\"observations\":[]},{\"policyId\":)",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12A-M11-the-harness-module-is-not-exempt",
+		file: "verif/reviewer-qualification-sequencing.test.ts",
+		find: "\t\t.filter((rel) => rel !== HARNESS)\n",
+		replace: "\t\t// MUTANT: the module that DEFINES the helper counts as a registration\n",
+		expectRed: ["verif/reviewer-qualification-sequencing.test.ts"],
+		why: "PROMISE (REG-D-072 D10): the harness module names the helper by construction and is exempt by path. Because the scan reads every .ts under e2e/ — not only *.e2e.ts — the harness IS in the population, so this exemption is load-bearing and its mutant reddens today; scanning only *.e2e.ts, it could never fail. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-sequencing.test.ts: '⛔ THIS REPOSITORY — every registration is preceded by the check in gate:fast and a deployable run' (AssertionError: expected [ …(2) ] to deeply equal []); '⭐ and nothing registering is never red — the harness that DEFINES the helper does not count' (AssertionError: expected [ …(2) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
 	}
 ];

@@ -64,6 +64,24 @@ export async function resetEngine(
 	expect(res.ok(), `reset(${seed}) should succeed`).toBeTruthy();
 }
 
+/**
+ * ⭐ `JAN-CRITREAD` J1-2 — declare that this test STIPULATES the reasoning-review remainder CLEAN for one PWA on one arm
+ * (`/test-api/reviewer-script`). The declared stand-in then answers what the structural checker cannot judge, and the
+ * record says so: `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it.
+ *
+ * ⚠ CALL IT IN THE TEST BODY, after the reset and after the PWA exists, with the id READ FROM THE STORE — never
+ * computed, and never at `describe`/`beforeAll` level, which the next reset wipes (ids restart at every reset).
+ */
+export async function registerStipulation(
+	request: APIRequestContext,
+	pwaId: string,
+	framing: 'PWA_GRAPH' | 'WORK_PRODUCT'
+): Promise<void> {
+	const res = await request.post('/test-api/reviewer-script', { data: { pwaId, framing, remaining: 'CLEAN' } });
+	expect(res.ok(), `registerStipulation(${pwaId}, ${framing}): ${await res.text()}`).toBeTruthy();
+	expect(((await res.json()) as { registered: unknown }).registered).toEqual({ pwaId, framing, remaining: 'CLEAN' });
+}
+
 /** Navigate and wait for Svelte to hydrate (so toggle/enhance handlers are attached before we interact). One call
  *  per full page load suffices — subsequent in-app link clicks are SPA navigations and stay hydrated. */
 export async function gotoHydrated(page: Page, path: string): Promise<void> {

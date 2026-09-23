@@ -34,6 +34,8 @@ import { recordAssuranceRecordingPlan, type AuthedEngineHandle } from '@janumipw
 import type { ProfessionalWorkObjectType } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from '../assurance/index.js';
+import type { StipulationLookup } from '../assurance/standin-reasoning-review-validator.js';
+import { anyStipulationRegistered, stipulationFor, workProductPwaOf } from '../stipulations.js';
 import { classifyFloorRemediation, type FloorRemediation, type FloorView } from '../floor.js';
 import { createExchangeSink } from '../assurance/exchange-capture.js';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
@@ -143,6 +145,13 @@ export async function runFloorOverSubject(
 	// ⚠ THE MOCK COULD NEVER HAVE CAUGHT IT: it captures nothing, so the sink was never reached and every gate
 	// run was green. That is the whole argument for a live lane — the guard was working correctly and the
 	// wiring around it had never been exercised.
+	// ⭐ THE WORK-PRODUCT ARM FINDS ITS PWA through artifact → work unit → undertaking (`REG-D-072` D6), on the engine this
+	// floor records into, and only when a test registered anything at all. A process result is never stipulated.
+	const stipulations: StipulationLookup = (s, framing) => {
+		if (framing !== 'WORK_PRODUCT' || !anyStipulationRegistered()) return undefined;
+		const pwaId = workProductPwaOf(engine, s.subjectId);
+		return pwaId === undefined ? undefined : stipulationFor(pwaId, 'WORK_PRODUCT');
+	};
 	const exchanges = createExchangeSink();
 	const plan = await runFloorAndPlanRecording(
 		assuranceSubject,
@@ -151,7 +160,8 @@ export async function runFloorOverSubject(
 			testMode: isTestMode(),
 			artifacts: opts.artifacts,
 			exchanges,
-			...(opts.print ? { print: opts.print } : {})
+			...(opts.print ? { print: opts.print } : {}),
+			stipulations
 		}),
 		// ⭐ `REG-D-071` Q5: the engine this floor records into decides whether a stipulated answer counts — the same
 		// engine whose Gate E judges the completion. One source, so the ladder and the gate cannot disagree.

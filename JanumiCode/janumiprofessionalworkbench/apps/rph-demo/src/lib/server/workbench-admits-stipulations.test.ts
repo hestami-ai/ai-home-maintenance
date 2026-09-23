@@ -20,6 +20,8 @@ async function engineUnder(mode: string, harness = false) {
 	vi.stubEnv('RPH_DEMO_MODE', mode);
 	vi.stubEnv('JPWB_DEMO_DB', '');
 	vi.stubEnv('JPWB_HARNESS', harness ? '1' : '');
+	// ⭑ A BARE BOOT: the claim is about the engine's flag, not the reference workbench, which costs seconds to seed.
+	vi.stubEnv('JPWB_SEED', 'bare');
 	const { getEngine } = await import('./workbench.js');
 	return getEngine();
 }

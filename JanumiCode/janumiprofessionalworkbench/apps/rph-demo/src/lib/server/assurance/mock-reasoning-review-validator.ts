@@ -9,6 +9,7 @@ import {
 	reasoningReviewResultFromJudgement,
 	type Identity,
 	type ReasoningReviewFinding,
+	type ReasoningReviewInput,
 	type ReasoningReviewJudgement,
 	type Validator
 } from '@janumipwb/rph-assurance';
@@ -287,6 +288,27 @@ function judgeProcessResult(
 	};
 }
 
+/**
+ * ⭐ THE STRUCTURAL CHECKER'S JUDGEMENT, BY THE FRAMING THE CALLER DECLARED (`R14`). Exported so the declared stand-in
+ * (`standin-reasoning-review-validator.ts`, `JAN-CRITREAD` J1-2) runs exactly this, unchanged — §4.1 rule 1: the
+ * checker's answers are recorded as its own. The switch is exhaustive, so a fourth framing is a type error here
+ * rather than a misdescription there.
+ */
+export function judgeStructurally(input: ReasoningReviewInput): ReasoningReviewJudgement {
+	switch (input.framing) {
+		case 'WORK_PRODUCT':
+			return judgeWorkProduct(input.content, input.prompt);
+		case 'PROCESS_RESULT':
+			return judgeProcessResult(input.content, input.observedToolCalls);
+		case 'PWA_GRAPH':
+			return judge(input.content);
+		default: {
+			const _never: never = input.framing;
+			throw new Error(`Unknown review framing: ${String(_never)}`);
+		}
+	}
+}
+
 export function createMockReasoningReviewValidator(): Validator {
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
@@ -306,20 +328,7 @@ export function createMockReasoningReviewValidator(): Validator {
 			// every subject kind that was neither took the graph arm SILENTLY, which for a process result meant a
 			// guaranteed INCONCLUSIVE and a permanently blocked step. `R14`: the CALLER declares the framing, and
 			// this switch is exhaustive, so a fourth kind is a type error here rather than a misdescription there.
-			const judgement = ((): ReasoningReviewJudgement => {
-				switch (input.framing) {
-					case 'WORK_PRODUCT':
-						return judgeWorkProduct(input.content, input.prompt);
-					case 'PROCESS_RESULT':
-						return judgeProcessResult(input.content, input.observedToolCalls);
-					case 'PWA_GRAPH':
-						return judge(input.content);
-					default: {
-						const _never: never = input.framing;
-						throw new Error(`Unknown review framing: ${String(_never)}`);
-					}
-				}
-			})();
+			const judgement = judgeStructurally(input);
 			return Promise.resolve(
 				reasoningReviewResultFromJudgement(
 					subject,

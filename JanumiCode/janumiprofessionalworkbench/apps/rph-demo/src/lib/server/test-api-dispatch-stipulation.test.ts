@@ -24,6 +24,9 @@ async function dispatchUnderTest(steps: unknown[]) {
 	vi.stubEnv('RPH_DEMO_MODE', 'test');
 	vi.stubEnv('JPWB_HARNESS', '');
 	vi.stubEnv('JPWB_DEMO_DB', '');
+	// ⭑ A BARE BOOT: this test needs an engine, not the reference workbench — seeding it costs seconds, and under a
+	// loaded package run that alone tripped the 5 s default.
+	vi.stubEnv('JPWB_SEED', 'bare');
 	const { getEngine } = await import('./workbench.js');
 	const { POST } = await import('../../routes/test-api/dispatch/+server.js');
 	const before = getEngine().readAllEvents().length;

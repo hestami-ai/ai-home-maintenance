@@ -1,6 +1,7 @@
 // The de minimis floor Validator registry for this host — the deployment-time capability binding (§8.9 layer 2).
-// Two deterministic Validators + a Reasoning-Review Validator (agy/Gemini in dev/prod, the deterministic structural
-// mock under E2E; setting JPWB_ASSURANCE_TOOL forces a real backend and names which one). The registry is an
+// Two deterministic Validators + a Reasoning-Review Validator (agy/Gemini in dev/prod, the DECLARED STAND-IN under
+// test mode — the structural checker plus the test's stipulated remainder, `JAN-CRITREAD` J1-2; setting
+// JPWB_ASSURANCE_TOOL forces a real backend and names which one). The registry is an
 // in-process seam, not a persisted contract.
 import {
 	createValidatorRegistry,
@@ -11,7 +12,10 @@ import {
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeSink } from './exchange-capture.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
-import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
+import {
+	createStandinReasoningReviewValidator,
+	type StipulationLookup
+} from './standin-reasoning-review-validator.js';
 import { assuranceModel, devinPrint } from '../tools/devin-reviewer.js';
 
 export function createFloorRegistry(opts: {
@@ -32,6 +36,13 @@ export function createFloorRegistry(opts: {
 	 */
 	print?: AgyPrint;
 	clock?: () => string;
+	/**
+	 * ⭐ `JAN-CRITREAD` J1-2 — the host's answer to "did the test register a stipulation for this subject, on this
+	 * arm?", handed to the declared stand-in. The floor callers supply it because they know what their subject IS
+	 * (a PWA, a work product); absent, nothing is ever stipulated — the stand-in then answers only what the checker
+	 * judged, and the review is INCONCLUSIVE, as it was under the mock.
+	 */
+	stipulations?: StipulationLookup;
 }): ValidatorRegistry {
 	// Fail closed (§8.4): no local instruction, env var, or planner optimization may suppress the Reasoning
 	// Review floor.
@@ -44,7 +55,7 @@ export function createFloorRegistry(opts: {
 	// ⛔ FAIL-CLOSED IS UNCHANGED AND IS THE POINT OF THE `opts.testMode` CONJUNCT. A mock may be selected ONLY
 	// inside test mode; outside it the real Validator is the only option, because `JPWB_ASSESSOR=mock` once
 	// swapped in the content-blind mock in ANY environment while the floor still recorded SATISFIED.
-	const useMock = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL;
+	const useStandin = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL;
 	// ⭑ WHICH REAL TOOL REVIEWS IS A DIFFERENT QUESTION FROM WHETHER A REAL TOOL REVIEWS, and neither can
 	// suppress the floor — the worst a tool selection can do is REFUSE. It defaults to `agy` when the real
 	// path is reached without a named tool, so existing deployments are unchanged.
@@ -53,8 +64,10 @@ export function createFloorRegistry(opts: {
 	registry.register(schemaInvariantValidatorInstance);
 	registry.register(identityProvenanceValidatorInstance);
 	registry.register(
-		useMock
-			? createMockReasoningReviewValidator()
+		useStandin
+			? // ⭐ THE DECLARED STAND-IN (§4.1): the structural checker's real answers, plus a CLEAN remainder only
+				// where the test registered one — recorded as NOT JUDGED, and counted only by an admitting engine.
+				createStandinReasoningReviewValidator({ stipulationFor: opts.stipulations ?? (() => undefined) })
 			: createAgyReasoningReviewValidator({
 					...(opts.artifacts ? { artifacts: opts.artifacts } : {}),
 					...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
@@ -81,3 +94,4 @@ export function createFloorRegistry(opts: {
 
 export { createAgyReasoningReviewValidator } from './reasoning-review-validator.js';
 export { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
+export { createStandinReasoningReviewValidator } from './standin-reasoning-review-validator.js';

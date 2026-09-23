@@ -34,6 +34,7 @@ import {
 } from './identity.js';
 import type { Credential } from '@janumipwb/rph-ports';
 import { openDraftOn } from './open-drafts.js';
+import { clearStipulations } from './stipulations.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 /**
@@ -330,6 +331,9 @@ export function resetEngine(seed: 'reference' | 'empty' | 'bare'): void {
 	idSeq = 0;
 	clockTick = 0;
 	undertakingIntent.clear();
+	// ⭐ A TEST'S STIPULATIONS DIE WITH ITS ENGINE (`JAN-CRITREAD` J1-2): ids restart at every reset, so a registration
+	// that survived would answer a LATER test's PWA that happened to get the same id.
+	clearStipulations();
 	handle = newEngine();
 	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
 	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));
