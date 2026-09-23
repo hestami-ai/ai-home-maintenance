@@ -119,5 +119,17 @@ export interface StorageAdapter {
 	/** Pending outbox records in global order. */
 	readPendingOutbox(): OutboxRecord[];
 	markOutboxPublished(outboxIds: readonly string[]): void;
+	/**
+	 * ⭐ DOES WHAT THIS STORE HOLDS OUTLIVE THE PROCESS? (`JAN-CRITREAD` J1-1b; `REG-D-071` Q5 (b), `REG-D-072` D5.)
+	 *
+	 * DERIVED from the connection the adapter actually opened — never declared by the class, which is the defect a
+	 * class-level `DURABLE` would have: a store constructed with no filename is in memory whatever its class says.
+	 * `UNKNOWN` is lawful, and every reader treats it as DURABLE: the one reader today is the `Engine`'s refusal to
+	 * admit test-stipulated answers over a durable store, and that refusal must fail closed.
+	 */
+	readonly durability: StoreDurability;
 	close(): void;
 }
+
+/** See `StorageAdapter.durability`. Only `NOT_DURABLE` is a positive statement that nothing outlives the process. */
+export type StoreDurability = 'DURABLE' | 'NOT_DURABLE' | 'UNKNOWN';

@@ -101,6 +101,9 @@ export interface CreateEngineDeps {
 	/** Deterministic event-id minter for tests. */
 	readonly newEventId?: () => string;
 	readonly logger?: Logger;
+	/** ⭐ `REG-D-071` Q5 — see `EngineDeps.admitStipulatedAnswers`. Refused by the `Engine` over any store that does
+	 *  not report itself `NOT_DURABLE`, so a fork of a durable store is refused as well. */
+	readonly admitStipulatedAnswers?: boolean;
 }
 
 /**
@@ -157,6 +160,13 @@ export interface EngineHandle {
 	/** What this handle was forked from (`ForkBase`); `undefined` on a handle that is not a fork. */
 	forkBase(): ForkBase | undefined;
 	readonly ontology: EngineOntology;
+	/**
+	 * ⭐ Does this engine count a test-stipulated answer as given? (`REG-D-071` Q5.) REQUIRED, so every hand-written
+	 * object that stands in for a handle — the authoring turn's recorder and witness among them — must carry it:
+	 * the floor callers read it from the engine they record into, and a wrapper that dropped it would record into an
+	 * admitting engine as though it were not one.
+	 */
+	readonly admitStipulatedAnswers: boolean;
 	/** Release the underlying storage (closes the sqlite connection). */
 	close(): void;
 }
@@ -185,16 +195,18 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 	}
 
 	const store = deps.store ?? new SqliteStorageAdapter({ now: deps.now });
-	// ⚠ AN EXPLICIT FIELD ENUMERATION, AND IT IS A TRAP THIS INCREMENT WALKED INTO ONCE. `fork()` below
-	// spreads `...deps`, so anything added to `CreateEngineDeps` reaches a FORK automatically and reaches THIS
-	// object — the only one that becomes an actual `Engine` — not at all. A port added above and forgotten here
-	// would leave the parent ungated while every fork looked correct.
+	// ⚠ AN EXPLICIT FIELD ENUMERATION. ~~`fork()` below spreads `...deps`, so anything added to `CreateEngineDeps`
+	// reaches a FORK automatically and reaches THIS object … not at all.~~ ⭑ Corrected 2026-09-23 (`REG-D-072`):
+	// a fork is `createEngine({ ...deps, store })`, which runs THIS enumeration again — so a field left out of it
+	// reaches NEITHER the parent's `Engine` nor a fork's, and the omission fails closed for both. The parent and a
+	// fork diverge only through an OVERRIDE inside `fork()`'s spread, which is where the flag's guard sits.
 	const engine = new Engine({
 		store,
 		authenticate: deps.authenticate,
 		now: deps.now,
 		newEventId: deps.newEventId,
-		logger: deps.logger
+		logger: deps.logger,
+		admitStipulatedAnswers: deps.admitStipulatedAnswers
 	});
 
 	const handle: EngineHandle = {
@@ -231,6 +243,9 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 					}
 				: undefined,
 		ontology,
+		// Read AFTER the `Engine` was built, which refuses the flag over a durable store — so a handle can only
+		// report `true` for an engine that was allowed to admit.
+		admitStipulatedAnswers: deps.admitStipulatedAnswers === true,
 		close: () => store.close()
 	};
 	return handle;

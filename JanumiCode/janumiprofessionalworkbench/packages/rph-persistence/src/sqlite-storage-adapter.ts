@@ -5,6 +5,7 @@ import type {
 	CommitResult,
 	OutboxRecord,
 	StorageAdapter,
+	StoreDurability,
 	StoredObject
 } from '@janumipwb/rph-ports';
 import { planMigration, SCHEMA_SQL, SCHEMA_VERSION } from './schema.js';
@@ -36,6 +37,19 @@ interface OutboxRow {
 }
 
 /**
+ * What the connection actually holds, from SQLite's own answer (`PRAGMA database_list`). Only the `main` database
+ * decides it: SQLite also lists `temp` (always an empty filename) and anything ATTACHed, and a rule over every row
+ * would answer for the wrong database. An empty filename is `:memory:` or an anonymous temporary database — gone
+ * with the process. No `main` row at all is a connection this code does not understand, so it says `UNKNOWN`.
+ */
+function openedDurability(db: SqlDriver): StoreDurability {
+	const rows = db.prepare('PRAGMA database_list').all() as { name?: string; file?: string }[];
+	const main = rows.find((r) => r.name === 'main');
+	if (main === undefined) return 'UNKNOWN';
+	return main.file ? 'DURABLE' : 'NOT_DURABLE';
+}
+
+/**
  * The better-sqlite3-shaped StorageAdapter, backed by a SqlDriver (bun:sqlite in dev/test). Every write goes
  * through `commit`, which runs the whole thing in one transaction — the single-authority guarantee is that
  * the application command bus is the only caller. Timestamps come through the injected `now` port so the
@@ -44,10 +58,15 @@ interface OutboxRow {
 export class SqliteStorageAdapter implements StorageAdapter {
 	private readonly db: SqlDriver;
 	private readonly now: () => string;
+	readonly durability: StoreDurability;
 
 	constructor(opts: { driver?: SqlDriver; filename?: string; now?: () => string } = {}) {
 		this.db = opts.driver ?? createSqliteDriver(opts.filename);
 		this.now = opts.now ?? (() => new Date().toISOString());
+		// ⭐ FROM THE CONNECTION THAT WAS OPENED, NOT FROM THE ARGUMENTS (`REG-D-072` D5). A driver can be injected
+		// with no `filename` in sight, so the constructor's arguments cannot say what was opened; SQLite can.
+		// Read once, here, because the driver refuses every statement after `close()`.
+		this.durability = openedDurability(this.db);
 		// ORDER MATTERS, and it is the one thing a migration ladder can get subtly wrong. `SCHEMA_SQL` is all
 		// `CREATE … IF NOT EXISTS`, so running it ERASES the difference between a brand-new file and a store that
 		// predates versioning — both then have every table, and both report `user_version = 0`. The distinction is

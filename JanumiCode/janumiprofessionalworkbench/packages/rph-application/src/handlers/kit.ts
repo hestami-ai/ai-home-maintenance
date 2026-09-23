@@ -30,6 +30,9 @@ export interface HandlerContext {
 	readonly now: () => string;
 	readonly newEventId: () => string;
 	readonly logger: Logger;
+	/** ⭐ `REG-D-071` Q5: this engine counts a test-stipulated answer as given. OPTIONAL, absent = not admitting —
+	 *  the refusing value — so the typed test contexts that build this literal by hand stay non-admitting. */
+	readonly admitStipulatedAnswers?: boolean;
 }
 
 /** A command handler: given the context + validated payload, produce next state + event and commit. */

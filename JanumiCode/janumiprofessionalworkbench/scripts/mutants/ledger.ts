@@ -8899,5 +8899,68 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-engine/src/record-assurance.test.ts"],
 		why: "PROMISE: FloorCriterion.stipulated crosses the command boundary, so the governed stream says which rows a TEST answered. Dropped, every stipulated row reads as an ordinary UNABLE_TO_DETERMINE and the disclosure J1-2 builds on is gone. OBSERVED: KILLED — 1 test(s) red in record-assurance.test.ts: 'records the judged rows MET, the stipulated rows UNABLE_TO_DETERMINE + stipulated MET — and the floor is NOT satisfied' (AssertionError: RR-01-no-problem-substitution's stipulation must cross the boundary: expected undefined to be 'MET' // Object.is equality)",
 		source: "JAN-CRITREAD J1-1a — the stipulated field carried end to end (REG-D-071 Q4, form D; ROADMAP-what-the-tests-prove.md)"
+	},
+	{
+		id: "J1B-M1-the-durability-lock-never-engages",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "\t\tif (deps.admitStipulatedAnswers === true && deps.store.durability !== 'NOT_DURABLE')\n",
+		replace: "\t\tif (deps.admitStipulatedAnswers === true && deps.store.durability !== deps.store.durability) // MUTANT: the lock never engages\n",
+		expectRed: ["packages/rph-engine/src/admit-stipulated-answers.test.ts"],
+		why: "PROMISE (REG-D-071 Q5 (b)): an engine that counts test-stipulated answers as given is never durable, so no stipulated SATISFIED outlives its process. The lock is in the Engine CONSTRUCTOR because Engine is public and built directly at well over a hundred sites (REG-D-072 D1). OBSERVED: KILLED — 4 test(s) red in admit-stipulated-answers.test.ts: '⛔ over a file store — through createEngine, and through `new Engine` directly' (AssertionError: expected [Function] to throw an error); '⛔ over a FORK of a durable store — its writes are committed back into it' (AssertionError: expected [Function] to throw an error)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M2-an-unknown-store-admits",
+		file: "packages/rph-application/src/command-bus.ts",
+		find: "deps.store.durability !== 'NOT_DURABLE')",
+		replace: "deps.store.durability === 'DURABLE') // MUTANT: only a store that SAYS durable is refused",
+		expectRed: ["packages/rph-engine/src/admit-stipulated-answers.test.ts"],
+		why: "PROMISE: UNKNOWN counts as durable. An adapter that cannot tell what it opened must not be where test answers are admitted — the lock fails closed, not open. OBSERVED: KILLED — 1 test(s) red in admit-stipulated-answers.test.ts: '⛔ over a store that cannot say — UNKNOWN counts as durable' (AssertionError: expected [Function] to throw an error)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M3-durability-declared-by-the-class",
+		file: "packages/rph-persistence/src/sqlite-storage-adapter.ts",
+		find: "\t\tthis.durability = openedDurability(this.db);\n",
+		replace: "\t\tthis.durability = 'NOT_DURABLE'; // MUTANT: declared by the class, not read from the connection\n",
+		expectRed: ["packages/rph-persistence/src/store-durability.test.ts"],
+		why: "PROMISE (REG-D-072 D5): durability is DERIVED from the connection actually opened. A class-level answer is what SqliteArtifactStore does (DURABLE for an in-memory instance) and is wrong in one direction or the other for some caller; here it would let an admitting engine sit on a file. OBSERVED: KILLED — 3 test(s) red in store-durability.test.ts: '⛔ a store opened on a file is DURABLE' (AssertionError: expected 'NOT_DURABLE' to be 'DURABLE' // Object.is equality); '⛔ and so is one whose FILE driver was injected — the constructor never saw a filename' (AssertionError: expected 'NOT_DURABLE' to be 'DURABLE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M4-a-fork-answers-for-itself",
+		file: "packages/rph-persistence/src/snapshot-overlay-storage-adapter.ts",
+		find: "\t\treturn this.source.durability;\n",
+		replace: "\t\treturn 'NOT_DURABLE'; // MUTANT: the overlay answers for itself, and it IS in memory\n",
+		expectRed: ["packages/rph-persistence/src/store-durability.test.ts"],
+		why: "PROMISE: a fork reports its SOURCE's durability, because its writes are committed back into that store. Answered for itself, a fork of a durable store looks ephemeral and an admitting Engine could be built over it. OBSERVED: KILLED — 1 test(s) red in store-durability.test.ts: '⛔ a fork reports its SOURCE — its writes are committed back into that store' (AssertionError: expected 'NOT_DURABLE' to be 'DURABLE' // Object.is equality)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M5-a-fork-does-not-admit",
+		file: "packages/rph-engine/src/engine.ts",
+		find: "\t\t\t\t...deps,\n",
+		replace: "\t\t\t\t...deps,\n\t\t\t\tadmitStipulatedAnswers: false, // MUTANT: the parent admits, its forks do not\n",
+		expectRed: ["packages/rph-engine/src/admit-stipulated-answers.test.ts"],
+		why: "PROMISE: the flag reaches a fork as it reaches the parent. An authoring turn records its floor into its FORK, so an override in fork()'s spread — the one place parent and fork can diverge (REG-D-072) — would make every turn refuse what the canonical engine admits. OBSERVED: KILLED — 1 test(s) red in admit-stipulated-answers.test.ts: '⛔ the flag reaches a FORK as it reaches the parent — an authoring turn records into its fork' (AssertionError: expected false to be true // Object.is equality)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M6-the-demo-never-admits",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "now: testNow, admitStipulatedAnswers: true }",
+		replace: "now: testNow } /* MUTANT: test mode builds a non-admitting engine */",
+		expectRed: ["apps/rph-demo/src/lib/server/workbench-admits-stipulations.test.ts"],
+		why: "PROMISE: a test process builds an admitting engine, and only a test process does. Without the flag the lane's stipulations could never count and the thirteen reds could never go green; the negative half of the same file pins that no other mode admits. OBSERVED: KILLED — 1 test(s) red in workbench-admits-stipulations.test.ts: '⛔ mode `test` builds an admitting engine' (AssertionError: expected false to be true // Object.is equality)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
+	},
+	{
+		id: "J1B-M7-every-handle-claims-to-admit",
+		file: "packages/rph-engine/src/engine.ts",
+		find: "\t\tadmitStipulatedAnswers: deps.admitStipulatedAnswers === true,\n",
+		replace: "\t\tadmitStipulatedAnswers: true, // MUTANT: every handle says it admits\n",
+		expectRed: ["packages/rph-engine/src/admit-stipulated-answers.test.ts"],
+		why: "PROMISE: absent is the refusing value. The floor callers read this member to decide whether the ladder counts a stipulation, so a handle that always said true would make every production floor's ladder admit — and Gate E refuse the completion it composed. OBSERVED: KILLED — 1 test(s) red in admit-stipulated-answers.test.ts: '⭐ an engine built without the flag does not admit — absent is the refusing value' (AssertionError: expected true to be false // Object.is equality)",
+		source: "JAN-CRITREAD J1-1b — the admitting flag and the lock that keeps it off durable stores (REG-D-071 Q5 (b); REG-D-072 D1, D2, D5)"
 	}
 ];

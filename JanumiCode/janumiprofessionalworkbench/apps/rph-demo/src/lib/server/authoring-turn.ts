@@ -237,6 +237,7 @@ function recordingEngine(
 		},
 		forkBase: () => delegate.forkBase(),
 		ontology: delegate.ontology,
+		admitStipulatedAnswers: delegate.admitStipulatedAnswers,
 		close: () => delegate.close()
 	};
 	recorderTurns.set(recorder, currentTurn);
@@ -292,6 +293,7 @@ function witnessingEngine(
 		fork: closed('a fork'),
 		forkBase: () => delegate.forkBase(),
 		ontology: delegate.ontology,
+		admitStipulatedAnswers: delegate.admitStipulatedAnswers,
 		close: closed('closing canonical')
 	};
 }

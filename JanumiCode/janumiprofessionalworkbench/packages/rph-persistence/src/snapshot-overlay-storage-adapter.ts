@@ -6,6 +6,7 @@ import type {
 	CommitResult,
 	OutboxRecord,
 	StorageAdapter,
+	StoreDurability,
 	StoredObject
 } from '@janumipwb/rph-ports';
 
@@ -67,6 +68,12 @@ export class SnapshotOverlayStorageAdapter implements StorageAdapter {
 		this.baseEvents = captured.events;
 		for (const [id, object] of captured.objects) this.baseObjects.set(id, object);
 		this.baseMark = captured.mark;
+	}
+
+	/** ⭐ ITS SOURCE'S ANSWER (`REG-D-072` D5). The overlay itself is in memory, but a fork of a durable store is
+	 *  committed back INTO that store — so what matters is where its writes end up, not where they wait. */
+	get durability(): StoreDurability {
+		return this.source.durability;
 	}
 
 	getReceipt(idempotencyKey: string): CommandReceiptRecord | undefined {

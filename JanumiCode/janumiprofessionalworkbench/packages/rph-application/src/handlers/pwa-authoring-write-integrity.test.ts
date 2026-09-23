@@ -65,6 +65,10 @@ class FaultInjectingStore implements StorageAdapter {
 
 	constructor(readonly inner: SqliteStorageAdapter) {}
 
+	get durability() {
+		return this.inner.durability;
+	}
+
 	getReceipt(idempotencyKey: string) {
 		return this.inner.getReceipt(idempotencyKey);
 	}

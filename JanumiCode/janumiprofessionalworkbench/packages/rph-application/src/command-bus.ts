@@ -44,6 +44,12 @@ export interface EngineDeps {
 	readonly now?: () => string;
 	readonly newEventId?: () => string;
 	readonly logger?: Logger;
+	/**
+	 * ⭐ AN ENGINE BUILT FOR TESTS, WHICH COUNTS A TEST-STIPULATED ANSWER AS GIVEN (`JAN-CRITREAD` J1-1b;
+	 * `REG-D-071` Q5). Absent means NOT admitting — the refusing value. Only the reasoning-review floor reads it
+	 * (J1-1c), and it is refused below over any store that does not report itself `NOT_DURABLE`.
+	 */
+	readonly admitStipulatedAnswers?: boolean;
 }
 
 export type EventSubscriber = (event: DomainEvent) => void;
@@ -256,8 +262,18 @@ export class Engine {
 	private readonly logger: Logger;
 	private readonly authenticate: AuthenticationPort;
 	private readonly subscribers: EventSubscriber[] = [];
+	private readonly admitStipulatedAnswers: boolean;
 
 	constructor(deps: EngineDeps) {
+		// ⛔ THE ENGINE'S GUARANTEE: A STIPULATED PASS NEVER OUTLIVES ITS PROCESS (`REG-D-071` Q5 (b), `REG-D-072` D1).
+		// Here, in the constructor, and not in `createEngine`: `Engine` is public and built directly at well over a
+		// hundred sites, so a lock in the factory would bind only the callers who happened to use it. `UNKNOWN`
+		// counts as durable — the refusal must fail closed. That the engine is a TEST engine stays the host's fact.
+		if (deps.admitStipulatedAnswers === true && deps.store.durability !== 'NOT_DURABLE')
+			throw new Error(
+				`Engine: admitStipulatedAnswers needs a store that reports itself NOT_DURABLE, and this one reports ${deps.store.durability}. A test-stipulated answer must never outlive its process (REG-D-071 Q5 (b)).`
+			);
+		this.admitStipulatedAnswers = deps.admitStipulatedAnswers === true;
 		this.store = deps.store;
 		this.now = deps.now ?? (() => new Date().toISOString());
 		this.newEventId = deps.newEventId ?? (() => mintId('EVENT'));
@@ -549,7 +565,8 @@ export class Engine {
 			store: this.store,
 			now: this.now,
 			newEventId: this.newEventId,
-			logger: this.logger
+			logger: this.logger,
+			admitStipulatedAnswers: this.admitStipulatedAnswers
 		};
 		return handler(ctx, command, parsed.value);
 	}

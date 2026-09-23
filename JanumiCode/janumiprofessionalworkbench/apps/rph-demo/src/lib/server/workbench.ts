@@ -167,7 +167,10 @@ function newEngine(dbPath?: string): EngineHandle {
 	// credential that matches WHO THEY ARE — SESSION for the surface, AGENT for the broker, SYSTEM for the
 	// seed. Binding one here would give every caller the same identity, which is REG-F-054's defect restored
 	// one layer up. (A codemod briefly wired the TEST authenticator into this production path; it is removed.)
-	return createEngine(TEST_MODE ? { ...base, now: testNow } : base);
+	// ⭐ ONLY A TEST PROCESS ADMITS A TEST-STIPULATED ANSWER (`REG-D-071` Q5). The engine cannot know it is a test
+	// engine — that is this host's fact — but it does refuse the flag over any durable store, so the two locks are
+	// separate: this line says "tests only", the `Engine` says "never durable".
+	return createEngine(TEST_MODE ? { ...base, now: testNow, admitStipulatedAnswers: true } : base);
 }
 
 /**
