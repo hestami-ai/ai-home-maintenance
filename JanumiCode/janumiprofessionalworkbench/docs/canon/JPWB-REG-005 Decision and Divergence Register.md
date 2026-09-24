@@ -37434,3 +37434,36 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Left as written, and flagged: `G-CLEAN-R3`'s *"Asset Protection Consent Application"*, read as the rail authority's own consent process.
 - **ORACLE INTEGRITY BINDS FROM HERE.** No increment that edits the reviewer's prompt, criteria or scoring edits the cases or oracles. Version one tunes nothing.
 - **FOR SPONSOR CONFIRMATION:** the standings (above all `W-RR-03`), the `R1` rename, and the `R3` wording.
+
+### REG-D-074 — DELEGATED (`REG-D-071`): how the reviewer-qualification runner loads, scores, classifies and RETAINS, where the design left it open
+
+**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-2`, `scripts/reviewer-qual/`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for qualification from `J2-2`; sponsor confirmation owed.**
+
+- **LOADING (D11).** The CLI runs as `bun --conditions=source scripts/reviewer-qual/run.ts`, and refuses to run unless `@janumipwb/rph-assurance` resolves to its `src`. Under bare bun it resolves to `dist`, which can be stale.
+- **SCORING.** Every case goes through the REAL validator, built with the run's recorded identity. It is scored by the product's `composeAssuranceOutcome` over the RR reference alone, never by the reply's own recommendation. A validator throw is scored as the product scores one (`runDeMinimisFloor`, VALIDATOR_FAILED, no criteria). `scored` is carried on the last call of a case repetition only.
+- **RETENTION (DESIGN §5.3, applied).** The rule: an answer span is retained only when it parses as ONE JSON value, and then only as its projection onto the keys the product's `coerceJudgement` reads.
+  - **What is read:** judgement `findings`, `recommendation`, `residualUncertainty`; finding `criterionId`, `failed`, `statement`, `severity`.
+  - **Unread keys** are dropped and marked `UNREAD_KEY`.
+  - **A span that does not parse** is `NOT_RETAINED`: none of its text is kept, only its `spanSha256` and the malformation classes.
+  - **The line validator enforces the rule**, and the projection is pinned to yield the same whole `ValidatorResult` as the span.
+  - **Why:** the adversarial verifier drove reasoning INTO a tracked record through a first-`{`-to-last-`}` span, `Let me think {…}. Conclusion: {…}`. The harness cannot tell reasoning from any other unread key by its name, so the only closed rule is: keep what the product reads.
+  - **Stated cost:** a future scoring path that reads a key the validator ignores today cannot be re-scored from the record, and needs a new run. The read-key list is restated from `coerceJudgement` and could drift; it is pinned for today's keys.
+  - **Kept as given:** the values of keys the product does read. Reasoning a model writes inside `statement` is kept, because it is the answer the product reads.
+- **CLASSES.** Malformations are detected harness-side over the raw reply (`REG-F-428`'s and siblings). There are thirteen: `NO_ANSWER_SPAN`, `UNPARSEABLE`, `FENCED`, `PROSE_WRAPPED`, `DUPLICATE_KEY`, `NO_FINDINGS_ARRAY`, `MALFORMED_FINDING`, `UNDECLARED_CRITERION_ID`, `DUPLICATE_CRITERION`, `NON_BOOLEAN_FAILED`, `MISSING_CRITERION`, `UNKNOWN_RECOMMENDATION`, `UNREAD_KEY`. HELD_OUT's material failures are ten: `PLANTED_DEFECT_NOT_FAULTED`, `CLEAN_NOT_SATISFIED`, `VERDICT_CHANGES_WITH_NAME`, `BOUNDEDNESS`, `FAULT_LOST`, `SATISFIED_LOST`, `MALFORMATION_GAINED`, `REPETITIONS_NOW_DISAGREE`, `BOUND_NOW_EXCEEDED`, `ANSWERED_NOW_UNDETERMINED`. The line shapes of RESCORED, ESCALATION, ACKNOWLEDGED and SUPERSEDED, and the fields beyond §5.4 (`spanSha256`, `preContact`, the served facts), are the agent's.
+- **A HARNESS FAULT IS NEVER THE CANDIDATE'S.**
+  - **Which faults:** a blank or untrimmed model label; an unresolved judge or assurance model; or a label that differs from the model the product resolves (devin, which has no argv to assert).
+  - **What happens:** each is a HarnessRefusal before the RUN line, never a TRANSPORT_FAILURE.
+  - **TIMEOUT vs REFUSAL:** TIMEOUT only when the bound fired (execFile's own kill, or elapsed ≥ the bound); any other signal or crash is REFUSAL.
+  - **Pre-contact refusals:** a refusal made before the server is touched is marked `preContact`, and only then may an Ollama CALL carry `served: null`.
+- **OLLAMA** (the harness transport, never deployable): `keep_alive` 0, and each call is unloaded and confirmed first. It re-imposes 240 s and the 28,000 check, and records the template hash and the server's `Date` per call.
+- **THE CLI.**
+  - **Flags:** a closed set; Ollama-only flags are refused elsewhere.
+  - **Numbers:** repetitions an integer ≥ 1; temperature 0–2; seed an integer ≥ 0; num-ctx an integer ≥ 1.
+  - **Per-line check:** every line is validated before it is appended.
+  - **Exit codes:** exit 2 when nothing was written; exit 3 when no fingerprint yet (`J2-3`); exit 4 when the run stopped part-way, keeping what was appended. A harness refusal is recognised by class or name (a module reset duplicates the class).
+- **OWED TO `J2-3`/`J2-4`.**
+  - The RUN fingerprint: the CLI stops at `NO_FINGERPRINT_YET`.
+  - Cross-file references (RESCORED `sourceRunId`, SUPERSEDED, ESCALATION), which are J2-3's check.
+  - The one-server-clock-day rule (§5.3; `REG-F-429`) is NOT enforced. The server's UTC offset IS observable, since `/api/ps`'s `expires_at` carries it (`REG-F-427`'s provenance), so the rule starts there.
+  - An over-long prompt still counts as the candidate's REFUSAL, although §5.1 makes the limit a case precondition. It is unreachable while the product budgets the prompt to 26,000.
+- **FOR SPONSOR CONFIRMATION:** the retention projection above all, then the classes, the temperature range and the exit codes.

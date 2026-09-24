@@ -16,6 +16,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { applyMutant } from './apply.js';
 import { DECLARED_MUTANTS, isHistory, type DeclaredMutant } from './ledger.js';
 import { timeoutEvidence } from './measured.js';
 import {
@@ -741,7 +742,8 @@ function runMutant(m: DeclaredMutant): Result {
 	const baselineGreen = unnamed ? true : victimWasGreen(target);
 
 	writeFileSync(JOURNAL, m.file, 'utf8');
-	writeFileSync(`${ROOT}${m.file}`, original.replace(m.find, m.replace), 'utf8');
+	// ⭐ LITERALLY — a `$'` in a replacement once spliced the rest of the file in (J22-M25; `apply.ts`).
+	writeFileSync(`${ROOT}${m.file}`, applyMutant(original, m.find, m.replace), 'utf8');
 	// ⚠ TELL THE ANCHOR CENSUS WHICH MUTANT IS CURRENTLY APPLIED (REG-F-110).
 	//
 	// REG-F-100's census reads the WORKING TREE and requires every measurable mutant's `find` to occur exactly
