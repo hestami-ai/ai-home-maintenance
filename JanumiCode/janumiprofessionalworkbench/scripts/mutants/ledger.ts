@@ -9216,7 +9216,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "export function assuredCandidateLine(candidateHash: string, f: FloorView | undefined): string {\n",
 		replace: "export function assuredCandidateLine(candidateHash: string, f: FloorView | undefined): string {\n\tvoid { stipulated: 'MET' as const }; // MUTANT: a new writer inside a file already named\n",
 		expectRed: ["verif/stipulation-writers.test.ts"],
-		why: "PROMISE: naming a file does not exempt it — a named file writes exactly as many times as pinned, so a new writer added beside the read-side tally in floor.ts (the module that runs the floor) reddens. Before J1-2b the file's name alone would have let it through. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file' (AssertionError: a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason: expected [ Array(1) ] to deeply equal []) OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file' (AssertionError: a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason: expected [ Array(1) ] to deeply equal [])",
+		why: "PROMISE: naming a file does not exempt it — a named file writes exactly as many times as pinned, so a new writer added beside the read-side tally in floor.ts (the module that runs the floor) reddens. Before J1-2b the file's name alone would have let it through. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file' (AssertionError: a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason: expected [ Array(1) ] to deeply equal [])",
 		source: "JAN-CRITREAD J1-2b — the census pins each named file's write COUNT, so naming a file no longer exempts it"
 	},
 	{
@@ -9225,7 +9225,115 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\tconst criterionId = str(p.criterionId);\n",
 		replace: "\tconst criterionId = String(p.criterionId); // MUTANT: coerce instead of read\n",
 		expectRed: ["packages/rph-projections/src/assurance-view.test.ts"],
-		why: "PROMISE: a criterion result missing its criterion id changes nothing — never a row keyed \"undefined\" on the Assurance tab. The first gate's coverage floor found the fold's fail-closed checks unexercised (+1 uncovered branch). OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`' (AssertionError: {\"assessmentId\":\"asm_c\",\"result\":\"MET\"}: expected { assessments: { asm_c: { …(14) } } } to be { assessments: { asm_c: { …(14) } } } // Object.is equality) OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`' (AssertionError: {\"assessmentId\":\"asm_c\",\"result\":\"MET\"}: expected { assessments: { asm_c: { …(14) } } } to be { assessments: { asm_c: { …(14) } } } // Object.is equality)",
+		why: "PROMISE: a criterion result missing its criterion id changes nothing — never a row keyed \"undefined\" on the Assurance tab. The first gate's coverage floor found the fold's fail-closed checks unexercised (+1 uncovered branch). OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`' (AssertionError: {\"assessmentId\":\"asm_c\",\"result\":\"MET\"}: expected { assessments: { asm_c: { …(14) } } } to be { assessments: { asm_c: { …(14) } } } // Object.is equality)",
 		source: "JAN-CRITREAD J1-2b — the §38 fold refuses a malformed criterion result (the coverage floor's +1 branch)"
+	},
+	{
+		id: "J21-M1-the-module-reaches-lib",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "import type { PwaGraphExport } from '@janumipwb/rph-projections';\n",
+		replace: "import type { PwaGraphExport } from '@janumipwb/rph-projections';\nimport type { FloorView } from '$lib/server/floor.js'; // MUTANT: the module reaches the demo host through $lib\n",
+		expectRed: ["verif/review-input-imports.test.ts"],
+		why: "PROMISE (DESIGN §5.2; ROADMAP J2-1): the review-input module imports no $lib specifier and none of authoring-turn, workbench, floor or floor-over-subject, so the reviewer-qualification runner and check can load it from scripts/reviewer-qual/ outside SvelteKit and outside the demo host. A type-only import is enough to break that: it pulls floor.ts, the authoring turn and $lib into any program that typechecks the module. OBSERVED: KILLED — 1 test(s) red in review-input-imports.test.ts: '⛔ THIS REPOSITORY — nothing in the module’s import closure is $lib, the authoring turn, the workbench or a floor' (AssertionError: forbidden import(s): expected 'apps/rph-demo/src/lib/server/assuranc…' to be '' // Object.is equality)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M2-the-graph-content-moves-its-hash",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "\t\tcontent: JSON.stringify({\n\t\t\t...source.graph,\n\t\t\t...(source.candidateSubjectHash ? { candidateSubjectHash: source.candidateSubjectHash } : {})\n\t\t}),\n",
+		replace: "\t\tcontent: JSON.stringify({\n\t\t\t...(source.candidateSubjectHash ? { candidateSubjectHash: source.candidateSubjectHash } : {}),\n\t\t\t...source.graph // MUTANT: the candidate's subject hash moves to the front of the content\n\t\t}),\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/review-input.test.ts"],
+		why: "PROMISE (ROADMAP J2-1): graphReviewInput reproduces what runPwaFloor built inline, byte for byte — the content is the graph export with the candidate's subject hash appended LAST. Once the inline code was deleted, the call site and the module move together, so only the pins (shown equal to the inline code's output while it existed) can see a change inside the builder; a reordered content string moves every reviewer prompt and every case digest. OBSERVED: KILLED — 2 test(s) red in review-input.test.ts: '⭐ a LITERAL graph put in an engine — the call site, the module and the pins agree' (AssertionError: the pin — every option present: the input's content: expected '{\"candidateSubjectHash\":\"sha256:0f1e2…' to strictly equal '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…'); '⛔ the PINS — graphReviewInput over the literal graph, written out (every branch of the assembly)' (AssertionError: the pin — every option present: the input's content: expected '{\"candidateSubjectHash\":\"sha256:0f1e2…' to strictly equal '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…')",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M3-the-work-product-input-loses-its-constant-shape",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "\t\trationale: source.rationale,\n\t\tnarration: undefined,\n",
+		replace: "\t\t...(source.rationale ? { rationale: source.rationale } : {}), // MUTANT: the graph arm's conditional shape\n\t\tnarration: undefined,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/review-input.test.ts"],
+		why: "PROMISE (ROADMAP J2-1; §9.7 as the work-product floor records it): workProductReviewInput reproduces runWorkProductFloor's input exactly — rationale, narration and prior passed UNCONDITIONALLY, so the input's shape never encodes whether the producer declared an account. Copying the graph arm's conditional spread (the harmonising refactor this invites) changes the shape and no prompt, so only the strict pins can see it. OBSERVED: KILLED — 2 test(s) red in review-input.test.ts: '⭐ a LITERAL work product — the call site, the module and the pins agree' (AssertionError: the pin — neither: the same keys, in the same order: expected [ 'criteria', 'framing', …(4) ] to deeply equal [ 'criteria', 'framing', …(5) ]); '⛔ the PINS — workProductReviewInput over the literal work product, written out' (AssertionError: the pin — neither: the same keys, in the same order: expected [ 'criteria', 'framing', …(4) ] to deeply equal [ 'criteria', 'framing', …(5) ])",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M4-the-authoring-floor-drops-the-narration",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\t\tnarration: opts.narration,\n",
+		replace: "\t\t\tnarration: undefined, // MUTANT: the call site stops passing the producer's narration\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/review-input.test.ts"],
+		why: "PROMISE: runPwaFloor hands the builder every route-level piece it was given. After the inline code's deletion the call-site limb compares the floor's WIRING with the module over the same inputs; a call site that drops an argument hands the reviewer '(none recorded)' where the producer's narration was, and the reviewer judges a thinner trace than the one that exists. OBSERVED: KILLED — 2 test(s) red in review-input.test.ts: '⭐ the REFERENCE workbench graph — the call site and the module agree, input and prompt, under every option set' (AssertionError: the call site — every option present: the input's narration: expected 'Defined the types and wired their inp…' to strictly equal ''); '⭐ a LITERAL graph put in an engine — the call site, the module and the pins agree' (AssertionError: the call site — every option present: the input's narration: expected 'Defined the types and wired their inp…' to strictly equal '')",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M5-the-work-product-floor-drops-the-prior-gaps",
+		file: "apps/rph-demo/src/lib/server/execution/work-product-floor.ts",
+		find: "\t\t\t\tpriorGaps: subject.priorGaps\n",
+		replace: "\t\t\t\tpriorGaps: undefined // MUTANT: the call site stops passing the prior findings\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/review-input.test.ts"],
+		why: "PROMISE: runWorkProductFloor hands the builder what its subject carries. When a deployment has chosen to show the reviewer prior findings (reviewSeesPriorFindings), a call site that drops them re-scores the draft cold while claiming otherwise; the call-site limb reddens on the dropped argument. OBSERVED: KILLED — 2 test(s) red in review-input.test.ts: '⭐ the demo backend’s OWN work product — the call site and the module agree, input and prompt' (AssertionError: the call site — prior gaps present: the input's prior: expected { Object (gaps) } to strictly equal undefined); '⭐ a LITERAL work product — the call site, the module and the pins agree' (AssertionError: the call site — rationale and prior gaps: the input's prior: expected { Object (gaps) } to strictly equal undefined)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M6-the-repair-prompt-outgrows-the-limit",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const repairPrompt = `${prompt}\\n\\nIMPORTANT: reply with ONLY the minified JSON object.`;",
+		replace: "const repairPrompt = `${prompt}\\n\\n${'IMPORTANT: reply with ONLY the minified JSON object. '.repeat(600)}`; // MUTANT: the repair instruction outgrows the 2,000-character margin",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (DESIGN §5.1; ROADMAP J2-1): every case materializes a prompt under the 28,000-character limit agy accepts in argv. The initial prompt is budgeted to 26,000 by the validator itself, so the check that can fail is the one on the REPAIR prompt — the initial one plus a suffix appended OUTSIDE the budget, inside a 2,000-character margin. A suffix that outgrows the margin makes every repair call refuse at agyPrint; the limb measures both prompts a case can send. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-cases.test.ts: '⛔ THE 28,000-CHARACTER LIMIT — every prompt a case can send, the initial and the repair, fits agy’s argv budget' (AssertionError: prompts over the 28000-character limit: expected 'G-CLEAN repair: 41768 chars\\nG-CLEAN-…' to be '' // Object.is equality)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M7-the-instruction-is-cut-to-fit",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const USER_INTENT_MAX = 4_000;",
+		replace: "const USER_INTENT_MAX = 400; // MUTANT: the instruction is cut to fit",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE: no case is truncated to fit, so an oracle is never about bytes the reviewer was not shown — a planted defect in a truncated slice would score as the reviewer's miss. The budget keeps a prompt under the limit by CUTTING, so the 28,000 limb alone cannot see this; the seen-whole limb does. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-cases.test.ts: '⛔ SEEN WHOLE — no slice of any case is truncated to fit, so no oracle is about bytes the reviewer did not see' (AssertionError: expected 'G-CLEAN: a slice is truncated\\nG-CLEA…' to be '' // Object.is equality)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M8-the-case-source-moves-without-its-data",
+		file: "scripts/reviewer-qual/case-set-v1.ts",
+		find: "\twindAction: '1.8 kN per metre of span on the truss, from a peak velocity pressure of 0.94 kN/m².',\n",
+		replace: "\twindAction: '1.8 kN per metre of span on the truss, from a peak velocity pressure of 0.94 kN/m² (edited at source).', // MUTANT: the source moves and the data is not regenerated\n",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE: the committed case set is exactly what scripts/reviewer-qual/generate.ts writes — the data is generated, never hand-edited, and a source change lands with its regenerated data. Otherwise the cases a run measures and the cases the source says it measures silently differ. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-cases.test.ts: '⛔ the committed case set and oracles are exactly what the generator writes — never hand-edited' (AssertionError: docs/tracking/reviewer-qualification/cases/case-set-v1.json is stale — run `bun run scripts/reviewer-qual/generate.ts`: expected '{\\n\\t\"note\": \"GENERATED by `bun run s…' to be '{\\n\\t\"note\": \"GENERATED by `bun run s…' // Obje)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M9-the-graph-export-reorders-its-keys",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\t\trequiredInputs: arr(t.state.requiredInputs),\n\t\trequiredOutputs: arr(t.state.requiredOutputs),\n",
+		replace: "\t\trequiredOutputs: arr(t.state.requiredOutputs), // MUTANT: production's export changes its key order\n\t\trequiredInputs: arr(t.state.requiredInputs),\n",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (ROADMAP J2-1): graph cases are literal nodes whose keys are in PRODUCTION's order, so a case materializes the content a live review of the same graph would. The limb puts every graph case into an engine through an author's commands and compares production's export with the literal one byte for byte; were production's export to change, the case set would silently stop being what reviewers are shown. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-cases.test.ts: '⭐ PRODUCTION’S GRAPH — every graph case, defined in an engine by an author’s commands, exports exactly its literal nodes' (AssertionError: G-CLEAN: expected '{\"pwa\":{\"id\":\"pwa_01M349RF344BB6S0V55…' to be '{\"pwa\":{\"id\":\"pwa_01M349RF344BB6S0V55…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M10-the-import-walk-stops-at-the-first-hop",
+		file: "verif/review-input-imports.test.ts",
+		find: "\t\t\telse queue.push(target);\n",
+		replace: "\t\t\t// MUTANT: the walk stops at the first hop\n",
+		expectRed: ["verif/review-input-imports.test.ts"],
+		why: "PROMISE: the guard reads the module's whole relative import closure, because a helper that reaches $lib or the host fails the runner's LOAD exactly as a direct import does. A first-hop check would pass a module that imports floor-over-subject through one helper. OBSERVED: KILLED — 2 test(s) red in review-input-imports.test.ts: 'a HELPER that imports floor-over-subject is refused — the walk reads the whole closure' (AssertionError: expected [] to deeply equal [ Array(1) ]); 'a HELPER reached only by a triple-slash reference is read too — a reference joins the closure as an import does' (AssertionError: expected [] to deeply equal [ Array(1) ])",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M11-the-pins-accept-an-empty-hash",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "\t\t\t...(source.candidateSubjectHash ? { candidateSubjectHash: source.candidateSubjectHash } : {})\n",
+		replace: "\t\t\t...(source.candidateSubjectHash !== undefined ? { candidateSubjectHash: source.candidateSubjectHash } : {}) // MUTANT: an empty hash is appended as a hash\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/review-input.test.ts"],
+		why: "PROMISE (ROADMAP J2-1): graphReviewInput reproduces what runPwaFloor built inline, byte for byte — the candidate's subject hash is appended to the content only when it is non-empty, so an empty hash adds nothing. The authoring route always passes a computed hash, but a case's data could carry '', and a builder that appended any DEFINED hash would put \"candidateSubjectHash\":\"\" into the content that case's reviewer reads. The call site and the module move together, so only a pin over an empty-hash option set can see it. OBSERVED: KILLED — 2 test(s) red in review-input.test.ts: '⭐ a LITERAL graph put in an engine — the call site, the module and the pins agree' (AssertionError: the pin — an empty hash, empty prior gaps and empty narration: the input's content: expected '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…' to strictly equal '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…'); '⛔ the PINS — graphReviewInput over the literal graph, written out (every branch of the assembly)' (AssertionError: the pin — an empty hash, empty prior gaps and empty narration: the input's content: expected '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…' to strictly equal '{\"pwa\":{\"id\":\"pwa_01K5QFBR8Z000000000…')",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
+	},
+	{
+		id: "J21-M12-a-type-level-import-of-the-floor",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "/** What the authoring floor knows about the draft it reviews. */\n",
+		replace: "/** MUTANT: a type-level import of the floor — no import statement, no call. */\nexport type _F = import('../floor.js').FloorView;\n\n/** What the authoring floor knows about the draft it reviews. */\n",
+		expectRed: ["verif/review-input-imports.test.ts"],
+		why: "PROMISE (DESIGN §5.2; ROADMAP J2-1): nothing in the review-input module's import closure reaches the floor, the workbench, the authoring turn or $lib, in any form TypeScript resolves. A type-level import('../floor.js') is an ImportTypeNode — neither an import statement nor a call — and it pulls floor.ts, and through it the demo host, into every program that typechecks the module, exactly as `import type` does; a guard that read only statements and calls passed it. OBSERVED: KILLED — 1 test(s) red in review-input-imports.test.ts: '⛔ THIS REPOSITORY — nothing in the module’s import closure is $lib, the authoring turn, the workbench or a floor' (AssertionError: forbidden import(s): expected 'apps/rph-demo/src/lib/server/assuranc…' to be '' // Object.is equality)",
+		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
 	}
 ];

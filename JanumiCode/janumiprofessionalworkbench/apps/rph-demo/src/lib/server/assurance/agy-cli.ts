@@ -169,7 +169,10 @@ export function splitAnswerSpan(raw: string): AnswerSpan {
 export function extractJson(raw: string): string {
 	let s = raw.trim();
 	const fence = /```(?:json)?([\s\S]*?)```/i.exec(s);
-	if (fence) s = fence[1].trim();
+	// `!` only: the group always participates when the fence matches. It lets this module typecheck under the
+	// repository's base config (`noUncheckedIndexedAccess`), which the reviewer-qualification harness compiles it
+	// with (`JAN-CRITREAD` J2-1); the emitted code is unchanged.
+	if (fence) s = fence[1]!.trim();
 	const first = s.indexOf('{');
 	const last = s.lastIndexOf('}');
 	if (first >= 0 && last > first) s = s.slice(first, last + 1);

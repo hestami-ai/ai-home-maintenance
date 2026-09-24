@@ -1,7 +1,7 @@
 # ROADMAP — `JAN-CRITREAD` `J`: what the browser tests prove, and what qualifies the reviewer
 
 **Design:** `DESIGN-what-the-tests-prove.md` (revision 5, `c715be57`) · **Ratified:** `REG-D-071` (sponsor, 2026-09-23,
-by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2b` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`, `2cfdb08d`); `J1-4` lands with this revision
+by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2b` and `J1-4` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`, `2cfdb08d`, `92feb9ba`); `J2-1` lands with this revision (case set v1 conferred by delegation, `REG-D-073`)
 
 ⭑ **Exit:** in test engines, a declared stand-in answers the review — the checker's real judgements plus a remainder
 the test stipulates, recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it and disclosed on every surface;

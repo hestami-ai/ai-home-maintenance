@@ -24,6 +24,7 @@ import {
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
+import { graphReviewInput } from './assurance/review-input.js';
 import { stipulationFor } from './stipulations.js';
 import type { AgyPrint } from './assurance/reasoning-review-validator.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
@@ -441,26 +442,18 @@ export async function runPwaFloor(
 			invariantViolations: report.valid ? [] : ['PWA_GRAPH_NOT_WELL_FORMED']
 		},
 		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer),
-		reasoningReview: {
+		// ⭐ BUILT BY THE ONE MODULE REVIEWER QUALIFICATION REPLAYS (`JAN-CRITREAD` J2-1): what the reviewer is handed
+		// for a graph is `graphReviewInput`'s, and `review-input.test.ts` holds this call to it byte for byte.
+		reasoningReview: graphReviewInput({
 			// The POLICY's criteria, read from the store — not a constant. See reasoningReviewCriteria().
 			criteria: reasoningReviewCriteria(engine),
-			// ⭑ `R14` — DECLARED, NOT INFERRED. This arm is the original framing and the one the reviewers used to
-			// reach as the FALSE half of a boolean; naming it means the graph arm is now chosen rather than
-			// defaulted into, which is what stopped a third subject kind arriving there silently.
-			framing: 'PWA_GRAPH',
 			prompt: opts.prompt,
-			content: JSON.stringify({
-				...graphExport,
-				...(opts.candidateSubjectHash ? { candidateSubjectHash: opts.candidateSubjectHash } : {})
-			}),
-			// §8.4 orders what Reasoning Review reviews: the contracted rationale summary FIRST, then outputs and
-			// tool records, then other observable trace data. Both are passed through unconditionally — §9.7
-			// forbids treating presence or absence as a signal, and a constant-shape input is also what makes the
-			// §14.3 ablation a real test rather than a null one.
-			...(opts.rationale ? { rationale: opts.rationale } : {}),
-			narration: opts.narration ?? '',
-			...(opts.priorGaps?.length ? { prior: { gaps: opts.priorGaps } } : {})
-		}
+			graph: graphExport,
+			candidateSubjectHash: opts.candidateSubjectHash,
+			rationale: opts.rationale,
+			narration: opts.narration,
+			priorGaps: opts.priorGaps
+		})
 	};
 	// MXR-05. BOTH OR NEITHER: `captureTry` refuses a store supplied without a sink, because bytes retained
 	// with no record referencing them are the orphan REG-F-336 C-2 forbids.

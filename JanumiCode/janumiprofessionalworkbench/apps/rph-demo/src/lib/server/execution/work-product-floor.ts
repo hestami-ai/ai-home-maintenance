@@ -25,6 +25,7 @@ import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-a
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { splitAnswerSpan } from '../assurance/agy-cli.js';
+import { workProductReviewInput } from '../assurance/review-input.js';
 import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
 
 /** What this module needs about the artifact and the call that produced it. Structural, so a test can drive it. */
@@ -156,29 +157,16 @@ export async function runWorkProductFloor(
 		{
 			schemaInvariant: facts.schemaInvariant,
 			identityProvenance: facts.identityProvenance,
-			reasoningReview: {
+			// ⭐ BUILT BY THE ONE MODULE REVIEWER QUALIFICATION REPLAYS (`JAN-CRITREAD` J2-1): the reviewer judges the same
+			// pair the producer saw — the prompt it was given and the answer that came back — assembled by
+			// `workProductReviewInput`, which `review-input.test.ts` holds this call to byte for byte.
+			reasoningReview: workProductReviewInput({
 				criteria: opts.criteria,
-				// ⭑ `R14` — DECLARED BY THE CALLER, so the reviewer is told what it is looking at rather than having
-				// it inferred from `subject.objectType`. The inference was BINARY, and Phase 5 measured what that
-				// costs.
-				framing: 'WORK_PRODUCT',
-				// ⭑ THE REVIEWER JUDGES THE SAME PAIR THE PRODUCER SAW — the prompt that was given and the answer
-				// that came back. Handing it a summary would make the judgement about the summary.
-				prompt: subject.producingPrompt,
-				content: subject.answer,
-				// ⚠ PASSED UNCONDITIONALLY — the section renders `(none recorded)` when absent. §9.7: presence or
-				// absence is never a signal, so the reviewer's INPUT SHAPE must not encode whether the producer
-				// declared one. What the reviewer may do is find against a real absence, which is a judgement about
-				// the work rather than a difference in what it was handed.
+				producingPrompt: subject.producingPrompt,
+				answer: subject.answer,
 				rationale: subject.rationale,
-				narration: undefined,
-				// ⭑ THE DESIGNED CHANNEL, USED ONLY WHEN CONFIGURED. `judgePrompt` frames it as *"A PREVIOUS review
-				// flagged … Judge whether those are genuinely resolved"* — which is the right framing IF the reviewer
-				// is meant to know. It defaults to unset because the sponsor's model puts that state on the
-				// PRODUCER, and the paper's deployed pipeline does the same: the judge's reason goes to the
-				// GENERATOR's prompt, and the judge re-scores each draft cold.
-				prior: subject.priorGaps?.length ? { gaps: [...subject.priorGaps] } : undefined
-			}
+				priorGaps: subject.priorGaps
+			})
 		},
 		engine,
 		opts
