@@ -20,7 +20,9 @@ import {
 	type TranscriptEntry
 } from '$lib/server/agent/transcript';
 import {
+	assuredCandidateLine,
 	classifyFloorRemediation,
+	floorStatusLine,
 	runPwaFloor,
 	type FloorObservationView,
 	type FloorProducer,
@@ -52,15 +54,9 @@ function compactArgs(args: Record<string, unknown> | undefined): string {
 		.join(', ');
 }
 
-/** A one-line status summary of a floor run for the agent log. */
-function floorStatus(f: FloorView): string {
-	if (f.satisfied) {
-		return '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.';
-	}
-	const validFindings = classifyFloorRemediation(f).findings.length;
-	const gaps = validFindings ? ` · ${validFindings} valid reasoning finding(s)` : '';
-	return `⚖ Assurance floor ${f.aggregate}${gaps}.`;
-}
+/** A one-line status summary of a floor run for the agent log — `floorStatusLine`, which carries the §4.4
+ *  disclosure when the reasoning review rests on a test's stipulations. */
+const floorStatus = (f: FloorView): string => floorStatusLine(f);
 
 /** Turn the Reasoning Review's open findings into an auto-refinement directive for the executor. */
 function refineDirective(prompt: string, findings: readonly FloorObservationView[]): string {
@@ -238,7 +234,7 @@ function applyFloorDisposition(
 ): void {
 	if (floorResult.floor?.satisfied && floorResult.subjectHash) {
 		const candidateHash = markAuthoringTurnAssured(turn, floorResult.subjectHash);
-		const text = `✓ Assured candidate ${candidateHash} is staged. Canonical DRAFT is unchanged until you accept this exact preview.`;
+		const text = assuredCandidateLine(candidateHash, floorResult.floor);
 		send({ kind: 'status', text });
 		return;
 	}

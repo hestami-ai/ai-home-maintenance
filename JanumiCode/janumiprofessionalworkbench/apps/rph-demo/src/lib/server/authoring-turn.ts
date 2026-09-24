@@ -56,6 +56,9 @@ interface MutableAuthoringTurn {
 export interface AuthoringTurnSummary {
 	readonly id: string;
 	readonly status: AuthoringTurnState;
+	/** ⭐ WHY the turn stopped, in the floor's own words (`REG-F-447`): the page names the recorded cause — an
+	 *  execution failure, an independence failure, an incomplete review — instead of one fixed sentence per status. */
+	readonly detail?: string;
 	readonly candidateHash?: string;
 	readonly assuredSubjectHash?: string;
 	readonly commandCount: number;
@@ -785,6 +788,7 @@ export function summarizeAuthoringTurn(turn: AuthoringTurn): AuthoringTurnSummar
 	return {
 		id: turn.id,
 		status: turn.status,
+		...(turn.detail !== undefined ? { detail: turn.detail } : {}),
 		candidateHash: turn.candidateHash,
 		assuredSubjectHash: turn.assuredSubjectHash,
 		commandCount: turn.commands.length,

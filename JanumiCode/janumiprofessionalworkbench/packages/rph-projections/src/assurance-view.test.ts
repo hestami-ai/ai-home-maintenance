@@ -532,3 +532,55 @@ describe('§38 "applicable policies" — the required-but-unassessed join (objec
 		expect(rows[0]!.disposition).toBeUndefined();
 	});
 });
+
+describe('⭐ JAN-CRITREAD J1-2 — the view carries each criterion\u2019s latest result, and a stipulation beside it', () => {
+	const requested = evt(1, 'AssuranceAssessmentRequested', {
+		assessmentId: 'asm_c',
+		assurancePolicyId: 'floor.reasoning-review',
+		policyVersion: '1',
+		subjectObjectIds: ['pwa_1'],
+		subjectSemanticVersions: { pwa_1: 1 },
+		claimIds: []
+	});
+	const criterion = (seq: number, criterionId: string, result: string, stipulated?: string) =>
+		evtOn(seq, 'AssuranceCriterionEvaluated', 'asm_c', {
+			assessmentId: 'asm_c',
+			criterionId,
+			result,
+			...(stipulated ? { stipulated } : {})
+		});
+
+	it('⛔ folds each criterion, latest wins, WHOLE — a superseded stipulation does not survive', () => {
+		// THE MUTANT: drop the fold. The Undertaking page's Assurance tab would then show a SATISFIED reasoning
+		// review with nothing to say that seven of its criteria were stipulated by a test.
+		const v = buildAssuranceView([
+			requested,
+			criterion(2, 'RR-04', 'MET'),
+			criterion(3, 'RR-06', 'UNABLE_TO_DETERMINE', 'MET'),
+			criterion(4, 'RR-07', 'UNABLE_TO_DETERMINE', 'MET'),
+			criterion(5, 'RR-07', 'UNABLE_TO_DETERMINE')
+		]).assessments['asm_c']!;
+		expect(v.criterionResults).toEqual({
+			'RR-04': { result: 'MET' },
+			'RR-06': { result: 'UNABLE_TO_DETERMINE', stipulated: 'MET' },
+			'RR-07': { result: 'UNABLE_TO_DETERMINE' }
+		});
+	});
+
+	it('⭐ an assessment with no recorded criterion has none — and a result for an unknown assessment changes nothing', () => {
+		const v = buildAssuranceView([requested, evtOn(9, 'AssuranceCriterionEvaluated', 'asm_other', { assessmentId: 'asm_other', criterionId: 'X', result: 'MET' })]);
+		expect(v.assessments['asm_c']!.criterionResults).toEqual({});
+		expect(v.assessments['asm_other']).toBeUndefined();
+	});
+
+	it('⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`', () => {
+		// THE MUTANT: drop the criterion check (`J12B-M8`) — a malformed event would fold a row under "undefined".
+		const before = buildAssuranceView([requested]);
+		for (const payload of [
+			{ criterionId: 'RR-01', result: 'MET' },
+			{ assessmentId: 'asm_c', result: 'MET' },
+			{ assessmentId: 'asm_c', criterionId: 'RR-01' }
+		])
+			expect(applyAssuranceEvent(before, evtOn(9, 'AssuranceCriterionEvaluated', 'asm_c', payload)), JSON.stringify(payload)).toBe(before);
+	});
+});

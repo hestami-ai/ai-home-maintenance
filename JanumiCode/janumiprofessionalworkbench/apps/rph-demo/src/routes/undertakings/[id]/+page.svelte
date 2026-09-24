@@ -723,6 +723,15 @@
 							<td></td>
 							<td colspan="5">
 								<div class="kv"><span>Claims evaluated</span><b>{a.claimsEvaluated.join(', ') || 'none'}</b></div>
+								{#if a.criteria.evaluated + a.criteria.stipulated > 0}
+									<div class="kv" data-testid="assessment-criteria">
+										<span>Criteria</span><b
+											>{a.criteria.evaluated} evaluated{a.criteria.stipulated
+												? ` · ${a.criteria.stipulated} stipulated by the test, not reviewed`
+												: ''}</b
+										>
+									</div>
+								{/if}
 								<div class="kv">
 									<span>Evidence considered</span><b>{a.evidenceConsidered.join(', ') || 'none'}</b>
 								</div>

@@ -9042,7 +9042,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "J1D-M3-a-named-writer-is-dropped",
 		file: "verif/stipulation-writers.test.ts",
-		find: "\t'apps/rph-demo/src/lib/server/workbench.ts': 'the demo host builds the admitting engine — in TEST mode only',\n",
+		find: "\t'apps/rph-demo/src/lib/server/workbench.ts': { why: 'the demo host builds the admitting engine — in TEST mode only', writes: 1 },\n",
 		replace: "\t// MUTANT: the demo host's admitting engine is no longer named\n",
 		expectRed: ["verif/stipulation-writers.test.ts"],
 		why: "PROMISE: the named list is exactly the writers. Dropping a name must redden (the file's writes are then unnamed), or the list could shrink silently while the writes stayed. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ no file outside the named list writes `stipulated`, or builds an engine that admits stipulations' (AssertionError: a NEW writer of a stipulation. Name it in WRITERS with the reason it writes one — in the same commit — or remove the write: expected [ Array(1) ] to deeply equal [])",
@@ -9155,5 +9155,77 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-sequencing.test.ts"],
 		why: "PROMISE (REG-D-072 D10): the harness module names the helper by construction and is exempt by path. Because the scan reads every .ts under e2e/ — not only *.e2e.ts — the harness IS in the population, so this exemption is load-bearing and its mutant reddens today; scanning only *.e2e.ts, it could never fail. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-sequencing.test.ts: '⛔ THIS REPOSITORY — every registration is preceded by the check in gate:fast and a deployable run' (AssertionError: expected [ …(2) ] to deeply equal []); '⭐ and nothing registering is never red — the harness that DEFINES the helper does not count' (AssertionError: expected [ …(2) ] to deeply equal [])",
 		source: "JAN-CRITREAD J1-2a — the declared stand-in, its registry and route, selection, the sequencing pin (DESIGN-what-the-tests-prove.md §4.1, §4.5, §6; REG-D-071; REG-D-072 D6, D7, D10)"
+	},
+	{
+		id: "J12B-M1-the-status-line-hides-the-stipulation",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\tif (rr && rr.stipulated > 0)\n\t\t\treturn `⚖ Assurance floor SATISFIED (test mode)",
+		replace: "\t\tif (rr && rr.stipulated > 0 && rr.stipulated < 0) // MUTANT: the disclosure never shows\n\t\t\treturn `⚖ Assurance floor SATISFIED (test mode)",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-disclosure.test.ts"],
+		why: "PROMISE (§4.4): a SATISFIED floor that rests on a test's stipulations says so on the agent's status line — which would otherwise tell the reader that 'an independent reasoning review' passed. OBSERVED: KILLED — 1 test(s) red in floor-disclosure.test.ts: '⛔ a SATISFIED floor resting on stipulations says so, with the counts' (AssertionError: expected '⚖ Assurance floor SATISFIED — schema,…' to contain 'reasoning review: 2 criteria evaluate…')",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M2-the-assured-line-hides-the-stipulation",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\trr && rr.stipulated > 0\n\t\t\t? ` Its reasoning review rests on",
+		replace: "\t\trr && rr.stipulated > 0 && rr.stipulated < 0 // MUTANT: the ✓ line never discloses\n\t\t\t? ` Its reasoning review rests on",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-disclosure.test.ts"],
+		why: "PROMISE (§4.4): the 'assured candidate' line carries the same disclosure beside the ✓, so the moment a professional is told a candidate is assured is also the moment they are told what the assurance rests on. OBSERVED: KILLED — 1 test(s) red in floor-disclosure.test.ts: '⛔ the \"assured candidate\" line carries the same disclosure beside the ✓' (AssertionError: expected '✓ Assured candidate sha256:abc is sta…' to contain 'rests on 7 criteria stipulated by the…')",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M3-the-run-view-carries-no-tally",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\t\tcriteria: tallyCriteria(a.criteria)\n",
+		replace: "\t\t\t// MUTANT: the run's view carries no tally\n",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-disclosure.test.ts"],
+		why: "PROMISE: the floor view built from a run carries who answered each criterion; the status line, the ✓ line and the panel read it from there. OBSERVED: KILLED — 1 test(s) red in floor-disclosure.test.ts: '⛔ the run reports 2 evaluated / 7 stipulated, and so does the canonical read-back after acceptance' (AssertionError: expected undefined to deeply equal { evaluated: 2, stipulated: 7 })",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M4-the-read-back-folds-nothing",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "\t\t\tcriteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])\n",
+		replace: "\t\t\tcriteria: tallyCriteria(criteriaByAssessment.size < 0 ? (criteriaByAssessment.get(a.id) ?? []) : []) // MUTANT: the read-back folds nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-disclosure.test.ts"],
+		why: "PROMISE: the canonical read-back — what the PWA panel and chip render after acceptance — folds the recorded criterion events. The judgement lives on the events (no state delta), so without the fold the panel shows a plain SATISFIED. OBSERVED: KILLED — 1 test(s) red in floor-disclosure.test.ts: '⛔ the run reports 2 evaluated / 7 stipulated, and so does the canonical read-back after acceptance' (AssertionError: expected { evaluated: +0, stipulated: +0 } to deeply equal { evaluated: 2, stipulated: 7 })",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M5-the-summary-drops-the-cause",
+		file: "apps/rph-demo/src/lib/server/authoring-turn.ts",
+		find: "\t\t...(turn.detail !== undefined ? { detail: turn.detail } : {}),\n",
+		replace: "\t\t// MUTANT: the page is not told why the turn stopped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/floor-disclosure.test.ts"],
+		why: "PROMISE (REG-F-447): the page names the recorded cause of a stopped turn in the floor's own words, rather than one fixed sentence per status — which told readers 'The reviewer call failed' for an INCONCLUSIVE review, the second time that banner named the wrong cause (REG-F-062). OBSERVED: KILLED — 1 test(s) red in floor-disclosure.test.ts: 'the summary the page renders carries the recorded cause, not one fixed sentence per status' (AssertionError: expected { …(7) } to match object { status: 'BLOCKED_EXTERNAL', …(1) })",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M6-the-assurance-view-ignores-criteria",
+		file: "packages/rph-projections/src/assurance-view.ts",
+		find: "\t\tcase 'AssuranceCriterionEvaluated':\n\t\t\treturn foldCriterionEvaluated(view, p);\n",
+		replace: "\t\tcase 'AssuranceCriterionEvaluated':\n\t\t\treturn foldCriterionEvaluated(view, {}); // MUTANT: the result is never folded\n",
+		expectRed: ["packages/rph-projections/src/assurance-view.test.ts"],
+		why: "PROMISE (§4.4): the Undertaking page's Assurance tab, built from the §38 view, shows the criteria a verdict rests on — evaluated and stipulated. Unfolded, a SATISFIED work-product review resting on seven stipulated criteria reads as a plain pass. OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ folds each criterion, latest wins, WHOLE — a superseded stipulation does not survive' (AssertionError: expected {} to deeply equal { 'RR-04': { result: 'MET' }, …(2) })",
+		source: "JAN-CRITREAD J1-2b — the disclosure: every surface that shows a reasoning-review verdict says what it rests on (DESIGN-what-the-tests-prove.md §4.4; B7, V1), and the resume hint names the recorded cause (REG-F-447)"
+	},
+	{
+		id: "J12B-M7-a-named-file-gains-a-writer",
+		file: "apps/rph-demo/src/lib/server/floor.ts",
+		find: "export function assuredCandidateLine(candidateHash: string, f: FloorView | undefined): string {\n",
+		replace: "export function assuredCandidateLine(candidateHash: string, f: FloorView | undefined): string {\n\tvoid { stipulated: 'MET' as const }; // MUTANT: a new writer inside a file already named\n",
+		expectRed: ["verif/stipulation-writers.test.ts"],
+		why: "PROMISE: naming a file does not exempt it — a named file writes exactly as many times as pinned, so a new writer added beside the read-side tally in floor.ts (the module that runs the floor) reddens. Before J1-2b the file's name alone would have let it through. OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file' (AssertionError: a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason: expected [ Array(1) ] to deeply equal []) OBSERVED: KILLED — 1 test(s) red in stipulation-writers.test.ts: '⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file' (AssertionError: a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-2b — the census pins each named file's write COUNT, so naming a file no longer exempts it"
+	},
+	{
+		id: "J12B-M8-the-fold-coerces-a-missing-criterion",
+		file: "packages/rph-projections/src/assurance-view.ts",
+		find: "\tconst criterionId = str(p.criterionId);\n",
+		replace: "\tconst criterionId = String(p.criterionId); // MUTANT: coerce instead of read\n",
+		expectRed: ["packages/rph-projections/src/assurance-view.test.ts"],
+		why: "PROMISE: a criterion result missing its criterion id changes nothing — never a row keyed \"undefined\" on the Assurance tab. The first gate's coverage floor found the fold's fail-closed checks unexercised (+1 uncovered branch). OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`' (AssertionError: {\"assessmentId\":\"asm_c\",\"result\":\"MET\"}: expected { assessments: { asm_c: { …(14) } } } to be { assessments: { asm_c: { …(14) } } } // Object.is equality) OBSERVED: KILLED — 1 test(s) red in assurance-view.test.ts: '⛔ a result missing its assessment, criterion or result changes nothing — never a row keyed `undefined`' (AssertionError: {\"assessmentId\":\"asm_c\",\"result\":\"MET\"}: expected { assessments: { asm_c: { …(14) } } } to be { assessments: { asm_c: { …(14) } } } // Object.is equality)",
+		source: "JAN-CRITREAD J1-2b — the §38 fold refuses a malformed criterion result (the coverage floor's +1 branch)"
 	}
 ];

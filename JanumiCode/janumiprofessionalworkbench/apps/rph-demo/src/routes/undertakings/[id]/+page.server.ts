@@ -75,7 +75,7 @@ import {
 	mayRetry,
 	reviewSeesPriorFindings
 } from '$lib/server/execution/loop-detection';
-import { reasoningReviewCriteria } from '$lib/server/floor';
+import { reasoningReviewCriteria, tallyCriteria } from '$lib/server/floor';
 import { getExecutionSession } from '$lib/server/execution/model';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
@@ -366,6 +366,8 @@ export const load: PageServerLoad = ({ params }) => {
 			evidenceConsidered: v?.evidenceConsideredIds ?? [],
 			controlActions: v?.controlActions ?? [],
 			missingEvidence: v?.missingEvidence ?? [],
+			// ⭐ §4.4 — what the verdict rests on: criteria a reviewer evaluated, and criteria a TEST stipulated.
+			criteria: tallyCriteria(Object.values(v?.criterionResults ?? {})),
 			findings: (v?.observations ?? []).map((o) => ({
 				code: o.findingCode,
 				severity: o.severity,

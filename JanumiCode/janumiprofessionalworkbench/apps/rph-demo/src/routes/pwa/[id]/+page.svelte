@@ -737,6 +737,10 @@
 	function policyLabel(id: string): string {
 		return policyDisplayName(id);
 	}
+	/** ⭐ §4.4 — how many of the floor's criteria a TEST stipulated (`JAN-CRITREAD` J1-2); 0 outside test mode. */
+	function stipulatedCount(floor: { policies: readonly { criteria?: { stipulated: number } }[] }): number {
+		return floor.policies.reduce((n, p) => n + (p.criteria?.stipulated ?? 0), 0);
+	}
 
 	const MUTATING = new Set([
 		'set_pwa_details',
@@ -936,7 +940,9 @@
 						title="Required assurance policies (mandatory) — schema, provenance, and an independent reasoning review (exec ≠ assurance)"
 						data-testid="assurance-chip"
 					>
-						⚖ {data.floor.satisfied ? 'floor satisfied' : `floor ${data.floor.aggregate.toLowerCase()}`}
+						⚖ {data.floor.satisfied ? 'floor satisfied' : `floor ${data.floor.aggregate.toLowerCase()}`}{stipulatedCount(data.floor)
+							? ` · ${stipulatedCount(data.floor)} stipulated by the test`
+							: ''}
 					</span>
 				{/if}
 				{#if editable}
@@ -1060,7 +1066,7 @@
 				{#if candidateResumable}
 					<span class="candidatehint" data-testid="candidate-resume-hint">
 						{data.authoringTurn.status === 'BLOCKED_EXTERNAL'
-							? 'The reviewer call failed (external/operational) — this candidate is preserved.'
+							? `The review did not produce a usable verdict — ${data.authoringTurn.detail ?? 'the reviewer did not complete'} This candidate is preserved.`
 							: 'Revision requested — this candidate is preserved.'} Refine it in the chat below (it continues on the same candidate), or Discard.
 					</span>
 				{/if}
@@ -2076,6 +2082,11 @@
 										>{pol.disposition === 'SATISFIED' ? '✓' : pol.disposition === 'REJECTED' ? '✗' : '•'}</span
 									>
 									{policyLabel(pol.policyId)}
+									{#if pol.criteria?.stipulated}
+										<span class="pstip" data-testid="assurance-stipulated"
+											>{pol.criteria.evaluated} evaluated · {pol.criteria.stipulated} stipulated by the test, not reviewed</span
+										>
+									{/if}
 								</li>
 							{/each}
 						</ul>
@@ -3238,6 +3249,7 @@
 	.floorpolicies .pdisp { color: var(--amber); font-weight: 800; }
 	.floorpolicies li.ok .pdisp { color: var(--tertiary); }
 	.floorpolicies li.bad .pdisp { color: var(--error); }
+	.floorpolicies .pstip { margin-left: 6px; font-size: 0.85em; color: var(--amber); }
 	.floorgapshdr { margin: 10px 0 4px; font-weight: 700; color: var(--on-variant); }
 	.floorgaps { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
 	.floorgaps li { line-height: 1.35; }

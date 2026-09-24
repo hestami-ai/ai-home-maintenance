@@ -31,27 +31,77 @@ const TREES = ['packages', 'apps/rph-demo/src', 'apps/rph-demo/e2e', 'verif', 's
 const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.svelte-kit', 'build', 'coverage', 'schemas', 'vocab']);
 
 /**
- * ⛔ THE NAMED WRITERS — PINNED. Adding a file is the act this gate exists to make visible: say WHY that file writes
- * a stipulation, here, in the same commit.
+ * ⛔ THE NAMED WRITERS — PINNED, each with WHY it writes and HOW MANY writes it holds. Adding a file is the act this
+ * gate exists to make visible: say why, here, in the same commit.
+ *
+ * ⭑ WHY THE COUNT (J1-2b): naming a file used to exempt the WHOLE file, so a new writer added to a named one —
+ * `workbench.ts`, say, beside the flag it already sets — went unseen. J1-2b made that concrete: its read-side tally
+ * and projection trip this census, and naming `floor.ts` whole would have blinded it to the one module that runs the
+ * floor. A named file now writes exactly as many times as pinned; one more is a new writer, and reddens.
  */
-const WRITERS: Readonly<Record<string, string>> = {
-	'packages/rph-contracts/src/messages.ts': 'GENERATED — the two payload schemas declare the optional field',
-	'packages/rph-application/src/handlers/assurance.ts': 'copies the command’s field onto the event, field by field',
-	'packages/rph-assurance/src/validators.ts': 'the mapper: a stipulated clean finding → UNABLE_TO_DETERMINE + stipulated MET',
-	'packages/rph-engine/src/record-assurance.ts': 'the recorder sends FloorCriterion.stipulated across the command boundary',
-	'packages/rph-engine/src/engine.ts': 'the handle reports the flag the Engine was built with (`deps.admitStipulatedAnswers === true`)',
-	'apps/rph-demo/src/lib/server/workbench.ts': 'the demo host builds the admitting engine — in TEST mode only',
-	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts':
-		'THE declared stand-in (J1-2): stipulates the DERIVED remainder CLEAN, only where a test registered one',
-	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts':
-		'the stand-in’s rules, composed as an ADMITTING engine would compose them',
-	'packages/rph-application/src/handlers/record-criterion-result.test.ts': 'the handler’s guard: a stipulated command reaches the event',
-	'packages/rph-application/src/handlers/stipulated-answer-gate.test.ts': 'Gate E’s admitting branch, driven in admitting and non-admitting engines',
-	'packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts': 'the mapper’s and the ladder’s guards',
-	'packages/rph-engine/src/record-assurance.test.ts': 'the recorder’s guard, and the admitting floor end to end',
-	'packages/rph-engine/src/admit-stipulated-answers.test.ts': 'the durability lock: admitting engines built over every kind of store',
-	'apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts': 'a MODEL reply that carries `stipulated` — which must be dropped',
-	'apps/rph-demo/src/lib/server/test-api-dispatch-stipulation.test.ts': 'a request carrying `stipulated`, which the dispatch route must refuse'
+const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: number }>> = {
+	'packages/rph-contracts/src/messages.ts': { why: 'GENERATED — the two payload schemas declare the optional field', writes: 2 },
+	'packages/rph-application/src/handlers/assurance.ts': { why: 'copies the command’s field onto the event, field by field', writes: 1 },
+	'packages/rph-assurance/src/validators.ts': {
+		why: 'the mapper: a stipulated clean finding → UNABLE_TO_DETERMINE + stipulated MET',
+		writes: 1
+	},
+	'packages/rph-engine/src/record-assurance.ts': {
+		why: 'the recorder sends FloorCriterion.stipulated across the command boundary',
+		writes: 1
+	},
+	'packages/rph-engine/src/engine.ts': {
+		why: 'the handle reports the flag the Engine was built with (`deps.admitStipulatedAnswers === true`)',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/workbench.ts': { why: 'the demo host builds the admitting engine — in TEST mode only', writes: 1 },
+	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts': {
+		why: 'THE declared stand-in (J1-2): stipulates the DERIVED remainder CLEAN, only where a test registered one',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts': {
+		why: 'the stand-in’s rules, composed as an ADMITTING engine would compose them',
+		writes: 1
+	},
+	'packages/rph-application/src/handlers/record-criterion-result.test.ts': {
+		why: 'the handler’s guard: a stipulated command reaches the event',
+		writes: 3
+	},
+	'packages/rph-application/src/handlers/stipulated-answer-gate.test.ts': {
+		why: 'Gate E’s admitting branch, driven in admitting and non-admitting engines',
+		writes: 2
+	},
+	'packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts': { why: 'the mapper’s and the ladder’s guards', writes: 11 },
+	'packages/rph-engine/src/record-assurance.test.ts': { why: 'the recorder’s guard, and the admitting floor end to end', writes: 3 },
+	'packages/rph-engine/src/admit-stipulated-answers.test.ts': {
+		why: 'the durability lock: admitting engines built over every kind of store',
+		writes: 3
+	},
+	'apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts': {
+		why: 'a MODEL reply that carries `stipulated` — which must be dropped',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/test-api-dispatch-stipulation.test.ts': {
+		why: 'a request carrying `stipulated`, which the dispatch route must refuse',
+		writes: 1
+	},
+	// ── READ SIDE (J1-2b, the disclosure): each carries or counts a RECORDED claim; none builds a command. ──────
+	'apps/rph-demo/src/lib/server/floor.ts': {
+		why: 'the tally’s count, named `stipulated`, and the read-back copying each recorded row’s claim — no command is built',
+		writes: 2
+	},
+	'packages/rph-projections/src/assurance-view.ts': {
+		why: 'the §38 view folds each criterion’s recorded claim into criterionResults — a projection, no command',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/floor-disclosure.test.ts': {
+		why: 'the disclosure’s fixtures: tallies and rows handed to pure functions — nothing dispatched',
+		writes: 9
+	},
+	'packages/rph-projections/src/assurance-view.test.ts': {
+		why: 'event fixtures for the pure §38 projection — nothing dispatched',
+		writes: 2
+	}
 };
 
 function everyFile(dir: string, acc: string[] = []): string[] {
@@ -125,6 +175,14 @@ describe('⛔ every writer of a stipulation is NAMED', () => {
 
 	it('⛔ every named file still writes one — a stale name would hide the next writer behind it', () => {
 		expect(Object.keys(WRITERS).filter((f) => !found.has(f))).toEqual([]);
+	});
+
+	it('⛔ a named file writes exactly as many times as pinned — one more is a NEW writer inside a named file', () => {
+		// THE MUTANT: add a write to a named file (`J12B-M7`) — before J1-2b the file's name alone let it through.
+		const drift = Object.entries(WRITERS)
+			.filter(([file, w]) => found.has(file) && found.get(file)!.length !== w.writes)
+			.map(([file, w]) => `${file} — pinned ${w.writes}, found ${found.get(file)!.length}: ${found.get(file)!.join(' | ')}`);
+		expect(drift, 'a named file’s writes changed. Review the new or removed write, then re-pin its count with the reason').toEqual([]);
 	});
 
 	it('⭐ CONTROL — the census reads tests and product alike, and skips build output', () => {

@@ -103,6 +103,55 @@ export interface FloorPolicyView {
 	readonly disposition: string;
 	readonly independenceOk: boolean;
 	readonly observations: FloorObservationView[];
+	/** ⭐ WHAT THE VERDICT RESTS ON (`JAN-CRITREAD` J1-2; §4.4): recorded criteria a reviewer EVALUATED, and criteria a
+	 *  TEST stipulated (`REG-D-071`). Optional: absent on a view built before any criterion was recorded. */
+	readonly criteria?: CriterionTally;
+}
+
+/** ⭐ `JAN-CRITREAD` J1-2 — a policy's recorded criteria, split by who answered them. */
+export interface CriterionTally {
+	/** A reviewer reached a result (anything but `UNABLE_TO_DETERMINE`). */
+	readonly evaluated: number;
+	/** Nobody judged it; the TEST stipulated it clean (`UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it). */
+	readonly stipulated: number;
+}
+
+/** Tally recorded criterion rows — `outcome` on the floor's own rows, `result` on the event that records them. */
+export function tallyCriteria(
+	rows: readonly { readonly outcome?: string; readonly result?: string; readonly stipulated?: string }[]
+): CriterionTally {
+	const result = (r: (typeof rows)[number]) => r.outcome ?? r.result;
+	return {
+		evaluated: rows.filter((r) => result(r) !== undefined && result(r) !== 'UNABLE_TO_DETERMINE').length,
+		stipulated: rows.filter((r) => r.stipulated === 'MET').length
+	};
+}
+
+/**
+ * ⭐ THE ONE-LINE STATUS OF A FLOOR RUN, for the agent's log (`JAN-CRITREAD` J1-2; §4.4). A SATISFIED floor whose
+ * reasoning review rests on a TEST's stipulations says so on the same line: the prefix every reader matches on is
+ * kept, and what follows it is true.
+ */
+export function floorStatusLine(f: FloorView): string {
+	if (f.satisfied) {
+		const rr = f.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW)?.criteria;
+		if (rr && rr.stipulated > 0)
+			return `⚖ Assurance floor SATISFIED (test mode) — schema and provenance pass; reasoning review: ${rr.evaluated} criteria evaluated, ${rr.stipulated} stipulated by the test, not reviewed.`;
+		return '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.';
+	}
+	const validFindings = classifyFloorRemediation(f).findings.length;
+	const gaps = validFindings ? ` · ${validFindings} valid reasoning finding(s)` : '';
+	return `⚖ Assurance floor ${f.aggregate}${gaps}.`;
+}
+
+/** ⭐ The "assured candidate" line, carrying the same disclosure beside the ✓ (§4.4). */
+export function assuredCandidateLine(candidateHash: string, f: FloorView | undefined): string {
+	const rr = f?.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW)?.criteria;
+	const disclosure =
+		rr && rr.stipulated > 0
+			? ` Its reasoning review rests on ${rr.stipulated} criteria stipulated by the test, not reviewed (test mode).`
+			: '';
+	return `✓ Assured candidate ${candidateHash} is staged.${disclosure} Canonical DRAFT is unchanged until you accept this exact preview.`;
 }
 export interface FloorView {
 	readonly subjectId: string;
@@ -512,7 +561,8 @@ export async function runPwaFloor(
 				code: o.code,
 				severity: o.severity,
 				statement: o.statement
-			}))
+			})),
+			criteria: tallyCriteria(a.criteria)
 		})),
 		reasoningGaps: rr ? rr.observations.map((o) => o.statement) : []
 	};
@@ -575,6 +625,26 @@ function floorAggregate(satisfied: boolean, policies: FloorPolicyView[]): string
 	return 'UNASSESSED';
 }
 
+/**
+ * The latest recorded result of each criterion of each named assessment, from `AssuranceCriterionEvaluated` — the
+ * judgement lives on the EVENT (no state delta), so this is a fold, latest wins, as Gate E folds it.
+ */
+function latestCriterionRows(
+	engine: AuthedEngineHandle,
+	assessmentIds: ReadonlySet<string>
+): Map<string, { result?: string; stipulated?: string }[]> {
+	const byAssessment = new Map<string, Map<string, { result?: string; stipulated?: string }>>();
+	for (const e of engine.readAllEvents()) {
+		if (e.eventType !== 'AssuranceCriterionEvaluated' || !assessmentIds.has(e.aggregateId)) continue;
+		const p = e.payload as { criterionId?: string; result?: string; stipulated?: string };
+		if (typeof p.criterionId !== 'string') continue;
+		const rows = byAssessment.get(e.aggregateId) ?? new Map();
+		rows.set(p.criterionId, { result: p.result, stipulated: p.stipulated });
+		byAssessment.set(e.aggregateId, rows);
+	}
+	return new Map([...byAssessment].map(([id, rows]) => [id, [...rows.values()]]));
+}
+
 /** The latest recorded floor outcome for a PWA, read back from the canonical ASSURANCE_ASSESSMENT/OBSERVATION
  *  objects (the read surface the UI renders). Undefined if no floor has been recorded for the subject yet. */
 export function loadPwaFloor(
@@ -584,6 +654,7 @@ export function loadPwaFloor(
 	const latest = latestFloorAssessments(engine, pwaId);
 	if (latest.size === 0) return undefined;
 	const obsByAssessment = observationsByAssessment(engine, pwaId);
+	const criteriaByAssessment = latestCriterionRows(engine, new Set([...latest.values()].map((a) => a.id)));
 	const order = [
 		FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
 		FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
@@ -602,7 +673,8 @@ export function loadPwaFloor(
 			// happened, while the run-path (runPwaFloor) carried the real value and dropped it at persistence. The
 			// composer now persists an INDEPENDENCE_VIOLATION observation (§8.12), so its absence is a real signal.
 			independenceOk: !obs.some((o) => o.code === 'INDEPENDENCE_VIOLATION'),
-			observations: obs
+			observations: obs,
+			criteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])
 		});
 	}
 	const satisfied = order.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED');

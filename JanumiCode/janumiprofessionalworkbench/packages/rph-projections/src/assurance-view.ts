@@ -123,6 +123,13 @@ export interface AssuranceAssessmentView {
 	 *  (AssuranceEvidenceReceived.satisfiesRequirementId, §32, Increment Q) removed. Empty = the policy requires no
 	 *  evidence OR every requirement has been satisfied — a real answer either way, no longer the whole required set. */
 	readonly missingEvidence: readonly string[];
+	/**
+	 * ⭐ THE LATEST RECORDED RESULT OF EACH CRITERION (`AssuranceCriterionEvaluated`, latest wins), with a test's
+	 * stipulation beside it where one was recorded (`JAN-CRITREAD` J1-2; §4.4; `REG-D-071`). NOT one of §38's
+	 * fourteen items: it is the disclosure `B7`/`V1` require wherever a verdict is shown, so a SATISFIED that rests on
+	 * criteria nobody judged cannot be displayed as though a reviewer had judged them.
+	 */
+	readonly criterionResults: Readonly<Record<string, { readonly result: string; readonly stipulated?: string }>>;
 }
 
 export interface AssuranceView {
@@ -172,7 +179,8 @@ function foldRequested(view: AssuranceView, p: Payload, landingState: string): A
 		controlActions: [],
 		// Filled by AssuranceEvidenceRequired, which is the event §31 says NAMES the required set. Empty here means
 		// "not yet evaluated", and the very next event in the same commit says what it is.
-		missingEvidence: []
+		missingEvidence: [],
+		criterionResults: {}
 	});
 }
 
@@ -362,6 +370,23 @@ function foldInvalidation(
 	);
 }
 
+/** ⭐ `JAN-CRITREAD` J1-2 — one criterion's result, latest wins, carried with any stipulation recorded beside it. */
+function foldCriterionEvaluated(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	const criterionId = str(p.criterionId);
+	const result = str(p.result);
+	const existing = assessmentId ? view.assessments[assessmentId] : undefined;
+	if (!assessmentId || !criterionId || !result || !existing) return view;
+	const stipulated = str(p.stipulated);
+	return withAssessment(view, assessmentId, {
+		...existing,
+		criterionResults: {
+			...existing.criterionResults,
+			[criterionId]: stipulated === undefined ? { result } : { result, stipulated }
+		}
+	});
+}
+
 /** One event -> the next view. Assessment-keyed events read `assessmentId` from the payload; waiver and
  *  invalidation events name a policy/subject/evidence and use the event's own `aggregateId`. Every field is READ
  *  FROM THE EVENT; nothing is inferred from a name. */
@@ -378,6 +403,8 @@ export function applyAssuranceEvent(view: AssuranceView, event: DomainEvent): As
 			return foldStarted(view, p);
 		case 'AssuranceObservationRecorded':
 			return foldObservation(view, p);
+		case 'AssuranceCriterionEvaluated':
+			return foldCriterionEvaluated(view, p);
 		case 'AssuranceEvidenceReceived':
 			return foldEvidenceReceived(view, p);
 		case 'AssuranceAssessmentCompleted':
