@@ -1,7 +1,7 @@
 # ROADMAP — `JAN-CRITREAD` `J`: what the browser tests prove, and what qualifies the reviewer
 
 **Design:** `DESIGN-what-the-tests-prove.md` (revision 5, `c715be57`) · **Ratified:** `REG-D-071` (sponsor, 2026-09-23,
-by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2a` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`); `J1-2b` lands with this revision
+by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2b` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`, `2cfdb08d`); `J1-4` lands with this revision
 
 ⭑ **Exit:** in test engines, a declared stand-in answers the review — the checker's real judgements plus a remainder
 the test stipulates, recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it and disclosed on every surface;
@@ -159,6 +159,17 @@ change before introspecting.
 Each of the seven is in the thirteen, and the fix lands after the line where the test fails today, so the gate's
 failure locations must not move.
 
+⭑ **Landed 2026-09-24, as measured.** The four "Accept exact candidate" sites wait for the banner to leave
+(`authoring-candidate-banner` hidden). The banner renders only while a pending turn exists, and the accept action
+deletes the turn only after its batch commits, so its leaving proves the commit. A `waitForResponse` there left a
+pending wait, and a second located failure, in a spec whose Accept button never renders today. The three "Begin &
+Execute" sites use `waitForResponse` on the exact `?/beginExecute` POST. Each of the six red-able sites was shown red
+under a held POST and green with its wait, and re-driven independently at four sites. The CONTROL is shown to pass
+vacuously while its POST is held, and its residual is `REG-F-448`. Two failure locations moved, each by a pure line
+shift on the same assertion: `execution-model-invocation.e2e.ts` `:235` → `:242` (+7) and
+`execution-agent-authored-binding.e2e.ts`'s CONTROL `:148` → `:158` (+10). The line numbers above are those before
+`J1-4`.
+
 ---
 
 ## `J1-2` — the stand-in, its registry and route, and the disclosure
@@ -289,8 +300,8 @@ failure locations must not move.
 - **Registrations** in the eleven, `assurance-floor`'s clean and dead-end tests, and `execution-model-invocation`
   (work-product arm) — in the test body, after the reset, reading the PWA id from the store.
 - **Restatements** (Q6b): `assurance-floor`'s clean test (title and assertions on the criterion events: two `MET`,
-  seven `UNABLE_TO_DETERMINE` + `stipulated`; the SSE counts) and `execution-model-invocation` (banner `:221`, message
-  `:235`, the work-product arm's rows). The dead-end test asserts RR-04 `NOT_MET` with no stipulation.
+  seven `UNABLE_TO_DETERMINE` + `stipulated`; the SSE counts) and `execution-model-invocation` (banner ~~`:221`~~ `:228`,
+  message ~~`:235`~~ `:242` — moved by `J1-4`, the work-product arm's rows). The dead-end test asserts RR-04 `NOT_MET` with no stipulation.
 - **43 files** import `test` from the harness module; a verif census reds any other `test` import from
   `@playwright/test` under `e2e/` (named and namespace forms).
 - **The lane control** (D8): the server computes both limbs of §4.8 over each segment between reset marks (a mark

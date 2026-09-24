@@ -96,6 +96,9 @@ test.describe('PWA coherence — artifact-flow conservation (ASHRAE-shaped)', ()
 		await expect(page.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 15_000 });
 		await expect(page.getByTestId('authoring-candidate-banner')).toContainText('READY_TO_COMMIT');
 		await page.getByRole('button', { name: 'Accept exact candidate' }).click();
+		// ⚠ WAIT FOR THE COMMIT, NOT THE CLICK (`JAN-CRITREAD` J1-4). `.click()` resolves when the click is dispatched;
+		// the banner leaves only when the page reloads after the accept action has removed the staged candidate.
+		await expect(page.getByTestId('authoring-candidate-banner')).toBeHidden();
 
 		const { report } = await snapshotPwaGraph(request, 'ashrae-coherence');
 

@@ -66,6 +66,9 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 		await page.getByRole('button', { name: 'Send' }).click();
 		await expect(page.getByTestId('agent-log')).toContainText('define_pwu_type');
 		await page.getByRole('button', { name: 'Accept exact candidate' }).click();
+		// ⚠ WAIT FOR THE COMMIT, NOT THE CLICK (`JAN-CRITREAD` J1-4). `.click()` resolves when the click is dispatched;
+		// the banner leaves only when the page reloads after the accept action has removed the staged candidate.
+		await expect(page.getByTestId('authoring-candidate-banner')).toBeHidden();
 
 		// ⭑ CONTROL — the AGENT's write actually carried the discharge into canonical state. Without this, a
 		// spec whose tool call silently dropped `workDischarge` would fail later at the binding and read as a
@@ -96,11 +99,18 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 		await gotoHydrated(page, (await row.getAttribute('href'))!);
 
 		await page.getByRole('button', { name: 'overview' }).click();
+		// ⚠ WAIT FOR THE ACTION, NOT THE CLICK (`JAN-CRITREAD` J1-4). `.click()` resolves when the click is dispatched,
+		// not when the POST returns, so reading the engine straight after it can run before the step has executed.
+		const executeUrl = new URL('?/beginExecute', page.url()).href;
+		const executed = page.waitForResponse(
+			(r) => r.url() === executeUrl && r.request().method() === 'POST'
+		);
 		await page
 			.getByRole('row', { name: /Route Assessment/ })
 			.first()
 			.getByRole('button', { name: 'Begin & Execute' })
 			.click();
+		await executed;
 
 		// ── 4. ⭑⭑ `STA-8` ON THE AGENT PATH ──────────────────────────────────────────────────────────────
 		const snap = await introspect(request);
@@ -163,11 +173,18 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 		await gotoHydrated(page, (await row.getAttribute('href'))!);
 
 		await page.getByRole('button', { name: 'overview' }).click();
+		// ⛔ WAIT FOR THE ACTION, NOT THE CLICK (`JAN-CRITREAD` J1-4): it closes the race in which the introspect beats the
+		// POST and passes vacuously. It does not show the step RAN — a refused POST resolves it too (`REG-F-448`).
+		const executeUrl = new URL('?/beginExecute', page.url()).href;
+		const executed = page.waitForResponse(
+			(r) => r.url() === executeUrl && r.request().method() === 'POST'
+		);
 		await page
 			.getByRole('row', { name: /Silent Assessment/ })
 			.first()
 			.getByRole('button', { name: 'Begin & Execute' })
 			.click();
+		await executed;
 
 		const snap = await introspect(request);
 		expect(

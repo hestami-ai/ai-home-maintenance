@@ -152,7 +152,7 @@ was Playwright's tracing being off (`REG-F-444`, measured).
 - **Eleven assert what the product does with a verdict.** Three of those also read the verdict back as a rendering
   check (the waiver tests at `:70`, and the control at `:217`). **Two were written to claim the verdict itself**
   (`assurance-floor`, *"a clean graph yields a SATISFIED floor…"*; `execution-model-invocation`, whose banner says it
-  *"COMPLETED BECAUSE IT WAS ASSURED"*, `:221`). Their claim is restated (§4.6) and moves to Job 2.
+  *"COMPLETED BECAUSE IT WAS ASSURED"*, ~~`:221`~~ `:228`). Their claim is restated (§4.6) and moves to Job 2.
 - **No test on the lane can prove satisfiability honestly**: no draft on the default lane has a correct verdict for a
   real reviewer to reach (`REG-F-440`), and no reviewer measured so far is both repeatable and judging (`REG-F-427`,
   `REG-F-429`).
@@ -242,7 +242,7 @@ Slice reaches no reasoning reviewer (its step is a TRANSFORMATION).
 | graph-validation (proper) | SATISFIED, to stage | no | analyzer report, computed in the test |
 | pwa-coherence | SATISFIED, to stage | no | analyzer attributes |
 | **assurance-floor (clean)** | SATISFIED | **`:70`, `:78`, `:82`** — its claim | atomic commit; the two deterministic validators; the publish gate admits |
-| **execution-model-invocation** | WORK_PRODUCT SATISFIED | **`:235`** — its claim | bindings, exchange, artifact (`:85-219`) |
+| **execution-model-invocation** | WORK_PRODUCT SATISFIED | **~~`:235`~~ `:242`** — its claim | bindings, exchange, artifact (~~`:85-219`~~ `:92-226`) |
 | assurance-floor (dead end) — passing | the checker's real RR-04 fault | yes: REJECTED | canonical untouched; discard works |
 | graph-validation (orphan) — passing | nothing (schema-invariant rejects alone) | no | analyzer attributes |
 | editors-locked, gallery — passing | nothing | no | accepts any staged status / screenshots |
@@ -531,7 +531,7 @@ match; Q6 lists them anyway.
   SATISFIED in a test engine, recorded canonically, and publishes"* — and it gains the assertions that make it honest:
   the reasoning-review assessment's criterion events show the checker's two criteria `MET` with no stipulation and the
   other seven `UNABLE_TO_DETERMINE` stipulated `MET`; and the SSE line names the counts.
-- **execution-model-invocation**, treated the same way: its banner (`:221`) and its `:235` message restated to
+- **execution-model-invocation**, treated the same way: its banner (~~`:221`~~ `:228`) and its ~~`:235`~~ `:242` message restated to
   *"completed because the floor composed SATISFIED from the checker's real answers and a stipulated remainder"*, and the
   same assertions for the work-product arm (RR-04 and RR-01 evaluated; seven stipulated).
 - **assurance-floor, dead end** (passing). Registers the clean stipulation, must still see REJECTED, and gains the
@@ -554,18 +554,22 @@ match; Q6 lists them anyway.
   (`DD-0`..`DD-6b`, the 4th to 13th commits after it) that every one of them goes through. Today's gate run adds that
   the checker passes RR-04 and RR-09 on every one of their drafts: all twelve are INCONCLUSIVE, none REJECTED. So the
   prediction is supported, not measured on this route.
-- **The thirteenth** is red on the gate's lane because the in-process review is INCONCLUSIVE (`:235`, both attempts).
+- **The thirteenth** is red on the gate's lane because the in-process review is INCONCLUSIVE (~~`:235`~~ `:242`, both attempts).
   It goes green only through the work-product stipulation, and **it has never been seen green on any lane**: the
   approve-everything run died earlier, at `:233`, on a race that exists only out of process.
 
 **J1-4 — the races, fixed on their own evidence.** Each fix is shown red first on a route that exposes its race:
 - the two **Begin & Execute** sites (`execution-model-invocation:71→75`, `execution-agent-authored-binding:101-103→106`),
-  under a test-mode delay injected into the work-product floor;
+  ~~under a test-mode delay injected into the work-product floor~~;
 - the **"Accept exact candidate"** click sites that introspect straight after the click (among them
-  `agent-retention:51→52` and `execution-agent-authored-binding:68→73`), under a test-mode delay injected into the
+  `agent-retention:51→52` and `execution-agent-authored-binding:68→73`), ~~under a test-mode delay injected into the
   accept action's `commitAuthoringTurn` path (`pwa/[id]/+page.server.ts:518-525`) — the work-product floor never runs
-  there.
+  there~~.
 Each then waits for the action's response or the banner's change before introspecting.
+⭑ **Superseded by `REG-D-072` D9 (2026-09-23):** each race is shown red by holding the browser's POST with
+`page.route` — no product delay hook — at seven sites, not four. **Landed 2026-09-24** (`J1-4`): the insertions moved
+`execution-model-invocation`'s lines from old `:73` on by +7 (`:68-72` by +6), so the citations of that spec struck
+above are re-pointed; the line numbers in this list are those before `J1-4`.
 
 ### 4.7 What this design does not change, and says so
 

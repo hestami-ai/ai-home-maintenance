@@ -65,11 +65,18 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 
 		// ── 3. Execute ────────────────────────────────────────────────────────────────────────────────────
 		await page.getByRole('button', { name: 'overview' }).click();
+		// ⚠ WAIT FOR THE ACTION, NOT THE CLICK (`JAN-CRITREAD` J1-4). `.click()` resolves when the click is dispatched,
+		// not when the POST returns, so reading the engine straight after it can run before the step has executed.
+		const executeUrl = new URL('?/beginExecute', page.url()).href;
+		const executed = page.waitForResponse(
+			(r) => r.url() === executeUrl && r.request().method() === 'POST'
+		);
 		await page
 			.getByRole('row', { name: /Route Assessment/ })
 			.first()
 			.getByRole('button', { name: 'Begin & Execute' })
 			.click();
+		await executed;
 
 		// ── 4. ENGINE STATE ───────────────────────────────────────────────────────────────────────────────
 		const snap = await introspect(request);

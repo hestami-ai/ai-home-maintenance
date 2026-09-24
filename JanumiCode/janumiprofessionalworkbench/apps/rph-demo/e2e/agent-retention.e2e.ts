@@ -49,6 +49,9 @@ test.describe('PWA Designer — agent chat history is retained', () => {
 		await expect(page.getByTestId('agent-log')).toContainText('Defined');
 
 		await page.getByRole('button', { name: 'Accept exact candidate' }).click();
+		// ⚠ WAIT FOR THE COMMIT, NOT THE CLICK (`JAN-CRITREAD` J1-4). `.click()` resolves when the click is dispatched;
+		// the banner leaves only when the page reloads after the accept action has removed the staged candidate.
+		await expect(page.getByTestId('authoring-candidate-banner')).toBeHidden();
 		const snap = await introspect(request);
 		expect(snap.conversations).toHaveLength(1);
 		expect(String(snap.conversations[0]!.state.pwaId)).toBe(snap.pwas[0]!.id);
