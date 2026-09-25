@@ -28,6 +28,8 @@ import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
 	CASE_SET_V1_FILE,
+	CURRENT_CASE_SET_FILE,
+	CURRENT_ORACLES_FILE,
 	ORACLES_V1_FILE,
 	type CaseSet,
 	type OracleSet,
@@ -57,9 +59,17 @@ import { BUN, GIT, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-her
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
 	.replace(/\/$/, '');
+// ⚠ `JAN-CRITREAD` J2-5 — THE LIMBS ARE DRIVEN OVER CASE SET VERSION ONE, A FIXED FIXTURE: the core is handed the set it
+// calls current (`SUBSET` below), so these ids are the fixture's, and version one — history the committed record
+// measured — never moves under them. The CLI reads the CURRENT set (`cases.ts`), and its tests at the end use it; so
+// does the J2-5 limb, which checks a record of version one against it.
 const CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V1_FILE}`, 'utf8')) as CaseSet).cases;
 const ORACLES = (JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet).oracles;
-const ORACLE = new Map(ORACLES.map((o) => [o.caseId, o]));
+const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
+const CURRENT_ORACLES = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
+const CURRENT_CASES = CURRENT_SET.cases;
+/** Every oracle either set holds: a case id both hold carries the same standing in each (the cases test holds that). */
+const ORACLE = new Map([...ORACLES, ...CURRENT_ORACLES.oracles].map((o) => [o.caseId, o]));
 /** The current case set most limbs are driven over: a clean case, a renamed copy of it, a planted defect. */
 const SUBSET: readonly QualificationCase[] = CASES.filter((c) => ['G-CLEAN', 'G-CLEAN-R1', 'G-RR-04'].includes(c.id));
 /** Findings the register holds — each a real entry (`register-citations.test.ts` resolves every id named here). */
@@ -102,14 +112,19 @@ const OLLAMA: CandidateIdentity = {
 
 let FP: ReviewerFingerprint;
 let CURRENT: RunFingerprint;
-/** Which case a prompt belongs to — by its hash, initial or repair. */
+/** Today's fingerprint over the CURRENT case set — the same reviewer; its case prompts and case-set digest differ. */
+let FP_NOW: ReviewerFingerprint;
+/** Which case a prompt belongs to — by its hash, initial or repair — in version one or the current set. */
 let CASE_OF: Map<string, string>;
 beforeAll(async () => {
 	// ⛔ No program can be found from this process: the validator's default print is `agyPrint`.
 	vi.stubEnv('PATH', NO_PROGRAMS);
 	FP = await reviewerFingerprint(CASES);
+	FP_NOW = await reviewerFingerprint(CURRENT_CASES);
 	CURRENT = { reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet };
-	CASE_OF = new Map([...FP.casePrompts].flatMap(([id, p]) => [[p.initial, id] as const, [p.repair, id] as const]));
+	CASE_OF = new Map(
+		[...FP.casePrompts, ...FP_NOW.casePrompts].flatMap(([id, p]) => [[p.initial, id] as const, [p.repair, id] as const])
+	);
 }, 60_000);
 afterAll(() => {
 	vi.unstubAllEnvs();
@@ -139,6 +154,8 @@ async function recorded(o: {
 	readonly repetitions?: number;
 	readonly reply?: (caseId: string, n: number) => string | TransportReply['returned'] | Error;
 	readonly served?: (n: number) => ServedFacts | null;
+	/** The versions a RUN line records — version one's unless the run is over the current set. */
+	readonly versions?: { readonly caseSet: number; readonly oracles: number };
 }): Promise<RecordLine[]> {
 	let n = 0;
 	const { TransportFailure } = await import('../scripts/reviewer-qual/transports.js');
@@ -148,8 +165,8 @@ async function recorded(o: {
 		commit: 'e5f9358b'.repeat(5),
 		fingerprint: o.fingerprint ?? CURRENT,
 		cases: o.cases ?? SUBSET,
-		caseSetVersion: 1,
-		oracleVersion: 1,
+		caseSetVersion: o.versions?.caseSet ?? 1,
+		oracleVersion: o.versions?.oracles ?? 1,
 		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 		transport: {
 			name: o.candidate?.transport ?? 'agy',
@@ -590,6 +607,56 @@ describe('JAN-CRITREAD J2-3 — the cross-file references REG-D-074 left to J2-3
 	});
 });
 
+// ── ⭐ `JAN-CRITREAD` J2-5 — the current case set is version two (`REG-F-449`; `REG-D-078`) ────────────────────────
+describe('JAN-CRITREAD J2-5 — under case set v2, a record of v1 owes a run over exactly the corrected cases', () => {
+	/** The corrected cases — in the current set under an id version one does not hold. */
+	const CORRECTED = [
+		'G2-CLEAN',
+		'G2-CLEAN-R1',
+		'G2-CLEAN-R2',
+		'G2-CLEAN-R3',
+		...SEEDED_REASONING_REVIEW_CRITERIA.slice(1).map((k) => `G2-${k.id.slice(0, 5)}`)
+	];
+	const onTheCurrentSet = (files: CheckInputs['files'], over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
+		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, ...over });
+
+	it('⛔ a record of version one under today’s fingerprint — the committed record’s shape — owes a run over exactly the corrected cases, and nothing else: no reproduction failure, no acknowledgement; a run over them turns it green', async () => {
+		const v1Ids = new Set(CASES.map((c) => c.id));
+		const corrected = CURRENT_CASES.filter((c) => !v1Ids.has(c.id));
+		expect(corrected.map((c) => c.id)).toEqual(CORRECTED);
+		const v1Record = await recorded({ runId: 'qr-v1-all', cases: CASES });
+		const owed = await onTheCurrentSet([file(v1Record)]);
+		expect(owed.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
+		expect(limb(owed, 'COVERAGE')).toBe(
+			`12 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CORRECTED.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`
+		);
+		const remeasured = await recorded({
+			runId: 'qr-v2-corrected',
+			cases: corrected,
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 2, oracles: 2 }
+		});
+		expect((await onTheCurrentSet([file([...v1Record, ...remeasured])])).problems).toEqual([]);
+	});
+
+	it('⭐ CONTROL — why a corrected case carries a new id: kept under its version-one id, it reads as a prompt that moved while the fingerprint did not — a non-reproduction a re-run does not discharge', async () => {
+		const v1IdOf = (id: string) => (id.startsWith('G2-') ? `G-${id.slice(3)}` : id);
+		const sameIds = CURRENT_CASES.map((c) => ({ ...c, id: v1IdOf(c.id) }));
+		const current = { ...FP_NOW, casePrompts: new Map([...FP_NOW.casePrompts].map(([id, p]) => [v1IdOf(id), p])) };
+		const v1Record = await recorded({ runId: 'qr-v1-same-ids', cases: CASES });
+		const rerun = await recorded({
+			runId: 'qr-same-ids-rerun',
+			cases: sameIds.filter((c) => c.id.startsWith('G-') && CORRECTED.includes(`G2-${c.id.slice(2)}`)),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet }
+		});
+		const r = await onTheCurrentSet([file([...v1Record, ...rerun])], { current, cases: sameIds, oracles: ORACLES });
+		expect(limb(r, 'REPRODUCTION')).toContain(
+			'run qr-v1-same-ids: G-CLEAN#1 initial — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move'
+		);
+		expect(limb(r, 'COVERAGE'), 'the re-run covers every case — only the old record fails').toBe('');
+	});
+});
+
 // ── the CLI, on mkdtemp fixtures (D11: it runs from source) ─────────────────────────────────────────────────────────
 describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only what git tracks, and exits with what it found', () => {
 	const dirs: string[] = [];
@@ -648,11 +715,18 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('26 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint');
 		expect(r.out).toContain(FP.reviewer);
+		// ⭐ `JAN-CRITREAD` J2-5 — the committed set it holds coverage to is the CURRENT one, version two, with its oracles.
+		expect(r.out).toContain('; case set v2, oracles v2\n');
+		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
+		expect(CURRENT_SET.caseSetVersion).toBe(2);
 	});
 
 	it('⭐ GREEN on a TRACKED record that covers the committed set, reproduces, and holds no material failure', async () => {
 		const dir = gitRepo();
-		writeFileSync(join(dir, 'runs.ndjson'), text(await recorded({ runId: 'qr-cli-1', cases: CASES })));
+		writeFileSync(
+			join(dir, 'runs.ndjson'),
+			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 2, oracles: 2 } }))
+		);
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
 		expect(r.out).toContain('GREEN');
@@ -660,7 +734,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	}, 120_000);
 
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {
-		const lines = await recorded({ runId: 'qr-cli-2', cases: CASES });
+		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 2, oracles: 2 } });
 		const untracked = gitRepo();
 		writeFileSync(join(untracked, 'runs.ndjson'), text(lines));
 		const r = cli(['--conditions=source'], ['--records', untracked]);
@@ -671,7 +745,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const changed = gitRepo();
 		writeFileSync(join(changed, 'runs.ndjson'), text(lines));
 		git(changed, 'add', 'runs.ndjson');
-		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G-CLEAN'])));
+		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G2-CLEAN'])));
 		const c = cli(['--conditions=source'], ['--records', changed]);
 		expect(c.status, c.out).toBe(1);
 		expect(c.out).toContain('runs.ndjson: not read — it differs from what git has staged');
@@ -681,17 +755,18 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const dir = gitRepo();
 		const missed = await recorded({
 			runId: 'qr-cli-3',
-			cases: CASES,
-			reply: (id) => (id === 'G-RR-04' ? judgement([]) : asOracle(id))
+			cases: CURRENT_CASES,
+			versions: { caseSet: 2, oracles: 2 },
+			reply: (id) => (id === 'G2-RR-04' ? judgement([]) : asOracle(id))
 		});
-		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G-RR-04'], 'REG-F-105')]));
+		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G2-RR-04'], 'REG-F-105')]));
 		git(dir, 'add', 'runs.ndjson');
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, '### ~~REG-F-105~~ — RULED\n');
 		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
-		expect(r.out).toContain('run qr-cli-3: G-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
+		expect(r.out).toContain('run qr-cli-3: G2-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(open.out, 'CONTROL: the same finding, open').toContain('GREEN');

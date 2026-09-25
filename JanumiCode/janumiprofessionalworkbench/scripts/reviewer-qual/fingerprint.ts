@@ -40,7 +40,7 @@ import {
 	REASONING_REVIEW_BUDGET,
 	type AgyPrint
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { CASE_SET_V1_FILE, type CaseSet, type QualificationCase } from './cases.js';
+import { CURRENT_CASE_SET_FILE, type CaseSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, sha256, type FingerprintComponents } from './digest.js';
 import { FINGERPRINT_PROBES, PROBE_SUBJECT } from './probes.js';
 import type { CandidateIdentity } from './record.js';
@@ -240,9 +240,9 @@ export async function reviewerFingerprint(
 	};
 }
 
-/** The committed case set, read from the tree `root` names (a `file:` URL ending in `/`). */
+/** The committed CURRENT case set (`cases.ts`), read from the tree `root` names (a `file:` URL ending in `/`). */
 export function committedCaseSet(root: URL): CaseSet {
-	return JSON.parse(readFileSync(new URL(CASE_SET_V1_FILE, root), 'utf8')) as CaseSet;
+	return JSON.parse(readFileSync(new URL(CURRENT_CASE_SET_FILE, root), 'utf8')) as CaseSet;
 }
 
 // `bun --conditions=source scripts/reviewer-qual/fingerprint.ts` — today's fingerprint of this tree, as JSON on stdout.

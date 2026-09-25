@@ -233,12 +233,13 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			return 2;
 		}
 	}
+	// ⭐ The CURRENT set and its oracles (`cases.ts`, `JAN-CRITREAD` J2-5) — the ones the check holds coverage to.
 	const root = new URL('../../', import.meta.url);
 	const caseSet = JSON.parse(
-		readFileSync(new URL(cases.CASE_SET_V1_FILE, root), 'utf8')
+		readFileSync(new URL(cases.CURRENT_CASE_SET_FILE, root), 'utf8')
 	) as import('./cases.js').CaseSet;
 	const oracles = JSON.parse(
-		readFileSync(new URL(cases.ORACLES_V1_FILE, root), 'utf8')
+		readFileSync(new URL(cases.CURRENT_ORACLES_FILE, root), 'utf8')
 	) as import('./cases.js').OracleSet;
 	const selected = selectCases(caseSet.cases, args.cases);
 	if (typeof selected === 'string') {

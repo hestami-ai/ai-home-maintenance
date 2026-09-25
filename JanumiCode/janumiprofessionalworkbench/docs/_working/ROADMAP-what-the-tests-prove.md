@@ -323,6 +323,33 @@ shift on the same assertion: `execution-model-invocation.e2e.ts` `:235` → `:24
 
 ---
 
+## `J2-5` — case set v2 and the second deployable candidate (after the roadmap; `REG-D-078`)
+
+The sponsor's ruling of 2026-09-25 (`REG-D-078`) authorizes `REG-F-449`'s remedy and defers `REG-F-450`'s pass bar to a
+second deployable candidate. The design's §5 already covers versioned case sets and candidates; this section sequences
+the work.
+
+- **Case set v2** (`REG-F-449`). ⭑ *Revised 2026-09-25 as built:* the correction reaches TWELVE cases under new `G2-` ids — `G2-CLEAN`, its three copies, and the planted `G2-RR-02`..`09` built on the same draft, each keeping its plant as its only defect (`REG-D-079`, for sponsor confirmation); `G-RR-01` and the work-product arm (14 cases) are byte-identical to v1. As first planned: `G-CLEAN` routes the geotechnical report (the known soft-clay layer) to the
+  structural-form options study and to the independent check, and its three renamed copies are regenerated from it.
+  Every other case is byte-identical to v1. Oracles v2 carry v1's standings unchanged. v1's committed data stays as
+  history, and the check's current set becomes v2. Oracle integrity: this increment edits no prompt, no criterion and no
+  scoring, so the reviewer fingerprint does not move.
+- **The frontier candidate re-measured** ~~on the four corrected cases~~ on the whole of v2 (a partial re-run would drop later runs' transition checks on the unchanged cases): `agy` with `gemini-3.1-pro-high`, × 2.
+- **The second deployable candidate** (`REG-F-450`): `devin` with `glm-5-3-flash-max`, the whole of v2 × 2, through the
+  product's `devinPrint` with `JPWB_ASSURANCE_MODEL` configured. No Ollama candidate is run.
+- Every material failure is filed and escalated. `REG-F-449` closes if the corrected clean case is SATISFIED, or its
+  new failures are filed. The two candidates' comparison goes to the sponsor for `REG-F-450`'s pass bar.
+
+| Instrument | Must show first |
+|---|---|
+| the corrected `G-CLEAN` graph is valid and coherent, and differs from v1 only in the geotechnical report's routing | new |
+| the cases limb against v2's generated data | red on stale data |
+| the check on the committed record under v2 | RED until ~~the four~~ the twelve corrected cases are measured under today's fingerprint |
+
+⭑ **Landed 2026-09-25, as measured.** Case set v2 corrects twelve cases (`REG-D-079`). Both deployable candidates ran the whole of v2 × 2. The frontier candidate SATISFIES the corrected clean graph case 5 of 8 (v1: 1 of 8; `REG-F-453`). devin with GLM-5.3 Flash Max SATISFIES it 7 of 8 (`REG-F-454`). Both reject all 36 planted evaluations and name the planted criterion in 32 of 36, missing `W-RR-03` and `W-RR-04` the same way. `REG-F-449` is closed; `REG-F-450`'s pass bar is with the sponsor. `reviewer:qual:check` is GREEN.
+
+---
+
 ## Order
 
 ~~`J1-1a` → `J1-1b` → `J1-1c` → `J1-1d` → `J1-4` → `J1-2` → `J2-1` → `J2-2` → `J2-3 + J2-4` (with the first run) →

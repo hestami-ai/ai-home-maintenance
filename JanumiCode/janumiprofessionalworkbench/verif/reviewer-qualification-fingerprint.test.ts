@@ -39,7 +39,12 @@ import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { REASONING_REVIEW_BUDGET } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { CASE_SET_V1_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
+import {
+	CASE_SET_V1_FILE,
+	CURRENT_CASE_SET_FILE,
+	type CaseSet,
+	type QualificationCase
+} from '../scripts/reviewer-qual/cases.js';
 import {
 	PRODUCT_SEAMS,
 	reviewerFingerprint,
@@ -55,6 +60,7 @@ import { BUN, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-hermetic
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
 	.replace(/\/$/, '');
+/** ⚠ `JAN-CRITREAD` J2-5 — case set version one, a fixed fixture: no reviewer component depends on the cases. */
 const CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V1_FILE}`, 'utf8')) as CaseSet).cases;
 const REPAIR_INSTRUCTION = 'IMPORTANT: reply with ONLY the minified JSON object.';
 const TRUNCATED = ' …(truncated)';
@@ -222,8 +228,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		dirs.push(root);
 		cpSync(`${REPO}/scripts/reviewer-qual`, `${root}/scripts/reviewer-qual`, { recursive: true });
 		cpSync(`${REPO}/apps/rph-demo/src/lib/server`, `${root}/apps/rph-demo/src/lib/server`, { recursive: true });
-		mkdirSync(dirname(`${root}/${CASE_SET_V1_FILE}`), { recursive: true });
-		copyFileSync(`${REPO}/${CASE_SET_V1_FILE}`, `${root}/${CASE_SET_V1_FILE}`);
+		// The case set the copied `fingerprint.ts` reads when run as a program — the CURRENT one (`cases.ts`, J2-5).
+		mkdirSync(dirname(`${root}/${CURRENT_CASE_SET_FILE}`), { recursive: true });
+		copyFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, `${root}/${CURRENT_CASE_SET_FILE}`);
 		writeFileSync(`${root}/package.json`, JSON.stringify({ name: 'jpwb-fingerprint-copy', type: 'module' }));
 		for (const pkg of readdirSync(`${REPO}/packages`)) {
 			const manifest = `${REPO}/packages/${pkg}/package.json`;

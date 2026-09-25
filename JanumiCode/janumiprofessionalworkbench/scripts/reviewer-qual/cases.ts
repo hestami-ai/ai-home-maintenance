@@ -40,7 +40,7 @@ export interface WorkProductCaseInput {
 }
 
 interface CaseCommon {
-	/** Stable across versions of the set: a case that changes gets a new id. */
+	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`). */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -89,6 +89,18 @@ export interface OracleSet {
 /** Where the generated data lives, repo-relative. The directory's own `*.ndjson` files are the run record (§5.4). */
 export const CASE_SET_V1_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v1.json';
 export const ORACLES_V1_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v1.json';
+/** ⭐ `JAN-CRITREAD` J2-5 — version two (`REG-F-449`; `REG-D-078`), beside version one, which stays as history. */
+export const CASE_SET_V2_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v2.json';
+export const ORACLES_V2_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v2.json';
+
+/**
+ * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
+ * escalation to, what a run runs (`run.ts`), and what the fingerprint's case-set digest is taken over. The one place
+ * the current version is named, so the check, the runner and the stamp cannot sit on different versions.
+ * Version two since J2-5: version one's graph cases built on the draft, with `REG-F-449`'s correction, under new ids.
+ */
+export const CURRENT_CASE_SET_FILE = CASE_SET_V2_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V2_FILE;
 
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {

@@ -1,30 +1,50 @@
 /**
- * `bun run scripts/reviewer-qual/generate.ts` — write the reviewer-qualification case set and its oracles
- * (`JAN-CRITREAD` J2-1; DESIGN-what-the-tests-prove.md §5.2).
+ * `bun run scripts/reviewer-qual/generate.ts` — write the reviewer-qualification case sets and their oracles, every
+ * version (`JAN-CRITREAD` J2-1, J2-5; DESIGN-what-the-tests-prove.md §5.2).
  *
- * The JSON under `docs/tracking/reviewer-qualification/` is DERIVED from `case-set-v1.ts` and `oracles-v1.ts` and is
- * never hand-edited: `verif/reviewer-qualification-cases.test.ts` reddens when a committed file differs from what
+ * The JSON under `docs/tracking/reviewer-qualification/` is DERIVED from `case-set-v<n>.ts` and `oracles-v<n>.ts` and
+ * is never hand-edited: `verif/reviewer-qualification-cases.test.ts` reddens when a committed file differs from what
  * this writes. Regenerate in the same commit as the change to its source.
+ * ⭐ `JAN-CRITREAD` J2-5 — EVERY VERSION IS WRITTEN, the superseded ones included: version one is history the committed
+ * record measured, and its data stays exactly what its own, unchanged source generates. Which version is CURRENT is
+ * named once, in `cases.ts`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CASE_SET_V1_FILE, ORACLES_V1_FILE, serializeGenerated } from './cases.js';
+import {
+	CASE_SET_V1_FILE,
+	CASE_SET_V2_FILE,
+	ORACLES_V1_FILE,
+	ORACLES_V2_FILE,
+	serializeGenerated,
+	type CaseSet,
+	type OracleSet
+} from './cases.js';
 import { CASE_SET_V1 } from './case-set-v1.js';
+import { CASE_SET_V2 } from './case-set-v2.js';
 import { ORACLES_V1 } from './oracles-v1.js';
+import { ORACLES_V2 } from './oracles-v2.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-for (const [file, value] of [
-	[CASE_SET_V1_FILE, CASE_SET_V1],
-	[ORACLES_V1_FILE, ORACLES_V1]
-] as const) {
-	const path = `${ROOT}${file}`;
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, serializeGenerated(value));
-	process.stdout.write(`reviewer-qual — wrote ${file}\n`);
+const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
+	[CASE_SET_V1_FILE, CASE_SET_V1, ORACLES_V1_FILE, ORACLES_V1],
+	[CASE_SET_V2_FILE, CASE_SET_V2, ORACLES_V2_FILE, ORACLES_V2]
+];
+
+for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {
+	for (const [file, value] of [
+		[casesFile, cases],
+		[oraclesFile, oracles]
+	] as const) {
+		const path = `${ROOT}${file}`;
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, serializeGenerated(value));
+		process.stdout.write(`reviewer-qual — wrote ${file}\n`);
+	}
+	process.stdout.write(
+		`reviewer-qual — ${cases.cases.length} cases (set v${cases.caseSetVersion}), ` +
+			`${oracles.oracles.length} oracles (v${oracles.oracleVersion})\n`
+	);
 }
-process.stdout.write(
-	`reviewer-qual — ${CASE_SET_V1.cases.length} cases (set v${CASE_SET_V1.caseSetVersion}), ` +
-		`${ORACLES_V1.oracles.length} oracles (v${ORACLES_V1.oracleVersion})\n`
-);

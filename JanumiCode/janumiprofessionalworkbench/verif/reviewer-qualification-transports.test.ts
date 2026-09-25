@@ -30,7 +30,12 @@ import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as agyCli from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { assuranceModel } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
-import { CASE_SET_V1_FILE, type CaseSet } from '../scripts/reviewer-qual/cases.js';
+import {
+	CURRENT_CASE_SET_FILE,
+	CURRENT_ORACLES_FILE,
+	type CaseSet,
+	type OracleSet
+} from '../scripts/reviewer-qual/cases.js';
 import {
 	createOllamaTransport,
 	OLLAMA_BOUND_MS
@@ -63,8 +68,17 @@ import {
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
 	.replace(/\/$/, '');
-const CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V1_FILE}`, 'utf8')) as CaseSet).cases;
-const TWO = CASES.filter((c) => c.id === 'G-CLEAN' || c.id === 'W-CLEAN');
+/** ⭐ `JAN-CRITREAD` J2-5 — the CURRENT case set (`cases.ts`): the one the runner's CLI reads, and stamps its digest over. */
+const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
+/** …and its oracles, whose version a RUN line records beside the set's. */
+const CURRENT_ORACLE_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
+const CASES = CURRENT_SET.cases;
+/** The versions a run over the current set records — a fixture that runs its cases records these, never another's. */
+const VERSIONS = {
+	caseSetVersion: CURRENT_SET.caseSetVersion,
+	oracleVersion: CURRENT_ORACLE_SET.oracleVersion
+} as const;
+const TWO = CASES.filter((c) => c.id === 'G2-CLEAN' || c.id === 'W-CLEAN');
 const LABEL = 'gemini-3.1-pro-high';
 const FINGERPRINT: RunFingerprint = {
 	reviewer: 'a'.repeat(64),
@@ -166,8 +180,7 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: FINGERPRINT,
 			cases: TWO,
-			caseSetVersion: 1,
-			oracleVersion: 1,
+			...VERSIONS,
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport,
 			repetitions: 1,
@@ -399,8 +412,7 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 				commit: 'e5f9358b'.repeat(5),
 				fingerprint: FINGERPRINT,
 				cases: TWO,
-				caseSetVersion: 1,
-				oracleVersion: 1,
+				...VERSIONS,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				transport: agy,
 				repetitions: 1,
@@ -712,9 +724,8 @@ describe('JAN-CRITREAD J2-2 — an Ollama refusal made before the server is touc
 				date: '2026-09-24T12:00:00.000Z',
 				commit: 'e5f9358b'.repeat(5),
 				fingerprint: FINGERPRINT,
-				cases: TWO.filter((c) => c.id === 'G-CLEAN'),
-				caseSetVersion: 1,
-				oracleVersion: 1,
+				cases: TWO.filter((c) => c.id === 'G2-CLEAN'),
+				...VERSIONS,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				transport: over,
 				repetitions: 1,
@@ -772,7 +783,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				'--ollama-url',
 				'http://127.0.0.1:9',
 				'--cases',
-				'G-CLEAN',
+				'G2-CLEAN',
 				'--repetitions',
 				'1',
 				'--out',
@@ -830,7 +841,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 					'--out',
 					out,
 					'--cases',
-					'G-CLEAN',
+					'G2-CLEAN',
 					'--repetitions',
 					'1'
 				],
@@ -881,7 +892,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				const spawned: Spawned[] = [];
 				const written: string[] = [];
 				const code = await main(
-					[...args, '--out', out, '--cases', 'G-CLEAN'],
+					[...args, '--out', out, '--cases', 'G2-CLEAN'],
 					inProcess(spawned, written)
 				).catch((e: unknown) => e);
 				expect(code, `${args.join(' ')}: ${written.join('')}`).toBe(2);
@@ -904,7 +915,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			const spawned: Spawned[] = [];
 			const written: string[] = [];
 			const code = await main(
-				['--transport', 'ollama', '--model', 'gpt-oss:20b', '--out', out, '--cases', 'G-CLEAN', '--repetitions', '1'],
+				['--transport', 'ollama', '--model', 'gpt-oss:20b', '--out', out, '--cases', 'G2-CLEAN', '--repetitions', '1'],
 				inProcess(spawned, written)
 			).catch((e: unknown) => e);
 			expect(code, written.join('')).toBe(2);
@@ -918,7 +929,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 
 	it('⭐ the SERVER’s date changes mid-run: the CLI stops part-way (exit 4) — the first day’s lines stay and validate, and no call follows', async () => {
 		cleanEnv();
-		// identify's show is the first; each call's show the next. G-CLEAN is served at 03:59 GMT — 2026-09-23 on the
+		// identify's show is the first; each call's show the next. G2-CLEAN is served at 03:59 GMT — 2026-09-23 on the
 		// server's UTC−4 — and W-CLEAN at 04:00:30, the server's next day.
 		const clocks = ['Thu, 24 Sep 2026 03:58:00 GMT', 'Thu, 24 Sep 2026 03:59:00 GMT', 'Thu, 24 Sep 2026 04:00:30 GMT'];
 		const s = await ollamaStandIn('answer', { clock: (n) => clocks[Math.min(Math.max(n, 1), clocks.length) - 1]! });
@@ -936,7 +947,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 					'--out',
 					out,
 					'--cases',
-					'G-CLEAN,W-CLEAN,G-RR-04',
+					'G2-CLEAN,W-CLEAN,G2-RR-04',
 					'--repetitions',
 					'1'
 				],
@@ -951,7 +962,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 					.split('\n')
 					.map((l) => (JSON.parse(l) as { caseId?: string }).caseId ?? 'RUN'),
 				'the RUN line and the evaluation made on the first day'
-			).toEqual(['RUN', 'G-CLEAN']);
+			).toEqual(['RUN', 'G2-CLEAN']);
 			expect(recordProblems(text, { tracked: true })).toEqual([]);
 			expect(
 				s.seen.filter((q) => q.body?.prompt !== undefined),
@@ -970,7 +981,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			'--model',
 			LABEL,
 			'--cases',
-			'G-CLEAN',
+			'G2-CLEAN',
 			'--repetitions',
 			'1'
 		];
@@ -1019,7 +1030,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				'--out',
 				out,
 				'--cases',
-				'G-CLEAN,W-CLEAN',
+				'G2-CLEAN,W-CLEAN',
 				'--repetitions',
 				'1'
 			],
@@ -1036,7 +1047,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				.split('\n')
 				.map((l) => (JSON.parse(l) as { kind: string; caseId?: string }).caseId ?? 'RUN'),
 			'the RUN line and the one evaluation measured'
-		).toEqual(['RUN', 'G-CLEAN']);
+		).toEqual(['RUN', 'G2-CLEAN']);
 		expect(recordProblems(text, { tracked: true })).toEqual([]);
 		expect(spawned).toHaveLength(1);
 	});
@@ -1084,7 +1095,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 						'--ollama-url',
 						s.url,
 						'--cases',
-						'G-CLEAN',
+						'G2-CLEAN',
 						'--repetitions',
 						'1',
 						'--out',
@@ -1109,12 +1120,12 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				reviewerFingerprint: today.reviewer,
 				scoringDigest: today.scoring,
 				caseSetDigest: today.caseSet,
-				caseIds: ['G-CLEAN'],
+				caseIds: ['G2-CLEAN'],
 				deployable: false
 			});
 			expect(run.candidate.serverUtcOffset).toBe('-04:00');
 			expect(call.promptSha256, 'the prompt the fingerprint derives is the one sent').toBe(
-				today.casePrompts.get('G-CLEAN')!.initial
+				today.casePrompts.get('G2-CLEAN')!.initial
 			);
 			expect(
 				s.seen.filter((q) => q.body?.prompt !== undefined),
@@ -1149,7 +1160,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			'--repetitions',
 			'1',
 			'--cases',
-			'G-CLEAN,W-CLEAN'
+			'G2-CLEAN,W-CLEAN'
 		];
 		expect(await main(args, deps), written.join('')).toBe(0);
 		const text = readFileSync(out, 'utf8');
@@ -1160,7 +1171,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			.map((l) => JSON.parse(l) as { kind: string; caseId?: string });
 		expect(lines.map((l) => `${l.kind}${l.caseId ? ` ${l.caseId}` : ''}`)).toEqual([
 			'RUN',
-			'CALL G-CLEAN',
+			'CALL G2-CLEAN',
 			'CALL W-CLEAN'
 		]);
 		expect(spawned).toHaveLength(2);
@@ -1182,5 +1193,33 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(
 			await main(['--transport', 'agy', '--model', LABEL, '--out', join(tmp(), 'run.json')], deps)
 		).toBe(2);
+	});
+
+	it('⭐ the RUN line records the CURRENT case set’s and oracles’ versions — 2 and 2 since J2-5 — the ones the CLI read and ran', async () => {
+		// ⚠ `JAN-CRITREAD` J2-5: a runner that read the current set but another version's oracles (or recorded another
+		// version) would stamp a run of version two as version one's — and the record would say its calls were judged by
+		// oracles that hold no entry for a G2- case. Nothing else reads these two fields back from a real run.
+		cleanEnv();
+		const out = join(tmp(), 'run.ndjson');
+		const spawned: Spawned[] = [];
+		const written: string[] = [];
+		const code = await main(
+			['--transport', 'agy', '--model', LABEL, '--out', out, '--cases', 'G2-CLEAN', '--repetitions', '1'],
+			inProcess(spawned, written)
+		);
+		expect(code, written.join('')).toBe(0);
+		const run = JSON.parse(readFileSync(out, 'utf8').trimEnd().split('\n')[0]!) as RunLine;
+		expect(run.kind).toBe('RUN');
+		expect(
+			{ caseSetVersion: run.caseSetVersion, oracleVersion: run.oracleVersion },
+			'the versions the RUN line records'
+		).toEqual({ caseSetVersion: 2, oracleVersion: 2 });
+		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
+		expect([
+			CURRENT_SET.caseSetVersion,
+			CURRENT_ORACLE_SET.oracleVersion,
+			CURRENT_ORACLE_SET.caseSetVersion
+		]).toEqual([2, 2, 2]);
+		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 });

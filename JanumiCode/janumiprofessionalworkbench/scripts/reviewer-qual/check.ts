@@ -124,8 +124,9 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		say(read);
 		return 2;
 	}
+	// ⭐ The CURRENT set and its oracles (`cases.ts`, `JAN-CRITREAD` J2-5): the one pointer the runner reads too.
 	const caseSet = fingerprint.committedCaseSet(deps.root);
-	const oracles = JSON.parse(readFileSync(join(root, cases.ORACLES_V1_FILE), 'utf8')) as import('./cases.js').OracleSet;
+	const oracles = JSON.parse(readFileSync(join(root, cases.CURRENT_ORACLES_FILE), 'utf8')) as import('./cases.js').OracleSet;
 	const today = await fingerprint.reviewerFingerprint(caseSet.cases);
 	const { findings, struck } = core.registerFindings(readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8'));
 	const report = await core.checkQualification({
