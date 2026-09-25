@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // S-1b of ROADMAP-decision-subject-scope (REG-F-104) — REJECTION, the third act JPWB-DOC-001 §5.2 reserves to
 // Governance, and the one that was unreachable for a reason worth stating.

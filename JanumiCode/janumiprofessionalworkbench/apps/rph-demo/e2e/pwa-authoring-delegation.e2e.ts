@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // JAN-PRPWA-DS-001 STD-2/STD-3 (DWP-05, RC-4): a human can author a DELEGATED_EXTERNAL leaf through the PWA
 // Designer form — the child block yields to a boundary-contract sub-form — and the delegated leaf round-trips

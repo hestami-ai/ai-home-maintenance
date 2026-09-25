@@ -35,6 +35,7 @@ import {
 import type { Credential } from '@janumipwb/rph-ports';
 import { openDraftOn } from './open-drafts.js';
 import { clearStipulations } from './stipulations.js';
+import { markLaneSegment } from './lane-control.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 /**
@@ -240,7 +241,12 @@ export function getArtifactStore(): ArtifactStore {
 }
 
 export function getEngine(): EngineHandle {
-	handle ??= openWorkbench(DB_PATH);
+	if (handle === null) {
+		handle = openWorkbench(DB_PATH);
+		// ⭐ THE LANE CONTROL'S BOOT MARK (`JAN-CRITREAD` J1-3; `REG-D-072` D8), taken AFTER the boot seed: a run whose
+		// first spec never resets still has a segment to check, and the seed's own records fall before the mark.
+		if (TEST_MODE) markLaneSegment(handle, 'boot');
+	}
 	return handle;
 }
 
@@ -338,6 +344,10 @@ export function resetEngine(seed: 'reference' | 'empty' | 'bare'): void {
 	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
 	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));
 	else if (seed === 'empty') seedPolicyLibrary(handle.as(SYSTEM_CREDENTIAL));
+	// ⭐ THE LANE CONTROL'S MARK, AT THE END OF EVERY RESET, AFTER ITS SEED (`JAN-CRITREAD` J1-3; §4.8). Kept by the
+	// SERVER, not by a spec: a fixture's own setup runs before the test's reset and would read the previous test's
+	// state, and a retry's new worker would lose anything kept worker-side.
+	markLaneSegment(handle, 'reset');
 }
 
 /** The command fields a UI action supplies; this host owns the common command envelope. */

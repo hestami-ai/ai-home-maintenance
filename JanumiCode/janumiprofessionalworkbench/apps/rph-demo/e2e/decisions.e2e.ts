@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // Decision Center authoring — a governance Decision must be proposeable (PROPOSED) and then approveable
 // (PROPOSED -> EFFECTIVE), each step driving the real engine. Approval is gated by the decision's HUMAN

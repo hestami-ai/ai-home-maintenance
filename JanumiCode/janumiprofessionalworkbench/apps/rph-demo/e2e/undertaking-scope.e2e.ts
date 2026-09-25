@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // JPWB-SPEC-001 SPEC-001-INV-02 / FORK-9 — a Projection SHALL be bound to a declared Projection Scope and SHALL
 // NOT present objects outside it.

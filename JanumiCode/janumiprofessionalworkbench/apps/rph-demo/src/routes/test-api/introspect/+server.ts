@@ -19,14 +19,31 @@ import {
 } from '@janumipwb/rph-engine';
 import { getEngine, harnessExposed } from '$lib/server/workbench';
 import { getPendingAuthoringTurn, summarizeAuthoringTurn } from '$lib/server/authoring-turn';
+import { registeredStipulations } from '$lib/server/stipulations';
+import { laneControlReport } from '$lib/server/lane-control';
+import type { DomainEvent } from '@janumipwb/rph-contracts';
 import type { RequestHandler } from './$types';
+
+/** A staged candidate's OWN events of one type: its log is canonical's at the fork plus its own, so only events
+ *  canonical does not hold are the candidate's. */
+function candidateOwn(
+	candidate: { readAllEvents(): readonly DomainEvent[] },
+	canonicalIds: ReadonlySet<string>,
+	eventType: string
+) {
+	return candidate
+		.readAllEvents()
+		.filter((e) => e.eventType === eventType && !canonicalIds.has(e.eventId));
+}
 
 export const GET: RequestHandler = () => {
 	if (!harnessExposed()) throw error(404, 'Not found');
 	const e = getEngine();
 	const pwas = listPwas(e);
+	const events = e.readAllEvents();
+	const canonicalIds = new Set(events.map((ev) => ev.eventId));
 	return json({
-		events: e.readAllEvents(),
+		events,
 		pwas,
 		pwuTypes: listPwuTypes(e),
 		undertakings: listUndertakings(e),
@@ -69,10 +86,19 @@ export const GET: RequestHandler = () => {
 							// WORKSPACE over the CANDIDATE engine — a preview turn's isolated engine holds only that
 							// turn's objects, so its workspace is already the scope.
 							assessments: listAssessments(turn.engine, { kind: 'WORKSPACE' }),
-							conversations: listConversations(turn.engine)
+							conversations: listConversations(turn.engine),
+							// ⭐ `JAN-CRITREAD` J1-3 (§4.8): what a staged review RESTS ON — its criterion rows and its
+							// completion — which the object state alone does not say. The candidate's own events only.
+							criterionEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceCriterionEvaluated'),
+							completionEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceAssessmentCompleted')
 						}
 					]
 				: [];
-		})
+		}),
+		// ⭐ `JAN-CRITREAD` J1-3 — the stipulation registry as the server holds it (a reset discards it), and the lane
+		// control's marks and kept violations (§4.8; `REG-D-072` D8). Read-only here: the checks run at every reset,
+		// after each test, and at the final call.
+		stipulations: registeredStipulations(),
+		lane: laneControlReport()
 	});
 };

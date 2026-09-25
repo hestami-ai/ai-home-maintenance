@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // Slice 1 — PWA Designer authoring (RPH-DOC-010 §6/§11). A DRAFT PWA must be extensible with PWU Types and
 // advanceable through the publication lifecycle DRAFT -> UNDER_REVIEW -> VALIDATED -> PUBLISHED, every step driving

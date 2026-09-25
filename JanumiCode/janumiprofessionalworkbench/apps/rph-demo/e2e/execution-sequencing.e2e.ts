@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { gotoHydrated, introspect, resetEngine } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, gotoHydrated, introspect, resetEngine } from './support/harness';
 
 // JAN-EXECPLAN-DR-003 DWP-03 — the execution tab VISIBLY sequences a multi-step plan (Tier 3C-i start-gate). Start is
 // offered ONLY on the startable step (the first non-terminal step whose predecessors are all terminal-success);

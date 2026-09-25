@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // N1 — the node-graph PWA Designer. PWU Types render as nodes on a Svelte Flow canvas; a permitted-child link
 // renders as a composition edge. Clicking a node selects it into the inspector for editing. This is the surface

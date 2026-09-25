@@ -1,7 +1,41 @@
 // Shared E2E harness helpers. These talk to the TEST-MODE-ONLY /test-api endpoints so a spec can (a) reset the
 // engine to a known state between tests and (b) read the engine's GROUND TRUTH — the append-only event log and
 // every object's materialized state — to assert the UI reflects real engine state, not just rendered markup.
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+//
+// ⭐⭐ AND EVERY SPEC TAKES ITS `test` FROM HERE (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.8), because
+// this `test` carries THE LANE CONTROL's automatic fixture. `verif/e2e-harness-import-census.test.ts` reddens on any
+// other `test` taken from `@playwright/test` under `e2e/`, so no current or future spec escapes it.
+import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
+
+/**
+ * ⭐ THE LANE CONTROL, PER TEST (§4.8; `REG-D-072` D8). The CHECK is the server's — both limbs of §4.8 over the event
+ * log since the last reset mark, and over every staged candidate — and so is what it KEEPS: every reset closes the
+ * segment it ends, and `e2e/lane-control-teardown.ts` fails the RUN on anything kept, so a violation that passes on
+ * retry, or a floor that completes after its test, cannot hide. This fixture adds ATTRIBUTION: it names the test to
+ * the server at setup, and after the test (after its `afterEach` hooks) fails it with whatever the server finds that
+ * this test is the first to see.
+ *
+ * ⚠ AUTOMATIC, so a spec cannot forget it — and the import census makes a spec that takes Playwright's own `test`
+ * impossible to land unseen.
+ */
+export const test = base.extend<{ laneControl: void }>({
+	laneControl: [
+		async ({ request }, use, testInfo) => {
+			const name = `${testInfo.titlePath.join(' › ')}${testInfo.retry > 0 ? ` (retry ${testInfo.retry})` : ''}`;
+			const announced = await request.post('/test-api/lane-control', { data: { announce: name } });
+			expect(announced.ok(), `the lane control did not take the test's name: ${await announced.text()}`).toBeTruthy();
+			await use();
+			const res = await request.post('/test-api/lane-control', { data: { check: name } });
+			expect(res.ok(), `the lane control's after-test check failed: ${await res.text()}`).toBeTruthy();
+			const { violations } = (await res.json()) as { violations: { limb: number; where: string; assessmentId: string; reason: string }[] };
+			expect(
+				violations.map((v) => `limb ${v.limb} · ${v.where} · ${v.assessmentId}: ${v.reason}`),
+				'LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): this test left a reasoning-review pass the lane may not rest on'
+			).toEqual([]);
+		},
+		{ auto: true }
+	]
+});
 
 export interface ObjectRow {
 	readonly id: string;
@@ -49,7 +83,18 @@ export interface EngineSnapshot {
 		readonly pwuTypes: ObjectRow[];
 		readonly assessments: ObjectRow[];
 		readonly conversations: ObjectRow[];
+		/** ⭐ J1-3 — the candidate's OWN `AssuranceCriterionEvaluated` events: what a staged review rests on. */
+		readonly criterionEvents: ReadonlyArray<Record<string, unknown>>;
+		/** ⭐ J1-3 — the candidate's OWN `AssuranceAssessmentCompleted` events. */
+		readonly completionEvents: ReadonlyArray<Record<string, unknown>>;
 	}>;
+	/** ⭐ J1-3 — the stipulation registry as the server holds it; a reset discards it. */
+	readonly stipulations: ReadonlyArray<{ readonly pwaId: string; readonly framing: string; readonly remaining: string }>;
+	/** ⭐ J1-3 — the lane control's marks (one per boot or reset) and the violations it has kept. */
+	readonly lane: {
+		readonly marks: ReadonlyArray<{ readonly id: number; readonly openedBy: string; readonly mark: number; readonly tests: readonly string[] }>;
+		readonly violations: ReadonlyArray<Record<string, unknown>>;
+	};
 }
 
 /** Reset the engine to a known state between specs (test mode only): 'empty' for authoring-from-scratch flows,

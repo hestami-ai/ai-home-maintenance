@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // JAN-PROMPT — the screen the sponsor went looking for and could not find.
 //

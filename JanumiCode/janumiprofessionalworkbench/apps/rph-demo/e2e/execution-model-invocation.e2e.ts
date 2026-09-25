@@ -1,5 +1,12 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import { expect } from '@playwright/test';
+import {
+	test,
+	resetEngine,
+	introspect,
+	gotoHydrated,
+	declareRisk,
+	registerStipulation
+} from './support/harness';
 
 // JAN-EXECRUN XR-03 — a work unit actually does work.
 //
@@ -26,6 +33,13 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		await page.getByPlaceholder(/Domain/i).fill('logistics');
 		await page.getByRole('button', { name: 'Create draft' }).click();
 		await page.getByRole('link', { name: /Executable Operations PWA/ }).click();
+		// ⭐ THE TEST STIPULATES THE WORK PRODUCT'S REVIEW REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md`
+		// §4.5, §4.6): the WORK_PRODUCT arm, in the body, after the reset, with the PWA's id READ FROM THE STORE. The
+		// work product finds its PWA through artifact → work unit → undertaking, so this is the PWA it will answer to.
+		const pwaId = (await introspect(request)).pwas.find(
+			(p) => p.state.name === 'Executable Operations PWA'
+		)!.id;
+		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
 
 		await page.getByRole('button', { name: /Define PWU Type/i }).click();
 		await page.locator('input[name="name"]').fill('Route Assessment');
@@ -225,7 +239,16 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		const step = plan.steps?.[0] ?? {};
 		expect(step.stepType, 'an AI-attempted step is a MODEL_INVOCATION').toBe('MODEL_INVOCATION');
 
-		// ── ⭑⭑ AND IT COMPLETED BECAUSE IT WAS ASSURED, NOT BECAUSE NOTHING CHECKED ──────────────────────
+		// ── ⭑⭑ AND IT COMPLETED BECAUSE THE FLOOR COMPOSED SATISFIED FROM THE CHECKER'S REAL ANSWERS AND A STIPULATED
+		//    REMAINDER — NOT BECAUSE NOTHING CHECKED ──────────────────────────────────────────────────────────────
+		//
+		// ⭐⭐ RESTATED (`JAN-CRITREAD` J1-3; `REG-D-071` Q6b). This banner read "AND IT COMPLETED BECAUSE IT WAS ASSURED",
+		// and its message "the work product was not assured": a claim that a REVIEWER satisfied the floor over the work
+		// product. On this lane nobody judges seven of the nine criteria — the declared stand-in records the structural
+		// checker's two real answers and the remainder THIS TEST stipulated, each `UNABLE_TO_DETERMINE` with the
+		// stipulation beside it. So the claim is now what the lane can prove: the step completed because the floor
+		// composed SATISFIED — from real answers and a declared stipulation, in an engine built for tests — and the
+		// record says which rows are which (below). Whether a reviewer can EARN it moved to reviewer qualification.
 		//
 		// `floor-gate.ts:30` makes a MODEL_INVOCATION AI-produced BY CONSTRUCTION, so completing it REQUIRES
 		// the three floor policies satisfied against the work product. Three assessments now exist against the
@@ -239,7 +262,41 @@ test.describe('Undertaking Workbench — a work unit is executed by a model', ()
 		);
 		expect(overArtifact.length, 'the floor never ran over the work product').toBe(3);
 		const rr = overArtifact.find((a) => a.state.assurancePolicyId === 'floor.reasoning-review');
-		expect(rr?.state.assessmentState, 'the work product was not assured').toBe('SATISFIED');
+		expect(
+			rr?.state.assessmentState,
+			'the floor did not compose SATISFIED from the checker’s real answers and the stipulated remainder'
+		).toBe('SATISFIED');
+
+		// ⭐ AND WHICH ROWS ARE WHICH — the work-product arm's (§4.6). The checker read a work product with content, so it
+		// judged RR-04 and RR-01, EVALUATED `MET` with no stipulation beside them; every other criterion of the policy is
+		// `UNABLE_TO_DETERMINE` — nobody judged it — with the test's stipulation beside it. The LATEST recording of each —
+		// and ⚠ NOT "ONCE": the handler lets a criterion be recorded again and Gate E reads the latest
+		// (`undetermined-criterion-gate.test.ts`, "a later determination SUPERSEDES…"), so no count of recordings is claimed.
+		const latest = new Map<string, [string, string, string | null]>();
+		for (const e of snap.events) {
+			if (e.eventType !== 'AssuranceCriterionEvaluated') continue;
+			const p = e.payload as { assessmentId: string; criterionId: string; result: string; stipulated?: string };
+			if (p.assessmentId === rr?.id) latest.set(p.criterionId, [p.criterionId, p.result, p.stipulated ?? null]);
+		}
+		const rows = [...latest.values()].sort((a, b) => a[0].localeCompare(b[0]));
+		const policy = snap.assurancePolicies.find((p) => p.id === 'floor.reasoning-review')!;
+		expect(
+			rows.map(([id]) => id),
+			'every criterion of the policy is recorded (its latest recording read, as Gate E reads it)'
+		).toEqual((policy.state.criteria as { id: string }[]).map((c) => c.id).sort((a, b) => a.localeCompare(b)));
+		expect(
+			rows.filter(([, , claim]) => claim === null),
+			'the structural checker judged RR-01 and RR-04 on a work product with content, and only those'
+		).toEqual([
+			['RR-01-no-problem-substitution', 'MET', null],
+			['RR-04-no-proxy-satisfaction', 'MET', null]
+		]);
+		const stipulatedRows = rows.filter(([, , claim]) => claim !== null);
+		expect(stipulatedRows, 'seven criteria the checker cannot judge').toHaveLength(7);
+		expect(
+			stipulatedRows.filter(([, result, claim]) => result !== 'UNABLE_TO_DETERMINE' || claim !== 'MET'),
+			'a stipulated row must say nobody judged it, with the test’s answer BESIDE the result'
+		).toEqual([]);
 
 		// ⚠ AND THE REVIEW WAS INDEPENDENT OF THE PRODUCER, which is not a formality: the policy requires
 		// DIFFERENT_MODEL, and `checkIndependence` refuses when either side leaves the field undefined — an

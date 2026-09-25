@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // PWA deletion (discard). A draft PWA the user no longer wants can be deleted from the Library, behind a
 // confirmation. Engine truth: it leaves the live set (tombstoned DISCARDED) and a PwaDeleted event is recorded.

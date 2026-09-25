@@ -33,7 +33,10 @@ export default defineConfig({
 	outputDir: 'e2e-results/artifacts',
 	// Review gallery: cleared per run, then built into e2e-results/gallery/index.html from the shots each spec takes.
 	globalSetup: './e2e/global-setup.ts',
-	globalTeardown: './e2e/global-teardown.ts',
+	// ⭐ `JAN-CRITREAD` J1-3 (`REG-D-072` D8): the gallery's index, then THE LANE CONTROL's final check, which fails the
+	// run on any reasoning-review pass the server kept — across every reset and retry, so `retries: 1` cannot hide one.
+	// The live configs keep the gallery's teardown alone: they are not this lane.
+	globalTeardown: ['./e2e/global-teardown.ts', './e2e/lane-control-teardown.ts'],
 	timeout: 30_000,
 	expect: { timeout: 7_000 },
 	use: {

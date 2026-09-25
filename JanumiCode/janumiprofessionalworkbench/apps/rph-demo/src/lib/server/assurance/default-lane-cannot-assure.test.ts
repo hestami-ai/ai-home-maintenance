@@ -1,17 +1,19 @@
-// ⭐⭐ `JAN-EXEC` `R32` CONTROL A — THE GATE'S DEFAULT LANE CANNOT ASSURE THIS FLOOR, ASSERTED RATHER THAN NOTED.
+// ⭐⭐ THE CHECKER CONTROL — THE STRUCTURAL CHECKER CANNOT JUDGE THE REASONING-REVIEW RUBRIC ALONE, ASSERTED RATHER THAN
+// NOTED (`JAN-EXEC` `R32` Control A; retitled in place by `JAN-CRITREAD` J1-3, `REG-D-071` Q3c).
 //
-// ⛔ THIRTEEN E2E SPECS ARE ACCEPTED RED BY SPONSOR RULING (`REG-D-067`), AND AN ACCEPTED RED WITH NO GREEN
-// ASSERTION BEHIND IT DECAYS INTO AN AMNESTY. This file is the assertion: it states, as a measurement anyone
-// can run in two seconds, the exact fact the thirteen are the expensive consequence of.
+// ⭑ WHAT IT MEASURES IS THE CHECKER, NOT THE LANE. It was written as "the gate's default lane cannot assure this floor",
+// when thirteen e2e specs were accepted red for exactly that reason (`REG-D-067`). The lane now goes green on the
+// declared stand-in: the checker's real judgements plus a remainder each test STIPULATES, recorded as nobody's
+// judgement and disclosed on every surface (`DESIGN-what-the-tests-prove.md` §4). That changes nothing measured here.
+// The checker still judges TWO of the policy's NINE criteria per arm, and DECLARES so; under `R26` the other seven
+// arrive `UNABLE_TO_DETERMINE`, every one mandatory (`severityIfNotMet: 'BLOCKING'`), and `dispositionFromFindings`
+// returns `INCONCLUSIVE` for a PERFECTLY CLEAN subject. It is incapable, and it says so — which is also why each
+// stipulation on the lane is needed at all.
 //
-// ⭑ THE FACT: the deterministic structural checker this lane runs examines TWO of the policy's NINE criteria
-// per arm and DECLARES so. Under `R26` the other seven arrive `UNABLE_TO_DETERMINE`, every one of them is
-// mandatory (`severityIfNotMet: 'BLOCKING'`), and `dispositionFromFindings` therefore returns `INCONCLUSIVE` —
-// for a PERFECTLY CLEAN subject. The lane is not failing; it is incapable, and it says so.
-//
-// ⚠ THIS IS NOT A TEST THAT WANTS THE PRODUCT TO STAY THIS WAY. It is written to DIE on its own remedy, the
-// pattern `REG-F-409` praises in `REG-F-407`: when a reviewer that examines all nine reaches this lane, this
-// file goes red and must be deleted. **Its failure is the signal that the gap closed.**
+// ⛔ DELETE WHEN THE CHECKER ITSELF IS REPLACED, OR JUDGES ALL NINE. It is written to DIE on its own remedy, the pattern
+// `REG-F-409` praises in `REG-F-407`: its failure is the signal that the checker's gap closed — and a checker that
+// CLAIMED all nine without judging them (`R26`'s option 3, not chosen) would redden it the same way, which is why
+// `mock-reasoning-review-validator.test.ts` guards the declaration separately.
 //
 // ⛔ AND IT DERIVES THE MANDATORY SET RATHER THAN NAMING IT. `REG-F-409`'s own exit named FIVE criteria; the
 // measured undetermined set is SEVEN per arm, and differs BETWEEN arms (`REG-F-417`). A hand-listed expectation
@@ -83,7 +85,7 @@ async function judgeCleanly(framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RES
 	} as never);
 }
 
-describe('⛔ R32 — the gate default lane CANNOT assure the reasoning-review floor, and says so', () => {
+describe('⛔ the checker control — the structural checker judges two of nine per arm and CANNOT assure the reasoning-review floor alone, and says so (delete when the checker itself is replaced, or judges all nine)', () => {
 	it('⭐ precondition: EVERY reasoning-review criterion is mandatory, derived from the policy', () => {
 		// ⛔ THIS IS WHAT MAKES THE REST OF THE FILE MEAN ANYTHING, and it is the limb a severity downgrade
 		// attacks. If a criterion's `severityIfNotMet` drops below BLOCKING it stops being mandatory, an
@@ -107,14 +109,14 @@ describe('⛔ R32 — the gate default lane CANNOT assure the reasoning-review f
 
 			expect(
 				undetermined.filter((id) => MANDATORY.includes(id)).length,
-				`${framing}: no mandatory criterion is unjudged — the lane may now be capable`
+				`${framing}: no mandatory criterion is unjudged — the checker may now judge all nine`
 			).toBeGreaterThan(0);
 
 			// ⭑ THE COMPOSITION, NOT JUST THE MAPPING. `reviewer-silence-is-not-a-pass` asserts the rule in
 			// isolation; this asserts what the rule does to a real validator's real output.
 			expect(
 				dispositionFromFindings({ findings: [], criteria: r.criteria }),
-				`${framing}: the default lane reached a definite verdict over criteria nobody judged`
+				`${framing}: the checker alone reached a definite verdict over criteria nobody judged`
 			).toBe('INCONCLUSIVE');
 		});
 	}
@@ -122,7 +124,8 @@ describe('⛔ R32 — the gate default lane CANNOT assure the reasoning-review f
 	it('⭐ CONTROL — the criteria it DOES examine are genuinely judged, so this is not "nothing works"', async () => {
 		// ⛔ WITHOUT THIS, EVERY ASSERTION ABOVE PASSES FOR A CHECKER THAT EXAMINES NOTHING AT ALL — and
 		// "INCONCLUSIVE because it judged nothing" would be indistinguishable from "INCONCLUSIVE because it
-		// judged two of nine". The thirteen accepted reds rest on the SECOND being true.
+		// judged two of nine". The lane's stipulations rest on the SECOND being true: the stand-in completes only a
+		// subject the checker READ (§4.1 rule 2).
 		const r = await judgeCleanly('PWA_GRAPH');
 		const judged = r.criteria.filter((c) => c.outcome !== 'UNABLE_TO_DETERMINE');
 		expect(judged.length, 'the checker judged nothing at all').toBeGreaterThan(0);

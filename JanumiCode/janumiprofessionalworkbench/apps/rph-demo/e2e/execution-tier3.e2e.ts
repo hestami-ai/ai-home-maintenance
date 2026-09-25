@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { gotoHydrated, introspect, resetEngine } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, gotoHydrated, introspect, resetEngine } from './support/harness';
 
 // JAN-EXECPLAN-DR-002 DWP-05 — the execution tab gains plan-terminal states/actions + per-step attempt history.
 // A plan can now be driven to COMPLETED through the UI (retiring the Tier-1 "no completion" F-9 note); the retry cap

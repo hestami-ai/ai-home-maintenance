@@ -1,5 +1,12 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, acceptAgentCandidate } from './support/harness';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import {
+	test,
+	resetEngine,
+	introspect,
+	gotoHydrated,
+	acceptAgentCandidate,
+	registerStipulation
+} from './support/harness';
 
 // A RECORDED WAIVER DOES NOT CLEAR THE DE MINIMIS FLOOR — asserted at the SURFACE (ASR-3, REG-F-202).
 //
@@ -42,6 +49,11 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		await page.getByRole('button', { name: 'Create draft' }).click();
 		await expect(page.getByRole('link', { name: new RegExp(name) })).toBeVisible();
 		const pwaId = (await introspect(request)).pwas[0]!.id;
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body — this helper runs in each test's — after the reset, with the PWA's id READ FROM THE STORE.
+		// The declared stand-in then answers what the structural checker cannot judge — recorded as not judged, and
+		// disclosed. No assertion here changes.
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 
 		const res = await request.post(`/pwa/${pwaId}/agent`, {
 			data: {

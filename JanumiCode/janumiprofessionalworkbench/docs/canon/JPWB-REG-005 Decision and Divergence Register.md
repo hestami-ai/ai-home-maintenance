@@ -36034,7 +36034,7 @@ criterion result entirely, but not nothing. Recorded here rather than left for a
 
 - **Date:** 2026-09-20 · **Type:** FINDING · **Class:** DEFECT — ⛔ **a control reporting itself satisfied over
   a rubric it never examined** · ~~**Status:** ⚠ **OPEN** — measured and filed; the remedy is a fork that needs a~~
-  ~~ruling and is NOT taken here.~~ **Status:** ⚠ **OPEN** — the fork was taken the same day by `R26` (verbatim in `REG-F-446`); the exit is ruled by `REG-D-071`: it closes when the default lane's reds are green on the declared stand-in and qualification's first run is recorded with its escalations (`DESIGN-what-the-tests-prove.md` §6).
+  ~~ruling and is NOT taken here.~~ **Status:** ~~⚠ **OPEN** — the fork was taken the same day by `R26` (verbatim in `REG-F-446`); the exit is ruled by `REG-D-071`: it closes when the default lane's reds are green on the declared stand-in and qualification's first run is recorded with its escalations (`DESIGN-what-the-tests-prove.md` §6).~~ ✅ **CLOSED 2026-09-25 by `JAN-CRITREAD` `J1-3`** — its ruled exit is met: the default lane's thirteen reds are green on the declared stand-in (95 of 95), and qualification's first run is recorded with its escalations (`4ece4f09`; `REG-F-449`, `REG-F-450`, `REG-F-451`).
 
 **THE MEASUREMENT.** The Reasoning Review policy declares nine criteria, `RR-01` … `RR-09`. The deterministic
 reviewer the GATE runs — `mock-reasoning-review-validator.ts` — can fault exactly **four**:
@@ -36611,7 +36611,7 @@ changes what every assertion about that value is worth, and neither the ruling n
 
 ### REG-D-067 — `JAN-EXEC` `R32`: the thirteen e2e reds are ACCEPTED as an INTERIM position, with controls and a named successor
 
-**Ruled 2026-09-20** (sponsor). ~~**Status:** ⚠ **OPEN — INTERIM, NOT CLOSED.**~~ **Status:** ⚠ **OPEN — INTERIM, NOT CLOSED; its named successor is replaced by `REG-D-071` (Q3b (i): Job 1 plus Job 2), and it closes when the lane is first observed green in a committed gate run, when its owed failing-set check is struck (Q3c).** ⛔ *Accepted* and *closed* are
+**Ruled 2026-09-20** (sponsor). ~~**Status:** ⚠ **OPEN — INTERIM, NOT CLOSED.**~~ **Status:** ~~⚠ **OPEN — INTERIM, NOT CLOSED; its named successor is replaced by `REG-D-071` (Q3b (i): Job 1 plus Job 2), and it closes when the lane is first observed green in a committed gate run, when its owed failing-set check is struck (Q3c).**~~ ✅ **CLOSED 2026-09-25 by `JAN-CRITREAD` `J1-3`** — the default lane is green in a committed gate run (95 of 95, the thirteen among them), its successor `REG-D-071` is delivered, and its owed failing-set check is struck below (Q3c). ⛔ *Accepted* and *closed* are
 not the same word, and this entry exists partly to stop them becoming one.
 
 ⭐⭐ **WHAT WAS ACCEPTED, PRECISELY:** the gate's default lane cannot satisfy the mandatory Reasoning Review
@@ -36643,11 +36643,12 @@ reviewer that examines all nine reaches this lane, the file goes red and must be
 signal that the gap closed.
 
 ⛔ **NAMED SUCCESSOR, WITHOUT WHICH THIS IS AN AMNESTY:** a reviewer on the gate's default lane that evaluates
-every mandatory criterion — the only exit that neither fabricates nor disarms. ⚠ **Owed and NOT built:** an
+every mandatory criterion — the only exit that neither fabricates nor disarms. ~~⚠ **Owed and NOT built:** an
 additive check that the failing-spec SET has not grown, so a fourteenth failure cannot hide among thirteen. It
 is recorded here rather than built hastily because its costing named it *"the most dangerous artifact this
 option introduces"* — there is **zero** precedent (no `test.skip`/`fail`/`fixme` in 41 e2e files), and wired
-wrongly it is the rubber stamp one plane up.
+wrongly it is the rubber stamp one plane up.~~ ⭑ **Struck 2026-09-25 (Q3c):** never built, and no longer owed — the lane is green, so there is no failing set to
+guard; `REG-D-071`'s qualification (`reviewer:qual:check`) carries the successor's exit instead.
 
 ---
 
@@ -37342,7 +37343,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-071 — SPONSOR RULING: `DESIGN-what-the-tests-prove.md` is ratified by adoption of its recommendations as written, and the decisions still open are delegated to the agent's recorded best judgement
 
-**Ruled 2026-09-23** (sponsor, in session, on revision 4 as corrected by revision 5 — `REG-F-446`). **Status:** ⚠ **OPEN — ratified; the build is owed (`docs/_working/ROADMAP-what-the-tests-prove.md`, J1-1..J2-4). Decisions made under its delegation are recorded as the agent's best judgement, flagged for sponsor confirmation.**
+**Ruled 2026-09-23** (sponsor, in session, on revision 4 as corrected by revision 5 — `REG-F-446`). **Status:** ~~⚠ **OPEN — ratified; the build is owed (`docs/_working/ROADMAP-what-the-tests-prove.md`, J1-1..J2-4). Decisions made under its delegation are recorded as the agent's best judgement, flagged for sponsor confirmation.**~~ ✅ **DELIVERED 2026-09-25** — the build is complete, `J1-1a` through `J1-3` (`0b9026c4` … `J1-3`'s commit). Its delegated decisions are `REG-D-072` to `REG-D-077`; the sponsor has confirmed `REG-D-073` and `REG-D-074`, and the others carry their own statuses.
 
 - **THE RULING, VERBATIM:** *"Yes - correct the design's wording and register. And then, I reviewed the "JanumiCode\janumiprofessionalworkbench\docs\_working\DESIGN-what-the-tests-prove.md" document and I found the totality of it to be too complex for me to follow in the time I had available. So we will proceed with your recommendations you authored. For anything else related that needs my decision or input you will need to author solutions and use your best judgement."*
 - ⛔ **WHAT THAT IS, AND IS NOT.** It adopts every §7 recommendation **as authored**; it is not a ruling on each question after reading it. Each ruling below is the agent's recommendation, carrying the sponsor's authority by adoption. Cite none of them as the sponsor's considered judgement of that one question.
@@ -37550,3 +37551,48 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **CONSISTENT WITH THE EARLIER MEASUREMENT.** `REG-F-427` measured four local models, `gpt-oss` among them, as byte-reproducible and blind to one planted defect. `REG-F-429` measured `gpt-oss`'s pinned verdicts changing overnight with no code change. This run widens the first to the whole case set. The second is exactly why the check discards a run that straddles the server's day.
 - **REMEDY.** None for the model. It stays non-deployable, and qualification records it as failed. An ESCALATION line cites this entry for its twelve failing cases.
 - **SEARCHED BEFORE FILING.** The register for `gpt-oss` (18, the nearest being `REG-F-427` and `REG-F-429`, above).
+
+### REG-D-077 — DELEGATED (`REG-D-071`): how the thirteen specs go green on the declared stand-in, and how the lane control holds them to it — and what the control cannot see
+
+**Decided 2026-09-25** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J1-3`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for the default lane from `J1-3`; sponsor confirmation owed.**
+
+- **THE GREEN.** The browser suite is 95 of 95, with the thirteen `REG-D-067` reds among them, each on its first attempt. The registrations are exactly the roadmap's set, in each test body after the reset, with the PWA id read from the store:
+  - **graph arm:** `agent-retention`, `agent-sse` tests 1 and 3, `agent-ui`, `assurance-floor-waiver` ×3, both `execution-agent-authored-binding` tests, `graph-validation`, `pwa-coherence`, and `assurance-floor`'s clean and dead-end tests;
+  - **work-product arm:** `execution-model-invocation`.
+
+  No assertion was weakened. The only restatements are Q6b's two, and each says what it now claims:
+  - `assurance-floor`'s clean test asserts the SSE disclosure and the canonical rows: RR-04 and RR-09 evaluated MET, seven stipulated;
+  - `execution-model-invocation` asserts the same for the work-product arm, with RR-01 and RR-04 evaluated.
+
+  The dead end still asserts REJECTED, with RR-04 `NOT_MET` unstipulated.
+- **THE LANE CONTROL (D8, §4.8).** Segments run between reset marks, including one after the boot seed. Both limbs are checked at every reset, after every test by an auto fixture, and at a final `globalTeardown` call. Findings are kept server-side across resets and retries, and the run fails if any exist.
+  - **Limb 1:** a positive stand-in pass must rest on at least one stipulated and at least one evaluated mandatory row, and on a registration for its (PWA, arm).
+  - **Limb 2:** no positive pass under any other validator.
+  - **The wiring is guarded in `gate:fast`:** the config's `globalTeardown` is read structurally, and the teardown's export is driven against a stand-in.
+- **CHOICES THE DESIGN LEFT OPEN.**
+  - **(a)** The population is Gate E's positive dispositions (SATISFIED and CONDITIONALLY_SATISFIED), stricter than SATISFIED alone.
+  - **(b)** A new route, `/test-api/lane-control`, handles announce, check and final; introspect stays read-only.
+  - **(c)** Attribution goes to the first test that sees a finding.
+  - **(d)** The lane teardown is in the default Playwright config only.
+  - **(e)** The run verdict is a pure function with its own mutant.
+  - **(f)** There are 44 harness importers, not the roadmap's 43: 43 specs (`resume-hint` arrived in `J1-2b`) plus `gallery.ts`.
+  - **(g)** The census also requires the harness `test` to be extended with an `auto: true` fixture, and refuses the unscoped `playwright/test` and import-equals forms.
+  - **(h)** *"recorded, once"* was not asserted, because the handler permits re-recording and Gate E folds latest-wins; the message says so.
+- **RESIDUALS, stated.**
+  - **(1)** Limb 1 cannot see a stipulation made over a criterion the checker itself judged. The lane does not enforce §4.1 rule 5; only the dead end's verdict and the restated tests' exact-row assertions do.
+  - **(2)** A registration outlives its test within a segment: the registry is per segment, and limb 1 asks only that one exists.
+  - **(3)** A candidate discarded inside a test is never read.
+  - **(4)** *"A floor completing after its test"* is shown deterministically only in unit tests and by a mutant.
+  - **(5)** `MU-F202-the-floor-blocks-everything` is killed by a 120 s webServer boot timeout, because the reference boot seed's own drive is refused, not by the admit path its entry claims. It predates `J1-3`, and its observed text is corrected in the ledger.
+  - **(6)** Nothing guards that the live configs do NOT list the lane teardown. If one did, it would fail closed on the route's 404.
+  - **(7)** The live lanes were not run; they need a real reviewer.
+- **FOR SPONSOR CONFIRMATION:** the lane control's population and attribution, and residuals (1) and (2).
+
+### REG-F-452 — `child-process-runner.test.ts`'s B2 arrangement assumes a node child exits inside its 500 ms deadline; under a loaded gate it did not, and the test reported a timeout it had correctly observed
+
+**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**
+
+- **WHAT HAPPENED.** In `gate:fast`'s parallel `rph-demo` test step, *"⛔⛔ B2 — and it is NOT a timeout: a child that exited 0 in milliseconds did not time out"* failed in 1814 ms. It reported *"a deadline that passes over an EXITED child is not a timeout: expected true to be false"*. In the previous gate run the same test passed in 579 ms. Run alone after the failure, it passed 3 of 3. Nothing in the runner or the test changed in `J1-3`; the file was last changed by `7189c4b7`.
+- **WHY — most likely, not proven.** The arrangement gives the child a 500 ms deadline and relies on its own note: *"The child exits in about 70ms on this host"*. The product sets `timedOut` from whether the child was still running when the deadline passed. On a loaded host, starting a node child can take longer than 500 ms, and then `timedOut: true` is the TRUE observation, not a fabricated one. The test cannot tell which case it got, because it does not observe the child's exit time.
+- **REMEDY — owed, not taken here.** The arrangement must make the deadline fall AFTER an observed exit, for example by driving the deadline from the child's recorded exit rather than from wall time. Raising the timeout would only move the flake, and is refused. Until then a red here on a loaded run is re-run, and the re-run is recorded.
+- **SEARCHED BEFORE FILING.** The register for `child-process-runner` (0), `HOLDS_THE_PIPES` (0) and `NOT a timeout` (0).

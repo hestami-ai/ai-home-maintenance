@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { gotoHydrated, resetEngine } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, gotoHydrated, resetEngine } from './support/harness';
 
 // W4-INC-1 (WP-4-007): the Undertaking Workbench's traceability tab renders the typed intent-to-baseline link
 // graph, consuming the rph-projections traceabilityProjector (built in W2-INC-3) — previously a backend-only

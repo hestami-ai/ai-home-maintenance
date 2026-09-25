@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 import { shot } from './support/gallery';
 
 // §11.7.2 / §11.7.4 — authoring per-child cardinality (M1/M+/C1/C+) and declared assurance policies through the

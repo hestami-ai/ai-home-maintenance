@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // Slice 3 — PWU lifecycle + INV-5 ("no green without assurance"). Drives a PWU through the four axes in the UI and
 // proves the engine keeps execution success and assurance separate: a SUCCEEDED PWU is NOT green until an assurance

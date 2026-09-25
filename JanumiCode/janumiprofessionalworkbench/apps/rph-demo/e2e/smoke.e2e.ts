@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './support/harness';
 
 // Phase 0 linchpin: proves a headless browser can drive THIS app in THIS environment and that a
 // screenshot artifact is produced (which the agent reads back visually to close the feedback loop).

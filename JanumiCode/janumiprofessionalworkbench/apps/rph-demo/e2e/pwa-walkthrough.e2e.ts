@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // JAN-PWADESIGNER-DR-001 DWP-04 — the hand-off dependency walkthrough. A READ-ONLY reading aid: step the graph in
 // hand-off DEPENDENCY order (never execution order, §9.1), with per-LAYER dependency-step numbers (shared within a

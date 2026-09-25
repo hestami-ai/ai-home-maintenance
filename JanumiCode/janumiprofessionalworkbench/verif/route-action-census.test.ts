@@ -156,6 +156,9 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 	// ⭐ `JAN-CRITREAD` J1-2: a spec declares a stipulated remainder; test mode only (not the harness switch).
 	'test-api/reviewer-script/+server.ts': ['POST'],
 	'test-api/introspect/+server.ts': ['GET'],
+	// ⭐ `JAN-CRITREAD` J1-3: the lane control's announce / after-test check / final call; test mode only. It writes no
+	// governed state — it keeps its findings in the server's memory, for `globalTeardown` to fail the run on.
+	'test-api/lane-control/+server.ts': ['POST'],
 	'test-api/reset/+server.ts': ['POST'],
 	'undertakings/+page.server.ts': ['create'],
 	'undertakings/[id]/+page.server.ts': [

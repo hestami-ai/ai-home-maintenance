@@ -28,9 +28,9 @@
 // page hydrates client-side**. So every clause below drives the REAL UI (through `gotoHydrated`, which waits on
 // `html[data-hydrated="true"]`) and then asserts against the ENGINE's own state via `/test-api/introspect`.
 // The page is used to ACT; the store is what says the act landed.
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-import { declareRisk, gotoHydrated, introspect, resetEngine, type ObjectRow } from '../support/harness';
+import { test, declareRisk, gotoHydrated, introspect, resetEngine, type ObjectRow } from '../support/harness';
 
 export const SLICE = {
 	id: 'S-01',

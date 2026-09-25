@@ -1,5 +1,4 @@
-import { test } from '@playwright/test';
-import { resetEngine, gotoHydrated } from './support/harness';
+import { test, resetEngine, gotoHydrated } from './support/harness';
 import { shot } from './support/gallery';
 
 // Review gallery for the PWA Designer renderer (§11.7): the composition TREE, collapse/expand, and the data-flow

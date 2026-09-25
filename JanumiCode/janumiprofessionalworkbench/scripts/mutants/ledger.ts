@@ -2967,7 +2967,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "const editable = $derived(isDraft && !hasStagedCandidate && !running);",
 		replace: "const editable = $derived(isDraft && (!hasStagedCandidate || running)); // MUTANT: offered while the run is live",
 		expectRed: ["apps/rph-demo/e2e/editors-locked-during-run.e2e.ts"],
-		why: "PROMISE: the page does not OFFER a manual canonical edit while an agent run is live or its candidate is staged (`REG-D-070` §5.6). WHO RELIES: the professional, who cannot be expected to know that the graph on screen is a fork while the button beside it writes canonical. WHAT THE MUTATION DOES: restores the formula this increment replaced — `isDraft && (!hasStagedCandidate || running)` — under which the editors were live EXACTLY while the run was. OBSERVED: KILLED. ⚠ ITS LANE IS NOT CLEAN: the runner reports `victim NOT green before mutation: assurance-floor-waiver.e2e.ts`, one of `REG-D-067`'s thirteen accepted reds, so the e2e verdict alone attributes little. MEASURED DIRECTLY INSTEAD: the spec run alone against a page carrying exactly this formula fails at its mid-run assertion — `expect(locator).toHaveCount(expected) failed / Locator: getByRole('button', { name: '+ Define PWU Type' }) / Expected: 0 / Received: 1`.",
+		why: "PROMISE: the page does not OFFER a manual canonical edit while an agent run is live or its candidate is staged (`REG-D-070` §5.6). WHO RELIES: the professional, who cannot be expected to know that the graph on screen is a fork while the button beside it writes canonical. WHAT THE MUTATION DOES: restores the formula this increment replaced — `isDraft && (!hasStagedCandidate || running)` — under which the editors were live EXACTLY while the run was. OBSERVED: KILLED. ⚠ ITS LANE IS NOT CLEAN: the runner reports `victim NOT green before mutation: assurance-floor-waiver.e2e.ts`, one of `REG-D-067`'s thirteen accepted reds, so the e2e verdict alone attributes little. MEASURED DIRECTLY INSTEAD: the spec run alone against a page carrying exactly this formula fails at its mid-run assertion — `expect(locator).toHaveCount(expected) failed / Locator: getByRole('button', { name: '+ Define PWU Type' }) / Expected: 0 / Received: 1`. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in editors-locked-during-run.e2e.ts: 'e2e\\\\editors-locked-during-run.e2e.ts:17:2 › PWA Designer — no manual edit while the agent runs › the manual editors go while a run is live, stay gone while its ' at :53 (Error: expect(locator).toHaveCount(expected) failed); 1 failed",
 		source: "JAN-CRITREAD DD-4 (ROADMAP-what-a-draft-depends-on.md); REG-D-070"
 	},
 	{
@@ -3725,7 +3725,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace:
 			'Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a waiver.',
 		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
-		why: "THE EXACT TEXT THAT WAS THERE, restored verbatim — this is a REGRESSION mutant, not an invented one. The hint is the sentence a blocked professional reads to learn what to do next, and naming a waiver there sends them down a route ASR-3 abolished: they record it, retry, and get the identical refusal. The spec's claim is `expect(hint).not.toContainText(/waiv/i)`, so the substring alone reddens it without touching the form below.",
+		why: "THE EXACT TEXT THAT WAS THERE, restored verbatim — this is a REGRESSION mutant, not an invented one. The hint is the sentence a blocked professional reads to learn what to do next, and naming a waiver there sends them down a route ASR-3 abolished: they record it, retry, and get the identical refusal. The spec's claim is `expect(hint).not.toContainText(/waiv/i)`, so the substring alone reddens it without touching the form below. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in assurance-floor-waiver.e2e.ts: 'e2e\\\\assurance-floor-waiver.e2e.ts:131:2 › Assurance floor — a recorded waiver does not clear it › the panel offers revision, and the waiver is framed as accepte' at :143 (Error: expect(locator).not.toContainText(expected) failed); 1 failed; 2 passed (33.5s)",
 		source: 'REG-F-202 (ASR-3, JPWB-DOC-003 §Semantic Model)'
 	},
 	{
@@ -3735,7 +3735,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			'for the current version before publishing. The floor is unconditional: no governance waiver discharges it.',
 		replace: 'for the current version, or a governance waiver, before publishing.',
 		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
-		why: "THE ENGINE'S OWN VOICE, and the highest-traffic false statement the sweep found — this refusal is the demo's answer to \"why can't I publish?\", surfaced verbatim through `advancePwa` -> `refuse(r)` -> the `{#if form?.error}` block. It survived the d24c19ec landing untouched because that increment changed the GATE and never read what the gate SAYS. Restoring the old wording reddens two assertions at once (the required `no governance waiver discharges it` and the forbidden `or a governance waiver`), which is deliberate: the spec pins both the presence of the correction and the absence of the error.",
+		why: "THE ENGINE'S OWN VOICE, and the highest-traffic false statement the sweep found — this refusal is the demo's answer to \"why can't I publish?\", surfaced verbatim through `advancePwa` -> `refuse(r)` -> the `{#if form?.error}` block. It survived the d24c19ec landing untouched because that increment changed the GATE and never read what the gate SAYS. Restoring the old wording reddens two assertions at once (the required `no governance waiver discharges it` and the forbidden `or a governance waiver`), which is deliberate: the spec pins both the presence of the correction and the absence of the error. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in assurance-floor-waiver.e2e.ts: 'e2e\\\\assurance-floor-waiver.e2e.ts:155:2 › Assurance floor — a recorded waiver does not clear it › recording one succeeds, says it clears nothing, and PublishPwa' at :216 (Error: expect(received).toContain(expected) // indexOf); 1 failed; 2 passed (20.3s)",
 		source: 'REG-F-202 (ASR-3, JPWB-DOC-003 §Semantic Model)'
 	},
 	{
@@ -3744,7 +3744,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: '{#if !data.floor.satisfied}',
 		replace: '{#if data.floor}',
 		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
-		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there. OBSERVED 2026-08-20, and the attribution is the point rather than the kill: tests 1 and 2 both PASS under this mutation (they arrange BLOCKING floors, where the hint renders either way) and ONLY the control at :213 fails, on `floor-blocked-hint` toHaveCount(0). A control whose mutant reddened a sibling would be measuring nothing of its own.",
+		why: "THE CONTROL'S OWN MUTANT, which the other two cannot supply. Both of them arrange a BLOCKING floor, so a panel that rendered the blocked hint and the waiver form UNCONDITIONALLY would pass both while lying on every satisfied floor — and the spec's third test exists precisely for that world. `{#if data.floor}` rather than `{#if true}` is the realistic slip (an existence check standing in for a state check) and it typechecks, where `if (true)` invites the dead-code NO_COMPILE this ledger's header documents. It is inside the outer `{#if data.floor}` block, so it is unconditionally true there. OBSERVED 2026-08-20, and the attribution is the point rather than the kill: tests 1 and 2 both PASS under this mutation (they arrange BLOCKING floors, where the hint renders either way) and ONLY the control at :213 fails, on `floor-blocked-hint` toHaveCount(0). A control whose mutant reddened a sibling would be measuring nothing of its own. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in assurance-floor-waiver.e2e.ts: 'e2e\\\\assurance-floor-waiver.e2e.ts:225:2 › Assurance floor — a recorded waiver does not clear it › a SATISFIED floor shows no blocked hint and no waiver form' at :230 (Error: expect(locator).toHaveCount(expected) failed); 1 failed; 2 passed (31.8s)",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
 	// ── REG-F-202: floorGateBlock's OWN decision, which had no declared mutant ────────────────────────────────
@@ -3760,7 +3760,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
 		replace: "\t\t.filter((r) => r.disposition === 'REJECTED')",
 		expectRed: ['apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts'],
-		why: "THE REALISTIC FAIL-OPEN, not an invented one: narrowing 'anything that is not SATISFIED blocks' to 'only an explicit REJECTED blocks' lets an assessment that is still ASSESSING, or INCONCLUSIVE, or MISSING entirely, pass the de minimis floor. ⚠ THE VICTIM WAS CHOSEN BECAUSE ITS ARRANGEMENT DISCRIMINATES: `assurance-floor-waiver.e2e.ts` stages a blocking floor by leaving the latest reasoning-review assessment in ASSESSING with a BLOCKING observation — deliberately NOT completed to REJECTED — so under this mutation that floor stops blocking and PublishPwa is admitted where the spec asserts refusal. `assurance-floor.e2e.ts` would NOT discriminate: its blocked case is a genuinely REJECTED review, which this mutation still blocks. OBSERVED 2026-08-21: KILLED, and the discrimination held as reasoned.",
+		why: "THE REALISTIC FAIL-OPEN, not an invented one: narrowing 'anything that is not SATISFIED blocks' to 'only an explicit REJECTED blocks' lets an assessment that is still ASSESSING, or INCONCLUSIVE, or MISSING entirely, pass the de minimis floor. ⚠ THE VICTIM WAS CHOSEN BECAUSE ITS ARRANGEMENT DISCRIMINATES: `assurance-floor-waiver.e2e.ts` stages a blocking floor by leaving the latest reasoning-review assessment in ASSESSING with a BLOCKING observation — deliberately NOT completed to REJECTED — so under this mutation that floor stops blocking and PublishPwa is admitted where the spec asserts refusal. `assurance-floor.e2e.ts` would NOT discriminate: its blocked case is a genuinely REJECTED review, which this mutation still blocks. OBSERVED 2026-08-21: KILLED, and the discrimination held as reasoned. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in assurance-floor-waiver.e2e.ts: 'e2e\\\\assurance-floor-waiver.e2e.ts:155:2 › Assurance floor — a recorded waiver does not clear it › recording one succeeds, says it clears nothing, and PublishPwa' at :214 (Error: expect(received).toBe(expected) // Object.is equality); 1 failed; 2 passed (20.2s)",
 		source: 'REG-F-202 (ASR-3: the de minimis floor is UNCONDITIONAL)'
 	},
 	{
@@ -3769,7 +3769,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t.filter((r) => r.disposition !== 'SATISFIED')",
 		replace: '\t\t.filter(() => true)',
 		expectRed: ['apps/rph-demo/e2e/assurance-floor.e2e.ts'],
-		why: "THE OPPOSITE-POLARITY PAIR, and the one that defends the CONTROL. A gate that blocked unconditionally would satisfy every refusal assertion in the suite — including its sibling's — while making publication impossible for a perfectly satisfied floor. The victim is the spec whose FIRST test drives a clean graph all the way to PUBLISHED, so the kill lands on the admit path rather than on any refusal. ⚠ Same anchor as its sibling by design: the one line IS the decision, and the two mutations fail in opposite directions. OBSERVED 2026-08-21: KILLED.",
+		why: "THE OPPOSITE-POLARITY PAIR, and the one that defends the CONTROL. A gate that blocked unconditionally would satisfy every refusal assertion in the suite — including its sibling's — while making publication impossible for a perfectly satisfied floor. The victim is the spec whose FIRST test drives a clean graph all the way to PUBLISHED, so the kill lands on the admit path rather than on any refusal. ⚠ Same anchor as its sibling by design: the one line IS the decision, and the two mutations fail in opposite directions. OBSERVED 2026-08-21: KILLED. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its victim now green): KILLED, but NOT on the admit path this entry claims - under the default reference boot the seed's own drive is refused by the mutated floor (#51 CompleteExecutionStep), so the webServer never boots: KILLED — 0 test(s) red in assurance-floor.e2e.ts (Error: Timed out waiting 120000ms from config.webServer.); ",
 		source: 'REG-F-202 (a control needs its own mutant)'
 	},
 	// ── REG-F-041 S-0: an empty composition is not a composition ──────────────────────────────────────────────
@@ -5026,7 +5026,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\tlistByType(h, 'AUTHORING_CONVERSATION');",
 		replace: "\tlistByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE');",
 		expectRed: ["apps/rph-demo/e2e/agent-retention.e2e.ts"],
-		why: "listConversations promises the DURABLE, event-sourced AUTHORING_CONVERSATION aggregates and nothing else - it is the line the authoring-retention contract is drawn on. Before acceptance the transcript lives only in the in-process candidate, and /test-api/introspect deliberately publishes `conversations` (canonical) apart from `authoringCandidates[].conversations` (preview) so a spec cannot conflate staged with committed. Pointing the single filter this query has at another aggregateType makes canonical conversations appear for a PWA that has committed none, i.e. the read surface asserts the chat history is durable domain state before any ConversationEntriesAppended event exists.",
+		why: "listConversations promises the DURABLE, event-sourced AUTHORING_CONVERSATION aggregates and nothing else - it is the line the authoring-retention contract is drawn on. Before acceptance the transcript lives only in the in-process candidate, and /test-api/introspect deliberately publishes `conversations` (canonical) apart from `authoringCandidates[].conversations` (preview) so a spec cannot conflate staged with committed. Pointing the single filter this query has at another aggregateType makes canonical conversations appear for a PWA that has committed none, i.e. the read surface asserts the chat history is durable domain state before any ConversationEntriesAppended event exists. RE-OBSERVED 2026-09-25 (JAN-CRITREAD J1-3, its e2e victim now green before mutation): KILLED — 1 test(s) red in agent-retention.e2e.ts: 'e2e\\\\agent-retention.e2e.ts:12:2 › PWA Designer — agent chat history is retained › a staged turn survives reload in-process and becomes durable only on acceptanc' at :49 (Error: expect(received).toEqual(expected) // deep equality); 1 failed",
 		source: "JAN-PFA R3 S3.3 burn-down increment 3a"
 	},
 	{
@@ -10163,5 +10163,194 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
 		why: "PROMISE (REG-F-427: the shared Ollama server may be the machine the harness runs on): an ollama run reaches only the server its command line names. A run that need not name one reaches whatever a default or the environment says — and a test whose flag a mutant dropped would reach the real GPU server. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⛔ an ollama run NAMES its server on the command line — no default, and no OLLAMA_HOST to fall back on (the machine may BE the shared server)' (AssertionError: expected TypeError: Cannot read properties of unde… to be 2 // Object.is equality)",
 		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J13-M1-the-stand-in-records-its-stipulations-as-met",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\t\t\t\t\tstipulated: true as const\n",
+		replace: "\t\t\t\t\t// MUTANT: the test's answers are recorded as MET, with nothing beside them saying nobody judged them\n",
+		expectRed: ["apps/rph-demo/e2e/agent-retention.e2e.ts"],
+		why: "PROMISE (§4.8 limb 1, the lane's first seam): a stand-in pass on the lane rests on at least one STIPULATED mandatory row — the record says which answers nobody gave. WHO RELIES: every reader of a lane verdict, and the disclosure on every surface (§4.4), which counts the stipulated rows. WHAT THE MUTATION DOES: the stand-in drops `stipulated` from the remainder it answers, so the mapper records the seven unjudged criteria `MET` — `REG-F-409`'s shape restored — and the floor is SATISFIED with nothing to show it was stipulated. The victim asserts nothing about criteria: only the lane control (its after-test check, and the run's final call) can redden it. OBSERVED: KILLED — 1 test(s) red in agent-retention.e2e.ts: 'e2e\\\\agent-retention.e2e.ts:12:2 › PWA Designer — agent chat history is retained › a staged turn survives reload in-process and becomes durable only on acceptanc' (Error: LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): 2 reasoning-review pass(es) the lane may not rest on, kept across 3 segment(s) — the run fails whatever the tests reported:); 1 failed",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M2-the-stand-in-stipulates-for-an-unregistered-arm",
+		file: "apps/rph-demo/src/lib/server/stipulations.ts",
+		find: "\treturn registered.get(key(pwaId, framing))?.remaining;\n",
+		replace: "\treturn registered.get(key(pwaId, framing))?.remaining ?? 'CLEAN'; // MUTANT: a stipulation is answered for a PWA and arm nobody registered\n",
+		expectRed: ["apps/rph-demo/e2e/execution-agent-authored-binding.e2e.ts"],
+		why: "PROMISE (§4.8 limb 1, the registration seam; §4.1 rule 4): the stand-in stipulates only where a TEST registered a stipulation for that PWA and arm, read from the server's registry, which a reset discards. WHO RELIES: every lane test that registers nothing — their reviews must stay INCONCLUSIVE — and the victim's own design: it registers the GRAPH arm only, and its work-product review must stay unstipulated (§4.6). WHAT THE MUTATION DOES: the lookup answers CLEAN for any PWA and arm, so that unregistered work-product review is SATISFIED. The victim asserts only the binding; only the lane control's registration check can redden it. OBSERVED: KILLED — 1 test(s) red in execution-agent-authored-binding.e2e.ts: 'e2e\\\\execution-agent-authored-binding.e2e.ts:27:2 › Undertaking Workbench — an AGENT-authored type executes under an authorized binding › ⭑ STA-8 holds for a typ' (Error: LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): 2 reasoning-review pass(es) the lane may not rest on, kept across 4 segment(s) — the run fails whatever the tests reported:); 1 failed; 1 passed (22.1s)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M3-the-real-adapter-with-an-approve-everything-reply-is-selected",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "createStandinReasoningReviewValidator({ stipulationFor: opts.stipulations ?? (() => undefined) })",
+		replace: "createAgyReasoningReviewValidator({ modelId: 'approve-everything', providerId: 'jpwb-mutant', print: (prompt) => Promise.resolve(JSON.stringify({ findings: [...new Set(prompt.match(/RR-0[1-9]-[a-z-]+/g) ?? [])].map((criterionId) => ({ criterionId, failed: false, statement: 'evaluated; the failure class is absent' })), recommendation: 'SATISFIED', residualUncertainty: [] })) }) /* MUTANT: the real adapter, answered by an approve-everything reply */",
+		expectRed: ["apps/rph-demo/e2e/graph-validation.e2e.ts"],
+		why: "PROMISE (§4.8 limb 2, the selection seam): on this lane only the declared stand-in may pass a reasoning review, and only on a stipulation. WHO RELIES: the lane's claim that every pass it shows is DISCLOSED — `REG-F-435`'s approve-everything run and `REG-F-441`'s program swap are the two ways a real adapter has already been made to answer everything. WHAT THE MUTATION DOES: test mode selects the real `agy.reasoning-review` adapter with an injected reply that clears every criterion the prompt names, so every clean draft is SATISFIED with nine rows `MET` and no stipulation — an undisclosed pass that looks exactly like a reviewer's. The victim's own assertions still pass; only limb 2 can redden it. (No real reviewer is called: the reply is the injected `print`.) OBSERVED: KILLED — 2 test(s) red in graph-validation.e2e.ts: 'e2e\\\\graph-validation.e2e.ts:30:2 › PWA graph — structural validity report › a proper decomposition is well-formed (all invariants pass)' (Error: LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): 4 reasoning-review pass(es) the lane may not rest on, kept across 5 segment(s) — the run fails whatever the tests reported:); 2 failed",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M4-the-checker-claims-all-nine",
+		file: "apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts",
+		find: "const GRAPH_ARM_EVALUATES = [RR_COMPLETENESS, RR_PROXY] as const;",
+		replace: "const GRAPH_ARM_EVALUATES = [RR_COMPLETENESS, RR_PROXY, RR_SUBSTITUTION, RR_CONTRADICTION, 'RR-02-no-obligation-elision', 'RR-03-no-unjustified-scope-reduction', 'RR-05-no-premature-convergence', 'RR-06-sound-inference', 'RR-08-evidence-integrity'] as const; // MUTANT: the checker claims all nine",
+		expectRed: ["apps/rph-demo/e2e/pwa-coherence.e2e.ts"],
+		why: "PROMISE (§4.8 limb 1; `R26`, verbatim in `REG-F-446`): the structural checker declares only what it examined — two of nine on the graph arm — and the lane's passes rest on a DISCLOSED stipulation for the rest. WHO RELIES: the disclosure's counts, and the checker control, which exists to die only when the checker genuinely judges all nine. WHAT THE MUTATION DOES: `R26`'s option 3, not chosen — the checker claims all nine clean, so the stand-in has no remainder to stipulate and every clean draft is SATISFIED on nine 'evaluated' rows nobody evaluated. The victim asserts only coherence attributes; only limb 1 (no stipulated row) reddens it on the lane. `default-lane-cannot-assure.test.ts` also reddens, as it must. OBSERVED: KILLED — 1 test(s) red in pwa-coherence.e2e.ts: 'e2e\\\\pwa-coherence.e2e.ts:27:2 › PWA coherence — artifact-flow conservation (ASHRAE-shaped) › a structurally-valid graph with an ungrounded phase branch is caugh' (Error: LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): 2 reasoning-review pass(es) the lane may not rest on, kept across 3 segment(s) — the run fails whatever the tests reported:); 1 failed",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M5-dead-end-REPLACE-the-checkers-fault-is-stipulated-over",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\t\tfindings: [...checker.findings, ...stipulated],\n",
+		replace: "\t\tfindings: [...checker.findings.map((f) => (f.failed ? { ...f, failed: false, stipulated: true as const } : f)), ...stipulated], // MUTANT: REPLACE — the checker's faulted row is replaced by a stipulated clean one\n",
+		expectRed: ["apps/rph-demo/e2e/assurance-floor.e2e.ts"],
+		why: "PROMISE (§4.1 rule 5; §4.6, §9; re-derived after `J1-1a`, `REG-D-072` D4): a stipulation covers only what the checker did NOT judge, so it can never overrule the checker's own fault — the dead-end test is the lane's one real discrimination check. WHAT THE MUTATION DOES: the REPLACE form of a derivation defect — the checker's failed RR-04 finding is replaced by a stipulated clean one. With no failed finding there is no BLOCKING observation, the ladder composes the draft SATISFIED over a real fault, and the dead-end test's verdict (`Assurance floor REJECTED`) fails. This is the form the VERDICT catches; its sibling APPEND keeps the verdict. OBSERVED: KILLED — 1 test(s) red in assurance-floor.e2e.ts: 'e2e\\\\assurance-floor.e2e.ts:162:2 › Assurance floor (mock) — staged binding and guarded admission › a rejected dead-end candidate never mutates canonical state a' at :187 (Error: expect(received).toContain(expected) // indexOf); 1 failed; 1 passed (14.3s)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M6-dead-end-APPEND-a-stipulated-row-follows-the-checkers-fault",
+		file: "apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts",
+		find: "\tconst remainder = policyCriteria.map((c) => c.id).filter((id) => !judged.has(id));\n",
+		replace: "\tconst remainder = policyCriteria.map((c) => c.id).filter((id) => !judged.has(id) || checker.findings.some((f) => f.criterionId === id && f.failed)); // MUTANT: APPEND — a stipulated clean row follows each faulted one\n",
+		expectRed: ["apps/rph-demo/e2e/assurance-floor.e2e.ts"],
+		why: "PROMISE (§4.6, §9; re-derived after `J1-1a`, `REG-D-072` D4): the checker's own RR-04 fault is RECORDED as it judged it — `NOT_MET`, with no stipulation beside it. WHAT THE MUTATION DOES: the APPEND form — the derived remainder also takes each faulted criterion, so a stipulated clean RR-04 follows the checker's failed one. Re-derived after `J1-1a`: the mapper keys findings LAST-WINS (`validators.ts`), so RR-04's recorded row becomes `UNABLE_TO_DETERMINE` + `stipulated: 'MET'`; but observations are built from EVERY failed finding, so the BLOCKING observation stays and the verdict is still REJECTED. Only the dead-end test's new RR-04 row assertion (`[['RR-04-no-proxy-satisfaction', 'NOT_MET', null]]`) can redden it. Clean drafts are untouched — no fault, nothing appended. OBSERVED: KILLED — 1 test(s) red in assurance-floor.e2e.ts: 'e2e\\\\assurance-floor.e2e.ts:162:2 › Assurance floor (mock) — staged binding and guarded admission › a rejected dead-end candidate never mutates canonical state a' at :206 (Error: the checker’s own RR-04 fault must be recorded as it judged it, never stipulated over); 1 failed; 1 passed (14.5s)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M7-the-boot-mark-is-taken-before-the-seed",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\t\tif (TEST_MODE) markLaneSegment(handle, 'boot');\n",
+		replace: "\t\tif (TEST_MODE) markLaneSegment({ readAllEvents: () => [] }, 'boot'); // MUTANT: the boot mark counts the seed as the lane's\n",
+		expectRed: ["apps/rph-demo/e2e/smoke.e2e.ts"],
+		why: "PROMISE (§4.8 limb 2; `REG-D-072` D8 — 'a run whose first spec never resets'): the reference seed's own hand-written SATISFIED reasoning reviews are excluded BY POSITION — the boot mark is taken after the boot seed — never by a name a writer could copy. WHO RELIES: any run whose first spec never resets (`smoke.e2e.ts` never resets; run alone it is the whole run), which would otherwise read the seed's records as the lane's. WHAT THE MUTATION DOES: the boot mark is taken at zero, before the seed, so the seed's `deterministic.reasoning-review` passes fall inside the first segment. The victim asserts only that the library renders. ⚠ WHERE ITS KILL LANDS — ONLY THROUGH THE RUN-LEVEL VERDICT. Under this mutant the victim fails its first attempt (its after-test check is the first to see the seed's passes) and passes its retry (they are already charged to that attempt), so Playwright reports `1 flaky` and the tests alone exit 0. Only `e2e/lane-control-teardown.ts`'s final call, wired by the default config's `globalTeardown`, makes the exit 1 — and the runner scores a fail-then-pass exit 0 as SURVIVED (`scripts/mutants/run.ts`: 'a fail-then-pass exits zero, so the mutant reports SURVIVED'). So this kill depends entirely on that wiring, which `verif/lane-control-teardown.test.ts` holds in `gate:fast` (`J13-M18`, `J13-M19`). OBSERVED: KILLED — 1 test(s) red in smoke.e2e.ts: 'e2e\\\\smoke.e2e.ts:7:1 › PWA Library renders in a real browser ─────────────────────────' (Error: LANE CONTROL (JAN-CRITREAD J1-3; DESIGN-what-the-tests-prove.md §4.8): 8 reasoning-review pass(es) the lane may not rest on, kept across 1 segment(s) — the run fails whatever the tests reported:); 1 flaky",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M8-the-reset-takes-no-mark",
+		file: "apps/rph-demo/src/lib/server/workbench.ts",
+		find: "\tmarkLaneSegment(handle, 'reset');\n",
+		replace: "\t// MUTANT: the reset takes no mark — the previous segment's baseline goes stale\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (§4.8: the baseline is the SERVER's reset mark — not worker state, not the fixture's setup): each segment is read from the mark its own reset took, after its seed. WHO RELIES: every test on a fresh engine whose ids restart — a stale baseline from a longer log points past the whole new segment and reads nothing (fail OPEN). WHAT THE MUTATION DOES: resets stop marking, so the boot mark stays the baseline; after a reference boot, an 'empty' reset's segment is shorter than it, and a pass forged there is never seen. The lane's clean run cannot show this (nothing to miss); the victim's two-test arrangement does. OBSERVED: KILLED — 2 test(s) red in lane-control.test.ts: '⛔ a run whose first spec NEVER RESETS: the boot mark falls after the seed, so the seed’s own passes are not the lane’s — and a second test is checked from ITS reset’s mark, not a stale one' (AssertionError: expected [] to deeply equal [ [ 2, 'canonical', …(1) ] ]); '⭐ CONTROL — a registered clean draft, staged and then accepted, is what the lane may rest on; introspect shows the marks, the registry and what the candidate rests on' (AssertionError: expected [ 'boot' ] to deeply equal [ 'boot', 'reset' ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M9-a-kept-violation-dies-at-the-next-mark",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "\tmarks.push(open);\n\tfirstSeenBy.clear();\n",
+		replace: "\tmarks.push(open);\n\tfirstSeenBy.clear();\n\tkept.clear(); // MUTANT: what a segment found dies with it\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (`REG-D-072` D8 — 'a violation that passes on retry'): what the server finds is KEPT across segments, resets and retries, and the final call fails the run on it. WHO RELIES: the run's exit code — `retries: 1` turns a test that fails once and passes on its retry into exit 0, so a violation charged only to the failed attempt would vanish. WHAT THE MUTATION DOES: every new mark clears what was kept, so the retry's own reset wipes the failed attempt's violation and the final call reports a clean lane. OBSERVED: KILLED — 3 test(s) red in lane-control.test.ts: '⛔ a violation that PASSES ON RETRY is still kept, and fails the run at the final call' (AssertionError: expected [] to deeply equal [ [ 2, …(1) ] ]); '⛔ a floor that completes AFTER its test’s own check is caught by the next reset, before anything is discarded' (AssertionError: expected [] to deeply equal [ [ 2, 'reset', [ …(2) ] ] ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M10-the-reset-discards-the-candidates-before-it-looks",
+		file: "apps/rph-demo/src/routes/test-api/reset/+server.ts",
+		find: "\tif (isTestMode()) closeLaneNow('reset');\n\tclearAuthoringTurns();\n",
+		replace: "\tclearAuthoringTurns();\n\tif (isTestMode()) closeLaneNow('reset'); // MUTANT: the staged candidates are discarded before the segment is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (§4.8: the population is canonical AND every staged candidate): the reset closes the segment BEFORE it discards a single staged candidate. WHO RELIES: every pass that lives only in a candidate — a draft staged READY_TO_COMMIT and never accepted is exactly where an undisclosed pass would sit. WHAT THE MUTATION DOES: `clearAuthoringTurns()` runs first, so a candidate's pass that no after-test check saw is gone when the reset looks. OBSERVED: KILLED — 1 test(s) red in lane-control.test.ts: '⛔ a STAGED candidate’s pass is read by the reset BEFORE the reset discards it' (AssertionError: expected [] to deeply equal [ [ 2, …(2) ] ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M11-the-reset-closes-nothing",
+		file: "apps/rph-demo/src/routes/test-api/reset/+server.ts",
+		find: "\tif (isTestMode()) closeLaneNow('reset');\n",
+		replace: "\tif (isTestMode() && false) closeLaneNow('reset'); // MUTANT: only the after-test check and the final call look\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (`REG-D-072` D8 — 'a floor completing after the test'): the server checks each segment when a reset CLOSES it, so a server action that completes after its test's own check is still read before the engine is replaced. WHO RELIES: the lane control's authority over timing — the after-test check reads a moment, and a floor can finish after it. WHAT THE MUTATION DOES: the reset closes nothing, so a pass completing after the check dies with its engine at the next reset, and the final call — which reads only the last segment — never sees it. OBSERVED: KILLED — 2 test(s) red in lane-control.test.ts: '⛔ a floor that completes AFTER its test’s own check is caught by the next reset, before anything is discarded' (AssertionError: expected [] to deeply equal [ [ 2, 'reset', [ …(2) ] ] ]); '⛔ a STAGED candidate’s pass is read by the reset BEFORE the reset discards it' (AssertionError: expected [] to deeply equal [ [ 2, …(2) ] ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M12-a-pass-with-no-real-judgement-is-let-through",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "\tif (evaluated === 0)\n",
+		replace: "\tif (evaluated < 0) // MUTANT: a pass with no evaluated row is let through\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (§4.8 limb 1 — 'a stipulation over an unread subject'): a stand-in pass rests on at least one EVALUATED mandatory row. WHO RELIES: §4.1 rule 2 at the lane — a stipulation completes a subject the checker READ; it never replaces a read. `J12A-M3` guards the stand-in itself; this is the lane control's own limb, which no clean browser run can exercise (no lane subject is unreadable), so its victim plants the record. WHAT THE MUTATION DOES: a pass resting on stipulations alone — nobody read the subject — is accepted. OBSERVED: KILLED — 2 test(s) red in lane-control.test.ts: '⛔ a stand-in pass with NO evaluated row — a stipulation over a subject nobody read' (AssertionError: expected [] to deeply equal [ Array(1) ]); '⛔ the LATEST recording of a criterion counts — an evaluation later stipulated over is not an evaluation' (AssertionError: expected [] to deeply equal [ Array(1) ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M13-a-registration-answers-for-either-arm",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "\telse if (!registrations.some((r) => r.pwaId === arm.pwaId && r.framing === arm.framing))\n",
+		replace: "\telse if (!registrations.some((r) => r.pwaId === arm.pwaId)) // MUTANT: any arm of the PWA answers for both\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (§4.5, §4.8 limb 1): a registration answers only the arm it names, and the lane control checks the arm. WHO RELIES: `execution-agent-authored-binding.e2e.ts`, which registers the GRAPH arm only and must never pass its work-product review; `J13-M2`'s kill on the lane rests on this limb. WHAT THE MUTATION DOES: the check keys by PWA alone, so a graph-arm registration covers a stipulated work-product pass nobody asked for. OBSERVED: KILLED — 1 test(s) red in lane-control.test.ts: '⛔ a stand-in pass for a PWA nobody registered, or registered only on the OTHER arm' (AssertionError: expected [] to deeply equal [ Array(1) ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M14-only-the-old-mock-is-refused",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "\t\t\tif (c.validatorId !== STANDIN_VALIDATOR_ID) {\n",
+		replace: "\t\t\tif (c.validatorId !== STANDIN_VALIDATOR_ID) {\n\t\t\t\tif (c.validatorId !== 'mock.reasoning-review') continue; // MUTANT: only the old mock is refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (§4.8 limb 2): no reasoning-review pass on the lane but the declared stand-in's, under ANY other validator. WHO RELIES: the lane's disclosure claim, against the `REG-F-435` / `REG-F-441` shapes — a real adapter made to answer everything is a different validator id, not the mock's. WHAT THE MUTATION DOES: limb 2 refuses only `mock.reasoning-review`, so an `agy.reasoning-review` pass — staged in a candidate or canonical — goes through. OBSERVED: KILLED — 5 test(s) red in lane-control.test.ts: '⛔ a SATISFIED — or CONDITIONALLY_SATISFIED — review under any other validator, registered or not' (AssertionError: expected [ [ 2, 'candidate of pwa-1', …(2) ] ] to deeply equal [ …(2) ]); '⛔ a run whose first spec NEVER RESETS: the boot mark falls after the seed, so the seed’s own passes are not the lane’s — and a second test is checked from ITS reset’s mark, not a stale one' (AssertionError: expected [] to deeply equal [ [ 2, 'canonical', …(1) ] ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M15-the-lane-fixture-is-not-automatic",
+		file: "apps/rph-demo/e2e/support/harness.ts",
+		find: "\t\t{ auto: true }\n",
+		replace: "\t\t{ auto: false } // MUTANT: the lane control's fixture runs only for a test that asks for it — none does\n",
+		expectRed: ["verif/e2e-harness-import-census.test.ts"],
+		why: "PROMISE (§4.8): every spec's tests run under the lane control's fixture, which names each test to the server and fails it on what it is first to see — the per-test attribution `REG-D-072` D8 keeps. WHO RELIES: every failing lane test's report; without it a violation surfaces only in the run's final call, attributed to a segment rather than a test. WHAT THE MUTATION DOES: the fixture stops being automatic, and no spec asks for it by name. The census's harness limb reddens: the harness's `test` must be Playwright's EXTENDED with an `auto: true` fixture. OBSERVED: KILLED — 1 test(s) red in e2e-harness-import-census.test.ts: '⛔ the harness’s `test` is Playwright’s EXTENDED with an automatic fixture — the lane control’s' (AssertionError: expected false to be true // Object.is equality)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M16-one-spec-takes-playwrights-test-again",
+		file: "apps/rph-demo/e2e/agent-retention.e2e.ts",
+		find: "import { expect } from '@playwright/test';\nimport { test, resetEngine, introspect, gotoHydrated, registerStipulation } from './support/harness';\n",
+		replace: "import { test, expect } from '@playwright/test'; // MUTANT: one spec takes Playwright's own test again\nimport { resetEngine, introspect, gotoHydrated, registerStipulation } from './support/harness';\n",
+		expectRed: ["verif/e2e-harness-import-census.test.ts"],
+		why: "PROMISE (§4.8; `ROADMAP` §J1-3 'the import census'): no file under `e2e/` takes Playwright's own `test`, so no current or future spec escapes the lane control's fixture. WHO RELIES: the per-test attribution of every lane violation. WHAT THE MUTATION DOES: reverts one spec's import to what all 43 had at `HEAD` — its tests then run on a `test` with no fixture, and the browser suite itself would not notice. OBSERVED: KILLED — 3 test(s) red in e2e-harness-import-census.test.ts: '⛔ no file under e2e/ takes Playwright’s own `test`' (AssertionError: a file under apps/rph-demo/e2e/ takes `test` from @playwright/test, so its tests run WITHOUT the lane control’s fixture — take it from ./support/harness: expected { …(1) } to deeply equal {}); '⛔ every spec takes `test` from the harness module' (AssertionError: a spec declares its tests on no harness `test`: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M17-the-run-trusts-the-per-test-fixture",
+		file: "apps/rph-demo/e2e/lane-control-teardown.ts",
+		find: "\tif (violations.length === 0) return undefined;\n",
+		replace: "\tif (violations.every((v) => v.seenAt === 'after-test check')) return undefined; // MUTANT: what a per-test check saw is left to that test\n",
+		expectRed: ["verif/lane-control-teardown.test.ts"],
+		why: "PROMISE (`REG-D-072` D8 — 'a violation that passes on retry'): the final call fails the RUN on every kept violation, whoever saw it first. WHO RELIES: the run's exit code — with `retries: 1`, a test whose first attempt the fixture failed and whose retry passed is reported `flaky` and the run exits 0. WHAT THE MUTATION DOES: the verdict leaves to the per-test fixture what that fixture saw, which is exactly the hole D8 names: the kept violation of a flaky test no longer fails the run. (Driven by hand in the browser too, on a scratch spec that forges a pass on its first attempt only: `1 flaky`, exit 1 with the verdict, exit 0 with it disabled.) OBSERVED: KILLED — 2 test(s) red in lane-control-teardown.test.ts: '⛔ a violation only an AFTER-TEST CHECK saw — a test that failed once and passed on retry — still fails the run' (AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string); '⛔ a report holding a violation — one a test saw, then passed on retry — makes it THROW the verdict' (AssertionError: promise resolved \"undefined\" instead of rejecting)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M18-the-default-config-drops-the-lane-teardown",
+		file: "apps/rph-demo/playwright.config.ts",
+		find: "\tglobalTeardown: ['./e2e/global-teardown.ts', './e2e/lane-control-teardown.ts'],\n",
+		replace: "\tglobalTeardown: './e2e/global-teardown.ts', // MUTANT: the gallery's teardown alone — the run's verdict is never asked for\n",
+		expectRed: ["verif/lane-control-teardown.test.ts"],
+		why: "PROMISE (`REG-D-072` D8; the MAJOR of J1-3's adversarial review): the DEFAULT config runs `e2e/lane-control-teardown.ts` as a `globalTeardown`, so what the server kept is asked for once, at the end, and fails the run. WHO RELIES: the run's exit code, and everything D8 promises beyond the per-test fixture — a violation that passes on retry, a floor that completes after its test, a run whose first spec never resets (`J13-M7`'s kill lands only here). WHAT THE MUTATION DOES: the config keeps the gallery's teardown alone — its shape at `HEAD` 4ece4f09 — so the final call is never made: every lane guard that reads the server stays green, and a flaky violation exits 0. The victim reads the config's AST, not its text, and resolves each `globalTeardown` entry against the teardown module it drives. OBSERVED: KILLED — 1 test(s) red in lane-control-teardown.test.ts: '⛔ the DEFAULT config’s `globalTeardown` names `e2e/lane-control-teardown.ts` — the module driven below' (AssertionError: apps/rph-demo/playwright.config.ts does not run e2e/lane-control-teardown.ts — so what the server KEPT (a violation that passed on retry, a floor that completed after its test) never fails the run (REG-D-072 D8): expected [ )",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M19-the-teardown-prints-the-verdict-and-lets-the-run-pass",
+		file: "apps/rph-demo/e2e/lane-control-teardown.ts",
+		find: "\t\tif (verdict !== undefined) throw new Error(verdict);\n",
+		replace: "\t\tif (verdict !== undefined) console.error(verdict); // MUTANT: the verdict is printed, and the run exits 0\n",
+		expectRed: ["verif/lane-control-teardown.test.ts"],
+		why: "PROMISE (`REG-D-072` D8): the teardown's default export THROWS the verdict when the server kept anything — a `globalTeardown` fails the run only by throwing. WHO RELIES: the same exit code as `J13-M18`; `J13-M17` holds what the verdict SAYS, not whether it is enforced. WHAT THE MUTATION DOES: the verdict is printed to stderr and the teardown returns normally, so a run whose server kept violations exits 0 with the message scrolled past in the log. The victim drives the default export against a local stand-in for `/test-api/lane-control` whose report holds one violation, and requires it to throw. OBSERVED: KILLED — 1 test(s) red in lane-control-teardown.test.ts: '⛔ a report holding a violation — one a test saw, then passed on retry — makes it THROW the verdict' (AssertionError: promise resolved \"undefined\" instead of rejecting)",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M20-the-census-knows-only-the-scoped-package",
+		file: "verif/e2e-harness-imports.ts",
+		find: "const PLAYWRIGHT = new Set(['@playwright/test', 'playwright/test']);\n",
+		replace: "const PLAYWRIGHT = new Set(['@playwright/test']); // MUTANT: only the scoped name is known — the unscoped module passes\n",
+		expectRed: ["verif/e2e-harness-import-census.test.ts"],
+		why: "PROMISE (§4.8; `ROADMAP` §J1-3 'the import census'): the census knows every module that yields Playwright's `test` — the scoped `@playwright/test` and the unscoped `playwright/test` it re-exports. WHO RELIES: the lane control's per-test attribution, which only the harness's `test` carries. WHAT THE MUTATION DOES: the scanner knows the scoped name only — the escape J1-3's adversarial review found — so `import { test as raw } from 'playwright/test'` declares tests with no fixture and the census stays green. The victim's control fixture for that form reddens. OBSERVED: KILLED — 1 test(s) red in e2e-harness-import-census.test.ts: '⭐ the UNSCOPED module `playwright/test` is where `@playwright/test` gets its `test` — it is caught too' (AssertionError: expected [] to deeply equal [ '1: a named import of test' ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
+	},
+	{
+		id: "J13-M21-the-census-lets-an-import-equals-through",
+		file: "verif/e2e-harness-imports.ts",
+		find: "\t\t\tat(n, 'an import-equals require of the module');\n",
+		replace: "\t\t\tvoid 0; // MUTANT: an import-equals of the module is let through\n",
+		expectRed: ["verif/e2e-harness-import-census.test.ts"],
+		why: "PROMISE (§4.8; the scanner's own header, 'every form that yields it'): a TypeScript import-equals, `import pw = require('@playwright/test')`, is caught — it is an `ImportEqualsDeclaration`, not a call, so the `require` limb cannot see it. WHO RELIES: as `J13-M20`. WHAT THE MUTATION DOES: the import-equals limb records nothing — the second escape J1-3's adversarial review found — so that form passes the census again. The victim's control fixture for that form reddens. OBSERVED: KILLED — 1 test(s) red in e2e-harness-import-census.test.ts: '⭐ a TypeScript import-equals — `import pw = require(…)` — is caught' (AssertionError: expected [] to deeply equal [ Array(1) ])",
+		source: "JAN-CRITREAD J1-3 — the specs go green, and the lane control (DESIGN-what-the-tests-prove.md §4.6, §4.8; ROADMAP-what-the-tests-prove.md §J1-3; REG-D-071 Q6b; REG-D-072 D4, D8)"
 	}
 ];

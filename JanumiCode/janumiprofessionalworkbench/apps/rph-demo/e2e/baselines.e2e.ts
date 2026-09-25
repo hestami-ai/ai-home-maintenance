@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // Baselines authoring — a Baseline candidate must be creatable and advanceable through the authoring lifecycle
 // CANDIDATE -> UNDER_REVIEW -> APPROVED, every step driving the real engine. (Promotion to AUTHORITATIVE is a

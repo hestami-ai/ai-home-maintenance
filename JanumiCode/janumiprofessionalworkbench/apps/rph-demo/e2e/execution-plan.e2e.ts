@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { gotoHydrated, introspect, resetEngine } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, gotoHydrated, introspect, resetEngine } from './support/harness';
 
 // JAN-EXECPLAN-DR-001 — the Execution Plan view on the Undertaking Workbench's "execution" tab.
 // DWP-02: the flat, engine-GLOBAL, count-only table is replaced by an undertaking-SCOPED, per-PWU plan → steps panel

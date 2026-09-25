@@ -3,7 +3,7 @@
 // truth (introspect) alongside it. global-teardown builds an index.html from the manifest so a human (or the
 // agent) can open one page and review the whole flow — the "screenshots of my end-to-end testing" the sponsor
 // asked for. The gallery is cleared per run by global-setup.
-import { test, type Page, type APIRequestContext } from '@playwright/test';
+import type { Page, APIRequestContext } from '@playwright/test';
 import {
 	analyzePwaGraph,
 	buildPwaGraphExport,
@@ -14,7 +14,7 @@ import {
 } from '@janumipwb/rph-projections';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { introspect } from './harness';
+import { test, introspect } from './harness';
 
 export const GALLERY_ROOT = 'e2e-results/gallery';
 const seqByTest = new Map<string, number>();

@@ -105,6 +105,11 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 	'packages/rph-projections/src/assurance-view.test.ts': {
 		why: 'event fixtures for the pure §38 projection — nothing dispatched',
 		writes: 2
+	},
+	// ── THE LANE CONTROL (J1-3): it READS the field; its test plants the rows it reads. ─────────────────────────
+	'apps/rph-demo/src/lib/server/lane-control.test.ts': {
+		why: 'the lane control’s fixtures: criterion EVENTS handed to its pure check — among them a stand-in pass resting on stipulations alone, which it must refuse; nothing dispatched',
+		writes: 1
 	}
 };
 

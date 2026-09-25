@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // JPWB-SPEC-001 SPEC-001-INV-14 / FORK-23 (b) — a multi-Command Affordance is ATOMIC where an atomic dispatch
 // exists, and a partially-applied sequence SHALL NOT leave committed state behind.

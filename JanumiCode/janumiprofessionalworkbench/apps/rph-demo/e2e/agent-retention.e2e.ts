@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, registerStipulation } from './support/harness';
 
 // The authoring agent's chat history is DOMAIN state (event-sourced in the engine — the AUTHORING_CONVERSATION
 // aggregate, a precursor to the governed stream), not a separate side store. Before acceptance it lives in the
@@ -19,6 +19,11 @@ test.describe('PWA Designer — agent chat history is retained', () => {
 		await page.getByRole('button', { name: 'Create draft' }).click();
 		const card = page.getByRole('link', { name: /Memory PWA/ });
 		await expect(card).toBeVisible();
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Memory PWA')!.id;
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 		const href = (await card.getAttribute('href'))!;
 		await gotoHydrated(page, href);
 

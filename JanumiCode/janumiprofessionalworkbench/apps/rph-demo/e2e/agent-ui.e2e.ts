@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated, registerStipulation } from './support/harness';
 import { shot } from './support/gallery';
 
 // A3 — the agent chat (bottom) + reasoning log (left) on the node-graph, end to end IN THE BROWSER. A human types
@@ -23,6 +23,11 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 		await page.getByRole('button', { name: 'Create draft' }).click();
 		const card = page.getByRole('link', { name: /Agent UI PWA/ });
 		await expect(card).toBeVisible();
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Agent UI PWA')!.id;
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 		await gotoHydrated(page, (await card.getAttribute('href'))!);
 
 		// The agent rail + chat bar are present on a DRAFT.

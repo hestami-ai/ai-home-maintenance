@@ -1,5 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import { resetEngine, gotoHydrated } from './support/harness';
+import { expect, type Page } from '@playwright/test';
+import { test, resetEngine, gotoHydrated } from './support/harness';
 
 // JPWB-SPEC-001-DR-002 W-1 — the Undertaking workbench must be reachable in full.
 //

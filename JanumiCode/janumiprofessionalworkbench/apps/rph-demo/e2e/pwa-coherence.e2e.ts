@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, gotoHydrated, introspect, registerStipulation } from './support/harness';
 import { snapshotPwaGraph } from './support/gallery';
 
 // The DEBUGGING HARNESS, deterministic path. It reproduces — via the mock agent + a recorded scaffold_graph plan —
@@ -29,6 +29,12 @@ test.describe('PWA coherence — artifact-flow conservation (ASHRAE-shaped)', ()
 		request
 	}) => {
 		await openDraft(page, 'ASHRAE Lifecycle Coherence');
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		// (Q2 (d): this graph is deliberately not COHERENT — the test checks what the product does AFTER acceptance.)
+		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'ASHRAE Lifecycle Coherence')!.id;
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 		await page.getByTestId('agent-input').fill(
 			JSON.stringify({
 				plan: [

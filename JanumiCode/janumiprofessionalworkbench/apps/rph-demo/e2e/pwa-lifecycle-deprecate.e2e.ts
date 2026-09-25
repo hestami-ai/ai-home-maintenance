@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // Slice — PWA publication lifecycle continuation (RPH-DOC-010 §11). The publication FSM does not end at PUBLISHED:
 // a published PWA can be DEPRECATED (superseded, still referenceable) and then RETIRED (withdrawn). Each step drives

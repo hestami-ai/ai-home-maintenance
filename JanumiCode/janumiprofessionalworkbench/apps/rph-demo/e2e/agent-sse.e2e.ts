@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { acceptAgentCandidate, resetEngine, introspect, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, acceptAgentCandidate, resetEngine, introspect, gotoHydrated, registerStipulation } from './support/harness';
 
 // A2 — the authoring agent loop over the SSE relay, driven by the DETERMINISTIC mock agent (RPH_DEMO_MODE=test
 // forces 'mock', so the gate never hits the network). Proves the whole server path: POST an instruction ->
@@ -25,6 +25,10 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		const before = await introspect(request);
 		expect(before.pwas).toHaveLength(1);
 		const pwaId = before.pwas[0]!.id;
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 
 		// Drive the agent with one complete, linked, assurance-satisfiable candidate.
 		const plan = {
@@ -126,6 +130,10 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		await page.getByRole('button', { name: 'Create draft' }).click();
 		await expect(page.getByRole('link', { name: /Scaffold PWA/ })).toBeVisible();
 		const pwaId = (await introspect(request)).pwas[0]!.id;
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 
 		// A single scaffold_graph call defines a root + a child and wires the permits edge — all-or-nothing.
 		const plan = {

@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { resetEngine, gotoHydrated } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, resetEngine, gotoHydrated, introspect, registerStipulation } from './support/harness';
 import { snapshotPwaGraph } from './support/gallery';
 
 // The harness validates the generated PWA against a QUERYABLE structural report (canonical export → invariants),
@@ -29,6 +29,11 @@ test.describe('PWA graph — structural validity report', () => {
 
 	test('a proper decomposition is well-formed (all invariants pass)', async ({ page, request }) => {
 		await openDraft(page, 'Valid Graph PWA');
+		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
+		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
+		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
+		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Valid Graph PWA')!.id;
+		await registerStipulation(request, pwaId, 'PWA_GRAPH');
 		await runPlan(page, {
 			plan: [
 				{

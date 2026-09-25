@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { gotoHydrated, introspect, resetEngine } from './support/harness';
+import { expect } from '@playwright/test';
+import { test, gotoHydrated, introspect, resetEngine } from './support/harness';
 
 type Box = { x: number; y: number; width: number; height: number };
 
