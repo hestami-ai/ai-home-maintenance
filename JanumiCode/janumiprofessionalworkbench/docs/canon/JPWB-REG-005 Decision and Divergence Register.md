@@ -37627,7 +37627,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-453 — on case set v2 the frontier candidate SATISFIES the corrected clean graph case 5 of 8; its three rejections turn on grounds v2 did not change, and it disagrees with itself on `G2-CLEAN`
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v2`). **Status:** ⚠ **OPEN — residual contestability of the clean graph case; any further case change is an oracle change and needs the sponsor (`DOC-004` §7.6).**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v2`). **Status:** ~~⚠ **OPEN — residual contestability of the clean graph case; any further case change is an oracle change and needs the sponsor (`DOC-004` §7.6).**~~ ⚠ **OPEN — the sponsor AUTHORIZES case set v3, 2026-09-25** (`REG-D-081`): a foundation-design responsibility and the permit's inputs. It closes when v3 lands and both candidates are re-measured.
 
 - **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`, reviewer fingerprint `2b6ca158…`, case set v2 × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; median 30 s, maximum 66 s.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 18 of 18 on the graph arm and 14 of 18 on the work-product arm (`REG-F-450`).
@@ -37663,3 +37663,18 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHAT (1) MEANS.** A candidate meets the bar on a case when its disposition is the oracle's: REJECTED for a planted defect, SATISFIED for a clean case. Which criterion it names for a planted defect is recorded and reported, but it is not a material failure. The oracles' `faulted` lists stay, as the author's attribution claim, measured and never escalated. Material failures keep every verdict-level class, among them a planted defect not REJECTED, a clean case not SATISFIED, a verdict that changes with a name, boundedness and malformations. Criterion-level classes that do not change the verdict become informational. The evidence it rests on (`REG-F-450`): both deployable candidates rejected 36 of 36 planted evaluations and named the planted criterion in 32 of 36, missing `W-RR-03` and `W-RR-04` the same way.
 - **WHAT (2) MEANS.** `REG-D-079` is confirmed. Case set v2's correction reaches the clean case, its three copies and the eight planted cases built on the same draft.
 - **MADE WITH THIS ENTRY.** The statuses of `REG-F-450` and `REG-D-079` are struck in place and restated.
+
+### REG-D-081 — SPONSOR RULING: case set v3 gives the clean draft a foundation-design responsibility and the permit its inputs — the two objections that recur or follow from the case itself — and nothing else
+
+**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING — an authorized oracle change (`DOC-004` §7.6). **Status:** ⚠ **OPEN — in force; case set v3 and both deployable candidates' re-measurement are owed (`JAN-CRITREAD` `J2-7`).**
+
+- **THE SPONSOR'S WORDS, verbatim:** *"I agree with your recommendation. Proceed."* The recommendation, as given to the sponsor the same day:
+  - do case set v3 with the first two objections only: *the foundation responsibility and the permit's inputs*;
+  - leave the two weak, one-off objections (the options study's missing comparison artifact, and the "surface-level" or Eurocode reading) to the next measurement.
+- **WHAT IT MEANS.**
+  - **(1) The foundations:** the draft's design step is *"Steelwork Design (members and joints)"*, while its own account says the soft clay may need piled foundations, so nobody designs them (`REG-F-453`: the frontier candidate, both repetitions of `G2-CLEAN-R2`). In v3 a design responsibility covers the foundations and consumes the geotechnical report.
+  - **(2) The permit:** the permit submission receives neither the geotechnical report nor the design calculations (`REG-F-453`, `G2-CLEAN-R2` #1). In v3 it receives both.
+  - **Reach:** the same twelve cases as v2, the clean case, its copies and the planted cases on the same draft (`REG-D-079`), each keeping its plant as its only defect. Every other case is byte-identical.
+  - **Candidates:** both deployable candidates, the frontier `agy` / `gemini-3.1-pro-high` and `devin` / `glm-5-3-flash-max`, are re-measured on the whole of v3 × 2, under the verdict bar (`REG-D-080`).
+- **NOT DONE, by the ruling:** no options-comparison artifact, and no change for the Eurocode or "surface-level" readings.
+- **MADE WITH THIS ENTRY.** `REG-F-453`'s status is struck in place and restated.
