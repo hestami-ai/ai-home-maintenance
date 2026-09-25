@@ -350,6 +350,57 @@ the work.
 
 ---
 
+## `J2-6` — the pass bar is the right verdict (`REG-D-080`)
+
+The sponsor ruled on 2026-09-25 that a candidate meets the bar on a case when its disposition is the oracle's
+(`REG-D-080`; DESIGN §5.1 as amended). `reviewer:qual:check` applies it:
+
+- **Material, as before:** every verdict-level class. That is a planted case whose disposition is not the oracle's
+  REJECTED, a clean case not SATISFIED, a verdict that changes with the name, Boundedness, a malformation gained, a
+  verdict-level transition, and the rest of §5.1's list.
+- **Reported, never escalated:** a planted case REJECTED without its planted criterion faulted, and a planted criterion
+  no longer faulted when the verdict holds. The check prints these as attribution, against the oracle's `faulted` list.
+- ⭑ *As built, 2026-09-25 (`REG-D-082`):* also reported — an answered criterion now `UNABLE_TO_DETERMINE` while the
+  verdict holds (`REG-D-080`'s *"criterion-level classes that do not change the verdict become informational"*). The
+  class `PLANTED_DEFECT_NOT_FAULTED` is renamed `PLANTED_DEFECT_NOT_REJECTED`. A planted case whose disposition is
+  anything but the oracle's REJECTED is material: SATISFIED, INCONCLUSIVE, VALIDATOR_FAILED or BOUNDARY_REJECTED,
+  the last three new, since the old rule asked only that the criterion be faulted. The attribution line says how many
+  planted evaluations of cases outside today's set it did not count, judged by each record's own oracle version.
+- **Unchanged:** the oracles, the case set, the record, and every committed ESCALATION line. An escalation cited for what
+  is now information stays valid history. The reviewer fingerprint must not move.
+
+| Instrument | Must show first |
+|---|---|
+| a planted case REJECTED with the planted criterion unfaulted is reported, not a material failure | red today (it is material) |
+| a planted case not REJECTED stays material | — a guard |
+| the committed record's attribution lines appear in the report | new |
+
+---
+
+## `J2-7` — case set v3: the foundations and the permit's inputs (`REG-D-081`)
+
+The sponsor authorized it on 2026-09-25. It follows `J2-6` (the verdict bar), and nothing starts until `J2-6` lands.
+
+- **Case set v3.** The same twelve cases as v2 (`REG-D-079`) take two changes, and only two:
+  - **(1) The foundations:** a design responsibility covers the foundations and consumes the geotechnical report, and its
+    output reaches the independent check.
+  - **(2) The permit:** the permit submission receives the geotechnical report and the design calculations.
+
+  Each account gains only the words those changes need. There is no new claim the graph does not show, and no new cue in
+  a planted case. Each planted case keeps its plant as its only defect; a plant that concerns the design, the check or the
+  permit is re-examined so it still plants exactly one defect. The fourteen other cases are byte-identical. Oracles v3
+  carry v2's standings. The reviewer fingerprint does not move; the case-set digest does.
+- **Both deployable candidates** run the whole of v3 × 2 under the verdict bar: `agy` / `gemini-3.1-pro-high` and
+  `devin` / `glm-5-3-flash-max`. Every material failure is filed and escalated.
+
+| Instrument | Must show first |
+|---|---|
+| every corrected case differs from its v2 case only by the two changes, and a planted case only by the clean case's words | new |
+| each corrected graph is valid and coherent through the engine | new |
+| the check on the committed record under v3 | RED until the corrected cases are measured |
+
+---
+
 ## Order
 
 ~~`J1-1a` → `J1-1b` → `J1-1c` → `J1-1d` → `J1-4` → `J1-2` → `J2-1` → `J2-2` → `J2-3 + J2-4` (with the first run) →

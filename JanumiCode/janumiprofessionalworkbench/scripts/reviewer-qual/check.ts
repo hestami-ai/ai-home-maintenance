@@ -19,6 +19,11 @@
  * gate. It cannot tell that replies came from the model named, nor that a run happened at all rather than a well-formed
  * record being written. And it never forces a reviewer to be good: once today's reviewer is covered and every failure
  * is written up, it is green whatever the runs found.
+ *
+ * ⭐ `JAN-CRITREAD` J2-6 — it also PRINTS attribution (`REG-D-080`): per record, the planted criterion named in N of M
+ * answered planted evaluations — the planted evaluations of cases outside today's set counted out aloud, by every
+ * oracle version on file — each miss, and the criterion-level transitions. That is reported, never escalated: the
+ * verdict is the pass bar.
  */
 import { SOURCE_PROBE, sourceResolutionProblem } from './preflight.js';
 
@@ -107,7 +112,7 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		args[flag.slice(2)] = value;
 	}
 	// ⭐ Only now — past D11 — is anything that reaches a package loaded.
-	const [{ join }, { fileURLToPath }, cases, record, fingerprint, core, rescore] = await Promise.all([
+	const [{ dirname, join }, { fileURLToPath }, cases, record, fingerprint, core, rescore] = await Promise.all([
 		import('node:path'),
 		import('node:url'),
 		import('./cases.js'),
@@ -116,7 +121,7 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		import('./check-core.js'),
 		import('./rescore.js')
 	]);
-	const { readFileSync } = await import('node:fs');
+	const { readdirSync, readFileSync } = await import('node:fs');
 	const root = fileURLToPath(deps.root);
 	const dir = args.records ?? join(root, record.RECORD_DIR);
 	const read = await trackedRecord(dir);
@@ -127,6 +132,12 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 	// ⭐ The CURRENT set and its oracles (`cases.ts`, `JAN-CRITREAD` J2-5): the one pointer the runner reads too.
 	const caseSet = fingerprint.committedCaseSet(deps.root);
 	const oracles = JSON.parse(readFileSync(join(root, cases.CURRENT_ORACLES_FILE), 'utf8')) as import('./cases.js').OracleSet;
+	// ⭐ `JAN-CRITREAD` J2-6 — EVERY oracle version on file, beside the current one: a run's own version says which of its
+	// cases outside today's set it planted, so the attribution report counts them out aloud (`REG-D-080`).
+	const oracleDir = join(root, dirname(cases.CURRENT_ORACLES_FILE));
+	const oracleSets = readdirSync(oracleDir)
+		.filter((name) => name.endsWith('.json'))
+		.map((name) => JSON.parse(readFileSync(join(oracleDir, name), 'utf8')) as import('./cases.js').OracleSet);
 	const today = await fingerprint.reviewerFingerprint(caseSet.cases);
 	const { findings, struck } = core.registerFindings(readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8'));
 	const report = await core.checkQualification({
@@ -135,6 +146,7 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		current: today,
 		cases: caseSet.cases,
 		oracles: oracles.oracles,
+		oracleSets,
 		findings,
 		struck,
 		rescore: (run, c, calls, digest) => rescore.rescoreEvaluation(run, c, calls, digest)
@@ -146,6 +158,13 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 			`; case set v${caseSet.caseSetVersion}, oracles v${oracles.oracleVersion}`
 	);
 	for (const n of report.notes) say(`note: ${n}`);
+	// ⭐ `JAN-CRITREAD` J2-6 — the pass bar is the right verdict (`REG-D-080`): which criterion each planted case faulted,
+	// and the criterion-level transitions, are printed here, whatever the verdict below, and never redden it.
+	if (report.attribution.length > 0)
+		say(
+			'attribution against the oracles’ `faulted` lists, and the criterion-level transitions — reported, never a material failure (REG-D-080):'
+		);
+	for (const a of report.attribution) deps.write(`  ${a}\n`);
 	if (report.problems.length === 0) {
 		say('GREEN — today’s reviewer is covered, the record reproduces, and every material failure is escalated');
 		return 0;

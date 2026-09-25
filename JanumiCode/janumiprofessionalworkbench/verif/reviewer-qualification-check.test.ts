@@ -11,6 +11,8 @@
 //      for a record that really fails this, and never while that record has an un-cited failure.
 //   3. ESCALATION — every material failure (§5.1) in every record, intermediate and superseded-by-fingerprint alike,
 //      cited by an ESCALATION line naming a finding the register holds. It stays red across a fingerprint move.
+//      ⭐ Since `JAN-CRITREAD` J2-6 (`REG-D-080`) the material classes are the VERDICT-level ones: which criterion a
+//      planted case faults is ATTRIBUTION, reported and never escalated (the J2-6 limb below).
 // And the cross-file references `REG-D-074` left to J2-3: run ids across files, a RESCORED line's source, an
 // ESCALATION's run, case and finding, a SUPERSEDED line's record and finding, an ACKNOWLEDGED line's cases.
 //
@@ -44,6 +46,7 @@ import {
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
 import { reviewerFingerprint, type ReviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import {
+	SCORED_DISPOSITIONS,
 	serializeLine,
 	type CallLine,
 	type CandidateIdentity,
@@ -68,6 +71,14 @@ const ORACLES = (JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) 
 const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
 const CURRENT_ORACLES = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_CASES = CURRENT_SET.cases;
+/**
+ * ⭐ `JAN-CRITREAD` J2-6 — every oracle version on file, as the CLI hands them to the check: a run's own version says
+ * which of its cases outside today's set it planted, so the attribution counts those out aloud (`REG-D-080`).
+ */
+const ORACLE_SETS: readonly OracleSet[] = [
+	JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet,
+	CURRENT_ORACLES
+];
 /** Every oracle either set holds: a case id both hold carries the same standing in each (the cases test holds that). */
 const ORACLE = new Map([...ORACLES, ...CURRENT_ORACLES.oracles].map((o) => [o.caseId, o]));
 /** The current case set most limbs are driven over: a clean case, a renamed copy of it, a planted defect. */
@@ -195,6 +206,7 @@ const check = (
 		current: FP,
 		cases: SUBSET,
 		oracles: ORACLES,
+		oracleSets: ORACLE_SETS,
 		findings: FINDINGS,
 		struck: new Set(),
 		rescore: (run, c, calls, digest) => rescoreEvaluation(run, c, calls, digest),
@@ -462,16 +474,18 @@ describe('JAN-CRITREAD J2-3 — RESCORED and ACKNOWLEDGED: a move owes a model c
 });
 
 describe('JAN-CRITREAD J2-3 — limb 3, ESCALATION', () => {
+	// ⚠ `JAN-CRITREAD` J2-6 — the miss planted here faults NOTHING, so the verdict is SATISFIED: the WRONG verdict, which
+	// stays material under `REG-D-080`. Only its class's name moved, with the ruling: a planted defect NOT REJECTED.
 	const plantedMissed = (runId: string, fingerprint?: RunFingerprint) =>
 		recorded({ runId, ...(fingerprint ? { fingerprint } : {}), reply: (id) => (id === 'G-RR-04' ? judgement([]) : asOracle(id)) });
 
 	it('⛔ a planted defect not faulted is red until an ESCALATION line cites a finding the register holds', async () => {
 		const lines = await plantedMissed('qr-esc-1');
 		const r = await check([file(lines)]);
-		expect(limb(r, 'ESCALATION')).toContain('run qr-esc-1: G-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
+		expect(limb(r, 'ESCALATION')).toContain('run qr-esc-1: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 		const another = await check([file([...lines, escalate('qr-esc-1', ['G-CLEAN'])])]);
 		expect(limb(another, 'ESCALATION'), 'an escalation of ANOTHER case of the run cites nothing here').toContain(
-			'run qr-esc-1: G-RR-04 — PLANTED_DEFECT_NOT_FAULTED'
+			'run qr-esc-1: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED'
 		);
 		expect((await check([file([...lines, escalate('qr-esc-1', ['G-RR-04'])])])).problems).toEqual([]);
 		const unfiled = await check([file([...lines, escalate('qr-esc-1', ['G-RR-04'], UNFILED)])]);
@@ -514,7 +528,7 @@ describe('JAN-CRITREAD J2-3 — limb 3, ESCALATION', () => {
 		const r = await check([file([...before, ...after, acknowledged])]);
 		expect(limb(r, 'COVERAGE'), 'today is covered by the new run').toBe('');
 		expect(limb(r, 'REPRODUCTION')).toBe('');
-		expect(limb(r, 'ESCALATION')).toContain('run qr-move-1: G-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
+		expect(limb(r, 'ESCALATION')).toContain('run qr-move-1: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 	});
 
 	it('⛔ a STRUCK finding escalates nothing — `### ~~REG-F-NNN~~` is a closed entry, and citing it clears no failure', async () => {
@@ -523,7 +537,7 @@ describe('JAN-CRITREAD J2-3 — limb 3, ESCALATION', () => {
 		const findings = new Set([...FINDINGS, 'REG-F-105']);
 		const struck = await check([citing], { findings, struck: new Set(['REG-F-105']) });
 		expect(limb(struck, 'RECORD')).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
-		expect(limb(struck, 'ESCALATION'), 'the failure stays un-cited').toContain('run qr-esc-3: G-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
+		expect(limb(struck, 'ESCALATION'), 'the failure stays un-cited').toContain('run qr-esc-3: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 		expect((await check([citing], { findings, struck: new Set() })).problems, 'CONTROL: the same finding, open').toEqual([]);
 	});
 
@@ -657,6 +671,306 @@ describe('JAN-CRITREAD J2-5 — under case set v2, a record of v1 owes a run ove
 	});
 });
 
+// ── ⭐ `JAN-CRITREAD` J2-6 — the pass bar is the RIGHT VERDICT (`REG-D-080`; DESIGN §5.1 as amended) ────────────────────
+/** The Reasoning Review criterion ids the J2-6 limb plants, names and leaves out: RR-02, RR-04 (G-RR-04's planted one),
+ *  RR-07, RR-08. */
+const RR02 = SEEDED_REASONING_REVIEW_CRITERIA[1]!.id;
+const RR04 = SEEDED_REASONING_REVIEW_CRITERIA[3]!.id;
+const RR07 = SEEDED_REASONING_REVIEW_CRITERIA[6]!.id;
+const RR08 = SEEDED_REASONING_REVIEW_CRITERIA[7]!.id;
+
+describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): attribution is reported, never escalated', () => {
+	/** A reply that faults `faulted` and still recommends SATISFIED — the floor refuses the contradiction. */
+	const contradicting = (faulted: readonly string[]) =>
+		JSON.stringify({ ...(JSON.parse(judgement(faulted)) as object), recommendation: 'SATISFIED' });
+	/** A reply faulting `faulted` with `gone`'s row left out: the product records `gone` UNABLE_TO_DETERMINE — the only
+	 *  way a model's reply leaves a criterion undetermined — and the harness a MISSING_CRITERION malformation. */
+	const omitting = (gone: string, faulted: readonly string[]) => {
+		const j = JSON.parse(judgement(faulted)) as { findings: { criterionId: string }[] };
+		return JSON.stringify({ ...j, findings: j.findings.filter((f) => f.criterionId !== gone) });
+	};
+	/** Every reply in a fence — a malformation that leaves every criterion answered. */
+	const fenced = (id: string) => `\`\`\`json\n${asOracle(id)}\n\`\`\``;
+	const unCited = (runId: string, entry: string) =>
+		`run ${runId}: ${entry} — no ESCALATION line cites a register finding for it (§5.6 limb 3)`;
+	/** Each evaluation's outcome — on its last call, the one that carries it (a repaired evaluation's first carries none). */
+	const scoredIn = (lines: readonly RecordLine[], caseId: string) =>
+		lines
+			.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === caseId && l.scored !== null)
+			.map((c) => c.scored!);
+	const outcome = (s: CallLine['scored'] | undefined, k: string) => s!.criteria.find(([c]) => c === k)?.[1];
+	const head = (id: string, named: number, of: number) =>
+		`run ${id}: the planted criterion named in ${named} of ${of} answered planted evaluation(s), against today’s oracles`;
+
+	it('⛔ a planted case REJECTED without its planted criterion faulted is REPORTED as attribution — never a material failure', async () => {
+		const lines = await recorded({ runId: 'qr-attr-1', reply: (id) => (id === 'G-RR-04' ? judgement([RR02]) : asOracle(id)) });
+		const [s] = scoredIn(lines, 'G-RR-04');
+		expect([s!.disposition, outcome(s, RR04), outcome(s, RR02)], 'the arrangement: the right verdict, on another criterion').toEqual([
+			'REJECTED',
+			'MET',
+			'NOT_MET'
+		]);
+		const r = await check([file(lines)]);
+		expect(limb(r, 'ESCALATION'), 'no ESCALATION is owed for it').toBe('');
+		expect(r.problems).toEqual([]);
+		expect(r.attribution).toEqual([
+			[head('qr-attr-1', 0, 1), 'G-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)'].join('\n    ')
+		]);
+	});
+
+	it('⛔ GUARD — a planted case whose verdict is not REJECTED stays MATERIAL: every disposition the floor gives short of REJECTED (SATISFIED, BOUNDARY_REJECTED with the planted criterion faulted, INCONCLUSIVE, VALIDATOR_FAILED), and every other one a record can carry', async () => {
+		const passed = await recorded({ runId: 'qr-verdict-1', reply: (id) => (id === 'G-RR-04' ? judgement([]) : asOracle(id)) });
+		expect(limb(await check([file(passed)]), 'ESCALATION')).toContain('run qr-verdict-1: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
+		// Naming the planted criterion does not make the verdict right: here RR-04 is faulted, and the floor refuses a
+		// reply that faults it and recommends SATISFIED — BOUNDARY_REJECTED, not the oracle's REJECTED.
+		const refused = await recorded({ runId: 'qr-verdict-2', reply: (id) => (id === 'G-RR-04' ? contradicting([RR04]) : asOracle(id)) });
+		const [s] = scoredIn(refused, 'G-RR-04');
+		expect([s!.disposition, outcome(s, RR04)], 'the arrangement: the planted criterion faulted, the verdict not REJECTED').toEqual([
+			'BOUNDARY_REJECTED',
+			'NOT_MET'
+		]);
+		const r = await check([file(refused)]);
+		expect(limb(r, 'ESCALATION')).toBe(
+			'run qr-verdict-2: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED — no ESCALATION line cites a register finding for it (§5.6 limb 3)'
+		);
+		expect(r.attribution, 'named, and still material').toEqual([head('qr-verdict-2', 1, 1)]);
+		expect((await check([file([...refused, escalate('qr-verdict-2', ['G-RR-04'])])])).problems, 'CONTROL: escalated, green').toEqual([]);
+		// ⭐ THE REST OF WHAT THE FLOOR GIVES, enumerated from the product: the Reasoning Review row's disposition is
+		// VALIDATOR_FAILED or BOUNDARY_REJECTED at the boundary (`classifyValidatorResult`), else `dispositionFromFindings`
+		// — REJECTED, INCONCLUSIVE or SATISFIED here. An INCONCLUSIVE faults nothing (a fault would reject), a
+		// VALIDATOR_FAILED records no criterion; neither is the oracle's REJECTED.
+		const arms: readonly [runId: string, reply: string, disposition: string][] = [
+			['qr-verdict-3', omitting(RR08, []), 'INCONCLUSIVE'],
+			['qr-verdict-4', 'I think it is fine.', 'VALIDATOR_FAILED']
+		];
+		for (const [runId, reply, disposition] of arms) {
+			const lines = await recorded({ runId, reply: (id) => (id === 'G-RR-04' ? reply : asOracle(id)) });
+			expect(scoredIn(lines, 'G-RR-04').map((x) => x.disposition), `the arrangement: ${disposition}`).toEqual([disposition]);
+			expect(limb(await check([file(lines)]), 'ESCALATION'), disposition).toBe(unCited(runId, 'G-RR-04 — PLANTED_DEFECT_NOT_REJECTED'));
+		}
+		// ⭐ AND EVERY OTHER DISPOSITION A RECORD CAN CARRY, which this floor does not give today — CONDITIONALLY_SATISFIED
+		// needs an open MATERIAL finding or a PARTIALLY_MET row, and every Reasoning Review criterion is BLOCKING and
+		// emits neither; no rule returns ESCALATED; MISSING needs no result at all. A line can still hold one (an earlier
+		// runner's, or one written by hand), and limb 3 reads the disposition as recorded: under an earlier fingerprint,
+		// so limb 2 does not re-score it.
+		const driven = new Set(['REJECTED', 'SATISFIED', 'BOUNDARY_REJECTED', 'INCONCLUSIVE', 'VALIDATOR_FAILED']);
+		const rest = SCORED_DISPOSITIONS.filter((d) => !driven.has(d));
+		expect(rest).toEqual(['CONDITIONALLY_SATISFIED', 'ESCALATED', 'MISSING']);
+		for (const d of rest) {
+			const runId = `qr-verdict-${d.toLowerCase()}`;
+			const lines = tamper(await recorded({ runId, fingerprint: moved('scoring') }), 'G-RR-04', (c) => ({
+				...c,
+				scored: c.scored && { ...c.scored, disposition: d }
+			}));
+			expect(limb(await check([file(lines)]), 'ESCALATION'), d).toBe(unCited(runId, 'G-RR-04 — PLANTED_DEFECT_NOT_REJECTED'));
+		}
+	});
+
+	it('⛔ a planted criterion left UNDETERMINED is not named — only NOT_MET names it', async () => {
+		const lines = await recorded({ runId: 'qr-attr-4', reply: (id) => (id === 'G-RR-04' ? omitting(RR04, [RR02]) : asOracle(id)) });
+		const [s] = scoredIn(lines, 'G-RR-04');
+		expect([s!.disposition, outcome(s, RR04), outcome(s, RR02)], 'the arrangement: the right verdict, the planted criterion unjudged').toEqual([
+			'REJECTED',
+			'UNABLE_TO_DETERMINE',
+			'NOT_MET'
+		]);
+		const r = await check([file(lines)]);
+		expect(r.problems).toEqual([]);
+		expect(r.attribution).toEqual([
+			[head('qr-attr-4', 0, 1), 'G-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)'].join('\n    ')
+		]);
+	});
+
+	it('⭐ a RESCORED record’s attribution is REPORTED — it is a record limb 3 reads', async () => {
+		const old = await recorded({
+			runId: 'qr-attr-5',
+			fingerprint: moved('scoring'),
+			reply: (id) => (id === 'G-RR-04' ? judgement([RR02]) : asOracle(id))
+		});
+		const rescored = await rescoredLines(
+			old.find((l): l is RunLine => l.kind === 'RUN')!,
+			old.filter((l): l is CallLine => l.kind === 'CALL'),
+			SUBSET,
+			{ rescoreId: 'rs-attr-5', date: '2026-09-25T09:00:00.000Z', commit: 'a'.repeat(40), reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet }
+		);
+		const r = await check([file([...old, ...rescored])]);
+		expect(r.problems).toEqual([]);
+		const miss = 'G-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)';
+		expect(r.attribution).toEqual([
+			[head('qr-attr-5', 0, 1), miss].join('\n    '),
+			['RESCORED rs-attr-5: the planted criterion named in 0 of 1 answered planted evaluation(s), against today’s oracles', miss].join('\n    ')
+		]);
+	});
+
+	it('⛔ a STRUCK record’s attribution is NOT reported — struck, it counts for nothing, as in limb 3', async () => {
+		// A run whose G-RR-04 does not re-score to what it recorded (RR-01 recorded unjudged), with an attribution miss.
+		const bad = tamper(
+			await recorded({ runId: 'qr-attr-6', reply: (id) => (id === 'G-RR-04' ? judgement([RR02]) : asOracle(id)) }),
+			'G-RR-04',
+			(c) => ({
+				...c,
+				scored: c.scored && {
+					...c.scored,
+					criteria: c.scored.criteria.map(([k, o]) => [k, k.startsWith('RR-01') ? 'UNABLE_TO_DETERMINE' : o] as const)
+				}
+			})
+		);
+		const good = await recorded({ runId: 'qr-attr-7' });
+		const miss = 'G-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)';
+		const standing = await check([file([...bad, ...good])]);
+		expect(limb(standing, 'REPRODUCTION'), 'the arrangement: it does not reproduce').toContain(
+			'run qr-attr-6: G-RR-04#1 — re-scored through today’s path it is'
+		);
+		expect(standing.attribution, 'CONTROL: not struck, it is reported').toEqual([
+			[head('qr-attr-6', 0, 1), miss].join('\n    '),
+			head('qr-attr-7', 1, 1)
+		]);
+		const struck = await check([file([...bad, supersede('qr-attr-6'), ...good])]);
+		expect(struck.problems).toEqual([]);
+		expect(struck.attribution).toEqual([head('qr-attr-7', 1, 1)]);
+	});
+
+	it('⛔ an answered criterion now UNDETERMINED, the verdict holding, is REPORTED, not escalated — REG-D-080: “criterion-level classes that do not change the verdict become informational”', async () => {
+		// The earlier run is FENCED — malformed already, every criterion answered — so the later run's missing row gains
+		// no malformation: the criterion now undetermined is the only thing that moved.
+		const first = await recorded({ runId: 'qr-und-1', date: '2026-09-24T12:00:00.000Z', reply: fenced });
+		const next = await recorded({
+			runId: 'qr-und-2',
+			date: '2026-09-25T12:00:00.000Z',
+			reply: (id) => (id === 'G-RR-04' ? omitting(RR08, [RR04]) : asOracle(id))
+		});
+		const [s] = scoredIn(next, 'G-RR-04');
+		expect([s!.disposition, outcome(s, RR04), outcome(s, RR08)], 'the arrangement: RR-08 undetermined, the verdict REJECTED as before').toEqual([
+			'REJECTED',
+			'NOT_MET',
+			'UNABLE_TO_DETERMINE'
+		]);
+		const r = await check([file([...first, ...next])]);
+		expect(limb(r, 'ESCALATION'), 'no ESCALATION is owed for it').toBe('');
+		expect(r.problems).toEqual([]);
+		expect(r.attribution).toEqual([
+			head('qr-und-1', 1, 1),
+			[
+				head('qr-und-2', 1, 1),
+				'G-RR-04 — ANSWERED_NOW_UNDETERMINED against run qr-und-1: RR-08 answered in every repetition there, UNABLE_TO_DETERMINE in a repetition here'
+			].join('\n    ')
+		]);
+	});
+
+	it('⛔ …and where the criterion now UNDETERMINED MOVES THE VERDICT, the verdict-level class escalates it: a planted case left INCONCLUSIVE, a clean case no longer SATISFIED', async () => {
+		const first = await recorded({ runId: 'qr-und-3', date: '2026-09-24T12:00:00.000Z', reply: fenced });
+		// Every Reasoning Review criterion is mandatory: the planted criterion's own row left out, nothing else faulted,
+		// is INCONCLUSIVE — not the oracle's REJECTED.
+		const planted = await recorded({
+			runId: 'qr-und-4',
+			date: '2026-09-25T12:00:00.000Z',
+			reply: (id) => (id === 'G-RR-04' ? omitting(RR04, []) : asOracle(id))
+		});
+		expect(scoredIn(planted, 'G-RR-04').map((x) => x.disposition), 'the arrangement: the planted verdict moved').toEqual(['INCONCLUSIVE']);
+		const p = await check([file([...first, ...planted])]);
+		expect(limb(p, 'ESCALATION')).toBe(unCited('qr-und-4', 'G-RR-04 — PLANTED_DEFECT_NOT_REJECTED'));
+		expect(p.attribution).toEqual([
+			head('qr-und-3', 1, 1),
+			[
+				head('qr-und-4', 0, 1),
+				'G-RR-04#1 — INCONCLUSIVE, not the oracle’s REJECTED: material (limb 3); RR-04 not faulted (it faulted nothing)',
+				'G-RR-04 — FAULT_LOST against run qr-und-3: RR-04 faulted in every repetition there, not in every repetition here',
+				'G-RR-04 — ANSWERED_NOW_UNDETERMINED against run qr-und-3: RR-04 answered in every repetition there, UNABLE_TO_DETERMINE in a repetition here'
+			].join('\n    ')
+		]);
+		// A clean case: one row left out is INCONCLUSIVE, and its renamed copy's verdict now differs from it.
+		const clean = await recorded({
+			runId: 'qr-und-5',
+			date: '2026-09-25T12:00:00.000Z',
+			reply: (id) => (id === 'G-CLEAN' ? omitting(RR08, []) : asOracle(id))
+		});
+		expect(scoredIn(clean, 'G-CLEAN').map((x) => x.disposition), 'the arrangement: the clean verdict moved').toEqual(['INCONCLUSIVE']);
+		const c = await check([file([...first, ...clean])]);
+		expect(limb(c, 'ESCALATION')).toBe(
+			[
+				unCited('qr-und-5', 'G-CLEAN — CLEAN_NOT_SATISFIED, SATISFIED_LOST'),
+				unCited('qr-und-5', 'G-CLEAN-R1 — VERDICT_CHANGES_WITH_NAME')
+			].join('\n')
+		);
+		expect(c.attribution.join('\n')).toContain(
+			'G-CLEAN — ANSWERED_NOW_UNDETERMINED against run qr-und-3: RR-08 answered in every repetition there, UNABLE_TO_DETERMINE in a repetition here'
+		);
+	});
+
+	it('⛔ NO SILENT SHRINK — a run’s planted evaluations of cases outside today’s set are counted out ALOUD, by the oracle version the run recorded', async () => {
+		// Version one's 26 cases against today's set: 10 planted cases are still in it; G-RR-02…09, planted in version
+		// one, are not — and nor are its 4 clean graph cases, which were never in M.
+		const v1Record = await recorded({ runId: 'qr-attr-8', cases: CASES });
+		const onTheCurrentSet = (over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
+			check([file(v1Record)], { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, ...over });
+		const head8 = head('qr-attr-8', 10, 10);
+		expect((await onTheCurrentSet()).attribution).toEqual([
+			`${head8} (8 answered planted evaluation(s) of cases not in the current set are not counted)`
+		]);
+		// Its own version is what says which were planted: not held, they are still counted out — as of unknown standing.
+		expect((await onTheCurrentSet({ oracleSets: [CURRENT_ORACLES] })).attribution).toEqual([
+			`${head8} (12 answered evaluation(s) of cases not in the current set are not counted: oracles v1, which say which were planted, are not held)`
+		]);
+	});
+
+	it('⛔ the criterion-level TRANSITION — a planted criterion faulted last run and not now, the verdict holding — is REPORTED, not escalated', async () => {
+		const first = await recorded({ runId: 'qr-lost-1', date: '2026-09-24T12:00:00.000Z' });
+		const next = await recorded({
+			runId: 'qr-lost-2',
+			date: '2026-09-25T12:00:00.000Z',
+			reply: (id) => (id === 'G-RR-04' ? judgement([RR02]) : asOracle(id))
+		});
+		const r = await check([file([...first, ...next])]);
+		expect(limb(r, 'ESCALATION'), 'no ESCALATION is owed for it').toBe('');
+		expect(r.problems).toEqual([]);
+		expect(r.attribution).toEqual([
+			head('qr-lost-1', 1, 1),
+			[
+				head('qr-lost-2', 0, 1),
+				'G-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
+				'G-RR-04 — FAULT_LOST against run qr-lost-1: RR-04 faulted in every repetition there, not in every repetition here'
+			].join('\n    ')
+		]);
+		// Where the verdict moves too, the VERDICT is escalated — the absolute class, as any wrong verdict is.
+		const flipped = await recorded({
+			runId: 'qr-lost-3',
+			date: '2026-09-25T12:00:00.000Z',
+			reply: (id) => (id === 'G-RR-04' ? judgement([]) : asOracle(id))
+		});
+		const moved = await check([file([...first, ...flipped])]);
+		expect(limb(moved, 'ESCALATION')).toBe(
+			'run qr-lost-3: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED — no ESCALATION line cites a register finding for it (§5.6 limb 3)'
+		);
+		expect(moved.attribution.join('\n')).toContain(
+			'G-RR-04#1 — SATISFIED, not the oracle’s REJECTED: material (limb 3); RR-04 not faulted (it faulted nothing)'
+		);
+	});
+
+	it('⭐ THE REPORT — per record, the planted criterion named in N of M ANSWERED planted evaluations, each miss with its verdict and what it faulted', async () => {
+		let k = 0;
+		const lines = await recorded({
+			runId: 'qr-attr-2',
+			repetitions: 2,
+			reply: (id) => (id === 'G-RR-04' && k++ === 1 ? judgement([RR02, RR07]) : asOracle(id))
+		});
+		const r = await check([file(lines)]);
+		expect(r.problems).toEqual([]);
+		expect(r.attribution).toEqual([
+			[head('qr-attr-2', 1, 2), 'G-RR-04#2 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02, RR-07)'].join('\n    ')
+		]);
+		// A planted evaluation cut at the bound answered nothing: it is a Boundedness failure, and not in M.
+		let j = 0;
+		const cut = await recorded({
+			runId: 'qr-attr-3',
+			repetitions: 2,
+			reply: (id) => (id === 'G-RR-04' && j++ === 0 ? new Error('the bound') : asOracle(id))
+		});
+		const c = await check([file([...cut, escalate('qr-attr-3', ['G-RR-04'])])]);
+		expect(c.problems).toEqual([]);
+		expect(c.attribution).toEqual([head('qr-attr-3', 1, 1)]);
+	});
+});
+
 // ── the CLI, on mkdtemp fixtures (D11: it runs from source) ─────────────────────────────────────────────────────────
 describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only what git tracks, and exits with what it found', () => {
 	const dirs: string[] = [];
@@ -691,6 +1005,10 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		});
 		return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 	};
+	/** ⭐ `JAN-CRITREAD` J2-6 — the report block's header: attribution, and the criterion-level transitions beside it
+	 *  (`FAULT_LOST`, `ANSWERED_NOW_UNDETERMINED`), none of them material (`REG-D-080`). */
+	const ATTRIBUTION_HEADER =
+		'reviewer:qual:check — attribution against the oracles’ `faulted` lists, and the criterion-level transitions — reported, never a material failure (REG-D-080):';
 
 	it('⛔ under bare bun the packages resolve to built dist, and the check refuses to run', () => {
 		const r = cli([], ['--records', gitRepo()]);
@@ -766,10 +1084,51 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
-		expect(r.out).toContain('run qr-cli-3: G2-RR-04 — PLANTED_DEFECT_NOT_FAULTED');
+		expect(r.out).toContain('run qr-cli-3: G2-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(open.out, 'CONTROL: the same finding, open').toContain('GREEN');
 		expect(open.status, open.out).toBe(0);
+	}, 120_000);
+
+	it('⭐ J2-6 — the CLI PRINTS the attribution report, and is GREEN on a record whose only miss is attribution (REG-D-080)', async () => {
+		const dir = gitRepo();
+		const lines = await recorded({
+			runId: 'qr-cli-4',
+			cases: CURRENT_CASES,
+			versions: { caseSet: 2, oracles: 2 },
+			reply: (id) => (id === 'W-RR-04' ? judgement([RR02]) : asOracle(id))
+		});
+		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
+		git(dir, 'add', 'runs.ndjson');
+		const r = cli(['--conditions=source'], ['--records', dir]);
+		expect(r.out).toContain(
+			[
+				ATTRIBUTION_HEADER,
+				'  run qr-cli-4: the planted criterion named in 17 of 18 answered planted evaluation(s), against today’s oracles',
+				'    W-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
+				'reviewer:qual:check — GREEN'
+			].join('\n')
+		);
+		expect(r.status, r.out).toBe(0);
+	}, 120_000);
+
+	it('⭐ J2-6 — the CLI counts a run’s planted evaluations outside today’s set OUT ALOUD, by every oracle version on file (REG-D-080)', async () => {
+		// The committed record's shape: a run of version one under today's fingerprint, beside one over today's set.
+		const dir = gitRepo();
+		const v1 = await recorded({ runId: 'qr-cli-5', cases: CASES });
+		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 2, oracles: 2 } });
+		writeFileSync(join(dir, 'runs.ndjson'), text([...v1, ...now]));
+		git(dir, 'add', 'runs.ndjson');
+		const r = cli(['--conditions=source'], ['--records', dir]);
+		expect(r.out).toContain(
+			[
+				ATTRIBUTION_HEADER,
+				'  run qr-cli-5: the planted criterion named in 10 of 10 answered planted evaluation(s), against today’s oracles (8 answered planted evaluation(s) of cases not in the current set are not counted)',
+				'  run qr-cli-6: the planted criterion named in 18 of 18 answered planted evaluation(s), against today’s oracles',
+				'reviewer:qual:check — GREEN'
+			].join('\n')
+		);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 });

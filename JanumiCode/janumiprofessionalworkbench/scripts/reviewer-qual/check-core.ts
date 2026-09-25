@@ -19,6 +19,12 @@
 //      its material failures are cited; a struck record then counts for nothing.
 //   3. ESCALATION — every material failure (§5.1) in every record not struck, intermediate runs included, cited by an
 //      ESCALATION line naming an OPEN finding the register holds — a struck heading (`### ~~REG-F-NNN~~`) is closed.
+//      ⭐ THE PASS BAR IS THE RIGHT VERDICT (`JAN-CRITREAD` J2-6; `REG-D-080`; §5.1 as amended): the material classes
+//      are the verdict-level ones (`record.ts`). Which criterion a planted case faults — against its oracle's
+//      `faulted` list — is ATTRIBUTION, and the criterion-level transitions (a planted criterion no longer faulted, an
+//      answered criterion now UNABLE_TO_DETERMINE) are informational: both REPORTED for every record this limb reads,
+//      and never escalated. An ESCALATION line already citing what is now reported stays valid history: nothing
+//      requires a line to cite a material failure, and the record is append-only.
 // And the cross-file references `REG-D-074` left here: a run id is declared once across the record; a RESCORED line's
 // source evaluation, an ESCALATION's run and cases, a SUPERSEDED line's record, an ACKNOWLEDGED line's cases all exist;
 // every cited finding is an entry of the register. Two runs of one candidate on one date are ordered by the record.
@@ -27,7 +33,7 @@
 // operation that needs the product — re-scoring — is a function handed in (`rescore.ts` in the CLI). It reads no file.
 // ⚠ "CONTENT UNCHANGED" IS THE CASE ID: a case that changes gets a new id (`cases.ts`), so a case id still in today's set
 // is the same case. A case edited in place under its id reads here as a non-reproduction — which it is.
-import type { Oracle, QualificationCase } from './cases.js';
+import type { Oracle, OracleSet, QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
 	MATERIAL_FAILURE_CLASSES,
@@ -67,6 +73,12 @@ export interface CheckInputs {
 	readonly cases: readonly QualificationCase[];
 	/** Today's oracles — material failures are judged against the current oracle version (§5.1). */
 	readonly oracles: readonly Oracle[];
+	/**
+	 * ⭐ `JAN-CRITREAD` J2-6 — EVERY oracle version on file, today's among them. Nothing is judged against them: they say
+	 * only which of a record's cases OUTSIDE today's set its own oracle version planted, so the attribution report
+	 * counts those evaluations out aloud instead of shrinking in silence (`REG-D-080`).
+	 */
+	readonly oracleSets: readonly OracleSet[];
 	/** The register findings that have an entry (`### REG-F-NNN`, struck or not — `registerFindings`). */
 	readonly findings: ReadonlySet<string>;
 	/** ⭐ Those among them whose heading is STRUCK (`### ~~REG-F-NNN~~`) — closed. A struck finding escalates nothing. */
@@ -90,6 +102,16 @@ export interface CheckReport {
 	readonly problems: readonly CheckProblem[];
 	/** What the check saw but does not redden on — confounds, runs that count for nothing. */
 	readonly notes: readonly string[];
+	/**
+	 * ⭐ `JAN-CRITREAD` J2-6 (`REG-D-080`) — ATTRIBUTION, one entry per record limb 3 reads that measured a planted case
+	 * or moved at the criterion level: the planted criterion named in N of M answered planted evaluations, against
+	 * today's oracles' `faulted` lists, with the answered planted evaluations of cases outside today's set counted OUT
+	 * ALOUD; each evaluation that did not name it, with its verdict and what it faulted; and the criterion-level
+	 * transitions since the same candidate's previous run — a planted criterion no longer faulted (`FAULT_LOST`), an
+	 * answered criterion now UNABLE_TO_DETERMINE (`ANSWERED_NOW_UNDETERMINED`). Reported, NEVER a material failure — it
+	 * never reddens. A miss under a wrong verdict is listed as such: that verdict is what limb 3 escalates.
+	 */
+	readonly attribution: readonly string[];
 }
 
 /**
@@ -366,15 +388,25 @@ interface Outcome {
 	readonly repetition: number;
 	readonly scored: ScoredOutcome;
 	readonly failedAtTransport: boolean;
+	/** The oracle version its record was measured under — a RESCORED line's is its source run's. */
+	readonly oracleVersion: number;
 }
 
-/** §5.1's absolute failures for one scored evaluation, judged against today's oracle. */
+/**
+ * ⭐ `JAN-CRITREAD` J2-6 — THE PASS BAR (`REG-D-080`): *"right verdict is selected and approved"*. An evaluation meets
+ * it when its disposition IS the oracle's — SATISFIED for a clean case, REJECTED for a planted one. Anything else is
+ * not the verdict: an INCONCLUSIVE, or a BOUNDARY_REJECTED the floor returns for a reply that faults the planted
+ * criterion and still recommends SATISFIED, misses the bar though it named the defect.
+ */
+const rightVerdict = (o: Oracle, s: ScoredOutcome): boolean => s.disposition === o.disposition;
+/** The oracle's planted criteria an evaluation did NOT fault — its attribution, against the `faulted` list. */
+const unnamedIn = (o: Oracle, s: ScoredOutcome): string[] => o.faulted.filter((k) => outcomeOf(s, k) !== 'NOT_MET');
+
+/** §5.1's absolute failures for one scored evaluation, judged against today's oracle — at the grain of the VERDICT. */
 function absolute(o: Oracle | undefined, x: Outcome): MaterialFailureClass[] {
 	if (x.failedAtTransport) return ['BOUNDEDNESS'];
-	if (!o) return [];
-	if (o.disposition === 'SATISFIED') return x.scored.disposition === 'SATISFIED' ? [] : ['CLEAN_NOT_SATISFIED'];
-	const found = o.faulted.every((k) => outcomeOf(x.scored, k) === 'NOT_MET') && x.scored.disposition !== 'SATISFIED';
-	return found ? [] : ['PLANTED_DEFECT_NOT_FAULTED'];
+	if (!o || rightVerdict(o, x.scored)) return [];
+	return [o.disposition === 'SATISFIED' ? 'CLEAN_NOT_SATISFIED' : 'PLANTED_DEFECT_NOT_REJECTED'];
 }
 
 /** The case a renamed copy renames, when today's set holds it (`<base>-R<n>`, pinned by the case set's shape limb). */
@@ -415,36 +447,168 @@ const agree = (ss: readonly ScoredOutcome[]) => new Set(ss.map((s) => s.disposit
 const answeredIn = (ss: readonly ScoredOutcome[], k: string) =>
 	ss.every((s) => (outcomeOf(s, k) ?? 'UNABLE_TO_DETERMINE') !== 'UNABLE_TO_DETERMINE');
 
-/** §5.1's transitions for one case, each asked only where both runs answered it. */
+/** §5.1's MATERIAL transitions for one case, each asked only where both runs answered it — every one but the
+ *  criterion-level two, `faultsLost` and `undeterminedNow`. */
 function pairTransitions(x: CasePair, o: Oracle | undefined): MaterialFailureClass[] {
 	const out: MaterialFailureClass[] = [];
 	const answered = x.aBefore.length > 0 && x.aNow.length > 0;
-	if (answered && o?.disposition === 'REJECTED' && o.faulted.some((k) => allFaulted(x.aBefore, k) && !allFaulted(x.aNow, k)))
-		out.push('FAULT_LOST');
 	if (answered && o?.disposition === 'SATISFIED' && allSatisfied(x.aBefore) && !allSatisfied(x.aNow)) out.push('SATISFIED_LOST');
 	if (wellFormed(x.before) && !wellFormed(x.now)) out.push('MALFORMATION_GAINED');
 	if (x.aBefore.length >= 2 && agree(x.aBefore) && x.aNow.length >= 2 && !agree(x.aNow)) out.push('REPETITIONS_NOW_DISAGREE');
 	if (!x.before.some(transportFailed) && x.now.some(transportFailed)) out.push('BOUND_NOW_EXCEEDED');
-	const criteria = answered ? x.aBefore[0]!.criteria.map(([k]) => k) : [];
-	if (criteria.some((k) => answeredIn(x.aBefore, k) && x.aNow.some((s) => outcomeOf(s, k) === 'UNABLE_TO_DETERMINE')))
-		out.push('ANSWERED_NOW_UNDETERMINED');
 	return out;
 }
 
 /**
+ * ⭐ `JAN-CRITREAD` J2-6 — §5.1's other CRITERION-LEVEL transition, `ANSWERED_NOW_UNDETERMINED`: the criteria answered in
+ * every answered repetition of the previous run and UNABLE_TO_DETERMINE in one of this. REPORTED, never escalated —
+ * `REG-D-080`: *"Criterion-level classes that do not change the verdict become informational."* Where it DOES change
+ * the verdict, the verdict-level class escalates it: every Reasoning Review criterion is mandatory, so an undetermined
+ * one leaves a clean case INCONCLUSIVE — CLEAN_NOT_SATISFIED, and SATISFIED_LOST — and a planted case INCONCLUSIVE
+ * unless another criterion is faulted — PLANTED_DEFECT_NOT_REJECTED.
+ */
+function undeterminedNow(x: CasePair): string[] {
+	if (x.aBefore.length === 0 || x.aNow.length === 0) return [];
+	return x.aBefore[0]!.criteria
+		.map(([k]) => k)
+		.filter((k) => answeredIn(x.aBefore, k) && x.aNow.some((s) => outcomeOf(s, k) === 'UNABLE_TO_DETERMINE'));
+}
+
+/**
+ * ⭐ `JAN-CRITREAD` J2-6 — §5.1's CRITERION-LEVEL transition, `FAULT_LOST`: the planted criteria faulted in every
+ * answered repetition of the previous run and not in every one of this. REPORTED, never escalated (`REG-D-080`). Where
+ * the verdict moved too, the absolute class — PLANTED_DEFECT_NOT_REJECTED, on each evaluation now not REJECTED — is
+ * what limb 3 escalates, so no verdict the old transition caught goes unescalated.
+ */
+function faultsLost(x: CasePair, o: Oracle | undefined): string[] {
+	if (x.aBefore.length === 0 || x.aNow.length === 0 || o?.disposition !== 'REJECTED') return [];
+	return o.faulted.filter((k) => allFaulted(x.aBefore, k) && !allFaulted(x.aNow, k));
+}
+
+/** A criterion id as the report names it — `RR-04`. */
+const short = (k: string): string => k.slice(0, 5);
+
+/**
  * §5.1's TRANSITIONS — only when a run repeats a candidate, keyed on (provider, model label, served-model digest), and
  * only against that candidate's previous run (the latest earlier-dated), case by case where the case is unchanged.
+ * The material ones go to `f`; the criterion-level ones to `reported`, as lines of the attribution report.
  */
-function transitions(r: Run, prev: Run, oracles: ReadonlyMap<string, Oracle>, f: Failures): void {
+function transitions(r: Run, prev: Run, oracles: ReadonlyMap<string, Oracle>, f: Failures, reported: string[]): void {
 	const of = (run: Run, caseId: string) => [...run.evaluations.values()].filter((e) => e.caseId === caseId && complete(e));
 	const answered = (es: readonly Evaluation[]) => es.filter((e) => !transportFailed(e)).map(scoredOf);
 	for (const caseId of r.run.caseIds) {
 		const now = of(r, caseId);
 		const before = of(prev, caseId);
 		if (now.length === 0 || before.length === 0) continue;
-		for (const k of pairTransitions({ before, now, aBefore: answered(before), aNow: answered(now) }, oracles.get(caseId)))
-			add(f, caseId, k);
+		const pair: CasePair = { before, now, aBefore: answered(before), aNow: answered(now) };
+		for (const k of pairTransitions(pair, oracles.get(caseId))) add(f, caseId, k);
+		const gone = faultsLost(pair, oracles.get(caseId));
+		if (gone.length > 0)
+			reported.push(
+				`${caseId} — FAULT_LOST against run ${prev.run.runId}: ${gone.map(short).join(', ')} faulted in every repetition there, not in every repetition here`
+			);
+		const undetermined = undeterminedNow(pair);
+		if (undetermined.length > 0)
+			reported.push(
+				`${caseId} — ANSWERED_NOW_UNDETERMINED against run ${prev.run.runId}: ${undetermined.map(short).join(', ')} answered in every repetition there, UNABLE_TO_DETERMINE in a repetition here`
+			);
 	}
+}
+
+// ── attribution (`JAN-CRITREAD` J2-6; `REG-D-080`) ──
+
+/** One answered planted evaluation that did not fault every planted criterion. */
+interface Miss {
+	readonly caseId: string;
+	readonly repetition: number;
+	readonly disposition: string;
+	/** Whether its disposition is the oracle's — if not, limb 3 escalates it; the attribution line only says so. */
+	readonly rightVerdict: boolean;
+	readonly unnamed: readonly string[];
+	/** Every criterion it faulted. */
+	readonly faulted: readonly string[];
+}
+/** What one record says about attribution. */
+interface Attribution {
+	/** The ANSWERED planted evaluations today's oracles judge — one cut at the bound answered nothing to attribute. */
+	readonly planted: number;
+	readonly misses: readonly Miss[];
+	/** ⭐ The answered evaluations of cases OUTSIDE today's set that the record's own oracle version planted — not in
+	 *  `planted`, and counted out aloud rather than dropped in silence. */
+	readonly leftOut: number;
+	/** The answered evaluations of cases outside today's set under an oracle version the check does not hold — whether
+	 *  they were planted cannot be said — by that version. */
+	readonly unheld: ReadonlyMap<number, number>;
+	/** The criterion-level transitions, as report lines (`transitions`). */
+	readonly reported: readonly string[];
+}
+/** Every oracle version on file, by version: case id → its oracle there. */
+type OracleHistory = ReadonlyMap<number, ReadonlyMap<string, Oracle>>;
+
+const byCaseThenRepetition = (a: Miss, b: Miss): number =>
+	a.caseId === b.caseId ? a.repetition - b.repetition : Number(a.caseId > b.caseId) - Number(a.caseId < b.caseId);
+
+/** ⭐ Which answered planted evaluations named the planted criterion — attribution, against the oracles' `faulted`. */
+function attributionOf(
+	outcomes: readonly Outcome[],
+	oracles: ReadonlyMap<string, Oracle>,
+	history: OracleHistory,
+	reported: readonly string[]
+): Attribution {
+	const planted = outcomes.filter((x) => !x.failedAtTransport && oracles.get(x.caseId)?.disposition === 'REJECTED');
+	const outside = outcomes.filter((x) => !x.failedAtTransport && !oracles.has(x.caseId));
+	const leftOut = outside.filter((x) => history.get(x.oracleVersion)?.get(x.caseId)?.disposition === 'REJECTED').length;
+	const unheld = new Map<number, number>();
+	for (const x of outside.filter((y) => !history.has(y.oracleVersion)))
+		unheld.set(x.oracleVersion, (unheld.get(x.oracleVersion) ?? 0) + 1);
+	const misses = planted.flatMap((x): Miss[] => {
+		const o = oracles.get(x.caseId)!;
+		const unnamed = unnamedIn(o, x.scored);
+		return unnamed.length === 0
+			? []
+			: [
+					{
+						caseId: x.caseId,
+						repetition: x.repetition,
+						disposition: x.scored.disposition,
+						rightVerdict: rightVerdict(o, x.scored),
+						unnamed,
+						faulted: x.scored.criteria.filter(([, v]) => v === 'NOT_MET').map(([k]) => k)
+					}
+				];
+	});
+	return { planted: planted.length, misses: misses.sort(byCaseThenRepetition), leftOut, unheld, reported };
+}
+
+const missLine = (m: Miss): string =>
+	`${m.caseId}#${m.repetition} — ${m.disposition}` +
+	(m.rightVerdict ? ', the right verdict' : ', not the oracle’s REJECTED: material (limb 3)') +
+	`; ${m.unnamed.map(short).join(', ')} not faulted (it faulted ${m.faulted.map(short).join(', ') || 'nothing'})`;
+
+/** ⭐ What M leaves out, said aloud: the evaluations of cases outside today's set — planted by the record's own
+ *  oracle version, or of a version the check does not hold. Empty when M left nothing out. */
+const notCounted = (a: Attribution): string => {
+	const parts = [
+		...(a.leftOut > 0 ? [`${a.leftOut} answered planted evaluation(s) of cases not in the current set are not counted`] : []),
+		...[...a.unheld]
+			.sort(([x], [y]) => x - y)
+			.map(
+				([v, n]) =>
+					`${n} answered evaluation(s) of cases not in the current set are not counted: oracles v${v}, which say which were planted, are not held`
+			)
+	];
+	return parts.length > 0 ? ` (${parts.join('; ')})` : '';
+};
+
+/** A record's attribution entry — or undefined for a record that measured no planted case, left none out, and moved at
+ *  no criterion. */
+function attributionEntry(kind: string, id: string, a: Attribution): string | undefined {
+	if (a.planted === 0 && a.leftOut === 0 && a.unheld.size === 0 && a.reported.length === 0) return undefined;
+	return [
+		`${kind} ${id}: the planted criterion named in ${a.planted - a.misses.length} of ${a.planted} answered planted evaluation(s), against today’s oracles${notCounted(a)}`,
+		...a.misses.map(missLine),
+		...a.reported
+	].join('\n    ');
 }
 
 // ── the check ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -467,6 +631,8 @@ interface Ctx {
 	readonly caseById: ReadonlyMap<string, QualificationCase>;
 	readonly caseIds: ReadonlySet<string>;
 	readonly oracles: ReadonlyMap<string, Oracle>;
+	/** Every oracle version on file (`CheckInputs.oracleSets`) — read by the attribution report alone. */
+	readonly history: OracleHistory;
 	/** Records refused for a stamp nothing this tree makes (`inconsistentStamps`): run ids and rescore ids. */
 	readonly refused: ReadonlySet<string>;
 	readonly problems: CheckProblem[];
@@ -547,7 +713,10 @@ async function reproduction(ctx: Ctx): Promise<Map<string, string[]>> {
 // ── limb 3's material failures ──
 interface RecordFailures {
 	readonly kind: 'run' | 'RESCORED';
+	/** The MATERIAL failures only — what limb 3 escalates and a SUPERSEDED line waits on. */
 	readonly failures: Failures;
+	/** What it reports and never escalates (`REG-D-080`). */
+	readonly attribution: Attribution;
 }
 
 /** Earlier in the record's time: by date, and two runs of one date by their order in the record. */
@@ -569,31 +738,46 @@ function confounds(r: Run, prev: Run, notes: string[]): void {
 	if (canonicalJson(prev.run.candidate.options) !== canonicalJson(r.run.candidate.options)) differs('its options');
 }
 
-function runFailures(ctx: Ctx, r: Run, sameCandidate: readonly Run[]): Failures {
-	const outcomes = [...r.evaluations.values()]
-		.filter(complete)
-		.map((e) => ({ caseId: e.caseId, repetition: e.repetition, scored: scoredOf(e), failedAtTransport: transportFailed(e) }));
+function runFailures(ctx: Ctx, r: Run, sameCandidate: readonly Run[]): RecordFailures {
+	const outcomes = [...r.evaluations.values()].filter(complete).map((e) => ({
+		caseId: e.caseId,
+		repetition: e.repetition,
+		scored: scoredOf(e),
+		failedAtTransport: transportFailed(e),
+		oracleVersion: r.run.oracleVersion
+	}));
 	const f = outcomeFailures(outcomes, ctx.oracles, ctx.caseIds);
+	const reported: string[] = [];
 	const prev = previousRun(r, sameCandidate);
 	if (prev) {
-		transitions(r, prev, ctx.oracles, f);
+		transitions(r, prev, ctx.oracles, f, reported);
 		confounds(r, prev, ctx.notes);
 	}
-	return f;
+	return { kind: 'run', failures: f, attribution: attributionOf(outcomes, ctx.oracles, ctx.history, reported) };
 }
 
-/** Every record's material failures: each run's, and each RESCORED record's. */
+/** Every record's material failures, and its attribution: each run's, and each RESCORED record's. */
 function materialFailures(ctx: Ctx): Map<string, RecordFailures> {
 	const out = new Map<string, RecordFailures>();
 	const byCandidate = new Map<string, Run[]>();
 	for (const r of ctx.p.runs.values()) byCandidate.set(candidateKey(r.run), [...(byCandidate.get(candidateKey(r.run)) ?? []), r]);
 	for (const r of ctx.p.runs.values())
-		out.set(r.run.runId, { kind: 'run', failures: runFailures(ctx, r, byCandidate.get(candidateKey(r.run))!) });
+		out.set(r.run.runId, runFailures(ctx, r, byCandidate.get(candidateKey(r.run))!));
 	const groups = new Map<string, Rescore[]>();
 	for (const x of ctx.rescores) groups.set(x.line.rescoreId, [...(groups.get(x.line.rescoreId) ?? []), x]);
 	for (const [id, xs] of groups) {
-		const outcomes = xs.map((x) => ({ caseId: x.line.caseId, repetition: x.line.repetition, scored: x.line.scored, failedAtTransport: false }));
-		out.set(id, { kind: 'RESCORED', failures: outcomeFailures(outcomes, ctx.oracles, ctx.caseIds) });
+		const outcomes = xs.map((x) => ({
+			caseId: x.line.caseId,
+			repetition: x.line.repetition,
+			scored: x.line.scored,
+			failedAtTransport: false,
+			oracleVersion: x.source.run.oracleVersion
+		}));
+		out.set(id, {
+			kind: 'RESCORED',
+			failures: outcomeFailures(outcomes, ctx.oracles, ctx.caseIds),
+			attribution: attributionOf(outcomes, ctx.oracles, ctx.history, [])
+		});
 	}
 	return out;
 }
@@ -765,6 +949,8 @@ function escalation(ctx: Ctx, failures: ReadonlyMap<string, RecordFailures>, str
 				limb: 'ESCALATION',
 				message: `${kind} ${id}: ${u} — no ESCALATION line cites a register finding for it (§5.6 limb 3)`
 			});
+	// A HELD_OUT line counts only material classes — since `REG-D-080` the verdict-level ones (`record.ts`) — so its
+	// total is what it owes an ESCALATION for; attribution has no count there to owe one.
 	for (const { line } of ctx.p.heldOut) {
 		const total = Object.values(line.counts).reduce((a, b) => a + b, 0);
 		const cited = ctx.p.escalations.some(
@@ -797,6 +983,7 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 		caseById,
 		caseIds: new Set(caseById.keys()),
 		oracles: new Map(i.oracles.map((o) => [o.caseId, o])),
+		history: new Map(i.oracleSets.map((s) => [s.oracleVersion, new Map(s.oracles.map((o) => [o.caseId, o]))])),
 		refused: inconsistentStamps(p, rescores, i.current.reviewer, i.current.scoring, refuse),
 		problems,
 		notes: []
@@ -812,5 +999,14 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 				message: `${messages.join('\n    ')}\n    — does not reproduce: discharged only by a SUPERSEDED line citing a register finding (§5.6 limb 2)`
 			});
 	escalation(ctx, failures, struck);
-	return { problems: problems.sort((a, b) => LIMB_ORDER.indexOf(a.limb) - LIMB_ORDER.indexOf(b.limb)), notes: ctx.notes };
+	// ⭐ `REG-D-080` — attribution, for the records limb 3 reads: every one not struck.
+	const attribution = [...failures]
+		.filter(([id]) => !struck.has(id))
+		.map(([id, x]) => attributionEntry(x.kind, id, x.attribution))
+		.filter((a): a is string => a !== undefined);
+	return {
+		problems: problems.sort((a, b) => LIMB_ORDER.indexOf(a.limb) - LIMB_ORDER.indexOf(b.limb)),
+		notes: ctx.notes,
+		attribution
+	};
 }

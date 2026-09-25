@@ -189,17 +189,20 @@ const EVERY_KIND: readonly RecordLine[] = [
 		runId: 'ho-2026-09-26-1',
 		date: '2026-09-26T09:00:00.000Z',
 		reviewerFingerprint: HEX('f'),
+		// ⭐ `JAN-CRITREAD` J2-6 — a count for each MATERIAL class, and since `REG-D-080` those are the verdict-level
+		// classes: a planted defect whose verdict is not REJECTED, not one whose criterion went unnamed. The
+		// criterion-level classes (an unnamed planted criterion, FAULT_LOST, and an answered criterion now
+		// UNABLE_TO_DETERMINE) are reported and never counted here. No HELD_OUT line has ever been written — the tier is
+		// deferred (Q7 (b)(i)) — so none is stranded.
 		counts: {
-			PLANTED_DEFECT_NOT_FAULTED: 1,
+			PLANTED_DEFECT_NOT_REJECTED: 1,
 			CLEAN_NOT_SATISFIED: 0,
 			VERDICT_CHANGES_WITH_NAME: 0,
 			BOUNDEDNESS: 0,
-			FAULT_LOST: 0,
 			SATISFIED_LOST: 0,
 			MALFORMATION_GAINED: 0,
 			REPETITIONS_NOW_DISAGREE: 0,
-			BOUND_NOW_EXCEEDED: 0,
-			ANSWERED_NOW_UNDETERMINED: 0
+			BOUND_NOW_EXCEEDED: 0
 		}
 	}
 ];

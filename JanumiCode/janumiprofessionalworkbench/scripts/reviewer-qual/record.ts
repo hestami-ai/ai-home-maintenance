@@ -115,18 +115,27 @@ export const IDENTITY_EVIDENCE = ['PROVIDER_REPORTED', 'HOST_CONFIGURED'] as con
 /**
  * §5.1's material failures — the absolute four, then the transitions (evaluated only when a run repeats a candidate).
  * A HELD_OUT line carries a count for each and nothing else.
+ *
+ * ⭐ `JAN-CRITREAD` J2-6 — THE PASS BAR IS THE RIGHT VERDICT (`REG-D-080`; DESIGN §5.1 as amended): these are the
+ * VERDICT-level classes. A planted defect is material when its disposition is not the oracle's REJECTED — not, as
+ * before, when its planted criterion went unnamed — and both CRITERION-level transitions are gone from the list:
+ * `FAULT_LOST` (a planted criterion no longer faulted) and `ANSWERED_NOW_UNDETERMINED` (an answered criterion now
+ * UNABLE_TO_DETERMINE) — *"Criterion-level classes that do not change the verdict become informational."* Which
+ * criterion a planted case faults is ATTRIBUTION; it and the two transitions are what `reviewer:qual:check` reports
+ * and never escalates (`check-core.ts`). Where an undetermined criterion does change the verdict, a class here
+ * escalates it: CLEAN_NOT_SATISFIED (and SATISFIED_LOST), or PLANTED_DEFECT_NOT_REJECTED. No record line names these
+ * classes but HELD_OUT's counts, and no HELD_OUT line has been written (the tier is deferred, Q7 (b)(i)), so none is
+ * stranded.
  */
 export const MATERIAL_FAILURE_CLASSES = [
-	'PLANTED_DEFECT_NOT_FAULTED',
+	'PLANTED_DEFECT_NOT_REJECTED',
 	'CLEAN_NOT_SATISFIED',
 	'VERDICT_CHANGES_WITH_NAME',
 	'BOUNDEDNESS',
-	'FAULT_LOST',
 	'SATISFIED_LOST',
 	'MALFORMATION_GAINED',
 	'REPETITIONS_NOW_DISAGREE',
-	'BOUND_NOW_EXCEEDED',
-	'ANSWERED_NOW_UNDETERMINED'
+	'BOUND_NOW_EXCEEDED'
 ] as const;
 export type MaterialFailureClass = (typeof MATERIAL_FAILURE_CLASSES)[number];
 

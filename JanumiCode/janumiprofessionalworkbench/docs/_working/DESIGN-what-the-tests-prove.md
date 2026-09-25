@@ -638,7 +638,9 @@ through the product's own rules:
 
 1. **Contract** — a row for every criterion, well-formed; the `REG-F-428` malformation classes counted separately, so
    *"judged wrong"* and *"the product discarded what it said"* stay distinguishable.
-2. **Discrimination** — on each planted-defect case, the planted criterion is faulted and the floor is not SATISFIED.
+2. **Discrimination** — on each planted-defect case, ~~the planted criterion is faulted and the floor is not SATISFIED~~
+   ⭑ *ruled 2026-09-25 (`REG-D-080`, the pass bar is the right verdict):* the floor reaches the oracle's disposition,
+   REJECTED. Which criterion it faults is REPORTED against the oracle's `faulted` list, and is never a material failure.
 3. **Clean acceptance** — on each clean case (with a TRUE reasoning account), SATISFIED.
 4. **Name invariance** — renamed copies reach the same outcome.
 5. **Reproducibility** — repeated runs reach the same outcome.
@@ -653,13 +655,13 @@ withholds, and thresholds are oracle content for the sponsor to confer (Q7).
 **But not silent.** `REG-Q-025` binds *"escalate material failure"*, and `DOC-004:241` forbids a prompt change that
 *"silently degrade[s] behavior"*. So each of the following is a **material failure that must be escalated as a
 register finding**, judged against the current oracle, with no weighting invented:
-- **absolute:** a planted defect not faulted; a clean case not SATISFIED; a verdict that changes with the name; a
+- **absolute:** ~~a planted defect not faulted~~ a planted defect whose disposition is not the oracle's (`REG-D-080`); a clean case not SATISFIED; a verdict that changes with the name; a
   Boundedness failure;
 - **transitions**, evaluated **only when a run repeats a candidate** — keyed on (provider, model label, served-model
-  digest) — against that candidate's previous run, and only for cases whose content is unchanged: a planted criterion
-  that was faulted and now is not; a clean case that was SATISFIED and now is not; a well-formed reply that now counts a
-  malformation class; repetitions that agreed and now disagree; a reply within the bound that is now past it; an
-  answered criterion now `UNABLE_TO_DETERMINE`. A prompt change covered by a DIFFERENT candidate from last time is
+  digest) — against that candidate's previous run, and only for cases whose content is unchanged: ~~a planted criterion
+  that was faulted and now is not;~~ (a planted criterion no longer faulted is REPORTED, not escalated — `REG-D-080`) a clean case that was SATISFIED and now is not; a well-formed reply that now counts a
+  malformation class; repetitions that agreed and now disagree; a reply within the bound that is now past it; ~~an
+  answered criterion now `UNABLE_TO_DETERMINE`~~ (an answered criterion now `UNABLE_TO_DETERMINE` while the verdict holds is REPORTED, not escalated — `REG-D-080`: criterion-level classes that do not change the verdict are informational). A prompt change covered by a DIFFERENT candidate from last time is
   therefore not compared for degradation; the report says so. Changes of served template, server version or options are
   reported as confounds, not as a new candidate; added and removed cases are listed; and for a served template that
   injects the date, the report says so, because `REG-F-429` measured verdicts moving across a day boundary with nothing
