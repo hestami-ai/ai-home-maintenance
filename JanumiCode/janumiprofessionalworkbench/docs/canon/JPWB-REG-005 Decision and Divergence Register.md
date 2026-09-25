@@ -37472,7 +37472,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-449 — the graph arm's "clean" case is rejected by the frontier candidate in 7 of 8 evaluations, on one engineering ground: the known soft-clay report reaches neither the options study nor the independent check
 
-**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the first qualification run, `qr-2026-09-24-agy-gemini-3.1-pro-high`). **Status:** ⚠ **OPEN — most likely a defect in the CASE, not the reviewer; the remedy, case set v2, is an oracle change and awaits the sponsor (`DOC-004` §7.6).**
+**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the first qualification run, `qr-2026-09-24-agy-gemini-3.1-pro-high`). **Status:** ~~⚠ **OPEN — most likely a defect in the CASE, not the reviewer; the remedy, case set v2, is an oracle change and awaits the sponsor (`DOC-004` §7.6).**~~ ⚠ **OPEN — the fix is AUTHORIZED by the sponsor, 2026-09-25:** *"1 - Fix flawed test case (REG-F-449) is approved"* (`REG-D-078`). It closes when case set v2 lands and the frontier candidate is re-measured on the corrected cases.
 
 - **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`, reviewer fingerprint `2b6ca158…`, case set v1 × 2 repetitions. 52 calls, all ANSWERED; no repair, no transport failure; median 28 s, maximum 51 s. `G-CLEAN` and its three renamed copies expect SATISFIED. Their standing is *"the author's claim"* (`REG-D-073`). **7 of their 8 evaluations are REJECTED** (VALID). `G-CLEAN-R2` is SATISFIED once and REJECTED once, which the check classes as VERDICT_CHANGES_WITH_NAME. Every other case's disposition is its oracle's: the graph arm's 18 planted evaluations are REJECTED and name their criterion; the work-product arm's clean case is SATISFIED 8 of 8.
 - **ONE GROUND, REPEATED.** Every rejection turns on the same fact of the case. The draft routes the geotechnical report, which records a 3 m soft-clay layer at the north abutment, to load analysis and design, but not to the structural-form options study or to the independent check. The reviewer files it under:
@@ -37487,7 +37487,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-450 — the frontier candidate REJECTS every planted work-product defect but does not reliably NAME the planted criterion: 14 of 18 evaluations, three cases unstable across repetitions
 
-**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the same run as `REG-F-449`). **Status:** ⚠ **OPEN — which criterion the reviewer names is unstable across repetitions; the verdicts are not. Whether §5.1's pass bar asks for the named criterion or the verdict is the sponsor's question.**
+**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the same run as `REG-F-449`). **Status:** ~~⚠ **OPEN — which criterion the reviewer names is unstable across repetitions; the verdicts are not. Whether §5.1's pass bar asks for the named criterion or the verdict is the sponsor's question.**~~ ⚠ **OPEN — the sponsor defers the pass-bar question to a second deployable candidate's measurement, 2026-09-25:** `devin` with `glm-5-3-flash-max` (GLM-5.3 Flash, Max effort; `REG-D-078`).
 
 - **WHAT WAS MEASURED.** All 18 of the work-product arm's planted evaluations (nine cases × 2) are REJECTED. 14 fault the planted criterion. The four that do not:
   - **`W-RR-03`:** the crowd load is applied over the central 20 m of a 40 m span; the oracle names RR-03, standing *"the author's claim"*. Both repetitions fault RR-06, and one also RR-07. This is the contest `REG-D-073` predicted when it downgraded this standing.
@@ -37500,7 +37500,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-075 — DELEGATED (`REG-D-071`): the reviewer fingerprint, `reviewer:qual:check`, `gate:tail`, and the first run's candidates — where the design left them open, and what they cannot see
 
-**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-3` + `J2-4`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for qualification from `J2-3`; sponsor confirmation owed.**
+**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-3` + `J2-4`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force for qualification from `J2-3`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-25 by the sponsor** — *"3 - Your delegated calls for REG-D-075, REG-D-076, and REG-D-077 are all approved."* (`REG-D-078`)
 
 - **THE FIRST RUN'S CANDIDATES.**
   - **Frontier (deployable):** `agy` with `gemini-3.1-pro-high`, set through `JPWB_JUDGE_MODEL` (`REG-D-052`: configured, never defaulted). It is the model of all seven stored live reviews (`REG-F-439` (2)).
@@ -37530,7 +37530,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-076 — `reviewer:qual:check` is the INTERIM CARRIER of the reviewer-qualification control (`DOC-004` §7.6)
 
-**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-4`). **Type:** DECISION — interim-carrier registration, **flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force until the platform hosts the control natively; sponsor confirmation owed.**
+**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-4`). **Type:** DECISION — interim-carrier registration, **flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force until the platform hosts the control natively; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-25 by the sponsor** — *"3 - Your delegated calls for REG-D-075, REG-D-076, and REG-D-077 are all approved."* ⚠ It stays an interim carrier until the platform hosts the control natively (`REG-D-078`).
 
 - **WHAT IT CARRIES.** The control that no reasoning reviewer is relied on by a browser-test lane until it is qualified. Every current case must be measured under today's reviewer fingerprint, the measurement must reproduce, and every material failure must be escalated to an open finding (§5.6).
 - **WHERE IT RUNS.** `bun run reviewer:qual:check`, as `gate:tail`'s first step, at the end of `gate:fast`. It executes the versioned artifacts the control is made of: the case set, oracles and the append-only record under `docs/tracking/reviewer-qualification/`, the fingerprint function, and the check core.
@@ -37539,7 +37539,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-451 — the local candidate, `gpt-oss:20b`, is NOT qualified: it passes 6 of 18 planted defects as SATISFIED, rejects only 20 of 36 planted evaluations, and names the planted criterion in 12 — repeatably
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-4`, the first qualification run's local candidate, `qr-2026-09-25-ollama-gpt-oss-20b`). **Status:** ⚠ **OPEN — the candidate fails qualification. It was never deployable (`REG-D-075`), so nothing relies on it; recorded so the measurement stands.**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-4`, the first qualification run's local candidate, `qr-2026-09-25-ollama-gpt-oss-20b`). **Status:** ~~⚠ **OPEN — the candidate fails qualification. It was never deployable (`REG-D-075`), so nothing relies on it; recorded so the measurement stands.**~~ ✅ **CLOSED 2026-09-25 by the sponsor's pivot away from Ollama for the reviewer role, for now** (`REG-D-078`). The measurement stands as recorded; no local candidate is pursued.
 
 - **WHAT WAS MEASURED.** Candidate: `gpt-oss:20b` on this host's Ollama 0.34.2, with `REG-F-427`'s pinned options (think medium, temperature 0, seed 42, num-ctx 131072). Server offset −04:00; unloaded before every call and after the run (`/api/ps` → `"models":[]`). Reviewer fingerprint `2b6ca158…`, case set v1 × 2. 54 calls, no transport failure, median 18 s. `W-CLEAN-R3`'s first reply did not parse in both repetitions (NOT_RETAINED, UNPARSEABLE); each repair answered.
 - **CLEAN CASES:** SATISFIED 16 of 16 on both arms. That includes the graph case the frontier candidate rejects 7 of 8 (`REG-F-449`). Given the next bullet, that agreement is not evidence the case is clean.
@@ -37554,7 +37554,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-077 — DELEGATED (`REG-D-071`): how the thirteen specs go green on the declared stand-in, and how the lane control holds them to it — and what the control cannot see
 
-**Decided 2026-09-25** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J1-3`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for the default lane from `J1-3`; sponsor confirmation owed.**
+**Decided 2026-09-25** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J1-3`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force for the default lane from `J1-3`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-25 by the sponsor** — *"3 - Your delegated calls for REG-D-075, REG-D-076, and REG-D-077 are all approved."* (`REG-D-078`)
 
 - **THE GREEN.** The browser suite is 95 of 95, with the thirteen `REG-D-067` reds among them, each on its first attempt. The registrations are exactly the roadmap's set, in each test body after the reset, with the PWA id read from the store:
   - **graph arm:** `agent-retention`, `agent-sse` tests 1 and 3, `agent-ui`, `assurance-floor-waiver` ×3, both `execution-agent-authored-binding` tests, `graph-validation`, `pwa-coherence`, and `assurance-floor`'s clean and dead-end tests;
@@ -37596,3 +37596,17 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY — most likely, not proven.** The arrangement gives the child a 500 ms deadline and relies on its own note: *"The child exits in about 70ms on this host"*. The product sets `timedOut` from whether the child was still running when the deadline passed. On a loaded host, starting a node child can take longer than 500 ms, and then `timedOut: true` is the TRUE observation, not a fabricated one. The test cannot tell which case it got, because it does not observe the child's exit time.
 - **REMEDY — owed, not taken here.** The arrangement must make the deadline fall AFTER an observed exit, for example by driving the deadline from the child's recorded exit rather than from wall time. Raising the timeout would only move the flake, and is refused. Until then a red here on a loaded run is re-run, and the re-run is recorded.
 - **SEARCHED BEFORE FILING.** The register for `child-process-runner` (0), `HOLDS_THE_PIPES` (0) and `NOT a timeout` (0).
+
+### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
+
+**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; the case set v2 fix and the devin candidate's qualification run are owed (`JAN-CRITREAD`).**
+
+- **THE SPONSOR'S WORDS, verbatim, in the order given:**
+  1. *"1 - Fix flawed test case (REG-F-449) is approved"*
+  2. *"2 - In relation to pass bar (REG-F-450) let's evaluate if a different model can do the work. We will use devin CLI which should be setup for the GLM 5.3 Flash model with Effort set to Max and pivot away from Ollama for now for the assurance policies responsibility if that's what you're asking about. This GLM 5.3 Flash Max effort model should be more capable in this role."*
+  3. *"3 - Your delegated calls for REG-D-075, REG-D-076, and REG-D-077 are all approved."*
+- **WHAT EACH MEANS FOR THE BUILD.**
+  1. `REG-F-449`'s remedy is authorized. That is the separately authorized oracle change `DOC-004` §7.6 requires. Case set v2 routes the geotechnical report to the options study and the independent check, and regenerates the renamed copies; the frontier candidate is then re-measured on the corrected cases.
+  2. The next deployable candidate is `devin` with `glm-5-3-flash-max`, the model id devin's `models list` gives for *"GLM-5.3 Flash Max"*. Devin encodes the effort in the id, so the recorded model label carries it. It is run through the product's own `devinPrint`, with the model configured through `JPWB_ASSURANCE_MODEL` (`REG-D-052`), never defaulted. The pass-bar question in `REG-F-450` waits on its measurement. No further local Ollama candidate is run for the reviewer role, for now; `REG-F-451` closes on that.
+  3. `REG-D-075`, `REG-D-076` and `REG-D-077` are confirmed.
+- **MADE WITH THIS ENTRY.** The statuses of `REG-D-075`, `REG-D-076`, `REG-D-077`, `REG-F-449`, `REG-F-450` and `REG-F-451` are struck in place and restated with the words above.
