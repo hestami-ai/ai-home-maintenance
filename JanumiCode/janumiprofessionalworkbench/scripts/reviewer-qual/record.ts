@@ -146,6 +146,13 @@ export interface CandidateIdentity {
 	/** Whether the served template injects the date (`REG-F-429`: verdicts moved across a day boundary). */
 	readonly templateInjectsDate: boolean | null;
 	readonly serverVersion: string | null;
+	/**
+	 * ⭐ `JAN-CRITREAD` J2-3 — Ollama only: the SERVER's UTC offset (`±HH:MM`), read from `/api/ps`'s `expires_at`
+	 * when the run began (`REG-D-074`). A CALL's served clock is the `Date` header, which is GMT; this is what places it
+	 * on the server's own calendar, where a template's `currentDate` is (`REG-F-429`), so the check can hold a run to
+	 * one server-clock day (§5.3).
+	 */
+	readonly serverUtcOffset: string | null;
 	readonly options: Readonly<Record<string, string | number | boolean>>;
 	readonly bounds: {
 		readonly wallClockMs: number;
@@ -364,6 +371,42 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const FINDING = /^REG-F-\d{3,}$/;
 
+// ── the server's calendar (§5.3; `REG-F-429`) ───────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ `JAN-CRITREAD` J2-3 — A UTC OFFSET A SERVER CAN ACTUALLY KEEP, as `/api/ps` writes one (`Z` normalised to
+ * `+00:00`): from −12:00 to +14:00, the minutes 00, 30 or 45. `-00:00` is refused — RFC 3339 spells an UNKNOWN offset
+ * that way, and an unknown offset is what the field exists to rule out. Minutes east of UTC, or undefined.
+ */
+export function utcOffsetMinutes(offset: string): number | undefined {
+	const m = /^([+-])(\d{2}):(00|30|45)$/.exec(offset);
+	if (!m || offset === '-00:00') return undefined;
+	const minutes = (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+	return minutes >= -12 * 60 && minutes <= 14 * 60 ? minutes : undefined;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** An HTTP `Date` header (IMF-fixdate, always GMT) as epoch milliseconds, or undefined. */
+function httpDate(value: string): number | undefined {
+	const m = /^[A-Z][a-z]{2}, (\d{2}) ([A-Z][a-z]{2}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/.exec(value);
+	const month = m ? MONTHS.indexOf(m[2]!) : -1;
+	if (!m || month < 0) return undefined;
+	return Date.UTC(Number(m[3]), month, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6]));
+}
+
+/**
+ * ⭐ THE SERVER'S OWN CALENDAR DATE (`YYYY-MM-DD`) for a served clock — the `Date` header a CALL records, which is GMT,
+ * shifted by the offset its run recorded — or undefined when either cannot be read. Where a template's `currentDate`
+ * lives (`REG-F-429`). ONE function, so the runner that stops a run at the server's midnight and the check that
+ * discards a run straddling it cannot disagree about where midnight is.
+ */
+export function serverDayOf(serverClock: string, offset: string): string | undefined {
+	const ms = httpDate(serverClock);
+	const minutes = utcOffsetMinutes(offset);
+	if (ms === undefined || minutes === undefined) return undefined;
+	return new Date(ms + minutes * 60_000).toISOString().slice(0, 10);
+}
+
 const str =
 	(pattern?: RegExp, what = 'a string'): Check =>
 	(v, at) =>
@@ -510,6 +553,11 @@ const candidate: Check = (v, at) => {
 		servedModelfileSha256: nullable(str(SHA256, 'a sha256')),
 		templateInjectsDate: nullable(bool),
 		serverVersion: nullable(str()),
+		serverUtcOffset: nullable((o, a) =>
+			typeof o === 'string' && utcOffsetMinutes(o) !== undefined
+				? []
+				: [`${a}: not a UTC offset (±HH:MM, from -12:00 to +14:00, minutes 00, 30 or 45)`]
+		),
 		options: (o, a) =>
 			isObject(o)
 				? Object.entries(o).flatMap(([k, x]) =>
@@ -544,7 +592,8 @@ const candidate: Check = (v, at) => {
 		'servedTemplateSha256',
 		'servedModelfileSha256',
 		'templateInjectsDate',
-		'serverVersion'
+		'serverVersion',
+		'serverUtcOffset'
 	]) {
 		if (transport === 'ollama' && v[key] === null)
 			problems.push(`${at}.${key}: an ollama candidate records what it was served`);

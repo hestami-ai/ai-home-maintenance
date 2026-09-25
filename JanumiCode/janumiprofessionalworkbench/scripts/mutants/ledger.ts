@@ -9285,8 +9285,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "J21-M7-the-instruction-is-cut-to-fit",
 		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
-		find: "const USER_INTENT_MAX = 4_000;",
-		replace: "const USER_INTENT_MAX = 400; // MUTANT: the instruction is cut to fit",
+		find: "USER_INTENT_MAX: 4_000,",
+		replace: "USER_INTENT_MAX: 400, // MUTANT: the instruction is cut to fit",
 		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
 		why: "PROMISE: no case is truncated to fit, so an oracle is never about bytes the reviewer was not shown — a planted defect in a truncated slice would score as the reviewer's miss. The budget keeps a prompt under the limit by CUTTING, so the 28,000 limb alone cannot see this; the seen-whole limb does. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-cases.test.ts: '⛔ SEEN WHOLE — no slice of any case is truncated to fit, so no oracle is about bytes the reviewer did not see' (AssertionError: expected 'G-CLEAN: a slice is truncated\\nG-CLEA…' to be '' // Object.is equality)",
 		source: "JAN-CRITREAD J2-1 — the case builders and case set version one: one pure module builds what the reasoning reviewer is handed, both floors build through it, and the reviewer-qualification cases v1 with their separately versioned oracles (ROADMAP-what-the-tests-prove.md J2-1; DESIGN-what-the-tests-prove.md §5.2; REG-D-071; REG-D-072 D13, D14)"
@@ -9396,7 +9396,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\trefuseProgramOverrides(deps.env);\n",
 		replace: "\t\trefuseProgramOverrides({}); // MUTANT: the CLI does not refuse the overrides itself\n",
 		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
-		why: "PROMISE (REG-D-072 D12): the CLI refuses JPWB_AGY_BIN before it loads the runner, the validator or a transport (exit 2) — the runner module imports the validator, which imports agy-cli.ts, so loading it is already the capture. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⛔ under --conditions=source it gets past D11, and refuses JPWB_AGY_BIN before loading a transport (D12)' (AssertionError: reviewer-qual — REFUSED: the reviewer fingerprint (§5.5) lands in J2-3. A RUN line must carry it, the scoring digest and the case-set digest, or the check could never say whether the run covers today’s reviewer — so no run i)",
+		why: "PROMISE (REG-D-072 D12): the CLI refuses JPWB_AGY_BIN before it loads the runner, the validator or a transport (exit 2) — the runner module imports the validator, which imports agy-cli.ts, so loading it is already the capture. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⛔ the CLI refuses JPWB_AGY_BIN ITSELF, before it computes a fingerprint — which loads the validator, and with it agy-cli (D12)' (AssertionError: refused before the fingerprint was computed: expected 1 to be +0 // Object.is equality)",
 		source: "JAN-CRITREAD J2-2 — the reviewer-qualification runner, its transports and its record: the real validator behind a transport at its print seam, scored through composeAssuranceOutcome over the Reasoning Review reference alone; agyPrint and devinPrint deployable, a harness Ollama transport not; D11 running from source, D12 the refusals and the argv assertion; retention; the append-only NDJSON record and its closed vocabulary (ROADMAP-what-the-tests-prove.md J2-2; DESIGN-what-the-tests-prove.md §5.3, §5.4; REG-D-072 D11, D12, D14; REG-F-427; REG-F-428); and the review's decisions 1-8, applied under delegation: own-property closed keys, retention of only the retained form of one JSON object, harness faults never the candidate's, devin held to its label, a signal not a bound, a pre-contact ollama refusal, the CLI's arguments and per-line check, and the recorded evaluator fed back on replay"
 	},
 	{
@@ -9594,7 +9594,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\tif (/\\/packages\\/rph-assurance\\/src\\/index\\.ts$/.test(resolved.replace(/\\\\/g, '/')))\n",
 		replace: "\tif (/\\/packages\\/rph-assurance\\/(src|dist)\\/index\\.(ts|js)$/.test(resolved.replace(/\\\\/g, '/'))) // MUTANT: dist is accepted\n",
 		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
-		why: "PROMISE (REG-D-072 D11): the runner runs from SOURCE — under bare bun every @janumipwb package resolves to its built dist, stale after any source edit, so a run would measure the last build's reviewer under today's fingerprint; the CLI refuses (exit 2) and names D11. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-transports.test.ts: '⭐ the source check itself — a package resolved to src passes, to dist is refused' (AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string); '⛔ under bare bun the packages resolve to built dist, and the CLI refuses to run' (AssertionError: reviewer-qual — REFUSED: the reviewer fingerprint (§5.5) lands in J2-3. A RUN line must carry it, the scoring digest and the case-set digest, or the check could never say whether the run covers today’s reviewer — so no run i)",
+		why: "PROMISE (REG-D-072 D11): the runner runs from SOURCE — under bare bun every @janumipwb package resolves to its built dist, stale after any source edit, so a run would measure the last build's reviewer under today's fingerprint; the CLI refuses (exit 2) and names D11. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-transports.test.ts: '⭐ the source check itself — a package resolved to src passes, to dist is refused' (AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string); '⛔ under bare bun the packages resolve to built dist, and the CLI refuses to run' (AssertionError: 60 | \t\treturn (await res.json()) as Record<string, unknown>;)",
 		source: "JAN-CRITREAD J2-2 — the reviewer-qualification runner, its transports and its record: the real validator behind a transport at its print seam, scored through composeAssuranceOutcome over the Reasoning Review reference alone; agyPrint and devinPrint deployable, a harness Ollama transport not; D11 running from source, D12 the refusals and the argv assertion; retention; the append-only NDJSON record and its closed vocabulary (ROADMAP-what-the-tests-prove.md J2-2; DESIGN-what-the-tests-prove.md §5.3, §5.4; REG-D-072 D11, D12, D14; REG-F-427; REG-F-428); and the review's decisions 1-8, applied under delegation: own-property closed keys, retention of only the retained form of one JSON object, harness faults never the candidate's, devin held to its label, a signal not a bound, a pre-contact ollama refusal, the CLI's arguments and per-line check, and the recorded evaluator fed back on replay"
 	},
 	{
@@ -9812,5 +9812,356 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/mutant-apply.test.ts"],
 		why: "PROMISE: a mutant's replacement is inserted exactly as written. With a string replacement, `$'`, `$&`, `$`` and `$$` are patterns: J22-M25's `key.startsWith('$')` spliced the rest of record.ts into the line and reported NO_COMPILE for a text that compiles. OBSERVED: KILLED — 4 test(s) red in mutant-apply.test.ts: '⛔ $' is inserted literally — not the text after the match' (AssertionError: expected 'before x aftery after' to be 'before x$\\'y after' // Object.is equality); '⛔ $` is inserted literally — not the text before the match' (AssertionError: expected 'before xbefore y after' to be 'before x$`y after' // Object.is equality)",
 		source: "JAN-CRITREAD J2-2 — the mutation runner applies a replacement literally (J22-M25's `$'` was expanded)"
+	},
+	{
+		id: "J23-M1-the-process-result-branch-is-not-probed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\tfor (const probe of FINGERPRINT_PROBES)\n",
+		replace: "\tfor (const probe of FINGERPRINT_PROBES.filter((p) => !p.id.startsWith('P-'))) // MUTANT: the process-result branches are not probed\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5; ROADMAP J2-3 row 1, a prompt branch): the fingerprint moves when a branch of prompt assembly moves, including a branch no qualification case exercises — the process-result framing, which version one has no case for (REG-D-072 D17). A probe set that skips it lets a change to that framing reach the product with the fingerprint unmoved, and the check green over a reviewer nobody re-measured. OBSERVED: KILLED — 4 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a PROMPT BRANCH — the process-result framing, which no case exercises: the probes move, no case prompt does' (AssertionError: the reviewer fingerprint moves: expected '816d6d7f79df02d0208487bc8a2f2cd393421…' not to be '816d6d7f79df02d0208487bc8a2f2cd393421…' // Object.is equality); '⭐ every framing, every observation kind and its absent report, the rationale both ways, narration, prior gaps, the subject hash' (AssertionError: expected 10 to be 17 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M2-the-oversize-probes-are-not-hashed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tprobes: sha256(JSON.stringify([...probePrompts].map(([id, p]) => [id, sha256(p)]))),\n",
+		replace: "\t\tprobes: sha256(JSON.stringify([...probePrompts].filter(([id]) => !id.includes('OVERSIZE')).map(([id, p]) => [id, sha256(p)]))), // MUTANT: the oversize probes are not hashed\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5; ROADMAP J2-3 row 1, an oversize probe): a change that only an input over its budget reaches — how a cut is declared, how the three content caps combine — moves the fingerprint. The qualification cases are seen whole, so no case prompt carries a cut; without the oversize-together probes the budget arithmetic could change with every fingerprint unmoved. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ an OVERSIZE PROBE — a change only an input over its budget reaches (how a cut is declared): the probes move' (AssertionError: the reviewer fingerprint moves: expected 'ae395a0f503612d754bc48aa366e15f896043…' not to be 'ae395a0f503612d754bc48aa366e15f896043…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M3-the-budget-names-are-hashed-not-its-values",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tbudget: sha256(canonicalJson(seams.budget)),\n",
+		replace: "\t\tbudget: sha256(canonicalJson(Object.keys(seams.budget))), // MUTANT: the budget names are hashed, not their values\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: \"the excerpt budget constants themselves, hashed explicitly\"; ROADMAP J2-3 row 1, a budget constant): CONTENT_MAX binds only when the scaffolding is under 2,000 characters, which no probe can make it, so a change to it reaches no materialized prompt. Only the explicit hash of the values sees it; hashing the names would let any limit move unseen. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a BUDGET CONSTANT — hashed as itself, so CONTENT_MAX moves the fingerprint though no probe can reach it' (AssertionError: the reviewer fingerprint moves: expected 'f544bba067bc2bcf510d0cad39b712d77415f…' not to be 'f544bba067bc2bcf510d0cad39b712d77415f…' // Object.is equality); '⛔ a COMMENT-ONLY edit moves nothing — on a disposable copy, with a behaviour edit to the same copy as its control' (AssertionError: through the budget component: expected '3f655c551eaf4bbe16e2515c0359337a2ab93…' not to be '3f655c551eaf4bbe16e2515c0359337a2ab93…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M4-only-the-rendered-criterion-fields-are-hashed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tcriteria: sha256(canonicalJson({ criteria: seams.criteria, independence: seams.independence })),\n",
+		replace: "\t\tcriteria: sha256(canonicalJson({ criteria: seams.criteria.map((c) => [c.id, c.description]), independence: seams.independence })), // MUTANT: only the fields the rubric renders are hashed\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: \"the seed criteria as whole objects — id, description, severityIfNotMet (it decides mandatoriness) and evaluationMethod\"; ROADMAP J2-3 row 1, a criterion field): every field of a seed criterion moves the fingerprint, the ones no prompt renders included. Hashing only what the rubric renders lets evaluationMethod, and any field the corpus does not happen to exercise, change the reviewer definition unseen. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a CRITERION FIELD — every field of a seed criterion, whole, the ones no prompt or score reads included' (AssertionError: name: the reviewer fingerprint moves: expected '8ee27a722397a5ff8180257f7e9e94306b1aa…' not to be '8ee27a722397a5ff8180257f7e9e94306b1aa…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M5-the-corpus-outcomes-are-not-hashed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\toutcomes.push([entry.id, scored, e.calls.length, e.calls.map((c) => c.malformations)]);\n",
+		replace: "\t\toutcomes.push([entry.id, scored.resultClass, e.calls.length, e.calls.map((c) => c.malformations)]); // MUTANT: only the result class is hashed, not the disposition or the criteria\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: the scoring digest hashes the outcomes \"as tuples of (aggregate, per-policy disposition, per-criterion outcome)\"; ROADMAP J2-3 row 1, a scoring rule): a change to how a reply is scored moves the scoring digest, and with it the fingerprint — which is what makes a RESCORED line the owed discharge. A digest blind to the per-criterion outcomes lets the scoring change with the digest unmoved, and limb 2 then compares a changed path against records it calls current. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a SCORING RULE — a fault now scored PARTIALLY_MET: the scoring digest moves, no prompt does' (AssertionError: the reviewer fingerprint moves: expected '156a9c666f28e4302dad60fc5bd3868e3bcfd…' not to be '156a9c666f28e4302dad60fc5bd3868e3bcfd…' // Object.is equality); '⭐ the review’s attacks move it, on a copy — E5, the model’s own `stipulated` honoured; E6, a duplicate key no longer detected' (AssertionError: E5: the scoring digest moves: expected 'f83666b5ceaace48fc1c08f7757ae6fb9e698…' not to be 'f83666b5ceaace48fc1c08f7757ae6fb9e698…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M6-the-repair-instruction-is-not-captured",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\t\t\trepair.startsWith(first) ? { appended: repair.slice(first.length) } : { prompt: sha256(repair) }\n",
+		replace: "\t\t\t\t{ appended: repair.length > 0 } // MUTANT: the repair instruction is not captured\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: \"one reply that fails the first parse, with the repair prompt captured\"; ROADMAP J2-3 row 1, the repair prompt): the instruction a failed first parse draws is part of the reviewer definition — every evaluation that repaired sent it. A fingerprint that does not capture it lets the repair prompt change while every repaired record still reads as current. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ the REPAIR PROMPT — the instruction a failed first parse draws: the scoring digest moves' (AssertionError: the reviewer fingerprint moves: expected '46e902f759742306781755a7094ec6b6675ef…' not to be '46e902f759742306781755a7094ec6b6675ef…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M7-the-fingerprint-hashes-a-whole-source-file",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tbudget: sha256(canonicalJson(seams.budget)),\n",
+		replace: "\t\tbudget: sha256(canonicalJson(seams.budget) + readFileSync(new URL('../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts', import.meta.url), 'utf8')), // MUTANT: the fingerprint hashes a whole source file\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: the fingerprint is \"what decides a verdict, at the grain of behaviour\"; ROADMAP J2-3 row 2): a comment decides no verdict and moves no fingerprint. A fingerprint that hashes source text would move on every comment, and every move owes a re-measurement or a re-stamp (§5.6 limb 1) — the check would be red on edits that change nothing, and a red that means nothing is soon ignored. The guard is measured on a disposable copy of the tree, with a behaviour edit to the same copy as its control. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-fingerprint.test.ts: '⛔ a COMMENT-ONLY edit moves nothing — on a disposable copy, with a behaviour edit to the same copy as its control' (AssertionError: a comment-only edit: expected { …(4) } to deeply equal { …(4) }); '⭐ the review’s attacks move it, on a copy — E5, the model’s own `stipulated` honoured; E6, a duplicate key no longer detected' (AssertionError: E5: budget: expected '0cd85fb63e49d3f5f6244f9d480032462d1a5…' to be 'af5efbd4c3c7d9f373aab0606b7fe53cb31af…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M8-the-prompt-cuts-the-intent-past-the-budget",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\tconst userIntent = excerpt(input.prompt, USER_INTENT_MAX);\n",
+		replace: "\tconst userIntent = excerpt(input.prompt, USER_INTENT_MAX + 1); // MUTANT: the prompt obeys an intent limit the budget object does not state\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (ROADMAP J2-3: \"the budget constants (exported as one frozen object)\"; DESIGN §5.5: \"the excerpt budget constants themselves, hashed explicitly\"): the budget the fingerprint hashes IS the budget judgePrompt obeys. Since J2-3's second round the object is the only place a limit is written, and the prompt reads each through one destructuring of it; a use site that cuts the instruction one character past USER_INTENT_MAX obeys a limit the hashed object does not state, so a later change there would move the prompts while the budget component stood still. The per-limit behavioural row measures every limit a probe can reach against the object's value. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ each framing has an OVERSIZE-TOGETHER probe that cuts every slice at once, reaching the content caps a probe can reach' (AssertionError: the instruction is cut at USER_INTENT_MAX: expected 4014 to be 4013 // Object.is equality); '⭐ every limit a probe can reach cuts exactly where the budget object says — intent, rubric, prior gaps, rationale, narration, the whole prompt' (AssertionError: G-OVERSIZE-ALL: the intent, at USER_INTENT_MAX: expected 4014 to be 4013 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M9-limb-1-a-run-under-any-fingerprint-covers",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tfor (const r of counted.filter((q) => q.run.reviewerFingerprint === ctx.F))\n",
+		replace: "\tfor (const r of counted) // MUTANT: a run under ANY fingerprint covers today's cases\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 1): every current case is MEASURED in a RUN, or a RESCORED record, carrying TODAY's fingerprint. A run under an earlier fingerprint measured a different reviewer definition; counting it would keep the check green across a change to the prompt, the criteria or the scoring with nothing re-measured and nothing re-stamped. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ a run under an EARLIER fingerprint covers nothing today — and says a RESCORED record would discharge a scoring-only move' (AssertionError: expected '' to contain '3 of 3 current case(s) are not MEASUR…'); '⭐ a SCORING-ONLY move is discharged by RESCORED lines — re-derived from the recorded spans, with no model call' (AssertionError: expected '' to contain '3 of 3')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M10-limb-2-reproduction-compares-the-verdict-only",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "const sameOutcome = (a: ScoredOutcome, b: ScoredOutcome) => canonicalJson(a) === canonicalJson(b);\n",
+		replace: "const sameOutcome = (a: ScoredOutcome, b: ScoredOutcome) => a.disposition === b.disposition; // MUTANT: reproduction compares the verdict, not the criteria\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 2): each re-scorable answer span, re-scored through today's path, reproduces the outcome recorded at run time — the per-criterion outcomes, not only the verdict. A change that turns a judged criterion into an unjudged one without moving the fingerprint is a real non-reproduction the verdict alone does not show. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record under today’s fingerprint that does not re-score to its run-time outcome is red, naming the case' (AssertionError: expected '' to contain 'run qr-repro-1: G-RR-04#1 — re-scored…'); '⭐ a SUPERSEDED line naming a record that really fails reproduction strikes it — and the struck record stops counting for coverage' (AssertionError: expected 'runs.ndjson:5: SUPERSEDED names qr-re…' to be '' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M11-limb-3-an-escalation-cites-every-case-of-its-record",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\t\t\te.line.runId === id && (e.line.caseIds ?? []).includes(caseId) && unescalatable(ctx.i, e.line.finding) === undefined\n",
+		replace: "\t\t\t\te.line.runId === id && (e.line.caseIds ?? []).length > 0 && unescalatable(ctx.i, e.line.finding) === undefined // MUTANT: an escalation of any case of a record cites every failure in it\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 3; §5.4 ESCALATION: \"(run id, case ids) → the register finding\"): every material failure has an ESCALATION line citing a finding FOR IT. An escalation of one case clearing every failure in the run would let a single filing write up failures nobody looked at. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ a SUPERSEDED line is refused while the record it names has an un-cited material failure' (AssertionError: one of two cited: still refused: expected '' to contain 'which still has an un-cited'); '⛔ a planted defect not faulted is red until an ESCALATION line cites a finding the register holds' (AssertionError: an escalation of ANOTHER case of the run cites nothing here: expected '' to contain 'run qr-esc-1: G-RR-04 — PLANTED_DEFEC…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M12-limb-3-reads-only-todays-records",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tfor (const r of ctx.p.runs.values())\n",
+		replace: "\tfor (const r of [...ctx.p.runs.values()].filter((q) => q.run.reviewerFingerprint === ctx.F)) // MUTANT: limb 3 reads only the records under today's fingerprint\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6: \"Every record not SUPERSEDED is in its population, whatever fingerprint it carries — so whether a failure has been written up is a property of the record that holds it\"; ROADMAP J2-3 row 3: \"an un-cited failure stays red across a fingerprint move\"): a failure found under one definition is not retired by moving to the next. Read only under today's fingerprint, limb 3 would let a change to the reviewer, or a re-run, discard every un-cited failure the earlier run found (design round-3 A3-1). OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ an UN-CITED failure stays red across a fingerprint move — every record is in the population, whatever it carries' (AssertionError: expected '' to contain 'run qr-move-1: G-RR-04 — PLANTED_DEFE…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M13-a-reproducing-record-may-be-struck",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (!repro.has(record))\n",
+		replace: "\tif (!repro.has(record) && record === '') // MUTANT: a record that reproduces may be struck\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 2: a SUPERSEDED line \"which the check accepts only if the named record really fails this limb\"; ROADMAP J2-3 row 3): records are struck only for a real non-reproduction. A SUPERSEDED line accepted for a record that reproduces would strike a measurement that stands, and with it the coverage and escalation it carries. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ a SUPERSEDED line naming a record that REPRODUCES is refused' (AssertionError: expected '' to contain 'SUPERSEDED names qr-fine-1, which rep…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M14-a-rescored-line-covers-nothing",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\tcovered.add(x.line.caseId);\n",
+		replace: "\t\t// MUTANT: a RESCORED line covers nothing\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 1: \"a scoring-only move (every case prompt unchanged) is discharged by a RESCORED record, re-derived from the recorded spans with no model call\"; ROADMAP J2-3 row 3): model calls are owed only for what actually changed. Without the discharge every scoring change owes a paid frontier run of the whole case set. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-check.test.ts: '⭐ a SCORING-ONLY move is discharged by RESCORED lines — re-derived from the recorded spans, with no model call' (AssertionError: expected [ { limb: 'COVERAGE', …(1) } ] to deeply equal []); '⛔ a RESCORED line re-stamping an evaluation whose prompt has changed is refused — that case owes a model call' (AssertionError: expected '3 of 3 current case(s) are not MEASUR…' to contain '1 of 3 current case(s) are not MEASUR…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M15-a-run-may-straddle-a-server-clock-day",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (days.size <= 1) return undefined;\n",
+		replace: "\tif (days.size <= 2) return undefined; // MUTANT: a run may straddle a server-clock day\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.3: \"a run must finish within one server-clock day\"; REG-F-429: gpt-oss's verdicts moved on 3 of 4 prompts across the server's midnight with nothing else changed; REG-D-074: the offset is observable in /api/ps): a run whose calls fall on two of the server's calendar days measured a reviewer that is a function of (prompt, date), and counts for nothing. Admitted, its covering evaluations would mix two reviewers under one label. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ ONE SERVER-CLOCK DAY (REG-F-429) — an ollama run whose calls straddle the server’s midnight counts for nothing; within one day it covers' (AssertionError: expected '' to contain '3 of 3 current case(s) are not MEASUR…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M16-an-escalation-finding-is-not-looked-up",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (!i.findings.has(finding)) return `${finding}, which the register does not hold`;\n",
+		replace: "\t// MUTANT: an ESCALATION's finding is not looked up in the register\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-074 leaves the cross-file references to J2-3; DESIGN §5.4 ESCALATION: \"→ the register finding filed for it\"): an ESCALATION line cites a finding that exists. A citation of an entry nobody wrote clears nothing — a commit message naming an entry does not create one — and the record must say which reference dangles. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ a planted defect not faulted is red until an ESCALATION line cites a finding the register holds' (AssertionError: expected '' to contain 'ESCALATION cites REG-F-998, which the…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M17-a-run-id-declared-again-is-taken-silently",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (first) refuse(`${at}: RUN ${line.runId} is declared again — first at ${first.at}; a run id is used once across the record`);\n\telse p.runs.set(",
+		replace: "\tif (!first) p.runs.set(",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-074: cross-file references are J2-3's check): a run id is declared once across the whole record, not only within a file. Two RUN lines under one id in two files make every ESCALATION, RESCORED and SUPERSEDED line naming it ambiguous — which run was escalated, which re-stamped, which struck. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ each dangling or doubled reference is refused by name' (AssertionError: a run id in two files: expected '' to contain 'b.ndjson:1: RUN qr-ref-1 is declared …')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M18-a-red-check-is-hidden-by-green-browser-tests",
+		file: "scripts/gate-tail.ts",
+		find: "\treturn Math.max(0, ...codes);\n",
+		replace: "\treturn codes.at(-1) ?? 0; // MUTANT: only the last step's exit counts\n",
+		expectRed: ["verif/gate-tail.test.ts"],
+		why: "PROMISE (DESIGN §5.6: gate:tail \"exits non-zero if either failed — so an e2e red cannot skip the check, and a red check cannot hide the browser tests\"; ROADMAP J2-3 row 4): a red reviewer:qual:check fails the gate whatever the browser tests did. Taking only the last step's exit lets a green e2e run hide an uncovered reviewer or an un-cited failure. OBSERVED: KILLED — 4 test(s) red in gate-tail.test.ts: '⛔ a RED CHECK is not hidden by green browser tests — and does not stop them running' (AssertionError: expected +0 not to be +0 // Object.is equality); '⭐ the worse of two reds, and a step killed by a signal is red' (AssertionError: expected 1 to be 2 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M19-red-browser-tests-are-hidden-by-a-green-check",
+		file: "scripts/gate-tail.ts",
+		find: "\treturn Math.max(0, ...codes);\n",
+		replace: "\treturn codes[0] ?? 0; // MUTANT: only the first step's exit counts\n",
+		expectRed: ["verif/gate-tail.test.ts"],
+		why: "PROMISE (DESIGN §5.6; ROADMAP J2-3 row 4): red browser tests fail the gate whatever the check said. Taking only the first step's exit lets a green check hide every e2e red — the step gate:fast has always ended on. OBSERVED: KILLED — 4 test(s) red in gate-tail.test.ts: '⛔ RED BROWSER TESTS are not hidden by a green check' (AssertionError: expected +0 not to be +0 // Object.is equality); '⭐ the worse of two reds, and a step killed by a signal is red' (AssertionError: expected 1 to be 2 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M20-a-red-check-stops-the-browser-tests",
+		file: "scripts/gate-tail.ts",
+		find: "\tconst codes = steps.map((step) => run(step) ?? 1);\n",
+		replace: "\tconst codes: number[] = [];\n\tfor (const step of steps) if (codes.push(run(step) ?? 1) && codes.at(-1) !== 0) break; // MUTANT: a red step stops the ones after it\n",
+		expectRed: ["verif/gate-tail.test.ts"],
+		why: "PROMISE (DESIGN §5.6: \"Placed early, a red check would blind everything after it\"): both steps always run. A tail that stops at the first red would report the check and never run the browser tests, so the gate would say nothing about them for as long as the check stayed red — through the whole of J2-4 until the first run lands. OBSERVED: KILLED — 4 test(s) red in gate-tail.test.ts: '⛔ a RED CHECK is not hidden by green browser tests — and does not stop them running' (AssertionError: the browser tests still ran: expected [ '.:reviewer:qual:check' ] to deeply equal [ '.:reviewer:qual:check', …(1) ]); '⭐ the worse of two reds, and a step killed by a signal is red' (AssertionError: expected 1 to be 2 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M21-the-pin-never-follows-a-step-runner",
+		file: "verif/reviewer-qualification-sequencing.test.ts",
+		find: "\t\t\t\tif (!existsSync(file) || !readFileSync(file, 'utf8').includes('export const GATE_STEPS')) continue;\n",
+		replace: "\t\t\t\tif (file.length > 0) continue; // MUTANT: a step runner is never followed\n",
+		expectRed: ["verif/reviewer-qualification-sequencing.test.ts"],
+		why: "PROMISE (REG-D-072 D10: \"gate:tail is a runner whose step list is exported and read by the pin\"): the pin resolves gate:fast through a step runner's exported GATE_STEPS. reviewer:qual:check and e2e now sit behind gate:tail, so a resolver that stops at the runner reads the check as unreachable — and would redden every registration J1-3 makes even after the check and a deployable run exist, or, inverted, could never see the check leave. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-sequencing.test.ts: '⭐ CONTROL — the resolver reaches through gate:fast today: the check and the browser tests, through gate:tail’s exported steps' (AssertionError: gate:tail → reviewer:qual:check, from the root: expected false to be true // Object.is equality); '⭐ J2-3 — the check reached only through a step runner that EXPORTS its steps clears the pin; one that hides them does not' (AssertionError: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M22-the-run-line-carries-the-scoring-digest-as-its-fingerprint",
+		file: "scripts/reviewer-qual/run.ts",
+		find: "\t\treturn { reviewer: f.reviewer, scoring: f.scoring, caseSet: f.caseSet };\n",
+		replace: "\t\treturn { reviewer: f.scoring, scoring: f.scoring, caseSet: f.caseSet }; // MUTANT: the RUN line carries the scoring digest where the fingerprint belongs\n",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (DESIGN §5.4 RUN: \"the reviewer fingerprint and the case-set digest (§5.5)\"; ROADMAP J2-3: one fingerprint function shared by the check and the runner): a RUN line is stamped with the fingerprint the check computes for the same tree. Stamped with anything else, the first run would cover nothing, and the only way to learn it is the paid run itself. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — and records a RUN stamped with today’s fingerprint' (AssertionError: stamped with today’s fingerprint, computed from source: expected { Object (kind, recordVersion, ...) } to match object { kind: 'RUN', …(5) })",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M23-the-server-is-assumed-to-keep-utc",
+		file: "scripts/reviewer-qual/ollama-transport.ts",
+		find: "\t\treturn offset === 'Z' ? '+00:00' : offset;\n",
+		replace: "\t\treturn '+00:00'; // MUTANT: the server is assumed to keep UTC\n",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (REG-D-074: the server's UTC offset IS observable in /api/ps's expires_at; REG-F-429: the server keeps UTC−4, so its date changes at 04:00 UTC): the offset a run records is the server's own. Assumed UTC, the one-server-clock-day rule would place gpt-oss's midnight four hours wrong, and pass exactly the run REG-F-429 measured. OBSERVED: KILLED — 4 test(s) red in reviewer-qualification-transports.test.ts: '⭐ it identifies what it is served, NOT deployable, with the product’s bounds re-imposed' (AssertionError: expected { transport: 'ollama', …(12) } to deeply equal { transport: 'ollama', …(12) }); '⛔ it records the SERVER’s UTC offset (REG-F-429) from /api/ps after loading the model, unloads it again — and refuses to run without one' (AssertionError: expected '+00:00' to be '-04:00' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M24-an-ollama-run-need-not-record-the-offset",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\t\t'serverVersion',\n\t\t'serverUtcOffset'\n\t]) {\n",
+		replace: "\t\t'serverVersion'\n\t]) { // MUTANT: the served-facts rule forgets the offset\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (REG-D-074; DESIGN §5.3): a tracked Ollama RUN carries the server's UTC offset, or the check cannot place its calls on the server's calendar. A record that admits an Ollama RUN without it admits a run the one-day rule cannot judge. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ THE SERVER’S UTC OFFSET (REG-F-429) — an ollama candidate records it as ±HH:MM, and no other transport can see one' (AssertionError: expected '' to contain 'RUN.candidate.serverUtcOffset: an oll…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M25-the-tail-exit-never-reaches-the-process",
+		file: "scripts/gate-tail.ts",
+		find: "\tprocess.exitCode = runGateTail(GATE_STEPS, (step) => {\n",
+		replace: "\tvoid runGateTail(GATE_STEPS, (step) => { // MUTANT: the tail computes the worse exit and never hands it to the process\n",
+		expectRed: ["verif/gate-tail.test.ts"],
+		why: "PROMISE (DESIGN §5.6: gate:tail \"exits non-zero if either failed\"; ROADMAP J2-3 row 4; the adversarial review's VX-1): the SCRIPT's exit is the worse step's. runGateTail computing it is not enough — a script that never sets the process's exit code exits 0, and gate:fast's && then passes a red reviewer:qual:check and red browser tests alike. The executable is spawned from a mkdtemp copy whose two steps are stand-ins, so only the exit wiring is measured and neither real step can run. OBSERVED: KILLED — 3 test(s) red in gate-tail.test.ts: '⛔ a RED CHECK reaches the process — and the browser tests still ran' (AssertionError: gate:tail — bun run reviewer:qual:check); '⛔ RED BROWSER TESTS reach the process — and the check ran first' (AssertionError: gate:tail — bun run reviewer:qual:check)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M26-a-run-under-today-waives-the-acknowledgement",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (ctx.p.acknowledged.some((a) => discharging.has(a.line.reviewerFingerprint))) return undefined;\n",
+		replace: "\tif (counted.some((r) => r.run.reviewerFingerprint === ctx.F) || ctx.p.acknowledged.some((a) => discharging.has(a.line.reviewerFingerprint))) return undefined; // MUTANT: any run under today's fingerprint waives the line\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 1: a move only in the probe set \"reddens until an ACKNOWLEDGED line names the new fingerprint\"; the adversarial review's VX-2 and its attacks 1b/1c): the line is owed whatever runs exist under the new fingerprint. Re-running cases that never exercised a change confined to the probe set (the process-result arm, CONTENT_MAX, an unrendered criterion field) says nothing about it; a one-case run, or a full re-run with unchanged case prompts, must not discharge what the line exists to make someone state. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the ACKNOWLEDGED line is owed WHATEVER RUNS EXIST under the new fingerprint — a one-case run does not waive it, nor a full re-run (§5.6 limb 1)' (AssertionError: re-stamped, and one case re-run: expected '' to contain 'an ACKNOWLEDGED line naming 2b6ca1585…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M27-the-producers-provider-never-answers-in-the-corpus",
+		file: "scripts/reviewer-qual/scoring-corpus.ts",
+		find: "\t\t\treplies: [reportedBy(clean, SIBLING_MODEL_ID, CASE_PRODUCER_PROVIDER_ID)]\n",
+		replace: "\t\t\treplies: [reportedBy(clean, SIBLING_MODEL_ID, 'jpwb-fingerprint')] // MUTANT: the sibling model is reported under another provider\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.5: the scoring digest moves on any change between a reply and its recorded outcome; the adversarial review's E4): the plan's independence cannot change without moving the fingerprint. Only a reply reported by ANOTHER model of the producer's OWN provider tells DIFFERENT_MODEL from DIFFERENT_PROVIDER; with every reply under a foreign provider the two score alike, and a same-provider, different-model reviewer's verdicts could change with no fingerprint recording it. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ an INDEPENDENCE RULE — the plan’s DIFFERENT_MODEL read as DIFFERENT_PROVIDER (the review’s E4): the scoring digest moves' (AssertionError: the reviewer fingerprint moves: expected '2b6ca158534f19f413157587a878e956455ab…' not to be '2b6ca158534f19f413157587a878e956455ab…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M28-no-corpus-reply-carries-a-stipulation",
+		file: "scripts/reviewer-qual/scoring-corpus.ts",
+		find: "\t\t\treplies: [reply(ids.map((id) => (id === first ? { ...row(id), stipulated: true } : row(id))))]\n",
+		replace: "\t\t\treplies: [reply(ids.map((id) => row(id)))] // MUTANT: no corpus reply carries stipulated\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (REG-D-071: a stipulation is the test's to make, never the reviewer's; the adversarial review's E5): coerceJudgement cannot start honouring a model-supplied stipulated without moving the fingerprint. Only a corpus reply that carries stipulated on a row can show it — with none, a validator that copied the model's claim would score a row UNABLE_TO_DETERMINE + stipulated, INCONCLUSIVE, where it scored MET, and no fingerprint or reproduction would mark it. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ the review’s attacks move it, on a copy — E5, the model’s own `stipulated` honoured; E6, a duplicate key no longer detected' (AssertionError: E5: the scoring digest moves: expected '96bb7b9f2cb23c8e4481ea0a863e1941a3be8…' not to be '96bb7b9f2cb23c8e4481ea0a863e1941a3be8…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M29-the-seeded-independence-is-not-hashed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tcriteria: sha256(canonicalJson({ criteria: seams.criteria, independence: seams.independence })),\n",
+		replace: "\t\tcriteria: sha256(canonicalJson({ criteria: seams.criteria })), // MUTANT: the seeded policy's independence is not hashed\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (the adversarial review's E14; rph-application assurance.ts, the §39 inv-8 check): the seeded Reasoning Review policy's independence requirement is part of the reviewer definition — the product's recording gate holds every reviewer to it, though no score reads it. A change there (DIFFERENT_MODEL to DIFFERENT_PROVIDER) alters what the product accepts from a same-provider reviewer; unhashed, it moves no fingerprint and a record made before it still reads as current. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ the SEEDED POLICY’S INDEPENDENCE — what the recording gate reads (the review’s E14): the criteria component moves' (AssertionError: the reviewer fingerprint moves: expected 'dddcff464335f499c5d1439062e0017f61a59…' not to be 'dddcff464335f499c5d1439062e0017f61a59…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M30-a-limit-is-restated-beside-the-budget-object",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\tCONTENT_MAX,\n\tCONTENT_MIN\n} = REASONING_REVIEW_BUDGET;\n",
+		replace: "\tCONTENT_MIN\n} = REASONING_REVIEW_BUDGET;\nconst CONTENT_MAX = 24_000; // MUTANT: a limit restated beside the object the fingerprint hashes\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (ROADMAP J2-3: the budget constants \"exported as one frozen object\"; the adversarial review's VX-5): the object is the only place a limit is written. CONTENT_MAX is the member the object exists to hash — no probe can reach it — so a second binding of it, equal today, would let the prompt's cap change later while the hashed object stood still. Held over the validator's syntax tree: each limit is bound exactly once, by destructuring the object, and read. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⛔ the budget object is the ONLY place a limit is written — the validator binds each once, by destructuring the object, and reads every one' (AssertionError: CONTENT_MAX: bound exactly once, from the object: expected [ 'a const of its own' ] to deeply equal [ Array(1) ])",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M31-the-rubric-is-cut-past-its-budget",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\tRUBRIC_MAX\n\t);\n\tconst priorLine",
+		replace: "\t\tRUBRIC_MAX + 1 // MUTANT: the prompt cuts the rubric one past the limit the object states\n\t);\n\tconst priorLine",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (the adversarial review's VX-4, RUBRIC_MAX: RUBRIC_MAX + 1): every limit a probe can reach cuts exactly where the budget object says. A rubric cut one character past RUBRIC_MAX is a prompt obeying a limit the hashed object does not state; the oversize-together probes are measured slice by slice against the object's values. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ every limit a probe can reach cuts exactly where the budget object says — intent, rubric, prior gaps, rationale, narration, the whole prompt' (AssertionError: G-OVERSIZE-ALL: the rubric, at RUBRIC_MAX: expected 6014 to be 6013 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M32-the-detected-malformations-are-not-hashed",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\toutcomes.push([entry.id, scored, e.calls.length, e.calls.map((c) => c.malformations)]);\n",
+		replace: "\t\toutcomes.push([entry.id, scored, e.calls.length]); // MUTANT: the classes the harness detects are not hashed\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (DESIGN §5.1 (1): the REG-F-428 malformation classes counted separately; MALFORMATION_GAINED is a material transition; the adversarial review's E6): a change to what the harness detects moves the fingerprint. No record can re-detect a class — a line keeps only the names, never the reply — so a detection change is visible only through the scoring digest; unhashed, the contract measure and a material-failure class could shift between runs with nothing marking it. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a MALFORMATION RULE — a class the harness no longer detects (the review’s E6): the scoring digest moves' (AssertionError: the reviewer fingerprint moves: expected '09cff9e68176804cad345ccb3a6ec46b2ec64…' not to be '09cff9e68176804cad345ccb3a6ec46b2ec64…' // Object.is equality); '⭐ the review’s attacks move it, on a copy — E5, the model’s own `stipulated` honoured; E6, a duplicate key no longer detected' (AssertionError: E6: the scoring digest moves: expected 'a7b93615607a7f98892ccd73dbf86c579e2ec…' not to be 'a7b93615607a7f98892ccd73dbf86c579e2ec…' // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M33-a-record-under-todays-fingerprint-and-another-digest-is-taken",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\tif (fingerprint !== F || digest === S || refused.has(id)) return;\n",
+		replace: "\t\tif (fingerprint !== F || digest !== '' || refused.has(id)) return; // MUTANT: a record stamped with today's fingerprint and another digest is taken\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.5: the reviewer fingerprint hashes the scoring digest; the adversarial review's VX-3 and attack 2): a record stamped with today's fingerprint under another scoring digest is refused and counts for nothing. Nothing this tree records can carry both, and limb 2 compares a run's outcomes under the digest it claims — so a forgery stamped (F, X) would cover today's reviewer while its rewritten outcomes were never re-scored as today's. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record stamped with today’s fingerprint under ANOTHER scoring digest is refused and counts for nothing — a forgery under it is not waved through' (AssertionError: expected '' to contain 'RUN qr-forged-1 carries today’s revie…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M34-a-struck-finding-carries-an-escalation",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (i.struck.has(finding))\n",
+		replace: "\tif (i.struck.has(finding) && finding === '') // MUTANT: a struck register heading carries an escalation\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.6 limb 3: every material failure cited by a register finding; the adversarial review's attack 3d): an ESCALATION cites an OPEN finding. A struck heading (### ~~REG-F-NNN~~) is a closed entry; citing one — an old, ruled finding unrelated to the run — would clear limb 3 without anything being written up. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ a STRUCK finding escalates nothing — `### ~~REG-F-NNN~~` is a closed entry, and citing it clears no failure' (AssertionError: expected '' to contain 'ESCALATION cites REG-F-105, whose reg…'); '⛔ an ESCALATION citing a finding the register STRIKES clears nothing, end to end — and one it holds open does' (AssertionError: reviewer:qual:check — today's reviewer fingerprint 2b6ca158534f19f413157587a878e956455ab826b424b04e1a5a3dac97718096 (scoring 94fcc2168215caa9fba8d67d84d3ab259728423c8966787f75c729d3396b155d, case set e12dc276105caceb012c4516)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M35-the-check-reads-an-untracked-record",
+		file: "scripts/reviewer-qual/check.ts",
+		find: "\t\tif (!indexed.has(name)) {\n",
+		replace: "\t\tif (!indexed.has(name) && name === '') { // MUTANT: a record file git does not track is read\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (the adversarial review's finding B(b)): the check reads what a commit would carry, so a person's local green is the committed tree's green. A record file git does not track — a run written and never added — would turn the check green here while the commit that follows is red. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'runs.ndjson: not read — git does not …')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M36-two-runs-of-one-date-are-never-compared",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "const before = (a: Run, b: Run): boolean => a.run.date < b.run.date || (a.run.date === b.run.date && a.order < b.order);\n",
+		replace: "const before = (a: Run, b: Run): boolean => a.run.date < b.run.date; // MUTANT: two runs of one date are never compared\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (DESIGN §5.1: transitions are evaluated when a run repeats a candidate, against its previous run; the adversarial review's attack 7): two runs of one candidate stamped with the same date are still two runs, ordered by the record. Comparing only strictly earlier dates would let a run-edit-run increment made within one timestamp drop a fault with no transition found. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ two runs of one candidate on ONE date are compared in record order — the later one’s transition is escalated' (AssertionError: expected '' to contain 'run qr-tr-5: G-CLEAN — MALFORMATION_G…')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M37-an-offset-no-server-keeps-is-recorded",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\treturn minutes >= -12 * 60 && minutes <= 14 * 60 ? minutes : undefined;\n",
+		replace: "\treturn minutes; // MUTANT: any sign, hours and 00/30/45 minutes is an offset\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (REG-F-429; REG-D-074: the offset places every call on the server's calendar): a RUN line records only an offset a server can keep, from -12:00 to +14:00. An offset of +24:00 or -12:30 places every call on a date no server kept, so the one-server-clock-day rule would be judged against a calendar that does not exist. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ THE SERVER’S UTC OFFSET (REG-F-429) — an ollama candidate records it as ±HH:MM, and no other transport can see one' (AssertionError: +14:30: expected '' to contain 'RUN.candidate.serverUtcOffset: not a …')",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M38-the-runner-runs-past-the-servers-midnight",
+		file: "scripts/reviewer-qual/runner.ts",
+		find: "\t\tif (day !== first)\n",
+		replace: "\t\tif (day !== first && first === '') // MUTANT: the run goes on past the server's midnight\n",
+		expectRed: ["verif/reviewer-qualification-runner.test.ts"],
+		why: "PROMISE (DESIGN §5.3: a run must finish within one server-clock day; REG-F-429: gpt-oss's verdicts moved on 3 of 4 prompts across the server's midnight): the runner stops at the first call served on another server date, before recording it, instead of spending GPU time on a run the check will discard — a run of 52 calls at up to 240 s each can take hours. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-runner.test.ts: '⛔ the server’s midnight falls mid-run: it STOPS at the call that crossed, before recording it — the first day’s lines stay, and validate' (AssertionError: promise resolved \"[ { kind: 'RUN', …(13) }, …(3) ]\" instead of rejecting); '⛔ a transport failure on the new day stops it too — and a clock that is not an HTTP date stops it before anything is recorded' (AssertionError: promise resolved \"[ { kind: 'RUN', …(13) }, …(3) ]\" instead of rejecting)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
+	},
+	{
+		id: "J23-M39-an-ollama-run-need-not-name-its-server",
+		file: "scripts/reviewer-qual/run.ts",
+		find: "\tif (args.transport === 'ollama' && args['ollama-url'] === undefined)\n",
+		replace: "\tif (args.transport === 'ollama' && args['ollama-url'] === '') // MUTANT: an ollama run need not name its server\n",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (REG-F-427: the shared Ollama server may be the machine the harness runs on): an ollama run reaches only the server its command line names. A run that need not name one reaches whatever a default or the environment says — and a test whose flag a mutant dropped would reach the real GPU server. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⛔ an ollama run NAMES its server on the command line — no default, and no OLLAMA_HOST to fall back on (the machine may BE the shared server)' (AssertionError: expected TypeError: Cannot read properties of unde… to be 2 // Object.is equality)",
+		source: "JAN-CRITREAD J2-3 + J2-4 — the reviewer fingerprint (one exported function, shared by the check and the runner), reviewer:qual:check (three limbs, a pure core and a source-reading CLI), gate:tail, the one-server-clock-day rule enforced from the offset /api/ps records (ROADMAP-what-the-tests-prove.md J2-3 + J2-4; DESIGN-what-the-tests-prove.md §5.3, §5.5, §5.6; REG-D-072 D10, D11; REG-D-074; REG-F-428; REG-F-429)"
 	}
 ];

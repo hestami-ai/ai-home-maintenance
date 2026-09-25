@@ -137,10 +137,13 @@ describe('⛔ no spec leans on a stipulated answer before the reviewer is measur
 		expect(await sequencingViolations(REPO)).toEqual([]);
 	});
 
-	it('⭐ CONTROL — the resolver reaches through gate:fast today (it finds the e2e step inside apps/rph-demo)', async () => {
+	it('⭐ CONTROL — the resolver reaches through gate:fast today: the check and the browser tests, through gate:tail’s exported steps', async () => {
 		const reached = await reachedScripts(REPO);
-		expect(reached.has('apps/rph-demo:e2e'), 'cd apps/rph-demo && bun run e2e').toBe(true);
 		expect(reached.has('coverage:floor:check')).toBe(true);
+		// ⭐ `JAN-CRITREAD` J2-3: both now sit behind a step RUNNER (`scripts/gate-tail.ts`), so these two hold only while
+		// the resolver follows its exported `GATE_STEPS` — the branch that, before J2-3, only a fixture could reach.
+		expect(reached.has('.:reviewer:qual:check'), 'gate:tail → reviewer:qual:check, from the root').toBe(true);
+		expect(reached.has('apps/rph-demo:e2e'), 'gate:tail → e2e, in apps/rph-demo').toBe(true);
 	});
 });
 
@@ -188,5 +191,35 @@ describe('⭐ CONTROL — the pin reddens on a fixture repository, and clears on
 
 	it('⭐ and nothing registering is never red — the harness that DEFINES the helper does not count', async () => {
 		expect(await sequencingViolations(fixture({ registers: false, gateReachesCheck: false, deployableRun: false }))).toEqual([]);
+	});
+
+	/** The gate's tail as this repository now has it: a step RUNNER, its steps exported — or the same runner hiding them. */
+	function tailFixture(steps: 'exported' | 'hidden'): string {
+		const root = fixture({ registers: true, gateReachesCheck: false, deployableRun: true });
+		writeFileSync(
+			`${root}/package.json`,
+			JSON.stringify({
+				scripts: {
+					'gate:fast': 'bun run test && cd apps/rph-demo && bun run check && cd ../.. && bun run gate:tail',
+					test: 'vitest run',
+					'gate:tail': 'bun run scripts/tail.ts',
+					'reviewer:qual:check': 'bun --conditions=source scripts/check.ts'
+				}
+			})
+		);
+		mkdirSync(`${root}/scripts`, { recursive: true });
+		const list = "[{ cwd: '.', script: 'reviewer:qual:check' }, { cwd: 'apps/rph-demo', script: 'e2e' }]";
+		writeFileSync(
+			`${root}/scripts/tail.ts`,
+			steps === 'exported' ? `export const GATE_STEPS = ${list};\n` : `const steps = ${list};\nexport const run = () => steps;\n`
+		);
+		return root;
+	}
+
+	it('⭐ J2-3 — the check reached only through a step runner that EXPORTS its steps clears the pin; one that hides them does not', async () => {
+		expect(await sequencingViolations(tailFixture('exported'))).toEqual([]);
+		const hidden = await sequencingViolations(tailFixture('hidden'));
+		expect(hidden).toHaveLength(1);
+		expect(hidden[0]).toContain('gate:fast does not reach reviewer:qual:check');
 	});
 });

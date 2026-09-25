@@ -1,7 +1,7 @@
 # ROADMAP — `JAN-CRITREAD` `J`: what the browser tests prove, and what qualifies the reviewer
 
 **Design:** `DESIGN-what-the-tests-prove.md` (revision 5, `c715be57`) · **Ratified:** `REG-D-071` (sponsor, 2026-09-23,
-by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2b`, `J1-4` and `J2-1` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`, `2cfdb08d`, `92feb9ba`, `e5f9358b`; case set v1 conferred by delegation, `REG-D-073`); `J2-2` lands with this revision (its delegated decisions, `REG-D-074`)
+by adoption of its recommendations, with the open decisions delegated) · **Date:** 2026-09-23 · **Status:** IN PROGRESS — `J1-1a`..`J1-2b`, `J1-4` and `J2-1` landed (`0b9026c4`, `938aebb3`, `e6ab50a9`, `dc6619e5`, `5594d545`, `2cfdb08d`, `92feb9ba`, `e5f9358b`, `6d879055`; `REG-D-073` and `REG-D-074` confirmed by the sponsor, `1fda2b3e`); `J2-3 + J2-4` land with this revision — the fingerprint, the check, `gate:tail` and the first run (`REG-D-075`, `REG-D-076`; its material failures `REG-F-449`, `REG-F-450` (frontier) and `REG-F-451` (local, not qualified))
 
 ⭑ **Exit:** in test engines, a declared stand-in answers the review — the checker's real judgements plus a remainder
 the test stipulates, recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it and disclosed on every surface;

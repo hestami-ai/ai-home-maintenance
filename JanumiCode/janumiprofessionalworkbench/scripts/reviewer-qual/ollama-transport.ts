@@ -77,6 +77,29 @@ export function createOllamaTransport(
 		);
 	};
 
+	/**
+	 * ⭐ `JAN-CRITREAD` J2-3 — THE SERVER'S UTC OFFSET (`REG-F-429`; `REG-D-074`). The `Date` header every CALL records
+	 * is GMT; a template's `currentDate` is the SERVER's local date. `/api/ps` writes a loaded model's `expires_at` in
+	 * the server's local time, offset included, so the model is loaded (an empty prompt loads it, as Ollama documents),
+	 * read there, and unloaded again and confirmed — the first call still starts from a fresh load. A server that shows
+	 * no offset is a harness refusal, before any line: the check could not hold the run to one server-clock day (§5.3).
+	 */
+	const serverUtcOffset = async (): Promise<string> => {
+		await json(await post('/api/generate', { model: o.model, keep_alive: '60s' }), 'load');
+		const ps = await json(await fetch(`${base}/api/ps`), 'ps');
+		const loaded = ((ps.models as { name?: string; expires_at?: unknown }[] | undefined) ?? []).find(
+			(m) => m.name === o.model
+		);
+		const offset = typeof loaded?.expires_at === 'string' ? /(Z|[+-]\d{2}:\d{2})$/.exec(loaded.expires_at)?.[1] : undefined;
+		await unload();
+		if (!offset)
+			throw new HarnessRefusal(
+				`ollama: the server’s UTC offset cannot be recorded — /api/ps shows ${o.model} with no offset in its ` +
+					'expires_at, so no call could be placed on the server’s calendar (REG-F-429)'
+			);
+		return offset === 'Z' ? '+00:00' : offset;
+	};
+
 	/** The served template, and the server's clock as the show request found it. */
 	const served = async (): Promise<
 		ServedFacts & { readonly template: string; readonly modelfile: string }
@@ -106,6 +129,7 @@ export function createOllamaTransport(
 			if (!listed?.digest)
 				throw new HarnessRefusal(`ollama: ${o.model} is not served, or has no digest`);
 			const s = await served();
+			const offset = await serverUtcOffset();
 			return {
 				transport: 'ollama',
 				agentId: 'ollama',
@@ -116,6 +140,7 @@ export function createOllamaTransport(
 				servedModelfileSha256: sha256(s.modelfile),
 				templateInjectsDate: s.template.includes('currentDate'),
 				serverVersion: String(version.version),
+				serverUtcOffset: offset,
 				options: { ...o.options, ...(o.think === undefined ? {} : { think: o.think }) },
 				bounds: { wallClockMs: boundMs, promptChars: MAX_AGY_PROMPT_CHARS, printTimeout: null },
 				argv: null

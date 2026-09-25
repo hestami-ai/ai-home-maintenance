@@ -140,6 +140,23 @@ describe('JAN-CRITREAD J2-1 — review-input.ts imports nothing that needs Svelt
 		expect(scanImports(REPO_ROOT, MODULE, FORBIDDEN_MODULES).violations.join('; '), 'forbidden import(s)').toBe('');
 	});
 
+	// ⭐ `JAN-CRITREAD` J2-3 (DESIGN §5.6: "the check's builders live in the module of §5.2, with a guard that it imports
+	// only that module, the validator and packages"). ⚠ Held to the SAME forbidden list rather than to an allow-list: the
+	// check's closure also holds the runner, the record and the transports' failure class, all under
+	// `scripts/reviewer-qual/`, and what the list refuses is exactly what would stop the check LOADING outside the app.
+	it('⛔ J2-3 — the reviewer-qualification check’s closure is held to the same list, and reaches the builders and the validator', () => {
+		const check = 'scripts/reviewer-qual/check.ts';
+		const scan = scanImports(REPO_ROOT, check, FORBIDDEN_MODULES);
+		expect(scan.violations.join('; '), 'forbidden import(s) in the check’s closure').toBe('');
+		for (const f of [
+			'scripts/reviewer-qual/check-core.ts',
+			'scripts/reviewer-qual/fingerprint.ts',
+			MODULE,
+			`${SERVER}/assurance/reasoning-review-validator.ts`
+		])
+			expect(scan.closure, f).toContain(f);
+	});
+
 	it('⭐ CONTROL — the population is real: the module is read, its imports are seen, and every banned module exists', () => {
 		const scan = scanImports(REPO_ROOT, MODULE, FORBIDDEN_MODULES);
 		expect(scan.closure[0]).toBe(MODULE);

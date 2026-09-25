@@ -87,6 +87,7 @@ const STUB: CandidateIdentity = {
 	servedModelfileSha256: null,
 	templateInjectsDate: null,
 	serverVersion: null,
+	serverUtcOffset: null,
 	options: {},
 	bounds: { wallClockMs: 240_000, promptChars: null, printTimeout: null },
 	argv: null
@@ -785,5 +786,88 @@ describe('JAN-CRITREAD J2-2 — REG-F-428’s classes, detected harness-side ove
 			call.malformations,
 			'the harness records that it was a malformation, not a finding'
 		).toEqual(['DUPLICATE_KEY', 'NON_BOOLEAN_FAILED']);
+	});
+});
+
+// ⭐ `JAN-CRITREAD` J2-3 — ONE SERVER-CLOCK DAY, HELD WHILE THE RUN IS MADE (§5.3; `REG-F-429`).
+describe('JAN-CRITREAD J2-3 — the runner stops an Ollama run when the SERVER’s date changes', () => {
+	const OLLAMA: CandidateIdentity = {
+		...STUB,
+		transport: 'ollama',
+		agentId: 'ollama',
+		provider: 'ollama',
+		modelLabel: 'gpt-oss:20b',
+		servedModelDigest: 'd'.repeat(64),
+		servedTemplateSha256: 'e'.repeat(64),
+		servedModelfileSha256: 'f'.repeat(64),
+		templateInjectsDate: true,
+		serverVersion: '0.34.2',
+		serverUtcOffset: '-04:00',
+		options: { temperature: 0, seed: 42, num_ctx: 131072 },
+		bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: null }
+	};
+	/** A server whose `Date` header reads each clock in turn — the last repeating — and fails the calls `fail` names. */
+	const onClocks = (clocks: readonly string[], fail: (n: number) => boolean = () => false): Transport => {
+		let n = 0;
+		return {
+			name: 'ollama',
+			identify: async () => OLLAMA,
+			call: async () => {
+				const k = n++;
+				const served = { templateSha256: 'e'.repeat(64), serverClock: clocks[Math.min(k, clocks.length - 1)]! };
+				if (fail(k)) throw new TransportFailure('TIMEOUT', 'cut at 240000 ms', { served });
+				return { returned: CLEAN, served };
+			}
+		};
+	};
+	const CLEAN = JSON.stringify({
+		findings: CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
+		recommendation: 'SATISFIED'
+	});
+	const THREE = [caseById('G-CLEAN'), caseById('W-CLEAN'), caseById('G-RR-04')];
+	const measured = (lines: readonly (RunLine | CallLine)[]) => lines.map((l) => (l.kind === 'RUN' ? 'RUN' : l.caseId));
+
+	it('⛔ the server’s midnight falls mid-run: it STOPS at the call that crossed, before recording it — the first day’s lines stay, and validate', async () => {
+		const lines: (RunLine | CallLine)[] = [];
+		const run = runQualification(
+			inputs({
+				transport: onClocks(['Thu, 24 Sep 2026 03:59:10 GMT', 'Thu, 24 Sep 2026 04:00:05 GMT']),
+				cases: THREE,
+				onLine: (l) => lines.push(l)
+			})
+		);
+		await expect(run).rejects.toThrow(
+			'the server’s date changed from 2026-09-23 to 2026-09-24 during the run (UTC-04:00; REG-F-429)'
+		);
+		expect(measured(lines), 'the evaluation that crossed is not recorded; nothing after it is attempted').toEqual(['RUN', 'G-CLEAN']);
+		expect(recordProblems(lines.map(serializeLine).join(''), { tracked: true })).toEqual([]);
+	});
+
+	it('⛔ a transport failure on the new day stops it too — and a clock that is not an HTTP date stops it before anything is recorded', async () => {
+		const failing: (RunLine | CallLine)[] = [];
+		await expect(
+			runQualification(
+				inputs({
+					transport: onClocks(['Thu, 24 Sep 2026 03:59:10 GMT', 'Thu, 24 Sep 2026 04:00:05 GMT'], (n) => n === 1),
+					cases: THREE,
+					onLine: (l) => failing.push(l)
+				})
+			)
+		).rejects.toThrow('the server’s date changed from 2026-09-23 to 2026-09-24');
+		expect(measured(failing)).toEqual(['RUN', 'G-CLEAN']);
+		const unreadable: (RunLine | CallLine)[] = [];
+		await expect(
+			runQualification(inputs({ transport: onClocks(['yesterday']), cases: THREE, onLine: (l) => unreadable.push(l) }))
+		).rejects.toThrow('the server’s clock "yesterday" is not an HTTP date');
+		expect(unreadable, 'nothing recorded').toEqual([]);
+	});
+
+	it('⭐ CONTROL — within one server day the run goes to the end, however late in UTC; a candidate with no server clock is never held', async () => {
+		const sameDay = await runQualification(
+			inputs({ transport: onClocks(['Thu, 24 Sep 2026 23:59:00 GMT', 'Fri, 25 Sep 2026 03:59:59 GMT']), cases: THREE })
+		);
+		expect(measured(sameDay), 'all on 2026-09-24 at UTC-04:00').toEqual(['RUN', 'G-CLEAN', 'W-CLEAN', 'G-RR-04']);
+		const stub = await runQualification(inputs({ transport: stubTransport(() => answer(CLEAN)), cases: THREE }));
+		expect(measured(stub)).toEqual(['RUN', 'G-CLEAN', 'W-CLEAN', 'G-RR-04']);
 	});
 });

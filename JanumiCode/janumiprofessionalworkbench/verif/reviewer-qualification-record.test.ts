@@ -40,6 +40,7 @@ import {
 	RECORD_LINE_KINDS,
 	recordProblems,
 	serializeLine,
+	serverDayOf,
 	type CallLine,
 	type RecordLine,
 	type RunLine
@@ -73,6 +74,7 @@ const RUN: RunLine = {
 		servedModelfileSha256: null,
 		templateInjectsDate: null,
 		serverVersion: null,
+		serverUtcOffset: null,
 		options: {},
 		bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: '3m' },
 		argv: ['--print', '<prompt>', '--print-timeout', '3m', '--model', 'gemini-3.1-pro-high']
@@ -401,6 +403,7 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 				servedModelfileSha256: HEX('3'),
 				templateInjectsDate: true,
 				serverVersion: '0.34.2',
+				serverUtcOffset: '-04:00',
 				options: { temperature: 0, seed: 42, num_ctx: 131072, think: 'medium' },
 				bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: null },
 				argv: null
@@ -435,6 +438,7 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 				servedModelfileSha256: HEX('3'),
 				templateInjectsDate: true,
 				serverVersion: '0.34.2',
+				serverUtcOffset: '-04:00',
 				options: { temperature: 0, seed: 42, num_ctx: 131072 },
 				bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: null },
 				argv: null
@@ -471,6 +475,61 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		);
 		expect(lineProblems({ ...failed(true, 'TIMEOUT'), served: null }).join('\n')).toContain(
 			'CALL.reply.preContact: a call refused before contact reached no bound'
+		);
+	});
+
+	it('⛔ THE SERVER’S UTC OFFSET (REG-F-429) — an ollama candidate records it as ±HH:MM, and no other transport can see one', () => {
+		const ollama: RunLine = {
+			...RUN,
+			candidate: {
+				...RUN.candidate,
+				transport: 'ollama',
+				agentId: 'ollama',
+				provider: 'ollama',
+				modelLabel: 'gpt-oss:20b',
+				servedModelDigest: HEX('1'),
+				servedTemplateSha256: HEX('2'),
+				servedModelfileSha256: HEX('3'),
+				templateInjectsDate: true,
+				serverVersion: '0.34.2',
+				serverUtcOffset: '-04:00',
+				options: { temperature: 0, seed: 42, num_ctx: 131072 },
+				bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: null },
+				argv: null
+			},
+			deployable: false
+		};
+		expect(lineProblems(ollama), 'recorded, as ±HH:MM').toEqual([]);
+		expect(lineProblems({ ...ollama, candidate: { ...ollama.candidate, serverUtcOffset: '+00:00' } })).toEqual([]);
+		expect(
+			lineProblems({ ...ollama, candidate: { ...ollama.candidate, serverUtcOffset: null } }).join('\n')
+		).toContain('RUN.candidate.serverUtcOffset: an ollama candidate records what it was served');
+		for (const bad of ['UTC-4', '-4:00', '-04', 'Z', '-04:00 '])
+			expect(
+				lineProblems({ ...ollama, candidate: { ...ollama.candidate, serverUtcOffset: bad } }).join('\n'),
+				bad
+			).toContain('RUN.candidate.serverUtcOffset: not a UTC offset');
+		// ⭐ `JAN-CRITREAD` J2-3 — ONLY AN OFFSET A SERVER CAN KEEP: −12:00 to +14:00, the minutes 00, 30 or 45; and never
+		// `-00:00`, RFC 3339's spelling of an UNKNOWN offset. The check places every call by it (`record.ts` `serverDayOf`).
+		for (const real of ['+14:00', '-12:00', '+05:45', '+05:30', '+12:45', '-09:30', '+00:00'])
+			expect(lineProblems({ ...ollama, candidate: { ...ollama.candidate, serverUtcOffset: real } }), real).toEqual([]);
+		for (const unreal of ['+99:99', '+14:30', '-12:30', '+05:15', '-04:60', '+24:00', '-00:00'])
+			expect(
+				lineProblems({ ...ollama, candidate: { ...ollama.candidate, serverUtcOffset: unreal } }).join('\n'),
+				unreal
+			).toContain('RUN.candidate.serverUtcOffset: not a UTC offset');
+		expect(
+			lineProblems({ ...RUN, candidate: { ...RUN.candidate, serverUtcOffset: '-04:00' } }).join('\n')
+		).toContain('RUN.candidate.serverUtcOffset: agy is served nothing a run can see');
+		// The server's calendar date for a served clock — the one function the runner stops by and the check discards by.
+		expect(serverDayOf('Thu, 24 Sep 2026 03:59:59 GMT', '-04:00'), 'a second before the server’s midnight').toBe('2026-09-23');
+		expect(serverDayOf('Thu, 24 Sep 2026 04:00:00 GMT', '-04:00'), 'its midnight').toBe('2026-09-24');
+		expect(serverDayOf('Wed, 23 Sep 2026 18:15:00 GMT', '+05:45')).toBe('2026-09-24');
+		expect(serverDayOf('Thursday, 24-Sep-26 04:00:00 GMT', '-04:00'), 'not an IMF-fixdate').toBeUndefined();
+		expect(serverDayOf('Thu, 24 Sep 2026 04:00:00 GMT', '+99:99'), 'not an offset').toBeUndefined();
+		const { serverUtcOffset: _dropped, ...without } = RUN.candidate;
+		expect(lineProblems({ ...RUN, candidate: without }).join('\n')).toContain(
+			'RUN.candidate: missing key "serverUtcOffset"'
 		);
 	});
 

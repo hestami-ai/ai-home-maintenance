@@ -231,6 +231,7 @@ export function createAgyTransport(
 			servedModelfileSha256: null,
 			templateInjectsDate: null,
 			serverVersion: null,
+			serverUtcOffset: null,
 			options: {},
 			bounds: {
 				wallClockMs: AGY_KILL_MS,
@@ -314,6 +315,7 @@ export function createDevinTransport(
 			servedModelfileSha256: null,
 			templateInjectsDate: null,
 			serverVersion: null,
+			serverUtcOffset: null,
 			options: {},
 			bounds: { wallClockMs: DEVIN_KILL_MS, promptChars: null, printTimeout: null },
 			argv: null

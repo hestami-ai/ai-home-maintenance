@@ -70,14 +70,34 @@ function excerpt(text: string, limit: number): string {
 // remains after the fixed scaffolding and the other bounded slices, so the total never approaches the limit. All
 // truncation is declared by `excerpt` (§9.7). A 2K margin under the backstop covers the retry-suffix appended at
 // evaluate() and Windows arg-escaping overhead.
-const PROMPT_BUDGET = MAX_AGY_PROMPT_CHARS - 2_000;
-const USER_INTENT_MAX = 4_000;
-const RUBRIC_MAX = 6_000;
-const PRIOR_MAX = 2_000;
-const RATIONALE_MAX = 4_000;
-const NARRATION_MAX = 2_000;
-const CONTENT_MAX = 24_000; // never render MORE graph than this even when there is room (the original cap)
-const CONTENT_MIN = 4_000; // always give the reviewer at least this much graph
+/**
+ * ⭐ `JAN-CRITREAD` J2-3 — THE EXCERPT BUDGET: ONE FROZEN OBJECT, AND THE ONLY PLACE ITS LIMITS ARE WRITTEN
+ * (DESIGN-what-the-tests-prove.md §5.5). The reviewer fingerprint hashes these values explicitly: `CONTENT_MAX` binds
+ * only when the scaffolding is under 2,000 characters, which no probe can make it, so a change to it would reach no
+ * materialized prompt. `judgePrompt` reads every limit from here and has no other binding of one — so the object the
+ * fingerprint hashes cannot state one budget while the prompt obeys another (`verif/reviewer-qualification-fingerprint
+ * .test.ts` holds that structurally, and each limit a probe can reach behaviourally).
+ */
+export const REASONING_REVIEW_BUDGET = Object.freeze({
+	PROMPT_BUDGET: MAX_AGY_PROMPT_CHARS - 2_000,
+	USER_INTENT_MAX: 4_000,
+	RUBRIC_MAX: 6_000,
+	PRIOR_MAX: 2_000,
+	RATIONALE_MAX: 4_000,
+	NARRATION_MAX: 2_000,
+	CONTENT_MAX: 24_000, // never render MORE graph than this even when there is room (the original cap)
+	CONTENT_MIN: 4_000 // always give the reviewer at least this much graph
+});
+const {
+	PROMPT_BUDGET,
+	USER_INTENT_MAX,
+	RUBRIC_MAX,
+	PRIOR_MAX,
+	RATIONALE_MAX,
+	NARRATION_MAX,
+	CONTENT_MAX,
+	CONTENT_MIN
+} = REASONING_REVIEW_BUDGET;
 
 /**
  * ⭑ THE SUBJECT IS DESCRIBED CORRECTLY, AND THAT IS NOT COSMETIC. This told every reviewer it was looking at

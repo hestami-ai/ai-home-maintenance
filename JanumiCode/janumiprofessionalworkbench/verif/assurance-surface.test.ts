@@ -118,8 +118,13 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * IS A GATE STEP, and because the per-file ratchet's two limbs must be shown to fail SEPARATELY — which the
  * gate step itself, a single pass/fail over 106 files, structurally cannot show. Its fixtures are private temp
  * dirs, so it asserts over the mechanism rather than over today's coverage numbers.
+ *
+ * ⚠ 65 -> 79 (2026-09-24, JAN-CRITREAD J2-3): measured before this increment's files the population was 76, not 65 —
+ * eleven files had landed since the last raise and nothing prompted one, which is the stale-low floor the note above
+ * warns about, found by the act of raising it. This increment adds three: `verif/reviewer-qualification-fingerprint`,
+ * `verif/reviewer-qualification-check` and `verif/gate-tail` (`.test.ts` each). The floor is set to the population.
  */
-const VERIF_TEST_FLOOR = 65;
+const VERIF_TEST_FLOOR = 79;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
@@ -147,7 +152,12 @@ const REQUIRED_ROOT_COMMANDS = [
 	'gate:fast',
 	'lint',
 	'test',
-	'test:coverage'
+	'test:coverage',
+	// JAN-CRITREAD J2-3 (2026-09-24): 10 -> 12. The reviewer-qualification check and the runner that puts it in the
+	// gate's tail beside the browser tests (DESIGN-what-the-tests-prove.md §5.6). Either vanishing makes `gate:fast`
+	// run a shorter gate — and the sequencing pin resolves the check through `gate:tail`'s exported steps.
+	'reviewer:qual:check',
+	'gate:tail'
 ] as const;
 
 /** Counted from DISK, not from git: vitest collects what is on disk, and that is the population at risk. */
@@ -191,7 +201,7 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
 		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
-		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(10);
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(12);
 	});
 
 	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
@@ -238,7 +248,14 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 			'bun run coverage:floor:check',
 			'cd apps/rph-demo',
 			'bun run check',
-			'bun run e2e'
+			// ⭐⭐ JAN-CRITREAD J2-3 (2026-09-24): `bun run e2e` -> `cd ../.. && bun run gate:tail`, AND THE POSITION IS AN
+			// ARGUMENT (DESIGN-what-the-tests-prove.md §5.6). The tail runs `reviewer:qual:check` from the root and the
+			// browser tests in `apps/rph-demo`, BOTH ALWAYS, and exits with the worse (`scripts/gate-tail.ts`,
+			// `verif/gate-tail.test.ts`). ⛔ The check could not simply be chained: placed early, a red check would blind
+			// every step after it; appended after e2e, any e2e red would skip it without a word. ⚠ It is LAST because it
+			// reads the record, which nothing earlier in the gate produces, and because the browser tests were last.
+			'cd ../..',
+			'bun run gate:tail'
 		]);
 	});
 

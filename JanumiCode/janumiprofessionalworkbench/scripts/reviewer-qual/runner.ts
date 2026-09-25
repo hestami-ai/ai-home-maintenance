@@ -46,6 +46,7 @@ import {
 	lineProblems,
 	RECORD_VERSION,
 	retainedAnswer,
+	serverDayOf,
 	type CallEvaluator,
 	type CallLine,
 	type CallReply,
@@ -292,6 +293,45 @@ function checked<L extends RunLine | CallLine>(line: L): L {
 	return line;
 }
 
+/**
+ * ⭐ `JAN-CRITREAD` J2-3 — ONE SERVER-CLOCK DAY, HELD WHILE THE RUN IS MADE (§5.3; `REG-F-429`). gpt-oss's template
+ * injects the server's date, and across its midnight 0 of 4 replies held; so the check discards an Ollama run whose
+ * calls fall on two server dates. This stops the run at the first call that lands on another date — or whose clock
+ * cannot be placed — BEFORE that call is recorded, instead of spending GPU time on calls the check would discard: the
+ * lines already appended stay, all on one date, and the CLI exits 4 (stopped part-way). The date is `record.ts`'s
+ * `serverDayOf`, the one the check uses. A candidate whose server shows no clock (agy, devin) is never held.
+ * ⚠ At most one call is spent past midnight: the clock is the one the call itself was served under.
+ */
+function oneServerDay(offset: string | null): (reply: () => Promise<TransportReply>) => Promise<TransportReply> {
+	let first: string | undefined;
+	const hold = (served: ServedFacts | null) => {
+		if (offset === null || served === null) return;
+		const day = serverDayOf(served.serverClock, offset);
+		if (day === undefined)
+			throw new HarnessRefusal(
+				`REFUSED: the server’s clock ${JSON.stringify(served.serverClock)} is not an HTTP date, so the call cannot be ` +
+					`placed on its calendar (UTC${offset}; REG-F-429) — the run stops here, before recording it`
+			);
+		first ??= day;
+		if (day !== first)
+			throw new HarnessRefusal(
+				`REFUSED: the server’s date changed from ${first} to ${day} during the run (UTC${offset}; REG-F-429) — a run ` +
+					'must finish within one server-clock day (§5.3), and the check discards one that does not; it stops here, ' +
+					'before recording the call that crossed. Measure the cases it did not reach in a run on the new day.'
+			);
+	};
+	return async (reply) => {
+		try {
+			const r = await reply();
+			hold(r.served);
+			return r;
+		} catch (e) {
+			if (e instanceof TransportFailure) hold(e.served);
+			throw e;
+		}
+	};
+}
+
 export interface RunInputs {
 	readonly runId: string;
 	readonly date: string;
@@ -329,6 +369,7 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 	};
 	try {
 		const candidate = await i.transport.identify();
+		const withinOneDay = oneServerDay(candidate.serverUtcOffset);
 		// ⛔ Checked NOW, though written only with the first evaluation: a stamp the record would refuse (a run id, a
 		// commit, a fingerprint) stops the run before a single model call is paid for.
 		let pending: RunLine | undefined = checked({
@@ -353,7 +394,7 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 					case: c,
 					criteria: i.criteria,
 					candidate,
-					call: (prompt) => i.transport.call(prompt),
+					call: (prompt) => withinOneDay(() => i.transport.call(prompt)),
 					scoringDigest: i.fingerprint.scoring,
 					...(i.now ? { now: i.now } : {})
 				});

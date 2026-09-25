@@ -81,6 +81,10 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 		why: 'a MODEL reply that carries `stipulated` — which must be dropped',
 		writes: 1
 	},
+	'scripts/reviewer-qual/scoring-corpus.ts': {
+		why: 'a MODEL reply in the reviewer fingerprint’s scoring corpus that carries `stipulated` — which the product must drop, so a validator that honoured it would move the fingerprint (JAN-CRITREAD J2-3)',
+		writes: 1
+	},
 	'apps/rph-demo/src/lib/server/test-api-dispatch-stipulation.test.ts': {
 		why: 'a request carrying `stipulated`, which the dispatch route must refuse',
 		writes: 1

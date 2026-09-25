@@ -298,6 +298,7 @@ All Section B entries: **Date:** 2026-07-16 (carried from Guide §16) · **Type:
 - **Statement:** Validator-system subjects, canary isolation, health/suspension Commands, precision/recall adjudication, shared-premise independence, and promotion of outcome-derived wisdom are undefined. One constraint is sponsor-adopted and carried (Validator Subsystem L2019): meta-assurance validators observe, emit telemetry and review flags, and escalate; they never hard-block human governance decisions — "a system that blocks its human overseer for reviewing too fast inverts the authority hierarchy." Human authority is never subordinated to meta-validator telemetry.
 - **Safe default:** Run held-out canaries and control-health analysis in an isolated, observe-first harness; record results as candidate engineering Evidence — not canonical Assurance Observations — until the subject/lifecycle contract is ratified; escalate material failure. Meta-assurance findings never hard-block a human governance act. Never auto-reject unrelated subjects or self-modify authoritative policies; activation, suspension, and evolution require explicit versioned governance.
 - **Merge target:** JPWB-DOC-001 (doctrine); JPWB-DOC-003 (contracts when decided — on ratification, §8 needs a scope line exempting human governance acts from meta-assurance blocking under ASR-10/ASR-15).
+- ⭑ **Partly carried, 2026-09-24 — `REG-D-075` / `REG-D-076`:** held-out canaries now run in an isolated harness whose results are an append-only record, not canonical Assurance Observations (`scripts/reviewer-qual/`, `docs/tracking/reviewer-qualification/`); material failures escalate to findings; the trigger is `reviewer:qual:check` at the end of `gate:fast` (an interim carrier); the held-out tier is deferred. The subject/lifecycle contract is still undefined.
 
 ---
 
@@ -37467,3 +37468,85 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The one-server-clock-day rule (§5.3; `REG-F-429`) is NOT enforced. The server's UTC offset IS observable, since `/api/ps`'s `expires_at` carries it (`REG-F-427`'s provenance), so the rule starts there.
   - An over-long prompt still counts as the candidate's REFUSAL, although §5.1 makes the limit a case precondition. It is unreachable while the product budgets the prompt to 26,000.
 - **FOR SPONSOR CONFIRMATION:** the retention projection above all, then the classes, the temperature range and the exit codes.
+
+### REG-F-449 — the graph arm's "clean" case is rejected by the frontier candidate in 7 of 8 evaluations, on one engineering ground: the known soft-clay report reaches neither the options study nor the independent check
+
+**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the first qualification run, `qr-2026-09-24-agy-gemini-3.1-pro-high`). **Status:** ⚠ **OPEN — most likely a defect in the CASE, not the reviewer; the remedy, case set v2, is an oracle change and awaits the sponsor (`DOC-004` §7.6).**
+
+- **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`, reviewer fingerprint `2b6ca158…`, case set v1 × 2 repetitions. 52 calls, all ANSWERED; no repair, no transport failure; median 28 s, maximum 51 s. `G-CLEAN` and its three renamed copies expect SATISFIED. Their standing is *"the author's claim"* (`REG-D-073`). **7 of their 8 evaluations are REJECTED** (VALID). `G-CLEAN-R2` is SATISFIED once and REJECTED once, which the check classes as VERDICT_CHANGES_WITH_NAME. Every other case's disposition is its oracle's: the graph arm's 18 planted evaluations are REJECTED and name their criterion; the work-product arm's clean case is SATISFIED 8 of 8.
+- **ONE GROUND, REPEATED.** Every rejection turns on the same fact of the case. The draft routes the geotechnical report, which records a 3 m soft-clay layer at the north abutment, to load analysis and design, but not to the structural-form options study or to the independent check. The reviewer files it under:
+  - RR-05: the form is chosen without the soft clay;
+  - RR-04: the check is DELEGATED_EXTERNAL but is not given the report;
+  - RR-08: the known inconvenient evidence is kept from the node it bears on;
+  - variously RR-02, 06, 07 and 09.
+  Quoted, `G-CLEAN` #1, RR-05: *"The structural form options study prematurely converges on a selected form without consuming the geotechnical report, ignoring the foundational implications of the soft c…"*
+- **ASSESSMENT: the reviewer is probably right.** Choosing a footbridge form without the ground conditions, when soft clay at an abutment is already known, is the premature convergence RR-05 names. A checker without the report cannot check the foundations. The clean case's standing was *"the author's claim"* for exactly this reason. This is a defect in the case surfaced by qualification; on this evidence it is not a defect in the reviewer.
+- **REMEDY.** Case set v2 routes the geotechnical report to the options study and the independent check, and regenerates the renamed copies. An oracle change is a separately authorized act (`DOC-004` §7.6; `REG-D-073`'s oracle-integrity rule), so it is not made here; it awaits the sponsor. Until then an ESCALATION line in `docs/tracking/reviewer-qualification/runs.ndjson` cites this entry.
+- **SEARCHED BEFORE FILING.** The register for `soft clay` (0) and `G-CLEAN` (3, all in `REG-D-073`).
+
+### REG-F-450 — the frontier candidate REJECTS every planted work-product defect but does not reliably NAME the planted criterion: 14 of 18 evaluations, three cases unstable across repetitions
+
+**Filed 2026-09-24** (`JAN-CRITREAD` `J2-4`, the same run as `REG-F-449`). **Status:** ⚠ **OPEN — which criterion the reviewer names is unstable across repetitions; the verdicts are not. Whether §5.1's pass bar asks for the named criterion or the verdict is the sponsor's question.**
+
+- **WHAT WAS MEASURED.** All 18 of the work-product arm's planted evaluations (nine cases × 2) are REJECTED. 14 fault the planted criterion. The four that do not:
+  - **`W-RR-03`:** the crowd load is applied over the central 20 m of a 40 m span; the oracle names RR-03, standing *"the author's claim"*. Both repetitions fault RR-06, and one also RR-07. This is the contest `REG-D-073` predicted when it downgraded this standing.
+  - **`W-RR-04`:** the first vertical natural frequency is asked for and not stated; the oracle names RR-04. Repetition 1 faults RR-02, RR-04 and RR-08; repetition 2 faults RR-01, RR-02 and RR-08.
+  - **`W-RR-05`:** the governing combination is closed on habit, with pedestrian 0.86 said to govern over wind 0.91; the oracle names RR-05. Repetition 1 faults RR-06, 07 and 08; repetition 2 names RR-05 among six.
+- ⚠ **A QUALITY TELL.** In `W-RR-04`'s repetition 2, statements do not describe their criterion. RR-02 fails with *"Initial logic and parameters are validated."*; RR-08 with *"Jumping directly to the omission of the 2.1 Hz frequency and 0.52 m/s² acceleration data."*. These are reasoning-trace fragments inside the answer's statement field. The statements are what the product reads, and `REG-D-074` retains them as given.
+- **ASSESSMENT.** As a verdict gate this candidate is right on all 36 planted evaluations, on both arms. What varies is which failure class it names. Under the oracles' *"`faulted` means at least these"*, each miss is a failure as defined.
+- **REMEDY.** None is proposed for the reviewer: oracle integrity means version one tunes nothing. For the sponsor: should §5.1's pass bar require the named criterion in every repetition, or only the verdict?
+- **SEARCHED BEFORE FILING.** The register for `W-RR-04` (0), `W-RR-05` (0) and `criterion attribution` (0).
+
+### REG-D-075 — DELEGATED (`REG-D-071`): the reviewer fingerprint, `reviewer:qual:check`, `gate:tail`, and the first run's candidates — where the design left them open, and what they cannot see
+
+**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-3` + `J2-4`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for qualification from `J2-3`; sponsor confirmation owed.**
+
+- **THE FIRST RUN'S CANDIDATES.**
+  - **Frontier (deployable):** `agy` with `gemini-3.1-pro-high`, set through `JPWB_JUDGE_MODEL` (`REG-D-052`: configured, never defaulted). It is the model of all seven stored live reviews (`REG-F-439` (2)).
+  - **Local (never deployable):** `gpt-oss:20b` on this host's Ollama with `REG-F-427`'s pinned options, unloaded before and after every call.
+- **THE FINGERPRINT (§5.5).** One function, shared by the check and the runner. It hashes four components; the reviewer fingerprint is a hash of those, so a run's own scoring digest can be recombined with today's prompt side to tell a scoring-only move from a prompt-side one:
+  - the materialized prompts of 17 probes;
+  - the budget object, now the ONLY place the limits are written, held by an AST guard and behavioural guards;
+  - the seed criteria whole, plus — a departure from §5.5's list — the seeded RR policy's independence rule, which the recording gate reads (`floor-policies.ts`), not the runner;
+  - a scoring digest over an 18-entry raw-reply corpus, every entry through the real evaluation, including every `REG-F-428` class, one repair, a producer's-provider/different-model report and a self-`stipulated` row, with each call's detected malformation classes.
+- **THE CHECK (§5.6).** A pure core and a CLI that reads only git-tracked record files identical to their staged blobs.
+  - **Limb 1 (coverage):** every current case is measured under today's fingerprint. A prompt-side move that reached no case prompt reddens until an ACKNOWLEDGED line names the new fingerprint, whatever runs exist under it; a scoring-only move is discharged by RESCORED.
+  - **Limb 2 (reproduction):** recorded prompts recompute; outcomes re-score where the digest is today's.
+  - **Limb 3 (escalation):** every material failure is cited by an ESCALATION naming an OPEN `### REG-F-NNN` heading. A struck heading does not count.
+  - **Refused:** a record stamped with today's fingerprint and another scoring digest; same-date runs are ordered by record order; an unreal UTC offset.
+- **`gate:tail`** runs the check and the browser suite, exits with the worse, and exports its step list for the sequencing pin; `gate:fast` ends in it. A spawn test pins the executable's exit wiring.
+- **THE ONE-SERVER-DAY RULE (`REG-F-429`).** The Ollama transport reads the server's UTC offset from `/api/ps`'s `expires_at` at identify. The runner stops part-way (exit 4) when the server's date changes, and the check discards a straddling run. `--ollama-url` is required: this host is itself an Ollama server, so the old default was the real one.
+- **SAFETY BY CONSTRUCTION.** Under any single ledger mutant, no test reaches a real agy, devin or Ollama: spawned children get a hermetic PATH and no program or model variables, and in-process tests an empty PATH. J2-2's `J22-M29` would otherwise have made about 52 real frontier calls during a mutation run.
+- **RESIDUALS, stated.**
+  - An un-cited failure vanishes when its case leaves the set, because failures are judged against today's oracles.
+  - An ESCALATION's relevance is not machine-checkable: any open finding satisfies it.
+  - `RUN.commit` names the HEAD the run was made on, not the commit that carries the code.
+  - The offset is read once, so a DST change mid-run shifts the boundary by an hour; a call begun near midnight can render the next date unseen.
+  - There is no CLI for RESCORED lines (`rescoredLines` only).
+  - Detection changes show only as fingerprint moves, since records keep class names, not replies.
+  - The recording gates' other seeded-policy fields are not hashed.
+- **FOR SPONSOR CONFIRMATION:** the candidates, the ACKNOWLEDGED rule, the independence departure, and the residuals.
+
+### REG-D-076 — `reviewer:qual:check` is the INTERIM CARRIER of the reviewer-qualification control (`DOC-004` §7.6)
+
+**Decided 2026-09-24** (agent, under `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-4`). **Type:** DECISION — interim-carrier registration, **flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force until the platform hosts the control natively; sponsor confirmation owed.**
+
+- **WHAT IT CARRIES.** The control that no reasoning reviewer is relied on by a browser-test lane until it is qualified. Every current case must be measured under today's reviewer fingerprint, the measurement must reproduce, and every material failure must be escalated to an open finding (§5.6).
+- **WHERE IT RUNS.** `bun run reviewer:qual:check`, as `gate:tail`'s first step, at the end of `gate:fast`. It executes the versioned artifacts the control is made of: the case set, oracles and the append-only record under `docs/tracking/reviewer-qualification/`, the fingerprint function, and the check core.
+- ⚠ **WHAT IT IS NOT.** `DOC-004` §7.6: *"A pre-commit hook or local gate run is developer convenience — valuable, and never the guarantee."* `gate:fast` runs where the change's author runs it, so this carrier can be skipped. The binding boundary is owed to the platform.
+- **ITS PIN.** `verif/reviewer-qualification-sequencing.test.ts` reddens if any spec registers a stipulation while `gate:fast` does not reach the check through `gate:tail`, or while no deployable RUN line exists.
+
+### REG-F-451 — the local candidate, `gpt-oss:20b`, is NOT qualified: it passes 6 of 18 planted defects as SATISFIED, rejects only 20 of 36 planted evaluations, and names the planted criterion in 12 — repeatably
+
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-4`, the first qualification run's local candidate, `qr-2026-09-25-ollama-gpt-oss-20b`). **Status:** ⚠ **OPEN — the candidate fails qualification. It was never deployable (`REG-D-075`), so nothing relies on it; recorded so the measurement stands.**
+
+- **WHAT WAS MEASURED.** Candidate: `gpt-oss:20b` on this host's Ollama 0.34.2, with `REG-F-427`'s pinned options (think medium, temperature 0, seed 42, num-ctx 131072). Server offset −04:00; unloaded before every call and after the run (`/api/ps` → `"models":[]`). Reviewer fingerprint `2b6ca158…`, case set v1 × 2. 54 calls, no transport failure, median 18 s. `W-CLEAN-R3`'s first reply did not parse in both repetitions (NOT_RETAINED, UNPARSEABLE); each repair answered.
+- **CLEAN CASES:** SATISFIED 16 of 16 on both arms. That includes the graph case the frontier candidate rejects 7 of 8 (`REG-F-449`). Given the next bullet, that agreement is not evidence the case is clean.
+- **PLANTED CASES** (36 evaluations):
+  - **SATISFIED — the defect passed**, 12 evaluations: `G-RR-02`, `G-RR-04`, `G-RR-08`, `W-RR-03`, `W-RR-04`, `W-RR-06`, both repetitions each.
+  - **INCONCLUSIVE**, 4: `G-RR-09`, `W-RR-05`, each with RR-08 undetermined.
+  - **REJECTED**, 20. The planted criterion is named in 12 of the 36 evaluations. `G-RR-03` faults RR-01 instead of RR-03, `G-RR-07` RR-04 instead of RR-07, and `G-RR-05`, `W-RR-08` fault five or six criteria without the planted one.
+- **REPEATABLE.** Every case gets the same disposition and the same faulted criteria in both repetitions. The misses are the model's answers, not noise.
+- **CONSISTENT WITH THE EARLIER MEASUREMENT.** `REG-F-427` measured four local models, `gpt-oss` among them, as byte-reproducible and blind to one planted defect. `REG-F-429` measured `gpt-oss`'s pinned verdicts changing overnight with no code change. This run widens the first to the whole case set. The second is exactly why the check discards a run that straddles the server's day.
+- **REMEDY.** None for the model. It stays non-deployable, and qualification records it as failed. An ESCALATION line cites this entry for its twelve failing cases.
+- **SEARCHED BEFORE FILING.** The register for `gpt-oss` (18, the nearest being `REG-F-427` and `REG-F-429`, above).

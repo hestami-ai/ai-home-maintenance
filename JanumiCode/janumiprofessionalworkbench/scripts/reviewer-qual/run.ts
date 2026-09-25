@@ -3,7 +3,12 @@
  *
  *   bun --conditions=source scripts/reviewer-qual/run.ts --transport agy|devin|ollama --model <label> --out <file.ndjson>
  *       [--repetitions 2] [--cases <id>,<id>…] [--run-id <id>]
- *       [--ollama-url http://host:11434] [--think <level>] [--temperature 0] [--seed 42] [--num-ctx 131072]
+ *       [--ollama-url http://host:11434 (required for ollama)] [--think <level>] [--temperature 0] [--seed 42]
+ *       [--num-ctx 131072]
+ *
+ * ⛔ AN OLLAMA RUN NAMES ITS SERVER (`JAN-CRITREAD` J2-3). `--ollama-url` is required — no default, and no `OLLAMA_HOST`
+ * fallback: the machine the harness runs on may BE the shared server (`REG-F-427`), so a run that forgot the flag, or a
+ * test whose flag a mutant dropped, would otherwise reach it. The server a run measures is the one its command says.
  *
  * ⛔ IT LOADS FROM SOURCE (`REG-D-072` D11). Under bare `bun` every `@janumipwb/*` specifier resolves to built `dist`,
  * stale after any source edit; `--conditions=source` makes every package's export map answer with `./src/…`. The first
@@ -11,10 +16,10 @@
  * ⛔ THEN IT REFUSES THE PROGRAM OVERRIDES (`REG-D-072` D12), before any transport module is loaded.
  * ⚠ So this file imports nothing at load but the two pure modules those checks need; everything else is loaded after.
  *
- * ⚠ IN J2-2 IT STOPS AT THE FINGERPRINT. A RUN line is stamped with the reviewer fingerprint, scoring digest and
- * case-set digest (§5.5), which J2-3 computes; a run recorded without them could never be checked for coverage or
- * reproduction, so until then the CLI refuses rather than write one (`exit 3`). Every step after it is exercised in
- * process with a fingerprint handed in (`verif/reviewer-qualification-transports.test.ts`).
+ * ⭐ `JAN-CRITREAD` J2-3 — EVERY RUN LINE IS STAMPED WITH TODAY'S REVIEWER FINGERPRINT, scoring digest and case-set
+ * digest (§5.5), computed by the one function the check shares (`fingerprint.ts` `reviewerFingerprint`) from the source
+ * this run loads — so the check can say whether a run covers the reviewer in force. Until J2-3 the CLI stopped here
+ * (`exit 3`); a fingerprint that cannot be computed still stops it there, before anything is written.
  *
  * The record is APPENDED to `--out`, line by line as each call is measured, so a run killed part-way keeps what it
  * measured. An `--out` that is not already a valid record is refused and left untouched.
@@ -36,20 +41,29 @@ export interface CliDeps {
 	/** `import.meta.resolve`. */
 	readonly resolve: (specifier: string) => string;
 	readonly write: (text: string) => void;
-	/** The run's stamps (§5.5) — J2-3's function. */
+	/** The run's stamps (§5.5) — `fingerprint.ts`'s `reviewerFingerprint`, over the committed case set. */
 	readonly fingerprint: () => Promise<RunFingerprint>;
 	readonly commit: () => string;
 	readonly now: () => Date;
 	readonly transportDeps?: TransportDeps;
 }
 
-/** Until J2-3: no fingerprint, so no run. */
-const NO_FINGERPRINT_YET = async (): Promise<RunFingerprint> => {
-	throw new HarnessRefusal(
-		'REFUSED: the reviewer fingerprint (§5.5) lands in J2-3. A RUN line must carry it, the scoring digest and the ' +
-			'case-set digest, or the check could never say whether the run covers today’s reviewer — so no run is recorded ' +
-			'without them.'
-	);
+/**
+ * ⭐ TODAY'S FINGERPRINT, from the source this process loads. ⚠ LOADED ONLY WHEN CALLED — after D11 and D12 — because
+ * the fingerprint drives the product's validator, whose module chain includes the transport module D12 guards.
+ * A fingerprint that cannot be computed is the harness's fault: no line is written (`exit 3`).
+ */
+const TODAYS_FINGERPRINT = async (): Promise<RunFingerprint> => {
+	try {
+		const { committedCaseSet, reviewerFingerprint } = await import('./fingerprint.js');
+		const f = await reviewerFingerprint(committedCaseSet(new URL('../../', import.meta.url)).cases);
+		return { reviewer: f.reviewer, scoring: f.scoring, caseSet: f.caseSet };
+	} catch (e) {
+		throw new HarnessRefusal(
+			`REFUSED: the reviewer fingerprint (§5.5) could not be computed, so no RUN line can say which reviewer it ` +
+				`measured — ${String(e)}`
+		);
+	}
 };
 
 type Args = Readonly<Record<string, string>>;
@@ -111,6 +125,8 @@ function argsProblem(args: Args): string | undefined {
 	const labelProblem = modelLabelProblem(args.model!);
 	if (labelProblem) return labelProblem;
 	if (!args.out!.endsWith('.ndjson')) return '--out must name an .ndjson record file';
+	if (args.transport === 'ollama' && args['ollama-url'] === undefined)
+		return '--ollama-url is required for the ollama transport: the server a run measures is named, never assumed';
 	const ignored =
 		args.transport === 'ollama' ? undefined : OLLAMA_ONLY.find((f) => args[f] !== undefined);
 	if (ignored)
@@ -135,15 +151,15 @@ function selectCases<C extends { readonly id: string }>(
 		: `--cases names a case the set does not hold: ${missing.join(', ')}`;
 }
 
-/** The candidate the flags name — every number already checked by `argsProblem`. */
-function candidateSpec(args: Args, env: CliDeps['env']): CandidateSpec {
+/** The candidate the flags name — every number, and an ollama run's server, already checked by `argsProblem`. */
+function candidateSpec(args: Args): CandidateSpec {
 	const transport = args.transport as CandidateSpec['transport'];
 	if (transport !== 'ollama') return { transport, modelLabel: args.model! };
 	return {
 		transport,
 		modelLabel: args.model!,
 		ollama: {
-			baseUrl: args['ollama-url'] ?? env.OLLAMA_HOST ?? 'http://127.0.0.1:11434',
+			baseUrl: args['ollama-url']!,
 			options: {
 				temperature: Number(args.temperature ?? 0),
 				seed: Number(args.seed ?? 42),
@@ -155,7 +171,7 @@ function candidateSpec(args: Args, env: CliDeps['env']): CandidateSpec {
 }
 
 /**
- * The run. Returns the exit code: 0 run recorded, 2 refused before anything was written, 3 no fingerprint (J2-3),
+ * The run. Returns the exit code: 0 run recorded, 2 refused before anything was written, 3 no fingerprint could be computed,
  * 4 the harness stopped the run part-way — the lines appended before it stay, and name no fault of the candidate's.
  */
 export async function main(argv: readonly string[], deps: CliDeps): Promise<number> {
@@ -234,7 +250,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 	let appended = 0;
 	try {
 		const transport = await transports.loadTransport(
-			candidateSpec(args, deps.env),
+			candidateSpec(args),
 			deps.env,
 			deps.transportDeps ?? {}
 		);
@@ -275,7 +291,7 @@ if (import.meta.main) {
 		env: process.env,
 		resolve: (s) => import.meta.resolve(s),
 		write: (s) => process.stderr.write(s),
-		fingerprint: NO_FINGERPRINT_YET,
+		fingerprint: TODAYS_FINGERPRINT,
 		commit: () => execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
 		now: () => new Date()
 	});

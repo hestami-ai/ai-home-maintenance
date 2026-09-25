@@ -14,7 +14,11 @@
 //     the `--model` the program was actually given.
 //   · A TIMEOUT AND A REFUSAL ARE CLASSIFIED APART, on every transport.
 //   · D11 — the CLI runs from SOURCE (`bun --conditions=source`), and refuses to run on built `dist`.
-import { spawnSync } from 'node:child_process';
+// ⛔ AND NO MODEL IS REACHABLE, BY CONSTRUCTION (`JAN-CRITREAD` J2-3; `reviewer-qualification-hermetic.ts`): in process
+// PATH names an empty directory, so a product transport whose exec seam a mutant bypassed finds no program; every
+// spawned CLI runs bun by absolute path on a PATH of bun's and git's directories alone; and the runner reaches only
+// the Ollama server its command line names — here a closed port or a stand-in this file starts.
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -23,7 +27,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as agyCli from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { assuranceModel } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { CASE_SET_V1_FILE, type CaseSet } from '../scripts/reviewer-qual/cases.js';
@@ -37,6 +41,7 @@ import {
 	sourceResolutionProblem
 } from '../scripts/reviewer-qual/preflight.js';
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
+import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { main } from '../scripts/reviewer-qual/run.js';
 import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/runner.js';
 import {
@@ -47,6 +52,13 @@ import {
 	TransportFailure,
 	type Transport
 } from '../scripts/reviewer-qual/transports.js';
+import {
+	BUN,
+	HERMETIC_SEARCH_PATH,
+	hermeticEnv,
+	NO_PROGRAMS,
+	reviewerProgramsIn
+} from './reviewer-qualification-hermetic.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -89,8 +101,36 @@ const cleanEnv = () => {
 	for (const v of [...PROGRAM_OVERRIDE_VARIABLES, 'JPWB_JUDGE_MODEL', 'JPWB_ASSURANCE_MODEL'])
 		vi.stubEnv(v, undefined);
 };
+beforeEach(() => {
+	// ⛔ No program can be found from this process — not `agy`, not `devin` — whatever a mutant does to an exec seam.
+	vi.stubEnv('PATH', NO_PROGRAMS);
+});
 afterEach(() => {
 	vi.unstubAllEnvs();
+});
+
+describe('JAN-CRITREAD J2-3 — the construction: no test here can start a real reviewer', () => {
+	it('⛔ in process no program is found; a spawned child searches only bun’s and git’s directories, which hold none, and inherits no override, model or server', () => {
+		expect(process.env.PATH, 'in process, PATH is the empty directory').toBe(NO_PROGRAMS);
+		expect(reviewerProgramsIn([NO_PROGRAMS])).toEqual([]);
+		expect(reviewerProgramsIn(HERMETIC_SEARCH_PATH), 'beside bun and git').toEqual([]);
+		vi.stubEnv('JPWB_AGY_BIN', 'C:/stand-in/agy-shim.exe');
+		vi.stubEnv('OLLAMA_HOST', 'http://127.0.0.1:11434');
+		vi.stubEnv('JPWB_JUDGE_MODEL', 'a-model');
+		const env = hermeticEnv();
+		for (const v of ['JPWB_AGY_BIN', 'JPWB_DEVIN_BIN', 'OLLAMA_HOST', 'JPWB_JUDGE_MODEL', 'JPWB_ASSURANCE_MODEL'])
+			expect(env[v], v).toBeUndefined();
+		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
+		expect(hermeticEnv({ JPWB_AGY_BIN: 'x' }).JPWB_AGY_BIN, 'a test that means to set one says so').toBe('x');
+		// THE CONTROL: the guard finds a program where there is one, in each spelling a search would start.
+		const planted = mkdtempSync(join(tmpdir(), 'jpwb-planted-'));
+		try {
+			for (const f of ['agy.cmd', 'devin', 'ollama.exe']) writeFileSync(join(planted, f), '');
+			expect(reviewerProgramsIn([planted]).map((f) => f.slice(planted.length + 1)).sort()).toEqual(['agy.cmd', 'devin', 'ollama.exe']);
+		} finally {
+			rmSync(planted, { recursive: true, force: true });
+		}
+	});
 });
 
 describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
@@ -404,6 +444,8 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 // ── the harness Ollama transport, against a local stand-in server ─────────────────────────────────────────────────
 const TEMPLATE = '<|start|>system<|message|>Current date: {{ currentDate }}\n{{ .Prompt }}';
 const DATE_HEADER = 'Thu, 24 Sep 2026 12:00:00 GMT';
+/** What `/api/ps` says of a loaded model: when it will be unloaded, in the SERVER's local time — its UTC offset included. */
+const EXPIRES_AT = '2026-09-24T08:01:00.123456789-04:00';
 interface Seen {
 	readonly method: string;
 	readonly path: string;
@@ -411,26 +453,39 @@ interface Seen {
 }
 async function ollamaStandIn(
 	mode: 'answer' | 'hang' | 'error',
-	opts: { stayLoaded?: boolean } = {}
+	opts: { stayLoaded?: boolean; expiresAt?: string | null; clock?: (shows: number) => string } = {}
 ) {
 	const seen: Seen[] = [];
 	let loaded = true;
+	/** How many `/api/show` requests have been answered — the clock a call is served under is its show's. */
+	let shows = 0;
 	const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 		let raw = '';
 		req.on('data', (c: Buffer) => (raw += c.toString('utf8')));
 		req.on('end', () => {
 			const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
 			seen.push({ method: req.method ?? '', path: req.url ?? '', body });
-			res.setHeader('Date', DATE_HEADER);
+			if (req.url === '/api/show') shows += 1;
+			res.setHeader('Date', opts.clock ? opts.clock(shows) : DATE_HEADER);
 			res.setHeader('content-type', 'application/json');
 			const send = (o: unknown) => res.end(JSON.stringify(o));
 			if (req.url === '/api/version') return send({ version: '0.34.2' });
 			if (req.url === '/api/tags')
 				return send({ models: [{ name: 'gpt-oss:20b', digest: 'd'.repeat(64) }] });
-			if (req.url === '/api/ps') return send({ models: loaded ? [{ name: 'gpt-oss:20b' }] : [] });
+			if (req.url === '/api/ps') {
+				const expires = opts.expiresAt === undefined ? EXPIRES_AT : opts.expiresAt;
+				return send({
+					models: loaded ? [{ name: 'gpt-oss:20b', ...(expires === null ? {} : { expires_at: expires }) }] : []
+				});
+			}
 			if (req.url === '/api/show')
 				return send({ template: TEMPLATE, modelfile: `FROM x\nTEMPLATE """${TEMPLATE}"""` });
+			// A generate with no prompt LOADS the model, or UNLOADS it when `keep_alive` is 0 — as Ollama documents.
 			if (req.url === '/api/generate' && body?.prompt === undefined) {
+				if (body?.keep_alive !== 0) {
+					loaded = true;
+					return send({ model: body?.model, done: true, done_reason: 'load' });
+				}
 				if (!opts.stayLoaded) loaded = false;
 				return send({ model: body?.model, done: true, done_reason: 'unload' });
 			}
@@ -474,6 +529,7 @@ describe('JAN-CRITREAD J2-2 — the harness Ollama transport (REG-F-427’s shim
 				servedModelfileSha256: sha256(`FROM x\nTEMPLATE """${TEMPLATE}"""`),
 				templateInjectsDate: true,
 				serverVersion: '0.34.2',
+				serverUtcOffset: '-04:00',
 				options: { ...OLLAMA_OPTIONS, think: 'medium' },
 				bounds: {
 					wallClockMs: 240_000,
@@ -487,6 +543,45 @@ describe('JAN-CRITREAD J2-2 — the harness Ollama transport (REG-F-427’s shim
 			);
 		} finally {
 			await s.close();
+		}
+	});
+
+	it('⛔ it records the SERVER’s UTC offset (REG-F-429) from /api/ps after loading the model, unloads it again — and refuses to run without one', async () => {
+		const s = await ollamaStandIn('answer');
+		try {
+			const t = createOllamaTransport({ baseUrl: s.url, model: 'gpt-oss:20b', options: OLLAMA_OPTIONS });
+			const before = s.seen.length;
+			expect((await t.identify()).serverUtcOffset).toBe('-04:00');
+			const generates = s.seen.slice(before).filter((r) => r.path === '/api/generate');
+			expect(
+				generates.map((r) => r.body),
+				'loaded to be seen, then unloaded — the first call still starts from a fresh load'
+			).toEqual([
+				{ model: 'gpt-oss:20b', keep_alive: '60s' },
+				{ model: 'gpt-oss:20b', keep_alive: 0 }
+			]);
+			const reads = s.seen.slice(before).map((r) => `${r.method} ${r.path}`);
+			expect(reads.indexOf('GET /api/ps'), '/api/ps is read while the model is loaded').toBeGreaterThan(
+				reads.indexOf('POST /api/generate')
+			);
+		} finally {
+			await s.close();
+		}
+		const utc = await ollamaStandIn('answer', { expiresAt: '2026-09-24T12:01:00.5Z' });
+		try {
+			const t = createOllamaTransport({ baseUrl: utc.url, model: 'gpt-oss:20b', options: OLLAMA_OPTIONS });
+			expect((await t.identify()).serverUtcOffset, 'a server on UTC').toBe('+00:00');
+		} finally {
+			await utc.close();
+		}
+		const silent = await ollamaStandIn('answer', { expiresAt: null });
+		try {
+			const t = createOllamaTransport({ baseUrl: silent.url, model: 'gpt-oss:20b', options: OLLAMA_OPTIONS });
+			const refused = await t.identify().catch((e: unknown) => e);
+			expect(refused).toBeInstanceOf(HarnessRefusal);
+			expect((refused as Error).message).toContain('the server’s UTC offset cannot be recorded');
+		} finally {
+			await silent.close();
 		}
 	});
 
@@ -656,26 +751,34 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		dirs.push(d);
 		return d;
 	};
-	const shellEnv = (extra: Record<string, string>) => {
-		const env: Record<string, string | undefined> = { ...process.env, ...extra };
-		for (const v of PROGRAM_OVERRIDE_VARIABLES) if (!(v in extra)) delete env[v];
-		return env as NodeJS.ProcessEnv;
-	};
+	/**
+	 * ⛔ A SPAWNED CLI HAS NO PATH TO A REAL MODEL, EVEN UNDER A MUTANT (`JAN-CRITREAD` J2-3). Since J2-3 a CLI that
+	 * passes its refusals goes on past the fingerprint to the transport — so a ledger mutant that disables D11 or D12
+	 * would, through `--transport agy`, run the real agy over the whole case set. Through the Ollama transport at a
+	 * CLOSED local port, one case, one repetition, the most it can reach is a refused connection; and the child is
+	 * hermetic besides — no `agy` or `devin` on its PATH, no `OLLAMA_HOST` to fall back on.
+	 */
 	const cli = (bunArgs: readonly string[], extra: Record<string, string> = {}) => {
 		const out = join(tmp(), 'run.ndjson');
 		const r = spawnSync(
-			'bun',
+			BUN,
 			[
 				...bunArgs,
 				'scripts/reviewer-qual/run.ts',
 				'--transport',
-				'agy',
+				'ollama',
 				'--model',
-				LABEL,
+				'gpt-oss:20b',
+				'--ollama-url',
+				'http://127.0.0.1:9',
+				'--cases',
+				'G-CLEAN',
+				'--repetitions',
+				'1',
 				'--out',
 				out
 			],
-			{ cwd: REPO, encoding: 'utf8', env: shellEnv(extra), shell: true }
+			{ cwd: REPO, encoding: 'utf8', env: hermeticEnv(extra), windowsHide: true }
 		);
 		return { status: r.status, err: `${r.stdout ?? ''}${r.stderr ?? ''}`, wrote: existsSync(out) };
 	};
@@ -689,6 +792,27 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		commit: () => commit,
 		now: () => new Date('2026-09-24T12:00:00.000Z'),
 		transportDeps: { agyExec: capturing(spawned) }
+	});
+
+	it('⛔ the CLI refuses JPWB_AGY_BIN ITSELF, before it computes a fingerprint — which loads the validator, and with it agy-cli (D12)', async () => {
+		// ⚠ WHY IN PROCESS (`JAN-CRITREAD` J2-3). Since the fingerprint is wired, a CLI that skipped its own refusal would
+		// still be refused later, by `loadTransport`, in the same words — so the spawned limb below cannot tell the two
+		// apart. Only the ORDER shows the guarantee: the refusal must come before anything that reaches `agy-cli.ts`.
+		let fingerprinted = 0;
+		const spawned: Spawned[] = [];
+		const written: string[] = [];
+		const code = await main(['--transport', 'agy', '--model', LABEL, '--out', join(tmp(), 'run.ndjson')], {
+			...inProcess(spawned, written),
+			env: { JPWB_AGY_BIN: 'C:/stand-in/agy-shim.exe' },
+			fingerprint: async () => {
+				fingerprinted += 1;
+				return FINGERPRINT;
+			}
+		});
+		expect(code, written.join('')).toBe(2);
+		expect(written.join('')).toContain('JPWB_AGY_BIN is set');
+		expect(fingerprinted, 'refused before the fingerprint was computed').toBe(0);
+		expect(spawned).toEqual([]);
 	});
 
 	it('⛔ the CLI refuses a blank or padded --model before anything is loaded or written', async () => {
@@ -766,6 +890,73 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				expect(spawned, `${args.join(' ')}: nothing spawned`).toEqual([]);
 			}
 			expect(s.seen, 'the stand-in server was never asked anything').toEqual([]);
+		} finally {
+			await s.close();
+		}
+	});
+
+	it('⛔ an ollama run NAMES its server on the command line — no default, and no OLLAMA_HOST to fall back on (the machine may BE the shared server)', async () => {
+		cleanEnv();
+		const s = await ollamaStandIn('answer');
+		try {
+			vi.stubEnv('OLLAMA_HOST', s.url);
+			const out = join(tmp(), 'run.ndjson');
+			const spawned: Spawned[] = [];
+			const written: string[] = [];
+			const code = await main(
+				['--transport', 'ollama', '--model', 'gpt-oss:20b', '--out', out, '--cases', 'G-CLEAN', '--repetitions', '1'],
+				inProcess(spawned, written)
+			).catch((e: unknown) => e);
+			expect(code, written.join('')).toBe(2);
+			expect(written.join('')).toContain('usage: --ollama-url is required for the ollama transport');
+			expect(existsSync(out), 'nothing written').toBe(false);
+			expect(s.seen, 'the server OLLAMA_HOST names was never asked anything').toEqual([]);
+		} finally {
+			await s.close();
+		}
+	});
+
+	it('⭐ the SERVER’s date changes mid-run: the CLI stops part-way (exit 4) — the first day’s lines stay and validate, and no call follows', async () => {
+		cleanEnv();
+		// identify's show is the first; each call's show the next. G-CLEAN is served at 03:59 GMT — 2026-09-23 on the
+		// server's UTC−4 — and W-CLEAN at 04:00:30, the server's next day.
+		const clocks = ['Thu, 24 Sep 2026 03:58:00 GMT', 'Thu, 24 Sep 2026 03:59:00 GMT', 'Thu, 24 Sep 2026 04:00:30 GMT'];
+		const s = await ollamaStandIn('answer', { clock: (n) => clocks[Math.min(Math.max(n, 1), clocks.length) - 1]! });
+		try {
+			const out = join(tmp(), 'run.ndjson');
+			const written: string[] = [];
+			const code = await main(
+				[
+					'--transport',
+					'ollama',
+					'--model',
+					'gpt-oss:20b',
+					'--ollama-url',
+					s.url,
+					'--out',
+					out,
+					'--cases',
+					'G-CLEAN,W-CLEAN,G-RR-04',
+					'--repetitions',
+					'1'
+				],
+				inProcess([], written)
+			);
+			expect(code, written.join('')).toBe(4);
+			expect(written.join('')).toContain('the server’s date changed from 2026-09-23 to 2026-09-24');
+			const text = readFileSync(out, 'utf8');
+			expect(
+				text
+					.trimEnd()
+					.split('\n')
+					.map((l) => (JSON.parse(l) as { caseId?: string }).caseId ?? 'RUN'),
+				'the RUN line and the evaluation made on the first day'
+			).toEqual(['RUN', 'G-CLEAN']);
+			expect(recordProblems(text, { tracked: true })).toEqual([]);
+			expect(
+				s.seen.filter((q) => q.body?.prompt !== undefined),
+				'two calls: the one recorded, and the one that crossed — none after it'
+			).toHaveLength(2);
 		} finally {
 			await s.close();
 		}
@@ -875,12 +1066,64 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(r.wrote).toBe(false);
 	});
 
-	it('⛔ with a clean environment it stops where J2-3 begins: no run is recorded without the reviewer fingerprint', () => {
-		const r = cli(['--conditions=source']);
-		expect(r.status, r.err).toBe(3);
-		expect(r.err).toContain('the reviewer fingerprint (§5.5) lands in J2-3');
-		expect(r.wrote).toBe(false);
-	});
+	it('⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — and records a RUN stamped with today’s fingerprint', async () => {
+		const s = await ollamaStandIn('answer');
+		try {
+			const out = join(tmp(), 'run.ndjson');
+			// ⚠ ASYNCHRONOUS, because the stand-in answers from THIS process: a synchronous spawn would block it.
+			const r = await new Promise<{ status: number | null; err: string }>((resolve) => {
+				const child = spawn(
+					BUN,
+					[
+						'--conditions=source',
+						'scripts/reviewer-qual/run.ts',
+						'--transport',
+						'ollama',
+						'--model',
+						'gpt-oss:20b',
+						'--ollama-url',
+						s.url,
+						'--cases',
+						'G-CLEAN',
+						'--repetitions',
+						'1',
+						'--out',
+						out
+					],
+					{ cwd: REPO, env: hermeticEnv(), windowsHide: true }
+				);
+				let err = '';
+				child.stdout.on('data', (c: Buffer) => (err += c.toString('utf8')));
+				child.stderr.on('data', (c: Buffer) => (err += c.toString('utf8')));
+				child.on('close', (status) => resolve({ status, err }));
+			});
+			expect(r.status, r.err).toBe(0);
+			const text = readFileSync(out, 'utf8');
+			expect(recordProblems(text, { tracked: true })).toEqual([]);
+			const [runRow = '', callRow = ''] = text.trimEnd().split('\n');
+			const run = JSON.parse(runRow) as RunLine;
+			const call = JSON.parse(callRow) as CallLine;
+			const today = await reviewerFingerprint(CASES);
+			expect(run, 'stamped with today’s fingerprint, computed from source').toMatchObject({
+				kind: 'RUN',
+				reviewerFingerprint: today.reviewer,
+				scoringDigest: today.scoring,
+				caseSetDigest: today.caseSet,
+				caseIds: ['G-CLEAN'],
+				deployable: false
+			});
+			expect(run.candidate.serverUtcOffset).toBe('-04:00');
+			expect(call.promptSha256, 'the prompt the fingerprint derives is the one sent').toBe(
+				today.casePrompts.get('G-CLEAN')!.initial
+			);
+			expect(
+				s.seen.filter((q) => q.body?.prompt !== undefined),
+				'one call, to the stand-in'
+			).toHaveLength(1);
+		} finally {
+			await s.close();
+		}
+	}, 120_000);
 
 	it('⭐ in process, with a fingerprint and agy’s exec seam injected, it appends a record that validates — and refuses a broken one', async () => {
 		cleanEnv();
