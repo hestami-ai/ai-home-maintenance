@@ -28,6 +28,17 @@ const SETUP_EMITTED_EVENT = join(ROOT, 'verif', 'emitted-event-guard.ts');
  *  the two above: a new package must not be able to opt out of a standing guard by omission. */
 const SETUP_DRAFT_PREMISES = join(ROOT, 'verif', 'draft-dependency-premises.ts');
 
+/**
+ * ⭐ `JAN-SELREV` D8 — no gate test file inherits a live-backend selection: see `verif/live-backend-isolation.ts`.
+ *
+ * ⭑ DECLARED AT THE ROOT OF BOTH CONFIGS, NOT PER PROJECT, because it must reach the `verif` project too — verif files
+ * load the product's reviewer adapters, which capture their program overrides when they load — and that project
+ * declares no setup files of its own (`verif/emitted-event-guard.test.ts` holds every per-project declaration to the
+ * emitted-event guard, which the verif project deliberately does not run). Every project `extends` its root config,
+ * and vitest runs the root's setup files before a project's own.
+ */
+export const SETUP_LIVE_BACKENDS = join(ROOT, 'verif', 'live-backend-isolation-setup.ts');
+
 /** Every `*.test.ts` under `dir`, recursively. Returns count only — the projects declare their own globs. */
 function countTests(dir: string): number {
 	if (!existsSync(dir)) return 0;

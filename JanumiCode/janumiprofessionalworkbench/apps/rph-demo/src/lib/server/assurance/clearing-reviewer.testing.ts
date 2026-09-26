@@ -2,14 +2,16 @@
 // THE PROCESS BACK.
 //
 // ⛔ WHY A SHARED HELPER RATHER THAN FIVE COPIES. `JPWB_ASSURANCE_TOOL` and `JPWB_JUDGE_MODEL` are
-// PROCESS-WIDE, and `createFloorRegistry` reads them at call time: `testMode && !JPWB_ASSURANCE_TOOL` selects
-// the deterministic structural checker. So an injected `print` alone does NOT reach the reviewer seam — the
+// PROCESS-WIDE, and `createFloorRegistry` reads them at call time through `selectReviewer`
+// (`reviewer-selection.ts`, `JAN-SELREV` SR-1): in test mode an UNSET tool selects the declared stand-in, the
+// structural checker. So an injected `print` alone does NOT reach the reviewer seam — the
 // env must move too, and it must move back. `process-result-floor.test.ts` already warns about this in a
 // `finally`; five hand-copied versions of that warning is how one leak becomes routine, and a leak here does
 // not fail loudly — it silently switches every LATER test in the same worker onto the live reviewer path.
 //
 // ⚠ NOTHING IN THE RESTORE MAY THROW. A throw from the cleanup would replace the test's real failure with this
 // module's — the rule this repository files as "cleanup must survive".
+import { noProgramsDirectory } from './no-programs.testing.js';
 
 /**
  * A reviewer's reply that EVALUATED EVERY CRITERION AND FAULTED NONE.
@@ -83,19 +85,30 @@ export function clearingReviewerFor(
  *
  * ⭑ THE PRIOR VALUES ARE CAPTURED AND RESTORED rather than deleted, so a caller that legitimately had these
  * set (a live lane) is not silently disarmed by a unit test that ran beside it.
+ *
+ * ⛔ AND FOR ITS DURATION PATH FINDS NO PROGRAM (`JAN-SELREV` SR-1). The seam selects agy, which on this machine's
+ * PATH is the real, paid reviewer, and only the caller's injected `print` keeps it from running: a mutant that
+ * stopped that `print` from winning (`index.ts`'s precedence) would otherwise start the real agy. With PATH pointed
+ * at the empty directory (`no-programs.testing.ts`) it finds nothing to start.
  */
 export async function withLiveReviewerSeam<T>(body: () => Promise<T>): Promise<T> {
+	// Resolved FIRST: it refuses a directory that is not empty, and a refusal here must leave the process untouched.
+	const noPrograms = noProgramsDirectory();
 	const priorTool = process.env.JPWB_ASSURANCE_TOOL;
 	const priorModel = process.env.JPWB_JUDGE_MODEL;
+	const priorPath = process.env.PATH;
 	process.env.JPWB_ASSURANCE_TOOL = 'agy';
 	process.env.JPWB_JUDGE_MODEL = 'test-judge-model';
+	process.env.PATH = noPrograms;
 	try {
 		return await body();
 	} finally {
-		// ⛔ RESTORE, NEVER DELETE, and never throw. Two assignments and two deletes, no logic.
+		// ⛔ RESTORE, NEVER DELETE, and never throw. Three assignments and three deletes, no logic.
 		if (priorTool === undefined) delete process.env.JPWB_ASSURANCE_TOOL;
 		else process.env.JPWB_ASSURANCE_TOOL = priorTool;
 		if (priorModel === undefined) delete process.env.JPWB_JUDGE_MODEL;
 		else process.env.JPWB_JUDGE_MODEL = priorModel;
+		if (priorPath === undefined) delete process.env.PATH;
+		else process.env.PATH = priorPath;
 	}
 }

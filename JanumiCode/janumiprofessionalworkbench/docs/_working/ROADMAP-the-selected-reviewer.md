@@ -33,7 +33,7 @@ Record `REG-D-085`.
     qualification harness's `DevinModule` type.
 - **The preflights.** The authoring preflight reads the selector, and `JPWB_ASSESSOR` is retired, which closes
   `REG-F-443`. `beginExecute` refuses a MODEL step before its dispatch batch, dispatching nothing.
-- **The gate starts with the eight live-backend variables as `''`** at all three entry points: the Playwright
+- **The gate starts with the eight live-backend variables ~~as `''`~~ REMOVED (as built; design D8)** at all three entry points: the Playwright
   webServer, the root vitest configs, and `apps/rph-demo`'s own vitest. Every reader treats `''` as unset.
 - **Tests rewritten, not deleted:** `preflight.test.ts:17, :28-41, :49-53, :60` (design §4). Moved anchors are
   re-anchored in this commit; new mutants attack each limb.
@@ -47,6 +47,26 @@ Record `REG-D-085`.
 | `beginExecute` refuses a model step before the executor opens; a TRANSFORMATION step is not refused | red today |
 | a child run with the eight variables exported still selects the stand-in and the fixture executor | red today |
 | the reviewer fingerprint | unmoved |
+
+- ⭑ *Landed 2026-09-26.*
+  - **The selector** is `assurance/reviewer-selection.ts`. A refusal registers `reasoning-review.unconfigured`,
+    and a refusal outranks an injected `print`. devin's model resolves inside `evaluate`, and the `DevinExec` seam
+    reaches the devin branch.
+  - **Both preflights** ask the selector. The authoring route's own call and beginExecute's server-mode limb are
+    pinned by route-level tests.
+  - **D8 as built.** The eight variables are REMOVED at every entry point, and the child-run instrument proves
+    each child RECEIVED the exported environment (a canary). The app's own `vitest run` is wired through a new
+    `apps/rph-demo/vitest.config.ts` (`mergeConfig` over `vite.config.ts`), which `check-types` now type-checks
+    through `tsconfig.vitest-config.json`. `svelte-check` never saw that file; its control reddens on a planted
+    type error.
+  - **Mutants.** 46, all KILLED: `SR1-M1`..`M32`; `M33`..`M42` from the adversarial verifier's findings; `M43`..`M46`
+    for the runner fix below. The reviewer fingerprint is unmoved.
+  - **The instrument, fixed on the way.** The mutation runner could not compile a root-level file, and it compiled
+    seven mutants (`J13-M15`..`M19`, `SR1-M29`, `SR1-M30`) under a program that did not contain their file, so
+    NO_COMPILE could never fire for them. `compileProjectOf` (`scripts/mutants/verdict.ts`) now maps every file to a
+    program that holds it, and a census over the whole ledger pins that. The root vitest configs gain
+    `tsconfig.root-configs.json`. `REG-F-443` is closed; G1, G2, G3, G5 and G8 of `REG-F-457` are closed.
+  - **Owed.** `SR-3` owes the stale header of `reasoning-review-validator.ts` and the documents.
 
 ## `SR-2` — the model and the program that ran are the ones configured (D6, D7)
 

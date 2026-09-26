@@ -15,8 +15,14 @@
 // calls it before verdict attribution and blocks on the result. That half was proved by driving it: a deliberately
 // hung victim under the real runner, which reported INCONCLUSIVE instead of KILLED. Recorded in REG-F-116, not
 // claimed here.
+import { readdirSync } from 'node:fs';
+import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { DECLARED_MUTANTS, isHistory } from '../scripts/mutants/ledger.js';
 import { timeoutEvidence } from '../scripts/mutants/measured.js';
+import { compileProjectOf, ROOT_CONFIGS_PROJECT, tscArgv } from '../scripts/mutants/verdict.js';
 
 /**
  * The ACTUAL failure text from V-4a, not a plausible reconstruction of one.
@@ -177,5 +183,240 @@ describe('REG-F-116 — a timeout is not a measurement, in either direction', ()
 		const evidence = timeoutEvidence(VITEST_TIMEOUT);
 		expect(evidence).not.toBeNull();
 		expect(VITEST_TIMEOUT).toContain(evidence as string);
+	});
+});
+
+// ── A PATH ERROR IS NOT A COMPILE VERDICT — JAN-SELREV SR-1 ─────────────────────────────────────────────────────
+//
+// SR-1 declared the first two ledger mutants on ROOT-LEVEL files (`SR1-M27` on `vitest.config.ts`, `SR1-M28` on
+// `vitest.dist.config.ts`), and `bun run mutants` reported both NO_COMPILE with
+// `error TS5058: The specified path does not exist: 'vitest.config.ts/tsconfig.json'`. Nothing had failed to
+// compile: `pkgOf` takes a path's first segment as its project, which for a file with no directory is the file,
+// and the runner then asked `tsc` for a tsconfig inside it. The same blocking verdict `pkgOf`'s own comment records
+// for `verif/x.test.ts`, one case further out — and `verif/dependency-boundary-rules.test.ts` had already named it
+// for `.dependency-cruiser.cjs` and driven its mutants by hand to avoid it.
+//
+// A root-level file now compiles under `tsconfig.root-configs.json`. Two things are held here: the mapping, and —
+// the `.svelte` lesson in `compileVerdict` — that the mutated file is one of that program's ROOT files. A tsconfig
+// that exists but leaves the file out compiles green whatever the mutation did (NO_COMPILE unreachable rather than
+// wrong, which no run would ever show), or checks it only while some other root file still imports it.
+//
+// ⚠ AND THE SAME HOLE WAS OPEN INSIDE `apps/rph-demo`, WHERE NOTHING WAS REPORTED AT ALL. Held to EVERY measurable
+// entry rather than the root-level two, this census found seven compiled with `-p apps/rph-demo/tsconfig.json`, a
+// program that does not hold their file: J13-M15..M19 (`e2e/**` and `playwright.config.ts`), and SR-1's own SR1-M29
+// (`vitest.config.ts`) and SR1-M30 (`playwright.config.ts`). No TS5058 there — the tsconfig exists, it just builds
+// other files — so each compile leg passed whatever the mutation did, and NO_COMPILE could never fire. The
+// programs that do hold them already existed and `check-types` already ran them: `apps/rph-demo/e2e/tsconfig.json`
+// and `apps/rph-demo/tsconfig.vitest-config.json`.
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+/** Parsed once per distinct program: the ledger census alone names 16 programs for 1040 entries. */
+const parsedPrograms = new Map<string, { files: ReadonlySet<string> } | { error: string }>();
+
+/** The ROOT FILES `tsc -p <project>` builds, repo-relative — parsed by TypeScript itself, `extends` and all. */
+function rootFilesOf(project: string): { files: ReadonlySet<string> } | { error: string } {
+	const cached = parsedPrograms.get(project);
+	if (cached !== undefined) return cached;
+	const program = parseRootFiles(project);
+	parsedPrograms.set(project, program);
+	return program;
+}
+
+/** ⚠ `apps/rph-demo/tsconfig.json` extends the GENERATED `.svelte-kit/tsconfig.json` (the app's `prepare` script,
+ *  `svelte-kit sync`, writes it on install). Without it the parse reports TS5083 ("Cannot read file") AND still
+ *  returns a file list — the default `include`, a different program — so any parse error is an error here, never
+ *  a file list to measure against. */
+function parseRootFiles(project: string): { files: ReadonlySet<string> } | { error: string } {
+	let unrecoverable: string | undefined;
+	const parsed = ts.getParsedCommandLineOfConfigFile(`${REPO_ROOT}${project}`, undefined, {
+		...ts.sys,
+		onUnRecoverableConfigFileDiagnostic: (d) => {
+			unrecoverable = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+		}
+	});
+	if (parsed === undefined || unrecoverable !== undefined)
+		return { error: unrecoverable ?? `${project} could not be parsed` };
+	if (parsed.errors.length > 0)
+		return {
+			error: parsed.errors
+				.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
+				.join('; ')
+		};
+	return {
+		files: new Set(parsed.fileNames.map((f) => relative(REPO_ROOT, f).replaceAll('\\', '/')))
+	};
+}
+
+describe('SR-1 — the runner maps a mutated file to the program that holds it', () => {
+	// The LITERAL as well as the constant: asserted against `ROOT_CONFIGS_PROJECT` alone, this stayed green when the
+	// constant named another real program (`verif/tsconfig.json`, which holds the root configs only as imports).
+	it('maps a ROOT-LEVEL file to the root-configs project, not to `<file>/tsconfig.json`', () => {
+		expect(ROOT_CONFIGS_PROJECT).toBe('tsconfig.root-configs.json');
+		expect(compileProjectOf('vitest.config.ts')).toEqual({
+			key: 'tsconfig.root-configs.json',
+			tsconfig: 'tsconfig.root-configs.json'
+		});
+		expect(compileProjectOf('vitest.dist.config.ts').tsconfig).toBe('tsconfig.root-configs.json');
+	});
+
+	// Key and tsconfig both, as the CONTROL below explains: each program gets its own timing leg and cache file.
+	it('maps an app file its `tsconfig.json` leaves out to the app program that holds it', () => {
+		const e2e = {
+			key: 'apps/rph-demo/e2e/tsconfig.json',
+			tsconfig: 'apps/rph-demo/e2e/tsconfig.json'
+		};
+		expect(compileProjectOf('apps/rph-demo/e2e/support/harness.ts')).toEqual(e2e);
+		expect(compileProjectOf('apps/rph-demo/e2e/agent-retention.e2e.ts')).toEqual(e2e);
+		expect(compileProjectOf('apps/rph-demo/playwright.config.ts')).toEqual(e2e);
+		expect(compileProjectOf('apps/rph-demo/e2e-live/sdlc-pwa.live.ts')).toEqual(e2e);
+		expect(compileProjectOf('apps/rph-demo/playwright.live-exec.config.ts')).toEqual(e2e);
+		expect(compileProjectOf('apps/rph-demo/vitest.config.ts')).toEqual({
+			key: 'apps/rph-demo/tsconfig.vitest-config.json',
+			tsconfig: 'apps/rph-demo/tsconfig.vitest-config.json'
+		});
+	});
+
+	// CONTROL — the fix must not move any path that HAS a directory. Key and tsconfig both, because the key names the
+	// timing leg and the incremental cache file, and a changed key is a cold cache on every package.
+	it('CONTROL — every path with a directory keeps the project it always had', () => {
+		expect(compileProjectOf('packages/rph-domain/src/execution.ts')).toEqual({
+			key: 'packages/rph-domain',
+			tsconfig: 'packages/rph-domain/tsconfig.json'
+		});
+		expect(compileProjectOf('apps/rph-demo/src/lib/server/tools/devin-reviewer.ts')).toEqual({
+			key: 'apps/rph-demo',
+			tsconfig: 'apps/rph-demo/tsconfig.json'
+		});
+		// The near miss: a config at the app's root that its own program DOES hold (`.svelte-kit/tsconfig.json`
+		// includes `../vite.config.ts`), so a rule widened to "every app-root config" moves it and reddens here.
+		expect(compileProjectOf('apps/rph-demo/vite.config.ts')).toEqual({
+			key: 'apps/rph-demo',
+			tsconfig: 'apps/rph-demo/tsconfig.json'
+		});
+		expect(compileProjectOf('verif/live-backend-isolation.ts')).toEqual({
+			key: 'verif',
+			tsconfig: 'verif/tsconfig.json'
+		});
+		expect(compileProjectOf('scripts/mutants/run.ts')).toEqual({
+			key: 'scripts',
+			tsconfig: 'scripts/tsconfig.json'
+		});
+	});
+
+	// The project's own comment claims `files` is EVERY `.ts` at the root. `tsc` already refuses a listed file that is
+	// missing (TS6053); this holds the other direction — a new root `.ts` that no project owns.
+	it('the root-configs project lists every `.ts` file at the repository root', () => {
+		const program = rootFilesOf(ROOT_CONFIGS_PROJECT);
+		if ('error' in program) throw new Error(program.error);
+		const onDisk = readdirSync(REPO_ROOT, { withFileTypes: true })
+			.filter((e) => e.isFile() && /\.[cm]?ts$/.test(e.name))
+			.map((e) => e.name)
+			.sort((a, b) => a.localeCompare(b));
+		expect([...program.files].sort((a, b) => a.localeCompare(b))).toEqual(onDisk);
+	});
+});
+
+/** Build output, caches and reports: never a program anyone type-checks. Dot-directories (`.svelte-kit`, `.turbo`)
+ *  are skipped by name below — `.svelte-kit/tsconfig.json` is a BASE the app extends, not a program of its own. */
+const NOT_PROGRAM_DIRS = new Set([
+	'build',
+	'coverage',
+	'dist',
+	'e2e-results',
+	'node_modules',
+	'playwright-report',
+	'test-results'
+]);
+
+/** Every `tsconfig*.json` at the root and under the four workspace roots — the programs that EXIST, found on disk
+ *  rather than listed, so a new one cannot be missed by forgetting to name it here. */
+function programsOnDisk(): string[] {
+	const isTsconfig = (name: string): boolean => /^tsconfig.*\.json$/.test(name);
+	const found = readdirSync(REPO_ROOT).filter(isTsconfig);
+	const walk = (dir: string): void => {
+		for (const e of readdirSync(`${REPO_ROOT}${dir}`, { withFileTypes: true })) {
+			if (!e.isDirectory()) {
+				if (isTsconfig(e.name)) found.push(`${dir}/${e.name}`);
+			} else if (!e.name.startsWith('.') && !NOT_PROGRAM_DIRS.has(e.name)) walk(`${dir}/${e.name}`);
+		}
+	};
+	for (const root of ['apps', 'packages', 'scripts', 'verif']) walk(root);
+	return found.sort((a, b) => a.localeCompare(b));
+}
+
+/** Everything the runner type-checks with `tsc`: not history (never compiled; its file may be gone), not `.svelte`
+ *  (`compileVerdict` sends those to `svelte-check`, which reads the app's `.svelte` files — REG-F-175). */
+function measuredByTsc(): typeof DECLARED_MUTANTS {
+	return DECLARED_MUTANTS.filter((m) => !isHistory(m) && !m.file.endsWith('.svelte'));
+}
+
+describe('SR-1 — every mutant compiles under a program that contains its file', () => {
+	// ⚠ SELECTED BY WHAT THE RUNNER COMPILES, NOT BY THE MAPPING UNDER TEST, so a mapping that sends an entry to the
+	// wrong program reddens here rather than shrinking the census. ROOT files, not every file the program loads: a
+	// file reached only by import is checked only while that import survives (REG-F-097's shape).
+	it('every measurable ledger mutant compiled by `tsc` is a ROOT FILE of the program the runner compiles for it', () => {
+		const measured = measuredByTsc();
+		expect(measured.length, 'a census over no entries proves nothing').toBeGreaterThan(0);
+		const outside = measured.flatMap((m) => {
+			const { tsconfig } = compileProjectOf(m.file);
+			const program = rootFilesOf(tsconfig);
+			if ('error' in program) return [`${m.id}: ${tsconfig} — ${program.error}`];
+			return program.files.has(m.file) ? [] : [`${m.id}: ${m.file} is not in ${tsconfig}'s files`];
+		});
+		expect(outside).toEqual([]);
+	});
+
+	// THE ARGV THE RUNNER SPAWNS, PINNED LITERALLY. `run.ts` is imported by nothing, so while it built this array
+	// inline, putting back the pre-SR-1 `-p <pkg>/tsconfig.json` SURVIVED every suite that reaches the harness (the
+	// SR-1 verifier's V8). The mapping above can be right and the leg still compile the wrong program.
+	it('the compile leg runs `tsc -p` on the program `compileProjectOf` names, with the cache file it is given', () => {
+		const argv = (file: string): string[] => tscArgv(compileProjectOf(file), 'CACHE.tsbuildinfo');
+		expect(argv('vitest.config.ts')).toEqual([
+			'tsc',
+			'--noEmit',
+			'--incremental',
+			'--tsBuildInfoFile',
+			'CACHE.tsbuildinfo',
+			'-p',
+			'tsconfig.root-configs.json'
+		]);
+		expect(argv('apps/rph-demo/e2e/support/harness.ts').slice(-2)).toEqual([
+			'-p',
+			'apps/rph-demo/e2e/tsconfig.json'
+		]);
+		expect(argv('apps/rph-demo/vitest.config.ts').slice(-2)).toEqual([
+			'-p',
+			'apps/rph-demo/tsconfig.vitest-config.json'
+		]);
+		expect(argv('packages/rph-domain/src/execution.ts').slice(-2)).toEqual([
+			'-p',
+			'packages/rph-domain/tsconfig.json'
+		]);
+	});
+
+	// THE MAPPING HELD TO THE PROGRAMS' OWN FILE LISTS, for files no ledger entry targets yet. `compileProjectOf` names
+	// its secondary programs by path (see why in `verdict.ts`); this is what keeps that table from drifting away from
+	// the tsconfigs it mirrors — a file some program type-checks, routed to one that does not hold it, is the next
+	// J13-M15 waiting for its mutant.
+	it('every file ANY program type-checks is routed to a program that holds it', () => {
+		const programs = programsOnDisk();
+		const named = [...new Set(measuredByTsc().map((m) => compileProjectOf(m.file).tsconfig))];
+		expect(
+			named.filter((p) => !programs.includes(p)),
+			'the walk must find every program the runner compiles, or this census is over the wrong set'
+		).toEqual([]);
+		const misrouted = programs.flatMap((p) => {
+			const own = rootFilesOf(p);
+			if ('error' in own) return [`${p} — ${own.error}`];
+			return [...own.files].flatMap((f) => {
+				const { tsconfig } = compileProjectOf(f);
+				const target = rootFilesOf(tsconfig);
+				if ('error' in target) return [`${f} (a root file of ${p}): ${tsconfig} — ${target.error}`];
+				return target.files.has(f)
+					? []
+					: [`${f} (a root file of ${p}) is not in ${tsconfig}'s files`];
+			});
+		});
+		expect(misrouted).toEqual([]);
 	});
 });

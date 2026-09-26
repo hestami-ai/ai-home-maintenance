@@ -333,13 +333,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					return;
 				}
 				const mode = agentMode();
-				// Resolve the configured judge model before the isolated candidate begins. This configuration-only
-				// preflight never invokes agy or claims it is healthy.
-				const preflight = assurancePreflight({
-					testMode: isTestMode(),
-					assessor: process.env.JPWB_ASSESSOR,
-					judgeModel: process.env.JPWB_JUDGE_MODEL
-				});
+				// Resolve the configured reviewer before the isolated candidate begins. This configuration-only
+				// preflight never invokes the reviewer or claims it is healthy.
+				// ⭐ `JAN-SELREV` SR-1 — IT ASKS THE SELECTOR THE FLOOR REGISTRY ASKS (`REG-F-443`). This call used to
+				// hand it the retired `JPWB_ASSESSOR`, so in test mode the preflight and the registry disagreed in
+				// both directions.
+				const preflight = assurancePreflight({ testMode: isTestMode() });
 				// ⚠ ACT ON THE VERDICT, NOT ONLY ON THE GUIDANCE. This route previously read `preflight.guidance`
 				// and NEVER read `preflight.ready` — which was harmless only while `ready` was the literal `true`
 				// on every path. The moment the preflight could refuse, ignoring the verdict would have made the

@@ -24,7 +24,14 @@ import {
 	mutationTreeMatchesBaseline,
 	type MutationTreeBaseline
 } from './tree-baseline.js';
-import { gradeControl, gradeNamedVictim, nonCompletion } from './verdict.js';
+import {
+	compileProjectOf,
+	gradeControl,
+	gradeNamedVictim,
+	nonCompletion,
+	pkgOf,
+	tscArgv
+} from './verdict.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -436,21 +443,21 @@ function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | 
 	// what the app actually checks: change the app's checker and this follows, with nothing to remember. The
 	// harness was compiling the app with a WEAKER compiler than the app's own gate, and copying the command here
 	// would have re-created that gap the next time the app changed.
+	//
+	// ⭐ THE `tsc` ARM ASKS `compileProjectOf` FOR ITS PROGRAM, NOT `pkgOf` FOR A DIRECTORY (JAN-SELREV SR-1). A
+	// ROOT-LEVEL file has no directory, and `pkgOf` returned the file itself: `SR1-M27`/`SR1-M28` ran
+	// `tsc -p vitest.config.ts/tsconfig.json` and reported NO_COMPILE on TS5058 — this comment's `.svelte` lesson
+	// from the other side, a path error where it had been a program that never held the file. The app's `e2e/**`,
+	// `playwright.config.ts` and `vitest.config.ts` had the `.svelte` lesson itself, silently: `-p
+	// apps/rph-demo/tsconfig.json` exists and holds none of them. `compileProjectOf` names the program that holds each,
+	// `tscArgv` builds the argv, and `verif/mutant-verdict.test.ts` pins both and holds every measurable ledger entry
+	// to being a root file of its program.
 	const isSvelte = m.file.endsWith('.svelte');
 	const pkg = pkgOf(m.file);
+	const project = compileProjectOf(m.file);
 	const types = isSvelte
 		? timed(`svelte-check ${pkg}`, () => sh('bun', ['run', '--cwd', pkg, 'check']))
-		: timed(`tsc ${pkg}`, () =>
-				sh('bunx', [
-					'tsc',
-					'--noEmit',
-					'--incremental',
-					'--tsBuildInfoFile',
-					buildInfoFor(pkg),
-					'-p',
-					`${pkg}/tsconfig.json`
-				])
-			);
+		: timed(`tsc ${project.key}`, () => sh('bunx', tscArgv(project, buildInfoFor(project.key))));
 	const compiles = types.status === 0;
 	// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck IS
 	// the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
@@ -546,7 +553,7 @@ function controlVerdict(m: DeclaredMutant, passed: boolean): Result {
  * blind to FLAKES: a timing-dependent test can pass the baseline and fail the mutated run for reasons that have
  * nothing to do with the mutation, and that was still scored KILLED.
  *
- * ⚠ THE ASYMMETRY THAT MADE THIS CHEAP TO FIX, AND IT WAS ALREADY HALF-DONE. `playwright.config.ts:30` sets
+ * ⚠ THE ASYMMETRY THAT MADE THIS CHEAP TO FIX, AND IT WAS ALREADY HALF-DONE. `playwright.config.ts:38` sets
  * `retries: 1`, so the e2e channel has ALWAYS confirmed its reds; a fail-then-pass exits zero and reports
  * SURVIVED. **Vitest had neither a retry nor a `testTimeout` override**, so its victims had no confirmation at
  * all — while REG-F-169 measured that this repository's real flake mechanism is precisely a load-dependent
@@ -826,21 +833,7 @@ function runMutant(m: DeclaredMutant): Result {
 	}
 }
 
-/**
- * `packages/rph-domain/src/x.ts` -> `packages/rph-domain`; `verif/x.test.ts` -> `verif`.
- *
- * ⚠ THE SECOND CASE WAS MISSING AND IT REPORTED NO_COMPILE, WHICH READS LIKE A VERDICT. Blind two-segment slicing
- * turns `verif/x.test.ts` into `verif/x.test.ts`, so the preflight typecheck ran `tsc -p verif/x.test.ts/tsconfig.json`
- * and failed with TS5058 — a path error dressed as a compile verdict, on a mutant that in fact kills cleanly.
- * `packages` and `apps` are the workspace roots and nest one level; every other top-level directory is its own
- * project. Named explicitly rather than inferred from the presence of a tsconfig, because a MISSING tsconfig must
- * stay loud: it means the mutated file is under no type gate at all, which is REG-F-097's whole subject.
- */
-const NESTED_ROOTS = new Set(['packages', 'apps']);
-const pkgOf = (file: string): string => {
-	const parts = file.split('/');
-	return NESTED_ROOTS.has(parts[0] ?? '') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
-};
+// `pkgOf` and its `verif/` history now live in `verdict.ts`, beside `compileProjectOf`, where a suite can reach them.
 
 /** The app that owns the Playwright project. Its config, its webServer, its `bunx playwright test`. */
 const E2E_APP = 'apps/rph-demo';

@@ -54,6 +54,7 @@ import {
 	dispatchMultiPartyBatch,
 	getRegisteredIntent,
 	hostNow,
+	isTestMode,
 	mintUiId,
 	reviewerSession,
 	uiSession
@@ -62,6 +63,7 @@ import {
 	planDeclaredSignoff,
 	unsatisfyingReviews
 } from '$lib/server/assurance/declared-policy-signoff';
+import { assurancePreflight } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
@@ -1009,6 +1011,23 @@ export const actions: Actions = {
 		// type now SAYS who does its work, and `checkDischargeCoherence` keeps the two from disagreeing — an
 		// ACTIVE template on a non-MODEL type is refused at the handler, so this single read is sufficient.
 		const isModelStep = pwuType?.workDischarge === 'MODEL';
+
+		// ── ⭐ `JAN-SELREV` SR-1 (D5) — A MODEL STEP IS REFUSED BEFORE PAID WORK WHEN ITS REVIEWER CANNOT RUN ────────
+		//
+		// ⛔ THE WORK PRODUCT OF A MODEL STEP IS JUDGED BY THE MANDATORY REASONING REVIEW, and until this line a
+		// misconfigured reviewer was discovered only when that review ran — after the batch below had started the step
+		// and the executor had been opened and paid for. When the fault was devin's missing model it was worse: the
+		// floor registry THREW at build, out of the loop's try/finally, leaving the step RUNNING (`REG-F-457` G3, G5).
+		// ⭑ So the selector the floor registry reads is asked HERE, before anything is dispatched: a refusal returns
+		// its guidance and the work unit stays as it was. The authoring route asks the same preflight (`REG-F-443`).
+		// ⚠ A TRANSFORMATION STEP runs no reviewer — the operator completes it — so it is never refused here.
+		// ⚠ WHAT THIS CANNOT SEE: a devin configured but unusable — not on the server's PATH, not signed in (inferred,
+		// untested), or run from an untrusted directory — is found at the first review and RECORDED there, after the
+		// paid work.
+		if (isModelStep) {
+			const reviewer = assurancePreflight({ testMode: isTestMode() });
+			if (!reviewer.ready) return fail(400, { error: reviewer.guidance });
+		}
 
 		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
 		//

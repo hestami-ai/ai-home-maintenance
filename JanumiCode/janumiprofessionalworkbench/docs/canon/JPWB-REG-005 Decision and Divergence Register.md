@@ -37266,7 +37266,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-443 — the authoring preflight still reads the retired `JPWB_ASSESSOR` switch while the reviewer is chosen by `JPWB_ASSURANCE_TOOL`, so in test mode the two disagree in both directions
 
-**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ⚠ **OPEN — a migration residual; read from code, not driven.**
+**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ~~⚠ **OPEN — a migration residual; read from code, not driven.**~~ ✅ **CLOSED 2026-09-26 by `JAN-SELREV` `SR-1`** — the preflight and `createFloorRegistry` ask ONE selector (`apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts`), and `JPWB_ASSESSOR` is read nowhere. The agreement pair is pinned (`SR1-M15`, `SR1-M16`), and so is the route's own call (`SR1-M33`, `SR1-M34`), where this disagreement lived.
 
 - **THE MIGRATION.** `f35cb69d` (`JAN-LIVEEXEC`, 2026-09-05) retired the *"`JPWB_ASSESSOR='agy'`-means-real sentinel"*. `createFloorRegistry` now selects the real reviewer whenever `JPWB_ASSURANCE_TOOL` is set (`assurance/index.ts:47`: `const useMock = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL;`), and `execution/model.ts` was moved off the old switch with mutants in both directions (`execution/model.test.ts:137-147`).
 - **THE CALL SITE IT MISSED.** The agent route still feeds the preflight `assessor: process.env.JPWB_ASSESSOR` (`routes/pwa/[id]/agent/+server.ts:344`, a line last changed in `43ec23d0`, 2026-07-18). The preflight requires a judge model only when `!input.testMode || input.assessor === 'agy'` (`assurance/preflight.ts:30`), and its comment still states the old rule (`:27-28`).
@@ -37765,7 +37765,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-457 — the product's reviewer selection puts the NON-selected reviewer on the default path, runs agy for any unknown tool, throws instead of recording a missing devin model, preflights neither devin nor execution, never checks the model devin reports, and lets the gate inherit a live-backend selection
 
-**Filed 2026-09-26** (`JAN-SELREV`, read from code by two readers and two critics before any change; `DESIGN-the-selected-reviewer.md` §2). **Status:** ⚠ **OPEN — owed by `JAN-SELREV` `SR-1` (G1, G2, G3, G5, G8) and `SR-2` (G6).**
+**Filed 2026-09-26** (`JAN-SELREV`, read from code by two readers and two critics before any change; `DESIGN-the-selected-reviewer.md` §2). **Status:** ~~⚠ **OPEN — owed by `JAN-SELREV` `SR-1` (G1, G2, G3, G5, G8) and `SR-2` (G6).**~~ ⚠ **OPEN — G1, G2, G3, G5 and G8 CLOSED by `JAN-SELREV` `SR-1` (2026-09-26); G6 is owed by `SR-2`.**
 
 - **G1 — THE DEFAULT IS agy.** `apps/rph-demo/src/lib/server/assurance/index.ts:62`: `const assuranceTool = (process.env.JPWB_ASSURANCE_TOOL ?? 'agy').trim();`. It was introduced in `bdff99ce` (`JAN-TOOLSUITE` TS-07, 2026-09-05) and kept in `f35cb69d`; no register entry rules on it. After `REG-D-084`, a host with nothing configured gets the reviewer the sponsor did not select, and the preflight's guidance (`assurance/preflight.ts:43-45`) steers it to agy.
 - **G2 — ANY OTHER VALUE RUNS agy.** `index.ts:80-89` routes every value except exactly `devin` to agy's defaults: `pi` (declared ASSURANCE-capable, `tools/backing-tool.ts:79-80`), `Devin`, a typo, `''`. The executor refuses the same thing, and `backing-tool.ts:115` names the class: *"A SILENT FALLBACK IS THE FICTION `REG-D-052` FORBIDS"*.

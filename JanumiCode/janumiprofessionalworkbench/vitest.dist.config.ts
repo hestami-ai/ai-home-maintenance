@@ -28,7 +28,7 @@
 // to `test:src`, where attribution and reachability are to real source. This mode answers one question — does the
 // shipped artifact behave — and answering only that is what keeps its verdict readable.
 import { defineConfig } from 'vitest/config';
-import { projectsFor } from './vitest.projects.js';
+import { projectsFor, SETUP_LIVE_BACKENDS } from './vitest.projects.js';
 
 export default defineConfig({
 	// NO `resolve.alias`. Its ABSENCE is the whole content of this config, which is exactly why
@@ -39,6 +39,8 @@ export default defineConfig({
 		// The mirror of `test:src`'s `RPH_TEST_RESOLVE: 'source'`. Declared in the config rather than plumbed through
 		// a shell variable so the flag cannot drift from the resolution it names.
 		env: { RPH_TEST_RESOLVE: 'dist' },
+		// ⭐ `JAN-SELREV` D8 — the same live-backend removal as `test:src`; see `vitest.projects.ts`.
+		setupFiles: [SETUP_LIVE_BACKENDS],
 		// Artifact mode runs the complete cross-project suite concurrently against emitted package exports. The
 		// Vitest 5-second defaults predate the compiler-backed CSAA fixtures and now expire during otherwise-valid
 		// scheduling contention. These are test-harness watchdogs, measured against the complete suite; they are not

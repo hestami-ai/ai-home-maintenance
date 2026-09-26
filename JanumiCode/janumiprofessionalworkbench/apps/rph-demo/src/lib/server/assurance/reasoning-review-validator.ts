@@ -334,7 +334,11 @@ function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
 
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
-	modelId?: string;
+	/**
+	 * The configured model, or a resolver called when the review RUNS (`JAN-SELREV` D4: the devin branch passes
+	 * `assuranceModel`, so its model is read in `evaluate`, as agy's `judgeModel()` is, and a refusal is recorded).
+	 */
+	modelId?: string | (() => string);
 	/**
 	 * WHO is reviewing, and on whose infrastructure.
 	 *
@@ -384,7 +388,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			let evaluator: Identity = {
 				actorType: 'AGENT',
 				agentId: opts.agentId ?? 'agy',
-				modelId: opts.modelId ?? judgeModel(),
+				modelId: typeof opts.modelId === 'function' ? opts.modelId() : (opts.modelId ?? judgeModel()),
 				// Defaults preserve today's behaviour exactly; a second tool supplies its own.
 				providerId: opts.providerId ?? 'google'
 			};

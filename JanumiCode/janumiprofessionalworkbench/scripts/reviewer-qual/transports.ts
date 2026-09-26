@@ -118,7 +118,8 @@ export async function loadTransport(
 			deps
 		);
 	const devin = await import('../../apps/rph-demo/src/lib/server/tools/devin-reviewer.js');
-	// ⛔ devin's argv cannot be seen (no exec seam), so the label is held to what the PRODUCT resolves instead: an `env`
+	// ⛔ devin's argv is not seen here: `devinPrint` has an exec seam (`DevinExec`, `JAN-SELREV` SR-1), but this harness
+	// runs it with the default exec, the real program. So the label is held to what the PRODUCT resolves instead: an `env`
 	// the product does not read, or a variable something else overrode, would otherwise record one model and run another.
 	const problem = devinModelProblem(devin.resolveAssuranceModel(), spec.modelLabel);
 	if (problem) throw new HarnessRefusal(problem);
@@ -291,7 +292,8 @@ export interface DevinModule {
 }
 
 /**
- * The product's `devinPrint`. ⚠ It has no exec seam, so its argv cannot be asserted: the label reaches it through
+ * The product's `devinPrint`. ⚠ Its argv is not asserted here: it has an exec seam (`DevinExec`, `JAN-SELREV` SR-1),
+ * but this harness calls it with the default exec, the real program. The label reaches it through
  * `JPWB_ASSURANCE_MODEL`, and what devin REPORTS having run is recorded as the resolved evaluator. Its failure carries
  * no kill flag through the sanitised message, so a failure at the 240 s bound is classified a TIMEOUT by the clock.
  * ⛔ SO THE LABEL IS HELD TO WHAT THE PRODUCT RESOLVES, before every call: a model that no longer resolves, or resolves to

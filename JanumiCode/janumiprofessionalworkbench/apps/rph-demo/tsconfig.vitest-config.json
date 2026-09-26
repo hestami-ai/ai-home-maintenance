@@ -1,0 +1,10 @@
+{
+	// ⭐ `JAN-SELREV` SR-1 — WHAT GATES THE GATE'S OWN WIRING. `vitest.config.ts` removes the live-backend variables for
+	// this app's own `vitest run` (design D8), but `svelte-check`'s include list (`.svelte-kit/tsconfig.json`) names
+	// `vite.config.ts` and not this file, so nothing type-checked it. This project checks exactly that one file under
+	// the app's own compiler options; `check-types` runs it.
+	"extends": "./tsconfig.json",
+	"compilerOptions": { "noEmit": true },
+	"include": [],
+	"files": ["vitest.config.ts"]
+}

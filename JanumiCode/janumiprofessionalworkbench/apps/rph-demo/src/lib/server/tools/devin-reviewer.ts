@@ -43,6 +43,19 @@ export function assuranceModel(): string {
 }
 
 /**
+ * The exec seam — `AgyExec`'s shape (`assurance/agy-cli.ts`), for the same reason: without it the devin branch could be
+ * exercised only by driving a real devin, so no test had ever reached it (`JAN-SELREV` SR-1). A stand-in script cannot
+ * take its place either: node refuses a batch target with `shell: false` (EINVAL, measured in
+ * `execution/child-process-runner.test.ts`). ⚠ A seam standing in for devin also writes the export file devin writes,
+ * at the path its argv names after `--export`.
+ */
+export type DevinExec = (
+	file: string,
+	args: readonly string[],
+	options: { timeout: number; maxBuffer: number; windowsHide: boolean }
+) => Promise<{ stdout: string }>;
+
+/**
  * One non-interactive Devin call, returning stdout.
  *
  * ⭑ THE PROMPT GOES IN A FILE, NOT IN ARGV, and that is the whole reason this adapter is simpler than `agy`'s.
@@ -59,7 +72,10 @@ export function assuranceModel(): string {
  * BYPASS. It proved unnecessary — the probe succeeded without it — so an untrusted-directory failure surfaces
  * as a refusal to be fixed by trusting the directory, never by disabling the check.
  */
-export async function devinPrint(prompt: string): Promise<string | ToolInvocationResult> {
+export async function devinPrint(
+	prompt: string,
+	exec: DevinExec = run as unknown as DevinExec
+): Promise<string | ToolInvocationResult> {
 	// ⚠ RESOLVED BEFORE THE DIRECTORY EXISTS. `assuranceModel()` REFUSES when unconfigured (`REG-F-331`), and
 	// my first version of this line put it after `mkdtemp` and outside the `try` — so an unconfigured host
 	// would leak a temp directory on every refusal. Resolving first means the refusal happens before anything
@@ -70,7 +86,7 @@ export async function devinPrint(prompt: string): Promise<string | ToolInvocatio
 	const exportPath = join(dir, 'export.json');
 	try {
 		await writeFile(promptPath, prompt, 'utf8');
-		const { stdout } = await run(
+		const { stdout } = await exec(
 			DEVIN_BIN,
 			['--print', '--model', configured, '--prompt-file', promptPath, '--export', exportPath],
 			{ timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }

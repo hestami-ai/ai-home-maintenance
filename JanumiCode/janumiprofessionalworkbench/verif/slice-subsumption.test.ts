@@ -579,7 +579,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			// ⭐ AND ASKING SHARPENED THE SCOPE: reading the live lane's roadmap end to end is what showed that the
 			// lane's report was the ONE place a reviewer's quality was ever recorded, and that its report is
 			// broken (`REG-F-445`) — qualification is the first durable record of it, not a second one.
-		).toBe(50);
+			//
+			// 50 -> 51 (2026-09-26): `ROADMAP-the-selected-reviewer.md` (`JAN-SELREV`, `REG-D-084`, `REG-D-085`,
+			// `REG-D-086`). ⭑ THE SPONSOR'S SELECTION CHANGES THE PRODUCT'S RUNTIME, WHICH NO NEAR CLAIMANT OWNS.
+			//   · `ROADMAP-what-the-tests-prove.md` MEASURES candidate reviewers; its design stops at *"your first
+			//     report can inform the choice of deployed model"* (Q7 (d)). Putting the chosen one into
+			//     `createFloorRegistry`, both preflights and the gate's environment is product work it never designed.
+			//     Only `SR-4` touches its check, under a ruling of its own (`REG-D-086`).
+			//   · `ROADMAP-backing-agent-tool-suite.md` (`JAN-TOOLSUITE`) made the executor and the reviewer
+			//     different TOOLS, under the 2026-09-05 direction (GLM-5.2); its `TS-07` introduced the `agy` default
+			//     this roadmap removes. Refusing an unconfigured host and holding the SELECTED model to its
+			//     qualification is a different goal under a different ruling.
+			//   · `ROADMAP-live-execution-lane.md` configures a reviewer for a lane whose `LE-03`–`LE-05` *"may never
+			//     gate"*; the selection is held by the gate.
+		).toBe(51);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

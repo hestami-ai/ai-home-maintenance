@@ -159,3 +159,112 @@ export function gradeControl(
 		detail: `declared a CONTROL, but the mutation NEWLY reddened ${fresh.length} suite(s) — something observes it: ${fresh.slice(0, 3).join(', ')}`
 	};
 }
+
+/**
+ * `packages/rph-domain/src/x.ts` -> `packages/rph-domain`; `verif/x.test.ts` -> `verif`.
+ *
+ * ⚠ THE SECOND CASE WAS MISSING AND IT REPORTED NO_COMPILE, WHICH READS LIKE A VERDICT. Blind two-segment slicing
+ * turns `verif/x.test.ts` into `verif/x.test.ts`, so the preflight typecheck ran `tsc -p verif/x.test.ts/tsconfig.json`
+ * and failed with TS5058 — a path error dressed as a compile verdict, on a mutant that in fact kills cleanly.
+ * `packages` and `apps` are the workspace roots and nest one level; every other top-level directory is its own
+ * project. Named explicitly rather than inferred from the presence of a tsconfig, because a MISSING tsconfig must
+ * stay loud: it means the mutated file is under no type gate at all, which is REG-F-097's whole subject.
+ *
+ * MOVED HERE FROM `run.ts` (JAN-SELREV SR-1) so a suite can reach it — see this file's header. A ROOT-LEVEL file has
+ * no directory to be a project, and is not this function's case: `compileProjectOf` below settles it first.
+ */
+const NESTED_ROOTS = new Set(['packages', 'apps']);
+export const pkgOf = (file: string): string => {
+	const parts = file.split('/');
+	return NESTED_ROOTS.has(parts[0] ?? '') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
+};
+
+/** The tracked project that type-checks every `.ts` file at the repository root (`check-types` runs it). */
+export const ROOT_CONFIGS_PROJECT = 'tsconfig.root-configs.json';
+
+/** What the compile leg builds: `tsconfig` is what `tsc -p` is given; `key` names the timing leg and the cache. */
+export interface CompileProject {
+	readonly key: string;
+	readonly tsconfig: string;
+}
+
+/**
+ * THE PROGRAMS INSIDE A PACKAGE THAT HOLD FILES ITS `tsconfig.json` LEAVES OUT — each mirrors its tsconfig's own
+ * `include`/`files`, directory by directory and file by file.
+ *
+ * ⚠ NAMED BY PATH, NOT DERIVED BY PARSING THE TSCONFIGS AT RUN TIME, for three reasons. This file is pure (see its
+ * header), and a parse is filesystem work. The app's main program is knowable only through `.svelte-kit/tsconfig.json`,
+ * which `svelte-kit sync` GENERATES, so a derived rule would let generated state choose which program judges a
+ * mutation. And the derivation still happens — in the test, where drift can be seen: `verif/mutant-verdict.test.ts`
+ * parses EVERY `tsconfig*.json` with TypeScript itself and holds each root file of each one, and each ledger mutant's
+ * file, to being a root file of the program this names. A table that falls behind its tsconfig reddens there.
+ */
+const SECONDARY_PROGRAMS: readonly {
+	readonly tsconfig: string;
+	readonly dirs: readonly string[];
+	readonly files: readonly string[];
+}[] = [
+	{
+		// `e2e/tsconfig.json`: `**/*.ts` under `e2e/`, the two live-suite directories, and the three Playwright configs.
+		tsconfig: 'apps/rph-demo/e2e/tsconfig.json',
+		dirs: ['apps/rph-demo/e2e/', 'apps/rph-demo/e2e-live/', 'apps/rph-demo/e2e-live-exec/'],
+		files: [
+			'apps/rph-demo/playwright.config.ts',
+			'apps/rph-demo/playwright.live.config.ts',
+			'apps/rph-demo/playwright.live-exec.config.ts'
+		]
+	},
+	{
+		tsconfig: 'apps/rph-demo/tsconfig.vitest-config.json',
+		dirs: [],
+		files: ['apps/rph-demo/vitest.config.ts']
+	}
+];
+
+/**
+ * WHICH PROGRAM `tsc` BUILDS TO JUDGE A MUTATION OF `file` — the cases `pkgOf` never had (JAN-SELREV SR-1).
+ *
+ * ⚠ THE `verif/` DEFECT ONE LEVEL FURTHER OUT, AND IT BLOCKED THE SAME WAY. `SR1-M27` (`vitest.config.ts`) and
+ * `SR1-M28` (`vitest.dist.config.ts`) are the ledger's first ROOT-LEVEL targets, and `pkgOf` returns such a file as
+ * its own project, so the runner ran `tsc -p vitest.config.ts/tsconfig.json` and reported both
+ * `NO_COMPILE — error TS5058: The specified path does not exist`. A root-level file has no directory; it compiles
+ * under `ROOT_CONFIGS_PROJECT`.
+ *
+ * ⚠ AND THE SAME DEFECT INSIDE THE APP, WHERE IT WAS SILENT. `apps/rph-demo/tsconfig.json` exists, so no TS5058 —
+ * but its program holds none of `e2e/**`, `playwright.config.ts` or `vitest.config.ts`, and seven ledger entries
+ * (J13-M15..M19, SR1-M29, SR1-M30) were compiled under it: a leg that passed whatever the mutation did, so
+ * NO_COMPILE could never fire (`compileVerdict`'s `.svelte` lesson, for `.ts`). They compile under the
+ * `SECONDARY_PROGRAMS` that hold them, which `check-types` already runs.
+ *
+ * Every other path maps exactly as before — same `-p`, same timing leg, same `.tsbuildinfo`. A new program's key is
+ * its tsconfig path, so its timing leg and cache file are its own.
+ */
+export function compileProjectOf(file: string): CompileProject {
+	if (!file.includes('/')) return { key: ROOT_CONFIGS_PROJECT, tsconfig: ROOT_CONFIGS_PROJECT };
+	const owner = SECONDARY_PROGRAMS.find(
+		(p) => p.files.includes(file) || p.dirs.some((dir) => file.startsWith(dir))
+	);
+	if (owner !== undefined) return { key: owner.tsconfig, tsconfig: owner.tsconfig };
+	const pkg = pkgOf(file);
+	return { key: pkg, tsconfig: `${pkg}/tsconfig.json` };
+}
+
+/**
+ * THE `tsc` ARGUMENTS FOR ONE COMPILE LEG (after `bunx`) — built here, not in `run.ts`, so a suite can pin them.
+ *
+ * ⚠ THE LEG'S TRUST RESTS ON `-p` NAMING THE PROGRAM `compileProjectOf` CHOSE, and when this was an inline array in
+ * `run.ts` nothing observed it: a mutant putting back the pre-SR-1 `-p <pkg>/tsconfig.json` SURVIVED every suite
+ * that reaches the harness, because `run.ts` is imported by nothing. `buildInfo` is the cache file's path, which
+ * `run.ts` owns because creating its directory is filesystem work.
+ */
+export function tscArgv(project: CompileProject, buildInfo: string): string[] {
+	return [
+		'tsc',
+		'--noEmit',
+		'--incremental',
+		'--tsBuildInfoFile',
+		buildInfo,
+		'-p',
+		project.tsconfig
+	];
+}

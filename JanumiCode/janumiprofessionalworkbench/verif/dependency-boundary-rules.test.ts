@@ -71,12 +71,14 @@
 //
 // ── THE MUTANTS, DRIVEN BY HAND AND RECORDED ──────────────────────────────────────────────────────────────────
 // Driven by editing `.dependency-cruiser.cjs`, running `--project verif dependency-boundary-rules`, and
-// restoring the file byte-for-byte. BY HAND rather than through the mutation ledger because
-// `scripts/mutants/run.ts:824-827` sets `NESTED_ROOTS = new Set(['packages','apps'])` and otherwise takes
-// `parts[0]` as the package, which for a ROOT-LEVEL file is the filename itself — so a ledger mutant on
-// `.dependency-cruiser.cjs` would compile `tsc -p .dependency-cruiser.cjs/tsconfig.json`, hit TS5058 and BLOCK
-// as NO_COMPILE. A root-level file with no directory is a third case neither arm of `pkgOf` handles; it is
-// filed for the mutation harness's owner, not fixed from here.
+// restoring the file byte-for-byte. BY HAND rather than through the mutation ledger because no program the runner
+// compiles holds a `.cjs`: `compileProjectOf` (`scripts/mutants/verdict.ts`) compiles a ROOT-LEVEL file under
+// `tsconfig.root-configs.json`, whose `files` are the root `.ts` files only, so a ledger mutant on this `.cjs`
+// would be judged by a program that does not contain it — and `verif/mutant-verdict.test.ts`'s ledger census
+// refuses exactly that (every measurable entry must be a root file of the program it compiles under). Before
+// JAN-SELREV SR-1 the reason was different: the runner took `pkgOf`'s first path segment as the project, ran
+// `tsc -p .dependency-cruiser.cjs/tsconfig.json`, hit TS5058 and BLOCKED as NO_COMPILE. Hand-driving is still
+// correct; only its reason changed.
 //
 // Every "the incumbent is GREEN/RED here" claim below is MEASURED, not reasoned from the source: the incumbent
 // derivation (`collect-inventory.ts:1655-1671`) was reproduced in a throwaway OS-temp probe and run against each

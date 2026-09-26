@@ -55,7 +55,7 @@
 // to check the replacement.
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { projectsFor } from './vitest.projects.js';
+import { projectsFor, SETUP_LIVE_BACKENDS } from './vitest.projects.js';
 
 const PKG_ROOT = fileURLToPath(new URL('./packages', import.meta.url));
 
@@ -92,6 +92,9 @@ export default defineConfig({
 		// mode — so the flag is correct by construction and cannot drift from the `resolve.conditions` above it.
 		// Cross-platform env plumbing in npm scripts needs `cross-env`; this needs nothing.
 		env: { RPH_TEST_RESOLVE: 'source' },
+		// ⭐ `JAN-SELREV` D8 — every project's test files start with the eight live-backend variables REMOVED, so an
+		// exported selection cannot turn the gate's stand-ins into real, paid runs. Shared with `vitest.dist.config.ts`.
+		setupFiles: [SETUP_LIVE_BACKENDS],
 		// ⭑⭑ JAN-CSAADEC CD-03 — THE SAME WATCHDOGS `vitest.dist.config.ts` HAS SET SINCE IT WAS WRITTEN, AND THE
 		// REASON THEY WERE MISSING HERE IS THE SHAPE THIS REPOSITORY KEEPS FILING. That file says, in terms:
 		// *"The Vitest 5-second defaults predate the compiler-backed CSAA fixtures and now expire during

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { forgetLiveBackendSelections } from '../../verif/live-backend-isolation';
 
 // E2E harness for the PWA Designer + Undertaking Workbench.
 //
@@ -19,6 +20,13 @@ import { defineConfig, devices } from '@playwright/test';
 // was wrong was not strictness but that the number was fixed in two places at once — the `url` read `PORT` while
 // the `command` hardcoded 4319, so they could disagree. Now there is one source.
 const PORT = Number(process.env.RPH_E2E_PORT ?? 4319);
+
+// ⭐ `JAN-SELREV` D8 — THE e2e SERVER NEVER INHERITS A LIVE-BACKEND SELECTION. Playwright launches the server below
+// from THIS process's environment (`{ ...process.env, ...webServer.env }`), so the eight live-backend variables are
+// removed here, at config load, before it does: exported, `JPWB_ASSURANCE_TOOL` would turn the declared stand-in into
+// the real, paid reviewer, `JPWB_EXECUTOR` the fixture into a real executor, and `JPWB_AGENT=pi` the mock into the live
+// agent (`REG-F-457` G8). The live lanes have their own configs, which run the real backends and do not import this one.
+forgetLiveBackendSelections();
 
 export default defineConfig({
 	testDir: './e2e',

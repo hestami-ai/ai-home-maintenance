@@ -57,7 +57,7 @@ Read from code (two readers, then two critics, 2026-09-26).
 | G5 | **The execution path has no preflight.** A misconfigured reviewer is discovered only after paid execution. | `+page.server.ts` (`beginExecute`) |
 | G6 | **devin's reported model is never checked.** The model devin reports running is not compared with the one configured. | `tools/devin-reviewer.ts:82-105` |
 | G7 | **The reviewer program can be replaced.** `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN` work in every mode, and a replacement's reviews are recorded as the real tool's (`REG-F-441`). The agy EXECUTOR shares `AGY_BIN` (`execution/model.ts:103`). | `tools/devin-reviewer.ts:20`; `assurance/agy-cli.ts:8` |
-| G8 | **The gate inherits the shell's live-backend selections.** An exported `JPWB_ASSURANCE_TOOL` turns every test-mode stand-in into the real, paid reviewer, because `useStandin` keys on the variable's ABSENCE. An exported `JPWB_EXECUTOR` reaches the e2e server's executor (`execution/model.ts:66`, same shape). An exported `JPWB_AGENT=pi` reaches the authoring agent (`workbench.ts:636`). The gate's three vitest entry points and its e2e server all inherit the shell. | `assurance/index.ts:58`; `playwright.config.ts:57`; `scripts/gate-tail.ts:47`; `package.json` `test` / `test:dist` / `test:coverage` |
+| G8 | **The gate inherits the shell's live-backend selections.** An exported `JPWB_ASSURANCE_TOOL` turns every test-mode stand-in into the real, paid reviewer, because `useStandin` keys on the variable's ABSENCE. An exported `JPWB_EXECUTOR` reaches the e2e server's executor (`execution/model.ts:66`, same shape). An exported `JPWB_AGENT=pi` reaches the authoring agent (`workbench.ts:636`). ~~The gate's three vitest entry points and its e2e server all inherit the shell.~~ ⭑ *Corrected (`SR-1`):* `test:dist`, `test:coverage`, a direct `vitest run` in the app and the e2e server inherit the shell; `turbo run test` does not (strict env mode). | `assurance/index.ts:58`; `playwright.config.ts:57`; `scripts/gate-tail.ts:47`; `package.json` `test` / `test:dist` / `test:coverage` |
 | G9 | **The documents say agy.** README and `AUTHORING-BACKBONE.md` describe a Gemini default that does not exist (`REG-F-442`). `harness/README.md:31-36` and the headers of `index.ts` and `reasoning-review-validator.ts` name agy/Gemini as the product's reviewer. The live lane: its documents name `glm-5-2`; its spec says `readReportedModel` *"IS NEVER CALLED"* (false since `devin-reviewer.ts:82`); its config's REQUIRED list demands `JPWB_ASSURANCE_MODEL` for every tool, while the spec compares the reviewer against it (`:169`), which is wrong for agy; and its comments at `:15` and `:42-43` are stale. | `README.md:68-75`; `AUTHORING-BACKBONE.md:73-76`; `e2e-live-exec/execution.live.ts:42-46, 169`; `playwright.live-exec.config.ts:15, 25-30, 42-46` |
 | G10 | **The agy executor records the wrong model.** It runs `JPWB_JUDGE_MODEL` (`agyPrint` → `judgeModel()`) but records `JPWB_EXECUTOR_MODEL`. So agy executing and agy reviewing could run one model while the record shows two, a false ASR-13 pass. Out of this design's scope; filed. | `execution/model.ts:103`; `agy-cli.ts:82`; `+page.server.ts:1328` |
 | G11 | **devin adds hidden context.** devin injects ambient context from its host profile (`REG-F-357`: *"`<rules type=\"always-on\">` … plus `<available_skills>` — an ASR-13 *shared hidden context* concern that nothing detects"*). It runs in the server process's working directory, which must be trusted for print mode (`devin-reviewer.ts:58-60`). | `tools/devin-reviewer.ts:73-77` |
@@ -129,16 +129,25 @@ Read from code (two readers, then two critics, 2026-09-26).
   - **Residual.** The agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode. `REG-F-441` closes for the reviewer
     only; the executor half is filed.
 - **D8 — The gate never inherits a live-backend selection.** Every test-mode entry point of the gate starts with these
-  variables set to `''`: `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`,
+  variables ~~set to `''`~~ REMOVED (as built, below): `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`,
   `JPWB_EXECUTOR_MODEL`, `JPWB_AGENT`, `JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`. This follows
   `verif/reviewer-qualification-hermetic.ts`'s prior art.
-  - **Why `''` and never `undefined`.** Vitest writes config env into `process.env`, and Node turns `undefined` into
+  - ~~**Why `''` and never `undefined`.** Vitest writes config env into `process.env`, and Node turns `undefined` into
     the string `"undefined"`. Every reader of these variables must therefore treat `''` as unset; the implementer
-    verifies each one.
+    verifies each one.~~
+  - ⭑ **As built (`SR-1`, 2026-09-26): REMOVED, never `''`.** Each entry point deletes the eight
+    (`verif/live-backend-isolation.ts`). `''` would have broken two readers:
+    - the qualification harness refuses any program override that is not `undefined`
+      (`scripts/reviewer-qual/preflight.ts:39`);
+    - `process.env.JPWB_AGY_BIN ?? 'agy'` reads `''` as an empty program name.
+    The selector still treats `''` and whitespace as unset (D2).
   - **The entry points.**
     - The Playwright webServer env (`playwright.config.ts:57`).
-    - The root vitest configs' `test.env`, covering `vitest.config.ts` and `vitest.dist.config.ts`.
-    - `apps/rph-demo`'s own `vitest run` under turbo, whose `vite.config.ts` has no `test` block.
+    - The root vitest configs' ~~`test.env`~~ root-level `setupFiles` (as built), covering `vitest.config.ts` and
+      `vitest.dist.config.ts`.
+    - `apps/rph-demo`'s own `vitest run` ~~under turbo~~, whose `vite.config.ts` has no `test` block. ⭑ *As built:*
+      turbo 2.x runs `turbo run test` in strict env mode and already withholds `JPWB_*` (measured under `SR1-M29`),
+      so this protects a DIRECT `vitest run` in the app.
   - Tests that set a value in-process for their own arrangement are unchanged.
 - **D9 — The documents say what the product does.**
   - **The host documents.** README and `AUTHORING-BACKBONE.md` are rewritten, which closes `REG-F-442`. They cover:

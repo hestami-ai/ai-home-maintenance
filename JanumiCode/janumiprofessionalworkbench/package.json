@@ -9,7 +9,7 @@
 	],
 	"scripts": {
 		"build": "turbo run build",
-		"check-types": "turbo run check-types && tsc --noEmit -p verif/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+		"check-types": "turbo run check-types && tsc --noEmit -p verif/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p tsconfig.root-configs.json",
 		"lint": "eslint .",
 		"test": "turbo run test && bun run test:dist",
 		"gen": "turbo run gen",

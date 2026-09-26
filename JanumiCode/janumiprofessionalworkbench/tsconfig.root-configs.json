@@ -1,0 +1,22 @@
+{
+  // WHY THIS FILE EXISTS (JAN-SELREV SR-1, 2026-09-26). REG-F-097's shape, a third time.
+  //
+  // The root `tsconfig.json` has `include: []` and `files: []`, and no project named the `.ts` files AT THE REPO
+  // ROOT. They were type-checked only INCIDENTALLY: `verif/test-modes.test.ts` imports all three, so they enter
+  // `verif/tsconfig.json`'s program as dependencies (measured: a planted TS2322 in each reddens that leg). That is
+  // exactly how `scripts/tsconfig.json` found `mutants/ledger.ts` checked — by an import someone could delete. They are
+  // not incidental files: `vitest.config.ts` and `vitest.dist.config.ts` decide what every gate run resolves and which
+  // setup files every project starts behind, and SR-1 had just given them the live-backend setup (design D8).
+  //
+  // IT IS ALSO THE PROGRAM THE MUTATION RUNNER COMPILES A ROOT-LEVEL FILE UNDER (`compileProjectOf` in
+  // `scripts/mutants/verdict.ts`). `files` is every `*.ts` at the root, and `verif/mutant-verdict.test.ts` holds it
+  // to that on disk and holds every root-level ledger mutant to being listed here — a mutant outside `files` would be
+  // judged by a program that does not own it.
+  "extends": "@janumipwb/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [],
+  "files": ["vitest.config.ts", "vitest.dist.config.ts", "vitest.projects.ts"]
+}
