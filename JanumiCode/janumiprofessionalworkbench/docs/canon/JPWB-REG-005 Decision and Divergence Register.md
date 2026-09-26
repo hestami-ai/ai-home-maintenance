@@ -37789,7 +37789,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-085 — DELEGATED (`REG-D-084`, `REG-D-071`): how the selected reviewer enters the product — configuration, never a default; one selector; a refusal recorded, never thrown; the model and program that ran are the ones configured; a hermetic gate
 
-**Decided 2026-09-26** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"* — for the outcome of Job 2, `REG-D-078` and `REG-D-084`; `JAN-SELREV`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `JAN-SELREV`; sponsor confirmation owed.**
+**Decided 2026-09-26** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"* — for the outcome of Job 2, `REG-D-078` and `REG-D-084`; `JAN-SELREV`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force from `JAN-SELREV`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-26 by the sponsor** — *"1 - REG-D-085 is confirmed"* (`REG-D-086`)
 
 - **THE DESIGN.** `docs/_working/DESIGN-the-selected-reviewer.md`, revision 2, after two adversarial critics (0 BLOCKER; 23 MAJOR and 14 MINOR findings on revision 1, all addressed). The roadmap is `ROADMAP-the-selected-reviewer.md`, in three increments: `SR-1`, `SR-2`, `SR-3`.
 - **IN BRIEF.**
@@ -37808,3 +37808,23 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   3. **A substituted model fails the review.** Its remedy is re-qualification or re-selection, not reconfiguration.
   4. **A program override outside test mode refuses the review.**
 - **THE SPONSOR'S QUESTION, not built until ruled:** should the gate hold the SELECTED reviewer to today's definition (design §5, `Q1`)? Recommended: yes.
+
+### REG-D-086 — SPONSOR RULING: `REG-D-085` confirmed; the gate holds the SELECTED reviewer to today's definition (`JAN-SELREV` Q1, built as `SR-4`)
+
+**Ruled 2026-09-26** (sponsor, in session, answering the `JAN-SELREV` design report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; `SR-4` is owed.**
+
+- **THE SPONSOR'S WORDS, verbatim:**
+  1. *"1 - REG-D-085 is confirmed"*
+  2. *"2 - Yes is approved."*
+- **WHAT (1) MEANS.** `REG-D-085` is confirmed, with the four items it listed:
+  - the selection leaves `REG-D-052`'s no-default rule in force;
+  - an unconfigured host is refused rather than given agy;
+  - a substituted model fails the review;
+  - a program override outside test mode refuses the review.
+- **WHAT (2) MEANS.** It answers the report's second question, *"Should the gate re-measure the selected reviewer whenever the review definition changes?"*, which is `DESIGN-the-selected-reviewer.md` §5 `Q1`, recommended yes.
+  - The qualification record gains a `SELECTION` line citing `REG-D-084`.
+  - For each case that changes, `reviewer:qual:check`'s coverage limb then requires a covering record from the SELECTED candidate under today's fingerprint. A RESCORED record of its run suffices when only the scoring moved.
+  - This is stricter than `DESIGN-what-the-tests-prove.md` Q7 (d) (ii).
+  - Its cost: nothing when only the scoring moves. When what the cases send changes, one devin run over the changed cases: at most 52 calls, 40 to 77 minutes on the measured latencies, plus devin's per-call charge.
+  - What it guarantees: the SELECTED candidate is measured on the current definition. It does not show what a given host deploys, or that devin served the model it named.
+- **MADE WITH THIS ENTRY.** `REG-D-085`'s status is struck in place and restated. The design records the ruling, and the roadmap gains `SR-4`.

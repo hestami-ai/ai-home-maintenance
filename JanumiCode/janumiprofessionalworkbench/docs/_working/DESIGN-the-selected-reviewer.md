@@ -3,7 +3,7 @@
 **Authority:** `REG-D-084` (sponsor, 2026-09-26): *"REG-D-083 and REG-D-082 are approved. We will proceed with your
 recommendation for the clean-case residue. GLM-5.3 Flash Max is selected."* The role is `REG-D-078`'s *"the assurance
 policies responsibility"*. · **Date:** 2026-09-26 · **Revision:** 2 (revision 1 was attacked by two adversarial
-critics; §7 lists what changed) · **Status:** DRAFT.
+critics; §7 lists what changed) · **Status:** ~~DRAFT.~~ ✅ **RATIFIED 2026-09-26** — `REG-D-085` confirmed and `Q1` approved by the sponsor (`REG-D-086`).
 
 **Delegation.** The decisions below are delegated best judgement under `REG-D-071`'s standing delegation: *"For anything
 else related that needs my decision or input you will need to author solutions and use your best judgement."* The
@@ -209,7 +209,7 @@ Any mutant whose anchor moves is re-anchored in the same commit (ledger rule #5)
     measured v3/v2 latencies, plus devin's per-call charge.
 - **What it guarantees.** The SELECTED candidate is measured on the current definition. It does not show what a given
   host deploys, or that devin served the model it named.
-- *Recommended: yes.* Not built until ruled.
+- *Recommended: yes.* ~~Not built until ruled.~~ ⭑ **RULED 2026-09-26: yes** — *"2 - Yes is approved."* (`REG-D-086`). Built as `SR-4`.
 
 ## 6. For sponsor confirmation (`REG-D-085`)
 

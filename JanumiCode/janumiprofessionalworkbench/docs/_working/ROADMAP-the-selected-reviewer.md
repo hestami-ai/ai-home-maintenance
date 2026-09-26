@@ -1,7 +1,7 @@
 # ROADMAP — `JAN-SELREV`: the selected reviewer in the product
 
 **Design:** `DESIGN-the-selected-reviewer.md` (revision 2) · **Authority:** `REG-D-084` (sponsor selection); the
-design's decisions are delegated under `REG-D-071` and recorded as `REG-D-085` · **Date:** 2026-09-26 · **Status:** IN
+design's decisions are delegated under `REG-D-071` and recorded as `REG-D-085`, confirmed with `Q1` approved (`REG-D-086`) · **Date:** 2026-09-26 · **Status:** IN
 PROGRESS.
 
 ⭑ **Exit.**
@@ -73,7 +73,29 @@ Record `REG-D-085`.
   the tool's model variable; its stale comments are corrected; `REG-F-445` is fixed or cited. Its test timeout is
   checked against the reviewer's worst case.
 
+## `SR-4` — the gate holds the SELECTED reviewer to today's definition (`Q1`, ruled yes: `REG-D-086`)
+
+- **The record.** A `SELECTION` line kind in `docs/tracking/reviewer-qualification/runs.ndjson` names the
+  selected candidate (transport `devin`, model label `glm-5-3-flash-max`) and cites `REG-D-084`. It is
+  validated like every other line, and the LAST `SELECTION` line is in force.
+- **The check.** When a `SELECTION` is in force, the coverage limb also requires every current case to be
+  covered by a deployable RUN of the selected candidate under today's fingerprint, or by a RESCORED record of
+  such a run when only the scoring moved. A missing one is a COVERAGE problem that names the selected
+  candidate.
+- **Today.** The selected candidate's v3 run (`qr-2026-09-25-devin-glm-5-3-flash-max-v3`) covers all 26 current
+  cases, so the check stays GREEN when the line is appended.
+
+| Instrument | Must show first |
+|---|---|
+| a record whose current cases are covered only by ANOTHER candidate, with a `SELECTION` in force | RED, naming the selected candidate |
+| the same record with the selected candidate's run | GREEN |
+| only the scoring moved: a RESCORED record of the selected candidate's run suffices | GREEN |
+| a malformed `SELECTION` line | refused by the record's validation |
+| the committed record, with the `SELECTION` line appended | GREEN |
+
 ## Order
 
-`SR-1` → `SR-2` → `SR-3`. Each lands with its mutants, `gate:fast` green and a local commit. `Q1` (the selected
-reviewer held to today's definition) is built as `SR-4` only if the sponsor rules yes.
+~~`SR-1` → `SR-2` → `SR-3`. Each lands with its mutants, `gate:fast` green and a local commit. `Q1` (the selected
+reviewer held to today's definition) is built as `SR-4` only if the sponsor rules yes.~~ ⭑ **Restated 2026-09-26
+(`REG-D-086`):** `SR-1` → `SR-2` → `SR-3` → `SR-4`. Each lands with its mutants, `gate:fast` green and a local
+commit.
