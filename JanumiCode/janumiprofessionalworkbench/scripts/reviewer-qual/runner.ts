@@ -141,6 +141,9 @@ export async function evaluateCase(args: {
 	let harness: unknown;
 	/** The last reply that REPORTED an identity — the validator keeps it across calls, and so does the record. */
 	let reported: ToolInvocationResult | undefined;
+	// ⛔ NEVER `requireReportedModel` (`JAN-SELREV` D6). A run measures what the candidate did, and a reply reporting
+	// another model is recorded under that model; the fingerprint scores its corpus through here, and the corpus holds
+	// such replies, so setting it would move the fingerprint (`verif/reviewer-qualification-fingerprint.test.ts`).
 	const validator = createAgyReasoningReviewValidator({
 		agentId: args.candidate.agentId,
 		modelId: args.candidate.modelLabel,

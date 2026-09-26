@@ -120,14 +120,14 @@ Read from code (two readers, then two critics, 2026-09-26).
     When devin reports nothing, the identity stays `HOST_CONFIGURED`, as today.
   - **Disclosed.** The model's VERSION stays unreported for this reviewer.
 - **D7 — `REG-F-441`, remedy (a), enforced in the SELECTOR.**
-  - The adapters keep reading their overrides at load (`agy-cli.ts:8`, `devin-reviewer.ts:20`, unchanged), so the
+  - The adapters keep reading their overrides at load (`agy-cli.ts:8`, `devin-reviewer.ts:20`, unchanged; ⭑ *as built, `SR-2`:* the same single read, now exported and shared with the program constant, at `agy-cli.ts:15-17` and `devin-reviewer.ts:26-28`), so the
     harness test that kills `J22-M10` stands. They export the value they captured.
   - Outside test mode, the selector refuses when the override for the SELECTED tool is defined, even as `''`. A set
     `JPWB_AGY_BIN` does not refuse a devin review.
   - *Remedy (b) rejected:* recording the program's path and hash would keep an override usable in server mode, where
     no product or harness path uses one (critic's search, 2026-09-26).
   - **Residual.** The agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode. `REG-F-441` closes for the reviewer
-    only; the executor half is filed.
+    only; the executor half is filed (`REG-F-459`).
 - **D8 — The gate never inherits a live-backend selection.** Every test-mode entry point of the gate starts with these
   variables ~~set to `''`~~ REMOVED (as built, below): `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`,
   `JPWB_EXECUTOR_MODEL`, `JPWB_AGENT`, `JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`. This follows

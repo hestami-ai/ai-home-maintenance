@@ -173,3 +173,30 @@ describe('⭐ REG-F-443 — the authoring preflight and the floor registry agree
 			expect(registered === REFUSING, `the registry built ${registered}`).toBe(!row.ready);
 		});
 });
+
+describe('⭐ SR-2 (D7) — a captured program override refuses the preflight, before paid work', () => {
+	// ⛔ THE ROADMAP'S EXIT: a misconfigured host is refused BEFORE paid work, and a program override outside test mode is
+	// a misconfiguration. The preflight asks the selector, which acts on the override the adapter CAPTURED at load — so
+	// the arrangement sets it before a fresh import and removes it after, as a host sets it before the server starts.
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	it('⛔ outside test mode, a captured JPWB_DEVIN_BIN refuses a devin host; in test mode the same host is READY', async () => {
+		vi.resetModules();
+		vi.stubEnv('JPWB_DEVIN_BIN', 'C:/stand-in/devin.exe');
+		const { assurancePreflight: fresh } = await import('./preflight.js');
+		vi.stubEnv('JPWB_DEVIN_BIN', undefined);
+		const env = { JPWB_ASSURANCE_TOOL: 'devin', JPWB_ASSURANCE_MODEL: 'glm-5-3-flash-max' };
+
+		const server = fresh({ testMode: false, env });
+		expect(server.ready).toBe(false);
+		expect(server.code).toBe('REVIEWER_PROGRAM_OVERRIDDEN');
+		expect(server.guidance).toContain('JPWB_DEVIN_BIN="C:/stand-in/devin.exe"');
+		expect(server.guidance).toContain('REG-D-084');
+		expect(fresh({ testMode: true, env }).ready, 'in test mode the override is honoured').toBe(
+			true
+		);
+	});
+});

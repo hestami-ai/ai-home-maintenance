@@ -5,7 +5,16 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';
+/**
+ * ⭐ `JAN-SELREV` SR-2 (D7) — the program override this module CAPTURED when it loaded: `undefined` when
+ * `JPWB_AGY_BIN` was unset, `''` when it was set empty. Exported so the reviewer selector refuses what this module
+ * will actually run — outside test mode, a set override refuses an agy review (`REG-F-441`). ⚠ Still honoured here, in
+ * every mode: the harness's argv assertion is tested against a captured override, and the agy EXECUTOR
+ * (`execution/model.ts`) runs through this module too — outside test mode that half is not refused (`REG-F-459`).
+ */
+export const AGY_BIN_OVERRIDE: string | undefined = process.env.JPWB_AGY_BIN;
+
+const AGY_BIN = AGY_BIN_OVERRIDE ?? 'agy';
 
 /**
  * Resolve the judge to a concrete model selection, or to NOTHING.

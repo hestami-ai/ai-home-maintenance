@@ -83,6 +83,18 @@ Record `REG-D-085`.
 | the fingerprint unmoved with the option off; a mutant turning it on in the fingerprint's seams reddens the fingerprint test | new |
 | an override outside test mode refuses; under the never-honour mutant the test fails at the seam, never at a real program | red today |
 
+- ⭑ *Landed 2026-09-26.*
+  - **D6.** `requireReportedModel` sits in the validator's `timed()`, and only `createFloorRegistry`'s devin branch sets
+    it; the fingerprint is unmoved, and a copy test shows setting it in the runner's scoring seam would move it.
+    A substituted model's try is recorded as `rejected`, with the reported id graded `PROVIDER_REPORTED` and the
+    substitute's reply retained, before the review fails closed naming both ids. A refused REPAIR try is recorded
+    against its predecessor. There is no repair after a refusal.
+  - **D7.** The selector refuses the SELECTED tool's override outside test mode, `''` included, before the model
+    check. The adapters' single load-time read is now exported (`agy-cli.ts:15-17`, `devin-reviewer.ts:26-28`).
+  - **The register.** `REG-F-441` is closed for the reviewer, and `REG-F-457` is closed.
+  - **Filed.** `REG-F-459`, the agy executor's override. `REG-F-460`, the floor's retry guidance beside a
+    substitution refusal.
+
 ## `SR-3` — the documents (D9)
 
 - **The host documents.** README and `AUTHORING-BACKBONE.md` are rewritten, which closes `REG-F-442`. They cover the

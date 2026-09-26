@@ -37240,7 +37240,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-441 — the reviewer PROGRAM can be replaced in every mode, and a replaced program's reviews are recorded as the real tool's: `JPWB_AGY_BIN` and `JPWB_DEVIN_BIN` are read ungated
 
-**Filed 2026-09-23** (`JAN-CRITREAD`; raised by the adversarial check of the reframing put to the sponsor, verified first-hand). **Status:** ⛔ **OPEN — a product defect in the class `createFloorRegistry` already closed once for the mock; the remedy is a design choice and is owed.**
+**Filed 2026-09-23** (`JAN-CRITREAD`; raised by the adversarial check of the reframing put to the sponsor, verified first-hand). **Status:** ~~⛔ **OPEN — a product defect in the class `createFloorRegistry` already closed once for the mock; the remedy is a design choice and is owed.**~~ ✅ **CLOSED FOR THE REVIEWER 2026-09-26 by `JAN-SELREV` `SR-2`** — remedy (a), enforced in the reviewer selector (`DESIGN-the-selected-reviewer.md` D7). Outside test mode, an override for the SELECTED tool refuses the review, even when set to `''`, and the refusal is recorded. The adapters still read the override once at load, now exported and shared with the program constant (`agy-cli.ts:15-17`, `devin-reviewer.ts:26-28`), so the harness test that kills `J22-M10` stands. **The executor half is `REG-F-459`**: the agy executor still honours `JPWB_AGY_BIN` outside test mode.
 
 - **THE READS.** `apps/rph-demo/src/lib/server/assurance/agy-cli.ts:8` — `const AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';` — and `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:20` — `const DEVIN_BIN = process.env.JPWB_DEVIN_BIN ?? 'devin';`. Module scope, no mode test. Searched `process\.env\.[A-Z_]*_(BIN|PATH|CMD|COMMAND|EXE)\b` across `apps/rph-demo/src`: these two, and nothing else.
 - **WHAT IS RECORDED.** The evaluator a review records is built from the TOOL, not the program that ran: `agentId: opts.agentId ?? 'agy'`, `modelId: opts.modelId ?? judgeModel()`, `providerId: opts.providerId ?? 'google'` (`reasoning-review-validator.ts:366-369`). A replaced program's review is therefore recorded as an agy review by the configured model, and nothing in the record names what actually ran. PER-9 requires *"the resolved provider, model, and version actually invoked"* (`JPWB-DOC-003:369`).
@@ -37765,7 +37765,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-457 — the product's reviewer selection puts the NON-selected reviewer on the default path, runs agy for any unknown tool, throws instead of recording a missing devin model, preflights neither devin nor execution, never checks the model devin reports, and lets the gate inherit a live-backend selection
 
-**Filed 2026-09-26** (`JAN-SELREV`, read from code by two readers and two critics before any change; `DESIGN-the-selected-reviewer.md` §2). **Status:** ~~⚠ **OPEN — owed by `JAN-SELREV` `SR-1` (G1, G2, G3, G5, G8) and `SR-2` (G6).**~~ ⚠ **OPEN — G1, G2, G3, G5 and G8 CLOSED by `JAN-SELREV` `SR-1` (2026-09-26); G6 is owed by `SR-2`.**
+**Filed 2026-09-26** (`JAN-SELREV`, read from code by two readers and two critics before any change; `DESIGN-the-selected-reviewer.md` §2). **Status:** ~~⚠ **OPEN — owed by `JAN-SELREV` `SR-1` (G1, G2, G3, G5, G8) and `SR-2` (G6).**~~ ~~⚠ **OPEN — G1, G2, G3, G5 and G8 CLOSED by `JAN-SELREV` `SR-1` (2026-09-26); G6 is owed by `SR-2`.**~~ ✅ **CLOSED 2026-09-26** — G1, G2, G3, G5 and G8 by `JAN-SELREV` `SR-1`; G6 by `SR-2`. devin's reported model must equal the configured one, or the review fails closed with both named, and the refused try is recorded.
 
 - **G1 — THE DEFAULT IS agy.** `apps/rph-demo/src/lib/server/assurance/index.ts:62`: `const assuranceTool = (process.env.JPWB_ASSURANCE_TOOL ?? 'agy').trim();`. It was introduced in `bdff99ce` (`JAN-TOOLSUITE` TS-07, 2026-09-05) and kept in `f35cb69d`; no register entry rules on it. After `REG-D-084`, a host with nothing configured gets the reviewer the sponsor did not select, and the preflight's guidance (`assurance/preflight.ts:43-45`) steers it to agy.
 - **G2 — ANY OTHER VALUE RUNS agy.** `index.ts:80-89` routes every value except exactly `devin` to agy's defaults: `pi` (declared ASSURANCE-capable, `tools/backing-tool.ts:79-80`), `Devin`, a typo, `''`. The executor refuses the same thing, and `backing-tool.ts:115` names the class: *"A SILENT FALLBACK IS THE FICTION `REG-D-052` FORBIDS"*.
@@ -37828,3 +37828,19 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Its cost: nothing when only the scoring moves. When what the cases send changes, one devin run over the changed cases: at most 52 calls, 40 to 77 minutes on the measured latencies, plus devin's per-call charge.
   - What it guarantees: the SELECTED candidate is measured on the current definition. It does not show what a given host deploys, or that devin served the model it named.
 - **MADE WITH THIS ENTRY.** `REG-D-085`'s status is struck in place and restated. The design records the ruling, and the roadmap gains `SR-4`.
+
+### REG-F-459 — the agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode: `REG-F-441`'s executor half
+
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, the residual its design names under D7). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE PATH.** `execution/model.ts:103` runs the agy executor through `agyPrint`, which spawns `AGY_BIN`, and `AGY_BIN` is `AGY_BIN_OVERRIDE ?? 'agy'` (`assurance/agy-cli.ts:15-17`), read once at load and in every mode.
+- **WHY SR-2 LEFT IT.** `SR-2` refuses an override in the REVIEWER selector, and only for the SELECTED tool, so a set `JPWB_AGY_BIN` does not refuse a devin review. A host can therefore run the agy executor with a replaced program while its devin reviewer is admitted. The record then names agy as the producer's tool, which PER-9 forbids: *"the resolved provider, model, and version actually invoked"*.
+- **REMEDY CANDIDATES, UNTESTED.** (a) The executor selection (`selectBackingTool(…, 'EXECUTION')`) refuses an agy executor whose override is set outside test mode, mirroring the reviewer. (b) `REG-F-458`'s remedy (b), refusing `JPWB_EXECUTOR=agy` outright, would subsume it.
+
+### REG-F-460 — a model-substitution refusal carries the right remedy in its statement, but the floor's operator guidance beside it says "Configure or retry the reviewer"
+
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, raised by its adversarial verifier). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE REFUSAL.** When devin reports a model other than the configured one, the validator throws a refusal naming both ids, whose remedy is *re-qualify or re-select, never reconfigure* (design D6). The floor records it as `VALIDATOR_EXECUTION_FAILED`, as every throw is.
+- **THE GUIDANCE.** The floor classifies by CODE, never by prose (`apps/rph-demo/src/lib/server/floor.ts:216-231`). So the operator is shown `RETRY_OR_CONFIGURE_REVIEWER` with *"Configure or retry the reviewer"*. That contradicts the refusal's own remedy, and a retry is a second billed call to the same substitute. `autoRefine` is false, so nothing retries automatically.
+- **REMEDY CANDIDATE, UNTESTED.** Give the substitution its own observation code, carried by the thrown error and mapped by `runFloorResults` (`packages/rph-assurance`), plus a branch in the floor's remediation classifier that says re-qualify or re-select and never retry.

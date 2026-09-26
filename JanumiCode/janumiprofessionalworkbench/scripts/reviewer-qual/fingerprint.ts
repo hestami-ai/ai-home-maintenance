@@ -115,6 +115,7 @@ const SEEDED_INDEPENDENCE: IndependenceRequirement = (() => {
 })();
 
 export const PRODUCT_SEAMS: FingerprintSeams = {
+	// ⛔ Built WITHOUT `requireReportedModel`, as the runner's is (`JAN-SELREV` D6): only the product's devin branch sets it.
 	validator: (print) =>
 		createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, print }),
 	evaluate: evaluateCase,

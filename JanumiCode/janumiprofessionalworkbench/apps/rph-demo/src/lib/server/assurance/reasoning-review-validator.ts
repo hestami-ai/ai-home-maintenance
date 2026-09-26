@@ -332,6 +332,26 @@ function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
 	return { outcome: 'SCHEMA_COERCION_FAILED', detail };
 }
 
+/**
+ * ⭐ `JAN-SELREV` SR-2 (D6) — why a review by a substituted model fails: both ids, and the remedy.
+ *
+ * ⛔ THE REMEDY IS NOT THE CONFIGURATION. The configured model is the one that was qualified and selected
+ * (`REG-D-084`); pointing the configuration at whatever the tool served instead would make the record agree with a
+ * reviewer nobody measured. So the guidance says re-qualify or re-select, never reconfigure.
+ */
+function substitutedModel(
+	agentId: string | undefined,
+	reported: string | undefined,
+	configured: string
+): string {
+	return (
+		`The reviewing tool '${agentId ?? ''}' reported that the model '${reported ?? ''}' answered, but this review is ` +
+		`configured for '${configured}' — a substituted model, so the review fails closed (JAN-SELREV D6). ` +
+		'Reconfiguring does not fix this: the configured model is the one qualified and selected, so the remedy is to ' +
+		're-qualify the model the tool actually serves, or to re-select the reviewer (REG-D-084).'
+	);
+}
+
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	/**
@@ -349,6 +369,16 @@ export interface AgyValidatorOptions {
 	 */
 	agentId?: string;
 	providerId?: string;
+	/**
+	 * ⭐ `JAN-SELREV` SR-2 (D6) — REFUSE A REVIEW BY A MODEL OTHER THAN THE ONE CONFIGURED. When the backing tool reports
+	 * the model that answered and it is not `modelId`, the try is recorded REJECTED under the reported id, nothing is
+	 * repaired, and the review fails closed naming both.
+	 *
+	 * ⛔ SET ONLY BY THE PRODUCT'S DEVIN BRANCH (`assurance/index.ts`), NEVER BY THE FINGERPRINT OR THE QUALIFICATION
+	 * RUNNER. Their scoring corpus holds replies reporting OTHER models (`scripts/reviewer-qual/scoring-corpus.ts`), and
+	 * those outcomes are hashed into the reviewer fingerprint: an ungated check would refuse them, and move it.
+	 */
+	requireReportedModel?: boolean;
 	/** ICP-02 d2b — where the per-try exchange records go. Optional: the Validator is constructed fresh on every
 	 *  floor run with an empty options object, so a hard dependency would break the assurance path rather than
 	 *  degrade to today's behaviour. */
@@ -392,6 +422,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				// Defaults preserve today's behaviour exactly; a second tool supplies its own.
 				providerId: opts.providerId ?? 'google'
 			};
+			// ⭐ SR-2 (D6) — what the host ASKED FOR, held apart from `evaluator`, which a tool's report overwrites below.
+			const configuredModelId = evaluator.modelId ?? '';
 			// ⭑ `undefined` UNTIL A TOOL REPORTS ONE, and `identityFacts` then defaults to `HOST_CONFIGURED`.
 			// Seeding it with a grade here would assert confirmation before any tool had spoken.
 			let identityEvidence: ToolIdentityEvidence | undefined;
@@ -461,8 +493,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				});
 			};
 
-			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent. */
-			const timed = async (p: string) => {
+			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent.
+			 *  ⭐ SR-2 — `role` and `predecessor` are what a try REFUSED here is recorded with (D6, below). */
+			const timed = async (p: string, role: 'initial' | 'repair', predecessor?: ExchangeRecord) => {
 				const requestedAt = clock();
 				let text: string;
 				try {
@@ -515,10 +548,37 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// ⭑ An adapter that sanitises is a DISCIPLINE; a seam that sanitises is a PROPERTY.
 					throw sanitiseToolFailure(e, p, 'reasoning-review backing tool');
 				}
-				return { text, times: { requestedAt, respondedAt: clock() } };
+				const times = { requestedAt, respondedAt: clock() };
+				// ⭐⭐ `JAN-SELREV` SR-2 (D6) — THE MODEL THAT ANSWERED MUST BE THE MODEL CONFIGURED, when the caller requires
+				// it. Right after the override above: `evaluator.modelId` is now the model the tool REPORTED, the value the
+				// record carries (devin's is its export's last `generation_model`, `devin-reviewer.ts` `readReportedModel`).
+				//   · A tool that reported NOTHING left the configured id in place, graded `HOST_CONFIGURED` — an absence of
+				//     evidence, not evidence of a substitute — so it is never refused here.
+				//   · ⛔ THE TRY IS RECORDED BEFORE THE THROW, as a failed repair is below: the try that broke the review
+				//     must not be the one try with no record (PER-9). It is `rejected` — an answer arrived and was refused
+				//     for who gave it — under the reported id and its grade, and E-5 says no parse was attempted.
+				//   · ⛔ NO REPAIR: a second call would go to the same substitute, and be billed.
+				//   · ⚠ OUTSIDE the `try` above on purpose: thrown inside it, the refusal would be dressed as a failed
+				//     invocation of the backing tool, which it is not.
+				// ⚠ DISCLOSED: the model's VERSION stays unreported for this reviewer. devin's export names a model id and no
+				// version, so a provider that changed what it serves under the same id passes this check.
+				if (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {
+					const refusal = substitutedModel(evaluator.agentId, evaluator.modelId, configuredModelId);
+					await capture(
+						role,
+						p,
+						text,
+						'rejected',
+						times,
+						{ outcome: 'NOT_ATTEMPTED', detail: refusal },
+						predecessor
+					);
+					throw new Error(refusal);
+				}
+				return { text, times };
 			};
 
-			const firstTry = await timed(prompt);
+			const firstTry = await timed(prompt, 'initial');
 			const firstRaw = firstTry.text;
 			let judgement: ReasoningReviewJudgement;
 			// ⚠ THE TRY COVERS THE PARSE AND NOTHING ELSE, AND THAT IS THE POINT.
@@ -571,7 +631,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					classifyParse(firstRaw, firstError)
 				);
 				const repairPrompt = `${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`;
-				const repairTry = await timed(repairPrompt);
+				const repairTry = await timed(repairPrompt, 'repair', first);
 				const repairRaw = repairTry.text;
 				try {
 					judgement = coerceJudgement(JSON.parse(extractJson(repairRaw)), input);

@@ -1,16 +1,20 @@
-// ⭐ `JAN-SELREV` SR-1 (D2, D3) — THE SELECTOR'S FULL TABLE: mode × tool × model.
+// ⭐ `JAN-SELREV` SR-1 (D2, D3) — THE SELECTOR'S FULL TABLE: mode × tool × model × program override.
 //
 // ⭑ THE ORACLE BELOW IS WRITTEN FROM THE DESIGN'S TABLE (D2), NOT FROM THE SELECTOR: an unset tool is the stand-in in
 // test mode and a refusal outside it; a set tool is held to the same rules in both modes — agy needs
 // `JPWB_JUDGE_MODEL`, devin `JPWB_ASSURANCE_MODEL`, `pi` is declared but unwired, anything else the catalog does not
 // know. Every row is compared whole, so a selector that answered one limb from another limb's variable reddens.
 //
-// ⚠ THE OVERRIDE DIMENSION (`JPWB_DEVIN_BIN` / `JPWB_AGY_BIN`) IS D7's, built in SR-2; this table has none yet.
+// ⭐ SR-2 (D7) — AND THE OVERRIDE DIMENSION: outside test mode, the SELECTED tool's program override (`JPWB_AGY_BIN`
+// for agy, `JPWB_DEVIN_BIN` for devin) refuses, even when it is `''`; the other tool's refuses nothing; in test mode
+// both are honoured. The overrides are handed in, as the environment is — what the adapters captured when they
+// LOADED is the default, held by the last block below.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	resolveReviewerToolId,
 	SELECTED_REVIEWER_GUIDANCE,
 	selectReviewer,
+	type ReviewerProgramOverrides,
 	type ReviewerRefusalCode,
 	type ReviewerSelection
 } from './reviewer-selection.js';
@@ -37,6 +41,18 @@ const MODELS: readonly {
 	{ name: 'both models', judge: 'fixture-judge', assurance: 'fixture-assurance' },
 	{ name: 'both models blank', judge: '  ', assurance: '' }
 ];
+/** ⭑ `''` is a SET override — an empty program name, which the adapter would run — never an unset one. */
+const OVERRIDES: readonly {
+	readonly name: string;
+	readonly overrides: ReviewerProgramOverrides;
+}[] = [
+	{ name: 'no override', overrides: { agy: undefined, devin: undefined } },
+	{ name: 'JPWB_AGY_BIN set', overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined } },
+	{ name: 'JPWB_DEVIN_BIN set', overrides: { agy: undefined, devin: 'C:/stand-in/devin.exe' } },
+	{ name: 'JPWB_AGY_BIN empty', overrides: { agy: '', devin: undefined } },
+	{ name: 'JPWB_DEVIN_BIN empty', overrides: { agy: undefined, devin: '' } },
+	{ name: 'both set', overrides: { agy: 'C:/stand-in/agy.exe', devin: 'C:/stand-in/devin.exe' } }
+];
 
 type Expected =
 	| { readonly kind: 'STAND_IN' | 'AGY' | 'DEVIN'; readonly modelId?: string }
@@ -46,12 +62,13 @@ type Expected =
 			readonly toolId: string | undefined;
 	  };
 
-/** D2, restated. */
+/** D2 and D7, restated. ⚠ A refused override outranks a missing model: the program is refused whatever it would run. */
 function oracle(
 	testMode: boolean,
 	tool: string | undefined,
-	judge?: string,
-	assurance?: string
+	judge: string | undefined,
+	assurance: string | undefined,
+	overrides: ReviewerProgramOverrides
 ): Expected {
 	const t = tool?.trim() ? tool.trim() : undefined;
 	const j = judge?.trim() ? judge.trim() : undefined;
@@ -60,6 +77,8 @@ function oracle(
 		return testMode
 			? { kind: 'STAND_IN' }
 			: { kind: 'REFUSED', code: 'REVIEWER_TOOL_UNSET', toolId: undefined };
+	if ((t === 'agy' || t === 'devin') && !testMode && overrides[t] !== undefined)
+		return { kind: 'REFUSED', code: 'REVIEWER_PROGRAM_OVERRIDDEN', toolId: t };
 	if (t === 'agy')
 		return j
 			? { kind: 'AGY', modelId: j }
@@ -79,20 +98,21 @@ function shape(s: ReviewerSelection): Expected {
 	return { kind: s.kind, modelId: s.modelId };
 }
 
-describe('⭐ the selector answers the design’s table — every mode, tool and model', () => {
+describe('⭐ the selector answers the design’s table — every mode, tool, model and program override', () => {
 	for (const testMode of [true, false])
 		for (const tool of TOOLS)
 			for (const m of MODELS)
-				it(`${testMode ? 'test mode' : 'server mode'} · tool ${JSON.stringify(tool)} · ${m.name}`, () => {
-					const env: Record<string, string | undefined> = {
-						JPWB_ASSURANCE_TOOL: tool,
-						JPWB_JUDGE_MODEL: m.judge,
-						JPWB_ASSURANCE_MODEL: m.assurance
-					};
-					const got = selectReviewer({ testMode, env });
-					expect(shape(got)).toEqual(oracle(testMode, tool, m.judge, m.assurance));
-					if (got.kind === 'REFUSED') expect(got.guidance).toBe(SELECTED_REVIEWER_GUIDANCE);
-				});
+				for (const o of OVERRIDES)
+					it(`${testMode ? 'test mode' : 'server mode'} · tool ${JSON.stringify(tool)} · ${m.name} · ${o.name}`, () => {
+						const env: Record<string, string | undefined> = {
+							JPWB_ASSURANCE_TOOL: tool,
+							JPWB_JUDGE_MODEL: m.judge,
+							JPWB_ASSURANCE_MODEL: m.assurance
+						};
+						const got = selectReviewer({ testMode, env, overrides: o.overrides });
+						expect(shape(got)).toEqual(oracle(testMode, tool, m.judge, m.assurance, o.overrides));
+						if (got.kind === 'REFUSED') expect(got.guidance).toBe(SELECTED_REVIEWER_GUIDANCE);
+					});
 });
 
 describe('what a refusal SAYS — it names the fault, and every one carries the selection and the independence rule', () => {
@@ -128,6 +148,30 @@ describe('what a refusal SAYS — it names the fault, and every one carries the 
 			expect(got.kind).toBe('REFUSED');
 			expect(got.kind === 'REFUSED' && got.reason).toContain(r.says);
 		});
+
+	// ⭐ SR-2 (D7) — an override's refusal names the VARIABLE and the PROGRAM, and says why it cannot be allowed.
+	for (const [tool, variable] of [
+		['agy', 'JPWB_AGY_BIN'],
+		['devin', 'JPWB_DEVIN_BIN']
+	] as const)
+		for (const program of ['C:/stand-in/reviewer.exe', ''])
+			it(`tool '${tool}', ${variable}=${JSON.stringify(program)}: names the variable, the program and REG-F-441`, () => {
+				const got = selectReviewer({
+					testMode: false,
+					env: {
+						JPWB_ASSURANCE_TOOL: tool,
+						JPWB_JUDGE_MODEL: 'fixture-judge',
+						JPWB_ASSURANCE_MODEL: 'fixture-assurance'
+					},
+					overrides: { agy: undefined, devin: undefined, [tool]: program }
+				});
+				expect(got.kind === 'REFUSED' && got.code).toBe('REVIEWER_PROGRAM_OVERRIDDEN');
+				const reason = got.kind === 'REFUSED' ? got.reason : '';
+				expect(reason).toContain(`${variable}=${JSON.stringify(program)}`);
+				expect(reason).toContain(`the product’s own '${tool}' program`);
+				expect(reason).toContain('REG-F-441');
+				expect(reason).toContain('even when it is empty');
+			});
 });
 
 describe('the selector reads the environment it is handed', () => {
@@ -168,5 +212,75 @@ describe('the selector reads the environment it is handed', () => {
 		expect(resolveReviewerToolId('')).toBeUndefined();
 		expect(resolveReviewerToolId(' \t ')).toBeUndefined();
 		expect(resolveReviewerToolId(' devin ')).toBe('devin');
+	});
+});
+
+describe('⭐ SR-2 (D7) — the overrides the selector acts on are the ones the ADAPTERS captured when they loaded', () => {
+	// ⛔ THE ADAPTERS READ THEIR OVERRIDE ONCE, AT LOAD (`agy-cli.ts`, `devin-reviewer.ts`), and run whatever it named for
+	// the life of the process. So the selector must refuse what was CAPTURED — a check of the environment at the review
+	// would pass a server whose override was unset after it started, and whose adapter still runs the replacement.
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	/** The two adapters and the selector, loaded afresh with these variables set, then the variables removed again. */
+	async function loadedWith(vars: {
+		readonly JPWB_AGY_BIN?: string;
+		readonly JPWB_DEVIN_BIN?: string;
+	}) {
+		vi.resetModules();
+		vi.stubEnv('JPWB_AGY_BIN', undefined);
+		vi.stubEnv('JPWB_DEVIN_BIN', undefined);
+		for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v);
+		const loaded = {
+			agy: await import('./agy-cli.js'),
+			devin: await import('../tools/devin-reviewer.js'),
+			selection: await import('./reviewer-selection.js')
+		};
+		vi.stubEnv('JPWB_AGY_BIN', undefined);
+		vi.stubEnv('JPWB_DEVIN_BIN', undefined);
+		return loaded;
+	}
+	const DEVIN_HOST = {
+		JPWB_ASSURANCE_TOOL: 'devin',
+		JPWB_ASSURANCE_MODEL: 'fixture-assurance'
+	};
+
+	it('⭑ each adapter exports what it captured — undefined when unset, and the empty string when set empty', async () => {
+		const unset = await loadedWith({});
+		expect(unset.agy.AGY_BIN_OVERRIDE).toBeUndefined();
+		expect(unset.devin.DEVIN_BIN_OVERRIDE).toBeUndefined();
+		const set = await loadedWith({ JPWB_AGY_BIN: 'C:/stand-in/agy.exe', JPWB_DEVIN_BIN: '' });
+		expect(set.agy.AGY_BIN_OVERRIDE).toBe('C:/stand-in/agy.exe');
+		expect(set.devin.DEVIN_BIN_OVERRIDE, 'an empty override is SET, to an empty program name').toBe(
+			''
+		);
+	});
+
+	it('⛔ with no overrides handed in, a captured JPWB_DEVIN_BIN refuses a devin review — though the variable is gone now', async () => {
+		const { selection } = await loadedWith({ JPWB_DEVIN_BIN: 'C:/stand-in/devin.exe' });
+		expect(
+			process.env.JPWB_DEVIN_BIN,
+			'the arrangement removed the variable after the load'
+		).toBeUndefined();
+		const got = selection.selectReviewer({ testMode: false, env: DEVIN_HOST });
+		expect(got.kind === 'REFUSED' && got.code).toBe('REVIEWER_PROGRAM_OVERRIDDEN');
+		expect(got.kind === 'REFUSED' && got.reason).toContain(
+			'JPWB_DEVIN_BIN="C:/stand-in/devin.exe"'
+		);
+	});
+
+	it('⭑ CONTROL — a captured JPWB_AGY_BIN does not refuse a devin review, and nothing captured refuses nothing', async () => {
+		const agyOnly = await loadedWith({ JPWB_AGY_BIN: 'C:/stand-in/agy.exe' });
+		expect(agyOnly.selection.selectReviewer({ testMode: false, env: DEVIN_HOST })).toEqual({
+			kind: 'DEVIN',
+			modelId: 'fixture-assurance'
+		});
+		const none = await loadedWith({});
+		expect(none.selection.selectReviewer({ testMode: false, env: DEVIN_HOST })).toEqual({
+			kind: 'DEVIN',
+			modelId: 'fixture-assurance'
+		});
 	});
 });

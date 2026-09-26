@@ -709,6 +709,259 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 	});
 });
 
+// ── ⭐ `JAN-SELREV` SR-2 (D6) — THE MODEL THE TOOL REPORTS MUST BE THE MODEL CONFIGURED, WHEN THE CALLER REQUIRES IT ──
+//
+// ⛔ WHAT WAS WRONG (`REG-F-457` G6). The block above records the model a tool REPORTS — and then accepted the review.
+// So a devin serving a model other than the one selected (`REG-D-084`) produced a review recorded under the
+// substitute's name and counted as the selected reviewer's work: the record was honest, the review was not the one
+// selected.
+// ⭑ BEHIND AN OPTION, AND THE OPTION IS THE DESIGN. Only the product's devin branch sets it (`assurance/index.ts`). The
+// fingerprint and the qualification runner build this validator without it: the scoring corpus holds replies that
+// report OTHER models, and their outcomes are hashed into the fingerprint (`verif/reviewer-qualification-fingerprint
+// .test.ts` holds both of its validators to that).
+describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configured fails the review', () => {
+	const SUBSTITUTE = 'substituted-model';
+	/** A backing tool that reports `modelId` as the model that answered, answering `text`. */
+	const reports = (modelId: string, text = CLEAN) => {
+		const prompts: string[] = [];
+		const print: AgyPrint = async (p) => {
+			prompts.push(p);
+			return {
+				answer: { arrived: true, text },
+				rawOutput: text,
+				producer: { agentId: 'devin', modelId, providerId: 'devin' },
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
+			};
+		};
+		return { prompts, print };
+	};
+	/** What the failure must say: both ids, and that the remedy is not the configuration. */
+	const namesBothAndTheRemedy = (message: string) => {
+		expect(message).toContain(`'${SUBSTITUTE}'`);
+		expect(message).toContain(`'${JUDGE}'`);
+		expect(message).toContain('Reconfiguring does not fix this');
+		expect(message).toContain('re-qualify');
+		expect(message).toContain('re-select the reviewer');
+	};
+	/**
+	 * A content store that RECORDS what it is handed, in order, and settles each `put` a timer tick later. A record
+	 * written after its `put`s therefore exists when the review fails only if the validator AWAITED it first: with no
+	 * store the record is written synchronously, and an unawaited capture cannot be told from an awaited one.
+	 */
+	const tickingStore = () => {
+		const stored: string[] = [];
+		const byKey = new Map<string, string>();
+		const store = {
+			durability: 'PROCESS_LOCAL' as const,
+			async put(o: { bytes: string }) {
+				stored.push(o.bytes);
+				const storageKey = `k${stored.length}`;
+				byKey.set(storageKey, o.bytes);
+				await new Promise((settle) => setTimeout(settle, 0));
+				return {
+					storageProvider: 'x',
+					storageKey,
+					contentHash: 'sha256:0',
+					byteSize: o.bytes.length
+				};
+			},
+			async get() {
+				return undefined;
+			},
+			async stat() {
+				return undefined;
+			},
+			async purge() {
+				return { purged: false as const, refusedBecause: 'n/a' };
+			}
+		};
+		return { store: store as unknown as ArtifactStore, stored, byKey };
+	};
+
+	it('⭐ the try is recorded REJECTED under the reported id, nothing is repaired, and the review fails naming both', async () => {
+		const { prompts, print } = reports(SUBSTITUTE);
+		const exchanges = createExchangeSink();
+		let thrown: unknown;
+		try {
+			await createAgyReasoningReviewValidator({
+				print,
+				modelId: JUDGE,
+				requireReportedModel: true,
+				exchanges
+			}).evaluate(SUBJECT, ctx());
+		} catch (e) {
+			thrown = e;
+		}
+		const records = exchanges.drain();
+		// ⭑ PER-9's RECORD IS KEPT: the try that broke the review is the one try that must not go unrecorded.
+		expect(records, 'the refused try was not recorded before the throw').toHaveLength(1);
+		const [record] = records;
+		expect(record!.disposition, 'a substituted answer is REJECTED, never accepted').toBe(
+			'rejected'
+		);
+		expect(record!.exchangeRole).toBe('initial');
+		expect(
+			record!.resolvedModelIdentity,
+			'the record carries the model that ANSWERED, graded by the tool'
+		).toEqual({
+			kind: 'resolved',
+			modelId: SUBSTITUTE,
+			providerId: 'devin',
+			evidence: 'PROVIDER_REPORTED'
+		});
+		// The answer was refused for WHO gave it, before any parse — so E-5 says the parse was not attempted.
+		expect(record!.parseOutcome.outcome).toBe('NOT_ATTEMPTED');
+		namesBothAndTheRemedy(record!.parseOutcome.detail);
+		expect(prompts, 'a repair is a second paid call to the same substitute').toHaveLength(1);
+		expect(thrown, 'the review stood').toBeInstanceOf(Error);
+		namesBothAndTheRemedy((thrown as Error).message);
+		// ⛔ NOT DRESSED AS A FAILED INVOCATION (`sanitiseToolFailure`): the tool ran and answered; who answered is refused.
+		expect(
+			(thrown as Error).message,
+			'the refusal reads as a failed tool invocation'
+		).not.toContain('invocation failed');
+		expect((thrown as Error).message).toMatch(/^The reviewing tool 'devin' reported /);
+	});
+
+	it('⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s', async () => {
+		// THE MUTANTS: the refused try recorded with '' for its answer, or its capture started and not awaited before
+		// the throw. Neither shows without a store; with this one the record lands only after its `put`s settle.
+		const { print } = reports(SUBSTITUTE);
+		const exchanges = createExchangeSink();
+		const { store, stored } = tickingStore();
+		let thrown: unknown;
+		try {
+			await createAgyReasoningReviewValidator({
+				print,
+				modelId: JUDGE,
+				requireReportedModel: true,
+				artifacts: store,
+				exchanges
+			}).evaluate(SUBJECT, ctx());
+		} catch (e) {
+			thrown = e;
+		}
+		// Drained in the turn the rejection arrived in: no timer has run since, so only an AWAITED record is here.
+		const records = exchanges.drain();
+		expect(thrown, 'the review stood').toBeInstanceOf(Error);
+		expect(records, 'the refused try was not recorded when the review failed').toHaveLength(1);
+		expect(records[0]!.disposition).toBe('rejected');
+		expect(records[0]!.answerSpanRef.status, 'the substitute’s answer was not retained').toBe(
+			'STORED'
+		);
+		expect(stored[0], 'the first bytes retained are the substitute’s answer').toBe(CLEAN);
+	});
+
+	it('⛔ an answer that would have drawn a repair draws none — the check comes before the parse', async () => {
+		// THE MUTANT: check the model only once a judgement parsed. This reply parses on no try, so a check there never
+		// runs: the first try is recorded `repair-requested` and a second call goes to the substitute.
+		const { prompts, print } = reports(SUBSTITUTE, 'not a judgement at all');
+		const exchanges = createExchangeSink();
+		await expect(
+			createAgyReasoningReviewValidator({
+				print,
+				modelId: JUDGE,
+				requireReportedModel: true,
+				exchanges
+			}).evaluate(SUBJECT, ctx())
+		).rejects.toThrow(`'${SUBSTITUTE}'`);
+		expect(prompts).toHaveLength(1);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['rejected']);
+	});
+
+	it('⭑ a REPAIR try that reports another model is refused the same way, after its predecessor', async () => {
+		// The first try reports the configured model and fails to parse; its repair is answered by a substitute.
+		let n = 0;
+		const prompts: string[] = [];
+		const print: AgyPrint = async (p) => {
+			prompts.push(p);
+			n += 1;
+			const [modelId, text] = n === 1 ? [JUDGE, 'not a judgement'] : [SUBSTITUTE, CLEAN];
+			return {
+				answer: { arrived: true, text },
+				rawOutput: text,
+				producer: { agentId: 'devin', modelId, providerId: 'devin' },
+				identityEvidence: 'PROVIDER_REPORTED' as const,
+				observedToolCalls: UNOBSERVED
+			};
+		};
+		const exchanges = createExchangeSink();
+		// ⭑ A store, so the prompt each record carries can be read back: the refused repair must carry the REPAIR prompt.
+		const { store, byKey } = tickingStore();
+		await expect(
+			createAgyReasoningReviewValidator({
+				print,
+				modelId: JUDGE,
+				requireReportedModel: true,
+				artifacts: store,
+				exchanges
+			}).evaluate(SUBJECT, ctx())
+		).rejects.toThrow(`'${SUBSTITUTE}'`);
+		expect(prompts).toHaveLength(2);
+		const [first, repair] = exchanges.drain();
+		expect(first!.disposition).toBe('repair-requested');
+		expect(repair!.exchangeRole).toBe('repair');
+		expect(repair!.predecessorExchangeId, 'the refused repair names the try it succeeds').toBe(
+			first!.exchangeId
+		);
+		expect(repair!.disposition).toBe('rejected');
+		expect((repair!.resolvedModelIdentity as { modelId: string }).modelId).toBe(SUBSTITUTE);
+		namesBothAndTheRemedy(repair!.parseOutcome.detail);
+		// THE MUTANT: the refused try recorded with the INITIAL prompt — a repair recorded as if sent what its predecessor was.
+		const input = repair!.materializedInputRef;
+		expect(input.status, 'the refused repair’s prompt was not retained').toBe('STORED');
+		const sent = byKey.get((input as { storageKey: string }).storageKey);
+		expect(sent, 'the refused repair is recorded with the prompt it was sent').toBe(prompts[1]);
+		expect(sent).toContain('IMPORTANT: reply with ONLY the minified JSON object.');
+	});
+
+	it('⭑ CONTROL — the configured model, reported, is accepted: the check compares, it does not refuse every report', async () => {
+		const { print } = reports(JUDGE);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({
+			print,
+			modelId: JUDGE,
+			requireReportedModel: true,
+			exchanges
+		}).evaluate(SUBJECT, ctx());
+		expect(result.executionFailed).toBe(false);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
+	});
+
+	it('⭑ CONTROL — a tool that reports NOTHING is not refused: the configured id stays, HOST_CONFIGURED (D6)', async () => {
+		// ⛔ AN ABSENCE OF EVIDENCE IS NOT EVIDENCE OF A SUBSTITUTE. devin's export can be unreadable, and then the
+		// honest record is the configured id at the weaker grade — as it was before this check existed.
+		const { print } = capturing();
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({
+			print,
+			modelId: JUDGE,
+			requireReportedModel: true,
+			exchanges
+		}).evaluate(SUBJECT, ctx());
+		expect(result.executionFailed).toBe(false);
+		const [record] = exchanges.drain();
+		expect(record!.disposition).toBe('accepted');
+		const identity = record!.resolvedModelIdentity as { modelId: string; evidence?: string };
+		expect(identity.modelId).toBe(JUDGE);
+		expect(identity.evidence, 'no report, so no grade').toBeUndefined();
+	});
+
+	it('⭑ CONTROL — WITHOUT the option a substitute is recorded and the review stands, as the fingerprint requires', async () => {
+		const { print } = reports(SUBSTITUTE);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({
+			print,
+			modelId: JUDGE,
+			exchanges
+		}).evaluate(SUBJECT, ctx());
+		expect(result.executionFailed).toBe(false);
+		expect(result.evaluator.modelId).toBe(SUBSTITUTE);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
+	});
+});
+
 // ── ⚠ JAN-OUTCONTRACT OC-02 — THE ONE LIMITATION THE PLACEMENT INTRODUCES, MEASURED RATHER THAN ASSUMED ────
 describe('JAN-OUTCONTRACT — the instruction carries the contract, and truncation is DECLARED', () => {
 	it('⭑ a contract inside the instruction reaches the reviewer verbatim', async () => {

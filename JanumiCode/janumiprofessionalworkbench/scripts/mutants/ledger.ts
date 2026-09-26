@@ -11163,5 +11163,320 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/mutant-verdict.test.ts"],
 		why: "The pre-SR-1 argv in tscArgv's new home: -p <pkg>/tsconfig.json whatever compileProjectOf chose, so the mapping is right and the leg still compiles the wrong program (tsconfig.root-configs.json/tsconfig.json for a root file, apps/rph-demo/tsconfig.json for e2e). While the argv was inline in run.ts, which nothing imports, this regression survived every suite (the SR-1 verifier's V8). OBSERVED: KILLED — 1 test(s) red in mutant-verdict.test.ts: 'the compile leg runs `tsc -p` on the program `compileProjectOf` names, with the cache file it is given' (AssertionError: expected [ 'tsc', '--noEmit', …(5) ] to deeply equal [ 'tsc', '--noEmit', …(5) ])",
 		source: "JAN-SELREV SR-1 — compileProjectOf maps each mutated file to a program that holds it; tscArgv builds the compile leg"
+	},
+	{
+		id: "SR2-M1-the-reported-model-check-is-not-gated",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {\n",
+		replace: "\t\t\t\tif (evaluator.modelId !== configuredModelId) { // MUTANT: the check is not gated by the option\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the reported-model check runs only when the caller sets requireReportedModel, which only the product's devin branch does. WHO RELIES: the reviewer fingerprint, whose scoring corpus holds replies reporting OTHER models (scoring-corpus.ts) and hashes their outcomes, and every qualification run. WHAT THE MUTATION DOES: the check runs for every caller, so the fingerprint's scoring seam refuses the corpus replies that report another model and scores them as throws - the fingerprint of an unchanged reviewer would move. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ an INDEPENDENCE RULE — the plan’s DIFFERENT_MODEL read as DIFFERENT_PROVIDER (the review’s E4): the scoring digest moves' (AssertionError: the reviewer fingerprint moves: expected 'bcc5c498eeeb26581e1c88ca94dcf7f4b8945…' not to be 'bcc5c498eeeb26581e1c88ca94dcf7f4b8945…' // Object.is equality); '⭐ SR-2 (D6) — why the reported-model check is GATED: set in the runner’s validator, on a copy, it moves the scoring digest' (AssertionError: the scoring digest moves: expected '88126a5c48687356402ae9e03be98e0a46603…' not to be '88126a5c48687356402ae9e03be98e0a46603…' // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M2-the-provider-is-compared-not-the-model",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {\n",
+		replace: "\t\t\t\tif (opts.requireReportedModel && evaluator.providerId !== (opts.providerId ?? 'google')) { // MUTANT: the provider is compared, not the model\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): what is compared is the MODEL devin reports against the model configured. WHO RELIES: the selected reviewer (REG-D-084), whose qualification is of one model; devin brokers many models under the one provider 'devin'. WHAT THE MUTATION DOES: the provider is compared instead, which devin reports as configured whatever model answered, so a substituted model's review is accepted and recorded as the selected reviewer's. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: one try, recorded as refused before the review failed: expected [ 'accepted' ] to deeply equal [ 'rejected' ])",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M3-the-comparison-is-inverted",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {\n",
+		replace: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId === configuredModelId) { // MUTANT: the comparison is inverted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the check compares - a report of the configured model is accepted, only another model is refused. WHO RELIES: every devin review on a correctly configured host (104 of 104 qualification calls reported the configured label). WHAT THE MUTATION DOES: the configured model, reported, is refused and every review on the selected configuration fails closed. OBSERVED: KILLED — 6 test(s) red in reasoning-review-validator.test.ts: '⭐ the try is recorded REJECTED under the reported id, nothing is repaired, and the review fails naming both' (AssertionError: a substituted answer is REJECTED, never accepted: expected 'accepted' to be 'rejected' // Object.is equality); '⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s' (AssertionError: the review stood: expected undefined to be an instance of Error)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M4-the-refused-try-is-not-recorded",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tawait capture(\n\t\t\t\t\t\trole,\n\t\t\t\t\t\tp,\n\t\t\t\t\t\ttext,\n\t\t\t\t\t\t'rejected',\n\t\t\t\t\t\ttimes,\n\t\t\t\t\t\t{ outcome: 'NOT_ATTEMPTED', detail: refusal },\n\t\t\t\t\t\tpredecessor\n\t\t\t\t\t);\n",
+		replace: "\t\t\t\t\tvoid capture; // MUTANT: the refused try is not recorded before the throw\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; PER-9): the try a substituted model answered is captured BEFORE the review fails, as the validator's 'record it as REJECTED before rethrowing' rule requires. WHO RELIES: the exchange record, which must show which model answered the try that broke the review. WHAT THE MUTATION DOES: the review fails with no record of the try that broke it - the one try with no exchange record. OBSERVED: KILLED — 4 test(s) red in reasoning-review-validator.test.ts: '⭐ the try is recorded REJECTED under the reported id, nothing is repaired, and the review fails naming both' (AssertionError: the refused try was not recorded before the throw: expected [] to have a length of 1 but got +0); '⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s' (AssertionError: the refused try was not recorded when the review failed: expected [] to have a length of 1 but got +0)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M5-the-substituted-answer-is-recorded-accepted",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\t\ttext,\n\t\t\t\t\t\t'rejected',\n\t\t\t\t\t\ttimes,\n",
+		replace: "\t\t\t\t\t\ttext,\n\t\t\t\t\t\t'accepted', // MUTANT: the substituted answer is recorded as accepted\n\t\t\t\t\t\ttimes,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the refused try is recorded with disposition 'rejected' - an answer arrived and was refused for who gave it. WHO RELIES: a reader of the exchange records, for whom 'accepted' means the answer bound the review. WHAT THE MUTATION DOES: the substitute's try is recorded as accepted while the review failed on it, so the record contradicts the outcome. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: one try, recorded as refused before the review failed: expected [ 'accepted' ] to deeply equal [ 'rejected' ])",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M6-the-refusal-draws-a-repair",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tthrow new Error(refusal);\n",
+		replace: "\t\t\t\t\treturn { text: '', times }; // MUTANT: the refused answer is dropped and the repair path asked instead\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): a substituted model fails the review at once - there is no repair try. WHO RELIES: the host paying per call, and the record, which would otherwise hold a second exchange with the same substitute. WHAT THE MUTATION DOES: the refused answer is emptied and the parse fails, so the repair prompt is sent to the same substitute and billed. OBSERVED: KILLED — 4 test(s) red in reasoning-review-validator.test.ts: '⭐ the try is recorded REJECTED under the reported id, nothing is repaired, and the review fails naming both' (AssertionError: the refused try was not recorded before the throw: expected [ …(4) ] to have a length of 1 but got 4); '⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s' (AssertionError: the refused try was not recorded when the review failed: expected [ …(4) ] to have a length of 1 but got 4)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M7-a-repair-try-is-never-checked",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {\n",
+		replace: "\t\t\t\tif (opts.requireReportedModel && role === 'initial' && evaluator.modelId !== configuredModelId) { // MUTANT: a repair try is never checked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): every try is checked, the repair as well as the first. WHO RELIES: a review whose first answer failed to parse, whose judgement then rests on the repair's answer alone. WHAT THE MUTATION DOES: a repair answered by a substituted model is accepted, and the review stands on a model nobody selected. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⭑ a REPAIR try that reports another model is refused the same way, after its predecessor' (AssertionError: promise resolved \"{ …(15) }\" instead of rejecting)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M8-a-refused-repair-names-no-predecessor",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const repairTry = await timed(repairPrompt, 'repair', first);",
+		replace: "const repairTry = await timed(repairPrompt, 'repair'); // MUTANT: a refused repair names no predecessor",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; CSAA-007): a refused repair try is recorded as the repair of its predecessor. WHO RELIES: the exchange record's chain, which makes 'repair never rewrites predecessor raw output' checkable. WHAT THE MUTATION DOES: the refused repair is captured without its predecessor, so the record either breaks or loses which try it repaired. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⭑ a REPAIR try that reports another model is refused the same way, after its predecessor' (AssertionError: expected [Function] to throw error including '\\'substituted-model\\'' but got 'ExchangeRecord exch-2: role \\'repair\\…')",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M9-an-unreported-model-is-refused",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\tif (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {\n",
+		replace: "\t\t\t\tif (opts.requireReportedModel && (identityEvidence === undefined || evaluator.modelId !== configuredModelId)) { // MUTANT: a tool that reports nothing is refused too\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): when devin reports nothing the identity stays HOST_CONFIGURED, as before, and the review is not refused. WHO RELIES: a devin review whose ATIF export was unreadable - an absence of evidence about the model, not evidence of a substitute. WHAT THE MUTATION DOES: every review that reports no model fails closed, turning a missing export into a claimed substitution. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⭑ CONTROL — a tool that reports NOTHING is not refused: the configured id stays, HOST_CONFIGURED (D6)' (Error: The reviewing tool 'agy' reported that the model 'gemini-judge-3' answered, but this review is configured for 'gemini-judge-3' — a substituted model, so the review fails closed (JAN-SELREV D6). Reconfiguring does not fix this: the co)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M10-the-refused-try-says-not-which-models",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\t\t{ outcome: 'NOT_ATTEMPTED', detail: refusal },\n",
+		replace: "\t\t\t\t\t\t{ outcome: 'NOT_ATTEMPTED', detail: 'refused' }, // MUTANT: the record does not say which models\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the refused try's E-5 detail names both ids. WHO RELIES: whoever audits the exchange record for a failed review, which is where PER-9 keeps what became of the bytes. WHAT THE MUTATION DOES: the record says a try was refused and not that another model answered it, or which. OBSERVED: KILLED — 2 test(s) red in reasoning-review-validator.test.ts: '⭐ the try is recorded REJECTED under the reported id, nothing is repaired, and the review fails naming both' (AssertionError: expected 'refused' to contain '\\'substituted-model\\''); '⭑ a REPAIR try that reports another model is refused the same way, after its predecessor' (AssertionError: expected 'refused' to contain '\\'substituted-model\\'')",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M11-the-remedy-offered-is-reconfiguration",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t'Reconfiguring does not fix this: the configured model is the one qualified and selected, so the remedy is to ' +\n\t\t're-qualify the model the tool actually serves, or to re-select the reviewer (REG-D-084).'\n",
+		replace: "\t\t'Set the configured model to the one the tool reports, and review again.' // MUTANT: the remedy offered is reconfiguration\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the failure says the remedy is re-qualification or re-selection, never reconfiguration. WHO RELIES: the operator reading VALIDATOR_EXECUTION_FAILED, and REG-D-084, whose selection is of the model qualified. WHAT THE MUTATION DOES: the operator is told to point the configuration at the substitute, which makes the record agree with a reviewer nobody measured. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: expected 'The reviewing tool \\'devin\\' reported…' to contain 'the remedy is to re-qualify')",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M12-the-configured-model-is-not-named",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "`configured for '${configured}' — a substituted model, so the review fails closed (JAN-SELREV D6). ` +",
+		replace: "'configured for another model — a substituted model, so the review fails closed (JAN-SELREV D6). ' + // MUTANT: the configured id is not named",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the review fails closed naming BOTH ids. WHO RELIES: the operator, who must tell a substitution from a misconfiguration by the two ids on the failure. WHAT THE MUTATION DOES: the recorded statement names the model that answered and not the model configured. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: expected 'The reviewing tool \\'devin\\' reported…' to contain '\\'fixture-devin-model\\'')",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M13-the-devin-branch-does-not-require-the-reported-model",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\t\t\t\t\t\t\t\trequireReportedModel: true\n",
+		replace: "\t\t\t\t\t\t\t\trequireReportedModel: false // MUTANT: the product's devin branch does not require the reported model\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; ROADMAP SR-2 exit): devin reviews with the model configured, or the review fails closed with both models named. WHO RELIES: the product's floors, which build the devin reviewer through createFloorRegistry's devin branch - the only caller that sets the option. WHAT THE MUTATION DOES: the product's devin review accepts a substituted model and records it as the selected reviewer's work. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: one try, recorded as refused before the review failed: expected [ 'accepted' ] to deeply equal [ 'rejected' ])",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M14-the-qualification-runner-requires-the-reported-model",
+		file: "scripts/reviewer-qual/runner.ts",
+		find: "\t\tclock: EXCHANGE_CLOCK,\n\t\tprint: async (prompt) => {\n",
+		replace: "\t\tclock: EXCHANGE_CLOCK,\n\t\trequireReportedModel: true, // MUTANT: the qualification runner requires the reported model\n\t\tprint: async (prompt) => {\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the qualification runner never sets requireReportedModel. WHO RELIES: the reviewer fingerprint, which scores its corpus through evaluateCase, and every qualification run, which records a reply reporting another model under that model. WHAT THE MUTATION DOES: the corpus replies reporting other models are refused and scored as throws, so the fingerprint's scoring seam no longer scores them as the product does. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ an INDEPENDENCE RULE — the plan’s DIFFERENT_MODEL read as DIFFERENT_PROVIDER (the review’s E4): the scoring digest moves' (AssertionError: the reviewer fingerprint moves: expected 'bcc5c498eeeb26581e1c88ca94dcf7f4b8945…' not to be 'bcc5c498eeeb26581e1c88ca94dcf7f4b8945…' // Object.is equality); '⭐ SR-2 (D6) — why the reported-model check is GATED: set in the runner’s validator, on a copy, it moves the scoring digest' (AssertionError: the scoring digest moves: expected '88126a5c48687356402ae9e03be98e0a46603…' not to be '88126a5c48687356402ae9e03be98e0a46603…' // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M15-the-fingerprints-probe-validator-requires-the-reported-model",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, print }),",
+		replace: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, print, requireReportedModel: true }), // MUTANT: the probe validator requires the reported model",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the fingerprint's probe validator is built without requireReportedModel, as the runner's is. WHO RELIES: the reviewer fingerprint, which must measure the prompt and scoring the product's validator has without the devin-only gate. WHAT THE MUTATION DOES: the probe seam refuses a reply reporting another model; the fingerprint measures a validator no qualification runs. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⛔ a corpus reply reporting ANOTHER model is scored, never refused — by both of the fingerprint’s validators' (Error: The reviewing tool 'devin' reported that the model 'jpwb-qualification-case-author' answered, but this review is configured for 'jpwb-fingerprint-reviewer' — a substituted model, so the review fails closed (JAN-SELREV D6). Reconfigur)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M16-an-agy-override-is-never-refused",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'agy' && overrides.agy !== undefined)\n\t\treturn programOverridden('agy', 'JPWB_AGY_BIN', overrides.agy);\n",
+		replace: "\t// MUTANT: an agy program override is never refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7; REG-F-441 remedy (a)): outside test mode a captured JPWB_AGY_BIN refuses an agy review. WHO RELIES: the record, which names every review agy's whatever program agy-cli.ts ran. WHAT THE MUTATION DOES: an agy review runs with its program replaced and is recorded as agy's; the test sees it AT THE SEAM, as a call to the injected print. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'agy, JPWB_AGY_BIN set: refused and recorded, the injected print never called' (AssertionError: a review ran with agy’s program replaced: expected true to be false // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M17-a-devin-override-is-never-refused",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'devin' && overrides.devin !== undefined)\n\t\treturn programOverridden('devin', 'JPWB_DEVIN_BIN', overrides.devin);\n",
+		replace: "\t// MUTANT: a devin program override is never refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7; REG-F-441 remedy (a)): outside test mode a captured JPWB_DEVIN_BIN refuses a devin review. WHO RELIES: the selected reviewer's record (REG-D-084), which names every review devin's whatever program devin-reviewer.ts ran. WHAT THE MUTATION DOES: the review runs the replacement; the test sees it AT THE SEAM, as a DevinExec call, never at a real program. OBSERVED: KILLED — 2 test(s) red in floor-registry.test.ts: 'devin, JPWB_DEVIN_BIN=\"C:/no-such-directory/reviewer-stand-in.exe\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { …(2) } ] to have a length of +0 but got 1); 'devin, JPWB_DEVIN_BIN=\"\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { file: '', args: [ …(7) ] } ] to have a length of +0 but got 1)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M18-an-empty-devin-override-is-unset",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'devin' && overrides.devin !== undefined)\n",
+		replace: "\tif (toolId === 'devin' && overrides.devin) // MUTANT: an empty override is read as unset\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): an override set to the empty string is SET - the adapter would run an empty program name - and is refused like any other. WHO RELIES: a host whose environment carries JPWB_DEVIN_BIN='' - the adapter's '?? devin' does not fall back on an empty string. WHAT THE MUTATION DOES: an empty override passes the selector and devin-reviewer.ts runs the program '', recorded as devin's review. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'devin, JPWB_DEVIN_BIN=\"\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { file: '', args: [ …(7) ] } ] to have a length of +0 but got 1)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M19-an-empty-agy-override-is-unset",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'agy' && overrides.agy !== undefined)\n",
+		replace: "\tif (toolId === 'agy' && overrides.agy) // MUTANT: an empty override is read as unset\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): an empty JPWB_AGY_BIN is SET and refuses an agy review outside test mode. WHO RELIES: a host whose environment carries JPWB_AGY_BIN='' - agy-cli.ts's '?? agy' does not fall back on an empty string. WHAT THE MUTATION DOES: an empty agy override passes the selector, so agy's review runs the program '' and is recorded as agy's. OBSERVED: KILLED — 6 test(s) red in reviewer-selection.test.ts: 'server mode · tool \"agy\" · no model · JPWB_AGY_BIN empty' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'server mode · tool \"agy\" · the assurance model only · JPWB_AGY_BIN empty' (AssertionError: expected { kind: 'AGY', …(1) } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M20-any-override-refuses-a-devin-review",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'devin' && overrides.devin !== undefined)\n\t\treturn programOverridden('devin', 'JPWB_DEVIN_BIN', overrides.devin);\n",
+		replace: "\tif (toolId === 'devin' && (overrides.devin ?? overrides.agy) !== undefined) // MUTANT: any tool's override refuses a devin review\n\t\treturn programOverridden('devin', 'JPWB_DEVIN_BIN', overrides.devin ?? overrides.agy ?? '');\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): only the SELECTED tool's override refuses - a set JPWB_AGY_BIN does not refuse a devin review. WHO RELIES: a host that runs the agy EXECUTOR through JPWB_AGY_BIN (execution/model.ts) and devin as its reviewer. WHAT THE MUTATION DOES: the other adapter's override, which runs no review, refuses the selected reviewer. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: '⭑ the OTHER tool’s override refuses nothing — a set JPWB_AGY_BIN does not stop a devin review' (AssertionError: expected 'reasoning-review.unconfigured' to be 'agy.reasoning-review' // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M21-any-override-refuses-an-agy-review",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId === 'agy' && overrides.agy !== undefined)\n\t\treturn programOverridden('agy', 'JPWB_AGY_BIN', overrides.agy);\n",
+		replace: "\tif (toolId === 'agy' && (overrides.agy ?? overrides.devin) !== undefined) // MUTANT: any tool's override refuses an agy review\n\t\treturn programOverridden('agy', 'JPWB_AGY_BIN', overrides.agy ?? overrides.devin ?? '');\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): only the SELECTED tool's override refuses - a set JPWB_DEVIN_BIN does not refuse an agy review. WHO RELIES: an agy-reviewed host (REG-D-052: agy stays configurable) whose environment names a devin program for other use. WHAT THE MUTATION DOES: an override that no agy review reads refuses the agy review. OBSERVED: KILLED — 10 test(s) red in reviewer-selection.test.ts: 'server mode · tool \"agy\" · no model · JPWB_DEVIN_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'server mode · tool \"agy\" · no model · JPWB_DEVIN_BIN empty' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'AGY', …(1) })",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M22-an-override-is-refused-in-test-mode",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (testMode) return undefined;\n",
+		replace: "\tvoid testMode; // MUTANT: an override is refused in test mode too\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): in test mode a program override is honoured. WHO RELIES: tests that point a reviewer adapter at a stand-in program - the harness's argv assertion, and the test-mode reviewer through its exec seam. WHAT THE MUTATION DOES: a test-mode review with an override is refused, so no test can exercise the adapter's honouring of what it captured. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: '⭑ in test mode the override is HONOURED — the program it names is the one handed to the seam' (AssertionError: expected [] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M23-the-selector-reads-the-environment-not-the-capture",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\t\tinput.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }\n",
+		replace: "\t\tinput.overrides ?? { agy: process.env.JPWB_AGY_BIN, devin: process.env.JPWB_DEVIN_BIN } // MUTANT: the environment at the review, not what the adapters captured\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): the selector refuses the override the adapters CAPTURED at load, which is the program they run for the life of the process. WHO RELIES: every floor and preflight, which pass no overrides and so read the captured exports. WHAT THE MUTATION DOES: a server started with JPWB_DEVIN_BIN, and the variable unset afterwards, passes the selector while devin-reviewer.ts still runs the replacement. OBSERVED: KILLED — 1 test(s) red in reviewer-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_DEVIN_BIN refuses a devin review — though the variable is gone now' (AssertionError: expected false to be 'REVIEWER_PROGRAM_OVERRIDDEN' // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M24-the-override-refusal-is-coded-unwired",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\trefused(\n\t\t'REVIEWER_PROGRAM_OVERRIDDEN',\n",
+		replace: "\trefused(\n\t\t'REVIEWER_TOOL_UNWIRED', // MUTANT: the override refusal is coded as an unwired tool\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/preflight.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): an override refusal carries its own code, REVIEWER_PROGRAM_OVERRIDDEN. WHO RELIES: the preflight's callers, which act on the code without parsing prose (AssurancePreflightCode). WHAT THE MUTATION DOES: the refusal is coded as an unwired tool, so a caller is told to wire an adapter when the fault is a replaced program. OBSERVED: KILLED — 1 test(s) red in preflight.test.ts: '⛔ outside test mode, a captured JPWB_DEVIN_BIN refuses a devin host; in test mode the same host is READY' (AssertionError: expected 'REVIEWER_TOOL_UNWIRED' to be 'REVIEWER_PROGRAM_OVERRIDDEN' // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M25-the-override-refusal-names-no-program",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "`The reviewing tool '${toolId}' would run a replaced program: ${variable}=${JSON.stringify(program)} was set when ` +",
+		replace: "'The reviewing tool would run a replaced program, set when ' + // MUTANT: the refusal names neither the variable nor the program",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): the refusal's reason names the variable and the program. WHO RELIES: the operator, who must know which variable to unset and what it pointed at. WHAT THE MUTATION DOES: the refusal says a program was replaced and not by which variable, or with what. OBSERVED: KILLED — 5 test(s) red in reviewer-selection.test.ts: 'tool 'agy', JPWB_AGY_BIN=\"C:/stand-in/reviewer.exe\": names the variable, the program and REG-F-441' (AssertionError: expected 'The reviewing tool would run a replac…' to contain 'JPWB_AGY_BIN=\"C:/stand-in/reviewer.ex…'); 'tool 'agy', JPWB_AGY_BIN=\"\": names the variable, the program and REG-F-441' (AssertionError: expected 'The reviewing tool would run a replac…' to contain 'JPWB_AGY_BIN=\"\"')",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M26-the-devin-export-does-not-carry-the-capture",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "export const DEVIN_BIN_OVERRIDE: string | undefined = process.env.JPWB_DEVIN_BIN;\n\nconst DEVIN_BIN = DEVIN_BIN_OVERRIDE ?? 'devin';\n",
+		replace: "export const DEVIN_BIN_OVERRIDE: string | undefined = undefined; // MUTANT: the export does not carry what the adapter runs\n\nconst DEVIN_BIN = process.env.JPWB_DEVIN_BIN ?? 'devin';\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): devin-reviewer.ts exports the override it captured at load, the one it runs. WHO RELIES: the selector, whose default overrides are these exports, and so every floor and preflight. WHAT THE MUTATION DOES: the adapter still runs the replacement while the selector is told nothing was set; the test sees the replacement AT THE SEAM, handed to DevinExec. OBSERVED: KILLED — 2 test(s) red in floor-registry.test.ts: 'devin, JPWB_DEVIN_BIN=\"C:/no-such-directory/reviewer-stand-in.exe\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { …(2) } ] to have a length of +0 but got 1); 'devin, JPWB_DEVIN_BIN=\"\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { file: '', args: [ …(7) ] } ] to have a length of +0 but got 1)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M27-the-agy-export-does-not-carry-the-capture",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "export const AGY_BIN_OVERRIDE: string | undefined = process.env.JPWB_AGY_BIN;\n\nconst AGY_BIN = AGY_BIN_OVERRIDE ?? 'agy';\n",
+		replace: "export const AGY_BIN_OVERRIDE: string | undefined = undefined; // MUTANT: the export does not carry what the adapter runs\n\nconst AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): agy-cli.ts exports the override it captured at load, the one it runs. WHO RELIES: the selector, whose default overrides are these exports, and so every floor and preflight on an agy host. WHAT THE MUTATION DOES: agy-cli.ts still runs the replacement while the selector admits the review; the test sees it AT THE SEAM, as a call to the injected print. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'agy, JPWB_AGY_BIN set: refused and recorded, the injected print never called' (AssertionError: a review ran with agy’s program replaced: expected true to be false // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M28-devin-never-honours-its-override",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "const DEVIN_BIN = DEVIN_BIN_OVERRIDE ?? 'devin';\n",
+		replace: "const DEVIN_BIN = 'devin'; // MUTANT: the captured override is never honoured\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): the adapters keep reading their override at load and honour it - in test mode it is the program run. WHO RELIES: tests that drive devin-reviewer.ts with a stand-in program, and the selector's refusal, which is only needed because the override is honoured. WHAT THE MUTATION DOES: devinPrint hands the seam 'devin' - the paid reviewer on this machine - whatever was captured; the test fails AT THE SEAM, which records the name, with PATH finding no program. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: '⭑ in test mode the override is HONOURED — the program it names is the one handed to the seam' (AssertionError: expected [ 'devin' ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M29-agy-never-honours-its-override",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "const AGY_BIN = AGY_BIN_OVERRIDE ?? 'agy';\n",
+		replace: "const AGY_BIN = 'agy'; // MUTANT: the captured override is never honoured\n",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): agy-cli.ts keeps honouring the override it captured at load, unchanged. WHO RELIES: the qualification harness's argv assertion, whose test (the J22-M10 victim) loads agy-cli.ts with an override and expects it refused at the exec seam. WHAT THE MUTATION DOES: agyPrint hands the seam 'agy' whatever was captured, so the argv assertion admits it; the test fails AT THE SEAM, which records the call and spawns nothing. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-transports.test.ts: '⛔ the argv assertion refuses a program captured at module load, and a model changed after loading — before anything is spawned' (AssertionError: promise resolved \"{ …(2) }\" instead of rejecting)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M30-the-preflight-ignores-the-captured-overrides",
+		file: "apps/rph-demo/src/lib/server/assurance/preflight.ts",
+		find: "\tconst selection = selectReviewer(input);",
+		replace: "\tconst selection = selectReviewer({ ...input, overrides: { agy: undefined, devin: undefined } }); // MUTANT: the preflight ignores the captured overrides",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/preflight.test.ts"],
+		why: "PROMISE (JAN-SELREV D7; ROADMAP exit): a program override outside test mode is refused BEFORE paid work - the preflight reads the overrides the adapters captured. WHO RELIES: the authoring route and beginExecute, which refuse on the preflight before a paid agent or executor runs. WHAT THE MUTATION DOES: the preflight says READY, the paid work runs, and the floor refuses only afterwards. OBSERVED: KILLED — 1 test(s) red in preflight.test.ts: '⛔ outside test mode, a captured JPWB_DEVIN_BIN refuses a devin host; in test mode the same host is READY' (AssertionError: expected true to be false // Object.is equality)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M31-the-registry-ignores-the-captured-overrides",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\tconst selection = selectReviewer({ testMode: opts.testMode });",
+		replace: "\tconst selection = selectReviewer({ testMode: opts.testMode, overrides: { agy: undefined, devin: undefined } }); // MUTANT: the registry ignores the captured overrides",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D7): the floor registry reads the overrides the adapters captured, so a replaced program's review is refused and recorded, never run. WHO RELIES: both floors (floor.ts, floor-over-subject.ts), which build the reviewer from createFloorRegistry. WHAT THE MUTATION DOES: the registry builds the real reviewer and the replacement runs; the test sees it AT THE SEAM, as a DevinExec call. OBSERVED: KILLED — 3 test(s) red in floor-registry.test.ts: 'devin, JPWB_DEVIN_BIN=\"C:/no-such-directory/reviewer-stand-in.exe\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { …(2) } ] to have a length of +0 but got 1); 'devin, JPWB_DEVIN_BIN=\"\": refused and recorded, nothing started — an empty override is still set' (AssertionError: a replaced program was started for a review: expected [ { file: '', args: [ …(7) ] } ] to have a length of +0 but got 1)",
+		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
+	},
+	{
+		id: "SR2-M32-the-refused-try-retains-no-answer",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\t\tp,\n\t\t\t\t\t\ttext,\n\t\t\t\t\t\t'rejected',\n",
+		replace: "\t\t\t\t\t\tp,\n\t\t\t\t\t\t'', // MUTANT: the substitute's answer is not retained\n\t\t\t\t\t\t'rejected',\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; PER-9; REG-D-056): the try a substituted model answered is recorded with the answer it returned, so its answer span is retained on the content plane before the review fails. WHO RELIES: a reader of the exchange record, who must be able to read what the substitute said on the try that broke the review. WHAT THE MUTATION DOES: the refused try is recorded with an empty answer, so no answer span is located and nothing the substitute said is retained - the record shows a rejected try with no content behind it. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s' (AssertionError: the substitute’s answer was not retained: expected 'PENDING_CONTENT_PLANE' to be 'STORED' // Object.is equality)",
+		source: "JAN-SELREV SR-2 fix - the verifier's surviving mutants V-I1, V-I25, V-I2 and V-I3, each killed by one added assertion: the refused try's answer is retained and its record is awaited before the throw (a content store settling each put a timer tick later), a refused repair carries the repair prompt, and the refusal is not dressed as a failed tool invocation"
+	},
+	{
+		id: "SR2-M33-the-refused-try-is-recorded-unawaited",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tawait capture(\n\t\t\t\t\t\trole,\n",
+		replace: "\t\t\t\t\tvoid capture( // MUTANT: the refused try's capture is not awaited before the throw\n\t\t\t\t\t\trole,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; PER-9): the refused try is recorded BEFORE the review fails - the capture completes, and only then is the refusal thrown. WHO RELIES: the floor, which drains the exchange records when the review fails and must find the try that broke it among them. WHAT THE MUTATION DOES: the capture is started but not awaited, so with a content store the refusal is thrown and the review fails before the record exists - the try that broke the review is missing from the records drained at the failure. OBSERVED: KILLED — 2 test(s) red in reasoning-review-validator.test.ts: '⛔ the refused try is RETAINED before the review fails: one record, its answer STORED, and the bytes are the substitute’s' (AssertionError: the refused try was not recorded when the review failed: expected [] to have a length of 1 but got +0)",
+		source: "JAN-SELREV SR-2 fix - the verifier's surviving mutants V-I1, V-I25, V-I2 and V-I3, each killed by one added assertion: the refused try's answer is retained and its record is awaited before the throw (a content store settling each put a timer tick later), a refused repair carries the repair prompt, and the refusal is not dressed as a failed tool invocation"
+	},
+	{
+		id: "SR2-M34-a-refused-repair-records-the-initial-prompt",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tawait capture(\n\t\t\t\t\t\trole,\n\t\t\t\t\t\tp,\n",
+		replace: "\t\t\t\t\tawait capture(\n\t\t\t\t\t\trole,\n\t\t\t\t\t\tprompt, // MUTANT: the initial prompt, whichever try was refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
+		why: "PROMISE (JAN-SELREV D6; PER-9-a): a refused try is recorded with the prompt it was actually sent - for a refused REPAIR try, the repair prompt carrying the minified-JSON instruction. WHO RELIES: the exchange record's chain, whose materialized input is what a reader reconstructs each try from. WHAT THE MUTATION DOES: a refused repair try is recorded as though it had been sent the initial prompt, so the record misstates what the substitute was asked. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⭑ a REPAIR try that reports another model is refused the same way, after its predecessor' (AssertionError: the refused repair is recorded with the prompt it was sent: expected 'You are an independent assurance revi…' to be 'You are an independent assurance revi…' // Object.is equality)",
+		source: "JAN-SELREV SR-2 fix - the verifier's surviving mutants V-I1, V-I25, V-I2 and V-I3, each killed by one added assertion: the refused try's answer is retained and its record is awaited before the throw (a content store settling each put a timer tick later), a refused repair carries the repair prompt, and the refusal is not dressed as a failed tool invocation"
+	},
+	{
+		id: "SR2-M35-the-refusal-is-dressed-as-a-failed-invocation",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tthrow new Error(refusal);\n",
+		replace: "\t\t\t\t\tthrow sanitiseToolFailure(new Error(refusal), p, 'reasoning-review backing tool'); // MUTANT: dressed as a failed invocation\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
+		why: "PROMISE (JAN-SELREV D6): the refusal of a substituted model is stated as what it is - the reviewing tool reported another model than the one configured - and is not dressed as a failed invocation of the backing tool, which is why the check sits outside the validator's invocation try. WHO RELIES: the operator reading the VALIDATOR_EXECUTION_FAILED statement, who must be told the tool ran and answered and that the remedy is to re-qualify or re-select, not to repair the tool. WHAT THE MUTATION DOES: the refusal is wrapped as 'reasoning-review backing tool invocation failed: ...', so the recorded statement opens as a tool failure. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: the refusal reads as a failed tool invocation: expected 'reasoning-review backing tool invocat…' not to contain 'invocation failed')",
+		source: "JAN-SELREV SR-2 fix - the verifier's surviving mutants V-I1, V-I25, V-I2 and V-I3, each killed by one added assertion: the refused try's answer is retained and its record is awaited before the throw (a content store settling each put a timer tick later), a refused repair carries the repair prompt, and the refusal is not dressed as a failed tool invocation"
 	}
 ];

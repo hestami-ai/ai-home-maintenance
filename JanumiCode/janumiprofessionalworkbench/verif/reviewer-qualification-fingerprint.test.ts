@@ -18,6 +18,12 @@
 //     seeded policy's (E14), a model-supplied `stipulated` honoured (E5), a malformation class no longer detected (E6).
 //   · THE BUDGET OBJECT IS THE ONLY PLACE A LIMIT IS WRITTEN — held structurally, over the validator's syntax tree,
 //     and behaviourally for every limit a probe can reach.
+//   · ⭐ `JAN-SELREV` SR-2 (D6) — THE FINGERPRINT MEASURES THE VALIDATOR WITHOUT `requireReportedModel`. What it hashes
+//     is the runner's SCORING seam: the corpus replies that report another model are scored there, never refused, and on
+//     a copy the option set in the runner moves the scoring digest — which is why only the product's devin branch sets
+//     it. ⚠ The PROBE seam's gate CANNOT move the fingerprint: every probe reply is a bare string that reports no model,
+//     so the option set there refuses nothing the fingerprint hashes. That seam's only guard is the test that hands it
+//     the corpus replies directly: 'a corpus reply reporting ANOTHER model is scored, never refused', below.
 // ⛔ NO MODEL IS REACHABLE: in process PATH names an empty directory, and every child is hermetic
 // (`reviewer-qualification-hermetic.ts`).
 import { spawnSync } from 'node:child_process';
@@ -51,7 +57,8 @@ import {
 	type ReviewerFingerprint
 } from '../scripts/reviewer-qual/fingerprint.js';
 import { detectMalformations } from '../scripts/reviewer-qual/malformations.js';
-import { FINGERPRINT_PROBES } from '../scripts/reviewer-qual/probes.js';
+import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { FINGERPRINT_PROBES, PROBE_SUBJECT } from '../scripts/reviewer-qual/probes.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
 import { CORPUS_CASE, scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
@@ -319,6 +326,21 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 			for (const k of ['probes', 'budget', 'criteria'] as const) expect(fp.components[k], `${label}: ${k}`).toBe(BASE.components[k]);
 		}
 	}, 120_000);
+
+	it('⭐ SR-2 (D6) — why the reported-model check is GATED: set in the runner’s validator, on a copy, it moves the scoring digest', () => {
+		// ⛔ The scoring corpus holds replies that report OTHER models (`scoring-corpus.ts`), and their outcomes are hashed.
+		// A check the fingerprint's validators made would refuse those replies, so an UNGATED check would move the
+		// fingerprint of a reviewer whose prompt and scoring did not change. Only the product's devin branch sets it.
+		const copy = disposableTree();
+		const file = `${copy}/scripts/reviewer-qual/runner.ts`;
+		const original = readFileSync(file, 'utf8');
+		const find = '\t\tclock: EXCHANGE_CLOCK,\n';
+		expect(original.split(find).length - 1, 'the edit anchors once').toBe(1);
+		writeFileSync(file, original.replace(find, () => `${find}\t\trequireReportedModel: true,\n`));
+		const gated = fingerprintIn(copy);
+		expect(gated.components.scoring, 'the scoring digest moves').not.toBe(BASE.components.scoring);
+		for (const k of ['probes', 'budget', 'criteria'] as const) expect(gated.components[k], k).toBe(BASE.components[k]);
+	}, 120_000);
 });
 
 describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt assembly', () => {
@@ -528,6 +550,44 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 		expect([...dispositions].sort()).toEqual(
 			['BOUNDARY_REJECTED', 'INCONCLUSIVE', 'REJECTED', 'SATISFIED', 'VALIDATOR_FAILED'].sort()
 		);
+	});
+});
+
+describe('JAN-SELREV SR-2 (D6) — the fingerprint measures the validator WITHOUT `requireReportedModel`', () => {
+	it('⛔ a corpus reply reporting ANOTHER model is scored, never refused — by both of the fingerprint’s validators', async () => {
+		// ⚠ THE TWO SEAMS ARE NOT GUARDED ALIKE. The fingerprint hashes the SCORING seam's outcomes, so the option set there
+		// moves the fingerprint too (the copy test above). The PROBE seam never receives a corpus reply in the fingerprint —
+		// its replies are bare strings that report no model — so the option set there moves no fingerprint component: THIS
+		// test, handing it the corpus replies directly, is that seam's only guard.
+		// ⭑ THE PREMISE, HELD: the corpus reaches the check. Two of its replies report a model other than the candidate's.
+		const reporting = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).filter(
+			(e) => typeof e.replies[0] !== 'string'
+		);
+		expect(reporting.map((e) => e.id)).toEqual(['reported-as-producer', 'reported-by-the-producers-provider']);
+		for (const entry of reporting) {
+			const reply = entry.replies[0] as ToolInvocationResult;
+			expect(reply.producer.modelId, `${entry.id}: another model`).not.toBe(FIXTURE.modelLabel);
+			// The SCORING seam — the runner's validator, which every corpus outcome is scored through.
+			const e = await PRODUCT_SEAMS.evaluate({
+				case: CORPUS_CASE,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: FIXTURE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect(e.calls, `${entry.id}: one call, and no repair`).toHaveLength(1);
+			expect(
+				e.scored.criteria.length,
+				`${entry.id}: scored as a THROW — the runner's validator refused the reported model`
+			).toBeGreaterThan(0);
+			expect(e.evaluator.modelId).toBe(reply.producer.modelId);
+			// The PROBE seam — the product's validator as the fingerprint builds it, handed a reply it never meets there.
+			const result = await PRODUCT_SEAMS.validator(async () => reply).evaluate(PROBE_SUBJECT, {
+				reasoningReview: FINGERPRINT_PROBES[0]!.input(SEEDED_REASONING_REVIEW_CRITERIA)
+			});
+			expect(result.executionFailed, `${entry.id}: the probe validator refused the reported model`).toBe(false);
+			expect(result.evaluator.modelId).toBe(reply.producer.modelId);
+		}
 	});
 });
 

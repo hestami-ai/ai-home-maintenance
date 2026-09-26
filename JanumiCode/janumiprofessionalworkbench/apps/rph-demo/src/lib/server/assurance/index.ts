@@ -101,7 +101,12 @@ export function createFloorRegistry(opts: {
 								modelId: assuranceModel,
 								// Devin brokers many vendors, so the PROVIDER is the broker, not the model family.
 								// Claiming `zhipu` for a GLM model would assert a relationship this host cannot see.
-								providerId: 'devin'
+								providerId: 'devin',
+								// ⭐ `JAN-SELREV` SR-2 (D6) — devin REPORTS the model that answered, and a model other than
+								// the one configured fails the review: the selected reviewer (`REG-D-084`) is the model
+								// qualified, so a substitute's review is not its review. Set HERE ONLY — the fingerprint and
+								// the qualification runner build the validator without it (`reasoning-review-validator.ts`).
+								requireReportedModel: true
 							}
 						: {})
 			})

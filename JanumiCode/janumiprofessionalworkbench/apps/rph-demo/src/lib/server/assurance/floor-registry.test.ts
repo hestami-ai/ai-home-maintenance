@@ -20,6 +20,7 @@ import {
 import { writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearingJudgement } from './clearing-reviewer.testing.js';
+import { createExchangeSink } from './exchange-capture.js';
 import { createFloorRegistry } from './index.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { STANDIN_VALIDATOR_ID } from './standin-reasoning-review-validator.js';
@@ -52,7 +53,10 @@ const CTX: ValidatorContext = {
 const SELECTION_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',
-	'JPWB_JUDGE_MODEL'
+	'JPWB_JUDGE_MODEL',
+	// ⭑ SR-2 (D7) — read by the adapters when they LOAD, so they reach a case only through `loadedWith` below.
+	'JPWB_AGY_BIN',
+	'JPWB_DEVIN_BIN'
 ] as const;
 
 /** One exec of the devin program, as its seam received it. */
@@ -252,5 +256,138 @@ describe('in test mode the stand-in stays the default, and a named tool is held 
 		expect(
 			createFloorRegistry({ testMode: true }).get(FLOOR_POLICY_IDS.REASONING_REVIEW)?.validatorId
 		).toBe('reasoning-review.unconfigured');
+	});
+});
+
+describe('⭐ SR-2 (D6) — devin reviews with the model configured, or the review fails closed naming both', () => {
+	it('a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named', async () => {
+		// ⛔ WHAT WAS WRONG (`REG-F-457` G6): devin's report was recorded and the review ACCEPTED — so a devin serving
+		// another model than the one selected (`REG-D-084`) produced a review counted as the selected reviewer's.
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const devin = devinProgram('substituted-model');
+		const exchanges = createExchangeSink();
+
+		const review = await recordedReview(
+			createFloorRegistry({ testMode: false, devinExec: devin.exec, exchanges })
+		);
+
+		const records = exchanges.drain();
+		expect(
+			records.map((r) => r.disposition),
+			'one try, recorded as refused before the review failed'
+		).toEqual(['rejected']);
+		expect(records[0]!.resolvedModelIdentity).toEqual({
+			kind: 'resolved',
+			modelId: 'substituted-model',
+			providerId: 'devin',
+			evidence: 'PROVIDER_REPORTED'
+		});
+		expect(devin.calls, 'a repair would be a second paid call to the substitute').toHaveLength(1);
+		const failed = review.observations.filter((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
+		expect(failed, 'the substituted review was not failed').toHaveLength(1);
+		const statement = failed[0]!.statement;
+		expect(statement).toContain("'substituted-model'");
+		expect(statement).toContain("'fixture-devin-model'");
+		expect(statement).toContain('the remedy is to re-qualify');
+		// ⛔ NOT DRESSED AS A FAILED INVOCATION of the backing tool (`sanitiseToolFailure`): devin ran and answered, and
+		// the refusal is of WHO answered — which is why the check sits outside the validator's invocation `try`.
+		expect(statement, 'the refusal reads as a failed tool invocation').not.toContain(
+			'invocation failed'
+		);
+		expect(statement).toMatch(/^The reviewing tool 'devin' reported /);
+	});
+});
+
+/**
+ * `createFloorRegistry` as a server that STARTED with these program overrides. The adapters capture them when they LOAD
+ * (`agy-cli.ts`, `devin-reviewer.ts`), so each is set before a fresh import and removed straight after: what the
+ * registry then acts on is what the adapters captured, never the environment at the review.
+ */
+async function loadedWith(overrides: {
+	readonly JPWB_AGY_BIN?: string;
+	readonly JPWB_DEVIN_BIN?: string;
+}): Promise<typeof createFloorRegistry> {
+	vi.resetModules();
+	for (const [k, v] of Object.entries(overrides)) vi.stubEnv(k, v);
+	const fresh = await import('./index.js');
+	for (const k of Object.keys(overrides)) vi.stubEnv(k, undefined);
+	vi.resetModules();
+	return fresh.createFloorRegistry;
+}
+
+describe('⛔ SR-2 (D7) — a program override: refused outside test mode for the SELECTED tool only, honoured inside it', () => {
+	// ⛔ EACH CASE FAILS AT THE SEAM, NEVER AT A PROGRAM. devin is reached only through `devinExec`, agy only through an
+	// injected `print`, and PATH names an empty directory — so a mutant that admits an override, or ignores one, is
+	// seen as a call the seam should not have had, or a program it should have been handed.
+	const STAND_IN = 'C:/no-such-directory/reviewer-stand-in.exe';
+
+	for (const program of [STAND_IN, ''])
+		it(`devin, JPWB_DEVIN_BIN=${JSON.stringify(program)}: refused and recorded, nothing started — an empty override is still set`, async () => {
+			vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+			vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+			const build = await loadedWith({ JPWB_DEVIN_BIN: program });
+			const devin = devinProgram('fixture-devin-model');
+
+			const review = await recordedReview(build({ testMode: false, devinExec: devin.exec }));
+
+			expect(devin.calls, 'a replaced program was started for a review').toHaveLength(0);
+			expect(review.validatorId).toBe('reasoning-review.unconfigured');
+			const failed = review.observations.filter((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
+			expect(failed).toHaveLength(1);
+			expect(failed[0]!.statement).toContain(`JPWB_DEVIN_BIN=${JSON.stringify(program)}`);
+			expect(failed[0]!.statement).toContain('REG-D-084');
+		});
+
+	it('agy, JPWB_AGY_BIN set: refused and recorded, the injected print never called', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'agy');
+		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge-model');
+		const build = await loadedWith({ JPWB_AGY_BIN: STAND_IN });
+		let called = false;
+
+		const review = await recordedReview(
+			build({
+				testMode: false,
+				print: async () => {
+					called = true;
+					return clearingJudgement(SEEDED_REASONING_REVIEW_CRITERIA);
+				}
+			})
+		);
+
+		expect(called, 'a review ran with agy’s program replaced').toBe(false);
+		expect(review.validatorId).toBe('reasoning-review.unconfigured');
+		expect(
+			review.observations.find((o) => o.code === 'VALIDATOR_EXECUTION_FAILED')?.statement
+		).toContain(`JPWB_AGY_BIN=${JSON.stringify(STAND_IN)}`);
+	});
+
+	it('⭑ the OTHER tool’s override refuses nothing — a set JPWB_AGY_BIN does not stop a devin review', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const build = await loadedWith({ JPWB_AGY_BIN: STAND_IN });
+		const devin = devinProgram('fixture-devin-model');
+
+		const review = await recordedReview(build({ testMode: false, devinExec: devin.exec }));
+
+		expect(review.validatorId).toBe('agy.reasoning-review');
+		expect(
+			devin.calls.map((c) => c.file),
+			'devin’s own program, run once'
+		).toEqual(['devin']);
+	});
+
+	it('⭑ in test mode the override is HONOURED — the program it names is the one handed to the seam', async () => {
+		// THE NEVER-HONOUR MUTANT: the adapter ignores what it captured, so the seam is handed `devin` — which on this
+		// machine is the paid reviewer. Here it is a string the seam records, and PATH could not find it anyway.
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const build = await loadedWith({ JPWB_DEVIN_BIN: STAND_IN });
+		const devin = devinProgram('fixture-devin-model');
+
+		const review = await recordedReview(build({ testMode: true, devinExec: devin.exec }));
+
+		expect(devin.calls.map((c) => c.file)).toEqual([STAND_IN]);
+		expect(review.observations.map((o) => o.code)).not.toContain('VALIDATOR_EXECUTION_FAILED');
 	});
 });

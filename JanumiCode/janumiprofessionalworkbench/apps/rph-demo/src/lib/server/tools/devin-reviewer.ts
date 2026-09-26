@@ -17,7 +17,15 @@ import type { ToolInvocationResult } from './backing-tool.js';
 
 const run = promisify(execFile);
 
-const DEVIN_BIN = process.env.JPWB_DEVIN_BIN ?? 'devin';
+/**
+ * ⭐ `JAN-SELREV` SR-2 (D7) — the program override this module CAPTURED when it loaded: `undefined` when
+ * `JPWB_DEVIN_BIN` was unset, `''` when it was set empty. Exported so the reviewer selector refuses what this module
+ * will actually run: outside test mode a set override refuses a devin review, because a replacement's reviews would be
+ * recorded as devin's (`REG-F-441`). ⚠ Still honoured here: in test mode the override is the tests' to use.
+ */
+export const DEVIN_BIN_OVERRIDE: string | undefined = process.env.JPWB_DEVIN_BIN;
+
+const DEVIN_BIN = DEVIN_BIN_OVERRIDE ?? 'devin';
 
 /**
  * The reviewing model. ⛔ Configured, never pinned (`REG-D-052`); absence is a refusal (`REG-F-331`).
