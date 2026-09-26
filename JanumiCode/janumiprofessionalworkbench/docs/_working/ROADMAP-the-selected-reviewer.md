@@ -105,6 +105,15 @@ Record `REG-D-085`.
   the tool's model variable; its stale comments are corrected; `REG-F-445` is fixed or cited. Its test timeout is
   checked against the reviewer's worst case.
 
+- ⭑ *`SR-3` landed 2026-09-26.*
+  - **The documents.** `README.md` gains *"The reasoning reviewer"*, `AUTHORING-BACKBONE.md` is restated, and
+    `harness/README.md` and the header comments are corrected. Every behavioural sentence was checked against
+    the code by an adversarial verifier, and its twelve overstatements were corrected. `REG-F-442` is closed.
+  - **The live lane.** One pure helper (`e2e-live-exec/lane-config.ts`) decides the lane's required variables
+    and its expected reviewer model, and a gate test pins it to the product's selector. `REG-F-461` is filed and
+    closed. `REG-F-445` is fixed in code, and closes on the lane's first paid run. The timeouts follow the
+    reviewer's bounded worst case.
+
 ## `SR-4` — the gate holds the SELECTED reviewer to today's definition (`Q1`, ruled yes: `REG-D-086`)
 
 - **The record.** A `SELECTION` line kind in `docs/tracking/reviewer-qualification/runs.ndjson` names the

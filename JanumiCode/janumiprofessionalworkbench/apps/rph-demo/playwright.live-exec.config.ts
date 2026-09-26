@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { laneKeysRefusal, requiredLaneKeys, TEST_TIMEOUT_MS } from './e2e-live-exec/lane-config';
 
 // JAN-LIVEEXEC — the LIVE EXECUTION lane: a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT
 // one. Sibling of playwright.live.config.ts, which runs the real Pi AUTHORING agent; this one exercises the
@@ -12,57 +13,50 @@ import { join } from 'node:path';
 // live coverage at all. The deterministic lane keeps proving the wiring; this lane exists to produce an
 // OBSERVATION about model behaviour that no gate can.
 //
-// ⚠ IT BOOTS IN RPH_DEMO_MODE=test so the harness (reset / introspect / stable ids) survives — only the TOOLS
-// are real. That is the same compromise the authoring live lane already documents.
+// ~~⚠ IT BOOTS IN RPH_DEMO_MODE=test so the harness (reset / introspect / stable ids) survives — only the TOOLS
+// are real. That is the same compromise the authoring live lane already documents.~~
+// ⭑ `JAN-SELREV` SR-3 — CORRECTED: it boots `RPH_DEMO_MODE=server` with `JPWB_HARNESS=1` (the `webServer.env` below,
+// and why). So it runs OUTSIDE test mode, and its reviewer is chosen exactly as a deployed host's is
+// (`src/lib/server/assurance/reviewer-selection.ts`): an unset or unknown tool, a missing model or a program override
+// (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`) is refused, and a model step is refused before its executor opens.
 const PORT = 4322;
 
 // ⛔ NO MODEL LABEL IS PINNED HERE (REG-D-052: the model is configured, never pinned; REG-F-331 measured what
-// pinning costs — a rotted label made EVERY review fail). The four keys are passed THROUGH from the operator's
-// environment; the app refuses, with its own reasoning, when one is unset.
+// pinning costs — a rotted label made EVERY review fail). The keys are passed THROUGH from the operator's
+// environment; the app refuses, with its own reasoning, when one is unset. The selected reviewer (REG-D-084, devin
+// with glm-5-3-flash-max) is named in the refusal below as the documented configuration, never as a value.
 //
 // ⭑ THE GUARD BELOW IS OPERATOR UX, NOT A SECOND POLICY. Without it the run boots, drives a browser for a
-// minute, and fails deep inside a form submission with a 400 — so it names all four keys at once, up front.
-const REQUIRED = [
-	'JPWB_EXECUTOR',
-	'JPWB_EXECUTOR_MODEL',
-	'JPWB_ASSURANCE_TOOL',
-	'JPWB_ASSURANCE_MODEL'
-] as const;
-
-/**
- * ⭐ THE FIFTH KEY, REQUIRED ONLY BY THE TOOL THAT READS IT.
- *
- * ⛔ THE GUARD BELOW EXISTS SO AN OPERATOR LEARNS EVERYTHING THAT IS MISSING AT ONCE, AND IT MISSED ONE. The
- * agy assurance adapter pins `--model judgeModel()`, and `judgeModel()` FAILS CLOSED when `JPWB_JUDGE_MODEL` is
- * unset — *“an unconfigured judge has no identity to record, and recording a placeholder is precisely what
- * this module was written to stop”*. So `JPWB_ASSURANCE_TOOL=agy` passed this guard, booted a browser, and
- * failed a minute later inside a form submission: the exact experience the guard's own comment says it is here
- * to prevent.
- *
- * ⚠ CONDITIONAL, NOT UNCONDITIONAL. Demanding it of a `devin` or `pi` reviewer would refuse a configuration
- * that works — a guard that over-refuses teaches operators to bypass it.
- */
-const assuranceTool = process.env.JPWB_ASSURANCE_TOOL?.trim();
-const alsoRequired = assuranceTool === 'agy' ? (['JPWB_JUDGE_MODEL'] as const) : ([] as const);
-
-const missing = [...REQUIRED, ...alsoRequired].filter((k) => !process.env[k]?.trim());
-if (missing.length > 0)
-	throw new Error(
-		`The live execution lane is missing ${missing.length} of the ${REQUIRED.length + alsoRequired.length} keys it needs: ${missing.join(', ')}.
-` +
-			'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL  — the tool and model that PRODUCE the work product\n' +
-			'  JPWB_ASSURANCE_TOOL / JPWB_ASSURANCE_MODEL — the tool and model that REVIEW it\n' +
-			(assuranceTool === 'agy'
-				? '  JPWB_JUDGE_MODEL — agy pins the judge model per call and refuses to invent one; `agy models` lists the labels it knows\n'
-				: '') +
-			'⚠ The two models must DIFFER, or the reasoning review is refused for non-independence (ASR-13) — ' +
-			'which is the check working, not a fault.\n' +
-			'Nothing is defaulted: the model is a deployment choice (REG-D-052).'
-	);
+// minute, and fails deep inside a form submission with a 400 — so it names every missing key at once, up front.
+//
+// ~~⭐ THE FIFTH KEY, REQUIRED ONLY BY THE TOOL THAT READS IT.
+//
+// ⛔ THE GUARD BELOW EXISTS SO AN OPERATOR LEARNS EVERYTHING THAT IS MISSING AT ONCE, AND IT MISSED ONE. The
+// agy assurance adapter pins `--model judgeModel()`, and `judgeModel()` FAILS CLOSED when `JPWB_JUDGE_MODEL` is
+// unset — *“an unconfigured judge has no identity to record, and recording a placeholder is precisely what
+// this module was written to stop”*. So `JPWB_ASSURANCE_TOOL=agy` passed this guard, booted a browser, and
+// failed a minute later inside a form submission: the exact experience the guard's own comment says it is here
+// to prevent.
+//
+// ⚠ CONDITIONAL, NOT UNCONDITIONAL. Demanding it of a `devin` or `pi` reviewer would refuse a configuration
+// that works — a guard that over-refuses teaches operators to bypass it.~~
+// ⭑ STRUCK by `JAN-SELREV` SR-3: the four-key list it sat beside demanded `JPWB_ASSURANCE_MODEL` of agy too, which
+// agy never reads; and a `pi` reviewer is not a configuration that works — the product refuses it, no reviewer adapter
+// being wired for it (`reviewer-selection.ts`).
+//
+// ⭐ `JAN-SELREV` SR-3 — WHICH KEYS DEPENDS ON THE REVIEWING TOOL, AND `e2e-live-exec/lane-config.ts` SAYS WHICH. This
+// list used to demand the devin model variable of EVERY tool, and a conditional added the agy one for agy only — so an
+// agy lane was refused a key agy never reads (`docs/_working/DESIGN-the-selected-reviewer.md` §2 G9; `REG-F-461`). The
+// helper maps each wired tool to the one variable it reads its model from, refuses a tool the product would refuse and
+// a program override the product would refuse for the selected tool, and is held to the product's own selector by
+// `verif/live-exec-lane-config.test.ts`. ⚠ Neither this file nor the spec names a reviewer model variable itself:
+// that test reddens if either does — and if this file stops throwing the refusal below.
+const refusal = laneKeysRefusal(process.env);
+if (refusal) throw new Error(refusal);
 
 const passthrough = Object.fromEntries(
-	REQUIRED.map((k) => [k, process.env[k]!.trim()])
-) as Record<(typeof REQUIRED)[number], string>;
+	requiredLaneKeys(process.env.JPWB_ASSURANCE_TOOL).map((k) => [k, process.env[k]!.trim()])
+) as Record<string, string>;
 
 export default defineConfig({
 	testDir: './e2e-live-exec',
@@ -75,8 +69,11 @@ export default defineConfig({
 	outputDir: 'e2e-results/artifacts-live-exec',
 	globalSetup: './e2e/global-setup.ts',
 	globalTeardown: './e2e/global-teardown.ts',
-	// Two real model calls per run (produce, then review), each of which may think for a while.
-	timeout: 600_000,
+	// ⭐ `JAN-SELREV` SR-3 — FROM THE REVIEWER'S BOUND, NOT FROM "TWO CALLS". This said *"Two real model calls per run
+	// (produce, then review)"* and allowed 600 s. The one Begin & Execute POST runs up to 3 tries, each an executor call
+	// and a review of at most 2 reviewer calls of 240 s: the reviewer alone may take 3 × 2 × 240 = 1,440 s. The wait and
+	// its arithmetic live in `e2e-live-exec/lane-config.ts` (2,160 s for the POST, 2,280 s for the test).
+	timeout: TEST_TIMEOUT_MS,
 	expect: { timeout: 20_000 },
 	use: {
 		baseURL: `http://127.0.0.1:${PORT}`,
@@ -91,7 +88,11 @@ export default defineConfig({
 		timeout: 120_000,
 		// ── ⭐⭐ SERVING **AND** OBSERVABLE — THE ARRANGEMENT `R24` EXISTS TO MAKE SAYABLE ───────────────
 		//
-		// ⛔ THIS LANE HAS NEVER RUN. It booted `RPH_DEMO_MODE='test'` with no `JPWB_DEMO_DB`, so
+		// ~~⛔ THIS LANE HAS NEVER RUN.~~ ⭑ `JAN-SELREV` SR-3 — HISTORY, written 2026-09-20 (`ce6000ce`): as then
+		// configured, the lane could not run. It ran green later that day (`7a988e2d`), and a passing run of 2026-09-20
+		// is recorded in `e2e-results/results-live-exec.json`, git-ignored, on the host that ran it (`REG-F-445` cites
+		// it). The spec's header records runs of 2026-09-05, under an earlier arrangement. As then configured, it booted
+		// `RPH_DEMO_MODE='test'` with no `JPWB_DEMO_DB`, so
 		// `durableWorkspaceRoot` returned undefined → an IN_MEMORY workspace → and `openPiExecutionSession`
 		// THROWS on a non-FILESYSTEM workspace, because a real runner needs a real `cwd`. The lane failed before
 		// it measured anything, and nothing reported it because nothing had run it.

@@ -98,8 +98,11 @@ export interface FloorRunOutcome {
  * ⛔ THE INVOKER ID IS SHARED BY BOTH CALLERS, AND IT DISAGREES WITH THE VOCABULARY — DISCLOSED, NOT MULTIPLIED.
  *
  * `RecordModelExchange.invokerId` is documented in the vocab as the VALIDATOR's id, and the reviewing validators
- * are `agy.reasoning-review` and `mock.reasoning-review`. This value is neither. ⚠ It is kept UNCHANGED because
- * altering it would change the shape of records the work-product path has already written, which is a records
+ * are ~~`agy.reasoning-review` and `mock.reasoning-review`~~ ⭑ `JAN-SELREV` SR-3 — the ones `assurance/index.ts`
+ * registers: `agy.reasoning-review` (the model-backed reviewer, whichever tool it runs), `standin.reasoning-review`
+ * (the declared stand-in, in test mode with no tool named) and `reasoning-review.unconfigured` (a refused selection,
+ * which reviews nothing); the registry no longer registers `mock.reasoning-review`. This value is none of them.
+ * ⚠ It is kept UNCHANGED because altering it would change the shape of records the work-product path has already written, which is a records
  * question and not this phase's; and it is kept in ONE PLACE because the alternative — a second caller copying
  * the literal — would make three constants disagree with one vocabulary instead of one.
  */

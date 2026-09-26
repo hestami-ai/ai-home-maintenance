@@ -1,9 +1,13 @@
 // The in-product de minimis assurance floor (guide §8.4) for the PWA authoring plane. After an authoring turn the
 // server runs the ordered floor over the DRAFT PWA graph — schema/invariant + identity/provenance (deterministic) +
-// an INDEPENDENT Reasoning Review (agy/Gemini in dev/prod, the structural mock under E2E; a different vendor than the
-// Pi authoring executor — exec != assurance, INV-5) — and persists the outcome as canonical ASSURANCE_ASSESSMENT +
-// ASSURANCE_OBSERVATION objects via the shared recorder. Nothing here self-dispositions; composeAssuranceOutcome does
-// the strictest-unresolved composition, and the PublishPwa gate (rph-application) enforces it.
+// an INDEPENDENT Reasoning Review (~~agy/Gemini in dev/prod, the structural mock under E2E; a different vendor than the
+// Pi authoring executor~~ ⭑ `JAN-SELREV` SR-3: the reviewer `assurance/reviewer-selection.ts` selects — outside test
+// mode the configured tool and model, devin with `glm-5-3-flash-max` being the sponsor's selection (`REG-D-084`) and agy
+// configurable; under E2E (test mode, no tool named) the declared stand-in; independence checked on the recorded
+// identities, never assumed from a vendor — exec != assurance, INV-5) — and persists the outcome as canonical
+// ASSURANCE_ASSESSMENT + ASSURANCE_OBSERVATION objects via the shared recorder. Nothing here self-dispositions;
+// composeAssuranceOutcome does the strictest-unresolved composition, and the PublishPwa gate (rph-application)
+// enforces it.
 import { analyzePwaGraph } from '@janumipwb/rph-projections';
 import {
 	FLOOR_POLICY_IDS,

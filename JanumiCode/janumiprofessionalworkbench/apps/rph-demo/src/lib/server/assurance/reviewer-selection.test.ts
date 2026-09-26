@@ -129,6 +129,10 @@ describe('what a refusal SAYS — it names the fault, and every one carries the 
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
 			'may run a GLM-5.3 Flash model under any provider or spelling'
 		);
+		// ⭑ `JAN-SELREV` SR-3: the executor's model is NOT always `JPWB_EXECUTOR_MODEL` — the agy executor runs the judge
+		// model (`REG-F-458`), and guidance naming only the executor variable would send an agy host to the wrong one.
+		expect(SELECTED_REVIEWER_GUIDANCE).toContain('the agy executor runs JPWB_JUDGE_MODEL, REG-F-458');
+		expect(SELECTED_REVIEWER_GUIDANCE).toContain('else the first model Pi has credentials for');
 	});
 
 	const REASONS: readonly { readonly tool: string | undefined; readonly says: string }[] = [

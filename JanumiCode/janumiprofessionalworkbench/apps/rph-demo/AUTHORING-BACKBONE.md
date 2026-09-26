@@ -70,10 +70,51 @@ The following fixes address concrete failures observed during a large natural-la
   Reasoning Review subject findings may trigger auto-refinement. `VALIDATOR_EXECUTION_FAILED`,
   `INDEPENDENCE_VIOLATION`, missing results, escalation, and configuration/external failures remain fail-closed and
   produce retry/configure/change-reviewer guidance rather than graph edits or waiver advice.
-- Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
+- ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
   resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default
   `Gemini 3.5 Flash (High)`. The actual agy invocation always receives that concrete value through `--model`; the
-  preflight does not invoke the reviewer or claim it is healthy.
+  preflight does not invoke the reviewer or claim it is healthy.~~
+  ⭑ **SUPERSEDED 2026-09-26** (`REG-F-442`; `JAN-SELREV`, `docs/_working/DESIGN-the-selected-reviewer.md` D9). No
+  default model exists, and agy is no longer the default reviewer. Before an authoring turn starts an isolated agent
+  candidate, an app-local preflight asks the same reviewer selector the assurance floor is built from
+  (`src/lib/server/assurance/reviewer-selection.ts`), so the two cannot disagree. The preflight does not invoke the
+  reviewer or claim it is healthy.
+  - **The reviewer is configuration.** Outside test mode, `JPWB_ASSURANCE_TOOL` names the tool, and the tool's own
+    variable names its model: `JPWB_ASSURANCE_MODEL` for devin, `JPWB_JUDGE_MODEL` for agy. There is no default tool
+    and no default model (`REG-D-052`). The sponsor's selection (`REG-D-084`) is `JPWB_ASSURANCE_TOOL=devin` with
+    `JPWB_ASSURANCE_MODEL=glm-5-3-flash-max`. It is the documented configuration, not a value the code falls back to,
+    and agy stays configurable.
+  - **Unset or wrong, the turn is refused.** In any mode, an unknown tool, `pi` (no reviewer adapter is wired), or a
+    missing model refuses the turn before the agent runs. Outside test mode, so do an unset tool (in test mode it
+    selects the declared stand-in) and a program override for the SELECTED tool — `JPWB_DEVIN_BIN` for devin,
+    `JPWB_AGY_BIN` for agy — even an empty one; the other tool's override refuses nothing. The guidance names the
+    selected configuration. A refusal that reaches a floor anyway is recorded as `VALIDATOR_EXECUTION_FAILED` under the
+    validator id `reasoning-review.unconfigured`, and the floor fails closed.
+  - **Independence (ASR-13) is partly the operator's.** The check compares the model ids the tools report by exact
+    string, so neither the executor nor the authoring agent may run a GLM-5.3 Flash model under any provider or
+    spelling. The authoring agent runs `JPWB_AGENT_MODEL` when it is set, otherwise Pi's own default model, and, when
+    that one does not resolve, the first model Pi has credentials for; the agy executor runs `JPWB_JUDGE_MODEL`. The
+    code cannot detect another spelling of the same model.
+  - **devin's host.** The adapter runs `devin` by name, so devin must be on the server process's `PATH`, and signed in
+    (inferred, not tested here). devin runs in the server process's working directory, which devin must trust: its
+    print mode fails in an untrusted directory, and the adapter does not bypass that check. Making the directory
+    trusted is devin's own step, and how is not verified here. devin also injects its host profile's always-on rules
+    and available skills into the reviewer's context (`REG-F-357`), so it is run from a profile that carries none, or
+    what the profile carries is disclosed. The preflight sees none of this: a missing program, a signed-out devin or an
+    untrusted directory shows up only at the first review, after the paid work it reviews, and that review is recorded
+    as failed; nothing detects the injected context.
+  - **The model devin reports must be the model configured.** When devin reports a model and it is not the configured
+    one, the review fails closed naming both, and the remedy is re-qualification or re-selection, not
+    reconfiguration. When devin reports no model, nothing is compared: the configured model is recorded, graded
+    `HOST_CONFIGURED`.
+  - **Program overrides** (`JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`) are honoured only in test mode for the reviewer. The agy
+    EXECUTOR still honours `JPWB_AGY_BIN` in every mode (`REG-F-459`), and it runs `JPWB_JUDGE_MODEL` while the
+    record names `JPWB_EXECUTOR_MODEL` (`REG-F-458`).
+  - **The gate never inherits this configuration.** Its tests and its e2e server start with the live-backend
+    variables removed, so exporting them in a shell does not turn the test stand-in into a paid reviewer.
+
+  The operator's version, with the commands, is the README's [reasoning reviewer](README.md#the-reasoning-reviewer)
+  section.
 
 These controls improve correctness and recovery behavior. The staged-turn layer below now prevents individual agent
 tools from becoming live canonical mutations, but it still does not provide a durable or post-commit reversible

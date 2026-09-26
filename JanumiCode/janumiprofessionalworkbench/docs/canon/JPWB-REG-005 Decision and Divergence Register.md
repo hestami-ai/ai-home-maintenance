@@ -37253,7 +37253,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-442 — two host documents still describe the judge-model default that `REG-D-052` removed
 
-**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ⚠ **OPEN — documentation residue of `REG-F-331` / `REG-D-052`; the remedy is to rewrite two paragraphs.**
+**Filed 2026-09-23** (`JAN-CRITREAD`, raised by the same check, verified first-hand). **Status:** ~~⚠ **OPEN — documentation residue of `REG-F-331` / `REG-D-052`; the remedy is to rewrite two paragraphs.**~~ ✅ **CLOSED 2026-09-26 by `JAN-SELREV` `SR-3`** — `apps/rph-demo/README.md` gains an operator section, *"The reasoning reviewer"*, and `AUTHORING-BACKBONE.md`'s bullet is struck and restated. Neither names a default. Both give the sponsor-selected configuration (`REG-D-084`) as configuration, with its refusals and preconditions.
 
 - `apps/rph-demo/README.md:68-69`: *"If `JPWB_JUDGE_MODEL` is not set, the application pins `Gemini 3.5 Flash (High)` and passes that exact label to `agy --model`."*
 - `apps/rph-demo/AUTHORING-BACKBONE.md:73-75`: *"an app-local preflight resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default `Gemini 3.5 Flash (High)`."*
@@ -37300,7 +37300,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-445 — the live-execution lane's only report of which reviews passed reads a field assessments do not have: its one stored run says `undefined=SATISFIED` three times
 
-**Filed 2026-09-23** (`JAN-CRITREAD`, found by the fact-gathering for `DESIGN-what-the-tests-prove.md`, verified first-hand). **Status:** ⚠ **OPEN — a harness reporting defect in an ungated lane; the fix is two field names.**
+**Filed 2026-09-23** (`JAN-CRITREAD`, found by the fact-gathering for `DESIGN-what-the-tests-prove.md`, verified first-hand). **Status:** ~~⚠ **OPEN — a harness reporting defect in an ungated lane; the fix is two field names.**~~ ⚠ **FIXED IN CODE 2026-09-26 by `JAN-SELREV` `SR-3`; closes on the lane's first paid run.** The report now reads `assurancePolicyId` (`objects.ts:674`) and `findingCode` (`:701`). The spec also requires at least one assessment and a `floor.reasoning-review` among them. The lane is paid and never in the gate, and it has not run since, so the fix has not been observed.
 
 - **THE CODE.** `apps/rph-demo/e2e-live-exec/execution.live.ts:212` prints `a.policyId` and `:219` builds the lane's one persistent report, its `live-review` annotation, from `a.policyId` and `a.assessmentState`, where `a` is an assessment's state (`:202`). The assessment schema's field is `assurancePolicyId` (`packages/rph-contracts/src/objects.ts:674`). The observation line at `:214` reads `o.code`; the observation schema's field is `findingCode` (`objects.ts:701`).
 - **THE STORED RESULT.** `apps/rph-demo/e2e-results/results-live-exec.json` (2026-09-20, the only run on record) carries the annotation `live-review: "undefined=SATISFIED undefined=SATISFIED undefined=SATISFIED"`. The lane exists, in its own words, because *"only this tells us whether the reviewer is any good"* (`:200-201`), and the only thing it recorded cannot say which policy each verdict belongs to.
@@ -37599,7 +37599,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
 
-**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force; the case set v2 fix and the devin candidate's qualification run are owed (`JAN-CRITREAD`).**~~ ⚠ **OPEN — the case set v2 fix and the devin candidate's runs are delivered (`J2-5`, `J2-7`), and the sponsor SELECTS GLM-5.3 Flash Max (`REG-D-084`). Putting it into the product's assurance-reviewer role is owed (`REG-D-084`).**
+**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force; the case set v2 fix and the devin candidate's qualification run are owed (`JAN-CRITREAD`).**~~ ~~⚠ **OPEN — the case set v2 fix and the devin candidate's runs are delivered (`J2-5`, `J2-7`), and the sponsor SELECTS GLM-5.3 Flash Max (`REG-D-084`). Putting it into the product's assurance-reviewer role is owed (`REG-D-084`).**~~ ✅ **DELIVERED 2026-09-26** — the case set v2 fix and the devin runs (`J2-5`, `J2-7`), the selection (`REG-D-084`), and its place in the product's assurance-reviewer role (`JAN-SELREV` `SR-1`..`SR-3`).
 
 - **THE SPONSOR'S WORDS, verbatim, in the order given:**
   1. *"1 - Fix flawed test case (REG-F-449) is approved"*
@@ -37753,7 +37753,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-084 — SPONSOR RULING: `REG-D-082` and `REG-D-083` approved; no further case change for the clean-case residual; GLM-5.3 Flash Max is SELECTED
 
-**Ruled 2026-09-26** (sponsor, in session, answering the `J2-7` report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; putting the selected reviewer into the product's assurance-reviewer role is owed, design first.**
+**Ruled 2026-09-26** (sponsor, in session, answering the `J2-7` report). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force; putting the selected reviewer into the product's assurance-reviewer role is owed, design first.**~~ ✅ **DELIVERED 2026-09-26 by `JAN-SELREV`** (`DESIGN-the-selected-reviewer.md`; `SR-1` `032deaad`, `SR-2` `3e88b0d1`, `SR-3`). The selection is the product's documented configuration. An unconfigured or misconfigured host is refused before paid work. A refusal that reaches a floor is recorded. devin's reported model must be the configured one. The gate never inherits a live-backend selection. `SR-4`, the gate holding the selected reviewer to today's definition, is `REG-D-086`'s.
 
 - **THE SPONSOR'S WORDS, verbatim:** *"REG-D-083 and REG-D-082 are approved. We will proceed with your recommendation for the clean-case residue. GLM-5.3 Flash Max is selected."*
 - **WHAT THEY MEAN, as this entry reads them:**
@@ -37844,3 +37844,11 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **THE REFUSAL.** When devin reports a model other than the configured one, the validator throws a refusal naming both ids, whose remedy is *re-qualify or re-select, never reconfigure* (design D6). The floor records it as `VALIDATOR_EXECUTION_FAILED`, as every throw is.
 - **THE GUIDANCE.** The floor classifies by CODE, never by prose (`apps/rph-demo/src/lib/server/floor.ts:216-231`). So the operator is shown `RETRY_OR_CONFIGURE_REVIEWER` with *"Configure or retry the reviewer"*. That contradicts the refusal's own remedy, and a retry is a second billed call to the same substitute. `autoRefine` is false, so nothing retries automatically.
 - **REMEDY CANDIDATE, UNTESTED.** Give the substitution its own observation code, carried by the thrown error and mapped by `runFloorResults` (`packages/rph-assurance`), plus a branch in the floor's remediation classifier that says re-qualify or re-select and never retry.
+
+### REG-F-461 — the live execution lane demanded `JPWB_ASSURANCE_MODEL` for every reviewing tool, and compared an agy reviewer's model against it
+
+**Filed 2026-09-26** (`JAN-SELREV` `SR-3`; the live-lane half of `DESIGN-the-selected-reviewer.md` §2 G9, which no register entry held — its adversarial verifier caught three new files citing a *"`REG-F-457` G9"* that does not exist). **Status:** ✅ **CLOSED 2026-09-26 by `JAN-SELREV` `SR-3`, in the same landing.**
+
+- **THE DEFECT.** `apps/rph-demo/playwright.live-exec.config.ts` required `JPWB_ASSURANCE_MODEL` whatever `JPWB_ASSURANCE_TOOL` named, adding `JPWB_JUDGE_MODEL` only for agy. `e2e-live-exec/execution.live.ts` asserted the recorded reviewer's model with `toContain(process.env.JPWB_ASSURANCE_MODEL)`. So an agy lane was held to devin's variable: it passed only if the two variables were equal. `toContain` would also pass a longer model id.
+- **THE FIX.** One pure helper, `e2e-live-exec/lane-config.ts`, maps the tool to its model variable, and both the config and the spec read it. The spec asserts the recorded reviewer's model with `toBe`, along with its identity grade per tool. The helper refuses what the product would refuse, a set program override for the selected tool included. A gate test pins the helper against the product's own selector, and the config and spec against the helper.
+- **NOT OBSERVED.** The lane is paid and outside the gate, and it has not run since.

@@ -1,9 +1,20 @@
-// The agy (Gemini) Reasoning-Review Validator — a replaceable implementation of the mandatory Reasoning Review floor
-// policy (§8.4). It is a DIFFERENT vendor than the Pi/Codex executor (model/provider independence), and — unlike the
+// ~~The agy (Gemini) Reasoning-Review Validator — a replaceable implementation of the mandatory Reasoning Review floor
+// policy (§8.4). It is a DIFFERENT vendor than the Pi/Codex executor (model/provider independence), and~~
+// ⭑ `JAN-SELREV` SR-3 — CORRECTED: agy is not THE reviewer. The model-backed Reasoning-Review Validator — a
+// replaceable implementation of the mandatory Reasoning Review floor policy (§8.4) — runs whatever backing tool its
+// `print` seam is given, and agy (`agyPrint`) is only that seam's default. The product gives it the reviewer
+// `reviewer-selection.ts` selects (`assurance/index.ts`): devin with its configured model — the sponsor's selection is
+// `glm-5-3-flash-max` (`REG-D-084`), configuration and never a default — or agy with `JPWB_JUDGE_MODEL`. Independence
+// from the producer is not assumed from a vendor: `checkIndependence` (`packages/rph-assurance`) compares the identities
+// recorded, and under `DIFFERENT_MODEL` their model ids by exact string. The recorded validator id
+// `agy.reasoning-review` is kept whichever tool reviews — records are already written under it
+// (DESIGN-the-selected-reviewer.md §3, "Kept, and disclosed") — and so, for now, are the `Agy` names of this module's
+// exports.
+// ⭑ And — unlike the
 // old prose-and-score critic — it emits a SCHEMA-CONFORMANT ValidatorResult: a MET/NOT_MET result for each §8.4/§11.7.5
 // derivational-integrity failure class, open observations for present failures, and a disposition RECOMMENDATION (the
 // Assurance Service, not this Validator, composes the authoritative disposition). Correctness of the mapping is unit-
-// tested in rph-assurance (reasoningReviewResultFromJudgement); this adapter is the impure agy backend + prompt.
+// tested in rph-assurance (reasoningReviewResultFromJudgement); this adapter is the impure ~~agy~~ backend + prompt.
 import {
 	FLOOR_POLICY_IDS,
 	reasoningReviewResultFromJudgement,
@@ -509,9 +520,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 						// ⭐ AND THE COLLAPSE IS CURRENTLY LOSSLESS, WHICH I CHECKED RATHER THAN ASSUMED. My first
 						// note here said a reviewer whose provider refused the model would be recorded as a
 						// reviewer that said nothing — the same finding on this plane. **That is not reachable
-						// today.** Only two adapters can be a reviewer (`agyPrint` at `:340` by default,
-						// `devinPrint` via `assurance/index.ts:69`), and BOTH THROW on a failed invocation rather
-						// than returning. So the only cause that can arrive here is `ENDED_WITHOUT_ANSWER`, which
+						// today.** Only two adapters can be a reviewer (`agyPrint`, this validator's `print` default,
+						// and `devinPrint`, which `assurance/index.ts` hands in when devin is selected — ⭑ `JAN-SELREV`
+						// SR-3: the `:340` and `index.ts:69` anchors this cited had drifted), and BOTH THROW on a
+						// failed invocation rather than returning. So the only cause that can arrive here is `ENDED_WITHOUT_ANSWER`, which
 						// is exactly what `classifyParse` already reports as `EMPTY_RESPONSE`.
 						//
 						// ⚠ IT BECOMES LOSSY THE MOMENT A SESSION-BASED REVIEWER IS WIRED — one that RESOLVES on a

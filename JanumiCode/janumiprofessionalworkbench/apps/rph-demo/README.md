@@ -65,14 +65,66 @@ bun run test
 bun run e2e
 ```
 
-Normal development and production use the agy Reasoning Review validator. If `JPWB_JUDGE_MODEL` is not set, the
-application pins `Gemini 3.5 Flash (High)` and passes that exact label to `agy --model`. To override it, set a model
-label returned by `agy models` in the same shell before starting the server, for example in PowerShell:
-
-```powershell
-$env:JPWB_JUDGE_MODEL = 'Gemini 3.1 Pro (High)'
-bun run --filter @janumipwb/rph-demo dev
-```
+The development server runs outside test mode, so an authoring turn or a model step runs only once a reasoning
+reviewer is configured. See [The reasoning reviewer](#the-reasoning-reviewer).
 
 The package is a Bun workspace and participates in the monorepo's Turbo tasks through its declared scripts. npm is
 not the supported package-manager path for this repository.
+
+## The reasoning reviewer
+
+The mandatory Reasoning Review judges an authoring turn's candidate before it can be committed to the DRAFT, and a
+model step's work product before the step can complete. When the authoring agent's run throws before the review, or
+the producing model never resolves, no review runs, and the candidate cannot be committed. Outside test mode
+(`bun run dev`, or `RPH_DEMO_MODE=server`) no reviewer runs until one is configured: there is no default tool and no
+default model (`REG-D-052`). The sponsor's selection (`REG-D-084`) is devin with GLM-5.3 Flash Max. That is
+configuration you set, not a value the application falls back to. For example, in PowerShell:
+
+```powershell
+$env:JPWB_ASSURANCE_TOOL = 'devin'
+$env:JPWB_ASSURANCE_MODEL = 'glm-5-3-flash-max'
+bun run --filter @janumipwb/rph-demo dev
+```
+
+- **Unset or wrong, it is refused before paid work.** These are refused: an unset `JPWB_ASSURANCE_TOOL`, a tool the
+  application does not know, `pi` (no reviewer adapter is wired for it), a missing model variable, and a program
+  override (below). The tool name is trimmed and then matched exactly, so `Devin` is unknown. A refused authoring turn
+  stops before the agent starts, and a refused model step before anything is dispatched. The message names the
+  selected configuration. A refusal that reaches an assurance floor anyway is recorded as a failed review
+  (`VALIDATOR_EXECUTION_FAILED`, under the validator id `reasoning-review.unconfigured`), and the floor fails closed.
+- **agy stays configurable.** Set `JPWB_ASSURANCE_TOOL=agy`, and `JPWB_JUDGE_MODEL` to a label the installed agy
+  recognises. agy rejects a label it does not know, and its error output lists the labels it does (`REG-F-331`).
+  devin with another model is configurable too.
+- **Independence (ASR-13).** Neither the executor nor the authoring agent may run a GLM-5.3 Flash model, under any
+  provider or spelling. The executor's model is `JPWB_EXECUTOR_MODEL`, except for the agy executor, which runs
+  `JPWB_JUDGE_MODEL` (below). The authoring agent's is `JPWB_AGENT_MODEL` when it is set, otherwise Pi's own default
+  model, and, when that one does not resolve, the first model Pi has credentials for. The independence check compares
+  the model ids the tools report by exact string, so another spelling of the same model would pass it falsely. The
+  code cannot detect this; keeping to it is the operator's job.
+- **devin's program, sign-in, working directory and profile.** The adapter runs `devin` by name, so devin must be on
+  the server process's `PATH`, and it must be signed in (inferred from the design, not tested here). devin runs in the
+  server process's working directory: `apps/rph-demo` when the server is started with either command above. devin's
+  print mode fails in a directory devin does not trust, and the adapter deliberately does not bypass that check, so
+  that directory must be one devin trusts. Making it trusted is devin's own step; this repository does not verify how.
+  The preflight checks none of these: a missing program, a signed-out devin or an untrusted directory shows up only at
+  the first review, after the paid work it reviews, and that review is recorded as failed. devin also injects its host
+  profile's always-on rules and available skills into the reviewer's context (`REG-F-357`). Run it from a profile
+  with none, or disclose what the profile carries.
+- **devin must answer with the model configured.** devin reports which model answered. If that is not
+  `JPWB_ASSURANCE_MODEL`, the review fails closed and names both. Pointing the configuration at the model devin
+  served is not the fix: the configured model is the one that was qualified and selected, so re-qualify the model
+  devin serves, or re-select the reviewer. When devin reports no model, the configured one is recorded, graded
+  `HOST_CONFIGURED`.
+- **Program overrides are for tests.** `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN` replace the reviewer's program only in
+  test mode. Outside it, an override set for the selected tool refuses the review, even when it is empty. Each adapter
+  reads its override once, when it loads, so unset it and restart the server.
+- **The agy executor.** With `JPWB_EXECUTOR=agy`, the executor runs `JPWB_JUDGE_MODEL`, while the record names
+  `JPWB_EXECUTOR_MODEL` as the producing model (`REG-F-458`). With agy also reviewing, both calls run one model, and
+  the record can show two: it does whenever `JPWB_EXECUTOR_MODEL` differs from `JPWB_JUDGE_MODEL`, and the
+  independence check then passes on that record. The agy executor also honours `JPWB_AGY_BIN` in every mode
+  (`REG-F-459`).
+- **The gate ignores all of this.** The gate's tests and its e2e server start with these variables removed:
+  `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`, `JPWB_EXECUTOR_MODEL`,
+  `JPWB_AGENT`, `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN`. So exporting the configuration in your shell does not change
+  `bun run test` or `bun run e2e`, and the e2e server's reviewer stays the declared test stand-in. The paid live lanes
+  (`e2e:live`, `e2e:live-exec`) do inherit them.

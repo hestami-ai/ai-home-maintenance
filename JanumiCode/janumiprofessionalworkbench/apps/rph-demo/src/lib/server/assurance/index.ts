@@ -32,9 +32,11 @@ export function createFloorRegistry(opts: {
 	/**
 	 * The model call, injectable.
 	 *
-	 * ⭑ WITHOUT THIS SEAM THE WIRING ABOVE IS UNTESTABLE. In test mode the registry builds the deterministic
-	 * MOCK reviewer, which never captures anything, so an end-to-end assertion here would observe zero
-	 * exchange records and prove nothing. The only alternative is spawning a real `agy`, which means the
+	 * ⭑ WITHOUT THIS SEAM THE WIRING ABOVE IS UNTESTABLE. In test mode the registry builds the ~~deterministic
+	 * MOCK reviewer~~ declared stand-in (⭑ `JAN-SELREV` SR-3: the mock's successor since `JAN-CRITREAD` J1-2), which
+	 * never captures anything, so an end-to-end assertion here would observe zero
+	 * exchange records and prove nothing. The only alternative is spawning a real ~~`agy`~~ reviewer program — agy,
+	 * or devin, whose program has its own seam below — which means the
 	 * regression that silently unwires retention would never redden a gate. This is the same reasoning that
 	 * justified `AgyExec` in `REG-F-333`.
 	 */

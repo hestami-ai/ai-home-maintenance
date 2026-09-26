@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
+import {
+	EXECUTE_TIMEOUT_MS,
+	REVIEWER_IDENTITY_EVIDENCE,
+	REVIEWER_MODEL_VARIABLE,
+	wiredReviewer
+} from './lane-config';
 
 // JAN-LIVEEXEC — a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT one.
 //
@@ -31,6 +37,9 @@ import { introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
 // ⭑ AND THE REVIEW ITSELF WAS SUBSTANTIVE. GLM-5.2 REJECTED the work product, saying the producer *"returned
 // the required JSON output but omitted the Section 9.7 professional rationale summary entirely, implicitly
 // treating output production as sufficient without accounting for how the obligation was discharged."*
+// ⚠ GLM-5.2 was the reviewer CONFIGURED for those runs, not the lane's reviewer: the lane reviews with whatever
+// `JPWB_ASSURANCE_TOOL` names and that tool's model variable (`lane-config.ts`). The selected reviewer (`REG-D-084`)
+// is devin with `glm-5-3-flash-max` — configuration an operator sets, never a default (`REG-D-052`).
 //
 // ⚠⚠ THAT REJECTION EXPOSES AN INCOHERENCE THIS SPEC DOES NOT RESOLVE, AND MUST NOT HIDE. The executor's own
 // system prompt says *"Do not narrate, do not explain your reasoning"* — so we INSTRUCTED the producer not to
@@ -39,11 +48,16 @@ import { introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
 // execution subjects — §9.7's own rule is that *presence or absence is never a signal*. That is a sponsor
 // question, not a thing to settle by quietly editing whichever side is easier to change.
 //
-// ⚠ ALSO DISCLOSED: the reviewer records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`.
+// ~~⚠ ALSO DISCLOSED: the reviewer records `HOST_CONFIGURED` while the suite declares Devin `PROVIDER_REPORTED`.
 // `readReportedModel` reads the model back out of Devin's ATIF export and IS NEVER CALLED — the assurance seam
 // still returns a bare string, exactly as the execution seam did before `TS-04`. The declaration and the record
 // therefore disagree, and the declaration is the one that is right. Owed, and asserted below only for the
-// producer so this spec does not claim what the record does not say.
+// producer so this spec does not claim what the record does not say.~~
+// ⭑ `JAN-SELREV` SR-3 — STRUCK: FALSE SINCE `devinPrint` CALLS IT. `readReportedModel` is called inside `devinPrint`,
+// before its temporary directory is removed (`src/lib/server/tools/devin-reviewer.ts`), and the result carries the
+// model devin reported, graded `PROVIDER_REPORTED`. And since `JAN-SELREV` SR-2 (D6) a reported model other than the
+// configured one fails the review. So the owed assertion is now made below, for each tool: the RECORDED reviewer model
+// is the one its tool was configured with, and its grade is the one that tool earns (`REVIEWER_IDENTITY_EVIDENCE`).
 
 const TEMPLATE = [
 	'You are assessing a delivery route for operational risk.',
@@ -85,10 +99,19 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// the resolved model id alone. Comparing the two forms directly fails on the prefix — the record is not
 		// wrong, the two are simply different notations for the same choice.
 		const executorModel = process.env.JPWB_EXECUTOR_MODEL!.split('/').pop()!;
-		const assuranceModel = process.env.JPWB_ASSURANCE_MODEL!;
+		// ⭐ `JAN-SELREV` SR-3 — THE REVIEWER'S MODEL IS READ FROM THE VARIABLE ITS TOOL READS. This read devin's
+		// variable whatever the tool, so an agy lane compared its reviewer with a model agy was never given (agy reads
+		// its own, `lane-config.ts`). The config has already refused any tool but these two.
+		const reviewerTool = wiredReviewer(process.env.JPWB_ASSURANCE_TOOL);
+		expect(
+			reviewerTool,
+			'the config refuses a reviewing tool the product would refuse'
+		).toBeDefined();
+		// ⚠ TRIMMED, as the product trims it before it runs the tool or records the model.
+		const reviewerModel = process.env[REVIEWER_MODEL_VARIABLE[reviewerTool!]]!.trim();
 		// ⭑ THE PRECONDITION OF THE WHOLE LANE, ASSERTED RATHER THAN ASSUMED. If these matched, the review would
 		// be refused for non-independence and the run would prove nothing about either model.
-		expect(executorModel, 'producer and reviewer must be different models').not.toBe(assuranceModel);
+		expect(executorModel, 'producer and reviewer must be different models').not.toBe(reviewerModel);
 
 		// ── 1. Author a type whose work a MODEL does, with a real prompt ──────────────────────────────────
 		await gotoHydrated(page, '/');
@@ -127,7 +150,7 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		await expect(row).toBeVisible();
 		await gotoHydrated(page, (await row.getAttribute('href'))!);
 
-		// ── 3. Execute — two real model calls: produce, then review ───────────────────────────────────────
+		// ── 3. Execute — each try a real produce, then a real review; up to 3 tries (`lane-config.ts`) ─────
 		await page.getByRole('button', { name: 'overview' }).click();
 
 		// ⚠ THE WAIT IS ON THE SERVER ACTION, AND IT TOOK TWO WRONG TRIES TO GET THERE.
@@ -138,8 +161,14 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		//      unit still sitting at PROPOSED and reported "no model was invoked" when nothing had been asked yet.
 		// ⭑ Waiting on the RESPONSE settles both: it resolves whether the action SUCCEEDS or REFUSES, so a
 		// refusal surfaces as an alert to read rather than as a timeout that hides it.
+		// ⭐ `JAN-SELREV` SR-3 — THE WAIT IS A BOUNDED ALLOWANCE, NOT A BOUND ON EVERYTHING THIS POST DOES. It was 480 s,
+		// which is two reviewer calls of 240 s and nothing else, while this one POST runs up to 3 tries of an executor
+		// call plus a review of up to 2 calls: 2,160 s, with the arithmetic in `lane-config.ts`. The reviewer's half is
+		// its bounded worst case; each executor call gets a 240 s allowance, because the Pi executor bounds only the
+		// commands it runs, not its model turn. ⚠ NOT COVERED: the review of each command the executor ran, which runs
+		// in this same POST after the loop (`evidence-join.ts`).
 		const executed = page.waitForResponse((r) => r.request().method() === 'POST', {
-			timeout: 480_000
+			timeout: EXECUTE_TIMEOUT_MS
 		});
 		await page
 			.getByRole('row', { name: /Route Assessment/ })
@@ -166,7 +195,13 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// the producing side labelled with the reviewing side's identity, which is both a fiction and a
 		// guaranteed independence refusal.
 		expect(producer.value, 'the producer must be the EXECUTING model').toContain(executorModel);
-		expect(reviewer.value, 'the reviewer must be the ASSURANCE model').toContain(assuranceModel);
+		// ⭐ `JAN-SELREV` SR-3 — THE RECORDED REVIEWER IS EXACTLY THE MODEL ITS TOOL WAS CONFIGURED WITH. `toContain` let a
+		// recorded `glm-5-3-flash-max-preview` pass for a configured `glm-5-3-flash-max`; the product records the model
+		// devin REPORTS and fails the review when it is not the configured one (`JAN-SELREV` D6), so equality is the claim.
+		expect(
+			reviewer.value,
+			`the reviewer must be the model ${reviewerTool} was configured with`
+		).toBe(reviewerModel);
 
 		// ⭑⭑ THE FIRST REAL INDEPENDENCE VERDICT THIS SYSTEM HAS PRODUCED. Everything before this compared a
 		// fixture against a mock with a hardcoded identity.
@@ -175,10 +210,20 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// ⭑ AND THE FIRST TIME `PROVIDER_REPORTED` IS WRITTEN BY LIVE TOOLS. It had ZERO producers from the day
 		// it was ratified until this lane ran: the old seam returned a bare string and could not carry it.
 		expect(producer.evidence, 'the executing tool reports its own model').toBe('PROVIDER_REPORTED');
-		// ⚠ NOT ASSERTED FOR THE REVIEWER, DELIBERATELY. Devin DOES report its own model, but the assurance seam
+		// ~~⚠ NOT ASSERTED FOR THE REVIEWER, DELIBERATELY. Devin DOES report its own model, but the assurance seam
 		// still returns a bare string so the record says HOST_CONFIGURED. Asserting PROVIDER_REPORTED here would
 		// redden honestly; asserting HOST_CONFIGURED would PIN THE DEFECT as though it were the design. Neither
-		// is right, so the spec says nothing and the header discloses it.
+		// is right, so the spec says nothing and the header discloses it.~~
+		// ⭐ `JAN-SELREV` SR-3 — ASSERTED FOR THE REVIEWER TOO, NOW THAT THE SEAM CARRIES IT (the header's struck note).
+		// devin's record is `PROVIDER_REPORTED`: its export named the model that answered. ⚠ If it reads HOST_CONFIGURED,
+		// devin's export named no model, so the substituted-model check (D6) had nothing to compare — the lane says so
+		// rather than passing. agy reports no model, so its record is `HOST_CONFIGURED` by design, not by defect.
+		expect(
+			reviewer.evidence,
+			reviewerTool === 'devin'
+				? 'devin reported no model, so the substituted-model check had nothing to compare'
+				: 'agy reports no model; its record carries the configured one'
+		).toBe(REVIEWER_IDENTITY_EVIDENCE[reviewerTool!]);
 
 		// ⚠ AND THE VERSION ARM STAYS UNREPORTED. Every tool returns a model LABEL; a label is not a version,
 		// and writing one into the version field is the substitution PER-9 forbids.
@@ -201,6 +246,23 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// whether the reviewer is any good.
 		const assessments = snap.assessments.map((r) => r.state as Record<string, unknown>);
 		const observations = snap.observations.map((r) => r.state as Record<string, unknown>);
+		// ⭐ `REG-F-445` — THE REPORT READ FIELDS THESE OBJECTS DO NOT HAVE. It printed `a.policyId` and `o.code`; an
+		// assessment's policy is `assurancePolicyId` and an observation's code is `findingCode`
+		// (`packages/rph-contracts/src/objects.ts`, `AssuranceAssessmentSchema`, `AssuranceObservationSchema`). So the one
+		// stored run's annotation read `undefined=SATISFIED` three times. ⭑ STRUCTURE, SO ASSERTED HARD: every assessment
+		// names a floor policy, or the report below would say `undefined` again and nothing would notice.
+		// ⚠ AND THERE IS ONE TO NAME: with no assessment at all, "every assessment names a floor policy" holds of
+		// nothing — so the lane also requires the Reasoning Review's own assessment among them.
+		const policyOf = (a: Record<string, unknown>) => String(a.assurancePolicyId);
+		expect(assessments.length, 'the floor recorded no assessment').toBeGreaterThanOrEqual(1);
+		expect(
+			assessments.map(policyOf),
+			'the Reasoning Review recorded its assessment (REG-F-445)'
+		).toContain('floor.reasoning-review');
+		expect(
+			assessments.map(policyOf).filter((id) => !id.startsWith('floor.')),
+			'every assessment names the floor policy it assessed (REG-F-445)'
+		).toEqual([]);
 		console.log('\n─── LIVE REVIEW OUTCOME ' + '─'.repeat(52));
 		// ⭑ JAN-EXECLOOP — ONE EXECUTION EXCHANGE PER TRY, so this IS the try count. `PER-9` requires each
 		// retry and repair request be its own record, which makes the loop's behaviour readable from the
@@ -209,14 +271,16 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		console.log(`producer : ${producer.value}  (${producer.evidence})`);
 		console.log(`reviewer : ${reviewer.value}  (${reviewer.evidence})`);
 		for (const a of assessments)
-			console.log(`assessment ${String(a.policyId ?? '?')} -> ${String(a.assessmentState ?? '?')}`);
+			console.log(`assessment ${policyOf(a)} -> ${String(a.assessmentState ?? '?')}`);
 		for (const o of observations)
-			console.log(`  · ${String(o.code ?? '?')}: ${String(o.statement ?? '').slice(0, 220)}`);
+			console.log(
+				`  · ${String(o.findingCode ?? '?')}: ${String(o.statement ?? '').slice(0, 220)}`
+			);
 		console.log('─'.repeat(75) + '\n');
 
 		test.info().annotations.push({
 			type: 'live-review',
-			description: assessments.map((a) => `${String(a.policyId)}=${String(a.assessmentState)}`).join(' ')
+			description: assessments.map((a) => `${policyOf(a)}=${String(a.assessmentState)}`).join(' ')
 		});
 	});
 });

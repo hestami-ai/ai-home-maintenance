@@ -2,7 +2,8 @@
 // structural report over the subject's graph export, so the floor RUNS reproducibly in the gate (a well-formed graph
 // passes; an invalid one is REJECTED; an UNREADABLE one is INCONCLUSIVE and therefore BLOCKS; dead-end outputs are a
 // MATERIAL proxy-satisfaction finding). It is honest about
-// its limits — it judges STRUCTURE, not deep semantics (that is what the agy Validator provides in dev/prod).
+// its limits — it judges STRUCTURE, not deep semantics (that is what ~~the agy Validator provides in dev/prod~~ the
+// model-backed reviewer `reviewer-selection.ts` selects provides outside test mode — `JAN-SELREV` SR-3).
 import { analyzePwaGraph, type PwaGraphExport } from '@janumipwb/rph-projections';
 import {
 	FLOOR_POLICY_IDS,

@@ -53,7 +53,7 @@ for a PWA.
 ### `LE-03` — the lane's configuration
 
 `playwright.live.exec.config.ts` (or the existing live config extended): `RPH_DEMO_MODE=test` for the harness,
-plus `JPWB_EXECUTOR=pi`, `JPWB_EXECUTOR_MODEL`, `JPWB_ASSURANCE_TOOL=devin`, `JPWB_ASSURANCE_MODEL=glm-5-2`.
+plus `JPWB_EXECUTOR=pi`, `JPWB_EXECUTOR_MODEL`, `JPWB_ASSURANCE_TOOL=devin`, `JPWB_ASSURANCE_MODEL=glm-5-2`. ⭑ *2026-09-26 (`REG-D-084`; `JAN-SELREV` `SR-3`):* the reviewing model is configuration, and the sponsor-selected value is `glm-5-3-flash-max`. GLM-5.2 was the model when this lane was built. The lane's required variables now follow the tool (`e2e-live-exec/lane-config.ts`; `REG-F-461`).
 
 ⛔ **No model label is pinned in the config** (`REG-D-052`; `REG-F-331` measured what pinning costs). The
 config reads them from the environment and the run **refuses** with the existing message when unset.

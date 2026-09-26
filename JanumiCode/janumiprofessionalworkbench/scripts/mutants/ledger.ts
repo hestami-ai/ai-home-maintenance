@@ -11478,5 +11478,302 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
 		why: "PROMISE (JAN-SELREV D6): the refusal of a substituted model is stated as what it is - the reviewing tool reported another model than the one configured - and is not dressed as a failed invocation of the backing tool, which is why the check sits outside the validator's invocation try. WHO RELIES: the operator reading the VALIDATOR_EXECUTION_FAILED statement, who must be told the tool ran and answered and that the remedy is to re-qualify or re-select, not to repair the tool. WHAT THE MUTATION DOES: the refusal is wrapped as 'reasoning-review backing tool invocation failed: ...', so the recorded statement opens as a tool failure. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: 'a reported ≠ configured model: exactly one exchange record carrying the reported id, no repair, the review failed with both ids named' (AssertionError: the refusal reads as a failed tool invocation: expected 'reasoning-review backing tool invocat…' not to contain 'invocation failed')",
 		source: "JAN-SELREV SR-2 fix - the verifier's surviving mutants V-I1, V-I25, V-I2 and V-I3, each killed by one added assertion: the refused try's answer is retained and its record is awaited before the throw (a content store settling each put a timer tick later), a refused repair carries the repair prompt, and the refusal is not dressed as a failed tool invocation"
+	},
+	{
+		id: "SR3-M1-agy-reads-devin-model-variable",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tagy: 'JPWB_JUDGE_MODEL',\n\tdevin: 'JPWB_ASSURANCE_MODEL'",
+		replace: "\tagy: 'JPWB_ASSURANCE_MODEL',\n\tdevin: 'JPWB_ASSURANCE_MODEL'",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The defect this increment removes: agy mapped to devin's model variable, so an agy lane is refused a key agy never reads and its reviewer is compared with a model agy was never given. The mapping test and the product-agreement test (the selector refuses agy with only JPWB_ASSURANCE_MODEL) must redden. OBSERVED: KILLED — 4 test(s) red in live-exec-lane-config.test.ts: 'agy reads JPWB_JUDGE_MODEL and devin JPWB_ASSURANCE_MODEL' (AssertionError: expected 'JPWB_ASSURANCE_MODEL' to be 'JPWB_JUDGE_MODEL' // Object.is equality); '⭑ and the product agrees: each tool is selected with its own variable, and refused with only the other' (AssertionError: agy with JPWB_ASSURANCE_MODEL: expected { kind: 'REFUSED', …(4) } to match object { kind: 'AGY', …(1) })",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M2-tool-not-trimmed",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tconst id = tool?.trim();\n\treturn id === 'agy'",
+		replace: "\tconst id = tool;\n\treturn id === 'agy'",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The product trims the tool before selecting (resolveReviewerToolId). Untrimmed, ' devin ' is refused by the lane while the product would run it; the selector-equivalence test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: '⭑ reads the tool as the selector does — trimmed, blank unset, the id matched exactly' (AssertionError: \" devin \": expected false to be true // Object.is equality); 'devin: the executor pair, the tool and JPWB_ASSURANCE_MODEL — never JPWB_JUDGE_MODEL' (AssertionError: expected [ 'JPWB_ASSURANCE_TOOL', …(2) ] to deeply equal [ 'JPWB_ASSURANCE_MODEL', …(3) ])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M3-tool-case-folded",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "return id === 'agy' || id === 'devin' ? id : undefined;",
+		replace: "return id?.toLowerCase() === 'agy' || id?.toLowerCase() === 'devin' ? (id?.toLowerCase() as WiredReviewer) : undefined;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The product matches the tool id exactly, so 'Devin' is refused. A case-folding lane would boot a tool the product refuses; the selector-equivalence test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: '⭑ reads the tool as the selector does — trimmed, blank unset, the id matched exactly' (AssertionError: \"Devin\": expected true to be false // Object.is equality); '⛔ a tool the product would refuse is refused before the lane boots, naming it and the tools it may be' (AssertionError: Devin: expected 'NO REFUSAL' to contain 'JPWB_ASSURANCE_TOOL=\\'Devin\\'')",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M4-every-tool-requires-devin-model",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "return model === undefined ? [...ALWAYS_REQUIRED] : [...ALWAYS_REQUIRED, model];",
+		replace: "return model === undefined ? [...ALWAYS_REQUIRED] : [...ALWAYS_REQUIRED, 'JPWB_ASSURANCE_MODEL', model];",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "HEAD's rule put back: JPWB_ASSURANCE_MODEL demanded whatever the tool. The agy required-keys test must redden. OBSERVED: KILLED — 3 test(s) red in live-exec-lane-config.test.ts: 'agy: the executor pair, the tool and JPWB_JUDGE_MODEL — never JPWB_ASSURANCE_MODEL' (AssertionError: expected [ 'JPWB_ASSURANCE_MODEL', …(4) ] to deeply equal [ 'JPWB_ASSURANCE_TOOL', …(3) ]); 'devin: the executor pair, the tool and JPWB_ASSURANCE_MODEL — never JPWB_JUDGE_MODEL' (AssertionError: expected [ 'JPWB_ASSURANCE_MODEL', …(4) ] to deeply equal [ 'JPWB_ASSURANCE_MODEL', …(3) ])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M5-unwired-tool-boots",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "const unwired = tool && wiredReviewer(tool) === undefined ? tool : undefined;",
+		replace: "const unwired = undefined;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "A tool the product refuses (pi, Devin, a typo) must be refused before the lane boots, not a minute later inside a form submission; the unknown-tool refusal test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ a tool the product would refuse is refused before the lane boots, naming it and the tools it may be' (AssertionError: pi: expected 'NO REFUSAL' to contain 'JPWB_ASSURANCE_TOOL=\\'pi\\'')",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M6-blank-key-counts-as-set",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "const missing = required.filter((k) => !env[k]?.trim());",
+		replace: "const missing = required.filter((k) => !env[k]);",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The product treats a blank or whitespace model variable as unset and refuses it; a lane that took '   ' as set would boot into that refusal. The blank-counts-as-unset test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ each tool is refused without its own model variable — blank counts as unset — and the refusal names it' (AssertionError: agy with JPWB_JUDGE_MODEL=\"   \": expected 'NO REFUSAL' to contain 'JPWB_JUDGE_MODEL')",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M7-refusal-loses-selected-configuration",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "'The selected reviewer (REG-D-084) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-max: ' +",
+		replace: "'The selected reviewer is devin: ' +",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "D9: the lane names the selected reviewer as configuration. A refusal that dropped the variables, the model or the ruling would leave the operator without the documented value; the selected-reviewer test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the refusal names the selected reviewer (REG-D-084) as configuration, never as a default' (AssertionError: expected 'The live execution lane cannot start:…' to contain 'JPWB_ASSURANCE_TOOL=devin')",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M8-one-try",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\ttries: 3,",
+		replace: "\ttries: 1,",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The Begin & Execute POST runs the whole repair loop, whose bound is DEFAULT_REPAIR_BOUND = 3. A budget of one try times out a run that is still inside its bound; the repair-bound test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'the tries are the execution loop’s repair bound' (AssertionError: expected 1 to be 3 // Object.is equality); 'the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup' (AssertionError: expected 720000 to be 2160000 // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M9-no-repair-call",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\treviewerCallsPerTry: 2,",
+		replace: "\treviewerCallsPerTry: 1,",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "A review is an initial call plus at most one repair, each bounded separately. Budgeting one call per try under-waits a review that repaired; the two-calls test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'a review is at most two calls — the initial one and one repair — measured by driving the product’s validator with a reviewer that never answers in JSON' (AssertionError: the calls one review made: expected [ …(2) ] to have a length of 1 but got 2); 'the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup' (AssertionError: expected 1440000 to be 2160000 // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M10-reviewer-bound-drifts",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\treviewerCallMs: 240_000,",
+		replace: "\treviewerCallMs: 180_000,",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The per-call figure must be the bound both reviewer adapters hand their program, measured through their exec seams. A drifted figure under-waits; the adapter-seam test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'each reviewer call is bounded by what BOTH reviewer adapters hand their program, measured at the exec seam' (AssertionError: expected [ 240000, 240000 ] to deeply equal [ 180000, 180000 ]); 'the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup' (AssertionError: expected 1800000 to be 2160000 // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M11-wait-omits-executor",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t(LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs);",
+		replace: "\t(LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs);",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "Each try is an executor call AND a review. A wait of the reviewer's bound alone leaves the executor no time; the arithmetic test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup' (AssertionError: expected 1440000 to be 2160000 // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M12-test-timeout-no-setup",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "export const TEST_TIMEOUT_MS = EXECUTE_TIMEOUT_MS + LANE_BUDGET.setupMs;",
+		replace: "export const TEST_TIMEOUT_MS = EXECUTE_TIMEOUT_MS;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The per-test timeout must exceed the POST's wait by the setup before it, or the test times out while the POST may still answer inside its own bound; the arithmetic test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup' (AssertionError: expected 2160000 to be 2280000 // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M13-devin-grade-host-configured",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tdevin: 'PROVIDER_REPORTED'",
+		replace: "\tdevin: 'HOST_CONFIGURED'",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "devinPrint reads the model back from devin's export and grades it PROVIDER_REPORTED. Expecting HOST_CONFIGURED would pin the weaker grade, the one under which the substituted-model check has nothing to compare; the grade test, driven through devinPrint's seam, must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⭑ the grade each reviewer’s record carries: devin’s is PROVIDER_REPORTED when its export names the model, agy reports none' (AssertionError: expected 'PROVIDER_REPORTED' to be 'HOST_CONFIGURED' // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M14-agy-grade-provider-reported",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tagy: 'HOST_CONFIGURED',\n\tdevin: 'PROVIDER_REPORTED'",
+		replace: "\tagy: 'PROVIDER_REPORTED',\n\tdevin: 'PROVIDER_REPORTED'",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "agy reports no model: agyPrint returns a bare string, so the record keeps the host's configuration. Expecting PROVIDER_REPORTED would claim a report agy never makes; the grade test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⭑ the grade each reviewer’s record carries: devin’s is PROVIDER_REPORTED when its export names the model, agy reports none' (AssertionError: expected 'PROVIDER_REPORTED' to be 'HOST_CONFIGURED' // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M15-config-timeout-literal",
+		file: "apps/rph-demo/playwright.live-exec.config.ts",
+		find: "\ttimeout: TEST_TIMEOUT_MS,",
+		replace: "\ttimeout: 600_000,",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The config's per-test timeout must be the helper's, which is derived from the reviewer's bound; HEAD's 600 s literal put back must redden the config-wiring test. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the config refuses and passes keys through by the helper, and its test timeout is the helper’s' (AssertionError: expected '600_000' to be 'TEST_TIMEOUT_MS' // Object.is equality)",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M16-config-restates-devin-model-key",
+		file: "apps/rph-demo/playwright.live-exec.config.ts",
+		find: "requiredLaneKeys(process.env.JPWB_ASSURANCE_TOOL).map(",
+		replace: "[...requiredLaneKeys(process.env.JPWB_ASSURANCE_TOOL), 'JPWB_ASSURANCE_MODEL'].map(",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The config may not name a reviewer model variable itself: a restated key is how the list came to demand devin's variable of agy. The no-restated-variable test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'neither names a reviewer model variable itself — the mapping has one home' (AssertionError: playwright.live-exec.config.ts: expected [ Array(1) ] to deeply equal [])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M17-config-guard-dropped",
+		file: "apps/rph-demo/playwright.live-exec.config.ts",
+		find: "const refusal = laneKeysRefusal(process.env);",
+		replace: "const refusal = undefined as string | undefined;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The config must ask the helper whether to refuse, over the whole environment; a dropped guard boots a lane the product will refuse. The config-wiring test must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'the config refuses and passes keys through by the helper, and its test timeout is the helper’s' (AssertionError: the refusal is asked of the whole environment: expected [] to deeply equal [ [ 'process.env' ] ]); '⛔ the config THROWS the helper’s refusal when it loads — a refusal only printed would boot the lane anyway' (AssertionError: expected [ 'undefined as string | undefined' ] to deeply equal [ 'laneKeysRefusal(process.env)' ])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M18-spec-reads-devin-model-variable",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "process.env[REVIEWER_MODEL_VARIABLE[reviewerTool!]]!.trim()",
+		replace: "process.env.JPWB_ASSURANCE_MODEL!.trim()",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "HEAD's spec read put back: the reviewer compared with devin's variable whatever the tool. The no-restated-variable test must redden on the spec. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'neither names a reviewer model variable itself — the mapping has one home' (AssertionError: e2e-live-exec/execution.live.ts: expected [ Array(1) ] to deeply equal []); '⛔ the spec reads its reviewing tool from the environment, and the reviewer model from that tool’s variable, trimmed' (AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M19-spec-wait-literal",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "\t\t\ttimeout: EXECUTE_TIMEOUT_MS",
+		replace: "\t\t\ttimeout: 480_000",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The spec's Begin & Execute wait must be the helper's; HEAD's 480 s literal (two reviewer calls and nothing else) put back must redden the spec-wiring test. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the spec takes its reviewer’s model variable and grade from the helper, and waits the helper’s Begin & Execute bound' (AssertionError: expected [ '480_000' ] to deeply equal [ 'EXECUTE_TIMEOUT_MS' ])",
+		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
+	},
+	{
+		id: "SR3-M20-config-refusal-only-warned",
+		file: "apps/rph-demo/playwright.live-exec.config.ts",
+		find: "if (refusal) throw new Error(refusal);",
+		replace: "if (refusal) console.warn(refusal);",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The verifier's SR3V-M1. The config must THROW the helper's refusal when Playwright loads it; a refusal only printed boots the lane anyway, and it fails a minute later inside a form submission with a 400. The AST check that the top-level guard on refusal is the throw must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the config THROWS the helper’s refusal when it loads — a refusal only printed would boot the lane anyway' (AssertionError: expected [ 'console.warn(refusal);' ] to deeply equal [ 'throw new Error(refusal);' ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M21-spec-hardcodes-devin-tool",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "const reviewerTool = wiredReviewer(process.env.JPWB_ASSURANCE_TOOL);",
+		replace: "const reviewerTool = wiredReviewer('devin');",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The verifier's SR3V-M2. A literal tool brings REG-F-461 back without naming a model variable: an agy lane's reviewer is compared with JPWB_ASSURANCE_MODEL. The AST check that the spec's only wiredReviewer call reads process.env.JPWB_ASSURANCE_TOOL must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec reads its reviewing tool from the environment, and the reviewer model from that tool’s variable, trimmed' (AssertionError: expected [ [ '\\'devin\\'' ] ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M22-spec-reviewer-model-toContain",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: ").toBe(reviewerModel);",
+		replace: ").toContain(reviewerModel);",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The verifier's SR3V-M3. toContain passes a recorded glm-5-3-flash-max-preview for a configured glm-5-3-flash-max; the product fails a substituted model's review (D6), so equality is the claim. The AST check of the assertions on reviewer.value must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [ 'toContain(reviewerModel)' ] to deeply equal [ 'toBe(reviewerModel)' ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M23-override-check-dropped",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "const overridden = program !== undefined && env[program] !== undefined ? program : undefined;",
+		replace: "const overridden = undefined as typeof program;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-5. Outside test mode the product refuses the selected tool's program override, and the lane boots outside test mode; without the check the lane boots and fails at the model step's 400. The own-override test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'each tool’s own override refuses its lane, even set empty, naming it — and the product refuses the same' (AssertionError: agy with JPWB_AGY_BIN=\"C:/fixture/reviewer.exe\": expected 'NO REFUSAL' to contain 'JPWB_AGY_BIN=\"C:/fixture/reviewer.exe\"')",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M24-empty-override-passes",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "const overridden = program !== undefined && env[program] !== undefined ? program : undefined;",
+		replace: "const overridden = program !== undefined && env[program]?.trim() ? program : undefined;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-5. The product refuses an override set EMPTY too (an empty program name the adapter would run), so a truthiness check lets the lane boot where the product refuses. The own-override test's empty-value arrangement must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'each tool’s own override refuses its lane, even set empty, naming it — and the product refuses the same' (AssertionError: agy with JPWB_AGY_BIN=\"\": expected 'NO REFUSAL' to contain 'JPWB_AGY_BIN=\"\"')",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M25-program-variables-swapped",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tagy: 'JPWB_AGY_BIN',\n\tdevin: 'JPWB_DEVIN_BIN'",
+		replace: "\tagy: 'JPWB_DEVIN_BIN',\n\tdevin: 'JPWB_AGY_BIN'",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-5. Each tool's program variable must be the one its adapter captures at load (agy-cli.ts AGY_BIN_OVERRIDE, devin-reviewer.ts DEVIN_BIN_OVERRIDE). The capture tests and the own/other-override tests must redden. OBSERVED: KILLED — 2 test(s) red in live-exec-lane-config.test.ts: 'agy: the module that runs agy captures JPWB_AGY_BIN' (AssertionError: expected undefined to be 'fixture-agy-program' // Object.is equality); 'devin: the module that runs devin captures JPWB_DEVIN_BIN' (AssertionError: expected undefined to be 'fixture-devin-program' // Object.is equality)",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M26-other-tool-override-refuses",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "const overridden = program !== undefined && env[program] !== undefined ? program : undefined;",
+		replace: "const overridden = program !== undefined && (env.JPWB_AGY_BIN ?? env.JPWB_DEVIN_BIN) !== undefined ? program : undefined;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-5. Only the SELECTED tool's override refuses: the other adapter's program never runs a review, and the product runs devin with JPWB_AGY_BIN set. An over-refusing guard teaches operators to bypass it. The other-override test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the OTHER tool’s override refuses nothing — and the product runs the selected tool with it set' (AssertionError: agy with JPWB_DEVIN_BIN set: expected 'The live execution lane cannot start:…' to be undefined)",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M27-spec-assessment-count-dropped",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "\t\texpect(assessments.length, 'the floor recorded no assessment').toBeGreaterThanOrEqual(1);\n",
+		replace: "",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-9. With no assessment at all, 'every assessment names a floor policy' holds of nothing, so REG-F-445's assertion passes on an empty report. The AST check of the assertions on assessments.length must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [] to deeply equal [ 'toBeGreaterThanOrEqual(1)' ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M28-spec-reasoning-review-not-required",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: ").toContain('floor.reasoning-review');",
+		replace: ").toBeDefined();",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-9. The lane exists to observe the Reasoning Review; a run whose floor recorded no Reasoning Review assessment must not pass. The AST check of the assertions on assessments.map(policyOf) must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [ 'toBeDefined()' ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M29-spec-reviewer-model-untrimmed",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "process.env[REVIEWER_MODEL_VARIABLE[reviewerTool!]]!.trim()",
+		replace: "process.env[REVIEWER_MODEL_VARIABLE[reviewerTool!]]!",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The product trims the configured model before it runs the tool and records it, so an untrimmed expectation fails an honest run whose shell exported a padded value. The AST check of reviewerModel's initializer must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec reads its reviewing tool from the environment, and the reviewer model from that tool’s variable, trimmed' (AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M30-config-boots-test-mode",
+		file: "apps/rph-demo/playwright.live-exec.config.ts",
+		find: "RPH_DEMO_MODE: 'server',",
+		replace: "RPH_DEMO_MODE: 'test',",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The helper restates the product's refusals OUTSIDE test mode (an unset tool, a program override); in test mode the product selects the stand-in and honours overrides, so the lane would not be the deployed host it claims to exercise. The AST check of RPH_DEMO_MODE must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the config boots its server OUTSIDE test mode — the mode whose refusals the helper restates' (AssertionError: expected [ '\\'test\\'' ] to deeply equal [ '\\'server\\'' ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M31-spec-reviewer-grade-unasserted",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: ").toBe(REVIEWER_IDENTITY_EVIDENCE[reviewerTool!]);",
+		replace: ").toBeDefined();",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "The grade says whether D6's substituted-model check had anything to compare: devin PROVIDER_REPORTED, agy HOST_CONFIGURED. Unasserted, a devin export naming no model passes silently. The AST check of the assertions on reviewer.evidence must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [ 'toBeDefined()' ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M32-product-validator-never-repairs",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const repairTry = await timed(repairPrompt, 'repair', first);",
+		replace: "const repairTry = firstTry;",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "MIN-4. LANE_BUDGET.reviewerCallsPerTry is now MEASURED, by driving the product's validator with a reviewer that never answers in JSON. A product that stops repairing makes one call; the measurement must see it, so the lane's figure cannot drift from the product unobserved. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'a review is at most two calls — the initial one and one repair — measured by driving the product’s validator with a reviewer that never answers in JSON' (AssertionError: the calls one review made: expected [ Array(1) ] to have a length of 2 but got 1)",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR3-M33-spec-floor-policy-filter-vacuous",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "assessments.map(policyOf).filter((id) => !id.startsWith('floor.')),",
+		replace: "assessments.map(policyOf).filter((id) => id.length < 0),",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "REG-F-445. Every assessment must name a floor policy, or the report prints undefined again; a filter that keeps nothing makes the assertion vacuous. The AST check of the assertion on the filtered policy ids must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [] to deeply equal [ 'toEqual([])' ])",
+		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
 	}
 ];

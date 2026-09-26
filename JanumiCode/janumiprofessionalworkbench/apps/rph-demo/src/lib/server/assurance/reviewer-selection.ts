@@ -70,8 +70,9 @@ export const SELECTED_REVIEWER_GUIDANCE =
 	'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max: set JPWB_ASSURANCE_TOOL=devin and ' +
 	'JPWB_ASSURANCE_MODEL=glm-5-3-flash-max. That selection is configuration, not a default this host falls back to ' +
 	'(REG-D-052); agy (JPWB_ASSURANCE_TOOL=agy with JPWB_JUDGE_MODEL), and devin with another model, stay ' +
-	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL) nor the authoring agent ' +
-	'(JPWB_AGENT_MODEL, or Pi’s own settings) may run a GLM-5.3 Flash model under any provider or spelling — the ' +
+	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL; the agy executor runs ' +
+	'JPWB_JUDGE_MODEL, REG-F-458) nor the authoring agent (JPWB_AGENT_MODEL, else Pi’s own settings, else the first ' +
+	'model Pi has credentials for) may run a GLM-5.3 Flash model under any provider or spelling — the ' +
 	'independence check compares the model ids the tools report by exact string, so another spelling of the same ' +
 	'model would pass it falsely.';
 
