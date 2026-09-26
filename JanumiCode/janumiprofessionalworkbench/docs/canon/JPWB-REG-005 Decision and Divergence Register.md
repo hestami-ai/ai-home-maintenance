@@ -37762,3 +37762,49 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **(3)** GLM-5.3 Flash Max, through `devin` (the measured candidate `glm-5-3-flash-max`), is the reviewer selected for the role `REG-D-078` names: *"the assurance policies responsibility"*. The frontier candidate is not the one selected; nothing here rules on it beyond that.
 - **WHAT IS OWED.** Today the product's real reviewer is `agy` whenever `JPWB_ASSURANCE_TOOL` is unset (`apps/rph-demo/src/lib/server/assurance/index.ts`). Devin is reached only with `JPWB_ASSURANCE_TOOL=devin` and an explicit `JPWB_ASSURANCE_MODEL` (`REG-D-052`). How the selection enters the product is a design question and goes design → roadmap → implementation.
 - **MADE WITH THIS ENTRY.** The statuses of `REG-D-082`, `REG-D-083`, `REG-F-455`, `REG-F-456`, `REG-F-454` and `REG-D-078` are struck in place and restated. The findings' headings stay live, because the append-only record cites them.
+
+### REG-F-457 — the product's reviewer selection puts the NON-selected reviewer on the default path, runs agy for any unknown tool, throws instead of recording a missing devin model, preflights neither devin nor execution, never checks the model devin reports, and lets the gate inherit a live-backend selection
+
+**Filed 2026-09-26** (`JAN-SELREV`, read from code by two readers and two critics before any change; `DESIGN-the-selected-reviewer.md` §2). **Status:** ⚠ **OPEN — owed by `JAN-SELREV` `SR-1` (G1, G2, G3, G5, G8) and `SR-2` (G6).**
+
+- **G1 — THE DEFAULT IS agy.** `apps/rph-demo/src/lib/server/assurance/index.ts:62`: `const assuranceTool = (process.env.JPWB_ASSURANCE_TOOL ?? 'agy').trim();`. It was introduced in `bdff99ce` (`JAN-TOOLSUITE` TS-07, 2026-09-05) and kept in `f35cb69d`; no register entry rules on it. After `REG-D-084`, a host with nothing configured gets the reviewer the sponsor did not select, and the preflight's guidance (`assurance/preflight.ts:43-45`) steers it to agy.
+- **G2 — ANY OTHER VALUE RUNS agy.** `index.ts:80-89` routes every value except exactly `devin` to agy's defaults: `pi` (declared ASSURANCE-capable, `tools/backing-tool.ts:79-80`), `Devin`, a typo, `''`. The executor refuses the same thing, and `backing-tool.ts:115` names the class: *"A SILENT FALLBACK IS THE FICTION `REG-D-052` FORBIDS"*.
+- **G3 — A MISSING devin MODEL THROWS OUT OF THE REGISTRY BUILD.** `index.ts:84` calls `assuranceModel()` while `createFloorRegistry` builds.
+  - On the authoring path the throw is caught (`routes/pwa/[id]/agent/+server.ts:173`) only after the paid Pi agent has run (`:372`).
+  - On the execution path it escapes `beginExecute`'s try/finally, which has no catch (`routes/undertakings/[id]/+page.server.ts:1253-1472`), leaving the step RUNNING.
+  - agy's missing model is resolved inside `evaluate` (`reasoning-review-validator.ts:387`) and recorded as `VALIDATOR_EXECUTION_FAILED`.
+- **G5 — NO PREFLIGHT ON EXECUTION.** `assurancePreflight` has one caller, the authoring route, so a misconfigured reviewer is discovered after paid execution. (G4, the agy-only authoring preflight, is `REG-F-443`.)
+- **G6 — THE REPORTED MODEL IS NEVER CHECKED.** `tools/devin-reviewer.ts:82-105` reads the model devin reports and never compares it with `JPWB_ASSURANCE_MODEL`.
+- **G8 — THE GATE INHERITS THE SHELL.** `useStandin = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL` (`index.ts:58`) keys on the variable's ABSENCE. `execution/model.ts:66` keys the fixture executor on `JPWB_EXECUTOR`'s absence. `workbench.ts:636` takes `JPWB_AGENT === 'pi'` first. The gate's e2e server inherits the shell (`playwright.config.ts:57`, via Playwright's env merge), as do its three vitest entry points. An operator who exports the selected configuration turns the gate's stand-ins into real, paid reviews.
+- **SEARCHED BEFORE FILING.** The register for `assuranceTool`, `=== 'devin'`, `JPWB_ASSURANCE_TOOL=pi`, and preflight lines naming devin or `ASSURANCE_MODEL`: only `REG-F-443`, which covers G4 alone.
+
+### REG-F-458 — the agy EXECUTOR runs `JPWB_JUDGE_MODEL` but records `JPWB_EXECUTOR_MODEL`, so agy executing and agy reviewing can run one model while the record shows two
+
+**Filed 2026-09-26** (`JAN-SELREV`, raised by the design's adversarial check, read from code). **Status:** ⚠ **OPEN — outside `JAN-SELREV`'s scope; unscheduled.**
+
+- **THE RUN.** `apps/rph-demo/src/lib/server/execution/model.ts:103`: `if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));`. `agyPrint` passes `'--model', judgeModel()` (`assurance/agy-cli.ts:82`), which is `JPWB_JUDGE_MODEL`.
+- **THE RECORD.** agy returns a bare string, so the step records the producer's model as `resolveExecutorModel() ?? 'unresolved'` (`routes/undertakings/[id]/+page.server.ts:1328`), graded `HOST_CONFIGURED`. `backing-tool.ts:371-378` says the executor model *"never falls back to the JUDGE model"*. It does not fall back, but on agy it is not what runs either.
+- **WHY IT MATTERS.** With agy executing and agy reviewing, both calls run `JPWB_JUDGE_MODEL`, while the record shows `JPWB_EXECUTOR_MODEL` for the producer. `DIFFERENT_MODEL` then passes on a fiction: ASR-13 asks for *actual* independence, and PER-9 for the model *"actually invoked"*.
+- **REMEDY CANDIDATES, UNTESTED.** (a) the agy executor passes `--model` from `JPWB_EXECUTOR_MODEL`; (b) `JPWB_EXECUTOR=agy` is refused until (a) exists. `JAN-SELREV`'s documents state the behaviour meanwhile.
+
+### REG-D-085 — DELEGATED (`REG-D-084`, `REG-D-071`): how the selected reviewer enters the product — configuration, never a default; one selector; a refusal recorded, never thrown; the model and program that ran are the ones configured; a hermetic gate
+
+**Decided 2026-09-26** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"* — for the outcome of Job 2, `REG-D-078` and `REG-D-084`; `JAN-SELREV`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `JAN-SELREV`; sponsor confirmation owed.**
+
+- **THE DESIGN.** `docs/_working/DESIGN-the-selected-reviewer.md`, revision 2, after two adversarial critics (0 BLOCKER; 23 MAJOR and 14 MINOR findings on revision 1, all addressed). The roadmap is `ROADMAP-the-selected-reviewer.md`, in three increments: `SR-1`, `SR-2`, `SR-3`.
+- **IN BRIEF.**
+  - The selection is DEPLOYMENT CONFIGURATION: `JPWB_ASSURANCE_TOOL=devin`, `JPWB_ASSURANCE_MODEL=glm-5-3-flash-max`. No code default names it; every refusal's guidance does.
+  - Outside test mode the tool is required, and unknown or unwired tools are refused.
+  - One selector serves the registry and both preflights (`REG-F-443`'s remedy).
+  - A misconfiguration reaching a floor is recorded as `VALIDATOR_EXECUTION_FAILED`, never thrown.
+  - A model step's execution is refused before paid work when the configuration is invalid.
+  - devin's reported model must equal the configured one.
+  - Program overrides are honoured only in test mode (`REG-F-441` (a)).
+  - The gate starts with eight live-backend variables as `''`.
+  - agy, and devin with another model, stay configurable (`REG-D-052`).
+- **FOR SPONSOR CONFIRMATION:**
+  1. **The reading** that the selection leaves `REG-D-052`'s no-default rule in force. `REG-F-331`'s argument, that a pinned label rots, applies to any label, selected or not.
+  2. **An unconfigured host is refused** rather than given agy. This includes the README's documented developer setup, which today sets only `JPWB_JUDGE_MODEL`.
+  3. **A substituted model fails the review.** Its remedy is re-qualification or re-selection, not reconfiguration.
+  4. **A program override outside test mode refuses the review.**
+- **THE SPONSOR'S QUESTION, not built until ruled:** should the gate hold the SELECTED reviewer to today's definition (design §5, `Q1`)? Recommended: yes.
