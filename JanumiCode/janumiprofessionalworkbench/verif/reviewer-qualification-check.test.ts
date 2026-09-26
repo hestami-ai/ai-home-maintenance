@@ -15,6 +15,8 @@
 //      planted case faults is ATTRIBUTION, reported and never escalated (the J2-6 limb below).
 // And the cross-file references `REG-D-074` left to J2-3: run ids across files, a RESCORED line's source, an
 // ESCALATION's run, case and finding, a SUPERSEDED line's record and finding, an ACKNOWLEDGED line's cases.
+// ⭐ `JAN-SELREV` SR-4 (`REG-D-086`): with a SELECTION in force, limb 1 asks its question again of the SELECTED
+// candidate's runs alone, and a SELECTION's ruling is held as an ESCALATION's finding is (the SR-4 limb below).
 //
 // ⚠ NO MODEL IS CALLED. Records are made by the real runner over a stub transport that answers each case as told, and
 // are re-scored through the real path (`rescore.ts`). The committed record is NOT asserted here: `bun run test` must
@@ -42,9 +44,11 @@ import {
 import {
 	checkQualification,
 	registerFindings,
+	registerRulings,
 	type CheckInputs,
 	type CheckReport
 } from '../scripts/reviewer-qual/check-core.js';
+import { REGISTER_FILE } from '../scripts/reviewer-qual/check.js';
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
 import { reviewerFingerprint, type ReviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import {
@@ -54,6 +58,9 @@ import {
 	type CandidateIdentity,
 	type RecordLine,
 	type RunLine,
+	type ScoredOutcome,
+	type SelectedCandidate,
+	type SelectionLine,
 	type ServedFacts
 } from '../scripts/reviewer-qual/record.js';
 import { rescoreEvaluation, rescoredLines } from '../scripts/reviewer-qual/rescore.js';
@@ -95,6 +102,8 @@ const SUBSET: readonly QualificationCase[] = CASES.filter((c) => ['G-CLEAN', 'G-
 const FINDINGS: ReadonlySet<string> = new Set(['REG-F-427', 'REG-F-428', 'REG-F-429']);
 /** A finding id no entry defines — the register-citations gate's own synthetic fixture id. */
 const UNFILED = 'REG-F-998';
+/** ⭐ `JAN-SELREV` SR-4 — rulings the register holds, each a real entry, as `FINDINGS` are. */
+const RULINGS: ReadonlySet<string> = new Set(['REG-D-084', 'REG-D-085', 'REG-D-086']);
 const HEX = (c: string) => c.repeat(64);
 
 const AGY: CandidateIdentity = {
@@ -128,6 +137,25 @@ const OLLAMA: CandidateIdentity = {
 	bounds: { wallClockMs: 240_000, promptChars: 28_000, printTimeout: null },
 	argv: null
 };
+/** ⭐ `JAN-SELREV` SR-4 — the candidate `REG-D-084` selects, as its runs record it: devin's own agent and provider, and
+ *  nothing served that a run can see. */
+const DEVIN: CandidateIdentity = {
+	...AGY,
+	transport: 'devin',
+	agentId: 'devin',
+	provider: 'devin',
+	modelLabel: 'glm-5-3-flash-max',
+	bounds: { wallClockMs: 240_000, promptChars: null, printTimeout: null },
+	argv: null
+};
+/** A SELECTION line — the selected candidate, on a ruling. */
+const select = (candidate: SelectedCandidate, ruling = 'REG-D-084'): SelectionLine => ({
+	kind: 'SELECTION',
+	date: '2026-09-26T09:00:00.000Z',
+	candidate,
+	ruling,
+	note: 'Selected for the fixture.'
+});
 
 let FP: ReviewerFingerprint;
 let CURRENT: RunFingerprint;
@@ -223,6 +251,8 @@ const check = (
 		oracleSets: ORACLE_SETS,
 		findings: FINDINGS,
 		struck: new Set(),
+		rulings: RULINGS,
+		struckRulings: new Set(),
 		rescore: (run, c, calls, digest) => rescoreEvaluation(run, c, calls, digest),
 		...over
 	});
@@ -1055,6 +1085,268 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 	});
 });
 
+// ── ⭐ `JAN-SELREV` SR-4 — the gate holds the SELECTED reviewer to today's definition (`REG-D-086`) ──────────────────
+// DESIGN-the-selected-reviewer.md §5 Q1, ruled yes. With a SELECTION in force, limb 1 asks its own question — covered,
+// in exactly its sense — again of the SELECTED candidate's runs alone: a RUN of it under today's fingerprint, or a
+// RESCORED record of one where only the scoring moved. With none in force the check is what it was: every limb above
+// runs with no SELECTION, and each is that control.
+describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is owed a measurement of the SELECTED candidate under today’s fingerprint (REG-D-086)', () => {
+	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
+	const NEVER_RUN: SelectedCandidate = { transport: 'devin', modelLabel: 'a-model-never-run' };
+	const ALL = SUBSET.map((c) => c.id);
+	/** Where the check places a line of a one-file record: `runs.ndjson:<n>`. */
+	const at = (lines: readonly RecordLine[], line: RecordLine) => `runs.ndjson:${lines.indexOf(line) + 1}`;
+	/** The COVERAGE problem SR-4 adds, verbatim: the selected candidate, its ruling, where the line is, what is owed. */
+	const owedBy = (c: SelectedCandidate, where: string, missing: readonly string[], ruling = 'REG-D-084') =>
+		`${missing.length} of ${SUBSET.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate ${c.transport} / ${c.modelLabel} (${ruling}; the SELECTION in force, ${where}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where only the scoring moved (§5.6 limb 1; REG-D-086)`;
+	const restamp = (lines: readonly RecordLine[], rescoreId: string) =>
+		rescoredLines(
+			lines.find((l): l is RunLine => l.kind === 'RUN')!,
+			lines.filter((l): l is CallLine => l.kind === 'CALL'),
+			SUBSET,
+			{ rescoreId, date: '2026-09-25T09:00:00.000Z', commit: 'a'.repeat(40), reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet }
+		);
+	/** RR-01 recorded unjudged for one case: an outcome today's path does not re-score to (limb 2's fixture), so a
+	 *  SUPERSEDED line may strike the record that holds it. */
+	const unjudged = (s: ScoredOutcome): ScoredOutcome => ({
+		...s,
+		criteria: s.criteria.map(([k, o]) => [k, k.startsWith('RR-01') ? 'UNABLE_TO_DETERMINE' : o] as const)
+	});
+
+	it('⛔ a record whose current cases are covered only by ANOTHER candidate is RED with a SELECTION in force, naming the selected candidate, its ruling and every uncovered case — and, the CONTROL, GREEN with none, as before SR-4', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-1' });
+		const without = await check([file(agy)]);
+		expect(without.problems, 'CONTROL: no SELECTION — any candidate’s run covers, as before').toEqual([]);
+		expect(without.selection, 'CONTROL: none is in force').toBeUndefined();
+		const selection = select(GLM);
+		const lines = [...agy, selection];
+		const r = await check([file(lines)]);
+		expect(r.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
+		expect(limb(r, 'COVERAGE')).toBe(owedBy(GLM, at(lines, selection), ALL));
+		expect(r.selection).toEqual({ candidate: GLM, ruling: 'REG-D-084', at: at(lines, selection), standing: 'IN_FORCE' });
+	});
+
+	it('⭐ the same record with the SELECTED candidate’s run is GREEN — and a run of it over one case owes exactly the others', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-2' });
+		const glm = await recorded({ runId: 'qr-sel-glm-2', candidate: DEVIN });
+		expect((await check([file([...agy, ...glm, select(GLM)])])).problems).toEqual([]);
+		const one = await recorded({ runId: 'qr-sel-glm-3', candidate: DEVIN, cases: SUBSET.filter((c) => c.id === 'G-RR-04') });
+		const selection = select(GLM);
+		const lines = [...agy, ...one, selection];
+		expect(limb(await check([file(lines)]), 'COVERAGE')).toBe(owedBy(GLM, at(lines, selection), ['G-CLEAN', 'G-CLEAN-R1']));
+	});
+
+	it('⛔ the candidate is its transport AND its model label — the same label through another transport, or another label through the same one, covers nothing of the selection', async () => {
+		const sameLabel = await recorded({
+			runId: 'qr-sel-agy-glm',
+			candidate: { ...AGY, modelLabel: GLM.modelLabel, argv: [...AGY.argv!.slice(0, 5), GLM.modelLabel] }
+		});
+		const otherLabel = await recorded({ runId: 'qr-sel-devin-other', candidate: { ...DEVIN, modelLabel: 'another-model' } });
+		for (const [label, run] of [
+			['another transport, the same label', sameLabel],
+			['the same transport, another label', otherLabel]
+		] as const) {
+			const selection = select(GLM);
+			const lines = [...run, selection];
+			const r = await check([file(lines)]);
+			expect(r.problems.map((p) => p.limb), label).toEqual(['COVERAGE']);
+			expect(limb(r, 'COVERAGE'), label).toBe(owedBy(GLM, at(lines, selection), ALL));
+		}
+	});
+
+	it('⭐ only the scoring moved: a RESCORED record of the SELECTED candidate’s run suffices — GREEN; its run under the earlier fingerprint does not, nor does another candidate’s RESCORED record', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-4' });
+		const old = await recorded({ runId: 'qr-sel-glm-4', candidate: DEVIN, fingerprint: moved('scoring') });
+		const selection = select(GLM);
+		const before = [...agy, ...old, selection];
+		expect(limb(await check([file(before)]), 'COVERAGE'), 'RED first: its run is under an earlier fingerprint').toBe(
+			[
+				owedBy(GLM, at(before, selection), ALL),
+				`same prompts under an earlier fingerprint in qr-sel-glm-4: ${ALL.join(', ')} — RESCORED lines discharge those if only the scoring moved`
+			].join('\n    ')
+		);
+		expect((await check([file([...before, ...(await restamp(old, 'rs-sel-glm-4'))])])).problems).toEqual([]);
+		const agyOld = await recorded({ runId: 'qr-sel-agy-5', fingerprint: moved('scoring') });
+		const other = select(GLM);
+		const lines = [...agyOld, ...(await restamp(agyOld, 'rs-sel-agy-5')), other];
+		const r = await check([file(lines)]);
+		expect(r.problems.map((p) => p.limb), 'today is covered — by another candidate’s re-stamp').toEqual(['COVERAGE']);
+		expect(limb(r, 'COVERAGE')).toBe(owedBy(GLM, at(lines, other), ALL));
+	});
+
+	it('⛔ the LAST SELECTION in the record is the one in force — an earlier one selects nothing; across files, by name, then line', async () => {
+		const glm = await recorded({ runId: 'qr-sel-glm-6', candidate: DEVIN });
+		const never = select(NEVER_RUN);
+		const selected = select(GLM);
+		const reselected = [...glm, never, selected];
+		const green = await check([file(reselected)]);
+		expect(green.problems, 'the selected candidate, selected last, is covered').toEqual([]);
+		expect(green.selection).toEqual({ candidate: GLM, ruling: 'REG-D-084', at: at(reselected, selected), standing: 'IN_FORCE' });
+		const later = select(NEVER_RUN);
+		const lines = [...glm, selected, later];
+		expect(limb(await check([file(lines)]), 'COVERAGE')).toBe(owedBy(NEVER_RUN, at(lines, later), ALL));
+		const across = await check([file([...glm, select(GLM)], 'a.ndjson'), file([select(NEVER_RUN)], 'b.ndjson')]);
+		expect(limb(across, 'COVERAGE')).toBe(owedBy(NEVER_RUN, 'b.ndjson:1', ALL));
+	});
+
+	it('⛔ a malformed SELECTION is refused by the record’s validation — in force nowhere, and its file read no further', async () => {
+		const glm = await recorded({ runId: 'qr-sel-glm-7', candidate: DEVIN });
+		const lines = [...glm, { ...select(GLM), candidate: { transport: 'ollama' as const, modelLabel: 'gpt-oss:20b' } }];
+		const r = await check([file(lines)]);
+		expect(limb(r, 'RECORD')).toBe(
+			`runs.ndjson: line ${lines.length}: SELECTION.candidate.transport: "ollama" cannot be deployed as the product’s reviewer (§3.5) — a SELECTION names a candidate it can deploy: agy, devin`
+		);
+		expect(r.selection, 'a refused line is in force nowhere').toBeUndefined();
+		expect(limb(r, 'COVERAGE'), 'nor is its file’s run read').toContain('3 of 3 current case(s) are not MEASURED');
+	});
+
+	it('⛔ a SELECTION’s ruling is held as an ESCALATION’s finding is — an entry the register holds, and, for the one in force, a heading not struck', async () => {
+		const glm = await recorded({ runId: 'qr-sel-glm-8', candidate: DEVIN });
+		const unheld = select(GLM, 'REG-D-999');
+		const lines = [...glm, unheld];
+		expect(limb(await check([file(lines)]), 'RECORD')).toBe(`${at(lines, unheld)}: SELECTION cites REG-D-999, which the register does not hold`);
+		const selection = select(GLM);
+		const cited = [...glm, selection];
+		expect(limb(await check([file(cited)], { struckRulings: new Set(['REG-D-084']) }), 'RECORD')).toBe(
+			`${at(cited, selection)}: the SELECTION in force cites REG-D-084, whose register heading is struck — a withdrawn ruling selects nothing; append a SELECTION citing a ruling in force`
+		);
+		expect((await check([file(cited)])).problems, 'CONTROL: the same ruling, in force').toEqual([]);
+		// ⭐ AN EARLIER SELECTION SELECTS NOTHING: a ruling withdrawn since does not redden it — the append-only record could
+		// never discharge that — but what it cites must still be an entry the register holds.
+		const withdrawn = [...glm, select(GLM, 'REG-D-085'), select(GLM)];
+		expect((await check([file(withdrawn)], { struckRulings: new Set(['REG-D-085']) })).problems).toEqual([]);
+		const dangling = select(GLM, 'REG-D-999');
+		const earlier = [...glm, dangling, select(GLM)];
+		expect(limb(await check([file(earlier)]), 'RECORD')).toBe(`${at(earlier, dangling)}: SELECTION cites REG-D-999, which the register does not hold`);
+	});
+
+	// ⛔ A RECORD OF THE SELECTED CANDIDATE THAT COUNTS FOR NOTHING COVERS NOTHING OF THE SELECTION — `coveredBy`, the one
+	// definition, asked of its COUNTED runs. Each fixture sits beside another candidate's run that covers today, so the
+	// selection's problem is the only one, and each has its own control: the same record, counting, covers.
+	it('⛔ its run STRUCK by a SUPERSEDED line covers nothing of the selection — beside another candidate’s run that covers today', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-11' });
+		// A run of it under today's fingerprint that really fails reproduction, and the SUPERSEDED line naming it.
+		const bad = tamper(await recorded({ runId: 'qr-sel-glm-11', candidate: DEVIN }), 'G-RR-04', (c) => ({
+			...c,
+			scored: c.scored && unjudged(c.scored)
+		}));
+		const selection = select(GLM);
+		const lines = [...bad, supersede('qr-sel-glm-11'), ...agy, selection];
+		const r = await check([file(lines)]);
+		expect(r.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
+		expect(limb(r, 'COVERAGE')).toBe(owedBy(GLM, at(lines, selection), ALL));
+		expect(limb(await check([file([...bad, ...agy, selection])]), 'COVERAGE'), 'CONTROL: not struck, it covers').toBe('');
+	});
+
+	it('⛔ its run REFUSED for its stamp covers nothing of the selection — beside another candidate’s run that covers today', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-12' });
+		// Today's reviewer fingerprint under another scoring digest: a stamp nothing this tree makes.
+		const forged = await recorded({
+			runId: 'qr-sel-glm-12',
+			candidate: DEVIN,
+			fingerprint: { reviewer: FP.reviewer, scoring: HEX('e'), caseSet: FP.caseSet }
+		});
+		const selection = select(GLM);
+		const lines = [...forged, ...agy, selection];
+		const r = await check([file(lines)]);
+		expect(r.problems.map((p) => p.limb), 'the stamp, and coverage').toEqual(['RECORD', 'COVERAGE']);
+		expect(limb(r, 'RECORD')).toContain(
+			`RUN qr-sel-glm-12 carries today’s reviewer fingerprint ${FP.reviewer} but scoring digest ${HEX('e')}, not today’s ${FP.scoring}`
+		);
+		expect(limb(r, 'COVERAGE')).toBe(owedBy(GLM, at(lines, selection), ALL));
+		const stamped = await recorded({ runId: 'qr-sel-glm-12', candidate: DEVIN });
+		expect((await check([file([...stamped, ...agy, selection])])).problems, 'CONTROL: today’s stamp, it covers').toEqual([]);
+	});
+
+	it('⛔ its RESCORED record STRUCK by a SUPERSEDED line covers nothing of the selection — beside another candidate’s run that covers today', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-13' });
+		// Its run under an earlier fingerprint (only the scoring moved), re-stamped by a RESCORED record that really fails
+		// reproduction, and the SUPERSEDED line naming that record.
+		const old = await recorded({ runId: 'qr-sel-glm-13', candidate: DEVIN, fingerprint: moved('scoring') });
+		const rescored = (await restamp(old, 'rs-sel-glm-13')).map((l) =>
+			l.caseId === 'G-RR-04' ? { ...l, scored: unjudged(l.scored) } : l
+		);
+		const selection = select(GLM);
+		const lines = [...old, ...rescored, supersede('rs-sel-glm-13'), ...agy, selection];
+		const r = await check([file(lines)]);
+		expect(r.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
+		expect(limb(r, 'COVERAGE')).toBe(
+			[
+				owedBy(GLM, at(lines, selection), ALL),
+				`same prompts under an earlier fingerprint in qr-sel-glm-13: ${ALL.join(', ')} — RESCORED lines discharge those if only the scoring moved`
+			].join('\n    ')
+		);
+		expect(
+			limb(await check([file([...old, ...rescored, ...agy, selection])]), 'COVERAGE'),
+			'CONTROL: not struck, the RESCORED record covers'
+		).toBe('');
+	});
+
+	// ⛔ THE MODEL LABEL IS MATCHED EXACTLY — a label that only BEGINS the other names another model.
+	for (const [label, runLabel, selected] of [
+		['a run labelled glm-5-3-flash-max-v2 covers nothing of a SELECTION of glm-5-3-flash-max', 'glm-5-3-flash-max-v2', 'glm-5-3-flash-max'],
+		['a run labelled glm-5-3-flash-max covers nothing of a SELECTION of glm-5-3-flash', 'glm-5-3-flash-max', 'glm-5-3-flash']
+	] as const)
+		it(`⛔ the model label is matched EXACTLY — ${label}`, async () => {
+			const run = await recorded({ runId: `qr-sel-${runLabel}`, candidate: { ...DEVIN, modelLabel: runLabel } });
+			const candidate: SelectedCandidate = { transport: 'devin', modelLabel: selected };
+			const selection = select(candidate);
+			const lines = [...run, selection];
+			const r = await check([file(lines)]);
+			expect(r.problems.map((p) => p.limb)).toEqual(['COVERAGE']);
+			expect(limb(r, 'COVERAGE')).toBe(owedBy(candidate, at(lines, selection), ALL));
+		});
+
+	it('⛔ the selected candidate’s coverage is asked WHETHER OR NOT every case is otherwise covered — an empty record with a SELECTION owes both, each naming what it owes', async () => {
+		const r = await check([file([select(GLM)])]);
+		expect(r.problems).toEqual([
+			{
+				limb: 'COVERAGE',
+				message: `3 of 3 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ALL.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`
+			},
+			{ limb: 'COVERAGE', message: owedBy(GLM, 'runs.ndjson:1', ALL) }
+		]);
+	});
+
+	it('⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD', async () => {
+		const agy = await recorded({ runId: 'qr-sel-agy-15' });
+		const selection = select(GLM);
+		const lines = [...agy, selection];
+		const withdrawn = await check([file(lines)], { struckRulings: new Set(['REG-D-084']) });
+		expect(withdrawn.problems.map((p) => p.limb)).toEqual(['RECORD', 'COVERAGE']);
+		expect(withdrawn.selection).toEqual({ candidate: GLM, ruling: 'REG-D-084', at: at(lines, selection), standing: 'STRUCK' });
+		expect(limb(withdrawn, 'COVERAGE')).toBe(
+			owedBy(GLM, at(lines, selection), ALL, 'REG-D-084, WITHDRAWN — its register heading is struck')
+		);
+		const unheld = select(GLM, 'REG-D-999');
+		const dangling = [...agy, unheld];
+		const notHeld = await check([file(dangling)]);
+		expect(notHeld.problems.map((p) => p.limb)).toEqual(['RECORD', 'COVERAGE']);
+		expect(notHeld.selection).toEqual({ candidate: GLM, ruling: 'REG-D-999', at: at(dangling, unheld), standing: 'NOT_HELD' });
+		expect(limb(notHeld, 'COVERAGE')).toBe(
+			owedBy(GLM, at(dangling, unheld), ALL, 'REG-D-999, NOT HELD — the register has no entry for it')
+		);
+		// CONTROL: the same record, its ruling in force — named bare.
+		const inForce = await check([file(lines)]);
+		expect(inForce.problems.map((p) => p.limb)).toEqual(['COVERAGE']);
+		expect(inForce.selection).toEqual({ candidate: GLM, ruling: 'REG-D-084', at: at(lines, selection), standing: 'IN_FORCE' });
+		expect(limb(inForce, 'COVERAGE')).toBe(owedBy(GLM, at(lines, selection), ALL));
+	});
+
+	it('⭐ the register’s RULINGS, read as its findings are — an entry struck in its heading is withdrawn; a finding is not a ruling, nor a ruling a finding', () => {
+		const register = [
+			'### REG-D-084 — SPONSOR RULING',
+			'### ~~REG-D-085~~ — withdrawn, for the fixture',
+			'### REG-F-427 — a finding',
+			'A line that names REG-D-086 is not a heading.'
+		].join('\n');
+		const { rulings, struck } = registerRulings(register);
+		expect([...rulings].sort()).toEqual(['REG-D-084', 'REG-D-085']);
+		expect([...struck]).toEqual(['REG-D-085']);
+		expect([...registerFindings(register).findings]).toEqual(['REG-F-427']);
+	});
+});
+
 // ── the CLI, on mkdtemp fixtures (D11: it runs from source) ─────────────────────────────────────────────────────────
 describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only what git tracks, and exits with what it found', () => {
 	const dirs: string[] = [];
@@ -1214,5 +1506,58 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			].join('\n')
 		);
 		expect(r.status, r.out).toBe(0);
+	}, 120_000);
+
+	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 26 cases (REG-D-086)', async () => {
+		const dir = gitRepo();
+		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 3, oracles: 3 } });
+		writeFileSync(join(dir, 'runs.ndjson'), text([...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })]));
+		git(dir, 'add', 'runs.ndjson');
+		const r = cli(['--conditions=source'], ['--records', dir]);
+		expect(r.out).toContain(
+			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${glm.length + 1}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
+		);
+		expect(r.out).toContain('reviewer:qual:check — GREEN');
+		expect(r.status, r.out).toBe(0);
+		appendFileSync(join(dir, 'runs.ndjson'), serializeLine(select({ transport: 'devin', modelLabel: 'a-model-never-run' })));
+		git(dir, 'add', 'runs.ndjson');
+		const red = cli(['--conditions=source'], ['--records', dir]);
+		expect(red.status, red.out).toBe(1);
+		expect(red.out).toContain(
+			`  [COVERAGE] 26 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
+		);
+	}, 120_000);
+
+	it('⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)', async () => {
+		// The committed record's shape — a run of version one beside one over today's set, here the selected candidate's —
+		// with the SELECTION appended.
+		const dir = gitRepo();
+		const v1 = await recorded({ runId: 'qr-cli-8', cases: CASES });
+		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 3, oracles: 3 } });
+		const lines = [...v1, ...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })];
+		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
+		git(dir, 'add', 'runs.ndjson');
+		// A copy of the register the CLI reads by default, with the one heading of REG-D-084 struck.
+		const live = readFileSync(`${REPO}/${REGISTER_FILE}`, 'utf8');
+		const struck = live.replace('\n### REG-D-084 —', '\n### ~~REG-D-084~~ —');
+		expect([...registerRulings(live).struck], 'the fixture: REG-D-084 is live in the register').not.toContain('REG-D-084');
+		expect([...registerRulings(struck).struck], 'the fixture: exactly REG-D-084 struck in the copy').toEqual(['REG-D-084']);
+		const register = join(tmp(), 'register.md');
+		writeFileSync(register, struck);
+		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(
+			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084, WITHDRAWN — its register heading is struck (runs.ndjson:${lines.length}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
+		);
+		expect(r.out).toContain(
+			`  [RECORD] runs.ndjson:${lines.length}: the SELECTION in force cites REG-D-084, whose register heading is struck — a withdrawn ruling selects nothing; append a SELECTION citing a ruling in force\n`
+		);
+		writeFileSync(register, live);
+		const control = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		expect(control.out, 'CONTROL: the same register, the heading live').toContain(
+			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${lines.length}) — every current case`
+		);
+		expect(control.out).toContain('reviewer:qual:check — GREEN');
+		expect(control.status, control.out).toBe(0);
 	}, 120_000);
 });

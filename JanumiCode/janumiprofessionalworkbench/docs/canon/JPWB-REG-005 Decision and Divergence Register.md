@@ -37811,7 +37811,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-086 — SPONSOR RULING: `REG-D-085` confirmed; the gate holds the SELECTED reviewer to today's definition (`JAN-SELREV` Q1, built as `SR-4`)
 
-**Ruled 2026-09-26** (sponsor, in session, answering the `JAN-SELREV` design report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; `SR-4` is owed.**
+**Ruled 2026-09-26** (sponsor, in session, answering the `JAN-SELREV` design report). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force; `SR-4` is owed.**~~ ✅ **DELIVERED 2026-09-26 by `JAN-SELREV` `SR-4`.** The qualification record carries a `SELECTION` line (devin / `glm-5-3-flash-max`, `REG-D-084`). For every current case, `reviewer:qual:check` now requires a covering record from the SELECTED candidate under today's fingerprint, or a RESCORED record of its run when only the scoring moved; a record from another candidate no longer suffices. The committed record is GREEN with it: the v3 devin run covers all 26 cases.
 
 - **THE SPONSOR'S WORDS, verbatim:**
   1. *"1 - REG-D-085 is confirmed"*

@@ -11775,5 +11775,284 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
 		why: "REG-F-445. Every assessment must name a floor policy, or the report prints undefined again; a filter that keeps nothing makes the assertion vacuous. The AST check of the assertion on the filtered policy ids must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⛔ the spec’s hard assertions on the reviewer and on the assessments are the ones this increment made' (AssertionError: expected [] to deeply equal [ 'toEqual([])' ])",
 		source: "JAN-SELREV SR-3 fix pass (DESIGN-the-selected-reviewer.md §2 G9; REG-F-461; REG-F-445) — the verifier's MAJ-1, MIN-4, MIN-5 and MIN-9: the lane throws its refusal, refuses the selected tool's program override, measures the reviewer's calls per try, and the spec's hard assertions are held from source"
+	},
+	{
+		id: "SR4-M1-the-same-label-through-another-transport-is-the-selected-candidate",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tr.candidate.transport === c.transport && r.candidate.modelLabel === c.modelLabel;\n",
+		replace: "\tr.candidate.modelLabel === c.modelLabel; // MUTANT: the transport is not matched\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086; record.ts SelectedCandidate): the selected candidate is its transport AND its model label — an agy run under the label glm-5-3-flash-max is not a run of devin's glm-5-3-flash-max, and covers nothing of the selection. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the candidate is its transport AND its model label — the same label through another transport, or another label through the same one, covers nothing of the selection' (AssertionError: another transport, the same label: expected [] to deeply equal [ 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M2-another-model-through-the-same-transport-is-the-selected-candidate",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tr.candidate.transport === c.transport && r.candidate.modelLabel === c.modelLabel;\n",
+		replace: "\tr.candidate.transport === c.transport; // MUTANT: the model label is not matched\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086): a run of another model through the selected transport is not a run of the selected candidate — the model is what the sponsor selected (REG-D-084). OBSERVED: KILLED — 5 test(s) red in reviewer-qualification-check.test.ts: '⛔ the candidate is its transport AND its model label — the same label through another transport, or another label through the same one, covers nothing of the selection' (AssertionError: the same transport, another label: expected [] to deeply equal [ 'COVERAGE' ]); '⛔ the LAST SELECTION in the record is the one in force — an earlier one selects nothing; across files, by name, then line' (AssertionError: expected '' to be '3 of 3 current case(s) are not MEASUR…' // Object.is equality)",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M3-an-undeployable-candidate-is-selectable",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\treturn DEPLOYABLE_TRANSPORTS.has(v as TransportName)\n\t\t? []\n",
+		replace: "\treturn TRANSPORT_NAMES.includes(v as TransportName) // MUTANT: any transport the record knows is selectable, deployable or not\n\t\t? []\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (DESIGN §3.5; REG-D-086): a SELECTION names a candidate the product can deploy — a local model or the harness stub is refused by the record's validation, so the gate is never held to a reviewer no host can have; and, since a RUN's deployable is its transport's, every RUN of a selected candidate is deployable. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)' (AssertionError: ollama: expected '' to contain 'SELECTION.candidate.transport: \"ollam…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M4-the-fingerprint-condition-is-read-off-the-case-set",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tfor (const r of counted.filter((q) => q.run.reviewerFingerprint === ctx.F))\n",
+		replace: "\tfor (const r of counted.filter((q) => q.run.caseSetDigest === ctx.i.current.caseSet)) // MUTANT: a run under an earlier reviewer fingerprint covers when its case set is today's\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (§5.6 limb 1; REG-D-086): the selected candidate is covered only by its runs under TODAY's reviewer fingerprint — its run under an earlier one (only the scoring moved) covers nothing until a RESCORED record re-stamps it. OBSERVED: KILLED — 14 test(s) red in reviewer-qualification-check.test.ts: '⛔ a run under an EARLIER fingerprint covers nothing today — and says a RESCORED record would discharge a scoring-only move' (AssertionError: expected '' to contain '3 of 3 current case(s) are not MEASUR…'); '⭐ a SCORING-ONLY move is discharged by RESCORED lines — re-derived from the recorded spans, with no model call' (AssertionError: expected '' to contain '3 of 3')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M5-another-candidates-rescored-record-covers-the-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\trescoreCoverage(ctx, new Set(counted.map((r) => r.run.runId)), struck, covered);\n",
+		replace: "\trescoreCoverage(ctx, new Set(ctx.p.runs.keys()), struck, covered); // MUTANT: a RESCORED record of ANY run covers, whichever candidate ran it\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086): a RESCORED record suffices for the selection only when its source is a run OF THE SELECTED candidate — another candidate's re-stamped run says nothing of the reviewer the product runs. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⭐ only the scoring moved: a RESCORED record of the SELECTED candidate’s run suffices — GREEN; its run under the earlier fingerprint does not, nor does another candidate’s RESCORED record' (AssertionError: today is covered — by another candidate’s re-stamp: expected [] to deeply equal [ 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M6-no-rescored-record-covers",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\trescoreCoverage(ctx, new Set(counted.map((r) => r.run.runId)), struck, covered);\n",
+		replace: "\t// MUTANT: no RESCORED record covers — a scoring-only move owes a model call after all\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086: 'A RESCORED record of its run suffices when only the scoring moved'): with only the scoring moved, RESCORED lines of the selected candidate's run discharge the selection with no model call. OBSERVED: KILLED — 6 test(s) red in reviewer-qualification-check.test.ts: '⭐ a SCORING-ONLY move is discharged by RESCORED lines — re-derived from the recorded spans, with no model call' (AssertionError: expected [ { limb: 'COVERAGE', …(1) } ] to deeply equal []); '⛔ a RESCORED line re-stamping an evaluation whose prompt has changed is refused — that case owes a model call' (AssertionError: expected '3 of 3 current case(s) are not MEASUR…' to contain '1 of 3 current case(s) are not MEASUR…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M7-the-first-selection-is-in-force",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "const selectionInForce = (p: Parsed): At<SelectionLine> | undefined => p.selections.at(-1);\n",
+		replace: "const selectionInForce = (p: Parsed): At<SelectionLine> | undefined => p.selections.at(0); // MUTANT: the FIRST SELECTION is in force\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (ROADMAP SR-4: 'the LAST SELECTION line is in force'): a later SELECTION replaces an earlier one — across files by name, then line — and the earlier selects nothing. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-check.test.ts: '⛔ the LAST SELECTION in the record is the one in force — an earlier one selects nothing; across files, by name, then line' (AssertionError: the selected candidate, selected last, is covered: expected [ { limb: 'COVERAGE', …(1) } ] to deeply equal []); '⛔ a SELECTION’s ruling is held as an ESCALATION’s finding is — an entry the register holds, and, for the one in force, a heading not struck' (AssertionError: expected [ { limb: 'RECORD', …(1) } ] to deeply equal [])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M8-a-selections-ruling-is-not-looked-up",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\tif (!i.rulings.has(x.line.ruling)) refuse(",
+		replace: "\t\tif (!i.rulings.has(x.line.ruling) && x.line.ruling === '' /* MUTANT: a SELECTION's ruling is not looked up */) refuse(",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4, held as an ESCALATION's finding is): every SELECTION cites a ruling the register holds — a citation of nothing is a RECORD problem. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ a SELECTION’s ruling is held as an ESCALATION’s finding is — an entry the register holds, and, for the one in force, a heading not struck' (AssertionError: expected '' to be 'runs.ndjson:5: SELECTION cites REG-D-…' // Object.is equality); '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected [ 'COVERAGE' ] to deeply equal [ 'RECORD', 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M9-a-struck-ruling-still-selects",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\telse if (x === inForce && i.struckRulings.has(x.line.ruling))\n",
+		replace: "\t\telse if (x === inForce && i.struckRulings.has(x.line.ruling) && x.line.ruling === '') // MUTANT: a struck ruling still selects\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4, held as an ESCALATION's finding is): the SELECTION in force rests on a ruling whose register heading is not struck — a withdrawn ruling selects nothing. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-check.test.ts: '⛔ a SELECTION’s ruling is held as an ESCALATION’s finding is — an entry the register holds, and, for the one in force, a heading not struck' (AssertionError: expected '' to be 'runs.ndjson:5: the SELECTION in force…' // Object.is equality); '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected [ 'COVERAGE' ] to deeply equal [ 'RECORD', 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M10-a-withdrawn-ruling-reddens-every-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\telse if (x === inForce && i.struckRulings.has(x.line.ruling))\n",
+		replace: "\t\telse if (i.struckRulings.has(x.line.ruling)) // MUTANT: an EARLIER SELECTION's withdrawn ruling reddens the record too\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): only the SELECTION in force is held to a live heading — an earlier one selects nothing, and a red on it could never be discharged in an append-only record. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ a SELECTION’s ruling is held as an ESCALATION’s finding is — an entry the register holds, and, for the one in force, a heading not struck' (AssertionError: expected [ { limb: 'RECORD', …(1) } ] to deeply equal [])",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M11-a-record-with-no-selection-owes-one",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (!selection) return;\n",
+		replace: "\tif (!selection) return void ctx.problems.push({ limb: 'COVERAGE', message: 'no SELECTION is in force' }); // MUTANT: the check is no longer what it was before SR-4\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "CONTROL (ROADMAP SR-4; the task's no-SELECTION limb): with no SELECTION in force the check is exactly what it was — a record covered by any candidate's run is GREEN. OBSERVED: KILLED — 29 test(s) red in reviewer-qualification-check.test.ts: '⭐ CONTROL — a run under today’s fingerprint, answering every case as its oracle expects, is green' (AssertionError: expected [ { limb: 'COVERAGE', …(1) } ] to deeply equal []); '⭐ a transport failure counts as MEASURED — it is covered, and escalated as a Boundedness failure' (AssertionError: expected 'no SELECTION is in force' to be '' // Object.is equality)",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M12-the-cli-header-never-names-the-selection",
+		file: "scripts/reviewer-qual/check.ts",
+		find: "\tif (selection)\n\t\tsay(\n",
+		replace: "\tif (selection && selection.at === '') // MUTANT: the header never names the SELECTION in force\n\t\tsay(\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): the CLI's header names the SELECTION in force — candidate, ruling, and where the line is — so a person reading a red knows which reviewer it holds the record to. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 26 cases (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…'); '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M13-a-finding-passes-as-a-ruling",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "const RULING = /^REG-D-\\d{3,}$/;\n",
+		replace: "const RULING = /^REG-[DF]-\\d{3,}/; // MUTANT: a finding passes as a sponsor ruling\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (SR-4): a SELECTION rests on a SPONSOR RULING (REG-D-NNN) — a finding is not a ruling, and a malformed id is refused by the record's validation. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)' (AssertionError: REG-F-454: expected '' to contain 'SELECTION.ruling: not a sponsor rulin…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M14-a-selection-needs-no-model-label",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\t\tcandidate: shape({ transport: selectable, modelLabel: str() }),\n",
+		replace: "\t\tcandidate: shape({ transport: selectable, modelLabel: str() }, ['modelLabel']), // MUTANT: a SELECTION may name a transport and no model\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (SR-4): a SELECTION names the candidate by transport AND model label — a line without the model is refused by the record's validation. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)' (AssertionError: expected '' to contain 'SELECTION.candidate: missing key \"mod…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M15-the-rulings-are-read-from-the-findings-headings",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tconst { entries, struck } = registerHeadings(register, 'D');\n",
+		replace: "\tconst { entries, struck } = registerHeadings(register, 'F'); // MUTANT: the rulings are read from the findings' headings\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): the register's rulings are its REG-D headings, read as its findings are read from their REG-F headings — struck ones withdrawn. OBSERVED: KILLED — 3 test(s) red in reviewer-qualification-check.test.ts: '⭐ the register’s RULINGS, read as its findings are — an entry struck in its heading is withdrawn; a finding is not a ruling, nor a ruling a finding' (AssertionError: expected [ 'REG-F-427' ] to deeply equal [ 'REG-D-084', 'REG-D-085' ]); '⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 26 cases (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M16-any-deployable-candidate-covers-the-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tconst selected = counted.filter((r) => isSelected(r.run, candidate));\n",
+		replace: "\tconst selected = counted.filter((r) => isSelected(r.run, candidate) || r.run.deployable); // MUTANT: any DEPLOYABLE candidate's run covers the selection\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1, 'stricter than Q7 (d) (ii)'): a deployable run of ANOTHER candidate does not cover the selection — only the selected candidate's own runs do. OBSERVED: KILLED — 12 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record whose current cases are covered only by ANOTHER candidate is RED with a SELECTION in force, naming the selected candidate, its ruling and every uncovered case — and, the CONTROL, GREEN with none, as before SR-4' (AssertionError: coverage alone: expected [] to deeply equal [ 'COVERAGE' ]); '⭐ the same record with the SELECTED candidate’s run is GREEN — and a run of it over one case owes exactly the others' (AssertionError: expected '' to be '2 of 3 current case(s) are not MEASUR…' // Object.is equality)",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M17-a-selection-line-is-read-and-dropped",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\t\treturn void p.selections.push({ line, at });\n",
+		replace: "\t\t\treturn; // MUTANT: a SELECTION line is read and dropped — none is ever in force\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): a SELECTION line in the record is read, and the last is in force. OBSERVED: KILLED — 15 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record whose current cases are covered only by ANOTHER candidate is RED with a SELECTION in force, naming the selected candidate, its ruling and every uncovered case — and, the CONTROL, GREEN with none, as before SR-4' (AssertionError: coverage alone: expected [] to deeply equal [ 'COVERAGE' ]); '⭐ the same record with the SELECTED candidate’s run is GREEN — and a run of it over one case owes exactly the others' (AssertionError: expected '' to be '2 of 3 current case(s) are not MEASUR…' // Object.is equality)",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M18-the-cli-hands-the-check-no-rulings",
+		file: "scripts/reviewer-qual/check.ts",
+		find: "\tconst { rulings, struck: struckRulings } = core.registerRulings(register);\n",
+		replace: "\tconst { rulings, struck: struckRulings } = core.registerRulings(''); // MUTANT: the CLI hands the check no rulings\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): the CLI reads the register's rulings from the register it reads findings from, so a SELECTION on a ruling the register holds is green end to end. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 26 cases (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…'); '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M19-the-selection-limb-is-never-asked",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tselectedCoverage(ctx, counted, struck);\n",
+		replace: "\t// MUTANT: the selected candidate's coverage is never asked\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086): with a SELECTION in force, limb 1 asks its question again of the selected candidate's runs — wired, not merely written. OBSERVED: KILLED — 13 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record whose current cases are covered only by ANOTHER candidate is RED with a SELECTION in force, naming the selected candidate, its ruling and every uncovered case — and, the CONTROL, GREEN with none, as before SR-4' (AssertionError: coverage alone: expected [] to deeply equal [ 'COVERAGE' ]); '⭐ the same record with the SELECTED candidate’s run is GREEN — and a run of it over one case owes exactly the others' (AssertionError: expected '' to be '2 of 3 current case(s) are not MEASUR…' // Object.is equality)",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M20-an-unknown-transport-is-called-undeployable",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\tif (notATransport.length > 0) return notATransport;\n",
+		replace: "\t// MUTANT: a transport the record does not know is refused only as undeployable\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (record.ts): a SELECTION's transport is first one the record knows (agy, devin, ollama, stub) and refused by name otherwise, exactly as a RUN's is; only then is it asked whether the product can deploy it. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-record.test.ts: '⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)' (AssertionError: expected 'SELECTION.candidate.transport: \"pi\" c…' to contain 'SELECTION.candidate.transport: \"pi\" i…')",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M21-the-report-names-no-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\t\tselection: s && { candidate: s.line.candidate, ruling: s.line.ruling, at: s.at, standing: rulingStanding(i, s.line.ruling) }\n",
+		replace: "\t\tselection: undefined // MUTANT: the report never names the SELECTION in force\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4): the check's report names the SELECTION in force — the candidate, the ruling, where its line is and how its ruling stands in the register — which is what the CLI's header prints. RE-ANCHORED in the SR-4 fix: the report's selection gained `standing` (the verifier's MINOR-2); the mutation is unchanged. OBSERVED: KILLED — 5 test(s) red in reviewer-qualification-check.test.ts: '⛔ a record whose current cases are covered only by ANOTHER candidate is RED with a SELECTION in force, naming the selected candidate, its ruling and every uncovered case — and, the CONTROL, GREEN with none, as before SR-4' (AssertionError: expected undefined to deeply equal { candidate: { …(2) }, …(3) }); '⛔ the LAST SELECTION in the record is the one in force — an earlier one selects nothing; across files, by name, then line' (AssertionError: expected undefined to deeply equal { candidate: { …(2) }, …(3) })",
+		source: "JAN-SELREV SR-4 — the gate holds the SELECTED reviewer to today's definition (REG-D-086; DESIGN-the-selected-reviewer.md §5 Q1; ROADMAP-the-selected-reviewer.md SR-4): a SELECTION line kind in the qualification record naming a deployable candidate by transport and model label and the sponsor ruling it rests on, the last in force; limb 1 asks its one definition of 'covered' again of the selected candidate's runs alone (a RUN under today's fingerprint, or a RESCORED record of one where only the scoring moved); the SELECTION's ruling held as an ESCALATION's finding is; the CLI's header names the selection in force"
+	},
+	{
+		id: "SR4-M22-a-struck-or-refused-run-of-the-selected-candidate-covers-the-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tconst selected = counted.filter((r) => isSelected(r.run, candidate));\n",
+		replace: "\tconst selected = [...counted, ...[...ctx.p.runs.values()].filter((r) => !counted.includes(r))].filter((r) => isSelected(r.run, candidate)); // MUTANT: struck and refused runs of the selected candidate count\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086; §5.6 limb 1, one definition of covered): the selected candidate is covered only by its COUNTED runs — a run of it struck by a SUPERSEDED line, or refused for a stamp nothing this tree makes, covers nothing of the selection, exactly as it covers nothing of limb 1. The verifier's ADV-O1, which survived SR-4's first tests; its fixtures are now in the SR-4 limb. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ its run STRUCK by a SUPERSEDED line covers nothing of the selection — beside another candidate’s run that covers today' (AssertionError: coverage alone: expected [] to deeply equal [ 'COVERAGE' ]); '⛔ its run REFUSED for its stamp covers nothing of the selection — beside another candidate’s run that covers today' (AssertionError: the stamp, and coverage: expected [ 'RECORD' ] to deeply equal [ 'RECORD', 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M23-a-struck-rescored-record-of-the-selected-candidate-covers-the-selection",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tconst missing = uncovered(ctx, coveredBy(ctx, selected, struck));\n",
+		replace: "\tconst missing = uncovered(ctx, coveredBy(ctx, selected, new Set<string>())); // MUTANT: a struck RESCORED record of the selected candidate still covers\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086; §5.6 limb 1): a RESCORED record of the selected candidate's run that a SUPERSEDED line strikes re-stamps nothing — the selection is owed its cases again. The verifier's ADV-O2, which survived SR-4's first tests. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ its RESCORED record STRUCK by a SUPERSEDED line covers nothing of the selection — beside another candidate’s run that covers today' (AssertionError: coverage alone: expected [] to deeply equal [ 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M24-a-model-label-that-only-begins-with-the-selected-one-is-the-selected-candidate",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tr.candidate.transport === c.transport && r.candidate.modelLabel === c.modelLabel;\n",
+		replace: "\tr.candidate.transport === c.transport && r.candidate.modelLabel.startsWith(c.modelLabel); // MUTANT: a label prefix names the selected candidate\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-084, REG-D-086): the selected model is named EXACTLY — a run labelled glm-5-3-flash-max-v2 is not a run of glm-5-3-flash-max, nor is a run of glm-5-3-flash-max one of a selected glm-5-3-flash. The verifier's ADV-O3, which survived SR-4's first tests (their labels shared no prefix). OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ the model label is matched EXACTLY — a run labelled glm-5-3-flash-max-v2 covers nothing of a SELECTION of glm-5-3-flash-max' (AssertionError: expected [] to deeply equal [ 'COVERAGE' ])",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M25-the-cli-never-tells-the-check-a-ruling-is-struck",
+		file: "scripts/reviewer-qual/check.ts",
+		find: "\tconst { rulings, struck: struckRulings } = core.registerRulings(register);\n",
+		replace: "\tconst { rulings } = core.registerRulings(register);\n\tconst struckRulings = new Set<string>(); // MUTANT: the CLI never tells the check a ruling is struck\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4, a SELECTION's ruling held as an ESCALATION's finding is): end to end, a SELECTION whose ruling the register the CLI reads STRIKES is red — the struck headings reach the check from the register, not only in the core's own tests. The verifier's ADV-O4, which survived SR-4's first tests (the real register strikes no REG-D heading). OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: reviewer:qual:check — today's reviewer fingerprint 2b6ca158534f19f413157587a878e956455ab826b424b04e1a5a3dac97718096 (scoring 94fcc2168215caa9fba8d67d84d3ab259728423c8966787f75c729d3396b155d, case set 9b1dd2e707b835851a375513)",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M26-the-selection-is-asked-only-when-every-case-is-otherwise-covered",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tselectedCoverage(ctx, counted, struck);\n",
+		replace: "\tif (missing.length === 0) selectedCoverage(ctx, counted, struck); // MUTANT: the selection is asked only when every case is otherwise covered\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (REG-D-086): the selected candidate's coverage is asked whether or not limb 1's own question found a case uncovered — an empty record with a SELECTION owes both, each problem naming what it owes. The verifier's ADV-O6, which survived SR-4's first tests. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the selected candidate’s coverage is asked WHETHER OR NOT every case is otherwise covered — an empty record with a SELECTION owes both, each naming what it owes' (AssertionError: expected [ { limb: 'COVERAGE', …(1) } ] to deeply equal [ { limb: 'COVERAGE', …(1) }, …(1) ])",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M27-the-report-calls-a-withdrawn-selection-in-force",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "standing: rulingStanding(i, s.line.ruling) }",
+		replace: "standing: 'IN_FORCE' as const /* MUTANT: the report calls every SELECTION's ruling in force */ }",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4; the verifier's MINOR-2): the check's report says how the ruling of the SELECTION in force stands — STRUCK when its register heading is struck, NOT_HELD when the register has no entry — so a withdrawn selection is never reported in force unqualified; the CLI's header prints from it. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected { candidate: { …(2) }, …(3) } to deeply equal { candidate: { …(2) }, …(3) }); '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M28-the-cli-header-names-a-withdrawn-ruling-bare",
+		file: "scripts/reviewer-qual/check.ts",
+		find: "core.rulingCaveat(selection.standing)",
+		replace: "''",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4; the verifier's MINOR-2): the CLI's header names the SELECTION in force with its ruling WITHDRAWN beside it when the register it reads strikes that ruling's heading — never 'in force' unqualified. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M29-a-struck-ruling-heading-reads-as-in-force",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\treturn i.struckRulings.has(ruling) ? 'STRUCK' : 'IN_FORCE';\n",
+		replace: "\treturn 'IN_FORCE'; // MUTANT: a struck ruling heading reads as in force\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4; the verifier's MINOR-2): a ruling whose register heading is struck stands WITHDRAWN — in the report, in the COVERAGE problem and in the CLI's header — while the RECORD refusal says it selects nothing. OBSERVED: KILLED — 2 test(s) red in reviewer-qualification-check.test.ts: '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected { candidate: { …(2) }, …(3) } to deeply equal { candidate: { …(2) }, …(3) }); '⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is GREEN (REG-D-086)' (AssertionError: expected 'reviewer:qual:check — today\\'s review…' to contain 'reviewer:qual:check — the SELECTION i…')",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M30-a-ruling-the-register-does-not-hold-reads-as-in-force",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tif (!i.rulings.has(ruling)) return 'NOT_HELD';\n",
+		replace: "\t// MUTANT: a ruling the register does not hold reads as in force\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4; MINOR-2's general form): a SELECTION in force on a ruling the register holds no entry for is reported NOT HELD, not in force — the same qualification a withdrawn ruling gets. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected { candidate: { …(2) }, …(3) } to deeply equal { candidate: { …(2) }, …(3) })",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "SR4-M31-the-coverage-problem-names-a-withdrawn-ruling-bare",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "\tconst cited = ruling + rulingCaveat(rulingStanding(ctx.i, ruling));\n",
+		replace: "\tconst cited = ruling; // MUTANT: the COVERAGE problem names a withdrawn ruling bare\n",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (SR-4; the verifier's MINOR-2): the COVERAGE problem held to a SELECTION whose ruling is not in force says so beside the ruling — WITHDRAWN, or NOT HELD — so no printed line names that SELECTION in force unqualified. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected '3 of 3 current case(s) are not MEASUR…' to be '3 of 3 current case(s) are not MEASUR…' // Object.is equality)",
+		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
 	}
 ];

@@ -25,9 +25,15 @@
 //      answered criterion now UNABLE_TO_DETERMINE) are informational: both REPORTED for every record this limb reads,
 //      and never escalated. An ESCALATION line already citing what is now reported stays valid history: nothing
 //      requires a line to cite a material failure, and the record is append-only.
+// ⭐ `JAN-SELREV` SR-4 — THE GATE HOLDS THE SELECTED REVIEWER TO TODAY'S DEFINITION (`REG-D-086`; DESIGN-the-selected-
+// reviewer.md §5 Q1). The LAST SELECTION line in the record is in force. With one in force, limb 1 asks its own
+// question — covered, in exactly its sense (`coveredBy`) — again of the selected candidate's runs alone, and a case no
+// run or re-stamp OF IT covers is a COVERAGE problem naming the candidate and its ruling. With none in force, nothing
+// here runs: the check is what it was before SR-4.
 // And the cross-file references `REG-D-074` left here: a run id is declared once across the record; a RESCORED line's
 // source evaluation, an ESCALATION's run and cases, a SUPERSEDED line's record, an ACKNOWLEDGED line's cases all exist;
-// every cited finding is an entry of the register. Two runs of one candidate on one date are ordered by the record.
+// every cited finding is an entry of the register, and every SELECTION's ruling. Two runs of one candidate on one date
+// are ordered by the record.
 //
 // ⚠ PURE: records, today's fingerprint, the cases, the oracles and the register's findings are handed in, and the one
 // operation that needs the product — re-scoring — is a function handed in (`rescore.ts` in the CLI). It reads no file.
@@ -48,6 +54,8 @@ import {
 	type RescoredLine,
 	type RunLine,
 	type ScoredOutcome,
+	type SelectedCandidate,
+	type SelectionLine,
 	type SupersededLine
 } from './record.js';
 
@@ -83,6 +91,10 @@ export interface CheckInputs {
 	readonly findings: ReadonlySet<string>;
 	/** ⭐ Those among them whose heading is STRUCK (`### ~~REG-F-NNN~~`) — closed. A struck finding escalates nothing. */
 	readonly struck: ReadonlySet<string>;
+	/** ⭐ `JAN-SELREV` SR-4 — the register rulings that have an entry (`### REG-D-NNN`, struck or not — `registerRulings`). */
+	readonly rulings: ReadonlySet<string>;
+	/** ⭐ Those among them whose heading is STRUCK (`### ~~REG-D-NNN~~`) — withdrawn. A withdrawn ruling selects nothing. */
+	readonly struckRulings: ReadonlySet<string>;
 	/** Re-score one recorded evaluation through TODAY's path under `scoringDigest`, with no model call; throws when it
 	 *  cannot be re-scored. */
 	readonly rescore: (
@@ -112,6 +124,30 @@ export interface CheckReport {
 	 * never reddens. A miss under a wrong verdict is listed as such: that verdict is what limb 3 escalates.
 	 */
 	readonly attribution: readonly string[];
+	/**
+	 * ⭐ `JAN-SELREV` SR-4 — the SELECTION in force, if any: the selected candidate, the ruling it rests on, where its line
+	 * is, and how that ruling stands in the register (`RulingStanding`) — so a SELECTION whose ruling is withdrawn, or
+	 * not held, is never reported in force unqualified. Undefined when the record holds none — and then the check is
+	 * exactly what it was before SR-4.
+	 */
+	readonly selection:
+		| {
+				readonly candidate: SelectedCandidate;
+				readonly ruling: string;
+				readonly at: string;
+				readonly standing: RulingStanding;
+		  }
+		| undefined;
+}
+
+/** Every entry of one series the register's headings name (`### REG-X-NNN`), and those whose heading is struck
+ *  (`### ~~REG-X-NNN~~`). An id with a live heading anywhere is live. */
+function registerHeadings(register: string, series: 'F' | 'D'): { entries: Set<string>; struck: Set<string> } {
+	const live = new Set([...register.matchAll(new RegExp(`^### (REG-${series}-\\d+)\\b`, 'gm'))].map((m) => m[1]!));
+	const struck = new Set(
+		[...register.matchAll(new RegExp(`^### ~~(REG-${series}-\\d+)\\b`, 'gm'))].map((m) => m[1]!).filter((id) => !live.has(id))
+	);
+	return { entries: new Set([...live, ...struck]), struck };
 }
 
 /**
@@ -119,11 +155,17 @@ export interface CheckReport {
  * whose heading is struck (`### ~~REG-F-NNN~~`, a closed finding). An id with a live heading anywhere is live.
  */
 export function registerFindings(register: string): { findings: Set<string>; struck: Set<string> } {
-	const live = new Set([...register.matchAll(/^### (REG-F-\d+)\b/gm)].map((m) => m[1]!));
-	const struck = new Set(
-		[...register.matchAll(/^### ~~(REG-F-\d+)\b/gm)].map((m) => m[1]!).filter((id) => !live.has(id))
-	);
-	return { findings: new Set([...live, ...struck]), struck };
+	const { entries, struck } = registerHeadings(register, 'F');
+	return { findings: entries, struck };
+}
+
+/**
+ * ⭐ `JAN-SELREV` SR-4 — THE REGISTER'S RULINGS, read as its findings are: every `### REG-D-NNN` entry, and those whose
+ * heading is struck (`### ~~REG-D-NNN~~`, a withdrawn ruling). A SELECTION's ruling must be one of them.
+ */
+export function registerRulings(register: string): { rulings: Set<string>; struck: Set<string> } {
+	const { entries, struck } = registerHeadings(register, 'D');
+	return { rulings: entries, struck };
 }
 
 // ── the record, read ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -161,6 +203,8 @@ interface Parsed {
 	readonly acknowledged: At<AcknowledgedLine>[];
 	readonly superseded: At<SupersededLine>[];
 	readonly heldOut: At<HeldOutLine>[];
+	/** ⭐ `JAN-SELREV` SR-4 — in record order: the last is in force (`selectionInForce`). */
+	readonly selections: At<SelectionLine>[];
 }
 type Refuse = (message: string) => void;
 
@@ -195,10 +239,12 @@ function addLine(line: RecordLine, file: string, at: string, p: Parsed, refuse: 
 			return void p.superseded.push({ line, at });
 		case 'HELD_OUT':
 			return void p.heldOut.push({ line, at });
+		case 'SELECTION':
+			return void p.selections.push({ line, at });
 	}
 }
 function parse(i: CheckInputs, problems: CheckProblem[]): Parsed {
-	const p: Parsed = { runs: new Map(), rescored: [], escalations: [], acknowledged: [], superseded: [], heldOut: [] };
+	const p: Parsed = { runs: new Map(), rescored: [], escalations: [], acknowledged: [], superseded: [], heldOut: [], selections: [] };
 	const refuse: Refuse = (message) => problems.push({ limb: 'RECORD', message });
 	for (const f of i.refusedFiles ?? []) refuse(`${f.name}: not read — ${f.why}`);
 	for (const f of i.files) {
@@ -316,7 +362,46 @@ function references(p: Parsed, i: CheckInputs, problems: CheckProblem[]): Rescor
 	for (const { line, at } of p.acknowledged)
 		for (const c of line.addedCaseIds ?? [])
 			if (!caseIds.has(c)) refuse(`${at}: ACKNOWLEDGED adds ${c}, which today’s case set does not hold`);
+	selectionRefs(p, i, refuse);
 	return rescores;
+}
+
+/** ⭐ `JAN-SELREV` SR-4 — THE SELECTION IN FORCE: the LAST in the record, its files by name and their lines in order. */
+const selectionInForce = (p: Parsed): At<SelectionLine> | undefined => p.selections.at(-1);
+
+/**
+ * ⭐ `JAN-SELREV` SR-4 — A SELECTION'S RULING, held as an ESCALATION's finding is (`unescalatable`): every SELECTION cites
+ * an entry the register holds, and the one in force a ruling whose heading is not struck. An earlier SELECTION selects
+ * nothing, so a ruling withdrawn since does not redden it — the append-only record could never discharge that.
+ */
+function selectionRefs(p: Parsed, i: CheckInputs, refuse: Refuse): void {
+	const inForce = selectionInForce(p);
+	for (const x of p.selections) {
+		if (!i.rulings.has(x.line.ruling)) refuse(`${x.at}: SELECTION cites ${x.line.ruling}, which the register does not hold`);
+		else if (x === inForce && i.struckRulings.has(x.line.ruling))
+			refuse(
+				`${x.at}: the SELECTION in force cites ${x.line.ruling}, whose register heading is struck — a withdrawn ruling selects nothing; append a SELECTION citing a ruling in force`
+			);
+	}
+}
+
+/**
+ * ⭐ `JAN-SELREV` SR-4 — HOW A SELECTION'S RULING STANDS IN THE REGISTER: an entry whose heading is live (`IN_FORCE`),
+ * one whose heading is struck — withdrawn (`STRUCK`) — or no entry at all (`NOT_HELD`). The SELECTION in force on
+ * either of the last two is refused (`selectionRefs`), and the record is red; coverage is still held to its candidate
+ * meanwhile. The report, the COVERAGE problem and the CLI's header each say how its ruling stands, so such a SELECTION
+ * is never named in force unqualified.
+ */
+export type RulingStanding = 'IN_FORCE' | 'STRUCK' | 'NOT_HELD';
+function rulingStanding(i: CheckInputs, ruling: string): RulingStanding {
+	if (!i.rulings.has(ruling)) return 'NOT_HELD';
+	return i.struckRulings.has(ruling) ? 'STRUCK' : 'IN_FORCE';
+}
+/** What is said beside a SELECTION's ruling that is not in force (`RulingStanding`) — nothing when it is. */
+export function rulingCaveat(standing: RulingStanding): string {
+	if (standing === 'STRUCK') return ', WITHDRAWN — its register heading is struck';
+	if (standing === 'NOT_HELD') return ', NOT HELD — the register has no entry for it';
+	return '';
 }
 
 /**
@@ -635,6 +720,8 @@ interface Ctx {
 	readonly history: OracleHistory;
 	/** Records refused for a stamp nothing this tree makes (`inconsistentStamps`): run ids and rescore ids. */
 	readonly refused: ReadonlySet<string>;
+	/** ⭐ `JAN-SELREV` SR-4 — the SELECTION in force (`selectionInForce`), or undefined when the record holds none. */
+	readonly selection: At<SelectionLine> | undefined;
 	readonly problems: CheckProblem[];
 	readonly notes: string[];
 }
@@ -906,6 +993,54 @@ function coverageHints(ctx: Ctx, counted: readonly Run[], missing: readonly stri
 	);
 }
 
+/** The current cases `covered` does not hold, in the case set's order. */
+const uncovered = (ctx: Ctx, covered: ReadonlySet<string>): string[] =>
+	ctx.i.cases.map((c) => c.id).filter((id) => !covered.has(id));
+
+/**
+ * ⭐ WHAT "COVERED" MEANS (§5.6 limb 1) — ONE DEFINITION, asked of every counted run and, since `JAN-SELREV` SR-4, of the
+ * SELECTED candidate's alone: a current case, by today's prompts, in a complete evaluation of one of `counted` carrying
+ * today's fingerprint, or re-stamped under it by a RESCORED line whose source is one of `counted`.
+ */
+function coveredBy(ctx: Ctx, counted: readonly Run[], struck: ReadonlySet<string>): Set<string> {
+	const covered = new Set<string>();
+	for (const r of counted.filter((q) => q.run.reviewerFingerprint === ctx.F))
+		for (const e of r.evaluations.values()) if (complete(e) && promptsMatch(ctx, e)) covered.add(e.caseId);
+	rescoreCoverage(ctx, new Set(counted.map((r) => r.run.runId)), struck, covered);
+	return covered;
+}
+
+/** A run of the selected candidate: its transport and its model label, the two fields that name it (`record.ts`
+ *  `SelectedCandidate`). */
+const isSelected = (r: RunLine, c: SelectedCandidate): boolean =>
+	r.candidate.transport === c.transport && r.candidate.modelLabel === c.modelLabel;
+
+/**
+ * ⭐ `JAN-SELREV` SR-4 — THE GATE HOLDS THE SELECTED REVIEWER TO TODAY'S DEFINITION (`REG-D-086`; DESIGN-the-selected-
+ * reviewer.md §5 Q1). With a SELECTION in force, every current case must ALSO be covered — `coveredBy`, the one
+ * definition — by the selected candidate's own counted runs: a RUN of it under today's fingerprint, or a RESCORED record
+ * of one where only the scoring moved. Another candidate's coverage says nothing of the reviewer the product runs.
+ * A run of it is DEPLOYABLE without asking: a SELECTION names only a deployable transport, and a RUN's `deployable` is
+ * its transport's (`record.ts`). With no SELECTION in force, nothing here runs. A SELECTION whose ruling is not in
+ * force is still held here, and its problem says how the ruling stands (`rulingCaveat`).
+ */
+function selectedCoverage(ctx: Ctx, counted: readonly Run[], struck: ReadonlySet<string>): void {
+	const selection = ctx.selection;
+	if (!selection) return;
+	const { candidate, ruling } = selection.line;
+	const selected = counted.filter((r) => isSelected(r.run, candidate));
+	const missing = uncovered(ctx, coveredBy(ctx, selected, struck));
+	if (missing.length === 0) return;
+	const cited = ruling + rulingCaveat(rulingStanding(ctx.i, ruling));
+	ctx.problems.push({
+		limb: 'COVERAGE',
+		message: [
+			`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F} by the SELECTED candidate ${candidate.transport} / ${candidate.modelLabel} (${cited}; the SELECTION in force, ${selection.at}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where only the scoring moved (§5.6 limb 1; REG-D-086)`,
+			...coverageHints(ctx, selected, missing)
+		].join('\n    ')
+	});
+}
+
 function coverage(ctx: Ctx, struck: ReadonlySet<string>): void {
 	const outsideOneDay: string[] = [];
 	const counted = [...ctx.p.runs.values()].filter((r) => {
@@ -915,10 +1050,7 @@ function coverage(ctx: Ctx, struck: ReadonlySet<string>): void {
 		return day === undefined;
 	});
 	ctx.notes.push(...outsideOneDay);
-	const covered = new Set<string>();
-	for (const r of counted.filter((q) => q.run.reviewerFingerprint === ctx.F))
-		for (const e of r.evaluations.values()) if (complete(e) && promptsMatch(ctx, e)) covered.add(e.caseId);
-	rescoreCoverage(ctx, new Set(counted.map((r) => r.run.runId)), struck, covered);
+	const covered = coveredBy(ctx, counted, struck);
 	const owed = acknowledgementOwed(ctx, counted, struck);
 	if (owed)
 		ctx.problems.push({
@@ -929,16 +1061,19 @@ function coverage(ctx: Ctx, struck: ReadonlySet<string>): void {
 				'is owed, with the case added to exercise the change or the reason none is needed, whatever runs exist under ' +
 				'it (§5.6 limb 1)'
 		});
-	const missing = ctx.i.cases.map((c) => c.id).filter((id) => !covered.has(id));
-	if (missing.length === 0) return;
-	ctx.problems.push({
-		limb: 'COVERAGE',
-		message: [
-			`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F}: ${missing.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`,
-			...coverageHints(ctx, counted, missing),
-			...outsideOneDay
-		].join('\n    ')
-	});
+	const missing = uncovered(ctx, covered);
+	if (missing.length > 0)
+		ctx.problems.push({
+			limb: 'COVERAGE',
+			message: [
+				`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F}: ${missing.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`,
+				...coverageHints(ctx, counted, missing),
+				...outsideOneDay
+			].join('\n    ')
+		});
+	// ⭐ `JAN-SELREV` SR-4 — and, with a SELECTION in force, the same question of the selected candidate's runs alone —
+	// asked whether or not the question above found a case uncovered: each problem names what it owes.
+	selectedCoverage(ctx, counted, struck);
 }
 
 // ── limb 3 ──
@@ -985,6 +1120,7 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 		oracles: new Map(i.oracles.map((o) => [o.caseId, o])),
 		history: new Map(i.oracleSets.map((s) => [s.oracleVersion, new Map(s.oracles.map((o) => [o.caseId, o]))])),
 		refused: inconsistentStamps(p, rescores, i.current.reviewer, i.current.scoring, refuse),
+		selection: selectionInForce(p),
 		problems,
 		notes: []
 	};
@@ -1004,9 +1140,11 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 		.filter(([id]) => !struck.has(id))
 		.map(([id, x]) => attributionEntry(x.kind, id, x.attribution))
 		.filter((a): a is string => a !== undefined);
+	const s = ctx.selection;
 	return {
 		problems: problems.sort((a, b) => LIMB_ORDER.indexOf(a.limb) - LIMB_ORDER.indexOf(b.limb)),
 		notes: ctx.notes,
-		attribution
+		attribution,
+		selection: s && { candidate: s.line.candidate, ruling: s.line.ruling, at: s.at, standing: rulingStanding(i, s.line.ruling) }
 	};
 }

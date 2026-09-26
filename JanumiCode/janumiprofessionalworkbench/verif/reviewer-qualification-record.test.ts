@@ -5,7 +5,10 @@
 // and what is escalated, and the sequencing pin reads it for a deployable RUN. So what a line may say is closed here,
 // before the first line is written:
 //
-//   · THE VOCABULARY IS CLOSED — seven line kinds, and a line of any other kind is refused by name.
+//   · THE VOCABULARY IS CLOSED — eight line kinds (§5.4's seven, and `JAN-SELREV` SR-4's SELECTION), and a line of any
+//     other kind is refused by name.
+//   · ⭐ `JAN-SELREV` SR-4 (`REG-D-086`) — A SELECTION names a candidate the product can DEPLOY, by its transport and
+//     model label, and the sponsor ruling it rests on; a malformed one is refused like any other line.
 //   · SO ARE THE KEYS — a line carrying a field its kind does not declare is refused. That is what keeps a CALL from
 //     ever carrying the raw reply or the reasoning beside its answer span (§5.3 retention), and a HELD_OUT line from
 //     carrying case ids (§5.2).
@@ -43,7 +46,8 @@ import {
 	serverDayOf,
 	type CallLine,
 	type RecordLine,
-	type RunLine
+	type RunLine,
+	type SelectionLine
 } from '../scripts/reviewer-qual/record.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
@@ -204,6 +208,14 @@ const EVERY_KIND: readonly RecordLine[] = [
 			REPETITIONS_NOW_DISAGREE: 0,
 			BOUND_NOW_EXCEEDED: 0
 		}
+	},
+	{
+		kind: 'SELECTION',
+		date: '2026-09-26T09:00:00.000Z',
+		candidate: { transport: 'devin', modelLabel: 'glm-5-3-flash-max' },
+		// ⚠ A REAL ruling, for the same reason: `REG-D-084` is the sponsor's selection of this candidate.
+		ruling: 'REG-D-084',
+		note: 'The sponsor selects GLM-5.3 Flash Max through devin.'
 	}
 ];
 const text = (lines: readonly unknown[]) => lines.map((l) => `${JSON.stringify(l)}\n`).join('');
@@ -218,7 +230,7 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		for (const line of EVERY_KIND) expect(serializeLine(line)).toBe(`${JSON.stringify(line)}\n`);
 	});
 
-	it('⛔ THE VOCABULARY IS CLOSED — exactly the seven line kinds of §5.4, and any other is refused by name', () => {
+	it('⛔ THE VOCABULARY IS CLOSED — exactly the seven line kinds of §5.4 and SR-4’s SELECTION, and any other is refused by name', () => {
 		expect([...RECORD_LINE_KINDS]).toEqual([
 			'RUN',
 			'CALL',
@@ -226,7 +238,8 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 			'RESCORED',
 			'ACKNOWLEDGED',
 			'SUPERSEDED',
-			'HELD_OUT'
+			'HELD_OUT',
+			'SELECTION'
 		]);
 		for (const kind of ['RERUN', 'NOTE', 'run', '']) {
 			const problems = lineProblems({ ...RUN, kind });
@@ -562,6 +575,43 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		expect(
 			at([RUN, { ...CALL_ANSWERED, scored: { ...SCORED, scoringDigest: HEX('0') } }])
 		).toContain('line 2: CALL G-CLEAN#1 initial is scored under a digest that is not its run’s');
+	});
+
+	it('⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)', () => {
+		const selection = EVERY_KIND.find((l): l is SelectionLine => l.kind === 'SELECTION')!;
+		const at = (line: unknown) => lineProblems(line).join('\n');
+		expect(lineProblems(selection), 'CONTROL: the selected candidate, on its ruling').toEqual([]);
+		// ⛔ THE CANDIDATE — a transport the record knows but the product cannot run as its reviewer (§3.5) is refused: a
+		// local model, the harness stub. A transport the record does not know is refused as it is in a RUN.
+		for (const transport of ['ollama', 'stub'])
+			expect(at({ ...selection, candidate: { transport, modelLabel: 'gpt-oss:20b' } }), transport).toContain(
+				`SELECTION.candidate.transport: "${transport}" cannot be deployed as the product’s reviewer (§3.5) — a SELECTION names a candidate it can deploy: agy, devin`
+			);
+		expect(at({ ...selection, candidate: { transport: 'agy', modelLabel: 'gemini-3.1-pro-high' } }), 'agy is deployable').toBe('');
+		expect(at({ ...selection, candidate: { transport: 'pi', modelLabel: 'x' } })).toContain(
+			'SELECTION.candidate.transport: "pi" is not one of agy, devin, ollama, stub'
+		);
+		// …by its transport AND its model label, and nothing else: the rest of a RUN's identity follows from them.
+		expect(at({ ...selection, candidate: { transport: 'devin' } })).toContain('SELECTION.candidate: missing key "modelLabel"');
+		expect(at({ ...selection, candidate: { transport: 'devin', modelLabel: '' } })).toContain(
+			'SELECTION.candidate.modelLabel: not a string'
+		);
+		expect(at({ ...selection, candidate: { ...selection.candidate, provider: 'devin' } })).toContain(
+			'SELECTION.candidate: unexpected key "provider"'
+		);
+		// ⛔ THE RULING — a sponsor ruling's id, `REG-D-NNN`: a finding is not a ruling.
+		for (const ruling of ['REG-F-454', 'D-084', 'reg-d-084', ''])
+			expect(at({ ...selection, ruling }), ruling).toContain('SELECTION.ruling: not a sponsor ruling (REG-D-NNN)');
+		// ⛔ ITS KEYS ARE CLOSED AND REQUIRED, like every line's.
+		expect(at({ ...selection, date: '2026-09-26' })).toContain('SELECTION.date: not an ISO-8601 UTC time');
+		const { note: _dropped, ...noNote } = selection;
+		expect(at(noNote)).toContain('SELECTION: missing key "note"');
+		expect(at({ ...selection, deployable: true })).toContain('SELECTION: unexpected key "deployable"');
+		// And a record holding one is refused, by line.
+		const ollama = { ...selection, candidate: { transport: 'ollama', modelLabel: 'gpt-oss:20b' } };
+		expect(recordProblems(text([RUN, CALL_ANSWERED, ollama]), { tracked: true }).join('\n')).toContain(
+			'line 3: SELECTION.candidate.transport: "ollama" cannot be deployed as the product’s reviewer'
+		);
 	});
 
 	it('⛔ THE TEXT — LF only, no BOM, one object per line, a final newline, no blank line', () => {

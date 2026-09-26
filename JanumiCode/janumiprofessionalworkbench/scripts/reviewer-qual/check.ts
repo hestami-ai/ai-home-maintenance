@@ -24,10 +24,15 @@
  * answered planted evaluations — the planted evaluations of cases outside today's set counted out aloud, by every
  * oracle version on file — each miss, and the criterion-level transitions. That is reported, never escalated: the
  * verdict is the pass bar.
+ *
+ * ⭐ `JAN-SELREV` SR-4 — its header NAMES THE SELECTION IN FORCE, when the record holds one (`REG-D-086`): the selected
+ * candidate, the ruling it rests on — WITHDRAWN or NOT HELD beside it when the register says so — and where the line is.
+ * Coverage then holds every current case to a measurement of that candidate under today's fingerprint too
+ * (`check-core.ts`). With none, the header says nothing of it.
  */
 import { SOURCE_PROBE, sourceResolutionProblem } from './preflight.js';
 
-/** The register the findings an ESCALATION or SUPERSEDED line cites must exist in. */
+/** The register the findings an ESCALATION or SUPERSEDED line cites, and the ruling a SELECTION cites, must exist in. */
 export const REGISTER_FILE = 'docs/canon/JPWB-REG-005 Decision and Divergence Register.md';
 
 export interface CheckCliDeps {
@@ -139,7 +144,9 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		.filter((name) => name.endsWith('.json'))
 		.map((name) => JSON.parse(readFileSync(join(oracleDir, name), 'utf8')) as import('./cases.js').OracleSet);
 	const today = await fingerprint.reviewerFingerprint(caseSet.cases);
-	const { findings, struck } = core.registerFindings(readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8'));
+	const register = readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8');
+	const { findings, struck } = core.registerFindings(register);
+	const { rulings, struck: struckRulings } = core.registerRulings(register);
 	const report = await core.checkQualification({
 		files: read.files,
 		refusedFiles: read.refused,
@@ -149,6 +156,8 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		oracleSets,
 		findings,
 		struck,
+		rulings,
+		struckRulings,
 		rescore: (run, c, calls, digest) => rescore.rescoreEvaluation(run, c, calls, digest)
 	});
 	say(
@@ -157,6 +166,13 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 			(read.refused.length > 0 ? ` and ${read.refused.length} not read` : '') +
 			`; case set v${caseSet.caseSetVersion}, oracles v${oracles.oracleVersion}`
 	);
+	// ⭐ `JAN-SELREV` SR-4 — the SELECTION in force, named with the fingerprint it is held to (`REG-D-086`) — and, when
+	// its ruling is withdrawn or not held, saying so beside the ruling: it is never named in force unqualified.
+	const selection = report.selection;
+	if (selection)
+		say(
+			`the SELECTION in force: ${selection.candidate.transport} / ${selection.candidate.modelLabel}, on ${selection.ruling}${core.rulingCaveat(selection.standing)} (${selection.at}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)`
+		);
 	for (const n of report.notes) say(`note: ${n}`);
 	// ⭐ `JAN-CRITREAD` J2-6 — the pass bar is the right verdict (`REG-D-080`): which criterion each planted case faulted,
 	// and the criterion-level transitions, are printed here, whatever the verdict below, and never redden it.

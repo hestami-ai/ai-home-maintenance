@@ -1,8 +1,8 @@
 # ROADMAP — `JAN-SELREV`: the selected reviewer in the product
 
 **Design:** `DESIGN-the-selected-reviewer.md` (revision 2) · **Authority:** `REG-D-084` (sponsor selection); the
-design's decisions are delegated under `REG-D-071` and recorded as `REG-D-085`, confirmed with `Q1` approved (`REG-D-086`) · **Date:** 2026-09-26 · **Status:** IN
-PROGRESS.
+design's decisions are delegated under `REG-D-071` and recorded as `REG-D-085`, confirmed with `Q1` approved (`REG-D-086`) · **Date:** 2026-09-26 · **Status:** ~~IN
+PROGRESS.~~ ✅ **COMPLETE 2026-09-26** — `SR-1` `032deaad`, `SR-2` `3e88b0d1`, `SR-3` `e4f66565`, and `SR-4` with this revision.
 
 ⭑ **Exit.**
 - **A misconfigured host is refused before paid work.** Misconfigured means: the tool unset outside test mode, the tool
@@ -133,6 +133,16 @@ Record `REG-D-085`.
 | only the scoring moved: a RESCORED record of the selected candidate's run suffices | GREEN |
 | a malformed `SELECTION` line | refused by the record's validation |
 | the committed record, with the `SELECTION` line appended | GREEN |
+
+- ⭑ *Landed 2026-09-26.*
+  - **The record.** An eighth line kind, `SELECTION` (`candidate: {transport, modelLabel}`, `ruling`, `date`,
+    `note`), validated like every other kind: the transport must be deployable and the ruling a `REG-D` id the
+    register holds. The last one is in force, and a struck ruling in force is refused and said to be struck.
+  - **The check.** The existing definition of *covered* was moved unchanged into one function and asked again
+    of the selected candidate's runs alone, whether or not general coverage is green. Struck runs, stamp-refused
+    runs, a struck RESCORED and a label that is only a prefix all fail to cover, and each is pinned. With no
+    `SELECTION`, the output is byte-identical to before.
+  - **Appended.** The real line: devin / `glm-5-3-flash-max`, on `REG-D-084`. The check is GREEN.
 
 ## Order
 

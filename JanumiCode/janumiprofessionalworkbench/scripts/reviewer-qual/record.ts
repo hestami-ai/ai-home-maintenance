@@ -1,9 +1,10 @@
 // ⭐ `JAN-CRITREAD` J2-2 — THE REVIEWER-QUALIFICATION RECORD: what a line may say (DESIGN-what-the-tests-prove.md §5.4).
 //
-// Append-only NDJSON under `docs/tracking/reviewer-qualification/`, one JSON object per line, seven line kinds and no
-// others. It is candidate engineering Evidence (`REG-Q-025`): never an `ASSURANCE_OBSERVATION`, never read by the
-// product. J2-3's check reads it for coverage, reproduction and escalation (§5.6); the sequencing pin reads its RUN
-// lines for `deployable` (`verif/reviewer-qualification-sequencing.test.ts`).
+// Append-only NDJSON under `docs/tracking/reviewer-qualification/`, one JSON object per line, eight line kinds and no
+// others: §5.4's seven, and `JAN-SELREV` SR-4's SELECTION (`REG-D-086`). It is candidate engineering Evidence
+// (`REG-Q-025`): never an `ASSURANCE_OBSERVATION`, never read by the product. J2-3's check reads it for coverage,
+// reproduction and escalation (§5.6), and — with a SELECTION in force — holds coverage to the selected candidate too;
+// the sequencing pin reads its RUN lines for `deployable` (`verif/reviewer-qualification-sequencing.test.ts`).
 //
 // ⛔ EVERY KEY SET IS CLOSED. A line carrying a field its kind does not declare is refused — which is what keeps a CALL
 // from ever holding the raw reply or the reasoning beside its answer span (§5.3 retention), and a HELD_OUT line from
@@ -17,7 +18,7 @@ export const RECORD_DIR = 'docs/tracking/reviewer-qualification';
 /** The line format's version, carried on every RUN line. */
 export const RECORD_VERSION = 1;
 
-/** §5.4's line kinds — CLOSED. */
+/** §5.4's line kinds, and `JAN-SELREV` SR-4's SELECTION (`REG-D-086`) — CLOSED. */
 export const RECORD_LINE_KINDS = [
 	'RUN',
 	'CALL',
@@ -25,7 +26,8 @@ export const RECORD_LINE_KINDS = [
 	'RESCORED',
 	'ACKNOWLEDGED',
 	'SUPERSEDED',
-	'HELD_OUT'
+	'HELD_OUT',
+	'SELECTION'
 ] as const;
 export type RecordLineKind = (typeof RECORD_LINE_KINDS)[number];
 
@@ -294,6 +296,35 @@ export interface HeldOutLine {
 	readonly reviewerFingerprint: string;
 	readonly counts: Readonly<Record<MaterialFailureClass, number>>;
 }
+/**
+ * ⭐ `JAN-SELREV` SR-4 — WHO THE SELECTED CANDIDATE IS (`REG-D-086`; DESIGN-the-selected-reviewer.md §5 Q1): the two
+ * fields of a RUN's `candidate` that tell one deployable candidate from another. The rest of a RUN's identity follows
+ * from them, or is not identity:
+ *   · `agentId` and `provider` are the transport's own (`TRANSPORT_IDENTITY`), and every real RUN is held to them;
+ *   · the served-model facts are null for every deployable transport, and every RUN is held to that — so the check's
+ *     candidate key (provider, model label, served-model digest) is a function of these two for a deployable run;
+ *   · of the rest, a change of options between two runs of one candidate is reported as a confound (§5.1; `confounds`
+ *     in `check-core.ts`, which reports a changed served template or server version too — null for a deployable run),
+ *     never a new candidate; bounds and argv are not in the candidate key, and the check does not read them.
+ */
+export interface SelectedCandidate {
+	readonly transport: TransportName;
+	readonly modelLabel: string;
+}
+/**
+ * ⭐ `JAN-SELREV` SR-4 — THE REVIEWER THE SPONSOR SELECTED, and the ruling that selects it. The LAST SELECTION in the
+ * record is the one in force (`check-core.ts`): with one in force, `reviewer:qual:check` holds every current case to a
+ * measurement of THIS candidate under today's fingerprint, besides whatever else covers it.
+ */
+export interface SelectionLine {
+	readonly kind: 'SELECTION';
+	readonly date: string;
+	/** A candidate the product can deploy (§3.5) — never a local model, never the harness stub. */
+	readonly candidate: SelectedCandidate;
+	/** The sponsor ruling it rests on (`REG-D-NNN`) — an entry the register holds, its heading, while in force, not struck. */
+	readonly ruling: string;
+	readonly note: string;
+}
 export type RecordLine =
 	| RunLine
 	| CallLine
@@ -301,7 +332,8 @@ export type RecordLine =
 	| RescoredLine
 	| AcknowledgedLine
 	| SupersededLine
-	| HeldOutLine;
+	| HeldOutLine
+	| SelectionLine;
 
 /** The one serialization of a line: its JSON, then LF. */
 export function serializeLine(line: RecordLine): string {
@@ -379,6 +411,7 @@ const COMMIT = /^[0-9a-f]{40}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const FINDING = /^REG-F-\d{3,}$/;
+const RULING = /^REG-D-\d{3,}$/;
 
 // ── the server's calendar (§5.3; `REG-F-429`) ───────────────────────────────────────────────────────────────────
 
@@ -612,6 +645,22 @@ const candidate: Check = (v, at) => {
 	return problems;
 };
 
+/**
+ * ⛔ `JAN-SELREV` SR-4 — A SELECTION NAMES A CANDIDATE THE PRODUCT CAN DEPLOY (§3.5). A transport the record knows but
+ * the product cannot run as its reviewer — a local model, the harness stub — is refused: selecting it would hold the gate
+ * to a reviewer no host can have. And since a RUN's `deployable` is its transport's, every RUN of a selected candidate
+ * is deployable.
+ */
+const selectable: Check = (v, at) => {
+	const notATransport = oneOf(TRANSPORT_NAMES)(v, at);
+	if (notATransport.length > 0) return notATransport;
+	return DEPLOYABLE_TRANSPORTS.has(v as TransportName)
+		? []
+		: [
+				`${at}: ${JSON.stringify(v)} cannot be deployed as the product’s reviewer (§3.5) — a SELECTION names a candidate it can deploy: ${[...DEPLOYABLE_TRANSPORTS].join(', ')}`
+			];
+};
+
 const LINE_SHAPES: Readonly<Record<RecordLineKind, Check>> = {
 	RUN: all(
 		shape({
@@ -713,6 +762,13 @@ const LINE_SHAPES: Readonly<Record<RecordLineKind, Check>> = {
 		date: str(ISO_UTC, 'an ISO-8601 UTC time'),
 		reviewerFingerprint: str(SHA256, 'a sha256'),
 		counts: shape(Object.fromEntries(MATERIAL_FAILURE_CLASSES.map((k) => [k, int(0)])))
+	}),
+	SELECTION: shape({
+		kind: str(),
+		date: str(ISO_UTC, 'an ISO-8601 UTC time'),
+		candidate: shape({ transport: selectable, modelLabel: str() }),
+		ruling: str(RULING, 'a sponsor ruling (REG-D-NNN)'),
+		note: str()
 	})
 };
 
