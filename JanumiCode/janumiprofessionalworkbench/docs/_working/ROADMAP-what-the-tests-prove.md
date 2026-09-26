@@ -399,6 +399,29 @@ The sponsor authorized it on 2026-09-25. It follows `J2-6` (the verdict bar), an
 | each corrected graph is valid and coherent through the engine | new |
 | the check on the committed record under v3 | RED until the corrected cases are measured |
 
+- ⭑ *As built, 2026-09-25 (`REG-D-083`):*
+  - Change (1) extends the design type's scope and name to the foundations; no type is added. The type already
+    consumed the report, and its outputs already reached the check.
+  - The permit gains both inputs. `G3-RR-02` gains the report only, because its plant already routes the calculations
+    to the permit.
+  - The soft-clay sentence stays v2's.
+  - The reviewer fingerprint did not move (`2b6ca158…`). The case-set digest moved to `9b1dd2e7…`.
+  - Ledger: `J25-M5` is re-anchored on the v3 pointer. `J25-M8` and `J27-M10` now name an older set by its fixed path:
+    a replace that rewrites the current path turns into an identity when the next set lands, as `J25-M8`'s did.
+- ⭑ *Landed 2026-09-25:* both candidates ran the whole of v3 × 2 (`REG-F-455`, `REG-F-456`).
+
+  | on case set v3 | `agy` / `gemini-3.1-pro-high` | `devin` / `glm-5-3-flash-max` |
+  |---|---|---|
+  | the right verdict | 49 of 52 | 51 of 52 |
+  | clean graph case SATISFIED | 5 of 8 (v2: 5 of 8) | 7 of 8 (v2: 7 of 8) |
+  | planted defect REJECTED | 36 of 36 | 36 of 36 |
+  | planted criterion named (reported) | 33 of 36 | 32 of 36 |
+  | median / maximum call | 26 s / 57 s | 45 s / 88 s |
+
+  None of v3's four clean-graph rejections says the design leaves out the foundations or that the permit lacks its
+  inputs. The rejections turn on new grounds, and 2 of the 4 are the reviewer's own CONDITIONALLY_SATISFIED with
+  only ADVISORY faults, scored REJECTED under `REG-F-408`. `REG-F-453` is closed and `REG-D-081` delivered.
+
 ---
 
 ## Order

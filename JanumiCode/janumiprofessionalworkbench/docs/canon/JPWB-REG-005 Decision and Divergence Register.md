@@ -37627,7 +37627,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-453 — on case set v2 the frontier candidate SATISFIES the corrected clean graph case 5 of 8; its three rejections turn on grounds v2 did not change, and it disagrees with itself on `G2-CLEAN`
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v2`). **Status:** ~~⚠ **OPEN — residual contestability of the clean graph case; any further case change is an oracle change and needs the sponsor (`DOC-004` §7.6).**~~ ⚠ **OPEN — the sponsor AUTHORIZES case set v3, 2026-09-25** (`REG-D-081`): a foundation-design responsibility and the permit's inputs. It closes when v3 lands and both candidates are re-measured.
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v2`). **Status:** ~~⚠ **OPEN — residual contestability of the clean graph case; any further case change is an oracle change and needs the sponsor (`DOC-004` §7.6).**~~ ~~⚠ **OPEN — the sponsor AUTHORIZES case set v3, 2026-09-25** (`REG-D-081`): a foundation-design responsibility and the permit's inputs. It closes when v3 lands and both candidates are re-measured.~~ ✅ **CLOSED 2026-09-25 by `JAN-CRITREAD` `J2-7`** — case set v3 lands (`REG-D-083`), and both candidates are re-measured on the whole of it × 2. None of v3's four clean-graph rejections says the design leaves out the foundations or that the permit lacks its inputs. The count does not move: the frontier candidate SATISFIES the clean graph case 5 of 8, and devin with GLM-5.3 Flash Max 7 of 8, as on v2, now on new grounds (`REG-F-455`, `REG-F-456`).
 
 - **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`, reviewer fingerprint `2b6ca158…`, case set v2 × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; median 30 s, maximum 66 s.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 18 of 18 on the graph arm and 14 of 18 on the work-product arm (`REG-F-450`).
@@ -37643,7 +37643,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-454 — the second deployable candidate, devin with GLM-5.3 Flash at Max effort: verdicts right on 7 of 8 clean graph evaluations and every planted defect; its attribution misses are STABLE across repetitions; one duplicate-key reply minted a phantom failure
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-devin-glm-5-3-flash-max`; the candidate the sponsor named in `REG-D-078`). **Status:** ⚠ **OPEN — measured; whether it qualifies depends on the pass bar (`REG-F-450`), which is the sponsor's.**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-devin-glm-5-3-flash-max`; the candidate the sponsor named in `REG-D-078`). **Status:** ~~⚠ **OPEN — measured; whether it qualifies depends on the pass bar (`REG-F-450`), which is the sponsor's.**~~ ⚠ **OPEN — the pass bar is ruled (`REG-D-080`, applied by `J2-6`): the stable attribution misses are reported, not material. Re-measured on case set v3 (`REG-F-456`). Whether the candidate qualifies is the sponsor's decision.**
 
 - **WHAT WAS MEASURED.** Candidate: `devin` with `glm-5-3-flash-max`, through the product's `devinPrint`. The model was read back from devin's export (PROVIDER_REPORTED). Reviewer fingerprint `2b6ca158…`, case set v2 × 2. 52 calls, all ANSWERED; no repair, no transport failure; median 85 s, **maximum 181 s against the 240 s bound**.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 18 of 18 on the graph arm and 14 of 18 on the work-product arm.
@@ -37666,7 +37666,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-081 — SPONSOR RULING: case set v3 gives the clean draft a foundation-design responsibility and the permit its inputs — the two objections that recur or follow from the case itself — and nothing else
 
-**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING — an authorized oracle change (`DOC-004` §7.6). **Status:** ⚠ **OPEN — in force; case set v3 and both deployable candidates' re-measurement are owed (`JAN-CRITREAD` `J2-7`).**
+**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING — an authorized oracle change (`DOC-004` §7.6). **Status:** ~~⚠ **OPEN — in force; case set v3 and both deployable candidates' re-measurement are owed (`JAN-CRITREAD` `J2-7`).**~~ ✅ **DELIVERED 2026-09-25 by `JAN-CRITREAD` `J2-7`** — case set v3 (`REG-D-083`), and both deployable candidates re-measured on the whole of it × 2 (`REG-F-455`, `REG-F-456`).
 
 - **THE SPONSOR'S WORDS, verbatim:** *"I agree with your recommendation. Proceed."* The recommendation, as given to the sponsor the same day:
   - do case set v3 with the first two objections only: *the foundation responsibility and the permit's inputs*;
@@ -37688,3 +37688,65 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **NO SILENT SHRINK.** Each record's attribution line says how many planted evaluations of cases outside today's set it did not count, using that record's own oracle version. For example, the v1 frontier run: *"16 of 20 … (16 answered planted evaluation(s) of cases not in the current set are not counted)"*.
 - **ON THE COMMITTED RECORD.** The check stays GREEN. With every ESCALATION line removed, the material population falls from 19 entries to 9, all of them cited. The escalations already filed for what is now information stay valid history. The reviewer fingerprint does not move.
 - **FOR SPONSOR CONFIRMATION:** the three stricter dispositions, and the demotion of the undetermined-criterion transition.
+
+### REG-D-083 — DELEGATED (`REG-D-081`): how case set v3 makes the sponsor's two changes — the design type's scope takes in the foundations (no new type), the permit gains its two inputs, and each account gains the fewest words for them
+
+**Decided 2026-09-25** (agent, under `REG-D-081` and `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-7`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `J2-7`; sponsor confirmation owed.**
+
+- **(1) THE FOUNDATIONS: A SCOPE EXTENSION, NOT A NEW TYPE.** The design type already consumes the geotechnical report and the load model, and its outputs (the design calculations and the general-arrangement drawings) already reach the independent check. Its scope was the gap `REG-F-453` records (*"Steelwork Design (members and joints)"*).
+  - So its name and scope take in the foundations. "Member and Connection Design" becomes "Member, Connection and Foundation Design", and its sentence now says it *"designs the members, connections and foundations from the load model and the geotechnical report"*.
+  - The renamed copies keep their own naming: "Element, Joint and Foundation Design", "Steelwork and Foundation Design (members, joints and foundations)" and "Structural Element and Foundation Design".
+  - A separate foundation-design type would add a type, a deliverable, edges and a sentence that the ruling does not ask for. It would also leave a second defect beside the plants of `G3-RR-06` and `G3-RR-08`, which sit in the design's sentence: their foundation decision would be in a type that no longer owns the foundations.
+- **(2) THE PERMIT.** The permit submission gains two inputs, the geotechnical report and the design calculations. Its sentence now ends *"; it also consumes the geotechnical report and the design calculations."*
+- **THE PLANTED CASES.** Each takes the clean case's edits, less what it lacks.
+  - `G3-RR-02` (no independent check) gains the report only: its plant already routes the design calculations straight to the permit. Its permit sentence is the plant's own and is not restated.
+  - Every plant is byte-identical to v2's, and the tests hold this.
+- **LEFT AS v2's.** The soft-clay residual uncertainty still names four consumers of the report: *"…which is why the options study, the load analysis, the design and the independent check all consume it"*. The permit is now a fifth consumer. It is not named there, because the clause gives the soft clay as the reason, and the graph does not show that reason for the permit.
+- **NOT DONE (`REG-D-081`).** No options-comparison artifact, and nothing for the Eurocode or "surface-level" readings.
+- **THE FINGERPRINT.** The reviewer fingerprint does not move (`2b6ca158…`). The case-set digest moves from `aabe78dc…` (v2) to `9b1dd2e7…` (v3).
+- **MEASUREMENT RISKS, left for the measurement to settle.** Most were raised by the adversarial verifier:
+  - The soft-clay sentence names four consumers, while the graph has five. In v2 the devin candidate counted that list (*"routed to all four consumers that need it"*).
+  - `G3-RR-06` and `G3-RR-08` now say the foundations are designed *"from the load model"* alone, because both plants drop the report from that sentence. The words are the clean case's own edit, but they make ignoring the ground bear on the foundations, which sharpens both plants slightly.
+  - Nothing names the abutments or the substructure. The frontier candidate's v2 objections name them (*"the obligation to perform foundation and substructure design is entirely omitted"*).
+  - The code basis still names only EN 1991-2 and EN 1993-2, so no geotechnical code is named for the new foundation scope. The ruling excludes the Eurocode reading.
+  - The design type now covers more than the instruction's *"member and connection design"*.
+  - In `G3-RR-02`, the edge from the calculations to the permit no longer singles out the plant, because the clean case has it too. The missing check type, the missing certificate input and the silent account still do.
+- **FOR SPONSOR CONFIRMATION:** the scope extension in place of a new type, and leaving the soft-clay sentence as v2's.
+
+### REG-F-455 — on case set v3 the frontier candidate again SATISFIES the clean graph case 5 of 8 (4 of 4 in one repetition, 1 of 4 in the other): the grounds v3 answered are not raised again, and new ones are
+
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v3`). **Status:** ⚠ **OPEN — measured. What the clean graph case's residual contestability calls for is the sponsor's: any further case change is an oracle change (`DOC-004` §7.6).**
+
+- **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`. Reviewer fingerprint `2b6ca158…`; case set v3 (digest `9b1dd2e7…`) × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; median 26 s, maximum 57 s.
+  - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 33 of 36. The three misses are `W-RR-03` #2 (RR-06), `W-RR-04` #2 (RR-01) and `W-RR-05` #2 (RR-06, 07, 08); under `REG-D-080` they are reported, not material.
+  - **Clean:** the work-product clean case is SATISFIED 8 of 8. **The graph clean case is SATISFIED 5 of 8**, the same count as on v2 (`REG-F-453`) but on different cases. Repetition 1 SATISFIED all four; repetition 2 rejected `G3-CLEAN`, `G3-CLEAN-R2` and `G3-CLEAN-R3`, and SATISFIED `G3-CLEAN-R1`.
+- **THE THREE REJECTIONS.**
+  - **`G3-CLEAN` #2.** Its own recommendation is CONDITIONALLY_SATISFIED, and both of its faults are ADVISORY:
+    - RR-08: *"Routing of geotechnical data acts as a procedural bypass, skipping explicit deep-foundation formulation for the known 3m soft clay finding."*
+    - RR-09: *"…omitting intermediate collision and clearance modeling for the two-track rail line."*
+    - It is scored REJECTED because the policy's declared severity sets the stakes, not the reviewer's (`REG-F-408`).
+  - **`G3-CLEAN-R2` #2.** RR-06, BLOCKING: the design *"fails to consume the 'selected-form' artifact … using only a load model and geotechnical report without geometric definition"*. Every version's graph routes the design this way; v3 did not change it.
+  - **`G3-CLEAN-R3` #2.** Four faults:
+    - RR-04: the soft clay is treated as *"satisfied merely by generic data routing"*. This is the "surface-level" reading `REG-D-081` left out.
+    - RR-05: there is no feedback loop from the load analysis back to the options appraisal.
+    - RR-07: the checker receives the design calculations, against *"a true independent check"*.
+    - RR-09: the erection sequence is excluded while the permit submission is modelled.
+  - **What they do not say.** None of the three says the design leaves out the foundations or that the permit lacks its inputs, the v2 grounds v3 targeted. One still asks about the foundations in another form: `G3-CLEAN` #2's ADVISORY RR-08.
+- **A TRANSITION.** The check reports VERDICT_CHANGES_WITH_NAME on `G3-CLEAN-R1`: it is SATISFIED in both repetitions, while its base case is rejected once.
+- **REMEDY — not taken.** v3 answered the grounds it targeted, and the count did not move: each case change has surfaced new grounds against an open-ended engineering draft. Whether to change the case again, or to read the remaining rejections as this reviewer's variance on it, is the sponsor's. An ESCALATION line cites this entry.
+
+### REG-F-456 — on case set v3 devin with GLM-5.3 Flash Max has the right verdict on 51 of 52: the clean graph case again SATISFIED 7 of 8, its one rejection an ADVISORY fault on the design's inputs and the code basis
+
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-devin-glm-5-3-flash-max-v3`; the candidate the sponsor named in `REG-D-078`). **Status:** ⚠ **OPEN — measured. Whether the candidate qualifies, and what the clean graph case's residual calls for, are the sponsor's.**
+
+- **WHAT WAS MEASURED.** Candidate: `devin` with `glm-5-3-flash-max`, through the product's `devinPrint`. The model was read back from devin's export (PROVIDER_REPORTED) on all 52 calls. Reviewer fingerprint `2b6ca158…`; case set v3 × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; **median 45 s (v2: 85 s), maximum 88 s against the 240 s bound**.
+  - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 32 of 36. The four misses are v2's and are stable across both repetitions: `W-RR-03` names RR-06 (with RR-08), and `W-RR-04` names RR-02 (`REG-F-454`).
+  - **Clean:** the work-product clean case is SATISFIED 8 of 8; **the graph clean case 7 of 8**, as on v2.
+- **THE ONE REJECTION: `G3-CLEAN-R3` #1** (its #2 is SATISFIED). Its own recommendation is CONDITIONALLY_SATISFIED, with one ADVISORY fault, RR-06: *"Two input-sufficiency inferences are unsupported: the Detailed Design unit must emit general-arrangement-drawings for a structure over a two-track railway while its requiredInputs (load-model, geotechnical-report) exclude the site-survey that carries the rail-interface geometry, and the declared Eurocode assumption enumerates only EN 1991-2 and EN 1993-2 although the scope includes wind actions (EN 1991-1-4) and foundation design (EN 1997)."*
+  - It is scored REJECTED under `REG-F-408`.
+  - Its second limb is the measurement risk `REG-D-083` flagged: the code basis names no geotechnical code for the new foundation scope.
+- **A TRANSITION.** The check reports VERDICT_CHANGES_WITH_NAME on `G3-CLEAN-R3`: it is rejected once, while its base case is SATISFIED in both repetitions.
+- **ACROSS BOTH CANDIDATES,** v3 has four clean-graph rejections, checked one by one:
+  - 2 of the 4 are the reviewer's own CONDITIONALLY_SATISFIED with only ADVISORY faults: `agy` `G3-CLEAN` #2 and this one.
+  - 2 of the 4 object to the design's inputs: `agy` `G3-CLEAN-R2` #2 (the selected form) and this one (the site survey).
+- **REMEDY — not taken.** An ESCALATION line cites this entry.

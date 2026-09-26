@@ -1,6 +1,8 @@
 // ⭐ `JAN-CRITREAD` J2-1 — REVIEWER-QUALIFICATION CASE SET VERSION ONE, AND WHAT IT MUST BE BEFORE ANYTHING IS
 // MEASURED WITH IT (DESIGN-what-the-tests-prove.md §5.2; ROADMAP J2-1). ⭐ And, since J2-5, VERSION TWO (`REG-F-449`;
-// `REG-D-078`) — the block at the end: every limb above, and that it is version one with the correction and nothing else.
+// `REG-D-078`) — the block after them: every limb above, and that it is version one with the correction and nothing else.
+// ⭐ And, since J2-7, VERSION THREE (`REG-F-453`; `REG-D-081`) — the block at the end: every limb above, and that it is
+// version two with the sponsor's two changes — the foundations and the permit's inputs — and nothing else.
 //
 // A qualification run is only as good as its cases: a case the reviewer is not shown whole, a "renamed" copy that
 // differs in more than names, a clean case built from a graph production could not hold, or an oracle whose
@@ -41,8 +43,10 @@ import {
 	CASE_PRODUCER_MODEL_ID,
 	CASE_SET_V1_FILE,
 	CASE_SET_V2_FILE,
+	CASE_SET_V3_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
+	ORACLES_V3_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
@@ -51,8 +55,10 @@ import {
 } from '../scripts/reviewer-qual/cases.js';
 import { CASE_SET_V1, RENAMES_V1 } from '../scripts/reviewer-qual/case-set-v1.js';
 import { CASE_SET_V2, clayUncertainty, CORRECTED_IN_V2, RENAMES_V2 } from '../scripts/reviewer-qual/case-set-v2.js';
+import { CASE_SET_V3, CHANGED_IN_V3, RENAMES_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
+import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -719,6 +725,399 @@ describe('JAN-CRITREAD J2-5 — reviewer-qualification case set v2: version one 
 	it('⭐ THE ORACLES COMPOSE — for every v2 case, a reply faulting exactly its oracle’s criteria scores to its disposition, with independence met', async () => {
 		const oracles = new Map(generatedOraclesV2().oracles.map((o) => [o.caseId, o]));
 		for (const c of generatedV2().cases) {
+			const oracle = oracles.get(c.id)!;
+			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+			const validator = createAgyReasoningReviewValidator({
+				...EVALUATOR,
+				print: async () =>
+					JSON.stringify({
+						findings: input.criteria.map((k) => ({
+							criterionId: k.id,
+							failed: oracle.faulted.includes(k.id),
+							statement: 'as the oracle expects',
+							severity: oracle.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+						})),
+						recommendation: oracle.disposition
+					})
+			});
+			const result = await validator.evaluate(c.subject, { reasoningReview: input });
+			const plan = deMinimisFloorPlan(c.subject).filter((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+			expect(plan, c.id).toHaveLength(1);
+			const outcome = composeAssuranceOutcome(c.subject, plan, [result]);
+			expect(outcome.perPolicy[0]?.independenceOk, `${c.id}: the case producer is independent of the evaluator`).toBe(true);
+			expect(outcome.perPolicy[0]?.disposition, c.id).toBe(oracle.disposition);
+		}
+	});
+});
+
+// ── ⭐ `JAN-CRITREAD` J2-7 — CASE SET VERSION THREE (`REG-F-453`; the sponsor's ruling `REG-D-081`) ──────────────────
+//
+// On version two the frontier candidate rejected the corrected clean graph case on two grounds version two did not
+// change (`REG-F-453`): the draft's design type is scoped to members and joints ("Steelwork Design (members and joints)")
+// while its account says the soft clay may need piled foundations, so nobody designs the foundations; and the permit
+// submission receives neither the geotechnical report nor the design calculations. The sponsor authorized exactly those
+// two changes and nothing else (`REG-D-081`): (1) a design responsibility covers the foundations — here the design type's
+// name and scope, since it already consumes the report and its outputs already reach the independent check; (2) the
+// permit submission receives the report and the calculations. They reach version two's twelve cases (`REG-D-079`), each
+// under a new G3- id, each planted case keeping its plant as its only defect; every other case is version two's.
+//
+// ⚠ THESE LIMBS READ VERSION THREE AS THE GENERATOR WRITES IT, as version two's do — the freshness limb holds the
+// committed file to those bytes. ⚠ THE EXPECTED TEXT BELOW IS WRITTEN HERE, not imported: the diff limb states what the
+// two changes are independently of the source that makes them.
+
+const committedV2Oracles = (): OracleSet => JSON.parse(read(ORACLES_V2_FILE)) as OracleSet;
+const committedV3 = (): CaseSet => JSON.parse(read(CASE_SET_V3_FILE)) as CaseSet;
+const generatedV3 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V3)) as CaseSet;
+const generatedOraclesV3 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V3)) as OracleSet;
+
+const CALCULATIONS = 'design-calculations';
+/** (1) The design type's name, version two → version three — the clean draft's (which every planted case carries) and each
+ *  renamed copy's: the same name, with the foundations taken into its scope. */
+const DESIGN_NAMES: Readonly<Record<string, readonly [was: string, now: string]>> = {
+	'G3-CLEAN': ['Member and Connection Design', 'Member, Connection and Foundation Design'],
+	'G3-CLEAN-R1': ['Element and Joint Design', 'Element, Joint and Foundation Design'],
+	'G3-CLEAN-R2': ['Steelwork Design (members and joints)', 'Steelwork and Foundation Design (members, joints and foundations)'],
+	'G3-CLEAN-R3': ['Structural Element Design', 'Structural Element and Foundation Design']
+};
+const designNamesOf = (id: string): readonly [string, string] => DESIGN_NAMES[id] ?? DESIGN_NAMES['G3-CLEAN']!;
+/** (1) …and the design's scope in its sentence, after its name. */
+const SCOPE: SentenceDiff = [
+	' designs the members and connections from the load model',
+	' designs the members, connections and foundations from the load model'
+];
+/** (2) The end of the clean draft's permit sentence: it also consumes the report and the calculations — no more. */
+const PERMIT: SentenceDiff = [
+	'so the submission cannot be made before the independent check exists.',
+	'so the submission cannot be made before the independent check exists; it also consumes the geotechnical report and the design calculations.'
+];
+/** The clean case's two restated sentences, whole — what a planted case's edits are held to. */
+const CLEAN_DESIGN_SENTENCE: SentenceDiff = [
+	'“Member and Connection Design” designs the members and connections from the load model and the geotechnical report.',
+	'“Member, Connection and Foundation Design” designs the members, connections and foundations from the load model and the geotechnical report.'
+];
+const CLEAN_PERMIT_SENTENCE: SentenceDiff = [
+	'“Rail Authority Permit Submission” consumes the check certificate, so the submission cannot be made before the independent check exists.',
+	'“Rail Authority Permit Submission” consumes the check certificate, so the submission cannot be made before the independent check exists; it also consumes the geotechnical report and the design calculations.'
+];
+
+/** What the two changes may change in a changed case. */
+interface AllowedV3 {
+	/** The design's sentence restated — its name and its scope phrase, nothing else in it. */
+	readonly design: boolean;
+	/** The permit's sentence restated — its end. */
+	readonly permit: boolean;
+	/** The inputs the permit gains, appended in this order. */
+	readonly permitGains: readonly string[];
+}
+const BOTH: AllowedV3 = { design: true, permit: true, permitGains: [REPORT, CALCULATIONS] };
+/**
+ * ⭐ THE ALLOWED DIFFS, LISTED PER CHANGED CASE. Graph: the design type's name (every case), the permit's inputs (every
+ * case). Account: the listed sentences. Nothing else of a changed case — no other node, no assumption, limitation,
+ * residual uncertainty, narration, instruction, subject or id — may differ from its version-two case.
+ */
+const ALLOWED_V3: Readonly<Record<string, AllowedV3>> = {
+	'G3-CLEAN': BOTH,
+	'G3-CLEAN-R1': BOTH,
+	'G3-CLEAN-R2': BOTH,
+	'G3-CLEAN-R3': BOTH,
+	// No check (the plant). Its permit sentence is the plant's own ("consumes the design calculations and drawings, so the
+	// submission is made once the design is complete") and is not restated; its permit already consumes the design
+	// calculations — the plant routes the design straight to it — so it gains the report alone.
+	'G3-RR-02': { design: true, permit: false, permitGains: [REPORT] },
+	'G3-RR-03': BOTH,
+	'G3-RR-04': BOTH,
+	'G3-RR-05': BOTH,
+	// The design's sentence carries the plant AFTER the scope phrase the clean draft shares; the plant's words stay.
+	'G3-RR-06': BOTH,
+	// The design team's own check (the plant): its permit sentence is the clean draft's, so it is restated as the clean's.
+	'G3-RR-07': BOTH,
+	// As G3-RR-06: the plant ("ground conditions at both abutments are benign") follows the shared scope phrase.
+	'G3-RR-08': BOTH,
+	// The account describes no type (the plant): only the graph moves.
+	'G3-RR-09': { design: false, permit: false, permitGains: [REPORT, CALCULATIONS] }
+};
+/** The changed cases, as version two names them — version two's twelve. Written here, not imported. */
+const CHANGED_V2_IDS = [
+	'G2-CLEAN',
+	'G2-CLEAN-R1',
+	'G2-CLEAN-R2',
+	'G2-CLEAN-R3',
+	...CRITERION_IDS.slice(1).map((k) => `G2-${k.slice(0, 5)}`)
+];
+const v2IdOf = (v3Id: string): string => (v3Id.startsWith('G3-') ? `G2-${v3Id.slice(3)}` : v3Id);
+const nodeOf = (c: GraphCase, kind: string) => c.input.nodes.find((n) => n.pwuKind === kind);
+
+/** Every prompt problem of `cases`: over the 28,000-character limit, a slice truncated, the content or instruction cut. */
+async function promptProblemsIn(cases: readonly QualificationCase[]): Promise<string[]> {
+	const problems: string[] = [];
+	for (const c of cases) {
+		const { initial, repair, input } = await promptsFor(c);
+		for (const [role, prompt] of [
+			['initial', initial],
+			['repair', repair]
+		] as const)
+			if (prompt.length > MAX_AGY_PROMPT_CHARS) problems.push(`${c.id} ${role}: ${prompt.length} chars`);
+		if (initial.includes('…(truncated)')) problems.push(`${c.id}: a slice is truncated`);
+		if (!initial.includes(input.content)) problems.push(`${c.id}: the content is not whole`);
+		if (!initial.includes(input.prompt)) problems.push(`${c.id}: the instruction is not whole`);
+	}
+	return problems;
+}
+
+describe('JAN-CRITREAD J2-7 — reviewer-qualification case set v3: version two with the foundations and the permit’s inputs (REG-D-081), and nothing else', () => {
+	it('⛔ the committed case set v3 and oracles v3 are exactly what the generator writes — never hand-edited', () => {
+		const cases = read(CASE_SET_V3_FILE);
+		const oracles = read(ORACLES_V3_FILE);
+		expect(cases, `${CASE_SET_V3_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(CASE_SET_V3)
+		);
+		expect(oracles, `${ORACLES_V3_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(ORACLES_V3)
+		);
+		for (const text of [cases, oracles]) {
+			expect(text.includes('\r'), 'LF only').toBe(false);
+			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
+		}
+		// Versions one and two stay committed as history, each still exactly what its own source generates (the limbs above).
+		expect(committedV3().caseSetVersion).toBe(3);
+		expect([committedCases().caseSetVersion, committedV2().caseSetVersion]).toEqual([1, 2]);
+	});
+
+	it('⭐ the shape — version two’s cases in version two’s order; each case version two corrected under a new G3- id, every other under its own', () => {
+		const { cases, caseSetVersion } = generatedV3();
+		expect(caseSetVersion).toBe(3);
+		expect(new Set(cases.map((c) => c.id)).size, 'case ids are unique').toBe(cases.length);
+		expect(cases.filter((c) => c.arm === 'PWA_GRAPH').map((c) => c.id)).toEqual([
+			'G3-CLEAN',
+			'G3-CLEAN-R1',
+			'G3-CLEAN-R2',
+			'G3-CLEAN-R3',
+			'G-RR-01',
+			...CRITERION_IDS.slice(1).map((k) => `G3-${k.slice(0, 5)}`)
+		]);
+		expect(cases.map((c) => v2IdOf(c.id)), 'version two’s cases, in its order').toEqual(committedV2().cases.map((c) => c.id));
+		expect(cases).toHaveLength(26);
+	});
+
+	it('⭐ WHICH CASES TAKE THE CHANGES — decided by RELATIONSHIP: exactly the graph cases built on the draft, version two’s twelve (REG-D-079), the planted ones included', () => {
+		const onTheDraft = committedV2()
+			.cases.filter((c): c is GraphCase => c.arm === 'PWA_GRAPH' && c.input.nodes.some((n) => n.requiredOutputs.includes(REPORT)))
+			.map((c) => c.id);
+		expect(onTheDraft, 'the graph cases version two built on the draft').toEqual(CHANGED_V2_IDS);
+		expect(onTheDraft, 'version two’s corrected cases').toEqual([...CORRECTED_IN_V2.values()]);
+		expect([...CHANGED_IN_V3.keys()]).toEqual(onTheDraft);
+		for (const [v2, v3] of CHANGED_IN_V3) expect(v3, v2).toBe(`G3-${v2.slice(3)}`);
+		expect(CHANGED_IN_V3.has('G-RR-01'), 'G-RR-01 models a concept study with no geotechnical report at all').toBe(false);
+	});
+
+	it('⛔ UNCHANGED MEANS UNCHANGED — the fourteen other cases are version two’s, byte for byte, and the reviewer is sent exactly the prompts it was sent', async () => {
+		const v2 = new Map(committedV2().cases.map((c) => [c.id, c]));
+		const kept = generatedV3().cases.filter((c) => v2.has(c.id));
+		expect(
+			kept.map((c) => c.id),
+			'G-RR-01 and the thirteen work-product cases'
+		).toEqual([
+			'G-RR-01',
+			...committedV2()
+				.cases.filter((c) => c.arm === 'WORK_PRODUCT')
+				.map((c) => c.id)
+		]);
+		expect(kept).toHaveLength(14);
+		for (const c of kept) {
+			expect(JSON.stringify(c), c.id).toBe(JSON.stringify(v2.get(c.id)));
+			const [now, then] = [await promptsFor(c), await promptsFor(v2.get(c.id)!)];
+			expect(now.initial, `${c.id}: the initial prompt`).toBe(then.initial);
+			expect(now.repair, `${c.id}: the repair prompt`).toBe(then.repair);
+		}
+	});
+
+	it('⛔ THE TWO CHANGES AND NOTHING ELSE — each changed case is its version-two case with the design’s name and the permit’s inputs changed, and ONLY the sentences listed for it rewritten', async () => {
+		const v2 = new Map(committedV2().cases.map((c) => [c.id, c]));
+		const changed = generatedV3().cases.filter((c): c is GraphCase => c.id.startsWith('G3-'));
+		expect(changed.map((c) => v2IdOf(c.id))).toEqual(CHANGED_V2_IDS);
+		expect(Object.keys(ALLOWED_V3), 'the allowed diffs are listed for exactly the changed cases').toEqual(
+			changed.map((c) => c.id)
+		);
+		const landed = { designSentence: 0, permitSentence: 0, renamed: 0, report: 0, calculations: 0 };
+		for (const c of changed) {
+			const was = v2.get(v2IdOf(c.id)) as GraphCase;
+			const allowed = ALLOWED_V3[c.id]!;
+			const [wasName, nowName] = designNamesOf(c.id);
+			// Everything but the nodes and the account is version two's: subject, instruction, PWA, narration.
+			expect(
+				JSON.stringify({ ...c, id: was.id, input: { ...c.input, nodes: was.input.nodes, rationale: was.input.rationale } }),
+				`${c.id}: nothing outside the nodes and the account moved`
+			).toBe(JSON.stringify(was));
+			// The nodes: the design's name, and the permit's inputs appended; no other node, no other field, no new id.
+			expect(c.input.nodes.map((n) => n.id), `${c.id}: the same types, in the same order`).toEqual(was.input.nodes.map((n) => n.id));
+			for (const [i, n] of c.input.nodes.entries()) {
+				const before = was.input.nodes[i]!;
+				if (before.pwuKind === 'DETAILED_DESIGN') {
+					expect(before.name, `${c.id}: version two's design`).toBe(wasName);
+					expect(n, `${c.id}/${before.name}`).toEqual({ ...before, name: nowName });
+					landed.renamed += 1;
+				} else if (before.pwuKind === 'PERMIT_SUBMISSION') {
+					for (const d of allowed.permitGains)
+						expect(before.requiredInputs, `${c.id}/${before.name}: version two withheld ${d}`).not.toContain(d);
+					expect(n, `${c.id}/${before.name}`).toEqual({
+						...before,
+						requiredInputs: [...before.requiredInputs, ...allowed.permitGains]
+					});
+					if (allowed.permitGains.includes(REPORT)) landed.report += 1;
+					if (allowed.permitGains.includes(CALCULATIONS)) landed.calculations += 1;
+				} else expect(n, `${c.id}/${before.name}`).toEqual(before);
+			}
+			// The account: ONLY the listed sentences differ from version two's, each exactly as listed.
+			const r = c.input.rationale!;
+			const r2 = was.input.rationale!;
+			expect(
+				[r.assumptions, r.limitations, r.residualUncertainty],
+				`${c.id}: assumptions, limitations and residual uncertainty — the soft-clay sentence among them — are version two’s`
+			).toEqual([r2.assumptions, r2.limitations, r2.residualUncertainty]);
+			const v2Sentences = sentencesOf(r2.rationale);
+			const designSentences = v2Sentences.filter((s) => s.startsWith(`“${wasName}”${SCOPE[0]}`));
+			const permitSentences = v2Sentences.filter((s) => s.endsWith(PERMIT[0]));
+			expect(allowed.design, `${c.id}: the design's sentence restated where version two has it`).toBe(designSentences.length === 1);
+			expect(allowed.permit, `${c.id}: the permit's sentence restated where version two has the clean draft's`).toBe(
+				permitSentences.length === 1
+			);
+			const expected: SentenceDiff[] = v2Sentences.flatMap((s): SentenceDiff[] => {
+				if (allowed.design && s === designSentences[0])
+					return [[s, `“${nowName}”${SCOPE[1]}${s.slice(`“${wasName}”${SCOPE[0]}`.length)}`]];
+				if (allowed.permit && s === permitSentences[0]) return [[s, `${s.slice(0, -PERMIT[0].length)}${PERMIT[1]}`]];
+				return [];
+			});
+			expect(
+				changedSentences(v2Sentences, sentencesOf(r.rationale), `${c.id}'s account`),
+				`${c.id}: the account's sentences that differ from version two's`
+			).toEqual(expected);
+			if (allowed.design) landed.designSentence += 1;
+			if (allowed.permit) landed.permitSentence += 1;
+			// And the changes reach the reviewer: the prompt it is sent is not version two's.
+			expect((await promptsFor(c)).initial, `${c.id}: the prompt moved`).not.toBe((await promptsFor(was)).initial);
+		}
+		// Where each piece landed: the design renamed and the report routed to the permit in all twelve; the calculations in
+		// every case but G3-RR-02 (its permit had them); the design's sentence wherever the account describes the type (not
+		// G3-RR-09's), the permit's wherever it is the clean draft's (not G3-RR-02's, nor G3-RR-09's).
+		expect(landed).toEqual({ designSentence: 11, permitSentence: 10, renamed: 12, report: 12, calculations: 11 });
+	});
+
+	it('⭐ WHAT VERSION THREE ADDS, READ FROM THE GRAPH — a design responsibility covers the foundations, consumes the report and reaches the check; the permit receives the report and the calculations; version two had neither', () => {
+		const v2 = new Map(committedV2().cases.map((c) => [c.id, c]));
+		for (const c of generatedV3().cases.filter((x): x is GraphCase => x.id.startsWith('G3-'))) {
+			const was = v2.get(v2IdOf(c.id)) as GraphCase;
+			const founders = c.input.nodes.filter((n) => n.name.includes('Foundation'));
+			expect(
+				founders.map((n) => n.pwuKind),
+				`${c.id}: one type takes the foundations, the design`
+			).toEqual(['DETAILED_DESIGN']);
+			expect(was.input.nodes.some((n) => n.name.includes('Foundation')), `${c.id}: version two had none`).toBe(false);
+			const design = founders[0]!;
+			expect(design.requiredInputs, `${c.id}: the design consumes the report`).toContain(REPORT);
+			const check = nodeOf(c, 'INDEPENDENT_CHECK');
+			// G3-RR-02 has no check — its plant.
+			expect(check === undefined, `${c.id}: the check is absent only where it is the plant`).toBe(c.id === 'G3-RR-02');
+			if (check)
+				expect(
+					design.requiredOutputs.filter((d) => check.requiredInputs.includes(d)),
+					`${c.id}: the design’s output reaches the check`
+				).toEqual(['design-calculations', 'general-arrangement-drawings']);
+			const permit = nodeOf(c, 'PERMIT_SUBMISSION')!;
+			expect(permit.requiredInputs, `${c.id}: the permit receives the report and the calculations`).toEqual(
+				expect.arrayContaining([REPORT, CALCULATIONS])
+			);
+			expect(nodeOf(was, 'PERMIT_SUBMISSION')!.requiredInputs, `${c.id}: version two's permit lacked the report`).not.toContain(
+				REPORT
+			);
+			// And the account claims no more than the graph shows: where it says the permit also consumes the report and the
+			// calculations, the permit does; where it says the design designs the foundations, the design is the type named.
+			const r = c.input.rationale!.rationale;
+			if (r.includes(PERMIT[1])) expect(r, c.id).toContain(`“${permit.name}” consumes the check certificate, ${PERMIT[1]}`);
+			if (r.includes(SCOPE[1])) expect(r, c.id).toContain(`“${design.name}”${SCOPE[1]}`);
+			expect(/checks? the foundations/.test(r), `${c.id}: no claim the check checks the foundations`).toBe(false);
+		}
+	});
+
+	it('⛔ NO NEW CUE IN A PLANTED CASE — what the changes add to a planted case is what they add to the clean case, less what the case lacks: they name, characterize, soften or sharpen no plant', () => {
+		const v2 = new Map(committedV2().cases.map((c) => [c.id, c]));
+		const changed = generatedV3().cases.filter((c): c is GraphCase => c.id.startsWith('G3-'));
+		/** What the changes did to a case, read from the data: each account edit, the design's rename, the permit's gains. */
+		const changesIn = (c: GraphCase) => {
+			const was = v2.get(v2IdOf(c.id)) as GraphCase;
+			const permitWas = nodeOf(was, 'PERMIT_SUBMISSION')!.requiredInputs;
+			return {
+				account: changedSentences(sentencesOf(was.input.rationale!.rationale), sentencesOf(c.input.rationale!.rationale), c.id).map(
+					minimalEdit
+				),
+				design: [nodeOf(was, 'DETAILED_DESIGN')!.name, nodeOf(c, 'DETAILED_DESIGN')!.name],
+				permitGains: nodeOf(c, 'PERMIT_SUBMISSION')!.requiredInputs.slice(permitWas.length),
+				permitWas
+			};
+		};
+		const clean = changesIn(changed.find((c) => c.id === 'G3-CLEAN')!);
+		expect(clean.account, 'what the changes do to the clean case’s account').toEqual([
+			minimalEdit(CLEAN_DESIGN_SENTENCE),
+			minimalEdit(CLEAN_PERMIT_SENTENCE)
+		]);
+		expect(clean.design).toEqual(DESIGN_NAMES['G3-CLEAN']);
+		expect(clean.permitGains).toEqual([REPORT, CALCULATIONS]);
+		const planted = changed.filter((c) => /^G3-RR-\d\d$/.test(c.id));
+		expect(planted.map((c) => c.id)).toEqual(CRITERION_IDS.slice(1).map((k) => `G3-${k.slice(0, 5)}`));
+		for (const c of planted) {
+			const { account, design, permitGains, permitWas } = changesIn(c);
+			for (const e of account) expect(clean.account, `${c.id}: "${e.inserted}" is added to the clean case too`).toContainEqual(e);
+			expect(design, `${c.id}: the design renamed as the clean case’s is`).toEqual(clean.design);
+			expect(permitGains, `${c.id}: the permit gains the clean case’s inputs, less those it already has`).toEqual(
+				clean.permitGains.filter((d) => !permitWas.includes(d))
+			);
+		}
+		// G3-RR-02's plant routes the design straight to the permit, so its permit already had the calculations — the one
+		// planted case whose gains are fewer than the clean case's.
+		expect(planted.filter((c) => changesIn(c).permitGains.length < 2).map((c) => c.id)).toEqual(['G3-RR-02']);
+	});
+
+	it('⭐ PRODUCTION’S GRAPH — every v3 graph case, the changed ones included, is valid, coherent and exported exactly by an engine', () => {
+		const graphs = generatedV3().cases.filter((c): c is GraphCase => c.arm === 'PWA_GRAPH');
+		expect(graphs).toHaveLength(13);
+		for (const c of graphs) expectProductionsGraph(c);
+	});
+
+	it('⛔ RENAMED MEANS RENAMED — each v3 copy is G3-CLEAN with version two’s names substituted, the design’s extended to the foundations, and nothing else', () => {
+		expect(Object.keys(RENAMES_V3).sort()).toEqual(
+			['G3-CLEAN-R1', 'G3-CLEAN-R2', 'G3-CLEAN-R3', 'W-CLEAN-R1', 'W-CLEAN-R2', 'W-CLEAN-R3'].sort()
+		);
+		const extend = (name: string) => Object.values(DESIGN_NAMES).find(([was]) => was === name)?.[1] ?? name;
+		for (const [id, names] of Object.entries(RENAMES_V3))
+			expect(names, id).toEqual({ from: RENAMES_V2[v2IdOf(id)]!.from.map(extend), to: RENAMES_V2[v2IdOf(id)]!.to.map(extend) });
+		expectRenamedOnly(generatedV3().cases, RENAMES_V3);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every v3 prompt fits agy’s argv budget, and no slice of any case is truncated', async () => {
+		expect((await promptProblemsIn(generatedV3().cases)).join('\n')).toBe('');
+	});
+
+	it('⭐ ORACLES v3 carry version two’s standings unchanged — each case’s oracle is the one of the version-two case it is, or changes', () => {
+		const set = generatedOraclesV3();
+		const v2 = new Map(committedV2Oracles().oracles.map((o) => [o.caseId, o]));
+		expect(set.oracleVersion).toBe(3);
+		expect(set.caseSetVersion, 'the oracles name the case set they judge').toBe(generatedV3().caseSetVersion);
+		expect(set.oracles.map((o) => o.caseId)).toEqual(generatedV3().cases.map((c) => c.id));
+		for (const o of set.oracles) {
+			const was = v2.get(v2IdOf(o.caseId))!;
+			expect({ faulted: o.faulted, disposition: o.disposition, expectation: o.expectation }, o.caseId).toEqual({
+				faulted: was.faulted,
+				disposition: was.disposition,
+				expectation: was.expectation
+			});
+			// A note names the case it is about — never an id version three or version two replaced.
+			for (const old of [...CHANGED_V2_IDS, ...CORRECTED_V1_IDS])
+				expect(o.note.includes(`${old}:`), `${o.caseId}'s note names ${old}`).toBe(false);
+		}
+	});
+
+	it('⭐ THE ORACLES COMPOSE — for every v3 case, a reply faulting exactly its oracle’s criteria scores to its disposition, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV3().oracles.map((o) => [o.caseId, o]));
+		for (const c of generatedV3().cases) {
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({

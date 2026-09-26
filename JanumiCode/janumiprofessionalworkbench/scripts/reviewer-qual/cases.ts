@@ -40,7 +40,8 @@ export interface WorkProductCaseInput {
 }
 
 interface CaseCommon {
-	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`). */
+	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`;
+	 *  version three's `G3-…`, `case-set-v3.ts`). */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -92,15 +93,20 @@ export const ORACLES_V1_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
 /** ⭐ `JAN-CRITREAD` J2-5 — version two (`REG-F-449`; `REG-D-078`), beside version one, which stays as history. */
 export const CASE_SET_V2_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v2.json';
 export const ORACLES_V2_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v2.json';
+/** ⭐ `JAN-CRITREAD` J2-7 — version three (`REG-F-453`; `REG-D-081`), beside versions one and two, which stay as history. */
+export const CASE_SET_V3_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v3.json';
+export const ORACLES_V3_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v3.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
  * escalation to, what a run runs (`run.ts`), and what the fingerprint's case-set digest is taken over. The one place
  * the current version is named, so the check, the runner and the stamp cannot sit on different versions.
- * Version two since J2-5: version one's graph cases built on the draft, with `REG-F-449`'s correction, under new ids.
+ * Version two from J2-5: version one's graph cases built on the draft, with `REG-F-449`'s correction, under new ids.
+ * ⭐ Version three since J2-7: version two's twelve changed cases with the sponsor's two changes — the design type's
+ * scope takes in the foundations, and the permit receives the report and the calculations (`REG-D-081`) — under new ids.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V2_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V2_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V3_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V3_FILE;
 
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {

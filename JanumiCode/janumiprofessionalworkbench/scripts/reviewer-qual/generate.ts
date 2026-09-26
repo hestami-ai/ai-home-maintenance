@@ -1,6 +1,6 @@
 /**
  * `bun run scripts/reviewer-qual/generate.ts` — write the reviewer-qualification case sets and their oracles, every
- * version (`JAN-CRITREAD` J2-1, J2-5; DESIGN-what-the-tests-prove.md §5.2).
+ * version (`JAN-CRITREAD` J2-1, J2-5, J2-7; DESIGN-what-the-tests-prove.md §5.2).
  *
  * The JSON under `docs/tracking/reviewer-qualification/` is DERIVED from `case-set-v<n>.ts` and `oracles-v<n>.ts` and
  * is never hand-edited: `verif/reviewer-qualification-cases.test.ts` reddens when a committed file differs from what
@@ -15,22 +15,27 @@ import { fileURLToPath } from 'node:url';
 import {
 	CASE_SET_V1_FILE,
 	CASE_SET_V2_FILE,
+	CASE_SET_V3_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
+	ORACLES_V3_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type OracleSet
 } from './cases.js';
 import { CASE_SET_V1 } from './case-set-v1.js';
 import { CASE_SET_V2 } from './case-set-v2.js';
+import { CASE_SET_V3 } from './case-set-v3.js';
 import { ORACLES_V1 } from './oracles-v1.js';
 import { ORACLES_V2 } from './oracles-v2.js';
+import { ORACLES_V3 } from './oracles-v3.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	[CASE_SET_V1_FILE, CASE_SET_V1, ORACLES_V1_FILE, ORACLES_V1],
-	[CASE_SET_V2_FILE, CASE_SET_V2, ORACLES_V2_FILE, ORACLES_V2]
+	[CASE_SET_V2_FILE, CASE_SET_V2, ORACLES_V2_FILE, ORACLES_V2],
+	[CASE_SET_V3_FILE, CASE_SET_V3, ORACLES_V3_FILE, ORACLES_V3]
 ];
 
 for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {
