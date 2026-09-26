@@ -37599,7 +37599,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
 
-**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; the case set v2 fix and the devin candidate's qualification run are owed (`JAN-CRITREAD`).**
+**Ruled 2026-09-25** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force; the case set v2 fix and the devin candidate's qualification run are owed (`JAN-CRITREAD`).**~~ ⚠ **OPEN — the case set v2 fix and the devin candidate's runs are delivered (`J2-5`, `J2-7`), and the sponsor SELECTS GLM-5.3 Flash Max (`REG-D-084`). Putting it into the product's assurance-reviewer role is owed (`REG-D-084`).**
 
 - **THE SPONSOR'S WORDS, verbatim, in the order given:**
   1. *"1 - Fix flawed test case (REG-F-449) is approved"*
@@ -37643,7 +37643,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-454 — the second deployable candidate, devin with GLM-5.3 Flash at Max effort: verdicts right on 7 of 8 clean graph evaluations and every planted defect; its attribution misses are STABLE across repetitions; one duplicate-key reply minted a phantom failure
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-devin-glm-5-3-flash-max`; the candidate the sponsor named in `REG-D-078`). **Status:** ~~⚠ **OPEN — measured; whether it qualifies depends on the pass bar (`REG-F-450`), which is the sponsor's.**~~ ⚠ **OPEN — the pass bar is ruled (`REG-D-080`, applied by `J2-6`): the stable attribution misses are reported, not material. Re-measured on case set v3 (`REG-F-456`). Whether the candidate qualifies is the sponsor's decision.**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-5`, run `qr-2026-09-25-devin-glm-5-3-flash-max`; the candidate the sponsor named in `REG-D-078`). **Status:** ~~⚠ **OPEN — measured; whether it qualifies depends on the pass bar (`REG-F-450`), which is the sponsor's.**~~ ~~⚠ **OPEN — the pass bar is ruled (`REG-D-080`, applied by `J2-6`): the stable attribution misses are reported, not material. Re-measured on case set v3 (`REG-F-456`). Whether the candidate qualifies is the sponsor's decision.**~~ ✅ **CLOSED 2026-09-26 by sponsor ruling (`REG-D-084`)** — the candidate is SELECTED. Its stable attribution misses are reported, not material (`REG-D-080`). The phantom failure it observed is `REG-F-428`'s class, which stays open there.
 
 - **WHAT WAS MEASURED.** Candidate: `devin` with `glm-5-3-flash-max`, through the product's `devinPrint`. The model was read back from devin's export (PROVIDER_REPORTED). Reviewer fingerprint `2b6ca158…`, case set v2 × 2. 52 calls, all ANSWERED; no repair, no transport failure; median 85 s, **maximum 181 s against the 240 s bound**.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 18 of 18 on the graph arm and 14 of 18 on the work-product arm.
@@ -37681,7 +37681,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-082 — DELEGATED (`REG-D-080`): how `reviewer:qual:check` applies the verdict bar — a planted case must reach the oracle's REJECTED, criterion-level changes are reported, and nothing shrinks silently
 
-**Decided 2026-09-25** (agent, under `REG-D-080` and `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-6`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `J2-6`; sponsor confirmation owed.**
+**Decided 2026-09-25** (agent, under `REG-D-080` and `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-6`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force from `J2-6`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-26 by the sponsor** — *"REG-D-083 and REG-D-082 are approved. We will proceed with your recommendation for the clean-case residue. GLM-5.3 Flash Max is selected."* (`REG-D-084`)
 
 - **THE PREDICATE.** The right verdict is the disposition equal to the oracle's. A planted case is material when its disposition is anything but REJECTED: SATISFIED, INCONCLUSIVE, VALIDATOR_FAILED or BOUNDARY_REJECTED. Three of these are STRICTER than before, because the old rule asked only that the planted criterion be faulted. They are INCONCLUSIVE, VALIDATOR_FAILED, and BOUNDARY_REJECTED (a reviewer faulting the criterion while recommending SATISFIED, contradicting itself). They follow the sponsor's words; none of them changes a committed result. The class is renamed `PLANTED_DEFECT_NOT_REJECTED`, because the old name would be false for the new predicate.
 - **REPORTED, NEVER ESCALATED.** Three things are printed as attribution, against the oracles' `faulted` lists: a planted case REJECTED without its criterion; FAULT_LOST; and an answered criterion now `UNABLE_TO_DETERMINE` while the verdict holds. The last is `REG-D-080`'s own *"criterion-level classes that do not change the verdict become informational"*. When such a change moves the verdict, a verdict-level class still escalates it.
@@ -37691,7 +37691,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-083 — DELEGATED (`REG-D-081`): how case set v3 makes the sponsor's two changes — the design type's scope takes in the foundations (no new type), the permit gains its two inputs, and each account gains the fewest words for them
 
-**Decided 2026-09-25** (agent, under `REG-D-081` and `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-7`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `J2-7`; sponsor confirmation owed.**
+**Decided 2026-09-25** (agent, under `REG-D-081` and `REG-D-071`'s delegation; `JAN-CRITREAD` `J2-7`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force from `J2-7`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-09-26 by the sponsor** — *"REG-D-083 and REG-D-082 are approved. We will proceed with your recommendation for the clean-case residue. GLM-5.3 Flash Max is selected."* (`REG-D-084`)
 
 - **(1) THE FOUNDATIONS: A SCOPE EXTENSION, NOT A NEW TYPE.** The design type already consumes the geotechnical report and the load model, and its outputs (the design calculations and the general-arrangement drawings) already reach the independent check. Its scope was the gap `REG-F-453` records (*"Steelwork Design (members and joints)"*).
   - So its name and scope take in the foundations. "Member and Connection Design" becomes "Member, Connection and Foundation Design", and its sentence now says it *"designs the members, connections and foundations from the load model and the geotechnical report"*.
@@ -37715,7 +37715,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-455 — on case set v3 the frontier candidate again SATISFIES the clean graph case 5 of 8 (4 of 4 in one repetition, 1 of 4 in the other): the grounds v3 answered are not raised again, and new ones are
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v3`). **Status:** ⚠ **OPEN — measured. What the clean graph case's residual contestability calls for is the sponsor's: any further case change is an oracle change (`DOC-004` §7.6).**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-agy-gemini-3.1-pro-high-v3`). **Status:** ~~⚠ **OPEN — measured. What the clean graph case's residual contestability calls for is the sponsor's: any further case change is an oracle change (`DOC-004` §7.6).**~~ ✅ **CLOSED 2026-09-26 by sponsor ruling (`REG-D-084`)** — no further case change: the remaining clean-graph rejections are read as the reviewer's variance on an open-ended draft, not a defect in the case. The frontier candidate is not the one selected. Its heading stays live: the append-only record cites it.
 
 - **WHAT WAS MEASURED.** Candidate: `agy` with `gemini-3.1-pro-high`. Reviewer fingerprint `2b6ca158…`; case set v3 (digest `9b1dd2e7…`) × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; median 26 s, maximum 57 s.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 33 of 36. The three misses are `W-RR-03` #2 (RR-06), `W-RR-04` #2 (RR-01) and `W-RR-05` #2 (RR-06, 07, 08); under `REG-D-080` they are reported, not material.
@@ -37737,7 +37737,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-456 — on case set v3 devin with GLM-5.3 Flash Max has the right verdict on 51 of 52: the clean graph case again SATISFIED 7 of 8, its one rejection an ADVISORY fault on the design's inputs and the code basis
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-devin-glm-5-3-flash-max-v3`; the candidate the sponsor named in `REG-D-078`). **Status:** ⚠ **OPEN — measured. Whether the candidate qualifies, and what the clean graph case's residual calls for, are the sponsor's.**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J2-7`, run `qr-2026-09-25-devin-glm-5-3-flash-max-v3`; the candidate the sponsor named in `REG-D-078`). **Status:** ~~⚠ **OPEN — measured. Whether the candidate qualifies, and what the clean graph case's residual calls for, are the sponsor's.**~~ ✅ **CLOSED 2026-09-26 by sponsor ruling (`REG-D-084`)** — the candidate is SELECTED, and its one clean-graph rejection is read as the reviewer's variance; no further case change. Its heading stays live: the append-only record cites it.
 
 - **WHAT WAS MEASURED.** Candidate: `devin` with `glm-5-3-flash-max`, through the product's `devinPrint`. The model was read back from devin's export (PROVIDER_REPORTED) on all 52 calls. Reviewer fingerprint `2b6ca158…`; case set v3 × 2. 52 calls, all ANSWERED; no repair, no malformation, no transport failure; **median 45 s (v2: 85 s), maximum 88 s against the 240 s bound**.
   - **Planted:** 36 of 36 evaluations REJECTED. The planted criterion is named in 32 of 36. The four misses are v2's and are stable across both repetitions: `W-RR-03` names RR-06 (with RR-08), and `W-RR-04` names RR-02 (`REG-F-454`).
@@ -37750,3 +37750,15 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - 2 of the 4 are the reviewer's own CONDITIONALLY_SATISFIED with only ADVISORY faults: `agy` `G3-CLEAN` #2 and this one.
   - 2 of the 4 object to the design's inputs: `agy` `G3-CLEAN-R2` #2 (the selected form) and this one (the site survey).
 - **REMEDY — not taken.** An ESCALATION line cites this entry.
+
+### REG-D-084 — SPONSOR RULING: `REG-D-082` and `REG-D-083` approved; no further case change for the clean-case residual; GLM-5.3 Flash Max is SELECTED
+
+**Ruled 2026-09-26** (sponsor, in session, answering the `J2-7` report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; putting the selected reviewer into the product's assurance-reviewer role is owed, design first.**
+
+- **THE SPONSOR'S WORDS, verbatim:** *"REG-D-083 and REG-D-082 are approved. We will proceed with your recommendation for the clean-case residue. GLM-5.3 Flash Max is selected."*
+- **WHAT THEY MEAN, as this entry reads them:**
+  - **(1)** `REG-D-082` (how `reviewer:qual:check` applies the verdict bar) and `REG-D-083` (how case set v3 makes the two changes) are confirmed.
+  - **(2)** The recommendation adopted is the one given with the `J2-7` report: *stop changing the case.* Two rounds of changes each answered their targeted objections without moving the clean-graph count, so the remaining rejections are read as each reviewer's variance on an open-ended engineering draft, not a defect in the case. Case set v3 stays current. The pass bar is unchanged: a future clean-case rejection is still a material failure and is still escalated.
+  - **(3)** GLM-5.3 Flash Max, through `devin` (the measured candidate `glm-5-3-flash-max`), is the reviewer selected for the role `REG-D-078` names: *"the assurance policies responsibility"*. The frontier candidate is not the one selected; nothing here rules on it beyond that.
+- **WHAT IS OWED.** Today the product's real reviewer is `agy` whenever `JPWB_ASSURANCE_TOOL` is unset (`apps/rph-demo/src/lib/server/assurance/index.ts`). Devin is reached only with `JPWB_ASSURANCE_TOOL=devin` and an explicit `JPWB_ASSURANCE_MODEL` (`REG-D-052`). How the selection enters the product is a design question and goes design → roadmap → implementation.
+- **MADE WITH THIS ENTRY.** The statuses of `REG-D-082`, `REG-D-083`, `REG-F-455`, `REG-F-456`, `REG-F-454` and `REG-D-078` are struck in place and restated. The findings' headings stay live, because the append-only record cites them.
