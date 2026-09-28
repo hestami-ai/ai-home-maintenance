@@ -592,7 +592,20 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//     qualification is a different goal under a different ruling.
 			//   · `ROADMAP-live-execution-lane.md` configures a reviewer for a lane whose `LE-03`–`LE-05` *"may never
 			//     gate"*; the selection is held by the gate.
-		).toBe(51);
+			//
+			// 51 -> 52 (2026-09-28): `ROADMAP-the-selection-residuals.md` (`JAN-SELRES`, `REG-D-087`; `REG-F-458`,
+			// `REG-F-459`, `REG-F-460`, `REG-F-462`). ⭑ A DEFECT TWO COMPLETE PROGRAMMES LEFT BETWEEN THEM — the
+			// 47 -> 48 warrant again.
+			//   · `ROADMAP-backing-agent-tool-suite.md` (`JAN-TOOLSUITE`) is the nearest claimant for `RS-1`: its goal
+			//     is that *"the execution producer stops borrowing the assurance judge"*, and the agy executor still
+			//     borrows its model (`REG-F-458`). ⛔ But it kept the agy adapter *"unchanged"* BY DESIGN, and pins
+			//     that with a CONTROL. Reversing a complete programme's control, under a later delegated decision and
+			//     through a selector shaped on `JAN-SELREV`'s, would rewrite that roadmap, not finish it.
+			//   · `ROADMAP-the-selected-reviewer.md` (`JAN-SELREV`) is the nearest for `RS-2` and `RS-3`. ⛔ Its
+			//     exits are MET, and it filed the executor half as outside its scope (`REG-F-458`, `REG-F-459`). One
+			//     design governs all three increments, and splitting them across two complete roadmaps would file
+			//     the executor under a reviewer programme.
+		).toBe(52);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

@@ -37777,10 +37777,11 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **G6 — THE REPORTED MODEL IS NEVER CHECKED.** `tools/devin-reviewer.ts:82-105` reads the model devin reports and never compares it with `JPWB_ASSURANCE_MODEL`.
 - **G8 — THE GATE INHERITS THE SHELL.** `useStandin = opts.testMode && !process.env.JPWB_ASSURANCE_TOOL` (`index.ts:58`) keys on the variable's ABSENCE. `execution/model.ts:66` keys the fixture executor on `JPWB_EXECUTOR`'s absence. `workbench.ts:636` takes `JPWB_AGENT === 'pi'` first. The gate's e2e server inherits the shell (`playwright.config.ts:57`, via Playwright's env merge), as do its three vitest entry points. An operator who exports the selected configuration turns the gate's stand-ins into real, paid reviews.
 - **SEARCHED BEFORE FILING.** The register for `assuranceTool`, `=== 'devin'`, `JPWB_ASSURANCE_TOOL=pi`, and preflight lines naming devin or `ASSURANCE_MODEL`: only `REG-F-443`, which covers G4 alone.
+- ⭑ **CORRECTED IN PART 2026-09-28 — see `REG-D-087`.** G8's *"as do its three vitest entry points"* is corrected there: `turbo run test` does not inherit the shell (turbo 2.x strict environment mode).
 
 ### REG-F-458 — the agy EXECUTOR runs `JPWB_JUDGE_MODEL` but records `JPWB_EXECUTOR_MODEL`, so agy executing and agy reviewing can run one model while the record shows two
 
-**Filed 2026-09-26** (`JAN-SELREV`, raised by the design's adversarial check, read from code). **Status:** ⚠ **OPEN — outside `JAN-SELREV`'s scope; unscheduled.**
+**Filed 2026-09-26** (`JAN-SELREV`, raised by the design's adversarial check, read from code). **Status:** ~~⚠ **OPEN — outside `JAN-SELREV`'s scope; unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**
 
 - **THE RUN.** `apps/rph-demo/src/lib/server/execution/model.ts:103`: `if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));`. `agyPrint` passes `'--model', judgeModel()` (`assurance/agy-cli.ts:82`), which is `JPWB_JUDGE_MODEL`.
 - **THE RECORD.** agy returns a bare string, so the step records the producer's model as `resolveExecutorModel() ?? 'unresolved'` (`routes/undertakings/[id]/+page.server.ts:1328`), graded `HOST_CONFIGURED`. `backing-tool.ts:371-378` says the executor model *"never falls back to the JUDGE model"*. It does not fall back, but on agy it is not what runs either.
@@ -37808,6 +37809,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   3. **A substituted model fails the review.** Its remedy is re-qualification or re-selection, not reconfiguration.
   4. **A program override outside test mode refuses the review.**
 - **THE SPONSOR'S QUESTION, not built until ruled:** should the gate hold the SELECTED reviewer to today's definition (design §5, `Q1`)? Recommended: yes.
+- ⭑ **SUPERSEDED IN PART 2026-09-28 — see `REG-D-087`.** Two lines above are corrected there, as deviations made after this entry's confirmation: *"The gate starts with eight live-backend variables as `''`"* (built as REMOVED) and *"Program overrides are honoured only in test mode"* (false for the agy executor until `JAN-SELRES` `RS-1`).
 
 ### REG-D-086 — SPONSOR RULING: `REG-D-085` confirmed; the gate holds the SELECTED reviewer to today's definition (`JAN-SELREV` Q1, built as `SR-4`)
 
@@ -37831,7 +37833,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-459 — the agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode: `REG-F-441`'s executor half
 
-**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, the residual its design names under D7). **Status:** ⚠ **OPEN — unscheduled.**
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, the residual its design names under D7). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**
 
 - **THE PATH.** `execution/model.ts:103` runs the agy executor through `agyPrint`, which spawns `AGY_BIN`, and `AGY_BIN` is `AGY_BIN_OVERRIDE ?? 'agy'` (`assurance/agy-cli.ts:15-17`), read once at load and in every mode.
 - **WHY SR-2 LEFT IT.** `SR-2` refuses an override in the REVIEWER selector, and only for the SELECTED tool, so a set `JPWB_AGY_BIN` does not refuse a devin review. A host can therefore run the agy executor with a replaced program while its devin reviewer is admitted. The record then names agy as the producer's tool, which PER-9 forbids: *"the resolved provider, model, and version actually invoked"*.
@@ -37839,7 +37841,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-460 — a model-substitution refusal carries the right remedy in its statement, but the floor's operator guidance beside it says "Configure or retry the reviewer"
 
-**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, raised by its adversarial verifier). **Status:** ⚠ **OPEN — unscheduled.**
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, raised by its adversarial verifier). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-2` (`REG-D-087`).**
 
 - **THE REFUSAL.** When devin reports a model other than the configured one, the validator throws a refusal naming both ids, whose remedy is *re-qualify or re-select, never reconfigure* (design D6). The floor records it as `VALIDATOR_EXECUTION_FAILED`, as every throw is.
 - **THE GUIDANCE.** The floor classifies by CODE, never by prose (`apps/rph-demo/src/lib/server/floor.ts:216-231`). So the operator is shown `RETRY_OR_CONFIGURE_REVIEWER` with *"Configure or retry the reviewer"*. That contradicts the refusal's own remedy, and a retry is a second billed call to the same substitute. `autoRefine` is false, so nothing retries automatically.
@@ -37852,3 +37854,76 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **THE DEFECT.** `apps/rph-demo/playwright.live-exec.config.ts` required `JPWB_ASSURANCE_MODEL` whatever `JPWB_ASSURANCE_TOOL` named, adding `JPWB_JUDGE_MODEL` only for agy. `e2e-live-exec/execution.live.ts` asserted the recorded reviewer's model with `toContain(process.env.JPWB_ASSURANCE_MODEL)`. So an agy lane was held to devin's variable: it passed only if the two variables were equal. `toContain` would also pass a longer model id.
 - **THE FIX.** One pure helper, `e2e-live-exec/lane-config.ts`, maps the tool to its model variable, and both the config and the spec read it. The spec asserts the recorded reviewer's model with `toBe`, along with its identity grade per tool. The helper refuses what the product would refuse, a set program override for the selected tool included. A gate test pins the helper against the product's own selector, and the config and spec against the helper.
 - **NOT OBSERVED.** The lane is paid and outside the gate, and it has not run since.
+
+### REG-F-462 — the PWA page tells the operator to "revise the graph" beside every failed or refused review, where the floor's own guidance says not to
+
+**Filed 2026-09-28** (`JAN-SELRES`, found by the search for `REG-F-460`'s general form; read from code, not driven). **Status:** ⚠ **OPEN — owed by `JAN-SELRES` `RS-3` (`REG-D-087`).**
+
+- **THE HINT.** `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:2120-2123` renders *"Publishing is blocked until the floor is SATISFIED — revise the graph and re-run."* for every unsatisfied floor.
+- **THE CONTRADICTION.** Beside a review that did not execute, the guidance the same turn carries says *"Do not revise the PWA or record a waiver in response to this execution failure"* (`apps/rph-demo/src/lib/server/floor.ts:235`). Every operational branch's guidance says not to revise the PWA or record a waiver (`:224`, `:248`, `:297`).
+- **THE REMEDY (`DESIGN-the-selection-residuals.md` D8).** Key the hint on the recorded observation CODES (`OPERATIONAL_REVIEW_CODES`), not on the remediation action: the catch-all action also covers an assessment left ASSESSING with a blocking finding, which is the waiver e2e's staged floor (`apps/rph-demo/e2e/assurance-floor-waiver.e2e.ts:111-122`), where "do not revise" is not established. The new sentence names no waiver and no route past the floor (ASR-3).
+- **SEARCHED BEFORE FILING.** The register for `revise the graph`, `floor-blocked-hint` and `floorhint`: 0 each.
+
+### REG-F-463 — every Validator throw also records an `INDEPENDENCE_VIOLATION` whose statement is `'validator execution failed'`
+
+**Filed 2026-09-28** (`JAN-SELRES` design, traced from code by its mappers and critics; no test covers it, nothing driven). **Status:** ⚠ **OPEN — unscheduled; a reading of ASR-13 is owed.**
+
+- **THE TRACE.** `packages/rph-assurance/src/validators.ts` `failedResult` records the evaluator `{ actorType: 'SYSTEM' }` with no model (`:405`). The Reasoning Review requires `DIFFERENT_MODEL`, and `checkIndependence` counts a field as differing only when both sides carry it (`assurance-rules.ts:190-191`), so it answers *same model* (`:202-203`). `recording.ts:116-123` then records `INDEPENDENCE_VIOLATION` with the boundary reason, which for a failed validator is the fixed `'validator execution failed'` (`assurance-rules.ts:263`).
+- **WHERE IT SHOWS.** The execution plane's failure message prints every observation as `code: statement` (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1607`), so an operator reads `INDEPENDENCE_VIOLATION: validator execution failed` beside every failed review. The floor classifier's execution-failure branch runs before its independence branch (`apps/rph-demo/src/lib/server/floor.ts:228-250`), so the guidance is unaffected.
+- **TWO READINGS OF ASR-13.** *"If required independence is missing: … an independence violation is recorded as a first-class outcome"* can read independence that cannot be verified as missing. Or no assessment took place, so there is nothing to be independent of.
+- **ITS COST.** `scripts/reviewer-qual/runner.ts:251-257` hashes `independenceOk` for a scored throw, so a change moves the reviewer fingerprint's scoring. A RESCORED record suffices, at no charge (`REG-D-086`).
+- **SEARCHED BEFORE FILING.** The register for `validator execution failed` and `independenceOk: false`: 0 each.
+
+### REG-F-464 — the "What the reviewer returned" panel does not say that the try it shows was rejected, or which model answered
+
+**Filed 2026-09-28** (`JAN-SELRES` design; read from code, not driven). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE PANEL.** `apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts:43-85` takes the newest `MODEL_EXCHANGE` by `attemptOrdinal` and discloses *"Retained and verified: the stored bytes were re-hashed and match what this record claims."* `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:2103-2113` titles it *"What the reviewer returned (try N)"*.
+- **THE OMISSION.** Neither says that the try was rejected, or which model answered. After a model substitution (`DESIGN-the-selected-reviewer.md` D6) the try is captured `rejected` with the substitute's answer retained (`SR2-M32`), so the panel shows the substitute's answer as the reviewer's. It contradicts nothing; it omits what the record holds.
+- **SEARCHED BEFORE FILING.** The register for `What the reviewer returned` and `reviewerAnswer`: 0 each.
+
+### REG-F-465 — the executors' recorded identities are not what a provider reported: Pi grades its CONFIGURED model `PROVIDER_REPORTED`, and the agy executor and agy reviewer record one provider two ways
+
+**Filed 2026-09-28** (`JAN-SELRES` design, raised by its adversarial critic; `REG-F-458`'s general form; read from code, not driven). **Status:** ⚠ **OPEN — unscheduled; the remedy needs one observation of a live Pi call.**
+
+- **PI'S GRADE.** `apps/rph-demo/src/lib/server/tools/pi-executor.ts:321-326` records `modelId: model.id, providerId: model.provider`, graded `PROVIDER_REPORTED`, where `model` is Pi's registry resolution of the CONFIGURED label (`:57-66`). Its `message_end` handler reads only `stopReason` and `errorMessage` (`:279-282`), though Pi's message type carries `responseModel?: string` (`node_modules/@earendil-works/pi-ai/dist/types.d.ts:282`). The authoring producer does the same (`apps/rph-demo/src/lib/server/agent/pi-agent.ts:123-126`).
+- **WHY IT MATTERS.** `ROADMAP-backing-agent-tool-suite.md:58` names the class (*"adapter returns a hardcoded provider/model instead of the reported one"*), and `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:107-110` forbids it: *"NO REPORT MEANS THE WEAKER GRADE, NOT THE CONFIGURED VALUE DRESSED UP"*. The live lane's `PROVIDER_REPORTED` assertion (`apps/rph-demo/e2e-live-exec/execution.live.ts:212`) passes on the self-grade.
+- **ONE PROVIDER, TWO RECORDS.** The agy executor records provider `'agy'` (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1351`) and the agy reviewer `'google'` (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:434`). A `DIFFERENT_PROVIDER` policy (`packages/rph-assurance/src/assurance-rules.ts:204`) would read one provider as two.
+- **REMEDY CANDIDATES, UNTESTED.** Read `responseModel` (or the message's own model and provider) at `message_end`, grading `HOST_CONFIGURED` when nothing is reported; consider `JAN-SELREV` D6's reported-equals-configured check for producers; record agy's provider one way.
+- **SEARCHED BEFORE FILING.** The register for `responseModel` and `model.provider`: 0 each.
+
+### REG-F-466 — other operator affordances beside a failed or refused review invite what its guidance forbids
+
+**Filed 2026-09-28** (`JAN-SELRES` design, found by its critics searching `REG-F-460`'s general form; read from code, not driven). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE RESUME HINT.** `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:1066-1070` says *"Refine it in the chat below (it continues on the same candidate), or Discard."* for every resumable turn, BLOCKED_EXTERNAL included. Resuming re-runs the agent and the floor (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:387-388`), a billed call, where the guidance beside a substitution will say that retrying does not fix it.
+- **THE THROWN-TURN CLEANUP.** `cleanupFailedTurn` (`agent/+server.ts:282-287`) marks every thrown turn REVISION_REQUIRED, operational throws included — for example a floor-recording refusal (`packages/rph-engine/src/record-assurance.ts:152-154`: *"`send` THROWS on any refusal"*) — and the hint then reads *"Revision requested"*.
+- **THE WAIVER AFFORDANCE.** Recording accepted risk is offered beside every unsatisfied floor (`+page.svelte:2131` onward), where every operational guidance string says not to record a waiver (`apps/rph-demo/src/lib/server/floor.ts:224`, `:235`, `:248`, `:297`).
+- **THE STEP RETRY (inferred, not driven).** The execution page's step controls include Retry (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:66-68`); whether it is offered beside a substitution's refusal was not driven.
+- **SEARCHED BEFORE FILING.** The register for `cleanupFailedTurn` and `Refine it in the chat`: 0 each.
+
+### REG-D-087 — DELEGATED (`REG-D-071`): `JAN-SELRES` — the executor is selected, run and recorded as the reviewer is; a substituted reviewer model is answered with its own code and action; three post-confirmation deviations recorded
+
+**Decided 2026-09-28** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `JAN-SELRES`; sponsor confirmation owed.**
+
+- **THE DESIGN.** `docs/_working/DESIGN-the-selection-residuals.md`, revision 2, after three adversarial critics (3 BLOCKER, 16 MAJOR and 30 MINOR findings on revision 1, with overlaps, all addressed). The roadmap is `ROADMAP-the-selection-residuals.md`: `RS-1` (the executor), `RS-2` (the substitution), `RS-3` (the page hint).
+- **THE SPONSOR'S WORDS, verbatim, and the reading taken.** After the 2026-09-26 report listed `REG-F-458`, `REG-F-459` and `REG-F-460` as open and unscheduled, the sponsor wrote on 2026-09-28: *"Codex is available for use again. Pickup from where you left off."* The agent reads it as taking up those findings. The words may instead only resume the session, or point at the offered paid live-lane run, which they do not name and which is not started.
+- **IN BRIEF.**
+  - One executor selector, `apps/rph-demo/src/lib/server/execution/executor-selection.ts`, which never throws; a misconfigured executor is refused before dispatch.
+  - The agy executor runs `JPWB_EXECUTOR_MODEL`, the model it records (`REG-F-458` remedy (a)). `agyPrint` is byte-identical, so the reviewer fingerprint does not move.
+  - The selected executor tool's program override is refused outside test mode (`REG-F-459` remedy (a)).
+  - The model configured, the model run and the model recorded are one read.
+  - A thrown validator failure may carry a code from a closed set. `VALIDATOR_MODEL_SUBSTITUTED` is recorded BESIDE `VALIDATOR_EXECUTION_FAILED`, and answered by a new action, `REQUALIFY_OR_RESELECT_REVIEWER` (`REG-F-460`).
+  - The PWA page's blocked hint is keyed on the recorded codes (`REG-F-462`).
+- **FOR SPONSOR CONFIRMATION:**
+  1. **The scheduling**, as read above.
+  2. **`REG-F-458` remedy (a):** the agy executor stays, and runs the model it records; it is not refused.
+  3. **The executor is selected the way the reviewer is:** its misconfiguration refused before dispatch, and its program override refused outside test mode.
+  4. **A substitution is recorded additively and answered by `REQUALIFY_OR_RESELECT_REVIEWER`.** Its guidance text is the agent's wording: re-qualification and re-selection are sponsor decisions, after which the host is configured to the new selection.
+  5. **`REG-F-462` is fixed within this work.**
+  6. **The three deviations below.**
+- **SUPERSEDING NOTES — deviations from confirmed or filed text** (this register's rule: *"a correction is a superseding entry citing the entry it supersedes"*).
+  - **`REG-D-085`: *"The gate starts with eight live-backend variables as `''`."*** `JAN-SELREV` `SR-1` (`032deaad`, built after the confirmation commit `86f5b1c1`) REMOVES them instead. `''` is still an override to the qualification harness (`scripts/reviewer-qual/preflight.ts:39`, `env[v] !== undefined`), and an empty program name to the adapters (`apps/rph-demo/src/lib/server/assurance/agy-cli.ts:17`, `?? 'agy'`). The design recorded this as built (`DESIGN-the-selected-reviewer.md` D8); the register did not until now.
+  - **`REG-D-085`: *"Program overrides are honoured only in test mode."*** True for the reviewer; false for the agy executor until `JAN-SELRES` `RS-1` (`REG-F-459`).
+  - **`REG-F-457` G8: *"as do its three vitest entry points."*** As measured in `SR-1`, `test:dist`, `test:coverage`, a direct `vitest run` in the app and the e2e server inherit the shell; `turbo run test` does not (turbo 2.x strict environment mode; `DESIGN-the-selected-reviewer.md` G8).
+- **MADE WITH THIS ENTRY.** `REG-F-462` to `REG-F-466` are filed. The statuses of `REG-F-458`, `REG-F-459` and `REG-F-460` are struck in place and restated as owed by `JAN-SELRES`. A pointer to this entry is appended to `REG-D-085` and `REG-F-457`.
