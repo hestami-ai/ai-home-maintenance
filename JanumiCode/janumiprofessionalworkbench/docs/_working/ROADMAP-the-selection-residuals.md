@@ -93,7 +93,7 @@ No agent stages or commits.
   - **The verifier's findings, applied.** No green route test reaches a real devin: a throwing mock stands behind PATH.
     The reviewer-first order, the executor's bounds and the lazy Pi load each have an instrument, the UNKNOWN reason
     offers only wired tools, and a repair turn is driven.
-  - **Mutants:** RS1-M1..M35 added (M31..M35 from the verifier and the fix round); with the 93 prior entries anchored in, or victimised by, the touched files, 129 of 129 KILLED by the official runner on the staged tree. **gate:fast:** GREEN, 6174 passed / 4 skipped, e2e 95 of 95, the fingerprint unmoved.
+  - **Mutants:** RS1-M1..M35 added (M31..M35 from the verifier and the fix round); with ~~the 93~~ 94 prior entries anchored in, or victimised by, the touched files (⭑ *corrected in `RS-2`: the runner matches ids as prefixes, and one asked id also measured its sibling `…_POLICY_ID`*), 129 of 129 KILLED by the official runner on the staged tree. **gate:fast:** GREEN, 6174 passed / 4 skipped, e2e 95 of 95, the fingerprint unmoved.
 
 ## `RS-2` — a substituted reviewer model: its own code, its own action (D6, D7; D9's substitution half)
 
@@ -133,7 +133,20 @@ No agent stages or commits.
   - the route's operational test missing the new action;
   - the code removed from `OPERATIONAL_REVIEW_CODES` (killed in `RS-3`, and noted if it survives here).
 
-## `RS-3` — the PWA page's blocked hint follows the record (D8; `REG-F-462`)
+- ⭑ *Landed 2026-09-28.*
+  - **The carrier.** `validatorFailure: { code, statement }` is read by property, with a guarded read, in
+    `runFloorResults`. `VALIDATOR_FAILURE_CODES` is a closed set of one. A causeless, malformed, near-miss or non-Error
+    throw is recorded as today: a differential over 33 throw shapes against HEAD showed only the in-set shapes differ,
+    by their one added observation.
+  - **The throw.** The substitution carries the code, and its message is unchanged. `SR2-M6` and `SR2-M35` are
+    re-anchored; `SR2-M35` in an isolated form that means only "dressed as a failed invocation".
+  - **The floor.** `REQUALIFY_OR_RESELECT_REVIEWER` comes before the execution-failure branch.
+    `isOperationalRemediation` is exhaustive, and the authoring route asks it for every action.
+  - **Filed with it:** `REG-F-468`, the reported model id is unbounded; `REG-F-469`, the execution plane's try count,
+    which joins `RS-3`; `REG-F-470`, the census field no check reads.
+  - **Mutants:** RS2-M1..M30 added (M23..M30 from the verifier and the fix round); with the 75 prior entries anchored in, or victimised by, the touched files (SR2-M6 and SR2-M35 re-anchored among them), 105 of 105 KILLED by the official runner on the staged tree. **gate:fast:** GREEN, 6204 passed / 4 skipped, e2e 95 of 95, census 362 of 362 guarded, the fingerprint unmoved.
+
+## `RS-3` — the PWA page's blocked hint follows the record (D8; `REG-F-462`), and the execution plane counts its tries (`REG-F-469`)
 
 1. **The page.** Its load exposes whether the reasoning-review policy's observations include a code in the exported
    `OPERATIONAL_REVIEW_CODES`.
@@ -141,6 +154,8 @@ No agent stages or commits.
 3. **A NEW e2e** stages a floor whose review recorded `VALIDATOR_EXECUTION_FAILED`, and asserts D8's sentence
    positively.
 4. **D9's hint half.**
+5. **`REG-F-469`, added by `RS-2`.** The execution plane's *"reviewed over N tries"* counts the tries that ran
+   (`openPerTry.length`, singular for one), pinned red-first with its own mutant.
 
 | Instrument | Must show first |
 |---|---|

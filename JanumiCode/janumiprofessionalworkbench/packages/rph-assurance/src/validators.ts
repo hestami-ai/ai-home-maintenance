@@ -389,11 +389,94 @@ export function reasoningReviewResultFromJudgement(
 	};
 }
 
+// ── ⭐ `JAN-SELRES` D6 (`REG-F-460`) — A VALIDATOR FAILURE THAT HAS A CODE OF ITS OWN ──────────────────────────────
+//
+// ⛔ WHAT WAS WRONG. A Validator that failed could say WHY only in prose: `runFloorResults` read the thrown error's
+// `.message` and nothing else, so every failure was recorded as one observation, `VALIDATOR_EXECUTION_FAILED`. The
+// app's remediation classifier reads CODES, never prose (`apps/rph-demo/src/lib/server/floor.ts`), so a review
+// refused because the reviewing tool reported a model other than the one selected took the execution-failure branch
+// and was told *"Configure or retry the reviewer"* — the one remedy its own statement forbids (`REG-D-085` item 3).
+//
+// ⭑ ADDITIVE, NOT A REPLACEMENT CODE. `VALIDATOR_EXECUTION_FAILED` means "the validator produced no result", and a
+// refused substitute is such a case. So it is still recorded FIRST, byte for byte as before, and the carried code
+// follows it as a refinement: `observations[0]` — what the waiver form targets and what a reader sees first — is
+// unchanged, and every predicate keyed on the old code still fires.
+
+/** The one failure this package records under its own code: the reviewing tool reported that a model other than the
+ *  configured and selected one answered, and the review was refused for it. */
+export const VALIDATOR_MODEL_SUBSTITUTED = 'VALIDATOR_MODEL_SUBSTITUTED';
+
+/**
+ * ⭐ THE CLOSED SET OF CODES A THROWN VALIDATOR FAILURE MAY CARRY. A code outside it is dropped, never recorded:
+ * this package's observation vocabulary is not extended by whatever a Validator happens to throw.
+ *
+ * ⭑ The member is ALSO exported by name so the app IMPORTS it rather than restating the literal — the classifier's
+ * `o.code === …` is a string comparison no compiler checks, so a restated literal that drifted would silently route
+ * a refused review back to "retry the reviewer" (`REG-F-460`, reopened).
+ */
+export const VALIDATOR_FAILURE_CODES = [VALIDATOR_MODEL_SUBSTITUTED] as const;
+export type ValidatorFailureCode = (typeof VALIDATOR_FAILURE_CODES)[number];
+
+/** What a thrown error may carry: a code in `VALIDATOR_FAILURE_CODES`, and the statement to record under it. */
+export interface ValidatorFailure {
+	readonly code: ValidatorFailureCode;
+	readonly statement: string;
+}
+
+/**
+ * An `Error` whose message is `message` — recorded as `VALIDATOR_EXECUTION_FAILED` exactly as any throw is — carrying
+ * `failure` for `runFloorResults` to record beside it.
+ *
+ * ⭑ WHY A HELPER AND NOT A CLASS, AND WHY EXPORTED. The property name is the whole contract between the Validator
+ * that throws and the runner that reads, and this keeps BOTH ends of it in this module: an app writing
+ * `Object.assign(new Error(m), { validatorFailure })` itself would restate the name, and a rename here would then
+ * turn every carried failure causeless with nothing to say so (`Object.assign` accepts any shape). ⛔ NOT a subclass,
+ * because the runner cannot ask `instanceof`: the app and this package can each load their own copy of it (`src`
+ * and `dist`), and a class from one copy is not an instance of the other's — the reason `StoreBusyError`'s `code` is
+ * read by property too (`rph-ports/src/ports/storage.ts`).
+ * ⚠ NOT `cause`: ES2022's `Error.cause` means the UNDERLYING error, and this is a classification of the failure itself.
+ */
+export function validatorFailureError(
+	message: string,
+	failure: ValidatorFailure
+): Error & { readonly validatorFailure: ValidatorFailure } {
+	return Object.assign(new Error(message), { validatorFailure: failure });
+}
+
+/**
+ * The failure a thrown value carries, read BY PROPERTY (see `validatorFailureError`), or `undefined`.
+ *
+ * ⛔ EVERYTHING BUT A WELL-FORMED, IN-SET CARRIER ON AN `Error` IS NOTHING, never a guess: a non-Error throw (its
+ * statement is already `String(e)`), a carrier that is not an object, a code outside the closed set, a statement
+ * that is not a non-blank string, or a carrier whose READ throws (a throwing getter, a Proxy's trap). Each of those
+ * is recorded exactly as a causeless throw is.
+ *
+ * ⭑ WHY THE READ IS GUARDED. This runs inside `runFloorResults`' catch, so a read that threw would escape it: the floor
+ * run would REJECT with the reader's error instead of recording the Validator's failure, and "a Validator that throws
+ * yields a failed result" would no longer hold for every throw.
+ */
+function carriedFailure(e: unknown): ValidatorFailure | undefined {
+	if (!(e instanceof Error)) return undefined;
+	try {
+		const carried: unknown = (e as { validatorFailure?: unknown }).validatorFailure;
+		if (typeof carried !== 'object' || carried === null) return undefined;
+		const { code, statement } = carried as { code?: unknown; statement?: unknown };
+		const known: readonly unknown[] = VALIDATOR_FAILURE_CODES;
+		if (!known.includes(code) || typeof statement !== 'string' || statement.trim() === '')
+			return undefined;
+		return { code: code as ValidatorFailureCode, statement };
+	} catch {
+		// ⛔ A READ THAT THROWS CARRIES NOTHING: the throw is recorded as a causeless one.
+		return undefined;
+	}
+}
+
 function failedResult(
 	subject: AssuranceSubject,
 	p: FloorPolicyRef,
 	validatorId: string,
-	reason: string
+	reason: string,
+	carried?: ValidatorFailure
 ): ValidatorResult {
 	return {
 		policyId: p.policyId,
@@ -405,7 +488,18 @@ function failedResult(
 		evaluator: { actorType: 'SYSTEM' },
 		criteria: [],
 		observations: [
-			{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: reason, open: true }
+			{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: reason, open: true },
+			// ⭐ D6 — THE REFINEMENT, SECOND AND ONLY WHEN CARRIED. `MATERIAL` like the failure it refines, and open.
+			...(carried
+				? [
+						{
+							code: carried.code,
+							severity: 'MATERIAL' as const,
+							statement: carried.statement,
+							open: true
+						}
+					]
+				: [])
 		],
 		dispositionRecommendation: 'INCONCLUSIVE',
 		consideredEvidenceIds: [],
@@ -420,6 +514,8 @@ function failedResult(
  * Run the ordered de minimis floor over a subject using the registered Validators. An absent Validator leaves its
  * policy MISSING (compose blocks — never assume satisfied); a Validator that throws yields a VALIDATOR_FAILED result
  * (compose blocks, and it is never mistaken for REJECTED). The composed outcome + its transition gate are returned.
+ * ⭐ `JAN-SELRES` D6: a throw recorded as `VALIDATOR_EXECUTION_FAILED` also records the failure it CARRIES, when it
+ * carries one in `VALIDATOR_FAILURE_CODES` (`validatorFailureError`), as a second observation.
  */
 async function runFloorResults(
 	subject: AssuranceSubject,
@@ -435,7 +531,13 @@ async function runFloorResults(
 			results.push(await v.evaluate(subject, ctx));
 		} catch (e) {
 			results.push(
-				failedResult(subject, p, v.validatorId, e instanceof Error ? e.message : String(e))
+				failedResult(
+					subject,
+					p,
+					v.validatorId,
+					e instanceof Error ? e.message : String(e),
+					carriedFailure(e)
+				)
 			);
 		}
 	}

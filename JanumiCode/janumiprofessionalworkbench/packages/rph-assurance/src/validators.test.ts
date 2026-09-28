@@ -7,6 +7,9 @@ import {
 	reasoningReviewResultFromJudgement,
 	runDeMinimisFloor,
 	schemaInvariantValidatorInstance,
+	VALIDATOR_FAILURE_CODES,
+	VALIDATOR_MODEL_SUBSTITUTED,
+	validatorFailureError,
 	type ReasoningReviewJudgement,
 	type Validator,
 	type ValidatorContext
@@ -230,5 +233,162 @@ describe('validator registry + runDeMinimisFloor', () => {
 		const out = await runDeMinimisFloor(nonAi, goodCtx, registry());
 		expect(out.aggregate).toBe('SATISFIED');
 		expect(out.gatePermitsTransition).toBe(true);
+	});
+});
+
+// ── ⭐ `JAN-SELRES` D6 (`REG-F-460`) — A THROWN FAILURE MAY CARRY ITS OWN CODE, RECORDED BESIDE THE FAILURE ─────────
+//
+// ⛔ WHAT WAS WRONG. The runner read a throw's `.message` and nothing else, so a review REFUSED because the reviewing
+// tool reported another model than the one selected was one `VALIDATOR_EXECUTION_FAILED` like any other — and the
+// app's classifier, which reads codes and never prose, told the operator to retry the reviewer.
+//
+// ⭑ ONE CASE PER LIMB, EACH WITH EXACT `toEqual` OBSERVATIONS — never "contains": a limb that ADDED an observation
+// would pass a containment check. The Reasoning-Review Validator is ALONE in its registry, so the floor's observations
+// are exactly the failed result's: the two deterministic policies are MISSING, and a missing policy records none.
+describe('⭐ D6 — a throw records VALIDATOR_EXECUTION_FAILED first, then a carried in-set failure, and nothing else', () => {
+	/** The floor's observations when the Reasoning-Review Validator rejects with `thrown`. */
+	async function observationsOfThrowing(thrown: unknown) {
+		const reg = createValidatorRegistry();
+		reg.register({
+			policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+			validatorId: 'throws',
+			evaluate: () => Promise.reject(thrown)
+		});
+		return (await runDeMinimisFloor(subject, goodCtx, reg)).observations;
+	}
+	/** The observation every throw has always recorded — the thrown message as its statement. */
+	const executionFailed = (statement: string) => ({
+		code: 'VALIDATOR_EXECUTION_FAILED',
+		severity: 'MATERIAL',
+		statement,
+		open: true
+	});
+
+	it('⭑ a CAUSELESS throw is recorded exactly as it always was: one VALIDATOR_EXECUTION_FAILED, its message the statement', async () => {
+		// ⛔ THE MUTANT: record something for a throw that carries nothing. The reviewer fingerprint scores throws
+		// (`scripts/reviewer-qual/runner.ts` `scoreThrow`) and every refused selection throws one of these, so a causeless
+		// throw must stay byte for byte what it was — this pins it, and held before `D6` was built.
+		expect(await observationsOfThrowing(new Error('agy unavailable'))).toEqual([
+			executionFailed('agy unavailable')
+		]);
+	});
+
+	it('⭐ an IN-SET failure adds exactly one observation, SECOND — its code and statement, MATERIAL and open', async () => {
+		// ⭑ THE CLOSED SET, PINNED: one member, by value.
+		expect(VALIDATOR_FAILURE_CODES).toEqual(['VALIDATOR_MODEL_SUBSTITUTED']);
+		const recorded = [
+			executionFailed('the review was refused'),
+			{
+				code: 'VALIDATOR_MODEL_SUBSTITUTED',
+				severity: 'MATERIAL',
+				statement:
+					"The reviewing tool 'devin' reported that 'm2' answered, not the configured 'm1'.",
+				open: true
+			}
+		];
+		// ⭑ BUILT BY THE HELPER THE APP THROWS WITH …
+		expect(
+			await observationsOfThrowing(
+				validatorFailureError('the review was refused', {
+					code: VALIDATOR_MODEL_SUBSTITUTED,
+					statement:
+						"The reviewing tool 'devin' reported that 'm2' answered, not the configured 'm1'."
+				})
+			),
+			'the carried failure was not recorded second, beside the execution failure'
+		).toEqual(recorded);
+		// ⭑ … AND BY HAND, WITH NO HELPER AND NO CLASS: the runner reads the PROPERTY, so a carrier from another copy of
+		// this package (`src` beside `dist`) is read the same.
+		expect(
+			await observationsOfThrowing(
+				Object.assign(new Error('the review was refused'), {
+					validatorFailure: {
+						code: 'VALIDATOR_MODEL_SUBSTITUTED',
+						statement:
+							"The reviewing tool 'devin' reported that 'm2' answered, not the configured 'm1'."
+					}
+				})
+			),
+			'a duck-typed carrier was not read'
+		).toEqual(recorded);
+	});
+
+	it('⛔ a code OUTSIDE the closed set adds nothing — a throw does not extend this package’s vocabulary', async () => {
+		// ⭑ NEAR MISSES, not only a far-away code: a reader that folded case or whitespace, or matched a prefix or a
+		// suffix, would record the spelling it was handed VERBATIM — a new code no classifier matches.
+		const outOfSet = [
+			'SOME_OTHER_CODE',
+			'validator_model_substituted',
+			' VALIDATOR_MODEL_SUBSTITUTED ',
+			'VALIDATOR_MODEL_SUBSTITUTED_X',
+			'MODEL_SUBSTITUTED'
+		];
+		for (const code of outOfSet)
+			expect(
+				await observationsOfThrowing(
+					Object.assign(new Error('refused for another reason'), {
+						validatorFailure: {
+							code,
+							statement: 'a statement under an unknown code'
+						}
+					})
+				),
+				`the out-of-set code ${JSON.stringify(code)} was recorded`
+			).toEqual([executionFailed('refused for another reason')]);
+	});
+
+	it('⛔ a NON-Error throw adds nothing, whatever it carries — its statement is still String(thrown)', async () => {
+		const thrown = {
+			message: 'not an Error',
+			validatorFailure: {
+				code: VALIDATOR_MODEL_SUBSTITUTED,
+				statement: 'carried by a plain object'
+			}
+		};
+		expect(await observationsOfThrowing(thrown)).toEqual([executionFailed(String(thrown))]);
+	});
+
+	it('⛔ a MALFORMED carrier adds nothing: not an object, no code, no statement, a statement that says nothing, or a read that throws', async () => {
+		/** An Error carrying `validatorFailure`, as a Validator throws one. */
+		const carrying = (validatorFailure: unknown): Error =>
+			Object.assign(new Error('refused'), { validatorFailure });
+		// ⛔ A READ THAT THROWS. The runner reads the carrier INSIDE its own catch, so a getter or a Proxy trap that throws
+		// there must not make the floor run reject: a Validator that throws yields a failed result, whatever it throws.
+		const throwingGetter = Object.defineProperty(new Error('refused'), 'validatorFailure', {
+			get(): never {
+				throw new Error('BOOM from the validatorFailure getter');
+			}
+		});
+		const throwingTrap = new Proxy(new Error('refused'), {
+			get(target, key, receiver): unknown {
+				if (key === 'validatorFailure') throw new Error('BOOM from a proxy trap');
+				return Reflect.get(target, key, receiver);
+			}
+		});
+		const throwingStatement = carrying({
+			code: VALIDATOR_MODEL_SUBSTITUTED,
+			get statement(): never {
+				throw new Error('BOOM from the statement getter');
+			}
+		});
+		const malformed: readonly (readonly [string, Error])[] = [
+			['null', carrying(null)],
+			['a string', carrying(VALIDATOR_MODEL_SUBSTITUTED)],
+			['no code', carrying({ statement: 'a statement with no code' })],
+			['no statement', carrying({ code: VALIDATOR_MODEL_SUBSTITUTED })],
+			[
+				'a statement that is not a string',
+				carrying({ code: VALIDATOR_MODEL_SUBSTITUTED, statement: 42 })
+			],
+			['a blank statement', carrying({ code: VALIDATOR_MODEL_SUBSTITUTED, statement: '   ' })],
+			['behind a getter that throws', throwingGetter],
+			['behind a Proxy trap that throws', throwingTrap],
+			['an object whose statement getter throws', throwingStatement]
+		];
+		for (const [name, thrown] of malformed)
+			expect(
+				await observationsOfThrowing(thrown),
+				`a carrier that is ${name} was recorded`
+			).toEqual([executionFailed('refused')]);
 	});
 });

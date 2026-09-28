@@ -132,7 +132,7 @@
 				"suspendAssurancePolicy",
 				"validatorNamedBy"
 			],
-			"unattributedMutants": 6
+			"unattributedMutants": 9
 		},
 		"packages/rph-application/src/handlers/command-precondition.ts": {
 			"consumedExports": [
@@ -614,7 +614,7 @@
 				"identityProvenanceValidator",
 				"schemaInvariantValidator"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 2
 		},
 		"packages/rph-assurance/src/recording.ts": {
 			"consumedExports": [
@@ -632,7 +632,10 @@
 				"REASONING_REVIEW_CRITERIA",
 				"reasoningReviewResultFromJudgement",
 				"runFloorAndPlanRecording",
-				"schemaInvariantValidatorInstance"
+				"schemaInvariantValidatorInstance",
+				"VALIDATOR_FAILURE_CODES",
+				"VALIDATOR_MODEL_SUBSTITUTED",
+				"validatorFailureError"
 			],
 			"guardedExports": [
 				"createValidatorRegistry",
@@ -640,9 +643,12 @@
 				"REASONING_REVIEW_CRITERIA",
 				"reasoningReviewResultFromJudgement",
 				"runFloorAndPlanRecording",
-				"schemaInvariantValidatorInstance"
+				"schemaInvariantValidatorInstance",
+				"VALIDATOR_FAILURE_CODES",
+				"VALIDATOR_MODEL_SUBSTITUTED",
+				"validatorFailureError"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 10
 		},
 		"packages/rph-authoring/src/broker.ts": {
 			"consumedExports": [
@@ -1296,7 +1302,7 @@
 				"buildApplicablePolicies",
 				"buildAssuranceView"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 1
 		},
 		"packages/rph-projections/src/composition-plan.ts": {
 			"consumedExports": [

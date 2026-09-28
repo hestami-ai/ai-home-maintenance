@@ -23,6 +23,7 @@ import {
 	assuredCandidateLine,
 	classifyFloorRemediation,
 	floorStatusLine,
+	isOperationalRemediation,
 	runPwaFloor,
 	type FloorObservationView,
 	type FloorProducer,
@@ -239,11 +240,12 @@ function applyFloorDisposition(
 		return;
 	}
 	const remediation = floorResult.remediation;
+	// ⭐ `JAN-SELRES` D7 — THE CLASSIFIER'S OWN EXHAUSTIVE ANSWER, NOT A LIST KEPT HERE. This enumerated three actions with
+	// `===`, so the fourth operational one — `REQUALIFY_OR_RESELECT_REVIEWER`, a review refused for a substituted model —
+	// would have fallen through to REVISION_REQUIRED: a defect in the candidate, for a review nobody selected.
 	const operational =
 		floorResult.externalDetail ||
-		remediation?.action === 'RETRY_OR_CONFIGURE_REVIEWER' ||
-		remediation?.action === 'CHANGE_REVIEWER' ||
-		remediation?.action === 'ESCALATE_REVIEW';
+		(remediation !== undefined && isOperationalRemediation(remediation.action));
 	const detail =
 		floorResult.externalDetail ||
 		remediation?.guidance ||

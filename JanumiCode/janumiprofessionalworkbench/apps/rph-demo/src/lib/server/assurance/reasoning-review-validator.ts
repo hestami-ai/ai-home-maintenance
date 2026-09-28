@@ -18,6 +18,8 @@
 import {
 	FLOOR_POLICY_IDS,
 	reasoningReviewResultFromJudgement,
+	VALIDATOR_MODEL_SUBSTITUTED,
+	validatorFailureError,
 	type Disposition,
 	type Identity,
 	type ReasoningReviewFinding,
@@ -363,6 +365,29 @@ function substitutedModel(
 	);
 }
 
+/**
+ * ⭐ `JAN-SELRES` RS-2 (D6) — the statement recorded under `VALIDATOR_MODEL_SUBSTITUTED`, beside the refusal above: the
+ * tool and both model ids, and nothing else.
+ *
+ * ⛔ NO PROMPT TEXT AND NO TOOL DIAGNOSTIC (`PER-12`): the validator writes this sentence itself, and puts in it
+ * neither the prompt nor anything an execFile rejection says. Its three values are the tool this validator named, the
+ * model it was configured for, and the model the tool's export reported. ⚠ THAT LAST ID IS TOOL-WRITTEN AND UNBOUNDED:
+ * it is devin's `generation_model`, which `readReportedModel` (`tools/devin-reviewer.ts`) accepts as any non-empty
+ * string, with no shape check and no length cap — so whatever the tool writes there reaches this statement, exactly as
+ * it reaches the refusal beside it. ⚠ And no remedy: the refusal beside it carries that, and the floor's guidance
+ * answers the code (`floor.ts`, D7).
+ */
+function substitutedModelStatement(
+	agentId: string | undefined,
+	reported: string | undefined,
+	configured: string
+): string {
+	return (
+		`The reviewing tool '${agentId ?? ''}' reported that the model '${reported ?? ''}' answered; the model ` +
+		`configured and selected for this review is '${configured}'.`
+	);
+}
+
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	/**
@@ -571,7 +596,14 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				//     for who gave it — under the reported id and its grade, and E-5 says no parse was attempted.
 				//   · ⛔ NO REPAIR: a second call would go to the same substitute, and be billed.
 				//   · ⚠ OUTSIDE the `try` above on purpose: thrown inside it, the refusal would be dressed as a failed
-				//     invocation of the backing tool, which it is not.
+				//     invocation of the backing tool, which it is not — ⭐ and `sanitiseToolFailure` REBUILDS every error it
+				//     catches (`tools/diagnostic-safety.ts`), so the code the throw carries (below) would be lost with it.
+				//   · ⭐ `JAN-SELRES` RS-2 (D6; `REG-F-460`) — THE THROW CARRIES `VALIDATOR_MODEL_SUBSTITUTED`, so the floor can
+				//     tell a refused substitute from a reviewer that failed to run: the runner records it beside
+				//     `VALIDATOR_EXECUTION_FAILED` (whose statement is this message, unchanged), and the classifier answers it
+				//     with its own action, `REQUALIFY_OR_RESELECT_REVIEWER` (`floor.ts`, D7) — never "retry the reviewer".
+				//     The code is the package's, imported: a restated literal here would part from the classifier's the day the
+				//     package's word moved (`verif/validator-failure-codes-imported.test.ts`).
 				// ⚠ DISCLOSED: the model's VERSION stays unreported for this reviewer. devin's export names a model id and no
 				// version, so a provider that changed what it serves under the same id passes this check.
 				if (opts.requireReportedModel && evaluator.modelId !== configuredModelId) {
@@ -585,7 +617,14 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 						{ outcome: 'NOT_ATTEMPTED', detail: refusal },
 						predecessor
 					);
-					throw new Error(refusal);
+					throw validatorFailureError(refusal, {
+						code: VALIDATOR_MODEL_SUBSTITUTED,
+						statement: substitutedModelStatement(
+							evaluator.agentId,
+							evaluator.modelId,
+							configuredModelId
+						)
+					});
 				}
 				return { text, times };
 			};

@@ -276,6 +276,14 @@ Read from code at `2bcf3b50`:
     regress, and the export census is regenerated (`scripts/export-guard.ts --write`).
     - `reviewer:qual:check` proves only that the fingerprint does not move. It cannot see observations:
       `scoreThrow` hashes `disposition`, `resultClass`, `independenceOk` and `criteria` (`runner.ts:251-257`).
+  - ⭑ *As built (`RS-2`):*
+    - **The exports.** The package also exports `VALIDATOR_MODEL_SUBSTITUTED` by name and a helper,
+      `validatorFailureError(message, failure)`, so the carrier's property name lives in one module.
+    - **What adds nothing.** A carrier whose READ throws (a getter, a Proxy trap) adds nothing, and nor does a
+      near-miss spelling of the code. Both are tested, with a table of malformed carriers.
+    - **The statement** holds the tool and the two model ids only, pinned exactly. The reported id is tool-written and
+      unbounded where it is read (`REG-F-468`).
+    - **The census** is regenerated: 362 of 362 guarded.
   - **Contract standing.** `findingCode` is `z.string()` (`packages/rph-contracts/src/objects.ts:701`). No schema,
     envelope or enum changes, so `JPWB-DOC-004`'s contract procedure is not engaged. The code is package vocabulary, as
     `VALIDATOR_EXECUTION_FAILED` is.
@@ -308,6 +316,11 @@ Read from code at `2bcf3b50`:
     classifier, so the co-recorded `VALIDATOR_EXECUTION_FAILED` and `INDEPENDENCE_VIOLATION` are present.
     `floor.test.ts`'s `reviewPolicy` (`independenceOk: true`) is not the shape a throw produces.
     - A mutant moving the new branch after the execution-failure branch is killed by the guidance assertion.
+  - ⭑ *As built (`RS-2`):*
+    - **The route.** Every reachable action is driven through the authoring route (`authoring-route-disposition.test.ts`,
+      keyed by the action union).
+    - **Hand-built limbs** (the code first, third, and with independence holding) sit beside the real-shape test.
+    - **Membership** of `OPERATIONAL_REVIEW_CODES` is equivalent until `RS-3` reads the set.
 - **D8 — The page's blocked hint follows the record (`REG-F-462`).**
   - **What changes.** When the reasoning-review policy's observations include a code in `OPERATIONAL_REVIEW_CODES`,
     the hint no longer says "revise the graph". Its new text:

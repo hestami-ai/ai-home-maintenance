@@ -12,6 +12,8 @@ import { analyzePwaGraph } from '@janumipwb/rph-projections';
 import {
 	FLOOR_POLICY_IDS,
 	runFloorAndPlanRecording,
+	VALIDATOR_FAILURE_CODES,
+	VALIDATOR_MODEL_SUBSTITUTED,
 	type AssuranceSubject,
 	type IdentityProvenanceFacts,
 	type ProfessionalRationaleSummary,
@@ -177,15 +179,46 @@ export interface FloorView {
 
 /** The authoring-plane response to an unsatisfied floor. Only a valid Reasoning Review finding about the reviewed
  *  subject may be sent back to the producing agent. Validator availability, execution, output-boundary, and
- *  independence failures are assurance-control failures; asking the producer to edit the graph in response would
- *  hide the failed control behind unrelated semantic mutation. */
+ *  independence failures — ⭐ and a review refused because a model other than the selected one answered it
+ *  (`REQUALIFY_OR_RESELECT_REVIEWER`, `JAN-SELRES` D7) — are assurance-control failures; asking the producer to edit
+ *  the graph in response would hide the failed control behind unrelated semantic mutation.
+ *
+ *  ⛔ A NEW MEMBER IS ALSO A NEW CASE IN `isOperationalRemediation`, below, whose `never` default refuses to compile
+ *  without one — the authoring route's disposition keys on it. */
 export type FloorRemediationAction =
 	| 'NONE'
 	| 'REFINE_SUBJECT'
 	| 'RETRY_OR_CONFIGURE_REVIEWER'
+	| 'REQUALIFY_OR_RESELECT_REVIEWER'
 	| 'CHANGE_REVIEWER'
 	| 'ESCALATE_REVIEW'
 	| 'RESOLVE_OTHER_FLOOR_FINDINGS';
+
+/**
+ * ⭐ `JAN-SELRES` D7 — IS THIS A PROBLEM WITH THE REVIEW, NOT WITH THE SUBJECT? The authoring route marks a staged
+ * candidate `BLOCKED_EXTERNAL` when it is, and `REVISION_REQUIRED` when it is not (`routes/pwa/[id]/agent/+server.ts`).
+ *
+ * ⛔ AN EXHAUSTIVE SWITCH, NOT A LIST. The route enumerated three actions with `===`, so an action added to the union and
+ * missed there fell to `REVISION_REQUIRED` in silence — a refused review recorded as a defect in the candidate. The
+ * `never` default makes that miss a COMPILE error instead.
+ */
+export function isOperationalRemediation(action: FloorRemediationAction): boolean {
+	switch (action) {
+		case 'RETRY_OR_CONFIGURE_REVIEWER':
+		case 'REQUALIFY_OR_RESELECT_REVIEWER':
+		case 'CHANGE_REVIEWER':
+		case 'ESCALATE_REVIEW':
+			return true;
+		case 'NONE':
+		case 'REFINE_SUBJECT':
+		case 'RESOLVE_OTHER_FLOOR_FINDINGS':
+			return false;
+		default: {
+			const unclassified: never = action;
+			throw new Error(`Unclassified floor remediation action: ${String(unclassified)}`);
+		}
+	}
+}
 
 export interface FloorRemediation {
 	readonly action: FloorRemediationAction;
@@ -196,7 +229,21 @@ export interface FloorRemediation {
 	readonly guidance: string;
 }
 
-const OPERATIONAL_REVIEW_CODES = new Set(['VALIDATOR_EXECUTION_FAILED', 'INDEPENDENCE_VIOLATION']);
+/**
+ * The review observation codes that say something about the REVIEW, never about the subject — never sent back to the
+ * producer as a finding.
+ *
+ * ⭐ `JAN-SELRES` D7 — EVERY CODE A THROWN VALIDATOR FAILURE MAY CARRY IS ONE, imported from the package's closed set
+ * rather than restated: each refines `VALIDATOR_EXECUTION_FAILED`, which it is always recorded beside. ⭑ EXPORTED FOR
+ * THE PWA PAGE, whose blocked hint keys on these recorded codes (`JAN-SELRES` RS-3, D8).
+ * ⚠ TODAY THE SUBSTITUTION'S MEMBERSHIP IS UNOBSERVABLE HERE: `classifyFloorRemediation` answers a
+ * `VALIDATOR_MODEL_SUBSTITUTED` review before it reaches the one reader below. RS-3's hint is its first reader.
+ */
+export const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
+	'VALIDATOR_EXECUTION_FAILED',
+	'INDEPENDENCE_VIOLATION',
+	...VALIDATOR_FAILURE_CODES
+]);
 
 /** The dispositions that JUDGED the subject and found something in it — the only ones whose findings may
  *  be sent back to the producer. Of `AggregateAssuranceDisposition`'s six members these are the two that
@@ -206,8 +253,12 @@ const FEEDS_BACK_TO_PRODUCER: ReadonlySet<string> = new Set(['REJECTED', 'CONDIT
 /** Classify remediation from policy identity, disposition, independence, and observation CODES — never prose.
  *
  * `VALIDATOR_EXECUTION_FAILED` covers missing host configuration and external process/provider failures alike. The
- * exact operational diagnosis remains in the recorded observation, but all such cases have the same safe authoring
- * response: preserve the subject, repair/retry/change the independent Validator, and keep publication blocked.
+ * exact operational diagnosis remains in the recorded observation, and ~~all such cases have the same safe authoring
+ * response~~ every such case keeps the subject preserved and publication blocked. ⭐ `JAN-SELRES` D7 (`REG-F-460`):
+ * ONE CASE HAS ITS OWN RESPONSE — a review refused because the reviewing tool reported a model other than the
+ * configured and selected one, recorded as `VALIDATOR_MODEL_SUBSTITUTED` beside it (`rph-assurance` D6). Retrying or
+ * reconfiguring would bill another call to the same substitute, so it is answered by re-qualification or re-selection;
+ * every other execution failure is still answered by repairing, retrying or changing the independent Validator.
  */
 export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	if (floor.satisfied) {
@@ -222,6 +273,21 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 			findings: [],
 			guidance:
 				'PublishPwa remains blocked because the mandatory Reasoning Review did not produce a policy result. Configure or register a permitted independent reviewer, then rerun assurance. Do not revise the PWA or record a waiver in response to the missing review.'
+		};
+	}
+
+	// ⭐ `JAN-SELRES` D7 — A SUBSTITUTED MODEL, BEFORE ANY OTHER FAILED REVIEW. ⛔ BEFORE, AND IT MUST BE: the substitution
+	// is always recorded BESIDE `VALIDATOR_EXECUTION_FAILED` (it refines it, `rph-assurance` D6), so the execution-failure
+	// branch below would take it first and answer "configure or retry" — the remedy its own refusal forbids.
+	// ⚠ The guidance is the agent's wording, flagged for the sponsor's confirmation (`REG-D-087`); the confirmed core is
+	// only *"re-qualification or re-selection, not reconfiguration"* (`REG-D-085` item 3, `REG-D-086`).
+	if (review.observations.some((o) => o.code === VALIDATOR_MODEL_SUBSTITUTED)) {
+		return {
+			action: 'REQUALIFY_OR_RESELECT_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the reviewing tool reported that a model other than the configured and selected one answered, so the review was refused. Retrying or reconfiguring the same selection does not fix this: another call is billed and may be served the same way. The remedy is a sponsor decision: re-qualify the model the tool actually serves and select it, or re-select the reviewer (REG-D-084, REG-D-086); then configure the host to the new selection. Do not revise the PWA or record a waiver in response to this refusal.'
 		};
 	}
 

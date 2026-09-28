@@ -19,6 +19,7 @@ import {
 } from '@janumipwb/rph-assurance';
 import { writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { classifyFloorRemediation, type FloorView } from '../floor.js';
 import { clearingJudgement } from './clearing-reviewer.testing.js';
 import { createExchangeSink } from './exchange-capture.js';
 import { createFloorRegistry } from './index.js';
@@ -296,6 +297,113 @@ describe('⭐ SR-2 (D6) — devin reviews with the model configured, or the revi
 			'invocation failed'
 		);
 		expect(statement).toMatch(/^The reviewing tool 'devin' reported /);
+	});
+});
+
+// ── ⭐ `JAN-SELRES` RS-2 (D6, D7; `REG-F-460`) — A SUBSTITUTED MODEL HAS ITS OWN CODE, AND ITS OWN REMEDY ────────────────
+//
+// ⛔ WHAT WAS WRONG (`DESIGN-the-selection-residuals.md` §2 G7). The refusal above says its remedy is re-qualification
+// or re-selection, never reconfiguration — and the floor could not tell it from any other failed review. The validator
+// threw a plain `Error`, the runner recorded one `VALIDATOR_EXECUTION_FAILED`, and the classifier, which reads codes and
+// never prose, answered *"Configure or retry the reviewer"*: another billed call to the same substitute.
+//
+// ⭑ THE REAL SHAPE, NEVER A HAND-BUILT ONE. Both cases run the product's devin branch through its exec seam and the
+// package's floor runner and recording plan, so what the classifier reads is what a throw actually produces:
+// `VALIDATOR_EXECUTION_FAILED` first, the new code beside it, and the `INDEPENDENCE_VIOLATION` recording adds because
+// no evaluator ran (`REG-F-463`) — `independenceOk` false. A view with `independenceOk: true` (`floor.test.ts`'s
+// `reviewPolicy`) is not a shape a throw can produce.
+describe('⭐ RS-2 (D6, D7) — a substituted model is recorded under its own code and answered with its own remedy', () => {
+	const INTENT = CTX.reasoningReview!.prompt;
+	const CONTENT = CTX.reasoningReview!.content;
+	/** D7's guidance, verbatim — the agent's wording, flagged for the sponsor's confirmation (`REG-D-087`). */
+	const REQUALIFY_OR_RESELECT_GUIDANCE =
+		'PublishPwa remains blocked because the reviewing tool reported that a model other than the configured and selected one answered, so the review was refused. Retrying or reconfiguring the same selection does not fix this: another call is billed and may be served the same way. The remedy is a sponsor decision: re-qualify the model the tool actually serves and select it, or re-select the reviewer (REG-D-084, REG-D-086); then configure the host to the new selection. Do not revise the PWA or record a waiver in response to this refusal.';
+
+	/** A floor run whose devin reviewer reports `substituted-model` while `fixture-devin-model` is configured. */
+	async function substitutedFloor() {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const devin = devinProgram('substituted-model');
+		const plan = await runFloorAndPlanRecording(
+			SUBJECT,
+			CTX,
+			createFloorRegistry({ testMode: false, devinExec: devin.exec })
+		);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+		if (!review) throw new Error('the floor recorded no reasoning-review assessment at all');
+		// ⭑ THE VIEW `runPwaFloor` BUILDS FROM A PLAN, in every field the classifier reads (`floor.ts`, its `return`). It
+		// omits the criteria tally, which `classifyFloorRemediation` never reads.
+		const view: FloorView = {
+			subjectId: SUBJECT.subjectId,
+			aggregate: plan.aggregate,
+			satisfied: plan.gatePermitsTransition,
+			waived: false,
+			policies: plan.assessments.map((a) => ({
+				policyId: a.policyId,
+				disposition: a.disposition,
+				independenceOk: a.independenceOk,
+				observations: a.observations.map((o) => ({
+					code: o.code,
+					severity: o.severity,
+					statement: o.statement
+				}))
+			})),
+			reasoningGaps: review.observations.map((o) => o.statement)
+		};
+		return { devin, review, view };
+	}
+
+	it('⭐ D6 — VALIDATOR_MODEL_SUBSTITUTED is recorded SECOND, beside VALIDATOR_EXECUTION_FAILED, naming the tool and both models and nothing of the prompt', async () => {
+		const { devin, review } = await substitutedFloor();
+
+		expect(devin.calls, 'a repair would be a second paid call to the substitute').toHaveLength(1);
+		expect(
+			review.observations.map((o) => o.code),
+			'the substitution was not recorded under its own code, after the execution failure'
+		).toEqual([
+			'VALIDATOR_EXECUTION_FAILED',
+			'VALIDATOR_MODEL_SUBSTITUTED',
+			'INDEPENDENCE_VIOLATION'
+		]);
+		// ⭑ THE FIRST OBSERVATION IS UNCHANGED — the refusal, with its remedy — so the waiver target and the order on screen
+		// lead as before.
+		expect(review.observations[0]!.statement).toMatch(/^The reviewing tool 'devin' reported /);
+		expect(review.observations[0]!.statement).toContain('the remedy is to re-qualify');
+		const substituted = review.observations[1]!;
+		expect(substituted.severity).toBe('MATERIAL');
+		expect(substituted.statement).toContain("'devin'");
+		expect(substituted.statement).toContain("'substituted-model'");
+		expect(substituted.statement).toContain("'fixture-devin-model'");
+		// ⛔ WRITTEN BY THE VALIDATOR, NEVER BY A TOOL'S DIAGNOSTIC — so nothing of the prompt (`PER-12`). ⚠ These two ask
+		// only whether the VALIDATOR writes the prompt: the reported id here is benign, and a tool-written id is carried
+		// unbounded (`readReportedModel`), so they cannot catch a tool that writes it.
+		expect(substituted.statement).not.toContain(INTENT);
+		expect(substituted.statement).not.toContain(CONTENT);
+		// ⭑ THE WHOLE SENTENCE — ids only, and NO REMEDY: the refusal at `observations[0]` carries the remedy, and the
+		// floor's guidance answers the code (D7). A statement that repeated the refusal would pass every check above.
+		expect(substituted.statement).toBe(
+			"The reviewing tool 'devin' reported that the model 'substituted-model' answered; the model configured and selected for this review is 'fixture-devin-model'."
+		);
+		expect(
+			review.independenceOk,
+			'arrangement: a throw records no evaluator, so independence fails'
+		).toBe(false);
+	});
+
+	it('⭐ D7 — the same floor is classified REQUALIFY_OR_RESELECT_REVIEWER: no auto-refinement, no findings, D7’s guidance — never "retry the reviewer"', async () => {
+		const { view } = await substitutedFloor();
+
+		const remediation = classifyFloorRemediation(view);
+
+		expect(remediation.action, 'a substitution was answered as a failed or dependent review').toBe(
+			'REQUALIFY_OR_RESELECT_REVIEWER'
+		);
+		expect(remediation.autoRefine, 'a refused review was sent back to the producer').toBe(false);
+		expect(remediation.findings).toEqual([]);
+		expect(remediation.guidance).toBe(REQUALIFY_OR_RESELECT_GUIDANCE);
+		expect(remediation.guidance, 'the guidance offers the remedy the refusal forbids').not.toMatch(
+			/retry the reviewer/i
+		);
 	});
 });
 

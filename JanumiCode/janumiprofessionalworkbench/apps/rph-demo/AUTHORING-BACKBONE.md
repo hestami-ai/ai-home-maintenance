@@ -69,7 +69,11 @@ The following fixes address concrete failures observed during a large natural-la
 - Assurance remediation uses policy identity, disposition, independence, and observation codes. Only valid
   Reasoning Review subject findings may trigger auto-refinement. `VALIDATOR_EXECUTION_FAILED`,
   `INDEPENDENCE_VIOLATION`, missing results, escalation, and configuration/external failures remain fail-closed and
-  produce retry/configure/change-reviewer guidance rather than graph edits or waiver advice.
+  produce retry/configure/change-reviewer guidance rather than graph edits or waiver advice. A model substitution
+  (`VALIDATOR_MODEL_SUBSTITUTED`, recorded beside `VALIDATOR_EXECUTION_FAILED`) is answered by its own action,
+  `REQUALIFY_OR_RESELECT_REVIEWER`, whose guidance says that retrying or reconfiguring the same selection does not fix
+  it. Which actions are operational is one exhaustive function, `isOperationalRemediation` (`floor.ts`), which the
+  authoring route asks.
 - ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
   resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default
   `Gemini 3.5 Flash (High)`. The actual agy invocation always receives that concrete value through `--model`; the
@@ -106,7 +110,10 @@ The following fixes address concrete failures observed during a large natural-la
   - **The model devin reports must be the model configured.** When devin reports a model and it is not the configured
     one, the review fails closed naming both, and the remedy is re-qualification or re-selection, not
     reconfiguration. When devin reports no model, nothing is compared: the configured model is recorded, graded
-    `HOST_CONFIGURED`.
+    `HOST_CONFIGURED`. The refusal carries its own code, `VALIDATOR_MODEL_SUBSTITUTED`, recorded beside
+    `VALIDATOR_EXECUTION_FAILED`; the turn is BLOCKED_EXTERNAL with the substitution's guidance, and the execution
+    plane names `REQUALIFY_OR_RESELECT_REVIEWER` (`JAN-SELRES` `RS-2`). The model id devin reports is tool-written and
+    unbounded where it is read (`REG-F-468`).
   - **Program overrides** (`JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`) are honoured only in test mode, for the reviewer and the
     executor alike: outside it, an override for the SELECTED reviewer tool refuses the review, and `JPWB_AGY_BIN` set
     while agy is the executor refuses the model step before dispatch.

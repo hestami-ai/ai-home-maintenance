@@ -37841,7 +37841,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-460 — a model-substitution refusal carries the right remedy in its statement, but the floor's operator guidance beside it says "Configure or retry the reviewer"
 
-**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, raised by its adversarial verifier). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-2` (`REG-D-087`).**
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, raised by its adversarial verifier). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ~~⚠ **OPEN — owed by `JAN-SELRES` `RS-2` (`REG-D-087`).**~~ ✅ **CLOSED 2026-09-28 by `JAN-SELRES` `RS-2`** — the refusal carries a code from a closed set in `rph-assurance`, and the floor records `VALIDATOR_MODEL_SUBSTITUTED` beside `VALIDATOR_EXECUTION_FAILED`; the classifier answers it by its own action, `REQUALIFY_OR_RESELECT_REVIEWER`, whose guidance says retrying or reconfiguring does not fix it (the wording is the agent's, `REG-D-087` item 4). The authoring turn is BLOCKED_EXTERNAL with that guidance, and the execution plane names the action.
 
 - **THE REFUSAL.** When devin reports a model other than the configured one, the validator throws a refusal naming both ids, whose remedy is *re-qualify or re-select, never reconfigure* (design D6). The floor records it as `VALIDATOR_EXECUTION_FAILED`, as every throw is.
 - **THE GUIDANCE.** The floor classifies by CODE, never by prose (`apps/rph-demo/src/lib/server/floor.ts:216-231`). So the operator is shown `RETRY_OR_CONFIGURE_REVIEWER` with *"Configure or retry the reviewer"*. That contradicts the refusal's own remedy, and a retry is a second billed call to the same substitute. `autoRefine` is false, so nothing retries automatically.
@@ -37938,3 +37938,30 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY IT MATTERS.** The predicate's own comment says the question is RELATIONAL, *"is this consumer a test?"*, and that an export whose only importer is a test *"makes no promise to the system"*. A test-only helper is a test by that reading; counting it obliges a guard no production code relies on.
 - **TODAY.** The three `*.testing.ts` files (`assurance/clearing-reviewer.testing.ts`, `assurance/no-programs.testing.ts`, `execution/begin-execute.testing.ts`) import no package export, so the census is not inflated.
 - **SEARCHED BEFORE FILING.** The register for `isProductionConsumer`, `.testing.ts` and `export-guard-core`: 0 each.
+
+### REG-F-468 — the model id devin reports is tool-written, unvalidated and unbounded, and it is written into two projected statements
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-2`, raised by its adversarial verifier, who drove a probe). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE READ.** `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts` `readReportedModel` returns the export's last `steps[].extra.generation_model` whenever it is a non-empty string: no shape check and no length cap.
+- **WHERE IT GOES.** It becomes the evaluator's model id, graded `PROVIDER_REPORTED`. When it differs from the configured model it is written into the refusal (the `VALIDATOR_EXECUTION_FAILED` statement, since `JAN-SELREV` `SR-2`) and into the `VALIDATOR_MODEL_SUBSTITUTED` statement (`RS-2`). Both are projected observations.
+- **THE PROBE.** A reported id carrying a newline, a 60-character prompt fragment and 5,000 more characters yields a 5,199-character, multi-line `VALIDATOR_MODEL_SUBSTITUTED` statement that contains the prompt text. `PER-12` forbids projecting prompt content. `floor-registry.test.ts`'s `not.toContain` checks on the prompt ask only whether the VALIDATOR writes it: the fixture's reported id is benign.
+- **REMEDY CANDIDATES, UNTESTED.** A model-id shape check and a length cap where the id is read, or `diagnosticCarriesPrompt` run over it. ⚠ Whatever is chosen must not let a malformed id slip past the substitution refusal, as treating it as "no report" (`HOST_CONFIGURED`) would.
+- **SEARCHED BEFORE FILING.** The register for `readReportedModel`: 7 hits, about the function once being unused (`REG-F-359`) and about what it reads, none about bounding it. For `generation_model`: 2 hits, both describing the export.
+
+### REG-F-469 — the execution plane says "reviewed over N tries" with N one too many
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-2`; its builder and verifier each observed devin called once and the message saying two tries; the cause is read from code). **Status:** ⚠ **OPEN — owed by `JAN-SELRES` `RS-3`, whose scope this entry extends.**
+
+- **THE COUNT.** `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1509` pushes each unsatisfied try's open-finding count before the loop decides whether to stop. `:1643` then prints `reviewed over ${openPerTry.length + 1} …`. On the unsatisfied path every try has already been pushed, so the count is always one too high: a single review reads "2 tries".
+- **WHY IT MATTERS.** It is `REG-F-460`'s general form: an operator surface beside a failed review that misstates what happened. A try is a billed call.
+- **SEARCHED BEFORE FILING.** The register for `reviewed over` and `openPerTry`: 0 each.
+
+### REG-F-470 — the export census records `unattributedMutants` for each file, nothing checks it, and the recorded values drift
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-2`, found when its regeneration moved three files no RS-2 change touched; read from code). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE FIELD.** `verif/floors/export-guard.baseline.json` records `unattributedMutants` per file. `compareGuardCensus` (`scripts/export-guard-core.ts`) compares only lost guards and consumed-export membership, never this field.
+- **THE DRIFT.** Regenerating for `RS-2` (`bun run guards:export`) also moved three untouched files: `packages/rph-application/src/handlers/assurance.ts` 6 → 9, `packages/rph-assurance/src/floor.ts` 0 → 2, `packages/rph-projections/src/assurance-view.ts` 0 → 1. Ledger entries added since the previous regeneration had changed the true values, and no check said so.
+- **WHY IT MATTERS.** A recorded value no check reads drifts silently. The summary line (*"N mutant(s) crediting none"*) is computed fresh; only the per-file record goes stale.
+- **SEARCHED BEFORE FILING.** The register for `unattributedMutants`: 0. For `guards:export`: 4 hits, none about this field.

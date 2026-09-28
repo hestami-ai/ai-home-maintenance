@@ -114,7 +114,10 @@ bun run --filter @janumipwb/rph-demo dev
   `JPWB_ASSURANCE_MODEL`, the review fails closed and names both. Pointing the configuration at the model devin
   served is not the fix: the configured model is the one that was qualified and selected, so re-qualify the model
   devin serves, or re-select the reviewer. When devin reports no model, the configured one is recorded, graded
-  `HOST_CONFIGURED`.
+  `HOST_CONFIGURED`. A substitution is recorded as `VALIDATOR_MODEL_SUBSTITUTED` beside `VALIDATOR_EXECUTION_FAILED`,
+  and answered by its own remediation, `REQUALIFY_OR_RESELECT_REVIEWER`: retrying or reconfiguring the same selection
+  does not fix it, and the remedy is a sponsor decision. An authoring turn shows that guidance and stays blocked; the
+  execution plane names the action (`REG-F-460`, closed by `JAN-SELRES` `RS-2`).
 - **Program overrides are for tests.** `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN` replace a program only in test mode.
   Outside it, an override set for the selected reviewer tool refuses the review, and `JPWB_AGY_BIN` set while agy is
   the executor refuses the model step before anything is dispatched, even when the override is empty. An override for

@@ -3,8 +3,12 @@
 // provenance, or an identified producer must fail its mandatory criterion. Mutation proof: revert any derived fact
 // below to a literal `true` and the matching case here goes red.
 import { describe, expect, it } from 'vitest';
-import { classifyFloorRemediation, identityProvenanceFactsOf } from './floor.js';
-import type { FloorProducer, FloorView } from './floor.js';
+import {
+	classifyFloorRemediation,
+	identityProvenanceFactsOf,
+	isOperationalRemediation
+} from './floor.js';
+import type { FloorProducer, FloorRemediationAction, FloorView } from './floor.js';
 
 const PRODUCER: FloorProducer = {
 	agentId: 'authoring-agent',
@@ -234,4 +238,79 @@ describe('classifyFloorRemediation — operational assurance failures never beco
 		);
 		expect(result).toEqual({ action: 'NONE', autoRefine: false, findings: [], guidance: '' });
 	});
+});
+
+// ⭐ `JAN-SELRES` D7 — *"ANY reasoning-review observation coded VALIDATOR_MODEL_SUBSTITUTED"*, WHEREVER IT SITS AND
+// WHATEVER INDEPENDENCE SAYS. ⚠ ALONGSIDE THE REAL SHAPE, NEVER IN PLACE OF IT: `assurance/floor-registry.test.ts`
+// drives a real throwing devin validator through the package's runner, which today records the code SECOND, with
+// `independenceOk` false (`REG-F-463`). Only that one shape is produced, so a branch that read position 1 alone, or that
+// fired only beside a failed independence, would pass there; these hand-built views hold the rule as D7 states it.
+describe('classifyFloorRemediation — a substitution anywhere in the review is answered by REQUALIFY_OR_RESELECT_REVIEWER', () => {
+	const executionFailed = {
+		code: 'VALIDATOR_EXECUTION_FAILED',
+		severity: 'MATERIAL',
+		statement: 'The reviewing tool reported another model.'
+	};
+	const substituted = {
+		code: 'VALIDATOR_MODEL_SUBSTITUTED',
+		severity: 'MATERIAL',
+		statement: 'The reviewing tool reported that another model answered.'
+	};
+	const independenceViolation = {
+		code: 'INDEPENDENCE_VIOLATION',
+		severity: 'BLOCKING',
+		statement: 'No evaluator was recorded.'
+	};
+	const views: readonly (readonly [string, FloorView['policies'][number]])[] = [
+		[
+			'the code FIRST',
+			reviewPolicy({
+				independenceOk: false,
+				observations: [substituted, executionFailed, independenceViolation]
+			})
+		],
+		[
+			'the code THIRD',
+			reviewPolicy({
+				independenceOk: false,
+				observations: [executionFailed, independenceViolation, substituted]
+			})
+		],
+		[
+			'independence HOLDING',
+			reviewPolicy({ independenceOk: true, observations: [executionFailed, substituted] })
+		]
+	];
+	for (const [name, review] of views)
+		it(`${name} → REQUALIFY_OR_RESELECT_REVIEWER, no auto-refinement, no findings`, () => {
+			const result = classifyFloorRemediation(floorView({ policies: [review] }));
+			expect(result.action, 'a substitution was answered as a failed or dependent review').toBe(
+				'REQUALIFY_OR_RESELECT_REVIEWER'
+			);
+			expect(result.autoRefine).toBe(false);
+			expect(result.findings).toEqual([]);
+		});
+});
+
+// ⭐ `JAN-SELRES` D7 — WHICH ACTIONS ARE THE REVIEW'S PROBLEM, NOT THE SUBJECT'S. The authoring route marks a candidate
+// BLOCKED_EXTERNAL on `true` and REVISION_REQUIRED on `false`; `authoring-route-disposition.test.ts` drives the route
+// itself for every reachable action. ⭑ The table is a `Record` over the union, so a new action that is not classified
+// here fails to COMPILE, as it does in the function's own `never` default.
+describe('isOperationalRemediation — every action answered, the operational ones true', () => {
+	const OPERATIONAL: Readonly<Record<FloorRemediationAction, boolean>> = {
+		NONE: false,
+		REFINE_SUBJECT: false,
+		RETRY_OR_CONFIGURE_REVIEWER: true,
+		REQUALIFY_OR_RESELECT_REVIEWER: true,
+		CHANGE_REVIEWER: true,
+		ESCALATE_REVIEW: true,
+		RESOLVE_OTHER_FLOOR_FINDINGS: false
+	};
+	for (const [action, operational] of Object.entries(OPERATIONAL) as [
+		FloorRemediationAction,
+		boolean
+	][])
+		it(`${action} → ${String(operational)}`, () => {
+			expect(isOperationalRemediation(action)).toBe(operational);
+		});
 });
