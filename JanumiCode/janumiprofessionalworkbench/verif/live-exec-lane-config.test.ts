@@ -35,17 +35,21 @@ import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	EXECUTE_TIMEOUT_MS,
+	EXECUTOR_PROGRAM_VARIABLE,
 	LANE_BUDGET,
 	REVIEWER_IDENTITY_EVIDENCE,
 	REVIEWER_MODEL_VARIABLE,
 	REVIEWER_PROGRAM_VARIABLE,
 	TEST_TIMEOUT_MS,
+	WIRED_EXECUTORS,
 	laneKeysRefusal,
 	requiredLaneKeys,
 	reviewerModelVariable,
+	wiredExecutor,
 	wiredReviewer
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { agyPrint } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
+import { selectExecutor } from '../apps/rph-demo/src/lib/server/execution/executor-selection.js';
 import { noProgramsDirectory } from '../apps/rph-demo/src/lib/server/assurance/no-programs.testing.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { selectReviewer } from '../apps/rph-demo/src/lib/server/assurance/reviewer-selection.js';
@@ -229,6 +233,162 @@ describe('⛔ the lane refuses a program override where the product does — the
 				await import('../apps/rph-demo/src/lib/server/tools/devin-reviewer.js');
 			expect(DEVIN_BIN_OVERRIDE).toBe('fixture-devin-program');
 		});
+	});
+});
+
+// ⭐ `JAN-SELRES` RS-1 (D5) — THE EXECUTOR LIMB, HELD TO THE PRODUCT'S EXECUTOR SELECTOR THE WAY THE REVIEWER LIMB IS HELD
+// TO ITS OWN (above): over a table, with the product asked outside test mode — where the lane runs — and handed the
+// overrides the shell would have made the adapters capture. ⭑ ONE RULE IS THE LANE'S OWN, and the table holds it apart
+// from the product's: no agy executor, because the spec asserts a provider-reported producer.
+describe('⭐ the lane refuses the executor the product refuses — and one more, labelled as the lane’s own', () => {
+	/** The line the lane's own rule writes — the one refusal the product does not make. */
+	const LANE_RULE = 'is refused by a rule of THIS LANE, not of the product';
+	/** Each reason the lane gives, one per line. */
+	const faultsOf = (refusal: string | undefined) =>
+		(refusal ?? '').split('\n').filter((l) => l.startsWith('  · '));
+
+	it('⭑ reads the executing tool as the selector does — trimmed, blank unset, the id matched exactly', () => {
+		const tools = [
+			'pi',
+			' pi ',
+			'pi\n',
+			'\tagy',
+			'agy',
+			'Agy',
+			'PI',
+			'devin',
+			'nosuchtool',
+			'',
+			'   '
+		];
+		for (const tool of tools) {
+			const product = selectExecutor({
+				testMode: false,
+				env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-model' },
+				overrides: NO_OVERRIDES
+			});
+			expect(wiredExecutor(tool) !== undefined, JSON.stringify(tool)).toBe(
+				product.kind !== 'REFUSED'
+			);
+		}
+		expect(wiredExecutor(undefined)).toBeUndefined();
+		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'pi']);
+	});
+
+	const EXECUTOR_TOOLS = [
+		undefined,
+		'',
+		'   ',
+		'pi',
+		' pi ',
+		'agy',
+		' agy ',
+		'Agy',
+		'devin',
+		'nosuchtool'
+	];
+	const EXECUTOR_MODELS = ['openai-codex/gpt-5.4-mini', undefined, '  '];
+	/** ⭑ `''` is SET. A devin program override needs an agy reviewer, or the REVIEWER limb would refuse the row too. */
+	const PROGRAM_ROWS: readonly {
+		readonly name: string;
+		readonly env: Readonly<Record<string, string>>;
+		readonly reviewer: Readonly<Record<string, string>>;
+	}[] = [
+		{ name: 'no override', env: {}, reviewer: { JPWB_ASSURANCE_TOOL: 'devin' } },
+		{
+			name: 'JPWB_AGY_BIN set',
+			env: { JPWB_AGY_BIN: 'C:/fixture/agy.exe' },
+			reviewer: { JPWB_ASSURANCE_TOOL: 'devin' }
+		},
+		{
+			name: 'JPWB_AGY_BIN empty',
+			env: { JPWB_AGY_BIN: '' },
+			reviewer: { JPWB_ASSURANCE_TOOL: 'devin' }
+		},
+		{
+			name: 'JPWB_DEVIN_BIN set',
+			env: { JPWB_DEVIN_BIN: 'C:/fixture/devin.exe' },
+			reviewer: { JPWB_ASSURANCE_TOOL: 'agy' }
+		}
+	];
+	for (const tool of EXECUTOR_TOOLS)
+		for (const model of EXECUTOR_MODELS)
+			for (const row of PROGRAM_ROWS)
+				it(`JPWB_EXECUTOR=${JSON.stringify(tool)} · JPWB_EXECUTOR_MODEL=${JSON.stringify(model)} · ${row.name}: the lane refuses what the product refuses`, () => {
+					const executor = { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: model, ...row.env };
+					// The lane's full environment: the reviewer's keys all present and admitted, so any fault is the executor's.
+					const env = { ...COMPLETE, ...row.reviewer, ...executor };
+					const product = selectExecutor({
+						testMode: false,
+						env: executor,
+						overrides: { agy: row.env.JPWB_AGY_BIN, devin: row.env.JPWB_DEVIN_BIN }
+					});
+					const faults = faultsOf(laneKeysRefusal(env));
+					const productFaults = faults.filter((l) => !l.includes(LANE_RULE));
+					expect(
+						productFaults.length > 0,
+						`the product answered ${product.kind === 'REFUSED' ? product.code : product.kind}; the lane said ` +
+							JSON.stringify(productFaults)
+					).toBe(product.kind === 'REFUSED');
+					// ⭑ AND THE LANE'S OWN RULE FIRES FOR agy, AND ONLY FOR agy — whether or not the product would run it.
+					expect(
+						faults.some((l) => l.includes(LANE_RULE)),
+						'the lane’s own agy rule'
+					).toBe(wiredExecutor(tool) === 'agy');
+				});
+
+	it('⛔ a Pi executor the product runs boots the lane — the stray JPWB_AGY_BIN of SR2-M20’s host included', () => {
+		const env = { ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin', JPWB_AGY_BIN: 'C:/fixture/agy.exe' };
+		expect(laneKeysRefusal(env)).toBeUndefined();
+		expect(
+			selectExecutor({
+				testMode: false,
+				env,
+				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined }
+			})
+		).toEqual({ kind: 'PI', modelId: COMPLETE.JPWB_EXECUTOR_MODEL });
+	});
+
+	it('⛔ an executor the product does not run is refused, named, with the tools it may be', () => {
+		for (const tool of ['devin', 'Agy', 'nosuchtool']) {
+			const refusal = laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'devin',
+				JPWB_EXECUTOR: tool
+			});
+			expect(refusal ?? 'NO REFUSAL', tool).toContain(`JPWB_EXECUTOR='${tool}' names no executor`);
+			expect(refusal ?? 'NO REFUSAL', tool).toContain('(agy, pi)');
+		}
+	});
+
+	it('⛔ the agy executor’s program override is refused as the product refuses it, even empty, naming it', () => {
+		for (const value of ['C:/fixture/agy.exe', '']) {
+			const refusal = laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'devin',
+				JPWB_EXECUTOR: 'agy',
+				JPWB_AGY_BIN: value
+			});
+			expect(refusal ?? 'NO REFUSAL').toContain(
+				`${EXECUTOR_PROGRAM_VARIABLE.agy}=${JSON.stringify(value)} replaces the agy executor's program`
+			);
+			expect(refusal ?? 'NO REFUSAL').toContain('REG-F-459');
+		}
+		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer.
+		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({ agy: REVIEWER_PROGRAM_VARIABLE.agy });
+	});
+
+	it('⭑ the lane’s agy rule says it is the lane’s, not the product’s — and the spec still makes the assertion it rests on', () => {
+		const refusal =
+			laneKeysRefusal({ ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin', JPWB_EXECUTOR: 'agy' }) ??
+			'NO REFUSAL';
+		expect(refusal).toContain(LANE_RULE);
+		expect(refusal).toContain('PROVIDER_REPORTED');
+		expect(refusal).toContain('e2e-live-exec/execution.live.ts');
+		expect(refusal).toContain('The product runs an agy executor');
+		// ⛔ THE REASON, HELD FROM SOURCE: were the spec to stop asserting a provider-reported producer, this rule would
+		// refuse a configuration for nothing — so the pin reddens and the rule is re-decided.
+		expect(assertionsOn(parsed(SPEC), 'producer.evidence')).toEqual(["toBe('PROVIDER_REPORTED')"]);
 	});
 });
 

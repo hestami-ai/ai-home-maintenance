@@ -11341,7 +11341,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\tif (toolId === 'devin' && overrides.devin !== undefined)\n\t\treturn programOverridden('devin', 'JPWB_DEVIN_BIN', overrides.devin);\n",
 		replace: "\tif (toolId === 'devin' && (overrides.devin ?? overrides.agy) !== undefined) // MUTANT: any tool's override refuses a devin review\n\t\treturn programOverridden('devin', 'JPWB_DEVIN_BIN', overrides.devin ?? overrides.agy ?? '');\n",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/floor-registry.test.ts"],
-		why: "PROMISE (JAN-SELREV D7): only the SELECTED tool's override refuses - a set JPWB_AGY_BIN does not refuse a devin review. WHO RELIES: a host that runs the agy EXECUTOR through JPWB_AGY_BIN (execution/model.ts) and devin as its reviewer. WHAT THE MUTATION DOES: the other adapter's override, which runs no review, refuses the selected reviewer. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: '⭑ the OTHER tool’s override refuses nothing — a set JPWB_AGY_BIN does not stop a devin review' (AssertionError: expected 'reasoning-review.unconfigured' to be 'agy.reasoning-review' // Object.is equality)",
+		why: "PROMISE (JAN-SELREV D7): only the SELECTED tool's override refuses - a set JPWB_AGY_BIN does not refuse a devin review. WHO RELIES: a host that runs a Pi EXECUTOR and devin as its reviewer with a stray JPWB_AGY_BIN left set - admitted on both sides (JAN-SELRES D3: the executor half is pinned by apps/rph-demo/src/lib/server/execution/executor-selection.test.ts, the reviewer half by this victim). The host this entry used to name, one running the agy EXECUTOR through JPWB_AGY_BIN, is refused outside test mode since JAN-SELRES RS-1 (REG-F-459). WHAT THE MUTATION DOES: the other adapter's override, which runs no review, refuses the selected reviewer. OBSERVED: KILLED — 1 test(s) red in floor-registry.test.ts: '⭑ the OTHER tool’s override refuses nothing — a set JPWB_AGY_BIN does not stop a devin review' (AssertionError: expected 'reasoning-review.unconfigured' to be 'agy.reasoning-review' // Object.is equality)",
 		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
 	},
 	{
@@ -12054,5 +12054,320 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-check.test.ts"],
 		why: "PROMISE (SR-4; the verifier's MINOR-2): the COVERAGE problem held to a SELECTION whose ruling is not in force says so beside the ruling — WITHDRAWN, or NOT HELD — so no printed line names that SELECTION in force unqualified. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-check.test.ts: '⛔ the SELECTION in force on a ruling that is not in force is never reported in force unqualified — the report and its COVERAGE problem say the ruling is WITHDRAWN, or NOT HELD' (AssertionError: expected '3 of 3 current case(s) are not MEASUR…' to be '3 of 3 current case(s) are not MEASUR…' // Object.is equality)",
 		source: "JAN-SELREV SR-4 fix — the adversarial verifier's findings (r1.md): MAJOR-1 a struck or refused record of the selected candidate covers nothing of the selection; MAJOR-2 the model label is matched exactly; MAJOR-3 the CLI reads struck ruling headings from the register it reads; MINOR-1 the selection is asked whether or not limb 1's question found a case uncovered; MINOR-2 a SELECTION in force on a ruling not in force is never reported in force unqualified (the report's standing, the COVERAGE problem, the CLI's header)"
+	},
+	{
+		id: "RS1-M1-the-model-is-asked-before-the-program",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tconst overridden = selectedProgramOverridden(\n\t\ttoolId,\n\t\tinput.testMode,\n\t\tinput.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }\n\t);\n\tif (overridden) return overridden;\n\tconst modelId = resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '');\n",
+		replace: "\tconst modelId = resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '');\n\t// MUTANT: the model is asked before the program - an overridden executor with no model is refused as MODEL_UNSET\n\tconst overridden =\n\t\tmodelId === undefined\n\t\t\t? undefined\n\t\t\t: selectedProgramOverridden(\n\t\t\t\t\ttoolId,\n\t\t\t\t\tinput.testMode,\n\t\t\t\t\tinput.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }\n\t\t\t\t);\n\tif (overridden) return overridden;\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1, D3): the refusal codes come in the design's order, and a replaced program is refused whatever model it would run - PROGRAM_OVERRIDDEN before MODEL_UNSET. WHO RELIES: the operator of an agy host whose program was replaced and whose model is also unset, who must be told the program is refused, not only sent to set a model and then refused again. WHAT THE MUTATION DOES: the model is asked first, so an overridden agy with no model is answered MODEL_UNSET and its replaced program is never named. OBSERVED: KILLED — 19 test(s) red in executor-selection.test.ts: 'server mode · tool \"agy\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'server mode · tool \"agy\" · no model · JPWB_AGY_BIN empty' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M2-an-unwired-tool-is-coded-unknown",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t\t'EXECUTOR_TOOL_UNWIRED',\n",
+		replace: "\t\t\t'EXECUTOR_TOOL_UNKNOWN', // MUTANT: an unwired tool is coded unknown\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): each refusal names its own code, so a caller acts on it without parsing prose - devin, declared for EXECUTION with no executor adapter, is EXECUTOR_TOOL_UNWIRED, not UNKNOWN. WHO RELIES: every caller that branches on the code, and the operator reading which configuration was wrong. WHAT THE MUTATION DOES: devin is coded as a tool the catalog does not know, though the catalog declares it. OBSERVED: KILLED — 73 test(s) red in executor-selection.test.ts: 'test mode · tool \"devin\" · no model · no override' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'test mode · tool \"devin\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M3-the-stand-in-is-server-modes",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\treturn input.testMode\n\t\t\t? { kind: 'STAND_IN' }",
+		replace: "\t\treturn !input.testMode // MUTANT: the stand-in outside test mode, a refusal inside it\n\t\t\t? { kind: 'STAND_IN' }",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1, D4; REG-D-052): the fixture executor is the stand-in of test mode alone; outside it an unset tool is a refusal. WHO RELIES: a deployed host with no executor configured, whose model steps must be refused rather than answered by a canned echo recorded as work; and the gate, whose fixture must stay the stand-in. WHAT THE MUTATION DOES: an unset tool outside test mode opens the fixture, and inside it is refused. OBSERVED: KILLED — 221 test(s) red in executor-selection.test.ts: 'test mode · tool undefined · no model · no override' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'STAND_IN' }); 'test mode · tool undefined · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'STAND_IN' } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M4-an-override-is-refused-in-test-mode",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (testMode) return undefined;\n\tconst program = PROGRAM_VARIABLE[toolId];\n",
+		replace: "\tif (testMode && !testMode) return undefined; // MUTANT: an override is refused in test mode too\n\tconst program = PROGRAM_VARIABLE[toolId];\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D3; JAN-SELREV D7): a program override is honoured in test mode, where it is the tests' own. WHO RELIES: the qualification harness's argv test and every gate test that runs agy through a stand-in program in test mode. WHAT THE MUTATION DOES: test mode refuses the agy executor whenever an override was captured, so a test-mode host with JPWB_AGY_BIN cannot execute at all. OBSERVED: KILLED — 38 test(s) red in executor-selection.test.ts: 'test mode · tool \"agy\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'test mode · tool \"agy\" · no model · JPWB_AGY_BIN empty' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'AGY', …(1) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M5-the-environment-is-read-not-the-capture",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tinput.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }\n",
+		replace: "\t\tinput.overrides ?? { agy: process.env.JPWB_AGY_BIN, devin: process.env.JPWB_DEVIN_BIN } // MUTANT: the environment, not the capture\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D3): the override refused is the one agy-cli.ts CAPTURED at load, which is the program it runs for the life of the process. WHO RELIES: a server whose JPWB_AGY_BIN was unset after it started, while agy-cli.ts still runs the replacement. WHAT THE MUTATION DOES: the selector reads the environment at dispatch, sees nothing set, and admits the agy executor that runs the replaced program. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_AGY_BIN refuses an agy executor — though the variable is gone now' (AssertionError: expected false to be 'EXECUTOR_PROGRAM_OVERRIDDEN' // Object.is equality)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M6-a-pi-executor-is-refused-by-JPWB_AGY_BIN",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tconst program = PROGRAM_VARIABLE[toolId];\n",
+		replace: "\tconst program = PROGRAM_VARIABLE[toolId] ?? PROGRAM_VARIABLE.agy; // MUTANT: another tool's override refuses a non-agy executor\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D3): only the SELECTED executor tool's override refuses - JPWB_AGY_BIN refuses an agy executor and nothing else. WHO RELIES: a host running a Pi executor and a devin reviewer with a stray JPWB_AGY_BIN (SR2-M20's host), admitted on both sides. WHAT THE MUTATION DOES: a Pi executor is refused as PROGRAM_OVERRIDDEN by an agy program that runs neither role. OBSERVED: KILLED — 38 test(s) red in executor-selection.test.ts: 'server mode · tool \"pi\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'server mode · tool \"pi\" · no model · JPWB_AGY_BIN empty' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'PI', …(1) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M7-the-model-is-read-from-the-process",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '')",
+		replace: "resolveExecutorModel(env.JPWB_EXECUTOR_MODEL) /* MUTANT: the model defaults to the process */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): the environment handed in is the whole input; resolveExecutorModel defaults to the PROCESS variable when handed undefined, and the empty-string default stops that. WHO RELIES: every caller that hands an explicit environment - the lane pin in verif, and any test that must not inherit the shell. WHAT THE MUTATION DOES: an explicit environment naming agy and no model takes its model from the process, a second read that can disagree with the first. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⭑ an explicit environment is the whole input — the process’s is not consulted' (AssertionError: agy’s model was read from the process, not from the environment handed in: expected { kind: 'AGY', …(1) } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M8-the-tool-is-read-from-the-process",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "resolveExecutorToolId(env.JPWB_EXECUTOR ?? '')",
+		replace: "resolveExecutorToolId(env.JPWB_EXECUTOR) /* MUTANT: the tool defaults to the process */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): the environment handed in is the whole input, for the tool as for the model. WHO RELIES: the lane pin and any caller handing an explicit environment. WHAT THE MUTATION DOES: an explicit environment naming no tool takes the process's JPWB_EXECUTOR, so a test asking about an empty host is answered about the shell. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⭑ an explicit environment is the whole input — the process’s is not consulted' (AssertionError: expected { kind: 'REFUSED', …(4) } to deeply equal { kind: 'STAND_IN' })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M9-the-executor-model-falls-back-to-the-judge",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '')",
+		replace: "resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? env.JPWB_JUDGE_MODEL ?? '') /* MUTANT: the reviewer's model as a fallback */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1; REG-D-052; REG-F-356): EXECUTOR_MODEL_UNSET never falls back to JPWB_JUDGE_MODEL, and says so. WHO RELIES: DIFFERENT_MODEL, which is only meaningful if producer and reviewer are configured apart. WHAT THE MUTATION DOES: an unset executor model silently becomes the reviewer's, so producer and reviewer are the same model by construction - the collision JAN-TOOLSUITE removed. OBSERVED: KILLED — 46 test(s) red in executor-selection.test.ts: 'test mode · tool \"agy\" · the judge model only · no override' (AssertionError: expected { kind: 'AGY', …(1) } to deeply equal { kind: 'REFUSED', …(2) }); 'test mode · tool \"agy\" · the judge model only · JPWB_AGY_BIN set' (AssertionError: expected { Object (kind, modelId) } to deeply equal { kind: 'REFUSED', …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M10-the-guidance-lists-the-catalog",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "Object.keys(WIRED_EXECUTORS).join(', ')",
+		replace: "['agy', 'pi', 'devin'].join(', ') /* MUTANT: the catalog, not the wired tools */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): the guidance lists the WIRED executor tools - the table the selector dispatches on - never the catalog. WHO RELIES: the operator following the refusal's guidance. WHAT THE MUTATION DOES: the guidance offers devin, which the very next refusal forbids as EXECUTOR_TOOL_UNWIRED. OBSERVED: KILLED — 3 test(s) red in executor-selection.test.ts: '⛔ and that reason offers only the WIRED tools — never devin, which the next refusal forbids (REG-F-460’s general form)' (AssertionError: the reason offers devin as a tool to set: expected 'The executing tool \\'nosuchtool\\' (JP…' not to match /devin/); '⛔ it lists the wired tools — agy, pi — and NOT devin' (AssertionError: expected 'Set JPWB_EXECUTOR to the tool that ex…' not to match /\\bpi, devin\\b/)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M11-the-route-refuses-nothing",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n",
+		replace: "\t\t\tconst selected = { kind: 'STAND_IN' } as ReturnType<typeof selectExecutor>; // MUTANT: the route refuses nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): beginExecute asks the executor selector for a MODEL step and returns its refusal before dispatch. WHO RELIES: a server host with a misconfigured executor, whose model step must be refused with guidance, the work unit left as it was. WHAT THE MUTATION DOES: the selector is never asked; every model step opens the fixture executor and runs, in server mode too. OBSERVED: KILLED — 7 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set'); '⛔ EXECUTOR_TOOL_UNKNOWN: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'Unknown backing tool \\'nosuchtool\\'')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M12-the-route-asks-in-test-mode-always",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n",
+		replace: "\t\t\tconst selected = selectExecutor({ testMode: true }); // MUTANT: asked in test mode whatever the host runs in\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4; G4): the selector is asked in the mode the host runs in - the only test-mode read is the caller's. WHO RELIES: a server host with no executor configured, whose model step must be refused rather than answered by the fixture. WHAT THE MUTATION DOES: beginExecute always asks in test mode, so an unset executor outside test mode opens the stand-in and records a canned echo as work. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M13-the-refusal-is-found-after-dispatch",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n",
+		replace: "\t\t\texecutor = selected as RunnableExecutorSelection; // MUTANT: the refusal is acted on only when the executor opens, after runSteps\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4; G3): an executor refusal is returned BEFORE runSteps, so nothing is dispatched and the executor is never opened. WHO RELIES: the operator and the record - a step that could not run must not be recorded as started-then-failed. WHAT THE MUTATION DOES: the refusal is carried past the dispatch batch and found only when the executor opens, so the step is started, then failed - design G3, restored. OBSERVED: KILLED — 5 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: a refused step dispatched something: expected 507 to be 495 // Object.is equality)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M14-a-transformation-step-asks-the-executor-selector",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor",
+		replace: "\t\tif (isModelStep || !isModelStep) { // MUTANT: every step asks the executor selector\n\t\t\tconst selected = selectExecutor",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): a TRANSFORMATION step asks neither selector - the operator completes it, and no executor runs. WHO RELIES: every work unit completed by hand, the reference seed's included, on a host with no executor configured. WHAT THE MUTATION DOES: a TRANSFORMATION step in server mode is refused for an unset JPWB_EXECUTOR it never uses; the server-mode control reddens. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⭑ CONTROL — a server-mode TRANSFORMATION step with NOTHING configured succeeds: it asks neither selector' (AssertionError: a TRANSFORMATION step was refused: expected 'JPWB_EXECUTOR is not set, and there i…' to be undefined)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M15-the-record-reads-the-environment-again",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\t\t\t\tmodelId: fallbackIdentity.modelId,\n",
+		replace: "\t\t\t\t\t\tmodelId: process.env.JPWB_EXECUTOR_MODEL?.trim() || 'unresolved', // MUTANT: resolveExecutorModel() again\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): the record's fallback model is the selection's - the one read that opened the executor - and the stand-in records none. WHO RELIES: DIFFERENT_MODEL and every reader of the EXECUTION exchange, which must name the model that produced the answer. WHAT THE MUTATION DOES: the record reads JPWB_EXECUTOR_MODEL again per try, so a stand-in step names a stray configured model as the producer of the fixture's echo. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ the STAND-IN records no configured model — a stray JPWB_EXECUTOR_MODEL names nothing that ran' (AssertionError: expected { availability: 'REPORTED', …(2) } to match object { value: 'unresolved', …(1) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M16-a-captured-override-never-refuses-the-route",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tconst captured = overrides[program.captured];\n",
+		replace: "\tconst captured = undefined as string | undefined; // MUTANT: no captured override is ever refused\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-program-overridden.test.ts"],
+		why: "PROMISE (JAN-SELRES D3; REG-F-459 remedy (a)): outside test mode an agy executor whose program agy-cli.ts captured from JPWB_AGY_BIN is refused before dispatch. WHO RELIES: the record, which grades every agy call as agy's whatever program ran. WHAT THE MUTATION DOES: the override is never refused; beginExecute in server mode dispatches the step and hands the replaced program to the exec seam. OBSERVED: KILLED — 1 test(s) red in begin-execute-program-overridden.test.ts: '⛔ EXECUTOR_PROGRAM_OVERRIDDEN: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused for its replaced program: expected 'The model ran, its work product was r…' to contain 'The executing tool \\'agy\\' would run …')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M17-agyPrintWithModel-ignores-its-model",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\treturn agyCall(prompt, model, 'EXECUTOR', exec);\n",
+		replace: "\treturn agyCall(prompt, judgeModel(), 'EXECUTOR', exec); // MUTANT: the executor runs the judge model again\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D2; REG-F-458 remedy (a)): the agy executor runs the model its selection names. WHO RELIES: DIFFERENT_MODEL on an agy-executing, agy-reviewing host, and the record, which names JPWB_EXECUTOR_MODEL. WHAT THE MUTATION DOES: agy is asked for JPWB_JUDGE_MODEL while the record names the executor model - REG-F-458 restored. OBSERVED: KILLED — 2 test(s) red in model.test.ts: '⛔ --model is the SELECTION’s model, never the judge model' (AssertionError: expected 'fixture-judge-model' to be 'fixture-executor-model' // Object.is equality); '⭑ the executor needs no judge model — with JPWB_JUDGE_MODEL unset the agy executor still runs' (AssertionError: promise rejected \"Error: JPWB_JUDGE_MODEL is not set, and t…\" instead of resolving)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M18-the-executor-failure-is-not-sanitised",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\t\tconst code = (e as { code?: unknown })?.code;\n\t\tconst withheld = WITHHELD_FROM[role];\n",
+		replace: "\t\tif (role === 'EXECUTOR') throw e; // MUTANT: the executor's failure is rethrown whole\n\t\tconst code = (e as { code?: unknown })?.code;\n\t\tconst withheld = WITHHELD_FROM[role];\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D2; PER-12, finding #60): the executor shares the ONE sanitising catch - execFile's rejection carries the whole argv, and so the whole instruction. WHO RELIES: the EXECUTION exchange record and the step's failure reason, which run-model-step writes verbatim and never sanitises. WHAT THE MUTATION DOES: a failed agy executor call puts the full instruction and stderr into a permanent record. OBSERVED: KILLED — 2 test(s) red in model.test.ts: 'the failure detail does NOT contain the prompt, nor raw stderr — and it DID fail' (AssertionError: expected 'Command failed: agy --print EXECUTE-T…' not to contain 'EXECUTE-THIS-INSTRUCTION-SECRET-CONTE…'); 'but it stays CLASSIFIABLE, and names the EXECUTOR’s record — not the judge’s' (AssertionError: expected 'Command failed: agy --print EXECUTE-T…' to match /^agy invocation failed \\(exit 1\\)\\./)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M19-the-executor-failure-names-the-judge",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\treturn agyCall(prompt, model, 'EXECUTOR', exec);\n",
+		replace: "\treturn agyCall(prompt, model, 'JUDGE', exec); // MUTANT: the executor's failure text names the judge's prompt and record\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D2): the failure text is role-parameterised so the executor's is true - it carried a work-unit instruction and would have reached the EXECUTION exchange record. WHO RELIES: the operator diagnosing a failed step from its recorded reason. WHAT THE MUTATION DOES: the executor's failure claims a judge prompt and a VALIDATOR_EXECUTION_FAILED observation that do not exist. OBSERVED: KILLED — 1 test(s) red in model.test.ts: 'but it stays CLASSIFIABLE, and names the EXECUTOR’s record — not the judge’s' (AssertionError: expected 'agy invocation failed (exit 1). Its d…' to contain 'entire work-unit instruction')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M20-the-judge-failure-text-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\treturn agyCall(prompt, judgeModel(), 'JUDGE', exec);\n",
+		replace: "\treturn agyCall(prompt, judgeModel(), 'EXECUTOR', exec); // MUTANT: the judge's failure text is the executor's\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/agy-failure-sanitisation.test.ts"],
+		why: "PROMISE (JAN-SELRES D2): agyPrint stays byte-identical - its failure text included - when the executor shares its catch. WHO RELIES: the projected VALIDATOR_EXECUTION_FAILED observation the floor records from it, and every reader of that statement. WHAT THE MUTATION DOES: a failed review's statement says an EXECUTION exchange record would have carried a work-unit instruction. OBSERVED: KILLED — 1 test(s) red in agy-failure-sanitisation.test.ts: '⭐ `JAN-SELRES` D2 — the JUDGE’s failure text is BYTE-IDENTICAL to what it was before the executor shared the catch' (AssertionError: expected 'agy invocation failed (exit 1). Its d…' to be 'agy invocation failed (exit 1). Its d…' // Object.is equality)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M21-the-executor-call-has-no-budget",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\trefuseOverBudget(prompt);\n\treturn agyCall(prompt, model, 'EXECUTOR', exec);\n",
+		replace: "\treturn agyCall(prompt, model, 'EXECUTOR', exec); // MUTANT: the executor's prompt is not held to the command-line budget\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/agy-cli.test.ts"],
+		why: "PROMISE (JAN-SELRES D2): the executor's call is held to the same command-line budget, refused before its exec is reached. WHO RELIES: a long work-unit instruction on Windows, which would otherwise fail opaquely as spawn ENAMETOOLONG. WHAT THE MUTATION DOES: an over-budget instruction is handed to the exec seam. OBSERVED: KILLED — 1 test(s) red in agy-cli.test.ts: '⭐ `JAN-SELRES` D2 — the EXECUTOR’s call (agyPrintWithModel) is held to the same budget, before its exec is reached' (AssertionError: promise resolved \"'{}'\" instead of rejecting)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M22-the-pi-branch-reads-the-environment",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "\t\treturn async (context) => openPi(context, selection.modelId);\n",
+		replace: "\t\treturn async (context) => openPi(context, process.env.JPWB_EXECUTOR_MODEL ?? ''); // MUTANT: Pi's model is read again\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): Pi is opened with the selection's model - the one the record names - never a second read of the environment. WHO RELIES: the record's fallback identity and the model Pi resolves, which must be one read. WHAT THE MUTATION DOES: the Pi opener is handed whatever JPWB_EXECUTOR_MODEL says when it opens, which a test that names another model in the process sees. OBSERVED: KILLED — 1 test(s) red in model.test.ts: '⛔ deps.openPi receives the SELECTION’s model and the sandbox, and is not called until the returned opener is' (AssertionError: expected \"vi.fn()\" to be called with arguments: [ { workspace: { …(8) }, …(3) }, …(1) ])",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M23-pi-executor-reads-the-environment",
+		file: "apps/rph-demo/src/lib/server/tools/pi-executor.ts",
+		find: "\tconst model = resolveExecutingModel(modelRegistry, modelId);\n",
+		replace: "\tconst model = resolveExecutingModel(modelRegistry, process.env.JPWB_EXECUTOR_MODEL ?? modelId); // MUTANT: the adapter reads the variable itself\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): pi-executor.ts runs the model it is HANDED and reads neither executorModel nor JPWB_EXECUTOR_MODEL. WHO RELIES: the one-read rule - the label configured, the label Pi resolves and the label recorded. WHAT THE MUTATION DOES: the adapter takes the process variable over the selection's label, a third read of the configuration. OBSERVED: KILLED — 1 test(s) red in model.test.ts: '⛔ pi-executor.ts reads the model it is HANDED — neither `executorModel` nor `JPWB_EXECUTOR_MODEL`' (AssertionError: pi-executor.ts reads the executor model itself: expected [ 'property JPWB_EXECUTOR_MODEL' ] to deeply equal [])",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M24-a-leaked-refusal-opens-agy",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "\tconst unwired: never = selection;\n\treturn async () => {\n",
+		replace: "\tconst unwired = selection as unknown as { modelId: string }; // MUTANT: an unwired selection falls through to agy\n\treturn async () => oneShotSession((prompt: string) => agyPrintWithModel(prompt, unwired.modelId, deps.agyExec));\n\treturn async () => {\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): getExecutionSession is exhaustive - a selection nobody wired opens nothing. WHO RELIES: any caller that forgot to act on a refusal, whose step must fail rather than run on a tool nobody chose. WHAT THE MUTATION DOES: a refusal that reached the opener runs agy - the silent default JAN-TOOLSUITE removed. OBSERVED: KILLED — 1 test(s) red in model.test.ts: 'a refusal that reached the opener past the type is refused when opened — no agy call, no Pi session' (AssertionError: promise resolved \"{ turn: [Function turn], …(4) }\" instead of rejecting)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M25-the-lane-admits-an-unknown-or-unwired-executor",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tconst strayExecutor = executorTool && executorId === undefined ? executorTool : undefined;\n",
+		replace: "\tconst strayExecutor = undefined as string | undefined; // MUTANT: the lane admits any executor tool\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (JAN-SELRES D5): the lane refuses at boot an executor tool the product would refuse - unknown, or unwired. WHO RELIES: the operator of the paid lane, who must not boot a browser and wait to be refused by a 400. WHAT THE MUTATION DOES: JPWB_EXECUTOR=devin or a typo boots the lane. OBSERVED: KILLED — 13 test(s) red in live-exec-lane-config.test.ts: 'JPWB_EXECUTOR=\"Agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · no override: the lane refuses what the product refuses' (AssertionError: the product answered EXECUTOR_TOOL_UNKNOWN; the lane said []: expected false to be true // Object.is equality); 'JPWB_EXECUTOR=\"Agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN set: the lane refuses what the product refuses' (AssertionError: the product answered EXECUTOR_TOOL_UNWIRED; the lane said []: expected false to be true // Object.is equality)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M26-the-lane-admits-an-overridden-executor",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t\treplacesExecutor !== undefined && env[replacesExecutor] !== undefined\n",
+		replace: "\t\treplacesExecutor !== undefined && env[replacesExecutor]?.trim() // MUTANT: an empty override passes\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (JAN-SELRES D5; REG-F-459): the lane refuses an agy executor whose program override is SET, even to the empty string, as the product does outside test mode. WHO RELIES: the lane operator whose shell exports JPWB_AGY_BIN empty, which the adapter would run as an empty program name. WHAT THE MUTATION DOES: an empty override boots the lane that the product then refuses. OBSERVED: KILLED — 3 test(s) red in live-exec-lane-config.test.ts: 'JPWB_EXECUTOR=\"agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN empty: the lane refuses what the product refuses' (AssertionError: the product answered EXECUTOR_PROGRAM_OVERRIDDEN; the lane said []: expected false to be true // Object.is equality); 'JPWB_EXECUTOR=\" agy \" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN empty: the lane refuses what the product refuses' (AssertionError: expected 'The live execution lane cannot start:…' to contain 'JPWB_AGY_BIN=\"\" replaces the agy exec…')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M27-the-lane-never-checks-the-executor-override",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tconst replacesExecutor =\n\t\texecutorId === undefined ? undefined : EXECUTOR_PROGRAM_VARIABLE[executorId];\n",
+		replace: "\tconst replacesExecutor = undefined as string | undefined; // MUTANT: no executor override is looked for\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (JAN-SELRES D5): the lane restates the product's D3 refusal of the selected executor's program override. WHO RELIES: the lane operator with a JPWB_AGY_BIN left set. WHAT THE MUTATION DOES: the override refusal is never reached, so only the lane rule would speak for an agy executor, and a replaced program is never named. OBSERVED: KILLED — 5 test(s) red in live-exec-lane-config.test.ts: 'JPWB_EXECUTOR=\"agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN set: the lane refuses what the product refuses' (AssertionError: the product answered EXECUTOR_PROGRAM_OVERRIDDEN; the lane said []: expected false to be true // Object.is equality); 'JPWB_EXECUTOR=\"agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN empty: the lane refuses what the product refuses' (AssertionError: expected 'The live execution lane cannot start:…' to contain 'JPWB_AGY_BIN=\"C:/fixture/agy.exe\" rep…')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M28-the-lane-reads-the-executor-case-blind",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\treturn WIRED_EXECUTORS.find((w) => w === executorId);\n",
+		replace: "\treturn WIRED_EXECUTORS.find((w) => w === executorId?.toLowerCase()); // MUTANT: Agy is agy to the lane\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (JAN-SELRES D5): the lane reads JPWB_EXECUTOR as the product does - trimmed, matched exactly. WHO RELIES: the lane operator who typed Agy or PI, which the product refuses as unknown. WHAT THE MUTATION DOES: the lane admits a spelling the product refuses, so the lane boots and is refused later. OBSERVED: KILLED — 4 test(s) red in live-exec-lane-config.test.ts: '⭑ reads the executing tool as the selector does — trimmed, blank unset, the id matched exactly' (AssertionError: \"Agy\": expected true to be false // Object.is equality); 'JPWB_EXECUTOR=\"Agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · no override: the lane refuses what the product refuses' (AssertionError: the product answered EXECUTOR_TOOL_UNKNOWN; the lane said []: expected false to be true // Object.is equality)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M29-the-lane-drops-its-agy-rule",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t\t...(executorId === 'agy'\n",
+		replace: "\t\t...(false // MUTANT: the lane admits an agy executor\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (JAN-SELRES D5): the lane refuses an agy executor at boot, by a rule it labels as its own - the spec asserts a PROVIDER_REPORTED producer, which agy can never give. WHO RELIES: the lane operator, who would otherwise wait out the whole Begin & Execute bound to fail on that assertion. WHAT THE MUTATION DOES: an agy lane boots. OBSERVED: KILLED — 25 test(s) red in live-exec-lane-config.test.ts: 'JPWB_EXECUTOR=\"agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · no override: the lane refuses what the product refuses' (AssertionError: the lane’s own agy rule: expected false to be true // Object.is equality); 'JPWB_EXECUTOR=\"agy\" · JPWB_EXECUTOR_MODEL=\"openai-codex/gpt-5.4-mini\" · JPWB_AGY_BIN set: the lane refuses what the product refuses' (AssertionError: expected 'NO REFUSAL' to contain 'is refused by a rule of THIS LANE, no…')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M30-the-guidance-still-sends-agy-executors-to-the-judge-model",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "neither the executor (JPWB_EXECUTOR_MODEL, for agy and Pi alike) ' +\n",
+		replace: "neither the executor (JPWB_EXECUTOR_MODEL; the agy executor runs JPWB_JUDGE_MODEL, REG-F-458) ' + // MUTANT: the old clause\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D2, D9): the reviewer's guidance says what the product does - the executor's model is JPWB_EXECUTOR_MODEL for agy and Pi alike. WHO RELIES: the operator following a reviewer refusal to keep the executor independent of the reviewer. WHAT THE MUTATION DOES: the guidance sends an agy-executing host to the judge model variable, which the agy executor no longer runs. OBSERVED: KILLED — 1 test(s) red in reviewer-selection.test.ts: '⭑ the guidance names REG-D-084’s selection as configuration, and ASR-13’s independence rule' (AssertionError: expected 'The selected reviewer (REG-D-084) is …' to contain 'neither the executor (JPWB_EXECUTOR_M…')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M31-the-executor-is-asked-before-the-reviewer",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t}\n\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t}\n",
+		replace: "\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t}\n\t\t// MUTANT: the executor is asked BEFORE the reviewer\n\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t}\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4; roadmap RS-1): beginExecute asks the executor selector AFTER the reviewer preflight, which JAN-SELREV D5 placed and D4 leaves unchanged - so with both misconfigured the operator is shown the reviewer's refusal first. WHO RELIES: the operator of a host whose reviewer and executor are both unconfigured, who is told to fix the reviewer (REG-D-084) before being told anything about the executor. WHAT THE MUTATION DOES: the executor block is moved above the reviewer block, so the executor's refusal (JPWB_EXECUTOR is not set) answers first and the reviewer's is not shown. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ server mode, devin with no model AND no executor configured → the reviewer’s guidance, not the executor’s; nothing is dispatched' (AssertionError: the step was not refused with the REVIEWER’s reason: expected 'JPWB_EXECUTOR is not set, and there i…' to contain '\\'devin\\' has no model: JPWB_ASSURANC…')",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M32-the-executor-call-is-unbounded",
+		file: "apps/rph-demo/src/lib/server/assurance/agy-cli.ts",
+		find: "\t\t\ttimeout: 240_000,\n",
+		replace: "\t\t\ttimeout: role === 'EXECUTOR' ? 0 : 240_000, // MUTANT: the executor's agy call has no kill\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE (JAN-SELRES D2): agy-cli.ts has ONE implementation for the judge and the executor, so the argv, the bounds and the sanitising catch cannot drift apart. WHO RELIES: a host running the agy executor, whose call must be killed at 240 s as the judge's is, not left to hang a Begin & Execute. WHAT THE MUTATION DOES: inside that one implementation, the executor's call alone is given no timeout (0 means no kill), keyed on the role - a drift only the judge's pinned kill (scripts/reviewer-qual/transports.ts) cannot see. OBSERVED: KILLED — 1 test(s) red in model.test.ts: '⛔ and its BOUNDS are `agyPrint`’s — the same kill, buffer and hidden window, handed to the same exec' (AssertionError: the executor’s agy call is bounded differently from the judge’s: expected { timeout: +0, …(2) } to deeply equal { timeout: 240000, …(2) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M33-the-unknown-reason-offers-the-catalog",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tcatalogRefusal.replace(CATALOG_LIST_SENTENCE, () => WIRED_LIST_SENTENCE);\n",
+		replace: "\tcatalogRefusal; // MUTANT: the catalog's list - agy, pi, devin - stays in the reason\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D1; REG-F-460's general form): an executor refusal offers only the tools this host has an executor adapter for - agy, pi - never devin, which the next refusal (EXECUTOR_TOOL_UNWIRED) forbids. WHO RELIES: the operator who mistyped JPWB_EXECUTOR and follows the reason printed beside the guidance. WHAT THE MUTATION DOES: the UNKNOWN reason keeps the catalog's sentence, This host can drive: agy, pi, devin, so it steers the operator to devin. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ and that reason offers only the WIRED tools — never devin, which the next refusal forbids (REG-F-460’s general form)' (AssertionError: the reason offers devin as a tool to set: expected 'The executing tool \\'nosuchtool\\' (JP…' not to match /devin/)",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M34-selecting-pi-loads-pis-sdk",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "\t\tconst openPi =\n\t\t\tdeps.openPi ??\n",
+		replace: "\t\tconst piModule = import('../tools/pi-executor.js'); // MUTANT: selecting Pi loads Pi's SDK, beside an injected opener\n\t\tconst openPi =\n\t\t\tdeps.openPi ??\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model-loads-pi-lazily.test.ts"],
+		why: "PROMISE (JAN-SELRES D4): openPi's default is a LAZY import, so the gate never loads Pi's SDK - only a Pi session opened with no opener handed in loads the adapter. WHO RELIES: every gate test that selects Pi through an injected opener (model.test.ts, the executor route tests), and the gate's hermeticity - Pi's SDK is heavy, and it reads PI_CODING_AGENT_DIR. WHAT THE MUTATION DOES: selecting Pi imports ../tools/pi-executor.js eagerly, beside the injected opener, which model.test.ts's Pi case cannot see because it watches only that opener. Its victim reads model.ts as source text and imports nothing that loads it, so driving this mutant loads no SDK. OBSERVED: KILLED — 1 test(s) red in model-loads-pi-lazily.test.ts: '⛔ model.ts loads the Pi adapter exactly once — dynamically, inside the default opener — and nowhere else' (AssertionError: model.ts loads the Pi adapter somewhere a gate test would run it: expected [ …(2) ] to deeply equal [ Array(1) ])",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
+	},
+	{
+		id: "RS1-M35-a-repair-turn-records-the-judge-model",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\t\t\t\tmodelId: fallbackIdentity.modelId,\n",
+		replace: "\t\t\t\t\t\tmodelId: attempt === 1 ? fallbackIdentity.modelId : (process.env.JPWB_JUDGE_MODEL ?? ''), // MUTANT: a repair turn re-reads the model\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (JAN-SELRES D4; REG-F-458): the model recorded for EVERY try is the one the selection names - one read before dispatch, not one per try. WHO RELIES: the independence check and the audit record of a step repaired after producer-actionable findings, whose second try must not name a model that did not run. WHAT THE MUTATION DOES: from the second try on, the EXECUTION record names JPWB_JUDGE_MODEL - REG-F-458's fiction, one try later, where no other case looks. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ and on a REPAIR turn too: the second agy call runs x, and both tries’ EXECUTION records name x' (AssertionError: expected { availability: 'REPORTED', …(2) } to match object { value: 'fixture-executor-x', …(1) })",
+		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	}
 ];

@@ -139,6 +139,10 @@ Read from code at `2bcf3b50`:
   - **Pi's model resolvability is not checked here.** It needs Pi's SDK, which the gate never loads (`model.ts:85`).
     It is still refused when the executor opens (D4, disclosed).
   - **Placement:** `execution/`, not `tools/`, for the reason the reviewer selector gives (`reviewer-selection.ts:13-14`).
+  - ⭑ *As built (`RS-1`):* the UNKNOWN reason keeps the catalog's verdict and replaces its tool list with the wired
+    executors (*"This host has an executor adapter for: agy, pi."*); the reviewer selector's UNKNOWN reason still offers
+    `pi` (`REG-F-466`). *"Never throws"* holds for the declared input: a non-string value throws in the resolvers, as it
+    does for `selectReviewer`.
 - **D2 — The agy executor runs the model it records (`REG-F-458`, remedy (a)).**
   - **One implementation.** `agy-cli.ts` gains a model-explicit call, for example
     `agyPrintWithModel(prompt, model, exec?)`. `agyPrint(prompt, exec?)` delegates to it after its own budget check and
@@ -210,6 +214,9 @@ Read from code at `2bcf3b50`:
   - **Functions the selector replaces.** `executorToolId()` and `executorModel()` lose their production callers and
     go. The rule in `verif/tool-adapter-exports-reachable.test.ts` requires it. Their assertions move with equal or
     stronger content (§4.5).
+  - ⭑ *As built (`RS-1`):* `getExecutionSession` has an exhaustive `never` default whose opener refuses, so a refusal
+    that leaked past the type opens nothing. `model-loads-pi-lazily.test.ts` holds the lazy Pi load structurally,
+    reading `model.ts` as source so that it never loads Pi's SDK itself.
 - **D5 — The live execution lane refuses what the product refuses about the executor.**
   - **Today.** `e2e-live-exec/lane-config.ts:66` requires `JPWB_EXECUTOR`, `JPWB_EXECUTOR_MODEL` and
     `JPWB_ASSURANCE_TOOL` to be present and non-blank, and checks no executor value.
@@ -414,6 +421,8 @@ Read from code at `2bcf3b50`:
    - The per-file coverage floor does not regress.
    - `REG-D-087` and `REG-F-462`…`466` are in the register before any code cites them
      (`verif/register-citations.test.ts`).
+   - ⭑ *As built (`RS-1`):* the export census walks `packages/` only, so `apps/` changes do not move it
+     (*"surface unchanged"*). It counts `*.testing.ts` helpers as production (`REG-F-467`).
 9. **The live-backend list is unchanged.** No new environment variable is introduced.
 
 ## 5. Filed with `REG-D-087`, not fixed here

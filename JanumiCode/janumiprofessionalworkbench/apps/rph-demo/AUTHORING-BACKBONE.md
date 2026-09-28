@@ -93,8 +93,8 @@ The following fixes address concrete failures observed during a large natural-la
   - **Independence (ASR-13) is partly the operator's.** The check compares the model ids the tools report by exact
     string, so neither the executor nor the authoring agent may run a GLM-5.3 Flash model under any provider or
     spelling. The authoring agent runs `JPWB_AGENT_MODEL` when it is set, otherwise Pi's own default model, and, when
-    that one does not resolve, the first model Pi has credentials for; the agy executor runs `JPWB_JUDGE_MODEL`. The
-    code cannot detect another spelling of the same model.
+    that one does not resolve, the first model Pi has credentials for; the executor runs `JPWB_EXECUTOR_MODEL`, for agy
+    and Pi alike. The code cannot detect another spelling of the same model.
   - **devin's host.** The adapter runs `devin` by name, so devin must be on the server process's `PATH`, and signed in
     (inferred, not tested here). devin runs in the server process's working directory, which devin must trust: its
     print mode fails in an untrusted directory, and the adapter does not bypass that check. Making the directory
@@ -107,9 +107,13 @@ The following fixes address concrete failures observed during a large natural-la
     one, the review fails closed naming both, and the remedy is re-qualification or re-selection, not
     reconfiguration. When devin reports no model, nothing is compared: the configured model is recorded, graded
     `HOST_CONFIGURED`.
-  - **Program overrides** (`JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`) are honoured only in test mode for the reviewer. The agy
-    EXECUTOR still honours `JPWB_AGY_BIN` in every mode (`REG-F-459`), and it runs `JPWB_JUDGE_MODEL` while the
-    record names `JPWB_EXECUTOR_MODEL` (`REG-F-458`).
+  - **Program overrides** (`JPWB_DEVIN_BIN`, `JPWB_AGY_BIN`) are honoured only in test mode, for the reviewer and the
+    executor alike: outside it, an override for the SELECTED reviewer tool refuses the review, and `JPWB_AGY_BIN` set
+    while agy is the executor refuses the model step before dispatch.
+  - **The executor is selected the way the reviewer is** (`execution/executor-selection.ts`, `JAN-SELRES` `RS-1`).
+    Outside test mode an unset or unknown tool, devin (no executor adapter), a missing `JPWB_EXECUTOR_MODEL` and a
+    replaced agy program are refused before anything is dispatched. One selection opens the executor and names the
+    record, so the model agy is asked to run is the model recorded (`REG-F-458`, `REG-F-459` closed).
   - **The gate never inherits this configuration.** Its tests and its e2e server start with the live-backend
     variables removed, so exporting them in a shell does not turn the test stand-in into a paid reviewer.
 

@@ -8,8 +8,6 @@ import { describe, expect, it } from 'vitest';
 import {
 	BACKING_TOOLS,
 	KNOWN_TOOL_IDS,
-	executorModel,
-	executorToolId,
 	resolveExecutorModel,
 	resolveExecutorToolId,
 	selectBackingTool
@@ -113,28 +111,11 @@ describe('JAN-TOOLSUITE — the executor has its OWN configuration', () => {
 		expect(resolveExecutorModel('  gpt-5.4-mini \n')).toBe('gpt-5.4-mini');
 	});
 
-	it('⛔ executorModel REFUSES when unset, and says why there is no default', () => {
-		// THE MUTANT: return a default label. REG-F-331 measured that outcome — a pinned label rotted, the
-		// installed tool rejected it, and EVERY Reasoning Review failed.
-		const saved = process.env.JPWB_EXECUTOR_MODEL;
-		delete process.env.JPWB_EXECUTOR_MODEL;
-		try {
-			expect(() => executorModel()).toThrow(/JPWB_EXECUTOR_MODEL is not set/);
-			// ⭑ The refusal must name the fallback it is refusing to make, or a future reader reinstates it.
-			expect(() => executorModel()).toThrow(/does NOT fall back to JPWB_JUDGE_MODEL/);
-		} finally {
-			if (saved !== undefined) process.env.JPWB_EXECUTOR_MODEL = saved;
-		}
-	});
-
-	it('⛔ executorToolId REFUSES when unset, and lists the drivable tools', () => {
-		const saved = process.env.JPWB_EXECUTOR;
-		delete process.env.JPWB_EXECUTOR;
-		try {
-			expect(() => executorToolId()).toThrow(/JPWB_EXECUTOR is not set/);
-			expect(() => executorToolId()).toThrow(/agy, pi, devin/);
-		} finally {
-			if (saved !== undefined) process.env.JPWB_EXECUTOR = saved;
-		}
-	});
+	// ⭐ `JAN-SELRES` RS-1 (D4) — `executorModel()` AND `executorToolId()` ARE GONE, and their two cases here MOVED with
+	// them, each to a successor with equal or stronger content (design §4.5), in `execution/executor-selection.test.ts`:
+	//   · `executorModel` REFUSES when unset → `EXECUTOR_MODEL_UNSET` says `JPWB_EXECUTOR_MODEL is not set` and
+	//     `does NOT fall back to JPWB_JUDGE_MODEL`, for agy and Pi alike, even with a judge model configured;
+	//   · `executorToolId` REFUSES when unset → `EXECUTOR_TOOL_UNSET` says `JPWB_EXECUTOR is not set`, and its guidance
+	//     lists the WIRED tools, `agy, pi`, and NOT devin. ⚠ A deliberate change of what is pinned, made stronger: the
+	//     old refusal listed the catalog (`agy, pi, devin`), steering an operator to a tool the next refusal forbids.
 });

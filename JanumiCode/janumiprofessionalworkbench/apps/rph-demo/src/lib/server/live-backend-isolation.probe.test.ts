@@ -6,8 +6,9 @@
 // in-process assertion is green today and proves nothing.
 //
 // ⭑ WHAT IT ASKS, per `REG-F-457` G8: each backend switch keys on its variable's ABSENCE — the reviewer on
-// `JPWB_ASSURANCE_TOOL` (`createFloorRegistry`), the executor on `JPWB_EXECUTOR` (`execution/model.ts`), the authoring
-// agent on `JPWB_AGENT` (`workbench.ts`) — so an exported selection turns the gate's stand-ins into real, paid runs.
+// `JPWB_ASSURANCE_TOOL` (`createFloorRegistry`), the executor on `JPWB_EXECUTOR` (⭐ `JAN-SELRES` D4: the executor
+// selector, `execution/executor-selection.ts`; `execution/model.ts` no longer chooses), the authoring agent on
+// `JPWB_AGENT` (`workbench.ts`) — so an exported selection turns the gate's stand-ins into real, paid runs.
 // ⛔ NOTHING HERE RUNS A REVIEW, OPENS AN EXECUTOR OR STARTS AN AGENT: it reads what each switch SELECTS.
 import { vi } from 'vitest';
 
@@ -19,7 +20,7 @@ import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import { describe, expect, it } from 'vitest';
 import { createFloorRegistry } from './assurance/index.js';
 import { STANDIN_VALIDATOR_ID } from './assurance/standin-reasoning-review-validator.js';
-import { resolveExecutorToolId } from './tools/backing-tool.js';
+import { selectExecutor } from './execution/executor-selection.js';
 import { agentMode, isTestMode } from './workbench.js';
 
 /**
@@ -53,8 +54,12 @@ describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
 		).toBe(STANDIN_VALIDATOR_ID);
 	});
 
-	it('the executor is the fixture — `execution/model.ts` selects it exactly when no executor tool resolves', () => {
-		expect(resolveExecutorToolId()).toBeUndefined();
+	// ⭐ `JAN-SELRES` RS-1 (D4) — ASKED AS THE REVIEWER'S LIMB ASKS THE REGISTRY: the selector `beginExecute` asks, in
+	// the mode the host runs in. ~~`execution/model.ts` selects it exactly when no executor tool resolves~~ — it chooses
+	// nothing now; the selector does, and answers the stand-in only in test mode with no tool named.
+	it('the executor is the fixture — the executor selector answers the stand-in', () => {
+		expect(isTestMode()).toBe(true);
+		expect(selectExecutor({ testMode: isTestMode() }).kind).toBe('STAND_IN');
 	});
 
 	it('the authoring agent is the deterministic mock', () => {

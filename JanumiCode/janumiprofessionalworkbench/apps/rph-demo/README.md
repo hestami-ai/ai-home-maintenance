@@ -65,8 +65,8 @@ bun run test
 bun run e2e
 ```
 
-The development server runs outside test mode, so an authoring turn or a model step runs only once a reasoning
-reviewer is configured. See [The reasoning reviewer](#the-reasoning-reviewer).
+The development server runs outside test mode, so an authoring turn runs only once a reasoning reviewer is configured,
+and a model step only once its executor is configured too. See [The reasoning reviewer](#the-reasoning-reviewer).
 
 The package is a Bun workspace and participates in the monorepo's Turbo tasks through its declared scripts. npm is
 not the supported package-manager path for this repository.
@@ -96,8 +96,8 @@ bun run --filter @janumipwb/rph-demo dev
   recognises. agy rejects a label it does not know, and its error output lists the labels it does (`REG-F-331`).
   devin with another model is configurable too.
 - **Independence (ASR-13).** Neither the executor nor the authoring agent may run a GLM-5.3 Flash model, under any
-  provider or spelling. The executor's model is `JPWB_EXECUTOR_MODEL`, except for the agy executor, which runs
-  `JPWB_JUDGE_MODEL` (below). The authoring agent's is `JPWB_AGENT_MODEL` when it is set, otherwise Pi's own default
+  provider or spelling. The executor's model is `JPWB_EXECUTOR_MODEL`, for agy and Pi alike (below). The authoring
+  agent's is `JPWB_AGENT_MODEL` when it is set, otherwise Pi's own default
   model, and, when that one does not resolve, the first model Pi has credentials for. The independence check compares
   the model ids the tools report by exact string, so another spelling of the same model would pass it falsely. The
   code cannot detect this; keeping to it is the operator's job.
@@ -115,14 +115,21 @@ bun run --filter @janumipwb/rph-demo dev
   served is not the fix: the configured model is the one that was qualified and selected, so re-qualify the model
   devin serves, or re-select the reviewer. When devin reports no model, the configured one is recorded, graded
   `HOST_CONFIGURED`.
-- **Program overrides are for tests.** `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN` replace the reviewer's program only in
-  test mode. Outside it, an override set for the selected tool refuses the review, even when it is empty. Each adapter
-  reads its override once, when it loads, so unset it and restart the server.
-- **The agy executor.** With `JPWB_EXECUTOR=agy`, the executor runs `JPWB_JUDGE_MODEL`, while the record names
-  `JPWB_EXECUTOR_MODEL` as the producing model (`REG-F-458`). With agy also reviewing, both calls run one model, and
-  the record can show two: it does whenever `JPWB_EXECUTOR_MODEL` differs from `JPWB_JUDGE_MODEL`, and the
-  independence check then passes on that record. The agy executor also honours `JPWB_AGY_BIN` in every mode
-  (`REG-F-459`).
+- **Program overrides are for tests.** `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN` replace a program only in test mode.
+  Outside it, an override set for the selected reviewer tool refuses the review, and `JPWB_AGY_BIN` set while agy is
+  the executor refuses the model step before anything is dispatched, even when the override is empty. An override for
+  a tool that is not selected refuses nothing. Each adapter reads its override once, when it loads, so unset it and
+  restart the server.
+- **The executor.** A model step needs `JPWB_EXECUTOR`, a tool this host has an executor adapter for (`agy` or `pi`),
+  and `JPWB_EXECUTOR_MODEL`, the model that tool runs. Neither has a default, and the executor's model never falls back
+  to the reviewer's. Outside test mode these are refused before anything is dispatched, with a message that says what
+  to set: an unset or unknown tool, `devin` (no executor adapter is wired for it), a missing model, and `JPWB_AGY_BIN`
+  set while agy is the executor. In test mode an unset tool selects the deterministic test fixture. For agy,
+  `JPWB_EXECUTOR_MODEL` must be a label agy recognises: it is the model agy is asked to run and the model the record
+  names, graded `HOST_CONFIGURED` because agy reports none (`REG-F-458` and `REG-F-459` are closed by `JAN-SELRES`
+  `RS-1`). Pi resolves its model only when the step opens it, so a model Pi cannot resolve still fails the step after
+  it has started. The paid execution lane (`e2e:live-exec`) refuses an agy executor at boot: its spec asserts a
+  provider-reported producer, which agy cannot give.
 - **The gate ignores all of this.** The gate's tests and its e2e server start with these variables removed:
   `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`, `JPWB_EXECUTOR_MODEL`,
   `JPWB_AGENT`, `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN`. So exporting the configuration in your shell does not change

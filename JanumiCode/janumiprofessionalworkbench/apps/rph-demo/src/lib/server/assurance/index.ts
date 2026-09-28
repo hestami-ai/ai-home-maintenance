@@ -60,7 +60,8 @@ export function createFloorRegistry(opts: {
 	// Review floor.
 	// ⭐ `JAN-SELREV` SR-1 (D3) — THE REVIEWER IS THE SELECTOR'S ANSWER, the same answer both preflights act on, so the
 	// three can no longer disagree (`REG-F-443`). A real reviewer is selected by NAMING a tool — symmetric with the
-	// executor (`execution/model.ts`) — and the retired `JPWB_ASSESSOR='agy'` sentinel stays retired.
+	// executor (⭐ `JAN-SELRES` D1: `execution/executor-selection.ts`, which `beginExecute` asks before dispatch) — and
+	// the retired `JPWB_ASSESSOR='agy'` sentinel stays retired.
 	//
 	// ⛔ FAIL-CLOSED IS UNCHANGED AND IS THE POINT OF THE `opts.testMode` INPUT. A stand-in may be selected ONLY
 	// inside test mode; outside it the real Validator is the only option, because `JPWB_ASSESSOR=mock` once

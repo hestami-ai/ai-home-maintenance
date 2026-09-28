@@ -129,9 +129,15 @@ describe('what a refusal SAYS — it names the fault, and every one carries the 
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
 			'may run a GLM-5.3 Flash model under any provider or spelling'
 		);
-		// ⭑ `JAN-SELREV` SR-3: the executor's model is NOT always `JPWB_EXECUTOR_MODEL` — the agy executor runs the judge
-		// model (`REG-F-458`), and guidance naming only the executor variable would send an agy host to the wrong one.
-		expect(SELECTED_REVIEWER_GUIDANCE).toContain('the agy executor runs JPWB_JUDGE_MODEL, REG-F-458');
+		// ~~⭑ `JAN-SELREV` SR-3: the executor's model is NOT always `JPWB_EXECUTOR_MODEL` — the agy executor runs the judge
+		// model (`REG-F-458`), and guidance naming only the executor variable would send an agy host to the wrong one.~~
+		// ⭐ `JAN-SELRES` RS-1 (D2, D9) — THE PIN NOW HOLDS THE NEW TRUTH, AND THE ABSENCE OF THE OLD ONE. The agy executor
+		// runs `JPWB_EXECUTOR_MODEL` now (`REG-F-458` remedy (a)), so guidance still naming the JUDGE model for the executor
+		// would send an agy host to the wrong variable — the same harm SR-3 pinned against, from the other side.
+		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
+			'neither the executor (JPWB_EXECUTOR_MODEL, for agy and Pi alike) nor the authoring agent'
+		);
+		expect(SELECTED_REVIEWER_GUIDANCE).not.toMatch(/executor runs JPWB_JUDGE_MODEL|REG-F-458/);
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain('else the first model Pi has credentials for');
 	});
 

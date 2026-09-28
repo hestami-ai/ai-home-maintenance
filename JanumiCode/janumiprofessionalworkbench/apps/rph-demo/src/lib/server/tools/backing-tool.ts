@@ -66,7 +66,8 @@ export const BACKING_TOOLS: readonly BackingTool[] = Object.freeze([
 		toolId: 'agy',
 		roles: ['EXECUTION', 'ASSURANCE'],
 		reports: {
-			// The host asserts the model via JPWB_JUDGE_MODEL and agy never echoes it back.
+			// The host asserts the model and agy never echoes it back: JPWB_JUDGE_MODEL when agy reviews, and ⭐
+			// (`JAN-SELRES` D2) JPWB_EXECUTOR_MODEL when it executes — the agy executor used to run the judge's too.
 			identity: 'HOST_CONFIGURED',
 			version: false,
 			// The answer must be LOCATED inside a text blob — `splitAnswerSpan`, a heuristic, not a structure.
@@ -339,11 +340,21 @@ export function isToolInvocationResult(v: string | ToolInvocationResult): v is T
 // ASSURANCE model `JPWB_JUDGE_MODEL`, so the producing model and the reviewing model were THE SAME BY
 // CONSTRUCTION and `checkIndependence('DIFFERENT_MODEL', …)` could only ever refuse. Giving the executor its
 // own keys is what makes producer and reviewer CAPABLE of differing; everything else merely records that they do.
+// ⭐ `JAN-SELRES` RS-1 (D2) — ONE TOOL WAS LEFT BEHIND, AND IS NOW NOT: the agy executor kept calling the reviewer's
+// `agyPrint`, which pins `JPWB_JUDGE_MODEL`, while the step recorded `JPWB_EXECUTOR_MODEL` — producer and reviewer the
+// same model again whenever agy took both roles, recorded as two (`REG-F-458`). It now runs the executor's model.
 //
 // ⛔ NO APPLICATION DEFAULT, IN EITHER KEY. `REG-D-052` is a sponsor ruling that the model is configured, never
 // pinned, and that its absence is a REFUSAL. `REG-F-331` is the measured reason: a pinned label rotted, the
 // installed tool rejected it, and EVERY Reasoning Review failed. A default here would reintroduce that exact
 // failure one layer over.
+//
+// ⭐ `JAN-SELRES` RS-1 (D1, D4) — AND THE REFUSAL IS THE EXECUTOR SELECTOR'S, BEFORE DISPATCH
+// (`execution/executor-selection.ts`, `selectExecutor`). The two accessors that stood here, `executorToolId()` and
+// `executorModel()`, THREW when the executor OPENED — after `StartExecutionStep` — so every misconfiguration was
+// recorded as a started-then-failed step; and `executorToolId()`'s refusal listed the CATALOG (`agy, pi, devin`),
+// steering an operator to `devin`, which has no executor adapter. The selector took their production callers, so they
+// went (`verif/tool-adapter-exports-reachable.test.ts` requires it); the two resolvers below are what it reads.
 
 export function resolveExecutorToolId(configured = process.env.JPWB_EXECUTOR): string | undefined {
 	const trimmed = configured?.trim();
@@ -353,30 +364,4 @@ export function resolveExecutorToolId(configured = process.env.JPWB_EXECUTOR): s
 export function resolveExecutorModel(configured = process.env.JPWB_EXECUTOR_MODEL): string | undefined {
 	const trimmed = configured?.trim();
 	return trimmed ? trimmed : undefined;
-}
-
-/** The tool that runs execution steps. Refuses when unconfigured. */
-export function executorToolId(): string {
-	const id = resolveExecutorToolId();
-	if (!id)
-		throw new Error(
-			'JPWB_EXECUTOR is not set, and there is no application default: the tool that executes work units is ' +
-				`a deployment choice and must be configured explicitly. Set it to one of: ${KNOWN_TOOL_IDS.join(', ')}. ` +
-				'⚠ It must not name the same tool AND model as the assurance reviewer, or the reasoning review will ' +
-				'be refused for non-independence (ASR-13), which is the check working rather than a fault.'
-		);
-	return id;
-}
-
-/** The model the executing tool runs. Refuses when unconfigured — never falls back to the JUDGE model. */
-export function executorModel(): string {
-	const model = resolveExecutorModel();
-	if (!model)
-		throw new Error(
-			'JPWB_EXECUTOR_MODEL is not set, and there is no application default (REG-D-052: the model is ' +
-				'configured, not pinned; REG-F-331: a pinned label rotted and every review failed). ' +
-				'⛔ It deliberately does NOT fall back to JPWB_JUDGE_MODEL: that fallback is exactly the ' +
-				'producer/reviewer collision this module exists to remove.'
-		);
-	return model;
 }

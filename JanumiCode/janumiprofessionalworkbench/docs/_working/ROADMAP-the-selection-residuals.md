@@ -84,6 +84,16 @@ No agent stages or commits.
   - `agyPrintWithModel` ignores its model;
   - the PI branch reads the environment;
   - the lane admits an unknown, unwired or overridden executor.
+- ⭑ *Landed 2026-09-28.*
+  - **The selector** is `execution/executor-selection.ts`; one selection per model step, asked after the reviewer
+    preflight and before dispatch, opens the executor and names the record. `executorToolId()`, `executorModel()` and
+    `model.ts`'s own test-mode constant are gone, and every assertion on them moved to a named successor.
+  - **The agy executor** runs `JPWB_EXECUTOR_MODEL` through `agyPrintWithModel`; `agyPrint` is byte-identical (200
+    differential cases, 0 differ). Pi takes the selection's model through `openPiExecutionSession(context, modelId)`.
+  - **The verifier's findings, applied.** No green route test reaches a real devin: a throwing mock stands behind PATH.
+    The reviewer-first order, the executor's bounds and the lazy Pi load each have an instrument, the UNKNOWN reason
+    offers only wired tools, and a repair turn is driven.
+  - **Mutants:** RS1-M1..M35 added (M31..M35 from the verifier and the fix round); with the 93 prior entries anchored in, or victimised by, the touched files, 129 of 129 KILLED by the official runner on the staged tree. **gate:fast:** GREEN, 6174 passed / 4 skipped, e2e 95 of 95, the fingerprint unmoved.
 
 ## `RS-2` — a substituted reviewer model: its own code, its own action (D6, D7; D9's substitution half)
 

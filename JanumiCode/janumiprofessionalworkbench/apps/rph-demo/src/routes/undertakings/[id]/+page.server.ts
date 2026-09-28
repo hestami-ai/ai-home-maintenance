@@ -79,13 +79,20 @@ import {
 } from '$lib/server/execution/loop-detection';
 import { reasoningReviewCriteria, tallyCriteria } from '$lib/server/floor';
 import { getExecutionSession } from '$lib/server/execution/model';
+import {
+	executorRecordIdentity,
+	executorRefusalMessage,
+	selectExecutor,
+	type RunnableExecutorSelection
+} from '$lib/server/execution/executor-selection';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
 import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
 // the last live reference to the REVIEWER's model on the EXECUTION path — `REG-F-356`'s defect, whose final
 // residue survived in the host-configured fallback identity below. Lint is what reports a relapse.
-import { resolveExecutorModel, resolveExecutorToolId } from '$lib/server/tools/backing-tool';
+// ⭐ `JAN-SELRES` RS-1 (D4): and `resolveExecutorModel`/`resolveExecutorToolId` are gone too — the fallback identity
+// comes from the executor SELECTION, the one read that also opened the executor.
 import { resolveInvocationSubject, resolvePwuTypeFacts } from '@janumipwb/rph-application';
 // ⭐ `PromptTemplate` IS NO LONGER IMPORTED HERE, and its absence is the check. Its only use in this route was
 // the assertion `pwuType?.promptTemplate as PromptTemplate | undefined`; `resolvePwuTypeFacts` PARSES that
@@ -1029,6 +1036,25 @@ export const actions: Actions = {
 			if (!reviewer.ready) return fail(400, { error: reviewer.guidance });
 		}
 
+		// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────
+		//
+		// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose
+		// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's
+		// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model
+		// were all found when the executor OPENED, after the batch below had started the step, and recorded as a
+		// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the
+		// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.
+		// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model
+		// configured, the model run and the model recorded are one read.
+		// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.
+		// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.
+		let executor!: RunnableExecutorSelection;
+		if (isModelStep) {
+			const selected = selectExecutor({ testMode: isTestMode() });
+			if (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });
+			executor = selected;
+		}
+
 		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
 		//
 		// *"Execution requires an approved plan and AUTHORIZED RUNTIME BINDINGS."* `REG-F-365` measured zero
@@ -1250,7 +1276,7 @@ export const actions: Actions = {
 			let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
 			try {
 				const current = binding ? currentBinding(bindingId) : undefined;
-				producer = await getExecutionSession()({
+				producer = await getExecutionSession(executor)({
 					...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
 					grantedCapabilities: current?.capabilities ?? [],
 					// ⚠ `''` FOR A STEP THAT NAMES NO BINDING, AND WHAT MAKES THAT SAFE IS THE **LIST**, NOT THIS
@@ -1269,6 +1295,8 @@ export const actions: Actions = {
 				runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
 				return fail(400, { error: `The model invocation did not run: ${why}` });
 			}
+			// ⭐ `JAN-SELRES` RS-1 (D4) — the record's fallback identity, from the selection that just opened the producer.
+			const fallbackIdentity = executorRecordIdentity(executor);
 			try {
 				for (let attempt = 1; ; attempt++) {
 					// ⛔ ONE READ PER TRY, HELD IN ONE VALUE. Reading the status and the grant through two calls
@@ -1337,18 +1365,26 @@ export const actions: Actions = {
 						// — and this arm was left behind.
 						//
 						// ⚠ IT SURVIVED BECAUSE NOTHING REACHED IT. These values are the HOST_CONFIGURED FALLBACK,
-						// used only when the tool reports no identity of its own: the success path always overrides
+						// used only when the tool reports no identity of its own~~: the success path always overrides
 						// them with `produced.producer`. So the only readers were the `catch` arm and — now —
-						// `JAN-NOANS`'s no-answer arm, and the defect became visible on the first live run that
-						// took one: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
+						// `JAN-NOANS`'s no-answer arm~~ — ⭐ `JAN-SELRES` D4, CORRECTED: which for the agy executor, whose
+						// answer is a bare string, is EVERY call, the successful ones included; only Pi's success path
+						// overrides them with `produced.producer`. The defect became visible on the first live run that
+						// took the fallback: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
 						//
 						// ⭑ MEASURED, NOT REASONED. `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so a
 						// failed execution call was recorded as having been produced by the reviewer.
-						modelId: resolveExecutorModel() ?? 'unresolved',
+						//
+						// ⭐ `JAN-SELRES` RS-1 (D4) — AND THEY COME FROM THE SELECTION THAT OPENED THE EXECUTOR, no longer
+						// from a second read of the environment per try (`resolveExecutorModel()`,
+						// `resolveExecutorToolId()`). With the agy executor running the JUDGE model, that read named a
+						// model that never ran (`REG-F-458`); now the model agy is asked to run IS the model recorded, and
+						// the stand-in records no configured model, because none produced its answer.
+						modelId: fallbackIdentity.modelId,
 						// ⭑ THE TOOL, GRADED HOST_CONFIGURED, WHICH IS WHAT IT HONESTLY IS. The provider proper is
 						// embedded in the model label (`openai-codex/gpt-6-astra`) and only the tool can resolve it —
 						// so when the tool told us nothing, the tool id is the strongest true thing available.
-						providerId: resolveExecutorToolId() ?? 'unresolved',
+						providerId: fallbackIdentity.providerId,
 						session: producer,
 						priorFindings,
 						// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the

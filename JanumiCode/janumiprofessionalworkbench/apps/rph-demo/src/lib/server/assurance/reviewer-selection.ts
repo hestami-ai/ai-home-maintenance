@@ -70,8 +70,8 @@ export const SELECTED_REVIEWER_GUIDANCE =
 	'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max: set JPWB_ASSURANCE_TOOL=devin and ' +
 	'JPWB_ASSURANCE_MODEL=glm-5-3-flash-max. That selection is configuration, not a default this host falls back to ' +
 	'(REG-D-052); agy (JPWB_ASSURANCE_TOOL=agy with JPWB_JUDGE_MODEL), and devin with another model, stay ' +
-	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL; the agy executor runs ' +
-	'JPWB_JUDGE_MODEL, REG-F-458) nor the authoring agent (JPWB_AGENT_MODEL, else Pi’s own settings, else the first ' +
+	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL, for agy and Pi alike) ' +
+	'nor the authoring agent (JPWB_AGENT_MODEL, else Pi’s own settings, else the first ' +
 	'model Pi has credentials for) may run a GLM-5.3 Flash model under any provider or spelling — the ' +
 	'independence check compares the model ids the tools report by exact string, so another spelling of the same ' +
 	'model would pass it falsely.';
@@ -138,7 +138,8 @@ function selectedProgramOverridden(
  *   · tool UNSET (absent, `''` or whitespace) — test mode: the declared STAND-IN; outside it: REFUSED.
  *   · tool SET, in either mode — through `selectBackingTool(tool, 'ASSURANCE')`, whose refusal covers an unknown tool
  *     (`Devin` is unknown: the catalog matches ids exactly, after the trim); `pi`, which the catalog declares but no
- *     reviewer adapter is wired for, REFUSED as the executor refuses an unwired tool (`execution/model.ts`); agy with
+ *     reviewer adapter is wired for, REFUSED as the executor refuses an unwired tool (⭐ `JAN-SELRES` D1: the executor
+ *     selector, `execution/executor-selection.ts`, refuses `devin` so, before dispatch); agy with
  *     `JPWB_JUDGE_MODEL`, devin with `JPWB_ASSURANCE_MODEL`, each REFUSED while its model is unset.
  *   · ⭐ SR-2 (D7) — agy or devin OUTSIDE test mode, REFUSED when that tool's own program override was captured, even
  *     as `''`, before its model is asked about: the program is refused whatever model it would run. The OTHER tool's

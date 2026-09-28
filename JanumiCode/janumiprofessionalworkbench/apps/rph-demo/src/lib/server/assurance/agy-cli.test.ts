@@ -1,8 +1,17 @@
 // §8.4 requires the Reasoning Review evaluator's "actual identities and lineage are recorded"; §14.6 requires the
 // "allowed and resolved provider/model/version". Both the application default and an environment override are
 // concrete selections passed to agy --model; neither permits agy's unnamed dynamic default.
-import { afterEach, describe, expect, it } from 'vitest';
-import { agyPrint, judgeModel, MAX_AGY_PROMPT_CHARS, resolveJudgeModel, extractJson, splitAnswerSpan } from './agy-cli.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+	agyPrint,
+	agyPrintWithModel,
+	judgeModel,
+	MAX_AGY_PROMPT_CHARS,
+	resolveJudgeModel,
+	extractJson,
+	splitAnswerSpan
+} from './agy-cli.js';
+import { noProgramsDirectory } from './no-programs.testing.js';
 
 const KEY = 'JPWB_JUDGE_MODEL';
 const original = process.env[KEY];
@@ -44,6 +53,22 @@ describe('agyPrint — fails closed above the command-line budget instead of cra
 		await expect(agyPrint('x'.repeat(MAX_AGY_PROMPT_CHARS + 1))).rejects.toThrow(
 			/command-line budget/
 		);
+	});
+
+	it('⭐ `JAN-SELRES` D2 — the EXECUTOR’s call (agyPrintWithModel) is held to the same budget, before its exec is reached', async () => {
+		// ⭑ The two share one implementation, and each checks the budget on its way in: the executor's instruction rides
+		// in argv exactly as the judge's prompt does, and would fail the same way, opaquely, as spawn ENAMETOOLONG.
+		// ⛔ HERMETIC: through the exec seam, with PATH finding no program.
+		vi.stubEnv('PATH', noProgramsDirectory());
+		try {
+			const exec = vi.fn(async () => ({ stdout: '{}' }));
+			await expect(
+				agyPrintWithModel('x'.repeat(MAX_AGY_PROMPT_CHARS + 1), 'fixture-executor-model', exec)
+			).rejects.toThrow(/command-line budget/);
+			expect(exec, 'the over-budget prompt reached the exec seam').not.toHaveBeenCalled();
+		} finally {
+			vi.unstubAllEnvs();
+		}
 	});
 });
 

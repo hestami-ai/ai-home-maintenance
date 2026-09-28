@@ -10,6 +10,8 @@
 // server's modules there would load the reviewer adapters, which capture their program overrides when they load. So
 // the product's rules are RESTATED here and the verif test asks the product whether they still agree — the reviewer
 // selector (`src/lib/server/assurance/reviewer-selection.ts`), the repair bound, and the two reviewer adapters.
+// ⭐ `JAN-SELRES` RS-1 (D5) — AND THE EXECUTOR SELECTOR (`src/lib/server/execution/executor-selection.ts`), whose rules
+// are restated the same way, beside ONE rule that is this lane's own and says so: no agy executor.
 
 /**
  * The reviewing tools this host has an adapter for, and the variable each reads its model from
@@ -62,6 +64,79 @@ export function reviewerModelVariable(tool: string | undefined): ReviewerModelVa
 	return reviewer === undefined ? undefined : REVIEWER_MODEL_VARIABLE[reviewer];
 }
 
+/**
+ * ⭐ `JAN-SELRES` RS-1 (D5) — the executing tools this host has an executor adapter for (`executor-selection.ts`,
+ * `WIRED_EXECUTORS`). ⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so the product refuses it.
+ */
+export const WIRED_EXECUTORS = ['agy', 'pi'] as const;
+
+export type WiredExecutor = (typeof WIRED_EXECUTORS)[number];
+
+/**
+ * The executing tool as the product's selector reads `JPWB_EXECUTOR`: trimmed, blank as unset, the id matched exactly
+ * (`Agy` is not `agy`). `undefined` for a tool the product would refuse, or none.
+ */
+export function wiredExecutor(tool: string | undefined): WiredExecutor | undefined {
+	const executorId = tool?.trim();
+	return WIRED_EXECUTORS.find((w) => w === executorId);
+}
+
+/**
+ * The variable that replaces each wired executor's program — agy's, the same variable the agy reviewer reads, because
+ * it is the same adapter's one capture (`agy-cli.ts`, `AGY_BIN_OVERRIDE`). Pi has none: it runs in-process. ⛔ Outside
+ * test mode the product refuses the SELECTED executor's override whenever it is set, even to `''` (`REG-F-459`).
+ */
+export const EXECUTOR_PROGRAM_VARIABLE: Readonly<Partial<Record<WiredExecutor, string>>> = {
+	agy: REVIEWER_PROGRAM_VARIABLE.agy
+};
+
+/**
+ * ⭐ `JAN-SELRES` RS-1 (D5) — WHY THE LANE REFUSES THE EXECUTOR in `env`, one line per fault, beyond a missing key.
+ *
+ * ⭑ THE PRODUCT'S RULES, RESTATED — a tool the product's selector would not run (unknown, or unwired), and outside
+ * test mode, where this lane runs, a set program override for the selected executor. An unset tool or model is the
+ * `missing` line's, not this one's.
+ *
+ * ⛔ AND ONE RULE OF THE LANE'S OWN, LABELLED AS SUCH: no agy executor. The product runs one; this lane's spec cannot
+ * pass with one — it asserts the producer's identity is `PROVIDER_REPORTED` (`execution.live.ts`), and agy reports no
+ * model, so its record is `HOST_CONFIGURED` by design. An agy lane would boot and spend up to the whole Begin & Execute
+ * wait failing there, so it is refused at boot, and the refusal says whose rule it is.
+ */
+function executorLaneFaults(env: Readonly<Record<string, string | undefined>>): string[] {
+	const executorTool = env.JPWB_EXECUTOR?.trim();
+	const executorId = wiredExecutor(executorTool);
+	const strayExecutor = executorTool && executorId === undefined ? executorTool : undefined;
+	const replacesExecutor =
+		executorId === undefined ? undefined : EXECUTOR_PROGRAM_VARIABLE[executorId];
+	const executorReplaced =
+		replacesExecutor !== undefined && env[replacesExecutor] !== undefined
+			? replacesExecutor
+			: undefined;
+	return [
+		...(strayExecutor !== undefined
+			? [
+					`  · JPWB_EXECUTOR='${strayExecutor}' names no executor this host has an adapter for (${WIRED_EXECUTORS.join(', ')}). ` +
+						'The id is matched exactly, after trimming, and the product refuses any other.'
+				]
+			: []),
+		...(executorReplaced !== undefined
+			? [
+					`  · ${executorReplaced}=${JSON.stringify(env[executorReplaced])} replaces the ${String(executorId)} executor's ` +
+						'program. This lane runs outside test mode, where the product refuses a program override for the ' +
+						'selected executor, even an empty one (REG-F-459). Unset it.'
+				]
+			: []),
+		...(executorId === 'agy'
+			? [
+					"  · JPWB_EXECUTOR='agy' is refused by a rule of THIS LANE, not of the product: the lane's spec asserts " +
+						'that the producing tool reports its own model (PROVIDER_REPORTED, e2e-live-exec/execution.live.ts), ' +
+						'and agy reports none — its record is HOST_CONFIGURED by design. The product runs an agy executor; ' +
+						'this lane cannot pass with one. Use JPWB_EXECUTOR=pi.'
+				]
+			: [])
+	];
+}
+
 /** What every run needs, whichever tool reviews: the producing tool and model, and the reviewing tool. */
 const ALWAYS_REQUIRED = ['JPWB_EXECUTOR', 'JPWB_EXECUTOR_MODEL', 'JPWB_ASSURANCE_TOOL'] as const;
 
@@ -81,7 +156,9 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * (`beginExecute`'s preflight) — but only after the lane has booted and driven a browser for a minute. So this names
  * everything wrong at once, up front. ⛔ It adds no rule the product lacks: an unknown tool is refused because the
  * product's selector refuses it, and a set program override for the selected tool because the product refuses that
- * outside test mode, where this lane runs.
+ * outside test mode, where this lane runs. ⭐ `JAN-SELRES` RS-1 (D5) — the same holds for the EXECUTOR, with ONE
+ * exception, which is the lane's own and is labelled as such where it is refused: no agy executor
+ * (`executorLaneFaults`).
  */
 export function laneKeysRefusal(
 	env: Readonly<Record<string, string | undefined>>
@@ -95,7 +172,15 @@ export function laneKeysRefusal(
 	// program never runs a review, and an empty override is an empty program name the adapter would try to run.
 	const program = reviewer === undefined ? undefined : REVIEWER_PROGRAM_VARIABLE[reviewer];
 	const overridden = program !== undefined && env[program] !== undefined ? program : undefined;
-	if (missing.length === 0 && unwired === undefined && overridden === undefined) return undefined;
+	// ⭐ `JAN-SELRES` RS-1 (D5) — THE EXECUTOR LIMB: the product's executor rules restated, and the lane's own.
+	const executorFaults = executorLaneFaults(env);
+	if (
+		missing.length === 0 &&
+		unwired === undefined &&
+		overridden === undefined &&
+		executorFaults.length === 0
+	)
+		return undefined;
 	return [
 		'The live execution lane cannot start:',
 		...(missing.length > 0
@@ -116,8 +201,10 @@ export function laneKeysRefusal(
 						'even an empty one (REG-F-441). Unset it.'
 				]
 			: []),
+		...executorFaults,
 		'The keys:',
-		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product',
+		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product: pi, with a model Pi ' +
+			'resolves (this lane refuses agy; devin has no executor adapter), and no program override for it',
 		'  JPWB_ASSURANCE_TOOL — the tool that REVIEWS it, with the model that tool reads:',
 		'    devin — JPWB_ASSURANCE_MODEL (`devin models list` shows what the account offers)',
 		'    agy   — JPWB_JUDGE_MODEL (a label the installed agy recognises: agy rejects an unknown one, and its error ' +

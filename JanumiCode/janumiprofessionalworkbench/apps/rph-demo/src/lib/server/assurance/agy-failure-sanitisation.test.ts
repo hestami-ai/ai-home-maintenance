@@ -21,8 +21,9 @@
 // But stderr reaches the record through `err.message`, and the demo never names `stderr` to do it. The gate is
 // structurally blind to the leak it was written to prevent: it searched for the NAME while the leak travels by
 // SHAPE. That is the defect class this repository records most often, committed inside an entry about it.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agyPrint } from './agy-cli.js';
+import { noProgramsDirectory } from './no-programs.testing.js';
 
 const JUDGE_ID = 'test-judge-model';
 
@@ -83,6 +84,28 @@ describe('agyPrint — a failure must not carry prompt content into the record p
 		await agyPrint(PROMPT, rejectingExec()).catch((e: Error) => (msg = e.message));
 		expect(msg).toMatch(/agy/i);
 		expect(msg).toMatch(/withheld|redact|record plane/i);
+	});
+
+	it('⭐ `JAN-SELRES` D2 — the JUDGE’s failure text is BYTE-IDENTICAL to what it was before the executor shared the catch', async () => {
+		// ⭑ ONE CATCH NOW SERVES THE JUDGE AND THE EXECUTOR, with a ROLE choosing which prompt and which record the
+		// sentence names. The judge's sentence is written into a projected observation and pinned downstream, so the
+		// role may change the executor's words only: this holds the judge's, whole.
+		// ⛔ HERMETIC: through the exec seam, with PATH finding no program.
+		vi.stubEnv('PATH', noProgramsDirectory());
+		let msg = '';
+		try {
+			await agyPrint(PROMPT, rejectingExec()).catch((e: Error) => (msg = e.message));
+		} finally {
+			vi.unstubAllEnvs();
+		}
+		expect(msg).toBe(
+			'agy invocation failed (exit 1). ' +
+				'Its diagnostic is WITHHELD from the record plane: execFile embeds the full argv — which carries the ' +
+				'entire judge prompt — and the full stderr into its error message, and that message is written ' +
+				'verbatim into a projected VALIDATOR_EXECUTION_FAILED observation. PER-12 forbids that content ' +
+				'being logged or projected and no redaction exists here (finding #60). Diagnose from the agy ' +
+				'process directly; the durable home for this outcome is the exchange record E-5 (REG-F-326).'
+		);
 	});
 
 	it('CONTROL — a SUCCESSFUL call still returns stdout unchanged', async () => {

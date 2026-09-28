@@ -26,7 +26,7 @@ import {
 	SessionManager,
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
-import { answerFromTurnEnd, executorModel } from './backing-tool.js';
+import { answerFromTurnEnd } from './backing-tool.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
@@ -51,10 +51,17 @@ import { createProcessRunObserver } from './process-run-observer.js';
  * an interactive chat. For an EXECUTOR it would be wrong: `REG-D-052` rules that the model is configured and its
  * absence is a REFUSAL, and a fallback would silently run professional work on a model nobody chose while the
  * record named it as though they had.
+ *
+ * ⭐ `JAN-SELRES` RS-1 (D4) — THE LABEL IS HANDED IN, NEVER READ HERE. It is the executor selection's model
+ * (`execution/executor-selection.ts`), which `beginExecute` asked for before dispatch and which also names the record —
+ * so the label configured, the label Pi resolves and the label the route falls back to are one read. ⚠ What Pi RECORDS
+ * is its registry's resolution of that label, graded `PROVIDER_REPORTED` below, not a model the provider reported
+ * (`REG-F-465`).
  */
-function resolveExecutingModel(modelRegistry: ModelRegistry) {
-	// Throws with REG-D-052's reasoning when JPWB_EXECUTOR_MODEL is unset.
-	const configured = executorModel();
+function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string) {
+	// ~~Throws with REG-D-052's reasoning when JPWB_EXECUTOR_MODEL is unset.~~ ⭐ `JAN-SELRES` D1: an unset
+	// `JPWB_EXECUTOR_MODEL` never reaches here — the selector refuses it before dispatch (`EXECUTOR_MODEL_UNSET`). What
+	// can still refuse here is a label Pi cannot resolve, which needs Pi's SDK to know.
 	const resolved = resolveCliModel({ cliModel: configured, modelRegistry });
 	if (!resolved.model)
 		throw new Error(
@@ -142,7 +149,9 @@ function toPiExecutionTools(descriptors: readonly ExecutionToolDescriptor[]) {
  * caller records it as a failed step rather than letting it escape as a 500.
  */
 export async function openPiExecutionSession(
-	context: ProducerSessionContext
+	context: ProducerSessionContext,
+	/** ⭐ `JAN-SELRES` RS-1 (D4) — the executor selection's model: the label this session runs and the record names. */
+	modelId: string
 ): Promise<ProducerSession> {
 	const working = producerWorkingDirectory(context);
 	if (!working.resolved) throw new Error(working.refusedBecause);
@@ -171,7 +180,7 @@ export async function openPiExecutionSession(
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
 	const settingsManager = SettingsManager.create(cwd, getAgentDir());
-	const model = resolveExecutingModel(modelRegistry);
+	const model = resolveExecutingModel(modelRegistry, modelId);
 
 	const loader = new DefaultResourceLoader({
 		cwd,

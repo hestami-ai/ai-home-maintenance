@@ -37781,7 +37781,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-458 — the agy EXECUTOR runs `JPWB_JUDGE_MODEL` but records `JPWB_EXECUTOR_MODEL`, so agy executing and agy reviewing can run one model while the record shows two
 
-**Filed 2026-09-26** (`JAN-SELREV`, raised by the design's adversarial check, read from code). **Status:** ~~⚠ **OPEN — outside `JAN-SELREV`'s scope; unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**
+**Filed 2026-09-26** (`JAN-SELREV`, raised by the design's adversarial check, read from code). **Status:** ~~⚠ **OPEN — outside `JAN-SELREV`'s scope; unscheduled.**~~ ~~⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**~~ ✅ **CLOSED 2026-09-28 by `JAN-SELRES` `RS-1`** — remedy (a): the agy executor runs `JPWB_EXECUTOR_MODEL`, the model its one selection names, and the record carries that same model, graded `HOST_CONFIGURED`.
 
 - **THE RUN.** `apps/rph-demo/src/lib/server/execution/model.ts:103`: `if (tool.toolId === 'agy') return async () => oneShotSession((prompt: string) => agyPrint(prompt));`. `agyPrint` passes `'--model', judgeModel()` (`assurance/agy-cli.ts:82`), which is `JPWB_JUDGE_MODEL`.
 - **THE RECORD.** agy returns a bare string, so the step records the producer's model as `resolveExecutorModel() ?? 'unresolved'` (`routes/undertakings/[id]/+page.server.ts:1328`), graded `HOST_CONFIGURED`. `backing-tool.ts:371-378` says the executor model *"never falls back to the JUDGE model"*. It does not fall back, but on agy it is not what runs either.
@@ -37833,7 +37833,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-459 — the agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode: `REG-F-441`'s executor half
 
-**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, the residual its design names under D7). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**
+**Filed 2026-09-26** (`JAN-SELREV` `SR-2`, the residual its design names under D7). **Status:** ~~⚠ **OPEN — unscheduled.**~~ ~~⚠ **OPEN — owed by `JAN-SELRES` `RS-1` (`REG-D-087`).**~~ ✅ **CLOSED 2026-09-28 by `JAN-SELRES` `RS-1`** — remedy (a): outside test mode the executor selector refuses the SELECTED executor tool while its captured program override is defined, even as `''`, before anything is dispatched. The adapter still honours the override in test mode, so `J22-M10`'s killing test stands.
 
 - **THE PATH.** `execution/model.ts:103` runs the agy executor through `agyPrint`, which spawns `AGY_BIN`, and `AGY_BIN` is `AGY_BIN_OVERRIDE ?? 'agy'` (`assurance/agy-cli.ts:15-17`), read once at load and in every mode.
 - **WHY SR-2 LEFT IT.** `SR-2` refuses an override in the REVIEWER selector, and only for the SELECTED tool, so a set `JPWB_AGY_BIN` does not refuse a devin review. A host can therefore run the agy executor with a replaced program while its devin reviewer is admitted. The record then names agy as the producer's tool, which PER-9 forbids: *"the resolved provider, model, and version actually invoked"*.
@@ -37900,6 +37900,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **THE THROWN-TURN CLEANUP.** `cleanupFailedTurn` (`agent/+server.ts:282-287`) marks every thrown turn REVISION_REQUIRED, operational throws included — for example a floor-recording refusal (`packages/rph-engine/src/record-assurance.ts:152-154`: *"`send` THROWS on any refusal"*) — and the hint then reads *"Revision requested"*.
 - **THE WAIVER AFFORDANCE.** Recording accepted risk is offered beside every unsatisfied floor (`+page.svelte:2131` onward), where every operational guidance string says not to record a waiver (`apps/rph-demo/src/lib/server/floor.ts:224`, `:235`, `:248`, `:297`).
 - **THE STEP RETRY (inferred, not driven).** The execution page's step controls include Retry (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:66-68`); whether it is offered beside a substitution's refusal was not driven.
+- ⭑ **ADDED 2026-09-28 (`JAN-SELRES` `RS-1`'s verification) — the reviewer selector's UNKNOWN reason offers a tool its next refusal forbids.** `apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts:175` embeds the catalog's refusal whole: *"Unknown backing tool 'nope'. This host can drive: agy, pi, devin."* — offering `pi`, which the selector then refuses as having no reviewer adapter. The catalog list is pinned verbatim (`reviewer-selection.test.ts:153`). The executor's half is fixed in `RS-1`: its UNKNOWN reason names only the wired executors (*"This host has an executor adapter for: agy, pi."*), pinned by `RS1-M33`.
 - **SEARCHED BEFORE FILING.** The register for `cleanupFailedTurn` and `Refine it in the chat`: 0 each.
 
 ### REG-D-087 — DELEGATED (`REG-D-071`): `JAN-SELRES` — the executor is selected, run and recorded as the reviewer is; a substituted reviewer model is answered with its own code and action; three post-confirmation deviations recorded
@@ -37927,3 +37928,13 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **`REG-D-085`: *"Program overrides are honoured only in test mode."*** True for the reviewer; false for the agy executor until `JAN-SELRES` `RS-1` (`REG-F-459`).
   - **`REG-F-457` G8: *"as do its three vitest entry points."*** As measured in `SR-1`, `test:dist`, `test:coverage`, a direct `vitest run` in the app and the e2e server inherit the shell; `turbo run test` does not (turbo 2.x strict environment mode; `DESIGN-the-selected-reviewer.md` G8).
 - **MADE WITH THIS ENTRY.** `REG-F-462` to `REG-F-466` are filed. The statuses of `REG-F-458`, `REG-F-459` and `REG-F-460` are struck in place and restated as owed by `JAN-SELRES`. A pointer to this entry is appended to `REG-D-085` and `REG-F-457`.
+
+### REG-F-467 — the export guard counts a `*.testing.ts` helper as a PRODUCTION consumer
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-1`, found when its first shared test helper reddened the guard; read from code). **Status:** ⚠ **OPEN — unscheduled; latent: no helper imports a package export today.**
+
+- **THE PREDICATE.** `scripts/export-guard-core.ts:49-50`: `!/[.](test|spec)[.](ts|tsx)$/.test(path) && !path.includes('/verif/') && !path.includes('/scripts/')`. A `*.testing.ts` file, a helper only tests import, is none of these, so the guard counts it as production.
+- **WHAT IT DID.** `RS-1`'s first `apps/rph-demo/src/lib/server/execution/begin-execute.testing.ts` imported `SEED_PWA`, and `guards:export:check` reddened: *"POPULATION_CHANGED packages/rph-engine/src/seed-workbench.ts: its production-consumed exports moved (3 -> 4)"*. The builder moved the import into the test file instead of regenerating the census.
+- **WHY IT MATTERS.** The predicate's own comment says the question is RELATIONAL, *"is this consumer a test?"*, and that an export whose only importer is a test *"makes no promise to the system"*. A test-only helper is a test by that reading; counting it obliges a guard no production code relies on.
+- **TODAY.** The three `*.testing.ts` files (`assurance/clearing-reviewer.testing.ts`, `assurance/no-programs.testing.ts`, `execution/begin-execute.testing.ts`) import no package export, so the census is not inflated.
+- **SEARCHED BEFORE FILING.** The register for `isProductionConsumer`, `.testing.ts` and `export-guard-core`: 0 each.

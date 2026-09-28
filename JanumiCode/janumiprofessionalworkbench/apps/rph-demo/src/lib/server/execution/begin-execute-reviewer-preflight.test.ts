@@ -10,21 +10,32 @@
 // opened, so the work unit stays as it was. A TRANSFORMATION step runs no reviewer and is never refused.
 //
 // ⛔ HERMETIC. The refused arrangement names devin with no model, PATH finds no program, and the executor seam is
-// spied rather than replaced — so the fixture executor is what would run, and nothing real can.
+// ~~spied rather than replaced~~ replaced by one that opens the fixture whatever it is handed (`JAN-SELRES` §4.3) — so
+// the fixture executor is what would run, and nothing real can.
 import { vi } from 'vitest';
 
 vi.hoisted(() => {
 	process.env.RPH_DEMO_MODE = 'test';
 });
 
+// ⭐ `JAN-SELRES` RS-1 (design §4.3) — AND WHATEVER IS OPENED IS THE FIXTURE. The executor now keys on the SELECTION the
+// route asks for in the host's mode, so the server-mode limb below configures a valid executor; were the reviewer's
+// refusal ever skipped there, the step would open it — and it must open the fixture, never a real agy or Pi.
 vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
-	return { ...actual, getExecutionSession: vi.fn(actual.getExecutionSession) };
+	return {
+		...actual,
+		getExecutionSession: vi.fn((_selection: Parameters<typeof actual.getExecutionSession>[0]) =>
+			actual.getExecutionSession({ kind: 'STAND_IN' })
+		)
+	};
 });
 
-// ⭑ THE PREFLIGHT'S MODE, SWITCHABLE ALONE. `isTestMode()` answers a constant read at load (`workbench.ts`), so the
-// server-mode limb below switches only what `beginExecute` hands the preflight. Nothing else moves with it: the fixture
-// executor keys on its own load-time constant (`execution/model.ts`), and the reset and the id sequence on theirs.
+// ⭑ THE PREFLIGHTS' MODE, SWITCHABLE ALONE. `isTestMode()` answers a constant read at load (`workbench.ts`), so the
+// server-mode limb below switches only what `beginExecute` hands the reviewer preflight and the executor selector.
+// Nothing else moves with it: the reset and the id sequence key on their own load-time constant. ~~the fixture executor
+// keys on its own load-time constant (`execution/model.ts`)~~ — ⭐ `JAN-SELRES` D4: no longer; `model.ts`'s `TEST_MODE`
+// is gone, and the executor is what the selector answers in the mode handed to it.
 vi.mock('../workbench.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../workbench.js')>();
 	return { ...actual, isTestMode: vi.fn(actual.isTestMode) };
@@ -203,7 +214,12 @@ describe('⭐ D5 — beginExecute asks the reviewer selector before it dispatche
 	it('⛔ OUTSIDE TEST MODE an unset tool refuses the model step — the preflight is asked in the mode the host runs in', async () => {
 		// ⛔ THE MUTANT: hand the preflight `testMode: true` whatever the host's mode. In test mode it is the same call,
 		// so only a server-mode answer tells the two apart: there an unset tool is a refusal, never the stand-in (D2).
+		// ⭐ `JAN-SELRES` RS-1 (design §4.3) — AND THE EXECUTOR IS VALID, so the reviewer's refusal is the ONLY one here:
+		// under that mutant the step is then dispatched and the executor opened, and this case reddens on those too, not
+		// only on the message. (With no executor configured, the executor's own refusal would answer instead.)
 		vi.stubEnv('JPWB_ASSURANCE_TOOL', undefined);
+		vi.stubEnv('JPWB_EXECUTOR', 'agy');
+		vi.stubEnv('JPWB_EXECUTOR_MODEL', 'fixture-executor-model');
 		const pwuId = await modelWorkUnit();
 		const before = eventCount();
 		vi.mocked(isTestMode).mockReturnValue(false);

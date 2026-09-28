@@ -73,7 +73,7 @@ describe('JAN-CTXPOL — the seeded default is a TRUE statement, not a permissiv
 
 	it('⭑⭑ and it permits NOTHING at THIS_UNDERTAKING — the boundary that survives the correction', () => {
 		// ⭑ THE FALSIFIABLE CONTENT, and it is a real claim about the code: the producer's session is opened and
-		// disposed PER WORK UNIT (`+page.server.ts` — `getExecutionSession()()` before the loop, `dispose()` in
+		// disposed PER WORK UNIT (`+page.server.ts` — `getExecutionSession(executor)(…)` before the loop, `dispose()` in
 		// `finally`), so no material crosses into a second unit. The day something does, this policy is wrong
 		// until someone updates it.
 		//

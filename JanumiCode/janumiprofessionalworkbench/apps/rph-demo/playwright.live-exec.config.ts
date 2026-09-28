@@ -19,6 +19,12 @@ import { laneKeysRefusal, requiredLaneKeys, TEST_TIMEOUT_MS } from './e2e-live-e
 // and why). So it runs OUTSIDE test mode, and its reviewer is chosen exactly as a deployed host's is
 // (`src/lib/server/assurance/reviewer-selection.ts`): an unset or unknown tool, a missing model or a program override
 // (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`) is refused, and a model step is refused before its executor opens.
+// ⭐ `JAN-SELRES` RS-1 (D1, D3, D4) — AND SO IS ITS EXECUTOR (`src/lib/server/execution/executor-selection.ts`): an unset
+// or unknown `JPWB_EXECUTOR`, an unwired one (`devin`), an agy executor whose program `JPWB_AGY_BIN` replaces, or an
+// unset `JPWB_EXECUTOR_MODEL` refuses the model step before anything is dispatched. ⚠ WHAT STILL REFUSES AFTER DISPATCH,
+// as before: a Pi model Pi cannot resolve (only Pi's SDK can say), a refused sandbox and a refused context policy are
+// found when the executor opens, and recorded as a started-then-failed step. `e2e-live-exec/lane-config.ts` restates the
+// executor rules and refuses them at boot, with one rule of the lane's own: no agy executor.
 const PORT = 4322;
 
 // ⛔ NO MODEL LABEL IS PINNED HERE (REG-D-052: the model is configured, never pinned; REG-F-331 measured what

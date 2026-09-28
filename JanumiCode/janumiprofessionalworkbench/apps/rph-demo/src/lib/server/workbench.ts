@@ -255,9 +255,11 @@ export function getEngine(): EngineHandle {
  *
  * ⚠ IT NO LONGER GUARDS THE `/test-api` ENDPOINTS, AND THE DOC LINE THAT SAID SO IS WHY THIS SPLIT EXISTS.
  * Those are `harnessExposed()`'s business now. This predicate keeps the callers that are genuinely about the
- * FIXTURE — and that question was already orthogonalised by configuration, since `model.ts` reads
- * `TEST_MODE && !resolveExecutorToolId()`, so naming a real executor overrides the fixture without touching
- * the mode.
+ * FIXTURE — and that question was already orthogonalised by configuration, since ~~`model.ts` reads
+ * `TEST_MODE && !resolveExecutorToolId()`~~ ⭐ (`JAN-SELRES` D4) the executor selector answers the stand-in only when
+ * this says test mode AND no executor tool is named (`execution/executor-selection.ts`, handed `isTestMode()` by
+ * `beginExecute`), so naming a real executor overrides the fixture without touching the mode. ⭑ This is now the ONE
+ * test-mode read the executor sees: `model.ts`'s own load-time copy is gone.
  */
 export function isTestMode(): boolean {
 	return TEST_MODE;
