@@ -53,7 +53,7 @@ import {
 import { markersIn } from '@janumipwb/rph-application';
 import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
 import { getArtifactStore } from '$lib/server/workbench';
-import { loadPwaFloor } from '$lib/server/floor';
+import { floorBlockedHint, loadPwaFloor } from '$lib/server/floor';
 import { openDraftOn } from '$lib/server/open-drafts';
 import { SESSION_CREDENTIAL } from '$lib/server/identity';
 import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
@@ -226,6 +226,11 @@ export const load: PageServerLoad = async ({ params }) => {
 			...(t.workDischarge ? { workDischarge: t.workDischarge } : {})
 		}))
 	);
+	// The latest recorded assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
+	// The floor RECORDS as well as reads, so it needs a session. It gets the professional's, because the
+	// floor is being run on their behalf — and `engine` here may be an authoring FORK, which is why the
+	// credential is applied to that handle rather than reaching for the canonical one.
+	const floor = loadPwaFloor(params.id, engine.as(SESSION_CREDENTIAL));
 	return {
 		composition,
 		pwa: {
@@ -247,11 +252,18 @@ export const load: PageServerLoad = async ({ params }) => {
 		conversation: loadConversation(params.id, engine)
 			.filter((e) => e.kind !== 'thinking')
 			.map(toLogEntry),
-		// The latest recorded assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
-		// The floor RECORDS as well as reads, so it needs a session. It gets the professional's, because the
-		// floor is being run on their behalf — and `engine` here may be an authoring FORK, which is why the
-		// credential is applied to that handle rather than reaching for the canonical one.
-		floor: loadPwaFloor(params.id, engine.as(SESSION_CREDENTIAL)),
+		floor,
+		// ⭐ `JAN-SELRES` D8 (`REG-F-462`), as revised in RS-3 — WHICH SENTENCE THE BLOCKED HINT READS (`floorBlockedHint`):
+		// revise the graph; revising does not address it; or revise the graph for the floor's findings against it AND run
+		// the review again. Answered ONCE, here, over the floor above: the one the panel shows. ⛔ THAT FLOOR, NOT
+		// CANONICAL'S. In the product a failed, refused or incomplete review reaches this page only through a staged
+		// candidate's FORK — the floor runs on an authoring turn (`agent/+server.ts`), and only a satisfied candidate is
+		// accepted — so canonical holds no floor beside it (`authoring-route-substituted-reviewer.test.ts` holds this read
+		// to the fork, for each of the three answers). The blocked hint renders from this answer and restates no code, no
+		// action and no policy. It said "revise the graph and re-run" beside every unsatisfied floor, where the floor's own
+		// guidance for a failed review says not to revise the PWA. `undefined` when no floor is recorded, and beside a
+		// satisfied one.
+		floorBlockedHint: floor === undefined ? undefined : floorBlockedHint(floor),
 		// ⭑ MXREAD-03 — THE REVIEWER'S OWN ANSWER, READ BACK AND VERIFIED. `ASR-11` limb 3 keeps raw output
 		// *"for diagnostics"*, and until this call the retention had no reader at all: the record named a
 		// storageKey nothing ever resolved (`REG-F-245` (b′)). The bytes are re-hashed before they are shown,

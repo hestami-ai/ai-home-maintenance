@@ -73,7 +73,10 @@ The following fixes address concrete failures observed during a large natural-la
   (`VALIDATOR_MODEL_SUBSTITUTED`, recorded beside `VALIDATOR_EXECUTION_FAILED`) is answered by its own action,
   `REQUALIFY_OR_RESELECT_REVIEWER`, whose guidance says that retrying or reconfiguring the same selection does not fix
   it. Which actions are operational is one exhaustive function, `isOperationalRemediation` (`floor.ts`), which the
-  authoring route asks.
+  authoring route asks. The PWA page's blocked hint asks the same classifier (`floorBlockedHint`), over the floor the
+  page shows, so it never says "revise the graph" where the guidance says not to: it says revise; or that revising
+  does not address a review that reached no verdict; or both, when a non-review floor policy also rejected the graph
+  (`JAN-SELRES` `RS-3`).
 - ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
   resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default
   `Gemini 3.5 Flash (High)`. The actual agy invocation always receives that concrete value through `--model`; the

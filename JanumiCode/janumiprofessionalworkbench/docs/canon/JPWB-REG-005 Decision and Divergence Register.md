@@ -37857,7 +37857,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-462 — the PWA page tells the operator to "revise the graph" beside every failed or refused review, where the floor's own guidance says not to
 
-**Filed 2026-09-28** (`JAN-SELRES`, found by the search for `REG-F-460`'s general form; read from code, not driven). **Status:** ⚠ **OPEN — owed by `JAN-SELRES` `RS-3` (`REG-D-087`).**
+**Filed 2026-09-28** (`JAN-SELRES`, found by the search for `REG-F-460`'s general form; read from code, not driven). **Status:** ~~⚠ **OPEN — owed by `JAN-SELRES` `RS-3` (`REG-D-087`).**~~ ✅ **CLOSED 2026-09-28 by `JAN-SELRES` `RS-3`** — by a remedy other than the one recorded below. Keying the hint on recorded codes (this entry's REMEDY, design D8) left it saying "revise the graph" beside blocks the floor's own guidance answers "Do not revise the PWA": an incomplete review with no subject finding (the default lane's resume-hint case), an ESCALATED review, an INCONCLUSIVE one with nothing recorded, no review at all. Two adversarial verifications showed this. The hint now asks the floor's classifier over the floor the page shows, a staged candidate's fork included, and has three sentences. It says revise the graph. Or it says revising does not address a review that reached no verdict. Or it says both, when a non-review floor policy also rejected the graph. The waiver e2e's revision test is re-staged as the concluded REJECTED assessment its title describes, its assertions byte-identical.
 
 - **THE HINT.** `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:2120-2123` renders *"Publishing is blocked until the floor is SATISFIED — revise the graph and re-run."* for every unsatisfied floor.
 - **THE CONTRADICTION.** Beside a review that did not execute, the guidance the same turn carries says *"Do not revise the PWA or record a waiver in response to this execution failure"* (`apps/rph-demo/src/lib/server/floor.ts:235`). Every operational branch's guidance says not to revise the PWA or record a waiver (`:224`, `:248`, `:297`).
@@ -37900,6 +37900,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **THE THROWN-TURN CLEANUP.** `cleanupFailedTurn` (`agent/+server.ts:282-287`) marks every thrown turn REVISION_REQUIRED, operational throws included — for example a floor-recording refusal (`packages/rph-engine/src/record-assurance.ts:152-154`: *"`send` THROWS on any refusal"*) — and the hint then reads *"Revision requested"*.
 - **THE WAIVER AFFORDANCE.** Recording accepted risk is offered beside every unsatisfied floor (`+page.svelte:2131` onward), where every operational guidance string says not to record a waiver (`apps/rph-demo/src/lib/server/floor.ts:224`, `:235`, `:248`, `:297`).
 - **THE STEP RETRY (inferred, not driven).** The execution page's step controls include Retry (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:66-68`); whether it is offered beside a substitution's refusal was not driven.
+- ⭑ **ADDED 2026-09-28 (`JAN-SELRES` `RS-3`'s verification) — the page hint's *"Run assurance again once the review's own cause is addressed"* names no control that does it.** The floor runs only on an authoring turn. Beside a staged candidate, the one way to run it again on that page is the resume hint's *"Refine it in the chat below"*, which re-runs the agent and the reviewer: after a substitution, another billed call to the same substitute.
 - ⭑ **ADDED 2026-09-28 (`JAN-SELRES` `RS-1`'s verification) — the reviewer selector's UNKNOWN reason offers a tool its next refusal forbids.** `apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts:175` embeds the catalog's refusal whole: *"Unknown backing tool 'nope'. This host can drive: agy, pi, devin."* — offering `pi`, which the selector then refuses as having no reviewer adapter. The catalog list is pinned verbatim (`reviewer-selection.test.ts:153`). The executor's half is fixed in `RS-1`: its UNKNOWN reason names only the wired executors (*"This host has an executor adapter for: agy, pi."*), pinned by `RS1-M33`.
 - **SEARCHED BEFORE FILING.** The register for `cleanupFailedTurn` and `Refine it in the chat`: 0 each.
 
@@ -37915,13 +37916,13 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The selected executor tool's program override is refused outside test mode (`REG-F-459` remedy (a)).
   - The model configured, the model run and the model recorded are one read.
   - A thrown validator failure may carry a code from a closed set. `VALIDATOR_MODEL_SUBSTITUTED` is recorded BESIDE `VALIDATOR_EXECUTION_FAILED`, and answered by a new action, `REQUALIFY_OR_RESELECT_REVIEWER` (`REG-F-460`).
-  - The PWA page's blocked hint is keyed on the recorded codes (`REG-F-462`).
+  - ~~The PWA page's blocked hint is keyed on the recorded codes (`REG-F-462`).~~ The PWA page's blocked hint asks the floor's own classifier, and has three sentences (`REG-F-462`). This deviates from design D8's code keying and was made on `RS-3`'s two adversarial verifications, 2026-09-28.
 - **FOR SPONSOR CONFIRMATION:**
   1. **The scheduling**, as read above.
   2. **`REG-F-458` remedy (a):** the agy executor stays, and runs the model it records; it is not refused.
   3. **The executor is selected the way the reviewer is:** its misconfiguration refused before dispatch, and its program override refused outside test mode.
   4. **A substitution is recorded additively and answered by `REQUALIFY_OR_RESELECT_REVIEWER`.** Its guidance text is the agent's wording: re-qualification and re-selection are sponsor decisions, after which the host is configured to the new selection.
-  5. **`REG-F-462` is fixed within this work.**
+  5. **`REG-F-462` is fixed within this work.** ⭑ *As built (`RS-3`):* the hint asks the floor's classifier, not the recorded codes. The waiver e2e's revision test is re-staged as a concluded REJECTED assessment, its assertions byte-identical, and its other test concludes INCONCLUSIVE.
   6. **The three deviations below.**
 - **SUPERSEDING NOTES — deviations from confirmed or filed text** (this register's rule: *"a correction is a superseding entry citing the entry it supersedes"*).
   - **`REG-D-085`: *"The gate starts with eight live-backend variables as `''`."*** `JAN-SELREV` `SR-1` (`032deaad`, built after the confirmation commit `86f5b1c1`) REMOVES them instead. `''` is still an override to the qualification harness (`scripts/reviewer-qual/preflight.ts:39`, `env[v] !== undefined`), and an empty program name to the adapters (`apps/rph-demo/src/lib/server/assurance/agy-cli.ts:17`, `?? 'agy'`). The design recorded this as built (`DESIGN-the-selected-reviewer.md` D8); the register did not until now.
@@ -37951,7 +37952,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-469 — the execution plane says "reviewed over N tries" with N one too many
 
-**Filed 2026-09-28** (`JAN-SELRES` `RS-2`; its builder and verifier each observed devin called once and the message saying two tries; the cause is read from code). **Status:** ⚠ **OPEN — owed by `JAN-SELRES` `RS-3`, whose scope this entry extends.**
+**Filed 2026-09-28** (`JAN-SELRES` `RS-2`; its builder and verifier each observed devin called once and the message saying two tries; the cause is read from code). **Status:** ~~⚠ **OPEN — owed by `JAN-SELRES` `RS-3`, whose scope this entry extends.**~~ ✅ **CLOSED 2026-09-28 by `JAN-SELRES` `RS-3`** — the message counts the tries that ran (`openPerTry.length`, "1 try" for one), pinned at one try, at a repair turn and at the repair bound of three.
 
 - **THE COUNT.** `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1509` pushes each unsatisfied try's open-finding count before the loop decides whether to stop. `:1643` then prints `reviewed over ${openPerTry.length + 1} …`. On the unsatisfied path every try has already been pushed, so the count is always one too high: a single review reads "2 tries".
 - **WHY IT MATTERS.** It is `REG-F-460`'s general form: an operator surface beside a failed review that misstates what happened. A try is a billed call.
@@ -37965,3 +37966,33 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **THE DRIFT.** Regenerating for `RS-2` (`bun run guards:export`) also moved three untouched files: `packages/rph-application/src/handlers/assurance.ts` 6 → 9, `packages/rph-assurance/src/floor.ts` 0 → 2, `packages/rph-projections/src/assurance-view.ts` 0 → 1. Ledger entries added since the previous regeneration had changed the true values, and no check said so.
 - **WHY IT MATTERS.** A recorded value no check reads drifts silently. The summary line (*"N mutant(s) crediting none"*) is computed fresh; only the per-file record goes stale.
 - **SEARCHED BEFORE FILING.** The register for `unattributedMutants`: 0. For `guards:export`: 4 hits, none about this field.
+
+### REG-F-471 — the floor panel lists the first five reasoning-review statements, so an operational observation recorded after five subject findings is not shown
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-3`, raised by its first adversarial verifier and driven with a probe, T12). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE LIST.** `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:2096` renders `data.floor.reasoningGaps.slice(0, 5)`. `reasoningGaps` is every reasoning-review observation's statement, in recorded order (`apps/rph-demo/src/lib/server/floor.ts:696`, `:817`). The recorder appends `INDEPENDENCE_VIOLATION` last (`packages/rph-assurance/src/recording.ts:116-123`).
+- **THE PROBE.** Five subject findings, then an `INDEPENDENCE_VIOLATION`, on an INCONCLUSIVE review. The hint says revising does not address the block, and the list shows five subject findings and never the violation that explains it. This is reachable with a live reviewer that is not independent and returns five or more findings.
+- **REMEDY CANDIDATES, UNTESTED.** List operational observations first, or unsliced, when the block is not answered by revision.
+- **SEARCHED BEFORE FILING.** The register for `reasoningGaps` and `slice(0, 5)`: 0 each.
+
+### REG-F-472 — the floor classifier answers a composite block by one cause only: a failed review hides a REJECTED graph policy from the producer, and a non-review validator that did not execute is answered as findings to resolve
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-3`, found by its re-verifier and its second fix round; driven with fork probes FD3/FD4 and the canonical T7 staging). **Status:** ⚠ **OPEN — unscheduled; the classifier's rule is owed a decision.**
+
+- **THE COMPOSITE.** `classifyFloorRemediation` (`apps/rph-demo/src/lib/server/floor.ts`) answers an operational review (a substitution, a failed execution, an independence failure, an escalation, an incomplete review) before it looks at the non-review policies. With a refused review AND a schema-invariant or identity policy REJECTED (two roots, an orphan work unit), it says *"Do not revise the PWA … in response to this execution failure"*. The authoring route then marks the candidate BLOCKED_EXTERNAL (`isOperationalRemediation`), so the graph defect is never sent back to the producer. Since `RS-3`, the page hint says revise the graph for those findings as well as re-run the review, so hint and guidance now differ on the graph half, and the hint is the true one.
+- **T7.** A non-review policy whose deterministic validator did not execute (`VALIDATOR_EXECUTION_FAILED` on schema-invariant), beside a passing review, is answered `RESOLVE_OTHER_FLOOR_FINDINGS`: *"Resolve the coded schema … findings"*. The hint then says revise the graph, although no finding exists to resolve.
+- **WHY NOT FIXED IN `RS-3`.** The classifier is shared by the authoring and execution planes and decides `autoRefine`. A rule for composite blocks changes what is fed back to a producer, which is a decision beyond `JAN-SELRES`.
+- **SEARCHED BEFORE FILING.**
+  - `RESOLVE_OTHER_FLOOR_FINDINGS`: 0.
+  - `classifyFloorRemediation`: 3 hits (its test coverage, its reuse on the execution plane, the loop programme), none about a composite block or a non-review validator failure.
+  - `composite`: 11 hits, none about the floor.
+
+### REG-F-473 — a reviewer's ESCALATED recommendation is never recorded as an escalation: `dispositionFromFindings` cannot return ESCALATED, so a review that recommends escalation with no failed criterion is recorded SATISFIED
+
+**Filed 2026-09-28** (`JAN-SELRES` `RS-3`; driven by its re-verifier with a load probe, F-esc, and confirmed from code). **Status:** ⚠ **OPEN — unscheduled; ⚠ a reading of whether this is by design is owed.**
+
+- **THE COMPOSITION.** `packages/rph-assurance/src/floor.ts` sets a policy's disposition from `dispositionFromFindings` (`packages/rph-assurance/src/assurance-rules.ts:47-67`, *"§10.3 precedence ladder"*). It returns REJECTED, INCONCLUSIVE, CONDITIONALLY_SATISFIED or SATISFIED from findings and criteria, and never ESCALATED. The reply's `dispositionRecommendation` reaches only `classifyValidatorResult`, which reads it for one boundary rule: a SATISFIED recommendation with a mandatory criterion unmet (`assurance-rules.ts:277`).
+- **THE CONSEQUENCE.** A reviewer that recommends ESCALATED with every criterion met is recorded as a SATISFIED Reasoning Review, and publication is not blocked. The floor's `ESCALATE_REVIEW` remediation (*"Route the recorded review to the governed human or alternate independent-review path"*) is reachable only from staged records; no review the product runs can produce it.
+- **THE OPEN QUESTION.** `REG-D-074` scores qualification *"never by the reply's own recommendation"*, mirroring the product. So the product may deliberately let criteria decide. But then a recommendation to escalate is a signal the record discards, and an escalation the register models (the `ESCALATE_REVIEW` arm) has no producer.
+- **SEARCHED BEFORE FILING.** The register for `dispositionFromFindings`: 6 hits, none about ESCALATED. For `ESCALATE_REVIEW`: 2 hits, which describe the arm as *"already a modelled outcome"* and never observe that nothing produces it.

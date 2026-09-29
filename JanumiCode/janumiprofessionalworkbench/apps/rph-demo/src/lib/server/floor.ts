@@ -234,12 +234,19 @@ export interface FloorRemediation {
  * producer as a finding.
  *
  * ⭐ `JAN-SELRES` D7 — EVERY CODE A THROWN VALIDATOR FAILURE MAY CARRY IS ONE, imported from the package's closed set
- * rather than restated: each refines `VALIDATOR_EXECUTION_FAILED`, which it is always recorded beside. ⭑ EXPORTED FOR
- * THE PWA PAGE, whose blocked hint keys on these recorded codes (`JAN-SELRES` RS-3, D8).
+ * rather than restated: each refines `VALIDATOR_EXECUTION_FAILED`, which it is always recorded beside. ~~⭑ EXPORTED FOR
+ * THE PWA PAGE, whose blocked hint keys on these recorded codes (`JAN-SELRES` RS-3, D8).~~
  * ⚠ TODAY THE SUBSTITUTION'S MEMBERSHIP IS UNOBSERVABLE HERE: `classifyFloorRemediation` answers a
- * `VALIDATOR_MODEL_SUBSTITUTED` review before it reaches the one reader below. RS-3's hint is its first reader.
+ * `VALIDATOR_MODEL_SUBSTITUTED` review before it reaches the one reader below. ~~RS-3's hint is its first reader.~~
+ * ⭑ `RS-3` (D8 as revised): the page's hint follows the classifier's ACTION and the non-review policies' dispositions
+ * (`floorBlockedHint`, below), never these codes, so the ONE reader of this set is the classifier's subject-finding
+ * filter, and it is private to this module. ⚠ AND NOT ONLY THE SUBSTITUTION'S: each member has its own branch ahead of the filter — the substitution, the
+ * execution failure (beside which any future member of `VALIDATOR_FAILURE_CODES` is recorded) and the independence
+ * violation — so no observation the filter reads carries one, and a mutant of the membership is EQUIVALENT today. The
+ * filter is defence in depth: a reordered or dropped branch still cannot send a failure of the review to the producer
+ * as a finding about the subject.
  */
-export const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
+const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
 	'VALIDATOR_EXECUTION_FAILED',
 	'INDEPENDENCE_VIOLATION',
 	...VALIDATOR_FAILURE_CODES
@@ -371,6 +378,65 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 		guidance:
 			'PublishPwa remains blocked by non-review assurance findings. Resolve the coded schema, invariant, identity, or provenance findings and rerun the assurance floor.'
 	};
+}
+
+/** Which of three sentences the PWA page's blocked hint reads — see `floorBlockedHint`. */
+export type FloorBlockedHint = 'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW';
+
+/**
+ * ⭐ `JAN-SELRES` D8 (`REG-F-462`), AS REVISED IN RS-3 — WHICH SENTENCE THE PWA PAGE'S BLOCKED HINT READS. The page renders
+ * its hint from this ONE answer, computed on the server from the floor the panel shows. It said *"revise the graph and
+ * re-run"* beside every unsatisfied floor, where the floor's own guidance for a failed review says *"Do not revise the
+ * PWA"*.
+ *   · `undefined` — the floor is SATISFIED: nothing blocks, and the page shows no blocked hint at all.
+ *   · `'REVISE'` — `classifyFloorRemediation` answers the block with an action that is NOT operational: a subject finding
+ *     to refine (`REFINE_SUBJECT`), or a non-review floor finding beside a review that passed the graph
+ *     (`RESOLVE_OTHER_FLOOR_FINDINGS`). Revising the graph answers it.
+ *   · `'NOT_BY_REVISION'` — the classifier answers with an operational action (`isOperationalRemediation`) and NO
+ *     non-review floor policy is REJECTED. Five of the six operational guidance strings say *"Do not revise the PWA"*;
+ *     the escalation's says *"an automatic subject edit cannot substitute for the escalation"*.
+ *   · `'REVISE_AND_REVIEW'` — operational, AND a non-review floor policy (schema/invariant or identity/provenance) is
+ *     REJECTED: a defect in the graph that revising DOES answer, beside a review that revising does not.
+ *
+ * ⛔ THE FLOOR'S OWN CLASSIFIER DECIDES WHETHER THE REVIEW IS THE PROBLEM, so the hint and the guidance cannot disagree
+ * about the review. This function adds only what the classifier does not ask when it answers an operational review:
+ * whether the floor ALSO records a finding against the graph.
+ *
+ * ⚠ A TWO-WAY ANSWER WAS FALSE FOR THAT SHAPE (the RS-3 re-verifier's MAJOR). Beside a refused substitute on a graph with
+ * two roots, the page read "revising it does not address this": false for the schema half, which HEAD's "revise the
+ * graph" had got right. RS-3's own route test pinned that floor as its refused-substitute case, because the mock agent's
+ * canned graph is not well formed on the reference seed. The fixture was the tell again.
+ *
+ * ⚠ IT WAS FIRST KEYED ON THE RECORDED CODES (`OPERATIONAL_REVIEW_CODES`), and that missed the blocks the classifier
+ * answers without one (the RS-3 verifier's MAJOR 1): an INCOMPLETE review, with no verdict that judged the subject
+ * (INCONCLUSIVE, ASSESSING, …), with or without subject-coded observations — the classifier's catch-all, which also takes
+ * the INCONCLUSIVE review with nothing recorded that an unregistered draft stages (`e2e/resume-hint.e2e.ts`); an
+ * ESCALATED review whose record names no operational code; and NO reasoning-review result at all. The codes were chosen
+ * because the waiver e2e staged its revision test's floor ASSESSING with a BLOCKING `RR-04`: a test about a SUBJECT
+ * rejection whose fixture recorded an incomplete review. That test now concludes its review REJECTED, and the classifier
+ * answers it `REFINE_SUBJECT`.
+ *
+ * ⭑ ONLY A REJECTED NON-REVIEW POLICY COUNTS: REJECTED is the disposition that records a finding AGAINST the graph. A
+ * non-review policy left INCONCLUSIVE or ASSESSING records none. And the review's OWN disposition never counts here: an
+ * operational review is answered by the classifier whatever its disposition, and the classifier sends none of its
+ * observations back as a finding (`findings: []`).
+ *
+ * ⭑ A NON-REVIEW POLICY CARRYING ONLY AN OPERATIONAL CODE, BESIDE A REVIEW THAT PASSED (a deterministic validator that did
+ * not execute), is the classifier's `RESOLVE_OTHER_FLOOR_FINDINGS`, and so `'REVISE'` here. Whether the classifier should
+ * answer that floor so is the classifier's question, not this function's.
+ *
+ * ⭑ A SATISFIED FLOOR IS `undefined`, NOT `'REVISE'`. The classifier answers it `NONE`, which is not operational, so the
+ * first line is what keeps it out of `'REVISE'`. The page renders the hint only under `!data.floor.satisfied`, where the
+ * difference is unobservable; `floor.test.ts` pins it.
+ */
+export function floorBlockedHint(floor: FloorView): FloorBlockedHint | undefined {
+	if (floor.satisfied) return undefined;
+	if (!isOperationalRemediation(classifyFloorRemediation(floor).action)) return 'REVISE';
+	return floor.policies.some(
+		(p) => p.policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && p.disposition === 'REJECTED'
+	)
+		? 'REVISE_AND_REVIEW'
+		: 'NOT_BY_REVISION';
 }
 
 /**

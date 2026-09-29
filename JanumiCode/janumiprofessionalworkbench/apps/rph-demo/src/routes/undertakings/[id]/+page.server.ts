@@ -1640,7 +1640,11 @@ export const actions: Actions = {
 							// ⭑ AND IT SAYS WHY THE LOOP STOPPED, not merely that it did. `REG-D-059` bounds the
 							// repair loop and escalates at the bound; an operator reading this needs to know
 							// whether the producer ran out of tries, stalled, or made things worse.
-							`The model ran, its work product was reviewed over ${openPerTry.length + 1} ${openPerTry.length === 0 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
+							// ⭐ `JAN-SELRES` RS-3 (`REG-F-469`) — THE TRIES THAT RAN, NO MORE. On this arm every try was unsatisfied,
+							// and each pushed its count onto `openPerTry` before the loop decided to stop, so its length IS the
+							// number of tries. This read `openPerTry.length + 1`: a single review said "2 tries", and a try is a
+							// billed call. `begin-execute-try-count.test.ts` holds it against the EXECUTION exchanges recorded.
+							`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
 				});
 			return { advanced: 'executed' };
 		}

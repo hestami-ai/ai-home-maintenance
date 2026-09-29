@@ -1,8 +1,8 @@
 # ROADMAP — `JAN-SELRES`: what `JAN-SELREV` left
 
 **Design:** `DESIGN-the-selection-residuals.md` (revision 2). · **Authority:** `REG-D-071`'s delegation. The design's
-decisions are recorded as `REG-D-087`, flagged for sponsor confirmation. · **Date:** 2026-09-28. · **Status:** IN
-PROGRESS.
+decisions are recorded as `REG-D-087`, flagged for sponsor confirmation. · **Date:** 2026-09-28. · **Status:** ~~IN
+PROGRESS.~~ ✅ **COMPLETE 2026-09-28** — `RS-1` `6812a42a`, `RS-2` `a5d47603`, and `RS-3` with this revision.
 
 ⭑ **Exit.**
 - **The agy executor runs the model it records** (`REG-F-458` closed).
@@ -148,9 +148,11 @@ No agent stages or commits.
 
 ## `RS-3` — the PWA page's blocked hint follows the record (D8; `REG-F-462`), and the execution plane counts its tries (`REG-F-469`)
 
-1. **The page.** Its load exposes whether the reasoning-review policy's observations include a code in the exported
-   `OPERATIONAL_REVIEW_CODES`.
-2. **The hint.** It renders D8's sentence then, and today's sentence otherwise. No guidance and no waiver appear in it.
+1. **The page.** ~~Its load exposes whether the reasoning-review policy's observations include a code in the exported
+   `OPERATIONAL_REVIEW_CODES`.~~ ⭑ *As built:* its load asks the floor's classifier over the floor the page shows
+   (`floorBlockedHint`: REVISE, NOT_BY_REVISION or REVISE_AND_REVIEW).
+2. **The hint.** It renders ~~D8's sentence then, and today's sentence otherwise~~ the matching one of three
+   sentences (design D8's as-built note). No guidance and no waiver appear in it.
 3. **A NEW e2e** stages a floor whose review recorded `VALIDATOR_EXECUTION_FAILED`, and asserts D8's sentence
    positively.
 4. **D9's hint half.**
@@ -167,4 +169,18 @@ No agent stages or commits.
 - **Mutants:**
   - the hint keyed on the action instead of the codes;
   - the operational sentence names a waiver;
-  - the hint ignores `VALIDATOR_MODEL_SUBSTITUTED`, which kills `RS-2`'s set-membership mutant.
+  - ~~the hint ignores `VALIDATOR_MODEL_SUBSTITUTED`, which kills `RS-2`'s set-membership mutant~~ (void as built: the
+    hint does not read the set, and the membership stays equivalent).
+- ⭑ *Landed 2026-09-28.*
+  - **The hint asks the floor's own classifier.** It has three sentences, and is computed once, from the floor the
+    page shows, a staged candidate's fork included. This DEVIATES from D8's code keying. Two adversarial verifications
+    drove the cases code keying missed (incomplete, escalated, no review) and a composite block the two-way hint
+    misstated.
+  - **The waiver e2e** re-stages its revision test as a concluded REJECTED assessment, and concludes its other test
+    INCONCLUSIVE; every assertion is byte-identical. `REG-F-469`: the try count is right at one, two and the bound.
+  - **Filed:**
+    - `REG-F-471`: the findings list's first-five slice;
+    - `REG-F-472`: the classifier answers a composite block by one cause;
+    - `REG-F-473`: a reviewer's ESCALATED recommendation is never recorded as an escalation;
+    - `REG-F-466` gains the page's "run assurance again" naming no control.
+  - **Mutants:** RS3-M4..M38 added (32; the fix rounds replaced the builder's code-keyed mutants with their inverses); with the 49 prior entries anchored in, or victimised by, the touched files, read in both quote styles, plus W2-a and W2-b (RS-1's runner list had skipped five single-quoted entries: B2, F199, S3, W2-a, W2-b), 82 KILLED and the one declared control, W2-b, HELD, by the official runner on the staged tree. **gate:fast:** GREEN, 6241 passed / 4 skipped, e2e 100 of 100 (95 plus 5 new), census 362 of 362 guarded, the fingerprint unmoved.

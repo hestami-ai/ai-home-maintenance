@@ -86,12 +86,65 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		return pwaId;
 	}
 
-	/** Leave the LATEST reasoning-review assessment non-SATISFIED, carrying a BLOCKING finding a waiver can name. */
-	async function blockTheFloor(request: APIRequestContext, pwaId: string): Promise<void> {
+	/**
+	 * Leave the LATEST reasoning-review assessment non-SATISFIED, carrying a BLOCKING finding a waiver can name, CONCLUDED
+	 * with the disposition given.
+	 *
+	 * ⭐ `JAN-SELRES` RS-3 (`REG-F-462`) — THE FIXTURE WAS THE TELL. This left every caller's review ASSESSING, which the
+	 * floor's own recorder does not do (`record-assurance.ts` completes every assessment it begins), and the floor's
+	 * classifier calls an unconcluded review with its finding open an INCOMPLETE review: *"Do not revise the PWA or record
+	 * a waiver merely to clear an incomplete review"*. Yet the first test below is about a SUBJECT rejection: "the panel
+	 * offers revision". D8 first bent the page's hint around this fixture (keyed on recorded codes, so it would keep saying
+	 * "revise" here), and that left "revise" beside every incomplete review in the product. The hint now follows the
+	 * classifier, and each test concludes its review:
+	 *   · the first `REJECTED` with the same finding, which the classifier answers `REFINE_SUBJECT` — what its title says;
+	 *   · the second `INCONCLUSIVE`, the review that reached no verdict. ⛔ NOT `REJECTED`, ON PURPOSE: its PublishPwa
+	 *     refusal is the victim of `MU-F202-the-floor-blocks-only-on-REJECTED`, which is killed only because this floor
+	 *     blocks WITHOUT a REJECTED review. Any non-REJECTED review does that; ASSESSING was never what it needed (a
+	 *     second test concluded `REJECTED` lets that mutant SURVIVE, driven).
+	 * No assertion in this file changed.
+	 */
+	async function blockTheFloor(
+		request: APIRequestContext,
+		pwaId: string,
+		concludeAs: 'REJECTED' | 'INCONCLUSIVE'
+	): Promise<void> {
 		const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId)!;
 		const version = Number(pwa.state.semanticVersion ?? 1);
 		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FA1';
 		const observationId = 'obs_01ARZ3NDEKTSV4RRFFQ69G5FA2';
+		const finding = {
+			findingCode: 'RR-04',
+			severity: 'BLOCKING',
+			statement: 'Staged blocking reasoning-review finding.'
+		};
+		// The verdict in DOC-007 §20's sixteen-field shape, without the evaluator and criterion rows the floor's own
+		// recorder also sends (`rph-engine` `record-assurance.ts`): no producer is named, so no independence is checked.
+		const conclude = [
+			'CompleteAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
+			assessmentId,
+			{
+				validatorResult: {
+					validatorId: 'e2e.staged-reasoning-review',
+					validatorVersion: '1',
+					policyId: POLICY,
+					policyVersion: POLICY_VERSION,
+					assessmentId,
+					subjectObjectIds: [pwaId],
+					subjectSemanticVersions: { [pwaId]: version },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [{ ...finding, subjectObjectIds: [pwaId] }],
+					dispositionRecommendation: concludeAs,
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {}
+				}
+			}
+		];
 		const res = await request.post('/test-api/dispatch', {
 			data: {
 				steps: [
@@ -113,14 +166,9 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 						'RecordAssuranceObservation',
 						'ASSURANCE_OBSERVATION',
 						observationId,
-						{
-							assessmentId,
-							observationType: 'FINDING',
-							findingCode: 'RR-04',
-							severity: 'BLOCKING',
-							statement: 'Staged blocking reasoning-review finding.'
-						}
-					]
+						{ assessmentId, observationType: 'FINDING', ...finding }
+					],
+					conclude
 				]
 			}
 		});
@@ -133,7 +181,8 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		request
 	}) => {
 		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Waiver Framing');
-		await blockTheFloor(request, pwaId);
+		// A SUBJECT rejection, concluded — see `blockTheFloor` for why this arrangement changed in RS-3.
+		await blockTheFloor(request, pwaId, 'REJECTED');
 
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		const hint = page.getByTestId('floor-blocked-hint');
@@ -157,7 +206,8 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		request
 	}) => {
 		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Waiver Nondischarge');
-		await blockTheFloor(request, pwaId);
+		// A review that reached no verdict, concluded — see `blockTheFloor` for why it is not REJECTED.
+		await blockTheFloor(request, pwaId, 'INCONCLUSIVE');
 
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		await page

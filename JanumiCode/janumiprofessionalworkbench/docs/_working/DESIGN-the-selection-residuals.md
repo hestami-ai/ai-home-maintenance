@@ -310,8 +310,10 @@ Read from code at `2bcf3b50`:
   - **The execution plane.** It keeps printing the action name and the statements (`:1483`, `:1607`). After D6 and D7
     it reads the refusal's remedy, a `VALIDATOR_MODEL_SUBSTITUTED` line and `(REQUALIFY_OR_RESELECT_REVIEWER)`. The
     PWA-worded guidance is not shown there.
-  - **`OPERATIONAL_REVIEW_CODES` gains the code.** D8 reads that set, so the membership becomes load-bearing and a
-    mutant can kill it.
+  - **`OPERATIONAL_REVIEW_CODES` gains the code.** ~~D8 reads that set, so the membership becomes load-bearing and a
+    mutant can kill it.~~ ⭑ *As built (`RS-3`):* D8 does not read the set. It is private to `floor.ts`, read only by
+    the classifier's subject-finding filter behind branches that answer each member first, so its membership is
+    equivalent.
   - **Tests use the real shape.** A real throwing validator goes through `runFloorResults`, recording and the
     classifier, so the co-recorded `VALIDATOR_EXECUTION_FAILED` and `INDEPENDENCE_VIOLATION` are present.
     `floor.test.ts`'s `reviewPolicy` (`independenceOk: true`) is not the shape a throw produces.
@@ -342,6 +344,33 @@ Read from code at `2bcf3b50`:
     `REG-F-447`), and every operational guidance string names a waiver.
   - **Proof.** A NEW e2e stages a floor whose review recorded `VALIDATOR_EXECUTION_FAILED`, and asserts the new sentence
     positively. It has its own mutant. e2e becomes 95 existing plus the new.
+  - ⭑ *As built (`RS-3`), a DEVIATION from D8 above, made on its two adversarial verifications:*
+    - **The hint asks the floor's own classifier, not the recorded codes.** `floorBlockedHint` (`floor.ts`) reads
+      `isOperationalRemediation(classifyFloorRemediation(floor).action)`, once, on the server, over the floor the page
+      shows, a staged candidate's fork included. Code keying left "revise the graph" beside blocks whose guidance says
+      "Do not revise the PWA": an incomplete review with no subject finding (the default lane's resume-hint case), an
+      ESCALATED review, an INCONCLUSIVE one with nothing recorded, no review at all. The hint and the guidance now
+      cannot disagree about the review.
+    - **Three sentences, not two.** An operational review beside a REJECTED non-review policy (a real graph defect)
+      needs both instructions:
+      - REVISE: *"Publishing is blocked until the floor is SATISFIED — revise the graph and re-run."* (unchanged).
+      - NOT_BY_REVISION: *"Publishing is blocked until the floor is SATISFIED — the Reasoning Review did not reach a
+        verdict that revising the graph can answer, so revising it does not address this. Run assurance again once the
+        review's own cause is addressed."*
+      - REVISE_AND_REVIEW: *"Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the
+        floor records against it; the Reasoning Review itself did not reach a verdict that revising can answer, so run
+        assurance again once the review's own cause is addressed."*
+    - **Why D8's sentence changed.** It said *"(its findings, below, say why)"*, but the findings sit above and the
+      waiver form below. *"Fix the reviewer"* could also read as reconfiguring after a substitution.
+    - **The waiver e2e's fixture was the tell.** Its revision test staged a review left ASSESSING, which the
+      classifier calls incomplete. It is re-staged as the concluded REJECTED assessment its title describes, with
+      every assertion byte-identical. Its other test concludes INCONCLUSIVE, the shape the product records after a
+      throw: `MU-F202-the-floor-blocks-only-on-REJECTED` needs a non-REJECTED review.
+    - **The real path is pinned.** A load test covers the staged fork's floor in each of the three shapes. A
+      default-lane e2e covers the resume-hint candidate, a waiver recorded through the form, and the combined case.
+    - **Left to the classifier** (`REG-F-472`): it answers a composite block by the review alone, and a non-review
+      validator that did not execute as findings to resolve. The findings list's first-five slice can hide the
+      operational observation (`REG-F-471`).
 - **D9 — Documents and comments.** Each is to say what the code then does.
   - `apps/rph-demo/README.md` and `AUTHORING-BACKBONE.md`:
     - the agy executor runs `JPWB_EXECUTOR_MODEL`;
@@ -493,7 +522,8 @@ Read from code at `2bcf3b50`:
    is answered by a new action, `REQUALIFY_OR_RESELECT_REVIEWER`. **Its guidance text is the agent's wording** (D7):
    it says re-qualification and re-selection are sponsor decisions, and that the host is then configured to the new
    selection.
-5. **`REG-F-462` is fixed within this work.** The hint is keyed on the recorded codes.
+5. **`REG-F-462` is fixed within this work.** ~~The hint is keyed on the recorded codes.~~ ⭑ *As built (`RS-3`):* the
+   hint asks the floor's own classifier, with three sentences (D8's as-built note).
 6. **Post-confirmation deviations, recorded as superseding notes in `REG-D-087`** (`REG-005`:19: *"a correction is a
    superseding entry citing the entry it supersedes"*), with a pointer from each entry:
    - **`REG-D-085` said *"The gate starts with eight live-backend variables as `''`"*.**

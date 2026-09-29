@@ -5,10 +5,16 @@
 import { describe, expect, it } from 'vitest';
 import {
 	classifyFloorRemediation,
+	floorBlockedHint,
 	identityProvenanceFactsOf,
 	isOperationalRemediation
 } from './floor.js';
-import type { FloorProducer, FloorRemediationAction, FloorView } from './floor.js';
+import type {
+	FloorBlockedHint,
+	FloorProducer,
+	FloorRemediationAction,
+	FloorView
+} from './floor.js';
 
 const PRODUCER: FloorProducer = {
 	agentId: 'authoring-agent',
@@ -313,4 +319,489 @@ describe('isOperationalRemediation — every action answered, the operational on
 		it(`${action} → ${String(operational)}`, () => {
 			expect(isOperationalRemediation(action)).toBe(operational);
 		});
+});
+
+// ⭐ `JAN-SELRES` D8 (`REG-F-462`), AS REVISED IN RS-3 — THE PAGE'S BLOCKED HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER, IN
+// THREE SENTENCES. `floorBlockedHint` is the one answer the PWA page renders its hint from: 'REVISE' says "revise the
+// graph and re-run", 'NOT_BY_REVISION' says revising does not address the block, and 'REVISE_AND_REVIEW' says to revise
+// the graph for the findings the floor records against it AND that the review reached no verdict revising can answer.
+// ⛔ IT ASKS `classifyFloorRemediation` WHETHER THE REVIEW IS THE PROBLEM, NEVER THE RECORDED CODES, and the non-review
+// policies' dispositions whether the GRAPH is too: a two-way answer read "revising it does not address this" beside a
+// refused substitute on a graph with two roots (the RS-3 re-verifier's MAJOR). ⭑ The first table is a `Record` over the
+// action union, so an action added without rows here fails to COMPILE; every operational action has a row alone and a
+// row beside a REJECTED non-review policy, and each row asserts, as arrangement, that its floor IS answered with that
+// action.
+describe('floorBlockedHint — "revise the graph" where revising answers the block, and never alone beside a review it does not answer', () => {
+	const executionFailed = {
+		code: 'VALIDATOR_EXECUTION_FAILED',
+		severity: 'MATERIAL',
+		statement: 'The reviewing tool did not run.'
+	};
+	const substituted = {
+		code: 'VALIDATOR_MODEL_SUBSTITUTED',
+		severity: 'MATERIAL',
+		statement: 'The reviewing tool reported that another model answered.'
+	};
+	const independenceViolation = {
+		code: 'INDEPENDENCE_VIOLATION',
+		severity: 'BLOCKING',
+		statement: 'Producer and reviewer resolve to the same model.'
+	};
+	const subjectFinding = {
+		code: 'RR-02-no-obligation-elision',
+		severity: 'BLOCKING',
+		statement: 'A delegated deployment obligation is absent.'
+	};
+	/** What the schema/invariant policy records for a graph with two roots or an orphan (`floor.ts` `runPwaFloor`). */
+	const notWellFormed = {
+		code: 'PWA_GRAPH_NOT_WELL_FORMED',
+		severity: 'BLOCKING',
+		statement: 'Deterministic invariant violated: PWA_GRAPH_NOT_WELL_FORMED'
+	};
+	const nonReview = (
+		policyId: 'floor.schema-invariant' | 'floor.identity-provenance',
+		disposition: string,
+		observations: FloorView['policies'][number]['observations'] = []
+	): FloorView['policies'][number] => ({
+		policyId,
+		disposition,
+		independenceOk: true,
+		observations
+	});
+	/** A defect in the GRAPH, which revising answers: the schema/invariant policy REJECTED it. */
+	const schemaRejected = nonReview('floor.schema-invariant', 'REJECTED', [notWellFormed]);
+	/** A defect in the PWA's provenance, which revising answers: the identity/provenance policy REJECTED it. */
+	const identityRejected = nonReview('floor.identity-provenance', 'REJECTED', [
+		{ code: 'IP-03-provenance', severity: 'BLOCKING', statement: 'Missing provenance.' }
+	]);
+	const schemaSatisfied = nonReview('floor.schema-invariant', 'SATISFIED');
+	const identitySatisfied = nonReview('floor.identity-provenance', 'SATISFIED');
+	/** The RECORDED shape of a refused substitute: all three codes, a subject finding beside them. */
+	const refusedSubstitute = reviewPolicy({
+		independenceOk: false,
+		observations: [subjectFinding, executionFailed, substituted, independenceViolation]
+	});
+	const notIndependent = reviewPolicy({
+		disposition: 'SATISFIED',
+		independenceOk: false,
+		observations: [independenceViolation]
+	});
+
+	const BY_ACTION: Readonly<
+		Record<
+			FloorRemediationAction,
+			readonly {
+				readonly shape: string;
+				readonly floor: FloorView;
+				readonly hint: FloorBlockedHint | undefined;
+			}[]
+		>
+	> = {
+		// Nothing blocks, so there is no hint — even with a stale operational code on the review.
+		NONE: [
+			{
+				shape: 'a SATISFIED floor whose review still carries a stale operational code',
+				floor: floorView({
+					aggregate: 'SATISFIED',
+					satisfied: true,
+					policies: [reviewPolicy({ disposition: 'SATISFIED', observations: [executionFailed] })]
+				}),
+				hint: undefined
+			}
+		],
+		REFINE_SUBJECT: [
+			{
+				shape: 'a REJECTED review with a subject finding',
+				floor: floorView({
+					policies: [reviewPolicy({ disposition: 'REJECTED', observations: [subjectFinding] })]
+				}),
+				hint: 'REVISE'
+			},
+			// Revising answers both halves: nothing here is the review's problem.
+			{
+				shape: 'the same, beside a REJECTED schema policy',
+				floor: floorView({
+					policies: [
+						schemaRejected,
+						reviewPolicy({ disposition: 'REJECTED', observations: [subjectFinding] })
+					]
+				}),
+				hint: 'REVISE'
+			}
+		],
+		RETRY_OR_CONFIGURE_REVIEWER: [
+			{
+				shape: 'a review that did not execute',
+				floor: floorView({ policies: [reviewPolicy({ observations: [executionFailed] })] }),
+				hint: 'NOT_BY_REVISION'
+			},
+			{
+				shape: 'a review that did not execute, beside a REJECTED schema policy',
+				floor: floorView({
+					policies: [schemaRejected, reviewPolicy({ observations: [executionFailed] })]
+				}),
+				hint: 'REVISE_AND_REVIEW'
+			}
+		],
+		REQUALIFY_OR_RESELECT_REVIEWER: [
+			{
+				shape: 'a refused substitute, as recorded',
+				floor: floorView({ policies: [refusedSubstitute] }),
+				hint: 'NOT_BY_REVISION'
+			},
+			// ⛔ FD3, the RS-3 re-verifier's MAJOR: the page read "revising it does not address this" beside two roots.
+			{
+				shape: 'a refused substitute beside a graph that is not well formed',
+				floor: floorView({ policies: [schemaRejected, refusedSubstitute] }),
+				hint: 'REVISE_AND_REVIEW'
+			}
+		],
+		CHANGE_REVIEWER: [
+			{
+				shape: 'a review that was not independent',
+				floor: floorView({ policies: [notIndependent] }),
+				hint: 'NOT_BY_REVISION'
+			},
+			{
+				shape: 'a review that was not independent, beside a REJECTED identity policy',
+				floor: floorView({ policies: [identityRejected, notIndependent] }),
+				hint: 'REVISE_AND_REVIEW'
+			}
+		],
+		// ⚠ NO CODE RECORDED AT ALL — the codes-keyed predicate answered the first of these "revise".
+		ESCALATE_REVIEW: [
+			{
+				shape: 'an ESCALATED review, nothing recorded',
+				floor: floorView({ policies: [reviewPolicy({ disposition: 'ESCALATED' })] }),
+				hint: 'NOT_BY_REVISION'
+			},
+			{
+				shape: 'an ESCALATED review beside a REJECTED identity policy',
+				floor: floorView({
+					policies: [identityRejected, reviewPolicy({ disposition: 'ESCALATED' })]
+				}),
+				hint: 'REVISE_AND_REVIEW'
+			}
+		],
+		// The review judged the graph and passed it; a non-review floor finding blocks, and revising answers it.
+		RESOLVE_OTHER_FLOOR_FINDINGS: [
+			{
+				shape: 'a passing review beside a REJECTED identity policy',
+				floor: floorView({
+					policies: [identityRejected, reviewPolicy({ disposition: 'SATISFIED' })]
+				}),
+				hint: 'REVISE'
+			}
+		]
+	};
+	for (const [action, rows] of Object.entries(BY_ACTION) as [
+		FloorRemediationAction,
+		(typeof BY_ACTION)[FloorRemediationAction]
+	][])
+		for (const { shape, floor, hint } of rows)
+			it(`${action} — ${shape} → ${String(hint)}`, () => {
+				expect(
+					classifyFloorRemediation(floor).action,
+					'arrangement: the classifier answers this floor with its row'
+				).toBe(action);
+				expect(floorBlockedHint(floor)).toBe(hint);
+			});
+
+	// ⭐ THE SHAPES RS-3's REVISION NAMES, each over the whole floor the page loads: schema, identity, review.
+	it('⛔ an operational review beside a REJECTED schema/invariant policy → REVISE_AND_REVIEW: the graph half is answered by revising', () => {
+		// FD4's shape: a reviewer that did not run, and a graph with an orphan PWU the schema policy rejected.
+		const floor = floorView({
+			policies: [
+				schemaRejected,
+				identitySatisfied,
+				reviewPolicy({ observations: [executionFailed] })
+			]
+		});
+		expect(
+			isOperationalRemediation(classifyFloorRemediation(floor).action),
+			'arrangement: the classifier answers the review, operationally'
+		).toBe(true);
+		expect(
+			floorBlockedHint(floor),
+			'a defect in the graph was answered as a block revising does not address'
+		).toBe('REVISE_AND_REVIEW');
+	});
+
+	it('⛔ an operational review beside a REJECTED identity/provenance policy → REVISE_AND_REVIEW: a non-review defect of either policy counts', () => {
+		const floor = floorView({
+			policies: [
+				schemaSatisfied,
+				identityRejected,
+				reviewPolicy({ observations: [executionFailed] })
+			]
+		});
+		expect(
+			isOperationalRemediation(classifyFloorRemediation(floor).action),
+			'arrangement: the classifier answers the review, operationally'
+		).toBe(true);
+		expect(floorBlockedHint(floor)).toBe('REVISE_AND_REVIEW');
+	});
+
+	it('an operational review ALONE, the other two policies SATISFIED → NOT_BY_REVISION', () => {
+		expect(
+			floorBlockedHint(
+				floorView({
+					policies: [
+						schemaSatisfied,
+						identitySatisfied,
+						reviewPolicy({ observations: [executionFailed] })
+					]
+				})
+			)
+		).toBe('NOT_BY_REVISION');
+	});
+
+	it('⭑ VALIDATOR_EXECUTION_FAILED on the SCHEMA policy beside a review that passed (the T7 shape) → REVISE: the classifier answers it RESOLVE_OTHER_FLOOR_FINDINGS', () => {
+		// ⚠ Whether a deterministic validator that did not execute is answered by revising is the CLASSIFIER's question;
+		// the hint follows its answer, and a two-way hint did the same.
+		const floor = floorView({
+			policies: [
+				nonReview('floor.schema-invariant', 'ASSESSING', [executionFailed]),
+				identitySatisfied,
+				reviewPolicy({ disposition: 'SATISFIED' })
+			]
+		});
+		expect(
+			classifyFloorRemediation(floor).action,
+			'arrangement: the classifier answers the non-review finding'
+		).toBe('RESOLVE_OTHER_FLOOR_FINDINGS');
+		expect(floorBlockedHint(floor)).toBe('REVISE');
+	});
+
+	it('⛔ a recorded waiver changes no answer (ASR-3): the waived floor reads what the unwaived one does', () => {
+		// A waiver moves nothing, so it may not move the hint either: yielding to `waived` puts "revise the graph and
+		// re-run" back beside a review that did not execute. `e2e/assurance-floor-review-failure-hint.e2e.ts` records the
+		// waiver through the page's own form.
+		const shapes: readonly (readonly [FloorView['policies'], FloorBlockedHint])[] = [
+			[
+				[schemaSatisfied, identitySatisfied, reviewPolicy({ observations: [executionFailed] })],
+				'NOT_BY_REVISION'
+			],
+			[
+				[schemaRejected, identitySatisfied, reviewPolicy({ observations: [executionFailed] })],
+				'REVISE_AND_REVIEW'
+			],
+			[
+				[
+					schemaSatisfied,
+					identitySatisfied,
+					reviewPolicy({ disposition: 'REJECTED', observations: [subjectFinding] })
+				],
+				'REVISE'
+			]
+		];
+		for (const [policies, hint] of shapes) {
+			expect(floorBlockedHint(floorView({ policies }))).toBe(hint);
+			expect(
+				floorBlockedHint(floorView({ waived: true, policies })),
+				'a recorded waiver moved the hint'
+			).toBe(hint);
+		}
+	});
+
+	it('⛔ the review’s OWN REJECTED is not a non-review finding: a REJECTED review that was not independent, the others SATISFIED → NOT_BY_REVISION', () => {
+		const floor = floorView({
+			policies: [
+				schemaSatisfied,
+				identitySatisfied,
+				reviewPolicy({
+					disposition: 'REJECTED',
+					independenceOk: false,
+					observations: [subjectFinding, independenceViolation]
+				})
+			]
+		});
+		expect(
+			classifyFloorRemediation(floor).action,
+			'arrangement: the independence branch answers it, ahead of the subject finding'
+		).toBe('CHANGE_REVIEWER');
+		expect(
+			floorBlockedHint(floor),
+			'the review’s own disposition was read as a finding against the graph'
+		).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ a non-review policy that did not conclude (ASSESSING, its validator did not execute) beside an operational review → NOT_BY_REVISION: only a REJECTED one records a finding against the graph', () => {
+		expect(
+			floorBlockedHint(
+				floorView({
+					policies: [
+						nonReview('floor.schema-invariant', 'ASSESSING', [executionFailed]),
+						identitySatisfied,
+						reviewPolicy({ observations: [executionFailed] })
+					]
+				})
+			)
+		).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ NO reasoning-review result, a REJECTED schema policy → REVISE_AND_REVIEW: the missing review is operational, the defect is the graph’s', () => {
+		const floor = floorView({ policies: [schemaRejected, identitySatisfied] });
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the missing-review branch answered it'
+		).toMatch(/did not produce a policy result/i);
+		expect(floorBlockedHint(floor)).toBe('REVISE_AND_REVIEW');
+	});
+
+	// ⭐ THE BLOCKS THE CODES MISSED (the RS-3 verifier's MAJOR 1). The classifier answers each "Do not revise the PWA" —
+	// or, for the escalation, that a subject edit cannot substitute — and the page told each "revise the graph and re-run".
+	// Each carries no REJECTED non-review policy, so each is NOT_BY_REVISION.
+	it('⛔ an INCOMPLETE review with nothing recorded (INCONCLUSIVE, no observation — what an unregistered draft stages, `e2e/resume-hint.e2e.ts`) → NOT_BY_REVISION', () => {
+		const floor = floorView({ policies: [reviewPolicy({ disposition: 'INCONCLUSIVE' })] });
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the classifier says not to revise the PWA'
+		).toMatch(/do not revise the PWA or record a waiver merely to clear an incomplete review/i);
+		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ a review left ASSESSING with one BLOCKING RR-04 open → NOT_BY_REVISION: an open finding on an unconcluded review is not a verdict', () => {
+		// The waiver e2e staged exactly this floor for a test about a SUBJECT rejection, and D8 keyed the hint on the codes
+		// so that test kept "revise". The classifier calls it an incomplete review; the waiver e2e's revision test now
+		// concludes its review REJECTED (`e2e/assurance-floor-waiver.e2e.ts`), and this answer changed from "revise" in
+		// RS-3's revision.
+		const floor = floorView({
+			policies: [
+				reviewPolicy({
+					disposition: 'ASSESSING',
+					observations: [
+						{
+							code: 'RR-04',
+							severity: 'BLOCKING',
+							statement: 'Staged blocking reasoning-review finding.'
+						}
+					]
+				})
+			]
+		});
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the classifier calls it an incomplete review'
+		).toMatch(/merely to clear an incomplete review/i);
+		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ a review CONCLUDED INCONCLUSIVE with one BLOCKING RR-04 (the waiver e2e’s second test) → NOT_BY_REVISION: INCONCLUSIVE judged nothing, whatever it recorded', () => {
+		const floor = floorView({
+			policies: [
+				schemaSatisfied,
+				identitySatisfied,
+				reviewPolicy({
+					disposition: 'INCONCLUSIVE',
+					observations: [
+						{
+							code: 'RR-04',
+							severity: 'BLOCKING',
+							statement: 'Staged blocking reasoning-review finding.'
+						}
+					]
+				})
+			]
+		});
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the classifier calls it an incomplete review'
+		).toMatch(/merely to clear an incomplete review/i);
+		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ an ESCALATED review carrying a subject observation → NOT_BY_REVISION: the escalation, not the finding, answers it', () => {
+		const floor = floorView({
+			policies: [reviewPolicy({ disposition: 'ESCALATED', observations: [subjectFinding] })]
+		});
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the escalation branch answered it'
+		).toMatch(/an automatic subject edit cannot substitute for the escalation/i);
+		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+	});
+
+	it('⛔ NO reasoning-review result recorded, the other floor policies SATISFIED → NOT_BY_REVISION: the review did not produce a policy result', () => {
+		// ⚠ THIS ANSWER CHANGED FROM "revise" IN RS-3's REVISION: keyed on the codes, the page said "revise" beside guidance
+		// that says "Do not revise the PWA or record a waiver in response to the missing review".
+		expect(floorBlockedHint(floorView({ policies: [schemaSatisfied, identitySatisfied] }))).toBe(
+			'NOT_BY_REVISION'
+		);
+	});
+
+	it('⛔ NO reasoning-review result, an operational code on ANOTHER policy → NOT_BY_REVISION, answered by the missing review and never by that code', () => {
+		const floor = floorView({
+			policies: [nonReview('floor.schema-invariant', 'INCONCLUSIVE', [executionFailed])]
+		});
+		expect(
+			classifyFloorRemediation(floor).guidance,
+			'arrangement: the missing-review branch answered it, not the other policy’s code'
+		).toMatch(/did not produce a policy result/i);
+		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+	});
+
+	it('an operational code on ANOTHER floor policy, beside a REJECTED review with a subject finding → REVISE: that review judged the graph', () => {
+		expect(
+			floorBlockedHint(
+				floorView({
+					policies: [
+						nonReview('floor.schema-invariant', 'INCONCLUSIVE', [executionFailed]),
+						reviewPolicy({ disposition: 'REJECTED', observations: [subjectFinding] })
+					]
+				})
+			)
+		).toBe('REVISE');
+	});
+
+	it('⭑ a VALIDATOR_MODEL_SUBSTITUTED observation ALONE → NOT_BY_REVISION — the classifier’s substitution branch answers it', () => {
+		// ⚠ NOT THE RECORDED SHAPE (that is the REQUALIFY rows above): alone, only the substitution branch can answer it.
+		expect(
+			floorBlockedHint(floorView({ policies: [reviewPolicy({ observations: [substituted] })] }))
+		).toBe('NOT_BY_REVISION');
+	});
+
+	it('an independence violation recorded after five subject findings (INCONCLUSIVE) → NOT_BY_REVISION: the findings recorded first do not make it a verdict', () => {
+		expect(
+			floorBlockedHint(
+				floorView({
+					policies: [
+						reviewPolicy({
+							independenceOk: false,
+							observations: [
+								subjectFinding,
+								subjectFinding,
+								subjectFinding,
+								subjectFinding,
+								subjectFinding,
+								independenceViolation
+							]
+						})
+					]
+				})
+			)
+		).toBe('NOT_BY_REVISION');
+	});
+
+	it('a SATISFIED floor → undefined, whatever its review recorded: no blocked hint is rendered at all', () => {
+		expect(
+			floorBlockedHint(
+				floorView({
+					aggregate: 'SATISFIED',
+					satisfied: true,
+					policies: [schemaSatisfied, identitySatisfied, reviewPolicy({ disposition: 'SATISFIED' })]
+				})
+			)
+		).toBeUndefined();
+		expect(
+			floorBlockedHint(
+				floorView({
+					aggregate: 'SATISFIED',
+					satisfied: true,
+					policies: [reviewPolicy({ disposition: 'SATISFIED', observations: [executionFailed] })]
+				})
+			),
+			'a satisfied floor was given a blocked hint'
+		).toBeUndefined();
+	});
 });

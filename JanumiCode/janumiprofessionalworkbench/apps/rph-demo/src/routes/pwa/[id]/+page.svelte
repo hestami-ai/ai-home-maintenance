@@ -2111,16 +2111,45 @@
 								<p class="revansnote">{data.reviewerAnswer.disclosure}</p>
 							</details>
 						{/if}
-						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so REVISION is the only route past
-						     it and this hint may not name another. It used to read "revise the graph and re-run, or record
-						     a waiver", and the waived arm above it announced "publishing is permitted despite the floor" —
-						     the exact reach ASR-3 removed. Recording a waiver is still OFFERED below, because ASR-14 keeps
-						     it recordable ("a waiver accepts risk; it never rewrites truth") and the act is real: it mints
-						     an EFFECTIVE WAIVER Decision. What it no longer does is move this gate. -->
+						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so ~~REVISION is the only route past
+						     it~~ a SATISFIED run of the floor is the only route past it, and this hint may not name another.
+						     It used to read "revise the graph and re-run, or record a waiver", and the waived arm above it
+						     announced "publishing is permitted despite the floor" — the exact reach ASR-3 removed. Recording
+						     a waiver is still OFFERED below, because ASR-14 keeps it recordable ("a waiver accepts risk; it
+						     never rewrites truth") and the act is real: it mints an EFFECTIVE WAIVER Decision. What it no
+						     longer does is move this gate.
+						     ⭐ JAN-SELRES D8 (REG-F-462), as revised in RS-3 — THE HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER,
+						     IN THREE SENTENCES. When `classifyFloorRemediation` answers this floor's block with an
+						     operational action — the review did not execute, was refused, was not independent, was
+						     escalated, is incomplete (no verdict that judged the subject, with or without subject-coded
+						     observations), or left no result — revising the graph does not answer the REVIEW, and five of
+						     those six guidance strings say "Do not revise the PWA" (the escalation's: a subject edit
+						     "cannot substitute"). Then, if no schema/invariant or identity/provenance policy is REJECTED,
+						     the hint says revising does not address it; if one is, it says to revise the graph for the
+						     findings the floor records against it AND that the review did not reach a verdict revising can
+						     answer — a two-way hint said "revising it does not address this" beside a graph with two
+						     roots. Either way it says to run assurance again once the review's own cause is addressed — the
+						     floor running again, not a route past it — and names no waiver. Otherwise (a subject finding to
+						     refine, or a non-review floor finding beside a review that passed) it says "revise the graph",
+						     as before. ⛔ The server answers which, over the floor this panel shows — a staged candidate's
+						     fork included (`floorBlockedHint`); this template restates no code, no action and no policy.
+						     ⚠ The guidance itself is not repeated here: five of the six name a waiver. The resume banner
+						     shows it for a STAGED candidate only; beside a canonical floor the recorded findings are all the
+						     page shows of why. -->
 						{#if !data.floor.satisfied}
-							<p class="floorhint" data-testid="floor-blocked-hint">
-								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
-							</p>
+							{#if data.floorBlockedHint === 'NOT_BY_REVISION'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — the Reasoning Review did not reach a verdict that revising the graph can answer, so revising it does not address this. Run assurance again once the review's own cause is addressed.
+								</p>
+							{:else if data.floorBlockedHint === 'REVISE_AND_REVIEW'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it; the Reasoning Review itself did not reach a verdict that revising can answer, so run assurance again once the review's own cause is addressed.
+								</p>
+							{:else}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
+								</p>
+							{/if}
 							{#if data.floor.waived}
 								<p class="floorhint warn" data-testid="floor-waiver-nondischarge">
 									A governance waiver is recorded against this PWA. It does <strong>not</strong> clear the floor —

@@ -112,9 +112,14 @@ describe('⭐ G8 — the execution plane names REQUALIFY_OR_RESELECT_REVIEWER be
 
 		expect(message, 'the model step did not run to its review').toMatch(/^The model ran/);
 		// ⭑ ONE CALL: the refusal draws no repair, and `autoRefine` false sends nothing back to the producer for a second
-		// turn. ⚠ The message's own count says "2 tries" here — `openPerTry.length + 1` after the refused try was pushed —
-		// which is not this increment's to change, and is reported rather than pinned.
+		// turn. ~~⚠ The message's own count says "2 tries" here — `openPerTry.length + 1` after the refused try was pushed —
+		// which is not this increment's to change, and is reported rather than pinned.~~ ⭑ `RS-3` (`REG-F-469`): it counts
+		// the tries that ran, and says so here — pinned beside this case, where it was first seen, and held in
+		// `begin-execute-try-count.test.ts` against the recorded exchanges.
 		expect(seam.devin.length, 'a refused substitute was called again').toBe(1);
+		expect(message, 'the one refused review was counted as more than one try').toContain(
+			'reviewed over 1 try,'
+		);
 		for (const { args } of seam.devin)
 			expect(args.slice(0, 3), 'the model devin was asked to run').toEqual([
 				'--print',
