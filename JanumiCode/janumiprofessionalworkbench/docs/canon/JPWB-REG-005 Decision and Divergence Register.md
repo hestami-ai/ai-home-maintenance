@@ -37469,6 +37469,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The one-server-clock-day rule (§5.3; `REG-F-429`) is NOT enforced. The server's UTC offset IS observable, since `/api/ps`'s `expires_at` carries it (`REG-F-427`'s provenance), so the rule starts there.
   - An over-long prompt still counts as the candidate's REFUSAL, although §5.1 makes the limit a case precondition. It is unreachable while the product budgets the prompt to 26,000.
 - **FOR SPONSOR CONFIRMATION:** the retention projection above all, then the classes, the temperature range and the exit codes.
+- ⭑ **SUPERSEDED IN PART 2026-10-01, PENDING SPONSOR CONFIRMATION — see `REG-D-090`.** From `JAN-ESCREC` `ER-1`, **SCORING**'s *"never by the reply's own recommendation"* has one exception, the sponsor's rule (a) (`REG-D-089`). A fully answered, clean reply that recommends ESCALATED composes ESCALATED, because a qualification plan holds the Reasoning Review alone. A clean case whose reply does so becomes a material failure, `CLEAN_NOT_SATISFIED`, where it was scored SATISFIED.
 
 ### REG-F-449 — the graph arm's "clean" case is rejected by the frontier candidate in 7 of 8 evaluations, ~~on one engineering ground~~ mostly on one engineering ground: the known soft-clay report reaches neither the options study nor the independent check
 
@@ -37527,6 +37528,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Detection changes show only as fingerprint moves, since records keep class names, not replies.
   - The recording gates' other seeded-policy fields are not hashed.
 - **FOR SPONSOR CONFIRMATION:** the candidates, the ACKNOWLEDGED rule, the independence departure, and the residuals.
+- ⭑ **SUPERSEDED IN PART 2026-10-01, PENDING SPONSOR CONFIRMATION — see `REG-D-090`.** From `JAN-ESCREC` `ER-2`, the fingerprint's *"18-entry raw-reply corpus"* has 22 entries: four replies that recommend ESCALATED, each pinned by id to the disposition rule (a) gives it. The fingerprint moves once, by them.
 
 ### REG-D-076 — `reviewer:qual:check` is the INTERIM CARRIER of the reviewer-qualification control (`DOC-004` §7.6)
 
@@ -37688,6 +37690,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **NO SILENT SHRINK.** Each record's attribution line says how many planted evaluations of cases outside today's set it did not count, using that record's own oracle version. For example, the v1 frontier run: *"16 of 20 … (16 answered planted evaluation(s) of cases not in the current set are not counted)"*.
 - **ON THE COMMITTED RECORD.** The check stays GREEN. With every ESCALATION line removed, the material population falls from 19 entries to 9, all of them cited. The escalations already filed for what is now information stay valid history. The reviewer fingerprint does not move.
 - **FOR SPONSOR CONFIRMATION:** the three stricter dispositions, and the demotion of the undetermined-criterion transition.
+- ⭑ **SUPERSEDED IN PART 2026-10-01, PENDING SPONSOR CONFIRMATION — see `REG-D-090`.** From `JAN-ESCREC` `ER-1` a review can compose ESCALATED (`REG-D-089`'s rule (a)), so **THE PREDICATE**'s list of what a planted case may be other than REJECTED gains ESCALATED. The predicate itself, *"anything but REJECTED"*, is unchanged.
 
 ### REG-D-083 — DELEGATED (`REG-D-081`): how case set v3 makes the sponsor's two changes — the design type's scope takes in the foundations (no new type), the permit gains its two inputs, and each account gains the fewest words for them
 
@@ -37990,7 +37993,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-473 — a reviewer's ESCALATED recommendation is never recorded as an escalation: `dispositionFromFindings` cannot return ESCALATED, so a review that recommends escalation with no failed criterion is recorded SATISFIED
 
-**Filed 2026-09-28** (`JAN-SELRES` `RS-3`; driven by its re-verifier with a load probe, F-esc, and confirmed from code). **Status:** ~~⚠ **OPEN — unscheduled; ⚠ a reading of whether this is by design is owed.**~~ ⚠ **OPEN — the reading is given below.** By the canon, the reviewer's recommendation and the recorded outcome are distinct, and both are to be recorded, so losing the recommendation is a defect. The sponsor's direction is that the ESCALATED recommendation be recorded as one (`REG-D-088`). The rule for the review's OUTCOME awaits the sponsor, and a design is owed.
+**Filed 2026-09-28** (`JAN-SELRES` `RS-3`; driven by its re-verifier with a load probe, F-esc, and confirmed from code). **Status:** ~~⚠ **OPEN — unscheduled; ⚠ a reading of whether this is by design is owed.**~~ ~~⚠ **OPEN — the reading is given below.** By the canon, the reviewer's recommendation and the recorded outcome are distinct, and both are to be recorded, so losing the recommendation is a defect. The sponsor's direction is that the ESCALATED recommendation be recorded as one (`REG-D-088`). The rule for the review's OUTCOME awaits the sponsor, and a design is owed.~~ ⚠ **OPEN — owed by `JAN-ESCREC` (`docs/_working/DESIGN-the-escalation-recommendation.md`, `ROADMAP-the-escalation-recommendation.md`).** The sponsor ruled option (a) on 2026-10-01 (`REG-D-089`): the ESCALATED recommendation is recorded in every case, and the review's outcome becomes ESCALATED only when nothing else already blocks. The design's reading of that rule awaits confirmation (`REG-D-090`). This entry closes for ESCALATED only; every other recommendation stays in no assessment record (`REG-F-475`).
 
 - **THE COMPOSITION.** `packages/rph-assurance/src/floor.ts` sets a policy's disposition from `dispositionFromFindings` (`packages/rph-assurance/src/assurance-rules.ts:47-67`, *"§10.3 precedence ladder"*). It returns REJECTED, INCONCLUSIVE, CONDITIONALLY_SATISFIED or SATISFIED from findings and criteria, and never ESCALATED. The reply's `dispositionRecommendation` reaches only `classifyValidatorResult`, which reads it for one boundary rule: a SATISFIED recommendation with a mandatory criterion unmet (`assurance-rules.ts:277`).
 - **THE CONSEQUENCE.** A reviewer that recommends ESCALATED with every criterion met is recorded as a SATISFIED Reasoning Review, and publication is not blocked. The floor's `ESCALATE_REVIEW` remediation (*"Route the recorded review to the governed human or alternate independent-review path"*) is reachable only from staged records; no review the product runs can produce it.
@@ -38005,7 +38008,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     - Its `EscalationRule` (a `trigger` and an `escalationTarget` such as `HUMAN_USER` or `INDEPENDENT_VALIDATOR`) is where a policy says when to escalate.
     - The Reasoning Review policy declares none.
   - **The reviewer prompt** lists ESCALATED among the recommendations without saying when to give it rather than INCONCLUSIVE (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:257-258`). Changing the prompt would move the reviewer fingerprint.
-- ⭑ **A SIBLING, AND A CONSEQUENCE FOR ANY FIX.** `REG-F-418` (OPEN) records the deterministic stand-in recommending SATISFIED after examining two of nine criteria. It notes that *"IT CHANGES NO BEHAVIOUR TODAY — the demo records the *recomputed* disposition, never the recommendation"*. A fix that records true recommendations makes that false SATISFIED a recorded one, so it must correct the stand-in too.
+- ⭑ **A SIBLING, AND ~~A CONSEQUENCE FOR ANY FIX~~ A CONSEQUENCE ONLY FOR A FIX THAT RECORDS EVERY RECOMMENDATION.** `REG-F-418` (OPEN) records the deterministic ~~stand-in~~ checker recommending SATISFIED after examining two of nine criteria. It notes that *"IT CHANGES NO BEHAVIOUR TODAY — the demo records the *recomputed* disposition, never the recommendation"*. ~~A fix that records true recommendations makes that false SATISFIED a recorded one, so it must correct the stand-in too.~~ ⭑ **CORRECTED 2026-10-01 (`REG-D-090`).** The fix the sponsor chose records only an ESCALATED recommendation, and neither the checker nor the declared stand-in ever returns one (`apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts:46`, `:80-82`, `:201`, `:206`, `:278`, `:283`; `standin-reasoning-review-validator.ts:76-80`). So under `JAN-ESCREC` the false SATISFIED stays unrecorded. The consequence would hold for a fix of `REG-F-475`, which would record every recommendation. The 2026-10-01 report to the sponsor made the same claim, and the correction is reported to them (`REG-D-089`).
 - ⭑ **THE QUALIFICATION RECORD.**
   - GLM-5.3 Flash Max recommended ESCALATED in 3 of its calls (`W-RR-03` twice, `W-RR-06` once; `docs/tracking/reviewer-qualification/runs.ndjson:211`, `:214`, `:321`). Each was beside a failed criterion, so each was scored REJECTED, the right verdict.
   - No ESCALATED reply with every criterion unfailed is on record. agy with `gemini-3.1-pro-high` and `gpt-oss:20b` recommended ESCALATED 0 times.
@@ -38013,7 +38016,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-088 — SPONSOR RULING: `REG-D-087` confirmed; the paid live execution lane approved and run; on `REG-F-473`, a reviewer's ESCALATED recommendation should be recorded as an escalation recommendation; a question about `REG-D-072`
 
-**Ruled 2026-10-01** (sponsor, in session, answering the `JAN-SELRES` completion report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN.** (1) and (4) are delivered with this entry. (2)'s design is owed, and its outcome rule awaits the sponsor. (3) was answered in session, and its confirmation is awaited.
+**Ruled 2026-10-01** (sponsor, in session, answering the `JAN-SELRES` completion report). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN.** (1) and (4) are delivered with this entry. (2)'s design is owed, and its outcome rule awaits the sponsor. (3) was answered in session, and its confirmation is awaited.~~ ⚠ **OPEN — (2)'s build is owed.** (1) and (4) were delivered with this entry. (2)'s outcome rule was ruled on 2026-10-01, option (a) (`REG-D-089`); its design and roadmap are recorded (`JAN-ESCREC`), with the delegated calls in `REG-D-090`. (3) was answered in session; the sponsor's follow-up and its answer are recorded in `REG-D-089`, and `REG-D-072` still awaits confirmation.
 
 - **THE SPONSOR'S WORDS, verbatim:**
   1. *"1 - REG-D-087 is confirmed"*
@@ -38044,3 +38047,115 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `REG-D-087`'s status is struck and restated CONFIRMED.
   - `REG-F-445`'s status is struck and restated CLOSED.
   - `REG-F-473` gains the canon reading and the qualification record's evidence, and its status is restated.
+
+### REG-D-089 — SPONSOR RULING: `REG-F-473` takes option (a) — an ESCALATED recommendation is recorded in every case, and escalates the review only when nothing else already blocks; the sponsor's follow-up on `REG-D-072`, answered
+
+**Ruled 2026-10-01** (sponsor, in session, answering the report that recorded `REG-D-088`). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — the build is owed (`JAN-ESCREC`), and `REG-D-072` awaits confirmation.**
+
+- **THE SPONSOR'S WORDS, verbatim:** *"REG-F-473 - select option (a) as recommended. I might be a bit confused about REG-D-072: is there a reason why we would accept the 17 as built, if, and this is where I'm not clear, but if build departed from the design? Is the design wrong but the build correct?"*
+- **OPTION (a), AS THE REPORT PUT IT** (verbatim, emphasis dropped; recorded here because it exists nowhere else):
+  - *"What the canon says. The reviewer recommends, and the system records the official outcome; the canon says both are to be recorded. So the fix will store the reviewer's ESCALATED as its recommendation in every case."*
+  - *"(a) Recommended: escalate only when nothing else already blocks. If no criterion failed, the outcome becomes ESCALATED: publishing stays blocked, and the page says to route the review to a human reviewer. If a criterion failed, the outcome stays REJECTED, which is more actionable, with the escalation recorded beside it."*
+  - Not chosen: (b), *"Always escalate."*, and (c), *"Record the recommendation only."*
+- **WHAT IT RULES.** The reviewer's ESCALATED recommendation is recorded whatever the outcome. It makes the review's outcome ESCALATED when nothing else already blocks, so publication stays blocked and the operator is sent to a human reviewer. The design's reading of *"no criterion failed"* and *"nothing else already blocks"* is delegated, and recorded for confirmation in `REG-D-090`.
+- ⚠ **THE SAME REPORT MADE A FALSE CLAIM, CORRECTED HERE.** It said *"Any of the three also needs one small correction. The test stand-in reviewer currently recommends SATISFIED after checking only two of nine criteria (REG-F-418). Once recommendations are recorded, that false answer would be recorded too."*
+  - **It was true of none of the three.** Each records only an ESCALATED recommendation, and neither the deterministic checker nor the declared stand-in ever returns one.
+  - **And it named the wrong reviewer.** `REG-F-418`'s subject is the checker. The stand-in derives its own recommendation, SATISFIED only when the whole remainder is stipulated (`apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts:76-80`).
+  - `REG-F-473`'s bullet that made the same claim is corrected (`REG-D-090`).
+- **THE FOLLOW-UP ON `REG-D-072`, AND THE ANSWER GIVEN IN SESSION.**
+  - **The report had overstated it.** It called the seventeen places where the code showed the design *"had a wrong or imprecise assumption"*. A read-only check then classified each departure against the design's and the roadmap's text:
+    - **the design assumed something untrue about the code, and the build reached the design's goal another way:** D1, D6, D8;
+    - **the design was silent, and the build decided:** D2, D4, D5, D11, D13, D14;
+    - **the build did more than the design asked:** D9, D10, D12, D15, D16;
+    - **the design contradicted itself, and the build followed its explicit rule:** D3;
+    - **the build did less:** D7, D17.
+  - **So, mostly, neither was wrong.** The design was written before every premise was checked against the code; the build made that check.
+  - **The two that did less.** D7 dropped a limb that could never fail; the engine's own refusal covers the case (`packages/rph-application/src/command-bus.ts:272`). D17 leaves a real gap: a change to how a production process result is rendered for the reviewer moves no fingerprint. It is filed as `REG-F-476`.
+  - **One weakness among the "more".** D16's guard does less than the design assumed: once qualification holds, it lets a spec on the paid authoring lane register stipulated answers. It is filed as `REG-F-477`.
+  - **What confirming `REG-D-072` means:** accepting that its record is accurate, and that the build's choices stand. The agent recommended confirming it, with D17 and D16 filed as gaps to fix. Fixing D17 moves the reviewer fingerprint, so it owes one paid re-measurement of the selected reviewer.
+- **MADE WITH THIS ENTRY.** `REG-F-476` and `REG-F-477` are filed. `REG-D-088`'s status is struck and restated. `REG-D-090`, `REG-F-474` and `REG-F-475` record the design.
+
+### REG-D-090 — DELEGATED (`REG-D-071`): `JAN-ESCREC` — how rule (a) is read, where it lives, how the recommendation is recorded and told, and how qualification carries it
+
+**Decided 2026-10-01** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*; `docs/_working/DESIGN-the-escalation-recommendation.md` revision 2, after three adversarial critics; `ROADMAP-the-escalation-recommendation.md`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force for `JAN-ESCREC`; sponsor confirmation owed.**
+
+- **THE READING OF RULE (a)** (design D1).
+  - **"No criterion failed" is read as a fully answered, clean review:** every mandatory criterion MET or NOT_APPLICABLE, no NOT_MET, and no open failure observation, which is a computed SATISFIED.
+    - ⚠ The agent's 2026-10-01 message to the sponsor read it more widely, to include a review that left criteria undetermined. That reading is withdrawn. ASR-2 calls an unanswered criterion invalid output.
+    - Driven: a reply with no findings array, and one with a failed row under a corrupted id, are INCONCLUSIVE today. Under the wider reading both would escalate, the second erasing a real failure (`REG-F-428`). Such a reply stays INCONCLUSIVE, with its recommendation recorded.
+  - **"Nothing else already blocks" is read across the floor:** every other floor policy is SATISFIED. A graph that is not well formed is revised first, with the escalation recorded beside it. *"More actionable"* is the ruling's own reason.
+  - **Only a VALID Reasoning Review result is read.** A boundary-rejected or failed validator's recommendation is never read (ASR-11), and the deterministic policies never escalate.
+- **WHERE THE RULE LIVES.** In `composeAssuranceOutcome` (`packages/rph-assurance/src/floor.ts`), as a second pass after every policy's disposition and before the aggregate, with no option flag. The qualification runner composes with no options, and its plan holds the Reasoning Review alone.
+  - ⚠ **The rule is coded, departing from ASR-1** (*"declarative data evaluated by the engine, never executable code"*). The declarative route, an `EscalationRule.trigger` (`REG-Q-057`), needs a contract change, a seed migration, an exception to the floor policies' edit lock, and a store reader inside a store-free package.
+  - ⚠ **Policy version '1' is unchanged, although what it yields changes.**
+- **HOW THE RECOMMENDATION IS RECORDED** (D2). A VALID Reasoning Review result that recommends the literal `ESCALATED`, whatever its outcome, carries one observation, appended after composition:
+  - code `REVIEWER_RECOMMENDED_ESCALATION`, type `RECOMMENDATION` (a ratified `ObservationType`), severity INFORMATIONAL, open;
+  - the fixed statement *"The reviewing model's recommendation was ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator implementation or policy-designated authority cannot resolve the issue within its authority or competence."*
+  - **Not the other channels.** `dispositionRecommendation` is the handler's target state. An `ESCALATE` control action is refused, because the policy permits only `RETRY`. `residualUncertainty`'s object field is always empty.
+  - **The statement's claims, checked.** The review prompt names ESCALATED and does not define it: `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`, searched for `escalat` (case-insensitive), has 2 hits, `:60` in the set of accepted recommendations and `:258` in the prompt's list of them. Positive control: the same sentence (`:257-258`) defines SATISFIED, CONDITIONALLY_SATISFIED and REJECTED in parentheses. The Assurance Policy Catalog defines ESCALATED under its own heading (`docs/Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md:571-573`).
+  - ⚠ It is the first production writer of RECOMMENDATION, and it names no criterion (`REG-Q-068`). The event carries no observation type, so the code is the discriminator there. On the authoring plane it is recorded in the candidate's fork only.
+- **WHAT THE OPERATOR IS TOLD** (D3).
+  - **The PWA page's blocked hint gains a fourth answer, `ROUTE_TO_HUMAN`:** *"Publishing is blocked until the floor is SATISFIED — the Reasoning Review recommended escalation to a human reviewer, and this workbench cannot record a human's review yet (REG-F-474). Revising the graph does not address this."*
+  - **The resume banner** names the escalation, and says that refining re-runs the same automated reviewer.
+  - **The execution plane** prints on both arms: *"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474)."*
+  - **Never a subject finding.** The recommendation is not fed back to the producer, not a waiver's target, and not listed among the reasoning-review findings.
+  - **The read-back** uses the package's `aggregateDisposition`, so an ESCALATED or INCONCLUSIVE review reads back INCONCLUSIVE instead of UNASSESSED.
+- **NOT A HARD STOP.** A chat turn still runs the automated reviewer again, and the latest assessment wins, so a re-run can clear an escalation; on the execution plane a step retry reviews again too (`REG-F-474`). The design builds the honest version: the operator is told so. Whether to stop instead is put to the sponsor below.
+- **HOW QUALIFICATION CARRIES IT** (D4).
+  - **Four scoring-corpus entries, each pinned by id:** `escalated-clean` → ESCALATED; `escalated-beside-a-fault` → REJECTED; `escalated-skipped-row` → INCONCLUSIVE; `escalated-reported-as-producer` → BOUNDARY_REJECTED. The reviewer fingerprint moves once, by them.
+  - **RESCORED lines for the selected run only,** `qr-2026-09-25-devin-glm-5-3-flash-max-v3` (52 lines), with one ESCALATION line citing `REG-F-456` for `G3-CLEAN-R3`, that record's one material failure.
+  - **No verdict on the record changes.** No recorded reply both recommends ESCALATED and composes SATISFIED; this is derived, and the build re-scores the whole record to show it. GLM-5.3 Flash Max's three ESCALATED replies are each beside a failed criterion, and stay REJECTED.
+- **SUPERSEDED IN PART, PENDING CONFIRMATION** (a pointer is appended to each):
+  - `REG-D-074`'s *"never by the reply's own recommendation"*: a clean case whose reviewer escalates becomes a material failure, `CLEAN_NOT_SATISFIED`;
+  - `REG-D-082`'s list of non-REJECTED verdicts, which gains ESCALATED;
+  - `REG-D-075`'s *"18-entry raw-reply corpus"*, which becomes 22 entries.
+- **FOR SPONSOR CONFIRMATION:**
+  1. **The two departures from the agent's 2026-10-01 messages:** the withdrawn INCONCLUSIVE reading, and *"nothing else already blocks"* read across the floor.
+  2. **The record:** a RECOMMENDATION observation, for VALID results only, with its type lost on the event and, on the authoring plane, in the candidate's fork only.
+  3. **The coded rule**, departing from ASR-1's declarative rule, with policy version '1' unchanged.
+  4. **The supersessions** above.
+  5. **The sponsor's question:** should an escalation be a HARD STOP until a human path exists? An `ESCALATE_REVIEW` block could then not resume into an automated re-review: discard only on the authoring plane, and no re-execute on the execution plane. `REG-D-059` records the human path as the sponsor's intent, not yet an obligation.
+- **MADE WITH THIS ENTRY.** `REG-F-474` and `REG-F-475` are filed. `REG-F-473`'s status is struck and restated, and its `REG-F-418` bullet is corrected. A pointer to this entry is appended to `REG-D-074`, `REG-D-075` and `REG-D-082`.
+
+### REG-F-474 — an escalated Reasoning Review has no human path, and an automated re-run clears it
+
+**Filed 2026-10-01** (`JAN-ESCREC`, found by the design's code mappers and critics; read from code). **Status:** ⚠ **OPEN — unscheduled. The sponsor is asked whether an escalation should be a hard stop until a human path exists (`REG-D-090`).**
+
+- **THE RE-RUN.** A chat turn on a BLOCKED_EXTERNAL candidate runs the same automated reviewer again (`apps/rph-demo/src/lib/server/authoring-turn.ts:416`, `RETRY_ASSURANCE`; then `apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:373`, `:393`). The latest assessment per policy wins (`packages/rph-application/src/handlers/assessment-index.ts:12`; `REG-F-215`). So one automated re-run can clear an escalation meant for a human. On the execution plane the step can be retried and executed again (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1705-1711`, `RetryExecutionStep`); read from code, not driven.
+- **NO HUMAN EVALUATOR CAN BE RECORDED.** No model id fails `DIFFERENT_MODEL` (`packages/rph-assurance/src/assurance-rules.ts:202-203`), although ASR-13 graduates independence to *"human or organizational independence"*.
+- **NO ESCALATION ACTION OR PACKAGE.** The Reasoning Review policy permits only `RETRY` as a control action (`packages/rph-assurance/src/floor-policies.ts:147`). Nothing builds the package the Assurance Policy Catalog requires: *"Escalation packages must be synthesized for the authority receiving them."* (`docs/Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md:716`).
+- **THE GUIDANCE NAMES A PATH THAT DOES NOT EXIST.** `ESCALATE_REVIEW` says *"Route the recorded review to the governed human or alternate independent-review path, then rerun assurance"* (`apps/rph-demo/src/lib/server/floor.ts:331`). The *"recorded review"* is not joined to its assessment, and the one reader that pairs them returns the older run's answer (`REG-F-433`).
+- **THE SPONSOR'S INTENT.** `REG-D-059` records escalation to *"the relevant human(s)"* as the terminal arm of a bounded review loop, as intent and not obligation: the sponsor called it *"possibly getting a bit far afield of where we are today"*.
+- **WHY IT MATTERS NOW.** Until `JAN-ESCREC` no review the product ran could escalate (`REG-F-473`). From `JAN-ESCREC`, a clean review whose reviewer recommends ESCALATED escalates, and the operator is told that a human's review cannot be recorded yet.
+- **SEARCHED BEFORE FILING.** The register for `RETRY_ASSURANCE`, `escalation package`, `human path` and `latest assessment`: 0 each. For `governed human`: 2, both quoting the `ESCALATE_REVIEW` guidance (`REG-D-059` and `REG-F-473`); neither observes that the path it names does not exist. `REG-F-215` records the arbitration rule, not its effect on an escalation.
+
+### REG-F-475 — §38's "both recorded, for every validator call" holds for ESCALATED only: every other recommendation is still in no assessment record
+
+**Filed 2026-10-01** (`JAN-ESCREC`, the residual its design names; read from code). **Status:** ⚠ **OPEN — unscheduled.**
+
+- **THE RULE.** The Command, Event, Schema Contract Package's §38 lists, *"For every validator call"*, both the *"disposition recommendation"* and the *"authoritative disposition"* (`:2411-2422`). It says a service should not be able to *"collapse validator recommendations into authoritative decisions"* (`:2542`).
+- **WHAT `JAN-ESCREC` RECORDS.** Only an ESCALATED recommendation, as a RECOMMENDATION observation (`REG-D-090`).
+- **WHAT STAYS LOST.** Every other recommendation is in no assessment record. The field that carries the outcome is still named the recommendation: `packages/rph-engine/src/record-assurance.ts:238` writes `dispositionRecommendation: a.disposition`, and the handler uses it as the target state (`packages/rph-application/src/handlers/assurance.ts:1937`, `:2624-2632`).
+- ⚠ **A FIX MUST AUDIT THE STAND-IN FIRST.** Recording every recommendation records the declared stand-in's as well. On a faulted arm it copies the structural checker's (`apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts:76-77`), and the checker recommends CONDITIONALLY_SATISFIED beside a failed RR-04 criterion on a well-formed graph (`mock-reasoning-review-validator.ts:73-82`). The checker's clean arms are `REG-F-418`'s subject.
+- **SEARCHED BEFORE FILING.** The register for `For every validator call`: 1, and for `disposition recommendation`: 1, both `REG-F-473`'s reading. For `dispositionRecommendation`: 14. Of these, `REG-F-420` cites the recorder's pass-through as one link in another argument, `REG-F-473` files the loss, and the rest concern the field's type, payload or validation. None files this residual.
+
+### REG-F-476 — a change to how a production process result is rendered for the reviewer moves no reviewer fingerprint, and qualification has no process-result case (`REG-D-072` D17)
+
+**Filed 2026-10-01** (`REG-D-089`, from the answer to the sponsor's follow-up on `REG-D-072`; read from code, the design and the roadmap). **Status:** ⚠ **OPEN — unscheduled. A fix moves the reviewer fingerprint, so it owes a paid re-measurement of the selected reviewer, which awaits the sponsor.**
+
+- **WHAT THE DESIGN ASKED.** The fingerprint covers *"every branch of prompt assembly: each framing"* (`docs/_working/DESIGN-what-the-tests-prove.md:766`). The process-result cases follow *"once it has a production case to model"* (`:694`).
+- **WHAT WAS BUILT.** A production process-result review exists: `apps/rph-demo/src/lib/server/execution/process-result-floor.ts:258` sets the reviewer's content to `renderProcessResult(subject.run)`. The fingerprint's probes carry that framing's content as a literal, and its header says so: *"a change to how a production process result is rendered into `content` moves no fingerprint"* (`scripts/reviewer-qual/fingerprint.ts:26-27`). Case set v3's arms are `PWA_GRAPH` (13 cases) and `WORK_PRODUCT` (13); none is a process result.
+- **WHY IT MATTERS.** A change to `renderProcessResult` changes what the selected reviewer reads on every process-result review, and `reviewer:qual:check` stays GREEN. The reviewer is relied on for an input it was never measured on, and a change to that input goes unseen. The renderer's unit tests pin its form, not the reviewer's answers to it.
+- **SEARCHED BEFORE FILING.** The register for `renderProcessResult`: 1, `REG-D-072`'s D17 itself, which records the departure and not the gap.
+- **REMEDY CANDIDATES, UNTESTED.** Hash the production renderer's output, over a fixed probe run, into the fingerprint. Add process-result cases, which the design's own trigger now calls for. Either moves the fingerprint.
+
+### REG-F-477 — once qualification holds, the sequencing pin lets the live authoring lane register stipulated answers, which the design assumed it never does (`REG-D-072` D16)
+
+**Filed 2026-10-01** (`REG-D-089`, from the answer to the sponsor's follow-up on `REG-D-072`; read from code, the design and the roadmap). **Status:** ⚠ **OPEN — unscheduled; latent: no live-lane spec registers today.**
+
+- **WHAT THE DESIGN ASSUMED.** The stipulation route answers on the live authoring lane, which is test mode, and *"none of that lane's specs registers anything, so its reviews stay INCONCLUSIVE"* (`docs/_working/DESIGN-what-the-tests-prove.md:509-510`).
+- **WHAT WAS BUILT.** The roadmap's D16 found that nothing guards this, and widened the sequencing pin's scan to `e2e-live/`. But the pin asks only whether a registration is sequenced after qualification: it is *"empty when nothing registers, or when both conditions hold"* (`verif/reviewer-qualification-sequencing.test.ts:123`).
+- **THE CONSEQUENCE.** Both conditions hold today: `gate:tail` reaches the check, and a deployable RUN exists. So a live-lane spec that registered a stipulation would pass the pin. That lane's reviewer is the declared stand-in unless a tool is exported (`apps/rph-demo/playwright.live.config.ts:22-23`), and the stand-in answers a registered CLEAN remainder. The paid authoring lane's reviews would then rest on stipulated answers instead of staying INCONCLUSIVE.
+- **TODAY.** No spec under `apps/rph-demo/e2e-live/` calls `registerStipulation` (`apps/rph-demo/e2e/support/harness.ts`) or names `/test-api/reviewer-script`.
+- **SEARCHED BEFORE FILING.** The register for `reviewer-qualification-sequencing`: 1, `REG-D-076`'s description of the pin. For `e2e-live`: 6, none about stipulations.
+- **REMEDY CANDIDATE, UNTESTED.** A limb that reddens on any registration under `e2e-live/`, whatever the sequencing.

@@ -605,7 +605,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//     exits are MET, and it filed the executor half as outside its scope (`REG-F-458`, `REG-F-459`). One
 			//     design governs all three increments, and splitting them across two complete roadmaps would file
 			//     the executor under a reviewer programme.
-		).toBe(52);
+			//
+			// 52 -> 53 (2026-10-01): `ROADMAP-the-escalation-recommendation.md` (`JAN-ESCREC`, `REG-D-089`, `REG-D-090`;
+			// `REG-F-473`). ⭑ A SPONSOR RULING THAT CHANGES THE FLOOR'S COMPOSITION, WHICH NO NEAR CLAIMANT OWNS.
+			//   · `ROADMAP-the-selection-residuals.md` (`JAN-SELRES`) filed `REG-F-473` and is the nearest. ⛔ But its
+			//     exits are MET, it filed the finding unscheduled, and the work is not about the selection: it changes
+			//     what `composeAssuranceOutcome` yields for the Reasoning Review and what the record holds.
+			//   · `ROADMAP-disposition-rule-independence.md` (`JAN-DISPIND`) owns a disposition rule's INDEPENDENCE
+			//     demand. ⛔ A reviewer's recommendation setting the outcome is a different rule, under a later ruling.
+			//   · `ROADMAP-assessment-lifecycle-restoration.md` is COMPLETE and restored skipped states. ⛔ ESCALATED's arrow
+			//     already exists; nothing here restores a state.
+		).toBe(53);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {
