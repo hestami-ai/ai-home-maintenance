@@ -37300,7 +37300,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-445 — the live-execution lane's only report of which reviews passed reads a field assessments do not have: its one stored run says `undefined=SATISFIED` three times
 
-**Filed 2026-09-23** (`JAN-CRITREAD`, found by the fact-gathering for `DESIGN-what-the-tests-prove.md`, verified first-hand). **Status:** ~~⚠ **OPEN — a harness reporting defect in an ungated lane; the fix is two field names.**~~ ⚠ **FIXED IN CODE 2026-09-26 by `JAN-SELREV` `SR-3`; closes on the lane's first paid run.** The report now reads `assurancePolicyId` (`objects.ts:674`) and `findingCode` (`:701`). The spec also requires at least one assessment and a `floor.reasoning-review` among them. The lane is paid and never in the gate, and it has not run since, so the fix has not been observed.
+**Filed 2026-09-23** (`JAN-CRITREAD`, found by the fact-gathering for `DESIGN-what-the-tests-prove.md`, verified first-hand). **Status:** ~~⚠ **OPEN — a harness reporting defect in an ungated lane; the fix is two field names.**~~ ~~⚠ **FIXED IN CODE 2026-09-26 by `JAN-SELREV` `SR-3`; closes on the lane's first paid run.**~~ The report now reads `assurancePolicyId` (`objects.ts:674`) and `findingCode` (`:701`). The spec also requires at least one assessment and a `floor.reasoning-review` among them. ~~The lane is paid and never in the gate, and it has not run since, so the fix has not been observed.~~ ✅ **CLOSED 2026-10-01 — observed on the lane's first paid run since the fix (`REG-D-088`).** Its annotation reads `floor.schema-invariant=SATISFIED floor.identity-provenance=SATISFIED floor.reasoning-review=SATISFIED`.
 
 - **THE CODE.** `apps/rph-demo/e2e-live-exec/execution.live.ts:212` prints `a.policyId` and `:219` builds the lane's one persistent report, its `live-review` annotation, from `a.policyId` and `a.assessmentState`, where `a` is an assessment's state (`:202`). The assessment schema's field is `assurancePolicyId` (`packages/rph-contracts/src/objects.ts:674`). The observation line at `:214` reads `o.code`; the observation schema's field is `findingCode` (`objects.ts:701`).
 - **THE STORED RESULT.** `apps/rph-demo/e2e-results/results-live-exec.json` (2026-09-20, the only run on record) carries the annotation `live-review: "undefined=SATISFIED undefined=SATISFIED undefined=SATISFIED"`. The lane exists, in its own words, because *"only this tells us whether the reviewer is any good"* (`:200-201`), and the only thing it recorded cannot say which policy each verdict belongs to.
@@ -37906,7 +37906,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-087 — DELEGATED (`REG-D-071`): `JAN-SELRES` — the executor is selected, run and recorded as the reviewer is; a substituted reviewer model is answered with its own code and action; three post-confirmation deviations recorded
 
-**Decided 2026-09-28** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — in force from `JAN-SELRES`; sponsor confirmation owed.**
+**Decided 2026-09-28** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — in force from `JAN-SELRES`; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-10-01 by the sponsor** — *"1 - REG-D-087 is confirmed"* (`REG-D-088`).
 
 - **THE DESIGN.** `docs/_working/DESIGN-the-selection-residuals.md`, revision 2, after three adversarial critics (3 BLOCKER, 16 MAJOR and 30 MINOR findings on revision 1, with overlaps, all addressed). The roadmap is `ROADMAP-the-selection-residuals.md`: `RS-1` (the executor), `RS-2` (the substitution), `RS-3` (the page hint).
 - **THE SPONSOR'S WORDS, verbatim, and the reading taken.** After the 2026-09-26 report listed `REG-F-458`, `REG-F-459` and `REG-F-460` as open and unscheduled, the sponsor wrote on 2026-09-28: *"Codex is available for use again. Pickup from where you left off."* The agent reads it as taking up those findings. The words may instead only resume the session, or point at the offered paid live-lane run, which they do not name and which is not started.
@@ -37990,9 +37990,57 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-473 — a reviewer's ESCALATED recommendation is never recorded as an escalation: `dispositionFromFindings` cannot return ESCALATED, so a review that recommends escalation with no failed criterion is recorded SATISFIED
 
-**Filed 2026-09-28** (`JAN-SELRES` `RS-3`; driven by its re-verifier with a load probe, F-esc, and confirmed from code). **Status:** ⚠ **OPEN — unscheduled; ⚠ a reading of whether this is by design is owed.**
+**Filed 2026-09-28** (`JAN-SELRES` `RS-3`; driven by its re-verifier with a load probe, F-esc, and confirmed from code). **Status:** ~~⚠ **OPEN — unscheduled; ⚠ a reading of whether this is by design is owed.**~~ ⚠ **OPEN — the reading is given below.** By the canon, the reviewer's recommendation and the recorded outcome are distinct, and both are to be recorded, so losing the recommendation is a defect. The sponsor's direction is that the ESCALATED recommendation be recorded as one (`REG-D-088`). The rule for the review's OUTCOME awaits the sponsor, and a design is owed.
 
 - **THE COMPOSITION.** `packages/rph-assurance/src/floor.ts` sets a policy's disposition from `dispositionFromFindings` (`packages/rph-assurance/src/assurance-rules.ts:47-67`, *"§10.3 precedence ladder"*). It returns REJECTED, INCONCLUSIVE, CONDITIONALLY_SATISFIED or SATISFIED from findings and criteria, and never ESCALATED. The reply's `dispositionRecommendation` reaches only `classifyValidatorResult`, which reads it for one boundary rule: a SATISFIED recommendation with a mandatory criterion unmet (`assurance-rules.ts:277`).
 - **THE CONSEQUENCE.** A reviewer that recommends ESCALATED with every criterion met is recorded as a SATISFIED Reasoning Review, and publication is not blocked. The floor's `ESCALATE_REVIEW` remediation (*"Route the recorded review to the governed human or alternate independent-review path"*) is reachable only from staged records; no review the product runs can produce it.
 - **THE OPEN QUESTION.** `REG-D-074` scores qualification *"never by the reply's own recommendation"*, mirroring the product. So the product may deliberately let criteria decide. But then a recommendation to escalate is a signal the record discards, and an escalation the register models (the `ESCALATE_REVIEW` arm) has no producer.
 - **SEARCHED BEFORE FILING.** The register for `dispositionFromFindings`: 6 hits, none about ESCALATED. For `ESCALATE_REVIEW`: 2 hits, which describe the arm as *"already a modelled outcome"* and never observe that nothing produces it.
+- ⭑ **THE READING, ADDED 2026-10-01 (`REG-D-088`). By the canon the loss is a defect, not a design.**
+  - **ASR-1** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:239`): a Validator *"returns schema-conformant findings and a *recommendation*. The Assurance Service validates the result, enforces policy, and records the authoritative disposition."*
+  - **The Command, Event, Schema Contract Package** (`:2411-2422`) lists, *"For every validator call"*, both *"disposition recommendation"* and *"authoritative disposition"*.
+  - **What the code does.** `packages/rph-engine/src/record-assurance.ts:238` writes `dispositionRecommendation: a.disposition`, which is the floor's computed outcome. So the reviewer's own recommendation is in no assessment record, and survives only inside the exchange record's retained answer.
+  - **The outcome is a separate, policy question.**
+    - The Assurance Policy Catalog's §10.3 default precedence names ESCALATED only for a CRITICAL open finding (*"CRITICAL open finding → REJECTED or ESCALATED"*).
+    - Its `EscalationRule` (a `trigger` and an `escalationTarget` such as `HUMAN_USER` or `INDEPENDENT_VALIDATOR`) is where a policy says when to escalate.
+    - The Reasoning Review policy declares none.
+  - **The reviewer prompt** lists ESCALATED among the recommendations without saying when to give it rather than INCONCLUSIVE (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:257-258`). Changing the prompt would move the reviewer fingerprint.
+- ⭑ **A SIBLING, AND A CONSEQUENCE FOR ANY FIX.** `REG-F-418` (OPEN) records the deterministic stand-in recommending SATISFIED after examining two of nine criteria. It notes that *"IT CHANGES NO BEHAVIOUR TODAY — the demo records the *recomputed* disposition, never the recommendation"*. A fix that records true recommendations makes that false SATISFIED a recorded one, so it must correct the stand-in too.
+- ⭑ **THE QUALIFICATION RECORD.**
+  - GLM-5.3 Flash Max recommended ESCALATED in 3 of its calls (`W-RR-03` twice, `W-RR-06` once; `docs/tracking/reviewer-qualification/runs.ndjson:211`, `:214`, `:321`). Each was beside a failed criterion, so each was scored REJECTED, the right verdict.
+  - No ESCALATED reply with every criterion unfailed is on record. agy with `gemini-3.1-pro-high` and `gpt-oss:20b` recommended ESCALATED 0 times.
+  - An outcome rule that let ESCALATED replace a REJECTED would change those three verdicts. One that escalates only an otherwise-satisfied review would not.
+
+### REG-D-088 — SPONSOR RULING: `REG-D-087` confirmed; the paid live execution lane approved and run; on `REG-F-473`, a reviewer's ESCALATED recommendation should be recorded as an escalation recommendation; a question about `REG-D-072`
+
+**Ruled 2026-10-01** (sponsor, in session, answering the `JAN-SELRES` completion report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN.** (1) and (4) are delivered with this entry. (2)'s design is owed, and its outcome rule awaits the sponsor. (3) was answered in session, and its confirmation is awaited.
+
+- **THE SPONSOR'S WORDS, verbatim:**
+  1. *"1 - REG-D-087 is confirmed"*
+  2. *"2 - In relation to REG-F-473, if I'm understanding correctly (and I may not) then a reviewer's ESCALATED recommendation which is currently never recorded as an escalation seems like it should be recorded as an escalation recommendation. I'm not sure what you mean by recorded as a pass and / or scheduled next? Or perhaps you mean fixing that issue next."*
+  3. *"3 - What do you need me to confirm about REG-D-072?"*
+  4. *"4 - You are approved to run the paid live-lane."*
+- **WHAT (1) MEANS.** `REG-D-087` is confirmed with its six items:
+  - the reading of the scheduling;
+  - `REG-F-458` remedy (a);
+  - the executor selected the way the reviewer is;
+  - the substitution recorded additively and answered by `REQUALIFY_OR_RESELECT_REVIEWER`, with the agent's guidance wording;
+  - `REG-F-462` fixed within the work: as built, by the floor's own classifier, with three sentences;
+  - the three superseding notes.
+- **WHAT (4) MEANS, AND THE RUN.**
+  - **The configuration.** The paid live execution lane ran on 2026-10-01 at `4503949b` (`bun run e2e:live-exec`), with `JPWB_EXECUTOR=pi`, `JPWB_EXECUTOR_MODEL=openai-codex/gpt-5.6-sol` (Pi's own configured default), `JPWB_ASSURANCE_TOOL=devin` and `JPWB_ASSURANCE_MODEL=glm-5-3-flash-max`.
+  - **The result.** 1 passed (58.8 s; 1.2 m in all), with one executor try.
+  - **The lane's report:** *"producer : gpt-5.6-sol (PROVIDER_REPORTED)"*, *"reviewer : glm-5-3-flash-max (PROVIDER_REPORTED)"*, and the annotation `floor.schema-invariant=SATISFIED floor.identity-provenance=SATISFIED floor.reasoning-review=SATISFIED`. devin's reported model equalled the configured one, so no substitution refusal fired.
+  - **What GLM reviewed.** The work unit (`Route Assessment`) asked for a delivery route's operational risk, with no route details given. The executor reported that no route data existed and withheld approval rather than inventing a rating. GLM's retained answer marks all nine RR criteria unfailed, recommends SATISFIED, and lists three residual uncertainties: the actual risk level is undetermined, the hazard domains are generic, and whether the gated review will happen is unknown.
+  - ⚠ **What it does not show.** This is one run of one demo work unit. The producer's `PROVIDER_REPORTED` grade is Pi's own resolution of its configured label (`REG-F-465`), not a model the provider reported.
+  - `REG-F-445` closes on this run.
+- **WHAT (2) MEANS: THE AGENT'S READING, AND THE CANON BEHIND IT.**
+  - **The direction.** The reviewer's ESCALATED recommendation is to be recorded as an escalation recommendation.
+  - **The canon agrees.** ASR-1 separates the validator's *recommendation* from the authoritative disposition the service records. The Command, Event, Schema Contract Package lists both among what is recorded for every validator call.
+  - **The report's words.** "Recorded as a pass" meant the review is recorded SATISFIED and publication is not blocked. "Scheduled next" meant fixing it next.
+  - **Put to the sponsor in session:** whether an ESCALATED recommendation also makes the review's OUTCOME ESCALATED, blocking publication and routing the review to a human. That is a policy rule, the kind the Assurance Policy Catalog's escalation rules state. `REG-F-473` carries the reading.
+- **WHAT (3) ASKED.** The sponsor asked what `REG-D-072` needs. Answered in session: confirmation that the seventeen departures from `DESIGN-what-the-tests-prove.md` made by the build (D1-D17), each recorded with its evidence, are accepted as built.
+- **MADE WITH THIS ENTRY.**
+  - `REG-D-087`'s status is struck and restated CONFIRMED.
+  - `REG-F-445`'s status is struck and restated CLOSED.
+  - `REG-F-473` gains the canon reading and the qualification record's evidence, and its status is restated.
