@@ -568,3 +568,11 @@ Three critics found 3 BLOCKER, 16 MAJOR and 30 MINOR findings between them, with
   - the `+page.svelte` ranges;
   - G3's "after the turn".
 - **Increments.** There are now three, not two: D8 is its own increment, `RS-3`.
+
+---
+
+⭑ **SUPERSEDED IN PART SINCE LANDING — 2026-10-02, `JAN-ESCREC` `ER-1` (`REG-D-092`).** This design is kept as written. These of its statements no longer describe the product:
+- **The hint's three sentences** (D8's as-built note; §6 item 5): there are FOUR. `ROUTE_TO_HUMAN` answers an escalated review, and the hint renders first in the floor panel's body.
+- **The waiver target** (`observations[0]`): it is the first observation that is not `REVIEWER_RECOMMENDED_ESCALATION`, and the form is offered only where such a target exists.
+- **The waiver affordance "beside every unsatisfied floor":** it is withheld where there is no target. It is still offered beside an operational block that records a finding, and while a draft is open (`REG-F-466`).
+- **The resume banner** (`+page.svelte:1067-1069`): its sentence is composed by `resumeHintText` (`apps/rph-demo/src/lib/server/authoring-turn.ts`), names an escalation, and wraps.

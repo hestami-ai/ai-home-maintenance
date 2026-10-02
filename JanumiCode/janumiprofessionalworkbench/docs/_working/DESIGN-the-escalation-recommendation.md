@@ -2,7 +2,7 @@
 
 **Authority:** `REG-D-089`, recorded with this design. On 2026-10-01 the sponsor answered the report that put three
 options to them for `REG-F-473`: *"REG-F-473 - select option (a) as recommended."* · **Date:** 2026-10-01 ·
-**Revision:** 2 (revision 1 was attacked by three adversarial critics; §7 lists what changed) · **Status:** DRAFT.
+**Revision:** 2 (revision 1 was attacked by three adversarial critics; §7 lists what changed) · **Status:** ~~DRAFT.~~ `ER-1` BUILT 2026-10-02 (§8; `REG-D-092`); `ER-2` owed.
 
 **The report's text for option (a), verbatim** (it is recorded in `REG-D-089`, because it exists nowhere else):
 - *"What the canon says. The reviewer recommends, and the system records the official outcome; the canon says both are
@@ -261,7 +261,7 @@ memory, and every driven claim below is labelled. `pkg/` = `packages/`, `app/` =
    - **D1, red:**
      - ESCALATED with every criterion MET → per-policy ESCALATED, aggregate INCONCLUSIVE, `gatePermitsTransition`
        false;
-     - the same beside a REJECTED schema policy → the review stays SATISFIED.
+     - ~~the same beside a REJECTED schema policy → the review stays SATISFIED.~~ A control, not a red: the code before `ER-1` already passes it (§8).
    - **D1, controls:**
      - NOT_MET → REJECTED;
      - an undetermined criterion → INCONCLUSIVE;
@@ -353,3 +353,39 @@ The critics returned 4 BLOCKER findings, 31 MAJOR and many MINOR between them, w
   - the supersessions and narrowings are in §6;
   - `REG-Q-057`, `REG-Q-068`, `REG-F-472` and ASR-10 are engaged;
   - G5 and G8 are corrected.
+
+## 8. As built (`ER-1`, 2026-10-02)
+
+`ER-1` was built in two halves, the package and engine, then the app. Each half was attacked by an adversarial verifier, then by four fix rounds, each re-verified. The MAJOR findings per round were 2, then 1, 0, 2 and 0; every one was fixed. 144 mutants landed in the ledger. The line citations in §1 to §7 are at `ed7bd0ff` and `6a5cd1fc`; several have moved. What goes beyond `REG-D-090` is recorded as `REG-D-092`, flagged for sponsor confirmation.
+
+- **D1 — the readings, pinned.**
+  - Condition (iii) is the ladder's computed SATISFIED. A non-mandatory criterion NOT_MET, its ADVISORY finding open, beside every mandatory criterion MET, still escalates; so does a mandatory NOT_APPLICABLE.
+  - Condition (iv) reads "already blocks" as the engine's floor gate does: all three floor policies, whatever the plan marks. A non-required other policy that is not SATISFIED stops the escalation. When a plan marks the review itself non-required, the row is ESCALATED and the plan's own gate opens, while the engine's `floorGateBlock` still refuses. No product plan marks a floor policy non-required.
+  - Condition (i) is kept although (iii) implies it in composition; dropping it alone is an equivalent mutant.
+  - A partial reply is classed VALID and composes INCONCLUSIVE; only an empty criteria list is boundary-rejected. So D2 records its recommendation.
+  - The engine's own floor gate refuses an ESCALATED review (`packages/rph-engine/src/floor-gate.test.ts`).
+- **D2.**
+  - `REVIEWER_RECOMMENDED_ESCALATION` is exported from `recording.ts`; the statement is not. The observation is appended last.
+  - The statement's claim about the review prompt is pinned in the app: the recommendation sentence whole in each framing, and the value named once.
+  - A validator could itself propose an observation under the code: `REG-F-478`.
+  - A criterion listed twice, faulted then clean, is recorded MET beside an open BLOCKING observation. That predates `ER-1`: `REG-F-479`.
+- **D3 — what the operator is told, as built.**
+  - **The floor panel shows the blocked hint FIRST**, before the policy list, the findings and the reviewer's answer. At 1280x720 it was measured cut off on ordinary paths whenever anything preceded it.
+  - **The escalation line comes directly after the hint**, when the latest review carries the recommendation and the hint is not `ROUTE_TO_HUMAN`. It reads one of two sentences:
+    - beside findings (hint REVISE or REVISE_AND_REVIEW): *"The reviewer also recommended escalation to a human reviewer. The recommendation is recorded beside the findings, which are addressed first (REG-D-089)."*
+    - beside an incomplete review (NOT_BY_REVISION): *"The reviewer also recommended escalation to a human reviewer. The review reached no usable verdict; the recommendation is recorded with it (REG-D-089)."*
+    - ⚠ At 1280x720 the line may need a scroll in the panel; the hint stays on screen.
+  - **The resume banner** is composed by `resumeHintText` (`apps/rph-demo/src/lib/server/authoring-turn.ts`) from the classifier's action carried on the turn, and wraps on a row of its own. It had been one ellipsised line that hid the guidance of every blocked candidate.
+  - **The composition advisory, while a candidate is staged,** hangs below the banner, no wider than unstaged, right-aligned with the lifecycle row, with opaque chips at 4.5:1 or better. ⚠ While staged, it covers the inspector panel's header.
+  - **The read-back** through `aggregateDisposition` also reads a CONDITIONALLY_SATISFIED review back as CONDITIONALLY_SATISFIED (it read UNASSESSED). The header chip prints the aggregate with spaces.
+  - **The waiver form** is offered only where the recorded floor has a waiver target, chosen by one function shared with the action. A REJECTED or CONDITIONALLY_SATISFIED review whose only observation is the recommendation is answered `RETRY_OR_CONFIGURE_REVIEWER`.
+  - **The execution plane.**
+    - A REJECTED review its reviewer also escalated prints no human sentence: its outcome is REJECTED, and its finding goes back to the producer.
+    - The step's message beside a SATISFIED work product now prints refused command evidence, which it omitted.
+    - A refused result with no observation says *"no observation recorded (<policy>=<disposition>)."* A non-escalated one whose only observation is the recommendation adds *"— no finding recorded (<policy>=<disposition>)."*
+- **Unpinned, disclosed:**
+  - the escalation line beside a STAGED candidate, because no test-mode reviewer recommends ESCALATED (ER1-V152);
+  - a CSS mutant that changes no banner the lane can stage (ER1-V157);
+  - the hint above the reviewer's answer on the lane, which records no model exchange (ER1-V405).
+
+  Pins for ER1-V400, V401, V403 and V404 are owed in `ER-2`.

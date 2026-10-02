@@ -76,7 +76,10 @@ The following fixes address concrete failures observed during a large natural-la
   authoring route asks. The PWA page's blocked hint asks the same classifier (`floorBlockedHint`), over the floor the
   page shows, so it never says "revise the graph" where the guidance says not to: it says revise; or that revising
   does not address a review that reached no verdict; or both, when a non-review floor policy also rejected the graph
-  (`JAN-SELRES` `RS-3`).
+  (`JAN-SELRES` `RS-3`); or, for an escalated review, that it is to be routed to a human reviewer, whose review
+  this workbench cannot record yet (`JAN-ESCREC` `ER-1`, `REG-F-474`). The hint renders first in the floor panel.
+  Where the reviewer also recommended escalation beside findings or an incomplete review, one informational line
+  says so after the hint; the recommendation is never sent back to the producer as a finding.
 - ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
   resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default
   `Gemini 3.5 Flash (High)`. The actual agy invocation always receives that concrete value through `--model`; the

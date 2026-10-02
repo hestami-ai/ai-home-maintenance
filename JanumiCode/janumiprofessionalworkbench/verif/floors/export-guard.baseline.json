@@ -614,16 +614,18 @@
 				"identityProvenanceValidator",
 				"schemaInvariantValidator"
 			],
-			"unattributedMutants": 2
+			"unattributedMutants": 22
 		},
 		"packages/rph-assurance/src/recording.ts": {
 			"consumedExports": [
-				"assuranceRecordingPlan"
+				"assuranceRecordingPlan",
+				"REVIEWER_RECOMMENDED_ESCALATION"
 			],
 			"guardedExports": [
-				"assuranceRecordingPlan"
+				"assuranceRecordingPlan",
+				"REVIEWER_RECOMMENDED_ESCALATION"
 			],
-			"unattributedMutants": 1
+			"unattributedMutants": 12
 		},
 		"packages/rph-assurance/src/validators.ts": {
 			"consumedExports": [
@@ -1098,7 +1100,7 @@
 			"guardedExports": [
 				"recordAssuranceRecordingPlan"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 1
 		},
 		"packages/rph-engine/src/reference-undertaking.ts": {
 			"consumedExports": [

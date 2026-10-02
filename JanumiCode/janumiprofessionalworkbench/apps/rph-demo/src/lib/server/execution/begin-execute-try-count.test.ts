@@ -111,6 +111,11 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
+/** `REG-D-090`'s sentence for the execution plane, verbatim (`JAN-ESCREC` design D3) — printed beside an ESCALATED review
+ *  only. Restated, not imported: it is the operator's word, so a change to it must redden here rather than be followed. */
+const HUMAN_SENTENCE =
+	"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474).";
+
 /** The number of tries that RAN, counted apart from the message: one EXECUTION exchange per try (`PER-9`). */
 const triesRecorded = (): number =>
 	listByType(getEngine(), 'MODEL_EXCHANGE').filter(
@@ -144,6 +149,16 @@ describe('⭐ REG-F-469 — "reviewed over N tries" counts the tries that ran', 
 		expect(message, 'the message miscounted the one try that ran').toContain(
 			'its work product was reviewed over 1 try, and the assurance floor is NOT satisfied'
 		);
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-090`; the ER-1 app verifier's finding [2]) — A REVIEW THAT REACHED NO VERDICT IS NOT AN
+		// ESCALATION. The stand-in's review is incomplete — the commonest refusal in this lane — and the classifier answers it
+		// RETRY_OR_CONFIGURE_REVIEWER; the human-review sentence is keyed on ESCALATE_REVIEW alone, so it is not printed.
+		expect(message, 'arrangement: the review was not answered as incomplete').toContain(
+			'(RETRY_OR_CONFIGURE_REVIEWER)'
+		);
+		expect(
+			message,
+			'an incomplete review was told as an escalation to a human reviewer'
+		).not.toContain(HUMAN_SENTENCE);
 		expect(seam.agy, 'arrangement: the stand-in executor called no agy').toEqual([]);
 		expect(vi.mocked(devinPrint), 'arrangement: no devin review').not.toHaveBeenCalled();
 	});

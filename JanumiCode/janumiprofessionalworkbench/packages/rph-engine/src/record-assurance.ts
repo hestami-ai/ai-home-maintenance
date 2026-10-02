@@ -1,13 +1,13 @@
 // recordAssuranceRecordingPlan — persist a floor RECORDING PLAN as canonical ASSURANCE_ASSESSMENT +
 // ASSURANCE_OBSERVATION objects, entirely through live commands (§8.9 layer 3 — the Assurance-Service recording arm).
-// For each policy that produced a Validator result: request the assessment (created directly in ASSESSING), record
-// each proposed observation (OPEN, carrying the Validator's specific finding code + severity), then complete the
-// assessment to the floor-computed disposition. Boundary pseudo-dispositions were already folded to INCONCLUSIVE by
-// assuranceRecordingPlan, and the AssuranceAssessment.state machine independently rejects any illegal transition.
-// This is validator-AGNOSTIC and plane-AGNOSTIC: authoring- and execution-plane hosts hand it the same plan shape.
-// exec≠assurance (INV-5) is upheld structurally — nothing here reads executionState.
+// For each policy that produced a Validator result: request the assessment (created directly in ASSESSING), record each
+// observation the plan carries (OPEN, at its finding code + severity: the Validator's own, then the two the plan
+// authors), then complete the assessment to the floor-computed disposition. Boundary pseudo-dispositions were already
+// folded to INCONCLUSIVE by assuranceRecordingPlan, and the AssuranceAssessment.state machine independently rejects any
+// illegal transition. This is validator-AGNOSTIC and plane-AGNOSTIC: authoring- and execution-plane hosts hand it the
+// same plan shape. exec≠assurance (INV-5) is upheld structurally — nothing here reads executionState.
 import type { AssuranceRecordingPlan, Identity } from '@janumipwb/rph-assurance';
-import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { ActorReference, DomainCommand, ObservationType } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing } from './assessment-drive.js';
 import type { AuthedEngineHandle } from './engine.js';
 
@@ -85,8 +85,10 @@ export interface RecordedAssurance {
 }
 
 /** Map a floor policy to the closest ASSURANCE_OBSERVATION.observationType (§21). Contract/provenance floor failures
- *  are POLICY_VIOLATIONs; reasoning-review failures are FINDINGs. The precise floor code rides in `findingCode`. */
-function observationTypeFor(policyId: string): string {
+ *  are POLICY_VIOLATIONs; reasoning-review failures are FINDINGs. The precise floor code rides in `findingCode`.
+ *  ⭐ `JAN-ESCREC` D2: the DEFAULT, for an observation the plan does not type — which is every one but the review's
+ *  ESCALATED recommendation. Typed `ObservationType` so the plan's own union is checked against the ratified enum below. */
+function observationTypeFor(policyId: string): ObservationType {
 	return policyId === 'floor.reasoning-review' ? 'FINDING' : 'POLICY_VIOLATION';
 }
 
@@ -173,13 +175,19 @@ export function recordAssuranceRecordingPlan(
 				...(c.stipulated !== undefined ? { stipulated: c.stipulated } : {})
 			});
 		});
-		// Record each proposed observation while ASSESSING (observations require the assessment to exist).
+		// Record each observation the plan carries while ASSESSING (observations require the assessment to exist).
 		a.observations.forEach((o) => {
 			const observationId = opts.newId('obs');
 			observationIds.push(observationId);
+			// ⭐ `JAN-ESCREC` D2 — THE PLAN'S TYPE WHERE IT CARRIES ONE, ELSE THE POLICY'S DEFAULT. The review's ESCALATED
+			// recommendation arrives typed RECOMMENDATION (`REG-D-090`); dropping that here would file it as a FINDING — a
+			// fault the reviewer never reported. ⭑ The annotation is the compile-time tie between `rph-assurance`'s LOCAL
+			// union (its `recording.ts` imports no contracts) and the ratified §21 enum; the command schema still refuses
+			// any other value at dispatch. ⚠ The OBJECT keeps the type; the event does not carry one.
+			const observationType: ObservationType = o.observationType ?? observationTypeFor(a.policyId);
 			send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', observationId, {
 				assessmentId,
-				observationType: observationTypeFor(a.policyId),
+				observationType,
 				findingCode: o.code,
 				severity: o.severity,
 				statement: o.statement

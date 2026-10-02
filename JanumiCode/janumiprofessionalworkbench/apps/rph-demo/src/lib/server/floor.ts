@@ -10,12 +10,15 @@
 // enforces it.
 import { analyzePwaGraph } from '@janumipwb/rph-projections';
 import {
+	aggregateDisposition,
 	FLOOR_POLICY_IDS,
+	REVIEWER_RECOMMENDED_ESCALATION,
 	runFloorAndPlanRecording,
 	VALIDATOR_FAILURE_CODES,
 	VALIDATOR_MODEL_SUBSTITUTED,
 	type AssuranceSubject,
 	type IdentityProvenanceFacts,
+	type PolicyAssessment,
 	type ProfessionalRationaleSummary,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
@@ -27,7 +30,10 @@ import {
 	recordAssuranceRecordingPlan,
 	type AuthedEngineHandle
 } from '@janumipwb/rph-engine';
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import {
+	AssuranceDispositionRecommendationSchema,
+	type AssessmentCriterion
+} from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
 import { graphReviewInput } from './assurance/review-input.js';
@@ -160,6 +166,21 @@ export function assuredCandidateLine(candidateHash: string, f: FloorView | undef
 			: '';
 	return `✓ Assured candidate ${candidateHash} is staged.${disclosure} Canonical DRAFT is unchanged until you accept this exact preview.`;
 }
+
+/**
+ * ⭐ `JAN-ESCREC` D3 — THE PWA PAGE'S HEADER CHIP, IN WORDS: *"floor satisfied"*, or the aggregate lower-cased with its
+ * underscores read as spaces. The read-back now passes a CONDITIONALLY_SATISFIED review through as itself
+ * (`aggregateDisposition`, `floorAggregate` below), and the template's `floor ${aggregate}` then read *"floor
+ * conditionally_satisfied"*, the contract's token (the ER-1 app verifier's finding [4]). Nothing asserted the underscore
+ * form. The page's load answers it once, beside the floor; `floor.test.ts` holds every aggregate, because the e2e lane
+ * may record no positive reasoning review but the stand-in's (`lane-control.ts`, LIMB 2), so no browser test can stage
+ * a CONDITIONALLY_SATISFIED review to read the chip from. The panel's own disposition chip keeps the token.
+ */
+export function floorChipLabel(floor: Pick<FloorView, 'satisfied' | 'aggregate'>): string {
+	return floor.satisfied
+		? 'floor satisfied'
+		: `floor ${floor.aggregate.toLowerCase().replaceAll('_', ' ')}`;
+}
 export interface FloorView {
 	readonly subjectId: string;
 	readonly aggregate: string;
@@ -173,7 +194,12 @@ export interface FloorView {
 	readonly waived: boolean;
 	readonly policies: FloorPolicyView[];
 	/** Open Reasoning-Review observation statements for display. Remediation decisions MUST use the structured
-	 *  policy/observation fields above: this list also contains operational findings when review execution fails. */
+	 *  policy/observation fields above: this list also contains operational findings when review execution fails.
+	 *  ⭐ `JAN-ESCREC` D3 (`REG-D-090`): NEVER the reviewer's recommendation (`isReviewerRecommendation`). The page lists
+	 *  these under "Reasoning-review findings", and a recommendation is not one; the blocked hint and the resume banner
+	 *  carry an escalation, one line beside the findings says it where they do not, in the sentence true of the floor
+	 *  (`escalationRecommendationNote`), and the observation stays on `policies` above, as the informational record it
+	 *  is. */
 	readonly reasoningGaps: string[];
 }
 
@@ -223,7 +249,8 @@ export function isOperationalRemediation(action: FloorRemediationAction): boolea
 export interface FloorRemediation {
 	readonly action: FloorRemediationAction;
 	readonly autoRefine: boolean;
-	/** Structured, valid subject findings that may be given to the authoring agent. Never operational failures. */
+	/** Structured, valid subject findings that may be given to the authoring agent. Never operational failures — ⭐ and
+	 *  never the reviewer's recommendation (`JAN-ESCREC` D3, `isReviewerRecommendation`). */
 	readonly findings: readonly FloorObservationView[];
 	/** Human/operator guidance. The route emits this verbatim after the fail-closed floor result. */
 	readonly guidance: string;
@@ -251,6 +278,27 @@ const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
 	'INDEPENDENCE_VIOLATION',
 	...VALIDATOR_FAILURE_CODES
 ]);
+
+/**
+ * ⭐⭐ `JAN-ESCREC` D3 (`REG-D-089`; `REG-D-090`) — THE REVIEWER'S ESCALATED RECOMMENDATION IS RECORDED, AND IS NEVER A FINDING
+ * ABOUT THE SUBJECT.
+ *
+ * `rph-assurance`'s recording plan appends `REVIEWER_RECOMMENDED_ESCALATION` (typed RECOMMENDATION, INFORMATIONAL) to a VALID
+ * Reasoning Review whose reviewer recommended the literal ESCALATED, whatever the review's outcome (D2): LAST, beside a
+ * REJECTED review's subject finding, and ALONE on the clean review rule (a) escalates (D1). It records what the reviewer
+ * RECOMMENDED — it names no criterion and no deficiency — so it is never sent back to the producer as work, never listed
+ * among the reasoning-review findings (`reasoningGaps`), and never a waiver's target (`routes/pwa/[id]/+page.server.ts`).
+ * Unexcluded, a REJECTED review sent "the reviewing model's recommendation was ESCALATED" back as a defect to repair, and a
+ * review that recorded no subject finding at all became a refinement of nothing (`REG-D-059`: *"work from silence"*).
+ *
+ * ⛔ ITS OWN EXCLUSION, NOT A MEMBER OF `OPERATIONAL_REVIEW_CODES`. That set's members are failures of the REVIEW — each
+ * refines `VALIDATOR_EXECUTION_FAILED` or records a failed independence — and a recommendation is not one: a REJECTED review
+ * that carries it is still a verdict that judged the subject, and its own finding still goes back.
+ * ⭑ IMPORTED, NEVER RESTATED: `o.code === …` is a comparison no compiler checks, and a restated spelling matches only until
+ * the package's word moves (`verif/validator-failure-codes-imported.test.ts` holds the app to the import).
+ */
+const isReviewerRecommendation = (o: { readonly code: string }): boolean =>
+	o.code === REVIEWER_RECOMMENDED_ESCALATION;
 
 /** The dispositions that JUDGED the subject and found something in it — the only ones whose findings may
  *  be sent back to the producer. Of `AggregateAssuranceDisposition`'s six members these are the two that
@@ -332,7 +380,12 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 		};
 	}
 
-	const subjectFindings = review.observations.filter((o) => !OPERATIONAL_REVIEW_CODES.has(o.code));
+	// ⭐ `JAN-ESCREC` D3 — AND NEVER THE REVIEWER'S RECOMMENDATION (`isReviewerRecommendation`, above). THIS ONE FILTER IS
+	// EVERY PATH TO THE PRODUCER: its `findings` are `refineDirective`'s and `priorGaps`' (`routes/pwa/[id]/agent/+server.ts`)
+	// and `openPerTry`'s and `priorFindings`' (`routes/undertakings/[id]/+page.server.ts`), and `floorStatusLine` counts them.
+	const subjectFindings = review.observations.filter(
+		(o) => !OPERATIONAL_REVIEW_CODES.has(o.code) && !isReviewerRecommendation(o)
+	);
 	// ⛔ ONLY A DISPOSITION THAT ACTUALLY JUDGES THE SUBJECT MAY SEND WORK BACK TO ITS PRODUCER.
 	//
 	// This read `disposition !== 'SATISFIED'`, which swept in `INCONCLUSIVE` — and `REG-D-059` rules that out in
@@ -380,8 +433,22 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	};
 }
 
-/** Which of three sentences the PWA page's blocked hint reads — see `floorBlockedHint`. */
-export type FloorBlockedHint = 'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW';
+/** Which of ~~three~~ four sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3 added
+ *  `'ROUTE_TO_HUMAN'`. */
+export type FloorBlockedHint =
+	'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW' | 'ROUTE_TO_HUMAN';
+
+/**
+ * ⭐ `JAN-ESCREC` D3 — DOES A FLOOR POLICY OTHER THAN THE REVIEW RECORD A FINDING AGAINST THE GRAPH? The question the last
+ * line of `floorBlockedHint` asks, WRITTEN APART FROM IT ON PURPOSE: that line's predicate is a ledger anchor (`RS3-M29`..
+ * `M31`), and an anchor must occur exactly once in its file. So it is asked the other way round here — every policy is
+ * the review or is not REJECTED — and neither spelling contains the other.
+ */
+function rejectsTheGraph(floor: FloorView): boolean {
+	return !floor.policies.every(
+		(p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW || p.disposition !== 'REJECTED'
+	);
+}
 
 /**
  * ⭐ `JAN-SELRES` D8 (`REG-F-462`), AS REVISED IN RS-3 — WHICH SENTENCE THE PWA PAGE'S BLOCKED HINT READS. The page renders
@@ -394,9 +461,19 @@ export type FloorBlockedHint = 'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW
  *     (`RESOLVE_OTHER_FLOOR_FINDINGS`). Revising the graph answers it.
  *   · `'NOT_BY_REVISION'` — the classifier answers with an operational action (`isOperationalRemediation`) and NO
  *     non-review floor policy is REJECTED. Five of the six operational guidance strings say *"Do not revise the PWA"*;
- *     the escalation's says *"an automatic subject edit cannot substitute for the escalation"*.
+ *     the escalation's says *"an automatic subject edit cannot substitute for the escalation"*. ⭐ Since `JAN-ESCREC` an
+ *     escalation with no REJECTED non-review policy is `'ROUTE_TO_HUMAN'`'s (below), so this answer is the other five's.
  *   · `'REVISE_AND_REVIEW'` — operational, AND a non-review floor policy (schema/invariant or identity/provenance) is
- *     REJECTED: a defect in the graph that revising DOES answer, beside a review that revising does not.
+ *     REJECTED: a defect in the graph that revising DOES answer, beside a review that revising does not. An escalation
+ *     beside one reads this too, as every operational block does.
+ *   · ⭐ `'ROUTE_TO_HUMAN'` (`JAN-ESCREC` D3; `REG-D-090`) — the classifier answers `ESCALATE_REVIEW` and NO non-review floor
+ *     policy is REJECTED. The review was escalated — from `JAN-ESCREC`, the clean review whose reviewer recommended
+ *     ESCALATED with nothing else in the floor blocking (`rph-assurance` D1) — so the page says the review is routed to a
+ *     human, that this workbench cannot record a human's review yet (`REG-F-474`), and that revising the graph does not
+ *     address it. It does not say to run assurance again: a re-run re-runs the same automated reviewer (`REG-F-474`).
+ *     ⛔ THE INSERTION SHAPE IS THE DESIGN'S: one line after the `'REVISE'` line, asking the classifier AGAIN — never a
+ *     cached call, so that line stays byte-identical — and asking `rejectsTheGraph`, never the last line's predicate, which
+ *     stays byte-identical too.
  *
  * ⛔ THE FLOOR'S OWN CLASSIFIER DECIDES WHETHER THE REVIEW IS THE PROBLEM, so the hint and the guidance cannot disagree
  * about the review. This function adds only what the classifier does not ask when it answers an operational review:
@@ -432,11 +509,71 @@ export type FloorBlockedHint = 'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW
 export function floorBlockedHint(floor: FloorView): FloorBlockedHint | undefined {
 	if (floor.satisfied) return undefined;
 	if (!isOperationalRemediation(classifyFloorRemediation(floor).action)) return 'REVISE';
+	if (classifyFloorRemediation(floor).action === 'ESCALATE_REVIEW' && !rejectsTheGraph(floor)) return 'ROUTE_TO_HUMAN';
 	return floor.policies.some(
 		(p) => p.policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && p.disposition === 'REJECTED'
 	)
 		? 'REVISE_AND_REVIEW'
 		: 'NOT_BY_REVISION';
+}
+
+/** Which sentence the floor panel says when the reviewer also recommended escalation — see `escalationRecommendationNote`.
+ *  ⭐ `JAN-ESCREC` D3 (the ER-1 app re-verifier's finding [0]): a SENTENCE, never a boolean. */
+export type EscalationRecommendationNote = 'BESIDE_FINDINGS' | 'WITH_AN_INCOMPLETE_REVIEW';
+
+/**
+ * ⭐ `JAN-ESCREC` D3 (`REG-D-089`; `REG-D-090`) — WHAT THE FLOOR PANEL SAYS WHEN THE REVIEWER ALSO RECOMMENDED ESCALATION:
+ * WHICH of two informational sentences, never whether one. One line, beside the findings and never among them, rendered
+ * AFTER the blocked hint so the instruction keeps its place on screen (`routes/pwa/[id]/+page.svelte`):
+ *   · `'BESIDE_FINDINGS'` — *"The reviewer also recommended escalation to a human reviewer. The recommendation is recorded
+ *     beside the findings, which are addressed first (REG-D-089)."* The hint says to revise (`'REVISE'` or
+ *     `'REVISE_AND_REVIEW'`): the floor records findings revising answers, and they are addressed first.
+ *   · `'WITH_AN_INCOMPLETE_REVIEW'` — *"The reviewer also recommended escalation to a human reviewer. The review reached no
+ *     usable verdict; the recommendation is recorded with it (REG-D-089)."* The hint says revising does not address the
+ *     block (`'NOT_BY_REVISION'`): D2 records the recommendation on a VALID INCONCLUSIVE review too — a reply that left a
+ *     criterion unanswered — and that review has no finding to be addressed first.
+ *   · `undefined` — the floor is satisfied (its hint is `undefined`: nothing blocks, and nothing is addressed first); the
+ *     latest reasoning review carries no recommendation (keyed on its imported CODE, `isReviewerRecommendation`, never on
+ *     prose); or the hint routes the review to a human (`'ROUTE_TO_HUMAN'` says the escalation itself, so the line would
+ *     say it twice).
+ *
+ * ⛔ WHAT WAS WRONG, TWICE. (1) The ER-1 app verifier's finding [7]: the recommendation is recorded whatever the review's
+ * outcome (`rph-assurance` D2), and beside a REJECTED review, or one KEPT SATISFIED because another floor policy blocks, the
+ * page showed it nowhere — the policy list renders no observation, `reasoningGaps` excludes it, and the hint and the resume
+ * banner key on `ESCALATE_REVIEW`. (2) The ER-1 app re-verifier's finding [0] (its mutant `ER1-V153`): that first answer was
+ * a BOOLEAN (`escalationRecommendedBesideTheFindings`), and its one sentence was shown beside an incomplete review as well —
+ * "recorded beside the findings, which are addressed first", beside no finding, under a hint saying revising does not
+ * address the block. `REG-D-090` accepted option (a), no hard stop, on the condition that the operator is told honestly;
+ * so the server answers which sentence, and the template renders exactly one, restating no code.
+ *
+ * ⛔ KEYED ON THE HINT'S ANSWER, NOT ON THE REVIEW'S DISPOSITION: an ESCALATED review beside a REJECTED identity policy reads
+ * `'REVISE_AND_REVIEW'`, which names no escalation, so the line is said there, beside the findings. ⭑ AN EXHAUSTIVE SWITCH,
+ * so a fifth answer of the hint must be decided here before this compiles. Neither sentence names a waiver or a route past
+ * the floor (ASR-3).
+ */
+export function escalationRecommendationNote(
+	floor: FloorView
+): EscalationRecommendationNote | undefined {
+	const review = floor.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+	if (review?.observations.some(isReviewerRecommendation) !== true) return undefined;
+	const hint = floorBlockedHint(floor);
+	switch (hint) {
+		case 'REVISE':
+		case 'REVISE_AND_REVIEW':
+			return 'BESIDE_FINDINGS';
+		case 'NOT_BY_REVISION':
+			return 'WITH_AN_INCOMPLETE_REVIEW';
+		// ⭑ ROUTE_TO_HUMAN says the escalation itself. And a SATISFIED floor's hint is `undefined` (`floorBlockedHint`'s first
+		// line): nothing blocks, nothing is addressed first — asked once, here, rather than again above, where a second test
+		// of `satisfied` could never fail.
+		case 'ROUTE_TO_HUMAN':
+		case undefined:
+			return undefined;
+		default: {
+			const unanswered: never = hint;
+			throw new Error(`Unanswered floor blocked hint: ${String(unanswered)}`);
+		}
+	}
 }
 
 /**
@@ -693,7 +830,10 @@ export async function runPwaFloor(
 			})),
 			criteria: tallyCriteria(a.criteria)
 		})),
-		reasoningGaps: rr ? rr.observations.map((o) => o.statement) : []
+		// ⭐ `JAN-ESCREC` D3 — never the reviewer's recommendation: it stays on `policies`, and is not a finding.
+		reasoningGaps: rr
+			? rr.observations.filter((o) => !isReviewerRecommendation(o)).map((o) => o.statement)
+			: []
 	};
 }
 
@@ -747,11 +887,40 @@ function observationsByAssessment(
 	return byId;
 }
 
-/** The panel's display aggregate from the per-policy dispositions. */
-function floorAggregate(satisfied: boolean, policies: FloorPolicyView[]): string {
-	if (satisfied) return 'SATISFIED';
-	if (policies.some((p) => p.disposition === 'REJECTED')) return 'REJECTED';
-	return 'UNASSESSED';
+/** The assessment states a COMPLETION concludes in — the five dispositions `CompleteAssuranceAssessment` admits, read from
+ *  the contract it reads them from (`rph-application` `assurance.ts`), never restated here. */
+const CONCLUDED_DISPOSITIONS: ReadonlySet<string> = new Set(
+	AssuranceDispositionRecommendationSchema.options
+);
+
+/**
+ * The panel's display aggregate from the per-policy dispositions.
+ *
+ * ⭐ `JAN-ESCREC` D3 — THE PACKAGE'S OWN STRICTEST-UNRESOLVED COMPOSITION (`aggregateDisposition`, §28.2), the one the run
+ * computed. ~~SATISFIED, else REJECTED, else UNASSESSED~~ was a hand-written ladder, and it read an ESCALATED or an
+ * INCONCLUSIVE review back UNASSESSED — "nothing assessed it", beside a review that ran and concluded — and a
+ * CONDITIONALLY_SATISFIED one too. Every floor policy is REQUIRED (§8.4), and one with no recorded assessment is MISSING.
+ * ⭑ ONLY A CONCLUDED DISPOSITION IS READ AS ONE. A review still in progress (REQUESTED, EVIDENCE_PENDING, READY,
+ * ASSESSING), and any other state that is not one of the five dispositions, is MISSING here, so it keeps the reading the
+ * ladder gave it: UNASSESSED, or REJECTED beside a rejection. Passed through, `aggregateDisposition` reads a state it does
+ * not know as INCONCLUSIVE — a review nobody concluded would read as one that concluded nothing.
+ * ⛔ AND A WAIVED STATE IS NOT PASSED AS WAIVED. It is no completion's disposition (only a waiver GRANT on the assessment
+ * reaches it), so it is MISSING here: `aggregateDisposition` counts a required WAIVED policy as satisfying, while the floor
+ * is UNCONDITIONAL (ASR-3; `REG-F-202`) — `satisfied` below and the engine's floor gate both block on it. ⚠ No test stages
+ * a WAIVED floor assessment; this sentence is read from code.
+ */
+function floorAggregate(order: readonly string[], policies: readonly FloorPolicyView[]): string {
+	return aggregateDisposition(
+		order.map((policyId): PolicyAssessment => {
+			const disposition = policies.find((p) => p.policyId === policyId)?.disposition ?? '';
+			return {
+				required: true,
+				disposition: CONCLUDED_DISPOSITIONS.has(disposition)
+					? (disposition as PolicyAssessment['disposition'])
+					: 'MISSING'
+			};
+		})
+	);
 }
 
 /**
@@ -810,10 +979,15 @@ export function loadPwaFloor(
 	const rr = latest.get(FLOOR_POLICY_IDS.REASONING_REVIEW);
 	return {
 		subjectId: pwaId,
-		aggregate: floorAggregate(satisfied, policies),
+		aggregate: floorAggregate(order, policies),
 		satisfied,
 		waived: hasEffectiveWaiver(engine, pwaId),
 		policies,
-		reasoningGaps: rr ? (obsByAssessment.get(rr.id) ?? []).map((o) => o.statement) : []
+		// ⭐ `JAN-ESCREC` D3 — never the reviewer's recommendation: it stays on `policies`, and is not a finding.
+		reasoningGaps: rr
+			? (obsByAssessment.get(rr.id) ?? [])
+					.filter((o) => !isReviewerRecommendation(o))
+					.map((o) => o.statement)
+			: []
 	};
 }

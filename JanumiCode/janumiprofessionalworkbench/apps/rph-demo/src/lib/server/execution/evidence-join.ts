@@ -35,11 +35,16 @@
 // stream with nothing to assess.*
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
-import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import {
+	REVIEWER_RECOMMENDED_ESCALATION,
+	type ProfessionalRationaleSummary
+} from '@janumipwb/rph-assurance';
 import type { ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
+import type { FloorRemediationAction } from '../floor.js';
+import { escalatedReviewNote } from './floor-over-subject.js';
 import {
 	processResultLimitations,
 	renderProcessResult,
@@ -52,6 +57,22 @@ export interface JoinedProcessEvidence {
 	readonly run: ObservedProcessRun;
 	readonly satisfied: boolean;
 	readonly observations: { code: string; statement: string }[];
+	/**
+	 * ⭐ `JAN-ESCREC` D3 (the ER-1 app re-verifier's finding [6]) — each policy this result's floor left unsatisfied, with
+	 * the disposition the floor composed for it, in the plan's order — the engine's own test (`floorGateBlock`: anything
+	 * not SATISFIED). What the refusal names when the floor recorded NO observation (`describeRefusedEvidence`): a review
+	 * that left a criterion unanswered and recommended SATISFIED is INCONCLUSIVE with nothing observed, and its refusal
+	 * printed the command, a colon, and nothing (`REG-F-415`'s symptom; its cause is not this field's to close).
+	 */
+	readonly unsatisfiedPolicies: readonly {
+		readonly policyId: string;
+		readonly disposition: string;
+	}[];
+	/**
+	 * ⭐ `JAN-ESCREC` D3 — what the floor's classifier answered this result's floor with: the STRUCTURE the refusal keys its
+	 * escalation sentence on (`describeRefusedEvidence`), never the observations' prose.
+	 */
+	readonly remediationAction: FloorRemediationAction;
 }
 
 export interface EvidenceJoinInput {
@@ -243,7 +264,9 @@ export async function joinProcessEvidence(
 			evidenceId,
 			run,
 			satisfied: floor.satisfied,
-			observations: floor.observations
+			observations: floor.observations,
+			unsatisfiedPolicies: floor.dispositions.filter((d) => d.disposition !== 'SATISFIED'),
+			remediationAction: floor.remediation.action
 		});
 	}
 	return { joined };
@@ -255,13 +278,91 @@ export async function joinProcessEvidence(
  * ⭑ IT NAMES THE COMMAND AND THE EVIDENCE ID, because a step with an ARTIFACT subject and N EVIDENCE subjects
  * produces the SAME status and the SAME code from every one of them — an arrangement that trips several guards
  * proves none of them. The id is the only thing that says which subject refused.
+ *
+ * ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, WHAT THE ESCALATION ASKS: the execution
+ * plane's fixed sentence (`escalatedReviewNote`), keyed on the result's own classifier action. Its caller, the model step's
+ * refusal, carries this text whole on BOTH of its arms — beside a work product whose floor did not pass, and beside one
+ * whose floor did (`routes/undertakings/[id]/+page.server.ts`). ⚠ That second arm printed none of it until the ER-1 app
+ * verifier's MAJOR 1: a passed work product beside an escalated command result read only the engine's text.
+ *
+ * ⭐ AND A RESULT WHOSE FLOOR RECORDED NO OBSERVATION SAYS SO (`refusedBecause`, below; the ER-1 app re-verifier's finding
+ * [6]): it printed `evd_… (npm test): ` and then nothing — `REG-F-415`'s symptom — so the engine's text after it on the
+ * satisfied arm read as the result's own reason. ⭐ And one whose observations hold NO FINDING says that, and names what
+ * refused it (`noFindingNote`, below; the second fix round's re-verifier's finding [0]) — save an ESCALATED one, which the
+ * sentence above explains.
  */
 export function describeRefusedEvidence(joined: readonly JoinedProcessEvidence[]): string {
 	return joined
 		.filter((j) => !j.satisfied)
 		.map(
 			(j) =>
-				`${j.evidenceId} (${j.run.argv.join(' ')}): ${j.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ')}`
+				`${j.evidenceId} (${j.run.argv.join(' ')}): ${refusedBecause(j)}${escalatedReviewNote(j.remediationAction)}`
 		)
 		.join(' — ');
+}
+
+/**
+ * WHY ONE REFUSED RESULT REFUSED: its recorded observations as `code: statement`, or — where its floor recorded none —
+ * that none was recorded, and which policies it left unsatisfied, in the engine's own `policyId=disposition` form
+ * (`floorGateBlock`'s refusal reads the same way). ⭑ That second form ends with its own full stop, as an observed result
+ * ends with its statement's: on the model step's satisfied arm the engine's text follows it, with no period between.
+ *
+ * ⛔ THE EMPTY COLON IS `REG-F-415` (OPEN AS A SYMPTOM), AND THIS REPAIRS ITS TEXT, NOT ITS REGISTERED CAUSE: `RPH-ASR-005`'s
+ * command-path limb — `completeAssuranceAssessment` reads no criterion result — stays UNENFORCED_DISCLOSED. So this says
+ * only what the joined floor holds: that NO observation was recorded, and each unsatisfied policy's disposition. It never
+ * says which criterion went unjudged. Since `JAN-CRITREAD` L3 each criterion result IS recorded (`RecordCriterionResult`),
+ * but nothing here reads them back; a refusal naming the unjudged criterion would be that reader's, and is not built. The
+ * gap stays named on this surface — in words now, where the empty colon named it by omission.
+ *
+ * ⭐ OBSERVATIONS THAT HOLD NO FINDING ARE FOLLOWED BY `noFindingNote` (below): printed alone, the reviewer's recommendation
+ * was the whole reason given for a review it does not explain. An escalated review's are not: the sentence explains it.
+ */
+function refusedBecause(j: JoinedProcessEvidence): string {
+	if (j.observations.length > 0)
+		return (
+			j.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') +
+			noFindingNote(j.observations, j.unsatisfiedPolicies, j.remediationAction)
+		);
+	const unsatisfied = j.unsatisfiedPolicies.map((p) => `${p.policyId}=${p.disposition}`).join(', ');
+	return unsatisfied ? `no observation recorded (${unsatisfied}).` : 'no observation recorded.';
+}
+
+/**
+ * ⭐ `JAN-ESCREC` D3 (`REG-D-090`; the second fix round's re-verifier's finding [0], its drives E5, E7 and E8) — WHERE A
+ * REFUSED REVIEW'S OBSERVATIONS HOLD NO FINDING, THE EXECUTION PLANE SAYS SO AND NAMES WHAT REFUSED IT: after the
+ * observations, ` — no finding recorded (<policyId>=<disposition>, …).` — each policy the floor left unsatisfied, in the
+ * engine's own form, as `refusedBecause` names them where nothing was observed at all. `''` for every other list, so a
+ * caller appends it unconditionally: each refused command result (`refusedBecause`, above) and the model step's arm for a
+ * work product whose floor did not pass (`routes/undertakings/[id]/+page.server.ts`).
+ *
+ * ⛔ WHAT WAS INCOMPLETE. D2 records the reviewer's ESCALATED recommendation on a VALID review whatever its outcome — on one
+ * left INCONCLUSIVE by an unanswered criterion too — and that record forecloses no disposition, so it never explains a
+ * refusal. Yet it was all either arm printed of such a review: *"evd_… (npm test): REVIEWER_RECOMMENDED_ESCALATION: …"*,
+ * beside a re-run-or-reconfigure remedy, and on the arm for a work product whose floor did not pass INCONCLUSIVE was named
+ * nowhere. The PWA panel answers that review with its incomplete-review sentence; this plane had no counterpart.
+ *
+ * ⛔ KEYED ON STRUCTURE — the observations' CODES, never their prose: a list with at least one observation, every one the
+ * recommendation's code, IMPORTED (`verif/validator-failure-codes-imported.test.ts` holds the app to the import). ⛔ AND
+ * NEVER AN ESCALATED REVIEW'S (the third fix round's re-verifier's finding [1], as the caller ruled): its list holds no
+ * finding either, but the human sentence explains it (`escalatedReviewNote`, keyed on the same ACTION, which each caller
+ * hands this too), so `''` where the classifier answered `ESCALATE_REVIEW`. An EMPTY list is not this note's:
+ * `refusedBecause` says "no observation recorded" itself, and the work product's arm prints the engine's text, which names
+ * the dispositions.
+ */
+export function noFindingNote(
+	observations: readonly { readonly code: string }[],
+	policies: readonly { readonly policyId: string; readonly disposition: string }[],
+	action: FloorRemediationAction
+): string {
+	if (
+		action === 'ESCALATE_REVIEW' ||
+		observations.length === 0 ||
+		observations.some((o) => o.code !== REVIEWER_RECOMMENDED_ESCALATION)
+	)
+		return '';
+	const named = policies
+		.filter((p) => p.disposition !== 'SATISFIED')
+		.map((p) => `${p.policyId}=${p.disposition}`)
+		.join(', ');
+	return named ? ` — no finding recorded (${named}).` : ' — no finding recorded.';
 }

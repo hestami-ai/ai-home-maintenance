@@ -20,6 +20,7 @@ import type {
 	PermittedChildRule
 } from '@janumipwb/rph-authoring';
 import type { AssessmentCriterion, PromptTemplate } from '@janumipwb/rph-contracts';
+import { REVIEWER_RECOMMENDED_ESCALATION } from '@janumipwb/rph-assurance';
 import {
 	listOrDefault,
 	policyEditPatch,
@@ -53,7 +54,15 @@ import {
 import { markersIn } from '@janumipwb/rph-application';
 import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
 import { getArtifactStore } from '$lib/server/workbench';
-import { floorBlockedHint, loadPwaFloor } from '$lib/server/floor';
+import {
+	escalationRecommendationNote,
+	floorBlockedHint,
+	floorChipLabel,
+	loadPwaFloor,
+	type FloorObservationView,
+	type FloorPolicyView,
+	type FloorView
+} from '$lib/server/floor';
 import { openDraftOn } from '$lib/server/open-drafts';
 import { SESSION_CREDENTIAL } from '$lib/server/identity';
 import { readRenderedRevision, refuse, STALE_FORM } from '$lib/server/optimistic-concurrency';
@@ -61,6 +70,7 @@ import {
 	commitAuthoringTurn,
 	discardAuthoringTurn,
 	getPendingAuthoringTurn,
+	resumeHintText,
 	summarizeAuthoringTurn
 } from '$lib/server/authoring-turn';
 import type { Actions, PageServerLoad } from './$types';
@@ -84,6 +94,31 @@ function toLogEntry(e: ConversationEntry): LogEntry {
 		default:
 			return { kind: 'error', text: e.text };
 	}
+}
+
+/**
+ * ⭐ `JAN-ESCREC` D3 (`REG-D-090`; the third fix round's re-verifier's finding [7], as the caller ruled) — WHAT A WAIVER WOULD
+ * NAME ON A RECORDED FLOOR, ONE SELECTION FOR THE PAGE AND THE ACTION: the first policy that is not SATISFIED, and its first
+ * observation that is a finding. `recordWaiver` records against it, and refuses where there is none; the load offers the
+ * waiver form only where there is one (`hasWaiverTarget`). ⛔ ONE FUNCTION, NEVER TWO COPIES: the form was offered on
+ * publication status alone, so beside a review whose only observation is the reviewer's recommendation — every ESCALATED
+ * review, and an incomplete one its reviewer escalated — the page offered "Record accepted risk" and the action refused it.
+ * `waiver-target-recommendation.test.ts` holds the load's answer to the action's outcome.
+ */
+function waiverTargetOf(floor: FloorView | undefined): {
+	readonly blocking: FloorPolicyView | undefined;
+	readonly finding: FloorObservationView | undefined;
+} {
+	const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
+	if (!blocking) return { blocking, finding: undefined };
+	// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — NEVER THE REVIEWER'S RECOMMENDATION. A reasoning review carries
+	// `REVIEWER_RECOMMENDED_ESCALATION` whenever its reviewer recommended ESCALATED: ALONE on the clean review rule (a)
+	// escalates, and after the review's own observations elsewhere. It names no criterion and no deficiency, so a waiver
+	// naming it as its `waivedCriterionId` would record accepted risk against a recommendation. This took
+	// `observations[0]`; it now takes the first observation that is a finding, and a review that recorded none has no
+	// target. ⭑ IMPORTED, never restated (`verif/validator-failure-codes-imported.test.ts`).
+	const finding = blocking.observations.find((o) => o.code !== REVIEWER_RECOMMENDED_ESCALATION);
+	return { blocking, finding };
 }
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -255,7 +290,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		floor,
 		// ⭐ `JAN-SELRES` D8 (`REG-F-462`), as revised in RS-3 — WHICH SENTENCE THE BLOCKED HINT READS (`floorBlockedHint`):
 		// revise the graph; revising does not address it; or revise the graph for the floor's findings against it AND run
-		// the review again. Answered ONCE, here, over the floor above: the one the panel shows. ⛔ THAT FLOOR, NOT
+		// the review again; ⭐ or (`JAN-ESCREC` D3, `REG-D-090`) the review was escalated, is routed to a human whose review
+		// this workbench cannot record yet (`REG-F-474`), and revising does not address it — which
+		// `authoring-route-escalated-review.test.ts` holds to the fork too. Answered ONCE, here, over the floor above: the
+		// one the panel shows. ⛔ THAT FLOOR, NOT
 		// CANONICAL'S. In the product a failed, refused or incomplete review reaches this page only through a staged
 		// candidate's FORK — the floor runs on an authoring turn (`agent/+server.ts`), and only a satisfied candidate is
 		// accepted — so canonical holds no floor beside it (`authoring-route-substituted-reviewer.test.ts` holds this read
@@ -264,6 +302,25 @@ export const load: PageServerLoad = async ({ params }) => {
 		// guidance for a failed review says not to revise the PWA. `undefined` when no floor is recorded, and beside a
 		// satisfied one.
 		floorBlockedHint: floor === undefined ? undefined : floorBlockedHint(floor),
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-089`; the ER-1 app verifier's finding [7], and its re-verifier's [0]) — AND WHAT THE PANEL
+		// SAYS WHEN THE REVIEWER ALSO RECOMMENDED ESCALATION (`escalationRecommendationNote`): WHICH of two informational
+		// sentences — beside the findings, or with an incomplete review — never whether one. A boolean here once put "beside
+		// the findings, which are addressed first" beside an incomplete review that had none. `undefined` where the hint
+		// already routes the review to a human, beside a satisfied floor, where nothing recorded the recommendation, and when
+		// no floor is recorded. Answered ONCE, here, over the same floor — the candidate's FORK beside a staged candidate,
+		// which `authoring-route-escalated-review.test.ts` holds — keyed on the recommendation's imported code; the template
+		// restates nothing.
+		escalationRecommendationNote:
+			floor === undefined ? undefined : escalationRecommendationNote(floor),
+		// ⭐ `JAN-ESCREC` D3 — THE HEADER CHIP'S WORDS (`floorChipLabel`): the aggregate the read-back now passes through,
+		// CONDITIONALLY_SATISFIED included, read without the contract's underscore (the ER-1 app verifier's finding [4]).
+		// `undefined` when no floor is recorded, and the chip is not rendered then.
+		floorChipLabel: floor === undefined ? undefined : floorChipLabel(floor),
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-090`; the third fix round's re-verifier's finding [7], as the caller ruled) — WHETHER THE
+		// FLOOR ON SCREEN NAMES A FINDING A WAIVER COULD NAME (`waiverTargetOf`, the selection `recordWaiver` records
+		// against), so the panel offers its form only beside one. ⚠ Over the floor the panel shows — the candidate's FORK
+		// beside a staged one, where the action, which reads canonical, refuses while the draft is open (`DD-4`).
+		hasWaiverTarget: waiverTargetOf(floor).finding !== undefined,
 		// ⭑ MXREAD-03 — THE REVIEWER'S OWN ANSWER, READ BACK AND VERIFIED. `ASR-11` limb 3 keeps raw output
 		// *"for diagnostics"*, and until this call the retention had no reader at all: the record named a
 		// storageKey nothing ever resolved (`REG-F-245` (b′)). The bytes are re-hashed before they are shown,
@@ -279,7 +336,13 @@ export const load: PageServerLoad = async ({ params }) => {
 		),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
 		// boundary explicit to the browser and supplies the exact hash required by the accept action.
-		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined
+		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined,
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — THE RESUME BANNER'S SENTENCE, answered ONCE, here, from the same summary
+		// (`resumeHintText`): it names an escalation as one, and says refining re-runs the same automated reviewer
+		// (`REG-F-474`). The banner renders it in one interpolation and composes nothing (the ER-1 app verifier's finding
+		// [6]: composed in the template, the escalated branch had no test). `undefined` with no staged candidate, and for
+		// a status the page offers no resume for.
+		resumeHint: candidate ? resumeHintText(summarizeAuthoringTurn(candidate)) : undefined
 	};
 };
 
@@ -730,11 +793,10 @@ export const actions: Actions = {
 		// A waiver must name the EXACT policy and criterion it discharges (DOC-004 §12.2; RPH-GOV-005 forbids
 		// bleeding to another criterion). It used to send a free-text scope of "de minimis assurance floor", which
 		// the gate honored as a blanket bypass of the WHOLE floor — including a REJECTED independent review. So we
-		// derive the target from the RECORDED floor: the blocking policy and the open finding it actually failed on.
-		const floor = loadPwaFloor(params.id);
-		const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
+		// derive the target from the RECORDED floor: the blocking policy and the open finding it actually failed on — the
+		// one selection the load offers the form by (`waiverTargetOf`), never a second copy of it.
+		const { blocking, finding } = waiverTargetOf(loadPwaFloor(params.id));
 		if (!blocking) return fail(400, { error: 'Nothing to waive: the floor is not blocking.' });
-		const finding = blocking.observations[0];
 		if (!finding)
 			return fail(400, {
 				error: `Cannot waive ${blocking.policyId}: no open finding is recorded for it, and a waiver must name the finding it waives (DOC-004 §12.2).`

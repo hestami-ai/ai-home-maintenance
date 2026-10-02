@@ -15,7 +15,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type { ProcessOutputRetention } from '@janumipwb/rph-ports';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
-import { reasoningReviewCriteria } from '../floor.js';
+import { reasoningReviewCriteria, type FloorRemediationAction } from '../floor.js';
 import {
 	clearingReviewerFor,
 	withLiveReviewerSeam
@@ -26,6 +26,7 @@ import {
 	joinProcessEvidence,
 	type ProcessEvidenceContentReference
 } from './evidence-join.js';
+import { escalatedReviewNote } from './floor-over-subject.js';
 
 const TS = '2026-09-17T00:00:00Z';
 
@@ -102,11 +103,20 @@ function harness() {
 
 // ⭑ THE WHOLE HELPER RUNS UNDER THE LIVE REVIEWER SEAM, once, rather than each test arranging it. The env
 // keys are PROCESS-WIDE and a leak silently switches every later test in this worker onto the live path.
-async function join(runs: readonly ObservedProcessRun[], h = harness()) {
-	return withLiveReviewerSeam(() => joinUnderSeam(runs, h));
+// ⭐ `JAN-ESCREC` D3: a case may name the reviewer's reply (`review`); every other case keeps the clearing reviewer.
+async function join(
+	runs: readonly ObservedProcessRun[],
+	h = harness(),
+	review?: (prompt: string) => Promise<string>
+) {
+	return withLiveReviewerSeam(() => joinUnderSeam(runs, h, review));
 }
 
-async function joinUnderSeam(runs: readonly ObservedProcessRun[], h: ReturnType<typeof harness>) {
+async function joinUnderSeam(
+	runs: readonly ObservedProcessRun[],
+	h: ReturnType<typeof harness>,
+	review?: (prompt: string) => Promise<string>
+) {
 	const ref = await h.artifacts.put({
 		tenantPrefix: 'tnt-t',
 		bytes: 'the producing turn',
@@ -158,7 +168,9 @@ async function joinUnderSeam(runs: readonly ObservedProcessRun[], h: ReturnType<
 			// ONE run is satisfied and one is not. With every subject refusing for want of criterion coverage,
 			// neither is, and the discrimination it exists to prove cannot fail. Leaving it red preserved a
 			// BROKEN discriminator, not a true statement.
-			print: clearingReviewerFor('The COMMAND RESULT to review', reasoningReviewCriteria(h.session))
+			print:
+				review ??
+				clearingReviewerFor('The COMMAND RESULT to review', reasoningReviewCriteria(h.session))
 		}
 	);
 	return { ...out, h };
@@ -323,4 +335,253 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 		});
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 	});
+});
+
+// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — A COMMAND RESULT WHOSE REVIEW IS ESCALATED SAYS WHAT THE ESCALATION ASKS, IN ITS REFUSAL.
+//
+// ⛔ The process-result refusal printed observations only, so an escalated review read as a recommendation and nothing
+// more. Each joined result now carries the classifier's ACTION, and `describeRefusedEvidence` prints the fixed sentence
+// beside the observations of a result whose action is ESCALATE_REVIEW — keyed on that structure, never on prose, and
+// never on the recommendation's code alone: a review the reviewer escalated is recorded with the recommendation whatever
+// its outcome (`rph-assurance` D2), and only the clean one with nothing else blocking IS escalated (D1).
+describe('⭐ JAN-ESCREC D3 — the process-result refusal says what an escalated review asks', () => {
+	const HUMAN_SENTENCE =
+		"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474).";
+	const RECOMMENDATION_CODE = 'REVIEWER_RECOMMENDED_ESCALATION';
+	const RECOMMENDATION_STATEMENT =
+		"The reviewing model's recommendation was ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator implementation or policy-designated authority cannot resolve the issue within its authority or competence.";
+	/** A reviewer that answers every criterion unfailed and recommends ESCALATED — the clean arm rule (a) escalates. */
+	const escalating = (h: ReturnType<typeof harness>) => async () =>
+		JSON.stringify({
+			findings: reasoningReviewCriteria(h.session).map((c) => ({
+				criterionId: c.id,
+				failed: false,
+				statement: 'evaluated; the failure class is absent'
+			})),
+			recommendation: 'ESCALATED',
+			residualUncertainty: []
+		});
+
+	it('⛔ a command result whose review is escalated: it carries the action, and its refusal prints the sentence beside its observations', async () => {
+		const h = harness();
+		const { joined } = await join([aRun(['npm', 'test'])], h, escalating(h));
+		expect(joined[0]!.satisfied, 'arrangement: the escalated review satisfied the floor').toBe(
+			false
+		);
+		expect(
+			joined[0]!.remediationAction,
+			'the joined result does not say its review was escalated'
+		).toBe('ESCALATE_REVIEW');
+		expect(describeRefusedEvidence(joined)).toBe(
+			`${joined[0]!.evidenceId} (npm test): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — ${HUMAN_SENTENCE}`
+		);
+	});
+
+	it('⭑ CONTROL — the same reviewer beside a result with NO VERDICT escalates nothing: the recommendation is printed, the sentence is not', async () => {
+		// The schema/invariant policy refuses the result first (`PROCESS_VERDICT_UNOBSERVED`), so rule (a) leaves the review
+		// SATISFIED and the recommendation recorded beside it. A refusal keyed on the recommendation's CODE would print the
+		// sentence here; one keyed on the classifier's action does not.
+		const h = harness();
+		const { joined } = await join(
+			[aRun(['node', 'flaky.js'], { exitCode: null })],
+			h,
+			escalating(h)
+		);
+		expect(joined[0]!.satisfied, 'arrangement: a result with no verdict satisfied the floor').toBe(
+			false
+		);
+		const codes = joined[0]!.observations.map((o) => o.code);
+		expect(codes, 'arrangement: the run’s missing verdict was not refused').toContain(
+			'PROCESS_VERDICT_UNOBSERVED'
+		);
+		expect(codes, 'arrangement: the recommendation was not recorded beside it').toContain(
+			RECOMMENDATION_CODE
+		);
+		expect(joined[0]!.remediationAction).toBe('RESOLVE_OTHER_FLOOR_FINDINGS');
+		expect(
+			describeRefusedEvidence(joined),
+			'a refusal that is not an escalation was told as one'
+		).not.toContain(HUMAN_SENTENCE);
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — A REFUSED RESULT WITH NO OBSERVATION SAYS SO, AND NAMES WHAT REFUSED IT.
+//
+// ⛔ The ER-1 app re-verifier's finding [6] (its drive E4): a command result's reviewer skipped a criterion and recommended
+// SATISFIED, so the review is INCONCLUSIVE and records NO observation — and the refusal printed the command, a colon, and
+// nothing: *"evd_… (npm test): CompleteExecutionStep: …"*, as though the engine's text were the result's reason. The
+// model step carries this text on both arms (`routes/undertakings/[id]/+page.server.ts`), so the operator read it twice
+// over. ⭑ Each joined result now carries the policies its floor left unsatisfied, as the floor composed them, and the
+// refusal names them where nothing was observed — in the engine's own `policyId=disposition` form — ending with its own
+// full stop, as an observed result ends with its statement's.
+// ⛔ THAT EMPTY COLON IS `REG-F-415`, OPEN AS A SYMPTOM, AND THIS DOES NOT CLOSE IT: its registered cause is `RPH-ASR-005`'s
+// command-path limb, still UNENFORCED_DISCLOSED, and the refusal names a policy's disposition, never the criterion that
+// went unjudged. It says the absence in words, where it was named only by omission.
+describe('⭐ JAN-ESCREC D3 — a refused result whose floor recorded no observation says so, and names what refused it', () => {
+	/** A reviewer that answers every criterion but the LAST, unfailed, recommending SATISFIED: an unanswered mandatory
+	 *  criterion is invalid output (ASR-2), so the review is INCONCLUSIVE — and nothing failed, so nothing is observed. */
+	const skipping = (h: ReturnType<typeof harness>) => async () =>
+		JSON.stringify({
+			findings: reasoningReviewCriteria(h.session)
+				.slice(0, -1)
+				.map((c) => ({
+					criterionId: c.id,
+					failed: false,
+					statement: 'evaluated; the failure class is absent'
+				})),
+			recommendation: 'SATISFIED',
+			residualUncertainty: []
+		});
+
+	it('⛔ an INCONCLUSIVE review with nothing observed: the refusal says no observation was recorded, and names the policy and its disposition', async () => {
+		const h = harness();
+		const { joined } = await join([aRun(['npm', 'test'])], h, skipping(h));
+		expect(joined[0]!.satisfied, 'arrangement: an incomplete review satisfied the floor').toBe(
+			false
+		);
+		expect(joined[0]!.observations, 'arrangement: the floor recorded an observation').toEqual([]);
+		// ⭐ THE CLAIM, WHOLE.
+		expect(
+			describeRefusedEvidence(joined),
+			'a refused result with nothing observed printed no reason at all'
+		).toBe(
+			`${joined[0]!.evidenceId} (npm test): no observation recorded (floor.reasoning-review=INCONCLUSIVE).`
+		);
+		// ⭑ CARRIED, NOT RE-DERIVED: the policies the result's own floor left unsatisfied, as it composed them.
+		expect(joined[0]!.unsatisfiedPolicies).toEqual([
+			{ policyId: 'floor.reasoning-review', disposition: 'INCONCLUSIVE' }
+		]);
+	});
+
+	it('⭑ CONTROL — a refused result WITH an observation prints the observation, and no disposition list', async () => {
+		const { joined } = await join([aRun(['npm', 'test'], { exitCode: null })]);
+		const described = describeRefusedEvidence(joined);
+		expect(described, 'arrangement: the run’s missing verdict was not refused').toContain(
+			'PROCESS_VERDICT_UNOBSERVED: '
+		);
+		expect(described).not.toContain('no observation recorded');
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — A REFUSED RESULT WHOSE OBSERVATIONS HOLD NO FINDING SAYS SO, AND NAMES WHAT REFUSED IT.
+//
+// ⛔ The second fix round's re-verifier's finding [0] (its drives E5 and E8): a command result's reviewer skipped the last
+// criterion AND recommended ESCALATED, so the review is INCONCLUSIVE and D2 records the recommendation on it — its one
+// observation. Round two's "no observation recorded" keyed on an EMPTY list, so this list printed the recommendation and
+// nothing else: *"evd_… (npm test): REVIEWER_RECOMMENDED_ESCALATION: …"*, beside a re-run-or-reconfigure remedy, and
+// INCONCLUSIVE named only in the engine's text — on the arm for a work product whose floor did not pass, nowhere. The
+// recommendation forecloses no disposition, so it never explains a refusal. ⭑ Now, after observations none of which is a
+// finding — keyed on their CODES, the recommendation's imported — the refusal says so in round two's `policyId=disposition`
+// form: ` — no finding recorded (floor.reasoning-review=INCONCLUSIVE).` A list carrying a FINDING is told as before.
+describe('⭐ JAN-ESCREC D3 — a refused result whose observations hold no finding says so, and names what refused it', () => {
+	const RECOMMENDATION_CODE = 'REVIEWER_RECOMMENDED_ESCALATION';
+	const RECOMMENDATION_STATEMENT =
+		"The reviewing model's recommendation was ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator implementation or policy-designated authority cannot resolve the issue within its authority or competence.";
+	/** A reviewer that answers every criterion but the LAST, unfailed, recommending ESCALATED: incomplete, so INCONCLUSIVE
+	 *  (ASR-2) — and D2 records the recommendation on it all the same, its ONLY observation. */
+	const skippingAndEscalating = (h: ReturnType<typeof harness>) => async () =>
+		JSON.stringify({
+			findings: reasoningReviewCriteria(h.session)
+				.slice(0, -1)
+				.map((c) => ({
+					criterionId: c.id,
+					failed: false,
+					statement: 'evaluated; the failure class is absent'
+				})),
+			recommendation: 'ESCALATED',
+			residualUncertainty: []
+		});
+
+	it('⛔ an INCONCLUSIVE review whose only observation is the recommendation: the refusal names floor.reasoning-review=INCONCLUSIVE after it', async () => {
+		const h = harness();
+		const { joined } = await join([aRun(['npm', 'test'])], h, skippingAndEscalating(h));
+		expect(joined[0]!.satisfied, 'arrangement: an incomplete review satisfied the floor').toBe(
+			false
+		);
+		expect(
+			joined[0]!.observations.map((o) => o.code),
+			'arrangement: the recommendation is not the result’s only observation'
+		).toEqual([RECOMMENDATION_CODE]);
+		expect(
+			joined[0]!.remediationAction,
+			'arrangement: the incomplete review was answered as something else'
+		).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		const described = describeRefusedEvidence(joined);
+		// ⭐ THE CLAIM: the disposition that refused it is named — INCONCLUSIVE, which nothing else here says.
+		expect(
+			described,
+			'a refusal whose observations hold no finding does not name what refused it'
+		).toContain('floor.reasoning-review=INCONCLUSIVE');
+		// ⭐ AND WHOLE: the recommendation as recorded, then the note, ending with its own full stop — no human sentence,
+		// because this review is not escalated (`RETRY_OR_CONFIGURE_REVIEWER`).
+		expect(described).toBe(
+			`${joined[0]!.evidenceId} (npm test): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — no finding recorded (floor.reasoning-review=INCONCLUSIVE).`
+		);
+	});
+
+	it('⭑ CONTROL — a REJECTED review carrying a finding AND the recommendation is told by its observations, with no note', async () => {
+		// The first criterion failed, so a FINDING stands beside the recommendation: the observations explain the refusal,
+		// and a note keyed on "the recommendation is present" rather than "nothing else is" would be said here too.
+		const h = harness();
+		const { joined } = await join([aRun(['npm', 'test'])], h, async () =>
+			JSON.stringify({
+				findings: reasoningReviewCriteria(h.session).map((c, i) => ({
+					criterionId: c.id,
+					failed: i === 0,
+					statement:
+						i === 0
+							? 'The command result substitutes an easier problem.'
+							: 'evaluated; the failure class is absent'
+				})),
+				recommendation: 'ESCALATED',
+				residualUncertainty: []
+			})
+		);
+		expect(
+			joined[0]!.observations.map((o) => o.code),
+			'arrangement: the finding and the recommendation were not both recorded'
+		).toEqual([reasoningReviewCriteria(h.session)[0]!.id, RECOMMENDATION_CODE]);
+		const described = describeRefusedEvidence(joined);
+		expect(described, 'arrangement: the finding is not printed').toContain(
+			'The command result substitutes an easier problem.'
+		);
+		expect(
+			described,
+			'a refusal whose observations hold a finding was told it holds none'
+		).not.toContain('no finding recorded');
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — THE EXECUTION PLANE'S HUMAN SENTENCE, OVER EVERY ACTION THE CLASSIFIER CAN ANSWER.
+//
+// ⛔ The ER-1 app re-verifier's finding [5] (its mutant `ER1-V156`): RETRY and REQUALIFY were each pinned at their route
+// (`begin-execute-try-count.test.ts`, `begin-execute-substituted-reviewer.test.ts`), and CHANGE_REVIEWER nowhere — so a
+// note that told an independence refusal "the reviewer recommended escalation to a human reviewer" passed every test,
+// where the remedy is to select another reviewer. ⭑ So `escalatedReviewNote` is held here for EVERY action, exhaustive by
+// `satisfies` as `authoring-turn-resume-hint.test.ts` holds the banner: an action added to `FloorRemediationAction` must be
+// decided here before this file compiles. Only ESCALATE_REVIEW is an escalation (D1); every other action answers the
+// empty string, which both callers append unconditionally after the observations it would stand beside.
+describe('⭐ JAN-ESCREC D3 — escalatedReviewNote: the human sentence for ESCALATE_REVIEW, and for no other action', () => {
+	const HUMAN_SENTENCE =
+		"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474).";
+	/** ⛔ EVERY ACTION — exhaustive by construction: `satisfies` refuses a member of the union left out. */
+	const NOTE_FOR = {
+		NONE: '',
+		REFINE_SUBJECT: '',
+		RETRY_OR_CONFIGURE_REVIEWER: '',
+		REQUALIFY_OR_RESELECT_REVIEWER: '',
+		CHANGE_REVIEWER: '',
+		ESCALATE_REVIEW: ` — ${HUMAN_SENTENCE}`,
+		RESOLVE_OTHER_FLOOR_FINDINGS: ''
+	} as const satisfies Record<FloorRemediationAction, string>;
+
+	it.each(Object.entries(NOTE_FOR) as [FloorRemediationAction, string][])(
+		'%s → %j',
+		(action, note) => {
+			expect(
+				escalatedReviewNote(action),
+				`${action} is told the wrong thing beside its observations`
+			).toBe(note);
+		}
+	);
 });

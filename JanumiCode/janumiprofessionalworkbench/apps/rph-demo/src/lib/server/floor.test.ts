@@ -2,14 +2,44 @@
 // the derivation that replaced five literal `true`s (findings 18/67): a PWA missing a stable id, semantic version,
 // provenance, or an identified producer must fail its mandatory criterion. Mutation proof: revert any derived fact
 // below to a literal `true` and the matching case here goes red.
+import { vi } from 'vitest';
+
+// ⭐ `JAN-ESCREC` D3 — the last describe records a floor through `runPwaFloor` and reads it back, as
+// `floor-recording.test.ts` does: `workbench.ts` reads `RPH_DEMO_MODE` at load, so it is set before any import. The
+// pure cases above it read no engine, and nothing in them depends on the mode.
+vi.hoisted(() => {
+	process.env.RPH_DEMO_MODE = 'test';
+});
+
+import {
+	FLOOR_POLICY_DEFINITIONS,
+	SEEDED_REASONING_REVIEW_CRITERIA,
+	type AggregateDisposition
+} from '@janumipwb/rph-assurance';
+import { createEngine, getObject, seedFloorPolicies } from '@janumipwb/rph-engine';
+import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
+import {
+	ProfessionalWorkObjectTypeSchema,
+	type AssessmentCriterion,
+	type DomainCommand
+} from '@janumipwb/rph-contracts';
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
+import { withLiveReviewerSeam } from './assurance/clearing-reviewer.testing.js';
+import { SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
 import {
 	classifyFloorRemediation,
+	escalationRecommendationNote,
 	floorBlockedHint,
+	floorChipLabel,
+	floorStatusLine,
 	identityProvenanceFactsOf,
-	isOperationalRemediation
+	isOperationalRemediation,
+	loadPwaFloor,
+	runPwaFloor
 } from './floor.js';
 import type {
+	EscalationRecommendationNote,
 	FloorBlockedHint,
 	FloorProducer,
 	FloorRemediationAction,
@@ -322,9 +352,11 @@ describe('isOperationalRemediation — every action answered, the operational on
 });
 
 // ⭐ `JAN-SELRES` D8 (`REG-F-462`), AS REVISED IN RS-3 — THE PAGE'S BLOCKED HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER, IN
-// THREE SENTENCES. `floorBlockedHint` is the one answer the PWA page renders its hint from: 'REVISE' says "revise the
-// graph and re-run", 'NOT_BY_REVISION' says revising does not address the block, and 'REVISE_AND_REVIEW' says to revise
-// the graph for the findings the floor records against it AND that the review reached no verdict revising can answer.
+// ~~THREE~~ FOUR SENTENCES. `floorBlockedHint` is the one answer the PWA page renders its hint from: 'REVISE' says "revise
+// the graph and re-run", 'NOT_BY_REVISION' says revising does not address the block, and 'REVISE_AND_REVIEW' says to
+// revise the graph for the findings the floor records against it AND that the review reached no verdict revising can
+// answer. ⭐ `JAN-ESCREC` D3 (`REG-D-090`) added 'ROUTE_TO_HUMAN': an escalated review with no REJECTED non-review policy
+// is routed to a human, whose review this workbench cannot record yet (`REG-F-474`).
 // ⛔ IT ASKS `classifyFloorRemediation` WHETHER THE REVIEW IS THE PROBLEM, NEVER THE RECORDED CODES, and the non-review
 // policies' dispositions whether the GRAPH is too: a two-way answer read "revising it does not address this" beside a
 // refused substitute on a graph with two roots (the RS-3 re-verifier's MAJOR). ⭑ The first table is a `Record` over the
@@ -469,11 +501,15 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 			}
 		],
 		// ⚠ NO CODE RECORDED AT ALL — the codes-keyed predicate answered the first of these "revise".
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-090`): ALONE, an escalation is routed to a human — the fourth sentence, which says a
+		// human's review cannot be recorded yet (`REG-F-474`). This row read NOT_BY_REVISION until then. BESIDE a REJECTED
+		// non-review policy it still reads REVISE_AND_REVIEW: the graph half is answered by revising, as for every other
+		// operational action (the second row, unchanged — the control).
 		ESCALATE_REVIEW: [
 			{
 				shape: 'an ESCALATED review, nothing recorded',
 				floor: floorView({ policies: [reviewPolicy({ disposition: 'ESCALATED' })] }),
-				hint: 'NOT_BY_REVISION'
+				hint: 'ROUTE_TO_HUMAN'
 			},
 			{
 				shape: 'an ESCALATED review beside a REJECTED identity policy',
@@ -711,7 +747,8 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
 	});
 
-	it('⛔ an ESCALATED review carrying a subject observation → NOT_BY_REVISION: the escalation, not the finding, answers it', () => {
+	it('⛔ an ESCALATED review carrying a subject observation → ROUTE_TO_HUMAN: the escalation, not the finding, answers it, and it is routed to a human', () => {
+		// ⭐ `JAN-ESCREC` D3: this answer was NOT_BY_REVISION until the hint gained its fourth sentence.
 		const floor = floorView({
 			policies: [reviewPolicy({ disposition: 'ESCALATED', observations: [subjectFinding] })]
 		});
@@ -719,7 +756,7 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 			classifyFloorRemediation(floor).guidance,
 			'arrangement: the escalation branch answered it'
 		).toMatch(/an automatic subject edit cannot substitute for the escalation/i);
-		expect(floorBlockedHint(floor)).toBe('NOT_BY_REVISION');
+		expect(floorBlockedHint(floor)).toBe('ROUTE_TO_HUMAN');
 	});
 
 	it('⛔ NO reasoning-review result recorded, the other floor policies SATISFIED → NOT_BY_REVISION: the review did not produce a policy result', () => {
@@ -803,5 +840,728 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 			),
 			'a satisfied floor was given a blocked hint'
 		).toBeUndefined();
+	});
+});
+
+// ⭐⭐ `JAN-ESCREC` D3 (`REG-D-089`; `REG-D-090`) — THE REVIEWER'S ESCALATED RECOMMENDATION IS RECORDED, AND NEVER READ AS A
+// FINDING ABOUT THE SUBJECT.
+//
+// ⛔ WHAT IS AT STAKE. A VALID Reasoning Review whose reviewer recommends the literal ESCALATED now carries one more
+// observation, `REVIEWER_RECOMMENDED_ESCALATION` (INFORMATIONAL, typed RECOMMENDATION), whatever the review's outcome
+// (`rph-assurance` D2): LAST, beside a REJECTED review's subject finding, and ALONE on the clean review D1 escalates. The
+// classifier's subject-finding filter sent every non-operational code back to the producer, so the recommendation became
+// WORK — a REJECTED review sent "the reviewing model's recommendation was ESCALATED" back as a defect to repair, and a
+// review with no subject finding at all became a refinement of nothing. That one filter feeds `refineDirective` and
+// `priorGaps` (authoring), `openPerTry` and `priorFindings` (execution) and the status line's count, so its one exclusion
+// answers all five.
+//
+// ⭑ THE CODE IS RESTATED HERE AS A LITERAL, ON PURPOSE (part A's convention): it is the RECORDED word, so a rename in the
+// package must redden this file rather than be followed silently. Production imports it, and
+// `verif/validator-failure-codes-imported.test.ts` holds it to that. The statement is `REG-D-090`'s, byte for byte.
+const RECOMMENDATION_CODE = 'REVIEWER_RECOMMENDED_ESCALATION';
+const RECOMMENDATION_STATEMENT =
+	"The reviewing model's recommendation was ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator implementation or policy-designated authority cannot resolve the issue within its authority or competence.";
+
+describe('⭐ JAN-ESCREC D3 — the recommendation is never a subject finding, and an escalation alone routes to a human', () => {
+	const recommendation = {
+		code: RECOMMENDATION_CODE,
+		severity: 'INFORMATIONAL',
+		statement: RECOMMENDATION_STATEMENT
+	};
+	const subjectFinding = {
+		code: 'RR-02-no-obligation-elision',
+		severity: 'BLOCKING',
+		statement: 'A delegated deployment obligation is absent.'
+	};
+	const passed = (
+		policyId: 'floor.schema-invariant' | 'floor.identity-provenance'
+	): FloorView['policies'][number] => ({
+		policyId,
+		disposition: 'SATISFIED',
+		independenceOk: true,
+		observations: []
+	});
+
+	it('⛔ a REJECTED review carrying a subject finding AND the recommendation → REFINE_SUBJECT, its findings the subject finding only, and the hint REVISE', () => {
+		// The shape D2 records when a criterion failed: the subject finding first, the recommendation LAST.
+		const floor = floorView({
+			aggregate: 'REJECTED',
+			policies: [
+				passed('floor.schema-invariant'),
+				passed('floor.identity-provenance'),
+				reviewPolicy({ disposition: 'REJECTED', observations: [subjectFinding, recommendation] })
+			]
+		});
+		const result = classifyFloorRemediation(floor);
+		expect(result.action).toBe('REFINE_SUBJECT');
+		expect(result.autoRefine).toBe(true);
+		expect(
+			result.findings,
+			'the recommendation was sent back to the producer as a finding'
+		).toEqual([subjectFinding]);
+		expect(floorStatusLine(floor), 'the status line counted the recommendation as a finding').toBe(
+			'⚖ Assurance floor REJECTED · 1 valid reasoning finding(s).'
+		);
+		expect(floorBlockedHint(floor)).toBe('REVISE');
+	});
+
+	it('⛔ a REJECTED review whose ONLY observation is the recommendation is no work to send back: no refinement, no findings', () => {
+		// Without the exclusion the recommendation is the one "subject finding", and a review that recorded none is answered
+		// with a refinement of nothing — work manufactured from a recommendation (`REG-D-059`: *"work from silence"*).
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [reviewPolicy({ disposition: 'REJECTED', observations: [recommendation] })]
+			})
+		);
+		expect(
+			result.action,
+			'the recommendation alone was answered as a subject finding to refine'
+		).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		expect(result.autoRefine).toBe(false);
+		expect(result.findings).toEqual([]);
+	});
+
+	it('⛔ an ESCALATED review carrying the recommendation — the clean review D1 escalates → ESCALATE_REVIEW, no findings, and the hint ROUTE_TO_HUMAN', () => {
+		// ⭑ Every OTHER operational action alone still reads NOT_BY_REVISION: the table above holds a row for each, so a
+		// hint that sent every operational block to a human reddens there, not here.
+		const floor = floorView({
+			policies: [
+				passed('floor.schema-invariant'),
+				passed('floor.identity-provenance'),
+				reviewPolicy({ disposition: 'ESCALATED', observations: [recommendation] })
+			]
+		});
+		const result = classifyFloorRemediation(floor);
+		expect(result.action).toBe('ESCALATE_REVIEW');
+		expect(result.autoRefine).toBe(false);
+		expect(result.findings).toEqual([]);
+		expect(floorBlockedHint(floor)).toBe('ROUTE_TO_HUMAN');
+	});
+
+	it('⛔ the exclusion is of ONE CODE, not of a severity: an INFORMATIONAL subject finding beside the recommendation is still sent back, and counted', () => {
+		// The ER-1 app verifier's finding [5] (its mutant `ER1-V51`): every neighbour above is BLOCKING, so a filter that
+		// dropped every INFORMATIONAL observation along with the recommendation passed them all. Here a subject finding is
+		// INFORMATIONAL too, and only the recommendation's CODE tells the two apart.
+		const informational = {
+			code: 'RR-08-evidence-integrity',
+			severity: 'INFORMATIONAL',
+			statement: 'An uncertainty the graph rests on is acknowledged but not carried forward.'
+		};
+		const floor = floorView({
+			aggregate: 'REJECTED',
+			policies: [
+				passed('floor.schema-invariant'),
+				passed('floor.identity-provenance'),
+				reviewPolicy({
+					disposition: 'REJECTED',
+					observations: [subjectFinding, informational, recommendation]
+				})
+			]
+		});
+		const result = classifyFloorRemediation(floor);
+		expect(result.action).toBe('REFINE_SUBJECT');
+		expect(
+			result.findings,
+			'an informational subject finding was excluded with the recommendation'
+		).toEqual([subjectFinding, informational]);
+		expect(floorStatusLine(floor)).toBe(
+			'⚖ Assurance floor REJECTED · 2 valid reasoning finding(s).'
+		);
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 (`REG-D-089`; `REG-D-090`) — WHEREVER THE HINT DOES NOT ROUTE THE REVIEW TO A HUMAN, THE PANEL SAYS THE
+// REVIEWER ALSO RECOMMENDED ESCALATION, IN A SENTENCE THAT IS TRUE OF THE FLOOR IT IS SAID BESIDE.
+//
+// ⛔ WHAT WAS WRONG (the ER-1 app verifier's finding [7]). The recommendation is recorded whatever the outcome, and the page
+// showed it nowhere unless the review itself escalated: the policy list renders no observation, `reasoningGaps` excludes
+// it, and the hint and the banner key on ESCALATE_REVIEW. So beside a failed criterion, or a graph defect that kept the
+// review SATISFIED, *"the escalation recorded beside it"* (`REG-D-089`) was visible only in the raw answer — and once the
+// graph was fixed, the next run escalated with no earlier word.
+//
+// ⛔ AND THEN WHAT WAS FALSE (the ER-1 app re-verifier's finding [0], its mutant `ER1-V153`). The first answer was a boolean,
+// and its one sentence — *"recorded beside the findings, which are addressed first"* — was shown beside an INCOMPLETE review
+// too: D2 records the recommendation on a VALID INCONCLUSIVE review (a reply that left a criterion unanswered), whose page
+// lists no finding at all, under a hint saying revising does not address the block. `REG-D-090` accepted option (a), no hard
+// stop, on the condition that the operator is told honestly.
+//
+// ⭑ WHAT MUST HOLD. The server answers WHICH sentence (`escalationRecommendationNote`), never whether, keyed on the hint's
+// answer — one table row per answer, exhaustive by `satisfies`, so a fifth answer must be decided here before this compiles:
+//   · REVISE and REVISE_AND_REVIEW → `BESIDE_FINDINGS`: the floor records findings revising answers, and they come first;
+//   · NOT_BY_REVISION → `WITH_AN_INCOMPLETE_REVIEW`: the review reached no usable verdict, and the recommendation is
+//     recorded with it;
+//   · ROUTE_TO_HUMAN → `undefined`: the hint says the escalation itself, so the line would say it twice;
+// and `undefined` beside a satisfied floor, and beside a review that recorded no recommendation, whatever the hint.
+// ⛔ Keyed on the hint's answer, not on the review's disposition: an ESCALATED review beside a REJECTED identity policy reads
+// REVISE_AND_REVIEW, which names no escalation, so the line is shown there.
+describe('⭐ JAN-ESCREC D3 — escalationRecommendationNote: which sentence the panel says beside the findings, for every hint', () => {
+	const recommendation = {
+		code: RECOMMENDATION_CODE,
+		severity: 'INFORMATIONAL',
+		statement: RECOMMENDATION_STATEMENT
+	};
+	const subjectFinding = {
+		code: 'RR-02-no-obligation-elision',
+		severity: 'BLOCKING',
+		statement: 'A delegated deployment obligation is absent.'
+	};
+	const policy = (
+		policyId: 'floor.schema-invariant' | 'floor.identity-provenance',
+		disposition: 'SATISFIED' | 'REJECTED'
+	): FloorView['policies'][number] => ({
+		policyId,
+		disposition,
+		independenceOk: true,
+		observations:
+			disposition === 'REJECTED'
+				? [
+						{
+							code: 'PWA_GRAPH_NOT_WELL_FORMED',
+							severity: 'BLOCKING',
+							statement: 'Not well formed.'
+						}
+					]
+				: []
+	});
+
+	/** For each answer the hint can give an unsatisfied floor, the floors that reach it with the recommendation recorded,
+	 *  and the sentence the panel says beside them — every answer a key, so a fifth must be decided here to compile. */
+	const BY_HINT: Readonly<
+		Record<
+			FloorBlockedHint,
+			readonly {
+				readonly shape: string;
+				readonly floor: FloorView;
+				readonly note: EscalationRecommendationNote | undefined;
+			}[]
+		>
+	> = {
+		REVISE: [
+			{
+				shape: 'a REJECTED review carrying the recommendation beside its finding',
+				floor: floorView({
+					aggregate: 'REJECTED',
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({
+							disposition: 'REJECTED',
+							observations: [subjectFinding, recommendation]
+						})
+					]
+				}),
+				note: 'BESIDE_FINDINGS'
+			},
+			// `REG-D-090`: *"nothing else already blocks"* is read across the floor, so the graph is revised first and the
+			// review stays SATISFIED — with the escalation recorded beside it.
+			{
+				shape:
+					'a review KEPT SATISFIED beside a REJECTED schema policy, carrying the recommendation',
+				floor: floorView({
+					aggregate: 'REJECTED',
+					policies: [
+						policy('floor.schema-invariant', 'REJECTED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'SATISFIED', observations: [recommendation] })
+					]
+				}),
+				note: 'BESIDE_FINDINGS'
+			}
+		],
+		REVISE_AND_REVIEW: [
+			{
+				shape:
+					'an ESCALATED review beside a REJECTED identity policy — its hint names no escalation',
+				floor: floorView({
+					aggregate: 'REJECTED',
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'REJECTED'),
+						reviewPolicy({ disposition: 'ESCALATED', observations: [recommendation] })
+					]
+				}),
+				note: 'BESIDE_FINDINGS'
+			},
+			// ⭐ THE SECOND FIX ROUND'S RE-VERIFIER'S CASE [5] (its probe P8, its mutant `ER1-V207`): a staged candidate with two
+			// roots whose reviewer skipped a criterion AND recommended ESCALATED. The review is INCOMPLETE, yet the hint says to
+			// revise the graph's findings first — so the line says they come first, never the incomplete-review sentence: keyed
+			// on the hint's answer, not on the review's disposition. The only row above held an ESCALATED review alone.
+			{
+				shape:
+					'an INCONCLUSIVE review carrying the recommendation beside a REJECTED schema policy — incomplete, with findings to revise first',
+				floor: floorView({
+					aggregate: 'REJECTED',
+					policies: [
+						policy('floor.schema-invariant', 'REJECTED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'INCONCLUSIVE', observations: [recommendation] })
+					]
+				}),
+				note: 'BESIDE_FINDINGS'
+			}
+		],
+		NOT_BY_REVISION: [
+			// ⭐ THE RE-VERIFIER'S CASE: the reply left a criterion unanswered AND recommended ESCALATED. No finding is listed,
+			// the hint says revising does not address it, and "beside the findings, which are addressed first" was false.
+			{
+				shape: 'an INCONCLUSIVE review carrying the recommendation, its neighbours SATISFIED',
+				floor: floorView({
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'INCONCLUSIVE', observations: [recommendation] })
+					]
+				}),
+				note: 'WITH_AN_INCOMPLETE_REVIEW'
+			},
+			// ⭑ The classifier's catch-all for a review with no subject finding (`RETRY_OR_CONFIGURE_REVIEWER`): the same
+			// incomplete-review sentence, whatever disposition the review carries.
+			{
+				shape:
+					'a REJECTED review whose ONLY observation is the recommendation, its neighbours SATISFIED',
+				floor: floorView({
+					aggregate: 'REJECTED',
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'REJECTED', observations: [recommendation] })
+					]
+				}),
+				note: 'WITH_AN_INCOMPLETE_REVIEW'
+			}
+		],
+		ROUTE_TO_HUMAN: [
+			{
+				shape: 'an ESCALATED review, nothing else blocking — the hint already routes it to a human',
+				floor: floorView({
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'ESCALATED', observations: [recommendation] })
+					]
+				}),
+				note: undefined
+			}
+		]
+	};
+	for (const [hint, rows] of Object.entries(BY_HINT) as [
+		FloorBlockedHint,
+		(typeof BY_HINT)[FloorBlockedHint]
+	][])
+		for (const { shape, floor, note } of rows) {
+			it(`⭐ ${hint} — ${shape} → ${String(note)}`, () => {
+				expect(floorBlockedHint(floor), 'arrangement: the hint is not the row’s').toBe(hint);
+				expect(
+					escalationRecommendationNote(floor),
+					'the line beside the findings says something that is not true of this floor'
+				).toBe(note);
+			});
+			// ⛔ AND ONLY WHERE THE RECOMMENDATION IS RECORDED: the same floor without it reads the same hint, and no line.
+			it(`⛔ ${hint} — ${shape}, with NO recommendation recorded → no line`, () => {
+				const without: FloorView = {
+					...floor,
+					policies: floor.policies.map((p) => ({
+						...p,
+						observations: p.observations.filter((o) => o.code !== RECOMMENDATION_CODE)
+					}))
+				};
+				expect(floorBlockedHint(without), 'arrangement: the hint is not the row’s').toBe(hint);
+				expect(
+					escalationRecommendationNote(without),
+					'a line said the reviewer recommended escalation where nothing recorded it'
+				).toBeUndefined();
+			});
+		}
+
+	it('⛔ a SATISFIED floor → no line, whatever its review recorded: nothing blocks, and nothing is addressed first', () => {
+		expect(
+			escalationRecommendationNote(
+				floorView({
+					aggregate: 'SATISFIED',
+					satisfied: true,
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({ disposition: 'SATISFIED', observations: [recommendation] })
+					]
+				})
+			)
+		).toBeUndefined();
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 — THE HEADER CHIP READS THE AGGREGATE IN WORDS. The read-back passes a CONDITIONALLY_SATISFIED review
+// through as itself (`aggregateDisposition`), and the chip — `floor ${aggregate}` lower-cased in the template — then read
+// "floor conditionally_satisfied", the contract's token with its underscore (the ER-1 app verifier's finding [4], its drive
+// S10). Nothing in the suite asserted the underscore form (searched first). ⭑ The label is the server's (`floorChipLabel`),
+// so every value is held here: the e2e lane may record no positive reasoning review but the stand-in's
+// (`lane-control.ts`, LIMB 2), so no browser test can stage a CONDITIONALLY_SATISFIED review to read it from.
+describe('⭐ JAN-ESCREC D3 — floorChipLabel: the header chip reads the aggregate in words, never as a token', () => {
+	/** Every aggregate the floor can show, and its words — exhaustive by construction (`satisfies`). */
+	const CHIP_WORDS = {
+		REJECTED: 'floor rejected',
+		EVIDENCE_REQUIRED: 'floor evidence required',
+		UNASSESSED: 'floor unassessed',
+		INCONCLUSIVE: 'floor inconclusive',
+		CONDITIONALLY_SATISFIED: 'floor conditionally satisfied',
+		SATISFIED: 'floor satisfied'
+	} as const satisfies Record<AggregateDisposition, string>;
+
+	it.each(Object.entries(CHIP_WORDS))('⭑ %s → "%s"', (aggregate, words) => {
+		expect(floorChipLabel(floorView({ aggregate, satisfied: aggregate === 'SATISFIED' }))).toBe(
+			words
+		);
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 — THE READ-BACK, AND THE RECORD BEHIND IT. A floor is recorded through `runPwaFloor` — the product's
+// recorder, over a real engine — with the reviewer's reply injected (`withLiveReviewerSeam`: agy selected, PATH finding no
+// program, so nothing is started), then read back by `loadPwaFloor`, the reader the PWA page uses.
+//
+// ⛔ THE READ-BACK AGGREGATE WAS A HAND-WRITTEN LADDER — SATISFIED, else REJECTED, else UNASSESSED — so an ESCALATED or an
+// INCONCLUSIVE review read back UNASSESSED, "nothing assessed it", beside a review that ran and concluded. It now asks the
+// package's `aggregateDisposition`, the composition's own, so the read-back says what the run said. ⭑ A review still IN
+// PROGRESS keeps the reading it had (the control): nothing concluded it, and UNASSESSED says so.
+describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and lists no recommendation among the findings', () => {
+	const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5E00';
+	const ROOT_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5E01';
+	const PRODUCER: FloorProducer = {
+		agentId: 'jpwb-authoring-agent',
+		modelId: 'pi-authoring',
+		providerId: 'janumi'
+	};
+	const review = (f: FloorView | undefined) =>
+		f?.policies.find((p) => p.policyId === 'floor.reasoning-review');
+
+	/** A reviewer's reply over the seeded criteria: the first faulted when asked, every other answered unfailed. */
+	const reply = (recommendation: string, faultFirst = false): string =>
+		JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c, i) => ({
+				criterionId: c.id,
+				failed: faultFirst && i === 0,
+				statement:
+					faultFirst && i === 0
+						? 'The graph substitutes an easier problem.'
+						: 'evaluated; the failure class is absent'
+			})),
+			recommendation,
+			residualUncertainty: []
+		});
+
+	/** A real engine holding one DRAFT PWA with one root type — a graph the schema/invariant policy passes. Its clock
+	 *  moves on every read, so "the latest assessment" is never decided by a tie.
+	 *  ⭑ `reviewCriteria`, when given, seeds the floor policies from their definitions with the reasoning review's
+	 *  criteria passed through it — the POLICY in force, which the review reads from the store (`reasoningReviewCriteria`)
+	 *  — and otherwise `seedFloorPolicies` seeds them as the workbench does. */
+	function engineWithAPwa(
+		reviewCriteria?: (criteria: readonly AssessmentCriterion[]) => AssessmentCriterion[]
+	): {
+		readonly session: AuthedEngineHandle;
+		readonly send: (type: string, aggregateType: string, id: string, payload: unknown) => void;
+	} {
+		let tick = 0;
+		let events = 0;
+		const host = createEngine({
+			authenticate: standaloneAuthenticator(),
+			ontology,
+			now: () => new Date(Date.UTC(2026, 9, 1, 9) + 1000 * ++tick).toISOString(),
+			newEventId: () => `evt_${++events}`
+		});
+		const session = host.as(SESSION_CREDENTIAL);
+		let sequence = 0;
+		const send = (type: string, aggregateType: string, id: string, payload: unknown): void => {
+			sequence += 1;
+			const command = {
+				commandId: `escrec-${sequence}`,
+				commandType: type,
+				commandSchemaVersion: 1,
+				targetAggregateType: aggregateType,
+				targetAggregateId: id,
+				issuedAt: '2026-10-01T09:00:00Z',
+				correlationId: 'escrec-setup',
+				idempotencyKey: `escrec-idem-${sequence}`,
+				payload
+			} as DomainCommand;
+			const r = session.dispatch(command);
+			expect(r.status, `arrangement: ${type} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+		};
+		if (reviewCriteria === undefined) seedFloorPolicies(session);
+		else
+			// `seedFloorPolicies`' own payload (`rph-engine` `seed-workbench.ts`), with the review's criteria passed through.
+			for (const def of FLOOR_POLICY_DEFINITIONS)
+				send('CreateAssurancePolicy', 'ASSURANCE_POLICY', def.policyId, {
+					policyId: def.policyId,
+					version: '1.0.0',
+					name: def.name,
+					purpose: def.purpose,
+					rationale: def.rationale,
+					applicableObjectTypes: [...ProfessionalWorkObjectTypeSchema.options],
+					evaluatedClaimTypes: def.evaluatedClaimTypes,
+					criteria:
+						def.policyId === 'floor.reasoning-review' ? reviewCriteria(def.criteria) : def.criteria,
+					evaluatorRole: def.evaluatorRole,
+					independenceRequirement: def.independence,
+					findingDefinitions: def.findingDefinitions,
+					permittedControlActions: def.permittedControlActions
+				});
+		send('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', PWA, {
+			pwaId: PWA,
+			name: 'Escalation read-back fixture',
+			description: 'A DRAFT PWA whose review is recorded and read back.',
+			domain: 'software',
+			version: '1.0.0'
+		});
+		send('DefinePwuType', 'PWU_TYPE', ROOT_TYPE, {
+			pwuTypeId: ROOT_TYPE,
+			pwaId: PWA,
+			pwuKind: 'PLAN',
+			name: 'Plan',
+			purpose: 'Plan the work',
+			isRoot: true,
+			permittedChildTypeIds: [],
+			requiredInputs: [],
+			requiredOutputs: [],
+			requiredAssurancePolicyIds: []
+		});
+		return { session, send };
+	}
+
+	const runFloor = (session: AuthedEngineHandle, answer: string) =>
+		withLiveReviewerSeam(() =>
+			runPwaFloor(
+				PWA,
+				{
+					prompt: 'Assess it.',
+					producer: PRODUCER,
+					print: async () => answer,
+					canonical: session
+				},
+				session
+			)
+		);
+
+	it('⛔ a clean review recommending ESCALATED: neither the run nor the read-back lists the recommendation as a finding, and the read-back reads INCONCLUSIVE, as the run did — not UNASSESSED', async () => {
+		const { session } = engineWithAPwa();
+		const run = await runFloor(session, reply('ESCALATED'));
+		expect(review(run)?.disposition, 'arrangement: D1 did not escalate the clean review').toBe(
+			'ESCALATED'
+		);
+		expect(
+			run?.policies
+				.filter((p) => p.policyId !== 'floor.reasoning-review')
+				.map((p) => p.disposition),
+			'arrangement: another floor policy blocks, so D1 had nothing to escalate'
+		).toEqual(['SATISFIED', 'SATISFIED']);
+		expect(run?.aggregate, 'arrangement: the composition did not shut the gate').toBe(
+			'INCONCLUSIVE'
+		);
+		expect(
+			review(run)?.observations.map((o) => o.code),
+			'arrangement: D2 recorded no recommendation'
+		).toEqual([RECOMMENDATION_CODE]);
+		expect(
+			run?.reasoningGaps,
+			'the run listed the recommendation among the reasoning-review findings'
+		).toEqual([]);
+
+		const back = loadPwaFloor(PWA, session);
+		expect(review(back)?.disposition).toBe('ESCALATED');
+		// ⭑ READ FROM THE OBJECT: the recorded code, severity and statement.
+		expect(review(back)?.observations).toEqual([
+			{ code: RECOMMENDATION_CODE, severity: 'INFORMATIONAL', statement: RECOMMENDATION_STATEMENT }
+		]);
+		expect(
+			back?.reasoningGaps,
+			'the read-back listed the recommendation among the reasoning-review findings'
+		).toEqual([]);
+		expect(back?.satisfied).toBe(false);
+		expect(back?.aggregate, 'an escalated review read back as though nothing had assessed it').toBe(
+			'INCONCLUSIVE'
+		);
+		expect(floorBlockedHint(back!)).toBe('ROUTE_TO_HUMAN');
+	});
+
+	it('⛔ a review that answered nothing (INCONCLUSIVE) reads back INCONCLUSIVE, as the run did — not UNASSESSED', async () => {
+		const { session } = engineWithAPwa();
+		const run = await runFloor(
+			session,
+			JSON.stringify({ findings: [], recommendation: 'INCONCLUSIVE', residualUncertainty: [] })
+		);
+		expect(review(run)?.disposition, 'arrangement: the review was not INCONCLUSIVE').toBe(
+			'INCONCLUSIVE'
+		);
+		expect(run?.aggregate, 'arrangement: the run did not read INCONCLUSIVE').toBe('INCONCLUSIVE');
+
+		const back = loadPwaFloor(PWA, session);
+		expect(review(back)?.disposition).toBe('INCONCLUSIVE');
+		expect(
+			back?.aggregate,
+			'an inconclusive review read back as though nothing had assessed it'
+		).toBe('INCONCLUSIVE');
+	});
+
+	it('⭑ a REJECTED review recommending ESCALATED: its subject finding is listed among the findings, the recommendation is not', async () => {
+		// The exclusion is of ONE code: an exclusion that dropped the review's own findings with it passes the case above.
+		const { session } = engineWithAPwa();
+		const run = await runFloor(session, reply('ESCALATED', true));
+		expect(review(run)?.disposition, 'arrangement: the faulted criterion did not reject').toBe(
+			'REJECTED'
+		);
+		const codes = review(run)?.observations.map((o) => o.code) ?? [];
+		expect(codes.at(-1), 'arrangement: the recommendation was not recorded last').toBe(
+			RECOMMENDATION_CODE
+		);
+		expect(codes, 'arrangement: no subject finding was recorded beside it').toHaveLength(2);
+		const finding = review(run)!.observations[0]!.statement;
+		expect(run?.reasoningGaps).toEqual([finding]);
+		expect(loadPwaFloor(PWA, session)?.reasoningGaps).toEqual([finding]);
+	});
+
+	it('⭑ CONTROL — a review still IN PROGRESS keeps the reading it had: begun and not concluded, it reads back UNASSESSED', async () => {
+		// Without this, INCONCLUSIVE above could hold for a read-back that called every unsatisfied review INCONCLUSIVE —
+		// which `aggregateDisposition` does to a state it does not know, unless the reader says the review is not concluded.
+		const { session, send } = engineWithAPwa();
+		const run = await runFloor(session, reply('SATISFIED'));
+		expect(run?.satisfied, 'arrangement: the clean floor was not satisfied').toBe(true);
+		expect(
+			loadPwaFloor(PWA, session)?.aggregate,
+			'arrangement: the satisfied floor did not read back SATISFIED'
+		).toBe('SATISFIED');
+		// A fresh review of the same subject, begun and left ASSESSING: the LATEST, so the one the reader takes.
+		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5E02';
+		const version = Number(getObject(session, PWA)?.semanticVersion ?? 1);
+		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: 'floor.reasoning-review',
+			policyVersion: '1',
+			subjectObjectIds: [PWA],
+			subjectSemanticVersions: { [PWA]: version },
+			claimIds: []
+		});
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
+
+		const back = loadPwaFloor(PWA, session);
+		expect(
+			review(back)?.disposition,
+			'arrangement: the reader did not take the review in progress'
+		).toBe('ASSESSING');
+		expect(back?.aggregate, 'a review in progress read back as a concluded one').toBe('UNASSESSED');
+	});
+
+	it('⛔ a review concluded CONDITIONALLY_SATISFIED reads back CONDITIONALLY_SATISFIED — what it concluded, never UNASSESSED', async () => {
+		// The ER-1 app verifier's finding [4] (its mutant `ER1-V53`; part B's disclosed problem 4). The read-back passes every
+		// one of the five concluded dispositions to `aggregateDisposition`; the hand-written ladder read this one UNASSESSED,
+		// and only ESCALATED and INCONCLUSIVE were pinned. Staged as the control above stages its review: the floor run
+		// satisfied, then a fresh review of the same subject — the LATEST — concluded beside the MATERIAL finding that
+		// conditions it (a positive disposition is foreclosed only by an open BLOCKING or CRITICAL one).
+		const { session, send } = engineWithAPwa();
+		const run = await runFloor(session, reply('SATISFIED'));
+		expect(run?.satisfied, 'arrangement: the clean floor was not satisfied').toBe(true);
+		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5E03';
+		const version = Number(getObject(session, PWA)?.semanticVersion ?? 1);
+		const finding = {
+			findingCode: 'RR-08-evidence-integrity',
+			severity: 'MATERIAL',
+			statement: 'A cited source is summarised but not linked.'
+		};
+		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: 'floor.reasoning-review',
+			policyVersion: '1',
+			subjectObjectIds: [PWA],
+			subjectSemanticVersions: { [PWA]: version },
+			claimIds: []
+		});
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
+		send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', 'obs_01ARZ3NDEKTSV4RRFFQ69G5E04', {
+			assessmentId,
+			observationType: 'FINDING',
+			...finding
+		});
+		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			validatorResult: {
+				validatorId: 'staged.reasoning-review',
+				validatorVersion: '1',
+				policyId: 'floor.reasoning-review',
+				policyVersion: '1',
+				assessmentId,
+				subjectObjectIds: [PWA],
+				subjectSemanticVersions: { [PWA]: version },
+				claimResults: [],
+				evidenceConsideredIds: [],
+				evidenceRejected: [],
+				observations: [{ ...finding, subjectObjectIds: [PWA] }],
+				dispositionRecommendation: 'CONDITIONALLY_SATISFIED',
+				recommendedControlActions: [],
+				residualUncertainty: [],
+				limitations: [],
+				executionProvenance: {}
+			}
+		});
+
+		const back = loadPwaFloor(PWA, session);
+		expect(
+			review(back)?.disposition,
+			'arrangement: the reader did not take the conditionally satisfied review'
+		).toBe('CONDITIONALLY_SATISFIED');
+		expect(back?.satisfied, 'arrangement: a conditional review satisfied the floor').toBe(false);
+		expect(
+			back?.aggregate,
+			'a conditionally satisfied review read back as though nothing had assessed it'
+		).toBe('CONDITIONALLY_SATISFIED');
+		// ⭑ And the header chip reads it in words, over this read-back (`floorChipLabel`, held whole in its describe above).
+		expect(
+			floorChipLabel(back!),
+			'the header chip read the contract’s token, underscore and all'
+		).toBe('floor conditionally satisfied');
+	});
+
+	it('⛔ the exclusion is of ONE CODE, not a severity: a finding the POLICY declares INFORMATIONAL is listed beside the BLOCKING one — run and read-back — and only the recommendation is not', async () => {
+		// The ER-1 app verifier's finding [5] (its mutants `ER1-V52` and `ER1-V56`). A reply's finding is recorded at its
+		// criterion's DECLARED severity (`reasoningReviewResultFromJudgement`), and every seeded floor criterion declares
+		// BLOCKING — so a list that dropped every INFORMATIONAL observation along with the recommendation passed every case
+		// above. Here the POLICY in force declares one criterion INFORMATIONAL, so two INFORMATIONAL observations meet in
+		// one review, and only the recommendation's CODE tells them apart.
+		const [blocking, informational] = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
+		const { session } = engineWithAPwa((criteria) =>
+			criteria.map((c) =>
+				c.id === informational ? { ...c, severityIfNotMet: 'INFORMATIONAL' } : c
+			)
+		);
+		const statements = [
+			'The graph substitutes an easier problem.',
+			'An obligation is named, but not who discharges it.'
+		];
+		const run = await runFloor(
+			session,
+			JSON.stringify({
+				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c, i) => ({
+					criterionId: c.id,
+					failed: i < 2,
+					statement: statements[i] ?? 'evaluated; the failure class is absent'
+				})),
+				recommendation: 'ESCALATED',
+				residualUncertainty: []
+			})
+		);
+		expect(review(run)?.disposition, 'arrangement: the BLOCKING finding did not reject').toBe(
+			'REJECTED'
+		);
+		expect(
+			review(run)?.observations.map((o) => `${o.code}/${o.severity}`),
+			'arrangement: the review did not record a BLOCKING finding, an INFORMATIONAL one and the recommendation'
+		).toEqual([
+			`${blocking}/BLOCKING`,
+			`${informational}/INFORMATIONAL`,
+			`${RECOMMENDATION_CODE}/INFORMATIONAL`
+		]);
+		expect(
+			run?.reasoningGaps,
+			'the run dropped an informational finding along with the recommendation'
+		).toEqual(statements);
+		expect(
+			loadPwaFloor(PWA, session)?.reasoningGaps,
+			'the read-back dropped an informational finding along with the recommendation'
+		).toEqual(statements);
 	});
 });

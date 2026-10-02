@@ -901,6 +901,12 @@
 <svelte:head><title>{data.pwa.name} — Work Architecture</title></svelte:head>
 
 <div class="designer">
+	<!-- ⭐ JAN-ESCREC D3 (REG-D-090; the ER-1 app re-verifier's finding [2]) — THE HEADER, IN ONE BOX: the top bar and, while a
+	     candidate is staged, its resume banner. While one is staged the composition advisory (`.complint`) hangs out of flow
+	     below THIS box — never over the banner that says why the candidate is held — no wider than with none staged, its items
+	     opaque, so over the canvas it covers rather than prints text over text (`.pubact.staged .complint`, its `li`);
+	     with none, it hangs from the lifecycle row as before (see `.designerhead`). ⚠ Indentation kept: ledger anchors use it. -->
+	<div class="designerhead">
 	<header class="topbar">
 		<div class="tbmain">
 			<nav class="crumbs"><a href="/">PWA Library</a> › <span>{data.pwa.name}</span></nav>
@@ -932,6 +938,8 @@
 				{/if}
 
 				{#if data.floor}
+					<!-- ⭐ JAN-ESCREC D3 — the aggregate in words, as the server answers it (`floorChipLabel`): this read the aggregate
+					     lower-cased, so a CONDITIONALLY_SATISFIED read-back showed the contract's token, underscore and all. -->
 					<span
 						class="floorchip"
 						class:bad={data.floor.aggregate === 'REJECTED'}
@@ -940,7 +948,7 @@
 						title="Required assurance policies (mandatory) — schema, provenance, and an independent reasoning review (exec ≠ assurance)"
 						data-testid="assurance-chip"
 					>
-						⚖ {data.floor.satisfied ? 'floor satisfied' : `floor ${data.floor.aggregate.toLowerCase()}`}{stipulatedCount(data.floor)
+						⚖ {data.floorChipLabel}{stipulatedCount(data.floor)
 							? ` · ${stipulatedCount(data.floor)} stipulated by the test`
 							: ''}
 					</span>
@@ -988,7 +996,7 @@
 				<li class:done={rank > 5} class:active={data.pwa.publicationStatus === 'DEPRECATED'}>Deprec.</li>
 				<li class:done={rank > 6} class:active={data.pwa.publicationStatus === 'RETIRED'}>Retired</li>
 			</ol>
-			<div class="pubact">
+			<div class="pubact" class:staged={hasStagedCandidate}>
 				<button class="ghost small" onclick={openPolicyManager}>⚖ Policies</button>
 				{#if editable}
 					<button class="ghost small" onclick={openDefine} disabled={typeMutationPending}
@@ -1064,11 +1072,15 @@
 					<code title={data.authoringTurn.candidateHash}>{data.authoringTurn.candidateHash}</code>
 				{/if}
 				{#if candidateResumable}
-					<span class="candidatehint" data-testid="candidate-resume-hint">
-						{data.authoringTurn.status === 'BLOCKED_EXTERNAL'
-							? `The review did not produce a usable verdict — ${data.authoringTurn.detail ?? 'the reviewer did not complete'} This candidate is preserved.`
-							: 'Revision requested — this candidate is preserved.'} Refine it in the chat below (it continues on the same candidate), or Discard.
-					</span>
+					<!-- ⭐ JAN-ESCREC D3 (REG-D-090) — AN ESCALATED REVIEW IS NAMED AS ONE. Its frame reads "The reviewer recommended
+					     escalation to a human reviewer —" in place of "The review did not produce a usable verdict —", and its "Refine it"
+					     sentence says what refining does there: it re-runs the same automated reviewer (REG-F-474 — the latest
+					     assessment wins, so a re-run can clear an escalation meant for a human). ⛔ THE SERVER ANSWERS THE SENTENCE,
+					     ONCE (`resumeHintText`, keyed on the classifier's ACTION carried on the turn's summary, never on the guidance's
+					     prose in `detail`), and this span renders it in ONE interpolation and composes nothing: composed here, the
+					     escalated branch had no test (the ER-1 app verifier's finding [6]). `authoring-turn-resume-hint.test.ts` holds
+					     every branch whole; `e2e/resume-hint.e2e.ts` holds one banner whole in the browser, which proves this wiring. -->
+					<span class="candidatehint" data-testid="candidate-resume-hint">{data.resumeHint}</span>
 				{/if}
 			</div>
 			<div class="candidateactions">
@@ -1084,6 +1096,7 @@
 			</div>
 		</section>
 	{/if}
+	</div>
 
 	<div class="canvas">
 		<div class="flowarea">
@@ -2056,6 +2069,88 @@
 						</header>
 						{#if !floorCollapsed}
 							<div class="panelbody">
+						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so ~~REVISION is the only route past
+						     it~~ a SATISFIED run of the floor is the only route past it, and this hint may not name another.
+						     It used to read "revise the graph and re-run, or record a waiver", and the waived arm above it
+						     announced "publishing is permitted despite the floor" — the exact reach ASR-3 removed. Recording
+						     a waiver is still OFFERED below, because ASR-14 keeps it recordable ("a waiver accepts risk; it
+						     never rewrites truth") and the act is real: it mints an EFFECTIVE WAIVER Decision. What it no
+						     longer does is move this gate. ⭐ And it is offered only beside a floor that names a finding a
+						     waiver can name (`hasWaiverTarget`; the third fix round's re-verifier's finding [7]).
+						     ⭐ JAN-SELRES D8 (REG-F-462), as revised in RS-3 — THE HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER,
+						     IN ~~THREE~~ FOUR SENTENCES. When `classifyFloorRemediation` answers this floor's block with an
+						     operational action — the review did not execute, was refused, was not independent, was
+						     escalated, is incomplete (no verdict that judged the subject, with or without subject-coded
+						     observations), or left no result — revising the graph does not answer the REVIEW, and five of
+						     those six guidance strings say "Do not revise the PWA" (the escalation's: a subject edit
+						     "cannot substitute"). Then, if no schema/invariant or identity/provenance policy is REJECTED,
+						     the hint says revising does not address it; if one is, it says to revise the graph for the
+						     findings the floor records against it AND that the review did not reach a verdict revising can
+						     answer — a two-way hint said "revising it does not address this" beside a graph with two
+						     roots. Either way it says to run assurance again once the review's own cause is addressed — the
+						     floor running again, not a route past it — and names no waiver. ⭐ JAN-ESCREC D3 (REG-D-090) — SAVE
+						     AN ESCALATION ALONE: an ESCALATED review with no REJECTED schema/invariant or identity/provenance
+						     policy reads the fourth sentence (`ROUTE_TO_HUMAN`) — the review was escalated to a human reviewer,
+						     this workbench cannot record a human's review yet (REG-F-474), and revising the graph does not
+						     address it. It does NOT say to run assurance again: a re-run re-runs the same automated reviewer,
+						     which is REG-F-474's too. It names no waiver either. Otherwise (a subject finding to
+						     refine, or a non-review floor finding beside a review that passed) it says "revise the graph",
+						     as before. ⛔ The server answers which, over the floor this panel shows — a staged candidate's
+						     fork included (`floorBlockedHint`); this template restates no code, no action and no policy.
+						     ⚠ The guidance itself is not repeated here: five of the six name a waiver. The resume banner
+						     shows it for a STAGED candidate only; beside a canonical floor the recorded findings are all the
+						     page shows of why. -->
+						{#if !data.floor.satisfied}
+							{#if data.floorBlockedHint === 'NOT_BY_REVISION'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — the Reasoning Review did not reach a verdict that revising the graph can answer, so revising it does not address this. Run assurance again once the review's own cause is addressed.
+								</p>
+							{:else if data.floorBlockedHint === 'REVISE_AND_REVIEW'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it; the Reasoning Review itself did not reach a verdict that revising can answer, so run assurance again once the review's own cause is addressed.
+								</p>
+							{:else if data.floorBlockedHint === 'ROUTE_TO_HUMAN'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — the Reasoning Review recommended escalation to a human reviewer, and this workbench cannot record a human's review yet (REG-F-474). Revising the graph does not address this.
+								</p>
+							{:else}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
+								</p>
+							{/if}
+							<!-- ⭐ JAN-ESCREC D3 (REG-D-089; REG-D-090) — BESIDE THE FINDINGS AND NEVER AMONG THEM, AND AFTER THE HINT: the
+							     reviewer's ESCALATED recommendation, recorded beside a REJECTED review, one kept SATISFIED because another
+							     policy blocks, or an incomplete one, was shown nowhere on this page (the ER-1 app verifier's finding [7]).
+							     One informational line, where the hint does not already route the review to a human, in ONE of two
+							     sentences: beside the findings, which are addressed first; or, beside a review that reached no usable
+							     verdict, recorded with it — the first was said there too, beside no finding at all (the ER-1 app
+							     re-verifier's finding [0]). ⛔ The server answers which (`escalationRecommendationNote`, keyed on the
+							     recorded code); this template restates no code and composes nothing. ⛔ AFTER THE HINT, NEVER BEFORE IT, AND
+							     BOTH FIRST IN THE PANEL'S BODY: the panel is capped and its body scrolls, so whatever renders above the hint
+							     pushes it below the fold. This line did (the re-verifier's finding [1]), and so did the reasoning-review
+							     findings and the reviewer's answer, which rendered above it — beside a review whose program did not run, on a
+							     second authoring turn, beside a waived floor (the third fix round's re-verifier's finding [0], ruled). So the
+							     hint renders FIRST in the panel's body — before the floor's own head, whose "waiver recorded" badge wraps, and
+							     its policy list — and this line directly after it, both before the findings and the answer; the line may still
+							     need a scroll in the panel (the decided trade-off). Two e2e specs hold the hint on screen beside every review
+							     they stage — `e2e/assurance-floor-escalated-review-hint.e2e.ts` and `e2e/assurance-floor-review-failure-hint.e2e.ts`
+							     — and the first holds this line after it and before the waiver's note and form. Neither sentence names a waiver
+							     or a route past the floor.
+							     ⚠ BESIDE A STAGED CANDIDATE THIS BRANCH IS UNPINNED IN THE BROWSER. In the product a review the reviewer also
+							     escalated reaches this panel only through a staged candidate's fork, and no reviewer the e2e lane can select
+							     recommends ESCALATED, so every browser case stages its review on canonical with no candidate: a condition
+							     keyed on `data.authoringTurn` here (`ER1-V152`) survives them all. The load's answer ON THE FORK is held by
+							     `authoring-route-escalated-review.test.ts`; that this template renders it beside a candidate is not. -->
+							{#if data.escalationRecommendationNote === 'BESIDE_FINDINGS'}
+								<p class="floorhint" data-testid="floor-escalation-recommended">
+									The reviewer also recommended escalation to a human reviewer. The recommendation is recorded beside the findings, which are addressed first (REG-D-089).
+								</p>
+							{:else if data.escalationRecommendationNote === 'WITH_AN_INCOMPLETE_REVIEW'}
+								<p class="floorhint" data-testid="floor-escalation-recommended">
+									The reviewer also recommended escalation to a human reviewer. The review reached no usable verdict; the recommendation is recorded with it (REG-D-089).
+								</p>
+							{/if}
+						{/if}
 						<div class="floorhead">
 							<span
 								class="floortag"
@@ -2111,70 +2206,36 @@
 								<p class="revansnote">{data.reviewerAnswer.disclosure}</p>
 							</details>
 						{/if}
-						<!-- ASR-3 (REG-F-202): the de minimis floor is UNCONDITIONAL, so ~~REVISION is the only route past
-						     it~~ a SATISFIED run of the floor is the only route past it, and this hint may not name another.
-						     It used to read "revise the graph and re-run, or record a waiver", and the waived arm above it
-						     announced "publishing is permitted despite the floor" — the exact reach ASR-3 removed. Recording
-						     a waiver is still OFFERED below, because ASR-14 keeps it recordable ("a waiver accepts risk; it
-						     never rewrites truth") and the act is real: it mints an EFFECTIVE WAIVER Decision. What it no
-						     longer does is move this gate.
-						     ⭐ JAN-SELRES D8 (REG-F-462), as revised in RS-3 — THE HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER,
-						     IN THREE SENTENCES. When `classifyFloorRemediation` answers this floor's block with an
-						     operational action — the review did not execute, was refused, was not independent, was
-						     escalated, is incomplete (no verdict that judged the subject, with or without subject-coded
-						     observations), or left no result — revising the graph does not answer the REVIEW, and five of
-						     those six guidance strings say "Do not revise the PWA" (the escalation's: a subject edit
-						     "cannot substitute"). Then, if no schema/invariant or identity/provenance policy is REJECTED,
-						     the hint says revising does not address it; if one is, it says to revise the graph for the
-						     findings the floor records against it AND that the review did not reach a verdict revising can
-						     answer — a two-way hint said "revising it does not address this" beside a graph with two
-						     roots. Either way it says to run assurance again once the review's own cause is addressed — the
-						     floor running again, not a route past it — and names no waiver. Otherwise (a subject finding to
-						     refine, or a non-review floor finding beside a review that passed) it says "revise the graph",
-						     as before. ⛔ The server answers which, over the floor this panel shows — a staged candidate's
-						     fork included (`floorBlockedHint`); this template restates no code, no action and no policy.
-						     ⚠ The guidance itself is not repeated here: five of the six name a waiver. The resume banner
-						     shows it for a STAGED candidate only; beside a canonical floor the recorded findings are all the
-						     page shows of why. -->
-						{#if !data.floor.satisfied}
-							{#if data.floorBlockedHint === 'NOT_BY_REVISION'}
-								<p class="floorhint" data-testid="floor-blocked-hint">
-									Publishing is blocked until the floor is SATISFIED — the Reasoning Review did not reach a verdict that revising the graph can answer, so revising it does not address this. Run assurance again once the review's own cause is addressed.
-								</p>
-							{:else if data.floorBlockedHint === 'REVISE_AND_REVIEW'}
-								<p class="floorhint" data-testid="floor-blocked-hint">
-									Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it; the Reasoning Review itself did not reach a verdict that revising can answer, so run assurance again once the review's own cause is addressed.
-								</p>
-							{:else}
-								<p class="floorhint" data-testid="floor-blocked-hint">
-									Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
-								</p>
-							{/if}
-							{#if data.floor.waived}
-								<p class="floorhint warn" data-testid="floor-waiver-nondischarge">
-									A governance waiver is recorded against this PWA. It does <strong>not</strong> clear the floor —
-									the floor is unconditional, so publishing stays blocked. The waiver stands as an auditable
-									record of accepted risk.
-								</p>
-							{/if}
-							{#if canWaive}
-								<!-- ⚠ THIS RECORDS ACCEPTED RISK. It does NOT unblock publishing, and its labels must never
-								     imply it does — the button read "Record waiver + allow publish" and the placeholder asked
-								     "why publish despite the floor", both of which describe an outcome the engine refuses. -->
-								<form method="POST" action="?/recordWaiver" use:enhance class="floorwaiver">
-									<input
-										name="rationale"
-										placeholder="Rationale — why this risk is accepted (does not unblock publishing)"
-										required
-									/>
-									<button
-										class="ghost small danger"
-										type="submit"
-										title="Records an auditable WAIVER Decision accepting this risk. The de minimis floor is unconditional (ASR-3), so publishing remains blocked."
-										>Record accepted risk (floor still blocks)</button
-									>
-								</form>
-							{/if}
+						<!-- ⭐ JAN-ESCREC D3 — THE WAIVER'S NOTE AND ITS FORM FOLLOW THE FINDINGS AND THE REVIEWER'S ANSWER, as they always
+						     did; only the hint and the escalation line moved above them (the third fix round's re-verifier's finding [0]).
+						     The note is said only beside a blocked floor. ⛔ THE FORM ONLY WHERE THERE IS A TARGET (`hasWaiverTarget`; its
+						     finding [7], ruled): the load asks the selection `recordWaiver` records against (`waiverTargetOf`), so beside a
+						     review whose only observation is the reviewer's recommendation — which a waiver never names — no form is
+						     offered that the action would refuse. -->
+						{#if data.floor.waived && !data.floor.satisfied}
+							<p class="floorhint warn" data-testid="floor-waiver-nondischarge">
+								A governance waiver is recorded against this PWA. It does <strong>not</strong> clear the floor —
+								the floor is unconditional, so publishing stays blocked. The waiver stands as an auditable
+								record of accepted risk.
+							</p>
+						{/if}
+						{#if canWaive && data.hasWaiverTarget && !data.floor.satisfied}
+							<!-- ⚠ THIS RECORDS ACCEPTED RISK. It does NOT unblock publishing, and its labels must never
+							     imply it does — the button read "Record waiver + allow publish" and the placeholder asked
+							     "why publish despite the floor", both of which describe an outcome the engine refuses. -->
+							<form method="POST" action="?/recordWaiver" use:enhance class="floorwaiver">
+								<input
+									name="rationale"
+									placeholder="Rationale — why this risk is accepted (does not unblock publishing)"
+									required
+								/>
+								<button
+									class="ghost small danger"
+									type="submit"
+									title="Records an auditable WAIVER Decision accepting this risk. The de minimis floor is unconditional (ASR-3), so publishing remains blocked."
+									>Record accepted risk (floor still blocks)</button
+								>
+							</form>
 						{/if}
 							</div>
 						{/if}
@@ -2209,6 +2270,19 @@
 		flex-direction: column;
 		overflow: hidden;
 	}
+	/* ⭐ JAN-ESCREC D3 (REG-D-090; the ER-1 app re-verifier's finding [2]) — THE HEADER BOX: WHILE A CANDIDATE IS STAGED, THE
+	   COMPOSITION ADVISORY'S POSITIONED ANCESTOR. `.complint` hangs from `.pubact`, inside the top bar, so beside a staged
+	   candidate it was painted over the wrapped resume banner below the bar — at 1280x720 over the right end of the hint's
+	   first four lines (eight words of an escalation's), which no measure of the banner against itself could see. While a candidate is staged `.pubact` is not
+	   positioned (`.pubact.staged`), so the advisory hangs below THIS box, which ends with the banner; with none staged it
+	   hangs from the lifecycle row, exactly as before. ⚠ NOT A z-index ON THE BANNER (prototyped, and refused): the banner's
+	   tint is translucent (`--candidate-background`), the advisory starts above the banner's top edge so a cut sliver of its
+	   first line stayed painted over the bar, and the advisory — which then describes the CANDIDATE's graph — was hidden for as
+	   long as a candidate was staged. `e2e/resume-hint.e2e.ts` holds the banner free of it. */
+	.designerhead {
+		flex: 0 0 auto;
+		position: relative;
+	}
 	.candidatebanner {
 		display: flex;
 		align-items: center;
@@ -2221,6 +2295,7 @@
 	}
 	.candidatecopy {
 		display: flex;
+		flex-wrap: wrap;
 		min-width: 0;
 		align-items: baseline;
 		gap: 0.7rem;
@@ -2230,13 +2305,22 @@
 		font-size: 0.78rem;
 		white-space: nowrap;
 	}
+	/* ⭐ JAN-ESCREC D3 (REG-D-090) — THE RESUME BANNER WRAPS, AND NOTHING OF IT IS CLIPPED. It was one line, `nowrap` with an
+	   ellipsis, so at 1280px the professional read its first seventy-odd characters: the floor's guidance after them, and
+	   beside an escalation that refining re-runs the same automated reviewer (REG-F-474), were laid out past the edge and
+	   never seen (the ER-1 app verifier's MAJOR 2). It is the one sentence that says why the candidate is held and what to
+	   do, so every banner wraps; `anywhere` breaks a long unbreakable token rather than letting it overflow.
+	   `e2e/resume-hint.e2e.ts` measures the rendering — `toHaveText` reads textContent, which clipping never touches.
+	   ⭐ AND IT HAS A ROW OF ITS OWN (the ER-1 app re-verifier's finding [2]): `.candidatecopy` wraps and the hint takes the
+	   row's full width, so it no longer squeezes the title beside it to one word a line (seven lines, measured). The e2e
+	   also holds its last phrase inside every ancestor that clips, so a container cut to one line reddens there too. */
 	.candidatehint {
+		flex-basis: 100%;
 		min-width: 0;
-		overflow: hidden;
 		color: var(--candidate-muted);
 		font-size: 0.76rem;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
+		white-space: normal;
 	}
 	.candidatecopy code {
 		overflow: hidden;
@@ -2361,7 +2445,8 @@
 		font-weight: 700;
 	}
 	.pubact {
-		/* the positioned ancestor for `.complint`, which hangs below the bar and out of flow */
+		/* the positioned ancestor for `.complint`, which hangs below the bar and out of flow — ⭐ save while a candidate is
+		   staged (`.staged`, below): it then hangs below `.designerhead`, the bar AND the banner, never over the banner */
 		position: relative;
 		display: flex;
 		align-items: center;
@@ -2369,6 +2454,38 @@
 	}
 	.pubact form {
 		margin: 0;
+	}
+	.pubact.staged {
+		position: static;
+	}
+	/* against `.designerhead` while staged, so the top bar's own padding keeps it under the lifecycle buttons — and ⭐ NO
+	   WIDER THAN WITH NONE STAGED (the second fix round's re-verifier's finding [7]). Against this box its fitted width reached
+	   its declared 34rem (544px, measured at 1280 and 1920), over the canvas's nodes and the inspector's header; with none
+	   staged it is held to the lifecycle row it hangs from (377px, measured), so 20rem keeps the staged one inside that.
+	   `e2e/resume-hint.e2e.ts` holds its right edge to the lifecycle row's, read while staged (the third fix round's
+	   re-verifier's finding [6]). */
+	.pubact.staged .complint {
+		right: 20px;
+		max-width: 20rem;
+	}
+	/* ⭐ JAN-ESCREC D3 (the second fix round's re-verifier's finding [7]) — AND WHILE STAGED EACH ITEM IS AN OPAQUE CHIP. Out
+	   of flow below the header box, the advisory lies over the canvas — a node, the inspector's header — and its text was
+	   printed over theirs. ⛔ STAGED ONLY (the third fix round's re-verifier's finding [2]): with none staged it hangs from
+	   the lifecycle row as at HEAD, transparent, and a chip there hid the inspector's header and its collapse control.
+	   `e2e/resume-hint.e2e.ts` holds each staged item opaque, nothing painted over it, and no wider than the lifecycle row
+	   with none staged. */
+	.pubact.staged .complint li {
+		background: var(--surface);
+	}
+	/* ⭐ AND READABLE ON IT (the third fix round's re-verifier's finding [4]): on this chip the unstaged grey (#6b7280) read
+	   3.84:1 in the dark theme (measured) and the orange (#b45309) 3.70:1 (computed), below WCAG AA's 4.5:1 for 0.72rem
+	   text, so the staged chip takes the theme's own tokens: 5.86:1 and 9.88:1 dark (measured), 5.01:1 and 5.94:1 light
+	   (computed). `e2e/resume-hint.e2e.ts` holds each staged item at 4.5:1 or more. */
+	.pubact.staged .complint .clinfo {
+		color: var(--outline);
+	}
+	.pubact.staged .complint .clwarn {
+		color: var(--amber);
 	}
 	.immutable {
 		font-size: 11px;

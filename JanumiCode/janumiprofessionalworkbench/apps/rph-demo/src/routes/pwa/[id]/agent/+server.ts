@@ -250,7 +250,9 @@ function applyFloorDisposition(
 		floorResult.externalDetail ||
 		remediation?.guidance ||
 		'The candidate did not satisfy the authoring assurance floor.';
-	if (operational) markAuthoringTurnExternalBlock(turn, detail);
+	// ⭐ `JAN-ESCREC` D3 — THE ACTION RIDES ON THE TURN, AS DATA, so the page's resume banner can name an escalation
+	// (`ESCALATE_REVIEW`) without matching the guidance's prose. Undefined when the floor could not run.
+	if (operational) markAuthoringTurnExternalBlock(turn, detail, remediation?.action);
 	else markAuthoringTurnRevisionRequired(turn, detail);
 	send({
 		kind: 'status',

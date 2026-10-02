@@ -853,6 +853,11 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 		// VALIDATOR_FAILED or BOUNDARY_REJECTED at the boundary (`classifyValidatorResult`), else `dispositionFromFindings`
 		// — REJECTED, INCONCLUSIVE or SATISFIED here. An INCONCLUSIVE faults nothing (a fault would reject), a
 		// VALIDATOR_FAILED records no criterion; neither is the oracle's REJECTED.
+		// ⚠ 2026-10-01 (`JAN-ESCREC` ER-1; the ER-1 verifier's finding [8]): NO LONGER THE WHOLE LIST. `REG-D-089`'s rule
+		// (a), a second pass after `dispositionFromFindings` (`composeAssuranceOutcome`,
+		// `packages/rph-assurance/src/floor.ts`), now gives ESCALATED for a clean reply that recommends it. ER-2 (design D4)
+		// drives that arm with a real ESCALATED reply and moves ESCALATED into `driven` below; until then it reaches limb 3
+		// only as a tampered line.
 		const arms: readonly [runId: string, reply: string, disposition: string][] = [
 			['qr-verdict-3', omitting(RR08, []), 'INCONCLUSIVE'],
 			['qr-verdict-4', 'I think it is fine.', 'VALIDATOR_FAILED']
@@ -867,6 +872,10 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 		// emits neither; no rule returns ESCALATED; MISSING needs no result at all. A line can still hold one (an earlier
 		// runner's, or one written by hand), and limb 3 reads the disposition as recorded: under an earlier fingerprint,
 		// so limb 2 does not re-score it.
+		// ⚠ 2026-10-01 (`JAN-ESCREC` ER-1): "no rule returns ESCALATED" IS NO LONGER TRUE — `REG-D-089`'s rule (a) returns it
+		// for a clean reply that recommends it, so ESCALATED is now a disposition this floor gives. The assertions below are
+		// left as they are on purpose: ER-2 (design D4) extends the driven set, with an `arms` row driven by a real
+		// ESCALATED reply, and until then the tampered line here is what keeps limb 3 covering ESCALATED.
 		const driven = new Set(['REJECTED', 'SATISFIED', 'BOUNDARY_REJECTED', 'INCONCLUSIVE', 'VALIDATOR_FAILED']);
 		const rest = SCORED_DISPOSITIONS.filter((d) => !driven.has(d));
 		expect(rest).toEqual(['CONDITIONALLY_SATISFIED', 'ESCALATED', 'MISSING']);

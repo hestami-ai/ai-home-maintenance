@@ -256,6 +256,14 @@ function judgePrompt(input: ReasoningReviewInput): string {
 			'',
 			'Then give an overall disposition RECOMMENDATION: SATISFIED (no material failures), CONDITIONALLY_SATISFIED',
 			'(only minor/advisory failures), REJECTED (a BLOCKING/CRITICAL failure), INCONCLUSIVE, or ESCALATED.',
+			// ⚠ A RECORDED STATEMENT IS ABOUT THE TWO LINES ABOVE (`REG-D-090`; `JAN-ESCREC` D2). Every VALID
+			// review whose recommendation is the LAST value they name gets an observation saying *"The review
+			// prompt does not define"* it: true while these two lines stand exactly as written, that value bare at
+			// their end, and the prompt names it nowhere else — both pinned in every framing where the prompt is
+			// built, the sentence whole and the value's every mention counted (`reasoning-review-validator.test.ts`).
+			// What neither pin sees is a definition ELSEWHERE in the prompt that never names the value. ⛔ Any edit
+			// that defines it makes every LATER record false, revises the statement too, and moves the reviewer
+			// fingerprint (a paid re-measurement). ⭑ No name of that value here: `REG-D-090`'s search still finds two.
 			'',
 			'Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:',
 			// The example id comes from the POLICY too. It was hardcoded to 'RR-01-no-problem-substitution' — a

@@ -445,3 +445,151 @@ describe('⭐ REG-D-071 Q5 (a) — in an engine built to admit them, a stipulate
 		expect(review.state.assessmentState, 'Gate E admitted the completion').toBe('SATISFIED');
 	});
 });
+
+// ── ⭐⭐ `JAN-ESCREC` D1 + D2 THROUGH AN ENGINE — the recommendation is RECORDED, read back from the OBJECTS ──────────────
+//
+// `REG-D-089`: the reviewer's ESCALATED is recorded in every case, and escalates the review only when nothing else already
+// blocks. `REG-D-090`: it is recorded as ONE `RECOMMENDATION` observation at INFORMATIONAL, typed by the plan and honoured
+// by the recorder (`o.observationType ?? observationTypeFor(a.policyId)`). These read the ASSURANCE_OBSERVATION objects
+// the handler persisted — never the plan — because the type is lost on the EVENT (`AssuranceObservationRecorded` carries
+// none), so the object is the only place it can be seen.
+//
+// ⛔ THE EXPECTED VALUES ARE LITERALS, restated from `REG-D-090`: the code is the event's discriminator, and a test that
+// imported the recorder's own constants would pass any edit of them.
+describe('⭐⭐ JAN-ESCREC — a reviewer’s ESCALATED recommendation reaches the governed stream as a RECOMMENDATION observation (REG-D-089, REG-D-090)', () => {
+	const REVIEW = 'floor.reasoning-review';
+	const STATEMENT =
+		"The reviewing model's recommendation was ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator implementation or policy-designated authority cannot resolve the issue within its authority or competence.";
+	const FAULTED = 'RR-04-no-proxy-satisfaction';
+
+	/** A reviewer reporting `findings`, recommending ESCALATED — mapped by the product's own judgement mapper. */
+	const escalatingReviewer = (findings: ReturnType<typeof allClean>): Validator => ({
+		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+		validatorId: 'test.reasoning-review',
+		evaluate: (sub) =>
+			Promise.resolve(
+				reasoningReviewResultFromJudgement(
+					sub,
+					JUDGE,
+					'test.reasoning-review',
+					{ findings, recommendation: 'ESCALATED' },
+					SEEDED_REASONING_REVIEW_CRITERIA
+				)
+			)
+	});
+	/** Every criterion evaluated clean except `FAULTED`, which the reviewer reports present. */
+	const oneFault = () =>
+		allClean().map((f) =>
+			f.criterionId === FAULTED
+				? { ...f, failed: true, statement: 'proxy satisfaction conceals the problem' }
+				: f
+		);
+
+	async function recordWith(rr: Validator, ctx: ValidatorContext = goodCtx) {
+		const eng = engine();
+		seedFloorPolicies(eng);
+		const r = createValidatorRegistry();
+		r.register(schemaInvariantValidatorInstance);
+		r.register(identityProvenanceValidatorInstance);
+		r.register(rr);
+		const plan = await runFloorAndPlanRecording(subject, ctx, r);
+		recordAssuranceRecordingPlan(eng, plan, {
+			issuedAt: '2026-07-14T00:00:00Z',
+			correlationId: 'floor-run',
+			idPrefix: 'rec-esc',
+			newId: ulidGen()
+		});
+		return eng;
+	}
+	const assessment = (eng: ReturnType<typeof engine>, policyId: string) =>
+		listByType(eng, 'ASSURANCE_ASSESSMENT').find((a) => a.state.assurancePolicyId === policyId)!;
+	/** The observation OBJECTS recorded against one assessment, in recording order, as the fields this asserts. */
+	const observationsOf = (eng: ReturnType<typeof engine>, assessmentId: string) =>
+		listByType(eng, 'ASSURANCE_OBSERVATION')
+			.filter((o) => o.state.assessmentId === assessmentId)
+			.map((o) => ({
+				observationType: o.state.observationType,
+				findingCode: o.state.findingCode,
+				severity: o.state.severity,
+				statement: o.state.statement,
+				disposition: o.state.disposition
+			}));
+	const RECOMMENDATION = {
+		observationType: 'RECOMMENDATION',
+		findingCode: 'REVIEWER_RECOMMENDED_ESCALATION',
+		severity: 'INFORMATIONAL',
+		statement: STATEMENT,
+		disposition: 'OPEN'
+	};
+
+	it('⭐ RED — a clean review recommending ESCALATED concludes ESCALATED, with the recommendation recorded as a RECOMMENDATION', async () => {
+		// PREDICTED RED AT HEAD: the review composes SATISFIED and records nothing beside it (design G1 + G2).
+		const eng = await recordWith(escalatingReviewer(allClean()));
+		const review = assessment(eng, REVIEW);
+		expect(review.state.assessmentState, 'the assessment concluded ESCALATED').toBe('ESCALATED');
+		expect(
+			['floor.schema-invariant', 'floor.identity-provenance'].map(
+				(p) => assessment(eng, p).state.assessmentState
+			),
+			'the arrangement: nothing else blocks'
+		).toEqual(['SATISFIED', 'SATISFIED']);
+		expect(observationsOf(eng, review.id), 'one observation: the recommendation, open').toEqual([
+			RECOMMENDATION
+		]);
+		expect(
+			listByType(eng, 'ASSURANCE_OBSERVATION'),
+			'and no other observation anywhere'
+		).toHaveLength(1);
+	});
+
+	it('⭐ RED — a failed criterion keeps the review REJECTED; its finding stays a FINDING, and the recommendation is recorded beside it', async () => {
+		// *"If a criterion failed, the outcome stays REJECTED, which is more actionable, with the escalation recorded
+		// beside it."* — the ruling. PREDICTED RED AT HEAD: REJECTED, but the ESCALATED is recorded nowhere (design G2).
+		const eng = await recordWith(escalatingReviewer(oneFault()));
+		const review = assessment(eng, REVIEW);
+		expect(review.state.assessmentState, 'the assessment concluded REJECTED').toBe('REJECTED');
+		expect(
+			observationsOf(eng, review.id),
+			'the subject finding first, untouched; the recommendation last'
+		).toEqual([
+			{
+				// ⛔ THE FAULT IS NOT RE-LABELLED: still a FINDING, at the policy's declared BLOCKING (`R25`).
+				observationType: 'FINDING',
+				findingCode: FAULTED,
+				severity: 'BLOCKING',
+				statement: 'proxy satisfaction conceals the problem',
+				disposition: 'OPEN'
+			},
+			RECOMMENDATION
+		]);
+	});
+
+	it('⭐ RED — beside a REJECTED schema policy the review stays SATISFIED and records the recommendation; the schema observation stays a POLICY_VIOLATION', async () => {
+		// D1's condition (iv) end to end: another policy blocks, so the review is NOT escalated, and an open INFORMATIONAL
+		// observation does not foreclose its SATISFIED completion. PREDICTED RED AT HEAD: SATISFIED with nothing beside it.
+		const eng = await recordWith(escalatingReviewer(allClean()), {
+			...goodCtx,
+			schemaInvariant: { schemaValid: false, invariantViolations: [] }
+		});
+		const review = assessment(eng, REVIEW);
+		const schema = assessment(eng, 'floor.schema-invariant');
+		expect(
+			review.state.assessmentState,
+			'another policy blocks, so the review keeps its SATISFIED'
+		).toBe('SATISFIED');
+		expect(schema.state.assessmentState).toBe('REJECTED');
+		expect(observationsOf(eng, review.id)).toEqual([RECOMMENDATION]);
+		expect(
+			observationsOf(eng, schema.id),
+			'a non-review policy’s observation keeps its type'
+		).toEqual([
+			{
+				observationType: 'POLICY_VIOLATION',
+				findingCode: 'SCHEMA_INVALID',
+				severity: 'CRITICAL',
+				statement: 'Subject failed strict output-contract/schema validation.',
+				disposition: 'OPEN'
+			}
+		]);
+	});
+});

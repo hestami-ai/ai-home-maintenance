@@ -72,6 +72,10 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 		writes: 2
 	},
 	'packages/rph-assurance/src/stipulated-row-is-not-a-pass.test.ts': { why: 'the mapper’s and the ladder’s guards', writes: 11 },
+	'packages/rph-assurance/src/floor.test.ts': {
+		why: '`JAN-ESCREC` D1: `REG-D-089`’s rule (a) reads the disposition the LADDER computed, so an admitting composition of a stipulated remainder escalates and the default ladder’s INCONCLUSIVE does not — composed in memory, nothing dispatched',
+		writes: 2
+	},
 	'packages/rph-engine/src/record-assurance.test.ts': { why: 'the recorder’s guard, and the admitting floor end to end', writes: 3 },
 	'packages/rph-engine/src/admit-stipulated-answers.test.ts': {
 		why: 'the durability lock: admitting engines built over every kind of store',

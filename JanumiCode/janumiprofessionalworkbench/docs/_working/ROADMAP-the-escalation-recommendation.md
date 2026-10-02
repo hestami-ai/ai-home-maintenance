@@ -38,11 +38,13 @@ ledger, `bun run mutants`, observe, `gate:fast` and `commit -F`.
 
 ## `ER-1` — the product: rule (a), the record, and what the operator is told (D1, D2, D3)
 
+⭑ **DONE 2026-10-02** (`REG-D-092`; the design's §8 is the as-built record). Four rounds of adversarial verification and fix; 144 ledger mutants. The pins owed for ER1-V400, V401, V403 and V404 are added to `ER-2` (step 7).
+
 **Order, red first:**
 1. **`packages/rph-assurance/src/floor.test.ts`, the D1 limbs.**
    - **Red:** a clean, fully answered review recommending ESCALATED is ESCALATED per policy, the aggregate is
      INCONCLUSIVE, and `gatePermitsTransition` is false.
-   - **Red:** the same review beside a REJECTED schema-invariant result stays SATISFIED.
+   - ~~**Red:**~~ **Control** (the code before `ER-1` passes it): the same review beside a REJECTED schema-invariant result stays SATISFIED.
    - **Controls:**
      - NOT_MET → REJECTED;
      - an undetermined criterion → INCONCLUSIVE;
@@ -139,6 +141,8 @@ ledger, `bun run mutants`, observe, `gate:fast` and `commit -F`.
 5. **Edits.** Make the manual edit to `verif/reviewer-qualification-check.test.ts:867-872`, with its `arms` row driven
    by a real ESCALATED reply.
 6. **Mutants.** Write one per corpus entry. Keep J23-M27 and J23-M28's anchors unique.
+7. **`ER-1`'s residual pins** (`REG-D-092`): ER1-V400 (the escalation line directly after the hint), V401 (the waiver note withheld on a satisfied floor), V403 (the staged warn chip's colour) and V404 (contrast computed on the alpha-composited text colour). Each is shown red under its mutant, then landed.
+8. **The `ER-1` window notes.** `ER-1` left dated ⚠ notes in `scripts/reviewer-qual/scoring-corpus.ts`'s header and in `verif/reviewer-qualification-check.test.ts` (near `:856` and `:875`; step 5's lines are now `:872-881`). Remove them when the entries land.
 
 **The window between `ER-1` and `ER-2`.** The fingerprint stays blind to rule (a), as it is today. No paid
 qualification run may be made in that window.

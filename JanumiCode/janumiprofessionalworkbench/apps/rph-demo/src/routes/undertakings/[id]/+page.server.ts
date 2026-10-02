@@ -67,9 +67,11 @@ import { assurancePreflight } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
+import { escalatedReviewNote } from '$lib/server/execution/floor-over-subject';
 import {
 	describeRefusedEvidence,
-	joinProcessEvidence
+	joinProcessEvidence,
+	noFindingNote
 } from '$lib/server/execution/evidence-join';
 import { governedToolCallReport } from '$lib/server/tools/observed-tool-calls';
 import {
@@ -1632,7 +1634,13 @@ export const actions: Actions = {
 			if (completed)
 				return fail(400, {
 					error: review.satisfied
-						? `The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete. ${completed}`
+						? // ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND WHEN THE WORK PRODUCT PASSED BUT A COMMAND'S RESULT DID NOT, THE COMMAND
+							// EVIDENCE'S OWN REFUSAL (`describeRefusedEvidence`), BEFORE THE ENGINE'S TEXT. The two reviews are independent
+							// calls, so the work product can pass while a command's result is escalated or rejected; this arm printed only
+							// the engine's text, whose fallback is `policyId=disposition` (design G5) — no observation, and beside an
+							// escalation no sentence saying what it asks (the ER-1 app verifier's MAJOR 1, its probe `ER1-VP1`). ⭑ The
+							// same hand-over as the arm below, so one reader splits both; with nothing refused this message is unchanged.
+							`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : '.'} ${completed}`
 						: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
 							// check, and the two must not read the same. The findings are surfaced; feeding them back
 							// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
@@ -1644,7 +1652,17 @@ export const actions: Actions = {
 							// and each pushed its count onto `openPerTry` before the loop decided to stop, so its length IS the
 							// number of tries. This read `openPerTry.length + 1`: a single review said "2 tries", and a try is a
 							// billed call. `begin-execute-try-count.test.ts` holds it against the EXECUTION exchanges recorded.
-							`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
+							// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, WHAT THE ESCALATION ASKS
+							// (`escalatedReviewNote`): routed to a human reviewer, whose review this workbench cannot record yet
+							// (`REG-F-474`). Keyed on the classifier's ACTION, never on prose; the command evidence's refusal carries
+							// its own (`describeRefusedEvidence`), on this arm and on the satisfied arm above.
+							// `begin-execute-escalated-review.test.ts` holds both arms, and the satisfied work product beside an
+							// escalated command result.
+							// ⭐ `JAN-ESCREC` D3 — AND OBSERVATIONS THAT HOLD NO FINDING SAY SO, NAMING WHAT REFUSED (`noFindingNote`, keyed
+							// on the codes): the recommendation alone was all this arm printed of a review left INCONCLUSIVE by an
+							// unanswered criterion, and INCONCLUSIVE was named nowhere (the second fix round's re-verifier's finding [0]).
+							// ⛔ Never an ESCALATED review's: the sentence after it explains that one, so the note is keyed on the action too.
+							`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
 				});
 			return { advanced: 'executed' };
 		}

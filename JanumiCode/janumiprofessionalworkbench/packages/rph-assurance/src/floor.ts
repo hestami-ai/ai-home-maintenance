@@ -4,8 +4,8 @@
 // (3) a Reasoning Review Assessment iff produced or materially shaped by an AI/agent, and (4) canonical
 // disposition + protected-transition enforcement. This module is the PURE core: it defines the Validator RESULT
 // shape a Validator must emit (never bare prose/pass-fail/score — §8.9), the deterministic floor validators, the
-// ordered floor plan, and `composeAssuranceOutcome`, which finally wires the assurance island
-// (dispositionFromFindings → aggregateDisposition strictest-unresolved + checkIndependence + the result boundary).
+// ordered floor plan, and `composeAssuranceOutcome`, which finally wires the assurance island (dispositionFromFindings
+// → `REG-D-089`'s rule (a), a second pass → aggregateDisposition strictest-unresolved + checkIndependence + boundary).
 // The model-backed Reasoning Review Validator and the registry/invocation live server-side (impure); step (4)
 // enforcement is done by the caller that records the Assessment and re-checks the disposition at the gate.
 import {
@@ -312,11 +312,98 @@ function countedCriteria(
 }
 
 /**
+ * ⭐⭐ `REG-D-089`'S RULE (a), AS `REG-D-090` READS IT (`JAN-ESCREC` design D1) — does this row escalate on its
+ * reviewer's recommendation?
+ *
+ * THE RULING (sponsor, 2026-10-01, option (a)): *"escalate only when nothing else already blocks. If no criterion
+ * failed, the outcome becomes ESCALATED: publishing stays blocked […]. If a criterion failed, the outcome stays
+ * REJECTED, which is more actionable, with the escalation recorded beside it."* `REG-D-090` reads it as four
+ * conditions, EVERY ONE required:
+ *   (i)   the row is the Reasoning Review's, and its result's class is VALID;
+ *   (ii)  the result recommends the literal `ESCALATED` — no other value, no other spelling;
+ *   (iii) the row's computed disposition is SATISFIED;
+ *   (iv)  every OTHER policy of the plan is SATISFIED.
+ *
+ * ⭑ (iii) IS KEYED ON SATISFIED, NOT ON "NO CRITERION FAILED". SATISFIED is a fully answered, clean review: every
+ * mandatory criterion MET or NOT_APPLICABLE, and no open failure observation. An undetermined criterion is an
+ * UNANSWERED one, and ASR-2 calls that *"invalid output"* — so such a review stays INCONCLUSIVE, and a failed row filed
+ * under a corrupted id is never escalated past (`REG-F-428`). The agent's wider reading is withdrawn (`REG-D-090`).
+ * ⚠ BUT "INVALID OUTPUT" IS ASR-2'S WORD, NOT THIS BOUNDARY'S CLASS (the ER-1 verifier's finding [7]). A PARTIAL
+ * reply — criteria present, some undetermined — is classed VALID here and composes INCONCLUSIVE; it is not
+ * boundary-rejected, as ASR-2's *"invalid output"* would have it. Only an EMPTY criteria list is: the
+ * `requiredCriteriaPresent` flag that `composeAssuranceOutcome` hands the boundary (:440). That is why D2 records such
+ * a review's recommendation: `recording.ts` reads VALID results (ASR-11), and this one is VALID — as its own findings,
+ * recorded beside it, were before ER-1.
+ * ⭑ AND IT READS THE DISPOSITION THE LADDER COMPUTED — this row's, which went through `countedCriteria` — never a
+ * second reading of the criteria. So an engine that admits stipulations escalates exactly the remainder its own ladder
+ * calls clean, and the two cannot disagree about what "clean" means.
+ * ⭑ SO "NO CRITERION FAILED" MEANS THE COMPUTED SATISFIED (the ER-1 re-verifier's finding [5], decided in the second
+ * fix round). `REG-D-090`'s gloss also says *"no NOT_MET"* and *"no open failure observation"*: both are read as the
+ * ladder reads them, no MANDATORY criterion NOT_MET and no open finding a rung reads. So a NOT_MET criterion the policy
+ * does not make mandatory, its finding open at ADVISORY, does not stop a SATISFIED, and the escalation stands; nor does
+ * a mandatory criterion NOT_APPLICABLE. Pinned (`floor.test.ts`). No live review has either: every seeded Reasoning
+ * Review criterion declares BLOCKING and may not be NOT_APPLICABLE (`floor-policies.ts`).
+ *
+ * ⭑ (i) IS ASR-11: *"Malformed or invalid validator output can never mutate authoritative state."* A boundary-rejected
+ * or failed result's recommendation is never READ — `failedResult`'s `INCONCLUSIVE` (`validators.ts`) is a
+ * placeholder, not a reviewer's word. ⚠ (iii) implies it today, because composition gives a non-VALID class a
+ * non-SATISFIED row; it is stated anyway, so the guarantee does not rest on how the boundary arms happen to be spelt.
+ * ⚠ Dropping (i) ALONE is therefore an EQUIVALENT mutant: a boundary mutant must also let the boundary row past (iii).
+ *
+ * ⭑ (iv) READS "NOTHING ELSE ALREADY BLOCKS" ACROSS THE FLOOR. A graph that is not well formed is revised first, with
+ * the escalation recorded beside it: *"more actionable"* is the ruling's own reason, and a graph defect is that kind of
+ * block. It reads the floor AS COMPUTED, before any row is escalated. In the qualification runner's plan the review
+ * stands alone, so (iv) holds vacuously there — rightly: qualification asks what the reviewer's reply yields.
+ * ⭑ "ALREADY BLOCKS" MEANS WHAT THE ENGINE'S FLOOR GATE MEANS, NOT WHAT THIS PACKAGE'S AGGREGATE MEANS (the ER-1
+ * verifier's finding [4], decided in its fix round). So (iv) asks EVERY other policy of the plan, required or not. The
+ * engine's gate requires all three floor policies whatever a plan marks — `FLOOR_POLICY_IDS_REQUIRED` and
+ * `floorGateBlock` (`packages/rph-application/src/handlers/floor-gate.ts:21-25`, `:275-295`) — so a floor policy
+ * that is not SATISFIED blocks there, while `aggregateDisposition` (`assurance-rules.ts`) leaves a non-required
+ * policy out of the aggregate. ⚠ The consequence, disclosed and pinned (`floor.test.ts`): beside a non-required
+ * policy that is not SATISFIED, a clean review its reviewer escalates stays SATISFIED, and the PLAN's aggregate opens
+ * its gate while the engine's gate refuses. No product plan marks a floor policy non-required: `deMinimisFloorPlan`
+ * marks every policy it plans required.
+ * ⚠ AND THE REVIEW'S OWN FLAG (the ER-1 re-verifier's finding [4], decided in the second fix round): no condition reads
+ * the review's `required` flag either. Where the plan marks the review itself non-required, a clean review its reviewer
+ * escalates is ESCALATED, and D2 records the recommendation; the second pass keeps the plan's flag in the aggregate's
+ * input, so the aggregate leaves the escalated review out — SATISFIED, the PLAN's gate open — while the engine's gate,
+ * which requires the review whatever the plan marks, refuses it. The same disclosed split, pinned (`floor.test.ts`,
+ * `recording.test.ts`).
+ *
+ * ⛔ SCOPED TO `floor.reasoning-review`. A deterministic policy recommends what its own ladder computed (`buildResult`),
+ * so it never escalates; a rule that read every policy's recommendation would let one hand-built result shut a floor
+ * that is SATISFIED everywhere.
+ *
+ * ⚠ DISCLOSED: A CODED RULE, DEPARTING FROM ASR-1 (*"Policy applicability and disposition rules are declarative data
+ * evaluated by the engine, never executable code"*). Its declarative home, a ratified `EscalationRule.trigger`, has no
+ * evaluator (`REG-Q-057`); reaching it needs a contract change, a seed migration, an exception to the floor policies'
+ * edit lock, and a store reader in this store-free package. This implements a sponsor ruling scoped to one locked
+ * policy, and the departure is put to the sponsor (`REG-D-090`).
+ * ⚠ DISCLOSED: POLICY VERSION '1' IS UNCHANGED, although what it yields changes. ASR-1's scope says *"Policy meaning is
+ * stable across validator replacement"*; the meaning moves here by a ruling, not by a validator.
+ */
+function escalatesOnTheRecommendation(
+	po: FloorPolicyOutcome,
+	r: ValidatorResult | undefined,
+	computed: readonly FloorPolicyOutcome[]
+): boolean {
+	return (
+		po.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW &&
+		po.resultClass === 'VALID' &&
+		r?.dispositionRecommendation === 'ESCALATED' &&
+		po.disposition === 'SATISFIED' &&
+		computed.every((other) => other.policyId === po.policyId || other.disposition === 'SATISFIED')
+	);
+}
+
+/**
  * The Assurance-Service composition step. For each planned floor policy: if its Validator result is MISSING, the
  * floor is incomplete (never assume satisfied). Otherwise classify the result at the boundary (VALIDATOR_FAILED /
  * BOUNDARY_REJECTED never become authoritative findings), enforce the policy's independence requirement, derive the
  * single-policy disposition, and fold everything into the strictest-unresolved aggregate. The gate opens only on a
  * SATISFIED aggregate.
+ * ⭐ `JAN-ESCREC` D1: between the two, a SECOND PASS applies `REG-D-089`'s rule (a) — a clean Reasoning Review its
+ * reviewer recommends ESCALATED becomes ESCALATED when nothing else blocks (`escalatesOnTheRecommendation`).
  */
 export function composeAssuranceOutcome(
 	subject: AssuranceSubject,
@@ -383,6 +470,23 @@ export function composeAssuranceOutcome(
 		});
 		policyAssessments.push({ required: p.required, disposition: aggDisposition });
 	}
+
+	// ⭐⭐ THE SECOND PASS — `REG-D-089`'s rule (a), after every row is computed and BEFORE the aggregate (design D1).
+	// ⛔ BOTH RECORDS MOVE, OR ONE OF TWO GATES LIES. The row is what the recorder persists and the engine's floor gate
+	// reads (`floorGateBlock`, latest recorded assessment per policy); `policyAssessments` is the aggregate's input, where
+	// a required ESCALATED reads INCONCLUSIVE (`aggregateDisposition`) and shuts `gatePermitsTransition`. The row alone
+	// leaves the plan's gate OPEN for every host that acts on the verdict; the aggregate alone records the review
+	// SATISFIED, which the engine's gate then admits.
+	// ⭑ NOTHING ELSE MOVES: `resultClass` stays VALID (a ruling over a valid result is not a boundary event), the order
+	// is the plan's, and `observations` are untouched — the recommendation is RECORDED after composition, by
+	// `assuranceRecordingPlan` (D2), never placed in the ladder's input. ⭑ No `ComposeOptions` flag: every caller gets the
+	// ruling, the qualification runner included (it composes with no options).
+	const computed = [...perPolicy];
+	computed.forEach((po, i) => {
+		if (!escalatesOnTheRecommendation(po, byPolicy.get(po.policyId), computed)) return;
+		perPolicy[i] = { ...po, disposition: 'ESCALATED' };
+		policyAssessments[i] = { required: po.required, disposition: 'ESCALATED' };
+	});
 
 	const aggregate = aggregateDisposition(policyAssessments);
 	return {

@@ -7,6 +7,7 @@ import {
 	acceptAgentCandidate,
 	registerStipulation
 } from './support/harness';
+import { expectTheHintOnScreen } from './support/floor-panel';
 
 // ⭐ `JAN-SELRES` D8 (`REG-F-462`), AS REVISED IN RS-3 — THE BLOCKED HINT FOLLOWS THE FLOOR'S OWN CLASSIFIER: BESIDE A
 // BLOCK REVISING THE GRAPH DOES NOT ANSWER, IT DOES NOT SAY "REVISE THE GRAPH", AND BESIDE ONE REVISING ANSWERS ONLY IN
@@ -33,6 +34,13 @@ import {
 // default lane and its review stages BLOCKED_EXTERNAL, INCOMPLETE — the floor on screen is the candidate's FORK, and
 // canonical holds none. In the product a failed or incomplete review reaches this page only that way: the floor runs on
 // an authoring turn, and only a satisfied candidate is accepted.
+//
+// ⭐ `JAN-ESCREC` D3 (the third fix round's re-verifier's finding [0], ruled) — AND EACH HINT IS WHOLLY ON SCREEN, beside
+// every review staged here, the waived one included (`expectTheHintOnScreen`). The reasoning-review findings rendered above
+// the hint in the capped floor panel, and at the lane's default 1280x720 they pushed it below the panel's fold: 24 of its
+// 101px were on screen beside a review that did not execute, none once a waiver was recorded (measured by ER-1's third fix
+// round). The hint now renders FIRST in the panel's body, before the floor's own head — whose "waiver recorded" badge
+// wraps — and its policy list.
 const POLICY = 'floor.reasoning-review';
 const POLICY_VERSION = '1';
 
@@ -249,6 +257,8 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		// ⛔ NOT THE ROUTE THE RECORD RULES OUT, AND NO ROUTE PAST THE FLOOR (ASR-3).
 		await expect(hint).not.toContainText('revise the graph and re-run');
 		await expect(hint).not.toContainText(/waiv/i);
+		// ⭐ AND ON SCREEN, though the review's finding is listed too.
+		await expectTheHintOnScreen(page);
 	});
 
 	test('⭐ a staged candidate whose review is INCOMPLETE — the page a professional sees: the hint beside the banner says revising does not address it', async ({
@@ -301,6 +311,7 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		await expect(hint).toHaveText(NOT_ANSWERED_BY_REVISION_HINT);
 		await expect(hint).not.toContainText('revise the graph and re-run');
 		await expect(hint).not.toContainText(/waiv/i);
+		await expectTheHintOnScreen(page);
 	});
 
 	test('⭐ a review that did not execute BESIDE a schema policy that rejected the graph: the hint says revise the graph for its findings AND run the review again, whole', async ({
@@ -325,6 +336,7 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		await expect(hint).toHaveText(REVISE_AND_REVIEW_HINT);
 		await expect(hint).not.toContainText('revise the graph and re-run');
 		await expect(hint).not.toContainText(/waiv/i);
+		await expectTheHintOnScreen(page);
 	});
 
 	test('⭐ a waiver recorded through the page’s form does not turn the hint back to "revise the graph": revising still does not address the block', async ({
@@ -358,6 +370,9 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		await expect(hint).toHaveCount(1);
 		await expect(hint).toHaveText(NOT_ANSWERED_BY_REVISION_HINT);
 		await expect(hint).not.toContainText(/waiv/i);
+		// ⭐ AND ON SCREEN beside the waived floor, whose "waiver recorded" badge wraps the panel's header: with the finding
+		// above it, none of this hint was on screen.
+		await expectTheHintOnScreen(page);
 	});
 
 	// THE CONTROL, with its own failure mode: a page that rendered the new sentence beside EVERY unsatisfied floor would
@@ -377,5 +392,6 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		const hint = page.getByTestId('floor-blocked-hint');
 		await expect(hint).toHaveCount(1);
 		await expect(hint).toHaveText(REVISE_HINT);
+		await expectTheHintOnScreen(page);
 	});
 });

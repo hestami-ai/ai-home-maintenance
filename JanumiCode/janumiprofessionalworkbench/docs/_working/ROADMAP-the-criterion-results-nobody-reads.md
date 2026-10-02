@@ -204,3 +204,5 @@ while §33's worked example says otherwise. ⚠ That is a discrepancy the ruling
   watches — and with `REG-F-419` (no CI) that is the only surface there is.
 - ⚠ **The `ProposedAssuranceObservation` shape** is a placeholder with §33 as its only ratified statement.
   Untouched here.
+
+⭑ **2026-10-02 — `REG-F-415`'s rendered string was repaired after L3, in `JAN-ESCREC` `ER-1` (`REG-D-092`).** It says only what the joined floor holds (*"no observation recorded (floor.reasoning-review=INCONCLUSIVE)."*), never the unjudged criterion, so it does not make the registered gap look closed: `REG-F-415` stays open.

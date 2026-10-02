@@ -77,6 +77,11 @@ import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { resetEngine } from '../workbench.js';
 import { beginExecute, modelWorkUnit } from './begin-execute.testing.js';
 
+/** `REG-D-090`'s sentence for the execution plane, verbatim (`JAN-ESCREC` design D3) — printed beside an ESCALATED review
+ *  only. Restated, not imported: it is the operator's word, so a change to it must redden here rather than be followed. */
+const HUMAN_SENTENCE =
+	"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474).";
+
 /** The eight live-backend variables — each case sets only what it names. */
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -136,6 +141,13 @@ describe('⭐ G8 — the execution plane names REQUALIFY_OR_RESELECT_REVIEWER be
 		expect(message, 'the operator was told to retry the reviewer').not.toContain(
 			'RETRY_OR_CONFIGURE_REVIEWER'
 		);
+		// ⭐ `JAN-ESCREC` D3 (`REG-D-090`; the ER-1 app verifier's finding [2]) — A REFUSED SUBSTITUTE IS NOT AN ESCALATION:
+		// its remedy is the sponsor's re-qualification or re-selection, and the human-review sentence is keyed on
+		// ESCALATE_REVIEW alone.
+		expect(
+			message,
+			'a refused substitute was told as an escalation to a human reviewer'
+		).not.toContain(HUMAN_SENTENCE);
 		// ⛔ NOT THE PWA'S GUIDANCE: this plane has no PWA, and D7's text is written for one.
 		expect(message).not.toContain('PublishPwa remains blocked');
 		expect(seam.pi, 'arrangement: the stand-in executor opened no Pi').toEqual([]);

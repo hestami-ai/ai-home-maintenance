@@ -1022,3 +1022,96 @@ describe('⛔ REG-D-071 Q4 — a MODEL cannot mark its own answers stipulated', 
 		).toEqual([]);
 	});
 });
+
+// ── ⚠ `JAN-ESCREC` (`REG-D-090`) — A RECORDED STATEMENT IS ABOUT THIS PROMPT, SO IT IS PINNED WHERE THE PROMPT IS BUILT ──
+describe('⚠ JAN-ESCREC — the prompt NAMES ESCALATED once and gives it no definition that names it, as REG-D-090’s recorded statement says', () => {
+	// ⭑ `rph-assurance`'s recording plan appends ONE observation to every VALID Reasoning Review whose recommendation is
+	// the literal ESCALATED, with a fixed statement (`REG-D-090`, verbatim): *"The reviewing model's recommendation was
+	// ESCALATED. The review prompt does not define ESCALATED; the Assurance Policy Catalog defines it as: the validator
+	// implementation or policy-designated authority cannot resolve the issue within its authority or competence."* Its
+	// second sentence is a claim about THIS prompt, recorded by a validator-agnostic package that cannot see it (the ER-1
+	// verifier's finding [10]). `REG-D-090` checked it once, by search — the prompt names ESCALATED and does not define
+	// it, with the three recommendations defined in parentheses as its positive control — and this pins that check.
+	// ⛔ A definition added to the prompt would make every LATER record false while the earlier ones stayed true, and
+	// before this only the fingerprint's prompt hash, indirectly, would have moved: the edit must revise the statement
+	// with it. ⭑ OVER THE MATERIALIZED PROMPT, in every framing — what the reviewer reads is what the statement is about.
+	// ⭐ ONCE IN THE WHOLE PROMPT (the ER-1 re-verifier's finding [2]; `ER1-V103`; the second fix round). The parenthesis
+	// reader sees a definition only where the value is directly followed by one, inside its own sentence: a definition in
+	// a sentence of its own (*"ESCALATED means …"*) passed it, and so did REG-D-090's line search, which counts LINES. So
+	// the prompt's every mention of the value is counted, case-insensitively: exactly one, the one in the recommendation
+	// sentence. Any definition that NAMES the value — anywhere in the prompt — then reddens here.
+	// ⭐ AND THE SENTENCE IS PINNED WHOLE (the second fix round's re-verifier's finding [3]; `ER1-V200`; the third fix round).
+	// The two readers above saw a gloss only where it was parenthesised or named the value again, so the most natural edit —
+	// glossing the value where the other three are glossed, after a dash (*"or ESCALATED — use it when …"*) — passed both,
+	// and the statement became false. Its two lines are now compared exactly as the prompt joins them, the value bare at
+	// their end: ANY gloss inside the sentence, in any form — or appended to either of its lines — reddens here.
+	// ⚠ THE LIMIT, STATED: a definition ELSEWHERE in the prompt that never names the value (*"choose the last value when
+	// …"*, on a line of its own) is invisible to all three. Such an edit still moves the reviewer fingerprint, as any edit
+	// of the prompt's text does, and owes a paid re-measurement (`reviewer:qual:check`) — but that gate asks whether the
+	// reviewer was measured, not whether the statement is true.
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	/** ⭐ THE RECOMMENDATION SENTENCE, WHOLE: its two lines exactly as the prompt joins them, the value bare at the end. */
+	const RECOMMENDATION_LINES = [
+		'Then give an overall disposition RECOMMENDATION: SATISFIED (no material failures), CONDITIONALLY_SATISFIED',
+		'(only minor/advisory failures), REJECTED (a BLOCKING/CRITICAL failure), INCONCLUSIVE, or ESCALATED.'
+	] as const;
+	/** The MATERIALIZED prompt for one framing: what the reviewer reads, and what the statement is about. */
+	const promptFor = async (framing: ReviewFraming): Promise<string> => {
+		const { prompts, print } = capturing();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+			SUBJECT,
+			ctx({ framing })
+		);
+		return prompts[0] ?? '';
+	};
+	/** The prompt's recommendation sentence, up to its full stop ('' if the prompt has none). */
+	const recommendationSentence = (prompt: string): string =>
+		/overall disposition RECOMMENDATION:([^.]*)\./.exec(prompt)?.[1] ?? '';
+	/** The parenthesised definition that directly FOLLOWS a recommendation in the sentence, or undefined. */
+	const definitionOf = (sentence: string, d: string): string | undefined =>
+		new RegExp(`(?<![A-Z_])${d}\\s*\\(([^)]*)\\)`).exec(sentence)?.[1];
+
+	it.each(FRAMINGS)(
+		'⭐ %s — ESCALATED is named ONCE in the whole prompt, in the recommendation sentence, pinned WHOLE, with no parenthesised definition',
+		async (framing) => {
+			const prompt = await promptFor(framing);
+			const sentence = recommendationSentence(prompt);
+			// ⭐ THE SENTENCE, WHOLE (`ER1-V200`): the line that opens it and the line after, compared exactly — so nothing
+			// is attached to the value where it is named, parenthesised or not.
+			const lines = prompt.split('\n');
+			const at = lines.findIndex((l) =>
+				l.startsWith('Then give an overall disposition RECOMMENDATION:')
+			);
+			expect(
+				lines.slice(at, at + 2),
+				'the recommendation sentence is not the one the recorded statement is about, whole'
+			).toEqual([...RECOMMENDATION_LINES]);
+			// ⭑ THE POSITIVE CONTROL FIRST — `REG-D-090`'s own: the reader finds a definition where there is one. Without
+			// it, a reader that never matched would pass the assertion on ESCALATED below vacuously.
+			expect(
+				['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED'].map((d) => [
+					d,
+					definitionOf(sentence, d)
+				]),
+				'the three defined recommendations carry their parenthesised definitions'
+			).toEqual([
+				['SATISFIED', 'no material failures'],
+				['CONDITIONALLY_SATISFIED', 'only minor/advisory failures'],
+				['REJECTED', 'a BLOCKING/CRITICAL failure']
+			]);
+			expect(sentence, 'ESCALATED is named among the recommendations').toMatch(
+				/(?<![A-Z_])ESCALATED(?![A-Z_])/
+			);
+			expect(
+				definitionOf(sentence, 'ESCALATED'),
+				'and the sentence gives it no parenthesised definition'
+			).toBeUndefined();
+			// ⭐ AND NOWHERE ELSE: every mention of the value in the whole prompt, in any case, is that one. A definition in a
+			// sentence of its own names the value again, and is counted here (`ER1-V103`).
+			expect(
+				prompt.match(/escalat/gi) ?? [],
+				'the whole prompt names it ONCE: in the recommendation sentence, and nowhere else'
+			).toHaveLength(1);
+		}
+	);
+});

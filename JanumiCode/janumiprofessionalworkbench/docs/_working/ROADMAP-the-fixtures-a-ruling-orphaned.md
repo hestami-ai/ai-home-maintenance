@@ -126,3 +126,5 @@ across workers. Five more hand-copied `try/finally` blocks is how that becomes r
 ⛔ **No real reviewer is put on the gate's default path**, and after this lands **no test drives any floor
 composition to SATISFIED on the mock lane.** The mock's own arms stay covered by their own suites. ⭑ That is
 arguably the honest reflection of `REG-F-409` — disclosed here rather than discovered later.
+
+⭑ **2026-10-02 — `C-2`'s rendered text is repaired (`JAN-ESCREC` `ER-1`, `REG-D-092`).** `describeRefusedEvidence` now prints *"evd_… (npm test): no observation recorded (floor.reasoning-review=INCONCLUSIVE)."* where it printed nothing after the colon. The cause is untouched, and `REG-F-415` stays open as a symptom.

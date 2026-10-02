@@ -10,6 +10,7 @@ import { authoringTurnMachine, type AuthoringTurnState } from '$lib/server/autho
 import { AGENT_CREDENTIAL } from './identity.js';
 import { getEngine, makeAuthoringBroker, mintUiId } from '$lib/server/workbench';
 import { holdForDraft, releaseDraft } from './open-drafts.js';
+import type { FloorRemediationAction } from './floor.js';
 
 type TurnActor = ReturnType<typeof newTurnActor>;
 
@@ -29,6 +30,8 @@ export interface AuthoringTurn {
 	readonly candidateHash?: string;
 	readonly assuredSubjectHash?: string;
 	readonly detail?: string;
+	/** ⭐ `JAN-ESCREC` D3 — the floor classifier's action a BLOCKED_EXTERNAL turn stopped on (see the summary's). */
+	readonly remediationAction?: FloorRemediationAction;
 }
 
 interface MutableAuthoringTurn {
@@ -51,6 +54,7 @@ interface MutableAuthoringTurn {
 	candidateHash?: string;
 	assuredSubjectHash?: string;
 	detail?: string;
+	remediationAction?: FloorRemediationAction;
 }
 
 export interface AuthoringTurnSummary {
@@ -59,6 +63,14 @@ export interface AuthoringTurnSummary {
 	/** ⭐ WHY the turn stopped, in the floor's own words (`REG-F-447`): the page names the recorded cause — an
 	 *  execution failure, an independence failure, an incomplete review — instead of one fixed sentence per status. */
 	readonly detail?: string;
+	/**
+	 * ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — THE FLOOR CLASSIFIER'S ACTION a BLOCKED_EXTERNAL turn stopped on, so the page's
+	 * resume banner can tell an ESCALATED review (`ESCALATE_REVIEW`) from one that reached no usable verdict — as DATA,
+	 * never by matching the guidance's prose in `detail`. Absent when the block had no classification (the floor could
+	 * not run, or the producer never resolved), and on every other status: a resumed turn forgets it, as it forgets
+	 * `detail`, and only an external block sets it again.
+	 */
+	readonly remediationAction?: FloorRemediationAction;
 	readonly candidateHash?: string;
 	readonly assuredSubjectHash?: string;
 	readonly commandCount: number;
@@ -132,6 +144,9 @@ function publicTurn(turn: MutableAuthoringTurn): AuthoringTurn {
 		},
 		get detail() {
 			return turn.detail;
+		},
+		get remediationAction() {
+			return turn.remediationAction;
 		}
 	};
 }
@@ -393,11 +408,17 @@ export function markAuthoringTurnRevisionRequired(turn: AuthoringTurn, detail: s
 	finalizeAuthoringTurn(turn);
 }
 
-/** An unavailable/misconfigured/independence-invalid assessor is external to candidate content. */
-export function markAuthoringTurnExternalBlock(turn: AuthoringTurn, detail: string): void {
+/** An unavailable/misconfigured/independence-invalid assessor is external to candidate content. ⭐ `JAN-ESCREC` D3: so is
+ *  an ESCALATED review; `remediationAction` is the floor classifier's action, when the block has one (the summary's). */
+export function markAuthoringTurnExternalBlock(
+	turn: AuthoringTurn,
+	detail: string,
+	remediationAction?: FloorRemediationAction
+): void {
 	const current = mutable(turn);
 	transition(current, { type: 'EXTERNAL_BLOCK' }, 'BLOCKED_EXTERNAL');
 	current.detail = detail;
+	current.remediationAction = remediationAction;
 	finalizeAuthoringTurn(turn);
 }
 
@@ -418,6 +439,7 @@ export function resumeAuthoringTurn(pwaId: string): AuthoringTurn | undefined {
 	// The prior candidate/assurance bindings no longer describe the (about to be refined) candidate.
 	turn.candidateHash = undefined;
 	turn.assuredSubjectHash = undefined;
+	turn.remediationAction = undefined;
 	turn.detail = undefined;
 	return publicTurn(turn);
 }
@@ -789,12 +811,48 @@ export function summarizeAuthoringTurn(turn: AuthoringTurn): AuthoringTurnSummar
 		id: turn.id,
 		status: turn.status,
 		...(turn.detail !== undefined ? { detail: turn.detail } : {}),
+		...(turn.remediationAction !== undefined ? { remediationAction: turn.remediationAction } : {}),
 		candidateHash: turn.candidateHash,
 		assuredSubjectHash: turn.assuredSubjectHash,
 		commandCount: turn.commands.length,
 		createdAt: turn.createdAt,
 		canonicalUnchanged: true
 	};
+}
+
+/**
+ * ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — THE RESUME BANNER'S SENTENCE for a staged candidate the professional can address in
+ * place (REVISION_REQUIRED or BLOCKED_EXTERNAL), from the summary above; `undefined` for every other status, which the page
+ * offers no resume for. The page's load answers it ONCE (`routes/pwa/[id]/+page.server.ts`) and the banner renders it in
+ * one interpolation.
+ *
+ * ⭐ AN ESCALATED REVIEW IS NAMED AS ONE. Its frame reads *"The reviewer recommended escalation to a human reviewer —"* in
+ * place of *"The review did not produce a usable verdict —"*, and its "Refine it" sentence says what refining does there:
+ * it re-runs the same automated reviewer (`REG-F-474` — the latest assessment wins, so a re-run can clear an escalation
+ * meant for a human). ⛔ KEYED ON THE CLASSIFIER'S ACTION AND THE STATUS, never on the guidance's prose in `detail`: only an
+ * external block carries an action (`markAuthoringTurnExternalBlock`), and only `ESCALATE_REVIEW` is an escalation. Every
+ * other banner reads exactly as the template composed it before.
+ *
+ * ⚠ WHY HERE AND NOT IN THE TEMPLATE (the ER-1 app verifier's finding [6]): composed in `+page.svelte`, the escalated
+ * branch had no test — no reviewer the default e2e lane can select recommends ESCALATED — and a mutant keying it on the
+ * wrong status survived its e2e victim. `authoring-turn-resume-hint.test.ts` holds every branch whole;
+ * `e2e/resume-hint.e2e.ts` holds the INCOMPLETE banner whole in the browser, which proves the template renders this.
+ */
+export function resumeHintText(
+	turn: Pick<AuthoringTurnSummary, 'status' | 'detail' | 'remediationAction'>
+): string | undefined {
+	const escalated =
+		turn.status === 'BLOCKED_EXTERNAL' && turn.remediationAction === 'ESCALATE_REVIEW';
+	const refine = `Refine it in the chat below (it continues on the same candidate${escalated ? ', and refining re-runs the same automated reviewer' : ''}), or Discard.`;
+	if (turn.status === 'REVISION_REQUIRED')
+		return `Revision requested — this candidate is preserved. ${refine}`;
+	if (turn.status !== 'BLOCKED_EXTERNAL') return undefined;
+	const frame = escalated
+		? 'The reviewer recommended escalation to a human reviewer'
+		: 'The review did not produce a usable verdict';
+	// ⭑ The fallback ends with its own full stop, as every recorded detail does: it ran on into "This candidate is
+	// preserved." (the ER-1 app re-verifier's finding [8]).
+	return `${frame} — ${turn.detail ?? 'the reviewer did not complete.'} This candidate is preserved. ${refine}`;
 }
 
 /** Test/reset seam: abandon every process-local overlay before replacing the canonical engine. */

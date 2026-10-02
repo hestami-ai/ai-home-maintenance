@@ -170,3 +170,5 @@ here**, not left to be discovered.
 The eleven tests assert what they were written to assert, on fixtures that say what a real reviewer says; every
 declared mutant still reddens; a silent reviewer is proven to close the gate by a test that did not exist
 before; and the deterministic checker's two-of-nine declaration is untouched.
+
+⭑ **2026-10-02 — `C-2`'s rendered text is repaired (`JAN-ESCREC` `ER-1`, `REG-D-092`).** `describeRefusedEvidence` now prints *"evd_… (npm test): no observation recorded (floor.reasoning-review=INCONCLUSIVE)."* where it printed nothing after the colon. The cause is untouched, and `REG-F-415` stays open as a symptom.

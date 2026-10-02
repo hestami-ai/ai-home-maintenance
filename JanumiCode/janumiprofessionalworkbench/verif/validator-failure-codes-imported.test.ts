@@ -19,10 +19,20 @@
 // not `.svelte` markup). A restatement inside a workspace package other than `rph-assurance` is not looked for. Only a
 // value fixed by the expression itself is folded: a name bound to a string (`const a = 'VALIDATOR_MODEL_'; a + …`), a
 // call (`.concat`, `.join`, `String.raw`) or a computed value is not resolved.
+//
+// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND THE REVIEWER'S RECOMMENDATION, THE SAME WAY. `REVIEWER_RECOMMENDED_ESCALATION` is
+// written by the package's recording plan (`rph-assurance` `recording.ts`, D2) and READ in the app with `o.code` comparisons
+// no compiler checks: the classifier's subject-finding exclusion and `reasoningGaps` (`lib/server/floor.ts`), the waiver
+// target (`routes/pwa/[id]/+page.server.ts`), and the execution plane's note on observations that hold no finding
+// (`lib/server/execution/evidence-join.ts` `noFindingNote`). A restated spelling keeps them working only until the
+// package's word moves — and then the recommendation is fed back to the producer as a finding, listed among the findings,
+// named by a waiver, and a review it does not explain is described by it alone.
+// It is NOT a validator failure code (a recommendation is not a failure of the review), so it is walked as its own set,
+// by the same walk.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { VALIDATOR_FAILURE_CODES } from '@janumipwb/rph-assurance';
+import { REVIEWER_RECOMMENDED_ESCALATION, VALIDATOR_FAILURE_CODES } from '@janumipwb/rph-assurance';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -42,6 +52,8 @@ function productionSources(dir: string, out: string[] = []): string[] {
 }
 
 const CODES: ReadonlySet<string> = new Set(VALIDATOR_FAILURE_CODES);
+/** ⭐ `JAN-ESCREC` D3 — the recommendation's code, walked apart from the failure codes it is not one of. */
+const RECOMMENDATION_CODES: ReadonlySet<string> = new Set([REVIEWER_RECOMMENDED_ESCALATION]);
 
 /** The string `node` evaluates to when the expression fixes it by itself, or `undefined` (see the header's bound). */
 function folded(node: ts.Node): string | undefined {
@@ -67,7 +79,8 @@ function folded(node: ts.Node): string | undefined {
 /** Where `text` (the source of `file`) restates a code as a string, and whether it imports one from the package. */
 function restatementsIn(
 	file: string,
-	text: string
+	text: string,
+	codes: ReadonlySet<string> = CODES
 ): { readonly restated: string[]; readonly imports: boolean } {
 	const restated: string[] = [];
 	let imports = false;
@@ -80,14 +93,14 @@ function restatementsIn(
 			node.importClause?.namedBindings &&
 			ts.isNamedImports(node.importClause.namedBindings) &&
 			node.importClause.namedBindings.elements.some((e) =>
-				CODES.has((e.propertyName ?? e.name).text)
+				codes.has((e.propertyName ?? e.name).text)
 			)
 		) {
 			imports = true;
 			return; // an import names the code as an identifier, never as a string
 		}
 		const value = folded(node);
-		if (value !== undefined && CODES.has(value)) {
+		if (value !== undefined && codes.has(value)) {
 			restated.push(`${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`);
 			return; // the whole expression is ONE restatement; its parts are not counted again
 		}
@@ -98,11 +111,14 @@ function restatementsIn(
 }
 
 /** Where each file restates a code as a string, and which files import one from the package by name. */
-function walk(): { readonly restated: string[]; readonly importers: string[] } {
+function walk(codes: ReadonlySet<string> = CODES): {
+	readonly restated: string[];
+	readonly importers: string[];
+} {
 	const restated: string[] = [];
 	const importers: string[] = [];
 	for (const file of productionSources(APP_SRC)) {
-		const found = restatementsIn(rel(file), readFileSync(file, 'utf8'));
+		const found = restatementsIn(rel(file), readFileSync(file, 'utf8'), codes);
 		restated.push(...found.restated);
 		if (found.imports) importers.push(rel(file));
 	}
@@ -141,6 +157,41 @@ describe('⭐ D6/D7 — no app source restates a validator failure code; the two
 		].join('\n');
 		expect(restatementsIn('control.ts', source)).toEqual({
 			restated: ['control.ts:1', 'control.ts:2', 'control.ts:3', 'control.ts:4'],
+			imports: false
+		});
+	});
+});
+
+// ⭐ `JAN-ESCREC` D3 — THE RECOMMENDATION'S CODE, BY THE SAME WALK. ⭑ Its controls are its own: the failure codes' controls
+// above see `floor.ts` import `VALIDATOR_MODEL_SUBSTITUTED`, so they cannot tell a walk that compares this code from one
+// that does not.
+describe('⭐ JAN-ESCREC D3 — no app source restates the recommendation’s code; the sites that read it import it', () => {
+	const { restated, importers } = walk(RECOMMENDATION_CODES);
+
+	it('⛔ no production source under apps/rph-demo/src spells REVIEWER_RECOMMENDED_ESCALATION as a string', () => {
+		expect(
+			restated,
+			'the reviewer’s recommendation code is restated as a literal instead of imported'
+		).toEqual([]);
+	});
+
+	it('⭑ CONTROL — the walk SEES the three sites that read the code, each importing it from the package', () => {
+		// Without this, "none restated" above holds for a walk that read nothing, or compared nothing: here it must find
+		// the classifier's exclusion, the waiver target and the execution plane's no-finding note, each importing the code
+		// by name.
+		expect(importers).toContain('apps/rph-demo/src/lib/server/floor.ts');
+		expect(importers).toContain('apps/rph-demo/src/routes/pwa/[id]/+page.server.ts');
+		expect(importers).toContain('apps/rph-demo/src/lib/server/execution/evidence-join.ts');
+	});
+
+	it('⭑ CONTROL — the fold SEES the code spelled whole or split, and only what the source fixes by itself', () => {
+		const source = [
+			"const a = 'REVIEWER_RECOMMENDED_ESCALATION';",
+			"const b = 'REVIEWER_RECOMMENDED_' + 'ESCALATION';",
+			"const c = 'REVIEWER_RECOMMENDED_' + suffix;"
+		].join('\n');
+		expect(restatementsIn('control.ts', source, RECOMMENDATION_CODES)).toEqual({
+			restated: ['control.ts:1', 'control.ts:2'],
 			imports: false
 		});
 	});

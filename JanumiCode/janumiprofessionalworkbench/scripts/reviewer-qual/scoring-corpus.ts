@@ -5,6 +5,13 @@
 // hashed as outcomes only. So a change anywhere between a reply and its recorded outcome moves the digest: the parse,
 // the repair decision, `coerceJudgement`, the mapper, the ladder, the independence check, the runner's handling of a
 // validator that throws. A change that moves NONE of these outcomes is, by this measure, no change to the scoring.
+// ⚠ 2026-10-01 — NOT TRUE OF ONE CHANGE, FOR A WINDOW (`JAN-ESCREC`; the ER-1 verifier's finding [8]). `REG-D-089`'s
+// rule (a), built in ER-1, moves the outcome of a clean reply recommending escalation (to the escalated disposition,
+// from SATISFIED), and no entry below carries such a reply until ER-2 adds four (`escalated-clean`,
+// `escalated-beside-a-fault`, `escalated-skipped-row`, `escalated-reported-as-producer`). Until then the scoring digest
+// does not see the rule: that outcome moved, and the reviewer fingerprint did not. The roadmap discloses the window
+// and forbids a paid qualification run in it (`docs/_working/ROADMAP-the-escalation-recommendation.md`, last section);
+// ER-2 closes it and moves the fingerprint, in one commit. (Lower case here keeps design G7's count of the value at 0.)
 //
 // ⭐ EVERY `REG-F-428` CLASS IS HERE — a duplicate key, an unknown id and a corrupted one, a non-boolean `failed`,
 // fenced JSON, prose-wrapped JSON — with the siblings the harness detects, and ONE REPLY THAT FAILS THE FIRST PARSE, so

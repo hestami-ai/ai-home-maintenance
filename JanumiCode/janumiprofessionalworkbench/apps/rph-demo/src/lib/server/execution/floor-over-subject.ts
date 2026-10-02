@@ -36,7 +36,12 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from '../assurance/index.js';
 import type { StipulationLookup } from '../assurance/standin-reasoning-review-validator.js';
 import { anyStipulationRegistered, stipulationFor, workProductPwaOf } from '../stipulations.js';
-import { classifyFloorRemediation, type FloorRemediation, type FloorView } from '../floor.js';
+import {
+	classifyFloorRemediation,
+	type FloorRemediation,
+	type FloorRemediationAction,
+	type FloorView
+} from '../floor.js';
 import { createExchangeSink } from '../assurance/exchange-capture.js';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
@@ -88,10 +93,39 @@ export interface FloorSubjectDeclaration {
 export interface FloorRunOutcome {
 	satisfied: boolean;
 	observations: { code: string; statement: string }[];
+	/** ⭐ `JAN-ESCREC` D3 — every policy's disposition as this floor COMPOSED it, in the plan's order: what a refusal names
+	 *  when the floor recorded no observation at all (`evidence-join.ts` `describeRefusedEvidence`; the ER-1 app
+	 *  re-verifier's finding [6]). Read from the plan this run recorded, never re-derived from the store. */
+	dispositions: { policyId: string; disposition: string }[];
 	/** ⭑ JAN-EXECLOOP — what to DO about an unsatisfied floor, decided by the SAME classifier the authoring
 	 *  plane uses. Computing it here rather than in the route keeps one definition of "these findings may go
 	 *  back to the producer", which is the distinction `REG-D-059` turns on. */
 	remediation: FloorRemediation;
+}
+
+/**
+ * ⭐⭐ `JAN-ESCREC` D3 (`REG-D-090`) — WHAT THE EXECUTION PLANE SAYS BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, on both of its
+ * arms: the model step's message (`routes/undertakings/[id]/+page.server.ts`) and each refused process result
+ * (`evidence-join.ts` `describeRefusedEvidence`) — which that message carries whether or not the work product's own floor
+ * passed (its satisfied arm printed no refused result until the ER-1 app verifier's MAJOR 1). This plane never shows the
+ * classifier's guidance — it is written for a PWA (*"PublishPwa remains blocked…"*) — so beside an escalation the operator
+ * read the recorded recommendation and the action's NAME, and nothing said what either asks of them, or that no human's
+ * review can be recorded here (`REG-F-474`).
+ *
+ * ⛔ KEYED ON THE CLASSIFIER'S ACTION, NEVER ON PROSE AND NEVER ON THE RECOMMENDATION'S CODE. The recommendation is recorded
+ * whatever the review's outcome (`rph-assurance` D2), and only the review the classifier answers `ESCALATE_REVIEW` IS
+ * escalated (D1). A REJECTED review its reviewer also escalated stays REJECTED — *"more actionable"* (`REG-D-089`) — and
+ * the classifier answers it `REFINE_SUBJECT`, as the PWA page's hint does (`REVISE`); its recommendation is still printed
+ * among its observations, and this sentence is not. ⭑ The try count is not this sentence's: it counts tries, never notes.
+ *
+ * ⭑ `''` FOR EVERY OTHER ACTION, so a caller appends it unconditionally, after the observations it stands beside.
+ * `evidence-join.test.ts` holds it for EVERY action, exhaustively — CHANGE_REVIEWER was pinned nowhere, so an independence
+ * refusal could be told it was an escalation (the ER-1 app re-verifier's finding [5]).
+ */
+export function escalatedReviewNote(action: FloorRemediationAction): string {
+	return action === 'ESCALATE_REVIEW'
+		? " — The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474)."
+		: '';
 }
 
 /**
@@ -224,6 +258,10 @@ export async function runFloorOverSubject(
 		observations: plan.assessments.flatMap((a) =>
 			a.observations.map((o) => ({ code: o.code, statement: o.statement }))
 		),
+		dispositions: plan.assessments.map((a) => ({
+			policyId: a.policyId,
+			disposition: a.disposition
+		})),
 		// ⚠ THE SAME CLASSIFIER, NOT A SECOND ONE. `classifyFloorRemediation` is subject-agnostic — it reads
 		// policy ids, dispositions and observation CODES, "never prose" — so a second subject is the same call
 		// with different content. Writing a subject-specific one here is how two descriptions of one rule come

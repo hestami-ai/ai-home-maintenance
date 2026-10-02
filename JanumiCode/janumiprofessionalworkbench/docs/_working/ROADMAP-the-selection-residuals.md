@@ -184,3 +184,5 @@ No agent stages or commits.
     - `REG-F-473`: a reviewer's ESCALATED recommendation is never recorded as an escalation;
     - `REG-F-466` gains the page's "run assurance again" naming no control.
   - **Mutants:** RS3-M4..M38 added (32; the fix rounds replaced the builder's code-keyed mutants with their inverses); with the 49 prior entries anchored in, or victimised by, the touched files, read in both quote styles, plus W2-a and W2-b (RS-1's runner list had skipped five single-quoted entries: B2, F199, S3, W2-a, W2-b), 82 KILLED and the one declared control, W2-b, HELD, by the official runner on the staged tree. **gate:fast:** GREEN, 6241 passed / 4 skipped, e2e 100 of 100 (95 plus 5 new), census 362 of 362 guarded, the fingerprint unmoved.
+
+⭑ **SUPERSEDED IN PART SINCE LANDING — 2026-10-02, `JAN-ESCREC` `ER-1` (`REG-D-092`).** The hint's "three sentences" (`RS-3`, items 1 and 2 and the landing note) are FOUR: `ROUTE_TO_HUMAN` answers an escalated review.

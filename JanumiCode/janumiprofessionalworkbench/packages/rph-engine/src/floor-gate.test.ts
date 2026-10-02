@@ -239,3 +239,98 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 		);
 	});
 });
+
+// ── ⭐⭐ `JAN-ESCREC` D1 — THE ENGINE'S OWN GATE REFUSES AN ESCALATED REVIEW (`REG-D-089`: *"publishing stays blocked"*) ───
+//
+// The package's `gatePermitsTransition` is the floor's OWN answer; what actually refuses publication is the engine's
+// `floorGateBlock`, which reads the latest RECORDED assessment per floor policy and admits SATISFIED only. So rule (a)
+// is proved end to end here: the real floor runs, the recorder persists an ESCALATED review, and PublishPwa is refused
+// naming it. The CONTROL is the identical arrangement with the reviewer recommending SATISFIED, which publishes — so
+// the refusal is the escalation's, and not the version binding's or the author's.
+describe('⭐⭐ JAN-ESCREC D1 — PublishPwa is refused over a recorded ESCALATED review, and admitted over the same review SATISFIED', () => {
+	async function recordFloorRecommending(
+		eng: EngineHandle,
+		recommendation: 'ESCALATED' | 'SATISFIED'
+	) {
+		const semanticVersion = Number(
+			(eng.loadObject(PWA)?.state as { semanticVersion: number }).semanticVersion
+		);
+		const subject: AssuranceSubject = {
+			subjectId: PWA,
+			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			semanticVersion,
+			isAiProduced: true,
+			producer: PRODUCER
+		};
+		const registry = createValidatorRegistry();
+		registry.register(schemaInvariantValidatorInstance);
+		registry.register(identityProvenanceValidatorInstance);
+		registry.register({
+			...rrSatisfied,
+			evaluate: (s) =>
+				Promise.resolve(
+					reasoningReviewResultFromJudgement(
+						s,
+						JUDGE,
+						'test.reasoning-review',
+						{ findings: allClean(), recommendation },
+						SEEDED_REASONING_REVIEW_CRITERIA
+					)
+				)
+		});
+		const plan = await runFloorAndPlanRecording(
+			subject,
+			{
+				schemaInvariant: { schemaValid: true, invariantViolations: [] },
+				identityProvenance: {
+					hasStableId: true,
+					hasSemanticVersion: true,
+					hasProvenance: true,
+					hasProducer: true,
+					traceComplete: true
+				}
+			},
+			registry
+		);
+		let idn = 0;
+		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
+			issuedAt: TS,
+			correlationId: 'floor',
+			idPrefix: `rec-${recommendation.toLowerCase()}`,
+			newId: (p) => `${p}_${String(++idn).padStart(26, '0')}`
+		});
+		return plan;
+	}
+	const publicationStatus = (eng: EngineHandle) =>
+		(eng.loadObject(PWA)?.state as { publicationStatus: string }).publicationStatus;
+
+	it('⭐ RED — a clean review recommending ESCALATED is recorded ESCALATED, and the engine’s floor gate refuses PublishPwa naming it', async () => {
+		// PREDICTED RED AT HEAD: the review is recorded SATISFIED and the publish is ACCEPTED (`REG-F-473`: *"publication
+		// is not blocked"*).
+		const eng = build();
+		seedFloorPolicies(asActor(eng, SVC));
+		authorValidated(eng);
+		const plan = await recordFloorRecommending(eng, 'ESCALATED');
+
+		// ⭑ THE ENGINE'S REFUSAL IS ASSERTED FIRST, because it is the claim: the plan's `gatePermitsTransition` is only the
+		// floor's own answer, and a host that published on its own reading would still meet this gate.
+		const r = publish(eng);
+		expect(r.status, 'the engine’s floor gate refuses the protected transition').toBe('REJECTED');
+		// ⭐ THE MESSAGE NAMES THE ESCALATED REVIEW AND ONLY IT: the two deterministic policies are SATISFIED, so the
+		// block is the review's alone — `floorGateBlock` lists every non-SATISFIED required policy.
+		expect(r.error?.message).toContain('(floor.reasoning-review=ESCALATED)');
+		expect(publicationStatus(eng), 'nothing was published').toBe('VALIDATED');
+		expect(plan.gatePermitsTransition, 'and the floor’s own answer agrees').toBe(false);
+	});
+
+	it('CONTROL — the identical arrangement, the reviewer recommending SATISFIED, publishes', async () => {
+		const eng = build();
+		seedFloorPolicies(asActor(eng, SVC));
+		authorValidated(eng);
+		const plan = await recordFloorRecommending(eng, 'SATISFIED');
+		expect(plan.gatePermitsTransition).toBe(true);
+		const r = publish(eng);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(publicationStatus(eng)).toBe('PUBLISHED');
+	});
+});

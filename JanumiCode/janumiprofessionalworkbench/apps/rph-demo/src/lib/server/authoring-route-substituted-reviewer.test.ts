@@ -237,7 +237,8 @@ describe('⭐ D7 — a review refused for a substituted model blocks the turn EX
 });
 
 // ⭐ `JAN-SELRES` RS-3 (D8 as revised, `REG-F-462`) — THE PAGE'S BLOCKED HINT IS ANSWERED FROM THE FLOOR THE PANEL SHOWS,
-// WHICH BESIDE A STAGED CANDIDATE IS THE FORK'S, AND IN THREE SENTENCES.
+// WHICH BESIDE A STAGED CANDIDATE IS THE FORK'S, AND IN ~~THREE~~ FOUR SENTENCES — ⭐ `JAN-ESCREC` D3 added `ROUTE_TO_HUMAN`,
+// which `authoring-route-escalated-review.test.ts` holds to the fork; this file holds the other three.
 //
 // ⛔ WHY THIS IS THE REAL PATH. In the product a refused or failed review reaches the PWA page ONLY through a staged
 // candidate: the floor runs on an authoring turn and records into the turn's fork, and only a satisfied candidate is
