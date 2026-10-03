@@ -12,7 +12,14 @@
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { QualificationCase } from './cases.js';
-import type { CallLine, RescoredLine, RunLine, ScoredOutcome } from './record.js';
+import {
+	restampable,
+	type CallLine,
+	type CasePromptHashes,
+	type RescoredLine,
+	type RunLine,
+	type ScoredOutcome
+} from './record.js';
 import { evaluateCase, replayReplies } from './runner.js';
 
 /** Why a recorded evaluation cannot be re-scored today — the check reports it as a non-reproduction. */
@@ -71,11 +78,17 @@ export interface RescoreStamp {
  * ⭐ THE RESCORED LINES FOR A SOURCE RUN — one per complete evaluation that is re-scorable today, re-derived from its
  * recorded spans and stamped with today's fingerprint (§5.4). `cases` is today's case set: an evaluation of a case it
  * no longer holds has nothing to be scored against, and is skipped.
+ * ⭐ `JAN-ESCREC` ER-2 — WHICH EVALUATIONS, BY THE ONE PREDICATE THE CHECK DEMANDS THEM BY (`record.ts` `restampable`),
+ * then re-scorability (`rescoreEvaluation`): the check refuses a RESCORED record that leaves out one this yields, or
+ * re-stamps one it does not (`check-core.ts`). `casePrompts` is today's prompt hashes (`fingerprint.ts`), what limb 2
+ * compares first: an evaluation whose recorded prompt is not today's owes a model call, not a re-scoring, and is
+ * skipped (the ER-2 fix round's re-verifier's finding [0]).
  */
 export async function rescoredLines(
 	source: RunLine,
 	calls: readonly CallLine[],
 	cases: readonly QualificationCase[],
+	casePrompts: CasePromptHashes,
 	stamp: RescoreStamp,
 	criteria: readonly AssessmentCriterion[] = SEEDED_REASONING_REVIEW_CRITERIA
 ): Promise<RescoredLine[]> {
@@ -86,9 +99,9 @@ export async function rescoredLines(
 	}
 	const out: RescoredLine[] = [];
 	for (const evaluation of byEvaluation.values()) {
+		if (!restampable(evaluation, (id) => cases.some((k) => k.id === id), casePrompts)) continue;
 		const last = evaluation.at(-1)!;
-		const c = cases.find((k) => k.id === last.caseId);
-		if (!c || !last.scored) continue;
+		const c = cases.find((k) => k.id === last.caseId)!;
 		let scored: ScoredOutcome;
 		try {
 			scored = await rescoreEvaluation(source, c, evaluation, stamp.scoring, criteria);

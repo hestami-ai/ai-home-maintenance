@@ -449,6 +449,48 @@ export function serverDayOf(serverClock: string, offset: string): string | undef
 	return new Date(ms + minutes * 60_000).toISOString().slice(0, 10);
 }
 
+// ── what a re-scoring re-stamps (§5.4; `JAN-ESCREC` ER-2) ──────────────────────────────────────────────────────────
+
+/** Today's prompt hashes, by case and call role — `fingerprint.ts`'s `casePrompts`, as the check is handed them. */
+export type CasePromptHashes = ReadonlyMap<string, Readonly<Record<CallRole, string>>>;
+
+/**
+ * ⭐ `JAN-ESCREC` ER-2 (the ER-2 fix round's re-verifier's finding [0]) — WHETHER EACH CALL RECORDED THE PROMPT TODAY'S
+ * REVIEWER SENDS for its case and role (a case gone from the set has none): limb 2's FIRST question of a RESCORED line,
+ * which it refuses when the answer is no — a model call is owed, not a re-scoring (`check-core.ts` `reproduceRescore`).
+ * ONE predicate, read there, by limb 1's coverage, and — through `restampable` — by the writer of the lines and by the
+ * check that demands every one of them, so none of them can disagree about it.
+ */
+export function promptsAreToday(calls: readonly CallLine[], casePrompts: CasePromptHashes): boolean {
+	return calls.every((k) => casePrompts.get(k.caseId)?.[k.role] === k.promptSha256);
+}
+
+/**
+ * ⭐ `JAN-ESCREC` ER-2 — AN EVALUATION A RESCORED RECORD RE-STAMPS, before today's path is asked to re-score it: one
+ * evaluation's calls, in order, whose last call carries the outcome (a run stopped part-way leaves one that does not),
+ * none cut at the transport (nothing to replay — and the check refuses a line re-stamping one), each recording the
+ * prompt today's reviewer sends (`promptsAreToday`: limb 2 refuses to re-score one whose prompt changed — its case owes
+ * a model call, so a record that re-stamps the rest of its run without it is whole; the ER-2 fix round's re-verifier's
+ * finding [0]), of a case `isCurrent` holds (one gone from today's set has nothing to be scored against). ONE
+ * predicate, read by the writer of the lines (`rescore.ts` `rescoredLines`) and by the check that demands every one of
+ * them (`check-core.ts`), so the two cannot disagree about what a whole re-scoring holds — the day's midnight is shared
+ * the same way (`serverDayOf`).
+ */
+export function restampable(
+	calls: readonly CallLine[],
+	isCurrent: (caseId: string) => boolean,
+	casePrompts: CasePromptHashes
+): boolean {
+	const last = calls.at(-1);
+	return (
+		last !== undefined &&
+		last.scored !== null &&
+		!calls.some((k) => k.reply.status === 'TRANSPORT_FAILURE') &&
+		promptsAreToday(calls, casePrompts) &&
+		isCurrent(last.caseId)
+	);
+}
+
 const str =
 	(pattern?: RegExp, what = 'a string'): Check =>
 	(v, at) =>

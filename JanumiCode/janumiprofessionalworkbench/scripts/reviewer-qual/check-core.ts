@@ -43,7 +43,9 @@ import type { Oracle, OracleSet, QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
 	MATERIAL_FAILURE_CLASSES,
+	promptsAreToday,
 	recordProblems,
+	restampable,
 	serverDayOf,
 	type AcknowledgedLine,
 	type CallLine,
@@ -725,9 +727,10 @@ interface Ctx {
 	readonly problems: CheckProblem[];
 	readonly notes: string[];
 }
-/** The prompt today's reviewer sends for a call of this case, in this role — or undefined for a case gone from the set. */
-const promptsMatch = (ctx: Ctx, e: Evaluation) =>
-	e.calls.every((c) => ctx.i.current.casePrompts.get(c.caseId)?.[c.role] === c.promptSha256);
+/** Whether each call of `e` recorded the prompt today's reviewer sends — none does for a case gone from the set. The ONE
+ *  predicate (`record.ts` `promptsAreToday`) that `restampable` reads too, for the writer of RESCORED lines and the check
+ *  that demands them whole (`restampsWhole`). */
+const promptsMatch = (ctx: Ctx, e: Evaluation) => promptsAreToday(e.calls, ctx.i.current.casePrompts);
 
 // ── limb 2 ──
 type Fail = (id: string, message: string) => void;
@@ -917,6 +920,72 @@ function weighSupersessions(
 		else struck.add(line.record);
 	}
 	return struck;
+}
+
+// ── ⭐ `JAN-ESCREC` ER-2 — a RESCORED record re-stamps the whole of its source run ──
+
+/** Whether a re-scoring of `run` re-stamps `e`: `restampable` (`record.ts`) — its prompts today's among its legs, limb 2's
+ *  first question (`promptsMatch`) — then re-scorable as limb 2 asks it. */
+async function owedARestamp(ctx: Ctx, run: RunLine, e: Evaluation): Promise<boolean> {
+	if (!restampable(e.calls, (caseId) => ctx.caseIds.has(caseId), ctx.i.current.casePrompts)) return false;
+	try {
+		await ctx.i.rescore(run, ctx.caseById.get(e.caseId)!, e.calls, ctx.S);
+	} catch {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * ⭐ `JAN-ESCREC` ER-2 (the ER-2 verifier's finding [1]) — A RESCORED RECORD RE-STAMPS EXACTLY WHAT A RE-SCORING OF ITS
+ * SOURCE RUN YIELDS. Unlike a run, it is derivable from what its source recorded: `rescoredLines` writes one line for
+ * each evaluation `restampable` admits — the ONE predicate both read — that today's path re-scores. Coverage asks per
+ * case, limb 2 re-scores the lines present, limb 3 reads the outcomes present: without this, a record that left out
+ * one repetition, the one carrying its material failure among them, passed all three. So a record limb 2 reads
+ * (today's fingerprint, not refused) and not struck must re-stamp each such evaluation of its source run, and no other
+ * of a current case: one left out, or one too many, is a RECORD problem naming it. ⭐ Re-scorability is asked as limb 2
+ * asks it, in its order (the ER-2 fix round's re-verifier's finding [0]): FIRST whether its recorded prompts are today's
+ * (`promptsMatch`, a leg of `restampable`) — limb 2 refuses one whose prompt changed, "a model call is owed, not a
+ * re-scoring", so it is owed no line: the rest of its source run is re-stamped without it, and its case is owed a RUN,
+ * as limb 1's hint says — THEN whether today's path re-scores it (`ctx.i.rescore`).
+ * ⚠ NOT ASKED OF A RECORD UNDER AN EARLIER FINGERPRINT: whether its evaluations were re-scorable was its own day's
+ * path's question, which today's cannot replay — the check of its day asked it. Nor of a refused or a struck one: each
+ * counts for nothing. Nor of a line of a case gone from today's set, which limb 2 does not re-score either.
+ * ⭐ COMPLETED BY APPENDING (ruled; the ER-2 fix round's re-verifier's finding [6]): the record is append-only, and a
+ * RESCORED record that leaves an owed evaluation out MAY be completed later by appending that line under the same
+ * rescore id — the comparison groups the lines by rescore id and source run wherever they stand in the record. It is RED
+ * until then; nothing refuses a RESCORED record that grows after its first commit.
+ */
+async function restampsWhole(ctx: Ctx, struck: ReadonlySet<string>): Promise<void> {
+	const asked = ctx.rescores.filter(
+		(x) => x.line.reviewerFingerprint === ctx.F && !ctx.refused.has(x.line.rescoreId) && !struck.has(x.line.rescoreId)
+	);
+	// By record AND source, never by record alone (`ER2-V51`): `rescoredLines` writes one source run per rescore id, so each
+	// pair is one re-scoring — and another run's line for the same case and repetition never stands in for its source's.
+	const records = new Map<string, Rescore[]>();
+	for (const x of asked) {
+		const key = `${x.line.rescoreId}|${x.source.run.runId}`;
+		records.set(key, [...(records.get(key) ?? []), x]);
+	}
+	for (const xs of records.values()) {
+		const { line, at, source } = xs[0]!;
+		const restamped = new Map(xs.map((x) => [evaluationKey(x.line.caseId, x.line.repetition), x]));
+		for (const e of source.evaluations.values()) {
+			const owed = await owedARestamp(ctx, source.run, e);
+			const x = restamped.get(evaluationKey(e.caseId, e.repetition));
+			const label = `${e.caseId}#${e.repetition}`;
+			if (owed && !x)
+				ctx.problems.push({
+					limb: 'RECORD',
+					message: `${at}: RESCORED ${line.rescoreId} leaves out ${label} of run ${source.run.runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, not cut at the transport, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`
+				});
+			else if (!owed && x && ctx.caseIds.has(e.caseId))
+				ctx.problems.push({
+					limb: 'RECORD',
+					message: `${x.at}: RESCORED ${line.rescoreId} re-stamps ${label} of run ${source.run.runId}, which a re-scoring of that run does not (\`rescoredLines\`) — today’s path cannot re-score it`
+				});
+		}
+	}
 }
 
 // ── limb 1 ──
@@ -1127,6 +1196,7 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 	const repro = await reproduction(ctx);
 	const failures = materialFailures(ctx);
 	const struck = weighSupersessions(ctx, repro, failures);
+	await restampsWhole(ctx, struck);
 	coverage(ctx, struck);
 	for (const [id, messages] of repro)
 		if (!struck.has(id))

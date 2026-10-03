@@ -102,6 +102,8 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 	 *     refusal is the victim of `MU-F202-the-floor-blocks-only-on-REJECTED`, which is killed only because this floor
 	 *     blocks WITHOUT a REJECTED review. Any non-REJECTED review does that; ASSESSING was never what it needed (a
 	 *     second test concluded `REJECTED` lets that mutant SURVIVE, driven).
+	 *   · ⭐ `JAN-ESCREC` ER-2 step 7 — the third `REJECTED`, a subject finding a waiver names: the floor a later accepted
+	 *     turn then SATISFIES, with the waiver still EFFECTIVE (`ER1-V401`).
 	 * No assertion in this file changed.
 	 */
 	async function blockTheFloor(
@@ -270,7 +272,73 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		).not.toMatch(/or a governance waiver/i);
 	});
 
-	// THE CONTROL, with its own failure mode rather than a mirror of the two above: a panel that rendered the
+	// ⭐ `JAN-ESCREC` ER-2 step 7 (`REG-D-092`; the ER-1 fourth fix round's re-verifier's finding [1]; `ER1-V401`) — THE NOTE
+	// IS SAID ONLY BESIDE A BLOCKED FLOOR, AND A WAIVED FLOOR CAN BE SATISFIED. `waived` is any EFFECTIVE waiver on the PWA
+	// (`floor.ts` `hasEffectiveWaiver`), so it stays true after a later turn satisfies the floor; the page's note — "publishing
+	// stays blocked" — is held to `!satisfied` by a condition of its own (ER-1's fourth fix round split it out of the blocked
+	// branch), and the control below stages a satisfied floor with NO waiver, where the note is absent either way. So this
+	// stages the state the condition exists for: a REJECTED review, a waiver recorded through the form, then a second agent
+	// turn — the stipulation `draftWithSatisfiedFloor` registered still stands, so the declared stand-in answers SATISFIED —
+	// accepted. ⭑ THE ARRANGEMENT FIRST, AND BOTH WAYS: the note is shown beside the waived floor while it blocks, and after
+	// the accepted turn the floor reads SATISFIED with the "waiver recorded" badge still shown — so the absence below is the
+	// condition's, never a page that lost the waiver.
+	test('a waiver recorded, then the floor SATISFIED by a later accepted turn: the badge stays, and neither the note nor the blocked hint is shown', async ({
+		page,
+		request
+	}) => {
+		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Waiver Then Satisfied');
+		await blockTheFloor(request, pwaId, 'REJECTED');
+		await gotoHydrated(page, `/pwa/${pwaId}`);
+		await page
+			.locator('form.floorwaiver input[name="rationale"]')
+			.fill('Accepted: the reasoning gap is understood, and the graph will be revised.');
+		await page.locator('form.floorwaiver').getByRole('button').click();
+		await expect
+			.poll(async () =>
+				(await introspect(request)).decisions.map(
+					(d) => `${String(d.state.decisionType)}/${String(d.state.status)}`
+				)
+			)
+			.toEqual(['WAIVER/EFFECTIVE']);
+		await gotoHydrated(page, `/pwa/${pwaId}`);
+		await expect(
+			page.getByTestId('floor-waiver-nondischarge'),
+			'arrangement: the note is not shown beside the waived floor while it blocks'
+		).toHaveCount(1);
+
+		const res = await request.post(`/pwa/${pwaId}/agent`, {
+			data: {
+				instruction: JSON.stringify({
+					plan: [
+						{
+							tool: 'set_pwa_details',
+							args: { description: 'Revised in a second authoring turn, after the waiver.' }
+						}
+					]
+				})
+			}
+		});
+		const body = await res.text();
+		expect(body, 'arrangement: the second turn did not satisfy the floor').toContain(
+			'Assurance floor SATISFIED'
+		);
+		await acceptAgentCandidate(request, pwaId, body);
+		expect((await introspect(request)).authoringCandidates).toEqual([]);
+
+		await gotoHydrated(page, `/pwa/${pwaId}`);
+		await expect(page.getByTestId('assurance-disposition'), 'arrangement: the floor is not SATISFIED').toHaveText(
+			'⚖ SATISFIED'
+		);
+		await expect(
+			page.getByTestId('assurance-waived'),
+			'arrangement: the waiver no longer shows, so its note could not either'
+		).toBeVisible();
+		// ⭐ THE CLAIM: beside a satisfied floor, no "publishing stays blocked" — and no blocked hint.
+		await expect(page.getByTestId('floor-waiver-nondischarge')).toHaveCount(0);
+		await expect(page.getByTestId('floor-blocked-hint')).toHaveCount(0);
+	});
+
+	// THE CONTROL, with its own failure mode rather than a mirror of the first two: a panel that rendered the
 	// blocked hint UNCONDITIONALLY would pass both, while lying on every satisfied floor. This fails in that world.
 	test('a SATISFIED floor shows no blocked hint and no waiver form', async ({ page, request }) => {
 		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Waiver Control');

@@ -3,15 +3,9 @@
 // The scoring digest is what these RAW replies score to through the real path — the product's validator at its
 // `print` seam, then the runner's scoring over the Reasoning Review reference alone (`runner.ts` `evaluateCase`) —
 // hashed as outcomes only. So a change anywhere between a reply and its recorded outcome moves the digest: the parse,
-// the repair decision, `coerceJudgement`, the mapper, the ladder, the independence check, the runner's handling of a
-// validator that throws. A change that moves NONE of these outcomes is, by this measure, no change to the scoring.
-// ⚠ 2026-10-01 — NOT TRUE OF ONE CHANGE, FOR A WINDOW (`JAN-ESCREC`; the ER-1 verifier's finding [8]). `REG-D-089`'s
-// rule (a), built in ER-1, moves the outcome of a clean reply recommending escalation (to the escalated disposition,
-// from SATISFIED), and no entry below carries such a reply until ER-2 adds four (`escalated-clean`,
-// `escalated-beside-a-fault`, `escalated-skipped-row`, `escalated-reported-as-producer`). Until then the scoring digest
-// does not see the rule: that outcome moved, and the reviewer fingerprint did not. The roadmap discloses the window
-// and forbids a paid qualification run in it (`docs/_working/ROADMAP-the-escalation-recommendation.md`, last section);
-// ER-2 closes it and moves the fingerprint, in one commit. (Lower case here keeps design G7's count of the value at 0.)
+// the repair decision, `coerceJudgement`, the mapper, the ladder, `REG-D-089`'s rule (a), the independence check, the
+// runner's handling of a validator that throws. A change that moves NONE of these outcomes is, by this measure, no
+// change to the scoring.
 //
 // ⭐ EVERY `REG-F-428` CLASS IS HERE — a duplicate key, an unknown id and a corrupted one, a non-boolean `failed`,
 // fenced JSON, prose-wrapped JSON — with the siblings the harness detects, and ONE REPLY THAT FAILS THE FIRST PARSE, so
@@ -21,6 +15,16 @@
 // so the plan's independence cannot change without moving the digest; and one whose row carries `stipulated: true`,
 // which the product must read as the model answered it — a stipulation is the test's to make (`REG-D-071`), never the
 // reviewer's — so `coerceJudgement` cannot start honouring it without moving the digest.
+// ⭐ `JAN-ESCREC` ER-2 (design D4; `REG-D-089`, `REG-D-090`, `REG-D-092`) — AND `REG-D-089`'S RULE (a) FROM EACH SIDE: a
+// clean, fully answered reply recommending ESCALATED, which the rule escalates (`composeAssuranceOutcome`'s second
+// pass); and the same recommendation where the rule must NOT reach — beside a BLOCKING fault (REJECTED stays, "more
+// actionable"), beside a row never answered (INCONCLUSIVE stays: the rule is keyed on the ladder's SATISFIED, never on
+// "no criterion failed"), and reported as the producer (BOUNDARY_REJECTED stays: the rule reads the VALID arm only). So
+// the rule cannot be dropped, widened past either narrowing, or turned on another arm without moving the digest. Each
+// is pinned by id to its disposition (`verif/reviewer-qualification-fingerprint.test.ts`) — a set pin cannot kill a
+// mutant of one entry. ⭐ And the rule's LITERAL from its other side (the ER-2 verifier's finding [3]): a clean reply
+// recommending CONDITIONALLY_SATISFIED, REJECTED or INCONCLUSIVE in turn, each SATISFIED, so the rule cannot be widened
+// to any recommendation but ESCALATED without moving the digest either — each pinned by id alike.
 //
 // ⚠ THE CORPUS IS NEVER SENT TO A MODEL, and it does not tune anything: it is the fixed input of a measurement.
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
@@ -85,6 +89,8 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 	const ids = criteria.map((c) => c.id);
 	const [first = 'CRITERION-A', second = 'CRITERION-B', third = 'CRITERION-C', fourth = 'CRITERION-D'] = ids;
 	const clean = reply(ids.map((id) => row(id)));
+	/** ⭐ `JAN-ESCREC` D4 — every criterion clean, and the recommendation the ruling acts on (`REG-D-089`). */
+	const escalated = reply(ids.map((id) => row(id)), 'ESCALATED');
 	const cleanRow = JSON.stringify(row(second)).slice(0, -1);
 	return [
 		{ id: 'clean', covers: 'every criterion evaluated clean', replies: [clean] },
@@ -160,6 +166,44 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 			id: 'self-stipulated',
 			covers: 'a row the model marks `stipulated: true` — read as it answered, never as a stipulation (REG-D-071)',
 			replies: [reply(ids.map((id) => (id === first ? { ...row(id), stipulated: true } : row(id))))]
+		},
+		// ⭐ `JAN-ESCREC` ER-2 (D4) — `REG-D-089`'s rule (a), then the three places it must not reach (the header).
+		{
+			id: 'escalated-clean',
+			covers: 'every criterion evaluated clean, the recommendation ESCALATED — REG-D-089 rule (a) escalates the review',
+			replies: [escalated]
+		},
+		{
+			id: 'escalated-beside-a-fault',
+			covers: 'one criterion faulted, BLOCKING by the reviewer, the recommendation ESCALATED — REJECTED stays, "more actionable" (REG-D-089)',
+			replies: [reply(ids.map((id) => (id === fourth ? row(id, true, 'BLOCKING') : row(id))), 'ESCALATED')]
+		},
+		{
+			id: 'escalated-skipped-row',
+			covers: 'one criterion never answered, the recommendation ESCALATED — INCONCLUSIVE stays: rule (a) is keyed on a computed SATISFIED, never on "no criterion failed" (REG-D-090)',
+			replies: [reply(ids.slice(1).map((id) => row(id)), 'ESCALATED')]
+		},
+		{
+			id: 'escalated-reported-as-producer',
+			covers: 'a clean reply recommending ESCALATED, the producer reported as the model that answered — BOUNDARY_REJECTED stays: rule (a) reads a VALID result only (ASR-11; REG-D-090)',
+			replies: [reportedAsProducer(escalated)]
+		},
+		// ⭐ `JAN-ESCREC` ER-2 (the ER-2 verifier's finding [3]) — and rule (a)'s LITERAL: a clean reply recommending any value
+		// but ESCALATED stays SATISFIED (the header).
+		{
+			id: 'clean-recommends-conditionally-satisfied',
+			covers: 'every criterion evaluated clean, the recommendation CONDITIONALLY_SATISFIED — SATISFIED stays: rule (a) reads the literal ESCALATED only (REG-D-090)',
+			replies: [reply(ids.map((id) => row(id)), 'CONDITIONALLY_SATISFIED')]
+		},
+		{
+			id: 'clean-recommends-rejected',
+			covers: 'every criterion evaluated clean, the recommendation REJECTED — SATISFIED stays: the recommendation is not the verdict (REG-D-074), and rule (a) reads the literal ESCALATED only (REG-D-090)',
+			replies: [reply(ids.map((id) => row(id)), 'REJECTED')]
+		},
+		{
+			id: 'clean-recommends-inconclusive',
+			covers: 'every criterion evaluated clean, the recommendation INCONCLUSIVE — SATISFIED stays: rule (a) reads the literal ESCALATED only (REG-D-090)',
+			replies: [reply(ids.map((id) => row(id)), 'INCONCLUSIVE')]
 		}
 	];
 }

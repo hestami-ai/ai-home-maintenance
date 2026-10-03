@@ -57,6 +57,7 @@ import {
 	type CallLine,
 	type CandidateIdentity,
 	type RecordLine,
+	type RescoredLine,
 	type RunLine,
 	type ScoredOutcome,
 	type SelectedCandidate,
@@ -65,6 +66,7 @@ import {
 } from '../scripts/reviewer-qual/record.js';
 import { rescoreEvaluation, rescoredLines } from '../scripts/reviewer-qual/rescore.js';
 import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/runner.js';
+import { scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
 import type { TransportReply } from '../scripts/reviewer-qual/transports.js';
 import { BUN, GIT, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
 
@@ -417,6 +419,7 @@ describe('JAN-CRITREAD J2-3 — RESCORED and ACKNOWLEDGED: a move owes a model c
 			lines.find((l): l is RunLine => l.kind === 'RUN')!,
 			lines.filter((l): l is CallLine => l.kind === 'CALL'),
 			SUBSET,
+			FP.casePrompts,
 			stamp(rescoreId)
 		);
 
@@ -438,11 +441,16 @@ describe('JAN-CRITREAD J2-3 — RESCORED and ACKNOWLEDGED: a move owes a model c
 	});
 
 	it('⛔ a RESCORED line re-stamping an evaluation whose prompt has changed is refused — that case owes a model call', async () => {
-		const old = tamper(await recorded({ runId: 'qr-sc-3', fingerprint: moved('scoring') }), 'G-RR-04', (c) => ({
+		// ⚠ `JAN-ESCREC` ER-2 (the ER-2 fix round's re-verifier's finding [0]) — `rescoredLines` no longer writes such a line:
+		// it asks limb 2's first question too (`promptsAreToday`). So the lines are written while G-RR-04's recorded prompt
+		// was still today's, and its prompt changes after.
+		const ran = await recorded({ runId: 'qr-sc-3', fingerprint: moved('scoring') });
+		const rescored = await restamp(ran, 'rs-sc-3');
+		const old = tamper(ran, 'G-RR-04', (c) => ({
 			...c,
 			promptSha256: HEX('d')
 		}));
-		const r = await check([file([...old, ...(await restamp(old, 'rs-sc-3'))])]);
+		const r = await check([file([...old, ...rescored])]);
 		expect(limb(r, 'REPRODUCTION')).toContain(
 			'RESCORED rs-sc-3: G-RR-04#1 — re-stamps an evaluation whose prompt has changed since run qr-sc-3'
 		);
@@ -514,6 +522,277 @@ describe('JAN-CRITREAD J2-3 — RESCORED and ACKNOWLEDGED: a move owes a model c
 			`RUN qr-forged-1 carries today’s reviewer fingerprint ${FP.reviewer} but scoring digest ${HEX('e')}, not today’s ${FP.scoring}`
 		);
 		expect(limb(r, 'COVERAGE'), 'it covers nothing').toContain('3 of 3 current case(s) are not MEASURED');
+	});
+});
+
+// ── ⭐ `JAN-ESCREC` ER-2 — a RESCORED record re-stamps the WHOLE of its source run (the ER-2 verifier's finding [1]) ──────
+// Unlike a run, a re-scoring is derivable from what its source recorded, so the check demands it whole: every evaluation
+// `rescoredLines` yields — `restampable` (`record.ts`, the ONE predicate the writer and the check both read) and
+// re-scorable today, as limb 2 decides it — and no other of a current case. Before, coverage asked per case, limb 2
+// re-scored the lines present and limb 3 read the outcomes present, so a record that left out one repetition — the one
+// carrying its material failure among them — was GREEN.
+describe('JAN-ESCREC ER-2 — a RESCORED record re-stamps the WHOLE of its source run: an evaluation left out, or one too many, is a RECORD problem naming it', () => {
+	const restamp = (lines: readonly RecordLine[], rescoreId: string, at: RunFingerprint = CURRENT, cases = SUBSET) =>
+		rescoredLines(
+			lines.find((l): l is RunLine => l.kind === 'RUN')!,
+			lines.filter((l): l is CallLine => l.kind === 'CALL'),
+			cases,
+			FP.casePrompts,
+			{ rescoreId, date: '2026-10-02T09:00:00.000Z', commit: 'a'.repeat(40), reviewer: at.reviewer, scoring: at.scoring, caseSet: at.caseSet }
+		);
+	/** A run under an earlier fingerprint — only the scoring moved — in two repetitions, whose renamed copy G-CLEAN-R1 is
+	 *  rejected in its first alone: one material failure, as on the committed record's source run (`REG-F-456`). */
+	const twice = (runId: string) => {
+		const asked = new Map<string, number>();
+		return recorded({
+			runId,
+			fingerprint: moved('scoring'),
+			repetitions: 2,
+			reply: (id) => {
+				const k = asked.get(id) ?? 0;
+				asked.set(id, k + 1);
+				return id === 'G-CLEAN-R1' && k === 0 ? judgement([SEEDED_REASONING_REVIEW_CRITERIA[5]!.id]) : asOracle(id);
+			}
+		});
+	};
+	const label = (l: RescoredLine) => `${l.caseId}#${l.repetition}`;
+	const ALL_SIX = ['G-CLEAN#1', 'G-CLEAN#2', 'G-CLEAN-R1#1', 'G-CLEAN-R1#2', 'G-RR-04#1', 'G-RR-04#2'];
+	/** Where the check places a line of a one-file record. */
+	const at = (lines: readonly RecordLine[], line: RecordLine) => `runs.ndjson:${lines.indexOf(line) + 1}`;
+	/** The RECORD problem for an evaluation a RESCORED record leaves out, verbatim — placed at the record's first line. */
+	const leftOut = (lines: readonly RecordLine[], rescoreId: string, evaluation: string, runId: string) =>
+		`${at(lines, lines.find((l) => l.kind === 'RESCORED' && l.rescoreId === rescoreId)!)}: RESCORED ${rescoreId} leaves out ${evaluation} of run ${runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, not cut at the transport, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`;
+	/** The RECORD problem for a line re-stamping an evaluation a re-scoring does not yield, verbatim. */
+	const tooMany = (lines: readonly RecordLine[], line: RescoredLine) =>
+		`${at(lines, line)}: RESCORED ${line.rescoreId} re-stamps ${label(line)} of run ${line.sourceRunId}, which a re-scoring of that run does not (\`rescoredLines\`) — today’s path cannot re-score it`;
+
+	it('⭐ CONTROL — the whole re-scoring, its material failure escalated, is GREEN; the arrangement: one repetition carries the re-scored record’s own material failure', async () => {
+		const old = await twice('qr-whole-1');
+		const rescored = await restamp(old, 'rs-whole-1');
+		expect(rescored.map(label).sort(), 'every evaluation of the source run is re-stamped').toEqual(ALL_SIX);
+		expect(
+			['G-CLEAN-R1#1', 'G-CLEAN-R1#2'].map((k) => rescored.find((l) => label(l) === k)!.scored.disposition),
+			'the arrangement: G-CLEAN-R1 rejected in its first repetition alone'
+		).toEqual(['REJECTED', 'SATISFIED']);
+		const source = escalate('qr-whole-1', ['G-CLEAN-R1']);
+		expect(limb(await check([file([...old, source, ...rescored])]), 'ESCALATION'), 'the arrangement: the re-scored record owes its own ESCALATION').toBe(
+			'RESCORED rs-whole-1: G-CLEAN-R1 — CLEAN_NOT_SATISFIED, VERDICT_CHANGES_WITH_NAME — no ESCALATION line cites a register finding for it (§5.6 limb 3)'
+		);
+		expect((await check([file([...old, source, ...rescored, escalate('rs-whole-1', ['G-CLEAN-R1'])])])).problems).toEqual([]);
+	});
+
+	it('⛔ a RESCORED record that leaves out ONE evaluation of its source run is refused, naming it — whichever one it is, though the case is still covered by its other repetition', async () => {
+		const old = await twice('qr-whole-2');
+		const rescored = await restamp(old, 'rs-whole-2');
+		const cited = [escalate('qr-whole-2', ['G-CLEAN-R1']), escalate('rs-whole-2', ['G-CLEAN-R1'])];
+		expect(rescored.map(label).sort(), 'the arrangement: six evaluations, three cases in two repetitions').toEqual(ALL_SIX);
+		for (const gone of rescored) {
+			const lines = [...old, ...rescored.filter((l) => l !== gone), ...cited];
+			expect((await check([file(lines)])).problems, `${label(gone)} left out`).toEqual([
+				{ limb: 'RECORD', message: leftOut(lines, 'rs-whole-2', label(gone), 'qr-whole-2') }
+			]);
+		}
+	});
+
+	it('⛔ THE CHERRY-PICK (the ER-2 verifier’s `cherry.ts`) — the repetition carrying the re-scored record’s material failure left out, WITH the ESCALATION line that cited it, is refused: it was GREEN', async () => {
+		const old = await twice('qr-whole-3');
+		const rescored = await restamp(old, 'rs-whole-3');
+		const failing = rescored.find((l) => label(l) === 'G-CLEAN-R1#1')!;
+		expect(failing.scored.disposition, 'the arrangement: the repetition left out is the one rejected').toBe('REJECTED');
+		const lines = [...old, escalate('qr-whole-3', ['G-CLEAN-R1']), ...rescored.filter((l) => l !== failing)];
+		expect((await check([file(lines)])).problems).toEqual([
+			{ limb: 'RECORD', message: leftOut(lines, 'rs-whole-3', 'G-CLEAN-R1#1', 'qr-whole-3') }
+		]);
+	});
+
+	it('⛔ ONE RESCORE ID OVER TWO SOURCE RUNS (the ER-2 fix round’s re-verifier’s finding [1], `ER2-V51`) — another run’s line for the repetition left out does not stand in for it: each source run is asked whole', async () => {
+		const first = await twice('qr-whole-10');
+		const second = await recorded({ runId: 'qr-whole-10b', fingerprint: moved('scoring'), repetitions: 2 });
+		const own = await restamp(first, 'rs-whole-10');
+		const failing = own.find((l) => label(l) === 'G-CLEAN-R1#1')!;
+		const standIn = (await restamp(second, 'rs-whole-10')).find((l) => label(l) === 'G-CLEAN-R1#1')!;
+		expect(
+			[failing.scored.disposition, standIn.scored.disposition],
+			'the arrangement: the first run’s repetition is the one rejected, the other run’s is not'
+		).toEqual(['REJECTED', 'SATISFIED']);
+		const lines = [...first, escalate('qr-whole-10', ['G-CLEAN-R1']), ...second, ...own.filter((l) => l !== failing), standIn];
+		const r = await check([file(lines)]);
+		expect(r.problems, 'the first run’s left-out repetition is named').toContainEqual({
+			limb: 'RECORD',
+			message: leftOut(lines, 'rs-whole-10', 'G-CLEAN-R1#1', 'qr-whole-10')
+		});
+		expect(
+			r.problems.filter((p) => p.message.includes(' of run qr-whole-10,')).map((p) => p.message),
+			'and nothing else of the first run'
+		).toEqual([leftOut(lines, 'rs-whole-10', 'G-CLEAN-R1#1', 'qr-whole-10')]);
+		expect(
+			r.problems
+				.filter((p) => p.message.includes(' of run qr-whole-10b,'))
+				.map((p) => /leaves out (\S+) of run/.exec(p.message)?.[1])
+				.sort(),
+			'and the other run, asked whole too, is owed the five evaluations it was not re-stamped for'
+		).toEqual(ALL_SIX.filter((k) => k !== 'G-CLEAN-R1#1'));
+		expect([...new Set(r.problems.map((p) => p.limb))], 'RECORD problems alone').toEqual(['RECORD']);
+	});
+
+	it('⭐ re-scorability is decided as limb 2 decides it — an evaluation today’s path cannot re-score is owed no line, and a line re-stamping one is one too many', async () => {
+		const old = await twice('qr-whole-4');
+		const rescored = await restamp(old, 'rs-whole-4');
+		const cited = [escalate('qr-whole-4', ['G-CLEAN-R1']), escalate('rs-whole-4', ['G-CLEAN-R1'])];
+		// A re-scorer that refuses G-RR-04's second repetition, as `rescoreEvaluation` refuses one whose first parse today's
+		// path decides otherwise than the run did.
+		const refusing: CheckInputs['rescore'] = (run, c, calls, digest) =>
+			c.id === 'G-RR-04' && calls[0]!.repetition === 2
+				? Promise.reject(new Error('today’s path makes 2 call(s) where the run made 1'))
+				: rescoreEvaluation(run, c, calls, digest);
+		const unrescorable = rescored.find((l) => label(l) === 'G-RR-04#2')!;
+		const without = [...old, ...rescored.filter((l) => l !== unrescorable), ...cited];
+		expect((await check([file(without)], { rescore: refusing })).problems, 'left out, it is owed nothing').toEqual([]);
+		const whole = [...old, ...rescored, ...cited];
+		const r = await check([file(whole)], { rescore: refusing });
+		expect(limb(r, 'RECORD')).toBe(tooMany(whole, unrescorable));
+		expect(limb(r, 'REPRODUCTION'), 'and limb 2 says why').toContain(
+			'RESCORED rs-whole-4: G-RR-04#2 — cannot be re-scored: today’s path makes 2 call(s) where the run made 1'
+		);
+	});
+
+	// ⭐ LIMB 2'S FIRST QUESTION, ON BOTH SIDES (the ER-2 fix round's re-verifier's finding [0]): limb 2 refuses to re-score
+	// an evaluation whose recorded prompt is not today's — "a model call is owed, not a re-scoring" — so neither the writer
+	// nor the check owes it a line, and the rest of its source run can still be re-stamped (`promptsAreToday`, a leg of
+	// `restampable`). Before, the check owed it, and the only GREEN path was a paid re-run of every case.
+	/** `twice`, with G-RR-04's recorded prompts no longer today's (the fingerprint unmoved but for the scoring). */
+	const promptMoved = async (runId: string) =>
+		tamper(await twice(runId), 'G-RR-04', (c) => ({ ...c, promptSha256: HEX('d') }));
+
+	it('⭐ THE WRITER — `rescoredLines` over a source run one of whose cases’ prompt changed yields exactly the owed lines: every other evaluation, none of that case', async () => {
+		const old = await promptMoved('qr-whole-9');
+		expect(
+			old.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-RR-04').map((c) => c.promptSha256),
+			'the arrangement: both of G-RR-04’s evaluations recorded a prompt today’s reviewer does not send'
+		).toEqual([HEX('d'), HEX('d')]);
+		const rescored = await restamp(old, 'rs-whole-9');
+		expect(rescored.map(label).sort()).toEqual(ALL_SIX.filter((k) => !k.startsWith('G-RR-04#')));
+	});
+
+	it('⭐ THE CHECK — the record re-stamping every OTHER evaluation of that run, plus the one-case RUN the changed case owes under today’s fingerprint, is GREEN; without that run the case is owed a RUN, and no line', async () => {
+		const old = await promptMoved('qr-whole-9');
+		// G-RR-04 is filtered out here too, so this half asks the check alone, whatever the writer yields.
+		const rescored = (await restamp(old, 'rs-whole-9')).filter((l) => l.caseId !== 'G-RR-04');
+		const cited = [escalate('qr-whole-9', ['G-CLEAN-R1']), escalate('rs-whole-9', ['G-CLEAN-R1'])];
+		const owed = await check([file([...old, ...rescored, ...cited])]);
+		expect(limb(owed, 'RECORD'), 'G-RR-04 is owed no line').toBe('');
+		expect(limb(owed, 'COVERAGE'), 'its case is owed a RUN').toContain(
+			'1 of 3 current case(s) are not MEASURED under today’s reviewer fingerprint'
+		);
+		expect(limb(owed, 'COVERAGE')).toContain('G-RR-04');
+		const oneCase = await recorded({ runId: 'qr-whole-9-today', cases: SUBSET.filter((c) => c.id === 'G-RR-04') });
+		expect((await check([file([...old, ...rescored, ...cited, ...oneCase])])).problems).toEqual([]);
+	});
+
+	it('⭐ by its OWN rule (`restampable`), whatever a re-scorer admits — an evaluation cut at the transport is owed no line (a line re-stamping one is refused), nor one of a case gone from today’s set (limb 2 never re-scores one)', async () => {
+		// A re-scorer that admits whatever it is handed, at the outcome its last call recorded — so what the core owes by its
+		// own rule shows apart from what a re-scorer refuses (`rescoreEvaluation` refuses both).
+		const admitting: CheckInputs['rescore'] = async (_run, _c, calls, digest) => ({ ...calls.at(-1)!.scored!, scoringDigest: digest });
+		const gone = CASES.find((c) => c.id === 'G-CLEAN-R2')!;
+		const asked = new Map<string, number>();
+		const old = await recorded({
+			runId: 'qr-whole-5',
+			fingerprint: moved('scoring'),
+			cases: [...SUBSET, gone],
+			repetitions: 2,
+			reply: (id) => {
+				const k = asked.get(id) ?? 0;
+				asked.set(id, k + 1);
+				return id === 'G-CLEAN' && k === 1 ? new Error('the bound') : asOracle(id);
+			}
+		});
+		const rescored = await restamp(old, 'rs-whole-5');
+		expect(rescored.map(label).sort(), 'the arrangement: neither G-CLEAN#2, cut, nor G-CLEAN-R2, gone, is re-stamped').toEqual(
+			ALL_SIX.filter((k) => k !== 'G-CLEAN#2')
+		);
+		const lines = [...old, escalate('qr-whole-5', ['G-CLEAN']), ...rescored];
+		expect((await check([file(lines)], { rescore: admitting })).problems).toEqual([]);
+		// ⭐ (the ER-2 fix round's re-verifier's finding [2], `ER2-V50`) — NOR IS A LINE OF THE GONE CASE ONE TOO MANY, written
+		// with the set that still held it: limb 2 never re-scores it, so no SUPERSEDED line could ever strike the record.
+		const held = (await restamp(old, 'rs-whole-5', CURRENT, [...SUBSET, gone])).filter((l) => l.caseId === gone.id);
+		expect(held.map(label).sort(), 'the arrangement: G-CLEAN-R2 re-stamped with the set that held it').toEqual([
+			'G-CLEAN-R2#1',
+			'G-CLEAN-R2#2'
+		]);
+		expect((await check([file([...lines, ...held])], { rescore: admitting })).problems).toEqual([]);
+	});
+
+	it('⭐ CONTROL — the writer and the check AGREE where the REAL path refuses (the ER-2 fix round’s re-verifier’s finding [3], `ER2-V52`): an evaluation `rescoreEvaluation` cannot re-score is left out by `rescoredLines`, every one after it is still re-stamped, and the check owes it nothing', async () => {
+		const ran = await recorded({ runId: 'qr-whole-11', fingerprint: moved('scoring'), repetitions: 2 });
+		// G-CLEAN#1's initial reply recorded as a span the parse rejects: today's path asks for a repair the run never made.
+		const refused = ran.map((l) =>
+			l.kind === 'CALL' && l.caseId === 'G-CLEAN' && l.repetition === 1
+				? { ...l, reply: { status: 'NOT_RETAINED' as const, spanSha256: HEX('c') } }
+				: l
+		);
+		const calls = refused.filter((l): l is CallLine => l.kind === 'CALL');
+		expect(`${calls[0]!.caseId}#${calls[0]!.repetition}`, 'the arrangement: the refused evaluation is the run’s first').toBe(
+			'G-CLEAN#1'
+		);
+		await expect(
+			rescoreEvaluation(
+				refused.find((l): l is RunLine => l.kind === 'RUN')!,
+				SUBSET.find((c) => c.id === 'G-CLEAN')!,
+				calls.filter((c) => c.caseId === 'G-CLEAN' && c.repetition === 1),
+				FP.scoring
+			),
+			'the arrangement: the REAL path refuses it'
+		).rejects.toThrow("today's path asks for a repair the run never made");
+		const rescored = await restamp(refused, 'rs-whole-11');
+		expect(rescored.map(label).sort(), 'the writer: the evaluations, less the one refused').toEqual(
+			ALL_SIX.filter((k) => k !== 'G-CLEAN#1')
+		);
+		const r = await check([file([...refused, ...rescored])]);
+		expect(limb(r, 'RECORD'), 'the check, through the same real path, owes it nothing').toBe('');
+		expect(r.problems).toEqual([]);
+	});
+
+	// ⭐ ONLY A RECORD LIMB 2 READS IS ASKED, AND ONLY WHILE IT COUNTS. Each fixture leaves out G-RR-04#2 beside a run under
+	// today's fingerprint that covers every case, so the left-out line would be the only problem if it were asked.
+	it('⭐ a RESCORED record under an EARLIER fingerprint is not asked — whether its evaluations were re-scorable was its own day’s path’s question, which today’s cannot replay', async () => {
+		const old = await twice('qr-whole-6');
+		const earlier = reviewerFingerprintOf({ ...FP.components, scoring: HEX('d') });
+		const then = (await restamp(old, 'rs-whole-6', { reviewer: earlier, scoring: HEX('d'), caseSet: FP.caseSet })).filter(
+			(l) => label(l) !== 'G-RR-04#2'
+		);
+		const lines = [...old, escalate('qr-whole-6', ['G-CLEAN-R1']), ...then, escalate('rs-whole-6', ['G-CLEAN-R1']), ...(await recorded({ runId: 'qr-whole-6-today' }))];
+		expect((await check([file(lines)])).problems).toEqual([]);
+	});
+
+	it('⭐ a RESCORED record REFUSED for its stamp is not asked — refused, it counts for nothing, and its one RECORD problem is the stamp', async () => {
+		const old = await twice('qr-whole-7');
+		const forged = (await restamp(old, 'rs-whole-7', { reviewer: FP.reviewer, scoring: HEX('d'), caseSet: FP.caseSet })).filter(
+			(l) => label(l) !== 'G-RR-04#2'
+		);
+		const lines = [...old, escalate('qr-whole-7', ['G-CLEAN-R1']), ...forged, escalate('rs-whole-7', ['G-CLEAN-R1']), ...(await recorded({ runId: 'qr-whole-7-today' }))];
+		expect(limb(await check([file(lines)]), 'RECORD')).toBe(
+			`${at(lines, forged[0]!)}: RESCORED rs-whole-7 carries today’s reviewer fingerprint ${FP.reviewer} but scoring digest ${HEX('d')}, not today’s ${FP.scoring} — the fingerprint hashes the scoring digest, so nothing this tree records can carry both; it counts for nothing`
+		);
+	});
+
+	it('⭐ a RESCORED record STRUCK by a SUPERSEDED line is not asked — struck, it counts for nothing', async () => {
+		const old = await twice('qr-whole-8');
+		// Under today's fingerprint, G-CLEAN#1 recorded with RR-01 unjudged — an outcome today's path does not re-score to —
+		// so the SUPERSEDED line naming the record strikes it.
+		const bad = (await restamp(old, 'rs-whole-8'))
+			.filter((l) => label(l) !== 'G-RR-04#2')
+			.map((l) =>
+				label(l) === 'G-CLEAN#1'
+					? { ...l, scored: { ...l.scored, criteria: l.scored.criteria.map(([k, o]) => [k, k.startsWith('RR-01') ? 'UNABLE_TO_DETERMINE' : o] as const) } }
+					: l
+			);
+		const today = await recorded({ runId: 'qr-whole-8-today' });
+		const lines = [...old, escalate('qr-whole-8', ['G-CLEAN-R1']), ...bad, escalate('rs-whole-8', ['G-CLEAN-R1']), supersede('rs-whole-8'), ...today];
+		expect((await check([file(lines)])).problems).toEqual([]);
+		const unstruck = lines.filter((l) => l.kind !== 'SUPERSEDED');
+		expect(limb(await check([file(unstruck)]), 'REPRODUCTION'), 'CONTROL: not struck, it fails limb 2').toContain(
+			'RESCORED rs-whole-8: G-CLEAN#1 — re-scored through today’s path it is'
+		);
 	});
 });
 
@@ -832,7 +1111,7 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 		]);
 	});
 
-	it('⛔ GUARD — a planted case whose verdict is not REJECTED stays MATERIAL: every disposition the floor gives short of REJECTED (SATISFIED, BOUNDARY_REJECTED with the planted criterion faulted, INCONCLUSIVE, VALIDATOR_FAILED), and every other one a record can carry', async () => {
+	it('⛔ GUARD — a planted case whose verdict is not REJECTED stays MATERIAL: every disposition the floor gives short of REJECTED (SATISFIED, BOUNDARY_REJECTED with the planted criterion faulted, INCONCLUSIVE, VALIDATOR_FAILED, ESCALATED), and every other one a record can carry', async () => {
 		const passed = await recorded({ runId: 'qr-verdict-1', reply: (id) => (id === 'G-RR-04' ? judgement([]) : asOracle(id)) });
 		expect(limb(await check([file(passed)]), 'ESCALATION')).toContain('run qr-verdict-1: G-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 		// Naming the planted criterion does not make the verdict right: here RR-04 is faulted, and the floor refuses a
@@ -851,16 +1130,20 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 		expect((await check([file([...refused, escalate('qr-verdict-2', ['G-RR-04'])])])).problems, 'CONTROL: escalated, green').toEqual([]);
 		// ⭐ THE REST OF WHAT THE FLOOR GIVES, enumerated from the product: the Reasoning Review row's disposition is
 		// VALIDATOR_FAILED or BOUNDARY_REJECTED at the boundary (`classifyValidatorResult`), else `dispositionFromFindings`
-		// — REJECTED, INCONCLUSIVE or SATISFIED here. An INCONCLUSIVE faults nothing (a fault would reject), a
-		// VALIDATOR_FAILED records no criterion; neither is the oracle's REJECTED.
-		// ⚠ 2026-10-01 (`JAN-ESCREC` ER-1; the ER-1 verifier's finding [8]): NO LONGER THE WHOLE LIST. `REG-D-089`'s rule
-		// (a), a second pass after `dispositionFromFindings` (`composeAssuranceOutcome`,
-		// `packages/rph-assurance/src/floor.ts`), now gives ESCALATED for a clean reply that recommends it. ER-2 (design D4)
-		// drives that arm with a real ESCALATED reply and moves ESCALATED into `driven` below; until then it reaches limb 3
-		// only as a tampered line.
+		// — REJECTED, INCONCLUSIVE or SATISFIED here — and then `REG-D-089`'s rule (a), a second pass in
+		// `composeAssuranceOutcome` (`packages/rph-assurance/src/floor.ts`), which gives ESCALATED for a clean, fully
+		// answered reply that recommends it. An INCONCLUSIVE faults nothing (a fault would reject), a VALIDATOR_FAILED
+		// records no criterion, an ESCALATED faults nothing either (the rule reads a computed SATISFIED); none is the
+		// oracle's REJECTED.
+		// ⭑ `JAN-ESCREC` ER-2 (design D4): the ESCALATED arm is driven by a REAL reply — the scoring corpus's own
+		// `escalated-clean`, the one the reviewer fingerprint pins to ESCALATED — through the real runner and validator, so
+		// limb 3 is shown to read the disposition rule (a) actually gives; until ER-2 only a tampered line reached it.
+		const escalatedClean = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).find((e) => e.id === 'escalated-clean')?.replies[0];
+		expect(typeof escalatedClean, 'the corpus’s escalated-clean reply, a raw reply').toBe('string');
 		const arms: readonly [runId: string, reply: string, disposition: string][] = [
 			['qr-verdict-3', omitting(RR08, []), 'INCONCLUSIVE'],
-			['qr-verdict-4', 'I think it is fine.', 'VALIDATOR_FAILED']
+			['qr-verdict-4', 'I think it is fine.', 'VALIDATOR_FAILED'],
+			['qr-verdict-5', escalatedClean as string, 'ESCALATED']
 		];
 		for (const [runId, reply, disposition] of arms) {
 			const lines = await recorded({ runId, reply: (id) => (id === 'G-RR-04' ? reply : asOracle(id)) });
@@ -869,16 +1152,13 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 		}
 		// ⭐ AND EVERY OTHER DISPOSITION A RECORD CAN CARRY, which this floor does not give today — CONDITIONALLY_SATISFIED
 		// needs an open MATERIAL finding or a PARTIALLY_MET row, and every Reasoning Review criterion is BLOCKING and
-		// emits neither; no rule returns ESCALATED; MISSING needs no result at all. A line can still hold one (an earlier
-		// runner's, or one written by hand), and limb 3 reads the disposition as recorded: under an earlier fingerprint,
-		// so limb 2 does not re-score it.
-		// ⚠ 2026-10-01 (`JAN-ESCREC` ER-1): "no rule returns ESCALATED" IS NO LONGER TRUE — `REG-D-089`'s rule (a) returns it
-		// for a clean reply that recommends it, so ESCALATED is now a disposition this floor gives. The assertions below are
-		// left as they are on purpose: ER-2 (design D4) extends the driven set, with an `arms` row driven by a real
-		// ESCALATED reply, and until then the tampered line here is what keeps limb 3 covering ESCALATED.
-		const driven = new Set(['REJECTED', 'SATISFIED', 'BOUNDARY_REJECTED', 'INCONCLUSIVE', 'VALIDATOR_FAILED']);
+		// emits neither; MISSING needs no result at all. A line can still hold one (an earlier runner's, or one written by
+		// hand), and limb 3 reads the disposition as recorded: under an earlier fingerprint, so limb 2 does not re-score it.
+		// ⭑ `JAN-ESCREC` ER-2 (D4): ESCALATED is in `driven` — the `arms` row above reaches it with a real reply — so the
+		// hand-written set and the enumeration of the rest still cover every disposition between them.
+		const driven = new Set(['REJECTED', 'SATISFIED', 'BOUNDARY_REJECTED', 'INCONCLUSIVE', 'VALIDATOR_FAILED', 'ESCALATED']);
 		const rest = SCORED_DISPOSITIONS.filter((d) => !driven.has(d));
-		expect(rest).toEqual(['CONDITIONALLY_SATISFIED', 'ESCALATED', 'MISSING']);
+		expect(rest).toEqual(['CONDITIONALLY_SATISFIED', 'MISSING']);
 		for (const d of rest) {
 			const runId = `qr-verdict-${d.toLowerCase()}`;
 			const lines = tamper(await recorded({ runId, fingerprint: moved('scoring') }), 'G-RR-04', (c) => ({
@@ -886,6 +1166,31 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 				scored: c.scored && { ...c.scored, disposition: d }
 			}));
 			expect(limb(await check([file(lines)]), 'ESCALATION'), d).toBe(unCited(runId, 'G-RR-04 — PLANTED_DEFECT_NOT_REJECTED'));
+		}
+	});
+
+	it('⛔ GUARD (the ER-2 verifier’s finding [0]) — a CLEAN case its reviewer ESCALATES is not the right verdict: CLEAN_NOT_SATISFIED, and VERDICT_CHANGES_WITH_NAME on a renamed copy it then differs from', async () => {
+		// ⭑ `REG-D-089`'s rule (a) fires only where the ladder computed SATISFIED (`REG-D-090`), so in qualification it lands
+		// on a CLEAN case — the place it matters, and the one the `arms` row above, a planted case, never reaches. The pass
+		// bar there is SATISFIED (`REG-D-080`), and ESCALATED is not it: a reviewer that sends every clean work product to a
+		// human has not given the right verdict. The reply is the scoring corpus's own `escalated-clean`, through the real
+		// runner and validator.
+		const escalatedClean = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).find((e) => e.id === 'escalated-clean')?.replies[0];
+		expect(typeof escalatedClean, 'the corpus’s escalated-clean reply, a raw reply').toBe('string');
+		const rows: readonly [runId: string, escalated: readonly string[], owed: readonly string[]][] = [
+			// The base case alone: its renamed copy, SATISFIED, now differs from it.
+			['qr-verdict-clean-1', ['G-CLEAN'], ['G-CLEAN — CLEAN_NOT_SATISFIED', 'G-CLEAN-R1 — VERDICT_CHANGES_WITH_NAME']],
+			// Every clean case: the copies agree, and each misses the bar.
+			['qr-verdict-clean-2', ['G-CLEAN', 'G-CLEAN-R1'], ['G-CLEAN — CLEAN_NOT_SATISFIED', 'G-CLEAN-R1 — CLEAN_NOT_SATISFIED']]
+		];
+		for (const [runId, escalated, owed] of rows) {
+			const lines = await recorded({ runId, reply: (id) => (escalated.includes(id) ? (escalatedClean as string) : asOracle(id)) });
+			for (const id of ['G-CLEAN', 'G-CLEAN-R1'])
+				expect(scoredIn(lines, id).map((x) => x.disposition), `the arrangement: ${runId} ${id}`).toEqual([
+					escalated.includes(id) ? 'ESCALATED' : 'SATISFIED'
+				]);
+			expect(limb(await check([file(lines)]), 'ESCALATION'), runId).toBe(owed.map((u) => unCited(runId, u)).join('\n'));
+			expect((await check([file([...lines, escalate(runId, ['G-CLEAN', 'G-CLEAN-R1'])])])).problems, `CONTROL: ${runId} escalated, green`).toEqual([]);
 		}
 	});
 
@@ -914,6 +1219,7 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 			old.find((l): l is RunLine => l.kind === 'RUN')!,
 			old.filter((l): l is CallLine => l.kind === 'CALL'),
 			SUBSET,
+			FP.casePrompts,
 			{ rescoreId: 'rs-attr-5', date: '2026-09-25T09:00:00.000Z', commit: 'a'.repeat(40), reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet }
 		);
 		const r = await check([file([...old, ...rescored])]);
@@ -1113,6 +1419,7 @@ describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is o
 			lines.find((l): l is RunLine => l.kind === 'RUN')!,
 			lines.filter((l): l is CallLine => l.kind === 'CALL'),
 			SUBSET,
+			FP.casePrompts,
 			{ rescoreId, date: '2026-09-25T09:00:00.000Z', commit: 'a'.repeat(40), reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet }
 		);
 	/** RR-01 recorded unjudged for one case: an outcome today's path does not re-score to (limb 2's fixture), so a

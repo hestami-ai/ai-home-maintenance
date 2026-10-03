@@ -2,7 +2,7 @@
 
 **Design:** `DESIGN-the-escalation-recommendation.md` (revision 2). · **Authority:** `REG-D-089` (sponsor ruling, option
 (a)); the design's delegated calls are recorded as `REG-D-090`, flagged for sponsor confirmation. · **Date:**
-2026-10-01. · **Status:** IN PROGRESS.
+2026-10-01. · **Status:** ~~IN PROGRESS.~~ COMPLETE 2026-10-02 (`ER-1` `117bb65b`, then `ER-2`).
 
 ⭑ **Exit.**
 - **The recommendation is recorded.** A VALID Reasoning Review whose recommendation is the literal `ESCALATED` carries
@@ -125,6 +125,8 @@ ledger, `bun run mutants`, observe, `gate:fast` and `commit -F`.
 **The fingerprint does not move in `ER-1`.** No corpus entry exercises the rule yet.
 
 ## `ER-2` — qualification carries the rule (D4)
+
+⭑ **DONE 2026-10-02** (`REG-D-093`; the design's §9). Seven corpus entries, not four; the record re-scored whole; the check now demands a whole RESCORED record. The pins its last verification still found owed are folded into `REG-F-476`'s programme.
 
 1. **The pins.** Add per-entry pins for the four corpus entries, and ESCALATED in the corpus's disposition set. They
    are red: the entries do not exist yet.

@@ -547,9 +547,93 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 			if (e.calls.length === 2) repaired += 1;
 		}
 		expect(repaired, 'a reply that fails the first parse draws the repair prompt').toBeGreaterThanOrEqual(1);
+		// ⭑ `JAN-ESCREC` ER-2 (design D4) — ESCALATED is an outcome of the ladder since `REG-D-089`'s rule (a) (`REG-D-090`,
+		// `composeAssuranceOutcome`'s second pass), and the corpus reaches it: a set pin says only that SOME entry does —
+		// which entry gives which disposition is the per-entry pin below.
 		expect([...dispositions].sort()).toEqual(
-			['BOUNDARY_REJECTED', 'INCONCLUSIVE', 'REJECTED', 'SATISFIED', 'VALIDATOR_FAILED'].sort()
+			['BOUNDARY_REJECTED', 'ESCALATED', 'INCONCLUSIVE', 'REJECTED', 'SATISFIED', 'VALIDATOR_FAILED'].sort()
 		);
+	});
+
+	it('⭐ `JAN-ESCREC` ER-2 (D4) — REG-D-089’s rule (a) from each side: each escalated entry PINNED BY ID to the disposition it scores', async () => {
+		// ⛔ PER ENTRY, NOT AS A SET: the set pin above is kept green by any one entry reaching ESCALATED, so a mutant of
+		// one entry — its fault dropped, its row restored, its producer report dropped — moves nothing it asks. Each row
+		// here is one entry: the clean reply the rule escalates (`REG-D-089`); the same recommendation beside a BLOCKING
+		// fault, which stays REJECTED, "more actionable" (the ruling's own reason); beside a row never answered, which stays
+		// INCONCLUSIVE — rule (a) is keyed on the ladder's SATISFIED, never on "no criterion failed" (revision 2's
+		// narrowing, `REG-D-090`; ASR-2's "invalid output"); and reported as the producer, which stays BOUNDARY_REJECTED —
+		// the rule reads the VALID arm only (ASR-11). The result class says which arm each was scored in.
+		// ⭑ THE ARRANGEMENT FIRST: each entry's one reply recommends ESCALATED, so no row can pass on an entry that no longer
+		// asks for the rule — `one-fault`, `skipped-row` and `reported-as-producer` already score the last three dispositions.
+		const pinned: readonly [id: string, disposition: string, resultClass: string][] = [
+			['escalated-clean', 'ESCALATED', 'VALID'],
+			['escalated-beside-a-fault', 'REJECTED', 'VALID'],
+			['escalated-skipped-row', 'INCONCLUSIVE', 'VALID'],
+			['escalated-reported-as-producer', 'BOUNDARY_REJECTED', 'BOUNDARY_REJECTED']
+		];
+		const corpus = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA);
+		for (const [id, disposition, resultClass] of pinned) {
+			const entry = corpus.find((e) => e.id === id);
+			expect(entry, `${id}: a corpus entry`).toBeDefined();
+			expect(entry!.replies, `${id}: one reply, and no repair`).toHaveLength(1);
+			const reply = entry!.replies[0]!;
+			const text = typeof reply === 'string' ? reply : reply.answer.arrived ? reply.answer.text : '';
+			expect((JSON.parse(text) as { recommendation?: unknown }).recommendation, `${id}: the reply recommends ESCALATED`).toBe(
+				'ESCALATED'
+			);
+			const e = await evaluateCase({
+				case: CORPUS_CASE,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: FIXTURE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([e.scored.disposition, e.scored.resultClass], id).toEqual([disposition, resultClass]);
+		}
+	});
+
+	it('⭐ `JAN-ESCREC` ER-2 — REG-D-089’s rule (a) reads the LITERAL ESCALATED: a clean reply recommending CONDITIONALLY_SATISFIED, REJECTED or INCONCLUSIVE stays SATISFIED, each PINNED BY ID', async () => {
+		// ⛔ THE RULE'S CONDITION (ii) FROM ITS OTHER SIDE (the ER-2 verifier's finding [3]): a clean review escalates when its
+		// reviewer recommends ESCALATED and on no other value (`REG-D-090`) — the recommendation is otherwise never the
+		// verdict (`REG-D-074`). Until these entries no corpus reply was clean with CONDITIONALLY_SATISFIED or REJECTED, so
+		// the rule widened to either moved no corpus outcome and no fingerprint (`ER2-V7`). An INCONCLUSIVE widening already
+		// moved `unknown-recommendation` — clean, recommending PASS, which the validator reads as INCONCLUSIVE — and the
+		// fingerprint with it, but no pin named it (the ER-2 fix round's re-verifier's finding [5]); `floor.test.ts` alone
+		// held the literal. The selected reviewer's commonest recommendation on clean work short of SATISFIED is
+		// CONDITIONALLY_SATISFIED (`REG-F-456`), so a widening there would re-score its paid runs under an unmoved fingerprint.
+		// ⭑ THE ARRANGEMENT FIRST: each entry's one reply recommends its value and answers every criterion clean, so no row
+		// can pass on an entry that no longer stands where the rule must not reach.
+		const pinned: readonly [id: string, recommendation: string][] = [
+			['clean-recommends-conditionally-satisfied', 'CONDITIONALLY_SATISFIED'],
+			['clean-recommends-rejected', 'REJECTED'],
+			['clean-recommends-inconclusive', 'INCONCLUSIVE']
+		];
+		const corpus = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA);
+		const ids = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
+		for (const [id, recommendation] of pinned) {
+			const entry = corpus.find((e) => e.id === id);
+			expect(entry, `${id}: a corpus entry`).toBeDefined();
+			expect(entry!.replies, `${id}: one reply, and no repair`).toHaveLength(1);
+			const reply = entry!.replies[0]!;
+			expect(typeof reply, `${id}: a raw reply`).toBe('string');
+			const judged = JSON.parse(reply as string) as {
+				findings: readonly { criterionId: unknown; failed: unknown }[];
+				recommendation: unknown;
+			};
+			expect(judged.recommendation, `${id}: the reply recommends ${recommendation}`).toBe(recommendation);
+			expect(
+				judged.findings.map((f) => [f.criterionId, f.failed]),
+				`${id}: every criterion answered, none failed`
+			).toEqual(ids.map((k) => [k, false]));
+			const e = await evaluateCase({
+				case: CORPUS_CASE,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: FIXTURE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([e.scored.disposition, e.scored.resultClass], id).toEqual(['SATISFIED', 'VALID']);
+		}
 	});
 });
 
@@ -559,11 +643,16 @@ describe('JAN-SELREV SR-2 (D6) — the fingerprint measures the validator WITHOU
 		// moves the fingerprint too (the copy test above). The PROBE seam never receives a corpus reply in the fingerprint —
 		// its replies are bare strings that report no model — so the option set there moves no fingerprint component: THIS
 		// test, handing it the corpus replies directly, is that seam's only guard.
-		// ⭑ THE PREMISE, HELD: the corpus reaches the check. Two of its replies report a model other than the candidate's.
+		// ⭑ THE PREMISE, HELD: the corpus reaches the check. Three of its replies report a model other than the candidate's —
+		// since `JAN-ESCREC` ER-2 (D4) the third is `escalated-reported-as-producer`, which the loop below holds alike.
 		const reporting = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).filter(
 			(e) => typeof e.replies[0] !== 'string'
 		);
-		expect(reporting.map((e) => e.id)).toEqual(['reported-as-producer', 'reported-by-the-producers-provider']);
+		expect(reporting.map((e) => e.id)).toEqual([
+			'reported-as-producer',
+			'reported-by-the-producers-provider',
+			'escalated-reported-as-producer'
+		]);
 		for (const entry of reporting) {
 			const reply = entry.replies[0] as ToolInvocationResult;
 			expect(reply.producer.modelId, `${entry.id}: another model`).not.toBe(FIXTURE.modelLabel);

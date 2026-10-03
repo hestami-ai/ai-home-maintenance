@@ -46,8 +46,8 @@ import { expectTheHintOnScreen } from './support/floor-panel';
 // `ER1-V205`): the fold and the order were checked beside the REJECTED review alone, so the incomplete review's sentence
 // could move above the hint, and either sentence below the waiver form, with every case green. Each case now asks the
 // hint's fold (`expectTheHintOnScreen`, shared with `assurance-floor-review-failure-hint.e2e.ts`), and each case with a
-// line asks its place (`expectTheLineInItsPlace`): after the hint — and before the waiver's form and the note a recorded
-// waiver adds, which the second case records to ask.
+// line asks its place (`expectTheLineInItsPlace`): directly after the hint, its next element (since ER-2 step 7;
+// `ER1-V400`) — and before the waiver's form and the note a recorded waiver adds, which the second case records to ask.
 // ⭐ THE HINT IS FIRST IN THE PANEL'S BODY (the third fix round's re-verifier's finding [0], ruled): the reasoning-review
 // findings and the reviewer's answer rendered above it and pushed it below the fold — beside a review whose program did not
 // run, on a second authoring turn, beside a waived floor — so it now renders FIRST in the panel's body, before the floor's
@@ -244,6 +244,10 @@ async function stageAReview(
  * re-verifier's finding [7], ruled; `hasWaiverTarget`): beside a review carrying a finding a waiver can name the form is
  * there and the line precedes it (`A_FINDING`); beside a review whose only observation is the recommendation, which a
  * waiver never names, it is ABSENT (`ONLY_THE_RECOMMENDATION`) — and the order limbs then ask the note, where there is one.
+ * ⭐ `JAN-ESCREC` ER-2 step 7 (`REG-D-092`; the fourth fix round's re-verifier's finding [0]; `ER1-V400`) — AND DIRECTLY
+ * AFTER THE HINT: "after" held while the line moved below the findings and the reviewer's answer, still before the note and
+ * the form, and there it lay below the panel's fold at 1280x720 (measured). The line is the hint's NEXT ELEMENT — a comment
+ * or a block's anchor between them is no element — so nothing the panel lists can come between them.
  */
 async function expectTheLineInItsPlace(
 	page: Page,
@@ -260,6 +264,7 @@ async function expectTheLineInItsPlace(
 		const form = document.querySelector('form.floorwaiver');
 		return {
 			afterTheHint: follows(hint, line),
+			directlyAfterTheHint: hint !== null && line !== null && hint.nextElementSibling === line,
 			formOffered: form !== null,
 			beforeTheForm: form === null || follows(line, form),
 			beforeTheNote: note === null || follows(line, note)
@@ -268,6 +273,10 @@ async function expectTheLineInItsPlace(
 	expect(order.afterTheHint, 'the escalation line is not rendered after the blocked hint').toBe(
 		true
 	);
+	expect(
+		order.directlyAfterTheHint,
+		'the escalation line is not directly after the blocked hint'
+	).toBe(true);
 	if (review === 'ONLY_THE_RECOMMENDATION')
 		expect(
 			order.formOffered,

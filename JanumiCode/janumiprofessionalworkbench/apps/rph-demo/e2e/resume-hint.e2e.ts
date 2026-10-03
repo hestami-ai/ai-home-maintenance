@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { test, resetEngine, gotoHydrated } from './support/harness';
 
 // ⛔ REG-F-447 — AN INCONCLUSIVE REVIEW IS NOT A FAILED CALL, AND THE PAGE MUST NOT SAY IT IS.
@@ -16,6 +16,204 @@ import { test, resetEngine, gotoHydrated } from './support/harness';
 const INCOMPLETE_REVIEW_GUIDANCE =
 	'PublishPwa remains blocked because the mandatory Reasoning Review is incomplete but produced no valid subject finding. Inspect the recorded policy result, configure or change the reviewer as needed, and rerun assurance. Do not revise the PWA or record a waiver merely to clear an incomplete review.';
 const INCOMPLETE_REVIEW_BANNER = `The review did not produce a usable verdict — ${INCOMPLETE_REVIEW_GUIDANCE} This candidate is preserved. Refine it in the chat below (it continues on the same candidate), or Discard.`;
+
+/**
+ * ⭐ (1c) `JAN-ESCREC` D3 (the second fix round's re-verifier's findings [6] and [7]) — AND READABLE THERE, NOT ONLY
+ * PLACED. The first case's overlay measures read each item's BOX, which stays where it is while nobody can read it: an advisory painted
+ * fully transparent (`ER1-V202`), or cut away by the header box it hangs from (`ER1-V203`), passed them all. So each
+ * visible item must also lie inside every ancestor whose overflow is not `visible` — read at its padding box, the
+ * region it clips to — and the product of the computed opacities over it and its ancestors must be 1. ⭑ And it is
+ * never text over text: each item carries an OPAQUE background (it is an overlay over the canvas — a node, the
+ * inspector's header — and with none of its own it printed over theirs), and while a candidate is staged the advisory
+ * is no wider than the lifecycle row it hangs from with nothing staged, read before the plan was sent: there it is
+ * 544px against the canvas, and that row's width bounds it.
+ * ⭐ (1c) AND SEEN, NOT ONLY DRAWN (the third fix round's re-verifier's findings [3], [4] and [6]): boxes, clips,
+ * opacities and an opaque background all held while the canvas — positioned, later in the document, opaque — was
+ * painted over every item (`ER1-V300`), while each chip was the colour of its own text (`ER1-V301`), and while the list
+ * hung at the header box's LEFT edge, over the agent's panel and a node (`ER1-V306`). So, with the list's
+ * `pointer-events` switched on for the measure and restored after it — the only way `elementFromPoint` can see it —
+ * the topmost element at each item's centre and inset corners must be the item or inside it; each item's text must
+ * reach 4.5:1 against its own background (WCAG AA, for its 0.72rem); and the staged list's right edge must be the
+ * lifecycle row's, so it hangs under the lifecycle buttons.
+ * ⭐ `JAN-ESCREC` ER-2 step 7 (`REG-D-092`; the ER-1 fourth fix round's re-verifier's findings [2] and [3]) — MOVED HERE
+ * FROM THE FIRST CASE, every limb as it was, so the TWO-ROOTS case below asks the same limbs of a WARNING chip — the
+ * first case stages one root, so its advisory carries the info item alone, and the staged warn colour was held by no test
+ * (`ER1-V403`). ⭐ AND THE RATIO IS TAKEN ON THE TEXT COLOUR AS PAINTED (`ER1-V404`): the luminance read r, g and b and
+ * dropped the alpha, so text painted white at 6% — rgb(33, 33, 33) as composited over the dark surface, invisible — read
+ * 18.58:1 where it paints 1.16:1 (measured). The text colour is composited over the item's own background by its own
+ * alpha first; the background itself is held opaque by the limb before it. ⭐ And the text colour is the one the glyphs
+ * are FILLED with (`-webkit-text-fill-color`, which paints in place of `color`; `ER2-V6`), `color` only where no fill is
+ * set — Chromium resolves an unset fill to the current colour.
+ * ⭐ AND NO PAINT-TIME FILTER (the ER-2 fix round's re-verifier's finding [4], `ER2-V53`): a `filter` — `opacity()`,
+ * `brightness()` or any other — is applied as the item paints, after every value read above, so a chip filtered to 6%
+ * kept opacity 1, an opaque background, a readable colour and the topmost place at each point. The item and every
+ * ancestor must compute `filter: none`.
+ */
+async function measureTheStagedAdvisory(page: Page) {
+	return page.evaluate(() => {
+		const ul = document.querySelector('.complint') as HTMLElement;
+		const items = [...ul.querySelectorAll('li')].filter((li) => {
+			const r = li.getBoundingClientRect();
+			return r.width > 0 && r.height > 0 && getComputedStyle(li).visibility === 'visible';
+		});
+		/** The alpha of a computed colour: `a` in `rgba(r, g, b, a)` or after the slash of `rgb(r g b / a)` and
+		 *  `color(… / a)`; with neither, the colour is opaque — save `transparent`. */
+		const alpha = (colour: string): number => {
+			const inner = /\(([^)]*)\)/.exec(colour)?.[1];
+			if (inner === undefined) return colour === 'transparent' ? 0 : 1;
+			const slash = inner.split('/');
+			const a = (slash.length > 1 ? slash[1]! : (inner.split(',')[3] ?? '1')).trim();
+			return a.endsWith('%') ? Number(a.slice(0, -1)) / 100 : Number(a);
+		};
+		/** The r, g and b of a computed `rgb(r, g, b)` / `rgba(r, g, b, a)` colour; `undefined` for any other form, which is
+		 *  reported rather than guessed. */
+		const channels = (colour: string): [number, number, number] | undefined => {
+			const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(colour);
+			return m === null ? undefined : [Number(m[1]), Number(m[2]), Number(m[3])];
+		};
+		/** WCAG 2's relative luminance of r, g and b. */
+		const luminance = (rgb: readonly [number, number, number]): number => {
+			const [r, g, b] = rgb.map((c) => {
+				const s = c / 255;
+				return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+			}) as [number, number, number];
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		/** ⭐ `JAN-ESCREC` ER-2 step 7 (`ER1-V404`) — the text colour AS PAINTED: its r, g and b composited over the item's
+		 *  background by the text's own alpha (`painted = fg × a + bg × (1 − a)`), so a colour that is near-transparent is
+		 *  read as the near-background it paints, never as the full colour it names. */
+		const painted = (ink: string, under: string): [number, number, number] | undefined => {
+			const [fg, bg] = [channels(ink), channels(under)];
+			if (fg === undefined || bg === undefined) return undefined;
+			const a = alpha(ink);
+			return fg.map((c, i) => c * a + bg[i]! * (1 - a)) as [number, number, number];
+		};
+		const clipped: string[] = [];
+		const notOpaque: string[] = [];
+		const filtered: string[] = [];
+		const translucent: string[] = [];
+		const unreadable: string[] = [];
+		const covered: string[] = [];
+		for (const li of items) {
+			const text = (li.textContent ?? '').trim().slice(0, 60);
+			const r = li.getBoundingClientRect();
+			let opacity = 1;
+			for (let a: Element | null = li; a !== null; a = a.parentElement) {
+				const cs = getComputedStyle(a);
+				opacity *= Number(cs.opacity);
+				if (cs.filter !== 'none')
+					filtered.push(`${text}: <${a.tagName.toLowerCase()} class="${a.getAttribute('class') ?? ''}"> filter ${cs.filter}`);
+				if (a === li || (cs.overflowX === 'visible' && cs.overflowY === 'visible')) continue;
+				const b = a.getBoundingClientRect();
+				const left = b.left + a.clientLeft;
+				const top = b.top + a.clientTop;
+				if (
+					r.left < left - 0.5 ||
+					r.top < top - 0.5 ||
+					r.right > left + a.clientWidth + 0.5 ||
+					r.bottom > top + a.clientHeight + 0.5
+				)
+					clipped.push(
+						`${text} @ y ${Math.round(r.top)}-${Math.round(r.bottom)}: <${a.tagName.toLowerCase()} class="${a.getAttribute('class') ?? ''}"> clips it to y ${Math.round(top)}-${Math.round(top + a.clientHeight)}`
+					);
+			}
+			if (opacity !== 1) notOpaque.push(`${text}: opacity ${opacity}`);
+			const background = getComputedStyle(li).backgroundColor;
+			if (alpha(background) !== 1) translucent.push(`${text}: background ${background}`);
+			// ⭑ THE COLOUR THE GLYPHS ARE PAINTED IN (the ER-2 verifier's finding [2]; `ER2-V6`): `-webkit-text-fill-color`
+			// paints in place of `color`, and Chromium resolves an unset fill to the current colour — so the fill, then `color`.
+			const own = getComputedStyle(li);
+			const ink = own.webkitTextFillColor || own.color;
+			const [shown, under] = [painted(ink, background), channels(background)];
+			const [fg, bg] = [shown && luminance(shown), under && luminance(under)];
+			const ratio =
+				fg === undefined || bg === undefined
+					? undefined
+					: (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+			if (ratio === undefined || ratio < 4.5)
+				unreadable.push(
+					`${text}: ${ratio === undefined ? 'unreadable colours' : `${ratio.toFixed(2)}:1`} (${ink} on ${background})`
+				);
+		}
+		// ⭑ What is PAINTED at each item, topmost — read with the list hit-testable for the measure alone.
+		const pointerEvents = ul.style.pointerEvents;
+		ul.style.pointerEvents = 'auto';
+		try {
+			for (const li of items) {
+				const text = (li.textContent ?? '').trim().slice(0, 60);
+				const r = li.getBoundingClientRect();
+				const inset = 3;
+				const points: [number, number][] = [
+					[(r.left + r.right) / 2, (r.top + r.bottom) / 2],
+					[r.left + inset, r.top + inset],
+					[r.right - inset, r.top + inset],
+					[r.left + inset, r.bottom - inset],
+					[r.right - inset, r.bottom - inset]
+				];
+				for (const [x, y] of points) {
+					const top = document.elementFromPoint(x, y);
+					if (top === null || !li.contains(top))
+						covered.push(
+							`${text} @ (${Math.round(x)}, ${Math.round(y)}): <${top?.tagName.toLowerCase() ?? 'nothing'} class="${top?.getAttribute('class') ?? ''}">`
+						);
+				}
+			}
+		} finally {
+			ul.style.pointerEvents = pointerEvents;
+		}
+		return {
+			visible: items.length,
+			/** Each measured item's kind — `clwarn` or `clinfo`, read from its class list (Svelte adds its scope class) — so a
+			 *  case can say which chips it measured. */
+			kinds: items.map((li) =>
+				li.classList.contains('clwarn') ? 'clwarn' : li.classList.contains('clinfo') ? 'clinfo' : li.className
+			),
+			width: ul.getBoundingClientRect().width,
+			right: ul.getBoundingClientRect().right,
+			rowRight: document.querySelector('.pubact')!.getBoundingClientRect().right,
+			clipped,
+			notOpaque,
+			filtered,
+			translucent,
+			unreadable,
+			covered
+		};
+	});
+}
+
+/** (1c)'s limbs over `measureTheStagedAdvisory`'s report, against the lifecycle row's width read with nothing staged. */
+function expectTheStagedAdvisoryReadable(
+	advisory: Awaited<ReturnType<typeof measureTheStagedAdvisory>>,
+	unstagedRow: number
+): void {
+	expect(advisory.visible, 'arrangement: no advisory item is measured').toBeGreaterThan(0);
+	expect(advisory.clipped, 'an ancestor clips the composition advisory').toEqual([]);
+	expect(
+		advisory.notOpaque,
+		'the composition advisory is painted translucent, or not at all'
+	).toEqual([]);
+	expect(
+		advisory.filtered,
+		'a paint-time filter is laid over the composition advisory, which its opacity and colours do not show'
+	).toEqual([]);
+	expect(
+		advisory.translucent,
+		'an advisory item has no opaque background, so its text is printed over the canvas’s'
+	).toEqual([]);
+	expect(
+		advisory.width,
+		`the staged advisory is wider than the lifecycle row it hangs from with nothing staged (${unstagedRow}px)`
+	).toBeLessThanOrEqual(unstagedRow + 0.5);
+	expect(advisory.covered, 'something is painted over the composition advisory').toEqual([]);
+	expect(
+		advisory.unreadable,
+		'an advisory item’s text does not reach 4.5:1 against its own background, so it cannot be read'
+	).toEqual([]);
+	expect(
+		Math.abs(advisory.right - advisory.rowRight),
+		`the staged advisory does not hang under the lifecycle buttons: its right edge is at x ${advisory.right}, the lifecycle row's at x ${advisory.rowRight}`
+	).toBeLessThanOrEqual(1);
+}
 
 test.describe('Assurance floor — the resume hint names the recorded cause', () => {
 	test.beforeEach(async ({ request }) => {
@@ -136,150 +334,10 @@ test.describe('Assurance floor — the resume hint names the recorded cause', ()
 			overlay.offScreenOrAbove,
 			'the composition advisory is not on screen below the banner'
 		).toEqual([]);
-		// ⭐ (1c) `JAN-ESCREC` D3 (the second fix round's re-verifier's findings [6] and [7]) — AND READABLE THERE, NOT ONLY
-		// PLACED. The measures above read each item's BOX, which stays where it is while nobody can read it: an advisory painted
-		// fully transparent (`ER1-V202`), or cut away by the header box it hangs from (`ER1-V203`), passed them all. So each
-		// visible item must also lie inside every ancestor whose overflow is not `visible` — read at its padding box, the
-		// region it clips to — and the product of the computed opacities over it and its ancestors must be 1. ⭑ And it is
-		// never text over text: each item carries an OPAQUE background (it is an overlay over the canvas — a node, the
-		// inspector's header — and with none of its own it printed over theirs), and while a candidate is staged the advisory
-		// is no wider than the lifecycle row it hangs from with nothing staged, read before the plan was sent: there it is
-		// 544px against the canvas, and that row's width bounds it.
-		// ⭐ (1c) AND SEEN, NOT ONLY DRAWN (the third fix round's re-verifier's findings [3], [4] and [6]): boxes, clips,
-		// opacities and an opaque background all held while the canvas — positioned, later in the document, opaque — was
-		// painted over every item (`ER1-V300`), while each chip was the colour of its own text (`ER1-V301`), and while the list
-		// hung at the header box's LEFT edge, over the agent's panel and a node (`ER1-V306`). So, with the list's
-		// `pointer-events` switched on for the measure and restored after it — the only way `elementFromPoint` can see it —
-		// the topmost element at each item's centre and inset corners must be the item or inside it; each item's text must
-		// reach 4.5:1 against its own background (WCAG AA, for its 0.72rem); and the staged list's right edge must be the
-		// lifecycle row's, so it hangs under the lifecycle buttons.
-		const advisory = await page.evaluate(() => {
-			const ul = document.querySelector('.complint') as HTMLElement;
-			const items = [...ul.querySelectorAll('li')].filter((li) => {
-				const r = li.getBoundingClientRect();
-				return r.width > 0 && r.height > 0 && getComputedStyle(li).visibility === 'visible';
-			});
-			/** The alpha of a computed colour: `a` in `rgba(r, g, b, a)` or after the slash of `rgb(r g b / a)` and
-			 *  `color(… / a)`; with neither, the colour is opaque — save `transparent`. */
-			const alpha = (colour: string): number => {
-				const inner = /\(([^)]*)\)/.exec(colour)?.[1];
-				if (inner === undefined) return colour === 'transparent' ? 0 : 1;
-				const slash = inner.split('/');
-				const a = (slash.length > 1 ? slash[1]! : (inner.split(',')[3] ?? '1')).trim();
-				return a.endsWith('%') ? Number(a.slice(0, -1)) / 100 : Number(a);
-			};
-			/** WCAG 2's relative luminance of a computed `rgb(r, g, b)` / `rgba(r, g, b, a)` colour; `undefined` for any other
-			 *  form, which is reported rather than guessed. */
-			const luminance = (colour: string): number | undefined => {
-				const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(colour);
-				if (m === null) return undefined;
-				const [r, g, b] = [m[1], m[2], m[3]].map((c) => {
-					const s = Number(c) / 255;
-					return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-				}) as [number, number, number];
-				return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-			};
-			const clipped: string[] = [];
-			const notOpaque: string[] = [];
-			const translucent: string[] = [];
-			const unreadable: string[] = [];
-			const covered: string[] = [];
-			for (const li of items) {
-				const text = (li.textContent ?? '').trim().slice(0, 60);
-				const r = li.getBoundingClientRect();
-				let opacity = 1;
-				for (let a: Element | null = li; a !== null; a = a.parentElement) {
-					const cs = getComputedStyle(a);
-					opacity *= Number(cs.opacity);
-					if (a === li || (cs.overflowX === 'visible' && cs.overflowY === 'visible')) continue;
-					const b = a.getBoundingClientRect();
-					const left = b.left + a.clientLeft;
-					const top = b.top + a.clientTop;
-					if (
-						r.left < left - 0.5 ||
-						r.top < top - 0.5 ||
-						r.right > left + a.clientWidth + 0.5 ||
-						r.bottom > top + a.clientHeight + 0.5
-					)
-						clipped.push(
-							`${text} @ y ${Math.round(r.top)}-${Math.round(r.bottom)}: <${a.tagName.toLowerCase()} class="${a.getAttribute('class') ?? ''}"> clips it to y ${Math.round(top)}-${Math.round(top + a.clientHeight)}`
-						);
-				}
-				if (opacity !== 1) notOpaque.push(`${text}: opacity ${opacity}`);
-				const background = getComputedStyle(li).backgroundColor;
-				if (alpha(background) !== 1) translucent.push(`${text}: background ${background}`);
-				const ink = getComputedStyle(li).color;
-				const [fg, bg] = [luminance(ink), luminance(background)];
-				const ratio =
-					fg === undefined || bg === undefined
-						? undefined
-						: (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
-				if (ratio === undefined || ratio < 4.5)
-					unreadable.push(
-						`${text}: ${ratio === undefined ? 'unreadable colours' : `${ratio.toFixed(2)}:1`} (${ink} on ${background})`
-					);
-			}
-			// ⭑ What is PAINTED at each item, topmost — read with the list hit-testable for the measure alone.
-			const pointerEvents = ul.style.pointerEvents;
-			ul.style.pointerEvents = 'auto';
-			try {
-				for (const li of items) {
-					const text = (li.textContent ?? '').trim().slice(0, 60);
-					const r = li.getBoundingClientRect();
-					const inset = 3;
-					const points: [number, number][] = [
-						[(r.left + r.right) / 2, (r.top + r.bottom) / 2],
-						[r.left + inset, r.top + inset],
-						[r.right - inset, r.top + inset],
-						[r.left + inset, r.bottom - inset],
-						[r.right - inset, r.bottom - inset]
-					];
-					for (const [x, y] of points) {
-						const top = document.elementFromPoint(x, y);
-						if (top === null || !li.contains(top))
-							covered.push(
-								`${text} @ (${Math.round(x)}, ${Math.round(y)}): <${top?.tagName.toLowerCase() ?? 'nothing'} class="${top?.getAttribute('class') ?? ''}">`
-							);
-					}
-				}
-			} finally {
-				ul.style.pointerEvents = pointerEvents;
-			}
-			return {
-				visible: items.length,
-				width: ul.getBoundingClientRect().width,
-				right: ul.getBoundingClientRect().right,
-				rowRight: document.querySelector('.pubact')!.getBoundingClientRect().right,
-				clipped,
-				notOpaque,
-				translucent,
-				unreadable,
-				covered
-			};
-		});
-		expect(advisory.visible, 'arrangement: no advisory item is measured').toBeGreaterThan(0);
-		expect(advisory.clipped, 'an ancestor clips the composition advisory').toEqual([]);
-		expect(
-			advisory.notOpaque,
-			'the composition advisory is painted translucent, or not at all'
-		).toEqual([]);
-		expect(
-			advisory.translucent,
-			'an advisory item has no opaque background, so its text is printed over the canvas’s'
-		).toEqual([]);
-		expect(
-			advisory.width,
-			`the staged advisory is wider than the lifecycle row it hangs from with nothing staged (${unstagedRow}px)`
-		).toBeLessThanOrEqual(unstagedRow + 0.5);
-		expect(advisory.covered, 'something is painted over the composition advisory').toEqual([]);
-		expect(
-			advisory.unreadable,
-			'an advisory item’s text does not reach 4.5:1 against its own background, so it cannot be read'
-		).toEqual([]);
-		expect(
-			Math.abs(advisory.right - advisory.rowRight),
-			`the staged advisory does not hang under the lifecycle buttons: its right edge is at x ${advisory.right}, the lifecycle row's at x ${advisory.rowRight}`
-		).toBeLessThanOrEqual(1);
+		// ⭐ (1c) `JAN-ESCREC` D3 — AND READABLE THERE, NOT ONLY PLACED: clipped by no ancestor, at full opacity, an opaque
+		// chip with nothing painted over it, its text at 4.5:1 or more as painted, and hung under the lifecycle buttons no wider
+		// than the row it hangs from with nothing staged (`expectTheStagedAdvisoryReadable`, above, which says why each limb).
+		expectTheStagedAdvisoryReadable(await measureTheStagedAdvisory(page), unstagedRow);
 		// ⭑ (1b) THE HINT HAS A ROW OF ITS OWN: it starts the banner copy's row, below the title, so the title beside it is no
 		// longer squeezed to one word a line (seven lines at this width, before).
 		const row = await hint.evaluate((el) => {
@@ -329,5 +387,48 @@ test.describe('Assurance floor — the resume hint names the recorded cause', ()
 			return out;
 		}, 'or Discard.');
 		expect(clipped, 'an ancestor clips the banner’s last phrase').toEqual([]);
+	});
+
+	// ⭐ `JAN-ESCREC` ER-2 step 7 (`REG-D-092`; the ER-1 fourth fix round's re-verifier's finding [2]; `ER1-V403`) — THE
+	// WARNING CHIP, ASKED BY THE SAME LIMBS. The case above stages one root, so its advisory carries the info item alone,
+	// and the staged warn colour (`.pubact.staged .complint .clwarn`) was held by no test: removed, the warning read the
+	// unstaged orange on the dark chip, 3.70:1 (computed), with every case green. Two root types staged give the advisory its
+	// root-count WARNING, and (1c) asks it every limb it asks the info item. ⭑ THE ARRANGEMENT FIRST: a `clwarn` item is among
+	// the items measured, so the readability limb is asked of a warning chip, never vacuously.
+	test('two root types staged: the advisory’s WARNING chip is measured by (1c) as every item is — readable on its own background', async ({
+		page
+	}) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Resume Hint Two Roots');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		const card = page.getByRole('link', { name: /Resume Hint Two Roots/ });
+		await expect(card).toBeVisible();
+		await gotoHydrated(page, (await card.getAttribute('href'))!);
+		// The lifecycle row with nothing staged, read before the plan is sent — as the case above reads it.
+		const unstagedRow = await page
+			.locator('.pubact')
+			.evaluate((el) => el.getBoundingClientRect().width);
+
+		const plan = {
+			plan: [
+				{
+					tool: 'scaffold_graph',
+					args: {
+						types: [
+							{ tempKey: 'a', name: 'Plan A', pwuKind: 'PLAN', isRoot: true },
+							{ tempKey: 'b', name: 'Plan B', pwuKind: 'PLAN', isRoot: true }
+						]
+					}
+				}
+			]
+		};
+		await page.getByTestId('agent-input').fill(JSON.stringify(plan));
+		await page.getByRole('button', { name: 'Send' }).click();
+		await expect(page.getByTestId('authoring-candidate-banner')).toBeVisible();
+
+		const advisory = await measureTheStagedAdvisory(page);
+		expect(advisory.kinds, 'arrangement: no warning chip is measured').toContain('clwarn');
+		expectTheStagedAdvisoryReadable(advisory, unstagedRow);
 	});
 });
