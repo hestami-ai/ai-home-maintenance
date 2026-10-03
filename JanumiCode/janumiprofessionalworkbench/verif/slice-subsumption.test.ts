@@ -615,7 +615,17 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//     demand. ⛔ A reviewer's recommendation setting the outcome is a different rule, under a later ruling.
 			//   · `ROADMAP-assessment-lifecycle-restoration.md` is COMPLETE and restored skipped states. ⛔ ESCALATED's arrow
 			//     already exists; nothing here restores a state.
-		).toBe(53);
+			//
+			// 53 -> 54 (2026-10-02): `ROADMAP-process-result-qualification.md` (`JAN-PRQUAL`, `REG-D-094`; `REG-F-476`).
+			// ⭑ A DEPARTURE A CONFIRMED PROGRAMME LEFT OPEN, SCHEDULED BY A LATER SPONSOR RULING (`REG-D-091`).
+			//   · `ROADMAP-what-the-tests-prove.md` (`JAN-CRITREAD`) made the departure (D17) and is the nearest. ⛔ But the
+			//     sponsor confirmed its seventeen departures AS BUILT (`REG-D-091`), its exits are MET, and the fix adds a
+			//     case-set version and a paid run that the roadmap never owned.
+			//   · `ROADMAP-the-selected-reviewer.md` (`JAN-SELREV`) owns the selection the paid run measures. ⛔ Its exits are
+			//     MET; re-measuring the selection on a new arm is not selecting it.
+			//   · `ROADMAP-the-escalation-recommendation.md` (`JAN-ESCREC`) is COMPLETE and touched the same check files. ⛔ It
+			//     changed what a review yields, not what the reviewer reads or which framings qualification measures.
+		).toBe(54);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

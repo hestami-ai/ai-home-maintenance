@@ -37836,6 +37836,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Its cost: nothing when only the scoring moves. When what the cases send changes, one devin run over the changed cases: at most 52 calls, 40 to 77 minutes on the measured latencies, plus devin's per-call charge.
   - What it guarantees: the SELECTED candidate is measured on the current definition. It does not show what a given host deploys, or that devin served the model it named.
 - **MADE WITH THIS ENTRY.** `REG-D-085`'s status is struck in place and restated. The design records the ruling, and the roadmap gains `SR-4`.
+- ⭑ **READ 2026-10-02, FOR CONFIRMATION — see `REG-D-094`.** RESCORED lines also discharge a probes-only move where no case prompt changed, as `DESIGN-what-the-tests-prove.md` §5.6 provides; this entry's text names only a scoring move.
 
 ### REG-F-459 — the agy EXECUTOR still honours `JPWB_AGY_BIN` outside test mode: `REG-F-441`'s executor half
 
@@ -38082,6 +38083,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **One weakness among the "more".** D16's guard does less than the design assumed: once qualification holds, it lets a spec on the paid authoring lane register stipulated answers. It is filed as `REG-F-477`.
   - **What confirming `REG-D-072` means:** accepting that its record is accurate, and that the build's choices stand. The agent recommended confirming it, with D17 and D16 filed as gaps to fix. Fixing D17 moves the reviewer fingerprint, so it owes one paid re-measurement of the selected reviewer.
 - **MADE WITH THIS ENTRY.** `REG-F-476` and `REG-F-477` are filed. `REG-D-088`'s status is struck and restated. `REG-D-090`, `REG-F-474` and `REG-F-475` record the design.
+- ⭑ **CORRECTED 2026-10-02 — see `REG-D-094`.** *"Fixing D17 moves the reviewer fingerprint, so it owes one paid re-measurement"* reads the paid run as owed by the fingerprint move. A fingerprint move from the renderer is discharged with no model call; the paid run is owed by the new process-result cases, which coverage requires the selected candidate to run. The one run the sponsor approved is unchanged in kind.
 
 ### REG-D-090 — DELEGATED (`REG-D-071`): `JAN-ESCREC` — how rule (a) is read, where it lives, how the recommendation is recorded and told, and how qualification carries it
 
@@ -38151,13 +38153,13 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-476 — a change to how a production process result is rendered for the reviewer moves no reviewer fingerprint, and qualification has no process-result case (`REG-D-072` D17)
 
-**Filed 2026-10-01** (`REG-D-089`, from the answer to the sponsor's follow-up on `REG-D-072`; read from code, the design and the roadmap). **Status:** ~~⚠ **OPEN — unscheduled. A fix moves the reviewer fingerprint, so it owes a paid re-measurement of the selected reviewer, which awaits the sponsor.**~~ ~~⚠ **OPEN — scheduled after `JAN-ESCREC` (`REG-D-091`: *"Fix D17 as is opportune to do so."*).** Its fix moves the reviewer fingerprint and owes one paid re-measurement of the selected reviewer, read as approved by that go-ahead. New process-result cases, if the fix needs them, go to the sponsor for conferral first.~~ ⚠ **OPEN — scheduled next: `JAN-ESCREC` is complete (`REG-D-091`: *"Fix D17 as is opportune to do so."*).** Its fix moves the reviewer fingerprint and owes one paid re-measurement of the selected reviewer, read as approved by that go-ahead; new process-result cases, if the fix needs them, go to the sponsor for conferral first. `ER-2`'s owed pins (`REG-D-093`) are folded into its programme.
+**Filed 2026-10-01** (`REG-D-089`, from the answer to the sponsor's follow-up on `REG-D-072`; read from code, the design and the roadmap). **Status:** ~~⚠ **OPEN — unscheduled. A fix moves the reviewer fingerprint, so it owes a paid re-measurement of the selected reviewer, which awaits the sponsor.**~~ ~~⚠ **OPEN — scheduled after `JAN-ESCREC` (`REG-D-091`: *"Fix D17 as is opportune to do so."*).** Its fix moves the reviewer fingerprint and owes one paid re-measurement of the selected reviewer, read as approved by that go-ahead. New process-result cases, if the fix needs them, go to the sponsor for conferral first.~~ ~~⚠ **OPEN — scheduled next: `JAN-ESCREC` is complete (`REG-D-091`: *"Fix D17 as is opportune to do so."*).** Its fix moves the reviewer fingerprint and owes one paid re-measurement of the selected reviewer, read as approved by that go-ahead; new process-result cases, if the fix needs them, go to the sponsor for conferral first. `ER-2`'s owed pins (`REG-D-093`) are folded into its programme.~~ ⚠ **OPEN — designed as `JAN-PRQUAL` (`docs/_working/DESIGN-process-result-qualification.md`, `ROADMAP-process-result-qualification.md`; `REG-D-094`); the sponsor's answers to its three questions are owed.** The paid re-measurement is owed by the new process-result cases, which coverage requires the selected candidate to run, read as approved by the sponsor's go-ahead; the cases go to the sponsor for conferral first.
 
 - **WHAT THE DESIGN ASKED.** The fingerprint covers *"every branch of prompt assembly: each framing"* (`docs/_working/DESIGN-what-the-tests-prove.md:766`). The process-result cases follow *"once it has a production case to model"* (`:694`).
 - **WHAT WAS BUILT.** A production process-result review exists: `apps/rph-demo/src/lib/server/execution/process-result-floor.ts:258` sets the reviewer's content to `renderProcessResult(subject.run)`. The fingerprint's probes carry that framing's content as a literal, and its header says so: *"a change to how a production process result is rendered into `content` moves no fingerprint"* (`scripts/reviewer-qual/fingerprint.ts:26-27`). Case set v3's arms are `PWA_GRAPH` (13 cases) and `WORK_PRODUCT` (13); none is a process result.
 - **WHY IT MATTERS.** A change to `renderProcessResult` changes what the selected reviewer reads on every process-result review, and `reviewer:qual:check` stays GREEN. The reviewer is relied on for an input it was never measured on, and a change to that input goes unseen. The renderer's unit tests pin its form, not the reviewer's answers to it.
 - **SEARCHED BEFORE FILING.** The register for `renderProcessResult`: 1, `REG-D-072`'s D17 itself, which records the departure and not the gap.
-- **REMEDY CANDIDATES, UNTESTED.** Hash the production renderer's output, over a fixed probe run, into the fingerprint. Add process-result cases, which the design's own trigger now calls for. Either moves the fingerprint.
+- **REMEDY CANDIDATES, UNTESTED.** Hash the production renderer's output, over a fixed probe run, into the fingerprint. Add process-result cases, which the design's own trigger now calls for. ~~Either moves the fingerprint.~~ ⭑ *Corrected 2026-10-02 (`REG-D-094`): a case moves no fingerprint component; it moves the case-set digest and the case prompts, and owes a RUN.*
 
 ### REG-F-477 — once qualification holds, the sequencing pin lets the live authoring lane register stipulated answers, which the design assumed it never does (`REG-D-072` D16)
 
@@ -38260,3 +38262,98 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - a mask image over the staged advisory (ER2-V103).
 - **FOR SPONSOR CONFIRMATION:** (1) the three extra corpus entries; (2) the new RECORD obligation, with completion by appending.
 - **MADE WITH THIS ENTRY.** `REG-F-473` is struck and restated CLOSED; `REG-D-088` and `REG-D-089` DELIVERED; `REG-F-476` scheduled next. Pointers are appended to `REG-D-075` and `REG-D-090`.
+
+### REG-D-094 — DELEGATED (`REG-D-071`): `JAN-PRQUAL` — how `REG-F-476` is fixed: one pure renderer and builder, a truthful process-result input, a fingerprint that reaches the renderer, and a process-result arm to confer
+
+**Decided 2026-10-02** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*; `docs/_working/DESIGN-process-result-qualification.md` revision 3, after two rounds of three adversarial critics; `ROADMAP-process-result-qualification.md`). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation; three questions put to the sponsor.** **Status:** ⚠ **OPEN — the sponsor's answers to the design's §7 are owed; nothing lands before them.**
+
+- **BOTH REMEDIES, NOT ONE.**
+  - Hashing the renderer alone is discharged with no model call and never measures the reviewer on a process result.
+  - Cases alone leave a later renderer change to surface as a non-reproduction.
+  - So the probes are rebuilt through one pure builder (D1, D3), and the cases carry run literals rendered through it (D4).
+- **WHAT THE REVIEWER OF A PROCESS RESULT READS** (D2):
+  - the exit line first;
+  - the command line, stdout and stderr as budgeted slices, each cut keeping its head and tail and declared before its bytes;
+  - `argv` as JSON, in the evidence too;
+  - an observation block that says only what the host knows (the LAST turn; which call produced the result is not recorded).
+  - The question the reviewer is asked does not change.
+- **THE INCREMENTS.**
+  - `PQ-1` changes what the reviewer reads.
+  - `PQ-2` adds the conferred cases and the paid run, in one commit. Oracle integrity (`REG-D-073`) keeps the two apart.
+- **THE CORRECTION.** A case is not a fingerprint component: it moves the case-set digest and owes a RUN. `REG-D-089` told the sponsor that the fingerprint move owes the paid run; the new cases owe it.
+- **FOR THE SPONSOR** (the design's §7):
+  1. **The fence and the declared cuts:** in every framing, or in process results only?
+     - **(a) Every framing.** Recommended (`REG-D-013`). Two paid runs, 80 evaluations.
+     - **(b) Process results only.** One run, 28 evaluations; the forging path stays open elsewhere.
+  2. **Confer the 14 process-result cases** (§5).
+  3. **The rule for when the result comes back to the sponsor.**
+- **RECORDED FOR CONFIRMATION, NOT ASKED.**
+  - Under (b), `PQ-1` is discharged by an ACKNOWLEDGED line naming the cases still owed. That is neither of the two forms §5.6 of `DESIGN-what-the-tests-prove.md` allows.
+  - RESCORED lines re-stamp unchanged cases after a probes-only move, as that §5.6 provides, where `REG-D-086`'s text names only a scoring move.
+- **MADE WITH THIS ENTRY.** `REG-F-480` to `REG-F-487` are filed. `REG-F-476`'s status is restated, and its *"Either moves the fingerprint"* is struck with a pointer. A correction bullet is appended to `REG-D-089`, and a pointer to `REG-D-086`.
+
+### REG-F-480 — the reviewer of a process result can lose a whole stream, and every prompt-layer cut is declared after its bytes, naming nothing
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, driven by its code mappers). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1` for process results; in every framing too if the sponsor chooses `REG-D-094` §7.1 (a).**
+
+- **THE STREAM.** The renderer puts stdout before stderr (`apps/rph-demo/src/lib/server/execution/process-result-floor.ts:158-176`), and the validator's content budget, about 22.6k characters, cuts the tail. Driven: with a 64 KiB stdout (the capture cap), the whole stderr section is gone from the prompt.
+- **THE DECLARATION.** The prompt-layer marker ` …(truncated)` follows the bytes and names no stream. The capture layer's `[STDOUT TRUNCATED …]` line, before the bytes, then misstates what the reviewer sees.
+- **THE GENERAL FORM.** In every framing, a cut is declared after the bytes. This narrows `REG-F-360`'s acceptance of that declaration, which holds for a single-slice excerpt and fails for a multi-part slice.
+- **SEARCHED BEFORE FILING.** The register for `stderr section` and `after the bytes`: 0 each. For `renderProcessResult`: 4 hits, `REG-D-072` D17 and `REG-F-476`, neither about a lost stream.
+
+### REG-F-481 — untrusted text in the reviewer's prompt is unfenced or weakly fenced: a command's output and an agent's account can forge the prompt's own sections
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, driven by its code mappers and critics). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1` for process results; in every framing too under `REG-D-094` §7.1 (a).**
+
+- **DRIVEN.** A command whose stdout prints the host-observation heading puts a second, forged block before the real one, and a reviewer reads it first. The content of a process result is not fenced at all.
+- **THE ACCOUNT.** The agent's account, the untrusted half under review, is fenced with `"""`. It can close that fence and forge a block in the same way.
+- **SEARCHED BEFORE FILING.** The register for `unfenced`: 0. For `injection`: 5 hits, none about the reviewer's prompt. For `forge` near the prompt, observation or stdout: 0.
+
+### REG-F-482 — a process result's command line is joined by spaces, so different commands render identically, in the reviewer's prompt and in the evidence
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, driven). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1`.**
+
+- **DRIVEN.** `["node","a b"]` and `["node","a","b"]` render the same `command:` line (`process-result-floor.ts:158-176`). The evidence bytes minted from the renderer (`evidence-join.ts:162`) and the limitations line share the ambiguity.
+- **SEARCHED BEFORE FILING.** The register for `argv.join` and `joined by space`: 0 each.
+
+### REG-F-483 — the prompt-layer excerpt cuts in UTF-16 units, and the marker it appends is not counted in the budget
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, driven). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1` for process results; the excerpt of the other framings stays as it is unless `REG-D-094` §7.1 (a) is chosen.**
+
+- **DRIVEN.** An excerpt of 20,001 filler characters ending in a surrogate pair leaves a lone high surrogate, which a UTF-8 round trip turns into U+FFFD. The capture layer avoids exactly that.
+- **THE BUDGET.** The 13-character marker is not budgeted, so a cut prompt overruns `PROMPT_BUDGET` by 13. This is harmless against the 28,000-character ceiling, but the validator's comment claims otherwise.
+- **SEARCHED BEFORE FILING.** The register for `surrogate`: 0. For `UTF-16`: 2 hits, about canonical key order and byte length, neither about the excerpt.
+
+### REG-F-484 — the reviewer of a process result is told more than the host knows: the observation shown is the LAST turn's, and every call is said to have its verdict "in the result above"
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, read from the prompt and from code). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1`.**
+
+- **THE TEXT.** The observed-calls block says of every call *"The command own verdict is in the result above"* (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:207`), which is true of one call at most.
+- **WHAT THE HOST KNOWS.** It records the session's LAST turn only (`undertakings/[id]/+page.server.ts:1561`). Nothing records which observed call produced which run: run and call ordinals are separate numberings, and under parallel tool execution a run's ordinal follows completion order.
+- **WHY IT MATTERS.** A correct reviewer can fault a clean result on the strength of a statement the host cannot make. This is read from the prompt and not driven, because it is a risk about reviewer behaviour.
+- **SEARCHED BEFORE FILING.** The register for `lastTurnObservation`: 0.
+
+### REG-F-485 — every run of a step is reviewed against the LAST try's account and the LAST turn's observation, so on a repaired step an earlier try's run is judged against a later try's account
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, read from code, not driven). **Status:** ⚠ **OPEN — unscheduled; fixing it is an execution-plane join redesign.**
+
+- **THE JOIN.** One producer serves the whole repair loop (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1281`). Its runs accumulate across tries, and every run is joined (`:1550-1553`) against the last try's rationale (`:1429`, `:1562`) and the last turn's observation (`:1561`).
+- **WHY IT MATTERS.** On a step the producer repaired, the reviewer judges a run from try 1 against try 2's account, so an oracle for any multi-try scenario is undefined.
+- **SEARCHED BEFORE FILING.** The register for `cross-try` and `across tries`: 0 each. The nearest entry is `REG-F-433` (nothing joins a floor's assessment to the reviewer tries it concluded from), on the same plane but about a different join.
+
+### REG-F-486 — `R18` reviews every completed run, an incidental one included, against the whole step's account and a criterion it cannot meet
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, read from the prompt and the policy; found when a proposed qualification case could not be given a defensible oracle). **Status:** ⚠ **OPEN — unscheduled; a product question for the sponsor, not a qualification one.**
+
+- **THE RULE.** Every completed run becomes reviewed evidence (`evidence-join.ts:22-30`), a `pip install` included.
+- **THE CRITERION.** RR-01's label, *"The result genuinely discharges its delegated obligation rather than substituting an easier problem"*, is the policy's own text (`packages/rph-assurance/src/validators.ts:213-216`) and cannot change per framing. An incidental run never discharges the obligation, so a correct reviewer may fault it, and a step that installs its dependencies could be refused.
+- **THE QUESTION FOR LATER.** Should incidental runs be reviewed, reviewed only when the account cites them, or reviewed under a different question? A qualification case for them waits on that answer; one was dropped from `JAN-PRQUAL`'s proposal for this reason.
+- **SEARCHED BEFORE FILING.** The register for `incidental`: 20 hits, none about a command run. For `R18`: 1 hit (`TEST_RESULT` evidence), not this.
+
+### REG-F-487 — the process-result renderer's only test fixture names its stream in lower case, forced past the type checker, where the port says `STDOUT`
+
+**Filed 2026-10-02** (`JAN-PRQUAL`, read from the test). **Status:** ⚠ **OPEN — owed by `JAN-PRQUAL` `PQ-1`, whose branch pins use the port's names.**
+
+- **THE FIXTURE.** `apps/rph-demo/src/lib/server/execution/process-result-floor.test.ts:190` and `:224` write `stream: 'stdout' … as never`. The port's `ProcessOutputOmission` says `'STDOUT' | 'STDERR'` (`packages/rph-ports/src/ports/process-runner.ts:134-141`).
+- **WHY IT MATTERS.** The renderer's three pinned expectations pass on a cut no production run produces, and nothing pins the `command:` line, `TIMED OUT`, the incomplete-capture line or the stderr section.
+- **SEARCHED BEFORE FILING.** The register for `stream: 'stdout'` and `lowercase stream`: 0 each.
