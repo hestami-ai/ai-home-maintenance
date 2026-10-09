@@ -38844,7 +38844,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-100 — SPONSOR RULING: `JAN-EXEC` Phase 7, the live end-to-end, is the next programme; every issue it or its preparation surfaces is registered, because assurance is the methodology's critical value proposition
 
-**Ruled 2026-10-09** (sponsor, in session, answering `REG-D-099` (4) and the recommendation recorded there). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — the run plan is designed (`docs/_working/DESIGN-the-live-end-to-end-run.md`, `REG-D-101`), and the sponsor's answers to its §9 are owed.**
+**Ruled 2026-10-09** (sponsor, in session, answering `REG-D-099` (4) and the recommendation recorded there). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — the run plan is designed (`docs/_working/DESIGN-the-live-end-to-end-run.md`, `REG-D-101`), and the sponsor's answers to its §9 are owed.**~~ ⚠ **OPEN — the sponsor answered the run plan's §9 on 2026-10-09, all six as recommended (`REG-D-102`); Phase 7's steps are owed.**
 
 - **THE SPONSOR'S WORDS, verbatim:**
   1. *"Well, while there are a lot of detail issues to be worked through as your , I'm concerned that we aren't making progress on the big end to end testing objective that we started a long while back as the focus which is: after a PWA and it's PWUs are built and published is an undertaking able to execute as intended? There was a whole chain of work that we were following. You can probably look through this sessions chat transcripts for some context as well. Now maybe the items you proposed like REG-F-433 then dropping G4 and REG-F-431 and REG-F-432 are those level of concerns and my quick read of REG-F-433 suggest that it is something that needs to be addressed (at some point) so fair point in that regard."*
@@ -38862,7 +38862,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-101 — DELEGATED (`REG-D-071`): `JAN-EXEC` Phase 7's run plan as designed — the execution half first on a person-authored, product-specific PWA; a stage-by-phase answer that counts only what could have failed; checks against a false "Yes"; and 36 findings filed before any run
 
-**Decided 2026-10-09** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*; `docs/_working/DESIGN-the-live-end-to-end-run.md` revision 2). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ⚠ **OPEN — awaiting the sponsor's answers to the design's §9; the calls below are flagged for confirmation.**
+**Decided 2026-10-09** (agent, under `REG-D-071`'s delegation — *"For anything else related that needs my decision or input you will need to author solutions and use your best judgement"*; `docs/_working/DESIGN-the-live-end-to-end-run.md` revision 2). **Type:** DECISION — **delegated best judgement, flagged for sponsor confirmation.** **Status:** ~~⚠ **OPEN — awaiting the sponsor's answers to the design's §9; the calls below are flagged for confirmation.**~~ ⚠ **OPEN — §9 is answered, all six as recommended (`REG-D-102`). The calls below stand, the sponsor having raised no objection, and stay flagged for confirmation with the run's report.**
 
 - **HOW IT WAS DESIGNED.**
   - **The mapping.** Five read-only readers mapped the run's stages at `a2d88db6`: authoring and publishing; the PWA the run needs; multi-unit execution; building and testing the product; and the lane, its record, cost and replay. They reported 207 cited facts and 78 predicted breaks, and no model was called.
@@ -39597,3 +39597,28 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Normalise model ids before comparing (provider prefix, case, known aliases), with a declared alias table.
   2. Compare the providers' reported model families, not names, where a provider reports one.
   3. Refuse at boot a configuration whose producer and reviewer models normalise to the same id.
+
+### REG-D-102 — SPONSOR RULING: the Phase 7 run plan's six decisions, all as recommended — the execution half first; one fix before the paid run (a reviewer call that throws is run once more); this workstation; a limit of 150 reviewer calls; test results read as `R18`'s OBSERVATION evidence; the declared policies run as is, reported unchecked
+
+**Ruled 2026-10-09** (sponsor, in session, answering the six decisions of `docs/_working/DESIGN-the-live-end-to-end-run.md` §9). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force; Phase 7's steps P7-1 to P7-7 are owed under it.**
+
+- **THE SPONSOR'S WORDS, verbatim** (one message; each number answers the design's §9.1 to §9.6, and each of those carried one recommendation):
+  - *"1 - Your recommendation is agreed"*
+  - *"2 - Agreed"*
+  - *"3 - Your recommendation is agreed"*
+  - *"4 - Agreed"*
+  - *"5 - Agreed"*
+  - *"6 - Agreed"*
+- **WHAT IT MEANS.**
+  1. **The execution half runs first,** on the PWA of the design's §3.2, typed into the designer as the operator. The live authoring agent's run (P7-7) follows the first report.
+  2. **Option (b), P7-2b:** a devin call that throws before its bound, with no reply, is run once more, and both calls are recorded; a second throw counts. It is built and tested before the paid run.
+  3. **The run is on this workstation,** under the sponsor's account, in a folder outside the repository. Its commands run unconfined (`R9`, `R12`, `R13`), accepted for this first run with that stated. `R5`'s *"a real build"* is not met on this host: the product has no dependencies and no build step (`REG-F-534`).
+  4. **The paid limit is 150 reviewer calls,** checked between phases.
+     - A phase in flight may overshoot by its worst case: 70 calls, or 140 with P7-2b.
+     - Executor tries are capped by the code at 3 per phase. The model requests inside a try are not counted.
+     - Nothing is paid before the free rehearsals pass.
+     - Within the limit, three paid steps are approved: the one-unit live check (P7-3a), the measured run (P7-3), and the reviewer-only negative control (P7-4e).
+     - Each re-run after a fix comes back to the sponsor.
+  5. **"The results become TEST_RESULT evidence" is read as `R18`:** each completed command is one OBSERVATION record, judged by the reviewer against the phase's closing summary. No evidence type is added.
+  6. **The declared policies run as is.** Their sign-off checks no criterion (`REG-F-523`), so `R25`'s first obligation is unmet for this run. The report marks all 14 verdicts vacuous, and a "Yes" cannot count them.
+- **MADE WITH THIS ENTRY.** The statuses of `REG-D-100` and `REG-D-101` are restated. The design's status line, its §9 heading and the roadmap's Phase 7 table record the answers.

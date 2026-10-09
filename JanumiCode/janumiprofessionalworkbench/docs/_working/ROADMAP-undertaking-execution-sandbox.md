@@ -1915,15 +1915,15 @@ publish → create an Undertaking → run its work units → **a small CLI or we
 workspace, its unit and e2e tests are executed, the results become `TEST_RESULT` evidence, and the declared
 assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 
-⭐ **DESIGNED 2026-10-09** (`docs/_working/DESIGN-the-live-end-to-end-run.md`; the sponsor's go-ahead `REG-D-100`; the delegated calls `REG-D-101`; 36 findings filed, `REG-F-502` to `REG-F-537`). The steps, each awaiting the sponsor's answers to the design's §9:
+⭐ **DESIGNED 2026-10-09** (`docs/_working/DESIGN-the-live-end-to-end-run.md`; the sponsor's go-ahead `REG-D-100`; the delegated calls `REG-D-101`; 36 findings filed, `REG-F-502` to `REG-F-537`). The steps; the sponsor answered the design's §9 on 2026-10-09, all six as recommended (`REG-D-102`):
 
 | Step | What | Status |
 |---|---|---|
 | P7-0 | register what the preparation found | ✅ with the design |
 | P7-1a / P7-1b | free rehearsals: a route test that reaches the command-evidence join, and a five-unit gate spec | owed |
 | P7-2 | the run's live spec, archive, checks and run report | owed |
-| P7-2b | a reviewer call that throws, run once more and recorded (if chosen) | owed, on the sponsor's §9.2 |
-| P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | owed; paid, within the sponsor's §9.4 limit |
+| P7-2b | a reviewer call that throws, run once more and recorded | owed; chosen (`REG-D-102`) |
+| P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | owed; paid, within the approved limit of 150 reviewer calls (`REG-D-102`) |
 | P7-4 | our checks against a false "Yes" | owed; written before P7-3 |
 | P7-5 / P7-6 | report and register; fix and run again | owed |
 | P7-7 | the authoring half: the live agent builds the PWA from a request | owed |

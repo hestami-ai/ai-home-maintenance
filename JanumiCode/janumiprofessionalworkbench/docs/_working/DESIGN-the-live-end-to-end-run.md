@@ -1,7 +1,7 @@
 # DESIGN — JAN-EXEC Phase 7: the live end-to-end run
 
 **Programme:** `JAN-EXEC` Phase 7 (`ROADMAP-undertaking-execution-sandbox.md` §9, where Phase 7 is one paragraph).
-**Status:** DESIGN rev 2, awaiting the sponsor's answers to §9.
+**Status:** DESIGN rev 2. ~~Awaiting the sponsor's answers to §9.~~ The sponsor answered §9 on 2026-10-09, all six as recommended (`REG-D-102`).
 **Date:** 2026-10-09.
 **Records:** the go-ahead is `REG-D-100`; the delegated calls are `REG-D-101`; the findings are `REG-F-502` to `REG-F-537`. All are filed with this design.
 **Evidence:**
@@ -421,7 +421,7 @@ The stage maps predicted 78 breaks, B01 to B78 (labels local to this design). Ea
 
 **What "paid" means:** Pi on `openai-codex/gpt-5.6-sol`, and devin with `glm-5-3-flash-max`. The record counts calls, not tokens or money (`REG-F-529`).
 
-## 9. Decisions for the sponsor
+## 9. Decisions for the sponsor — answered 2026-10-09, all six as recommended (`REG-D-102`)
 
 One answer each. "Phase" means one of the four model-run work units.
 
