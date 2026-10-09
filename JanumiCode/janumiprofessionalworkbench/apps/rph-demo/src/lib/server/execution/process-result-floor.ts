@@ -44,36 +44,25 @@
 // already has the field, `ProposeEvidence` already requires it, and `evidenceAdmissibility`'s
 // `LIMITATIONS_RECORDED` limb already reads it — so this is the one place a reader of the evidence will look.
 //
-// ── ⛔⛔ THE RETENTION DISPOSITION THIS FILE OWES, BECAUSE IT BINDS `stderr` (`REG-Q-066`) ──────────────
+// ── ⭐ `JAN-PRQUAL` `PQ-1` (design D1; `REG-F-476`) — THE RENDERER, AND THE RETENTION DISPOSITION IT OWES, MOVED ──────
 //
-// `renderProcessResult` puts both streams into the text a REVIEWING MODEL reads, which is a third destination
-// for them: Phase 2b's capture, Phase 3's producing model, and now an ASSURANCE reviewer.
+// ~~`renderProcessResult` puts both streams into the text a REVIEWING MODEL reads~~ — it lived here, and this file
+// imports `floor-over-subject`, which the reviewer-qualification closure refuses: so no fingerprint could reach what a
+// reviewer of a process result reads (`REG-D-072` D17). It is now `assurance/process-result-render.ts`, a pure module
+// with two views of one run (the EVIDENCE bytes `evidence-join.ts` mints, and the REVIEW view the reviewer reads), and
+// `REG-Q-066`'s retention disposition for binding `stderr` moved into ITS header with it, restated for the two views.
+// This file binds no stream any more, so `verif/agy-stderr-unbound.test.ts` names that module in its place.
 //
-// **THE CLASS IS THE SAME AND THE ARGUMENT IS THE SAME ONE, APPLIED TO A DIFFERENT PARTY.** `REG-D-050`:
-// participation is a property of USE. A reviewer READS these bytes and its verdict rests on them, so they
-// participated in an assessment — `RETAINED_BY_PARTICIPATION`, on the CONTENT plane, which `PER-9` gives a
-// removal path (E-6) and which the record plane does not have.
-//
-// ⚠ AND THE REVIEWING CALL IS ITSELF RECORDED, which is where these bytes become durable a second time: the
-// reviewer's prompt is captured by `captureTry` into a `MODEL_EXCHANGE`'s E-1 composite, exactly as the
-// producing call's was. That is `PER-9` working as designed — a review that left no record would be the
-// record-plane omission it calls illegal — and it is stated here rather than discovered later, because it means
-// a build's stderr lands in TWO participating content objects, not one.
-//
-// ⛔ NO REDACTION COVERS EITHER, AND THAT IS RECORDED RATHER THAN SMOOTHED. `inputRedactionManifestRef` is
-// `PENDING_CONTENT` on every path in this repository and `REG-005` records E-6 as unimplemented, so the removal
-// path both this disposition and Phase 3's RELY ON has no producer. Phase 5 makes a known gap LARGER — a build
-// prints far more than a model writes, and now it is written twice.
-//
-// ⛔ FILTERING IS NOT THE ANSWER AND HAS BEEN REFUSED FOUR TIMES ON THIS SEAM: a predicate deciding whether a
-// line of build output "looks like a secret" is a normaliser over arbitrary bytes. The cuts that ARE applied
-// are the runner's own bound and its declared `omittedRegions`, and they travel with the bytes.
+// ⛔ AND THE REVIEW INPUT IS BUILT IN ONE PLACE: `processResultReviewInput` (`assurance/review-input.ts`), with no
+// narration and no prior — `review-input.test.ts` holds `runProcessResultFloor` to it byte for byte.
 import type { ProfessionalRationaleSummary, ValidatorContext } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
+import { commandLine } from '../assurance/process-result-render.js';
+import { processResultReviewInput } from '../assurance/review-input.js';
 import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
 
 /** The two BLOCKING codes `R17` names. Exported so a test names the same string the floor emits. */
@@ -129,7 +118,9 @@ export function processVerdictObserved(run: ObservedProcessRun): boolean {
  */
 export function processResultLimitations(run: ObservedProcessRun): string[] {
 	const out = [
-		`This evidence is the recorded outcome of one command (${run.argv.join(' ')}) run in the work unit's ` +
+		// ⭐ `REG-F-482` — `argv` AS A JSON ARRAY, as both views of the run render it (`commandLine`): joined by spaces,
+		// two different commands read as one.
+		`This evidence is the recorded outcome of one command (${commandLine(run.argv)}) run in the work unit's ` +
 			`workspace by the executing model. It establishes what that command exited with and printed. It does ` +
 			`NOT establish that the command was the right one to run, that its scope covers any particular claim, ` +
 			`or that a passing exit status means the work is correct.`
@@ -148,32 +139,8 @@ export function processResultLimitations(run: ObservedProcessRun): string[] {
 	return out;
 }
 
-/**
- * What the reviewer reads as the subject's CONTENT.
- *
- * ⛔ THE CUTS ARE RENDERED BEFORE THE BYTES, NOT AFTER, so a reviewer that reads no further than the first lines
- * has still seen that this is a prefix. A declaration below the content it qualifies is a declaration the reader
- * reaches only if the content did not already convince them.
- */
-export function renderProcessResult(run: ObservedProcessRun): string {
-	const cuts = run.omittedRegions.map(
-		(r) => `[${r.stream} TRUNCATED: ${r.byteSize} UTF-8 bytes removed from byte offset ${r.byteOffset}]`
-	);
-	return [
-		`command: ${run.argv.join(' ')}`,
-		// ⚠ `null` IS REPORTED AS WHAT THE PORT SAYS IT MEANS — terminated by a signal — rather than as the word
-		// `null`, which a reader would take for "no information". It is never folded into 0.
-		`exit ${run.exitCode ?? 'null (terminated by a signal)'}${run.timedOut ? ' TIMED OUT' : ''} in ${run.durationMs}ms`,
-		run.outputComplete
-			? ''
-			: '[OUTPUT INCOMPLETE: a descendant still held the streams when the child exited, so more may have been coming]',
-		...cuts,
-		`--- stdout ---\n${run.stdout}`,
-		`--- stderr ---\n${run.stderr}`
-	]
-		.filter((s) => s !== '')
-		.join('\n');
-}
+// ~~`renderProcessResult` — what the reviewer reads as the subject's CONTENT~~ — moved, with its two views, to
+// `assurance/process-result-render.ts` (`JAN-PRQUAL` `PQ-1`, design D1). See this file's header.
 
 /** The deterministic floor facts for a command result. See `R17` in this file's header. */
 export function processResultFloorFacts(
@@ -248,21 +215,21 @@ export async function runProcessResultFloor(
 	const ctx: ValidatorContext = {
 		schemaInvariant: facts.schemaInvariant,
 		identityProvenance: facts.identityProvenance,
-		reasoningReview: {
+		// ⭐ `JAN-PRQUAL` `PQ-1` (design D1) — BUILT BY THE ONE BUILDER, WITH NO NARRATION AND NO PRIOR, as this floor always
+		// built it inline: `review-input.test.ts` holds this call site to `processResultReviewInput` byte for byte.
+		reasoningReview: processResultReviewInput({
 			// ⛔ THE SAME RUBRIC THE WORK-PRODUCT AND GRAPH RUNS USE, READ FROM THE SAME POLICY OBJECT (`R14`).
 			// A second rubric here would be recorded citing `floor.reasoning-review` anyway — `ValidatorResult.
 			// policyId` is typed `FloorPolicyId` — so the record would name a policy that did not supply it.
 			criteria: opts.criteria,
-			framing: 'PROCESS_RESULT',
-			prompt: subject.producingPrompt,
-			content: renderProcessResult(subject.run),
+			producingPrompt: subject.producingPrompt,
+			run: subject.run,
 			// ⭐ `R15` — THE TWO HALVES OF THE JOIN. The model's own account, and the host's observation of what
 			// it actually did. Neither alone is a review: §22.1 makes the first untrusted, and the second carries
 			// no reasoning at all.
 			rationale: subject.rationale,
-			...(subject.observedToolCalls ? { observedToolCalls: subject.observedToolCalls } : {}),
-			narration: undefined
-		}
+			...(subject.observedToolCalls ? { observedToolCalls: subject.observedToolCalls } : {})
+		})
 	};
 	return runFloorOverSubject(
 		{

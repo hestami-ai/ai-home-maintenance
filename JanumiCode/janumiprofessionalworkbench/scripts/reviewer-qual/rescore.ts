@@ -4,7 +4,7 @@
 // The recorded replies are replayed at the validator's print seam, in order, as the tool's report of the recorded
 // evaluator (`runner.ts` `replayReplies`), and scored by the runner's own `evaluateCase` — the same path a run scores
 // through. Two uses: the check's REPRODUCTION limb (does a record still score what it scored at run time?) and the
-// RESCORED lines that discharge a scoring-only move (`rescoredLines`).
+// RESCORED lines that discharge a move where no case prompt changed (`rescoredLines`; §5.6 limb 1).
 //
 // ⛔ A RE-SCORING THAT WOULD NEED A DIFFERENT NUMBER OF CALLS IS NOT ONE. If today's parse accepts a first reply the run
 // had to repair, or rejects one the run accepted, the evaluation today's reviewer would make is not the recorded one:

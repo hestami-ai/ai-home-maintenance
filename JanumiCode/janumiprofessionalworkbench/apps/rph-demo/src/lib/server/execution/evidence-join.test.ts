@@ -13,7 +13,7 @@ import { createEngine, seedFloorPolicies } from '@janumipwb/rph-engine';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
-import type { ProcessOutputRetention } from '@janumipwb/rph-ports';
+import type { ArtifactStore, ProcessOutputRetention } from '@janumipwb/rph-ports';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
 import { reasoningReviewCriteria, type FloorRemediationAction } from '../floor.js';
 import {
@@ -21,6 +21,8 @@ import {
 	withLiveReviewerSeam
 } from '../assurance/clearing-reviewer.testing.js';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
+import { renderProcessResultEvidence } from '../assurance/process-result-render.js';
+import { processResultLimitations } from './process-result-floor.js';
 import {
 	describeRefusedEvidence,
 	joinProcessEvidence,
@@ -254,8 +256,16 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 		expect(ref.mint.byteSize).toBeGreaterThan(0);
 		// ⭑ THE BYTES REALLY ARE THERE — re-read them, so this is a measurement and not a claim about a key.
 		const back = await h.artifacts.get(ref.mint.storageKey);
-		expect(back).toContain('npm test');
+		// ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-482`) — THE COMMAND IS `argv` AS A JSON ARRAY. This read `toContain('npm test')`, the
+		// space-joined form, and was the predicted red of the change (driven: *"expected 'command: ["npm","test"]\nexit 0
+		// in 12…' to contain 'npm test'"*).
+		expect(back).toContain('command: ["npm","test"]');
 		expect(back).toContain('12 passed');
+		// ⭐ AND THE MINT IS THE EVIDENCE VIEW, WHOLE — today's bytes save `argv`, never the reviewer's fenced, budgeted
+		// REVIEW view (design D1). Written out, so a mint of the other view, or of a changed one, reddens here.
+		expect(back, 'the mint is not the EVIDENCE view of the run').toBe(
+			'command: ["npm","test"]\nexit 0 in 12ms\n--- stdout ---\n12 passed\n\n--- stderr ---\n'
+		);
 
 		// ⭐ AND BOTH COPIES ARE NAMED, which is what keeps `R7` true AND makes the evidence verifiable.
 		expect(ref.capture).toMatchObject({
@@ -298,7 +308,8 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 			aRun(['node', 'flaky.js'], { exitCode: null })
 		]);
 		const described = describeRefusedEvidence(joined);
-		expect(described).toContain('node flaky.js');
+		// ⭐ `PQ-1` (`REG-F-482`): the command as the evidence spells it, a JSON array (this read `'node flaky.js'`).
+		expect(described).toContain('(["node","flaky.js"])');
 		expect(described).toContain(joined[1]!.evidenceId);
 		expect(described, 'the run that PASSED must not appear in a refusal').not.toContain(
 			joined[0]!.evidenceId
@@ -334,6 +345,69 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 			payload: { admissibilityAssessmentId: 'a', admittedScope: 'unit', admittedClaimIds: [] }
 		});
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+	});
+});
+
+// ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-482`; design D2) — TWO COMMANDS ARE TWO COMMANDS, IN THE EVIDENCE AND IN WHAT IS SAID OF IT.
+//
+// ⛔ DRIVEN RED AT THE ROUND START: `["node","a b"]` and `["node","a","b"]` rendered the same `command: node a b` in the
+// minted evidence, the same limitations line and the same refusal — a reader of the record could not tell which command
+// ran. Joined by spaces, an argument holding a space is two arguments to every reader; as JSON it is one quoted string.
+describe('⭐ JAN-PRQUAL PQ-1 — argv is a JSON array in the evidence, its limitations line and its refusal', () => {
+	const ONE_ARGUMENT = aRun(['node', 'a b'], { exitCode: null });
+	const TWO_ARGUMENTS = aRun(['node', 'a', 'b'], { exitCode: null });
+
+	it('⛔ the minted EVIDENCE bytes differ, and spell each argument as a JSON string', async () => {
+		const { joined, h } = await join([ONE_ARGUMENT, TWO_ARGUMENTS]);
+		const bytes = await Promise.all(
+			joined.map(async (j) => {
+				const ref = (h.getObject(j.evidenceId) ?? {}).contentReference as ProcessEvidenceContentReference;
+				return h.artifacts.get(ref.mint.storageKey);
+			})
+		);
+		expect(bytes[0]).not.toBe(bytes[1]);
+		expect(bytes[0]).toContain('command: ["node","a b"]\n');
+		expect(bytes[1]).toContain('command: ["node","a","b"]\n');
+		// ⭑ The mint is the renderer's EVIDENCE view of each run, not a re-spelling of it here.
+		expect(bytes).toEqual([renderProcessResultEvidence(ONE_ARGUMENT), renderProcessResultEvidence(TWO_ARGUMENTS)]);
+	});
+
+	it('⛔ the limitations line differs, and names the command as a JSON array', () => {
+		const [one] = processResultLimitations(ONE_ARGUMENT);
+		const [two] = processResultLimitations(TWO_ARGUMENTS);
+		expect(one).not.toBe(two);
+		expect(one).toContain('one command (["node","a b"]) run in');
+		expect(two).toContain('one command (["node","a","b"]) run in');
+	});
+
+	it('⭑ and the refusal an operator reads names the command as the evidence does', async () => {
+		const { joined } = await join([ONE_ARGUMENT, TWO_ARGUMENTS]);
+		const described = describeRefusedEvidence(joined);
+		expect(described).toContain(`${joined[0]!.evidenceId} (["node","a b"]): `);
+		expect(described).toContain(`${joined[1]!.evidenceId} (["node","a","b"]): `);
+	});
+
+	it('⛔ and so does the refusal when the content plane accepts the result and then cannot describe it — whole', async () => {
+		// ⭐ THE ONE REFUSAL NAMING A COMMAND THAT NO TEST REACHED: a store whose `stat` answers nothing for bytes it accepted.
+		// Joined by spaces, `["node","a b"]` read here as the two-argument command it is not.
+		const h = harness();
+		const minted: string[] = [];
+		const blind: ArtifactStore = {
+			...h.artifacts,
+			put: async (input) => {
+				const ref = await h.artifacts.put(input);
+				minted.push(ref.storageKey);
+				return ref;
+			},
+			stat: async () => undefined
+		};
+		const { joined, refusedBecause } = await join([ONE_ARGUMENT], { ...h, artifacts: blind });
+		expect(joined, 'no evidence is recorded for a result the store cannot describe').toEqual([]);
+		expect(refusedBecause).toBe(
+			`the content plane accepted the result of ["node","a b"] at ${minted.at(-1)} and then could not describe it, so its ` +
+				'retention class cannot be stated. No evidence was recorded for that command rather than one whose content ' +
+				'reference is a guess.'
+		);
 	});
 });
 
@@ -373,7 +447,7 @@ describe('⭐ JAN-ESCREC D3 — the process-result refusal says what an escalate
 			'the joined result does not say its review was escalated'
 		).toBe('ESCALATE_REVIEW');
 		expect(describeRefusedEvidence(joined)).toBe(
-			`${joined[0]!.evidenceId} (npm test): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — ${HUMAN_SENTENCE}`
+			`${joined[0]!.evidenceId} (["npm","test"]): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — ${HUMAN_SENTENCE}`
 		);
 	});
 
@@ -445,7 +519,7 @@ describe('⭐ JAN-ESCREC D3 — a refused result whose floor recorded no observa
 			describeRefusedEvidence(joined),
 			'a refused result with nothing observed printed no reason at all'
 		).toBe(
-			`${joined[0]!.evidenceId} (npm test): no observation recorded (floor.reasoning-review=INCONCLUSIVE).`
+			`${joined[0]!.evidenceId} (["npm","test"]): no observation recorded (floor.reasoning-review=INCONCLUSIVE).`
 		);
 		// ⭑ CARRIED, NOT RE-DERIVED: the policies the result's own floor left unsatisfied, as it composed them.
 		expect(joined[0]!.unsatisfiedPolicies).toEqual([
@@ -515,7 +589,7 @@ describe('⭐ JAN-ESCREC D3 — a refused result whose observations hold no find
 		// ⭐ AND WHOLE: the recommendation as recorded, then the note, ending with its own full stop — no human sentence,
 		// because this review is not escalated (`RETRY_OR_CONFIGURE_REVIEWER`).
 		expect(described).toBe(
-			`${joined[0]!.evidenceId} (npm test): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — no finding recorded (floor.reasoning-review=INCONCLUSIVE).`
+			`${joined[0]!.evidenceId} (["npm","test"]): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — no finding recorded (floor.reasoning-review=INCONCLUSIVE).`
 		);
 	});
 

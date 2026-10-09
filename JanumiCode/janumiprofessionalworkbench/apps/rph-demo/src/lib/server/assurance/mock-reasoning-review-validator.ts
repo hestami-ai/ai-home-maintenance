@@ -223,6 +223,11 @@ function judgeWorkProduct(content: string, prompt: string): ReasoningReviewJudge
  * ⭑ THE JOIN IS STRUCTURAL, WHICH IS WHY IT IS DECIDABLE OFFLINE. A process result is under review, so a command
  * ran. If the host WATCHED and completed nothing, the subject's existence and the observation contradict each
  * other — `RR-07-no-contradiction`, verbatim: *"No contradiction with intent, constraints, inputs, or evidence."*
+ * ⚠ `JAN-PRQUAL` `PQ-1` (`REG-F-484`'s general form): "the host watched" is the session's LAST turn — the only
+ * observation this arm is handed — so its recorded statements say that turn, and that it sees no earlier one in which
+ * the command may have run (`REG-F-485`). That holds of all four arms: an absent report and a NOT_OBSERVABLE one say
+ * what the host could not observe — the tool calls of that turn — and that the account could not be checked against
+ * THEM; the command under review DID run, and the host observed the process. The verdict is unchanged.
  *
  * ⛔ AND IT DELIBERATELY DOES NOT MATCH TOOL NAMES OR READ THE ACCOUNT'S PROSE. Deciding whether a sentence
  * *claims* a command ran is a predicate over arbitrary text — the normaliser shape this programme has refused in
@@ -237,11 +242,14 @@ function judgeProcessResult(
 	content: string,
 	observed: ObservedToolCallReport | undefined
 ): ReasoningReviewJudgement {
+	// ⭐ `PQ-1` (`REG-F-484`'s general form): narrowed to the session's LAST turn, as the validator's own observation block
+	// is. ⛔ They said the host could not observe "tool calls" at all and could not check the account "against what actually
+	// ran" — but the command under review ran, and what the host lacked is only that turn's calls.
 	if (!observed || observed.observation === 'NOT_OBSERVABLE')
 		return unreadable(
 			observed?.reason
-				? `the host was not in a position to observe tool calls (${observed.reason}), so the agent’s account could not be checked against what actually ran`
-				: 'the host reported nothing about tool calls, so the agent’s account could not be checked against what actually ran'
+				? `the host was not in a position to observe the tool calls of the session’s LAST turn (${observed.reason}), so the agent’s account could not be checked against the calls of that turn`
+				: 'the host reported nothing about the tool calls of the session’s LAST turn, so the agent’s account could not be checked against the calls of that turn'
 		);
 
 	const findings: ReasoningReviewFinding[] = [];
@@ -259,6 +267,12 @@ function judgeProcessResult(
 
 	// ⛔ THE JOIN. `NONE_OBSERVED` means the host WATCHED and saw nothing — it is not an absence of observation,
 	// and `R11` minted the discriminator so those two could never be confused here.
+	// ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-484`'s general form) — AND EACH STATEMENT SAYS ONLY WHAT THE HOST KNOWS, WHICH IS THE
+	// SESSION'S LAST TURN: the observation this arm is handed is that turn's (`producer.lastTurnObservation()`), and the
+	// command under review may have run in an earlier one (`REG-F-485`). They read *"the host watched this turn …
+	// The result and the host’s own observation contradict each other"* and *"Nothing the host watched could have
+	// produced this result"* — false whenever the command ran earlier. ⚠ THE VERDICT IS UNCHANGED: whether this
+	// stand-in should judge an earlier turn's run at all is the cross-try question (`REG-F-485`), not this audit's.
 	const completed = (observed.calls ?? []).filter((c) => c.outcome === 'COMPLETED').length;
 	if (observed.observation === 'NONE_OBSERVED' || completed === 0)
 		findings.push({
@@ -266,8 +280,8 @@ function judgeProcessResult(
 			failed: true,
 			statement:
 				observed.observation === 'NONE_OBSERVED'
-					? 'A command result is under review, yet the host watched this turn and observed NO tool calls at all. The result and the host’s own observation contradict each other.'
-					: `A command result is under review, yet of the ${(observed.calls ?? []).length} tool call(s) the host observed, NONE completed. Nothing the host watched could have produced this result.`,
+					? 'A command result is under review, yet the host watched the session’s LAST turn and observed NO tool calls in it at all. This stand-in sees no earlier turn, so nothing it can see could have produced this result; it cannot tell a contradiction from a command run in an earlier turn.'
+					: `A command result is under review, yet of the ${(observed.calls ?? []).length} tool call(s) the host observed in the session’s LAST turn, NONE completed. Nothing the host watched in that turn could have produced this result; this stand-in sees no earlier turn.`,
 			severity: 'BLOCKING'
 		});
 
@@ -284,7 +298,7 @@ function judgeProcessResult(
 		// ⚠ THE LIMITATION IS WHAT KEEPS THE WORD HONEST, exactly as in the work-product arm. Without it a
 		// two-limb structural join is recorded as a passed REASONING review over a build.
 		limitations: [
-			`This review checked the JOIN only — that a command result exists and that the host observed ${completed} tool call(s) complete this turn, so the result and the observation do not contradict each other. It did NOT read the command’s output, did NOT judge whether the right command was run, and did NOT assess whether the agent’s account of why it ran is sound. A semantic review requires the configured reviewer model.`
+			`This review checked the JOIN only — that a command result exists and that the host observed ${completed} tool call(s) complete in the session’s LAST turn, so the result and that turn’s observation do not contradict each other (the host does not record which call produced it). It did NOT read the command’s output, did NOT judge whether the right command was run, and did NOT assess whether the agent’s account of why it ran is sound. A semantic review requires the configured reviewer model.`
 		]
 	};
 }

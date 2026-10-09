@@ -450,11 +450,20 @@ describe('JAN-CRITREAD J2-3 — RESCORED and ACKNOWLEDGED: a move owes a model c
 			...c,
 			promptSha256: HEX('d')
 		}));
-		const r = await check([file([...old, ...rescored])]);
+		const lines = [...old, ...rescored];
+		const r = await check([file(lines)]);
 		expect(limb(r, 'REPRODUCTION')).toContain(
 			'RESCORED rs-sc-3: G-RR-04#1 — re-stamps an evaluation whose prompt has changed since run qr-sc-3'
 		);
 		expect(limb(r, 'COVERAGE')).toContain('1 of 3 current case(s) are not MEASURED');
+		// ⭐ `JAN-PRQUAL` `PQ-1` (design D6; `REG-D-093`'s owed pin `ER2-V102`, the ER-2 fix round 2's re-verifier's finding
+		// [1]) — AND THE RECORD LIMB SAYS SO TOO, NAMING THE CAUSE. The writer never yields such a line, so it is one too many
+		// — a RECORD problem whatever a SUPERSEDED line later does to limb 2's refusal. Its text said ~~"today’s path cannot
+		// re-score it"~~, false here: today's path re-scores it (driven, `REJECTED`); limb 2 refuses it for its prompt first.
+		const line = rescored.find((l) => l.caseId === 'G-RR-04')!;
+		expect(limb(r, 'RECORD')).toBe(
+			`runs.ndjson:${lines.indexOf(line) + 1}: RESCORED rs-sc-3 re-stamps G-RR-04#1 of run qr-sc-3, which a re-scoring of that run does not (\`rescoredLines\`) — its recorded prompt is not the one today’s reviewer sends: a model call is owed, not a re-scoring`
+		);
 	});
 
 	it('⛔ a move in the PROBE SET owes an ACKNOWLEDGED line naming the new fingerprint, besides the re-stamp', async () => {
@@ -654,6 +663,81 @@ describe('JAN-ESCREC ER-2 — a RESCORED record re-stamps the WHOLE of its sourc
 		expect(limb(r, 'REPRODUCTION'), 'and limb 2 says why').toContain(
 			'RESCORED rs-whole-4: G-RR-04#2 — cannot be re-scored: today’s path makes 2 call(s) where the run made 1'
 		);
+	});
+
+	// ⭐ `JAN-PRQUAL` `PQ-1` (design D6; `REG-D-093`'s owed pin `ER2-V104`, the ER-2 fix round 2's re-verifier's finding [2])
+	// — COMPLETED BY APPENDING, PINNED. Ruled on the ER-2 fix round's re-verifier's finding [6]: the record is append-only,
+	// so a RESCORED record that left an owed evaluation out is completed by APPENDING that line under the same rescore id —
+	// later in the record, on a later date — and the lines are grouped by rescore id and source run wherever they stand.
+	// The ruling built no refusal; the path it permits had no pin (a grouping that took the date too survived all of verif).
+	it('⭐ COMPLETED BY APPENDING — a RESCORED record that left one evaluation out is RED, and GREEN once the owed line is appended LAST, on a later date, under the same rescore id', async () => {
+		const old = await twice('qr-whole-12');
+		const rescored = await restamp(old, 'rs-whole-12');
+		const cited = [escalate('qr-whole-12', ['G-CLEAN-R1']), escalate('rs-whole-12', ['G-CLEAN-R1'])];
+		const gone = rescored.find((l) => label(l) === 'G-RR-04#2')!;
+		const first = [...old, ...rescored.filter((l) => l !== gone), ...cited];
+		expect((await check([file(first)])).problems, 'left out, it is owed').toEqual([
+			{ limb: 'RECORD', message: leftOut(first, 'rs-whole-12', 'G-RR-04#2', 'qr-whole-12') }
+		]);
+		const appended: RescoredLine = { ...gone, date: '2026-10-09T09:00:00.000Z' };
+		expect(appended.date > gone.date, 'the arrangement: the owed line is written later').toBe(true);
+		expect((await check([file([...first, appended])])).problems, 'appended last, it completes the record').toEqual([]);
+	});
+
+	// ⭐ `JAN-PRQUAL` `PQ-1` (design D6; `REG-D-093`'s owed pins `ER2-V100` and `ER2-V101`, the ER-2 fix round 2's
+	// re-verifier's finding [0]) — A REPAIRED, TWO-CALL EVALUATION UNDER THE PROMPT PREDICATE. `promptsAreToday` asks EVERY
+	// call of an evaluation, each against today's prompt for ITS role (initial or repair) — the one predicate limb 2's first
+	// question, limb 1's coverage and the writer read. No arrangement held a repaired evaluation, so neither the quantifier
+	// nor the role was pinned: both mutants survived all of verif. The committed record holds two (the ollama run's
+	// W-CLEAN-R3), so a reading of either that went wrong would mis-stamp a real record.
+	/** A run under an earlier fingerprint (only the scoring moved) whose G-CLEAN reply fails the first parse: the validator
+	 *  sends its repair prompt, and the evaluation records two calls. */
+	const repaired = (runId: string) => {
+		const asked = new Map<string, number>();
+		return recorded({
+			runId,
+			fingerprint: moved('scoring'),
+			reply: (id) => {
+				const k = asked.get(id) ?? 0;
+				asked.set(id, k + 1);
+				return id === 'G-CLEAN' && k === 0 ? 'I could not decide whether the draft discharges its obligation.' : asOracle(id);
+			}
+		});
+	};
+
+	it('⭐ a REPAIRED evaluation, its initial AND its repair prompt today’s, is re-stamped by the writer and covers its case — GREEN', async () => {
+		const old = await repaired('qr-repaired-1');
+		const calls = old.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-CLEAN');
+		expect(calls.map((c) => c.role), 'the arrangement: G-CLEAN drew a repair').toEqual(['initial', 'repair']);
+		expect(
+			calls.map((c) => c.promptSha256),
+			'the arrangement: each call recorded today’s prompt for ITS role'
+		).toEqual([FP.casePrompts.get('G-CLEAN')!.initial, FP.casePrompts.get('G-CLEAN')!.repair]);
+		const rescored = await restamp(old, 'rs-repaired-1');
+		expect(rescored.map(label).sort(), 'the writer re-stamps the repaired evaluation').toEqual([
+			'G-CLEAN#1',
+			'G-CLEAN-R1#1',
+			'G-RR-04#1'
+		]);
+		expect((await check([file([...old, ...rescored])])).problems).toEqual([]);
+	});
+
+	it('⛔ a REPAIRED evaluation whose REPAIR prompt ALONE changed is owed a model call — the writer leaves it out, the check owes it no line, and its case is not covered', async () => {
+		const old = (await repaired('qr-repaired-2')).map((l) =>
+			l.kind === 'CALL' && l.caseId === 'G-CLEAN' && l.role === 'repair' ? { ...l, promptSha256: HEX('d') } : l
+		);
+		expect(
+			old.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-CLEAN').map((c) => c.promptSha256),
+			'the arrangement: the initial prompt still today’s, the repair prompt not'
+		).toEqual([FP.casePrompts.get('G-CLEAN')!.initial, HEX('d')]);
+		const rescored = await restamp(old, 'rs-repaired-2');
+		expect(rescored.map(label).sort(), 'the writer leaves it out').toEqual(['G-CLEAN-R1#1', 'G-RR-04#1']);
+		const r = await check([file([...old, ...rescored])]);
+		expect(limb(r, 'RECORD'), 'the check owes it no line').toBe('');
+		expect(limb(r, 'COVERAGE'), 'its case is owed a RUN, and named').toBe(
+			`1 of 3 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: G-CLEAN — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+		);
+		expect([...new Set(r.problems.map((p) => p.limb))], 'and nothing else').toEqual(['COVERAGE']);
 	});
 
 	// ⭐ LIMB 2'S FIRST QUESTION, ON BOTH SIDES (the ER-2 fix round's re-verifier's finding [0]): limb 2 refuses to re-score
@@ -949,6 +1033,12 @@ describe('JAN-CRITREAD J2-3 — the cross-file references REG-D-074 left to J2-3
 // FIXTURE — the set it was written about — exactly as the J2-3 limbs are driven over version one. Its assertions are
 // unchanged; only the set it hands the core is named for what it is. The same claim for version three is the J2-7 limb
 // below, over the current set.
+// ⭐ `JAN-PRQUAL` `PQ-1` (design §3; roadmap PQ-1's guards) — THE MESSAGES THAT TELL HOW TO CLEAR A MOVE NOW SAY WHAT THE
+// CODE DOES: ~~"or RESCORED lines where only the scoring moved"~~, ~~"RESCORED lines discharge those if only the scoring
+// moved"~~ → "…where no case prompt changed (§5.6 limb 1)". A RESCORED line re-stamps an evaluation whose recorded prompts
+// are today's (`restampable`, `promptsAreToday`) whatever else moved — the scoring, or the probe set alone, where the
+// ACKNOWLEDGED line is owed besides (§5.6 limb 1). Each reworded message is pinned whole below, the selected candidate's
+// with it (the SR-4 block's `owedBy`), and the hint in the SR-4 rows that print it.
 describe('JAN-CRITREAD J2-5 — under case set v2, a record of v1 owes a run over exactly the corrected cases', () => {
 	/** The corrected cases — in version two under an id version one does not hold. */
 	const CORRECTED = [
@@ -969,7 +1059,7 @@ describe('JAN-CRITREAD J2-5 — under case set v2, a record of v1 owes a run ove
 		const owed = await onVersionTwo([file(v1Record)]);
 		expect(owed.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
 		expect(limb(owed, 'COVERAGE')).toBe(
-			`12 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CORRECTED.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`
+			`12 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CORRECTED.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
 		);
 		const remeasured = await recorded({
 			runId: 'qr-v2-corrected',
@@ -1027,7 +1117,7 @@ describe('JAN-CRITREAD J2-7 — under case set v3, the committed record’s shap
 		const owed = await onTheCurrentSet([file([...v1Record, ...v2Record])]);
 		expect(owed.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
 		expect(limb(owed, 'COVERAGE')).toBe(
-			`12 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CHANGED.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`
+			`12 of 26 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CHANGED.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
 		);
 		// The fourteen unchanged cases stay covered by version two's run — the same ids, the same prompts.
 		const remeasured = await recorded({
@@ -1403,8 +1493,8 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 // ── ⭐ `JAN-SELREV` SR-4 — the gate holds the SELECTED reviewer to today's definition (`REG-D-086`) ──────────────────
 // DESIGN-the-selected-reviewer.md §5 Q1, ruled yes. With a SELECTION in force, limb 1 asks its own question — covered,
 // in exactly its sense — again of the SELECTED candidate's runs alone: a RUN of it under today's fingerprint, or a
-// RESCORED record of one where only the scoring moved. With none in force the check is what it was: every limb above
-// runs with no SELECTION, and each is that control.
+// RESCORED record of one ~~where only the scoring moved~~ where no case prompt changed (`JAN-PRQUAL` `PQ-1`). With none
+// in force the check is what it was: every limb above runs with no SELECTION, and each is that control.
 describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is owed a measurement of the SELECTED candidate under today’s fingerprint (REG-D-086)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
 	const NEVER_RUN: SelectedCandidate = { transport: 'devin', modelLabel: 'a-model-never-run' };
@@ -1413,7 +1503,7 @@ describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is o
 	const at = (lines: readonly RecordLine[], line: RecordLine) => `runs.ndjson:${lines.indexOf(line) + 1}`;
 	/** The COVERAGE problem SR-4 adds, verbatim: the selected candidate, its ruling, where the line is, what is owed. */
 	const owedBy = (c: SelectedCandidate, where: string, missing: readonly string[], ruling = 'REG-D-084') =>
-		`${missing.length} of ${SUBSET.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate ${c.transport} / ${c.modelLabel} (${ruling}; the SELECTION in force, ${where}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where only the scoring moved (§5.6 limb 1; REG-D-086)`;
+		`${missing.length} of ${SUBSET.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate ${c.transport} / ${c.modelLabel} (${ruling}; the SELECTION in force, ${where}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
 	const restamp = (lines: readonly RecordLine[], rescoreId: string) =>
 		rescoredLines(
 			lines.find((l): l is RunLine => l.kind === 'RUN')!,
@@ -1478,7 +1568,7 @@ describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is o
 		expect(limb(await check([file(before)]), 'COVERAGE'), 'RED first: its run is under an earlier fingerprint').toBe(
 			[
 				owedBy(GLM, at(before, selection), ALL),
-				`same prompts under an earlier fingerprint in qr-sel-glm-4: ${ALL.join(', ')} — RESCORED lines discharge those if only the scoring moved`
+				`same prompts under an earlier fingerprint in qr-sel-glm-4: ${ALL.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`
 			].join('\n    ')
 		);
 		expect((await check([file([...before, ...(await restamp(old, 'rs-sel-glm-4'))])])).problems).toEqual([]);
@@ -1589,7 +1679,7 @@ describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is o
 		expect(limb(r, 'COVERAGE')).toBe(
 			[
 				owedBy(GLM, at(lines, selection), ALL),
-				`same prompts under an earlier fingerprint in qr-sel-glm-13: ${ALL.join(', ')} — RESCORED lines discharge those if only the scoring moved`
+				`same prompts under an earlier fingerprint in qr-sel-glm-13: ${ALL.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`
 			].join('\n    ')
 		);
 		expect(
@@ -1618,7 +1708,7 @@ describe('JAN-SELREV SR-4 — with a SELECTION in force, every current case is o
 		expect(r.problems).toEqual([
 			{
 				limb: 'COVERAGE',
-				message: `3 of 3 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ALL.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`
+				message: `3 of 3 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ALL.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
 			},
 			{ limb: 'COVERAGE', message: owedBy(GLM, 'runs.ndjson:1', ALL) }
 		]);

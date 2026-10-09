@@ -118,6 +118,12 @@ export interface ReasoningReviewInput {
 	readonly framing: ReviewFraming;
 	readonly prompt: string;
 	readonly content: string;
+	/**
+	 * ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-481`) — the exact app-local semantic hash of the candidate under review, which the
+	 * HOST computed: a reviewer shows it on a line of the host's own, never inside the content it quotes. ⛔ It was merged
+	 * into a graph's content, so the host's computation was quoted as the agent's artifact. Absent or empty: no line.
+	 */
+	readonly candidateSubjectHash?: string;
 	/** The producer's contracted §9.7 deliverable. Undefined means the producer did not discharge that half of its
 	 *  execution contract — the Validator records that as a LIMITATION on its result and never infers anything
 	 *  from the absence. */

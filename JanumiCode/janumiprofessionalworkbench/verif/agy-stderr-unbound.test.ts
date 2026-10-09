@@ -51,6 +51,15 @@
 // `process-result-floor.ts` renders them as the subject a reviewer reads) and the commit could not go green
 // until the answer was re-stated.
 //
+// ⭐ `JAN-PRQUAL` `PQ-1` (design D1; `REG-F-476`) — AND THE RENDERER MOVED, SO THE SITE WAS RE-POINTED, NOT WIDENED.
+// `renderProcessResult` left `process-result-floor.ts` (which imports `floor-over-subject`, so reviewer qualification
+// could not reach it) for `assurance/process-result-render.ts`, a pure module with TWO VIEWS of one run: the EVIDENCE
+// bytes the join mints and the REVIEW view a reviewer reads. The floor binds no stream any more — the ratchet below
+// ("every disposed site ACTUALLY BINDS") would refuse it standing — so the list names the renderer in its place, still
+// four entries, and the disposition moved into the renderer's own header, restated for the two views. ⚠ Same class,
+// same argument: participation is a property of USE (`REG-D-050`); both views are content-plane bytes; no byte of
+// either stream reaches the record plane.
+//
 // ⭐ THE DISPOSITION, AND ITS ARGUMENT IS SHORTER THAN PHASE 3'S BECAUSE PHASE 3 DID THE WORK:
 //   · NO NEW RETENTION SURFACE IS CREATED BY HOLDING THEM. `run_command` already hands both streams back to the
 //     model, so they are already in the E-1 composite stored under `RETAINED_BY_PARTICIPATION`. The observer
@@ -178,7 +187,8 @@ const DISPOSED_STDERR_SITES = [
 	'lib/server/execution/child-process-runner.ts',
 	'lib/server/tools/execution-tool-surface.ts',
 	'lib/server/tools/process-run-observer.ts',
-	'lib/server/execution/process-result-floor.ts'
+	// ⭐ `JAN-PRQUAL` `PQ-1` — was `lib/server/execution/process-result-floor.ts`; the renderer, and its disposition, moved.
+	'lib/server/assurance/process-result-render.ts'
 ];
 
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
@@ -503,11 +513,14 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 	it('⛔ the disposed-site list is PINNED — widening it is a deliberate, visible act', () => {
 		// ⭑ THE `slice-subsumption.test.ts` IDIOM: a population that may only move by someone editing this literal
 		// and recording why. A list that grows quietly is how an exemption becomes a policy.
+		// ⭐ `JAN-PRQUAL` `PQ-1`: the fourth entry RE-POINTED with the renderer it disposes of (it read
+		// `'lib/server/execution/process-result-floor.ts'`), its disposition moved into that module's header in the same
+		// change — not a fifth entry.
 		expect(DISPOSED_STDERR_SITES).toEqual([
 			'lib/server/execution/child-process-runner.ts',
 			'lib/server/tools/execution-tool-surface.ts',
 			'lib/server/tools/process-run-observer.ts',
-			'lib/server/execution/process-result-floor.ts'
+			'lib/server/assurance/process-result-render.ts'
 		]);
 	});
 

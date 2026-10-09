@@ -44,12 +44,9 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import type { FloorRemediationAction } from '../floor.js';
+import { commandLine, renderProcessResultEvidence } from '../assurance/process-result-render.js';
 import { escalatedReviewNote } from './floor-over-subject.js';
-import {
-	processResultLimitations,
-	renderProcessResult,
-	runProcessResultFloor
-} from './process-result-floor.js';
+import { processResultLimitations, runProcessResultFloor } from './process-result-floor.js';
 
 /** One command's result, as it reached the record. */
 export interface JoinedProcessEvidence {
@@ -159,7 +156,10 @@ export async function joinProcessEvidence(
 		// mints a second retention surface under no declared class"* — and re-labelling would retroactively
 		// falsify `R7` for every prior run. ⭑ The store makes the distinction STRUCTURAL rather than
 		// disciplinary: purgeability is part of the storage key, so the two copies cannot collide.
-		const bytes = renderProcessResult(run);
+		// ⭐ `JAN-PRQUAL` `PQ-1` (design D1) — THE EVIDENCE VIEW of the one renderer: the bytes this mint has always held,
+		// save `argv`, now a JSON array (`REG-F-482`). ⛔ Never the REVIEW view: that is a budgeted, fenced projection for a
+		// prompt, and evidence a reader re-hashes holds the run as it was captured.
+		const bytes = renderProcessResultEvidence(run);
 		const ref = await opts.artifacts.put({
 			tenantPrefix: input.tenantPrefix,
 			bytes,
@@ -185,7 +185,8 @@ export async function joinProcessEvidence(
 				// here can say what was retained or under what class — and an evidence object whose own content
 				// reference is a guess is worse than no evidence object.
 				refusedBecause:
-					`the content plane accepted the result of \`${run.argv.join(' ')}\` at ${ref.storageKey} and ` +
+					// ⭐ `REG-F-482` — the command as a JSON array, as the evidence and its limitations line now spell it.
+					`the content plane accepted the result of ${commandLine(run.argv)} at ${ref.storageKey} and ` +
 					'then could not describe it, so its retention class cannot be stated. No evidence was recorded ' +
 					'for that command rather than one whose content reference is a guess.'
 			};
@@ -279,6 +280,10 @@ export async function joinProcessEvidence(
  * produces the SAME status and the SAME code from every one of them — an arrangement that trips several guards
  * proves none of them. The id is the only thing that says which subject refused.
  *
+ * ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-482`) — AND THE COMMAND IS `argv` AS A JSON ARRAY, as the evidence's own bytes and its
+ * limitations line now spell it: an operator comparing this refusal with the evidence it names reads ONE spelling of
+ * one command, and `["node","a b"]` is no longer `node a b`.
+ *
  * ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, WHAT THE ESCALATION ASKS: the execution
  * plane's fixed sentence (`escalatedReviewNote`), keyed on the result's own classifier action. Its caller, the model step's
  * refusal, carries this text whole on BOTH of its arms — beside a work product whose floor did not pass, and beside one
@@ -296,7 +301,7 @@ export function describeRefusedEvidence(joined: readonly JoinedProcessEvidence[]
 		.filter((j) => !j.satisfied)
 		.map(
 			(j) =>
-				`${j.evidenceId} (${j.run.argv.join(' ')}): ${refusedBecause(j)}${escalatedReviewNote(j.remediationAction)}`
+				`${j.evidenceId} (${commandLine(j.run.argv)}): ${refusedBecause(j)}${escalatedReviewNote(j.remediationAction)}`
 		)
 		.join(' — ');
 }

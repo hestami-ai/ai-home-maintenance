@@ -161,6 +161,41 @@ describe('⭐ JAN-EXEC Phase 5 — the PROCESS_RESULT arm joins the agent\'s res
 		expect(r.observations[0]?.statement).toMatch(/NONE completed/);
 	});
 
+	it('⭐ JAN-PRQUAL PQ-1 (REG-F-484) — what the arm records says only what the host knows: the session’s LAST turn', async () => {
+		// ⛔ They read *"the host watched this turn … The result and the host’s own observation contradict each other"*,
+		// *"Nothing the host watched could have produced this result"* and *"complete this turn"*: the observation is the
+		// LAST turn's, and the command under review may have run in an earlier one (`REG-F-485`). The verdicts are unchanged.
+		const none = await judgeProcess(RESULT, { observation: 'NONE_OBSERVED' });
+		expect(none.observations[0]?.statement).toBe(
+			'A command result is under review, yet the host watched the session’s LAST turn and observed NO tool calls in it at all. This stand-in sees no earlier turn, so nothing it can see could have produced this result; it cannot tell a contradiction from a command run in an earlier turn.'
+		);
+		const refused = await judgeProcess(RESULT, OBSERVED('REFUSED'));
+		expect(refused.observations[0]?.statement).toBe(
+			'A command result is under review, yet of the 1 tool call(s) the host observed in the session’s LAST turn, NONE completed. Nothing the host watched in that turn could have produced this result; this stand-in sees no earlier turn.'
+		);
+		const clean = await judgeProcess(RESULT, OBSERVED('COMPLETED'));
+		expect(clean.limitations).toContain(
+			'This review checked the JOIN only — that a command result exists and that the host observed 1 tool call(s) complete in the session’s LAST turn, so the result and that turn’s observation do not contradict each other (the host does not record which call produced it). It did NOT read the command’s output, did NOT judge whether the right command was run, and did NOT assess whether the agent’s account of why it ran is sound. A semantic review requires the configured reviewer model.'
+		);
+		for (const r of [none, refused, clean]) expect(JSON.stringify(r)).not.toMatch(/this turn/);
+		expect([none, refused, clean].map((r) => r.dispositionRecommendation)).toEqual(['REJECTED', 'REJECTED', 'SATISFIED']);
+	});
+
+	it('⭐ JAN-PRQUAL PQ-1 (REG-F-484) — and the two arms that could not look say what they could not see: the calls of the LAST turn', async () => {
+		// ⛔ They read *"the host was not in a position to observe tool calls … could not be checked against what actually ran"*
+		// and *"the host reported nothing about tool calls …"*: the command under review DID run, and the host observed the
+		// process; what it lacked is the tool calls of the session's last turn. The verdicts are unchanged.
+		const blind = await judgeProcess(RESULT, { observation: 'NOT_OBSERVABLE', reason: 'the backing tool returned only an answer string' });
+		expect(blind.limitations).toEqual([
+			'The Reasoning Review did not run: the host was not in a position to observe the tool calls of the session’s LAST turn (the backing tool returned only an answer string), so the agent’s account could not be checked against the calls of that turn. No structural review was performed, so no criterion was evaluated and no conclusion about the subject may be drawn from this result.'
+		]);
+		const absent = await judgeProcess(RESULT, undefined);
+		expect(absent.limitations).toEqual([
+			'The Reasoning Review did not run: the host reported nothing about the tool calls of the session’s LAST turn, so the agent’s account could not be checked against the calls of that turn. No structural review was performed, so no criterion was evaluated and no conclusion about the subject may be drawn from this result.'
+		]);
+		expect([blind, absent].map((r) => r.dispositionRecommendation)).toEqual(['INCONCLUSIVE', 'INCONCLUSIVE']);
+	});
+
 	it('⭐⛔ NOT_OBSERVABLE is INCONCLUSIVE and NEVER a pass — the two absences do not collapse', async () => {
 		// ⛔ THE DISTINCTION `R11` MINTED THE DISCRIMINATOR FOR. "Nothing could look" is not "something looked
 		// and saw none": the first supplies no independent half, so the only check this arm performs could not

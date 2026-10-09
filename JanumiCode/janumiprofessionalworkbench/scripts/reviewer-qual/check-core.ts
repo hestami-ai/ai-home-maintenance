@@ -982,7 +982,12 @@ async function restampsWhole(ctx: Ctx, struck: ReadonlySet<string>): Promise<voi
 			else if (!owed && x && ctx.caseIds.has(e.caseId))
 				ctx.problems.push({
 					limb: 'RECORD',
-					message: `${x.at}: RESCORED ${line.rescoreId} re-stamps ${label} of run ${source.run.runId}, which a re-scoring of that run does not (\`rescoredLines\`) — today’s path cannot re-score it`
+					// ⭐ `JAN-PRQUAL` `PQ-1` (design D6; `REG-D-093`'s owed pin ER2-V102) — THE CAUSE IS NAMED. Since `restampable`
+					// took limb 2's prompt leg, a line too many is one of TWO evaluations a re-scoring never yields: one today's
+					// path cannot re-score, or one whose recorded prompt is not today's — which today's path CAN re-score, so
+					// ~~"today’s path cannot re-score it"~~ was false of it: limb 2 refuses that line for its prompt before it
+					// re-scores anything, and its case is owed a model call.
+					message: `${x.at}: RESCORED ${line.rescoreId} re-stamps ${label} of run ${source.run.runId}, which a re-scoring of that run does not (\`rescoredLines\`) — ${promptsMatch(ctx, e) ? 'today’s path cannot re-score it' : 'its recorded prompt is not the one today’s reviewer sends: a model call is owed, not a re-scoring'}`
 				});
 		}
 	}
@@ -1048,7 +1053,13 @@ function acknowledgementOwed(ctx: Ctx, counted: readonly Run[], struck: Readonly
 	return moved.find((s) => !reachedACasePrompt(s.fingerprint))?.what;
 }
 
-/** For each case not covered: an earlier run that recorded today's prompts for it, if one did. */
+/**
+ * For each case not covered: an earlier run that recorded today's prompts for it, if one did.
+ * ⭐ `JAN-PRQUAL` `PQ-1` — ~~"RESCORED lines discharge those if only the scoring moved"~~: a RESCORED line re-stamps an
+ * evaluation whose recorded prompts are today's (`restampable`, the prompt leg `promptsAreToday`), whatever else moved —
+ * the scoring, or the probe set alone (§5.6 limb 1: "until a RESCORED record re-stamps the unchanged cases under it"),
+ * where the ACKNOWLEDGED line is owed besides. So every hint and coverage message says WHERE NO CASE PROMPT CHANGED.
+ */
 function coverageHints(ctx: Ctx, counted: readonly Run[], missing: readonly string[]): string[] {
 	const earlier = (id: string) =>
 		counted.find(
@@ -1058,7 +1069,7 @@ function coverageHints(ctx: Ctx, counted: readonly Run[], missing: readonly stri
 		)?.run.runId;
 	return [...new Set(missing.map(earlier).filter((x): x is string => x !== undefined))].map(
 		(runId) =>
-			`same prompts under an earlier fingerprint in ${runId}: ${missing.filter((id) => earlier(id) === runId).join(', ')} — RESCORED lines discharge those if only the scoring moved`
+			`same prompts under an earlier fingerprint in ${runId}: ${missing.filter((id) => earlier(id) === runId).join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`
 	);
 }
 
@@ -1088,7 +1099,9 @@ const isSelected = (r: RunLine, c: SelectedCandidate): boolean =>
  * ⭐ `JAN-SELREV` SR-4 — THE GATE HOLDS THE SELECTED REVIEWER TO TODAY'S DEFINITION (`REG-D-086`; DESIGN-the-selected-
  * reviewer.md §5 Q1). With a SELECTION in force, every current case must ALSO be covered — `coveredBy`, the one
  * definition — by the selected candidate's own counted runs: a RUN of it under today's fingerprint, or a RESCORED record
- * of one where only the scoring moved. Another candidate's coverage says nothing of the reviewer the product runs.
+ * of one ~~where only the scoring moved~~ where no case prompt changed (`JAN-PRQUAL` `PQ-1`: `restampable` keys on the
+ * recorded prompts, not on which component moved). Another candidate's coverage says nothing of the reviewer the product
+ * runs.
  * A run of it is DEPLOYABLE without asking: a SELECTION names only a deployable transport, and a RUN's `deployable` is
  * its transport's (`record.ts`). With no SELECTION in force, nothing here runs. A SELECTION whose ruling is not in
  * force is still held here, and its problem says how the ruling stands (`rulingCaveat`).
@@ -1104,7 +1117,7 @@ function selectedCoverage(ctx: Ctx, counted: readonly Run[], struck: ReadonlySet
 	ctx.problems.push({
 		limb: 'COVERAGE',
 		message: [
-			`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F} by the SELECTED candidate ${candidate.transport} / ${candidate.modelLabel} (${cited}; the SELECTION in force, ${selection.at}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where only the scoring moved (§5.6 limb 1; REG-D-086)`,
+			`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F} by the SELECTED candidate ${candidate.transport} / ${candidate.modelLabel} (${cited}; the SELECTION in force, ${selection.at}): ${missing.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`,
 			...coverageHints(ctx, selected, missing)
 		].join('\n    ')
 	});
@@ -1135,7 +1148,7 @@ function coverage(ctx: Ctx, struck: ReadonlySet<string>): void {
 		ctx.problems.push({
 			limb: 'COVERAGE',
 			message: [
-				`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F}: ${missing.join(', ')} — owed: a RUN over them, or RESCORED lines where only the scoring moved (§5.6 limb 1)`,
+				`${missing.length} of ${ctx.i.cases.length} current case(s) are not MEASURED under today’s reviewer fingerprint ${ctx.F}: ${missing.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`,
 				...coverageHints(ctx, counted, missing),
 				...outsideOneDay
 			].join('\n    ')

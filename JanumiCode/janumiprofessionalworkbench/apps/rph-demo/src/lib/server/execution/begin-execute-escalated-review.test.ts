@@ -292,7 +292,7 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		const [workProduct, evidence] = message.split(COMMAND_EVIDENCE);
 		expect(evidence, 'arrangement: the command evidence did not refuse').toBeDefined();
 		expect(evidence, 'arrangement: the refusal does not name the command').toContain(
-			'(npm test): '
+			'(["npm","test"]): '
 		);
 		// ⭐ EACH ARM ITS OWN SENTENCE: the work product's before the hand-over, the command result's after it.
 		expect(workProduct, 'the work product’s arm dropped the sentence').toContain(
@@ -328,7 +328,7 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		expect(workProduct, 'arrangement: the work product’s floor did not pass').toBe(
 			'The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete'
 		);
-		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(npm test\): /);
+		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(\["npm","test"\]\): /);
 		// ⭐ THE CLAIM: the command result's recommendation, as recorded, and the sentence BESIDE it — then the engine's
 		// own text, after it and unchanged.
 		expect(evidence, 'the process-result refusal did not say what the escalation asks').toContain(
@@ -363,12 +363,12 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 			'The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete'
 		);
 		// ⭐ THE CLAIM: the refused result named, ITS finding as recorded — `code: statement` — and THEN the engine's text.
-		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(npm test\): /);
+		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(\["npm","test"\]\): /);
 		expect(
 			evidence,
 			'the refused command result’s finding is not printed before the engine’s text'
 		).toContain(
-			`(npm test): ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${COMMAND_FAULT} CompleteExecutionStep: `
+			`(["npm","test"]): ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${COMMAND_FAULT} CompleteExecutionStep: `
 		);
 		expect(evidence, 'the engine’s refusal was dropped').toContain(
 			'(floor.reasoning-review=REJECTED)'
@@ -433,13 +433,13 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		expect(workProduct, 'arrangement: the work product’s floor did not pass').toBe(
 			'The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete'
 		);
-		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(npm test\): /);
+		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(\["npm","test"\]\): /);
 		// ⭐ THE CLAIM: the result named, what its floor recorded — nothing — and what refused it, THEN the engine's text.
 		expect(
 			evidence,
 			'a refused command result that observed nothing is not said before the engine’s text'
 		).toContain(
-			'(npm test): no observation recorded (floor.reasoning-review=INCONCLUSIVE). CompleteExecutionStep: '
+			'(["npm","test"]): no observation recorded (floor.reasoning-review=INCONCLUSIVE). CompleteExecutionStep: '
 		);
 	});
 
@@ -512,13 +512,13 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 			`${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT} — ${HUMAN_SENTENCE}`
 		);
 		// ⭐ THE COMMAND HALF, WHOLE: incomplete — INCONCLUSIVE named after the recommendation, and no human sentence.
-		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(npm test\): /);
+		expect(evidence, 'the refusal does not name the command').toMatch(/^evd_\w+ \(\["npm","test"\]\): /);
 		expect(
 			evidence,
 			'the incomplete command result’s refusal does not name INCONCLUSIVE'
 		).toContain('floor.reasoning-review=INCONCLUSIVE');
 		expect((evidence ?? '').replace(/^evd_\w+ /, '')).toBe(
-			`(npm test): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT}${NO_FINDING_INCONCLUSIVE}`
+			`(["npm","test"]): ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT}${NO_FINDING_INCONCLUSIVE}`
 		);
 		expect(evidence, 'an incomplete command result was told as an escalation').not.toContain(
 			HUMAN_SENTENCE

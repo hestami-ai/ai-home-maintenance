@@ -48,9 +48,35 @@ const INCOMPLETE_REVIEW_BANNER = `The review did not produce a usable verdict �
  * `brightness()` or any other — is applied as the item paints, after every value read above, so a chip filtered to 6%
  * kept opacity 1, an opaque background, a readable colour and the topmost place at each point. The item and every
  * ancestor must compute `filter: none`.
+ * ⭐ AND NO PAINT-TIME MASK OR BLEND (`JAN-PRQUAL` `PQ-1` D6; `REG-D-093`'s owed pin `ER2-V103`, and its general form): a
+ * `mask-image` — or `-webkit-mask-image`, its prefixed alias — and a `mix-blend-mode` are applied as the item paints too,
+ * after every value read above. A chip masked to 6% kept opacity 1, `filter: none`, its opaque background, its readable
+ * colours and the topmost place at each point, while its brightest PAINTED pixel fell from rgb(142, 144, 153) to
+ * rgb(24, 26, 32) over a page of rgb(17, 19, 24) (measured in the lane's Edge).
+ * So the item and every ancestor must compute `mask-image: none`, `-webkit-mask-image: none` and `mix-blend-mode: normal`.
+ * ⭐ AND THE RATIO IS TAKEN ON THE PIXELS AS PAINTED (`JAN-PRQUAL` `PQ-1` D6; the general form of `ER2-V53` and `ER2-V103`):
+ * every limb above reads a computed value or hit-tests a point, and a positioned `::after` laid over each chip in the
+ * page's own colour at 94% left every one of them green — `elementFromPoint` returns the chip for its own pseudo-element,
+ * and no opacity, filter, mask, blend or colour changes. So each item's PADDING box (inside its border, which paints its
+ * text colour whatever lies over the text) is screenshotted TWICE and decoded by the page itself: as the page composites
+ * it, and with the items' own glyphs unfilled — their text fill transparent, every pseudo-element keeping its own. What
+ * differs between the two readings is what the GLYPHS paint, after everything laid over, under or through them, and on
+ * EACH LINE of its text some pixel must change between them by 4.5:1. ⛔ READ ONCE, against the colour most of the box's
+ * pixels are, the limb asked only whether a line held ONE pixel at 4.5:1 — and an opaque cover striped in the chip's own
+ * colour passed it with every glyph hidden, its stripes carrying the contrast the glyphs no longer did (`PQ1-V424`). A
+ * cover is in both readings alike, so its own pixels cancel out, whatever contrast they carry.
+ * ⭐ AND HOW MUCH OF EACH LINE, READ AGAINST THE GLYPHS ALONE (`JAN-PRQUAL` `PQ-1` D6): a cover over MOST of a line passed —
+ * opaque in the chip's own colour, with a one-pixel slit in every eight columns, laid by the item's own `::before`: the
+ * glyphs' pixels left in the slits still changed by 4.5:1 between the two readings, and no computed limb or hit test
+ * saw it (`PQ1-V604`). So each box is read twice more with the staged items ALONE — every other box hidden, the items'
+ * own pseudo-elements gone — filled and unfilled; and on each line, the pixels that change by 4.5:1 as painted must be at
+ * least nine tenths of those that change so alone. ⚠ NOT YET SEEN, AND SAID SO: anything the ITEM ITSELF paints over its
+ * glyphs that the readings alone keep — a child element, or its own text decoration (a line-through in the chip's own
+ * colour) — is in all four readings and takes from both counts alike; such a cover is reddened, if at all, only by the
+ * CONTROL below, never by this limb.
  */
 async function measureTheStagedAdvisory(page: Page) {
-	return page.evaluate(() => {
+	const measured = await page.evaluate(() => {
 		const ul = document.querySelector('.complint') as HTMLElement;
 		const items = [...ul.querySelectorAll('li')].filter((li) => {
 			const r = li.getBoundingClientRect();
@@ -91,6 +117,7 @@ async function measureTheStagedAdvisory(page: Page) {
 		const clipped: string[] = [];
 		const notOpaque: string[] = [];
 		const filtered: string[] = [];
+		const masked: string[] = [];
 		const translucent: string[] = [];
 		const unreadable: string[] = [];
 		const covered: string[] = [];
@@ -103,6 +130,16 @@ async function measureTheStagedAdvisory(page: Page) {
 				opacity *= Number(cs.opacity);
 				if (cs.filter !== 'none')
 					filtered.push(`${text}: <${a.tagName.toLowerCase()} class="${a.getAttribute('class') ?? ''}"> filter ${cs.filter}`);
+				// ⭑ `ER2-V103` — a mask or a blend, read as each property computes (the prefixed alias on its own).
+				for (const [property, none] of [
+					['mask-image', 'none'],
+					['-webkit-mask-image', 'none'],
+					['mix-blend-mode', 'normal']
+				] as const) {
+					const value = cs.getPropertyValue(property);
+					if (value !== none)
+						masked.push(`${text}: <${a.tagName.toLowerCase()} class="${a.getAttribute('class') ?? ''}"> ${property} ${value}`);
+				}
 				if (a === li || (cs.overflowX === 'visible' && cs.overflowY === 'visible')) continue;
 				const b = a.getBoundingClientRect();
 				const left = b.left + a.clientLeft;
@@ -161,7 +198,37 @@ async function measureTheStagedAdvisory(page: Page) {
 		} finally {
 			ul.style.pointerEvents = pointerEvents;
 		}
+		// ⭐ WHERE THE PIXELS ARE READ (`PQ-1` D6): each item's PADDING box in whole pixels, inside its border — which paints
+		// the text colour whatever lies over the text — and each line its text is laid out on, within that box.
+		const paintBoxes = items.map((li) => {
+			const r = li.getBoundingClientRect();
+			const left = r.left + li.clientLeft;
+			const top = r.top + li.clientTop;
+			const x = Math.ceil(left);
+			const y = Math.ceil(top);
+			const clip = { x, y, width: Math.floor(left + li.clientWidth) - x, height: Math.floor(top + li.clientHeight) - y };
+			const range = document.createRange();
+			range.selectNodeContents(li);
+			const byTop = new Map<number, { x0: number; y0: number; x1: number; y1: number }>();
+			for (const f of range.getClientRects()) {
+				if (f.width <= 0 || f.height <= 0) continue;
+				const key = Math.round(f.top);
+				const line = byTop.get(key) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+				byTop.set(key, {
+					x0: Math.min(line.x0, Math.max(0, Math.floor(f.left) - x)),
+					y0: Math.min(line.y0, Math.max(0, Math.floor(f.top) - y)),
+					x1: Math.max(line.x1, Math.min(clip.width, Math.ceil(f.right) - x)),
+					y1: Math.max(line.y1, Math.min(clip.height, Math.ceil(f.bottom) - y))
+				});
+			}
+			return {
+				text: (li.textContent ?? '').trim().slice(0, 60),
+				clip,
+				lines: [...byTop.values()]
+			};
+		});
 		return {
+			paintBoxes,
 			visible: items.length,
 			/** Each measured item's kind — `clwarn` or `clinfo`, read from its class list (Svelte adds its scope class) — so a
 			 *  case can say which chips it measured. */
@@ -174,11 +241,252 @@ async function measureTheStagedAdvisory(page: Page) {
 			clipped,
 			notOpaque,
 			filtered,
+			masked,
 			translucent,
 			unreadable,
 			covered
 		};
 	});
+	// ⭐ THE GLYPHS' OWN PAINT, BY DIFFERENCE (`PQ-1` D6): each padding box is screenshotted twice — as the page
+	// composites it, and with the items' own glyphs unfilled (`GLYPHS_UNFILLED`) — and both are decoded by the page's own
+	// image decoder, no codec of ours. What differs between the two readings is what the GLYPHS paint, after everything
+	// laid over, under or through them; so on EACH LINE some pixel must change by 4.5:1 between them. ⛔ A cover over the
+	// glyphs is in both readings alike, and cancels out whatever contrast its own pixels carry (`PQ1-V424`).
+	// ⭐ AND TWICE MORE, THE ITEMS ALONE (`GLYPHS_ALONE`; `PQ1-V604`): what changes there is what the glyphs paint with
+	// nothing laid over them — so on each line, as painted, nine tenths of those pixels must still change by 4.5:1.
+	const { paintBoxes, ...rest } = measured;
+	const shoot = async (): Promise<string[]> => {
+		const out: string[] = [];
+		for (const box of paintBoxes)
+			out.push(
+				(await page.screenshot({ clip: box.clip, scale: 'css', animations: 'disabled', caret: 'hide' })).toString('base64')
+			);
+		return out;
+	};
+	const composited = await shoot();
+	const unfilling = await page.addStyleTag({ content: GLYPHS_UNFILLED });
+	let unfilled: string[];
+	try {
+		unfilled = await shoot();
+	} finally {
+		await unfilling.evaluate((el) => el.parentNode?.removeChild(el));
+	}
+	const isolating = await page.addStyleTag({ content: GLYPHS_ALONE });
+	let alone: string[];
+	let aloneUnfilled: string[];
+	try {
+		alone = await shoot();
+		const unfillingAlone = await page.addStyleTag({ content: GLYPHS_UNFILLED });
+		try {
+			aloneUnfilled = await shoot();
+		} finally {
+			await unfillingAlone.evaluate((el) => el.parentNode?.removeChild(el));
+		}
+	} finally {
+		await isolating.evaluate((el) => el.parentNode?.removeChild(el));
+	}
+	const paintedUnreadable: string[] = [];
+	let paintedLines = 0;
+	for (const [b, box] of paintBoxes.entries()) {
+		const read = await page.evaluate(
+			async ({ asPainted, withoutGlyphs, glyphsAlone, glyphsAloneUnfilled, lines }) => {
+				const decode = async (b64: string): Promise<ImageData> => {
+					const image = new Image();
+					image.src = `data:image/png;base64,${b64}`;
+					await image.decode();
+					const canvas = document.createElement('canvas');
+					canvas.width = image.naturalWidth;
+					canvas.height = image.naturalHeight;
+					const g = canvas.getContext('2d')!;
+					g.drawImage(image, 0, 0);
+					return g.getImageData(0, 0, canvas.width, canvas.height);
+				};
+				const [first, second, third, fourth] = [
+					await decode(asPainted),
+					await decode(withoutGlyphs),
+					await decode(glyphsAlone),
+					await decode(glyphsAloneUnfilled)
+				];
+				const luminance = ({ data, width }: ImageData, x: number, y: number): number => {
+					const i = (y * width + x) * 4;
+					const [r, gr, bl] = [data[i]!, data[i + 1]!, data[i + 2]!].map((c) => {
+						const s = c / 255;
+						return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+					}) as [number, number, number];
+					return 0.2126 * r + 0.7152 * gr + 0.0722 * bl;
+				};
+				const width = Math.min(first.width, second.width, third.width, fourth.width);
+				const height = Math.min(first.height, second.height, third.height, fourth.height);
+				/** The contrast ratio between two readings at one pixel. */
+				const ratio = (p: ImageData, q: ImageData, x: number, y: number): number => {
+					const [la, lb] = [luminance(p, x, y), luminance(q, x, y)];
+					return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+				};
+				// ⭐ Per line: the most any pixel changes as painted; how many change by 4.5:1 as painted; and how many so alone.
+				const perLine = lines.map((line) => {
+					let best = 1;
+					let painted = 0;
+					let isolated = 0;
+					for (let y = Math.max(0, line.y0); y < Math.min(height, line.y1); y += 1)
+						for (let x = Math.max(0, line.x0); x < Math.min(width, line.x1); x += 1) {
+							const k = ratio(first, second, x, y);
+							best = Math.max(best, k);
+							if (k >= 4.5) painted += 1;
+							if (ratio(third, fourth, x, y) >= 4.5) isolated += 1;
+						}
+					return { best, painted, isolated };
+				});
+				return { perLine, size: [width, height] };
+			},
+			{
+				asPainted: composited[b]!,
+				withoutGlyphs: unfilled[b]!,
+				glyphsAlone: alone[b]!,
+				glyphsAloneUnfilled: aloneUnfilled[b]!,
+				lines: box.lines
+			}
+		);
+		if (read.perLine.length === 0) paintedUnreadable.push(`${box.text}: no line of its text was found to read`);
+		paintedLines += read.perLine.length;
+		read.perLine.forEach(({ best, painted, isolated }, i) => {
+			if (best < 4.5)
+				paintedUnreadable.push(
+					`${box.text}: line ${i + 1} — its own glyphs change the paint by at most ${best.toFixed(2)}:1 (${read.size.join('×')} px read)`
+				);
+			// ⭐ `PQ1-V604` — most of the line covered: its glyphs change by 4.5:1 alone what a cover takes from them as painted.
+			else if (painted < 0.9 * isolated)
+				paintedUnreadable.push(
+					`${box.text}: line ${i + 1} — ${painted} of the ${isolated} pixels its glyphs change by 4.5:1 alone change so as painted`
+				);
+		});
+	}
+	return { ...rest, paintedUnreadable, paintedLines };
+}
+
+/**
+ * ⭐ WHAT THE SECOND READING TAKES AWAY (`PQ-1` D6): the staged items' own glyphs — the text fill of every item and of
+ * everything in it made transparent (`-webkit-text-fill-color` paints in place of `color`) — while every pseudo-element of
+ * them keeps its own fill, so a cover one lays is painted in both readings and cancels out.
+ */
+const GLYPHS_UNFILLED =
+	'.pubact.staged .complint li, .pubact.staged .complint li * { -webkit-text-fill-color: transparent !important; } ' +
+	'.pubact.staged .complint li::before, .pubact.staged .complint li::after, ' +
+	'.pubact.staged .complint li *::before, .pubact.staged .complint li *::after ' +
+	'{ -webkit-text-fill-color: currentColor !important; }';
+
+/**
+ * ⭐ WHAT THE THIRD AND FOURTH READINGS SHOW (`PQ-1` D6; `PQ1-V604`): the staged items ALONE — every other box hidden, and
+ * the items' own pseudo-elements and their descendants' gone — so what their glyphs paint there is what no cover laid
+ * over them, by the page or by the item's pseudo-elements, has taken away. ⚠ What the item paints as ITSELF stays: a
+ * child element of it, and its own text decoration — so a cover laid by either is in these readings too.
+ */
+const GLYPHS_ALONE =
+	'body * { visibility: hidden !important; } ' +
+	'.pubact.staged .complint li, .pubact.staged .complint li * { visibility: visible !important; } ' +
+	'.pubact.staged .complint li::before, .pubact.staged .complint li::after, ' +
+	'.pubact.staged .complint li *::before, .pubact.staged .complint li *::after { content: none !important; }';
+
+/**
+ * ⭐ (1c)'s PAINTED LIMB, CONTROLLED (`JAN-PRQUAL` `PQ-1` D6): five covers no computed value shows, each laid over each
+ * staged chip for this measure alone, then taken off — by a positioned `::after` of the chip, the page's own colour at
+ * 94%; an OPAQUE cover striped in the chip's own colour, whose stripes carry the very contrast the glyphs would
+ * (`PQ1-V424`); and an opaque cover in the chip's own colour with a one-pixel slit in every eight columns, through which
+ * the glyphs still change by 4.5:1 (`PQ1-V604`); and the same slits laid by an element of the PAGE's, not the chip's,
+ * its pointer events off so no hit test meets it — which only the readings alone take away, because they hide every
+ * box but the staged items (`GLYPHS_ALONE`); ⭐ and, by the chip's `::after` again, a cover in the chip's own colour
+ * over TWO of every eight columns, leaving six open — so about four fifths of what the glyphs change alone still
+ * changes as painted, short of the nine tenths the limb asks. ⛔ WITHOUT IT, the slit covers left about one eighth open,
+ * so any share between about an eighth and the whole passed them alike, and a limb held to a fifth, not nine tenths,
+ * named every line still (`PQ1-V806`); with it, the limb is shown to discriminate between about four fifths and the
+ * whole, at the nine tenths it asks. Under each, the painted limb must name EVERY line of every chip, and nothing else
+ * may: every computed limb and the hit test stay clear. So the painted limb is the one that sees them, and is shown
+ * able to — a limb reading one pixel's contrast, not the glyphs' own paint, passes the striped cover, and one that does
+ * not read the glyphs alone passes the slits. ⭐ AND EACH BY THE LIMB BUILT FOR IT: a line no pixel of which changes by
+ * 4.5:1 is named for that (the overlay, the stripes), and one that keeps some such pixels but too few of its own for
+ * that (the slits) — so neither half of the limb can lean on the other: the first held to a weaker ratio, the
+ * overlay's lines would be named by the second alone.
+ */
+async function expectThePaintedLimbToSeeAnOverlay(page: Page): Promise<void> {
+	const TOO_LITTLE_CHANGE = 'its own glyphs change the paint by at most';
+	const TOO_FEW_PIXELS = 'pixels its glyphs change by 4.5:1 alone change so as painted';
+	/** A cover laid by each staged chip's own positioned `::after`; what is returned takes it off. */
+	const byTheChip = (cover: string) => async (): Promise<() => Promise<void>> => {
+		const overlay = await page.addStyleTag({
+			content:
+				'.pubact.staged .complint li { position: relative; } ' +
+				`.pubact.staged .complint li::after { content: ""; position: absolute; inset: 0; ${cover} }`
+		});
+		return async () => {
+			await overlay.evaluate((el) => el.parentNode?.removeChild(el));
+		};
+	};
+	/**
+	 * ⭐ The slits laid by an element of the PAGE's over each staged chip — fixed at the chip's box, in the chip's own
+	 * computed background, its pointer events off — so neither the hit test nor the chip's own pseudo-elements meet it.
+	 */
+	const byThePage = async (): Promise<() => Promise<void>> => {
+		await page.evaluate(() => {
+			for (const li of document.querySelectorAll('.pubact.staged .complint li')) {
+				const r = li.getBoundingClientRect();
+				const background = getComputedStyle(li).backgroundColor;
+				const cover = document.createElement('div');
+				cover.dataset.paintedControl = 'slits';
+				cover.setAttribute(
+					'style',
+					`position: fixed; left: ${r.left}px; top: ${r.top}px; width: ${r.width}px; height: ${r.height}px; ` +
+						`pointer-events: none; z-index: 2147483647; background: repeating-linear-gradient(to right, ${background} 0 7px, transparent 7px 8px);`
+				);
+				document.body.appendChild(cover);
+			}
+		});
+		return async () => {
+			await page.evaluate(() => {
+				for (const cover of document.querySelectorAll('[data-painted-control]')) cover.remove();
+			});
+		};
+	};
+	for (const [cover, lay, limb] of [
+		['background: var(--surface); opacity: 0.94;', byTheChip('background: var(--surface); opacity: 0.94;'), TOO_LITTLE_CHANGE],
+		[
+			'background: repeating-linear-gradient(to bottom, var(--surface) 0 4px, currentColor 4px 6px);',
+			byTheChip('background: repeating-linear-gradient(to bottom, var(--surface) 0 4px, currentColor 4px 6px);'),
+			TOO_LITTLE_CHANGE
+		],
+		[
+			'background: repeating-linear-gradient(to right, var(--surface) 0 7px, transparent 7px 8px);',
+			byTheChip('background: repeating-linear-gradient(to right, var(--surface) 0 7px, transparent 7px 8px);'),
+			TOO_FEW_PIXELS
+		],
+		['the same slits, laid by an element of the page over each chip', byThePage, TOO_FEW_PIXELS],
+		// ⭐ `PQ1-V806` — two of every eight columns covered, six open: a share of about four fifths, under nine tenths.
+		[
+			'background: repeating-linear-gradient(to right, var(--surface) 0 2px, transparent 2px 8px);',
+			byTheChip('background: repeating-linear-gradient(to right, var(--surface) 0 2px, transparent 2px 8px);'),
+			TOO_FEW_PIXELS
+		]
+	] as const) {
+		const takeOff = await lay();
+		try {
+			const hidden = await measureTheStagedAdvisory(page);
+			expect(hidden.paintedLines, 'CONTROL arrangement: lines of text are read').toBeGreaterThan(0);
+			expect(hidden.paintedUnreadable, `CONTROL: the painted limb names every hidden line under ${cover}`).toHaveLength(
+				hidden.paintedLines
+			);
+			expect(
+				hidden.paintedUnreadable.filter((line) => !line.includes(limb)),
+				`CONTROL: each line under ${cover} is named because ${limb}`
+			).toEqual([]);
+			expect(
+				[hidden.clipped, hidden.notOpaque, hidden.filtered, hidden.masked, hidden.translucent, hidden.unreadable, hidden.covered],
+				`CONTROL: and no other limb sees ${cover} — which is why the painted limb is there`
+			).toEqual([[], [], [], [], [], [], []]);
+		} finally {
+			await takeOff();
+		}
+	}
+	expect((await measureTheStagedAdvisory(page)).paintedUnreadable, 'CONTROL: the covers taken off, every line reads again').toEqual(
+		[]
+	);
 }
 
 /** (1c)'s limbs over `measureTheStagedAdvisory`'s report, against the lifecycle row's width read with nothing staged. */
@@ -197,6 +505,10 @@ function expectTheStagedAdvisoryReadable(
 		'a paint-time filter is laid over the composition advisory, which its opacity and colours do not show'
 	).toEqual([]);
 	expect(
+		advisory.masked,
+		'a paint-time mask or blend is laid over the composition advisory, which its opacity, filter and colours do not show'
+	).toEqual([]);
+	expect(
 		advisory.translucent,
 		'an advisory item has no opaque background, so its text is printed over the canvas’s'
 	).toEqual([]);
@@ -208,6 +520,11 @@ function expectTheStagedAdvisoryReadable(
 	expect(
 		advisory.unreadable,
 		'an advisory item’s text does not reach 4.5:1 against its own background, so it cannot be read'
+	).toEqual([]);
+	// ⭐ `PQ-1` D6 — AND AS PAINTED: what the pixels show, whatever the computed values above say.
+	expect(
+		advisory.paintedUnreadable,
+		'an advisory item’s text, as PAINTED, does not reach 4.5:1 against its background as painted — something laid over, under or through it hides what no computed value shows'
 	).toEqual([]);
 	expect(
 		Math.abs(advisory.right - advisory.rowRight),
@@ -430,5 +747,7 @@ test.describe('Assurance floor — the resume hint names the recorded cause', ()
 		const advisory = await measureTheStagedAdvisory(page);
 		expect(advisory.kinds, 'arrangement: no warning chip is measured').toContain('clwarn');
 		expectTheStagedAdvisoryReadable(advisory, unstagedRow);
+		// ⭐ `JAN-PRQUAL` `PQ-1` D6 — and the painted limb, over both kinds of chip, shown to see what nothing else does.
+		await expectThePaintedLimbToSeeAnOverlay(page);
 	});
 });

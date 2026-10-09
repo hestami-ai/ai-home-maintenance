@@ -1,8 +1,9 @@
 # ROADMAP — `JAN-PRQUAL`: the selected reviewer is measured on process results, and the fingerprint sees how a process result is shown to it
 
-**Design:** `DESIGN-process-result-qualification.md` (revision 3). · **Authority:** `REG-F-476`, scheduled by `REG-D-091`. The design's delegated calls are `REG-D-094`, flagged for sponsor confirmation. · **Date:** 2026-10-02. · **Status:** AWAITING THE SPONSOR'S ANSWERS to the design's §7.
-- `PQ-1`'s parts common to both answers may be built now. Nothing lands before the answer to §7.1.
-- Nothing of `PQ-2` is built before the cases are conferred.
+**Design:** `DESIGN-process-result-qualification.md` (revision ~~4~~ 5). · **Authority:** `REG-F-476`, scheduled by `REG-D-091`. The design's delegated calls are `REG-D-094`, flagged for sponsor confirmation. · **Date:** 2026-10-02; updated 2026-10-05. ⭑ Landed 2026-10-08. · **Status:** ~~`PQ-1` IN PROGRESS.~~ `PQ-1` COMPLETE at its landing commit (2026-10-08; `REG-D-097`). `PQ-2` is next.
+- The sponsor answered §7 on 2026-10-03 (`REG-D-095`): option (a), so `PQ-1` changes every case prompt; the fourteen cases are conferred; the reopening rule is adopted.
+- Paid run 1 ran on 2026-10-04. The sponsor answered its result on 2026-10-05 (design §9.2): options 1 and 3 combined, built as design D7 to D9 in `PQ-1`, then one paid re-run.
+- The re-run ran on 2026-10-05 (`qr-2026-10-05-devin-glm-5-3-flash-max-v3`): right in 52 of 52, so under design §9.4's rule (A) suffices and D9 stays HELD (`REG-D-096`). `REG-F-488` records paid run 1, and `REG-F-489` the re-run's malformations.
 
 ⭑ **Exit.**
 - **What the reviewer reads for a process result is truthful** (design D2) and pinned branch by branch. The fingerprint reaches the renderer (D3).
@@ -71,9 +72,15 @@
 - **Under (b):** the ACKNOWLEDGED line with the design's verbatim reason, a whole RESCORED record of the selected run, and its ESCALATION line citing `REG-F-456`.
 - **Under (a):** paid run 1 of the selected candidate over the 26 v3 cases, two repetitions, with its ESCALATION lines.
 
+**Design §9's additions (revision 5; the sponsor's answers of 2026-10-05, the last *"Proceed as you recommend"*).** Built after the fence rounds, before the re-run:
+1. **D7.** The account's layout restored inside its regions: HEAD's labels and `  - ` bullets, each field its own region, the prose first and unlabelled. Every reader of the list encoding moves with it (the regions pin, both copies of the §4.1 inverse transform, `processResultUntrustedSlices`, the probes' plants, the per-break and encoder rows).
+2. **D8.** The rubric and recommendation lines exactly as design §9.3 writes them: each criterion's declared stakes beside it; `failed: true` as "not met"; concerns that leave a criterion met in residual uncertainty; each gloss held by a test to `dispositionFromFindings`. ESCALATED stays bare, last and named once; `REG-D-090`'s pins restated for the new glosses and their ledger entries re-anchored.
+3. **D9 is HELD.** Nothing of it is built in the product. A scratch re-scorer (a copy of the package scoring with the tolerance sketched) re-scores the re-run's replies for the report.
+4. **The re-run.** The selected candidate over the 26 v3 cases, two repetitions, on the prompt with D7 and D8; a transport failure re-run once, then counted. It is reported under design §9.4's rule, decided before the run, with each verdict beside its re-scored verdict. Paid run 1 stays in the record with ESCALATION lines citing the finding that records design §9.1. ⭑ That finding is `REG-F-488`. Done 2026-10-05: the re-run is right in 52 of 52, so (A) suffices and D9 stays HELD. The re-run's ESCALATION lines cite `REG-F-489`, and the probes-only move after it (the account-breaks probes) is discharged by an ACKNOWLEDGED line and a whole RESCORED record of the re-run, `rs-2026-10-08-devin-glm-5-3-flash-max-v3`.
+
 ## `PQ-2` — the process-result arm and the paid run (D4, D5)
 
-**Begins only after the sponsor confers §5's cases.**
+**Begins only after the sponsor confers §5's cases.** ⭑ Conferred 2026-10-03 (`REG-D-095`): `PQ-2` is next, its fourteen cases rendered on the final prompt.
 1. **The fixture suite.** Build it in scratch, outside the repository: pytest 9.1.0 on the build host, with the `fatigue` marker registered. Record each case's output literally, and state the platform in the case file.
 2. **Case set v4 and oracles v4.**
    - They are generated: the 26 v3 cases carried under their ids, plus the 14 conferred cases.

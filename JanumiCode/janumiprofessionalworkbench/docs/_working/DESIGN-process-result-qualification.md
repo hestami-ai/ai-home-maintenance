@@ -5,7 +5,7 @@
 - The agent read the go-ahead as covering the paid re-measurement the fix owes.
 - `REG-D-091` sends any new process-result cases to the sponsor for conferral first.
 
-**Date:** 2026-10-02. **Revision:** 3. Revisions 1 and 2 were each attacked by three adversarial critics; §8 lists what each finding became. **Status:** DRAFT — for the sponsor's answers to §7.
+**Date:** 2026-10-02; revisions 4 and 5 on 2026-10-05. **Revision:** 5. Revisions 1, 2 and 4 were each attacked by three adversarial critics; §8 lists what revisions 1 and 2's findings became, and §9.2 records what revision 4's corrected. The sponsor answered §7 on 2026-10-03 (option (a); the cases conferred; the rule adopted). §9 records paid run 1, the sponsor's answers to it, and D7 to D9. **Status:** §1-§8 RULED (`REG-D-095`); §9 RULED (*"Proceed as you recommend"*, 2026-10-05), its delegated calls flagged for confirmation. ⭑ 2026-10-08: the rulings of 2026-10-05 are `REG-D-096`, the delegated calls `REG-D-097`, paid run 1's result `REG-F-488` and the re-run's `REG-F-489`; §9.4 records the outcome, and `PQ-1` lands with it.
 
 **Delegation.**
 - Decisions the ruling does not settle are delegated best judgement under `REG-D-071`. They are recorded as `REG-D-094`, for sponsor confirmation.
@@ -131,7 +131,7 @@ Read and driven by three code mappers, a corpus reader and six critics, on the s
 
 ## 4. What must hold
 
-1. **What does not change is byte-identical.** Under §7.1 (b), the graph and work-product inputs and prompts do not change (pinned). Under (a), they change only by the fence and the declared cuts (pinned). The EVIDENCE view changes only by `argv`.
+1. **What does not change is byte-identical.** Under §7.1 (b), the graph and work-product inputs and prompts do not change (pinned). Under (a), they change only by the fence and the declared cuts (pinned). The EVIDENCE view changes only by `argv`. ⭑ 2026-10-08: as built under (a), they also change by the account fenced field by field under the host's labels and the graph's subject hash on a host line of its own (`REG-F-481`), and by revision 5's D7 and D8 (§9.3). The pin inverts each, back to the prompt the selected run measured (`verif/reviewer-qualification-prompt-move.test.ts`, steps 2a to 2c).
 2. **Increment 1 moves the `probes` component.** Under (a) it also moves every case prompt. Increment 2 moves no fingerprint component.
 3. **Red first.** Each D2 behaviour is shown wrong at the round start, then right. Each renderer branch has its byte pin, and the disconnection mutant has the `render` row.
 4. **No case is built or run before the sponsor confers it.** No paid call is made before §7's answers.
@@ -233,3 +233,127 @@ Each filing carries its own search and nearest entries.
   - the guards named;
   - figures corrected (six of seven; the median);
   - overclaims reworded.
+
+## 9. Paid run 1, the sponsor's answers, and design D7 to D9 (revisions 4 and 5, 2026-10-05)
+
+### 9.1 What paid run 1 measured
+
+Paid run 1 (`qr-2026-10-04-devin-glm-5-3-flash-max-v3`) is the selected candidate over the 26 v3 cases, two repetitions each, on the prompt `PQ-1` builds under §7.1 (a). The 52 case prompts it measured had been byte-identical since the end of `PQ-1`'s third fix round, and no later round moved one.
+
+| | GLM, 2026-09-25 (HEAD's prompt) | Paid run 1 (`PQ-1`'s prompt) |
+|---|---|---|
+| Right verdict | 51 of 52 | 45 of 52 |
+| Planted, answered, REJECTED | 36 of 36 | 34 of 34 (2 devin transport failures) |
+| Clean work product SATISFIED | 8 of 8 | 8 of 8 |
+| **Clean graph SATISFIED** | **7 of 8** | **3 of 8** |
+
+- **The five clean-graph rejections.**
+  - Each has the reviewer's own recommendation CONDITIONALLY_SATISFIED and one failed RR-06 row graded ADVISORY.
+  - 4 of the 5 rows fault the account's declared code basis: its Eurocode parts omit EN 1991-1-4 and EN 1997. `G3-CLEAN` #1 instead faults the load analysis's inputs, and opens by calling the declared assumptions "supported".
+- **The shape is not new; its rate is.**
+  - The same shape (CONDITIONALLY_SATISFIED, advisory rows only) rejected a clean graph three times under HEAD's prompt:
+    - GLM v2 `G2-CLEAN-R3` #1 (RR-09);
+    - agy v3 `G3-CLEAN` #2;
+    - GLM v3 `G3-CLEAN-R3` #1, which faulted the same code basis (`REG-F-456`).
+  - On GLM's clean graphs the rate went from 1 of 8 to 5 of 8. That is a one-sided Fisher p of about 0.06; renamed copies are correlated.
+- **What rejects them** is the mandatory NOT_MET rung. A failed row on a criterion the policy declares BLOCKING makes it NOT_MET (`R26`'s three-way mapping), and a mandatory NOT_MET rejects (`dispositionFromFindings`). `REG-F-408`'s rule decides the observation's severity, not this rung: with the reviewer's own severity put back, all eight such rejections in the record stay REJECTED.
+- **Why the reviewer does it: the prompt and the policy contradict each other.**
+  - The prompt asks, for each criterion, whether the failure is present *and* how severe it is.
+  - The recommendation line glosses CONDITIONALLY_SATISFIED as *"only minor/advisory failures"*.
+  - The policy declares every criterion BLOCKING, so any failed row rejects, whatever its grade.
+  - A reviewer that reports a minor failure and recommends CONDITIONALLY_SATISFIED has done what the prompt asked.
+- **What `PQ-1` changed in the graph prompt.** The fence on the instruction, the content, the account and the narration; the account split into regions, its lists as quoted JSON arrays; declared cuts; the subject hash on a host line. Which of these, if any, raised the rate is untested. devin's served model is not pinned either: `servedModelDigest` is null on every devin RUN line.
+- **The planted cases.** On the selected reviewer's record (its v2, v3 and paid run 1 runs), 106 planted evaluations were answered:
+  - 1 is advisory-only: GLM v2 `W-RR-03` #1, CONDITIONALLY_SATISFIED with one ADVISORY RR-06 row, on the same prompt bytes as v3's `W-RR-03`;
+  - 7 more are one row-grade from it: `W-RR-03` ×3, `W-RR-06` ×3, `W-RR-08` ×1;
+  - all 8 are on the work-product arm, which is the execution plane's.
+- **§7.3's thresholds, applied to this run.** §7.3 was written for the process-result run. Applied here, they are crossed twice: a clean case was wrong in both repetitions (`G3-CLEAN-R3`), and 5 clean evaluations of 16 were wrong. So the result came back to the sponsor.
+
+### 9.2 The sponsor's answers, and a correction
+
+- **2026-10-05, first answer:** *"I'm going to recommend a combination of both options 1 and option 3."* Option 1 restores the layout and measures again; option 3 addresses the advisory rejections.
+- **Then, asked (A) or (B):** *"Again, I think you'are asking for a binary decision where I think this is not an either / or necessarily dynamic. It depends if the problem is fundamentally what option (A) is implying is the problem or if option (B). Personally, while I'm inclined to agree with your option (A) as recommended, my read of option (B) is that aspects of the "judgement" may have to be some risk acceptance as the nature of LLM-as-Judge aspects of this overall approach. Specifically, I think it might be reasonable that a review whose failed rows are all advisory would no longer be rejected seems like it might be reasonable in practice of not quite ideal."* ⭑ Quoted whole 2026-10-08 (`REG-D-096`): the reply opens with *"Again,"*, which this quote left out until then.
+- **The correction, made to the sponsor the same day.** Revision 4's critics found that what the sponsor had been told was wrong in three ways:
+  - **The planted cases.** The sponsor was told that none of 106 answered planted evaluations was advisory-only. That count used agy's v3 run in place of GLM's own v2 run, and missed `W-RR-03` #1, which the tolerance would pass. The trade on GLM's record is: 7 wrong clean verdicts right, 1 right planted verdict wrong, and 7 more one grade away.
+  - **The cause.** The sponsor was told the layout caused it, and that `REG-F-408`'s rule rejects. Both are corrected above: the cause is untested, and the rejecting rule is the mandatory NOT_MET rung.
+  - **(B) as designed** would record SATISFIED where the reviewer itself recommended CONDITIONALLY_SATISFIED. `R25`'s ratified text says the engine must "refuse a satisfaction the reviewer's own report does not support".
+- **The recommendation then made:** build (A) properly, hold (B), and measure (B) at no cost by re-scoring the re-run's own replies with and without it.
+- **The sponsor's answer:** *"Proceed as you recommend."*
+
+### 9.3 The design
+
+- **D7 — the account's layout restored inside its regions (option 1).**
+  - The rationale's prose is a region of its own, first, under the section heading, with no label of its own (as in HEAD).
+  - Each list is preceded by HEAD's host label: `Assumptions relied on:`, `Limitations the producer declares:` or `Residual uncertainty:`.
+  - Its region holds the items in HEAD's serialization: one line per item, each prefixed `  - `. That prefix is the host's formatting, not a statement. ~~It is the only host byte inside any region, and the regions pin states it.~~ The prefix before each item, and the line feed that ends every item but the last — `renderRationale`'s formatting, stating nothing — are the only host bytes inside any region, and the regions pin states both.
+  - An empty list is the host line `<label>: (none declared)`, as in HEAD.
+  - Bullets are ambiguous where JSON was not: an item holding a newline and a bullet reads as two items. Both readings are the agent's own words, so this is stated, not closed.
+  - The one-line JSON encoder no longer applies to the lists.
+  - Every reader of the list encoding moves with it: the regions pin, both copies of the §4.1 inverse transform, `processResultUntrustedSlices`, the probes' plants, the per-break plants and the encoder's call-site rows.
+- **D8 — (A): the prompt agrees with the policy.** The rubric and recommendation lines become exactly these, with `<stakes>` being the criterion's `severityIfNotMet`, read from the policy, never a constant:
+
+  ```
+  Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT
+  (failed=true): present means the artifact does NOT MEET that criterion. What an unmet criterion costs is the
+  policy's, shown in brackets beside it, whatever severity you give; a concern that leaves the criterion met
+  is not a failure, so put it in residualUncertainty, not in a failed finding. For each failure give a
+  one-sentence statement citing specifics, and a severity (INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL):
+  - <criterion id>: <description> [if unmet: <stakes>]
+  …
+
+  Then give an overall disposition RECOMMENDATION: SATISFIED (no criterion is unmet, except ones the policy
+  marks ADVISORY or INFORMATIONAL), CONDITIONALLY_SATISFIED (an unmet criterion the policy marks MATERIAL, and
+  none it marks BLOCKING or CRITICAL), REJECTED (an unmet criterion the policy marks BLOCKING or CRITICAL),
+  INCONCLUSIVE, or ESCALATED.
+  ```
+
+  - **Each gloss is true of `dispositionFromFindings`** for the stakes shown:
+    - a declared BLOCKING or CRITICAL criterion unmet is a mandatory NOT_MET, or a BLOCKING or CRITICAL observation, and rejects;
+    - a declared MATERIAL one unmet is an open MATERIAL observation, and gives CONDITIONALLY_SATISFIED;
+    - a declared ADVISORY or INFORMATIONAL one unmet changes nothing.
+    - A test holds each gloss to the ladder.
+  - **ESCALATED stays bare and last, named once.** So `REG-D-090`'s recorded statement, that the prompt does not define it, stays true. The sentence's pins (`RECOMMENDATION_LINES`, the gloss assertions) are restated for the new glosses, and their ledger entries are re-anchored.
+  - **The question is otherwise unchanged:** the criteria are the policy's own (`ASR-4`), and the obligation question stays.
+- **D9 — (B), the advisory tolerance: HELD, measured, not built.**
+  - Nothing of D9 is built in the product.
+  - The re-run's replies are re-scored in scratch, through a copy of the package scoring with the tolerance sketched (~~a failed row graded ADVISORY or INFORMATIONAL does not make its criterion NOT_MET, unless the reviewer recommends REJECTED~~ unless the reviewer recommends REJECTED, a criterion whose every failed row is graded ADVISORY or INFORMATIONAL is recorded MET, and each such row's observation is recorded at the reviewer's grade; a row with no grade takes the policy's stakes). No model is called.
+  - ⚠ **The tolerance as measured also records a tolerated row's observation at the reviewer's grade**, in place of the stakes the policy declares. That reverses `REG-F-408`'s severity rule for that row, and it is what moves dispositions: with the criterion's outcome changed alone, 0 of 362 move, because the observation keeps its declared BLOCKING and rejects (measured on the re-scorer and on an independent derivation, 2026-10-05; `REG-F-495`).
+  - If the decision rule below brings D9 back, it is designed then, with the defects revision 4's critics found:
+    - a criterion recorded MET over the reviewer's "not met" (`R25` limb 2);
+    - a SATISFIED above the reviewer's own recommendation (`R25` limb 3);
+    - a deny-list guard that lets INCONCLUSIVE through and changes rule (a)'s outcome;
+    - no buildable home for the declaration short of a contract change against Catalog §7.
+    - a missing or malformed recommendation, coerced to INCONCLUSIVE, passes the deny-list: *"REJECT"* beside an ADVISORY row becomes SATISFIED (the coerced recommendation).
+    - a SATISFIED recommendation beside an ADVISORY row, BOUNDARY_REJECTED today, becomes SATISFIED.
+    - the observation-severity limb above, which the sketch needed and these words did not state.
+  - These defects, and the others revision 4's critics named, are filed as `REG-F-495`.
+- **What moves.** D7 and D8 move every case prompt. They move no scoring, criteria or budget component. Because the rubric's stakes are read from the criteria the policy already declares, the criteria component does not move.
+
+### 9.4 The measurement, and the rule decided before it
+
+- **The run.** The selected candidate over the 26 v3 cases, two repetitions each, on the prompt with D7 and D8. This is the paid run option 1 approved.
+- **The report gives:**
+  - each evaluation's verdict as the product scores it, and beside it the verdict with D9's tolerance applied in scratch;
+  - the clean evaluations' failed rows graded ADVISORY or INFORMATIONAL, with their count and grounds;
+  - every planted evaluation the tolerance would pass, by name;
+  - §7.3's thresholds read both ways.
+- **The report does not claim** that the layout caused paid run 1's rejections, or did not; nor credit a change to D7 alone or D8 alone. The run cannot separate them.
+- **The rule, decided now:**
+  1. **(A) suffices** if, as the product scores it, the clean evaluations are wrong at most once in 8 per arm and no clean case is wrong in both repetitions. D9 is then not needed. The recommendation is not to build it, because on the record it would pass a planted defect.
+  2. **(A) falls short** if not. D9 goes back to the sponsor with the trade measured on this run (clean verdicts it turns right, planted verdicts it turns wrong, and those one grade away), designed against the defects in §9.3 D9.
+  3. **Either way,** a planted evaluation the product scores wrong reopens the selection, as §7.3 provides.
+  - A transport failure is re-run once, under its own run id over that case alone, and then counts (§7.3).
+- **Confounds, stated in the report:**
+  - the served model is not pinned;
+  - there are eight clean-graph evaluations, and renamed copies are correlated;
+  - D7 and D8 land together.
+- **The outcome, measured 2026-10-05** (`REG-F-489`; `REG-D-097`).
+  - The re-run `qr-2026-10-05-devin-glm-5-3-flash-max-v3`: 52 calls, all answered, no transport failure and no repair, on the case prompts D7 and D8 produce (each case's initial prompt, twice).
+  - As the product scores it: right in 52 of 52 — planted 36 of 36 REJECTED, clean graph 8 of 8 and clean work product 8 of 8 SATISFIED. With D9's tolerance applied in scratch: the same 52 of 52.
+  - The clean evaluations' failed rows graded ADVISORY or INFORMATIONAL: 0; no clean evaluation has a failed row. Of the planted evaluations' 195 failed rows, 194 are graded BLOCKING and 1 MATERIAL.
+  - Planted evaluations the tolerance would turn wrong, or pass: none. One row-grade from it: none.
+  - Rule 1 and §7.3, read both ways: clean wrong 0 of 8 in each arm, no clean case wrong in both repetitions, no planted evaluation wrong.
+  - **So rule 1 holds: (A) suffices.** D9 is not built, and stays HELD with its defects filed (`REG-F-495`).
+  - The re-scorer's control, with the tolerance off, reproduces 414 of 414 answered evaluations in the record; 2 transport failures are not re-scorable.
+  - Reported, not a threshold: 5 of the 52 replies are malformed. 3 hold a row only for each criterion they fault (MISSING_CRITERION), a shape that on a clean case would read INCONCLUSIVE, and 2 carry prose outside their answer (`REG-F-489`).
+  - The confounds stand: the run cannot say which of D7 and D8 did it.

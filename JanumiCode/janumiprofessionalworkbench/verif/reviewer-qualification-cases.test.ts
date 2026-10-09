@@ -75,6 +75,14 @@ const CONTESTABLE_PLANTED: ReadonlySet<string> = new Set(['W-RR-03']);
 const ARMS = ['PWA_GRAPH', 'WORK_PRODUCT'] as const;
 const EVALUATOR = { agentId: 'agy', modelId: 'test-judge-model', providerId: 'google' } as const;
 
+/**
+ * ⭐ `JAN-PRQUAL` `PQ-1` (design D2; the sponsor's answer (a) of 2026-10-03) — HOW A CUT IS DECLARED, in every framing:
+ * `[CUT FOR THIS REVIEW: <slice> — …]`, on its own line BEFORE the bytes it cut. ~~`…(truncated)`~~, the marker the
+ * validator appended after the bytes until `PQ-1`, can no longer occur — so every SEEN WHOLE guard below keyed on it was
+ * VACUOUS from that change until re-keyed here, and the control beside the v1 guard shows this key is the product's.
+ */
+const CUT_DECLARED = '[CUT FOR THIS REVIEW: ';
+
 /** Every prompt the REAL validator sends for a case: the first, then — when the first reply is unusable — the repair. */
 async function promptsFor(c: QualificationCase): Promise<{ initial: string; repair: string; input: ReasoningReviewInput }> {
 	const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
@@ -319,11 +327,21 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 		const cut: string[] = [];
 		for (const c of committedCases().cases) {
 			const { initial, input } = await promptsFor(c);
-			if (initial.includes('…(truncated)')) cut.push(`${c.id}: a slice is truncated`);
+			if (initial.includes(CUT_DECLARED)) cut.push(`${c.id}: a slice is truncated`);
 			if (!initial.includes(input.content)) cut.push(`${c.id}: the content is not whole`);
 			if (!initial.includes(input.prompt)) cut.push(`${c.id}: the instruction is not whole`);
 		}
 		expect(cut.join('\n')).toBe('');
+		// ⭐ `PQ-1` — CONTROL: the key is what the product writes when it cuts. The first case, its content and its
+		// instruction each made longer than any budget, is cut — and the guard's key is in its prompt, once per slice.
+		const first = committedCases().cases[0]!;
+		const over = 'x'.repeat(30_000);
+		const oversize: QualificationCase =
+			first.arm === 'PWA_GRAPH'
+				? { ...first, input: { ...first.input, prompt: over, pwa: { ...first.input.pwa, name: over } } }
+				: { ...first, input: { ...first.input, producingPrompt: over, answer: over } };
+		const control = (await promptsFor(oversize)).initial;
+		expect(control.split(CUT_DECLARED).length - 1, 'CONTROL: an oversize instruction and content are each declared cut').toBe(2);
 	});
 
 	it('⭐ THE ORACLES COMPOSE — a reply faulting exactly the oracle’s criteria scores to its disposition, with independence met', async () => {
@@ -697,7 +715,7 @@ describe('JAN-CRITREAD J2-5 — reviewer-qualification case set v2: version one 
 				['repair', repair]
 			] as const)
 				if (prompt.length > MAX_AGY_PROMPT_CHARS) problems.push(`${c.id} ${role}: ${prompt.length} chars`);
-			if (initial.includes('…(truncated)')) problems.push(`${c.id}: a slice is truncated`);
+			if (initial.includes(CUT_DECLARED)) problems.push(`${c.id}: a slice is truncated`);
 			if (!initial.includes(input.content)) problems.push(`${c.id}: the content is not whole`);
 			if (!initial.includes(input.prompt)) problems.push(`${c.id}: the instruction is not whole`);
 		}
@@ -857,7 +875,7 @@ async function promptProblemsIn(cases: readonly QualificationCase[]): Promise<st
 			['repair', repair]
 		] as const)
 			if (prompt.length > MAX_AGY_PROMPT_CHARS) problems.push(`${c.id} ${role}: ${prompt.length} chars`);
-		if (initial.includes('…(truncated)')) problems.push(`${c.id}: a slice is truncated`);
+		if (initial.includes(CUT_DECLARED)) problems.push(`${c.id}: a slice is truncated`);
 		if (!initial.includes(input.content)) problems.push(`${c.id}: the content is not whole`);
 		if (!initial.includes(input.prompt)) problems.push(`${c.id}: the instruction is not whole`);
 	}

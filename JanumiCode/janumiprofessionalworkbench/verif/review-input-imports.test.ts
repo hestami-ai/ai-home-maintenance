@@ -14,6 +14,14 @@
 // not import statements — a type-level `import('…')` (an ImportTypeNode, not a call) and a triple-slash `path` or
 // `types` reference (a comment the parser files beside the statements) — and each is resolved through the same
 // walk and refused by the same list.
+//
+// ⭐ `JAN-PRQUAL` `PQ-1` (design D1; `REG-F-476`) — THE CENSUS RE-POINTED WITH THE PROCESS-RESULT RENDERER. A process result's
+// renderer lived in `execution/process-result-floor.ts`, which imports `floor-over-subject`: the closure refused it, so no
+// fingerprint reached what the reviewer of a process result reads (`REG-D-072` D17). It now lives INSIDE the closure —
+// `assurance/process-result-render.ts`, with the fence module `assurance/review-fence.ts` — and `review-input.ts` imports
+// both, and the validator's budget seam, at RUNTIME. The guard is unchanged in what it refuses (`floor-over-subject` among
+// the rest, anywhere in the closure); what is added is that the census names the new modules as INSIDE it, so a renderer
+// moved back behind the floor reddens here, and the floor that builds through the module is shown to stay OUTSIDE it.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,6 +32,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url)).split('\\').join('/');
 const SERVER = 'apps/rph-demo/src/lib/server';
 const MODULE = `${SERVER}/assurance/review-input.ts`;
+/** ⭐ `PQ-1` — the pure modules the builders now reach at runtime, each required INSIDE the closure. */
+const RENDERER = `${SERVER}/assurance/process-result-render.ts`;
+const FENCE = `${SERVER}/assurance/review-fence.ts`;
+const VALIDATOR = `${SERVER}/assurance/reasoning-review-validator.ts`;
 /** The host modules the closure may never reach: each opens, reads or records through the demo host's engine. */
 const FORBIDDEN_MODULES = [
 	`${SERVER}/authoring-turn.ts`,
@@ -151,10 +163,27 @@ describe('JAN-CRITREAD J2-1 — review-input.ts imports nothing that needs Svelt
 		for (const f of [
 			'scripts/reviewer-qual/check-core.ts',
 			'scripts/reviewer-qual/fingerprint.ts',
+			// ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-481`) — the skeleton's digest, which the fingerprint hashes beside the probes.
+			'scripts/fence-skeleton/digest.ts',
 			MODULE,
 			`${SERVER}/assurance/reasoning-review-validator.ts`
 		])
 			expect(scan.closure, f).toContain(f);
+	});
+
+	// ⭐ `JAN-PRQUAL` `PQ-1` (design D1) — THE PROCESS-RESULT RENDERER IS INSIDE THE CLOSURE, AND ITS FLOOR IS NOT.
+	it('⛔ PQ-1 — the renderer, the fence and the validator are in the module’s closure; the floor that builds through it is outside', () => {
+		const scan = scanImports(REPO_ROOT, MODULE, FORBIDDEN_MODULES);
+		for (const f of [RENDERER, FENCE, VALIDATOR]) expect(scan.closure, f).toContain(f);
+		// ⛔ The floor imports `floor-over-subject`: the module importing IT would be refused — and it does not.
+		expect(scan.closure).not.toContain(`${SERVER}/execution/process-result-floor.ts`);
+		const viaFloor = scanImports(REPO_ROOT, `${SERVER}/execution/process-result-floor.ts`, FORBIDDEN_MODULES);
+		expect(
+			viaFloor.violations.some((v) => v.includes('floor-over-subject')),
+			'CONTROL: the floor still reaches floor-over-subject, so the census can see the edge it refuses'
+		).toBe(true);
+		// ⭑ The renderer's OWN closure is held to the list too: it is what the fingerprint must reach.
+		expect(scanImports(REPO_ROOT, RENDERER, FORBIDDEN_MODULES).violations.join('; ')).toBe('');
 	});
 
 	it('⭐ CONTROL — the population is real: the module is read, its imports are seen, and every banned module exists', () => {
@@ -166,6 +195,15 @@ describe('JAN-CRITREAD J2-1 — review-input.ts imports nothing that needs Svelt
 				`${MODULE}: @janumipwb/rph-contracts`,
 				`${MODULE}: @janumipwb/rph-assurance`,
 				`${MODULE}: @janumipwb/rph-projections`
+			])
+		);
+		// ⭐ `PQ-1` — and its RUNTIME imports: the renderer, the validator's budget seam, and the fence module for the one
+		// encoder of JSON on a line (`jsonLine`, `REG-F-481`), which the renderer and the validator import too.
+		expect(scan.seen).toEqual(
+			expect.arrayContaining([
+				`${MODULE}: ./process-result-render.js`,
+				`${MODULE}: ./reasoning-review-validator.js`,
+				`${MODULE}: ./review-fence.js`
 			])
 		);
 		// A ban on a path that moved would ban nothing.

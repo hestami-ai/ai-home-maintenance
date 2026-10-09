@@ -14,6 +14,27 @@ import { describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => {
 	process.env.RPH_DEMO_MODE = 'test';
 });
+// ⛔ `JAN-PRQUAL` `PQ-1` — NO REAL REVIEW CAN RUN FROM THIS FILE: both review adapters REFUSE here, so a floor whose injected
+// `print` ever stopped winning could not reach a real `execFile` guarded only by PATH (the pattern of
+// `begin-execute-program-overridden.test.ts`). The fail-closed case below asserts neither was called.
+vi.mock('../assurance/agy-cli.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../assurance/agy-cli.js')>();
+	return {
+		...actual,
+		agyPrint: vi.fn(async () => {
+			throw new Error('hermetic: no process-result floor test runs a real agy review');
+		})
+	};
+});
+vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../tools/devin-reviewer.js')>();
+	return {
+		...actual,
+		devinPrint: vi.fn(async () => {
+			throw new Error('hermetic: no process-result floor test runs a real devin review');
+		})
+	};
+});
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { createEngine, seedFloorPolicies } from '@janumipwb/rph-engine';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -22,15 +43,19 @@ import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../identity.js';
 import { reasoningReviewCriteria } from '../floor.js';
 import {
+	clearingJudgement,
 	clearingReviewerFor,
 	withLiveReviewerSeam
 } from '../assurance/clearing-reviewer.testing.js';
+import { agyPrint } from '../assurance/agy-cli.js';
+import { devinPrint } from '../tools/devin-reviewer.js';
+import { fenceCandidate, NO_FENCE_STATEMENT } from '../assurance/review-fence.js';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
+import { renderProcessResultEvidence } from '../assurance/process-result-render.js';
 import {
 	PROCESS_RESULT_VIOLATIONS,
 	processResultFloorFacts,
 	processResultLimitations,
-	renderProcessResult,
 	runProcessResultFloor,
 	type ProcessResultSubject
 } from './process-result-floor.js';
@@ -185,10 +210,11 @@ describe('⭐ JAN-EXEC Phase 5 — R17: what makes a command result unfit to be 
 		// the strict reading NO REAL TEST SUITE COULD EVER PRODUCE ADMISSIBLE EVIDENCE. THE MUTANT: add
 		// `omittedRegions.length > 0` to the violations list — every assertion above still passes.
 		const { artifacts } = harness();
+		// ⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-487`) — THE PORT'S STREAM NAME, AND NO `as never`. This fixture wrote
+		// `stream: 'stdout' … as never`, forced past the type checker: a cut no production run produces, which the port
+		// spells `'STDOUT' | 'STDERR'` (`ProcessOutputOmission`). The limitation line below now names it as the port does.
 		const truncated = run({
-			omittedRegions: [
-				{ stream: 'stdout', byteOffset: 65536, byteSize: 4096, reason: 'capture bound' } as never
-			],
+			omittedRegions: [{ stream: 'STDOUT', byteOffset: 65536, byteSize: 4096, reason: 'capture bound' }],
 			outputComplete: false
 		});
 		const facts = await processResultFloorFacts(
@@ -203,7 +229,7 @@ describe('⭐ JAN-EXEC Phase 5 — R17: what makes a command result unfit to be 
 		// `evidenceAdmissibility`'s LIMITATIONS_RECORDED limb reads.
 		const limits = processResultLimitations(truncated);
 		expect(limits.join(' ')).toMatch(/DECLARED PREFIX/);
-		expect(limits.join(' ')).toMatch(/4096 UTF-8 bytes were removed from stdout at byte offset 65536/);
+		expect(limits.join(' ')).toMatch(/4096 UTF-8 bytes were removed from STDOUT at byte offset 65536/);
 		expect(limits.join(' ')).toMatch(/descendant process still held the output streams/);
 	});
 
@@ -217,12 +243,12 @@ describe('⭐ JAN-EXEC Phase 5 — R17: what makes a command result unfit to be 
 	});
 
 	it('⛔ the rendered result declares its cuts BEFORE the bytes, and never folds `null` into a number', async () => {
-		const rendered = renderProcessResult(
+		// ⭐ `JAN-PRQUAL` `PQ-1` — the EVIDENCE view of the renderer, which moved to `assurance/process-result-render.ts`
+		// (design D1); its every branch is pinned byte for byte in `review-input.test.ts`. The port's stream name, as above.
+		const rendered = renderProcessResultEvidence(
 			run({
 				exitCode: null,
-				omittedRegions: [
-					{ stream: 'stdout', byteOffset: 10, byteSize: 20, reason: 'capture bound' } as never
-				]
+				omittedRegions: [{ stream: 'STDOUT', byteOffset: 10, byteSize: 20, reason: 'capture bound' }]
 			})
 		);
 		expect(rendered).toMatch(/null \(terminated by a signal\)/);
@@ -390,5 +416,41 @@ describe('⭐⭐ JAN-EXEC Phase 5 — the floor RUNS over an EVIDENCE subject, w
 			expect(a.subjectObjectIds).toEqual([s.evidenceId]);
 			expect(a.subjectSemanticVersions).toEqual({ [s.evidenceId]: 4 });
 		}
+	});
+});
+
+// ⭐ `JAN-PRQUAL` `PQ-1` (design D2 under the sponsor's (a); `REG-F-481`) — A COMMAND RESULT NO FENCE CAN ENCLOSE IS NOT REVIEWED.
+//
+// ⛔ FAIL CLOSED, AND WHAT THE FLOOR THEN RECORDS. A command that prints every candidate fence, `<<<UNTRUSTED-00>>>` to
+// `<<<UNTRUSTED-99>>>`, leaves the review prompt no fence its bytes cannot contain. The prompt is never built unfenced or
+// ambiguously fenced, and the bytes are never altered to make a candidate fit: the review VIEW is rendered unfenced and
+// says so, the validator's own chooser — which reads that view whole — finds every candidate too and refuses, and no model
+// is called. ⚠ The floor records that refusal as any validator failure: `VALIDATOR_EXECUTION_FAILED` carrying the statement,
+// the review INCONCLUSIVE, the floor unsatisfied — and the classifier's answer to an execution failure is
+// RETRY_OR_CONFIGURE_REVIEWER, a remedy a deterministic refusal does not answer (a retry refuses again).
+describe('⭐ JAN-PRQUAL PQ-1 — a command result no fence can enclose is NOT reviewed, and the floor says why', () => {
+	it('⛔ every fence candidate in stdout: VALIDATOR_EXECUTION_FAILED with the fail-closed statement, INCONCLUSIVE, and no call', async () => {
+		const { session, artifacts, newId } = harness();
+		const prompts: string[] = [];
+		const stdout = Array.from({ length: 100 }, (_, i) => fenceCandidate(i)).join('\n');
+		const out = await withLiveReviewerSeam(async () =>
+			runProcessResultFloor(await subjectFor(artifacts, { run: run({ stdout }) }), session, {
+				artifacts,
+				now: () => TS,
+				newId,
+				criteria: reasoningReviewCriteria(session),
+				print: async (p) => {
+					prompts.push(p);
+					return clearingJudgement(reasoningReviewCriteria(session));
+				}
+			})
+		);
+		expect(prompts, 'a review with no fence was sent').toEqual([]);
+		expect(vi.mocked(agyPrint)).not.toHaveBeenCalled();
+		expect(vi.mocked(devinPrint)).not.toHaveBeenCalled();
+		expect(out.satisfied).toBe(false);
+		expect(out.observations).toContainEqual({ code: 'VALIDATOR_EXECUTION_FAILED', statement: NO_FENCE_STATEMENT });
+		expect(out.dispositions).toContainEqual({ policyId: 'floor.reasoning-review', disposition: 'INCONCLUSIVE' });
+		expect(out.remediation.action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
 	});
 });
